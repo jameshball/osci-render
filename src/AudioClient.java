@@ -7,6 +7,7 @@ public class AudioClient {
 
     long startTime = System.nanoTime();
 
+    // Draws a square.
     AudioPlayer.addLine(new Line(-0.5f, -0.5f, 0.5f, -0.5f));
     AudioPlayer.addLine(new Line(0.5f, -0.5f, 0.5f, 0.5f));
     AudioPlayer.addLine(new Line(0.5f, 0.5f, -0.5f, 0.5f));
