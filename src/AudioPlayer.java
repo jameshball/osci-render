@@ -4,13 +4,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class AudioPlayer extends Thread {
-  private static double phase;
   public static XtFormat FORMAT;
   private static int count = 0;
   private static volatile boolean stopped = false;
   private static List<Line> lines = new ArrayList<>();
-
-  private static float FREQUENCY = 440f;
 
   static void render(XtStream stream, Object input, Object output, int frames,
                      double time, long position, boolean timeValid, long error, Object user) {
@@ -32,24 +29,6 @@ public class AudioPlayer extends Thread {
 
   public static void addLine(Line line) {
     AudioPlayer.lines.add(line);
-  }
-
-  public static void setFrequency(float frequency) {
-    AudioPlayer.FREQUENCY = frequency;
-  }
-
-  public static float nextSine(double frequency) {
-    phase += frequency / FORMAT.mix.rate;
-    if (phase >= 1.0)
-      phase = -1.0;
-    return (float) Math.sin(phase * Math.PI);
-  }
-
-  public static float nextCos(double frequency) {
-    phase += frequency / FORMAT.mix.rate;
-    if (phase >= 1.0)
-      phase = -1.0;
-    return (float) Math.cos(phase * Math.PI);
   }
 
   @Override
