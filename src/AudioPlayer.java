@@ -6,10 +6,12 @@ public class AudioPlayer extends Thread {
   private static float count = 1;
   private static volatile boolean stopped = false;
 
-  public static float x1;
-  public static float y1;
-  public static float x2;
-  public static float y2;
+  private static float x1;
+  private static float y1;
+  private static float x2;
+  private static float y2;
+
+  private static float FREQUENCY = 440f;
 
   static void render(XtStream stream, Object input, Object output, int frames,
                      double time, long position, boolean timeValid, long error, Object user) {
@@ -18,15 +20,12 @@ public class AudioPlayer extends Thread {
     count++;
 
     for (int f = 0; f < frames; f++) {
-      float sine = nextSine(format.mix.rate, 440);
-      float cos = nextCos(format.mix.rate, 440);
-
       for (int c = 0; c < format.outputs; c++) {
         float xMid = (x1 + x2) / 2f;
         float yMid = (y1 + y2) / 2f;
 
-        ((float[]) output)[f * format.outputs] = xMid + (Math.abs(x2 - x1) / 2f) * sine;
-        ((float[]) output)[f * format.outputs + 1] = yMid + (Math.abs(y2 - y1) / 2f) * sine;
+        ((float[]) output)[f * format.outputs] = xMid + (Math.abs(x2 - x1) / 2f) * nextSine(FREQUENCY);
+        ((float[]) output)[f * format.outputs + 1] = yMid + (Math.abs(y2 - y1) / 2f) * nextSine(FREQUENCY);
       }
     }
   }
@@ -38,15 +37,19 @@ public class AudioPlayer extends Thread {
     AudioPlayer.y2 = y2;
   }
 
-  private static float nextSine(double sampleRate, double frequency) {
-    phase += frequency / sampleRate;
+  public static void setFrequency(float frequency) {
+    AudioPlayer.FREQUENCY = frequency;
+  }
+
+  public static float nextSine(double frequency) {
+    phase += frequency / FORMAT.mix.rate;
     if (phase >= 1.0)
       phase = -1.0;
     return (float) Math.sin(phase * Math.PI);
   }
 
-  private static float nextCos(double sampleRate, double frequency) {
-    phase += frequency / sampleRate;
+  public static float nextCos(double frequency) {
+    phase += frequency / FORMAT.mix.rate;
     if (phase >= 1.0)
       phase = -1.0;
     return (float) Math.cos(phase * Math.PI);
