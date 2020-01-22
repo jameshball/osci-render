@@ -7,15 +7,14 @@ public class AudioClient {
 
     long startTime = System.nanoTime();
 
+    AudioPlayer.addLine(new Line(-0.5f, -0.5f, 0.5f, -0.5f));
+    AudioPlayer.addLine(new Line(0.5f, -0.5f, 0.5f, 0.5f));
+    AudioPlayer.addLine(new Line(0.5f, 0.5f, -0.5f, 0.5f));
+    AudioPlayer.addLine(new Line(-0.5f, 0.5f, -0.5f, -0.5f));
+
     player.start();
     while (true) {
-      float currentTime = System.nanoTime() - startTime;
 
-      if (currentTime > 100000) {
-        startTime = System.nanoTime();
-      }
-      AudioPlayer.setFrequency(0.1f);
-      AudioPlayer.drawLine(0, 0, 0.5f * (float) Math.sin(2 * Math.PI * (currentTime / 100000f)), 0.5f * (float) Math.cos(2 * Math.PI * (currentTime / 100000f)));
     }
   }
 }

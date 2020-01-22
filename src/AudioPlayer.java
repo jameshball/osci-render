@@ -1,15 +1,14 @@
 import com.xtaudio.xt.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class AudioPlayer extends Thread {
   private static double phase;
   public static XtFormat FORMAT;
-  private static float count = 1;
+  private static int count = 0;
   private static volatile boolean stopped = false;
-
-  private static float x1;
-  private static float y1;
-  private static float x2;
-  private static float y2;
+  private static List<Line> lines = new ArrayList<>();
 
   private static float FREQUENCY = 440f;
 
@@ -17,24 +16,22 @@ public class AudioPlayer extends Thread {
                      double time, long position, boolean timeValid, long error, Object user) {
     XtFormat format = stream.getFormat();
 
-    count++;
+    Line line = lines.get(count % lines.size());
+
+    int neg = line.getX1() < line.getX2() || line.getY1() < line.getY2() ? 1 : -1;
 
     for (int f = 0; f < frames; f++) {
       for (int c = 0; c < format.outputs; c++) {
-        float xMid = (x1 + x2) / 2f;
-        float yMid = (y1 + y2) / 2f;
-
-        ((float[]) output)[f * format.outputs] = xMid + (Math.abs(x2 - x1) / 2f) * nextSine(FREQUENCY);
-        ((float[]) output)[f * format.outputs + 1] = yMid + (Math.abs(y2 - y1) / 2f) * nextSine(FREQUENCY);
+        ((float[]) output)[f * format.outputs] = line.getX1() + Math.abs(line.getX2() - line.getX1()) * (float) (neg * f) / frames;
+        ((float[]) output)[f * format.outputs + 1] = line.getY1() + Math.abs(line.getY2() - line.getY1()) * (float) (neg * f) / frames;
       }
     }
+
+    count++;
   }
 
-  public static void drawLine(float x1, float y1, float x2, float y2) {
-    AudioPlayer.x1 = x1;
-    AudioPlayer.y1 = y1;
-    AudioPlayer.x2 = x2;
-    AudioPlayer.y2 = y2;
+  public static void addLine(Line line) {
+    AudioPlayer.lines.add(line);
   }
 
   public static void setFrequency(float frequency) {
