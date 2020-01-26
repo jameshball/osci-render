@@ -12,6 +12,10 @@ public class Line {
     this.b = new Point(x2, y2);
   }
 
+  public float length() {
+    return (float) Math.sqrt(Math.pow(getX1() - getX2(), 2) + Math.pow(getY1() - getY2(), 2));
+  }
+
   public Point getA() {
     return a;
   }
