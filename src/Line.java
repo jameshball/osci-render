@@ -16,6 +16,13 @@ public class Line {
     return (float) Math.sqrt(Math.pow(getX1() - getX2(), 2) + Math.pow(getY1() - getY2(), 2));
   }
 
+  public void rotate(double theta) {
+    setX1((float) (getX1() * Math.cos(theta) - getY1() * Math.sin(theta)));
+    setY1((float) (getX1() * Math.sin(theta) + getY1() * Math.cos(theta)));
+    setX2((float) (getX2() * Math.cos(theta) - getY2() * Math.sin(theta)));
+    setY2((float) (getX2() * Math.sin(theta) + getY2() * Math.cos(theta)));
+  }
+
   public Point getA() {
     return a;
   }
