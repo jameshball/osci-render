@@ -10,6 +10,7 @@ public class AudioPlayer extends Thread {
   private static int currentLine = 0;
   private static float FREQUENCY = 440;
   private static int framesDrawn = 0;
+  private static double phase = 0;
 
   static void render(XtStream stream, Object input, Object output, int frames,
                      double time, long position, boolean timeValid, long error, Object user) {
@@ -17,6 +18,8 @@ public class AudioPlayer extends Thread {
 
     for (int f = 0; f < frames; f++) {
       Line line = currentLine();
+      line.rotate(nextTheta(stream.getFormat().mix.rate, 0.000001));
+
       int framesToDraw = (int) (line.length() * 100);
       int neg = line.getX1() < line.getX2() || line.getY1() < line.getY2() ? 1 : -1;
 
@@ -32,6 +35,13 @@ public class AudioPlayer extends Thread {
         currentLine++;
       }
     }
+  }
+
+  static float nextTheta(double sampleRate, double frequency) {
+    phase += frequency / sampleRate;
+    if (phase >= 1.0)
+      phase = -1.0;
+    return (float) (phase * Math.PI);
   }
 
   public static void addLine(Line line) {
