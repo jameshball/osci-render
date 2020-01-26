@@ -39,4 +39,20 @@ public class Line {
   public float getY2() {
     return b.getY();
   }
+
+  public void setX1(float x1) {
+    a.setX(x1);
+  }
+
+  public void setY1(float y1) {
+    a.setY(y1);
+  }
+
+  public void setX2(float x2) {
+    b.setX(x2);
+  }
+
+  public void setY2(float y2) {
+    b.setY(y2);
+  }
 }
