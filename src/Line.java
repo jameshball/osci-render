@@ -17,10 +17,15 @@ public class Line {
   }
 
   public void rotate(double theta) {
-    setX1(getX1() * Math.cos(theta) - getY1() * Math.sin(theta));
-    setY1(getX1() * Math.sin(theta) + getY1() * Math.cos(theta));
-    setX2(getX2() * Math.cos(theta) - getY2() * Math.sin(theta));
-    setY2(getX2() * Math.sin(theta) + getY2() * Math.cos(theta));
+    double x1 = getX1();
+    double y1 = getY1();
+    double x2 = getX2();
+    double y2 = getY2();
+
+    setX1(x1 * Math.cos(theta) - y1 * Math.sin(theta));
+    setY1(x1 * Math.sin(theta) + y1 * Math.cos(theta));
+    setX2(x2 * Math.cos(theta) - y2 * Math.sin(theta));
+    setY2(x2 * Math.sin(theta) + y2 * Math.cos(theta));
   }
 
   public Point getA() {
