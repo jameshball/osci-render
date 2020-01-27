@@ -8,15 +8,17 @@ public class AudioClient {
     AudioPlayer.FORMAT = new XtFormat(new XtMix(sampleRate, XtSample.FLOAT32), 0, 0, 2, 0);
 
     // Draws a square.
-    Line l1 = new Line(-0.5f, -0.5f, 0.5f, -0.5f);
-    Line l2 = new Line(0.5f, -0.5f, 0.5f, 0.5f);
-    Line l3 = new Line(0.5f, 0.5f, -0.5f, 0.5f);
-    Line l4 = new Line(-0.5f, 0.5f, -0.5f, -0.5f);
+    Line l1 = new Line(-0.5, -0.5, 0.5, -0.5);
+    Line l2 = new Line(0.5, -0.5, 0.5, 0.5);
+    Line l3 = new Line(0.5, 0.5, -0.5, 0.5);
+    Line l4 = new Line(-0.5, 0.5, -0.5, -0.5);
 
     AudioPlayer.addLine(l1);
     AudioPlayer.addLine(l2);
     AudioPlayer.addLine(l3);
     AudioPlayer.addLine(l4);
+    
+    AudioPlayer.setRotateSpeed(0.4);
 
     player.start();
     while (true) {

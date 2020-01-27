@@ -16,16 +16,20 @@ public class Line {
     return Math.sqrt(Math.pow(getX1() - getX2(), 2) + Math.pow(getY1() - getY2(), 2));
   }
 
-  public void rotate(double theta) {
+  public Line rotate(double theta) {
     double x1 = getX1();
     double y1 = getY1();
     double x2 = getX2();
     double y2 = getY2();
 
-    setX1(x1 * Math.cos(theta) - y1 * Math.sin(theta));
-    setY1(x1 * Math.sin(theta) + y1 * Math.cos(theta));
-    setX2(x2 * Math.cos(theta) - y2 * Math.sin(theta));
-    setY2(x2 * Math.sin(theta) + y2 * Math.cos(theta));
+    Line line = new Line(x1, y1, x2, y2);
+
+    line.setX1(x1 * Math.cos(theta) - y1 * Math.sin(theta));
+    line.setY1(x1 * Math.sin(theta) + y1 * Math.cos(theta));
+    line.setX2(x2 * Math.cos(theta) - y2 * Math.sin(theta));
+    line.setY2(x2 * Math.sin(theta) + y2 * Math.cos(theta));
+
+    return line;
   }
 
   public Point getA() {
