@@ -21,11 +21,11 @@ public class AudioPlayer extends Thread {
       line.rotate(nextTheta(stream.getFormat().mix.rate, 0.000001));
 
       int framesToDraw = (int) (line.length() * 100);
-      //int neg = line.getX1() < line.getX2() || line.getY1() < line.getY2() ? 1 : -1;
+      int neg = line.getX1() < line.getX2() || line.getY1() < line.getY2() ? 1 : -1;
 
       for (int c = 0; c < format.outputs; c++) {
-        ((float[]) output)[f * format.outputs] = line.getX1() + Math.abs(line.getX2() - line.getX1()) * (float) (framesDrawn) / framesToDraw;
-        ((float[]) output)[f * format.outputs + 1] = line.getY1() + Math.abs(line.getY2() - line.getY1()) * (float) (framesDrawn) / framesToDraw;
+        ((float[]) output)[f * format.outputs] = (float) (line.getX1() + Math.abs(line.getX2() - line.getX1()) * (neg * framesDrawn) / framesToDraw);
+        ((float[]) output)[f * format.outputs + 1] = (float) (line.getY1() + Math.abs(line.getY2() - line.getY1()) * (neg * framesDrawn) / framesToDraw);
       }
 
       framesDrawn++;
