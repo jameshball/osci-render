@@ -8,6 +8,6 @@ public class TestSuite {
     Line line = new Line(-0.5, 0.5, 0.5, 0.5);
     line.rotate(Math.PI / 2);
 
-    assertEquals(new Line(0.5, 0.5, 0.5, -0.5), line);
+    assertEquals(new Line(-0.5, -0.5, -0.5, 0.5), line);
   }
 }
