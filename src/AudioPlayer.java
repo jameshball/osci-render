@@ -27,12 +27,10 @@ public class AudioPlayer extends Thread {
       }
 
       int framesToDraw = (int) (line.length() * 100);
-      int negX = line.getX1() < line.getX2()? 1 : -1;
-      int negY = line.getY1() < line.getY2() ? 1 : -1;
 
       for (int c = 0; c < format.outputs; c++) {
-        ((float[]) output)[f * format.outputs] = (float) (line.getX1() + negX * Math.abs(line.getX2() - line.getX1()) * framesDrawn / framesToDraw);
-        ((float[]) output)[f * format.outputs + 1] = (float) (line.getY1() + negY * Math.abs(line.getY2() - line.getY1()) * framesDrawn / framesToDraw);
+        ((float[]) output)[f * format.outputs] = (float) (line.getX1() + (line.getX2() - line.getX1()) * framesDrawn / framesToDraw);
+        ((float[]) output)[f * format.outputs + 1] = (float) (line.getY1() + (line.getY2() - line.getY1()) * framesDrawn / framesToDraw);
       }
 
       framesDrawn++;
