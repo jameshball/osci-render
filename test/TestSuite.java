@@ -3,6 +3,8 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class TestSuite {
+  // TODO: Create tests for Shapes class.
+
   @Test
   public void lineRotationTest1() {
     Line line = new Line(-0.5, 0.5, 0.5, 0.5);

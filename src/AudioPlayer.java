@@ -26,7 +26,7 @@ public class AudioPlayer extends Thread {
         line = currentLine().rotate(nextTheta(stream.getFormat().mix.rate, ROTATE_SPEED));
       }
 
-      int framesToDraw = (int) (line.length() * 100);
+      int framesToDraw = (int) (line.length() * line.getWeight());
 
       for (int c = 0; c < format.outputs; c++) {
         ((float[]) output)[f * format.outputs] = (float) (line.getX1() + (line.getX2() - line.getX1()) * framesDrawn / framesToDraw);
@@ -89,5 +89,9 @@ public class AudioPlayer extends Thread {
 
   public void stopPlaying() {
     stopped = true;
+  }
+
+  public static XtFormat defaultFormat(int sampleRate) {
+    return new XtFormat(new XtMix(sampleRate, XtSample.FLOAT32), 0, 0, 2, 0);
   }
 }

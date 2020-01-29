@@ -1,15 +1,26 @@
 public class Line {
   private Point a;
   private Point b;
+  private double weight;
 
-  public Line(Point a, Point b) {
+  public static final double DEFAULT_WEIGHT = 100;
+
+  public Line(Point a, Point b, double weight) {
     this.a = a;
     this.b = b;
+    this.weight = weight;
+  }
+
+  public Line(Point a, Point b) {
+    this(a, b, DEFAULT_WEIGHT);
+  }
+
+  public Line(double x1, double y1, double x2, double y2, double weight) {
+    this(new Point(x1, y1), new Point(x2, y2), weight);
   }
 
   public Line(double x1, double y1, double x2, double y2) {
-    this.a = new Point(x1, y1);
-    this.b = new Point(x2, y2);
+    this(new Point(x1, y1), new Point(x2, y2));
   }
 
   public double length() {
@@ -17,11 +28,11 @@ public class Line {
   }
 
   public Line rotate(double theta) {
-    return new Line(getA().rotate(theta), getB().rotate(theta));
+    return new Line(getA().rotate(theta), getB().rotate(theta), getWeight());
   }
 
   public Line copy() {
-    return new Line(getA().copy(), getB().copy());
+    return new Line(getA().copy(), getB().copy(), getWeight());
   }
 
   public Point getA() {
@@ -62,6 +73,14 @@ public class Line {
 
   public void setY2(double y2) {
     b.setY(y2);
+  }
+
+  public double getWeight() {
+    return weight;
+  }
+
+  public void setWeight(double weight) {
+    this.weight = weight;
   }
 
   @Override
