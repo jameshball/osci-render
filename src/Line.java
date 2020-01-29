@@ -20,6 +20,10 @@ public class Line {
     return new Line(getA().rotate(theta), getB().rotate(theta));
   }
 
+  public Line copy() {
+    return new Line(getA().copy(), getB().copy());
+  }
+
   public Point getA() {
     return a;
   }
