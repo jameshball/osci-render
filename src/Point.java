@@ -38,6 +38,18 @@ public class Point {
     }
   }
 
+  public Point rotate(double theta) {
+    double oldX = getX();
+    double oldY = getY();
+
+    Point point = new Point(oldX, oldY);
+
+    point.setX(oldX * Math.cos(theta) - oldY * Math.sin(theta));
+    point.setY(oldX * Math.sin(theta) + oldY * Math.cos(theta));
+
+    return point;
+  }
+
   private boolean approxEquals(double m, double n) {
     return Math.abs(m - n) < EPSILON;
   }
