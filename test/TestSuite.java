@@ -7,24 +7,16 @@ public class TestSuite {
   public void lineRotationTest1() {
     Line line = new Line(-0.5, 0.5, 0.5, 0.5);
 
-    line.rotate(Math.PI / 2);
-    assertEquals(new Line(-0.5, -0.5, -0.5, 0.5), line);
-
-    line.rotate(Math.PI / 2);
-    assertEquals(new Line(0.5, -0.5, -0.5, -0.5), line);
-
-    line.rotate(Math.PI / 2);
-    assertEquals(new Line(0.5, 0.5, 0.5, -0.5), line);
-
-    line.rotate(Math.PI / 2);
-    assertEquals(new Line(-0.5, 0.5, 0.5, 0.5), line);
+    assertEquals(new Line(-0.5, -0.5, -0.5, 0.5), line.rotate(Math.PI / 2));
+    assertEquals(new Line(0.5, -0.5, -0.5, -0.5), line.rotate(Math.PI));
+    assertEquals(new Line(0.5, 0.5, 0.5, -0.5), line.rotate(3 * Math.PI / 2));
+    assertEquals(new Line(-0.5, 0.5, 0.5, 0.5), line.rotate(2 * Math.PI));
   }
 
   @Test
   public void lineRotationTest2() {
     Line line = new Line(-0.5, -0.5, -0.25, 0.5);
 
-    line.rotate(Math.PI / 2);
-    assertEquals(new Line(0.5, -0.5, -0.5, -0.25), line);
+    assertEquals(new Line(0.5, -0.5, -0.5, -0.25), line.rotate(Math.PI / 2));
   }
 }

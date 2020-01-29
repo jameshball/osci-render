@@ -17,19 +17,7 @@ public class Line {
   }
 
   public Line rotate(double theta) {
-    double x1 = getX1();
-    double y1 = getY1();
-    double x2 = getX2();
-    double y2 = getY2();
-
-    Line line = new Line(x1, y1, x2, y2);
-
-    line.setX1(x1 * Math.cos(theta) - y1 * Math.sin(theta));
-    line.setY1(x1 * Math.sin(theta) + y1 * Math.cos(theta));
-    line.setX2(x2 * Math.cos(theta) - y2 * Math.sin(theta));
-    line.setY2(x2 * Math.sin(theta) + y2 * Math.cos(theta));
-
-    return line;
+    return new Line(getA().rotate(theta), getB().rotate(theta));
   }
 
   public Point getA() {

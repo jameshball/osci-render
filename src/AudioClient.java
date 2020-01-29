@@ -1,5 +1,8 @@
 import com.xtaudio.xt.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class AudioClient {
   public static void main(String[] args) throws Exception {
     int sampleRate = 192000;
@@ -24,5 +27,13 @@ public class AudioClient {
     while (true) {
 
     }
+  }
+
+  public static List<Line> generatePolygon(int sides, double scale) {
+    List<Line> polygon = new ArrayList<>();
+
+    Point start = new Point(scale, scale);
+
+    return null;
   }
 }
