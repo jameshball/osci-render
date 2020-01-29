@@ -5,7 +5,7 @@ public class Shapes {
   public static List<Line> generatePolygram(int sides, int angleJump, Point start) {
     List<Line> polygon = new ArrayList<>();
 
-    double theta = angleJump * Math.PI / sides;
+    double theta = angleJump * 2 * Math.PI / sides;
 
     Point rotated = start.rotate(theta);
 
@@ -25,7 +25,7 @@ public class Shapes {
   }
 
   public static List<Line> generatePolygon(int sides, Point start) {
-    return generatePolygram(sides, 2, start);
+    return generatePolygram(sides, 1, start);
   }
 
   public static List<Line> generatePolygon(int sides, double scale) {
