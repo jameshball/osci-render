@@ -38,14 +38,15 @@ public class Point {
     }
   }
 
+  public Point copy() {
+    return new Point(x, y);
+  }
+
   public Point rotate(double theta) {
-    double oldX = getX();
-    double oldY = getY();
+    Point point = new Point(getX(), getY());
 
-    Point point = new Point(oldX, oldY);
-
-    point.setX(oldX * Math.cos(theta) - oldY * Math.sin(theta));
-    point.setY(oldX * Math.sin(theta) + oldY * Math.cos(theta));
+    point.setX(getX() * Math.cos(theta) - getY() * Math.sin(theta));
+    point.setY(getX() * Math.sin(theta) + getY() * Math.cos(theta));
 
     return point;
   }

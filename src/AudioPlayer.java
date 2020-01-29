@@ -53,6 +53,10 @@ public class AudioPlayer extends Thread {
     AudioPlayer.lines.add(line);
   }
 
+  public static void addLines(List<Line> lines) {
+    AudioPlayer.lines.addAll(lines);
+  }
+
   private static Line currentLine() {
     return lines.get(currentLine % lines.size());
   }
