@@ -5,12 +5,16 @@ public class Line {
   private final Point b;
   private final double weight;
 
+  // Storing the length to save on repeat calculations.
+  public final double length;
+
   public static final double DEFAULT_WEIGHT = 100;
 
   public Line(Point a, Point b, double weight) {
     this.a = a;
     this.b = b;
     this.weight = weight;
+    this.length = calculateLength();
   }
 
   public Line(Point a, Point b) {
@@ -25,7 +29,7 @@ public class Line {
     this(new Point(x1, y1), new Point(x2, y2));
   }
 
-  public double length() {
+  private double calculateLength() {
     return Math.sqrt(Math.pow(getX1() - getX2(), 2) + Math.pow(getY1() - getY2(), 2));
   }
 
