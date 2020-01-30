@@ -3,8 +3,8 @@ package shapes;
 import java.util.Objects;
 
 public class Point {
-  private double x;
-  private double y;
+  private final double x;
+  private final double y;
 
   private static final double EPSILON = 0.001;
 
@@ -21,12 +21,12 @@ public class Point {
     return y;
   }
 
-  public void setX(double x) {
-    this.x = x;
+  public Point setX(double x) {
+    return new Point(x, this.y);
   }
 
-  public void setY(double y) {
-    this.y = y;
+  public Point setY(double y) {
+    return new Point(this.x, y);
   }
 
   @Override
@@ -56,10 +56,8 @@ public class Point {
   }
 
   public Point rotate(double theta) {
-    Point point = new Point(getX(), getY());
-
-    point.setX(getX() * Math.cos(theta) - getY() * Math.sin(theta));
-    point.setY(getX() * Math.sin(theta) + getY() * Math.cos(theta));
+    Point point = setX(getX() * Math.cos(theta) - getY() * Math.sin(theta));
+    point = point.setY(getX() * Math.sin(theta) + getY() * Math.cos(theta));
 
     return point;
   }
