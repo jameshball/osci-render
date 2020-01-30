@@ -22,6 +22,10 @@ public class Node {
     adjacentNodes.add(node);
   }
 
+  public int degree() {
+    return adjacentNodes.size();
+  }
+
   @Override
   public boolean equals(Object obj) {
     if (obj == this) {
