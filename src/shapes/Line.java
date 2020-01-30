@@ -1,3 +1,5 @@
+package shapes;
+
 public class Line {
   private Point a;
   private Point b;

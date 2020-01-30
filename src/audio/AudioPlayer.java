@@ -1,4 +1,7 @@
+package audio;
+
 import com.xtaudio.xt.*;
+import shapes.Line;
 
 import java.util.ArrayList;
 import java.util.List;

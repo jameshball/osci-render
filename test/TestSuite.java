@@ -1,9 +1,10 @@
 import org.junit.Test;
+import shapes.Line;
 
 import static org.junit.Assert.*;
 
 public class TestSuite {
-  // TODO: Create tests for Shapes class.
+  // TODO: Create tests for shapes.Shapes class.
 
   @Test
   public void lineRotationTest1() {

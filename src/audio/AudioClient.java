@@ -1,4 +1,6 @@
-import com.xtaudio.xt.*;
+package audio;
+
+import shapes.Shapes;
 
 public class AudioClient {
   private static final int SAMPLE_RATE = 192000;
