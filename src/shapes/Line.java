@@ -1,9 +1,9 @@
 package shapes;
 
 public class Line {
-  private Point a;
-  private Point b;
-  private double weight;
+  private final Point a;
+  private final Point b;
+  private final double weight;
 
   public static final double DEFAULT_WEIGHT = 100;
 
@@ -61,28 +61,28 @@ public class Line {
     return b.getY();
   }
 
-  public void setX1(double x1) {
-    a.setX(x1);
+  public Line setX1(double x1) {
+    return new Line(x1, getY1(), getX2(), getY2());
   }
 
-  public void setY1(double y1) {
-    a.setY(y1);
+  public Line setY1(double y1) {
+    return new Line(getX1(), y1, getX2(), getY2());
   }
 
-  public void setX2(double x2) {
-    b.setX(x2);
+  public Line setX2(double x2) {
+    return new Line(getX1(), getY1(), x2, getY2());
   }
 
-  public void setY2(double y2) {
-    b.setY(y2);
+  public Line setY2(double y2) {
+    return new Line(getX1(), getY1(), getX2(), y2);
   }
 
   public double getWeight() {
     return weight;
   }
 
-  public void setWeight(double weight) {
-    this.weight = weight;
+  public Line setWeight(double weight) {
+    return new Line(getX1(), getY1(), getX2(), getY2(), weight);
   }
 
   @Override

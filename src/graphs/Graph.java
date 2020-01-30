@@ -3,21 +3,31 @@ package graphs;
 import shapes.Line;
 import shapes.Point;
 
-import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 
 public class Graph {
-  private List<Node> nodes;
-  private List<Point> locations;
+  private Map<Point, Node> nodes;
 
   public Graph(List<Line> lines) {
-    this.nodes = new ArrayList<>();
-    this.locations = new ArrayList<>();
+    this.nodes = new HashMap<>();
 
     for (Line line : lines) {
-      nodes.add(new Node(line.getA()));
-      nodes.add(new Node(line.getB()));
+      if (!nodes.containsKey(line.getA())) {
+        nodes.put(line.getA(), new Node(line.getA()));
+      }
+
+      if (!nodes.containsKey(line.getB())) {
+        nodes.put(line.getB(), new Node(line.getB()));
+      }
+
+      Node nodeA = nodes.get(line.getA());
+      Node nodeB = nodes.get(line.getB());
+
+      nodeA.addAdjacent(nodeB);
+      nodeB.addAdjacent(nodeA);
     }
   }
 }

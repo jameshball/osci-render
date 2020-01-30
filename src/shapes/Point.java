@@ -6,7 +6,7 @@ public class Point {
   private double x;
   private double y;
 
-  private static final double EPSILON = 0.0001;
+  private static final double EPSILON = 0.001;
 
   public Point(double x, double y) {
     this.x = x;
@@ -40,6 +40,15 @@ public class Point {
     } else {
       return false;
     }
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(round(getX()), round(getY()));
+  }
+
+  private double round(double d) {
+    return Math.round(d * 1000) / 1000d;
   }
 
   public Point copy() {
