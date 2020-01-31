@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/oscilloscope-experiments.iml" filepath="$PROJECT_DIR$/.idea/oscilloscope-experiments.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/oscilloscope-renderer.iml" filepath="$PROJECT_DIR$/.idea/oscilloscope-renderer.iml" />
     </modules>
   </component>
 </project>

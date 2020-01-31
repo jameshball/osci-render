@@ -8,18 +8,21 @@ import java.util.List;
 public class Node {
   private Point location;
   private List<Node> adjacentNodes;
+  private List<Double> adjacentWeights;
 
   public Node(Point location) {
     this.location = location;
     this.adjacentNodes = new ArrayList<>();
+    this.adjacentWeights = new ArrayList<>();
   }
 
   public Point getLocation() {
     return location;
   }
 
-  public void addAdjacent(Node node) {
+  public void addAdjacent(Node node, double weight) {
     adjacentNodes.add(node);
+    adjacentWeights.add(weight);
   }
 
   public int degree() {

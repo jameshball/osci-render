@@ -26,8 +26,8 @@ public class Graph {
       Node nodeA = nodes.get(line.getA());
       Node nodeB = nodes.get(line.getB());
 
-      nodeA.addAdjacent(nodeB);
-      nodeB.addAdjacent(nodeA);
+      nodeA.addAdjacent(nodeB, line.length);
+      nodeB.addAdjacent(nodeA, line.length);
     }
   }
 }
