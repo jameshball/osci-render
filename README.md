@@ -1,5 +1,5 @@
-# oscilloscope-experiments
+# oscilloscope-renderer
 
-Experimenting with drawing lines on an oscilloscope using audio.
+Project for drawing lines on an oscilloscope using audio output.
 
-This will be formalised into separate projects as I see fit; this project is just a testing ground.
+This will gradually turn into a project that allows for 3D rendering of objects/models on an oscilloscope using audio output.
