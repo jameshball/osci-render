@@ -29,7 +29,7 @@ public class AudioPlayer extends Thread {
         line = currentLine().rotate(nextTheta(stream.getFormat().mix.rate, ROTATE_SPEED));
       }
 
-      int framesToDraw = (int) (line.length() * line.getWeight());
+      int framesToDraw = (int) (line.length * line.getWeight());
 
       for (int c = 0; c < format.outputs; c++) {
         ((float[]) output)[f * format.outputs] = (float) (line.getX1() + (line.getX2() - line.getX1()) * framesDrawn / framesToDraw);
