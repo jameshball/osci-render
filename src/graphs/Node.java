@@ -25,6 +25,14 @@ public class Node {
     adjacentWeights.add(weight);
   }
 
+  public Node getAdjacentNode(int index) {
+    return adjacentNodes.get(index);
+  }
+
+  public double getAdjacentWeight(int index) {
+    return adjacentWeights.get(index);
+  }
+
   public int degree() {
     return adjacentNodes.size();
   }
