@@ -11,9 +11,7 @@ public class AudioClient {
     AudioPlayer player = new AudioPlayer();
     AudioPlayer.FORMAT = AudioPlayer.defaultFormat(SAMPLE_RATE);
 
-    for (int i = 2; i < 8; i++) {
-      AudioPlayer.addLines(Shapes.generatePolygon(i, 0.5, 100));
-    }
+    AudioPlayer.addLines(Shapes.generatePolygon(5, 0.25));
 
 //    AudioPlayer.addLines(Shapes.generatePolygon(100, 0.5, 60));
 //    AudioPlayer.addLines(Shapes.generatePolygram(5, 3, 0.5, 60));
