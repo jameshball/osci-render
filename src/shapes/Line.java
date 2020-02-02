@@ -41,6 +41,10 @@ public class Line {
     return new Line(getA().add(vector), getB().add(vector));
   }
 
+  public Line scale(double factor) {
+    return new Line(getA().scale(factor), getB().scale(factor));
+  }
+
   public Line copy() {
     return new Line(getA().copy(), getB().copy(), getWeight());
   }

@@ -21,6 +21,7 @@ public class AudioPlayer extends Thread {
   private static final int TRANSLATE_PHASE_INDEX = 0;
   private static double ROTATE_SPEED = 0.4;
   private static final int ROTATE_PHASE_INDEX = 1;
+  private static double SCALE;
 
   static void render(XtStream stream, Object input, Object output, int frames,
                      double time, long position, boolean timeValid, long error, Object user) {
@@ -29,25 +30,15 @@ public class AudioPlayer extends Thread {
     for (int f = 0; f < frames; f++) {
       Line line = currentLine();
 
-      if (ROTATE_SPEED != 0) {
-        line = currentLine().rotate(
-          nextTheta(stream.getFormat().mix.rate, ROTATE_SPEED, TRANSLATE_PHASE_INDEX)
-        );
-      }
-
-      if (TRANSLATE_SPEED != 0) {
-        line = line.translate(
-          TRANSLATE_VECTOR.scale(
-            Math.sin(nextTheta(stream.getFormat().mix.rate, TRANSLATE_SPEED, ROTATE_PHASE_INDEX))
-          )
-        );
-      }
+      line = scale(line);
+      line = rotate(line, stream.getFormat().mix.rate);
+      line = translate(line, stream.getFormat().mix.rate);
 
       int framesToDraw = (int) (line.length * line.getWeight());
 
       for (int c = 0; c < format.outputs; c++) {
-        ((float[]) output)[f * format.outputs] = (float) (line.getX1() + (line.getX2() - line.getX1()) * framesDrawn / framesToDraw);
-        ((float[]) output)[f * format.outputs + 1] = (float) (line.getY1() + (line.getY2() - line.getY1()) * framesDrawn / framesToDraw);
+        ((float[]) output)[f * format.outputs] = nextX(line, framesToDraw);
+        ((float[]) output)[f * format.outputs + 1] = nextY(line, framesToDraw);
       }
 
       framesDrawn++;
@@ -64,6 +55,42 @@ public class AudioPlayer extends Thread {
     if (phases[phaseIndex] >= 1.0)
       phases[phaseIndex] = -1.0;
     return (float) (phases[phaseIndex] * Math.PI);
+  }
+
+  private static float nextX(Line line, double framesToDraw) {
+    return (float) (line.getX1() + (line.getX2() - line.getX1()) * framesDrawn / framesToDraw);
+  }
+
+  private static float nextY(Line line, double framesToDraw) {
+    return (float) (line.getY1() + (line.getY2() - line.getY1()) * framesDrawn / framesToDraw);
+  }
+
+  private static Line scale(Line line) {
+    if (SCALE != 1) {
+      return line.scale(SCALE);
+    }
+
+    return line;
+  }
+
+  private static Line rotate(Line line, double sampleRate) {
+    if (ROTATE_SPEED != 0) {
+      line = line.rotate(
+        nextTheta(sampleRate, ROTATE_SPEED, TRANSLATE_PHASE_INDEX)
+      );
+    }
+
+    return line;
+  }
+
+  private static Line translate(Line line, double sampleRate) {
+    if (TRANSLATE_SPEED != 0 && !TRANSLATE_VECTOR.equals(new Vector())) {
+      return line.translate(TRANSLATE_VECTOR.scale(
+        Math.sin(nextTheta(sampleRate, TRANSLATE_SPEED, ROTATE_PHASE_INDEX))
+      ));
+    }
+
+    return line;
   }
 
   public static void addLine(Line line) {
@@ -85,6 +112,10 @@ public class AudioPlayer extends Thread {
   public static void setTranslation(double speed, Vector translation) {
     AudioPlayer.TRANSLATE_SPEED = speed;
     AudioPlayer.TRANSLATE_VECTOR = translation;
+  }
+
+  public static void setScale(double scale) {
+    AudioPlayer.SCALE = scale;
   }
 
   @Override

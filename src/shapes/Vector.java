@@ -13,6 +13,10 @@ public class Vector {
     this.y = y;
   }
 
+  public Vector() {
+    this(0, 0);
+  }
+
   public double getX() {
     return x;
   }
