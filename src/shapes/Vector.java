@@ -33,6 +33,10 @@ public class Vector {
     return new Vector(getX() + vector.getX(), getY() + vector.getY());
   }
 
+  public Vector scale(double factor) {
+    return new Vector(getX() * factor, getY() * factor);
+  }
+
   @Override
   public boolean equals(Object obj) {
     if (obj == this) {

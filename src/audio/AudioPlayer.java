@@ -2,6 +2,7 @@ package audio;
 
 import com.xtaudio.xt.*;
 import shapes.Line;
+import shapes.Vector;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -11,22 +12,35 @@ public class AudioPlayer extends Thread {
   private static volatile boolean stopped = false;
   private static List<Line> lines = new ArrayList<>();
   private static int currentLine = 0;
-  private static float FREQUENCY = 440;
-  private static double ROTATE_SPEED = 0;
   private static int framesDrawn = 0;
-  private static double phase = 0;
+
+  private static double[] phases = new double[2];
+
+  private static double TRANSLATE_SPEED = 0;
+  private static Vector TRANSLATE_VECTOR;
+  private static final int TRANSLATE_PHASE_INDEX = 0;
+  private static double ROTATE_SPEED = 0.4;
+  private static final int ROTATE_PHASE_INDEX = 1;
 
   static void render(XtStream stream, Object input, Object output, int frames,
                      double time, long position, boolean timeValid, long error, Object user) {
     XtFormat format = stream.getFormat();
 
     for (int f = 0; f < frames; f++) {
-      Line line;
+      Line line = currentLine();
 
-      if (ROTATE_SPEED == 0) {
-        line = currentLine();
-      } else {
-        line = currentLine().rotate(nextTheta(stream.getFormat().mix.rate, ROTATE_SPEED));
+      if (ROTATE_SPEED != 0) {
+        line = currentLine().rotate(
+          nextTheta(stream.getFormat().mix.rate, ROTATE_SPEED, TRANSLATE_PHASE_INDEX)
+        );
+      }
+
+      if (TRANSLATE_SPEED != 0) {
+        line = line.translate(
+          TRANSLATE_VECTOR.scale(
+            Math.sin(nextTheta(stream.getFormat().mix.rate, TRANSLATE_SPEED, ROTATE_PHASE_INDEX))
+          )
+        );
       }
 
       int framesToDraw = (int) (line.length * line.getWeight());
@@ -45,11 +59,11 @@ public class AudioPlayer extends Thread {
     }
   }
 
-  static float nextTheta(double sampleRate, double frequency) {
-    phase += frequency / sampleRate;
-    if (phase >= 1.0)
-      phase = -1.0;
-    return (float) (phase * Math.PI);
+  static float nextTheta(double sampleRate, double frequency, int phaseIndex) {
+    phases[phaseIndex] += frequency / sampleRate;
+    if (phases[phaseIndex] >= 1.0)
+      phases[phaseIndex] = -1.0;
+    return (float) (phases[phaseIndex] * Math.PI);
   }
 
   public static void addLine(Line line) {
@@ -66,6 +80,11 @@ public class AudioPlayer extends Thread {
 
   public static void setRotateSpeed(double speed) {
     AudioPlayer.ROTATE_SPEED = speed;
+  }
+
+  public static void setTranslation(double speed, Vector translation) {
+    AudioPlayer.TRANSLATE_SPEED = speed;
+    AudioPlayer.TRANSLATE_VECTOR = translation;
   }
 
   @Override
