@@ -15,9 +15,9 @@ public class AudioClient {
     AudioPlayer.addLines(Shapes.generatePolygon(100, 0.5, 60));
     AudioPlayer.addLines(Shapes.generatePolygram(5, 3, 0.5, 60));
 
-    AudioPlayer.setRotateSpeed(0.4);
-    AudioPlayer.setTranslation(1, new Vector(0.25, 0.25));
-    AudioPlayer.setScale(0.3);
+    AudioPlayer.setRotateSpeed(0.8);
+    AudioPlayer.setTranslation(4, new Vector(1, 1));
+    AudioPlayer.setScale(0.5);
 
     player.start();
   }

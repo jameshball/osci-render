@@ -21,7 +21,7 @@ public class AudioPlayer extends Thread {
   private static final int TRANSLATE_PHASE_INDEX = 0;
   private static double ROTATE_SPEED = 0.4;
   private static final int ROTATE_PHASE_INDEX = 1;
-  private static double SCALE;
+  private static double SCALE = 1;
 
   static void render(XtStream stream, Object input, Object output, int frames,
                      double time, long position, boolean timeValid, long error, Object user) {
