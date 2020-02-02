@@ -1,8 +1,8 @@
 package shapes;
 
 public class Line {
-  private final Point a;
-  private final Point b;
+  private final Vector a;
+  private final Vector b;
   private final double weight;
 
   // Storing the length to save on repeat calculations.
@@ -10,23 +10,23 @@ public class Line {
 
   public static final double DEFAULT_WEIGHT = 100;
 
-  public Line(Point a, Point b, double weight) {
+  public Line(Vector a, Vector b, double weight) {
     this.a = a;
     this.b = b;
     this.weight = weight;
     this.length = calculateLength();
   }
 
-  public Line(Point a, Point b) {
+  public Line(Vector a, Vector b) {
     this(a, b, DEFAULT_WEIGHT);
   }
 
   public Line(double x1, double y1, double x2, double y2, double weight) {
-    this(new Point(x1, y1), new Point(x2, y2), weight);
+    this(new Vector(x1, y1), new Vector(x2, y2), weight);
   }
 
   public Line(double x1, double y1, double x2, double y2) {
-    this(new Point(x1, y1), new Point(x2, y2));
+    this(new Vector(x1, y1), new Vector(x2, y2));
   }
 
   private double calculateLength() {
@@ -37,15 +37,19 @@ public class Line {
     return new Line(getA().rotate(theta), getB().rotate(theta), getWeight());
   }
 
+  public Line translate(Vector vector) {
+    return new Line(getA().add(vector), getB().add(vector));
+  }
+
   public Line copy() {
     return new Line(getA().copy(), getB().copy(), getWeight());
   }
 
-  public Point getA() {
+  public Vector getA() {
     return a;
   }
 
-  public Point getB() {
+  public Vector getB() {
     return b;
   }
 

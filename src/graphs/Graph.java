@@ -1,7 +1,7 @@
 package graphs;
 
 import shapes.Line;
-import shapes.Point;
+import shapes.Vector;
 
 import java.util.HashMap;
 import java.util.List;
@@ -9,7 +9,7 @@ import java.util.Map;
 
 
 public class Graph {
-  private Map<Point, Node> nodes;
+  private Map<Vector, Node> nodes;
 
   public Graph(List<Line> lines) {
     this.nodes = new HashMap<>();
