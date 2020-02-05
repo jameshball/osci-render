@@ -1,5 +1,6 @@
 package audio;
 
+import shapes.Ellipse;
 import shapes.Shapes;
 import shapes.Vector;
 
@@ -12,10 +13,11 @@ public class AudioClient {
     AudioPlayer player = new AudioPlayer();
     AudioPlayer.FORMAT = AudioPlayer.defaultFormat(SAMPLE_RATE);
 
-    AudioPlayer.addLines(Shapes.generatePolygon(100, 0.5, 60));
-    AudioPlayer.addLines(Shapes.generatePolygram(5, 3, 0.5, 60));
+    AudioPlayer.addShapes(Shapes.generatePolygon(100, 0.5, 60));
+    AudioPlayer.addShapes(Shapes.generatePolygram(5, 3, 0.5, 60));
+    AudioPlayer.addShape(new Ellipse(0.5, 0.5));
 
-    AudioPlayer.setRotateSpeed(0.8);
+    AudioPlayer.setRotateSpeed(-0.8);
     AudioPlayer.setTranslation(4, new Vector(1, 1));
     AudioPlayer.setScale(0.5);
 
