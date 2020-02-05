@@ -13,12 +13,11 @@ public class AudioClient {
     AudioPlayer player = new AudioPlayer();
     AudioPlayer.FORMAT = AudioPlayer.defaultFormat(SAMPLE_RATE);
 
-    AudioPlayer.addShapes(Shapes.generatePolygon(100, 0.5, 60));
     AudioPlayer.addShapes(Shapes.generatePolygram(5, 3, 0.5, 60));
-    AudioPlayer.addShape(new Ellipse(0.5, 0.5));
+    AudioPlayer.addShape(new Ellipse(0.7, 0.7));
 
-    AudioPlayer.setRotateSpeed(-0.8);
-    AudioPlayer.setTranslation(4, new Vector(1, 1));
+    AudioPlayer.setRotateSpeed(0.8);
+    AudioPlayer.setTranslation(2, new Vector(0.5, 0.5));
     AudioPlayer.setScale(0.5);
 
     player.start();

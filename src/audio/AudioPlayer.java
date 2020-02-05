@@ -1,8 +1,6 @@
 package audio;
 
 import com.xtaudio.xt.*;
-import shapes.Ellipse;
-import shapes.Line;
 import shapes.Shape;
 import shapes.Vector;
 
