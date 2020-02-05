@@ -1,21 +1,23 @@
 package audio;
 
 import com.xtaudio.xt.*;
+import shapes.Ellipse;
 import shapes.Line;
+import shapes.Shape;
 import shapes.Vector;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class AudioPlayer extends Thread {
-  public static XtFormat FORMAT;
   private static volatile boolean stopped = false;
-  private static List<Line> lines = new ArrayList<>();
-  private static int currentLine = 0;
+  private static List<Shape> shapes = new ArrayList<>();
+  private static int currentShape = 0;
   private static int framesDrawn = 0;
 
   private static double[] phases = new double[2];
 
+  public static XtFormat FORMAT;
   private static double TRANSLATE_SPEED = 0;
   private static Vector TRANSLATE_VECTOR;
   private static final int TRANSLATE_PHASE_INDEX = 0;
@@ -28,81 +30,77 @@ public class AudioPlayer extends Thread {
     XtFormat format = stream.getFormat();
 
     for (int f = 0; f < frames; f++) {
-      Line line = currentLine();
+      Shape shape = currentShape();
 
-      line = scale(line);
-      line = rotate(line, stream.getFormat().mix.rate);
-      line = translate(line, stream.getFormat().mix.rate);
+      shape = scale(shape);
+      shape = rotate(shape, stream.getFormat().mix.rate);
+      shape = translate(shape, stream.getFormat().mix.rate);
 
-      int framesToDraw = (int) (line.length * line.getWeight());
+      double framesToDraw = shape.getLength() * shape.getWeight();
+      double drawingProgress = framesDrawn / framesToDraw;
 
       for (int c = 0; c < format.outputs; c++) {
-        ((float[]) output)[f * format.outputs] = nextX(line, framesToDraw);
-        ((float[]) output)[f * format.outputs + 1] = nextY(line, framesToDraw);
+        ((float[]) output)[f * format.outputs] = shape.nextX(drawingProgress);
+        ((float[]) output)[f * format.outputs + 1] = shape.nextY(drawingProgress);
       }
 
       framesDrawn++;
 
       if (framesDrawn > framesToDraw) {
         framesDrawn = 0;
-        currentLine++;
+        currentShape++;
       }
     }
   }
 
-  static float nextTheta(double sampleRate, double frequency, int phaseIndex) {
+  static double nextTheta(double sampleRate, double frequency, int phaseIndex) {
     phases[phaseIndex] += frequency / sampleRate;
-    if (phases[phaseIndex] >= 1.0)
+
+    if (phases[phaseIndex] >= 1.0) {
       phases[phaseIndex] = -1.0;
-    return (float) (phases[phaseIndex] * Math.PI);
-  }
-
-  private static float nextX(Line line, double framesToDraw) {
-    return (float) (line.getX1() + (line.getX2() - line.getX1()) * framesDrawn / framesToDraw);
-  }
-
-  private static float nextY(Line line, double framesToDraw) {
-    return (float) (line.getY1() + (line.getY2() - line.getY1()) * framesDrawn / framesToDraw);
-  }
-
-  private static Line scale(Line line) {
-    if (SCALE != 1) {
-      return line.scale(SCALE);
     }
 
-    return line;
+    return phases[phaseIndex] * Math.PI;
   }
 
-  private static Line rotate(Line line, double sampleRate) {
+  private static Shape scale(Shape shape) {
+    if (SCALE != 1) {
+      return shape.scale(SCALE);
+    }
+
+    return shape;
+  }
+
+  private static Shape rotate(Shape shape, double sampleRate) {
     if (ROTATE_SPEED != 0) {
-      line = line.rotate(
+      shape = shape.rotate(
         nextTheta(sampleRate, ROTATE_SPEED, TRANSLATE_PHASE_INDEX)
       );
     }
 
-    return line;
+    return shape;
   }
 
-  private static Line translate(Line line, double sampleRate) {
+  private static Shape translate(Shape shape, double sampleRate) {
     if (TRANSLATE_SPEED != 0 && !TRANSLATE_VECTOR.equals(new Vector())) {
-      return line.translate(TRANSLATE_VECTOR.scale(
+      return shape.translate(TRANSLATE_VECTOR.scale(
         Math.sin(nextTheta(sampleRate, TRANSLATE_SPEED, ROTATE_PHASE_INDEX))
       ));
     }
 
-    return line;
+    return shape;
   }
 
-  public static void addLine(Line line) {
-    AudioPlayer.lines.add(line);
+  public static void addShape(Shape shape) {
+    AudioPlayer.shapes.add(shape);
   }
 
-  public static void addLines(List<Line> lines) {
-    AudioPlayer.lines.addAll(lines);
+  public static void addShapes(List<Shape> shapes) {
+    AudioPlayer.shapes.addAll(shapes);
   }
 
-  private static Line currentLine() {
-    return lines.get(currentLine % lines.size());
+  private static Shape currentShape() {
+    return shapes.get(currentShape % shapes.size());
   }
 
   public static void setRotateSpeed(double speed) {

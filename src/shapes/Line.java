@@ -1,12 +1,12 @@
 package shapes;
 
-public class Line {
+public class Line implements Shape {
   private final Vector a;
   private final Vector b;
   private final double weight;
 
   // Storing the length to save on repeat calculations.
-  public final double length;
+  private final double length;
 
   public static final double DEFAULT_WEIGHT = 100;
 
@@ -33,20 +33,33 @@ public class Line {
     return Math.sqrt(Math.pow(getX1() - getX2(), 2) + Math.pow(getY1() - getY2(), 2));
   }
 
+  @Override
   public Line rotate(double theta) {
     return new Line(getA().rotate(theta), getB().rotate(theta), getWeight());
   }
 
+  @Override
   public Line translate(Vector vector) {
     return new Line(getA().add(vector), getB().add(vector));
   }
 
+  @Override
   public Line scale(double factor) {
     return new Line(getA().scale(factor), getB().scale(factor));
   }
 
   public Line copy() {
     return new Line(getA().copy(), getB().copy(), getWeight());
+  }
+
+  @Override
+  public float nextX(double drawingProgress) {
+    return (float) (getX1() + (getX2() - getX1()) * drawingProgress);
+  }
+
+  @Override
+  public float nextY(double drawingProgress) {
+    return (float) (getY1() + (getY2() - getY1()) * drawingProgress);
   }
 
   public Vector getA() {
@@ -89,8 +102,14 @@ public class Line {
     return new Line(getX1(), getY1(), getX2(), y2);
   }
 
+  @Override
   public double getWeight() {
     return weight;
+  }
+
+  @Override
+  public double getLength() {
+    return length;
   }
 
   public Line setWeight(double weight) {

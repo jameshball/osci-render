@@ -4,8 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Shapes {
-  public static List<Line> generatePolygram(int sides, int angleJump, Vector start, double weight) {
-    List<Line> polygon = new ArrayList<>();
+  public static List<Shape> generatePolygram(int sides, int angleJump, Vector start, double weight) {
+    List<Shape> polygon = new ArrayList<>();
 
     double theta = angleJump * 2 * Math.PI / sides;
 
@@ -22,31 +22,31 @@ public class Shapes {
     return polygon;
   }
 
-  public static List<Line> generatePolygram(int sides, int angleJump, Vector start) {
+  public static List<Shape> generatePolygram(int sides, int angleJump, Vector start) {
     return generatePolygram(sides, angleJump, start, Line.DEFAULT_WEIGHT);
   }
 
-  public static List<Line> generatePolygram(int sides, int angleJump, double scale, double weight) {
+  public static List<Shape> generatePolygram(int sides, int angleJump, double scale, double weight) {
     return generatePolygram(sides, angleJump, new Vector(scale, scale), weight);
   }
 
-  public static List<Line> generatePolygram(int sides, int angleJump, double scale) {
+  public static List<Shape> generatePolygram(int sides, int angleJump, double scale) {
     return generatePolygram(sides, angleJump, new Vector(scale, scale));
   }
 
-  public static List<Line> generatePolygon(int sides, Vector start, double weight) {
+  public static List<Shape> generatePolygon(int sides, Vector start, double weight) {
     return generatePolygram(sides, 1, start, weight);
   }
 
-  public static List<Line> generatePolygon(int sides, Vector start) {
+  public static List<Shape> generatePolygon(int sides, Vector start) {
     return generatePolygram(sides, 1, start);
   }
 
-  public static List<Line> generatePolygon(int sides, double scale, double weight) {
+  public static List<Shape> generatePolygon(int sides, double scale, double weight) {
     return generatePolygon(sides, new Vector(scale, scale), weight);
   }
 
-  public static List<Line> generatePolygon(int sides, double scale) {
+  public static List<Shape> generatePolygon(int sides, double scale) {
     return generatePolygon(sides, new Vector(scale, scale));
   }
 
