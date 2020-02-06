@@ -31,8 +31,8 @@ public class AudioPlayer extends Thread {
       Shape shape = currentShape();
 
       shape = scale(shape);
-      shape = rotate(shape, stream.getFormat().mix.rate);
-      shape = translate(shape, stream.getFormat().mix.rate);
+      shape = rotate(shape, format.mix.rate);
+      shape = translate(shape, format.mix.rate);
 
       double framesToDraw = shape.getLength() * shape.getWeight();
       double drawingProgress = framesDrawn / framesToDraw;
