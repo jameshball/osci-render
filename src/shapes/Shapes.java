@@ -8,9 +8,7 @@ public class Shapes {
     List<Shape> polygon = new ArrayList<>();
 
     double theta = angleJump * 2 * Math.PI / sides;
-
     Vector rotated = start.rotate(theta);
-
     polygon.add(new Line(start, rotated, weight));
 
     while (!rotated.equals(start)) {

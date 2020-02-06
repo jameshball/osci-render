@@ -38,6 +38,7 @@ public class AudioPlayer extends Thread {
       double drawingProgress = framesDrawn / framesToDraw;
 
       for (int c = 0; c < format.outputs; c++) {
+        // Even output indexes refer to first channel, odd indexes refer to second channel.
         ((float[]) output)[f * format.outputs] = shape.nextX(drawingProgress);
         ((float[]) output)[f * format.outputs + 1] = shape.nextY(drawingProgress);
       }
@@ -98,7 +99,11 @@ public class AudioPlayer extends Thread {
   }
 
   private static Shape currentShape() {
-    return shapes.get(currentShape % shapes.size());
+    if (currentShape >= shapes.size()) {
+      currentShape -= shapes.size();
+    }
+
+    return shapes.get(currentShape);
   }
 
   public static void setRotateSpeed(double speed) {

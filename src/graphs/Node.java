@@ -4,6 +4,7 @@ import shapes.Vector;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class Node {
   private Vector location;
@@ -38,15 +39,15 @@ public class Node {
   }
 
   @Override
-  public boolean equals(Object obj) {
-    if (obj == this) {
-      return true;
-    } else if (obj instanceof Node) {
-      Node point = (Node) obj;
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+    Node node = (Node) o;
+    return location.equals(node.location);
+  }
 
-      return getLocation().equals(point.getLocation());
-    } else {
-      return false;
-    }
+  @Override
+  public int hashCode() {
+    return Objects.hash(location);
   }
 }
