@@ -1,12 +1,8 @@
 package shapes;
 
-public class Line implements Shape {
+public class Line extends Shape {
   private final Vector a;
   private final Vector b;
-  private final double weight;
-
-  // Storing the length to save on repeat calculations.
-  private final double length;
 
   public static final double DEFAULT_WEIGHT = 100;
 
@@ -100,16 +96,6 @@ public class Line implements Shape {
 
   public Line setY2(double y2) {
     return new Line(getX1(), getY1(), getX2(), y2);
-  }
-
-  @Override
-  public double getWeight() {
-    return weight;
-  }
-
-  @Override
-  public double getLength() {
-    return length;
   }
 
   public Line setWeight(double weight) {
