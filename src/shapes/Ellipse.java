@@ -1,10 +1,8 @@
 package shapes;
 
-public class Ellipse implements Shape {
+public class Ellipse extends Shape {
   private final double a;
   private final double b;
-  private final double weight;
-  private final double length;
   private final double rotation;
   private final Vector position;
 
@@ -15,7 +13,7 @@ public class Ellipse implements Shape {
     this.rotation = rotation;
     this.position = position;
     // Approximation of length.
-    this.length = 2 * Math.PI * Math.sqrt((this.a * this.a + this.b * this.b) / 2);
+    this.length = 2 * Math.PI * Math.sqrt((a * a + b * b) / 2);
   }
 
   public Ellipse(double a, double b, Vector position) {
@@ -57,15 +55,5 @@ public class Ellipse implements Shape {
   @Override
   public Shape translate(Vector vector) {
     return new Ellipse(a, b, weight, rotation, position.add(vector));
-  }
-
-  @Override
-  public double getWeight() {
-    return weight;
-  }
-
-  @Override
-  public double getLength() {
-    return length;
   }
 }
