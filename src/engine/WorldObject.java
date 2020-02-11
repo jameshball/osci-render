@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class WorldObject {
-
   private Mesh mesh;
   private Vector3 position;
   private Vector3 rotation;
