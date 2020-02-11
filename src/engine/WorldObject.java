@@ -16,19 +16,16 @@ public class WorldObject {
   }
 
   public void rotate(Vector3 theta) {
-    this.rotation = this.rotation.add(theta);
+    rotation = rotation.add(theta);
   }
 
   public List<Vector3> getVertices() {
     List<Vector3> vertices = new ArrayList<>();
-    for(Vector3 vertex : mesh.getVertices()) {
-      vertices.add(
-        vertex
-          .rotateX(this.rotation.getX())
-          .rotateY(this.rotation.getY())
-          .rotateZ(this.rotation.getY())
-          .add(this.position));
+
+    for (Vector3 vertex : mesh.getVertices()) {
+      vertices.add(vertex.rotate(rotation).add(position));
     }
+
     return vertices;
   }
 
