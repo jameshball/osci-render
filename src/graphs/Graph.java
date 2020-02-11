@@ -1,7 +1,7 @@
 package graphs;
 
 import shapes.Line;
-import shapes.Vector;
+import shapes.Vector2;
 
 import java.util.HashMap;
 import java.util.List;
@@ -10,7 +10,7 @@ import java.util.Map;
 // TODO: Implement Chinese postman solving.
 
 public class Graph {
-  private Map<Vector, Node> nodes;
+  private Map<Vector2, Node> nodes;
 
   public Graph(List<Line> lines) {
     this.nodes = new HashMap<>();

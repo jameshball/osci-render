@@ -1,28 +1,28 @@
 package shapes;
 
 public class Line extends Shape {
-  private final Vector a;
-  private final Vector b;
+  private final Vector2 a;
+  private final Vector2 b;
 
   public static final double DEFAULT_WEIGHT = 100;
 
-  public Line(Vector a, Vector b, double weight) {
+  public Line(Vector2 a, Vector2 b, double weight) {
     this.a = a;
     this.b = b;
     this.weight = weight;
     this.length = calculateLength();
   }
 
-  public Line(Vector a, Vector b) {
+  public Line(Vector2 a, Vector2 b) {
     this(a, b, DEFAULT_WEIGHT);
   }
 
   public Line(double x1, double y1, double x2, double y2, double weight) {
-    this(new Vector(x1, y1), new Vector(x2, y2), weight);
+    this(new Vector2(x1, y1), new Vector2(x2, y2), weight);
   }
 
   public Line(double x1, double y1, double x2, double y2) {
-    this(new Vector(x1, y1), new Vector(x2, y2));
+    this(new Vector2(x1, y1), new Vector2(x2, y2));
   }
 
   private double calculateLength() {
@@ -35,7 +35,7 @@ public class Line extends Shape {
   }
 
   @Override
-  public Line translate(Vector vector) {
+  public Line translate(Vector2 vector) {
     return new Line(getA().add(vector), getB().add(vector));
   }
 
@@ -58,11 +58,11 @@ public class Line extends Shape {
     return (float) (getY1() + (getY2() - getY1()) * drawingProgress);
   }
 
-  public Vector getA() {
+  public Vector2 getA() {
     return a;
   }
 
-  public Vector getB() {
+  public Vector2 getB() {
     return b;
   }
 
