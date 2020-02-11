@@ -61,7 +61,7 @@ public class Vector2 extends Shape{
   }
 
   @Override
-  public Shape translate(Vector2 vector) {
+  public Vector2 translate(Vector2 vector) {
     return new Vector2(getX() + vector.getX(), getY() + vector.getY());
   }
 

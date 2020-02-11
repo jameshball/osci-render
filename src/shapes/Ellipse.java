@@ -39,7 +39,7 @@ public class Ellipse extends Shape {
   }
 
   @Override
-  public Shape rotate(double theta) {
+  public Ellipse rotate(double theta) {
     if (theta + rotation > 2 * Math.PI) {
       theta -= 2 * Math.PI;
     }
@@ -48,12 +48,12 @@ public class Ellipse extends Shape {
   }
 
   @Override
-  public Shape scale(double factor) {
+  public Ellipse scale(double factor) {
     return new Ellipse(a * factor, b * factor, weight, rotation, position.scale(factor));
   }
 
   @Override
-  public Shape translate(Vector2 vector) {
-    return new Ellipse(a, b, weight, rotation, position.add(vector));
+  public Ellipse translate(Vector2 vector) {
+    return new Ellipse(a, b, weight, rotation, position.translate(vector));
   }
 }

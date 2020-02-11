@@ -36,7 +36,7 @@ public class Line extends Shape {
 
   @Override
   public Line translate(Vector2 vector) {
-    return new Line(getA().add(vector), getB().add(vector));
+    return new Line(getA().translate(vector), getB().translate(vector));
   }
 
   @Override
