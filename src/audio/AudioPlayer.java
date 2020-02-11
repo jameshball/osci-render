@@ -106,7 +106,7 @@ public class AudioPlayer extends Thread {
     AudioPlayer.shapes.addAll(shapes);
   }
 
-  public static void updateFrame(List<Line> frame) {
+  public static void setFrame(List<Line> frame) {
     lock.lock();
     currentShape = 0;
     shapes = new ArrayList<>();

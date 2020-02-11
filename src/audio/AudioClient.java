@@ -21,7 +21,7 @@ public class AudioClient {
     AudioPlayer.setScale(0.5);
 
     while (true) {
-      AudioPlayer.updateFrame(Shapes.sortLines(camera.draw(cube)));
+      AudioPlayer.setFrame(Shapes.sortLines(camera.draw(cube)));
       cube.rotate(rotation);
       Thread.sleep((long) (1000 / FRAMERATE));
     }
