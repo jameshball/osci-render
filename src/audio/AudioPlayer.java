@@ -1,7 +1,6 @@
 package audio;
 
 import com.xtaudio.xt.*;
-import shapes.Line;
 import shapes.Shape;
 import shapes.Vector2;
 
@@ -11,14 +10,13 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class AudioPlayer extends Thread {
-  public static XtFormat FORMAT;
+  private static double[] phases = new double[2];
+  private static XtFormat FORMAT;
 
-  private static volatile boolean stopped = false;
   private static List<Shape> shapes = new ArrayList<>();
+  private static Lock lock = new ReentrantLock();
   private static int currentShape = 0;
   private static int framesDrawn = 0;
-  private static double[] phases = new double[2];
-  private static Lock lock = new ReentrantLock();
 
   private static double TRANSLATE_SPEED = 0;
   private static Vector2 TRANSLATE_VECTOR;
@@ -27,26 +25,28 @@ public class AudioPlayer extends Thread {
   private static final int ROTATE_PHASE_INDEX = 1;
   private static double SCALE = 1;
 
+  private boolean stopped;
+
+  public AudioPlayer(int sampleRate, double frequency) {
+    AudioPlayer.FORMAT = new XtFormat(new XtMix(sampleRate, XtSample.FLOAT32), 0, 0, 2, 0);
+  }
+
   static void render(XtStream stream, Object input, Object output, int frames,
                      double time, long position, boolean timeValid, long error, Object user) {
-    XtFormat format = stream.getFormat();
-
     lock.lock();
-
     for (int f = 0; f < frames; f++) {
-      Shape shape = currentShape();
+      Shape shape = getCurrentShape();
 
       shape = scale(shape);
-      shape = rotate(shape, format.mix.rate);
-      shape = translate(shape, format.mix.rate);
+      shape = rotate(shape, FORMAT.mix.rate);
+      shape = translate(shape, FORMAT.mix.rate);
 
-      double framesToDraw = shape.getLength() * shape.getWeight();
-      double drawingProgress = framesDrawn / framesToDraw;
+      double framesToDraw = shape.getWeight() * shape.getLength();
+      double drawingProgress = framesToDraw == 0 ? 1 : framesDrawn / framesToDraw;
 
-      for (int c = 0; c < format.outputs; c++) {
-        // Even output indexes refer to first channel, odd indexes refer to second channel.
-        ((float[]) output)[f * format.outputs] = shape.nextX(drawingProgress);
-        ((float[]) output)[f * format.outputs + 1] = shape.nextY(drawingProgress);
+      for (int c = 0; c < FORMAT.outputs; c++) {
+        ((float[]) output)[f * FORMAT.outputs] = (float) shape.nextX(drawingProgress);
+        ((float[]) output)[f * FORMAT.outputs + 1] = (float) shape.nextY(drawingProgress);
       }
 
       framesDrawn++;
@@ -56,26 +56,7 @@ public class AudioPlayer extends Thread {
         currentShape++;
       }
     }
-
     lock.unlock();
-  }
-
-  static double nextTheta(double sampleRate, double frequency, int phaseIndex) {
-    phases[phaseIndex] += frequency / sampleRate;
-
-    if (phases[phaseIndex] >= 1.0) {
-      phases[phaseIndex] = -1.0;
-    }
-
-    return phases[phaseIndex] * Math.PI;
-  }
-
-  private static Shape scale(Shape shape) {
-    if (SCALE != 1) {
-      return shape.scale(SCALE);
-    }
-
-    return shape;
   }
 
   private static Shape rotate(Shape shape, double sampleRate) {
@@ -98,28 +79,22 @@ public class AudioPlayer extends Thread {
     return shape;
   }
 
-  public static void addShape(Shape shape) {
-    AudioPlayer.shapes.add(shape);
-  }
+  static double nextTheta(double sampleRate, double frequency, int phaseIndex) {
+    phases[phaseIndex] += frequency / sampleRate;
 
-  public static void addShapes(List<Shape> shapes) {
-    AudioPlayer.shapes.addAll(shapes);
-  }
-
-  public static void setFrame(List<Line> frame) {
-    lock.lock();
-    currentShape = 0;
-    shapes = new ArrayList<>();
-    shapes.addAll(frame);
-    lock.unlock();
-  }
-
-  private static Shape currentShape() {
-    if (currentShape >= shapes.size()) {
-      currentShape -= shapes.size();
+    if (phases[phaseIndex] >= 1.0) {
+      phases[phaseIndex] = -1.0;
     }
 
-    return shapes.get(currentShape);
+    return phases[phaseIndex] * Math.PI;
+  }
+
+  private static Shape scale(Shape shape) {
+    if (SCALE != 1) {
+      return shape.scale(SCALE);
+    }
+
+    return shape;
   }
 
   public static void setRotateSpeed(double speed) {
@@ -135,11 +110,38 @@ public class AudioPlayer extends Thread {
     AudioPlayer.SCALE = scale;
   }
 
+  public static void addShape(Shape shape) {
+    shapes.add(shape);
+  }
+
+  public static void addShapes(List<Shape> newShapes) {
+    shapes.addAll(newShapes);
+  }
+
+  public static void updateFrame(List<Shape> frame) {
+    lock.lock();
+    currentShape = 0;
+    shapes = new ArrayList<>();
+    shapes.addAll(frame);
+    lock.unlock();
+  }
+
+  private static Shape getCurrentShape() {
+    if (shapes.size() == 0) {
+      return new Vector2(0, 0);
+    }
+
+    if (currentShape >= shapes.size()) {
+      currentShape -= shapes.size();
+    }
+
+    return shapes.get(currentShape);
+  }
+
   @Override
   public void run() {
     try (XtAudio audio = new XtAudio(null, null, null, null)) {
       XtService service = XtAudio.getServiceBySetup(XtSetup.CONSUMER_AUDIO);
-
       try (XtDevice device = service.openDefaultDevice(true)) {
         if (device != null && device.supportsFormat(FORMAT)) {
 
@@ -159,9 +161,5 @@ public class AudioPlayer extends Thread {
 
   public void stopPlaying() {
     stopped = true;
-  }
-
-  public static XtFormat defaultFormat(int sampleRate) {
-    return new XtFormat(new XtMix(sampleRate, XtSample.FLOAT32), 0, 0, 2, 0);
   }
 }
