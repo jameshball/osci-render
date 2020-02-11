@@ -2,6 +2,15 @@ package shapes;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+
+import org.jgrapht.Graph;
+import org.jgrapht.GraphPath;
+import org.jgrapht.alg.connectivity.ConnectivityInspector;
+import org.jgrapht.alg.cycle.ChinesePostman;
+import org.jgrapht.graph.AsSubgraph;
+import org.jgrapht.graph.DefaultUndirectedWeightedGraph;
+import org.jgrapht.graph.DefaultWeightedEdge;
 
 public class Shapes {
   public static List<Shape> generatePolygram(int sides, int angleJump, Vector2 start, double weight) {
@@ -48,9 +57,47 @@ public class Shapes {
     return generatePolygon(sides, new Vector2(scale, scale));
   }
 
-  public static List<Line> cleanupLines(List<Line> lines) {
-    // TODO: Implement this to create a route inspection of all lines in the input
-    //  to minimise electron beam jump distance.
-    return null;
+  public static List<Line> sortLines(List<Line> lines) {
+    Graph<Vector2, DefaultWeightedEdge> graph = new DefaultUndirectedWeightedGraph<>(DefaultWeightedEdge.class);
+
+    for (Line line : lines) {
+      graph.addVertex(line.getA());
+      graph.addVertex(line.getB());
+
+      DefaultWeightedEdge edge = new DefaultWeightedEdge();
+      graph.addEdge(line.getA(), line.getB(), edge);
+      graph.setEdgeWeight(edge, line.length * line.weight);
+    }
+
+    ConnectivityInspector<Vector2, DefaultWeightedEdge> inspector = new ConnectivityInspector<>(graph);
+
+    List<Line> sortedLines = new ArrayList<>();
+
+    for (Set<Vector2> vertices : inspector.connectedSets()) {
+      AsSubgraph<Vector2, DefaultWeightedEdge> subgraph = new AsSubgraph<>(graph, vertices);
+
+      ChinesePostman<Vector2, DefaultWeightedEdge> cp = new ChinesePostman<>();
+
+      try {
+        GraphPath<Vector2, DefaultWeightedEdge> edges = cp.getCPPSolution(subgraph);
+
+        Vector2 prevPoint = edges.getStartVertex();
+        Vector2 firstPoint = edges.getStartVertex();
+        List<Vector2> path = edges.getVertexList();
+
+        for (int i = 1; i < edges.getLength(); i++) {
+          sortedLines.add(new Line(prevPoint, path.get(i)));
+          prevPoint = path.get(i);
+        }
+
+        sortedLines.add(new Line(prevPoint, firstPoint));
+      } catch (Exception e) {
+        for (DefaultWeightedEdge edge : subgraph.edgeSet()) {
+          sortedLines.add(new Line(subgraph.getEdgeSource(edge), subgraph.getEdgeTarget(edge)));
+        }
+      }
+    }
+
+    return sortedLines;
   }
 }
