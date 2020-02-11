@@ -57,7 +57,7 @@ public class Shapes {
     return generatePolygon(sides, new Vector2(scale, scale));
   }
 
-  public static List<Line> sortLines(List<Line> lines) {
+  public static List<Shape> sortLines(List<Line> lines) {
     Graph<Vector2, DefaultWeightedEdge> graph = new DefaultUndirectedWeightedGraph<>(DefaultWeightedEdge.class);
 
     for (Line line : lines) {
@@ -71,7 +71,7 @@ public class Shapes {
 
     ConnectivityInspector<Vector2, DefaultWeightedEdge> inspector = new ConnectivityInspector<>(graph);
 
-    List<Line> sortedLines = new ArrayList<>();
+    List<Shape> sortedLines = new ArrayList<>();
 
     for (Set<Vector2> vertices : inspector.connectedSets()) {
       AsSubgraph<Vector2, DefaultWeightedEdge> subgraph = new AsSubgraph<>(graph, vertices);

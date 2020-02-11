@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/oscilloscope-renderer.iml" filepath="$PROJECT_DIR$/.idea/oscilloscope-renderer.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/osci-render.iml" filepath="$PROJECT_DIR$/.idea/osci-render.iml" />
     </modules>
   </component>
 </project>
