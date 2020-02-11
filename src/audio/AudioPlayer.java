@@ -2,7 +2,7 @@ package audio;
 
 import com.xtaudio.xt.*;
 import shapes.Shape;
-import shapes.Vector;
+import shapes.Vector2;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,7 +17,7 @@ public class AudioPlayer extends Thread {
 
   public static XtFormat FORMAT;
   private static double TRANSLATE_SPEED = 0;
-  private static Vector TRANSLATE_VECTOR;
+  private static Vector2 TRANSLATE_VECTOR;
   private static final int TRANSLATE_PHASE_INDEX = 0;
   private static double ROTATE_SPEED = 0.4;
   private static final int ROTATE_PHASE_INDEX = 1;
@@ -81,7 +81,7 @@ public class AudioPlayer extends Thread {
   }
 
   private static Shape translate(Shape shape, double sampleRate) {
-    if (TRANSLATE_SPEED != 0 && !TRANSLATE_VECTOR.equals(new Vector())) {
+    if (TRANSLATE_SPEED != 0 && !TRANSLATE_VECTOR.equals(new Vector2())) {
       return shape.translate(TRANSLATE_VECTOR.scale(
         Math.sin(nextTheta(sampleRate, TRANSLATE_SPEED, ROTATE_PHASE_INDEX))
       ));
@@ -110,7 +110,7 @@ public class AudioPlayer extends Thread {
     AudioPlayer.ROTATE_SPEED = speed;
   }
 
-  public static void setTranslation(double speed, Vector translation) {
+  public static void setTranslation(double speed, Vector2 translation) {
     AudioPlayer.TRANSLATE_SPEED = speed;
     AudioPlayer.TRANSLATE_VECTOR = translation;
   }

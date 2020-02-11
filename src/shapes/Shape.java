@@ -8,7 +8,7 @@ public abstract class Shape {
   public abstract float nextY(double drawingProgress);
   public abstract Shape rotate(double theta);
   public abstract Shape scale(double factor);
-  public abstract Shape translate(Vector vector);
+  public abstract Shape translate(Vector2 vector);
 
   public double getWeight() {
     return weight;

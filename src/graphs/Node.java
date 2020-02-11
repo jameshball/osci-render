@@ -1,23 +1,23 @@
 package graphs;
 
-import shapes.Vector;
+import shapes.Vector2;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 public class Node {
-  private Vector location;
+  private Vector2 location;
   private List<Node> adjacentNodes;
   private List<Double> adjacentWeights;
 
-  public Node(Vector location) {
+  public Node(Vector2 location) {
     this.location = location;
     this.adjacentNodes = new ArrayList<>();
     this.adjacentWeights = new ArrayList<>();
   }
 
-  public Vector getLocation() {
+  public Vector2 getLocation() {
     return location;
   }
 

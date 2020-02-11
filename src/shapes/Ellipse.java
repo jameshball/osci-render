@@ -4,9 +4,9 @@ public class Ellipse extends Shape {
   private final double a;
   private final double b;
   private final double rotation;
-  private final Vector position;
+  private final Vector2 position;
 
-  public Ellipse(double a, double b, double weight, double rotation, Vector position) {
+  public Ellipse(double a, double b, double weight, double rotation, Vector2 position) {
     this.a = a;
     this.b = b;
     this.weight = weight;
@@ -16,12 +16,12 @@ public class Ellipse extends Shape {
     this.length = 2 * Math.PI * Math.sqrt((a * a + b * b) / 2);
   }
 
-  public Ellipse(double a, double b, Vector position) {
+  public Ellipse(double a, double b, Vector2 position) {
     this(a, b, 100, 0, position);
   }
 
   public Ellipse(double a, double b) {
-    this(a, b, 100, 0, new Vector());
+    this(a, b, 100, 0, new Vector2());
   }
 
   @Override
@@ -53,7 +53,7 @@ public class Ellipse extends Shape {
   }
 
   @Override
-  public Shape translate(Vector vector) {
+  public Shape translate(Vector2 vector) {
     return new Ellipse(a, b, weight, rotation, position.add(vector));
   }
 }
