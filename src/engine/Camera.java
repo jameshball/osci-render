@@ -15,12 +15,10 @@ public class Camera extends Renderer{
   private double focalLength;
   private double clipping = 0.001;
   private Vector3 position;
-  private double fov;
 
-  public Camera(double focalLength, Vector3 position, double fov) {
+  public Camera(double focalLength, Vector3 position) {
     this.focalLength = focalLength;
     this.position = position;
-    this.fov = fov;
   }
 
   public List<Line> draw(WorldObject worldObject) {

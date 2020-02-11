@@ -16,7 +16,7 @@ public class AudioClient {
     AudioPlayer player = new AudioPlayer();
     AudioPlayer.FORMAT = AudioPlayer.defaultFormat(SAMPLE_RATE);
 
-    Camera camera = new Camera(0.6, new Vector3(0, 0, -2), 60);
+    Camera camera = new Camera(0.6, new Vector3(0, 0, -2));
     WorldObject cube = new WorldObject(args[0], new Vector3(0,0,0), new Vector3());
 
     player.start();
