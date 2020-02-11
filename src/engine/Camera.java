@@ -1,6 +1,7 @@
 package engine;
 
 import shapes.Line;
+import shapes.Shape;
 import shapes.Vector2;
 
 import java.util.ArrayList;
@@ -16,10 +17,10 @@ public class Camera extends Renderer{
   private Vector3 position;
   private double fov;
 
-  public Camera() {
-    this.focalLength = 0.6;
-    this.position = new Vector3(0,0,-2);
-    this.fov = 60;
+  public Camera(double focalLength, Vector3 position, double fov) {
+    this.focalLength = focalLength;
+    this.position = position;
+    this.fov = fov;
   }
 
   public List<Line> draw(WorldObject worldObject) {

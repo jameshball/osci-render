@@ -1,21 +1,25 @@
 package audio;
 
 import com.xtaudio.xt.*;
+import shapes.Line;
 import shapes.Shape;
 import shapes.Vector2;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class AudioPlayer extends Thread {
+  public static XtFormat FORMAT;
+
   private static volatile boolean stopped = false;
   private static List<Shape> shapes = new ArrayList<>();
   private static int currentShape = 0;
   private static int framesDrawn = 0;
-
   private static double[] phases = new double[2];
+  private static Lock lock = new ReentrantLock();
 
-  public static XtFormat FORMAT;
   private static double TRANSLATE_SPEED = 0;
   private static Vector2 TRANSLATE_VECTOR;
   private static final int TRANSLATE_PHASE_INDEX = 0;
@@ -26,6 +30,8 @@ public class AudioPlayer extends Thread {
   static void render(XtStream stream, Object input, Object output, int frames,
                      double time, long position, boolean timeValid, long error, Object user) {
     XtFormat format = stream.getFormat();
+
+    lock.lock();
 
     for (int f = 0; f < frames; f++) {
       Shape shape = currentShape();
@@ -50,6 +56,8 @@ public class AudioPlayer extends Thread {
         currentShape++;
       }
     }
+
+    lock.unlock();
   }
 
   static double nextTheta(double sampleRate, double frequency, int phaseIndex) {
@@ -96,6 +104,14 @@ public class AudioPlayer extends Thread {
 
   public static void addShapes(List<Shape> shapes) {
     AudioPlayer.shapes.addAll(shapes);
+  }
+
+  public static void updateFrame(List<Line> frame) {
+    lock.lock();
+    currentShape = 0;
+    shapes = new ArrayList<>();
+    shapes.addAll(frame);
+    lock.unlock();
   }
 
   private static Shape currentShape() {
