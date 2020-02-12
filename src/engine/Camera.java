@@ -1,6 +1,7 @@
 package engine;
 
 import shapes.Line;
+import shapes.Shape;
 import shapes.Vector2;
 
 import java.util.ArrayList;
@@ -40,9 +41,9 @@ public class Camera {
   public List<Line> getFrame(List<Vector2> vertices, List<Integer> connections) {
     List<Line> lines = new ArrayList<>();
 
-    for (int i = 0; i < connections.size(); i+=2) {
-      Vector2 start = vertices.get(connections.get(i));
-      Vector2 end = vertices.get(connections.get(i+1));
+    for (int i = 0; i < connections.size(); i += 2) {
+      Vector2 start = vertices.get(Math.abs(connections.get(i)));
+      Vector2 end = vertices.get(Math.abs(connections.get(i + 1)));
       double x1 = start.getX();
       double y1 = start.getY();
       double x2 = end.getX();
