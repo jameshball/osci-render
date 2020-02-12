@@ -1,7 +1,6 @@
 package engine;
 
 import shapes.Line;
-import shapes.Shape;
 import shapes.Vector2;
 
 import java.util.ArrayList;
