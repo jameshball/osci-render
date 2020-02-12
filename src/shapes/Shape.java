@@ -1,6 +1,8 @@
 package shapes;
 
 public abstract class Shape {
+  public static final int DEFAULT_WEIGHT = 100;
+
   protected double weight;
   protected double length;
 
