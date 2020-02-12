@@ -21,7 +21,7 @@ public class AudioPlayer extends Thread {
   private static double TRANSLATE_SPEED = 0;
   private static Vector2 TRANSLATE_VECTOR;
   private static final int TRANSLATE_PHASE_INDEX = 0;
-  private static double ROTATE_SPEED = 0.4;
+  private static double ROTATE_SPEED = 0;
   private static final int ROTATE_PHASE_INDEX = 1;
   private static double SCALE = 1;
 
