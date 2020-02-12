@@ -4,8 +4,6 @@ public class Line extends Shape {
   private final Vector2 a;
   private final Vector2 b;
 
-  public static final double DEFAULT_WEIGHT = 100;
-
   public Line(Vector2 a, Vector2 b, double weight) {
     this.a = a;
     this.b = b;
@@ -14,7 +12,7 @@ public class Line extends Shape {
   }
 
   public Line(Vector2 a, Vector2 b) {
-    this(a, b, DEFAULT_WEIGHT);
+    this(a, b, Shape.DEFAULT_WEIGHT);
   }
 
   public Line(double x1, double y1, double x2, double y2, double weight) {

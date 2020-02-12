@@ -11,6 +11,7 @@ public class Vector2 extends Shape{
   public Vector2(double x, double y) {
     this.x = x;
     this.y = y;
+    this.weight = Shape.DEFAULT_WEIGHT;
   }
 
   public Vector2() {

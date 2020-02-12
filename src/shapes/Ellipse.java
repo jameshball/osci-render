@@ -17,11 +17,11 @@ public class Ellipse extends Shape {
   }
 
   public Ellipse(double a, double b, Vector2 position) {
-    this(a, b, 100, 0, position);
+    this(a, b, Shape.DEFAULT_WEIGHT, 0, position);
   }
 
   public Ellipse(double a, double b) {
-    this(a, b, 100, 0, new Vector2());
+    this(a, b, Shape.DEFAULT_WEIGHT, 0, new Vector2());
   }
 
   @Override
