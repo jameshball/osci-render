@@ -96,6 +96,7 @@ public class Line extends Shape {
     return new Line(getX1(), getY1(), getX2(), y2);
   }
 
+  @Override
   public Line setWeight(double weight) {
     return new Line(getX1(), getY1(), getX2(), getY2(), weight);
   }

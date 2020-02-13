@@ -3,15 +3,17 @@ package audio;
 import engine.Camera;
 import engine.Vector3;
 import engine.WorldObject;
+import shapes.Shape;
 import shapes.Shapes;
+
+import java.util.List;
 
 public class AudioClient {
   private static final int SAMPLE_RATE = 192000;
   private static final double FRAMERATE = 30;
 
   public static void main(String[] args) throws InterruptedException {
-    // TODO: Implement adaptive default weight (i.e. the more things drawn, the lower the weight of lines)
-    //  Calculate weight of lines using depth.
+    // TODO: Calculate weight of lines using depth.
     //  Reduce weight of lines drawn multiple times.
     //  Find intersections of lines to (possibly) improve line cleanup.
     //  Improve performance of line cleanup with a heuristic.

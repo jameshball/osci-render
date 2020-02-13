@@ -57,6 +57,14 @@ public class Shapes {
     return generatePolygon(sides, new Vector2(scale, scale));
   }
 
+  public static double totalLength(List<Shape> shapes) {
+    return shapes
+      .stream()
+      .map(Shape::getLength)
+      .reduce(Double::sum)
+      .orElse(0d);
+  }
+
   public static List<Shape> sortLines(List<Line> lines) {
     Graph<Vector2, DefaultWeightedEdge> graph = new DefaultUndirectedWeightedGraph<>(DefaultWeightedEdge.class);
 
