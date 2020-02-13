@@ -1,7 +1,7 @@
 package shapes;
 
 public abstract class Shape {
-  public static final int DEFAULT_WEIGHT = 80;
+  public static final int DEFAULT_WEIGHT = 1;
 
   protected double weight;
   protected double length;
@@ -11,6 +11,7 @@ public abstract class Shape {
   public abstract Shape rotate(double theta);
   public abstract Shape scale(double factor);
   public abstract Shape translate(Vector2 vector);
+  public abstract Shape setWeight(double weight);
 
   public double getWeight() {
     return weight;

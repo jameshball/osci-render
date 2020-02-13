@@ -2,6 +2,7 @@ package audio;
 
 import com.xtaudio.xt.*;
 import shapes.Shape;
+import shapes.Shapes;
 import shapes.Vector2;
 
 import java.util.ArrayList;
@@ -24,6 +25,7 @@ public class AudioPlayer extends Thread {
   private static double ROTATE_SPEED = 0;
   private static final int ROTATE_PHASE_INDEX = 1;
   private static double SCALE = 1;
+  private static double WEIGHT = 100;
 
   private boolean stopped;
 
@@ -37,6 +39,7 @@ public class AudioPlayer extends Thread {
     for (int f = 0; f < frames; f++) {
       Shape shape = getCurrentShape();
 
+      shape = shape.setWeight(WEIGHT);
       shape = scale(shape);
       shape = rotate(shape, FORMAT.mix.rate);
       shape = translate(shape, FORMAT.mix.rate);
@@ -123,6 +126,7 @@ public class AudioPlayer extends Thread {
     currentShape = 0;
     shapes = new ArrayList<>();
     shapes.addAll(frame);
+    AudioPlayer.WEIGHT = 200 * Math.exp(-0.017 * Shapes.totalLength(frame));
     lock.unlock();
   }
 

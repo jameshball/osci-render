@@ -56,4 +56,9 @@ public class Ellipse extends Shape {
   public Ellipse translate(Vector2 vector) {
     return new Ellipse(a, b, weight, rotation, position.translate(vector));
   }
+
+  @Override
+  public Ellipse setWeight(double weight) {
+    return new Ellipse(a, b, weight, rotation, position);
+  }
 }
