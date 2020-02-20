@@ -117,15 +117,16 @@ public class AudioPlayer extends Thread {
     shapes.add(shape);
   }
 
-  public static void addShapes(List<Shape> newShapes) {
+  public static void addShapes(List<? extends Shape> newShapes) {
     shapes.addAll(newShapes);
   }
 
-  public static void updateFrame(List<Shape> frame) {
+  public static void updateFrame(List<? extends Shape> frame) {
     lock.lock();
     currentShape = 0;
     shapes = new ArrayList<>();
     shapes.addAll(frame);
+    // Arbitrary function for changing weights based on frame draw-time.
     AudioPlayer.WEIGHT = 200 * Math.exp(-0.017 * Shapes.totalLength(frame));
     lock.unlock();
   }
