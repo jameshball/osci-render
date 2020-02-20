@@ -1,6 +1,6 @@
 package shapes;
 
-public class Line extends Shape {
+public final class Line extends Shape {
   private final Vector2 a;
   private final Vector2 b;
 

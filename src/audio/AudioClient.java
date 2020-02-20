@@ -3,10 +3,7 @@ package audio;
 import engine.Camera;
 import engine.Vector3;
 import engine.WorldObject;
-import shapes.Shape;
 import shapes.Shapes;
-
-import java.util.List;
 
 public class AudioClient {
   private static final int SAMPLE_RATE = 192000;

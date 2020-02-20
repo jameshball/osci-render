@@ -1,6 +1,6 @@
 package shapes;
 
-public class Ellipse extends Shape {
+public final class Ellipse extends Shape {
   private final double a;
   private final double b;
   private final double rotation;
