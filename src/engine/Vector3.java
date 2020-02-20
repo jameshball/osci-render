@@ -2,8 +2,8 @@ package engine;
 
 import java.util.List;
 
-public class Vector3 {
-  private double x, y, z;
+public final class Vector3 {
+  private final double x, y, z;
 
   public Vector3() {
     this.x = 0;

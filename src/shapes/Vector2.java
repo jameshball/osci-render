@@ -2,7 +2,7 @@ package shapes;
 
 import java.util.Objects;
 
-public class Vector2 extends Shape{
+public final class Vector2 extends Shape{
   private final double x;
   private final double y;
 
