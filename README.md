@@ -9,3 +9,6 @@ I will continue adding extra fuctionality, such as outputting another audio chan
 Lots of this code was built as part of a 24hr hackathon: IC Hack 20. The original repository can be found here: https://github.com/wdhg/ICHack20
 
 Video demonstration can be found here: https://www.youtube.com/watch?v=oEX0mnv6PLM
+
+## Special Thanks
+Team Members: James Ball, William Grant, Jessica Lally, Noor Sawhney, and Andy Wang
