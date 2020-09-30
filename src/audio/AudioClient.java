@@ -7,7 +7,7 @@ import shapes.Shapes;
 
 public class AudioClient {
   private static final int SAMPLE_RATE = 192000;
-  private static final double FRAMERATE = 30;
+  private static final double TARGET_FRAMERATE = 30;
 
   public static void main(String[] args) throws InterruptedException {
     // TODO: Calculate weight of lines using depth.
@@ -26,7 +26,7 @@ public class AudioClient {
     while (true) {
       AudioPlayer.updateFrame(Shapes.sortLines(camera.draw(cube)));
       cube.rotate(rotation);
-      Thread.sleep((long) (1000 / FRAMERATE));
+      Thread.sleep((long) (1000 / TARGET_FRAMERATE));
     }
   }
 }
