@@ -10,5 +10,12 @@ Lots of this code was built as part of a 24hr hackathon: IC Hack 20. The origina
 
 Video demonstration can be found here: https://www.youtube.com/watch?v=oEX0mnv6PLM
 
+## Libraries
+
+- [XT-Audio](https://sjoerdvankreel.github.io/xt-audio/)
+- [JGraphT](https://jgrapht.org/)
+- [JUnit 4](https://junit.org/junit4/)
+- [java-data-front](https://github.com/mokiat/java-data-front)
+
 ## Special Thanks
 Team Members: James Ball, William Grant, Jessica Lally, Noor Sawhney, and Andy Wang
