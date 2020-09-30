@@ -23,8 +23,19 @@ public class WorldObject {
     loadFromFile(filename);
   }
 
+  public WorldObject(List<Vector3> vertices, List<Integer> edgeData, Vector3 position, Vector3 rotation) {
+    this.vertices = vertices;
+    this.edgeData = edgeData;
+    this.position = position;
+    this.rotation = rotation;
+  }
+
   public void rotate(Vector3 theta) {
     rotation = rotation.add(theta);
+  }
+
+  public void resetRotation() {
+    rotation = new Vector3();
   }
 
   public List<Vector3> getVertices() {
@@ -66,5 +77,21 @@ public class WorldObject {
       e.printStackTrace();
       throw new IllegalArgumentException("Cannot load mesh data from: " + filename);
     }
+  }
+
+  public WorldObject clone() {
+    List<Vector3> newVertices = new ArrayList<>();
+
+    for (Vector3 vertex : vertices) {
+      newVertices.add(vertex.clone());
+    }
+
+    List<Integer> newEdgeData = new ArrayList<>();
+
+    for (int edge : edgeData) {
+      newEdgeData.add(edge);
+    }
+
+    return new WorldObject(newVertices, newEdgeData, position.clone(), rotation.clone());
   }
 }
