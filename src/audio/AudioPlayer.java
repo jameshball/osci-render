@@ -136,7 +136,7 @@ public class AudioPlayer extends Thread {
   }
 
   private static Shape getCurrentShape() {
-    if (frames.size() == 0) {
+    if (frames.size() == 0 || frames.get(currentFrame).size() == 0) {
       return new Vector2(0, 0);
     }
 
