@@ -19,7 +19,6 @@ public class AudioClient {
     //  Reduce weight of lines drawn multiple times.
     //  Find intersections of lines to (possibly) improve line cleanup.
     //  Improve performance of line cleanup with a heuristic.
-    //  Pre-render in parallel.
 
     Camera camera = new Camera(0.6, new Vector3(0, 0, -0.08));
     WorldObject object = new WorldObject(args[0], new Vector3(0, 0, 0), new Vector3());
