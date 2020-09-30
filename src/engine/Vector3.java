@@ -84,4 +84,8 @@ public final class Vector3 {
 
     return mean.scale(1f / (points.size()));
   }
+
+  public Vector3 clone() {
+    return new Vector3(x, y, z);
+  }
 }
