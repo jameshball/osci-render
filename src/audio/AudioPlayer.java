@@ -7,17 +7,17 @@ import shapes.Vector2;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 public class AudioPlayer extends Thread {
   private static double[] phases = new double[2];
   private static XtFormat FORMAT;
 
   private static List<Shape> shapes = new ArrayList<>();
-  private static Lock lock = new ReentrantLock();
+  private static List<List<? extends Shape>> frames = new ArrayList<>();
+  private static int currentFrame = 0;
   private static int currentShape = 0;
-  private static int framesDrawn = 0;
+  private static long timeOfLastFrame;
+  private static int audioFramesDrawn = 0;
 
   private static double TRANSLATE_SPEED = 0;
   private static Vector2 TRANSLATE_VECTOR;
@@ -27,16 +27,17 @@ public class AudioPlayer extends Thread {
   private static double SCALE = 1;
   private static double WEIGHT = 100;
 
-  private boolean stopped;
+  private volatile boolean stopped;
 
-  public AudioPlayer(int sampleRate, double frequency) {
+  public AudioPlayer(int sampleRate, List<List<? extends Shape>> frames) {
     AudioPlayer.FORMAT = new XtFormat(new XtMix(sampleRate, XtSample.FLOAT32), 0, 0, 2, 0);
+    AudioPlayer.frames = frames;
+    AudioPlayer.timeOfLastFrame = System.currentTimeMillis();
   }
 
-  static void render(XtStream stream, Object input, Object output, int frames,
+  static void render(XtStream stream, Object input, Object output, int audioFrames,
                      double time, long position, boolean timeValid, long error, Object user) {
-    lock.lock();
-    for (int f = 0; f < frames; f++) {
+    for (int f = 0; f < audioFrames; f++) {
       Shape shape = getCurrentShape();
 
       shape = shape.setWeight(WEIGHT);
@@ -44,22 +45,27 @@ public class AudioPlayer extends Thread {
       shape = rotate(shape, FORMAT.mix.rate);
       shape = translate(shape, FORMAT.mix.rate);
 
-      double framesToDraw = shape.getWeight() * shape.getLength();
-      double drawingProgress = framesToDraw == 0 ? 1 : framesDrawn / framesToDraw;
+      double totalAudioFrames = shape.getWeight() * shape.getLength();
+      double drawingProgress = totalAudioFrames == 0 ? 1 : audioFramesDrawn / totalAudioFrames;
 
       for (int c = 0; c < FORMAT.outputs; c++) {
-        ((float[]) output)[f * FORMAT.outputs] = (float) shape.nextX(drawingProgress);
-        ((float[]) output)[f * FORMAT.outputs + 1] = (float) shape.nextY(drawingProgress);
+        ((float[]) output)[f * FORMAT.outputs] = shape.nextX(drawingProgress);
+        ((float[]) output)[f * FORMAT.outputs + 1] = shape.nextY(drawingProgress);
       }
 
-      framesDrawn++;
+      audioFramesDrawn++;
 
-      if (framesDrawn > framesToDraw) {
-        framesDrawn = 0;
-        currentShape++;
+      if (audioFramesDrawn > totalAudioFrames) {
+        audioFramesDrawn = 0;
+        currentShape = ++currentShape % AudioPlayer.frames.get(currentFrame).size();
+      }
+
+      if (System.currentTimeMillis() - timeOfLastFrame > (float) 1000 / AudioClient.TARGET_FRAMERATE) {
+        currentShape = 0;
+        currentFrame = ++currentFrame % AudioPlayer.frames.size();
+        timeOfLastFrame = System.currentTimeMillis();
       }
     }
-    lock.unlock();
   }
 
   private static Shape rotate(Shape shape, double sampleRate) {
@@ -122,25 +128,19 @@ public class AudioPlayer extends Thread {
   }
 
   public static void updateFrame(List<? extends Shape> frame) {
-    lock.lock();
     currentShape = 0;
     shapes = new ArrayList<>();
     shapes.addAll(frame);
     // Arbitrary function for changing weights based on frame draw-time.
     AudioPlayer.WEIGHT = 200 * Math.exp(-0.017 * Shapes.totalLength(frame));
-    lock.unlock();
   }
 
   private static Shape getCurrentShape() {
-    if (shapes.size() == 0) {
+    if (frames.size() == 0) {
       return new Vector2(0, 0);
     }
 
-    if (currentShape >= shapes.size()) {
-      currentShape -= shapes.size();
-    }
-
-    return shapes.get(currentShape);
+    return frames.get(currentFrame).get(currentShape);
   }
 
   @Override
