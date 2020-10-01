@@ -76,7 +76,7 @@ public class Shapes {
 
       DefaultWeightedEdge edge = new DefaultWeightedEdge();
       graph.addEdge(line.getA(), line.getB(), edge);
-      graph.setEdgeWeight(edge, line.length * line.weight);
+      graph.setEdgeWeight(edge, line.length);
     }
 
     ConnectivityInspector<Vector2, DefaultWeightedEdge> inspector = new ConnectivityInspector<>(graph);
