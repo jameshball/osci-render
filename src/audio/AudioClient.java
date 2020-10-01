@@ -42,7 +42,8 @@ public class AudioClient {
     for (int i = 0; i < numFrames; i++) {
       preRenderedFrames.add(new ArrayList<>());
     }
-    
+
+    // pre-renders the WorldObject in parallel
     IntStream.range(0, numFrames).parallel().forEach((frameNum) -> {
       WorldObject clone = object.clone();
       clone.rotate(rotation.scale(frameNum));

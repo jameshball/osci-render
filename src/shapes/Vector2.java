@@ -6,8 +6,6 @@ public final class Vector2 extends Shape{
   private final double x;
   private final double y;
 
-  private static final double EPSILON = 0.001;
-
   public Vector2(double x, double y, double weight) {
     this.x = x;
     this.y = y;
@@ -93,8 +91,8 @@ public final class Vector2 extends Shape{
     if (places < 0) throw new IllegalArgumentException();
 
     long factor = (long) Math.pow(10, places);
-    value = value * factor;
-    long tmp = Math.round(value);
-    return (double) tmp / factor;
+    value *= factor;
+
+    return (double) Math.round(value) / factor;
   }
 }

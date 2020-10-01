@@ -65,6 +65,8 @@ public class Shapes {
       .orElse(0d);
   }
 
+  // performs chinese postman on the input lines to get a path that will render cleanly on the oscilloscope.
+  // TODO: Speed up.
   public static List<Shape> sortLines(List<Line> lines) {
     Graph<Vector2, DefaultWeightedEdge> graph = new DefaultUndirectedWeightedGraph<>(DefaultWeightedEdge.class);
 
