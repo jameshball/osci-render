@@ -2,30 +2,27 @@ package audio;
 
 import com.xtaudio.xt.*;
 import shapes.Shape;
-import shapes.Shapes;
 import shapes.Vector2;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class AudioPlayer extends Thread {
-  private static double[] phases = new double[2];
   private static XtFormat FORMAT;
 
-  private static List<Shape> shapes = new ArrayList<>();
   private static List<List<? extends Shape>> frames = new ArrayList<>();
   private static int currentFrame = 0;
   private static int currentShape = 0;
   private static long timeOfLastFrame;
   private static int audioFramesDrawn = 0;
 
-  private static double TRANSLATE_SPEED = 0;
-  private static Vector2 TRANSLATE_VECTOR;
-  private static final int TRANSLATE_PHASE_INDEX = 0;
-  private static double ROTATE_SPEED = 0;
-  private static final int ROTATE_PHASE_INDEX = 1;
-  private static double SCALE = 1;
-  private static double WEIGHT = 100;
+  private double translateSpeed = 0;
+  private Vector2 translateVector = new Vector2();
+  private Phase translatePhase = new Phase();
+  private double rotateSpeed = 0;
+  private Phase rotatePhase = new Phase();
+  private double scale = 1;
+  private double weight = 100;
 
   private volatile boolean stopped;
 
@@ -35,12 +32,12 @@ public class AudioPlayer extends Thread {
     AudioPlayer.timeOfLastFrame = System.currentTimeMillis();
   }
 
-  static void render(XtStream stream, Object input, Object output, int audioFrames,
+  private void render(XtStream stream, Object input, Object output, int audioFrames,
                      double time, long position, boolean timeValid, long error, Object user) {
     for (int f = 0; f < audioFrames; f++) {
       Shape shape = getCurrentShape();
 
-      shape = shape.setWeight(WEIGHT);
+      shape = shape.setWeight(weight);
       shape = scale(shape);
       shape = rotate(shape, FORMAT.mix.rate);
       shape = translate(shape, FORMAT.mix.rate);
@@ -68,74 +65,62 @@ public class AudioPlayer extends Thread {
     }
   }
 
-  private static Shape rotate(Shape shape, double sampleRate) {
-    if (ROTATE_SPEED != 0) {
+  private Shape rotate(Shape shape, double sampleRate) {
+    if (rotateSpeed != 0) {
       shape = shape.rotate(
-        nextTheta(sampleRate, ROTATE_SPEED, TRANSLATE_PHASE_INDEX)
+        nextTheta(sampleRate, rotateSpeed, translatePhase)
       );
     }
 
     return shape;
   }
 
-  private static Shape translate(Shape shape, double sampleRate) {
-    if (TRANSLATE_SPEED != 0 && !TRANSLATE_VECTOR.equals(new Vector2())) {
-      return shape.translate(TRANSLATE_VECTOR.scale(
-        Math.sin(nextTheta(sampleRate, TRANSLATE_SPEED, ROTATE_PHASE_INDEX))
+  private Shape translate(Shape shape, double sampleRate) {
+    if (translateSpeed != 0 && !translateVector.equals(new Vector2())) {
+      return shape.translate(translateVector.scale(
+        Math.sin(nextTheta(sampleRate, translateSpeed, rotatePhase))
       ));
     }
 
     return shape;
   }
 
-  static double nextTheta(double sampleRate, double frequency, int phaseIndex) {
-    phases[phaseIndex] += frequency / sampleRate;
+  private double nextTheta(double sampleRate, double frequency, Phase phase) {
+    phase.value += frequency / sampleRate;
 
-    if (phases[phaseIndex] >= 1.0) {
-      phases[phaseIndex] = -1.0;
+    if (phase.value >= 1.0) {
+      phase.value = -1.0;
     }
 
-    return phases[phaseIndex] * Math.PI;
+    return phase.value * Math.PI;
   }
 
-  private static Shape scale(Shape shape) {
-    if (SCALE != 1) {
-      return shape.scale(SCALE);
+  private Shape scale(Shape shape) {
+    if (scale != 1) {
+      return shape.scale(scale);
     }
 
     return shape;
   }
 
-  public static void setRotateSpeed(double speed) {
-    AudioPlayer.ROTATE_SPEED = speed;
+  public void setRotateSpeed(double speed) {
+    this.rotateSpeed = speed;
   }
 
-  public static void setTranslation(double speed, Vector2 translation) {
-    AudioPlayer.TRANSLATE_SPEED = speed;
-    AudioPlayer.TRANSLATE_VECTOR = translation;
+  public void setTranslation(double speed, Vector2 translation) {
+    this.translateSpeed = speed;
+    this.translateVector = translation;
   }
 
-  public static void setScale(double scale) {
-    AudioPlayer.SCALE = scale;
+  public void setScale(double scale) {
+    this.scale = scale;
   }
 
-  public static void addShape(Shape shape) {
-    shapes.add(shape);
+  public void setWeight(double weight) {
+    this.weight = weight;
   }
 
-  public static void addShapes(List<? extends Shape> newShapes) {
-    shapes.addAll(newShapes);
-  }
-
-  public static void updateFrame(List<? extends Shape> frame) {
-    currentShape = 0;
-    shapes = new ArrayList<>();
-    shapes.addAll(frame);
-    // Arbitrary function for changing weights based on frame draw-time.
-    AudioPlayer.WEIGHT = 200 * Math.exp(-0.017 * Shapes.totalLength(frame));
-  }
-
-  private static Shape getCurrentShape() {
+  private Shape getCurrentShape() {
     if (frames.size() == 0 || frames.get(currentFrame).size() == 0) {
       return new Vector2(0, 0);
     }
@@ -152,7 +137,7 @@ public class AudioPlayer extends Thread {
 
           XtBuffer buffer = device.getBuffer(FORMAT);
           try (XtStream stream = device.openStream(FORMAT, true, false,
-            buffer.current, AudioPlayer::render, null, null)) {
+            buffer.current, this::render, null, null)) {
             stream.start();
             while (!stopped) {
               Thread.onSpinWait();
@@ -167,4 +152,9 @@ public class AudioPlayer extends Thread {
   public void stopPlaying() {
     stopped = true;
   }
+
+  private static final class Phase {
+    private double value = 0;
+  }
 }
+

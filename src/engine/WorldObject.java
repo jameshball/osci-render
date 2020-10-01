@@ -14,6 +14,15 @@ public class WorldObject {
   private Vector3 position;
   private Vector3 rotation;
 
+  public WorldObject(String filename) {
+    this.vertices = new ArrayList<>();
+    this.edgeData = new ArrayList<>();
+    this.position = new Vector3();
+    this.rotation = new Vector3();
+
+    loadFromFile(filename);
+  }
+
   public WorldObject(String filename, Vector3 position, Vector3 rotation) {
     this.vertices = new ArrayList<>();
     this.edgeData = new ArrayList<>();
@@ -80,18 +89,6 @@ public class WorldObject {
   }
 
   public WorldObject clone() {
-    List<Vector3> newVertices = new ArrayList<>();
-
-    for (Vector3 vertex : vertices) {
-      newVertices.add(vertex.clone());
-    }
-
-    List<Integer> newEdgeData = new ArrayList<>();
-
-    for (int edge : edgeData) {
-      newEdgeData.add(edge);
-    }
-
-    return new WorldObject(newVertices, newEdgeData, position.clone(), rotation.clone());
+    return new WorldObject(new ArrayList<>(vertices), new ArrayList<>(edgeData), position, rotation);
   }
 }

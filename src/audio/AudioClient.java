@@ -14,20 +14,30 @@ public class AudioClient {
   public static final int SAMPLE_RATE = 192000;
   public static final double TARGET_FRAMERATE = 30;
 
+  private static final double OBJ_ROTATE = Math.PI / 100;
+  private static final float ROTATE_SPEED = 0;
+  private static final float TRANSLATION_SPEED = 0;
+  private static final Vector2 TRANSLATION = new Vector2(1, 1);
+  private static final float SCALE = 2;
+  private static final float WEIGHT = 100;
+
   public static void main(String[] args) {
     // TODO: Calculate weight of lines using depth.
     //  Reduce weight of lines drawn multiple times.
     //  Find intersections of lines to (possibly) improve line cleanup.
     //  Improve performance of line cleanup with a heuristic.
 
-    Camera camera = new Camera(0.6, new Vector3(0, 0, -0.08));
-    WorldObject object = new WorldObject(args[0], new Vector3(0, 0, 0), new Vector3());
-    Vector3 rotation = new Vector3(0,Math.PI / 100,Math.PI / 100);
-    List<List<? extends Shape>> preRenderedFrames = new ArrayList<>();
-
+    String objFilePath = args[0];
     int numFrames = (int) (Float.parseFloat(args[1]) * TARGET_FRAMERATE);
+    float focalLength = Float.parseFloat(args[2]);
+    float cameraX = Float.parseFloat(args[3]);
+    float cameraY = Float.parseFloat(args[4]);
+    float cameraZ = Float.parseFloat(args[5]);
 
-    long start = System.currentTimeMillis();
+    Camera camera = new Camera(focalLength, new Vector3(cameraX, cameraY, cameraZ));
+    WorldObject object = new WorldObject(objFilePath);
+    Vector3 rotation = new Vector3(0, OBJ_ROTATE, OBJ_ROTATE);
+    List<List<? extends Shape>> preRenderedFrames = new ArrayList<>();
 
     for (int i = 0; i < numFrames; i++) {
       preRenderedFrames.add(new ArrayList<>());
@@ -39,11 +49,10 @@ public class AudioClient {
       preRenderedFrames.set(frameNum, Shapes.sortLines(camera.draw(clone)));
     });
 
-    System.out.println(System.currentTimeMillis() - start);
-
     AudioPlayer player = new AudioPlayer(SAMPLE_RATE, preRenderedFrames);
-    //AudioPlayer.setRotateSpeed(1);
-    //AudioPlayer.setTranslation(1, new Vector2(1, 1));
+    player.setRotateSpeed(ROTATE_SPEED);
+    player.setTranslation(TRANSLATION_SPEED, TRANSLATION);
+    player.setScale(SCALE);
     player.start();
   }
 }
