@@ -11,15 +11,15 @@ import shapes.Shapes;
 import shapes.Vector2;
 
 public class AudioClient {
-  public static final int SAMPLE_RATE = 192000;
   public static final double TARGET_FRAMERATE = 30;
 
+  private static final int SAMPLE_RATE = 192000;
   private static final double OBJ_ROTATE = Math.PI / 100;
   private static final float ROTATE_SPEED = 0;
   private static final float TRANSLATION_SPEED = 0;
   private static final Vector2 TRANSLATION = new Vector2(1, 1);
-  private static final float SCALE = 2;
-  private static final float WEIGHT = 100;
+  private static final float SCALE = 1;
+  private static final float WEIGHT = 80;
 
   public static void main(String[] args) {
     // TODO: Calculate weight of lines using depth.
@@ -42,7 +42,7 @@ public class AudioClient {
     for (int i = 0; i < numFrames; i++) {
       preRenderedFrames.add(new ArrayList<>());
     }
-
+    
     IntStream.range(0, numFrames).parallel().forEach((frameNum) -> {
       WorldObject clone = object.clone();
       clone.rotate(rotation.scale(frameNum));
@@ -53,6 +53,8 @@ public class AudioClient {
     player.setRotateSpeed(ROTATE_SPEED);
     player.setTranslation(TRANSLATION_SPEED, TRANSLATION);
     player.setScale(SCALE);
+    player.setWeight(WEIGHT);
+
     player.start();
   }
 }
