@@ -8,28 +8,28 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class AudioPlayer extends Thread {
-  private static XtFormat FORMAT;
+  private final XtFormat FORMAT;
 
-  private static List<List<? extends Shape>> frames = new ArrayList<>();
-  private static int currentFrame = 0;
-  private static int currentShape = 0;
-  private static long timeOfLastFrame;
-  private static int audioFramesDrawn = 0;
+  private final List<List<? extends Shape>> frames;
+  private int currentFrame = 0;
+  private int currentShape = 0;
+  private long timeOfLastFrame;
+  private int audioFramesDrawn = 0;
 
   private double translateSpeed = 0;
   private Vector2 translateVector = new Vector2();
-  private Phase translatePhase = new Phase();
+  private final Phase translatePhase = new Phase();
   private double rotateSpeed = 0;
-  private Phase rotatePhase = new Phase();
+  private final Phase rotatePhase = new Phase();
   private double scale = 1;
   private double weight = 100;
 
   private volatile boolean stopped;
 
   public AudioPlayer(int sampleRate, List<List<? extends Shape>> frames) {
-    AudioPlayer.FORMAT = new XtFormat(new XtMix(sampleRate, XtSample.FLOAT32), 0, 0, 2, 0);
-    AudioPlayer.frames = frames;
-    AudioPlayer.timeOfLastFrame = System.currentTimeMillis();
+    this.FORMAT = new XtFormat(new XtMix(sampleRate, XtSample.FLOAT32), 0, 0, 2, 0);
+    this.frames = frames;
+    this.timeOfLastFrame = System.currentTimeMillis();
   }
 
   private void render(XtStream stream, Object input, Object output, int audioFrames,
@@ -54,12 +54,12 @@ public class AudioPlayer extends Thread {
 
       if (audioFramesDrawn > totalAudioFrames) {
         audioFramesDrawn = 0;
-        currentShape = ++currentShape % AudioPlayer.frames.get(currentFrame).size();
+        currentShape = ++currentShape % frames.get(currentFrame).size();
       }
 
       if (System.currentTimeMillis() - timeOfLastFrame > (float) 1000 / AudioClient.TARGET_FRAMERATE) {
         currentShape = 0;
-        currentFrame = ++currentFrame % AudioPlayer.frames.size();
+        currentFrame = ++currentFrame % frames.size();
         timeOfLastFrame = System.currentTimeMillis();
       }
     }
