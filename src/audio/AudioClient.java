@@ -12,10 +12,10 @@ import shapes.Vector2;
 
 public class AudioClient {
   private static final int SAMPLE_RATE = 192000;
-  private static final double OBJ_ROTATE = Math.PI / 1000;
+  private static final double OBJ_ROTATE = Math.PI / 100;
   private static final float ROTATE_SPEED = 0;
   private static final float TRANSLATION_SPEED = 0;
-  private static final Vector2 TRANSLATION = new Vector2(1, 1);
+  private static final Vector2 TRANSLATION = new Vector2(0.3, 0.3);
   private static final float SCALE = 1;
   private static final float WEIGHT = 80;
 
@@ -26,11 +26,12 @@ public class AudioClient {
     //  Improve performance of line cleanup with a heuristic.
 
     String objFilePath = args[0];
-    int numFrames = Integer.parseInt(args[1]);
-    float focalLength = Float.parseFloat(args[2]);
-    float cameraX = Float.parseFloat(args[3]);
-    float cameraY = Float.parseFloat(args[4]);
-    float cameraZ = Float.parseFloat(args[5]);
+    float focalLength = Float.parseFloat(args[1]);
+    float cameraX = Float.parseFloat(args[2]);
+    float cameraY = Float.parseFloat(args[3]);
+    float cameraZ = Float.parseFloat(args[4]);
+
+    int numFrames = (int) (2 * Math.PI / OBJ_ROTATE);
 
     Camera camera = new Camera(focalLength, new Vector3(cameraX, cameraY, cameraZ));
     WorldObject object = new WorldObject(objFilePath);
