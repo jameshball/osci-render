@@ -1,6 +1,8 @@
 package audio;
 
 import com.xtaudio.xt.*;
+import java.time.Duration;
+import java.time.Instant;
 import shapes.Shape;
 import shapes.Vector2;
 
@@ -12,7 +14,6 @@ public class AudioPlayer extends Thread {
   private final List<List<? extends Shape>> frames;
   private int currentFrame = 0;
   private int currentShape = 0;
-  private long timeOfLastFrame;
   private int audioFramesDrawn = 0;
 
   private double translateSpeed = 0;
@@ -28,7 +29,6 @@ public class AudioPlayer extends Thread {
   public AudioPlayer(int sampleRate, List<List<? extends Shape>> frames) {
     this.FORMAT = new XtFormat(new XtMix(sampleRate, XtSample.FLOAT32), 0, 0, 2, 0);
     this.frames = frames;
-    this.timeOfLastFrame = System.currentTimeMillis();
   }
 
   private void render(XtStream stream, Object input, Object output, int audioFrames,
@@ -53,13 +53,12 @@ public class AudioPlayer extends Thread {
 
       if (audioFramesDrawn > totalAudioFrames) {
         audioFramesDrawn = 0;
-        currentShape = ++currentShape % frames.get(currentFrame).size();
+        currentShape++;
       }
 
-      if (System.currentTimeMillis() - timeOfLastFrame > (float) 1000 / AudioClient.TARGET_FRAMERATE) {
+      if (currentShape >= frames.get(currentFrame).size()) {
         currentShape = 0;
         currentFrame = ++currentFrame % frames.size();
-        timeOfLastFrame = System.currentTimeMillis();
       }
     }
   }
