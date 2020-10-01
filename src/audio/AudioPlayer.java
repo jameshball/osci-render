@@ -4,7 +4,6 @@ import com.xtaudio.xt.*;
 import shapes.Shape;
 import shapes.Vector2;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class AudioPlayer extends Thread {

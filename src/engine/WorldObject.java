@@ -9,8 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class WorldObject {
-  private List<Vector3> vertices;
-  private List<Integer> edgeData;
+  private final List<Vector3> vertices;
+  private final List<Integer> edgeData;
   private Vector3 position;
   private Vector3 rotation;
 
