@@ -29,21 +29,21 @@ public final class Line extends Shape {
 
   @Override
   public Line rotate(double theta) {
-    return new Line(getA().rotate(theta), getB().rotate(theta), getWeight());
+    return new Line(a.rotate(theta), b.rotate(theta), weight);
   }
 
   @Override
   public Line translate(Vector2 vector) {
-    return new Line(getA().translate(vector), getB().translate(vector));
+    return new Line(a.translate(vector), b.translate(vector), weight);
   }
 
   @Override
   public Line scale(double factor) {
-    return new Line(getA().scale(factor), getB().scale(factor));
+    return new Line(a.scale(factor), b.scale(factor), weight);
   }
 
   public Line copy() {
-    return new Line(getA().copy(), getB().copy(), getWeight());
+    return new Line(a.copy(), b.copy(), weight);
   }
 
   @Override
@@ -108,7 +108,7 @@ public final class Line extends Shape {
     } else if (obj instanceof Line) {
       Line line = (Line) obj;
 
-      return line.getA().equals(getA()) && line.getB().equals(getB());
+      return line.a.equals(a) && line.b.equals(b);
     } else {
       return false;
     }
