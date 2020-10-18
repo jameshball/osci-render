@@ -56,7 +56,7 @@ final class AudioArgs {
   private class IllegalAudioArgumentException extends IllegalArgumentException {
 
     private static final String USAGE = "Incorrect usage.\nUsage: osci-render objFilePath "
-        + "[rotateSpeed] [cameraX] [cameraY] [cameraZ] [focalLength]";
+        + "[rotateSpeed] [focalLength] [cameraX] [cameraY] [cameraZ]";
 
     public IllegalAudioArgumentException() {
       super(USAGE);
