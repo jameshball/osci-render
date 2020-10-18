@@ -1,6 +1,7 @@
 package shapes;
 
 public final class Ellipse extends Shape {
+
   private final double a;
   private final double b;
   private final double rotation;
@@ -27,15 +28,15 @@ public final class Ellipse extends Shape {
   @Override
   public float nextX(double drawingProgress) {
     return (float) (position.getX()
-      + a * Math.cos(2 * Math.PI * drawingProgress) * Math.cos(rotation)
-      - b * Math.sin(2 * Math.PI * drawingProgress) * Math.sin(rotation));
+        + a * Math.cos(2 * Math.PI * drawingProgress) * Math.cos(rotation)
+        - b * Math.sin(2 * Math.PI * drawingProgress) * Math.sin(rotation));
   }
 
   @Override
   public float nextY(double drawingProgress) {
     return (float) (position.getY()
-      + a * Math.cos(2 * Math.PI * drawingProgress) * Math.sin(rotation)
-      + b * Math.sin(2 * Math.PI * drawingProgress) * Math.cos(rotation));
+        + a * Math.cos(2 * Math.PI * drawingProgress) * Math.sin(rotation)
+        + b * Math.sin(2 * Math.PI * drawingProgress) * Math.cos(rotation));
   }
 
   @Override
