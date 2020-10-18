@@ -22,8 +22,9 @@ public class AudioClient {
   private static final float WEIGHT = 80;
   // Threshold for the max vertex value being displayed when rendering (will change position of
   // camera to scale the image)
-  private static final double VERTEX_VALUE_THRESHOLD = 0.5;
+  private static final double VERTEX_VALUE_THRESHOLD = 1;
   private static final double CAMERA_MOVE_INCREMENT = -0.1;
+  private static final int SAMPLE_RENDER_SAMPLES = 50;
 
   // args:
   // args[0] - path of .obj file
@@ -45,7 +46,6 @@ public class AudioClient {
 
     OBJ_ROTATE_SPEED *= args.rotateSpeed();
 
-    //Vector3 cameraPos = new Vector3(args.cameraX(), args.cameraY(), args.cameraZ());
     Camera camera = new Camera(args.focalLength());
     WorldObject object = new WorldObject(args.objFilePath());
     findZPos(camera, object);
@@ -96,8 +96,23 @@ public class AudioClient {
 
     while (maxVertexValue(vertices) > VERTEX_VALUE_THRESHOLD) {
       camera.move(new Vector3(0, 0, CAMERA_MOVE_INCREMENT));
-      vertices = camera.getProjectedVertices(object);
+      vertices = sampleVerticesInRender(camera, object);
     }
+  }
+
+  // Does a 'sample render' to find the possible range of projected vectors on the screen to reduce
+  // clipping on edges of the oscilloscope screen.
+  private static List<Vector2> sampleVerticesInRender(Camera camera, WorldObject object) {
+    Vector3 rotation = new Vector3(0, 2 * Math.PI / SAMPLE_RENDER_SAMPLES, 2 * Math.PI / SAMPLE_RENDER_SAMPLES);
+    WorldObject clone = object.clone();
+    List<Vector2> vertices = new ArrayList<>();
+
+    for (int i = 0; i < SAMPLE_RENDER_SAMPLES - 1; i++) {
+      vertices.addAll(camera.getProjectedVertices(clone));
+      clone.rotate(rotation);
+    }
+
+    return vertices;
   }
 
   private static double maxVertexValue(List<Vector2> vertices) {
