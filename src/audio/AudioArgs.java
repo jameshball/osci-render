@@ -29,20 +29,24 @@ final class AudioArgs {
     return getArg(0, 0);
   }
 
-  float cameraX() {
-    return getArg(1, 0);
+  float focalLength() {
+    return getArg(1, (float) Camera.DEFAULT_FOCAL_LENGTH);
   }
 
-  float cameraY() {
+  float cameraX() {
     return getArg(2, 0);
   }
 
-  float cameraZ() {
+  float cameraY() {
     return getArg(3, 0);
   }
 
-  float focalLength() {
-    return getArg(4, (float) Camera.DEFAULT_FOCAL_LENGTH);
+  float cameraZ() {
+    return getArg(4, 0);
+  }
+
+  boolean isDefaultPosition() {
+    return optionalArgs.length <= 2;
   }
 
   private float getArg(int n, float defaultVal) {
