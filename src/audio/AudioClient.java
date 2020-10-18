@@ -20,6 +20,10 @@ public class AudioClient {
   private static final Vector2 TRANSLATION = new Vector2(0.3, 0.3);
   private static final float SCALE = 1;
   private static final float WEIGHT = 80;
+  // Threshold for the max vertex value being displayed when rendering (will change position of
+  // camera to scale the image)
+  private static final double VERTEX_VALUE_THRESHOLD = 0.5;
+  private static final double CAMERA_MOVE_INCREMENT = -0.1;
 
   // args:
   // args[0] - path of .obj file
@@ -41,9 +45,10 @@ public class AudioClient {
 
     OBJ_ROTATE_SPEED *= args.rotateSpeed();
 
-    Vector3 cameraPos = new Vector3(args.cameraX(), args.cameraY(), args.cameraZ());
-    Camera camera = new Camera(args.focalLength(), cameraPos);
+    //Vector3 cameraPos = new Vector3(args.cameraX(), args.cameraY(), args.cameraZ());
+    Camera camera = new Camera(args.focalLength());
     WorldObject object = new WorldObject(args.objFilePath());
+    findZPos(camera, object);
     Vector3 rotation = new Vector3(0, OBJ_ROTATE_SPEED, OBJ_ROTATE_SPEED);
 
     System.out.println("Begin pre-render...");
@@ -76,9 +81,30 @@ public class AudioClient {
 
       if (numRendered % 50 == 0) {
         System.out.println("Rendered " + numRendered + " frames of " + (numFrames + 1) + " total");
+        System.out.println(maxVertexValue(camera.getProjectedVertices(object)));
       }
     });
 
     return preRenderedFrames;
+  }
+
+  // Automatically finds the correct Z position to use to view the world object properly.
+  private static void findZPos(Camera camera, WorldObject object) {
+    // TODO: Keep original x/y coords.
+    camera.setPos(new Vector3());
+    List<Vector2> vertices = new ArrayList<>();
+
+    while (maxVertexValue(vertices) > VERTEX_VALUE_THRESHOLD) {
+      camera.move(new Vector3(0, 0, CAMERA_MOVE_INCREMENT));
+      vertices = camera.getProjectedVertices(object);
+    }
+  }
+
+  private static double maxVertexValue(List<Vector2> vertices) {
+    return vertices
+        .stream()
+        .map((vec) -> Math.max(Math.abs(vec.getX()), Math.abs(vec.getY())))
+        .max(Double::compareTo)
+        .orElse(Double.POSITIVE_INFINITY);
   }
 }

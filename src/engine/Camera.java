@@ -8,6 +8,8 @@ import java.util.List;
 
 public class Camera {
 
+  public static double DEFAULT_FOCAL_LENGTH = 1;
+
   private double focalLength;
   private double clipping = 0.001;
   private Vector3 pos;
@@ -15,6 +17,18 @@ public class Camera {
   public Camera(double focalLength, Vector3 pos) {
     this.focalLength = focalLength;
     this.pos = pos;
+  }
+
+  public Camera(double focalLength) {
+    this(focalLength, new Vector3());
+  }
+
+  public Camera(Vector3 pos) {
+    this(DEFAULT_FOCAL_LENGTH, pos);
+  }
+
+  public Camera() {
+    this(DEFAULT_FOCAL_LENGTH, new Vector3());
   }
 
   public List<Line> draw(WorldObject worldObject) {
@@ -31,9 +45,21 @@ public class Camera {
     return vertices;
   }
 
+  public Vector3 getPos() {
+    return pos.clone();
+  }
+
+  public void setPos(Vector3 pos) {
+    this.pos = pos;
+  }
+
+  public void move(Vector3 dir) {
+    pos = pos.add(dir);
+  }
+
   private Vector2 project(Vector3 vertex) {
     if (vertex.getZ() - pos.getZ() < clipping) {
-      return new Vector2(0, 0);
+      return new Vector2();
     }
 
     return new Vector2(
