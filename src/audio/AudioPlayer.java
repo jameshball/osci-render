@@ -1,14 +1,12 @@
 package audio;
 
 import com.xtaudio.xt.*;
-import java.time.Duration;
-import java.time.Instant;
 import shapes.Shape;
 import shapes.Vector2;
 
 import java.util.List;
 
-public class AudioPlayer extends Thread {
+public class AudioPlayer {
   private final XtFormat FORMAT;
 
   private final List<List<? extends Shape>> frames;
@@ -29,6 +27,14 @@ public class AudioPlayer extends Thread {
   public AudioPlayer(int sampleRate, List<List<? extends Shape>> frames) {
     this.FORMAT = new XtFormat(new XtMix(sampleRate, XtSample.FLOAT32), 0, 0, 2, 0);
     this.frames = frames;
+  }
+
+  public AudioPlayer(int sampleRate, List<List<? extends Shape>> frames, float rotateSpeed, float translateSpeed, Vector2 translateVector, float scale, float weight) {
+    this(sampleRate, frames);
+    setRotateSpeed(rotateSpeed);
+    setTranslation(translateSpeed, translateVector);
+    setScale(scale);
+    setWeight(weight);
   }
 
   private void render(XtStream stream, Object input, Object output, int audioFrames,
@@ -126,14 +132,13 @@ public class AudioPlayer extends Thread {
     return frames.get(currentFrame).get(currentShape);
   }
 
-  @Override
-  public void run() {
+  public void play() {
     try (XtAudio audio = new XtAudio(null, null, null, null)) {
       XtService service = XtAudio.getServiceBySetup(XtSetup.CONSUMER_AUDIO);
       try (XtDevice device = service.openDefaultDevice(true)) {
         if (device != null && device.supportsFormat(FORMAT)) {
-
           XtBuffer buffer = device.getBuffer(FORMAT);
+
           try (XtStream stream = device.openStream(FORMAT, true, false,
             buffer.current, this::render, null, null)) {
             stream.start();
