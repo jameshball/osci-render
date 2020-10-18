@@ -1,5 +1,7 @@
 package audio;
 
+import engine.Camera;
+
 // Helper class for AudioClient that deals with optional program arguments.
 final class AudioArgs {
 
@@ -40,7 +42,7 @@ final class AudioArgs {
   }
 
   float focalLength() {
-    return getArg(4, 1);
+    return getArg(4, (float) Camera.DEFAULT_FOCAL_LENGTH);
   }
 
   private float getArg(int n, float defaultVal) {
