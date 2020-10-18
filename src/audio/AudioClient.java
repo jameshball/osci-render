@@ -23,14 +23,14 @@ public class AudioClient {
 
   // args:
   // args[0] - path of .obj file
-  // args[1] - focal length of camera
-  // args[2] - x position of camera
-  // args[3] - y position of camera
-  // args[4] - z position of camera
-  // args[5] - rotation speed of object
+  // args[1] - rotation speed of object
+  // args[2] - focal length of camera
+  // args[3] - x position of camera
+  // args[4] - y position of camera
+  // args[5] - z position of camera
   //
   // example:
-  // osci-render models/cube.obj 1 0 0 -3 10
+  // osci-render models/cube.obj 3
   public static void main(String[] programArgs) {
     // TODO: Calculate weight of lines using depth.
     //  Reduce weight of lines drawn multiple times.
@@ -44,6 +44,8 @@ public class AudioClient {
     Vector3 cameraPos = new Vector3(args.cameraX(), args.cameraY(), args.cameraZ());
     WorldObject object = new WorldObject(args.objFilePath());
 
+    // If camera position arguments haven't been specified, automatically work out the position of
+    // the camera based on the size of the object in the camera's view.
     Camera camera = args.isDefaultPosition() ? new Camera(args.focalLength(), object)
         : new Camera(args.focalLength(), cameraPos);
 
@@ -62,6 +64,7 @@ public class AudioClient {
   private static List<List<? extends Shape>> preRender(WorldObject object, Vector3 rotation,
       Camera camera) {
     List<List<? extends Shape>> preRenderedFrames = new ArrayList<>();
+    // Number of frames it will take to render a full rotation of the object.
     int numFrames = (int) (2 * Math.PI / OBJ_ROTATE_SPEED);
 
     for (int i = 0; i < numFrames; i++) {
@@ -74,6 +77,8 @@ public class AudioClient {
     IntStream.range(0, numFrames).parallel().forEach((frameNum) -> {
       WorldObject clone = object.clone();
       clone.rotate(rotation.scale(frameNum));
+      // Finds all lines to draw the object from the camera's view and then 'sorts' them by finding
+      // a hamiltonian path, which dramatically helps with rendering a clean image.
       preRenderedFrames.set(frameNum, Shapes.sortLines(camera.draw(clone)));
       int numRendered = renderedFrames.getAndIncrement();
 
