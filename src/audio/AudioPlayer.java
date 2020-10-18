@@ -20,7 +20,7 @@ public class AudioPlayer {
   private double rotateSpeed = 0;
   private final Phase rotatePhase = new Phase();
   private double scale = 1;
-  private double weight = 100;
+  private double weight = Shape.DEFAULT_WEIGHT;
 
   private volatile boolean stopped;
 
