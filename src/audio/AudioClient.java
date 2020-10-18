@@ -44,8 +44,6 @@ public class AudioClient {
     Vector3 cameraPos = new Vector3(args.cameraX(), args.cameraY(), args.cameraZ());
     WorldObject object = new WorldObject(args.objFilePath());
 
-    System.out.println(args.isDefaultPosition());
-
     Camera camera = args.isDefaultPosition() ? new Camera(args.focalLength(), object)
         : new Camera(args.focalLength(), cameraPos);
 
