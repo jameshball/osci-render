@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class WorldObject {
+
   private final List<Vector3> vertices;
   private final List<Integer> edgeData;
   private Vector3 position;
@@ -32,7 +33,8 @@ public class WorldObject {
     loadFromFile(filename);
   }
 
-  public WorldObject(List<Vector3> vertices, List<Integer> edgeData, Vector3 position, Vector3 rotation) {
+  public WorldObject(List<Vector3> vertices, List<Integer> edgeData, Vector3 position,
+      Vector3 rotation) {
     this.vertices = vertices;
     this.edgeData = edgeData;
     this.position = position;
@@ -89,6 +91,7 @@ public class WorldObject {
   }
 
   public WorldObject clone() {
-    return new WorldObject(new ArrayList<>(vertices), new ArrayList<>(edgeData), position, rotation);
+    return new WorldObject(new ArrayList<>(vertices), new ArrayList<>(edgeData), position,
+        rotation);
   }
 }

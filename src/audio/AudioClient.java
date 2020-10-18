@@ -50,12 +50,14 @@ public class AudioClient {
     List<List<? extends Shape>> frames = preRender(object, rotation, camera);
     System.out.println("Finish pre-render");
     System.out.println("Connecting to audio player");
-    AudioPlayer player = new AudioPlayer(SAMPLE_RATE, frames, ROTATE_SPEED, TRANSLATION_SPEED, TRANSLATION, SCALE, WEIGHT);
+    AudioPlayer player = new AudioPlayer(SAMPLE_RATE, frames, ROTATE_SPEED, TRANSLATION_SPEED,
+        TRANSLATION, SCALE, WEIGHT);
     System.out.println("Starting audio stream");
     player.play();
   }
 
-  private static List<List<? extends Shape>> preRender(WorldObject object, Vector3 rotation, Camera camera) {
+  private static List<List<? extends Shape>> preRender(WorldObject object, Vector3 rotation,
+      Camera camera) {
     List<List<? extends Shape>> preRenderedFrames = new ArrayList<>();
     int numFrames = (int) (2 * Math.PI / OBJ_ROTATE_SPEED);
 

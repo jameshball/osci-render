@@ -15,6 +15,7 @@ import shapes.Vector2;
 import java.util.List;
 
 public class AudioPlayer {
+
   private final XtFormat FORMAT;
 
   private final List<List<? extends Shape>> frames;
@@ -37,7 +38,8 @@ public class AudioPlayer {
     this.frames = frames;
   }
 
-  public AudioPlayer(int sampleRate, List<List<? extends Shape>> frames, float rotateSpeed, float translateSpeed, Vector2 translateVector, float scale, float weight) {
+  public AudioPlayer(int sampleRate, List<List<? extends Shape>> frames, float rotateSpeed,
+      float translateSpeed, Vector2 translateVector, float scale, float weight) {
     this(sampleRate, frames);
     setRotateSpeed(rotateSpeed);
     setTranslation(translateSpeed, translateVector);
@@ -46,7 +48,7 @@ public class AudioPlayer {
   }
 
   private void render(XtStream stream, Object input, Object output, int audioFrames,
-                     double time, long position, boolean timeValid, long error, Object user) {
+      double time, long position, boolean timeValid, long error, Object user) {
     for (int f = 0; f < audioFrames; f++) {
       Shape shape = getCurrentShape();
 
@@ -80,7 +82,7 @@ public class AudioPlayer {
   private Shape rotate(Shape shape, double sampleRate) {
     if (rotateSpeed != 0) {
       shape = shape.rotate(
-        nextTheta(sampleRate, rotateSpeed, translatePhase)
+          nextTheta(sampleRate, rotateSpeed, translatePhase)
       );
     }
 
@@ -90,7 +92,7 @@ public class AudioPlayer {
   private Shape translate(Shape shape, double sampleRate) {
     if (translateSpeed != 0 && !translateVector.equals(new Vector2())) {
       return shape.translate(translateVector.scale(
-        Math.sin(nextTheta(sampleRate, translateSpeed, rotatePhase))
+          Math.sin(nextTheta(sampleRate, translateSpeed, rotatePhase))
       ));
     }
 
@@ -148,7 +150,7 @@ public class AudioPlayer {
           XtBuffer buffer = device.getBuffer(FORMAT);
 
           try (XtStream stream = device.openStream(FORMAT, true, false,
-            buffer.current, this::render, null, null)) {
+              buffer.current, this::render, null, null)) {
             stream.start();
             while (!stopped) {
               Thread.onSpinWait();
@@ -165,6 +167,7 @@ public class AudioPlayer {
   }
 
   private static final class Phase {
+
     private double value = 0;
   }
 }
