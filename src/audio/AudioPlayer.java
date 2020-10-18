@@ -1,6 +1,14 @@
 package audio;
 
-import com.xtaudio.xt.*;
+import com.xtaudio.xt.XtAudio;
+import com.xtaudio.xt.XtBuffer;
+import com.xtaudio.xt.XtDevice;
+import com.xtaudio.xt.XtFormat;
+import com.xtaudio.xt.XtMix;
+import com.xtaudio.xt.XtSample;
+import com.xtaudio.xt.XtService;
+import com.xtaudio.xt.XtSetup;
+import com.xtaudio.xt.XtStream;
 import shapes.Shape;
 import shapes.Vector2;
 
