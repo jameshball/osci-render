@@ -1,14 +1,21 @@
 package audio;
 
-import com.xtaudio.xt.*;
-import java.time.Duration;
-import java.time.Instant;
+import com.xtaudio.xt.XtAudio;
+import com.xtaudio.xt.XtBuffer;
+import com.xtaudio.xt.XtDevice;
+import com.xtaudio.xt.XtFormat;
+import com.xtaudio.xt.XtMix;
+import com.xtaudio.xt.XtSample;
+import com.xtaudio.xt.XtService;
+import com.xtaudio.xt.XtSetup;
+import com.xtaudio.xt.XtStream;
 import shapes.Shape;
 import shapes.Vector2;
 
 import java.util.List;
 
-public class AudioPlayer extends Thread {
+public class AudioPlayer {
+
   private final XtFormat FORMAT;
 
   private final List<List<? extends Shape>> frames;
@@ -22,7 +29,7 @@ public class AudioPlayer extends Thread {
   private double rotateSpeed = 0;
   private final Phase rotatePhase = new Phase();
   private double scale = 1;
-  private double weight = 100;
+  private double weight = Shape.DEFAULT_WEIGHT;
 
   private volatile boolean stopped;
 
@@ -31,8 +38,17 @@ public class AudioPlayer extends Thread {
     this.frames = frames;
   }
 
+  public AudioPlayer(int sampleRate, List<List<? extends Shape>> frames, float rotateSpeed,
+      float translateSpeed, Vector2 translateVector, float scale, float weight) {
+    this(sampleRate, frames);
+    setRotateSpeed(rotateSpeed);
+    setTranslation(translateSpeed, translateVector);
+    setScale(scale);
+    setWeight(weight);
+  }
+
   private void render(XtStream stream, Object input, Object output, int audioFrames,
-                     double time, long position, boolean timeValid, long error, Object user) {
+      double time, long position, boolean timeValid, long error, Object user) {
     for (int f = 0; f < audioFrames; f++) {
       Shape shape = getCurrentShape();
 
@@ -66,7 +82,7 @@ public class AudioPlayer extends Thread {
   private Shape rotate(Shape shape, double sampleRate) {
     if (rotateSpeed != 0) {
       shape = shape.rotate(
-        nextTheta(sampleRate, rotateSpeed, translatePhase)
+          nextTheta(sampleRate, rotateSpeed, translatePhase)
       );
     }
 
@@ -76,7 +92,7 @@ public class AudioPlayer extends Thread {
   private Shape translate(Shape shape, double sampleRate) {
     if (translateSpeed != 0 && !translateVector.equals(new Vector2())) {
       return shape.translate(translateVector.scale(
-        Math.sin(nextTheta(sampleRate, translateSpeed, rotatePhase))
+          Math.sin(nextTheta(sampleRate, translateSpeed, rotatePhase))
       ));
     }
 
@@ -126,16 +142,15 @@ public class AudioPlayer extends Thread {
     return frames.get(currentFrame).get(currentShape);
   }
 
-  @Override
-  public void run() {
+  public void play() {
     try (XtAudio audio = new XtAudio(null, null, null, null)) {
       XtService service = XtAudio.getServiceBySetup(XtSetup.CONSUMER_AUDIO);
       try (XtDevice device = service.openDefaultDevice(true)) {
         if (device != null && device.supportsFormat(FORMAT)) {
-
           XtBuffer buffer = device.getBuffer(FORMAT);
+
           try (XtStream stream = device.openStream(FORMAT, true, false,
-            buffer.current, this::render, null, null)) {
+              buffer.current, this::render, null, null)) {
             stream.start();
             while (!stopped) {
               Thread.onSpinWait();
@@ -152,6 +167,7 @@ public class AudioPlayer extends Thread {
   }
 
   private static final class Phase {
+
     private double value = 0;
   }
 }

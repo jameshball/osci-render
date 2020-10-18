@@ -13,7 +13,9 @@ import org.jgrapht.graph.DefaultUndirectedWeightedGraph;
 import org.jgrapht.graph.DefaultWeightedEdge;
 
 public class Shapes {
-  public static List<Shape> generatePolygram(int sides, int angleJump, Vector2 start, double weight) {
+
+  public static List<Shape> generatePolygram(int sides, int angleJump, Vector2 start,
+      double weight) {
     List<Shape> polygon = new ArrayList<>();
 
     double theta = angleJump * 2 * Math.PI / sides;
@@ -33,7 +35,8 @@ public class Shapes {
     return generatePolygram(sides, angleJump, start, Line.DEFAULT_WEIGHT);
   }
 
-  public static List<Shape> generatePolygram(int sides, int angleJump, double scale, double weight) {
+  public static List<Shape> generatePolygram(int sides, int angleJump, double scale,
+      double weight) {
     return generatePolygram(sides, angleJump, new Vector2(scale, scale), weight);
   }
 
@@ -59,16 +62,17 @@ public class Shapes {
 
   public static double totalLength(List<? extends Shape> shapes) {
     return shapes
-      .stream()
-      .map(Shape::getLength)
-      .reduce(Double::sum)
-      .orElse(0d);
+        .stream()
+        .map(Shape::getLength)
+        .reduce(Double::sum)
+        .orElse(0d);
   }
 
   // performs chinese postman on the input lines to get a path that will render cleanly on the oscilloscope.
   // TODO: Speed up.
   public static List<Shape> sortLines(List<Line> lines) {
-    Graph<Vector2, DefaultWeightedEdge> graph = new DefaultUndirectedWeightedGraph<>(DefaultWeightedEdge.class);
+    Graph<Vector2, DefaultWeightedEdge> graph = new DefaultUndirectedWeightedGraph<>(
+        DefaultWeightedEdge.class);
 
     for (Line line : lines) {
       graph.addVertex(line.getA());
@@ -79,7 +83,8 @@ public class Shapes {
       graph.setEdgeWeight(edge, line.length);
     }
 
-    ConnectivityInspector<Vector2, DefaultWeightedEdge> inspector = new ConnectivityInspector<>(graph);
+    ConnectivityInspector<Vector2, DefaultWeightedEdge> inspector = new ConnectivityInspector<>(
+        graph);
 
     List<Shape> sortedLines = new ArrayList<>();
 
