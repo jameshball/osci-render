@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Camera {
+
   private double focalLength;
   private double clipping = 0.001;
   private Vector3 pos;
@@ -17,23 +18,27 @@ public class Camera {
   }
 
   public List<Line> draw(WorldObject worldObject) {
+    return getFrame(getProjectedVertices(worldObject), worldObject.getEdgeData());
+  }
+
+  public List<Vector2> getProjectedVertices(WorldObject worldObject) {
     List<Vector2> vertices = new ArrayList<>();
 
-    for(Vector3 vertex : worldObject.getVertices()) {
+    for (Vector3 vertex : worldObject.getVertices()) {
       vertices.add(project(vertex));
     }
 
-    return getFrame(vertices, worldObject.getEdgeData());
+    return vertices;
   }
 
   private Vector2 project(Vector3 vertex) {
-    if(vertex.getZ() - pos.getZ() < clipping) {
+    if (vertex.getZ() - pos.getZ() < clipping) {
       return new Vector2(0, 0);
     }
 
     return new Vector2(
-      vertex.getX() * focalLength / (vertex.getZ() - pos.getZ()) + pos.getX(),
-      vertex.getY() * focalLength / (vertex.getZ() - pos.getZ()) + pos.getY()
+        vertex.getX() * focalLength / (vertex.getZ() - pos.getZ()) + pos.getX(),
+        vertex.getY() * focalLength / (vertex.getZ() - pos.getZ()) + pos.getY()
     );
   }
 

@@ -2,7 +2,8 @@ package shapes;
 
 import java.util.Objects;
 
-public final class Vector2 extends Shape{
+public final class Vector2 extends Shape {
+
   private final double x;
   private final double y;
 
@@ -75,11 +76,15 @@ public final class Vector2 extends Shape{
 
   @Override
   public boolean equals(Object obj) {
-    if (this == obj) return true;
-    if (obj == null || getClass() != obj.getClass()) return false;
+    if (this == obj) {
+      return true;
+    }
+    if (obj == null || getClass() != obj.getClass()) {
+      return false;
+    }
     Vector2 point = (Vector2) obj;
     return round(x, 2) == round(point.x, 2)
-      && round(y, 2) == round(point.y, 2);
+        && round(y, 2) == round(point.y, 2);
   }
 
   @Override
@@ -88,7 +93,9 @@ public final class Vector2 extends Shape{
   }
 
   private static double round(double value, int places) {
-    if (places < 0) throw new IllegalArgumentException();
+    if (places < 0) {
+      throw new IllegalArgumentException();
+    }
 
     long factor = (long) Math.pow(10, places);
     value *= factor;
