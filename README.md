@@ -22,8 +22,9 @@ Lots of this code was built as part of a 24hr hackathon: IC Hack 20. The origina
 
 ## Proposed Features
 
-- Performance improvements to Shapes.sortLines()
+- Performance improvements to `Shapes.sortLines()`
     - With goal of high-framerate realtime rendering
+- Rendering `.svg` and other image formats
 - Tune and transpose audio output
 - Support rendering of multiple objects
 - Saving pre-rendered frames to file for later loading
