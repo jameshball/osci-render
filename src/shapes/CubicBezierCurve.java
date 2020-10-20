@@ -9,8 +9,8 @@ public class CubicBezierCurve extends Shape {
   private final double factor;
   private final Vector2 translation;
 
-  public CubicBezierCurve(Vector2 p0, Vector2 p1, Vector2 p2, Vector2 p3, double weight, double factor,
-      Vector2 translation) {
+  public CubicBezierCurve(Vector2 p0, Vector2 p1, Vector2 p2, Vector2 p3, double weight,
+      double factor, Vector2 translation) {
     this.p0 = p0;
     this.p1 = p1;
     this.p2 = p2;
@@ -37,14 +37,18 @@ public class CubicBezierCurve extends Shape {
 
   @Override
   public float nextX(double t) {
-    return (float) (Math.pow(1 - t, 3) * factor * p0.getX() + 3 * Math.pow(1 - t, 2) * t * factor * p1.getX()
-        + 3 * (1 - t) * Math.pow(t, 2) * factor * p2.getX() + Math.pow(t, 3) * factor * p3.getX());
+    return (float) (Math.pow(1 - t, 3) * factor * p0.getX()
+        + 3 * Math.pow(1 - t, 2) * t * factor * p1.getX()
+        + 3 * (1 - t) * Math.pow(t, 2) * factor * p2.getX()
+        + Math.pow(t, 3) * factor * p3.getX());
   }
 
   @Override
   public float nextY(double t) {
-    return (float) (Math.pow(1 - t, 3) * factor * p0.getY() + 3 * Math.pow(1 - t, 2) * t * factor * p1.getY()
-        + 3 * (1 - t) * Math.pow(t, 2) * factor * p2.getY() + Math.pow(t, 3) * factor * p3.getY());
+    return (float) (Math.pow(1 - t, 3) * factor * p0.getY()
+        + 3 * Math.pow(1 - t, 2) * t * factor * p1.getY()
+        + 3 * (1 - t) * Math.pow(t, 2) * factor * p2.getY()
+        + Math.pow(t, 3) * factor * p3.getY());
   }
 
   @Override
