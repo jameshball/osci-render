@@ -4,7 +4,7 @@ public abstract class Shape {
 
   public static final int DEFAULT_WEIGHT = 80;
 
-  protected double weight;
+  protected double weight = DEFAULT_WEIGHT;
   protected double length;
 
   public abstract float nextX(double drawingProgress);
