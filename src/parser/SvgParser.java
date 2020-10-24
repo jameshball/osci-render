@@ -18,116 +18,116 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.xml.sax.SAXException;
 import shapes.Shape;
+import shapes.Vector2;
 
 public class SvgParser extends FileParser {
 
   private final List<Shape> shapes;
-  private static final Map<Character, Function<List<Float>, List<? extends Shape>>> commandMap = new HashMap<>();
+  private final Map<Character, Function<List<Float>, List<? extends Shape>>> commandMap;
+
+  private Vector2 pos;
 
   static {
     fileExtension = "svg";
-
-    commandMap.put('M', SvgParser::parseMoveToAbsolute);
-    commandMap.put('m', SvgParser::parseMoveToRelative);
-    commandMap.put('L', SvgParser::parseLineToAbsolute);
-    commandMap.put('l', SvgParser::parseLineToRelative);
-    commandMap.put('H', SvgParser::parseHorizontalLineToAbsolute);
-    commandMap.put('h', SvgParser::parseHorizontalLineToRelative);
-    commandMap.put('V', SvgParser::parseVerticalLineToAbsolute);
-    commandMap.put('v', SvgParser::parseVerticalLineToRelative);
-    commandMap.put('C', SvgParser::parseCurveToAbsolute);
-    commandMap.put('c', SvgParser::parseCurveToRelative);
-    commandMap.put('S', SvgParser::parseSmoothCurveToAbsolute);
-    commandMap.put('s', SvgParser::parseSmoothCurveToRelative);
-    commandMap.put('Q', SvgParser::parseQuadraticCurveToAbsolute);
-    commandMap.put('q', SvgParser::parseQuadraticCurveToRelative);
-    commandMap.put('T', SvgParser::parseSmoothQuadraticCurveToAbsolute);
-    commandMap.put('t', SvgParser::parseSmoothQuadraticCurveToRelative);
-    commandMap.put('A', SvgParser::parseEllipticalArcAbsolute);
-    commandMap.put('a', SvgParser::parseEllipticalArcRelative);
-    commandMap.put('Z', SvgParser::parseClosePath);
-    commandMap.put('z', SvgParser::parseClosePath);
-  }
-
-  private static List<? extends Shape> parseMoveToAbsolute(List<Float> args) {
-    return null;
-  }
-
-  private static List<? extends Shape> parseMoveToRelative(List<Float> args) {
-    return null;
-  }
-
-  private static List<? extends Shape> parseClosePath(List<Float> args) {
-    return null;
-  }
-
-  private static List<? extends Shape> parseLineToAbsolute(List<Float> args) {
-    return null;
-  }
-
-  private static List<? extends Shape> parseLineToRelative(List<Float> args) {
-    return null;
-  }
-
-  private static List<? extends Shape> parseHorizontalLineToAbsolute(List<Float> args) {
-    return null;
-  }
-
-  private static List<? extends Shape> parseHorizontalLineToRelative(List<Float> args) {
-    return null;
-  }
-
-  private static List<? extends Shape> parseVerticalLineToAbsolute(List<Float> args) {
-    return null;
-  }
-
-  private static List<? extends Shape> parseVerticalLineToRelative(List<Float> args) {
-    return null;
-  }
-
-  private static List<? extends Shape> parseCurveToAbsolute(List<Float> args) {
-    return null;
-  }
-
-  private static List<? extends Shape> parseCurveToRelative(List<Float> args) {
-    return null;
-  }
-
-  private static List<? extends Shape> parseSmoothCurveToAbsolute(List<Float> args) {
-    return null;
-  }
-
-  private static List<? extends Shape> parseSmoothCurveToRelative(List<Float> args) {
-    return null;
-  }
-
-  private static List<? extends Shape> parseQuadraticCurveToAbsolute(List<Float> args) {
-    return null;
-  }
-
-  private static List<? extends Shape> parseQuadraticCurveToRelative(List<Float> args) {
-    return null;
-  }
-
-  private static List<? extends Shape> parseSmoothQuadraticCurveToAbsolute(List<Float> args) {
-    return null;
-  }
-
-  private static List<? extends Shape> parseSmoothQuadraticCurveToRelative(List<Float> args) {
-    return null;
-  }
-
-  private static List<? extends Shape> parseEllipticalArcAbsolute(List<Float> args) {
-    return null;
-  }
-
-  private static List<? extends Shape> parseEllipticalArcRelative(List<Float> args) {
-    return null;
   }
 
   public SvgParser(String path) throws IOException, SAXException, ParserConfigurationException {
-    super(path);
+    FileParser.checkFileExtension(path);
     shapes = new ArrayList<>();
+
+    commandMap = new HashMap<>();
+    commandMap.put('M', this::parseMoveToAbsolute);
+    commandMap.put('m', this::parseMoveToRelative);
+    commandMap.put('L', this::parseLineToAbsolute);
+    commandMap.put('l', this::parseLineToRelative);
+    commandMap.put('H', this::parseHorizontalLineToAbsolute);
+    commandMap.put('h', this::parseHorizontalLineToRelative);
+    commandMap.put('V', this::parseVerticalLineToAbsolute);
+    commandMap.put('v', this::parseVerticalLineToRelative);
+    commandMap.put('C', this::parseCurveToAbsolute);
+    commandMap.put('c', this::parseCurveToRelative);
+    commandMap.put('S', this::parseSmoothCurveToAbsolute);
+    commandMap.put('s', this::parseSmoothCurveToRelative);
+    commandMap.put('Q', this::parseQuadraticCurveToAbsolute);
+    commandMap.put('q', this::parseQuadraticCurveToRelative);
+    commandMap.put('T', this::parseSmoothQuadraticCurveToAbsolute);
+    commandMap.put('t', this::parseSmoothQuadraticCurveToRelative);
+    commandMap.put('A', this::parseEllipticalArcAbsolute);
+    commandMap.put('a', this::parseEllipticalArcRelative);
+
+    parseFile(path);
+  }
+
+  private List<? extends Shape> parseMoveToAbsolute(List<Float> args) {
+    return new ArrayList<>();
+  }
+
+  private List<? extends Shape> parseMoveToRelative(List<Float> args) {
+    return null;
+  }
+
+  private List<? extends Shape> parseLineToAbsolute(List<Float> args) {
+    return null;
+  }
+
+  private List<? extends Shape> parseLineToRelative(List<Float> args) {
+    return null;
+  }
+
+  private List<? extends Shape> parseHorizontalLineToAbsolute(List<Float> args) {
+    return null;
+  }
+
+  private List<? extends Shape> parseHorizontalLineToRelative(List<Float> args) {
+    return null;
+  }
+
+  private List<? extends Shape> parseVerticalLineToAbsolute(List<Float> args) {
+    return null;
+  }
+
+  private List<? extends Shape> parseVerticalLineToRelative(List<Float> args) {
+    return null;
+  }
+
+  private List<? extends Shape> parseCurveToAbsolute(List<Float> args) {
+    return null;
+  }
+
+  private List<? extends Shape> parseCurveToRelative(List<Float> args) {
+    return null;
+  }
+
+  private List<? extends Shape> parseSmoothCurveToAbsolute(List<Float> args) {
+    return null;
+  }
+
+  private List<? extends Shape> parseSmoothCurveToRelative(List<Float> args) {
+    return null;
+  }
+
+  private List<? extends Shape> parseQuadraticCurveToAbsolute(List<Float> args) {
+    return null;
+  }
+
+  private List<? extends Shape> parseQuadraticCurveToRelative(List<Float> args) {
+    return null;
+  }
+
+  private List<? extends Shape> parseSmoothQuadraticCurveToAbsolute(List<Float> args) {
+    return null;
+  }
+
+  private List<? extends Shape> parseSmoothQuadraticCurveToRelative(List<Float> args) {
+    return null;
+  }
+
+  private List<? extends Shape> parseEllipticalArcAbsolute(List<Float> args) {
+    return null;
+  }
+
+  private List<? extends Shape> parseEllipticalArcRelative(List<Float> args) {
+    return null;
   }
 
   private Document getSvgDocument(String path)
@@ -181,9 +181,16 @@ public class SvgParser extends FileParser {
 
     // Get all d attributes within path elements in the SVG file.
     for (String path : getSvgPathAttributes(svg)) {
+      pos = new Vector2();
       String[] commands = preProcessPath(path);
 
       for (String command : commands) {
+        char commandChar = command.charAt(0);
+
+        if (commandChar == 'z' || commandChar == 'Z') {
+          break;
+        }
+
         // Split the command into number strings and convert them into floats.
         List<Float> nums = Arrays.stream(command.substring(1).split(" "))
             .map(Float::parseFloat)
@@ -191,7 +198,7 @@ public class SvgParser extends FileParser {
 
         // Use the nums to get a list of shapes, using the first character in the command to specify
         // the function to use.
-        shapes.addAll(commandMap.get(command.charAt(0)).apply(nums));
+        shapes.addAll(commandMap.get(commandChar).apply(nums));
       }
     }
   }

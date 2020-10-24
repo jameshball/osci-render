@@ -15,12 +15,7 @@ public abstract class FileParser {
     return fileExtension;
   }
 
-  public FileParser(String path) throws IOException, SAXException, ParserConfigurationException {
-    checkFileExtension(path);
-    parseFile(path);
-  }
-
-  private static void checkFileExtension(String path) throws IllegalArgumentException {
+  protected static void checkFileExtension(String path) throws IllegalArgumentException {
     Pattern pattern = Pattern.compile("\\." + getFileExtension() + "$");
     if (!pattern.matcher(path).find()) {
       throw new IllegalArgumentException(
