@@ -8,6 +8,7 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import org.w3c.dom.Document;
+import org.w3c.dom.Node;
 import org.xml.sax.SAXException;
 import shapes.Shape;
 
@@ -33,6 +34,8 @@ public class SvgParser extends FileParser {
     DocumentBuilder builder = factory.newDocumentBuilder();
     File file = new File(path);
     Document doc = builder.parse(file);
+
+    for (Node elem : doc.getElementsByTagName("path"))
   }
 
   @Override
