@@ -14,6 +14,7 @@ public final class XmlUtil {
     return n.getLength()==0?
         Collections.emptyList(): new NodeListWrapper(n);
   }
+
   static final class NodeListWrapper extends AbstractList<Node>
       implements RandomAccess {
     private final NodeList list;
