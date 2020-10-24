@@ -31,5 +31,5 @@ public abstract class FileParser {
   protected abstract void parseFile(String path)
       throws ParserConfigurationException, IOException, SAXException, IllegalArgumentException;
 
-  public abstract List<? extends Shape> getShapes();
+  public abstract List<Shape> getShapes();
 }
