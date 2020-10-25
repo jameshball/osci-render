@@ -41,6 +41,18 @@ public final class Vector2 extends Shape {
     return new Vector2(x, y);
   }
 
+  public Vector2 add(Vector2 vector) {
+    return translate(vector);
+  }
+
+  public Vector2 sub(Vector2 vector) {
+    return new Vector2(getX() - vector.getX(), getY() - vector.getY());
+  }
+
+  public Vector2 reflectRelativeToVector(Vector2 vector) {
+    return translate(vector.sub(this).scale(2));
+  }
+
   @Override
   public float nextX(double drawingProgress) {
     return (float) getX();
