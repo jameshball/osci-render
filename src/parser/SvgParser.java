@@ -28,6 +28,7 @@ public class SvgParser extends FileParser {
   private final List<Shape> shapes;
   private final Map<Character, Function<List<Float>, List<? extends Shape>>> commandMap;
 
+
   private Vector2 currPoint;
   private Vector2 initialPoint;
   private Vector2 prevCubicControlPoint;
@@ -91,9 +92,13 @@ public class SvgParser extends FileParser {
   }
 
   private List<? extends Shape> parseClosePath(List<Float> args) {
-    Line line = new Line(currPoint, initialPoint);
-    currPoint = initialPoint;
-    return List.of(line);
+    if (!currPoint.equals(initialPoint)) {
+      Line line = new Line(currPoint, initialPoint);
+      currPoint = initialPoint;
+      return List.of(line);
+    } else {
+      return List.of();
+    }
   }
 
   private List<? extends Shape> parseLineTo(List<Float> args, boolean isAbsolute,
@@ -266,15 +271,14 @@ public class SvgParser extends FileParser {
 
       for (String command : commands) {
         char commandChar = command.charAt(0);
+        List<Float> nums = null;
 
-        if (commandChar == 'z' || commandChar == 'Z') {
-          continue;
+        if (commandChar != 'z' && commandChar != 'Z') {
+          // Split the command into number strings and convert them into floats.
+          nums = Arrays.stream(command.substring(1).split(" "))
+              .map(Float::parseFloat)
+              .collect(Collectors.toList());
         }
-
-        // Split the command into number strings and convert them into floats.
-        List<Float> nums = Arrays.stream(command.substring(1).split(" "))
-            .map(Float::parseFloat)
-            .collect(Collectors.toList());
 
         // Use the nums to get a list of shapes, using the first character in the command to specify
         // the function to use.
