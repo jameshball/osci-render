@@ -68,6 +68,94 @@ public class SvgParser extends FileParser {
     parseFile(path);
   }
 
+  private Document getSvgDocument(String path)
+      throws IOException, SAXException, ParserConfigurationException {
+    // opens XML reader for svg file.
+    DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+    factory.setValidating(true);
+    factory.setIgnoringElementContentWhitespace(true);
+    DocumentBuilder builder = factory.newDocumentBuilder();
+    File file = new File(path);
+
+    return builder.parse(file);
+  }
+
+  // Does error checking against SVG path and returns array of SVG commands and arguments
+  private String[] preProcessPath(String path) throws IllegalArgumentException {
+    // Replace all commas with spaces and then remove unnecessary whitespace
+    path = path.replace(',', ' ');
+    path = path.replaceAll("\\s+", " ");
+    path = path.replaceAll("(^\\s|\\s$)", "");
+
+    // If there are any characters in the path that are illegal
+    if (path.matches("[^mlhvcsqtazMLHVCSQTAZ\\-.\\d\\s]")) {
+      throw new IllegalArgumentException("Illegal characters in SVG path.");
+      // If there are more than 1 letters or delimiters next to one another
+    } else if (path.matches("[a-zA-Z.\\-]{2,}")) {
+      throw new IllegalArgumentException(
+          "Multiple letters or delimiters found next to one another in SVG path.");
+      // First character in path must be a command
+    } else if (path.matches("^[a-zA-Z]")) {
+      throw new IllegalArgumentException("Start of SVG path is not a letter.");
+    }
+
+    // Split on SVG path characters to get a list of instructions, keeping the SVG commands
+    return path.split("(?=[mlhvcsqtazMLHVCSQTAZ])");
+  }
+
+  // Returns list of SVG path data attributes
+  private List<String> getSvgPathAttributes(Document svg) {
+    List<String> paths = new ArrayList<>();
+
+    for (Node elem : asList(svg.getElementsByTagName("path"))) {
+      paths.add(elem.getAttributes().getNamedItem("d").getNodeValue());
+    }
+
+    return paths;
+  }
+
+  @Override
+  protected void parseFile(String filePath)
+      throws ParserConfigurationException, IOException, SAXException, IllegalArgumentException {
+    Document svg = getSvgDocument(filePath);
+
+    // Get all d attributes within path elements in the SVG file.
+    for (String path : getSvgPathAttributes(svg)) {
+      currPoint = new Vector2();
+      prevCubicControlPoint = null;
+      prevQuadraticControlPoint = null;
+      String[] commands = preProcessPath(path);
+
+      for (String command : commands) {
+        char commandChar = command.charAt(0);
+        List<Float> nums = null;
+
+        if (commandChar != 'z' && commandChar != 'Z') {
+          // Split the command into number strings and convert them into floats.
+          nums = Arrays.stream(command.substring(1).split(" "))
+              .map(Float::parseFloat)
+              .collect(Collectors.toList());
+        }
+
+        // Use the nums to get a list of shapes, using the first character in the command to specify
+        // the function to use.
+        shapes.addAll(commandMap.get(commandChar).apply(nums));
+
+        if (!String.valueOf(commandChar).matches("[csCS]")) {
+          prevCubicControlPoint = null;
+        }
+        if (!String.valueOf(commandChar).matches("[qtQT]")) {
+          prevQuadraticControlPoint = null;
+        }
+      }
+    }
+  }
+
+  @Override
+  public List<Shape> getShapes() {
+    return shapes;
+  }
+
   // Parses moveto commands (M and m commands)
   private List<? extends Shape> parseMoveTo(List<Float> args, boolean isAbsolute) {
     if (args.size() % 2 != 0 || args.size() < 2) {
@@ -223,93 +311,5 @@ public class SvgParser extends FileParser {
     }
 
     return parseLineTo(lineToArgs, isAbsolute, true, true);
-  }
-
-  private Document getSvgDocument(String path)
-      throws IOException, SAXException, ParserConfigurationException {
-    // opens XML reader for svg file.
-    DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-    factory.setValidating(true);
-    factory.setIgnoringElementContentWhitespace(true);
-    DocumentBuilder builder = factory.newDocumentBuilder();
-    File file = new File(path);
-
-    return builder.parse(file);
-  }
-
-  // Does error checking against SVG path and returns array of SVG commands and arguments
-  private String[] preProcessPath(String path) throws IllegalArgumentException {
-    // Replace all commas with spaces and then remove unnecessary whitespace
-    path = path.replace(',', ' ');
-    path = path.replaceAll("\\s+", " ");
-    path = path.replaceAll("(^\\s|\\s$)", "");
-
-    // If there are any characters in the path that are illegal
-    if (path.matches("[^mlhvcsqtazMLHVCSQTAZ\\-.\\d\\s]")) {
-      throw new IllegalArgumentException("Illegal characters in SVG path.");
-      // If there are more than 1 letters or delimiters next to one another
-    } else if (path.matches("[a-zA-Z.\\-]{2,}")) {
-      throw new IllegalArgumentException(
-          "Multiple letters or delimiters found next to one another in SVG path.");
-      // First character in path must be a command
-    } else if (path.matches("^[a-zA-Z]")) {
-      throw new IllegalArgumentException("Start of SVG path is not a letter.");
-    }
-
-    // Split on SVG path characters to get a list of instructions, keeping the SVG commands
-    return path.split("(?=[mlhvcsqtazMLHVCSQTAZ])");
-  }
-
-  // Returns list of SVG path data attributes
-  private List<String> getSvgPathAttributes(Document svg) {
-    List<String> paths = new ArrayList<>();
-
-    for (Node elem : asList(svg.getElementsByTagName("path"))) {
-      paths.add(elem.getAttributes().getNamedItem("d").getNodeValue());
-    }
-
-    return paths;
-  }
-
-  @Override
-  protected void parseFile(String filePath)
-      throws ParserConfigurationException, IOException, SAXException, IllegalArgumentException {
-    Document svg = getSvgDocument(filePath);
-
-    // Get all d attributes within path elements in the SVG file.
-    for (String path : getSvgPathAttributes(svg)) {
-      currPoint = new Vector2();
-      prevCubicControlPoint = null;
-      prevQuadraticControlPoint = null;
-      String[] commands = preProcessPath(path);
-
-      for (String command : commands) {
-        char commandChar = command.charAt(0);
-        List<Float> nums = null;
-
-        if (commandChar != 'z' && commandChar != 'Z') {
-          // Split the command into number strings and convert them into floats.
-          nums = Arrays.stream(command.substring(1).split(" "))
-              .map(Float::parseFloat)
-              .collect(Collectors.toList());
-        }
-
-        // Use the nums to get a list of shapes, using the first character in the command to specify
-        // the function to use.
-        shapes.addAll(commandMap.get(commandChar).apply(nums));
-
-        if (!String.valueOf(commandChar).matches("[csCS]")) {
-          prevCubicControlPoint = null;
-        }
-        if (!String.valueOf(commandChar).matches("[qtQT]")) {
-          prevQuadraticControlPoint = null;
-        }
-      }
-    }
-  }
-
-  @Override
-  public List<Shape> getShapes() {
-    return shapes;
   }
 }
