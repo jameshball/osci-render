@@ -42,36 +42,28 @@ public class SvgParser extends FileParser {
     shapes = new ArrayList<>();
 
     commandMap = new HashMap<>();
-    commandMap.put('M', this::parseMoveToAbsolute);
-    commandMap.put('m', this::parseMoveToRelative);
-    commandMap.put('L', this::parseLineToAbsolute);
-    commandMap.put('l', this::parseLineToRelative);
-    commandMap.put('H', this::parseHorizontalLineToAbsolute);
-    commandMap.put('h', this::parseHorizontalLineToRelative);
-    commandMap.put('V', this::parseVerticalLineToAbsolute);
-    commandMap.put('v', this::parseVerticalLineToRelative);
-    commandMap.put('C', this::parseCubicCurveToAbsolute);
-    commandMap.put('c', this::parseCubicCurveToRelative);
-    commandMap.put('S', this::parseSmoothCurveToAbsolute);
-    commandMap.put('s', this::parseSmoothCurveToRelative);
-    commandMap.put('Q', this::parseQuadraticCurveToAbsolute);
-    commandMap.put('q', this::parseQuadraticCurveToRelative);
-    commandMap.put('T', this::parseSmoothQuadraticCurveToAbsolute);
-    commandMap.put('t', this::parseSmoothQuadraticCurveToRelative);
-    commandMap.put('A', this::parseEllipticalArcAbsolute);
-    commandMap.put('a', this::parseEllipticalArcRelative);
+    commandMap.put('M', (args) -> parseMoveTo(args, true));
+    commandMap.put('m', (args) -> parseMoveTo(args, false));
+    commandMap.put('L', (args) -> parseLineTo(args, true, true, true));
+    commandMap.put('l', (args) -> parseLineTo(args, false, true, true));
+    commandMap.put('H', (args) -> parseLineTo(args, true, true, false));
+    commandMap.put('h', (args) -> parseLineTo(args, false, true, false));
+    commandMap.put('V', (args) -> parseLineTo(args, true, false, true));
+    commandMap.put('v', (args) -> parseLineTo(args, false, false, true));
+    commandMap.put('C', (args) -> parseCurveTo(args, true, true, false));
+    commandMap.put('c', (args) -> parseCurveTo(args, false, true, false));
+    commandMap.put('S', (args) -> parseCurveTo(args, true, true, true));
+    commandMap.put('s', (args) -> parseCurveTo(args, false, true, true));
+    commandMap.put('Q', (args) -> parseCurveTo(args, true, false, false));
+    commandMap.put('q', (args) -> parseCurveTo(args, false, false, false));
+    commandMap.put('T', (args) -> parseCurveTo(args, true, false, true));
+    commandMap.put('t', (args) -> parseCurveTo(args, false, false, true));
+    commandMap.put('A', (args) -> parseEllipticalArc(args, true));
+    commandMap.put('a', (args) -> parseEllipticalArc(args, false));
     commandMap.put('Z', this::parseClosePath);
     commandMap.put('z', this::parseClosePath);
 
     parseFile(path);
-  }
-
-  private List<? extends Shape> parseMoveToAbsolute(List<Float> args) {
-    return parseMoveTo(args, true);
-  }
-
-  private List<? extends Shape> parseMoveToRelative(List<Float> args) {
-    return parseMoveTo(args, false);
   }
 
   private List<? extends Shape> parseMoveTo(List<Float> args, boolean isAbsolute) {
@@ -85,13 +77,13 @@ public class SvgParser extends FileParser {
       currPoint = vec;
       initialPoint = currPoint;
       if (args.size() > 2) {
-        return parseLineToAbsolute(args.subList(2, args.size() - 1));
+        return parseLineTo(args.subList(2, args.size() - 1), true, true, true);
       }
     } else {
       currPoint = currPoint.translate(vec);
       initialPoint = currPoint;
       if (args.size() > 2) {
-        return parseLineToRelative(args.subList(2, args.size() - 1));
+        return parseLineTo(args.subList(2, args.size() - 1), false, true, true);
       }
     }
 
@@ -104,53 +96,35 @@ public class SvgParser extends FileParser {
     return List.of(line);
   }
 
-  private List<? extends Shape> parseLineToAbsolute(List<Float> args) {
-    return parseLineTo(args, true);
-  }
+  private List<? extends Shape> parseLineTo(List<Float> args, boolean isAbsolute,
+      boolean isHorizontal, boolean isVertical) {
+    int expectedArgs = isHorizontal && isVertical ? 2 : 1;
 
-  private List<? extends Shape> parseLineToRelative(List<Float> args) {
-    return parseLineTo(args, false);
-  }
-
-  private List<? extends Shape> parseLineTo(List<Float> args, boolean isAbsolute) {
-    if (args.size() % 2 != 0 || args.size() < 2) {
+    if (args.size() % expectedArgs != 0 || args.size() < expectedArgs) {
       throw new IllegalArgumentException("SVG lineto command has incorrect number of arguments.");
     }
 
     List<Line> lines = new ArrayList<>();
 
-    for (int i = 0; i < args.size(); i += 2) {
-      Vector2 newPoint = new Vector2(args.get(i), args.get(i + 1));
-
-      if (!isAbsolute) {
-        newPoint = currPoint.translate(newPoint);
-      }
-
-      lines.add(new Line(currPoint, newPoint));
-      currPoint = newPoint;
-    }
-
-    return lines;
-  }
-
-  private List<? extends Shape> parseHorizontalLineToAbsolute(List<Float> args) {
-    return parseHorizontalLineTo(args, true);
-  }
-
-  private List<? extends Shape> parseHorizontalLineToRelative(List<Float> args) {
-    return parseHorizontalLineTo(args, false);
-  }
-
-  private List<? extends Shape> parseHorizontalLineTo(List<Float> args, boolean isAbsolute) {
-    List<Line> lines = new ArrayList<>();
-
-    for (Float point : args) {
-      Vector2 newPoint;
+    for (int i = 0; i < args.size(); i += expectedArgs) {
+      Vector2 newPoint = currPoint;
 
       if (isAbsolute) {
-        newPoint = new Vector2(point, currPoint.getY());
+        if (isHorizontal && isVertical) {
+          newPoint = new Vector2(args.get(i), args.get(i + 1));
+        } else if (isHorizontal) {
+          newPoint = new Vector2(args.get(i), currPoint.getY());
+        } else if (isVertical) {
+          newPoint = new Vector2(currPoint.getX(), args.get(i));
+        }
       } else {
-        newPoint = currPoint.translate(new Vector2(point, 0));
+        if (isHorizontal && isVertical) {
+          newPoint = currPoint.translate(newPoint);
+        } else if (isHorizontal) {
+          newPoint = currPoint.translate(new Vector2(args.get(i), 0));
+        } else if (isVertical) {
+          newPoint = currPoint.translate(new Vector2(0, args.get(i)));
+        }
       }
 
       lines.add(new Line(currPoint, newPoint));
@@ -160,66 +134,8 @@ public class SvgParser extends FileParser {
     return lines;
   }
 
-  private List<? extends Shape> parseVerticalLineToAbsolute(List<Float> args) {
-    return parseVerticalLineTo(args, true);
-  }
-
-  private List<? extends Shape> parseVerticalLineToRelative(List<Float> args) {
-    return parseVerticalLineTo(args, false);
-  }
-
-  private List<? extends Shape> parseVerticalLineTo(List<Float> args, boolean isAbsolute) {
-    List<Line> lines = new ArrayList<>();
-
-    for (Float point : args) {
-      Vector2 newPoint;
-
-      if (isAbsolute) {
-        newPoint = new Vector2(currPoint.getX(), point);
-      } else {
-        newPoint = currPoint.translate(new Vector2(0, point));
-      }
-
-      lines.add(new Line(currPoint, newPoint));
-      currPoint = newPoint;
-    }
-
-    return lines;
-  }
-
-  private List<? extends Shape> parseCubicCurveToAbsolute(List<Float> args) {
-    return parseCurveTo(args, true, true, false);
-  }
-
-  private List<? extends Shape> parseCubicCurveToRelative(List<Float> args) {
-    return parseCurveTo(args, false, true, false);
-  }
-
-  private List<? extends Shape> parseSmoothCurveToAbsolute(List<Float> args) {
-    return parseCurveTo(args, true, true, true);
-  }
-
-  private List<? extends Shape> parseSmoothCurveToRelative(List<Float> args) {
-    return parseCurveTo(args, false, true, true);
-  }
-
-  private List<? extends Shape> parseQuadraticCurveToAbsolute(List<Float> args) {
-    return parseCurveTo(args, true, false, false);
-  }
-
-  private List<? extends Shape> parseQuadraticCurveToRelative(List<Float> args) {
-    return parseCurveTo(args, false, false, false);
-  }
-
-  private List<? extends Shape> parseSmoothQuadraticCurveToAbsolute(List<Float> args) {
-    return parseCurveTo(args, true, false, true);
-  }
-
-  private List<? extends Shape> parseSmoothQuadraticCurveToRelative(List<Float> args) {
-    return parseCurveTo(args, false, false, true);
-  }
-
-  private List<? extends Shape> parseCurveTo(List<Float> args, boolean isAbsolute, boolean isCubic, boolean isSmooth) {
+  private List<? extends Shape> parseCurveTo(List<Float> args, boolean isAbsolute, boolean isCubic,
+      boolean isSmooth) {
     int expectedArgs = isCubic ? 4 : 2;
     if (!isSmooth) {
       expectedArgs += 2;
@@ -237,9 +153,11 @@ public class SvgParser extends FileParser {
 
       if (isSmooth) {
         if (isCubic) {
-          controlPoint1 = prevCubicControlPoint == null ? currPoint : prevCubicControlPoint.reflectRelativeToVector(currPoint);
+          controlPoint1 = prevCubicControlPoint == null ? currPoint
+              : prevCubicControlPoint.reflectRelativeToVector(currPoint);
         } else {
-          controlPoint1 = prevQuadraticControlPoint == null ? currPoint : prevQuadraticControlPoint.reflectRelativeToVector(currPoint);
+          controlPoint1 = prevQuadraticControlPoint == null ? currPoint
+              : prevQuadraticControlPoint.reflectRelativeToVector(currPoint);
         }
       } else {
         controlPoint1 = new Vector2(args.get(i), args.get(i + 1));
@@ -249,7 +167,8 @@ public class SvgParser extends FileParser {
         controlPoint2 = new Vector2(args.get(i + 2), args.get(i + 3));
       }
 
-      Vector2 newPoint = new Vector2(args.get(i + expectedArgs - 2), args.get(i + expectedArgs - 1));
+      Vector2 newPoint = new Vector2(args.get(i + expectedArgs - 2),
+          args.get(i + expectedArgs - 1));
 
       if (!isAbsolute) {
         controlPoint1 = currPoint.translate(controlPoint1);
@@ -271,17 +190,12 @@ public class SvgParser extends FileParser {
     return curves;
   }
 
-  private List<? extends Shape> parseEllipticalArcAbsolute(List<Float> args) {
-    return parseEllipticalArc(args, true);
-  }
-
-  private List<? extends Shape> parseEllipticalArcRelative(List<Float> args) {
-    return parseEllipticalArc(args, false);
-  }
-
   private List<? extends Shape> parseEllipticalArc(List<Float> args, boolean isAbsolute) {
+    // TODO: Properly implement
+
     if (args.size() % 7 != 0 || args.size() < 7) {
-      throw new IllegalArgumentException("SVG elliptical arc command has incorrect number of arguments.");
+      throw new IllegalArgumentException(
+          "SVG elliptical arc command has incorrect number of arguments.");
     }
 
     List<Float> lineToArgs = new ArrayList<>();
@@ -291,7 +205,7 @@ public class SvgParser extends FileParser {
       lineToArgs.add(args.get(i + 6));
     }
 
-    return parseLineTo(lineToArgs, isAbsolute);
+    return parseLineTo(lineToArgs, isAbsolute, true, true);
   }
 
   private Document getSvgDocument(String path)
