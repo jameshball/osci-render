@@ -2,7 +2,6 @@ package parser;
 
 import static parser.XmlUtil.asList;
 
-import java.awt.font.ShapeGraphicAttribute;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -51,8 +50,8 @@ public class SvgParser extends FileParser {
     commandMap.put('h', this::parseHorizontalLineToRelative);
     commandMap.put('V', this::parseVerticalLineToAbsolute);
     commandMap.put('v', this::parseVerticalLineToRelative);
-    commandMap.put('C', this::parseCurveToAbsolute);
-    commandMap.put('c', this::parseCurveToRelative);
+    commandMap.put('C', this::parseCubicCurveToAbsolute);
+    commandMap.put('c', this::parseCubicCurveToRelative);
     commandMap.put('S', this::parseSmoothCurveToAbsolute);
     commandMap.put('s', this::parseSmoothCurveToRelative);
     commandMap.put('Q', this::parseQuadraticCurveToAbsolute);
@@ -131,9 +130,6 @@ public class SvgParser extends FileParser {
       currPoint = newPoint;
     }
 
-    prevCubicControlPoint = null;
-    prevQuadraticControlPoint = null;
-
     return lines;
   }
 
@@ -160,9 +156,6 @@ public class SvgParser extends FileParser {
       lines.add(new Line(currPoint, newPoint));
       currPoint = newPoint;
     }
-
-    prevCubicControlPoint = null;
-    prevQuadraticControlPoint = null;
 
     return lines;
   }
@@ -191,31 +184,72 @@ public class SvgParser extends FileParser {
       currPoint = newPoint;
     }
 
-    prevCubicControlPoint = null;
-    prevQuadraticControlPoint = null;
-
     return lines;
   }
 
-  private List<? extends Shape> parseCurveToAbsolute(List<Float> args) {
-    return parseCurveTo(args, true);
+  private List<? extends Shape> parseCubicCurveToAbsolute(List<Float> args) {
+    return parseCurveTo(args, true, true, false);
   }
 
-  private List<? extends Shape> parseCurveToRelative(List<Float> args) {
-    return parseCurveTo(args, false);
+  private List<? extends Shape> parseCubicCurveToRelative(List<Float> args) {
+    return parseCurveTo(args, false, true, false);
   }
 
-  private List<? extends Shape> parseCurveTo(List<Float> args, boolean isAbsolute) {
-    if (args.size() % 6 != 0 || args.size() < 6) {
+  private List<? extends Shape> parseSmoothCurveToAbsolute(List<Float> args) {
+    return parseCurveTo(args, true, true, true);
+  }
+
+  private List<? extends Shape> parseSmoothCurveToRelative(List<Float> args) {
+    return parseCurveTo(args, false, true, true);
+  }
+
+  private List<? extends Shape> parseQuadraticCurveToAbsolute(List<Float> args) {
+    return parseCurveTo(args, true, false, false);
+  }
+
+  private List<? extends Shape> parseQuadraticCurveToRelative(List<Float> args) {
+    return parseCurveTo(args, false, false, false);
+  }
+
+  private List<? extends Shape> parseSmoothQuadraticCurveToAbsolute(List<Float> args) {
+    return parseCurveTo(args, true, false, true);
+  }
+
+  private List<? extends Shape> parseSmoothQuadraticCurveToRelative(List<Float> args) {
+    return parseCurveTo(args, false, false, true);
+  }
+
+  private List<? extends Shape> parseCurveTo(List<Float> args, boolean isAbsolute, boolean isCubic, boolean isSmooth) {
+    int expectedArgs = isCubic ? 4 : 2;
+    if (!isSmooth) {
+      expectedArgs += 2;
+    }
+
+    if (args.size() % expectedArgs != 0 || args.size() < expectedArgs) {
       throw new IllegalArgumentException("SVG curveto command has incorrect number of arguments.");
     }
 
-    List<CubicBezierCurve> curves = new ArrayList<>();
+    List<Shape> curves = new ArrayList<>();
 
-    for (int i = 0; i < args.size(); i += 6) {
-      Vector2 controlPoint1 = new Vector2(args.get(i), args.get(i + 1));
-      Vector2 controlPoint2 = new Vector2(args.get(i + 2), args.get(i + 3));
-      Vector2 newPoint = new Vector2(args.get(i + 4), args.get(i + 5));
+    for (int i = 0; i < args.size(); i += expectedArgs) {
+      Vector2 controlPoint1;
+      Vector2 controlPoint2 = new Vector2();
+
+      if (isSmooth) {
+        if (isCubic) {
+          controlPoint1 = prevCubicControlPoint == null ? currPoint : prevCubicControlPoint.reflectRelativeToVector(currPoint);
+        } else {
+          controlPoint1 = prevQuadraticControlPoint == null ? currPoint : prevQuadraticControlPoint.reflectRelativeToVector(currPoint);
+        }
+      } else {
+        controlPoint1 = new Vector2(args.get(i), args.get(i + 1));
+      }
+
+      if (isCubic) {
+        controlPoint2 = new Vector2(args.get(i + 2), args.get(i + 3));
+      }
+
+      Vector2 newPoint = new Vector2(args.get(i + expectedArgs - 2), args.get(i + expectedArgs - 1));
 
       if (!isAbsolute) {
         controlPoint1 = currPoint.translate(controlPoint1);
@@ -223,114 +257,16 @@ public class SvgParser extends FileParser {
         newPoint = currPoint.translate(newPoint);
       }
 
-      curves.add(new CubicBezierCurve(currPoint, controlPoint1, controlPoint2, newPoint));
-      currPoint = newPoint;
-      prevCubicControlPoint = controlPoint2;
-    }
-
-    prevQuadraticControlPoint = null;
-
-    return curves;
-  }
-
-  private List<? extends Shape> parseSmoothCurveToAbsolute(List<Float> args) {
-    return parseSmoothCurveTo(args, true);
-  }
-
-  private List<? extends Shape> parseSmoothCurveToRelative(List<Float> args) {
-    return parseSmoothCurveTo(args, false);
-  }
-
-  private List<? extends Shape> parseSmoothCurveTo(List<Float> args, boolean isAbsolute) {
-    if (args.size() % 4 != 0 || args.size() < 4) {
-      throw new IllegalArgumentException("SVG smooth curveto command has incorrect number of arguments.");
-    }
-
-    List<CubicBezierCurve> curves = new ArrayList<>();
-
-    for (int i = 0; i < args.size(); i += 4) {
-      Vector2 controlPoint1 = prevCubicControlPoint == null ? currPoint : prevCubicControlPoint.reflectRelativeToVector(currPoint);
-      Vector2 controlPoint2 = new Vector2(args.get(i), args.get(i + 1));
-      Vector2 newPoint = new Vector2(args.get(i + 2), args.get(i + 3));
-
-      if (!isAbsolute) {
-        controlPoint2 = currPoint.translate(controlPoint2);
-        newPoint = currPoint.translate(newPoint);
+      if (isCubic) {
+        curves.add(new CubicBezierCurve(currPoint, controlPoint1, controlPoint2, newPoint));
+        currPoint = newPoint;
+        prevCubicControlPoint = controlPoint2;
+      } else {
+        curves.add(new QuadraticBezierCurve(currPoint, controlPoint1, newPoint));
+        currPoint = newPoint;
+        prevQuadraticControlPoint = controlPoint1;
       }
-
-      curves.add(new CubicBezierCurve(currPoint, controlPoint1, controlPoint2, newPoint));
-      currPoint = newPoint;
-      prevCubicControlPoint = controlPoint2;
     }
-
-    prevQuadraticControlPoint = null;
-
-    return curves;
-  }
-
-  private List<? extends Shape> parseQuadraticCurveToAbsolute(List<Float> args) {
-    return parseQuadraticCurveTo(args, true);
-  }
-
-  private List<? extends Shape> parseQuadraticCurveToRelative(List<Float> args) {
-    return parseQuadraticCurveTo(args, false);
-  }
-
-  private List<? extends Shape> parseQuadraticCurveTo(List<Float> args, boolean isAbsolute) {
-    if (args.size() % 4 != 0 || args.size() < 4) {
-      throw new IllegalArgumentException("SVG quadratic curveto command has incorrect number of arguments.");
-    }
-
-    List<QuadraticBezierCurve> curves = new ArrayList<>();
-
-    for (int i = 0; i < args.size(); i += 4) {
-      Vector2 controlPoint = new Vector2(args.get(i), args.get(i + 1));
-      Vector2 newPoint = new Vector2(args.get(i + 2), args.get(i + 3));
-
-      if (!isAbsolute) {
-        controlPoint = currPoint.translate(controlPoint);
-        newPoint = currPoint.translate(newPoint);
-      }
-
-      curves.add(new QuadraticBezierCurve(currPoint, controlPoint, newPoint));
-      currPoint = newPoint;
-      prevQuadraticControlPoint = controlPoint;
-    }
-
-    prevCubicControlPoint = null;
-
-    return curves;
-  }
-
-  private List<? extends Shape> parseSmoothQuadraticCurveToAbsolute(List<Float> args) {
-    return parseSmoothQuadraticCurveTo(args, true);
-  }
-
-  private List<? extends Shape> parseSmoothQuadraticCurveToRelative(List<Float> args) {
-    return parseSmoothQuadraticCurveTo(args, false);
-  }
-
-  private List<? extends Shape> parseSmoothQuadraticCurveTo(List<Float> args, boolean isAbsolute) {
-    if (args.size() % 2 != 0 || args.size() < 2) {
-      throw new IllegalArgumentException("SVG quadratic smooth curveto command has incorrect number of arguments.");
-    }
-
-    List<QuadraticBezierCurve> curves = new ArrayList<>();
-
-    for (int i = 0; i < args.size(); i += 2) {
-      Vector2 controlPoint = prevQuadraticControlPoint == null ? currPoint : prevQuadraticControlPoint.reflectRelativeToVector(currPoint);
-      Vector2 newPoint = new Vector2(args.get(i), args.get(i + 1));
-
-      if (!isAbsolute) {
-        newPoint = currPoint.translate(newPoint);
-      }
-
-      curves.add(new QuadraticBezierCurve(currPoint, controlPoint, newPoint));
-      currPoint = newPoint;
-      prevQuadraticControlPoint = controlPoint;
-    }
-
-    prevCubicControlPoint = null;
 
     return curves;
   }
@@ -418,7 +354,7 @@ public class SvgParser extends FileParser {
         char commandChar = command.charAt(0);
 
         if (commandChar == 'z' || commandChar == 'Z') {
-          break;
+          continue;
         }
 
         // Split the command into number strings and convert them into floats.
@@ -429,6 +365,13 @@ public class SvgParser extends FileParser {
         // Use the nums to get a list of shapes, using the first character in the command to specify
         // the function to use.
         shapes.addAll(commandMap.get(commandChar).apply(nums));
+
+        if (!String.valueOf(commandChar).matches("[csCS]")) {
+          prevCubicControlPoint = null;
+        }
+        if (!String.valueOf(commandChar).matches("[qtQT]")) {
+          prevQuadraticControlPoint = null;
+        }
       }
     }
   }
