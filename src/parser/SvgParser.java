@@ -43,6 +43,7 @@ public class SvgParser extends FileParser {
     shapes = new ArrayList<>();
 
     commandMap = new HashMap<>();
+    // Map command chars to function calls.
     commandMap.put('M', (args) -> parseMoveTo(args, true));
     commandMap.put('m', (args) -> parseMoveTo(args, false));
     commandMap.put('L', (args) -> parseLineTo(args, true, true, true));
@@ -67,6 +68,7 @@ public class SvgParser extends FileParser {
     parseFile(path);
   }
 
+  // Parses moveto commands (M and m commands)
   private List<? extends Shape> parseMoveTo(List<Float> args, boolean isAbsolute) {
     if (args.size() % 2 != 0 || args.size() < 2) {
       throw new IllegalArgumentException("SVG moveto command has incorrect number of arguments.");
@@ -91,6 +93,7 @@ public class SvgParser extends FileParser {
     return new ArrayList<>();
   }
 
+  // Parses close path commands (Z and z commands)
   private List<? extends Shape> parseClosePath(List<Float> args) {
     if (!currPoint.equals(initialPoint)) {
       Line line = new Line(currPoint, initialPoint);
@@ -101,6 +104,10 @@ public class SvgParser extends FileParser {
     }
   }
 
+  // Parses lineto commands (L, l, H, h, V, and v commands)
+  // isHorizontal and isVertical should be true for parsing L and l commands
+  // Only isHorizontal should be true for parsing H and h commands
+  // Only isVertical should be true for parsing V and v commands
   private List<? extends Shape> parseLineTo(List<Float> args, boolean isAbsolute,
       boolean isHorizontal, boolean isVertical) {
     int expectedArgs = isHorizontal && isVertical ? 2 : 1;
@@ -139,6 +146,11 @@ public class SvgParser extends FileParser {
     return lines;
   }
 
+  // Parses curveto commands (C, c, S, s, Q, q, T, and t commands)
+  // isCubic should be true for parsing C, c, S, and s commands
+  // isCubic should be false for parsing Q, q, T, and t commands
+  // isSmooth should be true for parsing S, s, T, and t commands
+  // isSmooth should be false for parsing C, c, Q, and q commands
   private List<? extends Shape> parseCurveTo(List<Float> args, boolean isAbsolute, boolean isCubic,
       boolean isSmooth) {
     int expectedArgs = isCubic ? 4 : 2;
@@ -225,6 +237,7 @@ public class SvgParser extends FileParser {
     return builder.parse(file);
   }
 
+  // Does error checking against SVG path and returns array of SVG commands and arguments
   private String[] preProcessPath(String path) throws IllegalArgumentException {
     // Replace all commas with spaces and then remove unnecessary whitespace
     path = path.replace(',', ' ');
@@ -247,6 +260,7 @@ public class SvgParser extends FileParser {
     return path.split("(?=[mlhvcsqtazMLHVCSQTAZ])");
   }
 
+  // Returns list of SVG path data attributes
   private List<String> getSvgPathAttributes(Document svg) {
     List<String> paths = new ArrayList<>();
 
