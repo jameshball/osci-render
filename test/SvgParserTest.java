@@ -13,8 +13,13 @@ import shapes.Vector2;
 public class SvgParserTest {
 
   @Test
-  public void lineToGeneratesALineShape() {
-
+  public void lineToGeneratesALineShape()
+      throws ParserConfigurationException, SAXException, IOException {
+    SvgParser svgParser = new SvgParser("test/images/line-to.svg");
+    List<Shape> shapes = svgParser.getShapes();
+    assertEquals(shapes.get(0), new Line(new Vector2(0.5, 0.5), new Vector2(0.75, 1)));
+    assertEquals(shapes.get(1), new Line(new Vector2(0.75, 1), new Vector2(0, 0)));
+    assertEquals(shapes.get(2), new Line(new Vector2(0, 0), new Vector2(0.5, 0.5)));
   }
 
   @Test
