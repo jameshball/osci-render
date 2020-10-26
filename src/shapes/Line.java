@@ -114,4 +114,12 @@ public final class Line extends Shape {
       return false;
     }
   }
+
+  @Override
+  public String toString() {
+    return "Line{" +
+        "a=" + a +
+        ", b=" + b +
+        '}';
+  }
 }

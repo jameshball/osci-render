@@ -114,4 +114,12 @@ public final class Vector2 extends Shape {
 
     return (double) Math.round(value) / factor;
   }
+
+  @Override
+  public String toString() {
+    return "Vector2{" +
+        "x=" + x +
+        ", y=" + y +
+        '}';
+  }
 }
