@@ -13,13 +13,18 @@ import shapes.Vector2;
 public class SvgParserTest {
 
   @Test
+  public void lineToGeneratesALineShape() {
+
+  }
+
+  @Test
   public void closingASubPathDrawsLineToInitialPoint()
       throws ParserConfigurationException, SAXException, IOException {
-    SvgParser svgParser = new SvgParser("test/images/square-relative.svg");
+    SvgParser svgParser = new SvgParser("test/images/closing-subpath.svg");
     List<Shape> shapes = svgParser.getShapes();
-    assertEquals(shapes.get(0), new Line(new Vector2(10, 10), new Vector2(12, 10)));
-    assertEquals(shapes.get(1), new Line(new Vector2(12, 10), new Vector2(12, 12)));
-    assertEquals(shapes.get(2), new Line(new Vector2(12, 12), new Vector2(10, 12)));
-    assertEquals(shapes.get(3), new Line(new Vector2(10, 12), new Vector2(10, 10)));
+    assertEquals(shapes.get(0), new Line(new Vector2(0.5, 0.5), new Vector2(0.75, 0.5)));
+    assertEquals(shapes.get(1), new Line(new Vector2(0.75, 0.5), new Vector2(0.75, 0.75)));
+    assertEquals(shapes.get(2), new Line(new Vector2(0.75, 0.75), new Vector2(0.5, 0.75)));
+    assertEquals(shapes.get(3), new Line(new Vector2(0.5, 0.75), new Vector2(0.5, 0.5)));
   }
 }
