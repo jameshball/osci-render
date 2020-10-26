@@ -17,9 +17,15 @@ public class SvgParserTest {
       throws ParserConfigurationException, SAXException, IOException {
     SvgParser svgParser = new SvgParser("test/images/line-to.svg");
     List<Shape> shapes = svgParser.getShapes();
-    assertEquals(shapes.get(0), new Line(new Vector2(0.5, 0.5), new Vector2(0.75, 1)));
-    assertEquals(shapes.get(1), new Line(new Vector2(0.75, 1), new Vector2(0, 0)));
-    assertEquals(shapes.get(2), new Line(new Vector2(0, 0), new Vector2(0.5, 0.5)));
+    assertEquals(shapes, Line.pathToLines(0.5, 0.5, 0.75, 1, 0, 0, 0.5, 0.5));
+  }
+
+  @Test
+  public void horizontalLineToGeneratesAHorizontalLineShape()
+      throws ParserConfigurationException, SAXException, IOException {
+    SvgParser svgParser = new SvgParser("test/images/horizontal-line-to.svg");
+    List<Shape> shapes = svgParser.getShapes();
+    assertEquals(shapes, Line.pathToLines(0.5, 0.5, 0.75, 0.5, 0, 0.5, 0.5, 0.5));
   }
 
   @Test
@@ -27,9 +33,6 @@ public class SvgParserTest {
       throws ParserConfigurationException, SAXException, IOException {
     SvgParser svgParser = new SvgParser("test/images/closing-subpath.svg");
     List<Shape> shapes = svgParser.getShapes();
-    assertEquals(shapes.get(0), new Line(new Vector2(0.5, 0.5), new Vector2(0.75, 0.5)));
-    assertEquals(shapes.get(1), new Line(new Vector2(0.75, 0.5), new Vector2(0.75, 0.75)));
-    assertEquals(shapes.get(2), new Line(new Vector2(0.75, 0.75), new Vector2(0.5, 0.75)));
-    assertEquals(shapes.get(3), new Line(new Vector2(0.5, 0.75), new Vector2(0.5, 0.5)));
+    assertEquals(shapes, Line.pathToLines(0.5, 0.5, 0.75, 0.5, 0.75, 0.75, 0.5, 0.75, 0.5, 0.5));
   }
 }
