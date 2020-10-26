@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Vector;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.xml.parsers.DocumentBuilder;
@@ -28,6 +29,8 @@ public class SvgParser extends FileParser {
   private final List<Shape> shapes;
   private final Map<Character, Function<List<Float>, List<? extends Shape>>> commandMap;
 
+  private float width;
+  private float height;
 
   private Vector2 currPoint;
   private Vector2 initialPoint;
@@ -104,7 +107,7 @@ public class SvgParser extends FileParser {
   }
 
   // Returns list of SVG path data attributes
-  private List<String> getSvgPathAttributes(Document svg) {
+  private static List<String> getSvgPathAttributes(Document svg) {
     List<String> paths = new ArrayList<>();
 
     for (Node elem : asList(svg.getElementsByTagName("path"))) {
@@ -114,10 +117,31 @@ public class SvgParser extends FileParser {
     return paths;
   }
 
+  // Returns the width and height of the viewBox attribute
+  private static List<Float> getViewBoxDimensions(Node svgElem) {
+    return Arrays.stream(
+        svgElem.getAttributes()
+            .getNamedItem("viewBox")
+            .getNodeValue()
+            .split(" "))
+        .map(Float::parseFloat)
+        .skip(2)
+        .collect(Collectors.toList());
+  }
+
   @Override
   protected void parseFile(String filePath)
       throws ParserConfigurationException, IOException, SAXException, IllegalArgumentException {
     Document svg = getSvgDocument(filePath);
+    List<Node> svgElem = asList(svg.getElementsByTagName("svg"));
+
+    if (svgElem.size() != 1) {
+      throw new IllegalArgumentException("SVG has either zero or more than one svg element.");
+    }
+
+    List<Float> dimensions = getViewBoxDimensions(svgElem.get(0));
+    width = dimensions.get(0);
+    height = dimensions.get(1);
 
     // Get all d attributes within path elements in the SVG file.
     for (String path : getSvgPathAttributes(svg)) {
@@ -162,7 +186,7 @@ public class SvgParser extends FileParser {
       throw new IllegalArgumentException("SVG moveto command has incorrect number of arguments.");
     }
 
-    Vector2 vec = new Vector2(args.get(0), args.get(1));
+    Vector2 vec = new Vector2(args.get(0) / width, args.get(1) / height);
 
     if (isAbsolute) {
       currPoint = vec;
@@ -207,24 +231,22 @@ public class SvgParser extends FileParser {
     List<Line> lines = new ArrayList<>();
 
     for (int i = 0; i < args.size(); i += expectedArgs) {
-      Vector2 newPoint = currPoint;
+      Vector2 newPoint;
 
-      if (isAbsolute) {
-        if (isHorizontal && isVertical) {
-          newPoint = new Vector2(args.get(i), args.get(i + 1));
-        } else if (isHorizontal) {
-          newPoint = new Vector2(args.get(i), currPoint.getY());
-        } else if (isVertical) {
-          newPoint = new Vector2(currPoint.getX(), args.get(i));
-        }
+      if (expectedArgs == 1) {
+        newPoint = new Vector2(args.get(i) / width, args.get(i) / height);
       } else {
-        if (isHorizontal && isVertical) {
-          newPoint = currPoint.translate(newPoint);
-        } else if (isHorizontal) {
-          newPoint = currPoint.translate(new Vector2(args.get(i), 0));
-        } else if (isVertical) {
-          newPoint = currPoint.translate(new Vector2(0, args.get(i)));
-        }
+        newPoint = new Vector2(args.get(i) / width, args.get(i + 1) / height);
+      }
+
+      if (isHorizontal && !isVertical) {
+        newPoint = isAbsolute ? newPoint.setY(currPoint.getY()) : newPoint.setY(0);
+      } else if (isVertical && !isHorizontal) {
+        newPoint = isAbsolute ? newPoint.setX(currPoint.getX()) : newPoint.setX(0);
+      }
+
+      if (!isAbsolute) {
+        newPoint = currPoint.translate(newPoint);
       }
 
       lines.add(new Line(currPoint, newPoint));
