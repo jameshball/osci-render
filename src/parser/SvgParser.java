@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Vector;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -87,6 +88,7 @@ public class SvgParser extends FileParser {
   private String[] preProcessPath(String path) throws IllegalArgumentException {
     // Replace all commas with spaces and then remove unnecessary whitespace
     path = path.replace(',', ' ');
+    path = path.replace("-", " -");
     path = path.replaceAll("\\s+", " ");
     path = path.replaceAll("(^\\s|\\s$)", "");
 
@@ -129,6 +131,28 @@ public class SvgParser extends FileParser {
         .collect(Collectors.toList());
   }
 
+  private static List<Float> splitCommand(String command) {
+    List<Float> nums = new ArrayList<>();
+    String[] decimalSplit = command.split("\\.");
+
+    try {
+      if (decimalSplit.length == 1) {
+        nums.add(Float.parseFloat(decimalSplit[0]));
+      } else {
+        nums.add(Float.parseFloat(decimalSplit[0] + "." + decimalSplit[1]));
+
+        for (int i = 2; i < decimalSplit.length; i++) {
+          nums.add(Float.parseFloat("." + decimalSplit[i]));
+        }
+      }
+    } catch (Exception e) {
+      System.out.println(Arrays.toString(decimalSplit));
+      System.out.println(command);
+    }
+
+    return nums;
+  }
+
   @Override
   protected void parseFile(String filePath)
       throws ParserConfigurationException, IOException, SAXException, IllegalArgumentException {
@@ -157,7 +181,8 @@ public class SvgParser extends FileParser {
         if (commandChar != 'z' && commandChar != 'Z') {
           // Split the command into number strings and convert them into floats.
           nums = Arrays.stream(command.substring(1).split(" "))
-              .map(Float::parseFloat)
+              .filter(Predicate.not(String::isBlank))
+              .flatMap((numString) -> splitCommand(numString).stream())
               .collect(Collectors.toList());
         }
 
@@ -287,15 +312,15 @@ public class SvgParser extends FileParser {
               : prevQuadraticControlPoint.reflectRelativeToVector(currPoint);
         }
       } else {
-        controlPoint1 = new Vector2(args.get(i), args.get(i + 1));
+        controlPoint1 = new Vector2(args.get(i) / width, args.get(i + 1) / height);
       }
 
       if (isCubic) {
-        controlPoint2 = new Vector2(args.get(i + 2), args.get(i + 3));
+        controlPoint2 = new Vector2(args.get(i + 2) / width, args.get(i + 3) / height);
       }
 
-      Vector2 newPoint = new Vector2(args.get(i + expectedArgs - 2),
-          args.get(i + expectedArgs - 1));
+      Vector2 newPoint = new Vector2(args.get(i + expectedArgs - 2) / width,
+          args.get(i + expectedArgs - 1) / height);
 
       if (!isAbsolute) {
         controlPoint1 = currPoint.translate(controlPoint1);
