@@ -1,5 +1,8 @@
 package shapes;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public final class Line extends Shape {
 
   private final Vector2 a;
@@ -95,6 +98,20 @@ public final class Line extends Shape {
 
   public Line setY2(double y2) {
     return new Line(getX1(), getY1(), getX2(), y2);
+  }
+
+  public static List<Line> pathToLines(double... path) {
+    List<Line> lines = new ArrayList<>();
+
+    Vector2 prev = new Vector2(path[0], path[1]);
+
+    for (int i = 2; i < path.length; i += 2) {
+      Vector2 dest = new Vector2(path[i], path[i + 1]);
+      lines.add(new Line(prev, dest));
+      prev = dest;
+    }
+
+    return lines;
   }
 
   @Override
