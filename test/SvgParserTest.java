@@ -29,6 +29,14 @@ public class SvgParserTest {
   }
 
   @Test
+  public void verticalLineToGeneratesAVerticalLineShape()
+      throws ParserConfigurationException, SAXException, IOException {
+    SvgParser svgParser = new SvgParser("test/images/vertical-line-to.svg");
+    List<Shape> shapes = svgParser.getShapes();
+    assertEquals(shapes, Line.pathToLines(0.5, 0.5, 0.5, 0.75, 0.5, 0, 0.5, 0.5));
+  }
+
+  @Test
   public void closingASubPathDrawsLineToInitialPoint()
       throws ParserConfigurationException, SAXException, IOException {
     SvgParser svgParser = new SvgParser("test/images/closing-subpath.svg");
