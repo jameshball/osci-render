@@ -54,6 +54,11 @@ public final class Ellipse extends Shape {
   }
 
   @Override
+  public Ellipse scale(Vector2 vector) {
+    return new Ellipse(a * vector.getX(), b * vector.getY(), weight, rotation, position.scale(vector));
+  }
+
+  @Override
   public Ellipse translate(Vector2 vector) {
     return new Ellipse(a, b, weight, rotation, position.translate(vector));
   }

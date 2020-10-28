@@ -15,6 +15,8 @@ public abstract class Shape {
 
   public abstract Shape scale(double factor);
 
+  public abstract Shape scale(Vector2 vector);
+
   public abstract Shape translate(Vector2 vector);
 
   public abstract Shape setWeight(double weight);

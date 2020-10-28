@@ -52,22 +52,27 @@ public class CubicBezierCurve extends Shape {
   }
 
   @Override
-  public Shape rotate(double theta) {
+  public CubicBezierCurve rotate(double theta) {
     return this;
   }
 
   @Override
-  public Shape scale(double factor) {
+  public CubicBezierCurve scale(double factor) {
     return new CubicBezierCurve(p0, p1, p2, p3, weight, factor, translation);
   }
 
   @Override
-  public Shape translate(Vector2 vector) {
+  public CubicBezierCurve scale(Vector2 vector) {
+    return new CubicBezierCurve(p0.scale(vector), p1.scale(vector), p2.scale(vector), p3.scale(vector), weight, translation);
+  }
+
+  @Override
+  public CubicBezierCurve translate(Vector2 vector) {
     return new CubicBezierCurve(p0, p1, p2, p3, weight, factor, translation.translate(vector));
   }
 
   @Override
-  public Shape setWeight(double weight) {
+  public CubicBezierCurve setWeight(double weight) {
     return new CubicBezierCurve(p0, p1, p2, p3, weight, factor, translation);
   }
 }
