@@ -28,4 +28,8 @@ public final class XmlUtil {
       return list.getLength();
     }
   }
+
+  public static String getNodeValue(Node node, String namedItem) {
+    return node.getAttributes().getNamedItem(namedItem).getNodeValue();
+  }
 }
