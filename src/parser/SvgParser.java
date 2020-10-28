@@ -205,13 +205,17 @@ public class SvgParser extends FileParser {
     return shapes;
   }
 
+  private Vector2 scaledArguments(float arg1, float arg2) {
+    return new Vector2(arg1 / width, arg2 / height);
+  }
+
   // Parses moveto commands (M and m commands)
   private List<? extends Shape> parseMoveTo(List<Float> args, boolean isAbsolute) {
     if (args.size() % 2 != 0 || args.size() < 2) {
       throw new IllegalArgumentException("SVG moveto command has incorrect number of arguments.");
     }
 
-    Vector2 vec = new Vector2(args.get(0) / width, args.get(1) / height);
+    Vector2 vec = scaledArguments(args.get(0), args.get(1));
 
     if (isAbsolute) {
       currPoint = vec;
@@ -259,9 +263,9 @@ public class SvgParser extends FileParser {
       Vector2 newPoint;
 
       if (expectedArgs == 1) {
-        newPoint = new Vector2(args.get(i) / width, args.get(i) / height);
+        newPoint = scaledArguments(args.get(i), args.get(i));
       } else {
-        newPoint = new Vector2(args.get(i) / width, args.get(i + 1) / height);
+        newPoint = scaledArguments(args.get(i), args.get(i + 1));
       }
 
       if (isHorizontal && !isVertical) {
@@ -312,15 +316,14 @@ public class SvgParser extends FileParser {
               : prevQuadraticControlPoint.reflectRelativeToVector(currPoint);
         }
       } else {
-        controlPoint1 = new Vector2(args.get(i) / width, args.get(i + 1) / height);
+        controlPoint1 = scaledArguments(args.get(i), args.get(i + 1));
       }
 
       if (isCubic) {
-        controlPoint2 = new Vector2(args.get(i + 2) / width, args.get(i + 3) / height);
+        controlPoint2 = scaledArguments(args.get(i + 2), args.get(i + 3));
       }
 
-      Vector2 newPoint = new Vector2(args.get(i + expectedArgs - 2) / width,
-          args.get(i + expectedArgs - 1) / height);
+      Vector2 newPoint = scaledArguments(args.get(i + expectedArgs - 2), args.get(i + expectedArgs - 1));
 
       if (!isAbsolute) {
         controlPoint1 = currPoint.translate(controlPoint1);

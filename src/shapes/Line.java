@@ -46,6 +46,11 @@ public final class Line extends Shape {
     return new Line(a.scale(factor), b.scale(factor), weight);
   }
 
+  @Override
+  public Line scale(Vector2 vector) {
+    return new Line(a.scale(vector), b.scale(vector), weight);
+  }
+
   public Line copy() {
     return new Line(a.copy(), b.copy(), weight);
   }
