@@ -1,6 +1,7 @@
 package parser;
 
 import static parser.XmlUtil.asList;
+import static parser.XmlUtil.getNodeValue;
 
 import java.io.File;
 import java.io.IOException;
@@ -9,10 +10,10 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Vector;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -30,6 +31,8 @@ public class SvgParser extends FileParser {
   private final List<Shape> shapes;
   private final Map<Character, Function<List<Float>, List<? extends Shape>>> commandMap;
 
+  private float viewBoxWidth;
+  private float viewBoxHeight;
   private float width;
   private float height;
 
@@ -76,7 +79,6 @@ public class SvgParser extends FileParser {
       throws IOException, SAXException, ParserConfigurationException {
     // opens XML reader for svg file.
     DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-    factory.setValidating(true);
     factory.setIgnoringElementContentWhitespace(true);
     DocumentBuilder builder = factory.newDocumentBuilder();
     File file = new File(path);
@@ -113,22 +115,24 @@ public class SvgParser extends FileParser {
     List<String> paths = new ArrayList<>();
 
     for (Node elem : asList(svg.getElementsByTagName("path"))) {
-      paths.add(elem.getAttributes().getNamedItem("d").getNodeValue());
+      paths.add(getNodeValue(elem, "d"));
     }
 
     return paths;
   }
 
   // Returns the width and height of the viewBox attribute
-  private static List<Float> getViewBoxDimensions(Node svgElem) {
-    return Arrays.stream(
-        svgElem.getAttributes()
-            .getNamedItem("viewBox")
-            .getNodeValue()
-            .split(" "))
+  private void getSvgDimensions(Node svgElem) {
+    List<Float> viewBox = Arrays.stream(getNodeValue(svgElem, "viewBox").split(" "))
         .map(Float::parseFloat)
         .skip(2)
         .collect(Collectors.toList());
+
+    viewBoxWidth = viewBox.get(0);
+    viewBoxHeight = viewBox.get(1);
+
+    width = Float.parseFloat(getNodeValue(svgElem, "width"));
+    height = Float.parseFloat(getNodeValue(svgElem, "height"));
   }
 
   private static List<Float> splitCommand(String command) {
@@ -163,9 +167,7 @@ public class SvgParser extends FileParser {
       throw new IllegalArgumentException("SVG has either zero or more than one svg element.");
     }
 
-    List<Float> dimensions = getViewBoxDimensions(svgElem.get(0));
-    width = dimensions.get(0);
-    height = dimensions.get(1);
+    getSvgDimensions(svgElem.get(0));
 
     // Get all d attributes within path elements in the SVG file.
     for (String path : getSvgPathAttributes(svg)) {
@@ -206,7 +208,11 @@ public class SvgParser extends FileParser {
   }
 
   private Vector2 scaledArguments(float arg1, float arg2) {
-    return new Vector2(arg1 / width, arg2 / height);
+    return new Vector2(arg1, arg2)
+        .scale(new Vector2((width / viewBoxWidth) / viewBoxWidth,
+            -(height / viewBoxHeight) / viewBoxHeight)
+        ).translate(new Vector2(-0.5, 0.5))
+        .scale(2);
   }
 
   // Parses moveto commands (M and m commands)
@@ -323,7 +329,8 @@ public class SvgParser extends FileParser {
         controlPoint2 = scaledArguments(args.get(i + 2), args.get(i + 3));
       }
 
-      Vector2 newPoint = scaledArguments(args.get(i + expectedArgs - 2), args.get(i + expectedArgs - 1));
+      Vector2 newPoint = scaledArguments(args.get(i + expectedArgs - 2),
+          args.get(i + expectedArgs - 1));
 
       if (!isAbsolute) {
         controlPoint1 = currPoint.translate(controlPoint1);
