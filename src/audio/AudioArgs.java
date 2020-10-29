@@ -53,7 +53,7 @@ final class AudioArgs {
     return optionalArgs.length > n ? optionalArgs[n] : defaultVal;
   }
 
-  private class IllegalAudioArgumentException extends IllegalArgumentException {
+  private static class IllegalAudioArgumentException extends IllegalArgumentException {
 
     private static final String USAGE = "Incorrect usage.\nUsage: osci-render objFilePath "
         + "[rotateSpeed] [focalLength] [cameraX] [cameraY] [cameraZ]";

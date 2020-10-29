@@ -61,10 +61,8 @@ public class AudioPlayer {
       double drawingProgress = totalAudioFrames == 0 ? 1 : audioFramesDrawn / totalAudioFrames;
       Vector2 nextVector = shape.nextVector(drawingProgress);
 
-      for (int c = 0; c < FORMAT.outputs; c++) {
-        ((float[]) output)[f * FORMAT.outputs] = (float) nextVector.getX();
-        ((float[]) output)[f * FORMAT.outputs + 1] = (float) nextVector.getY();
-      }
+      ((float[]) output)[f * FORMAT.outputs] = (float) nextVector.getX();
+      ((float[]) output)[f * FORMAT.outputs + 1] = (float) nextVector.getY();
 
       audioFramesDrawn++;
 
