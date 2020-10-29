@@ -54,13 +54,8 @@ public final class Vector2 extends Shape {
   }
 
   @Override
-  public float nextX(double drawingProgress) {
-    return (float) getX();
-  }
-
-  @Override
-  public float nextY(double drawingProgress) {
-    return (float) getY();
+  public Vector2 nextVector(double drawingProgress) {
+    return this;
   }
 
   @Override

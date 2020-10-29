@@ -21,19 +21,11 @@ public class CubicBezierCurve extends Shape {
   }
 
   @Override
-  public float nextX(double t) {
-    return (float) (Math.pow(1 - t, 3) * p0.getX()
-        + 3 * Math.pow(1 - t, 2) * t * p1.getX()
-        + 3 * (1 - t) * Math.pow(t, 2) * p2.getX()
-        + Math.pow(t, 3) * p3.getX());
-  }
-
-  @Override
-  public float nextY(double t) {
-    return (float) (Math.pow(1 - t, 3) * p0.getY()
-        + 3 * Math.pow(1 - t, 2) * t * p1.getY()
-        + 3 * (1 - t) * Math.pow(t, 2) * p2.getY()
-        + Math.pow(t, 3) * p3.getY());
+  public Vector2 nextVector(double t) {
+    return p0.scale(Math.pow(1 - t, 3))
+        .add(p1.scale(3 * Math.pow(1 - t, 2) * t))
+        .add(p2.scale(3 * (1 - t) * Math.pow(t, 2)))
+        .add(p3.scale(Math.pow(t, 3)));
   }
 
   @Override
