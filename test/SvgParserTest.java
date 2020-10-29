@@ -8,7 +8,6 @@ import org.xml.sax.SAXException;
 import parser.SvgParser;
 import shapes.Line;
 import shapes.Shape;
-import shapes.Vector2;
 
 public class SvgParserTest {
 
