@@ -19,16 +19,7 @@ public class QuadraticBezierCurve extends Shape {
   }
 
   @Override
-  public float nextX(double t) {
-    return (float) nextVector(t).getX();
-  }
-
-  @Override
-  public float nextY(double t) {
-    return (float) nextVector(t).getY();
-  }
-
-  private Vector2 nextVector(double t) {
+  public Vector2 nextVector(double t) {
     return p1.add(p0.sub(p1).scale(Math.pow(1 - t, 2))).add(p2.sub(p1).scale(Math.pow(t, 2)));
   }
 

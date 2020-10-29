@@ -208,11 +208,12 @@ public class SvgParser extends FileParser {
   }
 
   private Vector2 scaledArguments(float arg1, float arg2) {
-    return new Vector2(arg1, arg2)
-        .scale(new Vector2((width / viewBoxWidth) / viewBoxWidth,
-            -(height / viewBoxHeight) / viewBoxHeight)
-        ).translate(new Vector2(-0.5, 0.5))
-        .scale(2);
+    return new Vector2(arg1, arg2);
+//    return new Vector2(arg1, arg2)
+//        .scale(new Vector2((width / viewBoxWidth) / viewBoxWidth,
+//            -(height / viewBoxHeight) / viewBoxHeight)
+//        ).translate(new Vector2(-0.5, 0.5))
+//        .scale(2);
   }
 
   // Parses moveto commands (M and m commands)

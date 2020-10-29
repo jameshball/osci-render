@@ -56,13 +56,8 @@ public final class Line extends Shape {
   }
 
   @Override
-  public float nextX(double drawingProgress) {
-    return (float) (getX1() + (getX2() - getX1()) * drawingProgress);
-  }
-
-  @Override
-  public float nextY(double drawingProgress) {
-    return (float) (getY1() + (getY2() - getY1()) * drawingProgress);
+  public Vector2 nextVector(double drawingProgress) {
+    return a.add(b.sub(a).scale(drawingProgress));
   }
 
   public Vector2 getA() {
