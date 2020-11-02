@@ -45,7 +45,7 @@ public final class Ellipse extends Shape {
 
   @Override
   public Ellipse scale(double factor) {
-    return new Ellipse(a * factor, b * factor, weight, rotation, position.scale(factor));
+    return scale(new Vector2(factor));
   }
 
   @Override
