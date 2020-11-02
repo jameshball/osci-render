@@ -41,16 +41,16 @@ public class SvgParser extends FileParser {
   private Vector2 prevCubicControlPoint;
   private Vector2 prevQuadraticControlPoint;
 
-  static {
-    fileExtension = "svg";
+  public SvgParser(String path) throws IOException, SAXException, ParserConfigurationException {
+    checkFileExtension(path);
+    shapes = new ArrayList<>();
+    commandMap = new HashMap<>();
+    initialiseCommandMap();
+    parseFile(path);
   }
 
-  public SvgParser(String path) throws IOException, SAXException, ParserConfigurationException {
-    FileParser.checkFileExtension(path);
-    shapes = new ArrayList<>();
-
-    commandMap = new HashMap<>();
-    // Map command chars to function calls.
+  // Map command chars to function calls.
+  private void initialiseCommandMap() {
     commandMap.put('M', (args) -> parseMoveTo(args, true));
     commandMap.put('m', (args) -> parseMoveTo(args, false));
     commandMap.put('L', (args) -> parseLineTo(args, true, true, true));
@@ -71,8 +71,6 @@ public class SvgParser extends FileParser {
     commandMap.put('a', (args) -> parseEllipticalArc(args, false));
     commandMap.put('Z', this::parseClosePath);
     commandMap.put('z', this::parseClosePath);
-
-    parseFile(path);
   }
 
   private Document getSvgDocument(String path)
@@ -155,6 +153,11 @@ public class SvgParser extends FileParser {
     }
 
     return nums;
+  }
+
+  @Override
+  public String getFileExtension() {
+    return "svg";
   }
 
   @Override

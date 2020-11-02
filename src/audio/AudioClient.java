@@ -3,6 +3,7 @@ package audio;
 import engine.Camera;
 import engine.Vector3;
 import engine.WorldObject;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -31,7 +32,7 @@ public class AudioClient {
   //
   // example:
   // osci-render models/cube.obj 3
-  public static void main(String[] programArgs) {
+  public static void main(String[] programArgs) throws IOException {
     // TODO: Calculate weight of lines using depth.
     //  Reduce weight of lines drawn multiple times.
     //  Find intersections of lines to (possibly) improve line cleanup.
