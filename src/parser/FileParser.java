@@ -9,13 +9,9 @@ import shapes.Shape;
 
 public abstract class FileParser {
 
-  public static String fileExtension;
+  public abstract String getFileExtension();
 
-  public static String getFileExtension() {
-    return fileExtension;
-  }
-
-  protected static void checkFileExtension(String path) throws IllegalArgumentException {
+  protected void checkFileExtension(String path) throws IllegalArgumentException {
     Pattern pattern = Pattern.compile("\\." + getFileExtension() + "$");
     if (!pattern.matcher(path).find()) {
       throw new IllegalArgumentException(
