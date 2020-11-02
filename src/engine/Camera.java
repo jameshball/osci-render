@@ -15,9 +15,10 @@ public class Camera {
   private static final double VERTEX_VALUE_THRESHOLD = 1;
   private static final double CAMERA_MOVE_INCREMENT = -0.1;
   private static final int SAMPLE_RENDER_SAMPLES = 50;
+  private static final double EPSILON = 0.001;
 
-  private double focalLength;
-  private double clipping = 0.001;
+  private final double focalLength;
+
   private Vector3 pos;
 
   public Camera(double focalLength, Vector3 pos) {
@@ -100,7 +101,7 @@ public class Camera {
   }
 
   private Vector2 project(Vector3 vertex) {
-    if (vertex.getZ() - pos.getZ() < clipping) {
+    if (vertex.getZ() - pos.getZ() < EPSILON) {
       return new Vector2();
     }
 
