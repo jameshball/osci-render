@@ -17,6 +17,10 @@ public final class Vector2 extends Shape {
     this(x, y, Shape.DEFAULT_WEIGHT);
   }
 
+  public Vector2(double xy) {
+    this(xy, xy, Shape.DEFAULT_WEIGHT);
+  }
+
   public Vector2() {
     this(0, 0);
   }
@@ -68,7 +72,7 @@ public final class Vector2 extends Shape {
 
   @Override
   public Vector2 scale(double factor) {
-    return new Vector2(getX() * factor, getY() * factor);
+    return scale(new Vector2(factor));
   }
 
   @Override
