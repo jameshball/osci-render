@@ -8,6 +8,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
+import javax.xml.parsers.ParserConfigurationException;
+import org.xml.sax.SAXException;
+import parser.SvgParser;
 import shapes.Shape;
 import shapes.Shapes;
 import shapes.Vector2;
@@ -32,7 +35,8 @@ public class AudioClient {
   //
   // example:
   // osci-render models/cube.obj 3
-  public static void main(String[] programArgs) throws IOException {
+  public static void main(String[] programArgs)
+      throws IOException, ParserConfigurationException, SAXException {
     // TODO: Calculate weight of lines using depth.
     //  Reduce weight of lines drawn multiple times.
     //  Find intersections of lines to (possibly) improve line cleanup.
@@ -53,7 +57,10 @@ public class AudioClient {
     Vector3 rotation = new Vector3(0, OBJ_ROTATE_SPEED, OBJ_ROTATE_SPEED);
 
     System.out.println("Begin pre-render...");
-    List<List<? extends Shape>> frames = preRender(object, rotation, camera);
+    //List<List<? extends Shape>> frames = preRender(object, rotation, camera);
+    List<List<? extends Shape>> frames = new ArrayList<>();
+    List<Shape> frame = Shapes.normalizeShapes(new SvgParser("test/images/sine-wave.svg").getShapes());
+    frames.add(frame);
     System.out.println("Finish pre-render");
     System.out.println("Connecting to audio player");
     AudioPlayer player = new AudioPlayer(SAMPLE_RATE, frames, ROTATE_SPEED, TRANSLATION_SPEED,

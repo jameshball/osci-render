@@ -210,22 +210,13 @@ public class SvgParser extends FileParser {
     return shapes;
   }
 
-  private Vector2 scaledArguments(float arg1, float arg2) {
-    return new Vector2(arg1, arg2);
-//    return new Vector2(arg1, arg2)
-//        .scale(new Vector2((width / viewBoxWidth) / viewBoxWidth,
-//            -(height / viewBoxHeight) / viewBoxHeight)
-//        ).translate(new Vector2(-0.5, 0.5))
-//        .scale(2);
-  }
-
   // Parses moveto commands (M and m commands)
   private List<? extends Shape> parseMoveTo(List<Float> args, boolean isAbsolute) {
     if (args.size() % 2 != 0 || args.size() < 2) {
       throw new IllegalArgumentException("SVG moveto command has incorrect number of arguments.");
     }
 
-    Vector2 vec = scaledArguments(args.get(0), args.get(1));
+    Vector2 vec = new Vector2(args.get(0), args.get(1));
 
     if (isAbsolute) {
       currPoint = vec;
@@ -273,9 +264,9 @@ public class SvgParser extends FileParser {
       Vector2 newPoint;
 
       if (expectedArgs == 1) {
-        newPoint = scaledArguments(args.get(i), args.get(i));
+        newPoint = new Vector2(args.get(i), args.get(i));
       } else {
-        newPoint = scaledArguments(args.get(i), args.get(i + 1));
+        newPoint = new Vector2(args.get(i), args.get(i + 1));
       }
 
       if (isHorizontal && !isVertical) {
@@ -326,14 +317,14 @@ public class SvgParser extends FileParser {
               : prevQuadraticControlPoint.reflectRelativeToVector(currPoint);
         }
       } else {
-        controlPoint1 = scaledArguments(args.get(i), args.get(i + 1));
+        controlPoint1 = new Vector2(args.get(i), args.get(i + 1));
       }
 
       if (isCubic) {
-        controlPoint2 = scaledArguments(args.get(i + 2), args.get(i + 3));
+        controlPoint2 = new Vector2(args.get(i + 2), args.get(i + 3));
       }
 
-      Vector2 newPoint = scaledArguments(args.get(i + expectedArgs - 2),
+      Vector2 newPoint = new Vector2(args.get(i + expectedArgs - 2),
           args.get(i + expectedArgs - 1));
 
       if (!isAbsolute) {
