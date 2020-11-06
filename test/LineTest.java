@@ -3,7 +3,7 @@ import shapes.Line;
 
 import static org.junit.Assert.*;
 
-public class TestSuite {
+public class LineTest {
   // TODO: Create tests for shapes.Shapes class.
 
   @Test

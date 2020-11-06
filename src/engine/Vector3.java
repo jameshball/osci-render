@@ -6,16 +6,18 @@ public final class Vector3 {
 
   private final double x, y, z;
 
-  public Vector3() {
-    this.x = 0;
-    this.y = 0;
-    this.z = 0;
-  }
-
   public Vector3(double x, double y, double z) {
     this.x = x;
     this.y = y;
     this.z = z;
+  }
+
+  public Vector3(double xyz) {
+    this(xyz, xyz, xyz);
+  }
+
+  public Vector3() {
+    this(0, 0, 0);
   }
 
   public double getX() {

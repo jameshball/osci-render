@@ -1,5 +1,8 @@
 package shapes;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public final class Line extends Shape {
 
   private final Vector2 a;
@@ -43,18 +46,18 @@ public final class Line extends Shape {
     return new Line(a.scale(factor), b.scale(factor), weight);
   }
 
+  @Override
+  public Line scale(Vector2 vector) {
+    return new Line(a.scale(vector), b.scale(vector), weight);
+  }
+
   public Line copy() {
     return new Line(a.copy(), b.copy(), weight);
   }
 
   @Override
-  public float nextX(double drawingProgress) {
-    return (float) (getX1() + (getX2() - getX1()) * drawingProgress);
-  }
-
-  @Override
-  public float nextY(double drawingProgress) {
-    return (float) (getY1() + (getY2() - getY1()) * drawingProgress);
+  public Vector2 nextVector(double drawingProgress) {
+    return a.add(b.sub(a).scale(drawingProgress));
   }
 
   public Vector2 getA() {
@@ -97,6 +100,20 @@ public final class Line extends Shape {
     return new Line(getX1(), getY1(), getX2(), y2);
   }
 
+  public static List<Line> pathToLines(double... path) {
+    List<Line> lines = new ArrayList<>();
+
+    Vector2 prev = new Vector2(path[0], path[1]);
+
+    for (int i = 2; i < path.length; i += 2) {
+      Vector2 dest = new Vector2(path[i], path[i + 1]);
+      lines.add(new Line(prev, dest));
+      prev = dest;
+    }
+
+    return lines;
+  }
+
   @Override
   public Line setWeight(double weight) {
     return new Line(getX1(), getY1(), getX2(), getY2(), weight);
@@ -113,5 +130,13 @@ public final class Line extends Shape {
     } else {
       return false;
     }
+  }
+
+  @Override
+  public String toString() {
+    return "Line{" +
+        "a=" + a +
+        ", b=" + b +
+        '}';
   }
 }
