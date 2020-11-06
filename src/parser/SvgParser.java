@@ -13,7 +13,6 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -30,11 +29,6 @@ public class SvgParser extends FileParser {
 
   private final List<Shape> shapes;
   private final Map<Character, Function<List<Float>, List<? extends Shape>>> commandMap;
-
-  private float viewBoxWidth;
-  private float viewBoxHeight;
-  private float width;
-  private float height;
 
   private Vector2 currPoint;
   private Vector2 initialPoint;
@@ -119,20 +113,6 @@ public class SvgParser extends FileParser {
     return paths;
   }
 
-  // Returns the width and height of the viewBox attribute
-  private void getSvgDimensions(Node svgElem) {
-    List<Float> viewBox = Arrays.stream(getNodeValue(svgElem, "viewBox").split(" "))
-        .map(Float::parseFloat)
-        .skip(2)
-        .collect(Collectors.toList());
-
-    viewBoxWidth = viewBox.get(0);
-    viewBoxHeight = viewBox.get(1);
-
-    width = Float.parseFloat(getNodeValue(svgElem, "width"));
-    height = Float.parseFloat(getNodeValue(svgElem, "height"));
-  }
-
   private static List<Float> splitCommand(String command) {
     List<Float> nums = new ArrayList<>();
     String[] decimalSplit = command.split("\\.");
@@ -156,7 +136,7 @@ public class SvgParser extends FileParser {
   }
 
   @Override
-  public String getFileExtension() {
+  protected String getFileExtension() {
     return "svg";
   }
 
@@ -169,8 +149,6 @@ public class SvgParser extends FileParser {
     if (svgElem.size() != 1) {
       throw new IllegalArgumentException("SVG has either zero or more than one svg element.");
     }
-
-    getSvgDimensions(svgElem.get(0));
 
     // Get all d attributes within path elements in the SVG file.
     for (String path : getSvgPathAttributes(svg)) {
@@ -206,8 +184,10 @@ public class SvgParser extends FileParser {
   }
 
   @Override
-  public List<Shape> getShapes() {
-    return shapes;
+  public List<List<Shape>> getShapes() {
+    List<List<Shape>> frames = new ArrayList<>();
+    frames.add(shapes);
+    return frames;
   }
 
   // Parses moveto commands (M and m commands)
