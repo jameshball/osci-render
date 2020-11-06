@@ -17,6 +17,10 @@ public final class Vector2 extends Shape {
     this(x, y, Shape.DEFAULT_WEIGHT);
   }
 
+  public Vector2(double xy) {
+    this(xy, xy, Shape.DEFAULT_WEIGHT);
+  }
+
   public Vector2() {
     this(0, 0);
   }
@@ -41,14 +45,21 @@ public final class Vector2 extends Shape {
     return new Vector2(x, y);
   }
 
-  @Override
-  public float nextX(double drawingProgress) {
-    return (float) getX();
+  public Vector2 add(Vector2 vector) {
+    return translate(vector);
+  }
+
+  public Vector2 sub(Vector2 vector) {
+    return new Vector2(getX() - vector.getX(), getY() - vector.getY());
+  }
+
+  public Vector2 reflectRelativeToVector(Vector2 vector) {
+    return translate(vector.sub(this).scale(2));
   }
 
   @Override
-  public float nextY(double drawingProgress) {
-    return (float) getY();
+  public Vector2 nextVector(double drawingProgress) {
+    return this;
   }
 
   @Override
@@ -61,7 +72,12 @@ public final class Vector2 extends Shape {
 
   @Override
   public Vector2 scale(double factor) {
-    return new Vector2(getX() * factor, getY() * factor);
+    return scale(new Vector2(factor));
+  }
+
+  @Override
+  public Vector2 scale(Vector2 vector) {
+    return new Vector2(getX() * vector.getX(), getY() * vector.getY());
   }
 
   @Override
@@ -101,5 +117,13 @@ public final class Vector2 extends Shape {
     value *= factor;
 
     return (double) Math.round(value) / factor;
+  }
+
+  @Override
+  public String toString() {
+    return "Vector2{" +
+        "x=" + x +
+        ", y=" + y +
+        '}';
   }
 }

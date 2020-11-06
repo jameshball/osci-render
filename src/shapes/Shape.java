@@ -7,13 +7,13 @@ public abstract class Shape {
   protected double weight = DEFAULT_WEIGHT;
   protected double length;
 
-  public abstract float nextX(double drawingProgress);
-
-  public abstract float nextY(double drawingProgress);
+  public abstract Vector2 nextVector(double drawingProgress);
 
   public abstract Shape rotate(double theta);
 
   public abstract Shape scale(double factor);
+
+  public abstract Shape scale(Vector2 vector);
 
   public abstract Shape translate(Vector2 vector);
 
