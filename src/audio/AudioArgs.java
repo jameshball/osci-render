@@ -1,11 +1,20 @@
 package audio;
 
 import engine.Camera;
+import java.io.IOException;
+import java.util.List;
+import javax.xml.parsers.ParserConfigurationException;
+import org.xml.sax.SAXException;
+import parser.FileParser;
+import parser.ObjParser;
+import parser.SvgParser;
+import shapes.Shape;
+import shapes.Shapes;
 
 // Helper class for AudioClient that deals with optional program arguments.
 final class AudioArgs {
 
-  final String objFilePath;
+  final String filePath;
   final float[] optionalArgs;
 
   AudioArgs(String[] args) throws IllegalAudioArgumentException {
@@ -13,7 +22,7 @@ final class AudioArgs {
       throw new IllegalAudioArgumentException();
     }
 
-    objFilePath = args[0];
+    filePath = args[0];
     optionalArgs = new float[args.length - 1];
 
     for (int i = 0; i < optionalArgs.length; i++) {
@@ -21,8 +30,16 @@ final class AudioArgs {
     }
   }
 
-  String objFilePath() {
-    return objFilePath;
+  List<List<Shape>> getFramesFromFile() throws IOException, ParserConfigurationException, SAXException {
+    if (filePath.matches(".*\\.obj")) {
+      return new ObjParser(filePath, rotateSpeed(), cameraX(), cameraY(), cameraZ(), focalLength(),
+          isDefaultPosition()).getShapes();
+    } else if (filePath.matches(".*\\.svg")) {
+      return Shapes.normalize(new SvgParser(filePath).getShapes());
+    } else {
+      throw new IllegalArgumentException(
+          "Provided file extension in file " + filePath + " not supported.");
+    }
   }
 
   float rotateSpeed() {

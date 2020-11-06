@@ -18,7 +18,7 @@ public class AudioPlayer {
 
   private final XtFormat FORMAT;
 
-  private final List<List<? extends Shape>> frames;
+  private final List<List<Shape>> frames;
   private int currentFrame = 0;
   private int currentShape = 0;
   private int audioFramesDrawn = 0;
@@ -33,12 +33,12 @@ public class AudioPlayer {
 
   private volatile boolean stopped;
 
-  public AudioPlayer(int sampleRate, List<List<? extends Shape>> frames) {
+  public AudioPlayer(int sampleRate, List<List<Shape>> frames) {
     this.FORMAT = new XtFormat(new XtMix(sampleRate, XtSample.FLOAT32), 0, 0, 2, 0);
     this.frames = frames;
   }
 
-  public AudioPlayer(int sampleRate, List<List<? extends Shape>> frames, float rotateSpeed,
+  public AudioPlayer(int sampleRate, List<List<Shape>> frames, float rotateSpeed,
       float translateSpeed, Vector2 translateVector, float scale, float weight) {
     this(sampleRate, frames);
     setRotateSpeed(rotateSpeed);
