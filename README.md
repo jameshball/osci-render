@@ -13,6 +13,7 @@ Lots of this code was built as part of a 24hr hackathon: IC Hack 20. The origina
 ## Current Features
 
 - Render `.obj` files on an oscilloscope
+- Render `.svg` files
 - Rotation of objects
 - Scaling image
 - Translating image
@@ -24,7 +25,8 @@ Lots of this code was built as part of a 24hr hackathon: IC Hack 20. The origina
 
 - Performance improvements to `Shapes.sortLines()`
     - With goal of high-framerate realtime rendering
-- Rendering `.svg` and other image formats
+- ✔ Rendering `.svg` and other image formats
+- Rendering text
 - Tune and transpose audio output
 - Support rendering of multiple objects
 - Saving pre-rendered frames to file for later loading
@@ -46,15 +48,15 @@ This will render a cube with a rotation speed of 3 and a focal length of 1. Deta
 ### Program Arguments
 
 ```
-osci-render objFilePath [rotateSpeed] [focalLength] [cameraX] [cameraY] [cameraZ]
+osci-render filePath [rotateSpeed] [focalLength] [cameraX] [cameraY] [cameraZ]
 ```
 
 If no camera position arguments are given, the program will automatically move the camera to a position that renders the whole object on the screen with minimal display clipping.
 
 #### Required
 
-- objFilePath
-    - Specifies the file path to retrieve the `.obj` file
+- filePath
+    - Specifies the file path to retrieve the `.obj` or `.svg` file
 
 #### Optional
 
@@ -88,4 +90,4 @@ James Ball, [james@ball.sh](mailto:james@ball.sh)
 
 ## Special Thanks
 
-Team Members: [James Ball](https://github.com/jameshball), [William Grant](https://github.com/wdhg), [Jessica Lally](https://github.com/jessicalally), [Noor Sawhney](https://github.com/noor-gate), and [Andy Wang](https://github.com/cbeuw)
+IC Hack 20 Team Members: [James Ball](https://github.com/jameshball), [William Grant](https://github.com/wdhg), [Jessica Lally](https://github.com/jessicalally), [Noor Sawhney](https://github.com/noor-gate), and [Andy Wang](https://github.com/cbeuw)
