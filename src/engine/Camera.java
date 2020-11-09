@@ -3,6 +3,7 @@ package engine;
 import java.util.HashMap;
 import java.util.Map;
 import shapes.Line;
+import shapes.Shape;
 import shapes.Vector2;
 
 import java.util.ArrayList;
@@ -41,7 +42,7 @@ public class Camera {
     this(DEFAULT_FOCAL_LENGTH, object);
   }
 
-  public List<Line> draw(WorldObject worldObject) {
+  public List<Shape> draw(WorldObject worldObject) {
     return getFrame(getProjectedVertices(worldObject), worldObject.getVertexPath());
   }
 
@@ -113,8 +114,8 @@ public class Camera {
     );
   }
 
-  public List<Line> getFrame(Map<Vector3, Vector2> projectionMap, List<Vector3> vertexPath) {
-    List<Line> lines = new ArrayList<>();
+  public List<Shape> getFrame(Map<Vector3, Vector2> projectionMap, List<Vector3> vertexPath) {
+    List<Shape> lines = new ArrayList<>();
 
     for (int i = 0; i < vertexPath.size(); i += 2) {
       lines.add(new Line(

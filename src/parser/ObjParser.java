@@ -71,24 +71,9 @@ public class ObjParser extends FileParser {
     int numFrames = (int) (2 * Math.PI / OBJ_ROTATE_SPEED);
 
     for (int i = 0; i < numFrames; i++) {
-      preRenderedFrames.add(new ArrayList<>());
+      object.rotate(rotation);
+      preRenderedFrames.add(camera.draw(object));
     }
-
-    AtomicInteger renderedFrames = new AtomicInteger();
-
-    // pre-renders the WorldObject in parallel
-    IntStream.range(0, numFrames).parallel().forEach((frameNum) -> {
-      WorldObject clone = object.clone();
-      clone.rotate(rotation.scale(frameNum));
-      // Finds all lines to draw the object from the camera's view and then 'sorts' them by finding
-      // a hamiltonian path, which dramatically helps with rendering a clean image.
-      preRenderedFrames.set(frameNum, Shapes.sortLines(camera.draw(clone)));
-      int numRendered = renderedFrames.getAndIncrement();
-
-      if (numRendered % 50 == 0) {
-        System.out.println("Rendered " + numRendered + " frames of " + (numFrames + 1) + " total");
-      }
-    });
 
     return preRenderedFrames;
   }
