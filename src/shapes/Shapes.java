@@ -1,16 +1,7 @@
 package shapes;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
-import java.util.Set;
-
-import org.jgrapht.Graph;
-import org.jgrapht.alg.connectivity.ConnectivityInspector;
-import org.jgrapht.alg.cycle.ChinesePostman;
-import org.jgrapht.graph.AsSubgraph;
-import org.jgrapht.graph.DefaultUndirectedWeightedGraph;
-import org.jgrapht.graph.DefaultWeightedEdge;
 
 // Helper functions for the Shape interface.
 public class Shapes {
@@ -97,50 +88,5 @@ public class Shapes {
         .map(Shape::getLength)
         .reduce(Double::sum)
         .orElse(0d);
-  }
-
-  // Performs chinese postman on the input lines to get a path that will render cleanly on the
-  // oscilloscope.
-  // TODO: Speed up.
-  public static List<Shape> sortLines(List<Line> lines) {
-    Graph<Vector2, DefaultWeightedEdge> graph = new DefaultUndirectedWeightedGraph<>(
-        DefaultWeightedEdge.class);
-
-    // Add all lines in frame to graph as vertices and edges. Edge weight is determined by the
-    // length of the line as this is directly proportional to draw time.
-    for (Line line : lines) {
-      graph.addVertex(line.getA());
-      graph.addVertex(line.getB());
-
-      DefaultWeightedEdge edge = new DefaultWeightedEdge();
-      graph.addEdge(line.getA(), line.getB(), edge);
-      graph.setEdgeWeight(edge, line.length);
-    }
-
-    ConnectivityInspector<Vector2, DefaultWeightedEdge> inspector = new ConnectivityInspector<>(
-        graph);
-
-    List<Shape> sortedLines = new ArrayList<>();
-
-    // Chinese Postman can only be performed on connected graphs, so iterate over all connected
-    // sub-graphs.
-    for (Set<Vector2> vertices : inspector.connectedSets()) {
-      AsSubgraph<Vector2, DefaultWeightedEdge> subgraph = new AsSubgraph<>(graph, vertices);
-      ChinesePostman<Vector2, DefaultWeightedEdge> cp = new ChinesePostman<>();
-      Collection<DefaultWeightedEdge> path;
-
-      try {
-        path = cp.getCPPSolution(subgraph).getEdgeList();
-      } catch (Exception e) {
-        // Safety in case getCPPSolution fails.
-        path = subgraph.edgeSet();
-      }
-
-      for (DefaultWeightedEdge edge : path) {
-        sortedLines.add(new Line(subgraph.getEdgeSource(edge), subgraph.getEdgeTarget(edge)));
-      }
-    }
-
-    return sortedLines;
   }
 }

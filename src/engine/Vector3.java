@@ -2,7 +2,6 @@ package engine;
 
 import java.util.List;
 import java.util.Objects;
-import shapes.Vector2;
 
 public final class Vector3 {
 
@@ -111,18 +110,16 @@ public final class Vector3 {
     return Objects.hash(x, y, z);
   }
 
-  private static double round(double value, int places) {
-    if (places < 0) {
-      throw new IllegalArgumentException();
-    }
-
-    long factor = (long) Math.pow(10, places);
-    value *= factor;
-
-    return (double) Math.round(value) / factor;
-  }
-
   public Vector3 clone() {
     return new Vector3(x, y, z);
+  }
+
+  @Override
+  public String toString() {
+    return "Vector3{" +
+        "x=" + x +
+        ", y=" + y +
+        ", z=" + z +
+        '}';
   }
 }
