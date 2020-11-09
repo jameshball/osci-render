@@ -42,6 +42,9 @@ public class AudioClient {
     AudioPlayer player = new AudioPlayer(SAMPLE_RATE, frames, ROTATE_SPEED, TRANSLATION_SPEED,
         TRANSLATION, SCALE, WEIGHT);
     System.out.println("Starting audio stream");
-    player.play();
+    new Thread(player).start();
+    while (true) {
+
+    }
   }
 }
