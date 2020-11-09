@@ -1,5 +1,7 @@
 package engine;
 
+import java.util.HashMap;
+import java.util.Map;
 import shapes.Line;
 import shapes.Vector2;
 
@@ -40,17 +42,17 @@ public class Camera {
   }
 
   public List<Line> draw(WorldObject worldObject) {
-    return getFrame(getProjectedVertices(worldObject), worldObject.getEdgeData());
+    return getFrame(getProjectedVertices(worldObject), worldObject.getVertexPath());
   }
 
-  public List<Vector2> getProjectedVertices(WorldObject worldObject) {
-    List<Vector2> vertices = new ArrayList<>();
+  public Map<Vector3, Vector2> getProjectedVertices(WorldObject worldObject) {
+    Map<Vector3, Vector2> projectionMap = new HashMap<>();
 
     for (Vector3 vertex : worldObject.getVertices()) {
-      vertices.add(project(vertex));
+      projectionMap.put(vertex, project(vertex));
     }
 
-    return vertices;
+    return projectionMap;
   }
 
   // Automatically finds the correct Z position to use to view the world object properly.
@@ -73,7 +75,7 @@ public class Camera {
     List<Vector2> vertices = new ArrayList<>();
 
     for (int i = 0; i < SAMPLE_RENDER_SAMPLES - 1; i++) {
-      vertices.addAll(getProjectedVertices(clone));
+      vertices.addAll(getProjectedVertices(clone).values());
       clone.rotate(rotation);
     }
 
@@ -111,18 +113,14 @@ public class Camera {
     );
   }
 
-  public List<Line> getFrame(List<Vector2> vertices, List<Integer> connections) {
+  public List<Line> getFrame(Map<Vector3, Vector2> projectionMap, List<Vector3> vertexPath) {
     List<Line> lines = new ArrayList<>();
 
-    for (int i = 0; i < connections.size(); i += 2) {
-      Vector2 start = vertices.get(Math.abs(connections.get(i)));
-      Vector2 end = vertices.get(Math.abs(connections.get(i + 1)));
-      double x1 = start.getX();
-      double y1 = start.getY();
-      double x2 = end.getX();
-      double y2 = end.getY();
-
-      lines.add(new Line(x1, y1, x2, y2));
+    for (int i = 0; i < vertexPath.size(); i += 2) {
+      lines.add(new Line(
+          projectionMap.get(vertexPath.get(i)),
+          projectionMap.get(vertexPath.get(i + 1))
+      ));
     }
 
     return lines;

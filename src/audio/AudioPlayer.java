@@ -14,7 +14,7 @@ import shapes.Vector2;
 
 import java.util.List;
 
-public class AudioPlayer {
+public class AudioPlayer implements Runnable {
 
   private final XtFormat FORMAT;
 
@@ -141,7 +141,12 @@ public class AudioPlayer {
     return frames.get(currentFrame).get(currentShape);
   }
 
-  public void play() {
+  public void addFrame(List<Shape> frame) {
+    frames.add(frame);
+  }
+
+  @Override
+  public void run() {
     try (XtAudio audio = new XtAudio(null, null, null, null)) {
       XtService service = XtAudio.getServiceBySetup(XtSetup.CONSUMER_AUDIO);
       try (XtDevice device = service.openDefaultDevice(true)) {
