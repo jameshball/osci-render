@@ -56,25 +56,18 @@ public class ObjParser extends FileParser {
 
     Vector3 rotation = new Vector3(0, OBJ_ROTATE_SPEED, OBJ_ROTATE_SPEED);
 
-    shapes = preRender(object, rotation, camera);
-  }
-
-  @Override
-  public List<List<Shape>> getShapes() {
-    return shapes;
-  }
-
-  private static List<List<Shape>> preRender(WorldObject object, Vector3 rotation,
-      Camera camera) {
-    List<List<Shape>> preRenderedFrames = new ArrayList<>();
+    shapes = new ArrayList<>();
     // Number of frames it will take to render a full rotation of the object.
     int numFrames = (int) (2 * Math.PI / OBJ_ROTATE_SPEED);
 
     for (int i = 0; i < numFrames; i++) {
       object.rotate(rotation);
-      preRenderedFrames.add(camera.draw(object));
+      shapes.add(camera.draw(object));
     }
+  }
 
-    return preRenderedFrames;
+  @Override
+  public List<List<Shape>> getShapes() {
+    return shapes;
   }
 }
