@@ -6,10 +6,7 @@ import engine.WorldObject;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.IntStream;
 import shapes.Shape;
-import shapes.Shapes;
 
 public class ObjParser extends FileParser {
 
@@ -23,6 +20,9 @@ public class ObjParser extends FileParser {
   private final float cameraZ;
   private final float focalLength;
   private final boolean isDefaultPosition;
+
+  private WorldObject object;
+  private Camera camera;
 
   public ObjParser(String path, float rotateSpeed, float cameraX, float cameraY, float cameraZ,
       float focalLength, boolean isDefaultPosition) throws IOException {

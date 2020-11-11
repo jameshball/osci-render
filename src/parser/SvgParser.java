@@ -187,7 +187,7 @@ public class SvgParser extends FileParser {
   public List<List<Shape>> getShapes() {
     List<List<Shape>> frames = new ArrayList<>();
     frames.add(shapes);
-    return frames;
+    return Shape.normalize(frames);
   }
 
   // Parses moveto commands (M and m commands)
