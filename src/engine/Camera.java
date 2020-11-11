@@ -29,17 +29,8 @@ public class Camera {
     this.pos = pos;
   }
 
-  public Camera(double focalLength, WorldObject object) {
-    this(focalLength, new Vector3());
-    findZPos(object);
-  }
-
   public Camera(Vector3 pos) {
     this(DEFAULT_FOCAL_LENGTH, pos);
-  }
-
-  public Camera(WorldObject object) {
-    this(DEFAULT_FOCAL_LENGTH, object);
   }
 
   public List<Shape> draw(WorldObject worldObject) {

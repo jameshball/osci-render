@@ -27,8 +27,9 @@ import shapes.Vector2;
 
 public class SvgParser extends FileParser {
 
-  private final List<Shape> shapes;
   private final Map<Character, Function<List<Float>, List<? extends Shape>>> commandMap;
+
+  private List<Shape> shapes;
 
   private Vector2 currPoint;
   private Vector2 initialPoint;
@@ -45,6 +46,7 @@ public class SvgParser extends FileParser {
 
   // Map command chars to function calls.
   private void initialiseCommandMap() {
+    // TODO: Pull out into builder-like syntax if possible
     commandMap.put('M', (args) -> parseMoveTo(args, true));
     commandMap.put('m', (args) -> parseMoveTo(args, false));
     commandMap.put('L', (args) -> parseLineTo(args, true, true, true));
@@ -69,9 +71,17 @@ public class SvgParser extends FileParser {
 
   private Document getSvgDocument(String path)
       throws IOException, SAXException, ParserConfigurationException {
-    // opens XML reader for svg file.
+    // Opens XML reader for svg file.
     DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-    factory.setIgnoringElementContentWhitespace(true);
+
+    // Remove validation which massively slows down file parsing
+    factory.setNamespaceAware(false);
+    factory.setValidating(false);
+    factory.setFeature("http://xml.org/sax/features/namespaces", false);
+    factory.setFeature("http://xml.org/sax/features/validation", false);
+    factory.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false);
+    factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+
     DocumentBuilder builder = factory.newDocumentBuilder();
     File file = new File(path);
 
@@ -181,13 +191,13 @@ public class SvgParser extends FileParser {
         }
       }
     }
+
+    shapes = Shape.normalize(shapes);
   }
 
   @Override
-  public List<List<Shape>> getShapes() {
-    List<List<Shape>> frames = new ArrayList<>();
-    frames.add(shapes);
-    return Shape.normalize(frames);
+  public List<Shape> nextFrame() {
+    return shapes;
   }
 
   // Parses moveto commands (M and m commands)

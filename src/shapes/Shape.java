@@ -34,32 +34,31 @@ public abstract class Shape {
 
   // Normalises shapes between the coords -1 and 1 for proper scaling on an oscilloscope. May not
   // work perfectly with curves that heavily deviate from their start and end points.
-  public static List<List<Shape>> normalize(List<List<Shape>> shapeLists) {
+  public static List<Shape> normalize(List<Shape> shapes) {
     double maxVertex = 0;
 
-    for (List<Shape> shapes : shapeLists) {
-      for (Shape shape : shapes) {
-        Vector2 startVector = shape.nextVector(0);
-        Vector2 endVector = shape.nextVector(1);
+    for (Shape shape : shapes) {
+      Vector2 startVector = shape.nextVector(0);
+      Vector2 endVector = shape.nextVector(1);
 
-        double maxX = Math.max(Math.abs(startVector.getX()), Math.abs(endVector.getX()));
-        double maxY = Math.max(Math.abs(startVector.getY()), Math.abs(endVector.getY()));
+      double maxX = Math.max(Math.abs(startVector.getX()), Math.abs(endVector.getX()));
+      double maxY = Math.max(Math.abs(startVector.getY()), Math.abs(endVector.getY()));
 
-        maxVertex = Math.max(Math.max(maxX, maxY), maxVertex);
-      }
+      maxVertex = Math.max(Math.max(maxX, maxY), maxVertex);
     }
 
     double factor = 2 / maxVertex;
 
-    for (List<Shape> shapes : shapeLists) {
-      for (int i = 0; i < shapes.size(); i++) {
-        shapes.set(i, shapes.get(i)
-            .scale(new Vector2(factor, -factor))
-            .translate(new Vector2(-1, 1)));
-      }
+    List<Shape> normalizedShapes = new ArrayList<>();
+
+    for (Shape shape : shapes) {
+      normalizedShapes.add(shape
+          .scale(new Vector2(factor, -factor))
+          .translate(new Vector2(-1, 1))
+      );
     }
 
-    return shapeLists;
+    return normalizedShapes;
   }
 
   public static List<Shape> generatePolygram(int sides, int angleJump, Vector2 start,
