@@ -2,12 +2,15 @@ package audio;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
 import javax.xml.parsers.ParserConfigurationException;
 import org.xml.sax.SAXException;
 import shapes.Shape;
 import shapes.Vector2;
 
 public class AudioClient {
+
+  private static final int BUFFER_SIZE = 256;
 
   private static final int SAMPLE_RATE = 192000;
   private static final float ROTATE_SPEED = 0;
@@ -34,9 +37,10 @@ public class AudioClient {
     //  Improve performance of line cleanup with a heuristic.
 
     AudioArgs args = new AudioArgs(programArgs);
+    ArrayBlockingQueue<List<Shape>> queue = new ArrayBlockingQueue<>(BUFFER_SIZE);
 
     System.out.println("Begin pre-render...");
-    List<List<Shape>> frames = args.getFramesFromFile();
+    List<List<Shape>> frames = args.getFileParser().getShapes();
     System.out.println("Finish pre-render");
     System.out.println("Connecting to audio player");
     AudioPlayer player = new AudioPlayer(SAMPLE_RATE, frames, ROTATE_SPEED, TRANSLATION_SPEED,
