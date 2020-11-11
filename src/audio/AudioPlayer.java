@@ -9,6 +9,7 @@ import com.xtaudio.xt.XtSample;
 import com.xtaudio.xt.XtService;
 import com.xtaudio.xt.XtSetup;
 import com.xtaudio.xt.XtStream;
+import java.util.concurrent.ArrayBlockingQueue;
 import shapes.Shape;
 import shapes.Vector2;
 
@@ -17,9 +18,9 @@ import java.util.List;
 public class AudioPlayer implements Runnable {
 
   private final XtFormat FORMAT;
+  private final ArrayBlockingQueue<List<Shape>> frameQueue;
 
-  private final List<List<Shape>> frames;
-  private int currentFrame = 0;
+  private List<Shape> frame;
   private int currentShape = 0;
   private int audioFramesDrawn = 0;
 
@@ -33,14 +34,14 @@ public class AudioPlayer implements Runnable {
 
   private volatile boolean stopped;
 
-  public AudioPlayer(int sampleRate, List<List<Shape>> frames) {
+  public AudioPlayer(int sampleRate, ArrayBlockingQueue<List<Shape>> frameQueue) {
     this.FORMAT = new XtFormat(new XtMix(sampleRate, XtSample.FLOAT32), 0, 0, 2, 0);
-    this.frames = frames;
+    this.frameQueue = frameQueue;
   }
 
-  public AudioPlayer(int sampleRate, List<List<Shape>> frames, float rotateSpeed,
+  public AudioPlayer(int sampleRate, ArrayBlockingQueue<List<Shape>> frameQueue, float rotateSpeed,
       float translateSpeed, Vector2 translateVector, float scale, float weight) {
-    this(sampleRate, frames);
+    this(sampleRate, frameQueue);
     setRotateSpeed(rotateSpeed);
     setTranslation(translateSpeed, translateVector);
     setScale(scale);
@@ -48,7 +49,8 @@ public class AudioPlayer implements Runnable {
   }
 
   private void render(XtStream stream, Object input, Object output, int audioFrames,
-      double time, long position, boolean timeValid, long error, Object user) {
+      double time, long position, boolean timeValid, long error, Object user)
+      throws InterruptedException {
     for (int f = 0; f < audioFrames; f++) {
       Shape shape = getCurrentShape();
 
@@ -71,9 +73,9 @@ public class AudioPlayer implements Runnable {
         currentShape++;
       }
 
-      if (currentShape >= frames.get(currentFrame).size()) {
+      if (currentShape >= frame.size()) {
         currentShape = 0;
-        currentFrame = ++currentFrame % frames.size();
+        frame = frameQueue.take();
       }
     }
   }
@@ -134,19 +136,21 @@ public class AudioPlayer implements Runnable {
   }
 
   private Shape getCurrentShape() {
-    if (frames.size() == 0 || frames.get(currentFrame).size() == 0) {
-      return new Vector2(0, 0);
+    if (frame.size() == 0) {
+      return new Vector2();
     }
 
-    return frames.get(currentFrame).get(currentShape);
-  }
-
-  public void addFrame(List<Shape> frame) {
-    frames.add(frame);
+    return frame.get(currentShape);
   }
 
   @Override
   public void run() {
+    try {
+      frame = frameQueue.take();
+    } catch (InterruptedException e) {
+      throw new RuntimeException("Initial frame not found. Cannot continue.");
+    }
+
     try (XtAudio audio = new XtAudio(null, null, null, null)) {
       XtService service = XtAudio.getServiceBySetup(XtSetup.CONSUMER_AUDIO);
       try (XtDevice device = service.openDefaultDevice(true)) {

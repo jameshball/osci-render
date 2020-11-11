@@ -25,7 +25,8 @@ public class WorldObject {
   private Vector3 position;
   private Vector3 rotation;
 
-  private WorldObject(List<Vector3> objVertices, List<Vector3> vertexPath, Vector3 position, Vector3 rotation) {
+  private WorldObject(List<Vector3> objVertices, List<Vector3> vertexPath, Vector3 position,
+      Vector3 rotation) {
     this.objVertices = objVertices;
     this.position = position;
     this.rotation = rotation;
@@ -146,6 +147,7 @@ public class WorldObject {
   }
 
   public WorldObject clone() {
-    return new WorldObject(new ArrayList<>(objVertices), new ArrayList<>(vertexPath), position, rotation);
+    return new WorldObject(new ArrayList<>(objVertices), new ArrayList<>(vertexPath), position,
+        rotation);
   }
 }

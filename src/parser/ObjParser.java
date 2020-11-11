@@ -14,11 +14,9 @@ public class ObjParser extends FileParser {
 
   private List<List<Shape>> shapes;
 
-  private final float rotateSpeed;
-  private final float cameraX;
-  private final float cameraY;
-  private final float cameraZ;
-  private final float focalLength;
+  private final Vector3 cameraPos;
+  private final Vector3 rotation;
+  private final double focalLength;
   private final boolean isDefaultPosition;
 
   private WorldObject object;
@@ -26,14 +24,13 @@ public class ObjParser extends FileParser {
 
   public ObjParser(String path, float rotateSpeed, float cameraX, float cameraY, float cameraZ,
       float focalLength, boolean isDefaultPosition) throws IOException {
+    ObjParser.OBJ_ROTATE_SPEED *= rotateSpeed;
     checkFileExtension(path);
-    shapes = new ArrayList<>();
-    this.rotateSpeed = rotateSpeed;
-    this.cameraX = cameraX;
-    this.cameraY = cameraY;
-    this.cameraZ = cameraZ;
-    this.focalLength = focalLength;
+    this.shapes = new ArrayList<>();
+    this.cameraPos = new Vector3(cameraX, cameraY, cameraZ);
     this.isDefaultPosition = isDefaultPosition;
+    this.focalLength = focalLength;
+    this.rotation = new Vector3(0, OBJ_ROTATE_SPEED, OBJ_ROTATE_SPEED);
     parseFile(path);
   }
 
@@ -44,30 +41,18 @@ public class ObjParser extends FileParser {
 
   @Override
   protected void parseFile(String path) throws IllegalArgumentException, IOException {
-    OBJ_ROTATE_SPEED *= rotateSpeed;
-
-    Vector3 cameraPos = new Vector3(cameraX, cameraY, cameraZ);
-    WorldObject object = new WorldObject(path);
-
+    object = new WorldObject(path);
+    camera = new Camera(focalLength, cameraPos);
     // If camera position arguments haven't been specified, automatically work out the position of
     // the camera based on the size of the object in the camera's view.
-    Camera camera = isDefaultPosition ? new Camera(focalLength, object)
-        : new Camera(focalLength, cameraPos);
-
-    Vector3 rotation = new Vector3(0, OBJ_ROTATE_SPEED, OBJ_ROTATE_SPEED);
-
-    shapes = new ArrayList<>();
-    // Number of frames it will take to render a full rotation of the object.
-    int numFrames = (int) (2 * Math.PI / OBJ_ROTATE_SPEED);
-
-    for (int i = 0; i < numFrames; i++) {
-      object.rotate(rotation);
-      shapes.add(camera.draw(object));
+    if (isDefaultPosition) {
+      camera.findZPos(object);
     }
   }
 
   @Override
-  public List<List<Shape>> getShapes() {
-    return shapes;
+  public List<Shape> nextFrame() {
+    object.rotate(rotation);
+    return camera.draw(object);
   }
 }
