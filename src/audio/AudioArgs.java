@@ -2,14 +2,11 @@ package audio;
 
 import engine.Camera;
 import java.io.IOException;
-import java.util.List;
 import javax.xml.parsers.ParserConfigurationException;
 import org.xml.sax.SAXException;
 import parser.FileParser;
 import parser.ObjParser;
 import parser.SvgParser;
-import shapes.Shape;
-import shapes.Shapes;
 
 // Helper class for AudioClient that deals with optional program arguments.
 final class AudioArgs {
@@ -30,12 +27,12 @@ final class AudioArgs {
     }
   }
 
-  List<List<Shape>> getFramesFromFile() throws IOException, ParserConfigurationException, SAXException {
+  FileParser getFileParser() throws IOException, ParserConfigurationException, SAXException {
     if (filePath.matches(".*\\.obj")) {
       return new ObjParser(filePath, rotateSpeed(), cameraX(), cameraY(), cameraZ(), focalLength(),
-          isDefaultPosition()).getShapes();
+          isDefaultPosition());
     } else if (filePath.matches(".*\\.svg")) {
-      return Shapes.normalize(new SvgParser(filePath).getShapes());
+      return new SvgParser(filePath);
     } else {
       throw new IllegalArgumentException(
           "Provided file extension in file " + filePath + " not supported.");
