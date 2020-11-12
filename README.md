@@ -23,8 +23,8 @@ Lots of this code was built as part of a 24hr hackathon: IC Hack 20. The origina
 
 ## Proposed Features
 
-- Performance improvements to `Shapes.sortLines()`
-    - With goal of high-framerate realtime rendering
+- ✔ Performance improvements to `Shapes.sortLines()`
+    - ✔ With goal of high-framerate realtime rendering (Closed in [#9](https://github.com/jameshball/osci-render/issues/9))
 - ✔ Rendering `.svg` and other image formats
 - Rendering text
 - Tune and transpose audio output
