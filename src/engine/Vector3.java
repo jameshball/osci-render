@@ -1,6 +1,7 @@
 package engine;
 
 import java.util.List;
+import java.util.Objects;
 
 public final class Vector3 {
 
@@ -78,6 +79,10 @@ public final class Vector3 {
     );
   }
 
+  public double distance(Vector3 vector) {
+    return Math.sqrt(Math.pow(vector.x, 2) + Math.pow(vector.y, 2) + Math.pow(vector.z, 2));
+  }
+
   public static Vector3 meanPoint(List<Vector3> points) {
     Vector3 mean = new Vector3();
 
@@ -88,7 +93,33 @@ public final class Vector3 {
     return mean.scale(1f / (points.size()));
   }
 
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
+    }
+    if (obj == null || getClass() != obj.getClass()) {
+      return false;
+    }
+    Vector3 point = (Vector3) obj;
+    return x == point.x && y == point.y && z== point.z;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(x, y, z);
+  }
+
   public Vector3 clone() {
     return new Vector3(x, y, z);
+  }
+
+  @Override
+  public String toString() {
+    return "Vector3{" +
+        "x=" + x +
+        ", y=" + y +
+        ", z=" + z +
+        '}';
   }
 }
