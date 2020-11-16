@@ -35,42 +35,107 @@ public abstract class Shape {
   // Normalises shapes between the coords -1 and 1 for proper scaling on an oscilloscope. May not
   // work perfectly with curves that heavily deviate from their start and end points.
   public static List<Shape> normalize(List<Shape> shapes) {
-    double maxVertex = 0;
+    double maxAbsVertex = maxAbsVector(shapes).getX();
+    List<Shape> normalizedShapes = new ArrayList<>();
+
+    for (Shape shape : shapes) {
+      normalizedShapes.add(shape.scale(new Vector2(2 / maxAbsVertex, -2 / maxAbsVertex)));
+    }
+
+    return center(normalizedShapes);
+  }
+
+  public static List<Shape> center(List<Shape> shapes) {
+    Vector2 maxVector = maxVector(shapes);
+    double height = height(shapes);
+
+    return translate(shapes, new Vector2(-1, -maxVector.getY() + height / 2));
+  }
+
+  public static Vector2 maxAbsVector(List<Shape> shapes) {
+    double maxX = 0;
+    double maxY = 0;
 
     for (Shape shape : shapes) {
       Vector2 startVector = shape.nextVector(0);
       Vector2 endVector = shape.nextVector(1);
 
-      double maxX = Math.max(Math.abs(startVector.getX()), Math.abs(endVector.getX()));
-      double maxY = Math.max(Math.abs(startVector.getY()), Math.abs(endVector.getY()));
+      double x = Math.max(Math.abs(startVector.getX()), Math.abs(endVector.getX()));
+      double y = Math.max(Math.abs(startVector.getY()), Math.abs(endVector.getY()));
 
-      maxVertex = Math.max(Math.max(maxX, maxY), maxVertex);
+      maxX = Math.max(x, maxX);
+      maxY = Math.max(y, maxY);
     }
 
-    double factor = 2 / maxVertex;
-
-    List<Shape> normalizedShapes = new ArrayList<>();
-
-    for (Shape shape : shapes) {
-      normalizedShapes.add(shape
-          .scale(new Vector2(factor, -factor))
-          .translate(new Vector2(-1, 1))
-      );
-    }
-
-    return normalizedShapes;
+    return new Vector2(maxX, maxY);
   }
 
-  public static List<Shape> flipShapes(List<Shape> inputShapes) {
+  public static Vector2 maxVector(List<Shape> shapes) {
+    double maxX = Double.NEGATIVE_INFINITY;
+    double maxY = Double.NEGATIVE_INFINITY;
+
+    for (Shape shape : shapes) {
+      Vector2 startVector = shape.nextVector(0);
+      Vector2 endVector = shape.nextVector(1);
+
+      double x = Math.max(startVector.getX(), endVector.getX());
+      double y = Math.max(startVector.getY(), endVector.getY());
+
+      maxX = Math.max(x, maxX);
+      maxY = Math.max(y, maxY);
+    }
+
+    return new Vector2(maxX, maxY);
+  }
+
+  public static List<Shape> flip(List<Shape> shapes) {
     List<Shape> flippedShapes = new ArrayList<>();
 
-    for (Shape shape : inputShapes) {
-      flippedShapes.add(shape
-          .scale(new Vector2(1, -1))
-      );
+    for (Shape shape : shapes) {
+      flippedShapes.add(shape.scale(new Vector2(1, -1)));
     }
 
     return flippedShapes;
+  }
+
+  public static double height(List<Shape> shapes) {
+    double maxY = Double.NEGATIVE_INFINITY;
+    double minY = Double.POSITIVE_INFINITY;
+
+    for (Shape shape : shapes) {
+      Vector2 startVector = shape.nextVector(0);
+      Vector2 endVector = shape.nextVector(1);
+
+      maxY = Math.max(maxY, Math.max(startVector.getY(), endVector.getY()));
+      minY = Math.min(minY, Math.min(startVector.getY(), endVector.getY()));
+    }
+
+    return Math.abs(maxY - minY);
+  }
+
+  public static double width(List<Shape> shapes) {
+    double maxX = Double.NEGATIVE_INFINITY;
+    double minX = Double.POSITIVE_INFINITY;
+
+    for (Shape shape : shapes) {
+      Vector2 startVector = shape.nextVector(0);
+      Vector2 endVector = shape.nextVector(1);
+
+      maxX = Math.max(maxX, Math.max(startVector.getX(), endVector.getX()));
+      minX = Math.min(minX, Math.min(startVector.getX(), endVector.getX()));
+    }
+
+    return Math.abs(maxX - minX);
+  }
+
+  public static List<Shape> translate(List<Shape> shapes, Vector2 translation) {
+    List<Shape> translatedShapes = new ArrayList<>();
+
+    for (Shape shape : shapes) {
+      translatedShapes.add(shape.translate(translation));
+    }
+
+    return translatedShapes;
   }
 
   public static List<Shape> generatePolygram(int sides, int angleJump, Vector2 start,
