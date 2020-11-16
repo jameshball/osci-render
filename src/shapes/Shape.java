@@ -61,6 +61,18 @@ public abstract class Shape {
     return normalizedShapes;
   }
 
+  public static List<Shape> flipShapes(List<Shape> inputShapes) {
+    List<Shape> flippedShapes = new ArrayList<>();
+
+    for (Shape shape : inputShapes) {
+      flippedShapes.add(shape
+          .scale(new Vector2(1, -1))
+      );
+    }
+
+    return flippedShapes;
+  }
+
   public static List<Shape> generatePolygram(int sides, int angleJump, Vector2 start,
       double weight) {
     List<Shape> polygon = new ArrayList<>();

@@ -1,7 +1,9 @@
 package parser;
 
 import static parser.XmlUtil.asList;
+import static parser.XmlUtil.getAttributesOnTags;
 import static parser.XmlUtil.getNodeValue;
+import static parser.XmlUtil.getXMLDocument;
 
 import java.io.File;
 import java.io.IOException;
@@ -13,6 +15,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import javax.management.modelmbean.XMLParseException;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -27,7 +30,7 @@ import shapes.Vector2;
 
 public class SvgParser extends FileParser {
 
-  private final Map<Character, Function<List<Float>, List<? extends Shape>>> commandMap;
+  private final Map<Character, Function<List<Float>, List<Shape>>> commandMap;
 
   private List<Shape> shapes;
 
@@ -35,6 +38,7 @@ public class SvgParser extends FileParser {
   private Vector2 initialPoint;
   private Vector2 prevCubicControlPoint;
   private Vector2 prevQuadraticControlPoint;
+  private Document svg;
 
   public SvgParser(String path) throws IOException, SAXException, ParserConfigurationException {
     checkFileExtension(path);
@@ -69,25 +73,6 @@ public class SvgParser extends FileParser {
     commandMap.put('z', this::parseClosePath);
   }
 
-  private Document getSvgDocument(String path)
-      throws IOException, SAXException, ParserConfigurationException {
-    // Opens XML reader for svg file.
-    DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-
-    // Remove validation which massively slows down file parsing
-    factory.setNamespaceAware(false);
-    factory.setValidating(false);
-    factory.setFeature("http://xml.org/sax/features/namespaces", false);
-    factory.setFeature("http://xml.org/sax/features/validation", false);
-    factory.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false);
-    factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-
-    DocumentBuilder builder = factory.newDocumentBuilder();
-    File file = new File(path);
-
-    return builder.parse(file);
-  }
-
   // Does error checking against SVG path and returns array of SVG commands and arguments
   private String[] preProcessPath(String path) throws IllegalArgumentException {
     // Replace all commas with spaces and then remove unnecessary whitespace
@@ -110,17 +95,6 @@ public class SvgParser extends FileParser {
 
     // Split on SVG path characters to get a list of instructions, keeping the SVG commands
     return path.split("(?=[mlhvcsqtazMLHVCSQTAZ])");
-  }
-
-  // Returns list of SVG path data attributes
-  private static List<String> getSvgPathAttributes(Document svg) {
-    List<String> paths = new ArrayList<>();
-
-    for (Node elem : asList(svg.getElementsByTagName("path"))) {
-      paths.add(getNodeValue(elem, "d"));
-    }
-
-    return paths;
   }
 
   private static List<Float> splitCommand(String command) {
@@ -153,7 +127,7 @@ public class SvgParser extends FileParser {
   @Override
   protected void parseFile(String filePath)
       throws ParserConfigurationException, IOException, SAXException, IllegalArgumentException {
-    Document svg = getSvgDocument(filePath);
+    this.svg = getXMLDocument(filePath);
     List<Node> svgElem = asList(svg.getElementsByTagName("svg"));
 
     if (svgElem.size() != 1) {
@@ -161,38 +135,68 @@ public class SvgParser extends FileParser {
     }
 
     // Get all d attributes within path elements in the SVG file.
-    for (String path : getSvgPathAttributes(svg)) {
-      currPoint = new Vector2();
-      prevCubicControlPoint = null;
-      prevQuadraticControlPoint = null;
-      String[] commands = preProcessPath(path);
-
-      for (String command : commands) {
-        char commandChar = command.charAt(0);
-        List<Float> nums = null;
-
-        if (commandChar != 'z' && commandChar != 'Z') {
-          // Split the command into number strings and convert them into floats.
-          nums = Arrays.stream(command.substring(1).split(" "))
-              .filter(Predicate.not(String::isBlank))
-              .flatMap((numString) -> splitCommand(numString).stream())
-              .collect(Collectors.toList());
-        }
-
-        // Use the nums to get a list of shapes, using the first character in the command to specify
-        // the function to use.
-        shapes.addAll(commandMap.get(commandChar).apply(nums));
-
-        if (!String.valueOf(commandChar).matches("[csCS]")) {
-          prevCubicControlPoint = null;
-        }
-        if (!String.valueOf(commandChar).matches("[qtQT]")) {
-          prevQuadraticControlPoint = null;
-        }
-      }
+    for (Node node : getAttributesOnTags(svg, "path", "d")) {
+      shapes.addAll(parsePath(node.getNodeValue()));
     }
 
     shapes = Shape.normalize(shapes);
+  }
+
+  public List<Shape> parseGlyphsWithUnicode(char unicode) {
+    String xmlEntityHex = "&#x" + String.format("%x", (int) unicode) + ";";
+
+    for (Node node : asList(svg.getElementsByTagName("glyph"))) {
+      String unicodeString = getNodeValue(node, "unicode");
+
+      if (unicodeString == null) {
+        throw new IllegalArgumentException("Glyph should have unicode attribute.");
+      }
+
+      if (unicodeString.equals(xmlEntityHex) || (unicodeString.length() == 1 && unicodeString.charAt(0) == unicode)) {
+        return parsePath(getNodeValue(node, "d"));
+      }
+    }
+
+    return null;
+  }
+
+  // Performs path parsing on a single d=path
+  private List<Shape> parsePath(String path) {
+    if (path == null) {
+      return List.of();
+    }
+
+    currPoint = new Vector2();
+    prevCubicControlPoint = null;
+    prevQuadraticControlPoint = null;
+    String[] commands = preProcessPath(path);
+    List<Shape> svgShapes = new ArrayList<>();
+
+    for (String command : commands) {
+      char commandChar = command.charAt(0);
+      List<Float> nums = null;
+
+      if (commandChar != 'z' && commandChar != 'Z') {
+        // Split the command into number strings and convert them into floats.
+        nums = Arrays.stream(command.substring(1).split(" "))
+            .filter(Predicate.not(String::isBlank))
+            .flatMap((numString) -> splitCommand(numString).stream())
+            .collect(Collectors.toList());
+      }
+
+      // Use the nums to get a list of shapes, using the first character in the command to specify
+      // the function to use.
+      svgShapes.addAll(commandMap.get(commandChar).apply(nums));
+
+      if (!String.valueOf(commandChar).matches("[csCS]")) {
+        prevCubicControlPoint = null;
+      }
+      if (!String.valueOf(commandChar).matches("[qtQT]")) {
+        prevQuadraticControlPoint = null;
+      }
+    }
+
+    return svgShapes;
   }
 
   @Override
@@ -201,7 +205,7 @@ public class SvgParser extends FileParser {
   }
 
   // Parses moveto commands (M and m commands)
-  private List<? extends Shape> parseMoveTo(List<Float> args, boolean isAbsolute) {
+  private List<Shape> parseMoveTo(List<Float> args, boolean isAbsolute) {
     if (args.size() % 2 != 0 || args.size() < 2) {
       throw new IllegalArgumentException("SVG moveto command has incorrect number of arguments.");
     }
@@ -226,7 +230,7 @@ public class SvgParser extends FileParser {
   }
 
   // Parses close path commands (Z and z commands)
-  private List<? extends Shape> parseClosePath(List<Float> args) {
+  private List<Shape> parseClosePath(List<Float> args) {
     if (!currPoint.equals(initialPoint)) {
       Line line = new Line(currPoint, initialPoint);
       currPoint = initialPoint;
@@ -240,7 +244,7 @@ public class SvgParser extends FileParser {
   // isHorizontal and isVertical should be true for parsing L and l commands
   // Only isHorizontal should be true for parsing H and h commands
   // Only isVertical should be true for parsing V and v commands
-  private List<? extends Shape> parseLineTo(List<Float> args, boolean isAbsolute,
+  private List<Shape> parseLineTo(List<Float> args, boolean isAbsolute,
       boolean isHorizontal, boolean isVertical) {
     int expectedArgs = isHorizontal && isVertical ? 2 : 1;
 
@@ -248,7 +252,7 @@ public class SvgParser extends FileParser {
       throw new IllegalArgumentException("SVG lineto command has incorrect number of arguments.");
     }
 
-    List<Line> lines = new ArrayList<>();
+    List<Shape> lines = new ArrayList<>();
 
     for (int i = 0; i < args.size(); i += expectedArgs) {
       Vector2 newPoint;
@@ -281,7 +285,7 @@ public class SvgParser extends FileParser {
   // isCubic should be false for parsing Q, q, T, and t commands
   // isSmooth should be true for parsing S, s, T, and t commands
   // isSmooth should be false for parsing C, c, Q, and q commands
-  private List<? extends Shape> parseCurveTo(List<Float> args, boolean isAbsolute, boolean isCubic,
+  private List<Shape> parseCurveTo(List<Float> args, boolean isAbsolute, boolean isCubic,
       boolean isSmooth) {
     int expectedArgs = isCubic ? 4 : 2;
     if (!isSmooth) {
@@ -337,7 +341,7 @@ public class SvgParser extends FileParser {
     return curves;
   }
 
-  private List<? extends Shape> parseEllipticalArc(List<Float> args, boolean isAbsolute) {
+  private List<Shape> parseEllipticalArc(List<Float> args, boolean isAbsolute) {
     // TODO: Properly implement
 
     if (args.size() % 7 != 0 || args.size() < 7) {
