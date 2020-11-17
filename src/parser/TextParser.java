@@ -15,8 +15,8 @@ import shapes.Vector2;
 
 public class TextParser extends FileParser{
 
-  private static final char WIDE_CHAR = '_';
-  private static final double LENGTH_SCALAR = 1.2;
+  private static final char WIDE_CHAR = 'W';
+  private static final double HEIGHT_SCALAR = 1.6;
 
   private final Map<Character, List<Shape>> charToShape;
   private final List<String> text;
@@ -52,12 +52,14 @@ public class TextParser extends FileParser{
       }
     }
 
-    double length = LENGTH_SCALAR * Shape.width(charToShape.get(WIDE_CHAR));
+    double width = Shape.width(charToShape.get(WIDE_CHAR));
+    double height = HEIGHT_SCALAR * Shape.height(charToShape.get(WIDE_CHAR));
 
-    for (String line : text) {
+    for (int i = 0, textSize = text.size(); i < textSize; i++) {
+      String line = text.get(i);
       char[] lineChars = line.toCharArray();
-      for (int i = 0; i < lineChars.length; i++) {
-        shapes.addAll(Shape.translate(charToShape.get(lineChars[i]), new Vector2(i * length, 0)));
+      for (int j = 0; j < lineChars.length; j++) {
+        shapes.addAll(Shape.translate(charToShape.get(lineChars[j]), new Vector2(j * width, -i * height)));
       }
     }
 

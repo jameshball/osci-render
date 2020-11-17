@@ -16,7 +16,7 @@ public class AudioClient {
   private static final int SAMPLE_RATE = 192000;
   private static final float ROTATE_SPEED = 0;
   private static final float TRANSLATION_SPEED = 0;
-  private static final Vector2 TRANSLATION = new Vector2(0.3, 0.3);
+  private static final Vector2 TRANSLATION = new Vector2(0, 0.5);
   private static final float SCALE = 1;
   private static final float WEIGHT = Shape.DEFAULT_WEIGHT;
 
