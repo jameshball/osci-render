@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import javax.xml.parsers.ParserConfigurationException;
 import org.xml.sax.SAXException;
+import parser.svg.SvgParser;
 import shapes.Shape;
 import shapes.Vector2;
 

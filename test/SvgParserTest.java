@@ -1,13 +1,11 @@
 import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
-import java.util.List;
 import javax.xml.parsers.ParserConfigurationException;
 import org.junit.Test;
 import org.xml.sax.SAXException;
-import parser.SvgParser;
+import parser.svg.SvgParser;
 import shapes.Line;
-import shapes.Shape;
 
 public class SvgParserTest {
 
