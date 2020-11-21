@@ -6,7 +6,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import org.xml.sax.SAXException;
 import parser.FileParser;
 import parser.ObjParser;
-import parser.SvgParser;
+import parser.svg.SvgParser;
 import parser.TextParser;
 
 // Helper class for AudioClient that deals with optional program arguments.
