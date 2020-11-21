@@ -157,7 +157,7 @@ public class SvgParser extends FileParser {
       }
     }
 
-    return null;
+    return List.of();
   }
 
   // Performs path parsing on a single d=path
