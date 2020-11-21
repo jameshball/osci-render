@@ -1,0 +1,42 @@
+package parser.svg;
+
+import java.util.ArrayList;
+import java.util.List;
+import shapes.Shape;
+import shapes.Vector2;
+
+class MoveTo {
+
+  // Parses moveto commands (M and m commands)
+  private static List<Shape> parseMoveTo(SvgState state, List<Float> args, boolean isAbsolute) {
+    if (args.size() % 2 != 0 || args.size() < 2) {
+      throw new IllegalArgumentException("SVG moveto command has incorrect number of arguments.");
+    }
+
+    Vector2 vec = new Vector2(args.get(0), args.get(1));
+
+    if (isAbsolute) {
+      state.currPoint = vec;
+      state.initialPoint = state.currPoint;
+      if (args.size() > 2) {
+        return LineTo.absolute(state, args.subList(2, args.size() - 1));
+      }
+    } else {
+      state.currPoint = state.currPoint.translate(vec);
+      state.initialPoint = state.currPoint;
+      if (args.size() > 2) {
+        return LineTo.relative(state, args.subList(2, args.size() - 1));
+      }
+    }
+
+    return new ArrayList<>();
+  }
+
+  static List<Shape> absolute(SvgState state, List<Float> args) {
+    return parseMoveTo(state, args, true);
+  }
+
+  static List<Shape> relative(SvgState state, List<Float> args) {
+    return parseMoveTo(state, args, false);
+  }
+}

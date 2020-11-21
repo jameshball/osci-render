@@ -6,13 +6,16 @@ import javax.xml.parsers.ParserConfigurationException;
 import org.xml.sax.SAXException;
 import parser.FileParser;
 import parser.ObjParser;
-import parser.SvgParser;
+import parser.svg.SvgParser;
+import parser.TextParser;
 
 // Helper class for AudioClient that deals with optional program arguments.
 final class AudioArgs {
 
+  private final String fontPath;
+  private final float[] optionalArgs;
+
   final String filePath;
-  final float[] optionalArgs;
 
   AudioArgs(String[] args) throws IllegalAudioArgumentException {
     if (args.length < 1 || args.length > 6) {
@@ -21,6 +24,12 @@ final class AudioArgs {
 
     filePath = args[0];
     optionalArgs = new float[args.length - 1];
+    /* Second argument is a path to a font .svg if the first argument is a .txt file. */
+    if (filePath.matches(".*\\.txt") && args.length > 1) {
+      fontPath = args[1];
+      return;
+    }
+    fontPath = "";
 
     for (int i = 0; i < optionalArgs.length; i++) {
       optionalArgs[i] = Float.parseFloat(args[i + 1]);
@@ -33,6 +42,8 @@ final class AudioArgs {
           isDefaultPosition());
     } else if (filePath.matches(".*\\.svg")) {
       return new SvgParser(filePath);
+    } else if (filePath.matches(".*\\.txt")) {
+      return fontPath.isEmpty() ? new TextParser(filePath) : new TextParser(filePath, fontPath);
     } else {
       throw new IllegalArgumentException(
           "Provided file extension in file " + filePath + " not supported.");
@@ -69,8 +80,9 @@ final class AudioArgs {
 
   private static class IllegalAudioArgumentException extends IllegalArgumentException {
 
-    private static final String USAGE = "Incorrect usage.\nUsage: osci-render objFilePath "
-        + "[rotateSpeed] [focalLength] [cameraX] [cameraY] [cameraZ]";
+    private static final String USAGE = "Incorrect usage.\nUsage: osci-render filePath "
+        + "[rotateSpeed] [focalLength] [cameraX] [cameraY] [cameraZ]\nOR: osci-render textFilePath "
+        + "[fontFilePath]";
 
     public IllegalAudioArgumentException() {
       super(USAGE);
