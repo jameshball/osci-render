@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.xml.parsers.ParserConfigurationException;
 import org.xml.sax.SAXException;
 import shapes.Shape;
@@ -17,6 +18,7 @@ public class TextParser extends FileParser{
 
   private static final char WIDE_CHAR = 'W';
   private static final double HEIGHT_SCALAR = 1.6;
+  private static final String DEFAULT_FONT = "fonts/SourceCodePro-ExtraLight.svg";
 
   private final Map<Character, List<Shape>> charToShape;
   private final List<String> text;
@@ -29,6 +31,11 @@ public class TextParser extends FileParser{
     this.shapes = new ArrayList<>();
     this.text = Files.readAllLines(Paths.get(path), Charset.defaultCharset());
     parseFile(font);
+  }
+
+  public TextParser(String path)
+      throws IOException, SAXException, ParserConfigurationException {
+    this(path, DEFAULT_FONT);
   }
 
   @Override
