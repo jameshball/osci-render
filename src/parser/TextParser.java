@@ -13,7 +13,7 @@ import org.xml.sax.SAXException;
 import shapes.Shape;
 import shapes.Vector2;
 
-public class TextParser extends FileParser{
+public class TextParser extends FileParser {
 
   private static final char WIDE_CHAR = 'W';
   private static final double HEIGHT_SCALAR = 1.6;
@@ -47,6 +47,8 @@ public class TextParser extends FileParser{
       throws ParserConfigurationException, IOException, SAXException, IllegalArgumentException {
     SvgParser parser = new SvgParser(path);
 
+    /* WIDE_CHAR used as an example character that will be wide in most languages.
+     * This helps determine the correct character width for the font chosen. */
     charToShape.put(WIDE_CHAR, parser.parseGlyphsWithUnicode(WIDE_CHAR));
 
     for (String line : text) {
@@ -61,11 +63,13 @@ public class TextParser extends FileParser{
     double width = Shape.width(charToShape.get(WIDE_CHAR));
     double height = HEIGHT_SCALAR * Shape.height(charToShape.get(WIDE_CHAR));
 
-    for (int i = 0, textSize = text.size(); i < textSize; i++) {
-      String line = text.get(i);
-      char[] lineChars = line.toCharArray();
+    for (int i = 0; i < text.size(); i++) {
+      char[] lineChars = text.get(i).toCharArray();
       for (int j = 0; j < lineChars.length; j++) {
-        shapes.addAll(Shape.translate(charToShape.get(lineChars[j]), new Vector2(j * width, -i * height)));
+        shapes.addAll(Shape.translate(
+            charToShape.get(lineChars[j]),
+            new Vector2(j * width, -i * height)
+        ));
       }
     }
 
