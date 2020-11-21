@@ -19,6 +19,7 @@ import javax.management.modelmbean.XMLParseException;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import org.jsoup.Jsoup;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.xml.sax.SAXException;
@@ -142,9 +143,9 @@ public class SvgParser extends FileParser {
     shapes = Shape.normalize(shapes);
   }
 
+  /* Given a character, will return the glyph associated with it.
+   * Assumes that the .svg loaded has character glyphs. */
   public List<Shape> parseGlyphsWithUnicode(char unicode) {
-    String xmlEntityHex = "&#x" + String.format("%x", (int) unicode) + ";";
-
     for (Node node : asList(svg.getElementsByTagName("glyph"))) {
       String unicodeString = getNodeValue(node, "unicode");
 
@@ -152,7 +153,11 @@ public class SvgParser extends FileParser {
         throw new IllegalArgumentException("Glyph should have unicode attribute.");
       }
 
-      if (unicodeString.equals(xmlEntityHex) || (unicodeString.length() == 1 && unicodeString.charAt(0) == unicode)) {
+      /* Removes all html escaped characters, allowing it to be directly compared to the unicode
+       * parameter. */
+      String decodedString = Jsoup.parse(unicodeString).text();
+
+      if (String.valueOf(unicode).equals(decodedString)) {
         return parsePath(getNodeValue(node, "d"));
       }
     }
