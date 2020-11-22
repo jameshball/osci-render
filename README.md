@@ -1,8 +1,8 @@
 # osci-render
 
-Program for drawing lines on an oscilloscope using audio output.
+Program for drawing objects, text, and images on an oscilloscope using audio output.
 
-This allows for 3D rendering of any generic object (`.obj` file)
+This allows for 3D rendering of `.obj` files, `.svg` images, and `.txt` files.
 
 Lots of this code was built as part of a 24hr hackathon: IC Hack 20. The original repository can be found here: https://github.com/wdhg/ICHack20 It won 'Best Newcomers Prize' at the event.
 
@@ -14,28 +14,23 @@ Lots of this code was built as part of a 24hr hackathon: IC Hack 20. The origina
 
 - Render `.obj` files on an oscilloscope
 - Render `.svg` files
+- Render text
 - Rotation of objects
 - Scaling image
 - Translating image
-- Sorting of rendered lines for clean output
-- Rendering polygrams in realtime
-- Rendering simple shapes in realtime
 
 ## Proposed Features
 
-- ✔ Performance improvements to `Shapes.sortLines()`
-    - ✔ With goal of high-framerate realtime rendering (Closed in [#9](https://github.com/jameshball/osci-render/issues/9))
-- ✔ Rendering `.svg` and other image formats
-- Rendering text
 - Tune and transpose audio output
 - Support rendering of multiple objects
 - Saving pre-rendered frames to file for later loading
 - Saving audio output to file
+- (long term) Implement GUI
 - (long term) Keyframing/animating objects and camera
 
 ## Usage
 
-Using osci-render is very easy; specify the object file you would like to render, and optionally the rotation speed, and camera focal length and position and it will output the 3D model as audio to visualise on your oscilloscope.
+Using osci-render is very easy; specify the file you would like to render, and optionally the rotation speed, and camera focal length and position in the case of `.obj` files and it will output as audio to visualise on your oscilloscope.
 
 To render the cube example in `/models`, you would use the following args:
 
@@ -48,7 +43,11 @@ This will render a cube with a rotation speed of 3 and a focal length of 1. Deta
 ### Program Arguments
 
 ```
-osci-render filePath [rotateSpeed] [focalLength] [cameraX] [cameraY] [cameraZ]
+osci-render objFile [rotateSpeed] [focalLength] [cameraX] [cameraY] [cameraZ]
+OR
+osci-render svgFile
+OR
+osci-render textFile [fontSvgPath]
 ```
 
 If no camera position arguments are given, the program will automatically move the camera to a position that renders the whole object on the screen with minimal display clipping.
@@ -56,7 +55,7 @@ If no camera position arguments are given, the program will automatically move t
 #### Required
 
 - filePath
-    - Specifies the file path to retrieve the `.obj` or `.svg` file
+    - Specifies the file path to retrieve the `.obj`, `.svg`, or `.txt` file
 
 #### Optional
 
@@ -66,6 +65,8 @@ If no camera position arguments are given, the program will automatically move t
     - Sets the camera's focal length
 - cameraX/Y/Z
     - Sets X/Y/Z position of camera
+- fontSvgPath
+    - Sets the `.svg` file used as a source for the font used when text rendering
 
 ## Building
 
@@ -77,6 +78,7 @@ If no camera position arguments are given, the program will automatically move t
 - [JGraphT](https://jgrapht.org/)
 - [JUnit 4](https://junit.org/junit4/)
 - [java-data-front](https://github.com/mokiat/java-data-front)
+- [jsoup](https://jsoup.org/)
 
 Open the folder in your IDE of choice (I would recommend using IntelliJ) and build/run `AudioClient` after setting up libraries as provided in `/lib`. You will additionally require a platform-specific `dll`/`so` file for XT-Audio depending if you're on a windows/linux x86/x64 OS, which you'll find in the java-xt folder in the [XT-Audio](https://sjoerdvankreel.github.io/xt-audio/) binaries.
 
