@@ -1,6 +1,7 @@
 package gui;
 
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -10,10 +11,22 @@ public class Main extends Application {
 
   @Override
   public void start(Stage primaryStage) throws Exception {
-    Parent root = FXMLLoader.load(getClass().getResource("osci-render.fxml"));
+    FXMLLoader loader = new FXMLLoader(getClass().getResource("osci-render.fxml"));
+    Parent root = loader.load();
+    Controller controller = loader.getController();
+    controller.setStage(primaryStage);
+
     primaryStage.setTitle("osci-render");
     primaryStage.setScene(new Scene(root));
+
+    controller.setStage(primaryStage);
+
     primaryStage.show();
+
+    primaryStage.setOnCloseRequest(t -> {
+      Platform.exit();
+      System.exit(0);
+    });
   }
 
   public static void main(String[] args) {

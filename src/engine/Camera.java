@@ -20,7 +20,7 @@ public class Camera {
   private static final int SAMPLE_RENDER_SAMPLES = 50;
   private static final double EPSILON = 0.001;
 
-  private final double focalLength;
+  private double focalLength;
 
   private Vector3 pos;
 
@@ -99,9 +99,11 @@ public class Camera {
       return new Vector2();
     }
 
+    double oldFocalLength = focalLength;
+
     return new Vector2(
-        vertex.getX() * focalLength / (vertex.getZ() - pos.getZ()) + pos.getX(),
-        vertex.getY() * focalLength / (vertex.getZ() - pos.getZ()) + pos.getY()
+        vertex.getX() * oldFocalLength / (vertex.getZ() - pos.getZ()) + pos.getX(),
+        vertex.getY() * oldFocalLength / (vertex.getZ() - pos.getZ()) + pos.getY()
     );
   }
 
@@ -116,5 +118,9 @@ public class Camera {
     }
 
     return lines;
+  }
+
+  public void setFocalLength(float focalLength) {
+    this.focalLength = focalLength;
   }
 }

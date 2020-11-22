@@ -22,11 +22,14 @@ public class TextParser extends FileParser {
 
   private final Map<Character, List<Shape>> charToShape;
   private final List<String> text;
+  private final String filePath;
 
   private List<Shape> shapes;
 
   public TextParser(String path, String font)
       throws IOException, SAXException, ParserConfigurationException {
+    checkFileExtension(path);
+    this.filePath = path;
     this.charToShape = new HashMap<>();
     this.shapes = new ArrayList<>();
     this.text = Files.readAllLines(Paths.get(path), Charset.defaultCharset());
@@ -40,7 +43,7 @@ public class TextParser extends FileParser {
 
   @Override
   protected String getFileExtension() {
-    return ".txt";
+    return "txt";
   }
 
   @Override
@@ -80,5 +83,10 @@ public class TextParser extends FileParser {
   @Override
   public List<Shape> nextFrame() {
     return shapes;
+  }
+
+  @Override
+  public String getFilePath() {
+    return filePath;
   }
 }

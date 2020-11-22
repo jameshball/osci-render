@@ -31,7 +31,7 @@ public class AudioClient {
   // example:
   // osci-render models/cube.obj 3
   public static void main(String[] programArgs)
-      throws IOException, ParserConfigurationException, SAXException, InterruptedException {
+      throws IOException, ParserConfigurationException, SAXException {
     // TODO: Calculate weight of lines using depth.
     //  Reduce weight of lines drawn multiple times.
     //  Find intersections of lines to (possibly) improve line cleanup.
