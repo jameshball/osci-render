@@ -27,15 +27,17 @@ public class SvgParser extends FileParser {
 
   private final Map<Character, Function<List<Float>, List<Shape>>> commandMap;
   private final SvgState state;
+  private final String filePath;
 
   private List<Shape> shapes;
   private Document svg;
 
   public SvgParser(String path) throws IOException, SAXException, ParserConfigurationException {
     checkFileExtension(path);
-    shapes = new ArrayList<>();
-    state = new SvgState();
-    commandMap = new HashMap<>();
+    this.filePath = path;
+    this.shapes = new ArrayList<>();
+    this.state = new SvgState();
+    this.commandMap = new HashMap<>();
     initialiseCommandMap();
     parseFile(path);
   }
@@ -197,5 +199,10 @@ public class SvgParser extends FileParser {
   @Override
   public List<Shape> nextFrame() {
     return shapes;
+  }
+
+  @Override
+  public String getFilePath() {
+    return filePath;
   }
 }

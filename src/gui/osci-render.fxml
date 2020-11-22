@@ -8,8 +8,9 @@
    <children>
       <AnchorPane prefHeight="400.0" prefWidth="400.0">
          <children>
-            <Slider fx:id="slider" layoutX="44.0" layoutY="54.0" />
-            <Text fx:id="sliderOutput" layoutX="109.0" layoutY="39.0" strokeType="OUTSIDE" strokeWidth="0.0" text="0" />
+            <Slider fx:id="slider" blockIncrement="2.0" layoutX="45.0" layoutY="238.0" max="2.0" min="1.0E-5" prefHeight="14.0" prefWidth="313.0" />
+            <Text fx:id="sliderOutput" layoutX="196.0" layoutY="219.0" strokeType="OUTSIDE" strokeWidth="0.0" text="0" />
+            <Button fx:id="btnBrowse" layoutX="23.0" layoutY="22.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="119.0" text="Browse" />
          </children>
       </AnchorPane>
    </children>

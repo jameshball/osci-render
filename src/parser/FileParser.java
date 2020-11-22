@@ -25,4 +25,5 @@ public abstract class FileParser {
       throws ParserConfigurationException, IOException, SAXException, IllegalArgumentException;
 
   public abstract List<Shape> nextFrame();
+  public abstract String getFilePath();
 }

@@ -10,6 +10,7 @@ import com.xtaudio.xt.XtService;
 import com.xtaudio.xt.XtSetup;
 import com.xtaudio.xt.XtStream;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import shapes.Shape;
 import shapes.Vector2;
 
@@ -18,7 +19,7 @@ import java.util.List;
 public class AudioPlayer implements Runnable {
 
   private final XtFormat FORMAT;
-  private final ArrayBlockingQueue<List<Shape>> frameQueue;
+  private final BlockingQueue<List<Shape>> frameQueue;
 
   private List<Shape> frame;
   private int currentShape = 0;
@@ -34,7 +35,7 @@ public class AudioPlayer implements Runnable {
 
   private volatile boolean stopped;
 
-  public AudioPlayer(int sampleRate, ArrayBlockingQueue<List<Shape>> frameQueue) {
+  public AudioPlayer(int sampleRate, BlockingQueue<List<Shape>> frameQueue) {
     this.FORMAT = new XtFormat(new XtMix(sampleRate, XtSample.FLOAT32), 0, 0, 2, 0);
     this.frameQueue = frameQueue;
   }
