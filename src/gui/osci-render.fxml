@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+
+<GridPane alignment="center" hgap="10" vgap="10" xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="gui.Controller">
+   <children>
+      <AnchorPane prefHeight="400.0" prefWidth="400.0">
+         <children>
+            <Slider fx:id="slider" layoutX="44.0" layoutY="54.0" />
+            <Text fx:id="sliderOutput" layoutX="109.0" layoutY="39.0" strokeType="OUTSIDE" strokeWidth="0.0" text="0" />
+         </children>
+      </AnchorPane>
+   </children>
+   <columnConstraints>
+      <ColumnConstraints />
+   </columnConstraints>
+   <rowConstraints>
+      <RowConstraints />
+   </rowConstraints>
+</GridPane>
