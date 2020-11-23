@@ -64,7 +64,7 @@ public class ObjParser extends FileParser {
 
   // If camera position arguments haven't been specified, automatically work out the position of
   // the camera based on the size of the object in the camera's view.
-  public void setFocalLength(float focalLength) {
+  public void setFocalLength(double focalLength) {
     camera.setFocalLength(focalLength);
     if (isDefaultPosition) {
       camera.findZPos(object);

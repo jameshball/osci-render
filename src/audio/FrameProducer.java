@@ -40,7 +40,7 @@ public class FrameProducer implements Runnable {
     }
   }
 
-  public void setFocalLength(float focalLength) {
+  public void setFocalLength(Double focalLength) {
     objParser.setFocalLength(focalLength);
   }
 
@@ -59,5 +59,14 @@ public class FrameProducer implements Runnable {
       throw new IllegalArgumentException(
           "Provided file extension in file " + filePath + " not supported.");
     }
+  }
+
+  public void setRotateSpeed(Double rotateSpeed) {
+  }
+
+  public void setTranslationSpeed(Double translationSpeed) {
+  }
+
+  public void setScale(Double scale) {
   }
 }
