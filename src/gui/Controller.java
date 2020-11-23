@@ -6,26 +6,21 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.List;
+import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
-import javafx.scene.layout.AnchorPane;
-import javafx.scene.text.Text;
+import javafx.scene.control.TextField;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.xpath.XPathEvaluationResult;
 import org.xml.sax.SAXException;
-import parser.FileParser;
-import parser.ObjParser;
-import parser.TextParser;
-import parser.svg.SvgParser;
 import shapes.Shape;
-import shapes.Vector2;
 
 public class Controller implements Initializable {
 
@@ -35,29 +30,64 @@ public class Controller implements Initializable {
   private final FileChooser fileChooser = new FileChooser();
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
   private final AudioPlayer player = new AudioPlayer(SAMPLE_RATE, frameQueue);
-
-  /* Default parser. */
   private final FrameProducer producer = new FrameProducer(frameQueue);
+
   private Stage stage;
 
   @FXML
-  private Button btnBrowse;
+  private Button chooseFileButton;
   @FXML
-  private Text sliderOutput;
+  public Label fileLabel;
   @FXML
-  private Slider slider;
+  public TextField translationXTextField;
+  @FXML
+  public TextField translationYTextField;
+  @FXML
+  public TextField weightTextField;
+  @FXML
+  public Slider rotateSpeedSlider;
+  @FXML
+  public Label rotateSpeedLabel;
+  @FXML
+  public Slider translationSpeedSlider;
+  @FXML
+  public Label translationSpeedLabel;
+  @FXML
+  public Slider scaleSlider;
+  @FXML
+  public Label scaleLabel;
+  @FXML
+  private Slider focalLengthSlider;
+  @FXML
+  private Label focalLengthLabel;
 
   public Controller() throws IOException, ParserConfigurationException, SAXException {
   }
 
+  private Map<Slider, SliderUpdater<Double>> initializeSliderMap() {
+    return Map.of(
+        rotateSpeedSlider,
+        new SliderUpdater<>(rotateSpeedLabel::setText, producer::setRotateSpeed),
+        translationSpeedSlider,
+        new SliderUpdater<>(translationSpeedLabel::setText, producer::setTranslationSpeed),
+        scaleSlider,
+        new SliderUpdater<>(scaleLabel::setText, producer::setScale),
+        focalLengthSlider,
+        new SliderUpdater<>(focalLengthLabel::setText, producer::setFocalLength)
+    );
+  }
+
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
-    slider.valueProperty().addListener((source, oldValue, newValue) -> {
-      sliderOutput.setText(String.valueOf(slider.getValue()));
-      producer.setFocalLength((float) slider.getValue());
-    });
+    Map<Slider, SliderUpdater<Double>> sliders = initializeSliderMap();
 
-    btnBrowse.setOnAction(e -> {
+    for (Slider slider : sliders.keySet()) {
+      slider.valueProperty().addListener((source, oldValue, newValue) ->
+          sliders.get(slider).update(slider.getValue())
+      );
+    }
+
+    chooseFileButton.setOnAction(e -> {
       File file = fileChooser.showOpenDialog(stage);
       try {
         producer.setParser(file.getAbsolutePath());
@@ -67,7 +97,7 @@ public class Controller implements Initializable {
     });
 
     new Thread(producer).start();
-    new Thread(new AudioPlayer(SAMPLE_RATE, frameQueue)).start();
+    new Thread(player).start();
   }
 
   public void setStage(Stage stage) {

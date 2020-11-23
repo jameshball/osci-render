@@ -120,7 +120,7 @@ public class Camera {
     return lines;
   }
 
-  public void setFocalLength(float focalLength) {
+  public void setFocalLength(double focalLength) {
     this.focalLength = focalLength;
   }
 }
