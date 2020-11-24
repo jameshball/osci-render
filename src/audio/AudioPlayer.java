@@ -40,11 +40,12 @@ public class AudioPlayer implements Runnable {
     this.frameQueue = frameQueue;
   }
 
-  public AudioPlayer(int sampleRate, ArrayBlockingQueue<List<Shape>> frameQueue, float rotateSpeed,
-      float translateSpeed, Vector2 translateVector, float scale, float weight) {
+  public AudioPlayer(int sampleRate, ArrayBlockingQueue<List<Shape>> frameQueue, double rotateSpeed,
+      double translateSpeed, Vector2 translateVector, double scale, double weight) {
     this(sampleRate, frameQueue);
     setRotateSpeed(rotateSpeed);
-    setTranslation(translateSpeed, translateVector);
+    setTranslationSpeed(translateSpeed);
+    setTranslation(translateVector);
     setScale(scale);
     setWeight(weight);
   }
@@ -123,8 +124,7 @@ public class AudioPlayer implements Runnable {
     this.rotateSpeed = speed;
   }
 
-  public void setTranslation(double speed, Vector2 translation) {
-    this.translateSpeed = speed;
+  public void setTranslation(Vector2 translation) {
     this.translateVector = translation;
   }
 
@@ -173,6 +173,10 @@ public class AudioPlayer implements Runnable {
 
   public void stopPlaying() {
     stopped = true;
+  }
+
+  public void setTranslationSpeed(Double speed) {
+    translateSpeed = speed;
   }
 
   private static final class Phase {
