@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import javafx.beans.InvalidationListener;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
@@ -21,6 +22,7 @@ import javafx.stage.Stage;
 import javax.xml.parsers.ParserConfigurationException;
 import org.xml.sax.SAXException;
 import shapes.Shape;
+import shapes.Vector2;
 
 public class Controller implements Initializable {
 
@@ -43,7 +45,9 @@ public class Controller implements Initializable {
   @FXML
   public TextField translationYTextField;
   @FXML
-  public TextField weightTextField;
+  public Slider weightSlider;
+  @FXML
+  public Label weightLabel;
   @FXML
   public Slider rotateSpeedSlider;
   @FXML
@@ -66,12 +70,14 @@ public class Controller implements Initializable {
 
   private Map<Slider, SliderUpdater<Double>> initializeSliderMap() {
     return Map.of(
+        weightSlider,
+        new SliderUpdater<>(weightLabel::setText, player::setWeight),
         rotateSpeedSlider,
-        new SliderUpdater<>(rotateSpeedLabel::setText, producer::setRotateSpeed),
+        new SliderUpdater<>(rotateSpeedLabel::setText, player::setRotateSpeed),
         translationSpeedSlider,
-        new SliderUpdater<>(translationSpeedLabel::setText, producer::setTranslationSpeed),
+        new SliderUpdater<>(translationSpeedLabel::setText, player::setTranslationSpeed),
         scaleSlider,
-        new SliderUpdater<>(scaleLabel::setText, producer::setScale),
+        new SliderUpdater<>(scaleLabel::setText, player::setScale),
         focalLengthSlider,
         new SliderUpdater<>(focalLengthLabel::setText, producer::setFocalLength)
     );
@@ -87,10 +93,23 @@ public class Controller implements Initializable {
       );
     }
 
+    InvalidationListener translationUpdate = observable ->
+        player.setTranslation(new Vector2(
+            tryParse(translationXTextField.getText()),
+            tryParse(translationYTextField.getText())
+        ));
+
+    translationXTextField.textProperty().addListener(translationUpdate);
+    translationYTextField.textProperty().addListener(translationUpdate);
+
     chooseFileButton.setOnAction(e -> {
-      File file = fileChooser.showOpenDialog(stage);
+      File file = null;
+      while (file == null) {
+        file = fileChooser.showOpenDialog(stage);
+      }
       try {
         producer.setParser(file.getAbsolutePath());
+        fileLabel.setText(file.getAbsolutePath());
       } catch (IOException | ParserConfigurationException | SAXException ioException) {
         ioException.printStackTrace();
       }
@@ -98,6 +117,14 @@ public class Controller implements Initializable {
 
     new Thread(producer).start();
     new Thread(player).start();
+  }
+
+  private double tryParse(String value) {
+    try {
+      return Double.parseDouble(value);
+    } catch (NumberFormatException e) {
+      return 0;
+    }
   }
 
   public void setStage(Stage stage) {

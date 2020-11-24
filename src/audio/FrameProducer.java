@@ -40,10 +40,6 @@ public class FrameProducer implements Runnable {
     }
   }
 
-  public void setFocalLength(Double focalLength) {
-    objParser.setFocalLength(focalLength);
-  }
-
   public void setParser(String filePath)
       throws IOException, ParserConfigurationException, SAXException {
     if (filePath.matches(".*\\.obj")) {
@@ -61,12 +57,7 @@ public class FrameProducer implements Runnable {
     }
   }
 
-  public void setRotateSpeed(Double rotateSpeed) {
-  }
-
-  public void setTranslationSpeed(Double translationSpeed) {
-  }
-
-  public void setScale(Double scale) {
+  public void setFocalLength(Double focalLength) {
+    objParser.setFocalLength(focalLength);
   }
 }
