@@ -6,6 +6,7 @@ import engine.WorldObject;
 import java.io.IOException;
 import java.util.List;
 import shapes.Shape;
+import shapes.Vector2;
 
 public class ObjParser extends FileParser {
 
@@ -73,5 +74,9 @@ public class ObjParser extends FileParser {
 
   public static boolean isObjFile(String path) {
     return path.matches(".*\\.obj");
+  }
+
+  public void setCameraPos(Vector3 vector) {
+    camera.setPos(vector);
   }
 }

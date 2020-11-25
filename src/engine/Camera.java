@@ -11,6 +11,8 @@ import java.util.List;
 
 public class Camera {
 
+  private static final int MAX_NUM_STEPS = 1000;
+
   public static double DEFAULT_FOCAL_LENGTH = 1;
 
   // Threshold for the max vertex value being displayed when rendering (will change position of
@@ -52,9 +54,11 @@ public class Camera {
     setPos(new Vector3());
     List<Vector2> vertices = new ArrayList<>();
 
-    while (maxVertexValue(vertices) > VERTEX_VALUE_THRESHOLD) {
+    int stepsMade = 0;
+    while (maxVertexValue(vertices) > VERTEX_VALUE_THRESHOLD && stepsMade < MAX_NUM_STEPS) {
       move(new Vector3(0, 0, CAMERA_MOVE_INCREMENT));
       vertices = sampleVerticesInRender(object);
+      stepsMade++;
     }
   }
 

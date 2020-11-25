@@ -2,6 +2,7 @@ package gui;
 
 import audio.AudioPlayer;
 import audio.FrameProducer;
+import engine.Vector3;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -43,33 +44,39 @@ public class Controller implements Initializable {
   @FXML
   private Button chooseFileButton;
   @FXML
-  public Label fileLabel;
+  private Label fileLabel;
   @FXML
-  public TextField translationXTextField;
+  private TextField translationXTextField;
   @FXML
-  public TextField translationYTextField;
+  private TextField translationYTextField;
   @FXML
-  public Slider weightSlider;
+  private Slider weightSlider;
   @FXML
-  public Label weightLabel;
+  private Label weightLabel;
   @FXML
-  public Slider rotateSpeedSlider;
+  private Slider rotateSpeedSlider;
   @FXML
-  public Label rotateSpeedLabel;
+  private Label rotateSpeedLabel;
   @FXML
-  public Slider translationSpeedSlider;
+  private Slider translationSpeedSlider;
   @FXML
-  public Label translationSpeedLabel;
+  private Label translationSpeedLabel;
   @FXML
-  public Slider scaleSlider;
+  private Slider scaleSlider;
   @FXML
-  public Label scaleLabel;
+  private Label scaleLabel;
   @FXML
-  public TitledPane objTitledPane;
+  private TitledPane objTitledPane;
   @FXML
   private Slider focalLengthSlider;
   @FXML
   private Label focalLengthLabel;
+  @FXML
+  private TextField cameraXTextField;
+  @FXML
+  private TextField cameraYTextField;
+  @FXML
+  private TextField cameraZTextField;
 
   private Map<Slider, SliderUpdater<Double>> initializeSliderMap() {
     return Map.of(
@@ -88,7 +95,7 @@ public class Controller implements Initializable {
 
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
-    chooseFile(DEFAULT_PATH);
+    chooseFile(new File(DEFAULT_PATH));
 
     Map<Slider, SliderUpdater<Double>> sliders = initializeSliderMap();
 
@@ -107,12 +114,23 @@ public class Controller implements Initializable {
     translationXTextField.textProperty().addListener(translationUpdate);
     translationYTextField.textProperty().addListener(translationUpdate);
 
+    InvalidationListener cameraPosUpdate = observable ->
+        producer.setCameraPos(new Vector3(
+            tryParse(cameraXTextField.getText()),
+            tryParse(cameraYTextField.getText()),
+            tryParse(cameraZTextField.getText())
+        ));
+
+    cameraXTextField.textProperty().addListener(cameraPosUpdate);
+    cameraYTextField.textProperty().addListener(cameraPosUpdate);
+    cameraZTextField.textProperty().addListener(cameraPosUpdate);
+
     chooseFileButton.setOnAction(e -> {
       File file = null;
       while (file == null) {
         file = fileChooser.showOpenDialog(stage);
       }
-      chooseFile(file.getAbsolutePath());
+      chooseFile(file);
     });
 
     new Thread(producer).start();
@@ -127,11 +145,16 @@ public class Controller implements Initializable {
     }
   }
 
-  private void chooseFile(String path) {
+  private void chooseFile(File file) {
     try {
+      String path = file.getAbsolutePath();
       producer.setParser(path);
-      fileLabel.setText(path);
-      objTitledPane.setDisable(!ObjParser.isObjFile(path));
+      if (file.exists() && !file.isDirectory()) {
+        fileLabel.setText(path);
+        objTitledPane.setDisable(!ObjParser.isObjFile(path));
+      } else {
+        objTitledPane.setDisable(true);
+      }
     } catch (IOException | ParserConfigurationException | SAXException ioException) {
       ioException.printStackTrace();
     }

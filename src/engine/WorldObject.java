@@ -1,8 +1,10 @@
 package engine;
 
+import com.mokiat.data.front.error.WFException;
 import com.mokiat.data.front.parser.*;
 
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -117,10 +119,17 @@ public class WorldObject {
     return newVertices;
   }
 
-  private Set<Line3D> loadFromFile(String filename) throws IOException {
-    InputStream in = new FileInputStream(filename);
-    final IOBJParser parser = new OBJParser();
-    final OBJModel model = parser.parse(in);
+  private Set<Line3D> loadFromFile(String filename) {
+    OBJModel model;
+
+    try {
+      InputStream in = new FileInputStream(filename);
+
+      IOBJParser parser = new OBJParser();
+      model = parser.parse(in);
+    } catch (IOException e) {
+      return Set.of();
+    }
 
     Set<Line3D> edges = new HashSet<>();
 
