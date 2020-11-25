@@ -37,7 +37,7 @@ public class ObjParser extends FileParser {
   }
 
   @Override
-  protected String getFileExtension() {
+  public String getFileExtension() {
     return "obj";
   }
 
@@ -69,5 +69,9 @@ public class ObjParser extends FileParser {
     if (isDefaultPosition) {
       camera.findZPos(object);
     }
+  }
+
+  public static boolean isObjFile(String path) {
+    return path.matches(".*\\.obj");
   }
 }

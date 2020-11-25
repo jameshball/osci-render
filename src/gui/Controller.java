@@ -11,16 +11,19 @@ import java.util.ResourceBundle;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import javafx.beans.InvalidationListener;
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TitledPane;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javax.xml.parsers.ParserConfigurationException;
 import org.xml.sax.SAXException;
+import parser.ObjParser;
 import shapes.Shape;
 import shapes.Vector2;
 
@@ -28,6 +31,7 @@ public class Controller implements Initializable {
 
   private static final int BUFFER_SIZE = 20;
   private static final int SAMPLE_RATE = 192000;
+  private static final String DEFAULT_PATH = "models/cube.obj";
 
   private final FileChooser fileChooser = new FileChooser();
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
@@ -61,12 +65,11 @@ public class Controller implements Initializable {
   @FXML
   public Label scaleLabel;
   @FXML
+  public TitledPane objTitledPane;
+  @FXML
   private Slider focalLengthSlider;
   @FXML
   private Label focalLengthLabel;
-
-  public Controller() throws IOException, ParserConfigurationException, SAXException {
-  }
 
   private Map<Slider, SliderUpdater<Double>> initializeSliderMap() {
     return Map.of(
@@ -85,6 +88,8 @@ public class Controller implements Initializable {
 
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
+    chooseFile(DEFAULT_PATH);
+
     Map<Slider, SliderUpdater<Double>> sliders = initializeSliderMap();
 
     for (Slider slider : sliders.keySet()) {
@@ -107,12 +112,7 @@ public class Controller implements Initializable {
       while (file == null) {
         file = fileChooser.showOpenDialog(stage);
       }
-      try {
-        producer.setParser(file.getAbsolutePath());
-        fileLabel.setText(file.getAbsolutePath());
-      } catch (IOException | ParserConfigurationException | SAXException ioException) {
-        ioException.printStackTrace();
-      }
+      chooseFile(file.getAbsolutePath());
     });
 
     new Thread(producer).start();
@@ -124,6 +124,16 @@ public class Controller implements Initializable {
       return Double.parseDouble(value);
     } catch (NumberFormatException e) {
       return 0;
+    }
+  }
+
+  private void chooseFile(String path) {
+    try {
+      producer.setParser(path);
+      fileLabel.setText(path);
+      objTitledPane.setDisable(!ObjParser.isObjFile(path));
+    } catch (IOException | ParserConfigurationException | SAXException ioException) {
+      ioException.printStackTrace();
     }
   }
 
