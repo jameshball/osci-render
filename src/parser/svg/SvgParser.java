@@ -113,7 +113,7 @@ public class SvgParser extends FileParser {
   }
 
   @Override
-  protected String getFileExtension() {
+  public String getFileExtension() {
     return "svg";
   }
 
@@ -204,5 +204,9 @@ public class SvgParser extends FileParser {
   @Override
   public String getFilePath() {
     return filePath;
+  }
+
+  public static boolean isSvgFile(String path) {
+    return path.matches(".*\\.svg");
   }
 }

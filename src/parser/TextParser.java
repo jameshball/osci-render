@@ -42,7 +42,7 @@ public class TextParser extends FileParser {
   }
 
   @Override
-  protected String getFileExtension() {
+  public String getFileExtension() {
     return "txt";
   }
 
@@ -88,5 +88,9 @@ public class TextParser extends FileParser {
   @Override
   public String getFilePath() {
     return filePath;
+  }
+
+  public static boolean isTxtFile(String path) {
+    return path.matches(".*\\.txt");
   }
 }

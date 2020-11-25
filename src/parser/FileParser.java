@@ -8,7 +8,7 @@ import shapes.Shape;
 
 public abstract class FileParser {
 
-  protected abstract String getFileExtension();
+  public abstract String getFileExtension();
 
   protected void checkFileExtension(String path) throws IllegalArgumentException {
     if (!hasCorrectFileExtension(path)) {

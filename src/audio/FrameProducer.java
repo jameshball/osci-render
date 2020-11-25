@@ -13,8 +13,6 @@ import shapes.Shape;
 
 public class FrameProducer implements Runnable {
 
-  private static final String DEFAULT_FILE = "models/cube.obj";
-
   private final BlockingQueue<List<Shape>> frameQueue;
 
   private ObjParser objParser;
@@ -22,10 +20,8 @@ public class FrameProducer implements Runnable {
   private TextParser textParser;
   private FileParser parser;
 
-  public FrameProducer(BlockingQueue<List<Shape>> frameQueue)
-      throws ParserConfigurationException, SAXException, IOException {
+  public FrameProducer(BlockingQueue<List<Shape>> frameQueue) {
     this.frameQueue = frameQueue;
-    setParser(DEFAULT_FILE);
   }
 
   @Override
@@ -42,13 +38,13 @@ public class FrameProducer implements Runnable {
 
   public void setParser(String filePath)
       throws IOException, ParserConfigurationException, SAXException {
-    if (filePath.matches(".*\\.obj")) {
+    if (ObjParser.isObjFile(filePath)) {
       objParser = new ObjParser(filePath, 1);
       parser = objParser;
-    } else if (filePath.matches(".*\\.svg")) {
+    } else if (SvgParser.isSvgFile(filePath)) {
       svgParser = new SvgParser(filePath);
       parser = svgParser;
-    } else if (filePath.matches(".*\\.txt")) {
+    } else if (TextParser.isTxtFile(filePath)) {
       textParser = new TextParser(filePath);
       parser = textParser;
     } else {
