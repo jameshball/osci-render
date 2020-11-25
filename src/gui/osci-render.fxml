@@ -45,6 +45,13 @@
           <Slider fx:id="focalLengthSlider" blockIncrement="2.0" layoutX="116.0" layoutY="15.0" max="2.0" min="1.0E-5" prefHeight="14.0" prefWidth="198.0" value="1.0" />
           <Label layoutX="43.0" layoutY="14.0" text="Focal length" />
           <Label fx:id="focalLengthLabel" layoutX="316.0" layoutY="14.0" text="1" />
+               <TextField fx:id="cameraXTextField" layoutX="134.0" layoutY="39.0" prefHeight="26.0" prefWidth="38.0" text="0" />
+               <Label layoutX="44.0" layoutY="44.0" text="Camera pos" />
+               <Label layoutX="118.0" layoutY="44.0" text="x :" />
+               <Label layoutX="180.0" layoutY="43.0" text="y :" />
+               <TextField fx:id="cameraYTextField" layoutX="199.0" layoutY="39.0" prefHeight="26.0" prefWidth="38.0" text="0" />
+               <Label layoutX="244.0" layoutY="43.0" text="z :" />
+               <TextField fx:id="cameraZTextField" layoutX="263.0" layoutY="39.0" prefHeight="26.0" prefWidth="38.0" text="0" />
         </AnchorPane>
       </TitledPane>
     </SplitPane>

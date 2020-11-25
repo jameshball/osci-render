@@ -1,5 +1,6 @@
 package audio;
 
+import engine.Vector3;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -55,5 +56,9 @@ public class FrameProducer implements Runnable {
 
   public void setFocalLength(Double focalLength) {
     objParser.setFocalLength(focalLength);
+  }
+
+  public void setCameraPos(Vector3 vector) {
+    objParser.setCameraPos(vector);
   }
 }
