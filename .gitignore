@@ -1,4 +1,5 @@
 /out
+/target
 
 # Ignore libraries in /lib
 /lib
