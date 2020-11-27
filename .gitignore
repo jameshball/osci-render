@@ -1,5 +1,8 @@
 /out
 
+# Ignore libraries in /lib
+/lib
+
 # Ignore all models (excluding cube and machine)
 /models/*
 
