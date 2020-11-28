@@ -1,5 +1,6 @@
 /out
 /target
+/.idea
 
 # Ignore libraries in /lib
 /lib
