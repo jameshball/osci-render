@@ -8,13 +8,22 @@
     <artifactId>osci-render</artifactId>
     <version>1.0</version>
     <build>
+        <sourceDirectory>src</sourceDirectory>
+        <testSourceDirectory>test</testSourceDirectory>
+        <outputDirectory>out</outputDirectory>
+        <testOutputDirectory>out</testOutputDirectory>
+        <resources>
+            <resource>
+                <directory>resources</directory>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.openjfx</groupId>
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>0.0.5</version>
                 <configuration>
-                    <mainClass>osci-render/gui.Gui</mainClass>
+                    <mainClass>Gui</mainClass>
                 </configuration>
             </plugin>
             <plugin>
@@ -36,6 +45,12 @@
         </repository>
     </repositories>
     <dependencies>
+
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-fxml</artifactId>
+            <version>11.0.1</version>
+        </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>

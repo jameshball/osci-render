@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Slider?>
+<?import javafx.scene.control.SplitPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.TitledPane?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.RowConstraints?>
+
+<GridPane alignment="center" hgap="10" vgap="10" xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="gui.Controller">
+  <columnConstraints>
+    <ColumnConstraints />
+  </columnConstraints>
+  <rowConstraints>
+    <RowConstraints />
+  </rowConstraints>
+  <AnchorPane prefHeight="279.0" prefWidth="400.0">
+    <Button fx:id="chooseFileButton" layoutX="8.0" layoutY="15.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="119.0" text="Choose File" />
+    <SplitPane dividerPositions="0.4723618090452261" layoutX="8.0" layoutY="56.0" orientation="VERTICAL" prefHeight="371.0" prefWidth="386.0">
+      <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="0.0" prefWidth="385.0">
+        <Slider fx:id="rotateSpeedSlider" layoutX="116.0" layoutY="79.0" max="10.0" prefHeight="14.0" prefWidth="198.0" />
+        <Label layoutX="37.0" layoutY="77.0" text="Rotate speed" />
+        <Label fx:id="rotateSpeedLabel" layoutX="316.0" layoutY="77.0" text="0" />
+        <Slider fx:id="translationSpeedSlider" layoutX="116.0" layoutY="105.0" max="10.0" prefHeight="14.0" prefWidth="198.0" value="1.0" />
+        <Label layoutX="14.0" layoutY="103.0" text="Translation speed" />
+        <Label fx:id="translationSpeedLabel" layoutX="316.0" layoutY="103.0" text="1" />
+        <Slider fx:id="scaleSlider" layoutX="116.0" layoutY="130.0" max="10.0" prefHeight="14.0" prefWidth="198.0" value="1.0" />
+        <Label layoutX="80.0" layoutY="128.0" text="Scale" />
+        <Label fx:id="scaleLabel" layoutX="316.0" layoutY="128.0" text="1" />
+        <Label layoutX="70.0" layoutY="50.0" text="Weight" />
+        <TextField fx:id="translationXTextField" layoutX="136.0" layoutY="13.0" prefHeight="26.0" prefWidth="70.0" text="0" />
+        <Label layoutX="51.0" layoutY="18.0" text="Translation" />
+        <Label layoutX="120.0" layoutY="18.0" text="x :" />
+        <Label layoutX="217.0" layoutY="18.0" text="y :" />
+        <TextField fx:id="translationYTextField" layoutX="234.0" layoutY="13.0" prefHeight="26.0" prefWidth="70.0" text="0" />
+            <Slider fx:id="weightSlider" layoutX="116.0" layoutY="52.0" max="1000.0" prefHeight="14.0" prefWidth="198.0" value="100.0" />
+            <Label fx:id="weightLabel" layoutX="316.0" layoutY="51.0" text="100" />
+      </AnchorPane>
+      <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" text="3D .obj file settings">
+        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+          <Slider fx:id="focalLengthSlider" blockIncrement="2.0" layoutX="116.0" layoutY="15.0" max="2.0" min="1.0E-5" prefHeight="14.0" prefWidth="198.0" value="1.0" />
+          <Label layoutX="43.0" layoutY="14.0" text="Focal length" />
+          <Label fx:id="focalLengthLabel" layoutX="316.0" layoutY="14.0" text="1" />
+               <TextField fx:id="cameraXTextField" layoutX="134.0" layoutY="39.0" prefHeight="26.0" prefWidth="38.0" text="0" />
+               <Label layoutX="44.0" layoutY="44.0" text="Camera pos" />
+               <Label layoutX="118.0" layoutY="44.0" text="x :" />
+               <Label layoutX="180.0" layoutY="43.0" text="y :" />
+               <TextField fx:id="cameraYTextField" layoutX="199.0" layoutY="39.0" prefHeight="26.0" prefWidth="38.0" text="0" />
+               <Label layoutX="244.0" layoutY="43.0" text="z :" />
+               <TextField fx:id="cameraZTextField" layoutX="263.0" layoutY="39.0" prefHeight="26.0" prefWidth="38.0" text="0" />
+        </AnchorPane>
+      </TitledPane>
+    </SplitPane>
+    <Label fx:id="fileLabel" layoutX="134.0" layoutY="20.0" />
+  </AnchorPane>
+</GridPane>
