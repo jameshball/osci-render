@@ -1,10 +1,8 @@
 package engine;
 
-import com.mokiat.data.front.error.WFException;
 import com.mokiat.data.front.parser.*;
 
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
