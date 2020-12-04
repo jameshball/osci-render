@@ -8,15 +8,6 @@
     <artifactId>osci-render</artifactId>
     <version>1.0</version>
     <build>
-        <sourceDirectory>src</sourceDirectory>
-        <testSourceDirectory>test</testSourceDirectory>
-        <outputDirectory>out</outputDirectory>
-        <testOutputDirectory>out</testOutputDirectory>
-        <resources>
-            <resource>
-                <directory>resources</directory>
-            </resource>
-        </resources>
         <plugins>
             <plugin>
                 <groupId>org.openjfx</groupId>
@@ -79,6 +70,12 @@
             <groupId>com.github.mokiat</groupId>
             <artifactId>java-data-front</artifactId>
             <version>2.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.12</version>
+            <scope>test</scope>
         </dependency>
 
     </dependencies>
