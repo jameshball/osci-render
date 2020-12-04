@@ -1,6 +1,6 @@
 # osci-render
 
-Program for drawing objects, text, and images on an oscilloscope using audio output.
+Program for drawing objects, text, and images on an oscilloscope using sh.ball.audio output.
 
 This allows for 3D rendering of `.obj` files, `.svg` images, and `.txt` files.
 
@@ -21,16 +21,16 @@ Lots of this code was built as part of a 24hr hackathon: IC Hack 20. The origina
 
 ## Proposed Features
 
-- Tune and transpose audio output
+- Tune and transpose sh.ball.audio output
 - Support rendering of multiple objects
 - Saving pre-rendered frames to file for later loading
-- Saving audio output to file
+- Saving sh.ball.audio output to file
 - (long term) Implement GUI
 - (long term) Keyframing/animating objects and camera
 
 ## Usage
 
-Using osci-render is very easy; specify the file you would like to render, and optionally the rotation speed, and camera focal length and position in the case of `.obj` files and it will output as audio to visualise on your oscilloscope.
+Using osci-render is very easy; specify the file you would like to render, and optionally the rotation speed, and camera focal length and position in the case of `.obj` files and it will output as sh.ball.audio to visualise on your oscilloscope.
 
 To render the cube example in `/models`, you would use the following args:
 
@@ -82,7 +82,7 @@ If no camera position arguments are given, the program will automatically move t
 
 Open the folder in your IDE of choice (I would recommend using IntelliJ) and build/run `AudioClient` after setting up libraries as provided in `/lib`. You will additionally require a platform-specific `dll`/`so` file for XT-Audio depending if you're on a windows/linux x86/x64 OS, which you'll find in the java-xt folder in the [XT-Audio](https://sjoerdvankreel.github.io/xt-audio/) binaries.
 
-Make sure your default playback devices are setup correctly, as XT-Audio will try and find your default device for audio output.
+Make sure your default playback devices are setup correctly, as XT-Audio will try and find your default device for sh.ball.audio output.
 
 osci-render is currently using JDK 15, though anything past Java 10 will probably be fine.
 
