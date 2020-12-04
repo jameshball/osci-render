@@ -1,16 +1,8 @@
-/out
-
-# Ignore libraries in /lib
-/lib
+/target
+/.idea
 
 # Ignore all models (excluding cube and machine)
-/models/*
+/src/main/resources/models/*
 
 # ignore temporary files
 *~
-
-# platform-specific binaries folders
-/linux-x64
-/linux-x86
-/win32-x64
-/win32-x86
