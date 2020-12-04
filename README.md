@@ -34,7 +34,7 @@ Using osci-render is very easy; run the program and choose the file you would li
 
 By default, the program loads the `cube.obj` example. If this is working, you're good to go and should be able to load your own objects, files, or images!
 
-Control the output using the sliders and text boxes required. Currently the following can be controlled:
+Control the output using the sliders and text boxes provided. Currently the following can be controlled:
 
 - Translation and speed of translation of the output
 - Weight of the lines drawn
