@@ -1,6 +1,6 @@
 # osci-render
 
-Program for drawing objects, text, and images on an oscilloscope using sh.ball.audio output.
+Program for drawing objects, text, and images on an oscilloscope using audio output.
 
 This allows for 3D rendering of `.obj` files, `.svg` images, and `.txt` files.
 
@@ -18,73 +18,39 @@ Lots of this code was built as part of a 24hr hackathon: IC Hack 20. The origina
 - Rotation of objects
 - Scaling image
 - Translating image
+- GUI for controlling renderer
 
 ## Proposed Features
 
-- Tune and transpose sh.ball.audio output
+- Tune and transpose audio output
 - Support rendering of multiple objects
 - Saving pre-rendered frames to file for later loading
-- Saving sh.ball.audio output to file
-- (long term) Implement GUI
+- Saving audio output to file
 - (long term) Keyframing/animating objects and camera
 
 ## Usage
 
-Using osci-render is very easy; specify the file you would like to render, and optionally the rotation speed, and camera focal length and position in the case of `.obj` files and it will output as sh.ball.audio to visualise on your oscilloscope.
+Using osci-render is very easy; run the program and choose the file you would like to render, and it will output as audio to visualise on your oscilloscope.
 
-To render the cube example in `/models`, you would use the following args:
+By default, the program loads the `cube.obj` example. If this is working, you're good to go and should be able to load your own objects, files, or images!
 
-```
-osci-render models/cube.obj 3 1
-```
+Control the output using the sliders and text boxes required. Currently the following can be controlled:
 
-This will render a cube with a rotation speed of 3 and a focal length of 1. Detailed argument usage below:
+- Translation and speed of translation of the output
+- Weight of the lines drawn
+- Rotation speed
+- Scale of the image
 
-### Program Arguments
+There are some additional controls for `.obj` files:
 
-```
-osci-render objFile [rotateSpeed] [focalLength] [cameraX] [cameraY] [cameraZ]
-OR
-osci-render svgFile
-OR
-osci-render textFile [fontSvgPath]
-```
-
-If no camera position arguments are given, the program will automatically move the camera to a position that renders the whole object on the screen with minimal display clipping.
-
-#### Required
-
-- filePath
-    - Specifies the file path to retrieve the `.obj`, `.svg`, or `.txt` file
-
-#### Optional
-
-- rotateSpeed
-    - Sets the speed of rotation of the object
-- focalLength
-    - Sets the camera's focal length
-- cameraX/Y/Z
-    - Sets X/Y/Z position of camera
-- fontSvgPath
-    - Sets the `.svg` file used as a source for the font used when text rendering
+- Focal length of camera
+- Position of camera
 
 ## Building
 
-### Library setup
+All dependencies are specified in the `pom.xml` file. Cloning this repo and using IntelliJ should make building a painless process.
 
-#### Libraries
-
-- [XT-Audio](https://sjoerdvankreel.github.io/xt-audio/)
-- [JGraphT](https://jgrapht.org/)
-- [JUnit 4](https://junit.org/junit4/)
-- [java-data-front](https://github.com/mokiat/java-data-front)
-- [jsoup](https://jsoup.org/)
-
-Open the folder in your IDE of choice (I would recommend using IntelliJ) and build/run `AudioClient` after setting up libraries as provided in `/lib`. You will additionally require a platform-specific `dll`/`so` file for XT-Audio depending if you're on a windows/linux x86/x64 OS, which you'll find in the java-xt folder in the [XT-Audio](https://sjoerdvankreel.github.io/xt-audio/) binaries.
-
-Make sure your default playback devices are setup correctly, as XT-Audio will try and find your default device for sh.ball.audio output.
-
-osci-render is currently using JDK 15, though anything past Java 10 will probably be fine.
+[`xtaudio`](https://sjoerdvankreel.github.io/xt-audio/) is the only library that is not on Maven central, and so it is provided in the `lib` folder and a system dependency is given in `pom.xml`.
 
 ## Contact
 
