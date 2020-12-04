@@ -1,6 +1,5 @@
 package sh.ball.gui;
 
-import java.net.URISyntaxException;
 import sh.ball.audio.AudioPlayer;
 import sh.ball.audio.FrameProducer;
 import sh.ball.engine.Vector3;
@@ -27,13 +26,12 @@ import org.xml.sax.SAXException;
 import sh.ball.parser.ObjParser;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
-import sh.ball.util.ClassLoaderUtil;
 
 public class Controller implements Initializable {
 
   private static final int BUFFER_SIZE = 20;
   private static final int SAMPLE_RATE = 192000;
-  private static final String DEFAULT_FILE = "models/cube.obj";
+  private static final String DEFAULT_FILE = "src/main/resources/models/cube.obj";
 
   private final FileChooser fileChooser = new FileChooser();
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
@@ -96,7 +94,7 @@ public class Controller implements Initializable {
 
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
-    chooseFile(DEFAULT_FILE);
+    chooseFile(new File(DEFAULT_FILE));
 
     Map<Slider, SliderUpdater<Double>> sliders = initializeSliderMap();
 
@@ -158,14 +156,6 @@ public class Controller implements Initializable {
       }
     } catch (IOException | ParserConfigurationException | SAXException ioException) {
       ioException.printStackTrace();
-    }
-  }
-
-  private void chooseFile(String path) {
-    try {
-      chooseFile(new File(ClassLoaderUtil.getResource(path, this.getClass()).toURI()));
-    } catch (URISyntaxException e) {
-      e.printStackTrace();
     }
   }
 
