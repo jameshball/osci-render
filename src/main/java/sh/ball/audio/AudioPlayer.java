@@ -1,16 +1,25 @@
 package sh.ball.audio;
 
-import com.xtaudio.xt.XtAudio;
-import com.xtaudio.xt.XtBuffer;
-import com.xtaudio.xt.XtDevice;
-import com.xtaudio.xt.XtFormat;
-import com.xtaudio.xt.XtMix;
-import com.xtaudio.xt.XtSample;
-import com.xtaudio.xt.XtService;
-import com.xtaudio.xt.XtSetup;
-import com.xtaudio.xt.XtStream;
+import xt.audio.Enums.XtSample;
+import xt.audio.Enums.XtSetup;
+import xt.audio.Enums.XtSystem;
+import xt.audio.Structs.XtBuffer;
+import xt.audio.Structs.XtBufferSize;
+import xt.audio.Structs.XtChannels;
+import xt.audio.Structs.XtDeviceStreamParams;
+import xt.audio.Structs.XtFormat;
+import xt.audio.Structs.XtMix;
+import xt.audio.Structs.XtStreamParams;
+import xt.audio.XtAudio;
+import xt.audio.XtDevice;
+import xt.audio.XtPlatform;
+import xt.audio.XtSafeBuffer;
+import xt.audio.XtService;
+import xt.audio.XtStream;
+
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
@@ -18,7 +27,11 @@ import java.util.List;
 
 public class AudioPlayer implements Runnable {
 
-  private final XtFormat FORMAT;
+  private static final int SAMPLE_RATE = 192000;
+
+  private final XtMix MIX = new XtMix(SAMPLE_RATE, XtSample.FLOAT32);
+  private final XtChannels CHANNELS = new XtChannels(0, 0, 2, 0);
+  private final XtFormat FORMAT = new XtFormat(MIX, CHANNELS);
   private final BlockingQueue<List<Shape>> frameQueue;
 
   private List<Shape> frame;
@@ -35,14 +48,13 @@ public class AudioPlayer implements Runnable {
 
   private volatile boolean stopped;
 
-  public AudioPlayer(int sampleRate, BlockingQueue<List<Shape>> frameQueue) {
-    this.FORMAT = new XtFormat(new XtMix(sampleRate, XtSample.FLOAT32), 0, 0, 2, 0);
+  public AudioPlayer(BlockingQueue<List<Shape>> frameQueue) {
     this.frameQueue = frameQueue;
   }
 
-  public AudioPlayer(int sampleRate, ArrayBlockingQueue<List<Shape>> frameQueue, double rotateSpeed,
-      double translateSpeed, Vector2 translateVector, double scale, double weight) {
-    this(sampleRate, frameQueue);
+  public AudioPlayer(ArrayBlockingQueue<List<Shape>> frameQueue, double rotateSpeed,
+                     double translateSpeed, Vector2 translateVector, double scale, double weight) {
+    this(frameQueue);
     setRotateSpeed(rotateSpeed);
     setTranslationSpeed(translateSpeed);
     setTranslation(translateVector);
@@ -50,10 +62,12 @@ public class AudioPlayer implements Runnable {
     setWeight(weight);
   }
 
-  private void render(XtStream stream, Object input, Object output, int audioFrames,
-      double time, long position, boolean timeValid, long error, Object user)
-      throws InterruptedException {
-    for (int f = 0; f < audioFrames; f++) {
+  private int render(XtStream stream, XtBuffer buffer, Object user) throws InterruptedException {
+    XtSafeBuffer safe = XtSafeBuffer.get(stream);
+    safe.lock(buffer);
+    float[] output = (float[]) safe.getOutput();
+
+    for (int f = 0; f < buffer.frames; f++) {
       Shape shape = getCurrentShape();
 
       shape = shape.setWeight(weight);
@@ -65,8 +79,8 @@ public class AudioPlayer implements Runnable {
       double drawingProgress = totalAudioFrames == 0 ? 1 : audioFramesDrawn / totalAudioFrames;
       Vector2 nextVector = shape.nextVector(drawingProgress);
 
-      ((float[]) output)[f * FORMAT.outputs] = (float) nextVector.getX();
-      ((float[]) output)[f * FORMAT.outputs + 1] = (float) nextVector.getY();
+      output[f * FORMAT.channels.outputs] = (float) nextVector.getX();
+      output[f * FORMAT.channels.outputs + 1] = (float) nextVector.getY();
 
       audioFramesDrawn++;
 
@@ -80,12 +94,14 @@ public class AudioPlayer implements Runnable {
         frame = frameQueue.take();
       }
     }
+    safe.unlock(buffer);
+    return 0;
   }
 
   private Shape rotate(Shape shape, double sampleRate) {
     if (rotateSpeed != 0) {
       shape = shape.rotate(
-          nextTheta(sampleRate, rotateSpeed, translatePhase)
+        nextTheta(sampleRate, rotateSpeed, translatePhase)
       );
     }
 
@@ -95,7 +111,7 @@ public class AudioPlayer implements Runnable {
   private Shape translate(Shape shape, double sampleRate) {
     if (translateSpeed != 0 && !translateVector.equals(new Vector2())) {
       return shape.translate(translateVector.scale(
-          Math.sin(nextTheta(sampleRate, translateSpeed, rotatePhase))
+        Math.sin(nextTheta(sampleRate, translateSpeed, rotatePhase))
       ));
     }
 
@@ -152,14 +168,22 @@ public class AudioPlayer implements Runnable {
       throw new RuntimeException("Initial frame not found. Cannot continue.");
     }
 
-    try (XtAudio audio = new XtAudio(null, null, null, null)) {
-      XtService service = XtAudio.getServiceBySetup(XtSetup.CONSUMER_AUDIO);
-      try (XtDevice device = service.openDefaultDevice(true)) {
-        if (device != null && device.supportsFormat(FORMAT)) {
-          XtBuffer buffer = device.getBuffer(FORMAT);
+    try (XtPlatform platform = XtAudio.init(null, null)) {
+      XtSystem system = platform.setupToSystem(XtSetup.CONSUMER_AUDIO);
+      XtService service = platform.getService(system);
+      if (service == null) return;
 
-          try (XtStream stream = device.openStream(FORMAT, true, false,
-              buffer.current, this::render, null, null)) {
+      String defaultOutput = service.getDefaultDeviceId(true);
+      if (defaultOutput == null) return;
+
+      try (XtDevice device = service.openDevice(defaultOutput)) {
+        if (device.supportsFormat(FORMAT)) {
+
+          XtBufferSize size = device.getBufferSize(FORMAT);
+          XtStreamParams streamParams = new XtStreamParams(true, this::render, null, null);
+          XtDeviceStreamParams deviceParams = new XtDeviceStreamParams(streamParams, FORMAT, size.current);
+          try (XtStream stream = device.openStream(deviceParams, null);
+               XtSafeBuffer safe = XtSafeBuffer.register(stream, true)) {
             stream.start();
             while (!stopped) {
               Thread.onSpinWait();

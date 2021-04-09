@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.xml.parsers.ParserConfigurationException;
+
 import org.xml.sax.SAXException;
 import sh.ball.parser.svg.SvgParser;
 import sh.ball.shapes.Shape;
@@ -18,7 +19,7 @@ public class TextParser extends FileParser {
 
   private static final char WIDE_CHAR = 'W';
   private static final double HEIGHT_SCALAR = 1.6;
-  private static final String DEFAULT_FONT = "fonts/SourceCodePro-ExtraLight.svg";
+  private static final String DEFAULT_FONT = TextParser.class.getResource("/fonts/SourceCodePro-ExtraLight.svg").getPath();
 
   private final Map<Character, List<Shape>> charToShape;
   private final List<String> text;
@@ -27,7 +28,7 @@ public class TextParser extends FileParser {
   private List<Shape> shapes;
 
   public TextParser(String path, String font)
-      throws IOException, SAXException, ParserConfigurationException {
+    throws IOException, SAXException, ParserConfigurationException {
     checkFileExtension(path);
     this.filePath = path;
     this.charToShape = new HashMap<>();
@@ -37,7 +38,7 @@ public class TextParser extends FileParser {
   }
 
   public TextParser(String path)
-      throws IOException, SAXException, ParserConfigurationException {
+    throws IOException, SAXException, ParserConfigurationException {
     this(path, DEFAULT_FONT);
   }
 
@@ -48,7 +49,7 @@ public class TextParser extends FileParser {
 
   @Override
   protected void parseFile(String path)
-      throws ParserConfigurationException, IOException, SAXException, IllegalArgumentException {
+    throws ParserConfigurationException, IOException, SAXException, IllegalArgumentException {
     SvgParser parser = new SvgParser(path);
 
     /* WIDE_CHAR used as an example character that will be wide in most languages.
@@ -71,8 +72,8 @@ public class TextParser extends FileParser {
       char[] lineChars = text.get(i).toCharArray();
       for (int j = 0; j < lineChars.length; j++) {
         shapes.addAll(Shape.translate(
-            charToShape.get(lineChars[j]),
-            new Vector2(j * width, -i * height)
+          charToShape.get(lineChars[j]),
+          new Vector2(j * width, -i * height)
         ));
       }
     }

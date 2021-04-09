@@ -48,9 +48,7 @@ There are some additional controls for `.obj` files:
 
 ## Building
 
-All dependencies are specified in the `pom.xml` file. Cloning this repo and using IntelliJ should make building a painless process.
-
-[`xtaudio`](https://sjoerdvankreel.github.io/xt-audio/) is the only library that is not on Maven central, and so it is provided in the `lib` folder and a system dependency is given in `pom.xml`.
+All dependencies are specified in the `pom.xml` file. Cloning this repo and using IntelliJ with Maven should make building a painless process.
 
 ## Contact
 
