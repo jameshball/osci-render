@@ -1,8 +1,9 @@
 /target
 /.idea
 
-# Ignore all models (excluding cube and machine)
+# Ignore all models and files, (excluding defaults)
 /src/main/resources/models/*
+/src/main/resources/images/*
 
 # ignore temporary files
 *~

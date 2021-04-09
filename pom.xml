@@ -37,13 +37,11 @@
     </repositories>
     <dependencies>
 
-        <!-- XT-Audio required. This is not on maven central. https://sjoerdvankreel.github.io/xt-audio/ -->
+        <!-- https://sjoerdvankreel.github.io/xt-audio/ -->
         <dependency>
-            <groupId>com.xtaudio.xt</groupId>
-            <artifactId>xtaudio</artifactId>
-            <version>1.0.6</version>
-            <scope>system</scope>
-            <systemPath>${basedir}/lib/com.xt-audio.xt-1.0.6.jar</systemPath>
+            <groupId>com.github.sjoerdvankreel</groupId>
+            <artifactId>xt.audio</artifactId>
+            <version>1.9</version>
         </dependency>
 
         <dependency>

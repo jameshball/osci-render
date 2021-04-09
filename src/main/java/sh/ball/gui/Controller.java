@@ -30,12 +30,11 @@ import sh.ball.shapes.Vector2;
 public class Controller implements Initializable {
 
   private static final int BUFFER_SIZE = 20;
-  private static final int SAMPLE_RATE = 192000;
   private static final String DEFAULT_FILE = "src/main/resources/models/cube.obj";
 
   private final FileChooser fileChooser = new FileChooser();
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
-  private final AudioPlayer player = new AudioPlayer(SAMPLE_RATE, frameQueue);
+  private final AudioPlayer player = new AudioPlayer(frameQueue);
   private final FrameProducer producer = new FrameProducer(frameQueue);
 
   private Stage stage;
