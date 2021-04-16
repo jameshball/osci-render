@@ -1,5 +1,6 @@
 package sh.ball.gui;
 
+import sh.ball.MovableRenderer;
 import sh.ball.audio.AudioPlayer;
 import sh.ball.audio.FrameProducer;
 import sh.ball.engine.Vector3;
@@ -9,8 +10,6 @@ import java.net.URL;
 import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import javafx.beans.InvalidationListener;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -29,13 +28,12 @@ import sh.ball.shapes.Vector2;
 
 public class Controller implements Initializable {
 
-  private static final int BUFFER_SIZE = 20;
   private static final String DEFAULT_FILE = "src/main/resources/models/cube.obj";
 
   private final FileChooser fileChooser = new FileChooser();
-  private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
-  private final AudioPlayer player = new AudioPlayer(frameQueue);
-  private final FrameProducer producer = new FrameProducer(frameQueue);
+
+  private final MovableRenderer<List<Shape>, Vector2> renderer = new AudioPlayer();
+  private final FrameProducer producer = new FrameProducer(renderer);
 
   private Stage stage;
 
@@ -79,13 +77,13 @@ public class Controller implements Initializable {
   private Map<Slider, SliderUpdater<Double>> initializeSliderMap() {
     return Map.of(
         weightSlider,
-        new SliderUpdater<>(weightLabel::setText, player::setWeight),
+        new SliderUpdater<>(weightLabel::setText, renderer::setQuality),
         rotateSpeedSlider,
-        new SliderUpdater<>(rotateSpeedLabel::setText, player::setRotateSpeed),
+        new SliderUpdater<>(rotateSpeedLabel::setText, renderer::setRotationSpeed),
         translationSpeedSlider,
-        new SliderUpdater<>(translationSpeedLabel::setText, player::setTranslationSpeed),
+        new SliderUpdater<>(translationSpeedLabel::setText, renderer::setTranslationSpeed),
         scaleSlider,
-        new SliderUpdater<>(scaleLabel::setText, player::setScale),
+        new SliderUpdater<>(scaleLabel::setText, renderer::setScale),
         focalLengthSlider,
         new SliderUpdater<>(focalLengthLabel::setText, producer::setFocalLength)
     );
@@ -104,7 +102,7 @@ public class Controller implements Initializable {
     }
 
     InvalidationListener translationUpdate = observable ->
-        player.setTranslation(new Vector2(
+        renderer.setTranslation(new Vector2(
             tryParse(translationXTextField.getText()),
             tryParse(translationYTextField.getText())
         ));
@@ -132,7 +130,7 @@ public class Controller implements Initializable {
     });
 
     new Thread(producer).start();
-    new Thread(player).start();
+    new Thread(renderer).start();
   }
 
   private double tryParse(String value) {

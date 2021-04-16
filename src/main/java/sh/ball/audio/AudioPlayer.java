@@ -1,5 +1,6 @@
 package sh.ball.audio;
 
+import sh.ball.MovableRenderer;
 import xt.audio.Enums.XtSample;
 import xt.audio.Enums.XtSetup;
 import xt.audio.Enums.XtSystem;
@@ -25,14 +26,15 @@ import sh.ball.shapes.Vector2;
 
 import java.util.List;
 
-public class AudioPlayer implements Runnable {
+public class AudioPlayer implements MovableRenderer<List<Shape>, Vector2> {
 
   private static final int SAMPLE_RATE = 192000;
+  private static final int BUFFER_SIZE = 20;
 
   private final XtMix MIX = new XtMix(SAMPLE_RATE, XtSample.FLOAT32);
   private final XtChannels CHANNELS = new XtChannels(0, 0, 2, 0);
   private final XtFormat FORMAT = new XtFormat(MIX, CHANNELS);
-  private final BlockingQueue<List<Shape>> frameQueue;
+  private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
 
   private List<Shape> frame;
   private int currentShape = 0;
@@ -48,18 +50,14 @@ public class AudioPlayer implements Runnable {
 
   private volatile boolean stopped;
 
-  public AudioPlayer(BlockingQueue<List<Shape>> frameQueue) {
-    this.frameQueue = frameQueue;
-  }
+  public AudioPlayer() {}
 
-  public AudioPlayer(ArrayBlockingQueue<List<Shape>> frameQueue, double rotateSpeed,
-                     double translateSpeed, Vector2 translateVector, double scale, double weight) {
-    this(frameQueue);
-    setRotateSpeed(rotateSpeed);
+  public AudioPlayer(double rotateSpeed, double translateSpeed, Vector2 translateVector, double scale, double weight) {
+    setRotationSpeed(rotateSpeed);
     setTranslationSpeed(translateSpeed);
     setTranslation(translateVector);
     setScale(scale);
-    setWeight(weight);
+    setQuality(weight);
   }
 
   private int render(XtStream stream, XtBuffer buffer, Object user) throws InterruptedException {
@@ -136,20 +134,29 @@ public class AudioPlayer implements Runnable {
     return shape;
   }
 
-  public void setRotateSpeed(double speed) {
+  @Override
+  public void setRotationSpeed(double speed) {
     this.rotateSpeed = speed;
   }
 
+  @Override
   public void setTranslation(Vector2 translation) {
     this.translateVector = translation;
   }
 
+  @Override
+  public void setTranslationSpeed(double speed) {
+    translateSpeed = speed;
+  }
+
+  @Override
   public void setScale(double scale) {
     this.scale = scale;
   }
 
-  public void setWeight(double weight) {
-    this.weight = weight;
+  @Override
+  public void setQuality(double quality) {
+    this.weight = quality;
   }
 
   private Shape getCurrentShape() {
@@ -195,12 +202,19 @@ public class AudioPlayer implements Runnable {
     }
   }
 
-  public void stopPlaying() {
+  @Override
+  public void stop() {
     stopped = true;
   }
 
-  public void setTranslationSpeed(Double speed) {
-    translateSpeed = speed;
+  @Override
+  public void addFrame(List<Shape> frame) {
+    try {
+      frameQueue.put(frame);
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+      System.err.println("Frame missed.");
+    }
   }
 
   private static final class Phase {

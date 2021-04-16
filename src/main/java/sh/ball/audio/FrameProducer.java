@@ -1,9 +1,9 @@
 package sh.ball.audio;
 
+import sh.ball.Renderer;
 import sh.ball.engine.Vector3;
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
 import javax.xml.parsers.ParserConfigurationException;
 import org.xml.sax.SAXException;
 import sh.ball.parser.FileParser;
@@ -14,26 +14,21 @@ import sh.ball.shapes.Shape;
 
 public class FrameProducer implements Runnable {
 
-  private final BlockingQueue<List<Shape>> frameQueue;
+  private final Renderer<List<Shape>> renderer;
 
   private ObjParser objParser;
   private SvgParser svgParser;
   private TextParser textParser;
   private FileParser parser;
 
-  public FrameProducer(BlockingQueue<List<Shape>> frameQueue) {
-    this.frameQueue = frameQueue;
+  public FrameProducer(Renderer<List<Shape>> renderer) {
+    this.renderer = renderer;
   }
 
   @Override
   public void run() {
     while (true) {
-      try {
-        frameQueue.put(parser.nextFrame());
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-        System.out.println("Frame missed.");
-      }
+      renderer.addFrame(parser.nextFrame());
     }
   }
 
