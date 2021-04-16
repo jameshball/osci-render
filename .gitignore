@@ -7,3 +7,6 @@
 
 # ignore temporary files
 *~
+
+# Ignore local binaries for xt-audio
+/win32-x64
