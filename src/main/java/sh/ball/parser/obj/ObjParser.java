@@ -1,35 +1,35 @@
-package sh.ball.parser;
+package sh.ball.parser.obj;
 
+import sh.ball.FrameSet;
 import sh.ball.engine.Camera;
 import sh.ball.engine.Vector3;
 import sh.ball.engine.WorldObject;
 import java.io.IOException;
 import java.util.List;
+
+import sh.ball.parser.FileParser;
 import sh.ball.shapes.Shape;
 
-public class ObjParser extends FileParser {
+public class ObjParser extends FileParser<FrameSet<List<Shape>>> {
 
   private static final float DEFAULT_ROTATE_SPEED = 3;
 
-  private final Vector3 cameraPos;
   private final Vector3 rotation;
   private final boolean isDefaultPosition;
   private final String filePath;
+  private final Camera camera;
 
   private WorldObject object;
-  private Camera camera;
-  private double focalLength;
 
   public ObjParser(String path, float rotateSpeed, float cameraX, float cameraY, float cameraZ,
-      float focalLength, boolean isDefaultPosition) throws IOException {
+      float focalLength, boolean isDefaultPosition) {
     rotateSpeed *= Math.PI / 1000;
     checkFileExtension(path);
     this.filePath = path;
-    this.cameraPos = new Vector3(cameraX, cameraY, cameraZ);
     this.isDefaultPosition = isDefaultPosition;
-    this.focalLength = focalLength;
+    Vector3 cameraPos = new Vector3(cameraX, cameraY, cameraZ);
+    this.camera = new Camera(focalLength, cameraPos);
     this.rotation = new Vector3(0, rotateSpeed, rotateSpeed);
-    parseFile(path);
   }
 
   public ObjParser(String path, float focalLength) throws IOException {
@@ -42,19 +42,14 @@ public class ObjParser extends FileParser {
   }
 
   @Override
-  protected void parseFile(String path) throws IllegalArgumentException, IOException {
-    object = new WorldObject(path);
-    camera = new Camera(focalLength, cameraPos);
+  public FrameSet<List<Shape>> parse() throws IllegalArgumentException, IOException {
+    object = new WorldObject(filePath);
 
     if (isDefaultPosition) {
       camera.findZPos(object);
     }
-  }
 
-  @Override
-  public List<Shape> nextFrame() {
-    object.rotate(rotation);
-    return camera.draw(object);
+    return new ObjFrameSet(object, camera, rotation);
   }
 
   @Override

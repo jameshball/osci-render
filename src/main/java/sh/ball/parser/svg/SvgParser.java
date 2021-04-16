@@ -19,27 +19,26 @@ import org.jsoup.Jsoup;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.xml.sax.SAXException;
+import sh.ball.FrameSet;
 import sh.ball.parser.FileParser;
+import sh.ball.parser.ShapeFrameSet;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
-public class SvgParser extends FileParser {
+public class SvgParser extends FileParser<FrameSet<List<Shape>>> {
 
   private final Map<Character, Function<List<Float>, List<Shape>>> commandMap;
   private final SvgState state;
   private final String filePath;
 
-  private List<Shape> shapes;
   private Document svg;
 
-  public SvgParser(String path) throws IOException, SAXException, ParserConfigurationException {
+  public SvgParser(String path) {
     checkFileExtension(path);
     this.filePath = path;
-    this.shapes = new ArrayList<>();
     this.state = new SvgState();
     this.commandMap = new HashMap<>();
     initialiseCommandMap();
-    parseFile(path);
   }
 
   // Map command chars to function calls.
@@ -118,10 +117,11 @@ public class SvgParser extends FileParser {
   }
 
   @Override
-  protected void parseFile(String filePath)
+  public FrameSet<List<Shape>> parse()
       throws ParserConfigurationException, IOException, SAXException, IllegalArgumentException {
     this.svg = getXMLDocument(filePath);
     List<Node> svgElem = asList(svg.getElementsByTagName("svg"));
+    List<Shape> shapes = new ArrayList<>();
 
     if (svgElem.size() != 1) {
       throw new IllegalArgumentException("SVG has either zero or more than one svg element.");
@@ -132,7 +132,7 @@ public class SvgParser extends FileParser {
       shapes.addAll(parsePath(node.getNodeValue()));
     }
 
-    shapes = Shape.normalize(shapes);
+    return new ShapeFrameSet(Shape.normalize(shapes));
   }
 
   /* Given a character, will return the glyph associated with it.
@@ -194,11 +194,6 @@ public class SvgParser extends FileParser {
     }
 
     return svgShapes;
-  }
-
-  @Override
-  public List<Shape> nextFrame() {
-    return shapes;
   }
 
   @Override

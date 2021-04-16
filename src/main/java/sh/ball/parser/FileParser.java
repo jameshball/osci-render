@@ -6,7 +6,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import org.xml.sax.SAXException;
 import sh.ball.shapes.Shape;
 
-public abstract class FileParser {
+public abstract class FileParser<T> {
 
   public abstract String getFileExtension();
 
@@ -21,9 +21,8 @@ public abstract class FileParser {
     return path.matches(".*\\." + getFileExtension());
   }
 
-  protected abstract void parseFile(String path)
+  public abstract T parse()
       throws ParserConfigurationException, IOException, SAXException, IllegalArgumentException;
 
-  public abstract List<Shape> nextFrame();
   public abstract String getFilePath();
 }
