@@ -2,6 +2,7 @@ package sh.ball.parser.svg;
 
 import java.util.ArrayList;
 import java.util.List;
+
 import sh.ball.shapes.Line;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
@@ -13,7 +14,7 @@ class LineTo {
   // Only isHorizontal should be true for parsing H and h commands
   // Only isVertical should be true for parsing V and v commands
   private static List<Shape> parseLineTo(SvgState state, List<Float> args, boolean isAbsolute,
-      boolean isHorizontal, boolean isVertical) {
+                                         boolean isHorizontal, boolean isVertical) {
     int expectedArgs = isHorizontal && isVertical ? 2 : 1;
 
     if (args.size() % expectedArgs != 0 || args.size() < expectedArgs) {

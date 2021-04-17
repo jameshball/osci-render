@@ -2,6 +2,7 @@ package sh.ball.parser.svg;
 
 import java.util.ArrayList;
 import java.util.List;
+
 import sh.ball.shapes.Shape;
 
 class EllipticalArcTo {
@@ -11,7 +12,7 @@ class EllipticalArcTo {
 
     if (args.size() % 7 != 0 || args.size() < 7) {
       throw new IllegalArgumentException(
-          "SVG elliptical arc command has incorrect number of arguments.");
+        "SVG elliptical arc command has incorrect number of arguments.");
     }
 
     List<Float> lineToArgs = new ArrayList<>();

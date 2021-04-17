@@ -1,6 +1,7 @@
 package sh.ball.parser.svg;
 
 import java.util.List;
+
 import sh.ball.shapes.Line;
 import sh.ball.shapes.Shape;
 

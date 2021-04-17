@@ -10,6 +10,7 @@ import java.util.RandomAccess;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -22,11 +23,11 @@ public final class XmlUtil {
 
   public static List<Node> asList(NodeList n) {
     return n.getLength() == 0 ?
-        Collections.emptyList() : new NodeListWrapper(n);
+      Collections.emptyList() : new NodeListWrapper(n);
   }
 
   static final class NodeListWrapper extends AbstractList<Node>
-      implements RandomAccess {
+    implements RandomAccess {
 
     private final NodeList list;
 
@@ -49,7 +50,7 @@ public final class XmlUtil {
   }
 
   public static Document getXMLDocument(String path)
-      throws IOException, SAXException, ParserConfigurationException {
+    throws IOException, SAXException, ParserConfigurationException {
     // Opens XML reader for svg file.
     DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 

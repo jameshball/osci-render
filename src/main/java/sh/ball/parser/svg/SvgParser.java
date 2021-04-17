@@ -15,6 +15,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.xml.parsers.ParserConfigurationException;
+
 import org.jsoup.Jsoup;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
@@ -79,7 +80,7 @@ public class SvgParser extends FileParser<FrameSet<List<Shape>>> {
       // If there are more than 1 letters or delimiters next to one another
     } else if (path.matches("[a-zA-Z.\\-]{2,}")) {
       throw new IllegalArgumentException(
-          "Multiple letters or delimiters found next to one another in SVG path.");
+        "Multiple letters or delimiters found next to one another in SVG path.");
       // First character in path must be a command
     } else if (path.matches("^[a-zA-Z]")) {
       throw new IllegalArgumentException("Start of SVG path is not a letter.");
@@ -118,7 +119,7 @@ public class SvgParser extends FileParser<FrameSet<List<Shape>>> {
 
   @Override
   public FrameSet<List<Shape>> parse()
-      throws ParserConfigurationException, IOException, SAXException, IllegalArgumentException {
+    throws ParserConfigurationException, IOException, SAXException, IllegalArgumentException {
     this.svg = getXMLDocument(filePath);
     List<Node> svgElem = asList(svg.getElementsByTagName("svg"));
     List<Shape> shapes = new ArrayList<>();
@@ -176,9 +177,9 @@ public class SvgParser extends FileParser<FrameSet<List<Shape>>> {
       if (commandChar != 'z' && commandChar != 'Z') {
         // Split the command into number strings and convert them into floats.
         nums = Arrays.stream(command.substring(1).split(" "))
-            .filter(Predicate.not(String::isBlank))
-            .flatMap((numString) -> splitCommand(numString).stream())
-            .collect(Collectors.toList());
+          .filter(Predicate.not(String::isBlank))
+          .flatMap((numString) -> splitCommand(numString).stream())
+          .collect(Collectors.toList());
       }
 
       // Use the nums to get a list of sh.ball.shapes, using the first character in the command to specify

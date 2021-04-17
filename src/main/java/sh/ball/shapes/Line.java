@@ -135,8 +135,8 @@ public final class Line extends Shape {
   @Override
   public String toString() {
     return "Line{" +
-        "a=" + a +
-        ", b=" + b +
-        '}';
+      "a=" + a +
+      ", b=" + b +
+      '}';
   }
 }

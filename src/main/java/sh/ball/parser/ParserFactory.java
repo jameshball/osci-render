@@ -16,7 +16,7 @@ public class ParserFactory {
 
   public static FileParser<FrameSet<List<Shape>>> getParser(String filePath) throws IOException, ParserConfigurationException, SAXException {
     if (ObjParser.isObjFile(filePath)) {
-      return new ObjParser(filePath, 1);
+      return new ObjParser(filePath);
     } else if (SvgParser.isSvgFile(filePath)) {
       return new SvgParser(filePath);
     } else if (TextParser.isTxtFile(filePath)) {
