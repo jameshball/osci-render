@@ -5,7 +5,6 @@ import sh.ball.audio.AudioPlayer;
 import sh.ball.audio.FrameProducer;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URL;
 import java.util.List;
@@ -28,6 +27,8 @@ import javafx.stage.Stage;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.xml.sax.SAXException;
+import sh.ball.engine.Vector3;
+import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.ParserFactory;
 import sh.ball.parser.txt.TextParser;
@@ -44,7 +45,7 @@ public class Controller implements Initializable {
 
   private FrameProducer<List<Shape>> producer = new FrameProducer<>(
     renderer,
-    ParserFactory.getParser(DEFAULT_FILE).orElseThrow(FileNotFoundException::new)
+    ParserFactory.getParser(DEFAULT_FILE)
   );
 
   private Stage stage;
@@ -98,9 +99,9 @@ public class Controller implements Initializable {
       translationSpeedSlider,
       new SliderUpdater<>(translationSpeedLabel::setText, renderer::setTranslationSpeed),
       scaleSlider,
-      new SliderUpdater<>(scaleLabel::setText, renderer::setScale)
-//      focalLengthSlider,
-//      new SliderUpdater<>(focalLengthLabel::setText, producer::setFocalLength)
+      new SliderUpdater<>(scaleLabel::setText, renderer::setScale),
+      focalLengthSlider,
+      new SliderUpdater<>(focalLengthLabel::setText, this::setFocalLength)
     );
   }
 
@@ -123,27 +124,30 @@ public class Controller implements Initializable {
     translationXTextField.textProperty().addListener(translationUpdate);
     translationYTextField.textProperty().addListener(translationUpdate);
 
-//    InvalidationListener cameraPosUpdate = observable ->
-//      producer.setCameraPos(new Vector3(
-//        tryParse(cameraXTextField.getText()),
-//        tryParse(cameraYTextField.getText()),
-//        tryParse(cameraZTextField.getText())
-//      ));
-//
-//    cameraXTextField.textProperty().addListener(cameraPosUpdate);
-//    cameraYTextField.textProperty().addListener(cameraPosUpdate);
-//    cameraZTextField.textProperty().addListener(cameraPosUpdate);
+    InvalidationListener cameraPosUpdate = observable ->
+      producer.setFrameSettings(new ObjFrameSettings(new Vector3(
+        tryParse(cameraXTextField.getText()),
+        tryParse(cameraYTextField.getText()),
+        tryParse(cameraZTextField.getText())
+      )));
+
+    cameraXTextField.textProperty().addListener(cameraPosUpdate);
+    cameraYTextField.textProperty().addListener(cameraPosUpdate);
+    cameraZTextField.textProperty().addListener(cameraPosUpdate);
 
     chooseFileButton.setOnAction(e -> {
-      File file = null;
-      while (file == null) {
-        file = fileChooser.showOpenDialog(stage);
+      File file = fileChooser.showOpenDialog(stage);
+      if (file != null) {
+        chooseFile(file);
       }
-      chooseFile(file);
     });
 
     executor.submit(producer);
     new Thread(renderer).start();
+  }
+
+  private void setFocalLength(double focalLength) {
+    producer.setFrameSettings(new ObjFrameSettings(focalLength));
   }
 
   private double tryParse(String value) {
@@ -161,7 +165,6 @@ public class Controller implements Initializable {
       producer = new FrameProducer<>(
         renderer,
         ParserFactory.getParser(path)
-          .orElseThrow(FileNotFoundException::new)
       );
       executor.submit(producer);
 

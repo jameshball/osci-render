@@ -127,4 +127,8 @@ public class Camera {
   public void setFocalLength(double focalLength) {
     this.focalLength = focalLength;
   }
+
+  public double getFocalLength() {
+    return focalLength;
+  }
 }

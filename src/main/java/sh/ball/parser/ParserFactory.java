@@ -8,21 +8,21 @@ import sh.ball.parser.txt.TextParser;
 import sh.ball.shapes.Shape;
 
 import javax.xml.parsers.ParserConfigurationException;
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
-import java.util.Optional;
 
 public class ParserFactory {
 
-  public static Optional<FileParser<FrameSet<List<Shape>>>> getParser(String filePath) throws IOException, ParserConfigurationException, SAXException {
+  public static FileParser<FrameSet<List<Shape>>> getParser(String filePath) throws IOException, ParserConfigurationException, SAXException {
     if (ObjParser.isObjFile(filePath)) {
-      return Optional.of(new ObjParser(filePath, 1));
+      return new ObjParser(filePath, 1);
     } else if (SvgParser.isSvgFile(filePath)) {
-      return Optional.of(new SvgParser(filePath));
+      return new SvgParser(filePath);
     } else if (TextParser.isTxtFile(filePath)) {
-      return Optional.of(new TextParser(filePath));
+      return new TextParser(filePath);
     }
-    return Optional.empty();
+    throw new IOException("No known parser that can parse " + new File(filePath).getName());
   }
 
 }
