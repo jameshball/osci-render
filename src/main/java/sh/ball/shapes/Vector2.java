@@ -100,7 +100,7 @@ public final class Vector2 extends Shape {
     }
     Vector2 point = (Vector2) obj;
     return round(x, 2) == round(point.x, 2)
-        && round(y, 2) == round(point.y, 2);
+      && round(y, 2) == round(point.y, 2);
   }
 
   @Override
@@ -122,8 +122,8 @@ public final class Vector2 extends Shape {
   @Override
   public String toString() {
     return "Vector2{" +
-        "x=" + x +
-        ", y=" + y +
-        '}';
+      "x=" + x +
+      ", y=" + y +
+      '}';
   }
 }

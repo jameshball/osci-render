@@ -5,18 +5,19 @@ import sh.ball.FrameSet;
 import sh.ball.Renderer;
 
 import java.io.IOException;
+
 import sh.ball.parser.FileParser;
 
 import javax.xml.parsers.ParserConfigurationException;
 
-public class FrameProducer<S> implements Runnable {
+public class FrameProducer<T> implements Runnable {
 
-  private final Renderer<S> renderer;
-  private final FrameSet<S> frames;
+  private final Renderer<T> renderer;
+  private final FrameSet<T> frames;
 
   private boolean running;
 
-  public FrameProducer(Renderer<S> renderer, FileParser<FrameSet<S>> parser) throws IOException, SAXException, ParserConfigurationException {
+  public FrameProducer(Renderer<T> renderer, FileParser<FrameSet<T>> parser) throws IOException, SAXException, ParserConfigurationException {
     this.renderer = renderer;
     this.frames = parser.parse();
   }

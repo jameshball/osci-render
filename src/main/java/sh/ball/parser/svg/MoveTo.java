@@ -2,6 +2,7 @@ package sh.ball.parser.svg;
 
 import java.util.ArrayList;
 import java.util.List;
+
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 

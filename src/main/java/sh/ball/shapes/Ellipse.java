@@ -29,8 +29,8 @@ public final class Ellipse extends Shape {
   public Vector2 nextVector(double drawingProgress) {
     double theta = 2 * Math.PI * drawingProgress;
     return position.add(new Vector2(
-        a * Math.cos(theta) * Math.cos(rotation) - b * Math.sin(theta) * Math.sin(rotation),
-        a * Math.cos(theta) * Math.sin(rotation) + b * Math.sin(theta) * Math.cos(rotation)
+      a * Math.cos(theta) * Math.cos(rotation) - b * Math.sin(theta) * Math.sin(rotation),
+      a * Math.cos(theta) * Math.sin(rotation) + b * Math.sin(theta) * Math.cos(rotation)
     ));
   }
 
@@ -51,7 +51,7 @@ public final class Ellipse extends Shape {
   @Override
   public Ellipse scale(Vector2 vector) {
     return new Ellipse(a * vector.getX(), b * vector.getY(), weight, rotation,
-        position.scale(vector));
+      position.scale(vector));
   }
 
   @Override

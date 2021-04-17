@@ -23,15 +23,15 @@ public class CubicBezierCurve extends Shape {
   @Override
   public Vector2 nextVector(double t) {
     return p0.scale(Math.pow(1 - t, 3))
-        .add(p1.scale(3 * Math.pow(1 - t, 2) * t))
-        .add(p2.scale(3 * (1 - t) * Math.pow(t, 2)))
-        .add(p3.scale(Math.pow(t, 3)));
+      .add(p1.scale(3 * Math.pow(1 - t, 2) * t))
+      .add(p2.scale(3 * (1 - t) * Math.pow(t, 2)))
+      .add(p3.scale(Math.pow(t, 3)));
   }
 
   @Override
   public CubicBezierCurve rotate(double theta) {
     return new CubicBezierCurve(p0.rotate(theta), p1.rotate(theta), p2.rotate(theta),
-        p3.rotate(theta), weight);
+      p3.rotate(theta), weight);
   }
 
   @Override
@@ -42,13 +42,13 @@ public class CubicBezierCurve extends Shape {
   @Override
   public CubicBezierCurve scale(Vector2 vector) {
     return new CubicBezierCurve(p0.scale(vector), p1.scale(vector), p2.scale(vector),
-        p3.scale(vector), weight);
+      p3.scale(vector), weight);
   }
 
   @Override
   public CubicBezierCurve translate(Vector2 vector) {
     return new CubicBezierCurve(p0.translate(vector), p1.translate(vector), p2.translate(vector),
-        p3.translate(vector), weight);
+      p3.translate(vector), weight);
   }
 
   @Override

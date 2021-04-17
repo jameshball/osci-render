@@ -2,6 +2,7 @@ package sh.ball.parser.svg;
 
 import java.util.ArrayList;
 import java.util.List;
+
 import sh.ball.shapes.CubicBezierCurve;
 import sh.ball.shapes.QuadraticBezierCurve;
 import sh.ball.shapes.Shape;
@@ -15,7 +16,7 @@ class CurveTo {
   // isSmooth should be true for parsing S, s, T, and t commands
   // isSmooth should be false for parsing C, c, Q, and q commands
   private static List<Shape> parseCurveTo(SvgState state, List<Float> args, boolean isAbsolute,
-      boolean isCubic, boolean isSmooth) {
+                                          boolean isCubic, boolean isSmooth) {
     int expectedArgs = isCubic ? 4 : 2;
     if (!isSmooth) {
       expectedArgs += 2;
@@ -34,10 +35,10 @@ class CurveTo {
       if (isSmooth) {
         if (isCubic) {
           controlPoint1 = state.prevCubicControlPoint == null ? state.currPoint
-              : state.prevCubicControlPoint.reflectRelativeToVector(state.currPoint);
+            : state.prevCubicControlPoint.reflectRelativeToVector(state.currPoint);
         } else {
           controlPoint1 = state.prevQuadraticControlPoint == null ? state.currPoint
-              : state.prevQuadraticControlPoint.reflectRelativeToVector(state.currPoint);
+            : state.prevQuadraticControlPoint.reflectRelativeToVector(state.currPoint);
         }
       } else {
         controlPoint1 = new Vector2(args.get(i), args.get(i + 1));
@@ -48,7 +49,7 @@ class CurveTo {
       }
 
       Vector2 newPoint = new Vector2(args.get(i + expectedArgs - 2),
-          args.get(i + expectedArgs - 1));
+        args.get(i + expectedArgs - 1));
 
       if (!isAbsolute) {
         controlPoint1 = state.currPoint.translate(controlPoint1);

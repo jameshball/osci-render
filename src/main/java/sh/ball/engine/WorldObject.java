@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
 import org.jgrapht.Graph;
 import org.jgrapht.alg.connectivity.ConnectivityInspector;
 import org.jgrapht.alg.cycle.ChinesePostman;
@@ -26,7 +27,7 @@ public class WorldObject {
   private Vector3 rotation;
 
   private WorldObject(List<Vector3> objVertices, List<Vector3> vertexPath, Vector3 position,
-      Vector3 rotation) {
+                      Vector3 rotation) {
     this.objVertices = objVertices;
     this.position = position;
     this.rotation = rotation;
@@ -58,7 +59,7 @@ public class WorldObject {
 
   public void getDrawPath(Set<Line3D> edges) {
     Graph<Vector3, DefaultWeightedEdge> graph = new DefaultUndirectedWeightedGraph<>(
-        DefaultWeightedEdge.class);
+      DefaultWeightedEdge.class);
 
     vertexPath = new ArrayList<>();
 
@@ -75,7 +76,7 @@ public class WorldObject {
     }
 
     ConnectivityInspector<Vector3, DefaultWeightedEdge> inspector = new ConnectivityInspector<>(
-        graph);
+      graph);
 
     // Chinese Postman can only be performed on connected graphs, so iterate over all connected
     // sub-graphs.
@@ -142,8 +143,8 @@ public class WorldObject {
 
           for (int i = 0; i < references.size(); i++) {
             edges.add(new Line3D(
-                objVertices.get(references.get(i).vertexIndex),
-                objVertices.get(references.get((i + 1) % references.size()).vertexIndex)
+              objVertices.get(references.get(i).vertexIndex),
+              objVertices.get(references.get((i + 1) % references.size()).vertexIndex)
             ));
           }
         }
@@ -155,6 +156,6 @@ public class WorldObject {
 
   public WorldObject clone() {
     return new WorldObject(new ArrayList<>(objVertices), new ArrayList<>(vertexPath), position,
-        rotation);
+      rotation);
   }
 }

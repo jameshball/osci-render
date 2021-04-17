@@ -139,7 +139,7 @@ public abstract class Shape {
   }
 
   public static List<Shape> generatePolygram(int sides, int angleJump, Vector2 start,
-      double weight) {
+                                             double weight) {
     List<Shape> polygon = new ArrayList<>();
 
     double theta = angleJump * 2 * Math.PI / sides;
@@ -160,7 +160,7 @@ public abstract class Shape {
   }
 
   public static List<Shape> generatePolygram(int sides, int angleJump, double scale,
-      double weight) {
+                                             double weight) {
     return generatePolygram(sides, angleJump, new Vector2(scale, scale), weight);
   }
 
@@ -186,9 +186,9 @@ public abstract class Shape {
 
   public static double totalLength(List<? extends Shape> shapes) {
     return shapes
-        .stream()
-        .map(Shape::getLength)
-        .reduce(Double::sum)
-        .orElse(0d);
+      .stream()
+      .map(Shape::getLength)
+      .reduce(Double::sum)
+      .orElse(0d);
   }
 }

@@ -21,7 +21,7 @@ public class QuadraticBezierCurve extends Shape {
   @Override
   public Vector2 nextVector(double t) {
     return p1.add(p0.sub(p1).scale(Math.pow(1 - t, 2)))
-        .add(p2.sub(p1).scale(Math.pow(t, 2)));
+      .add(p2.sub(p1).scale(Math.pow(t, 2)));
   }
 
   @Override
@@ -42,7 +42,7 @@ public class QuadraticBezierCurve extends Shape {
   @Override
   public QuadraticBezierCurve translate(Vector2 vector) {
     return new QuadraticBezierCurve(p0.translate(vector), p1.translate(vector),
-        p2.translate(vector), weight);
+      p2.translate(vector), weight);
   }
 
   @Override

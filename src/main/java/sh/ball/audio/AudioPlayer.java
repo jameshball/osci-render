@@ -50,7 +50,8 @@ public class AudioPlayer implements MovableRenderer<List<Shape>, Vector2> {
 
   private volatile boolean stopped;
 
-  public AudioPlayer() {}
+  public AudioPlayer() {
+  }
 
   public AudioPlayer(double rotateSpeed, double translateSpeed, Vector2 translateVector, double scale, double weight) {
     setRotationSpeed(rotateSpeed);

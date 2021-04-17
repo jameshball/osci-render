@@ -4,6 +4,7 @@ import sh.ball.FrameSet;
 import sh.ball.engine.Camera;
 import sh.ball.engine.Vector3;
 import sh.ball.engine.WorldObject;
+
 import java.io.IOException;
 import java.util.List;
 
@@ -22,7 +23,7 @@ public class ObjParser extends FileParser<FrameSet<List<Shape>>> {
   private WorldObject object;
 
   public ObjParser(String path, float rotateSpeed, float cameraX, float cameraY, float cameraZ,
-      float focalLength, boolean isDefaultPosition) {
+                   float focalLength, boolean isDefaultPosition) {
     rotateSpeed *= Math.PI / 1000;
     checkFileExtension(path);
     this.filePath = path;
@@ -32,8 +33,12 @@ public class ObjParser extends FileParser<FrameSet<List<Shape>>> {
     this.rotation = new Vector3(0, rotateSpeed, rotateSpeed);
   }
 
-  public ObjParser(String path, float focalLength) throws IOException {
+  public ObjParser(String path, float focalLength) {
     this(path, DEFAULT_ROTATE_SPEED, 0, 0, 0, focalLength, true);
+  }
+
+  public ObjParser(String path) {
+    this(path, (float) Camera.DEFAULT_FOCAL_LENGTH);
   }
 
   @Override

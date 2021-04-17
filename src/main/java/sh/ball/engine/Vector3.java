@@ -35,47 +35,47 @@ public final class Vector3 {
 
   public Vector3 add(Vector3 other) {
     return new Vector3(
-        getX() + other.getX(),
-        getY() + other.getY(),
-        getZ() + other.getZ()
+      getX() + other.getX(),
+      getY() + other.getY(),
+      getZ() + other.getZ()
     );
   }
 
   public Vector3 scale(double factor) {
     return new Vector3(
-        getX() * factor,
-        getY() * factor,
-        getZ() * factor
+      getX() * factor,
+      getY() * factor,
+      getZ() * factor
     );
   }
 
   public Vector3 rotate(Vector3 rotation) {
     return rotateX(rotation.getX())
-        .rotateY(rotation.getY())
-        .rotateZ(rotation.getZ());
+      .rotateY(rotation.getY())
+      .rotateZ(rotation.getZ());
   }
 
   public Vector3 rotateX(double theta) {
     return new Vector3(
-        getX(),
-        Math.cos(theta) * getY() - Math.sin(theta) * getZ(),
-        Math.sin(theta) * getY() + Math.cos(theta) * getZ()
+      getX(),
+      Math.cos(theta) * getY() - Math.sin(theta) * getZ(),
+      Math.sin(theta) * getY() + Math.cos(theta) * getZ()
     );
   }
 
   public Vector3 rotateY(double theta) {
     return new Vector3(
-        Math.cos(theta) * getX() + Math.sin(theta) * getZ(),
-        getY(),
-        -Math.sin(theta) * getX() + Math.cos(theta) * getZ()
+      Math.cos(theta) * getX() + Math.sin(theta) * getZ(),
+      getY(),
+      -Math.sin(theta) * getX() + Math.cos(theta) * getZ()
     );
   }
 
   public Vector3 rotateZ(double theta) {
     return new Vector3(
-        Math.cos(theta) * getX() - Math.sin(theta) * getY(),
-        Math.sin(theta) * getX() + Math.cos(theta) * getY(),
-        getZ()
+      Math.cos(theta) * getX() - Math.sin(theta) * getY(),
+      Math.sin(theta) * getX() + Math.cos(theta) * getY(),
+      getZ()
     );
   }
 
@@ -102,7 +102,7 @@ public final class Vector3 {
       return false;
     }
     Vector3 point = (Vector3) obj;
-    return x == point.x && y == point.y && z== point.z;
+    return x == point.x && y == point.y && z == point.z;
   }
 
   @Override
@@ -117,9 +117,9 @@ public final class Vector3 {
   @Override
   public String toString() {
     return "Vector3{" +
-        "x=" + x +
-        ", y=" + y +
-        ", z=" + z +
-        '}';
+      "x=" + x +
+      ", y=" + y +
+      ", z=" + z +
+      '}';
   }
 }

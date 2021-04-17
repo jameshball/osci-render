@@ -2,6 +2,7 @@ package sh.ball.engine;
 
 import java.util.HashMap;
 import java.util.Map;
+
 import sh.ball.shapes.Line;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
@@ -66,7 +67,7 @@ public class Camera {
   // clipping on edges of the oscilloscope screen.
   private List<Vector2> sampleVerticesInRender(WorldObject object) {
     Vector3 rotation = new Vector3(0, 2 * Math.PI / SAMPLE_RENDER_SAMPLES,
-        2 * Math.PI / SAMPLE_RENDER_SAMPLES);
+      2 * Math.PI / SAMPLE_RENDER_SAMPLES);
     WorldObject clone = object.clone();
     List<Vector2> vertices = new ArrayList<>();
 
@@ -80,10 +81,10 @@ public class Camera {
 
   private static double maxVertexValue(List<Vector2> vertices) {
     return vertices
-        .stream()
-        .map((vec) -> Math.max(Math.abs(vec.getX()), Math.abs(vec.getY())))
-        .max(Double::compareTo)
-        .orElse(Double.POSITIVE_INFINITY);
+      .stream()
+      .map((vec) -> Math.max(Math.abs(vec.getX()), Math.abs(vec.getY())))
+      .max(Double::compareTo)
+      .orElse(Double.POSITIVE_INFINITY);
   }
 
   public Vector3 getPos() {
@@ -106,8 +107,8 @@ public class Camera {
     double oldFocalLength = focalLength;
 
     return new Vector2(
-        vertex.getX() * oldFocalLength / (vertex.getZ() - pos.getZ()) + pos.getX(),
-        vertex.getY() * oldFocalLength / (vertex.getZ() - pos.getZ()) + pos.getY()
+      vertex.getX() * oldFocalLength / (vertex.getZ() - pos.getZ()) + pos.getX(),
+      vertex.getY() * oldFocalLength / (vertex.getZ() - pos.getZ()) + pos.getY()
     );
   }
 
@@ -116,8 +117,8 @@ public class Camera {
 
     for (int i = 0; i < vertexPath.size(); i += 2) {
       lines.add(new Line(
-          projectionMap.get(vertexPath.get(i)),
-          projectionMap.get(vertexPath.get(i + 1))
+        projectionMap.get(vertexPath.get(i)),
+        projectionMap.get(vertexPath.get(i + 1))
       ));
     }
 
