@@ -49,7 +49,7 @@ public class ObjParser extends FileParser<FrameSet<List<Shape>>> {
       camera.findZPos(object);
     }
 
-    return new ObjFrameSet(object, camera, rotation);
+    return new ObjFrameSet(object, camera, rotation, isDefaultPosition);
   }
 
   @Override

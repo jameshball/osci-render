@@ -17,4 +17,7 @@ public class ShapeFrameSet implements FrameSet<List<Shape>> {
   public List<Shape> next() {
     return shapes;
   }
+
+  @Override
+  public void setFrameSettings(Object settings) {}
 }
