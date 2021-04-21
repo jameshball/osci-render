@@ -1,12 +1,16 @@
-module sh.ball {
+module oscirender {
   requires javafx.controls;
+  requires javafx.controls.exposed;
   requires javafx.graphics;
+  requires javafx.graphics.exposed;
   requires javafx.fxml;
+  requires javafx.fxml.exposed;
+  requires javafx.base.exposed;
   requires xt.audio;
   requires java.xml;
-  requires org.jsoup;
   requires java.data.front;
   requires org.jgrapht.core;
+  requires org.unbescape.html;
 
   opens sh.ball.gui;
 }

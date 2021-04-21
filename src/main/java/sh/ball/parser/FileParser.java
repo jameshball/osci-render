@@ -1,11 +1,9 @@
 package sh.ball.parser;
 
 import java.io.IOException;
-import java.util.List;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.xml.sax.SAXException;
-import sh.ball.shapes.Shape;
 
 public abstract class FileParser<T> {
 
