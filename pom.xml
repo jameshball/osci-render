@@ -7,25 +7,211 @@
     <groupId>sh.ball</groupId>
     <artifactId>osci-render</artifactId>
     <version>1.0</version>
+
+    <name>osci-render</name>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>15</maven.compiler.release>
+        <javafx.version>15.0.1</javafx.version>
+        <project.modulePath>${project.build.directory}\modules</project.modulePath>
+        <appModule>oscirender</appModule>
+        <appMainClass>sh.ball.gui.Gui</appMainClass>
+    </properties>
+
     <build>
         <plugins>
             <plugin>
-                <groupId>org.openjfx</groupId>
-                <artifactId>javafx-maven-plugin</artifactId>
-                <version>0.0.5</version>
-                <configuration>
-                    <mainClass>Gui</mainClass>
-                </configuration>
+                <artifactId>maven-clean-plugin</artifactId>
+                <version>2.4.1</version>
+                <executions>
+                    <execution>
+                        <id>auto-clean</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>default-jar</id>
+                        <phase>none</phase>
+                        <configuration>
+                            <finalName>unwanted</finalName>
+                            <classifier>unwanted</classifier>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.1.2</version>
+                <executions>
+                    <execution>
+                        <id>copy-dependencies</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/modules</outputDirectory>
+                            <overWriteReleases>true</overWriteReleases>
+                            <overWriteSnapshots>true</overWriteSnapshots>
+                            <overWriteIfNewer>true</overWriteIfNewer>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.8.1</version>
                 <configuration>
-                    <source>15</source>
-                    <target>15</target>
-                    <compilerArgs>--enable-preview</compilerArgs>
+                    <source>${maven.compiler.release}</source>
+                    <target>${maven.compiler.release}</target>
+                    <compilerArgs>
+                        <compilerArg>--enable-preview</compilerArg>
+                        <compilerArg>--module-path</compilerArg>
+                        <compilerArg>${project.modulePath}</compilerArg>
+                    </compilerArgs>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.panteleyev</groupId>
+                <artifactId>jpackage-maven-plugin</artifactId>
+                <version>1.4.0</version>
+
+                <configuration>
+                    <name>osci-render</name>
+                    <appVersion>${project.version}</appVersion>
+                    <vendor>james.ball.sh</vendor>
+                    <module>${appModule}/${appMainClass}</module>
+                    <modulePath>${project.build.directory}/modules;${project.build.directory}/classes</modulePath>
+                    <destination>${project.build.directory}</destination>
+                    <javaOptions>
+                        <option>--enable-preview</option>
+                        <option>-Dfile.encoding=UTF-8</option>
+                    </javaOptions>
+                </configuration>
+
+                <executions>
+                    <execution>
+                        <id>win</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jpackage</goal>
+                        </goals>
+                        <configuration>
+                            <!--icon>icons/icon.ico</icon-->
+                            <winMenu>true</winMenu>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.moditect</groupId>
+                <artifactId>moditect-maven-plugin</artifactId>
+                <version>1.0.0.Beta2</version>
+                <executions>
+                    <execution>
+                        <id>add-module-infos</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>add-module-info</goal>
+                        </goals>
+                        <configuration>
+                            <overwriteExistingFiles>true</overwriteExistingFiles>
+                            <outputDirectory>${project.build.directory}/modules</outputDirectory>
+                            <modules>
+                                <module>
+                                    <artifact>
+                                        <groupId>org.unbescape</groupId>
+                                        <artifactId>unbescape</artifactId>
+                                        <version>1.1.6.RELEASE</version>
+                                    </artifact>
+                                    <moduleInfo>
+                                        <name>org.unbescape.html</name>
+                                    </moduleInfo>
+                                </module>
+                                <module>
+                                    <artifact>
+                                        <groupId>com.github.mokiat</groupId>
+                                        <artifactId>java-data-front</artifactId>
+                                        <version>2.0.0</version>
+                                    </artifact>
+                                    <moduleInfo>
+                                        <name>java.data.front</name>
+                                    </moduleInfo>
+                                </module>
+                                <module>
+                                    <artifact>
+                                        <groupId>org.openjfx</groupId>
+                                        <artifactId>javafx-controls</artifactId>
+                                        <version>${javafx.version}</version>
+                                    </artifact>
+                                    <moduleInfo>
+                                        <name>javafx.controls.exposed</name>
+                                    </moduleInfo>
+                                </module>
+                                <module>
+                                    <artifact>
+                                        <groupId>org.openjfx</groupId>
+                                        <artifactId>javafx-fxml</artifactId>
+                                        <version>${javafx.version}</version>
+                                    </artifact>
+                                    <moduleInfo>
+                                        <name>javafx.fxml.exposed</name>
+                                    </moduleInfo>
+                                </module>
+                                <module>
+                                    <artifact>
+                                        <groupId>org.openjfx</groupId>
+                                        <artifactId>javafx-graphics</artifactId>
+                                        <version>${javafx.version}</version>
+                                    </artifact>
+                                    <moduleInfo>
+                                        <name>javafx.graphics.exposed</name>
+                                    </moduleInfo>
+                                </module>
+                                <module>
+                                    <artifact>
+                                        <groupId>org.openjfx</groupId>
+                                        <artifactId>javafx-base</artifactId>
+                                        <version>${javafx.version}</version>
+                                    </artifact>
+                                    <moduleInfo>
+                                        <name>javafx.base.exposed</name>
+                                    </moduleInfo>
+                                </module>
+                                <module>
+                                    <artifact>
+                                        <groupId>net.java.dev.jna</groupId>
+                                        <artifactId>jna</artifactId>
+                                        <version>5.6.0</version>
+                                    </artifact>
+                                    <moduleInfo>
+                                        <name>com.sun.jna</name>
+                                    </moduleInfo>
+                                </module>
+                                <module>
+                                    <artifact>
+                                        <groupId>org.jheaps</groupId>
+                                        <artifactId>jheaps</artifactId>
+                                        <version>0.13</version>
+                                    </artifact>
+                                    <moduleInfo>
+                                        <name>org.jheaps</name>
+                                    </moduleInfo>
+                                </module>
+                            </modules>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
@@ -37,29 +223,27 @@
         </repository>
     </repositories>
     <dependencies>
-
         <!-- https://sjoerdvankreel.github.io/xt-audio/ -->
         <dependency>
             <groupId>com.github.sjoerdvankreel</groupId>
             <artifactId>xt.audio</artifactId>
             <version>1.9</version>
         </dependency>
-
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-fxml</artifactId>
-            <version>11.0.1</version>
+            <version>${javafx.version}</version>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
-            <version>15.0.1</version>
+            <version>${javafx.version}</version>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/org.jsoup/jsoup -->
+        <!-- https://mvnrepository.com/artifact/org.unbescape/unbescape -->
         <dependency>
-            <groupId>org.jsoup</groupId>
-            <artifactId>jsoup</artifactId>
-            <version>1.13.1</version>
+            <groupId>org.unbescape</groupId>
+            <artifactId>unbescape</artifactId>
+            <version>1.1.6.RELEASE</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/org.jgrapht/jgrapht-core -->
         <dependency>
@@ -67,26 +251,11 @@
             <artifactId>jgrapht-core</artifactId>
             <version>1.5.0</version>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/net.java.dev.jna/jna -->
-        <dependency>
-            <groupId>net.java.dev.jna</groupId>
-            <artifactId>jna</artifactId>
-            <version>5.6.0</version>
-        </dependency>
-
         <dependency>
             <groupId>com.github.mokiat</groupId>
             <artifactId>java-data-front</artifactId>
             <version>2.0.0</version>
         </dependency>
-        <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>4.13.1</version>
-            <scope>test</scope>
-        </dependency>
 
     </dependencies>
-
-
 </project>

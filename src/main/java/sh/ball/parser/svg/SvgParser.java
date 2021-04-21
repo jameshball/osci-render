@@ -16,7 +16,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.xml.parsers.ParserConfigurationException;
 
-import org.jsoup.Jsoup;
+import org.unbescape.html.HtmlEscape;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.xml.sax.SAXException;
@@ -148,7 +148,7 @@ public class SvgParser extends FileParser<FrameSet<List<Shape>>> {
 
       /* Removes all html escaped characters, allowing it to be directly compared to the unicode
        * parameter. */
-      String decodedString = Jsoup.parse(unicodeString).text();
+      String decodedString = HtmlEscape.unescapeHtml(unicodeString);
 
       if (String.valueOf(unicode).equals(decodedString)) {
         return parsePath(getNodeValue(node, "d"));
