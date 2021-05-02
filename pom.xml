@@ -107,8 +107,9 @@
                             <goal>jpackage</goal>
                         </goals>
                         <configuration>
-                            <!--icon>icons/icon.ico</icon-->
+                            <icon>icon.ico</icon>
                             <winMenu>true</winMenu>
+                            <winMenuGroup>osci-render</winMenuGroup>
                         </configuration>
                     </execution>
                 </executions>
