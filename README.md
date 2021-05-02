@@ -1,5 +1,3 @@
-# osci-render
-
 <p align="center">
   <img width="512" height="256" src="osci.png" />
 </p>
