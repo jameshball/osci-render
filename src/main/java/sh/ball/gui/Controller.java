@@ -6,6 +6,7 @@ import sh.ball.audio.FrameProducer;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.util.List;
 import java.util.Map;
@@ -31,13 +32,12 @@ import sh.ball.engine.Vector3;
 import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.ParserFactory;
-import sh.ball.parser.txt.TextParser;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
 public class Controller implements Initializable {
 
-  private static final String DEFAULT_FILE = TextParser.class.getResource("/models/cube.obj").getPath();
+  private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
 
   private final FileChooser fileChooser = new FileChooser();
   private final MovableRenderer<List<Shape>, Vector2> renderer = new AudioPlayer();
@@ -45,7 +45,7 @@ public class Controller implements Initializable {
 
   private FrameProducer<List<Shape>> producer = new FrameProducer<>(
     renderer,
-    ParserFactory.getParser(DEFAULT_FILE)
+    new ObjParser(DEFAULT_OBJ)
   );
 
   private Stage stage;
