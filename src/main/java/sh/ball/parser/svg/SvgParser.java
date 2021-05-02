@@ -5,7 +5,10 @@ import static sh.ball.parser.XmlUtil.getAttributesOnTags;
 import static sh.ball.parser.XmlUtil.getNodeValue;
 import static sh.ball.parser.XmlUtil.getXMLDocument;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -30,16 +33,20 @@ public class SvgParser extends FileParser<FrameSet<List<Shape>>> {
 
   private final Map<Character, Function<List<Float>, List<Shape>>> commandMap;
   private final SvgState state;
-  private final String filePath;
+  private final InputStream input;
 
   private Document svg;
 
-  public SvgParser(String path) {
-    checkFileExtension(path);
-    this.filePath = path;
+  public SvgParser(InputStream input) {
+    this.input = input;
     this.state = new SvgState();
     this.commandMap = new HashMap<>();
     initialiseCommandMap();
+  }
+
+  public SvgParser(String path) throws FileNotFoundException {
+    this(new FileInputStream(path));
+    checkFileExtension(path);
   }
 
   // Map command chars to function calls.
@@ -120,7 +127,7 @@ public class SvgParser extends FileParser<FrameSet<List<Shape>>> {
   @Override
   public FrameSet<List<Shape>> parse()
     throws ParserConfigurationException, IOException, SAXException, IllegalArgumentException {
-    this.svg = getXMLDocument(filePath);
+    this.svg = getXMLDocument(input);
     List<Node> svgElem = asList(svg.getElementsByTagName("svg"));
     List<Shape> shapes = new ArrayList<>();
 
@@ -195,11 +202,6 @@ public class SvgParser extends FileParser<FrameSet<List<Shape>>> {
     }
 
     return svgShapes;
-  }
-
-  @Override
-  public String getFilePath() {
-    return filePath;
   }
 
   public static boolean isSvgFile(String path) {

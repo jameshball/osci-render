@@ -2,6 +2,7 @@ package sh.ball.parser;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -49,7 +50,7 @@ public final class XmlUtil {
     return attribute == null ? null : attribute.getNodeValue();
   }
 
-  public static Document getXMLDocument(String path)
+  public static Document getXMLDocument(InputStream input)
     throws IOException, SAXException, ParserConfigurationException {
     // Opens XML reader for svg file.
     DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -63,9 +64,8 @@ public final class XmlUtil {
     factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
 
     DocumentBuilder builder = factory.newDocumentBuilder();
-    File file = new File(path);
 
-    return builder.parse(file);
+    return builder.parse(input);
   }
 
   public static List<Node> getAttributesOnTags(Document xml, String tagName, String attribute) {

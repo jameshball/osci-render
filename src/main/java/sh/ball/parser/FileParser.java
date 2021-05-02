@@ -22,6 +22,4 @@ public abstract class FileParser<T> {
 
   public abstract T parse()
     throws ParserConfigurationException, IOException, SAXException, IllegalArgumentException;
-
-  public abstract String getFilePath();
 }

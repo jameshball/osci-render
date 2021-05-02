@@ -38,13 +38,13 @@ public class WorldObject {
     this(objVertices, new ArrayList<>(), position, rotation);
   }
 
-  public WorldObject(String filename, Vector3 position, Vector3 rotation) throws IOException {
+  public WorldObject(InputStream input, Vector3 position, Vector3 rotation) throws IOException {
     this(new ArrayList<>(), position, rotation);
-    getDrawPath(loadFromFile(filename));
+    getDrawPath(loadFromInput(input));
   }
 
-  public WorldObject(String filename) throws IOException {
-    this(filename, new Vector3(), new Vector3());
+  public WorldObject(InputStream input) throws IOException {
+    this(input, new Vector3(), new Vector3());
   }
 
   public List<Vector3> getVertexPath() {
@@ -118,14 +118,12 @@ public class WorldObject {
     return newVertices;
   }
 
-  private Set<Line3D> loadFromFile(String filename) {
+  private Set<Line3D> loadFromInput(InputStream input) {
     OBJModel model;
 
     try {
-      InputStream in = new FileInputStream(filename);
-
       IOBJParser parser = new OBJParser();
-      model = parser.parse(in);
+      model = parser.parse(input);
     } catch (IOException e) {
       return Set.of();
     }
