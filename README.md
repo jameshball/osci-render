@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="512" height="256" src="osci.png" />
+  <img width="267" height="256" src="osci.png" />
 </p>
 
 Program for drawing objects, text, and images on an oscilloscope using audio output.
