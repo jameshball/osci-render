@@ -21,11 +21,11 @@ jobs:
         mvn -B package
         $version= mvn help:evaluate -Dexpression="project.version" -q -DforceStdout
         echo "VERSION=$version" >> $env:GITHUB_ENV
-        echo "Release version $version" > ${{ github.workflow }}-CHANGELOG.txt
+        echo "Release version $version" > CHANGELOG
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
-        body_path: ${{ github.workflow }}-CHANGELOG.txt
+        body_path: CHANGELOG
         tag_name: v${{ env.VERSION }}
         files: target/osci-render-${{ env.VERSION }}.exe
       env:
