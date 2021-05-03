@@ -11,6 +11,7 @@ module oscirender {
   requires java.data.front;
   requires org.jgrapht.core;
   requires org.unbescape.html;
+  requires java.desktop;
 
   opens sh.ball.gui;
 }

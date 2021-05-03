@@ -4,6 +4,7 @@ import sh.ball.MovableRenderer;
 import sh.ball.audio.AudioPlayer;
 import sh.ball.audio.FrameProducer;
 
+import java.awt.geom.RoundRectangle2D;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,6 +30,7 @@ import javax.xml.parsers.ParserConfigurationException;
 
 import org.xml.sax.SAXException;
 import sh.ball.engine.Vector3;
+import sh.ball.shapes.ShapeFrameSet;
 import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.ParserFactory;
@@ -45,7 +47,7 @@ public class Controller implements Initializable {
 
   private FrameProducer<List<Shape>> producer = new FrameProducer<>(
     renderer,
-    new ObjParser(DEFAULT_OBJ)
+    new ObjParser(DEFAULT_OBJ).parse()
   );
 
   private Stage stage;
@@ -87,7 +89,7 @@ public class Controller implements Initializable {
   @FXML
   private TextField cameraZTextField;
 
-  public Controller() throws ParserConfigurationException, SAXException, IOException {
+  public Controller() throws IOException {
   }
 
   private Map<Slider, SliderUpdater<Double>> initializeSliderMap() {
@@ -164,7 +166,7 @@ public class Controller implements Initializable {
       String path = file.getAbsolutePath();
       producer = new FrameProducer<>(
         renderer,
-        ParserFactory.getParser(path)
+        ParserFactory.getParser(path).parse()
       );
       executor.submit(producer);
 

@@ -25,7 +25,7 @@ import org.w3c.dom.Node;
 import org.xml.sax.SAXException;
 import sh.ball.FrameSet;
 import sh.ball.parser.FileParser;
-import sh.ball.parser.ShapeFrameSet;
+import sh.ball.shapes.ShapeFrameSet;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
