@@ -1,5 +1,7 @@
 package sh.ball.shapes;
 
+import java.awt.geom.AffineTransform;
+import java.awt.geom.PathIterator;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,6 +33,52 @@ public abstract class Shape {
   }
 
   /* SHAPE HELPER FUNCTIONS */
+
+  public static List<Shape> convert(java.awt.Shape shape) {
+    List<Shape> shapes = new ArrayList<>();
+    Vector2 moveToPoint = new Vector2();
+    Vector2 currentPoint = new Vector2();
+    float[] coords = new float[6];
+
+    PathIterator pathIterator = shape.getPathIterator(new AffineTransform());
+    while (!pathIterator.isDone()) {
+      switch (pathIterator.currentSegment(coords)) {
+        case PathIterator.SEG_MOVETO -> {
+          currentPoint = new Vector2(coords[0], coords[1]);
+          moveToPoint = currentPoint;
+        }
+        case PathIterator.SEG_LINETO -> {
+          shapes.add(new Line(
+            currentPoint,
+            new Vector2(coords[0], coords[1])
+          ));
+          currentPoint = new Vector2(coords[0], coords[1]);
+        }
+        case PathIterator.SEG_QUADTO -> {
+          shapes.add(new QuadraticBezierCurve(
+            currentPoint,
+            new Vector2(coords[0], coords[1]),
+            new Vector2(coords[2], coords[3])
+          ));
+          currentPoint = new Vector2(coords[2], coords[3]);
+        }
+        case PathIterator.SEG_CUBICTO -> {
+          shapes.add(new CubicBezierCurve(
+            currentPoint,
+            new Vector2(coords[0], coords[1]),
+            new Vector2(coords[2], coords[3]),
+            new Vector2(coords[4], coords[5])
+          ));
+          currentPoint = new Vector2(coords[4], coords[5]);
+        }
+        case PathIterator.SEG_CLOSE ->
+          shapes.add(new Line(currentPoint, moveToPoint));
+      }
+      pathIterator.next();
+    }
+
+    return shapes;
+  }
 
   // Normalises sh.ball.shapes between the coords -1 and 1 for proper scaling on an oscilloscope. May not
   // work perfectly with curves that heavily deviate from their start and end points.

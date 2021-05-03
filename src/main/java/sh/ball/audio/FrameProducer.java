@@ -1,14 +1,7 @@
 package sh.ball.audio;
 
-import org.xml.sax.SAXException;
 import sh.ball.FrameSet;
 import sh.ball.Renderer;
-
-import java.io.IOException;
-
-import sh.ball.parser.FileParser;
-
-import javax.xml.parsers.ParserConfigurationException;
 
 public class FrameProducer<T> implements Runnable {
 
@@ -17,9 +10,9 @@ public class FrameProducer<T> implements Runnable {
 
   private boolean running;
 
-  public FrameProducer(Renderer<T> renderer, FileParser<FrameSet<T>> parser) throws IOException, SAXException, ParserConfigurationException {
+  public FrameProducer(Renderer<T> renderer, FrameSet<T> frames) {
     this.renderer = renderer;
-    this.frames = parser.parse();
+    this.frames = frames;
   }
 
   @Override
