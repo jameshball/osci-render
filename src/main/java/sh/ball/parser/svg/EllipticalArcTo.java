@@ -1,5 +1,6 @@
 package sh.ball.parser.svg;
 
+import java.awt.geom.AffineTransform;
 import java.awt.geom.Arc2D;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,8 +26,6 @@ class EllipticalArcTo {
 
       newPoint = isAbsolute ? newPoint : state.currPoint.translate(newPoint);
 
-      System.out.println(args.get(i + 2));
-
       arcs.addAll(createArc(
         state.currPoint,
         args.get(i),
@@ -51,11 +50,11 @@ class EllipticalArcTo {
     if (rx == 0 || ry == 0) {
       return List.of(new Line(start, end));
     }
-    double x0 = start.getX();
-    double y0 = start.getY();
+    double x1 = start.getX();
+    double y1 = start.getY();
     // Compute the half distance between the current and the final point
-    double dx2 = (x0 - x2) / 2.0f;
-    double dy2 = (y0 - y2) / 2.0f;
+    double dx2 = (x1 - x2) / 2.0;
+    double dy2 = (y1 - y2) / 2.0;
     // Convert theta from degrees to radians
     theta = (float) Math.toRadians(theta % 360);
 
@@ -69,9 +68,9 @@ class EllipticalArcTo {
     ry = Math.abs(ry);
     double Prx = rx * rx;
     double Pry = ry * ry;
-    double Px1 = x1prime * x1prime;
-    double Py1 = y1prime * y1prime;
-    double d = Px1 / Prx + Py1 / Pry;
+    double Px1prime = x1prime * x1prime;
+    double Py1prime = y1prime * y1prime;
+    double d = Px1prime / Prx + Py1prime / Pry;
     if (d > 1) {
       rx = Math.abs(Math.sqrt(d) * rx);
       ry = Math.abs(Math.sqrt(d) * ry);
@@ -83,16 +82,18 @@ class EllipticalArcTo {
     // Step 2 : Compute (cx', cy')
     //
     double sign = (largeArcFlag == sweepFlag) ? -1.0 : 1.0;
+    // Forcing the inner term to be positive. It should be >= 0 but can sometimes be negative due
+    // to double precision.
     double coef = sign *
-      Math.sqrt(((Prx * Pry) - (Prx * Py1) - (Pry * Px1)) / ((Prx * Py1) + (Pry * Px1)));
+      Math.sqrt(Math.abs((Prx * Pry) - (Prx * Py1prime) - (Pry * Px1prime)) / ((Prx * Py1prime) + (Pry * Px1prime)));
     double cxprime = coef * ((rx * y1prime) / ry);
     double cyprime = coef * -((ry * x1prime) / rx);
 
     //
     // Step 3 : Compute (cx, cy) from (cx', cy')
     //
-    double sx2 = (x0 + x2) / 2.0f;
-    double sy2 = (y0 + y2) / 2.0f;
+    double sx2 = (x1 + x2) / 2.0;
+    double sy2 = (y1 + y2) / 2.0;
     double cx = sx2 + Math.cos(theta) * cxprime - Math.sin(theta) * cyprime;
     double cy = sy2 + Math.sin(theta) * cxprime + Math.cos(theta) * cyprime;
 
@@ -125,12 +126,14 @@ class EllipticalArcTo {
     Arc2D.Float arc = new Arc2D.Float();
     arc.x = (float) (cx - rx);
     arc.y = (float) (cy - ry);
-    arc.width = (float) (rx * 2.0f);
-    arc.height = (float) (ry * 2.0f);
+    arc.width = (float) (rx * 2.0);
+    arc.height = (float) (ry * 2.0);
     arc.start = (float) -angleStart;
     arc.extent = (float) -angleExtent;
 
-    return Shape.convert(arc);
+    AffineTransform transform = AffineTransform.getRotateInstance(theta, arc.getX() + arc.getWidth()/2, arc.getY() + arc.getHeight()/2);
+
+    return Shape.convert(transform.createTransformedShape(arc));
   }
 
   static List<Shape> absolute(SvgState state, List<Float> args) {
