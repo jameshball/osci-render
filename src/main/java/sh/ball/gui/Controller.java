@@ -4,7 +4,6 @@ import sh.ball.MovableRenderer;
 import sh.ball.audio.AudioPlayer;
 import sh.ball.audio.FrameProducer;
 
-import java.awt.geom.RoundRectangle2D;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,7 +29,6 @@ import javax.xml.parsers.ParserConfigurationException;
 
 import org.xml.sax.SAXException;
 import sh.ball.engine.Vector3;
-import sh.ball.shapes.ShapeFrameSet;
 import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.ParserFactory;
