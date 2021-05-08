@@ -1,7 +1,8 @@
 package sh.ball.gui;
 
-import sh.ball.MovableRenderer;
+import javafx.scene.control.*;
 import sh.ball.audio.AudioPlayer;
+import sh.ball.audio.Effect;
 import sh.ball.audio.FrameProducer;
 
 import java.io.File;
@@ -17,11 +18,6 @@ import java.util.concurrent.Executors;
 import javafx.beans.InvalidationListener;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.Slider;
-import javafx.scene.control.TextField;
-import javafx.scene.control.TitledPane;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
@@ -40,7 +36,8 @@ public class Controller implements Initializable {
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
 
   private final FileChooser fileChooser = new FileChooser();
-  private final MovableRenderer<List<Shape>, Vector2> renderer = new AudioPlayer();
+  // TODO: Reduce coupling on AudioPlayer
+  private final AudioPlayer renderer = new AudioPlayer();
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
   private FrameProducer<List<Shape>> producer = new FrameProducer<>(
@@ -86,6 +83,8 @@ public class Controller implements Initializable {
   private TextField cameraYTextField;
   @FXML
   private TextField cameraZTextField;
+  @FXML
+  private CheckBox vectorCancellingCheckBox;
 
   public Controller() throws IOException {
   }
@@ -135,6 +134,11 @@ public class Controller implements Initializable {
     cameraYTextField.textProperty().addListener(cameraPosUpdate);
     cameraZTextField.textProperty().addListener(cameraPosUpdate);
 
+    vectorCancellingCheckBox.selectedProperty().addListener((o, old, checked) ->
+      updateEffect(EffectType.VECTOR_CANCELLING, checked,
+        ((count, v) -> count % 2 == 0 ? v.scale(-1) : v))
+    );
+
     chooseFileButton.setOnAction(e -> {
       File file = fileChooser.showOpenDialog(stage);
       if (file != null) {
@@ -155,6 +159,14 @@ public class Controller implements Initializable {
       return Double.parseDouble(value);
     } catch (NumberFormatException e) {
       return 0;
+    }
+  }
+
+  private void updateEffect(EffectType type, boolean checked, Effect effect) {
+    if (checked) {
+      renderer.addEffect(type, effect);
+    } else {
+      renderer.removeEffect(type);
     }
   }
 

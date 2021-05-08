@@ -1,7 +1,7 @@
 package sh.ball.parser;
 
 import org.xml.sax.SAXException;
-import sh.ball.FrameSet;
+import sh.ball.audio.FrameSet;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.svg.SvgParser;
 import sh.ball.parser.txt.TextParser;

@@ -22,6 +22,7 @@ public class Gui extends Application {
     stage.getIcons().add(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/icons/icon.png"))));
     stage.setTitle("osci-render");
     stage.setScene(new Scene(root));
+    stage.setResizable(false);
 
     controller.setStage(stage);
 
