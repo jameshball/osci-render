@@ -1,6 +1,5 @@
 package sh.ball.audio;
 
-import sh.ball.MovableRenderer;
 import xt.audio.Enums.XtSample;
 import xt.audio.Enums.XtSetup;
 import xt.audio.Enums.XtSystem;
@@ -18,6 +17,9 @@ import xt.audio.XtSafeBuffer;
 import xt.audio.XtService;
 import xt.audio.XtStream;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
@@ -26,7 +28,7 @@ import sh.ball.shapes.Vector2;
 
 import java.util.List;
 
-public class AudioPlayer implements MovableRenderer<List<Shape>, Vector2> {
+public class AudioPlayer implements Renderer<List<Shape>> {
 
   private static final int SAMPLE_RATE = 192000;
   private static final int BUFFER_SIZE = 20;
@@ -36,6 +38,7 @@ public class AudioPlayer implements MovableRenderer<List<Shape>, Vector2> {
   private final XtFormat FORMAT = new XtFormat(MIX, CHANNELS);
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
 
+  private Map<Object, Effect> effects = new HashMap<>();
   private List<Shape> frame;
   private int currentShape = 0;
   private int audioFramesDrawn = 0;
@@ -76,7 +79,7 @@ public class AudioPlayer implements MovableRenderer<List<Shape>, Vector2> {
 
       double totalAudioFrames = shape.getWeight() * shape.getLength();
       double drawingProgress = totalAudioFrames == 0 ? 1 : audioFramesDrawn / totalAudioFrames;
-      Vector2 nextVector = shape.nextVector(drawingProgress);
+      Vector2 nextVector = applyEffects(f, shape.nextVector(drawingProgress));
 
       output[f * FORMAT.channels.outputs] = (float) nextVector.getX();
       output[f * FORMAT.channels.outputs + 1] = (float) nextVector.getY();
@@ -95,6 +98,13 @@ public class AudioPlayer implements MovableRenderer<List<Shape>, Vector2> {
     }
     safe.unlock(buffer);
     return 0;
+  }
+
+  private Vector2 applyEffects(int frame, Vector2 vector) {
+    for (Effect effect : effects.values()) {
+      vector = effect.apply(frame, vector);
+    }
+    return vector;
   }
 
   private Shape rotate(Shape shape, double sampleRate) {
@@ -135,22 +145,18 @@ public class AudioPlayer implements MovableRenderer<List<Shape>, Vector2> {
     return shape;
   }
 
-  @Override
   public void setRotationSpeed(double speed) {
     this.rotateSpeed = speed;
   }
 
-  @Override
   public void setTranslation(Vector2 translation) {
     this.translateVector = translation;
   }
 
-  @Override
   public void setTranslationSpeed(double speed) {
     translateSpeed = speed;
   }
 
-  @Override
   public void setScale(double scale) {
     this.scale = scale;
   }
@@ -216,6 +222,16 @@ public class AudioPlayer implements MovableRenderer<List<Shape>, Vector2> {
       e.printStackTrace();
       System.err.println("Frame missed.");
     }
+  }
+
+  @Override
+  public void addEffect(Object identifier, Effect effect) {
+    effects.put(identifier, effect);
+  }
+
+  @Override
+  public void removeEffect(Object identifier) {
+    effects.remove(identifier);
   }
 
   private static final class Phase {

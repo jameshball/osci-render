@@ -1,6 +1,6 @@
 package sh.ball.shapes;
 
-import sh.ball.FrameSet;
+import sh.ball.audio.FrameSet;
 
 import java.awt.geom.AffineTransform;
 import java.awt.geom.PathIterator;
