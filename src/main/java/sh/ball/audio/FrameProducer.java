@@ -1,8 +1,5 @@
 package sh.ball.audio;
 
-import sh.ball.FrameSet;
-import sh.ball.Renderer;
-
 public class FrameProducer<T> implements Runnable {
 
   private final Renderer<T> renderer;

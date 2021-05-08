@@ -1,4 +1,4 @@
-package sh.ball;
+package sh.ball.audio;
 
 public interface FrameSet<T> {
 

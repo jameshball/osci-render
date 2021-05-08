@@ -23,7 +23,7 @@ import org.unbescape.html.HtmlEscape;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.xml.sax.SAXException;
-import sh.ball.FrameSet;
+import sh.ball.audio.FrameSet;
 import sh.ball.parser.FileParser;
 import sh.ball.shapes.ShapeFrameSet;
 import sh.ball.shapes.Shape;

@@ -1,7 +1,6 @@
 package sh.ball.shapes;
 
-import sh.ball.FrameSet;
-import sh.ball.shapes.Shape;
+import sh.ball.audio.FrameSet;
 
 import java.util.List;
 
