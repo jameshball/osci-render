@@ -1,6 +1,6 @@
 package sh.ball.parser.obj;
 
-import sh.ball.FrameSet;
+import sh.ball.audio.FrameSet;
 import sh.ball.engine.Camera;
 import sh.ball.engine.Vector3;
 import sh.ball.engine.WorldObject;

@@ -6,14 +6,14 @@
 
     <groupId>sh.ball</groupId>
     <artifactId>osci-render</artifactId>
-    <version>1.0.3</version>
+    <version>1.1.0</version>
 
     <name>osci-render</name>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>15</maven.compiler.release>
-        <javafx.version>15.0.1</javafx.version>
+        <javafx.version>16</javafx.version>
         <project.modulePath>${project.build.directory}\modules</project.modulePath>
         <appModule>oscirender</appModule>
         <appMainClass>sh.ball.gui.Gui</appMainClass>
