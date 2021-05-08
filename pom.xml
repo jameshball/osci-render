@@ -6,7 +6,7 @@
 
     <groupId>sh.ball</groupId>
     <artifactId>osci-render</artifactId>
-    <version>1.0.2</version>
+    <version>1.0.3</version>
 
     <name>osci-render</name>
 
@@ -107,7 +107,7 @@
                             <goal>jpackage</goal>
                         </goals>
                         <configuration>
-                            <icon>icon.ico</icon>
+                            <icon>src/main/resources/icons/icon.ico</icon>
                             <winMenu>true</winMenu>
                             <winMenuGroup>osci-render</winMenuGroup>
                         </configuration>
