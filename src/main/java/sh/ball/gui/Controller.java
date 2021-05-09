@@ -5,12 +5,10 @@ import sh.ball.audio.AudioPlayer;
 import sh.ball.audio.effect.Effect;
 import sh.ball.audio.FrameProducer;
 
-import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.util.EventListener;
 import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
@@ -23,8 +21,6 @@ import javafx.fxml.Initializable;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.xml.sax.SAXException;
