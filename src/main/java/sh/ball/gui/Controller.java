@@ -85,6 +85,8 @@ public class Controller implements Initializable {
   private TextField cameraZTextField;
   @FXML
   private CheckBox vectorCancellingCheckBox;
+  @FXML
+  private Slider vectorCancellingSlider;
 
   public Controller() throws IOException {
   }
@@ -104,9 +106,19 @@ public class Controller implements Initializable {
     );
   }
 
+  private Map<EffectType, Slider> effectTypes;
+
+  private void initializeEffectTypes() {
+    effectTypes = Map.of(
+      EffectType.VECTOR_CANCELLING,
+      vectorCancellingSlider
+    );
+  }
+
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
     Map<Slider, SliderUpdater<Double>> sliders = initializeSliderMap();
+    initializeEffectTypes();
 
     for (Slider slider : sliders.keySet()) {
       slider.valueProperty().addListener((source, oldValue, newValue) ->
@@ -136,7 +148,7 @@ public class Controller implements Initializable {
 
     vectorCancellingCheckBox.selectedProperty().addListener((o, old, checked) ->
       updateEffect(EffectType.VECTOR_CANCELLING, checked,
-        ((count, v) -> count % 2 == 0 ? v.scale(-1) : v))
+        ((count, v) -> count % (int) vectorCancellingSlider.getValue() == 0 ? v.scale(-1) : v))
     );
 
     chooseFileButton.setOnAction(e -> {
@@ -165,8 +177,10 @@ public class Controller implements Initializable {
   private void updateEffect(EffectType type, boolean checked, Effect effect) {
     if (checked) {
       renderer.addEffect(type, effect);
+      effectTypes.get(type).setDisable(false);
     } else {
       renderer.removeEffect(type);
+      effectTypes.get(type).setDisable(true);
     }
   }
 

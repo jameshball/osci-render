@@ -46,6 +46,7 @@
              <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
                   <children>
                      <CheckBox fx:id="vectorCancellingCheckBox" layoutX="14.0" layoutY="14.0" mnemonicParsing="false" text="Vector cancelling" />
+                     <Slider fx:id="vectorCancellingSlider" blockIncrement="1.0" disable="true" layoutX="141.0" layoutY="16.0" majorTickUnit="1.0" max="10.0" min="2.0" minorTickCount="0" prefHeight="33.0" prefWidth="198.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" value="2.0" />
                   </children>
                </AnchorPane>
            </content>
