@@ -29,7 +29,7 @@ public class ObjFrameSet implements FrameSet<List<Shape>> {
   }
 
   @Override
-  public void setFrameSettings(Object settings) {
+  public Object setFrameSettings(Object settings) {
     if (settings instanceof ObjFrameSettings obj) {
       Double focalLength = obj.focalLength();
       Vector3 cameraPos = obj.cameraPos();
@@ -44,5 +44,7 @@ public class ObjFrameSet implements FrameSet<List<Shape>> {
         camera.setPos(cameraPos);
       }
     }
+
+    return camera.getPos();
   }
 }

@@ -1,5 +1,6 @@
 package sh.ball.audio;
 
+import sh.ball.audio.effect.Effect;
 import xt.audio.Enums.XtSample;
 import xt.audio.Enums.XtSetup;
 import xt.audio.Enums.XtSystem;
@@ -17,7 +18,6 @@ import xt.audio.XtSafeBuffer;
 import xt.audio.XtService;
 import xt.audio.XtStream;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -222,6 +222,11 @@ public class AudioPlayer implements Renderer<List<Shape>> {
       e.printStackTrace();
       System.err.println("Frame missed.");
     }
+  }
+
+  @Override
+  public void flushFrames() {
+    frameQueue.clear();
   }
 
   @Override

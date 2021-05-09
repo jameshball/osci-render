@@ -25,13 +25,13 @@
       <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="271.0" prefWidth="385.0">
         <Slider fx:id="rotateSpeedSlider" layoutX="116.0" layoutY="79.0" max="10.0" prefHeight="14.0" prefWidth="198.0" />
         <Label layoutX="37.0" layoutY="77.0" text="Rotate speed" />
-        <Label fx:id="rotateSpeedLabel" layoutX="316.0" layoutY="77.0" text="0" />
+        <Label fx:id="rotateSpeedLabel" layoutX="316.0" layoutY="77.0" maxWidth="40.0" text="0" />
         <Slider fx:id="translationSpeedSlider" layoutX="116.0" layoutY="105.0" max="10.0" prefHeight="14.0" prefWidth="198.0" value="1.0" />
         <Label layoutX="14.0" layoutY="103.0" text="Translation speed" />
-        <Label fx:id="translationSpeedLabel" layoutX="316.0" layoutY="103.0" text="1" />
+        <Label fx:id="translationSpeedLabel" layoutX="316.0" layoutY="103.0" maxWidth="40.0" text="1" />
         <Slider fx:id="scaleSlider" layoutX="116.0" layoutY="130.0" max="10.0" prefHeight="14.0" prefWidth="198.0" value="1.0" />
         <Label layoutX="80.0" layoutY="128.0" text="Scale" />
-        <Label fx:id="scaleLabel" layoutX="316.0" layoutY="128.0" text="1" />
+        <Label fx:id="scaleLabel" layoutX="316.0" layoutY="128.0" maxWidth="40.0" text="1" />
         <Label layoutX="70.0" layoutY="50.0" text="Weight" />
         <TextField fx:id="translationXTextField" layoutX="136.0" layoutY="13.0" prefHeight="26.0" prefWidth="70.0" text="0" />
         <Label layoutX="51.0" layoutY="18.0" text="Translation" />
@@ -39,13 +39,16 @@
         <Label layoutX="217.0" layoutY="18.0" text="y :" />
         <TextField fx:id="translationYTextField" layoutX="234.0" layoutY="13.0" prefHeight="26.0" prefWidth="70.0" text="0" />
             <Slider fx:id="weightSlider" layoutX="116.0" layoutY="52.0" max="1000.0" prefHeight="14.0" prefWidth="198.0" value="100.0" />
-            <Label fx:id="weightLabel" layoutX="316.0" layoutY="51.0" text="100" />
+            <Label fx:id="weightLabel" layoutX="316.0" layoutY="51.0" maxWidth="40.0" text="100" />
       </AnchorPane>
          <TitledPane animated="false" collapsible="false" prefHeight="169.0" prefWidth="385.0" text="Effects" SplitPane.resizableWithParent="false">
            <content>
              <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
                   <children>
                      <CheckBox fx:id="vectorCancellingCheckBox" layoutX="14.0" layoutY="14.0" mnemonicParsing="false" text="Vector cancelling" />
+                     <Slider fx:id="vectorCancellingSlider" blockIncrement="1.0" disable="true" layoutX="141.0" layoutY="16.0" majorTickUnit="1.0" max="10.0" min="2.0" minorTickCount="0" prefHeight="33.0" prefWidth="198.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" value="2.0" />
+                     <CheckBox fx:id="bitCrushCheckBox" layoutX="14.0" layoutY="52.0" mnemonicParsing="false" text="Bit crush" />
+                     <Slider fx:id="bitCrushSlider" blockIncrement="1.0" disable="true" layoutX="141.0" layoutY="55.0" majorTickUnit="0.5" max="3.0" minorTickCount="0" prefHeight="33.0" prefWidth="198.0" showTickLabels="true" showTickMarks="true" value="2.0" />
                   </children>
                </AnchorPane>
            </content>
@@ -55,13 +58,13 @@
           <Slider fx:id="focalLengthSlider" blockIncrement="2.0" layoutX="116.0" layoutY="15.0" max="2.0" min="1.0E-5" prefHeight="14.0" prefWidth="198.0" value="1.0" />
           <Label layoutX="43.0" layoutY="14.0" text="Focal length" />
           <Label fx:id="focalLengthLabel" layoutX="316.0" layoutY="14.0" text="1" />
-               <TextField fx:id="cameraXTextField" layoutX="134.0" layoutY="39.0" prefHeight="26.0" prefWidth="38.0" text="0" />
+               <TextField fx:id="cameraXTextField" layoutX="134.0" layoutY="39.0" prefHeight="26.0" prefWidth="58.0" text="0" />
                <Label layoutX="44.0" layoutY="44.0" text="Camera pos" />
                <Label layoutX="118.0" layoutY="44.0" text="x :" />
-               <Label layoutX="180.0" layoutY="43.0" text="y :" />
-               <TextField fx:id="cameraYTextField" layoutX="199.0" layoutY="39.0" prefHeight="26.0" prefWidth="38.0" text="0" />
-               <Label layoutX="244.0" layoutY="43.0" text="z :" />
-               <TextField fx:id="cameraZTextField" layoutX="263.0" layoutY="39.0" prefHeight="26.0" prefWidth="38.0" text="0" />
+               <Label layoutX="199.0" layoutY="43.0" text="y :" />
+               <TextField fx:id="cameraYTextField" layoutX="218.0" layoutY="39.0" prefHeight="26.0" prefWidth="58.0" text="0" />
+               <Label layoutX="283.0" layoutY="43.0" text="z :" />
+               <TextField fx:id="cameraZTextField" layoutX="302.0" layoutY="39.0" prefHeight="26.0" prefWidth="58.0" text="0" />
         </AnchorPane>
       </TitledPane>
     </SplitPane>
