@@ -14,6 +14,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -31,7 +32,7 @@ import sh.ball.shapes.Vector2;
 
 public class SvgParser extends FileParser<FrameSet<List<Shape>>> {
 
-  private final Map<Character, Function<List<Float>, List<Shape>>> commandMap;
+  private final Map<Character, BiFunction<SvgState, List<Float>, List<Shape>>> commandMap;
   private final SvgState state;
   private final InputStream input;
 
@@ -51,26 +52,26 @@ public class SvgParser extends FileParser<FrameSet<List<Shape>>> {
 
   // Map command chars to function calls.
   private void initialiseCommandMap() {
-    commandMap.put('M', (args) -> MoveTo.absolute(state, args));
-    commandMap.put('m', (args) -> MoveTo.relative(state, args));
-    commandMap.put('L', (args) -> LineTo.absolute(state, args));
-    commandMap.put('l', (args) -> LineTo.relative(state, args));
-    commandMap.put('H', (args) -> LineTo.horizontalAbsolute(state, args));
-    commandMap.put('h', (args) -> LineTo.horizontalRelative(state, args));
-    commandMap.put('V', (args) -> LineTo.verticalAbsolute(state, args));
-    commandMap.put('v', (args) -> LineTo.verticalRelative(state, args));
-    commandMap.put('C', (args) -> CurveTo.absolute(state, args));
-    commandMap.put('c', (args) -> CurveTo.relative(state, args));
-    commandMap.put('S', (args) -> CurveTo.smoothAbsolute(state, args));
-    commandMap.put('s', (args) -> CurveTo.smoothRelative(state, args));
-    commandMap.put('Q', (args) -> CurveTo.quarticAbsolute(state, args));
-    commandMap.put('q', (args) -> CurveTo.quarticRelative(state, args));
-    commandMap.put('T', (args) -> CurveTo.quarticSmoothAbsolute(state, args));
-    commandMap.put('t', (args) -> CurveTo.quarticSmoothRelative(state, args));
-    commandMap.put('A', (args) -> EllipticalArcTo.absolute(state, args));
-    commandMap.put('a', (args) -> EllipticalArcTo.relative(state, args));
-    commandMap.put('Z', (args) -> ClosePath.absolute(state, args));
-    commandMap.put('z', (args) -> ClosePath.relative(state, args));
+    commandMap.put('M', MoveTo::absolute);
+    commandMap.put('m', MoveTo::relative);
+    commandMap.put('L', LineTo::absolute);
+    commandMap.put('l', LineTo::relative);
+    commandMap.put('H', LineTo::horizontalAbsolute);
+    commandMap.put('h', LineTo::horizontalRelative);
+    commandMap.put('V', LineTo::verticalAbsolute);
+    commandMap.put('v', LineTo::verticalRelative);
+    commandMap.put('C', CurveTo::absolute);
+    commandMap.put('c', CurveTo::relative);
+    commandMap.put('S', CurveTo::smoothAbsolute);
+    commandMap.put('s', CurveTo::smoothRelative);
+    commandMap.put('Q', CurveTo::quarticAbsolute);
+    commandMap.put('q', CurveTo::quarticRelative);
+    commandMap.put('T', CurveTo::quarticSmoothAbsolute);
+    commandMap.put('t', CurveTo::quarticSmoothRelative);
+    commandMap.put('A', EllipticalArcTo::absolute);
+    commandMap.put('a', EllipticalArcTo::relative);
+    commandMap.put('Z', ClosePath::absolute);
+    commandMap.put('z', ClosePath::relative);
   }
 
   // Does error checking against SVG path and returns array of SVG commands and arguments
@@ -191,7 +192,7 @@ public class SvgParser extends FileParser<FrameSet<List<Shape>>> {
 
       // Use the nums to get a list of sh.ball.shapes, using the first character in the command to specify
       // the function to use.
-      svgShapes.addAll(commandMap.get(commandChar).apply(nums));
+      svgShapes.addAll(commandMap.get(commandChar).apply(state, nums));
 
       if (!String.valueOf(commandChar).matches("[csCS]")) {
         state.prevCubicControlPoint = null;
