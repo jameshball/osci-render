@@ -1,4 +1,4 @@
-package sh.ball.audio;
+package sh.ball.audio.effect;
 
 import sh.ball.shapes.Vector2;
 
