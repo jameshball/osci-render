@@ -2,13 +2,15 @@ package sh.ball.gui;
 
 import javafx.scene.control.*;
 import sh.ball.audio.AudioPlayer;
-import sh.ball.audio.Effect;
+import sh.ball.audio.effect.Effect;
 import sh.ball.audio.FrameProducer;
 
+import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.util.EventListener;
 import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
@@ -21,9 +23,13 @@ import javafx.fxml.Initializable;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.xml.sax.SAXException;
+import sh.ball.audio.effect.EffectType;
+import sh.ball.audio.effect.EventFactory;
 import sh.ball.engine.Vector3;
 import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjParser;
@@ -85,6 +91,12 @@ public class Controller implements Initializable {
   private TextField cameraZTextField;
   @FXML
   private CheckBox vectorCancellingCheckBox;
+  @FXML
+  private Slider vectorCancellingSlider;
+  @FXML
+  private CheckBox bitCrushCheckBox;
+  @FXML
+  private Slider bitCrushSlider;
 
   public Controller() throws IOException {
   }
@@ -104,9 +116,21 @@ public class Controller implements Initializable {
     );
   }
 
+  private Map<EffectType, Slider> effectTypes;
+
+  private void initializeEffectTypes() {
+    effectTypes = Map.of(
+      EffectType.VECTOR_CANCELLING,
+      vectorCancellingSlider,
+      EffectType.BIT_CRUSH,
+      bitCrushSlider
+    );
+  }
+
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
     Map<Slider, SliderUpdater<Double>> sliders = initializeSliderMap();
+    initializeEffectTypes();
 
     for (Slider slider : sliders.keySet()) {
       slider.valueProperty().addListener((source, oldValue, newValue) ->
@@ -128,16 +152,25 @@ public class Controller implements Initializable {
         tryParse(cameraXTextField.getText()),
         tryParse(cameraYTextField.getText()),
         tryParse(cameraZTextField.getText())
-      )));
+    )));
+
 
     cameraXTextField.textProperty().addListener(cameraPosUpdate);
     cameraYTextField.textProperty().addListener(cameraPosUpdate);
     cameraZTextField.textProperty().addListener(cameraPosUpdate);
 
-    vectorCancellingCheckBox.selectedProperty().addListener((o, old, checked) ->
-      updateEffect(EffectType.VECTOR_CANCELLING, checked,
-        ((count, v) -> count % 2 == 0 ? v.scale(-1) : v))
-    );
+    InvalidationListener vectorCancellingListener = e ->
+      updateEffect(EffectType.VECTOR_CANCELLING, vectorCancellingCheckBox.isSelected(),
+        EventFactory.vectorCancelling((int) vectorCancellingSlider.getValue()));
+    InvalidationListener bitCrushListener = e ->
+      updateEffect(EffectType.BIT_CRUSH, bitCrushCheckBox.isSelected(),
+        EventFactory.bitCrush(bitCrushSlider.getValue()));
+
+    vectorCancellingSlider.valueProperty().addListener(vectorCancellingListener);
+    vectorCancellingCheckBox.selectedProperty().addListener(vectorCancellingListener);
+
+    bitCrushSlider.valueProperty().addListener(bitCrushListener);
+    bitCrushCheckBox.selectedProperty().addListener(bitCrushListener);
 
     chooseFileButton.setOnAction(e -> {
       File file = fileChooser.showOpenDialog(stage);
@@ -151,7 +184,10 @@ public class Controller implements Initializable {
   }
 
   private void setFocalLength(double focalLength) {
-    producer.setFrameSettings(new ObjFrameSettings(focalLength));
+    Vector3 pos = (Vector3) producer.setFrameSettings(new ObjFrameSettings(focalLength));
+    cameraXTextField.setText(String.valueOf(pos.getX()));
+    cameraYTextField.setText(String.valueOf(pos.getY()));
+    cameraZTextField.setText(String.valueOf(pos.getZ()));
   }
 
   private double tryParse(String value) {
@@ -165,8 +201,10 @@ public class Controller implements Initializable {
   private void updateEffect(EffectType type, boolean checked, Effect effect) {
     if (checked) {
       renderer.addEffect(type, effect);
+      effectTypes.get(type).setDisable(false);
     } else {
       renderer.removeEffect(type);
+      effectTypes.get(type).setDisable(true);
     }
   }
 
