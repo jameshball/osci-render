@@ -23,4 +23,14 @@ public class EventFactory {
     long tmp = Math.round(value);
     return (double) tmp / factor;
   }
+
+  public static Effect edgeStretch(double value) {
+    return (count, v) -> {
+      if (count % 2 == 0) {
+        return v.translate(new Vector2(value, 0));
+      } else {
+        return v.translate(new Vector2(-value, 0));
+      }
+    };
+  }
 }
