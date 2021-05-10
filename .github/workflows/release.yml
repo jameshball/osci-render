@@ -5,7 +5,7 @@ on:
     branches: [ release ]
 
 jobs:
-  build:
+  release:
 
     runs-on: windows-latest
 
