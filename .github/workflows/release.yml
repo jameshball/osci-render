@@ -5,7 +5,7 @@ on:
     branches: [ release ]
 
 jobs:
-  build:
+  release:
 
     runs-on: windows-latest
 
@@ -27,7 +27,9 @@ jobs:
       with:
         body_path: CHANGELOG
         tag_name: v${{ env.VERSION }}
-        files: target/osci-render-${{ env.VERSION }}.exe
+        files: |
+          target/osci-render-${{ env.VERSION }}.exe
+          target/osci-render-${{ env.VERSION }}.jar
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_REPOSITORY: jameshball/osci-render
