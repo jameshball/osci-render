@@ -2,7 +2,7 @@ package sh.ball.audio.effect;
 
 import sh.ball.shapes.Vector2;
 
-public class EventFactory {
+public class EffectFactory {
   public static Effect vectorCancelling(int frequency) {
     return (count, v) -> count % frequency == 0 ? v.scale(-1) : v;
   }
