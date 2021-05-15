@@ -1,6 +1,7 @@
 package sh.ball.audio;
 
 import sh.ball.audio.effect.Effect;
+import xt.audio.*;
 import xt.audio.Enums.XtSample;
 import xt.audio.Enums.XtSetup;
 import xt.audio.Enums.XtSystem;
@@ -11,12 +12,6 @@ import xt.audio.Structs.XtDeviceStreamParams;
 import xt.audio.Structs.XtFormat;
 import xt.audio.Structs.XtMix;
 import xt.audio.Structs.XtStreamParams;
-import xt.audio.XtAudio;
-import xt.audio.XtDevice;
-import xt.audio.XtPlatform;
-import xt.audio.XtSafeBuffer;
-import xt.audio.XtService;
-import xt.audio.XtStream;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -30,38 +25,24 @@ import java.util.List;
 
 public class AudioPlayer implements Renderer<List<Shape>> {
 
-  private static final int SAMPLE_RATE = 192000;
   private static final int BUFFER_SIZE = 20;
 
-  private final XtMix MIX = new XtMix(SAMPLE_RATE, XtSample.FLOAT32);
-  private final XtChannels CHANNELS = new XtChannels(0, 0, 2, 0);
-  private final XtFormat FORMAT = new XtFormat(MIX, CHANNELS);
+  private final XtFormat format;
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
+  private final Map<Object, Effect> effects = new HashMap<>();
 
-  private Map<Object, Effect> effects = new HashMap<>();
   private List<Shape> frame;
   private int currentShape = 0;
   private int audioFramesDrawn = 0;
 
-  private double translateSpeed = 0;
-  private Vector2 translateVector = new Vector2();
-  private final Phase translatePhase = new Phase();
-  private double rotateSpeed = 0;
-  private final Phase rotatePhase = new Phase();
-  private double scale = 1;
   private double weight = Shape.DEFAULT_WEIGHT;
 
   private volatile boolean stopped;
 
-  public AudioPlayer() {
-  }
-
-  public AudioPlayer(double rotateSpeed, double translateSpeed, Vector2 translateVector, double scale, double weight) {
-    setRotationSpeed(rotateSpeed);
-    setTranslationSpeed(translateSpeed);
-    setTranslation(translateVector);
-    setScale(scale);
-    setQuality(weight);
+  public AudioPlayer(int sampleRate) {
+    XtMix mix = new XtMix(sampleRate, XtSample.FLOAT32);
+    XtChannels channels = new XtChannels(0, 0, 2, 0);
+    this.format = new XtFormat(mix, channels);
   }
 
   private int render(XtStream stream, XtBuffer buffer, Object user) throws InterruptedException {
@@ -73,16 +54,13 @@ public class AudioPlayer implements Renderer<List<Shape>> {
       Shape shape = getCurrentShape();
 
       shape = shape.setWeight(weight);
-      shape = scale(shape);
-      shape = rotate(shape, FORMAT.mix.rate);
-      shape = translate(shape, FORMAT.mix.rate);
 
       double totalAudioFrames = shape.getWeight() * shape.getLength();
       double drawingProgress = totalAudioFrames == 0 ? 1 : audioFramesDrawn / totalAudioFrames;
       Vector2 nextVector = applyEffects(f, shape.nextVector(drawingProgress));
 
-      output[f * FORMAT.channels.outputs] = (float) nextVector.getX();
-      output[f * FORMAT.channels.outputs + 1] = (float) nextVector.getY();
+      output[f * format.channels.outputs] = (float) nextVector.getX();
+      output[f * format.channels.outputs + 1] = (float) nextVector.getY();
 
       audioFramesDrawn++;
 
@@ -105,60 +83,6 @@ public class AudioPlayer implements Renderer<List<Shape>> {
       vector = effect.apply(frame, vector);
     }
     return vector;
-  }
-
-  private Shape rotate(Shape shape, double sampleRate) {
-    if (rotateSpeed != 0) {
-      shape = shape.rotate(
-        nextTheta(sampleRate, rotateSpeed, translatePhase)
-      );
-    }
-
-    return shape;
-  }
-
-  private Shape translate(Shape shape, double sampleRate) {
-    if (translateSpeed != 0 && !translateVector.equals(new Vector2())) {
-      return shape.translate(translateVector.scale(
-        Math.sin(nextTheta(sampleRate, translateSpeed, rotatePhase))
-      ));
-    }
-
-    return shape;
-  }
-
-  private double nextTheta(double sampleRate, double frequency, Phase phase) {
-    phase.value += frequency / sampleRate;
-
-    if (phase.value >= 1.0) {
-      phase.value = -1.0;
-    }
-
-    return phase.value * Math.PI;
-  }
-
-  private Shape scale(Shape shape) {
-    if (scale != 1) {
-      return shape.scale(scale);
-    }
-
-    return shape;
-  }
-
-  public void setRotationSpeed(double speed) {
-    this.rotateSpeed = speed;
-  }
-
-  public void setTranslation(Vector2 translation) {
-    this.translateVector = translation;
-  }
-
-  public void setTranslationSpeed(double speed) {
-    translateSpeed = speed;
-  }
-
-  public void setScale(double scale) {
-    this.scale = scale;
   }
 
   @Override
@@ -191,11 +115,11 @@ public class AudioPlayer implements Renderer<List<Shape>> {
       if (defaultOutput == null) return;
 
       try (XtDevice device = service.openDevice(defaultOutput)) {
-        if (device.supportsFormat(FORMAT)) {
+        if (device.supportsFormat(format)) {
 
-          XtBufferSize size = device.getBufferSize(FORMAT);
+          XtBufferSize size = device.getBufferSize(format);
           XtStreamParams streamParams = new XtStreamParams(true, this::render, null, null);
-          XtDeviceStreamParams deviceParams = new XtDeviceStreamParams(streamParams, FORMAT, size.current);
+          XtDeviceStreamParams deviceParams = new XtDeviceStreamParams(streamParams, format, size.current);
           try (XtStream stream = device.openStream(deviceParams, null);
                XtSafeBuffer safe = XtSafeBuffer.register(stream, true)) {
             stream.start();
@@ -239,9 +163,4 @@ public class AudioPlayer implements Renderer<List<Shape>> {
     effects.remove(identifier);
   }
 
-  private static final class Phase {
-
-    private double value = 0;
-  }
 }
-

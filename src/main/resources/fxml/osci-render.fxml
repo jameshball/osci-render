@@ -12,7 +12,7 @@
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.RowConstraints?>
 
-<GridPane alignment="center" hgap="10" prefWidth="400.0" vgap="10" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.Controller">
+<GridPane alignment="center" hgap="10" prefWidth="400.0" vgap="10" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1">
   <columnConstraints>
     <ColumnConstraints />
   </columnConstraints>
@@ -26,9 +26,9 @@
         <Slider fx:id="rotateSpeedSlider" layoutX="116.0" layoutY="79.0" max="10.0" prefHeight="14.0" prefWidth="198.0" />
         <Label layoutX="37.0" layoutY="77.0" text="Rotate speed" />
         <Label fx:id="rotateSpeedLabel" layoutX="316.0" layoutY="77.0" maxWidth="40.0" text="0" />
-        <Slider fx:id="translationSpeedSlider" layoutX="116.0" layoutY="105.0" max="10.0" prefHeight="14.0" prefWidth="198.0" value="1.0" />
+        <Slider fx:id="translationSpeedSlider" layoutX="116.0" layoutY="105.0" max="10.0" prefHeight="14.0" prefWidth="198.0" />
         <Label layoutX="14.0" layoutY="103.0" text="Translation speed" />
-        <Label fx:id="translationSpeedLabel" layoutX="316.0" layoutY="103.0" maxWidth="40.0" text="1" />
+        <Label fx:id="translationSpeedLabel" layoutX="316.0" layoutY="103.0" maxWidth="40.0" text="0" />
         <Slider fx:id="scaleSlider" layoutX="116.0" layoutY="130.0" max="10.0" prefHeight="14.0" prefWidth="198.0" value="1.0" />
         <Label layoutX="80.0" layoutY="128.0" text="Scale" />
         <Label fx:id="scaleLabel" layoutX="316.0" layoutY="128.0" maxWidth="40.0" text="1" />
