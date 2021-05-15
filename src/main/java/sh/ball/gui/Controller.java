@@ -1,8 +1,8 @@
 package sh.ball.gui;
 
 import javafx.scene.control.*;
-import sh.ball.audio.AudioPlayer;
-import sh.ball.audio.effect.Effect;
+import sh.ball.audio.Renderer;
+import sh.ball.audio.effect.*;
 import sh.ball.audio.FrameProducer;
 
 import java.io.File;
@@ -24,8 +24,6 @@ import javafx.stage.Stage;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.xml.sax.SAXException;
-import sh.ball.audio.effect.EffectType;
-import sh.ball.audio.effect.EventFactory;
 import sh.ball.engine.Vector3;
 import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjParser;
@@ -35,17 +33,18 @@ import sh.ball.shapes.Vector2;
 
 public class Controller implements Initializable {
 
+  private static final int SAMPLE_RATE = 192000;
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
 
   private final FileChooser fileChooser = new FileChooser();
-  // TODO: Reduce coupling on AudioPlayer
-  private final AudioPlayer renderer = new AudioPlayer();
+  private final Renderer<List<Shape>> renderer;
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
-  private FrameProducer<List<Shape>> producer = new FrameProducer<>(
-    renderer,
-    new ObjParser(DEFAULT_OBJ).parse()
-  );
+  private final RotateEffect rotateEffect = new RotateEffect(SAMPLE_RATE);
+  private final TranslateEffect translateEffect = new TranslateEffect(SAMPLE_RATE);
+  private final ScaleEffect scaleEffect = new ScaleEffect();
+
+  private FrameProducer<List<Shape>> producer;
 
   private Stage stage;
 
@@ -94,7 +93,12 @@ public class Controller implements Initializable {
   @FXML
   private Slider bitCrushSlider;
 
-  public Controller() throws IOException {
+  public Controller(Renderer<List<Shape>> renderer) throws IOException {
+    this.renderer = renderer;
+    this.producer = new FrameProducer<>(
+      renderer,
+      new ObjParser(DEFAULT_OBJ).parse()
+    );
   }
 
   private Map<Slider, SliderUpdater<Double>> initializeSliderMap() {
@@ -102,11 +106,11 @@ public class Controller implements Initializable {
       weightSlider,
       new SliderUpdater<>(weightLabel::setText, renderer::setQuality),
       rotateSpeedSlider,
-      new SliderUpdater<>(rotateSpeedLabel::setText, renderer::setRotationSpeed),
+      new SliderUpdater<>(rotateSpeedLabel::setText, rotateEffect::setSpeed),
       translationSpeedSlider,
-      new SliderUpdater<>(translationSpeedLabel::setText, renderer::setTranslationSpeed),
+      new SliderUpdater<>(translationSpeedLabel::setText, translateEffect::setSpeed),
       scaleSlider,
-      new SliderUpdater<>(scaleLabel::setText, renderer::setScale),
+      new SliderUpdater<>(scaleLabel::setText, scaleEffect::setScale),
       focalLengthSlider,
       new SliderUpdater<>(focalLengthLabel::setText, this::setFocalLength)
     );
@@ -135,7 +139,7 @@ public class Controller implements Initializable {
     }
 
     InvalidationListener translationUpdate = observable ->
-      renderer.setTranslation(new Vector2(
+      translateEffect.setTranslation(new Vector2(
         tryParse(translationXTextField.getText()),
         tryParse(translationYTextField.getText())
       ));
@@ -149,7 +153,6 @@ public class Controller implements Initializable {
         tryParse(cameraYTextField.getText()),
         tryParse(cameraZTextField.getText())
     )));
-
 
     cameraXTextField.textProperty().addListener(cameraPosUpdate);
     cameraYTextField.textProperty().addListener(cameraPosUpdate);
@@ -174,6 +177,10 @@ public class Controller implements Initializable {
         chooseFile(file);
       }
     });
+
+    renderer.addEffect(EffectType.SCALE, scaleEffect);
+    renderer.addEffect(EffectType.ROTATE, rotateEffect);
+    renderer.addEffect(EffectType.TRANSLATE, translateEffect);
 
     executor.submit(producer);
     new Thread(renderer).start();
