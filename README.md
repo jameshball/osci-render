@@ -10,7 +10,7 @@ Some of this was built as part of a 24hr hackathon: IC Hack 20. The original rep
 
 ### Video Demonstration
 
-[![osci-render demonstration](https://img.youtube.com/vi/oEX0mnv6PLM/0.jpg)](https://www.youtube.com/watch?v=oEX0mnv6PLM)
+[![osci-render demonstration](https://img.youtube.com/vi/feQzC_Tz5K4/0.jpg)](https://www.youtube.com/watch?v=feQzC_Tz5K4)
 
 ## Current Features
 
