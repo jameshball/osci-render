@@ -2,7 +2,11 @@ package sh.ball.gui;
 
 import javafx.scene.control.*;
 import sh.ball.audio.Renderer;
-import sh.ball.audio.effect.*;
+import sh.ball.audio.effect.Effect;
+import sh.ball.audio.effect.EffectType;
+import sh.ball.audio.effect.RotateEffect;
+import sh.ball.audio.effect.ScaleEffect;
+import sh.ball.audio.effect.EffectFactory;
 import sh.ball.audio.FrameProducer;
 
 import java.io.File;
@@ -24,6 +28,7 @@ import javafx.stage.Stage;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.xml.sax.SAXException;
+import sh.ball.audio.effect.TranslateEffect;
 import sh.ball.engine.Vector3;
 import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjParser;
@@ -160,10 +165,10 @@ public class Controller implements Initializable {
 
     InvalidationListener vectorCancellingListener = e ->
       updateEffect(EffectType.VECTOR_CANCELLING, vectorCancellingCheckBox.isSelected(),
-        EventFactory.vectorCancelling((int) vectorCancellingSlider.getValue()));
+        EffectFactory.vectorCancelling((int) vectorCancellingSlider.getValue()));
     InvalidationListener bitCrushListener = e ->
       updateEffect(EffectType.BIT_CRUSH, bitCrushCheckBox.isSelected(),
-        EventFactory.bitCrush(bitCrushSlider.getValue()));
+        EffectFactory.bitCrush(bitCrushSlider.getValue()));
 
     vectorCancellingSlider.valueProperty().addListener(vectorCancellingListener);
     vectorCancellingCheckBox.selectedProperty().addListener(vectorCancellingListener);
