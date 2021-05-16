@@ -126,14 +126,16 @@
                 <executions>
                     <execution>
                         <id>win</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>jpackage</goal>
-                        </goals>
                         <configuration>
                             <icon>src/main/resources/icons/icon.ico</icon>
                             <winMenu>true</winMenu>
                             <winMenuGroup>osci-render</winMenuGroup>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>mac</id>
+                        <configuration>
+                            <icon>src/main/resources/icons/icon.icns</icon>
                         </configuration>
                     </execution>
                 </executions>
