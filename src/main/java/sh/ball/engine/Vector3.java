@@ -79,6 +79,7 @@ public final class Vector3 {
     );
   }
 
+  // TODO: Is this correctly used?!
   public double distance(Vector3 vector) {
     return Math.sqrt(Math.pow(vector.x, 2) + Math.pow(vector.y, 2) + Math.pow(vector.z, 2));
   }

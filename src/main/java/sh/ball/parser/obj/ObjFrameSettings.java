@@ -2,13 +2,23 @@ package sh.ball.parser.obj;
 
 import sh.ball.engine.Vector3;
 
-public record ObjFrameSettings(Double focalLength, Vector3 cameraPos) {
+public class ObjFrameSettings {
+
+  protected Double focalLength;
+  protected Vector3 cameraPos;
+  protected Vector3 rotation;
+  protected Double rotateSpeed;
 
   public ObjFrameSettings(double focalLength) {
-    this(focalLength, null);
+    this.focalLength = focalLength;
   }
 
   public ObjFrameSettings(Vector3 cameraPos) {
-    this(null, cameraPos);
+    this.cameraPos = cameraPos;
+  }
+
+  public ObjFrameSettings(Vector3 rotation, Double rotateSpeed) {
+    this.rotation = rotation;
+    this.rotateSpeed = rotateSpeed;
   }
 }
