@@ -21,7 +21,7 @@ public class TextParser extends FileParser<FrameSet<List<Shape>>> {
 
   private static final char WIDE_CHAR = 'W';
   private static final double HEIGHT_SCALAR = 1.6;
-  private static final InputStream DEFAULT_FONT = TextParser.class.getResourceAsStream("/fonts/SourceCodePro-ExtraLight.svg");
+  private static final String DEFAULT_FONT = "/fonts/SourceCodePro-ExtraLight.svg";
 
   private final Map<Character, List<Shape>> charToShape;
   private final InputStream input;
@@ -34,7 +34,7 @@ public class TextParser extends FileParser<FrameSet<List<Shape>>> {
   }
 
   public TextParser(String path) throws FileNotFoundException {
-    this(new FileInputStream(path), DEFAULT_FONT);
+    this(new FileInputStream(path), TextParser.class.getResourceAsStream(DEFAULT_FONT));
     checkFileExtension(path);
   }
 
@@ -46,18 +46,18 @@ public class TextParser extends FileParser<FrameSet<List<Shape>>> {
   @Override
   public FrameSet<List<Shape>> parse() throws IllegalArgumentException, IOException, ParserConfigurationException, SAXException {
     List<String> text = new BufferedReader(new InputStreamReader(input, Charset.defaultCharset())).lines().collect(Collectors.toList());
-    SvgParser parser = new SvgParser(font);
-    parser.parse();
+    SvgParser fontParser = new SvgParser(font);
+    fontParser.parse();
     List<Shape> shapes = new ArrayList<>();
 
     /* WIDE_CHAR used as an example character that will be wide in most languages.
      * This helps determine the correct character width for the font chosen. */
-    charToShape.put(WIDE_CHAR, parser.parseGlyphsWithUnicode(WIDE_CHAR));
+    charToShape.put(WIDE_CHAR, fontParser.parseGlyphsWithUnicode(WIDE_CHAR));
 
     for (String line : text) {
       for (char c : line.toCharArray()) {
         if (!charToShape.containsKey(c)) {
-          List<Shape> glyph = parser.parseGlyphsWithUnicode(c);
+          List<Shape> glyph = fontParser.parseGlyphsWithUnicode(c);
           charToShape.put(c, glyph);
         }
       }
