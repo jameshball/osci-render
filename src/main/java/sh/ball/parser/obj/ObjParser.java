@@ -16,27 +16,22 @@ import sh.ball.shapes.Shape;
 
 public class ObjParser extends FileParser<FrameSet<List<Shape>>> {
 
-  private static final float DEFAULT_ROTATE_SPEED = 3;
-
-  private final Vector3 rotation;
   private final boolean isDefaultPosition;
   private final InputStream input;
   private final Camera camera;
 
   private WorldObject object;
 
-  public ObjParser(InputStream input, float rotateSpeed, float cameraX, float cameraY, float cameraZ,
+  public ObjParser(InputStream input, float cameraX, float cameraY, float cameraZ,
                    float focalLength, boolean isDefaultPosition) {
-    rotateSpeed *= Math.PI / 1000;
     this.input = input;
     this.isDefaultPosition = isDefaultPosition;
     Vector3 cameraPos = new Vector3(cameraX, cameraY, cameraZ);
     this.camera = new Camera(focalLength, cameraPos);
-    this.rotation = new Vector3(0, rotateSpeed, rotateSpeed);
   }
 
   public ObjParser(InputStream input, float focalLength) {
-    this(input, DEFAULT_ROTATE_SPEED, 0, 0, 0, focalLength, true);
+    this(input, 0, 0, 0, focalLength, true);
   }
 
   public ObjParser(InputStream input) {
@@ -60,7 +55,7 @@ public class ObjParser extends FileParser<FrameSet<List<Shape>>> {
       camera.findZPos(object);
     }
 
-    return new ObjFrameSet(object, camera, rotation, isDefaultPosition);
+    return new ObjFrameSet(object, camera, isDefaultPosition);
   }
 
   // If camera position arguments haven't been specified, automatically work out the position of
@@ -74,9 +69,5 @@ public class ObjParser extends FileParser<FrameSet<List<Shape>>> {
 
   public static boolean isObjFile(String path) {
     return path.matches(".*\\.obj");
-  }
-
-  public void setCameraPos(Vector3 vector) {
-    camera.setPos(vector);
   }
 }
