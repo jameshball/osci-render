@@ -12,36 +12,44 @@ public class ObjFrameSet implements FrameSet<List<Shape>> {
 
   private final WorldObject object;
   private final Camera camera;
-  private final Vector3 rotation;
   private final boolean isDefaultPosition;
 
-  public ObjFrameSet(WorldObject object, Camera camera, Vector3 rotation, boolean isDefaultPosition) {
+  private Vector3 rotation = new Vector3();
+  private Double rotateSpeed = 0.0;
+
+  public ObjFrameSet(WorldObject object, Camera camera, boolean isDefaultPosition) {
     this.object = object;
     this.camera = camera;
-    this.rotation = rotation;
     this.isDefaultPosition = isDefaultPosition;
   }
 
   @Override
   public List<Shape> next() {
-    object.rotate(rotation);
+    object.rotate(rotation.scale(rotateSpeed));
     return camera.draw(object);
   }
 
+  // TODO: Refactor!
   @Override
   public Object setFrameSettings(Object settings) {
     if (settings instanceof ObjFrameSettings obj) {
-      Double focalLength = obj.focalLength();
-      Vector3 cameraPos = obj.cameraPos();
-
-      if (focalLength != null && camera.getFocalLength() != focalLength) {
-        camera.setFocalLength(focalLength);
+      if (obj.focalLength != null && camera.getFocalLength() != obj.focalLength) {
+        camera.setFocalLength(obj.focalLength);
         if (isDefaultPosition) {
           camera.findZPos(object);
         }
       }
-      if (cameraPos != null && camera.getPos() != cameraPos) {
-        camera.setPos(cameraPos);
+      if (obj.cameraPos != null && camera.getPos() != obj.cameraPos) {
+        camera.setPos(obj.cameraPos);
+      }
+      if (obj.rotation != null) {
+        this.rotation = obj.rotation;
+      }
+      if (obj.rotateSpeed != null) {
+        this.rotateSpeed = obj.rotateSpeed;
+      }
+      if (obj.resetRotation) {
+        object.resetRotation();
       }
     }
 
