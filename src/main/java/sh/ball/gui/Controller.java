@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 import javafx.beans.InvalidationListener;
 import javafx.fxml.FXML;
@@ -66,25 +67,15 @@ public class Controller implements Initializable {
   @FXML
   private Slider weightSlider;
   @FXML
-  private Label weightLabel;
-  @FXML
   private Slider rotateSpeedSlider;
-  @FXML
-  private Label rotateSpeedLabel;
   @FXML
   private Slider translationSpeedSlider;
   @FXML
-  private Label translationSpeedLabel;
-  @FXML
   private Slider scaleSlider;
-  @FXML
-  private Label scaleLabel;
   @FXML
   private TitledPane objTitledPane;
   @FXML
   private Slider focalLengthSlider;
-  @FXML
-  private Label focalLengthLabel;
   @FXML
   private TextField cameraXTextField;
   @FXML
@@ -93,8 +84,6 @@ public class Controller implements Initializable {
   private TextField cameraZTextField;
   @FXML
   private Slider objectRotateSpeedSlider;
-  @FXML
-  private Label objectRotateSpeedLabel;
   @FXML
   private TextField rotateXTextField;
   @FXML
@@ -120,20 +109,20 @@ public class Controller implements Initializable {
     );
   }
 
-  private Map<Slider, SliderUpdater<Double>> initializeSliderMap() {
+  private Map<Slider, Consumer<Double>> initializeSliderMap() {
     return Map.of(
       weightSlider,
-      new SliderUpdater<>(weightLabel::setText, renderer::setQuality),
+      renderer::setQuality,
       rotateSpeedSlider,
-      new SliderUpdater<>(rotateSpeedLabel::setText, rotateEffect::setSpeed),
+      rotateEffect::setSpeed,
       translationSpeedSlider,
-      new SliderUpdater<>(translationSpeedLabel::setText, translateEffect::setSpeed),
+      translateEffect::setSpeed,
       scaleSlider,
-      new SliderUpdater<>(scaleLabel::setText, scaleEffect::setScale),
+      scaleEffect::setScale,
       focalLengthSlider,
-      new SliderUpdater<>(focalLengthLabel::setText, this::setFocalLength),
+      this::setFocalLength,
       objectRotateSpeedSlider,
-      new SliderUpdater<>(objectRotateSpeedLabel::setText, this::setObjectRotateSpeed)
+      this::setObjectRotateSpeed
     );
   }
 
@@ -151,12 +140,12 @@ public class Controller implements Initializable {
   // TODO: Refactor and clean up duplication
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
-    Map<Slider, SliderUpdater<Double>> sliders = initializeSliderMap();
+    Map<Slider, Consumer<Double>> sliders = initializeSliderMap();
     initializeEffectTypes();
 
     for (Slider slider : sliders.keySet()) {
       slider.valueProperty().addListener((source, oldValue, newValue) ->
-        sliders.get(slider).update(slider.getValue())
+        sliders.get(slider).accept(slider.getValue())
       );
     }
 
