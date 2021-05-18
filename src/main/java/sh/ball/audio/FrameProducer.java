@@ -24,8 +24,10 @@ public class FrameProducer<T> implements Runnable {
     running = false;
   }
 
-  public Object setFrameSettings(Object settings) {
-    renderer.flushFrames();
+  public Object setFrameSettings(Object settings, boolean flushFrames) {
+    if (flushFrames) {
+      renderer.flushFrames();
+    }
     return frames.setFrameSettings(settings);
   }
 }
