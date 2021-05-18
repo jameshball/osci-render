@@ -171,7 +171,7 @@ public class Controller implements Initializable {
         tryParse(cameraXTextField.getText()),
         tryParse(cameraYTextField.getText()),
         tryParse(cameraZTextField.getText())
-    )));
+    )), true);
 
     cameraXTextField.textProperty().addListener(cameraPosUpdate);
     cameraYTextField.textProperty().addListener(cameraPosUpdate);
@@ -182,7 +182,7 @@ public class Controller implements Initializable {
         tryParse(rotateXTextField.getText()),
         tryParse(rotateYTextField.getText()),
         tryParse(rotateZTextField.getText())
-      ), null));
+      ), null), false);
 
     rotateXTextField.textProperty().addListener(rotateUpdate);
     rotateYTextField.textProperty().addListener(rotateUpdate);
@@ -219,14 +219,17 @@ public class Controller implements Initializable {
   }
 
   private void setFocalLength(double focalLength) {
-    Vector3 pos = (Vector3) producer.setFrameSettings(new ObjFrameSettings(focalLength));
+    Vector3 pos = (Vector3) producer.setFrameSettings(new ObjFrameSettings(focalLength), true);
     cameraXTextField.setText(String.valueOf(pos.getX()));
     cameraYTextField.setText(String.valueOf(pos.getY()));
     cameraZTextField.setText(String.valueOf(pos.getZ()));
   }
 
   private void setObjectRotateSpeed(double rotateSpeed) {
-    producer.setFrameSettings(new ObjFrameSettings(null, (Math.exp(3 * rotateSpeed) - 1) / 50));
+    producer.setFrameSettings(
+      new ObjFrameSettings(null, (Math.exp(3 * rotateSpeed) - 1) / 50),
+      false
+    );
   }
 
   private double tryParse(String value) {
