@@ -12,17 +12,17 @@
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.RowConstraints?>
 
-<GridPane alignment="center" hgap="10" prefWidth="400.0" vgap="10" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1">
+<GridPane alignment="center" hgap="10" prefHeight="653.0" prefWidth="400.0" vgap="10" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1">
   <columnConstraints>
     <ColumnConstraints />
   </columnConstraints>
   <rowConstraints>
     <RowConstraints />
   </rowConstraints>
-  <AnchorPane prefHeight="602.0" prefWidth="400.0">
+  <AnchorPane prefHeight="737.0" prefWidth="400.0">
     <Button fx:id="chooseFileButton" layoutX="8.0" layoutY="15.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="119.0" text="Choose File" />
-    <SplitPane dividerPositions="0.3406015037593984, 0.669548872180451" layoutX="8.0" layoutY="63.0" orientation="VERTICAL" prefHeight="533.0" prefWidth="386.0">
-      <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="271.0" prefWidth="385.0">
+    <SplitPane dividerPositions="0.31499312242090777, 0.6158872077028884" layoutX="6.0" layoutY="63.0" orientation="VERTICAL" prefHeight="583.0" prefWidth="388.0">
+      <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="178.0" prefWidth="396.0">
         <Slider fx:id="rotateSpeedSlider" layoutX="116.0" layoutY="79.0" max="10.0" prefHeight="14.0" prefWidth="198.0" />
         <Label layoutX="37.0" layoutY="77.0" text="Rotate speed" />
         <Label fx:id="rotateSpeedLabel" layoutX="316.0" layoutY="77.0" maxWidth="40.0" text="0" />
@@ -43,7 +43,7 @@
       </AnchorPane>
          <TitledPane animated="false" collapsible="false" prefHeight="169.0" prefWidth="385.0" text="Effects" SplitPane.resizableWithParent="false">
            <content>
-             <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+             <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="66.0" prefWidth="383.0">
                   <children>
                      <CheckBox fx:id="vectorCancellingCheckBox" layoutX="14.0" layoutY="14.0" mnemonicParsing="false" text="Vector cancelling" />
                      <Slider fx:id="vectorCancellingSlider" blockIncrement="1.0" disable="true" layoutX="141.0" layoutY="16.0" majorTickUnit="1.0" max="10.0" min="2.0" minorTickCount="0" prefHeight="33.0" prefWidth="198.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" value="2.0" />
@@ -53,8 +53,8 @@
                </AnchorPane>
            </content>
          </TitledPane>
-      <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" prefHeight="186.0" prefWidth="385.0" text="3D .obj file settings" SplitPane.resizableWithParent="false">
-        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="96.0" prefWidth="382.0">
+      <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" maxHeight="-Infinity" maxWidth="-Infinity" prefHeight="400.0" prefWidth="385.0" text="3D .obj file settings" SplitPane.resizableWithParent="false">
+        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="155.0" prefWidth="384.0">
           <Slider fx:id="focalLengthSlider" blockIncrement="2.0" layoutX="116.0" layoutY="15.0" max="2.0" min="1.0E-5" prefHeight="14.0" prefWidth="198.0" value="1.0" />
           <Label layoutX="43.0" layoutY="14.0" text="Focal length" />
           <Label fx:id="focalLengthLabel" layoutX="316.0" layoutY="14.0" text="1" />
@@ -75,6 +75,7 @@
                <TextField fx:id="rotateYTextField" layoutX="218.0" layoutY="111.0" prefHeight="26.0" prefWidth="58.0" text="0" />
                <Label layoutX="283.0" layoutY="115.0" text="z :" />
                <TextField fx:id="rotateZTextField" layoutX="302.0" layoutY="111.0" prefHeight="26.0" prefWidth="58.0" text="0" />
+               <Button fx:id="resetRotationButton" layoutX="145.0" layoutY="153.0" mnemonicParsing="false" text="Reset Rotation" />
         </AnchorPane>
       </TitledPane>
     </SplitPane>

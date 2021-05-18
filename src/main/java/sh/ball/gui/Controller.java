@@ -31,6 +31,7 @@ import org.xml.sax.SAXException;
 import sh.ball.audio.effect.TranslateEffect;
 import sh.ball.engine.Vector3;
 import sh.ball.parser.obj.ObjFrameSettings;
+import sh.ball.parser.obj.ObjSettingsFactory;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.ParserFactory;
 import sh.ball.shapes.Shape;
@@ -101,6 +102,8 @@ public class Controller implements Initializable {
   @FXML
   private TextField rotateZTextField;
   @FXML
+  private Button resetRotationButton;
+  @FXML
   private CheckBox vectorCancellingCheckBox;
   @FXML
   private Slider vectorCancellingSlider;
@@ -167,7 +170,7 @@ public class Controller implements Initializable {
     translationYTextField.textProperty().addListener(translationUpdate);
 
     InvalidationListener cameraPosUpdate = observable ->
-      producer.setFrameSettings(new ObjFrameSettings(new Vector3(
+      producer.setFrameSettings(ObjSettingsFactory.cameraPosition(new Vector3(
         tryParse(cameraXTextField.getText()),
         tryParse(cameraYTextField.getText()),
         tryParse(cameraZTextField.getText())
@@ -178,15 +181,17 @@ public class Controller implements Initializable {
     cameraZTextField.textProperty().addListener(cameraPosUpdate);
 
     InvalidationListener rotateUpdate = observable ->
-      producer.setFrameSettings(new ObjFrameSettings(new Vector3(
+      producer.setFrameSettings(ObjSettingsFactory.rotation(new Vector3(
         tryParse(rotateXTextField.getText()),
         tryParse(rotateYTextField.getText()),
         tryParse(rotateZTextField.getText())
-      ), null), false);
+      )));
 
     rotateXTextField.textProperty().addListener(rotateUpdate);
     rotateYTextField.textProperty().addListener(rotateUpdate);
     rotateZTextField.textProperty().addListener(rotateUpdate);
+
+    resetRotationButton.setOnAction(e -> producer.setFrameSettings(ObjSettingsFactory.resetRotation()));
 
     InvalidationListener vectorCancellingListener = e ->
       updateEffect(EffectType.VECTOR_CANCELLING, vectorCancellingCheckBox.isSelected(),
@@ -219,7 +224,10 @@ public class Controller implements Initializable {
   }
 
   private void setFocalLength(double focalLength) {
-    Vector3 pos = (Vector3) producer.setFrameSettings(new ObjFrameSettings(focalLength), true);
+    Vector3 pos = (Vector3) producer.setFrameSettings(
+      ObjSettingsFactory.focalLength(focalLength),
+      true
+    );
     cameraXTextField.setText(String.valueOf(pos.getX()));
     cameraYTextField.setText(String.valueOf(pos.getY()));
     cameraZTextField.setText(String.valueOf(pos.getZ()));
@@ -227,8 +235,7 @@ public class Controller implements Initializable {
 
   private void setObjectRotateSpeed(double rotateSpeed) {
     producer.setFrameSettings(
-      new ObjFrameSettings(null, (Math.exp(3 * rotateSpeed) - 1) / 50),
-      false
+      ObjSettingsFactory.rotateSpeed((Math.exp(3 * rotateSpeed) - 1) / 50)
     );
   }
 
