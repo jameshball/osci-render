@@ -35,9 +35,9 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_REPOSITORY: jameshball/osci-render
 
-  release-mac:
+  release-debian:
 
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2
@@ -49,14 +49,14 @@ jobs:
       - name: Build with Maven
         run: |
           mvn -B package
-          mvn -B jpackage:jpackage@mac
+          mvn -B jpackage:jpackage@debian
           version=$(mvn help:evaluate -Dexpression="project.version" -q -DforceStdout)
           echo "VERSION=$version" >> $GITHUB_ENV
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ env.VERSION }}
-          files: target/osci-render-${{ env.VERSION }}.dmg
+          files: target/osci-render-${{ env.VERSION }}.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: jameshball/osci-render

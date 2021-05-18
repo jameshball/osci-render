@@ -133,9 +133,9 @@
                         </configuration>
                     </execution>
                     <execution>
-                        <id>mac</id>
+                        <id>debian</id>
                         <configuration>
-                            <icon>src/main/resources/icons/icon.icns</icon>
+                            <type>deb</type>
                         </configuration>
                     </execution>
                 </executions>
