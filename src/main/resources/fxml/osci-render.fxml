@@ -12,7 +12,7 @@
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.RowConstraints?>
 
-<GridPane alignment="center" hgap="10" prefHeight="653.0" prefWidth="400.0" vgap="10" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1">
+<GridPane alignment="center" hgap="10" prefHeight="719.0" prefWidth="400.0" vgap="10" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1">
   <columnConstraints>
     <ColumnConstraints />
   </columnConstraints>
@@ -21,61 +21,55 @@
   </rowConstraints>
   <AnchorPane prefHeight="737.0" prefWidth="400.0">
     <Button fx:id="chooseFileButton" layoutX="8.0" layoutY="15.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="119.0" text="Choose File" />
-    <SplitPane dividerPositions="0.31499312242090777, 0.6158872077028884" layoutX="6.0" layoutY="63.0" orientation="VERTICAL" prefHeight="583.0" prefWidth="388.0">
+    <SplitPane dividerPositions="0.31499312242090777, 0.6158872077028884" layoutX="6.0" layoutY="63.0" orientation="VERTICAL" prefHeight="649.0" prefWidth="388.0">
       <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="178.0" prefWidth="396.0">
-        <Slider fx:id="rotateSpeedSlider" layoutX="116.0" layoutY="79.0" max="10.0" prefHeight="14.0" prefWidth="198.0" />
-        <Label layoutX="37.0" layoutY="77.0" text="Rotate speed" />
-        <Label fx:id="rotateSpeedLabel" layoutX="316.0" layoutY="77.0" maxWidth="40.0" text="0" />
-        <Slider fx:id="translationSpeedSlider" layoutX="116.0" layoutY="105.0" max="10.0" prefHeight="14.0" prefWidth="198.0" />
-        <Label layoutX="14.0" layoutY="103.0" text="Translation speed" />
-        <Label fx:id="translationSpeedLabel" layoutX="316.0" layoutY="103.0" maxWidth="40.0" text="0" />
-        <Slider fx:id="scaleSlider" layoutX="116.0" layoutY="130.0" max="10.0" prefHeight="14.0" prefWidth="198.0" value="1.0" />
-        <Label layoutX="80.0" layoutY="128.0" text="Scale" />
-        <Label fx:id="scaleLabel" layoutX="316.0" layoutY="128.0" maxWidth="40.0" text="1" />
+        <Slider fx:id="rotateSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="90.0" majorTickUnit="1.0" max="10.0" prefHeight="38.0" prefWidth="247.0" showTickLabels="true" showTickMarks="true" />
+        <Label layoutX="37.0" layoutY="88.0" text="Rotate speed" />
+        <Slider fx:id="translationSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="128.0" majorTickUnit="1.0" max="10.0" prefHeight="38.0" prefWidth="247.0" showTickLabels="true" showTickMarks="true" />
+        <Label layoutX="14.0" layoutY="126.0" text="Translation speed" />
+        <Slider fx:id="scaleSlider" blockIncrement="0.05" layoutX="116.0" layoutY="167.0" majorTickUnit="1.0" max="10.0" prefHeight="38.0" prefWidth="247.0" showTickLabels="true" showTickMarks="true" value="1.0" />
+        <Label layoutX="80.0" layoutY="165.0" text="Scale" />
         <Label layoutX="70.0" layoutY="50.0" text="Weight" />
         <TextField fx:id="translationXTextField" layoutX="136.0" layoutY="13.0" prefHeight="26.0" prefWidth="70.0" text="0" />
         <Label layoutX="51.0" layoutY="18.0" text="Translation" />
         <Label layoutX="120.0" layoutY="18.0" text="x :" />
         <Label layoutX="217.0" layoutY="18.0" text="y :" />
         <TextField fx:id="translationYTextField" layoutX="234.0" layoutY="13.0" prefHeight="26.0" prefWidth="70.0" text="0" />
-            <Slider fx:id="weightSlider" layoutX="116.0" layoutY="52.0" max="1000.0" prefHeight="14.0" prefWidth="198.0" value="100.0" />
-            <Label fx:id="weightLabel" layoutX="316.0" layoutY="51.0" maxWidth="40.0" text="100" />
+            <Slider fx:id="weightSlider" blockIncrement="1.0" layoutX="116.0" layoutY="52.0" majorTickUnit="100.0" max="1000.0" prefHeight="38.0" prefWidth="247.0" showTickLabels="true" showTickMarks="true" value="100.0" />
       </AnchorPane>
          <TitledPane animated="false" collapsible="false" prefHeight="169.0" prefWidth="385.0" text="Effects" SplitPane.resizableWithParent="false">
            <content>
              <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="66.0" prefWidth="383.0">
                   <children>
                      <CheckBox fx:id="vectorCancellingCheckBox" layoutX="14.0" layoutY="14.0" mnemonicParsing="false" text="Vector cancelling" />
-                     <Slider fx:id="vectorCancellingSlider" blockIncrement="1.0" disable="true" layoutX="141.0" layoutY="16.0" majorTickUnit="1.0" max="10.0" min="2.0" minorTickCount="0" prefHeight="33.0" prefWidth="198.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" value="2.0" />
+                     <Slider fx:id="vectorCancellingSlider" blockIncrement="0.05" disable="true" layoutX="141.0" layoutY="16.0" majorTickUnit="1.0" max="10.0" min="2.0" prefHeight="38.0" prefWidth="222.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" value="2.0" />
                      <CheckBox fx:id="bitCrushCheckBox" layoutX="14.0" layoutY="52.0" mnemonicParsing="false" text="Bit crush" />
-                     <Slider fx:id="bitCrushSlider" blockIncrement="1.0" disable="true" layoutX="141.0" layoutY="55.0" majorTickUnit="0.5" max="3.0" minorTickCount="0" prefHeight="33.0" prefWidth="198.0" showTickLabels="true" showTickMarks="true" value="2.0" />
+                     <Slider fx:id="bitCrushSlider" blockIncrement="0.01" disable="true" layoutX="141.0" layoutY="55.0" majorTickUnit="0.5" max="3.0" prefHeight="38.0" prefWidth="222.0" showTickLabels="true" showTickMarks="true" value="2.0" />
                   </children>
                </AnchorPane>
            </content>
          </TitledPane>
       <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" maxHeight="-Infinity" maxWidth="-Infinity" prefHeight="400.0" prefWidth="385.0" text="3D .obj file settings" SplitPane.resizableWithParent="false">
         <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="155.0" prefWidth="384.0">
-          <Slider fx:id="focalLengthSlider" blockIncrement="2.0" layoutX="116.0" layoutY="15.0" max="2.0" min="1.0E-5" prefHeight="14.0" prefWidth="198.0" value="1.0" />
+          <Slider fx:id="focalLengthSlider" blockIncrement="0.01" layoutX="116.0" layoutY="15.0" majorTickUnit="0.2" max="2.0" min="1.0E-5" prefHeight="38.0" prefWidth="247.0" showTickLabels="true" showTickMarks="true" value="1.0" />
           <Label layoutX="43.0" layoutY="14.0" text="Focal length" />
-          <Label fx:id="focalLengthLabel" layoutX="316.0" layoutY="14.0" text="1" />
-               <TextField fx:id="cameraXTextField" layoutX="134.0" layoutY="42.0" prefHeight="26.0" prefWidth="58.0" text="0" />
-               <Label layoutX="44.0" layoutY="47.0" text="Camera pos" />
-               <Label layoutX="118.0" layoutY="47.0" text="x :" />
-               <Label layoutX="199.0" layoutY="46.0" text="y :" />
-               <TextField fx:id="cameraYTextField" layoutX="218.0" layoutY="42.0" prefHeight="26.0" prefWidth="58.0" text="0" />
-               <Label layoutX="283.0" layoutY="46.0" text="z :" />
-               <TextField fx:id="cameraZTextField" layoutX="302.0" layoutY="42.0" prefHeight="26.0" prefWidth="58.0" text="-2.5" />
-               <Slider fx:id="objectRotateSpeedSlider" blockIncrement="2.0" layoutX="116.0" layoutY="83.0" max="1.0" prefHeight="14.0" prefWidth="198.0" value="0.1" />
-               <Label layoutX="36.0" layoutY="82.0" text="Rotate speed" />
-               <Label fx:id="objectRotateSpeedLabel" layoutX="316.0" layoutY="82.0" text="0.1" />
-               <TextField fx:id="rotateXTextField" layoutX="134.0" layoutY="111.0" prefHeight="26.0" prefWidth="58.0" text="0" />
-               <Label layoutX="62.0" layoutY="116.0" text="Rotation" />
-               <Label layoutX="118.0" layoutY="116.0" text="x :" />
-               <Label layoutX="199.0" layoutY="115.0" text="y :" />
-               <TextField fx:id="rotateYTextField" layoutX="218.0" layoutY="111.0" prefHeight="26.0" prefWidth="58.0" text="0" />
-               <Label layoutX="283.0" layoutY="115.0" text="z :" />
-               <TextField fx:id="rotateZTextField" layoutX="302.0" layoutY="111.0" prefHeight="26.0" prefWidth="58.0" text="0" />
-               <Button fx:id="resetRotationButton" layoutX="145.0" layoutY="153.0" mnemonicParsing="false" text="Reset Rotation" />
+               <TextField fx:id="cameraXTextField" layoutX="134.0" layoutY="56.0" prefHeight="26.0" prefWidth="58.0" text="0" />
+               <Label layoutX="44.0" layoutY="61.0" text="Camera pos" />
+               <Label layoutX="118.0" layoutY="61.0" text="x :" />
+               <Label layoutX="199.0" layoutY="60.0" text="y :" />
+               <TextField fx:id="cameraYTextField" layoutX="218.0" layoutY="56.0" prefHeight="26.0" prefWidth="58.0" text="0" />
+               <Label layoutX="283.0" layoutY="60.0" text="z :" />
+               <TextField fx:id="cameraZTextField" layoutX="302.0" layoutY="56.0" prefHeight="26.0" prefWidth="58.0" text="-2.5" />
+               <Slider fx:id="objectRotateSpeedSlider" blockIncrement="0.005" layoutX="116.0" layoutY="97.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="247.0" showTickLabels="true" showTickMarks="true" value="0.1" />
+               <Label layoutX="36.0" layoutY="96.0" text="Rotate speed" />
+               <TextField fx:id="rotateXTextField" layoutX="134.0" layoutY="139.0" prefHeight="26.0" prefWidth="58.0" text="0" />
+               <Label layoutX="62.0" layoutY="144.0" text="Rotation" />
+               <Label layoutX="118.0" layoutY="144.0" text="x :" />
+               <Label layoutX="199.0" layoutY="143.0" text="y :" />
+               <TextField fx:id="rotateYTextField" layoutX="218.0" layoutY="139.0" prefHeight="26.0" prefWidth="58.0" text="0" />
+               <Label layoutX="283.0" layoutY="143.0" text="z :" />
+               <TextField fx:id="rotateZTextField" layoutX="302.0" layoutY="139.0" prefHeight="26.0" prefWidth="58.0" text="0" />
+               <Button fx:id="resetRotationButton" layoutX="145.0" layoutY="183.0" mnemonicParsing="false" text="Reset Rotation" />
         </AnchorPane>
       </TitledPane>
     </SplitPane>
