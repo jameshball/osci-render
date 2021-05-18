@@ -8,17 +8,22 @@ public class ObjFrameSettings {
   protected Vector3 cameraPos;
   protected Vector3 rotation;
   protected Double rotateSpeed;
+  protected boolean resetRotation = false;
 
-  public ObjFrameSettings(double focalLength) {
+  protected ObjFrameSettings(double focalLength) {
     this.focalLength = focalLength;
   }
 
-  public ObjFrameSettings(Vector3 cameraPos) {
+  protected ObjFrameSettings(Vector3 cameraPos) {
     this.cameraPos = cameraPos;
   }
 
-  public ObjFrameSettings(Vector3 rotation, Double rotateSpeed) {
+  protected ObjFrameSettings(Vector3 rotation, Double rotateSpeed) {
     this.rotation = rotation;
     this.rotateSpeed = rotateSpeed;
+  }
+
+  protected ObjFrameSettings(boolean resetRotation) {
+    this.resetRotation = resetRotation;
   }
 }

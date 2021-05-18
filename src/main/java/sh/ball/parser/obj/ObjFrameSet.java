@@ -48,6 +48,9 @@ public class ObjFrameSet implements FrameSet<List<Shape>> {
       if (obj.rotateSpeed != null) {
         this.rotateSpeed = obj.rotateSpeed;
       }
+      if (obj.resetRotation) {
+        object.resetRotation();
+      }
     }
 
     return camera.getPos();
