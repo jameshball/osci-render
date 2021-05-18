@@ -31,6 +31,7 @@ import org.xml.sax.SAXException;
 import sh.ball.audio.effect.TranslateEffect;
 import sh.ball.engine.Vector3;
 import sh.ball.parser.obj.ObjFrameSettings;
+import sh.ball.parser.obj.ObjSettingsFactory;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.ParserFactory;
 import sh.ball.shapes.Shape;
@@ -40,6 +41,7 @@ public class Controller implements Initializable {
 
   private static final int SAMPLE_RATE = 192000;
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
+  private static final double DEFAULT_ROTATE_SPEED = 0.1;
 
   private final FileChooser fileChooser = new FileChooser();
   private final Renderer<List<Shape>> renderer;
@@ -90,6 +92,18 @@ public class Controller implements Initializable {
   @FXML
   private TextField cameraZTextField;
   @FXML
+  private Slider objectRotateSpeedSlider;
+  @FXML
+  private Label objectRotateSpeedLabel;
+  @FXML
+  private TextField rotateXTextField;
+  @FXML
+  private TextField rotateYTextField;
+  @FXML
+  private TextField rotateZTextField;
+  @FXML
+  private Button resetRotationButton;
+  @FXML
   private CheckBox vectorCancellingCheckBox;
   @FXML
   private Slider vectorCancellingSlider;
@@ -117,7 +131,9 @@ public class Controller implements Initializable {
       scaleSlider,
       new SliderUpdater<>(scaleLabel::setText, scaleEffect::setScale),
       focalLengthSlider,
-      new SliderUpdater<>(focalLengthLabel::setText, this::setFocalLength)
+      new SliderUpdater<>(focalLengthLabel::setText, this::setFocalLength),
+      objectRotateSpeedSlider,
+      new SliderUpdater<>(objectRotateSpeedLabel::setText, this::setObjectRotateSpeed)
     );
   }
 
@@ -132,6 +148,7 @@ public class Controller implements Initializable {
     );
   }
 
+  // TODO: Refactor and clean up duplication
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
     Map<Slider, SliderUpdater<Double>> sliders = initializeSliderMap();
@@ -153,15 +170,28 @@ public class Controller implements Initializable {
     translationYTextField.textProperty().addListener(translationUpdate);
 
     InvalidationListener cameraPosUpdate = observable ->
-      producer.setFrameSettings(new ObjFrameSettings(new Vector3(
+      producer.setFrameSettings(ObjSettingsFactory.cameraPosition(new Vector3(
         tryParse(cameraXTextField.getText()),
         tryParse(cameraYTextField.getText()),
         tryParse(cameraZTextField.getText())
-    )));
+    )), true);
 
     cameraXTextField.textProperty().addListener(cameraPosUpdate);
     cameraYTextField.textProperty().addListener(cameraPosUpdate);
     cameraZTextField.textProperty().addListener(cameraPosUpdate);
+
+    InvalidationListener rotateUpdate = observable ->
+      producer.setFrameSettings(ObjSettingsFactory.rotation(new Vector3(
+        tryParse(rotateXTextField.getText()),
+        tryParse(rotateYTextField.getText()),
+        tryParse(rotateZTextField.getText())
+      )));
+
+    rotateXTextField.textProperty().addListener(rotateUpdate);
+    rotateYTextField.textProperty().addListener(rotateUpdate);
+    rotateZTextField.textProperty().addListener(rotateUpdate);
+
+    resetRotationButton.setOnAction(e -> producer.setFrameSettings(ObjSettingsFactory.resetRotation()));
 
     InvalidationListener vectorCancellingListener = e ->
       updateEffect(EffectType.VECTOR_CANCELLING, vectorCancellingCheckBox.isSelected(),
@@ -183,6 +213,8 @@ public class Controller implements Initializable {
       }
     });
 
+    setObjectRotateSpeed(DEFAULT_ROTATE_SPEED);
+
     renderer.addEffect(EffectType.SCALE, scaleEffect);
     renderer.addEffect(EffectType.ROTATE, rotateEffect);
     renderer.addEffect(EffectType.TRANSLATE, translateEffect);
@@ -192,10 +224,19 @@ public class Controller implements Initializable {
   }
 
   private void setFocalLength(double focalLength) {
-    Vector3 pos = (Vector3) producer.setFrameSettings(new ObjFrameSettings(focalLength));
+    Vector3 pos = (Vector3) producer.setFrameSettings(
+      ObjSettingsFactory.focalLength(focalLength),
+      true
+    );
     cameraXTextField.setText(String.valueOf(pos.getX()));
     cameraYTextField.setText(String.valueOf(pos.getY()));
     cameraZTextField.setText(String.valueOf(pos.getZ()));
+  }
+
+  private void setObjectRotateSpeed(double rotateSpeed) {
+    producer.setFrameSettings(
+      ObjSettingsFactory.rotateSpeed((Math.exp(3 * rotateSpeed) - 1) / 50)
+    );
   }
 
   private double tryParse(String value) {
