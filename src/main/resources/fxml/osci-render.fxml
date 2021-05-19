@@ -75,6 +75,6 @@
     </SplitPane>
     <Label fx:id="fileLabel" layoutX="140.0" layoutY="29.0" maxWidth="250.0" />
       <Button fx:id="recordButton" layoutX="8.0" layoutY="68.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Record" />
-      <Label fx:id="recordLabel" layoutX="140.0" layoutY="73.0" />
+      <Label fx:id="recordLabel" layoutX="140.0" layoutY="73.0" maxWidth="250.0" />
   </AnchorPane>
 </GridPane>
