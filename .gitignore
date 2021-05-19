@@ -6,3 +6,6 @@
 
 # Ignore local binaries for xt-audio
 /win32-x64
+
+# Ignore any .wav file output
+*.wav

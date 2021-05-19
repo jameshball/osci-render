@@ -13,6 +13,7 @@ import xt.audio.Structs.XtFormat;
 import xt.audio.Structs.XtMix;
 import xt.audio.Structs.XtStreamParams;
 
+import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -21,16 +22,24 @@ import java.util.concurrent.BlockingQueue;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioInputStream;
 import java.util.List;
 
-public class AudioPlayer implements Renderer<List<Shape>> {
+public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
 
   private static final int BUFFER_SIZE = 20;
+  private static final int BITS_PER_SAMPLE = 16;
+  private static final boolean SIGNED = true;
+  private static final boolean BIG_ENDIAN = false;
 
   private final XtFormat format;
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
   private final Map<Object, Effect> effects = new HashMap<>();
 
+  private ByteArrayOutputStream outputStream;
+  private boolean recording = false;
+  private int framesRecorded = 0;
   private List<Shape> frame;
   private int currentShape = 0;
   private int audioFramesDrawn = 0;
@@ -45,22 +54,35 @@ public class AudioPlayer implements Renderer<List<Shape>> {
     this.format = new XtFormat(mix, channels);
   }
 
-  private int render(XtStream stream, XtBuffer buffer, Object user) throws InterruptedException {
+  private int render(XtStream stream, XtBuffer buffer, Object user) throws InterruptedException, IOException {
     XtSafeBuffer safe = XtSafeBuffer.get(stream);
     safe.lock(buffer);
     float[] output = (float[]) safe.getOutput();
 
     for (int f = 0; f < buffer.frames; f++) {
-      Shape shape = getCurrentShape();
-
-      shape = shape.setWeight(weight);
+      Shape shape = getCurrentShape().setWeight(weight);
 
       double totalAudioFrames = shape.getWeight() * shape.getLength();
       double drawingProgress = totalAudioFrames == 0 ? 1 : audioFramesDrawn / totalAudioFrames;
       Vector2 nextVector = applyEffects(f, shape.nextVector(drawingProgress));
 
-      output[f * format.channels.outputs] = cutoff((float) nextVector.getX());
-      output[f * format.channels.outputs + 1] = cutoff((float) nextVector.getY());
+      float nextX = cutoff((float) nextVector.getX());
+      float nextY = cutoff((float) nextVector.getY());
+
+      output[f * format.channels.outputs] = nextX;
+      output[f * format.channels.outputs + 1] = nextY;
+
+      if (recording) {
+        int left = (int)(nextX * Short.MAX_VALUE);
+        int right = (int)(nextY * Short.MAX_VALUE);
+
+        outputStream.write((byte) left);
+        outputStream.write((byte)(left >> 8));
+        outputStream.write((byte) right);
+        outputStream.write((byte)(right >> 8));
+
+        framesRecorded++;
+      }
 
       audioFramesDrawn++;
 
@@ -172,4 +194,21 @@ public class AudioPlayer implements Renderer<List<Shape>> {
     effects.remove(identifier);
   }
 
+  @Override
+  public void startRecord() {
+    outputStream = new ByteArrayOutputStream();
+    framesRecorded = 0;
+    recording = true;
+  }
+
+  @Override
+  public AudioInputStream stopRecord() {
+    recording = false;
+    byte[] input = outputStream.toByteArray();
+    outputStream = null;
+
+    AudioFormat audioFormat = new AudioFormat(format.mix.rate, BITS_PER_SAMPLE, format.channels.outputs, SIGNED, BIG_ENDIAN);
+
+    return new AudioInputStream(new ByteArrayInputStream(input), audioFormat, framesRecorded);
+  }
 }
