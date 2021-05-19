@@ -66,22 +66,14 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
       double drawingProgress = totalAudioFrames == 0 ? 1 : audioFramesDrawn / totalAudioFrames;
       Vector2 nextVector = applyEffects(f, shape.nextVector(drawingProgress));
 
-      float nextX = cutoff((float) nextVector.getX());
-      float nextY = cutoff((float) nextVector.getY());
+      float leftChannel = cutoff((float) nextVector.getX());
+      float rightChannel = cutoff((float) nextVector.getY());
 
-      output[f * format.channels.outputs] = nextX;
-      output[f * format.channels.outputs + 1] = nextY;
+      output[f * format.channels.outputs] = leftChannel;
+      output[f * format.channels.outputs + 1] = rightChannel;
 
       if (recording) {
-        int left = (int)(nextX * Short.MAX_VALUE);
-        int right = (int)(nextY * Short.MAX_VALUE);
-
-        outputStream.write((byte) left);
-        outputStream.write((byte)(left >> 8));
-        outputStream.write((byte) right);
-        outputStream.write((byte)(right >> 8));
-
-        framesRecorded++;
+        writeVector(leftChannel, rightChannel);
       }
 
       audioFramesDrawn++;
@@ -98,6 +90,18 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
     }
     safe.unlock(buffer);
     return 0;
+  }
+
+  private void writeVector(float leftChannel, float rightChannel) {
+    int left = (int)(leftChannel * Short.MAX_VALUE);
+    int right = (int)(rightChannel * Short.MAX_VALUE);
+
+    outputStream.write((byte) left);
+    outputStream.write((byte)(left >> 8));
+    outputStream.write((byte) right);
+    outputStream.write((byte)(right >> 8));
+
+    framesRecorded++;
   }
 
   private float cutoff(float value) {
