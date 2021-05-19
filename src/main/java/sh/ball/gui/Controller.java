@@ -46,7 +46,6 @@ public class Controller implements Initializable {
 
   private static final int SAMPLE_RATE = 192000;
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
-  private static final double DEFAULT_ROTATE_SPEED = 0.1;
 
   private final FileChooser fileChooser = new FileChooser();
   private final Renderer<List<Shape>, AudioInputStream> renderer;
@@ -129,9 +128,9 @@ public class Controller implements Initializable {
       scaleSlider,
       scaleEffect::setScale,
       focalLengthSlider,
-      this::setFocalLength,
+      d -> updateFocalLength(),
       objectRotateSpeedSlider,
-      this::setObjectRotateSpeed
+      d -> updateObjectRotateSpeed()
     );
   }
 
@@ -146,7 +145,6 @@ public class Controller implements Initializable {
     );
   }
 
-  // TODO: Refactor and clean up duplication
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
     Map<Slider, Consumer<Double>> sliders = initializeSliderMap();
@@ -158,36 +156,16 @@ public class Controller implements Initializable {
       );
     }
 
-    InvalidationListener translationUpdate = observable ->
-      translateEffect.setTranslation(new Vector2(
-        tryParse(translationXTextField.getText()),
-        tryParse(translationYTextField.getText())
-      ));
+    translationXTextField.textProperty().addListener(e -> updateTranslation());
+    translationYTextField.textProperty().addListener(e -> updateTranslation());
 
-    translationXTextField.textProperty().addListener(translationUpdate);
-    translationYTextField.textProperty().addListener(translationUpdate);
+    cameraXTextField.textProperty().addListener(e -> updateCameraPos());
+    cameraYTextField.textProperty().addListener(e -> updateCameraPos());
+    cameraZTextField.textProperty().addListener(e -> updateCameraPos());
 
-    InvalidationListener cameraPosUpdate = observable ->
-      producer.setFrameSettings(ObjSettingsFactory.cameraPosition(new Vector3(
-        tryParse(cameraXTextField.getText()),
-        tryParse(cameraYTextField.getText()),
-        tryParse(cameraZTextField.getText())
-    )));
-
-    cameraXTextField.textProperty().addListener(cameraPosUpdate);
-    cameraYTextField.textProperty().addListener(cameraPosUpdate);
-    cameraZTextField.textProperty().addListener(cameraPosUpdate);
-
-    InvalidationListener rotateUpdate = observable ->
-      producer.setFrameSettings(ObjSettingsFactory.rotation(new Vector3(
-        tryParse(rotateXTextField.getText()),
-        tryParse(rotateYTextField.getText()),
-        tryParse(rotateZTextField.getText())
-      )));
-
-    rotateXTextField.textProperty().addListener(rotateUpdate);
-    rotateYTextField.textProperty().addListener(rotateUpdate);
-    rotateZTextField.textProperty().addListener(rotateUpdate);
+    rotateXTextField.textProperty().addListener(e -> updateRotation());
+    rotateYTextField.textProperty().addListener(e -> updateRotation());
+    rotateZTextField.textProperty().addListener(e -> updateRotation());
 
     resetRotationButton.setOnAction(e -> producer.setFrameSettings(ObjSettingsFactory.resetRotation()));
 
@@ -222,7 +200,7 @@ public class Controller implements Initializable {
 
     recordButton.setOnAction(event -> toggleRecord());
 
-    setObjectRotateSpeed(DEFAULT_ROTATE_SPEED);
+    updateObjectRotateSpeed();
 
     renderer.addEffect(EffectType.SCALE, scaleEffect);
     renderer.addEffect(EffectType.ROTATE, rotateEffect);
@@ -258,14 +236,46 @@ public class Controller implements Initializable {
     }
   }
 
-  private void setFocalLength(double focalLength) {
+  private void updateFocalLength() {
+    double focalLength = focalLengthSlider.getValue();
     producer.setFrameSettings(ObjSettingsFactory.focalLength(focalLength));
   }
 
-  private void setObjectRotateSpeed(double rotateSpeed) {
+  private void updateObjectRotateSpeed() {
+    double rotateSpeed = objectRotateSpeedSlider.getValue();
     producer.setFrameSettings(
       ObjSettingsFactory.rotateSpeed((Math.exp(3 * rotateSpeed) - 1) / 50)
     );
+  }
+
+  private void updateTranslation() {
+    translateEffect.setTranslation(new Vector2(
+      tryParse(translationXTextField.getText()),
+      tryParse(translationYTextField.getText())
+    ));
+  }
+
+  private void resetCameraPos() {
+    cameraXTextField.setText("");
+    cameraYTextField.setText("");
+    cameraZTextField.setText("");
+  }
+
+  private void updateCameraPos() {
+    renderer.flushFrames();
+    producer.setFrameSettings(ObjSettingsFactory.cameraPosition(new Vector3(
+      tryParse(cameraXTextField.getText()),
+      tryParse(cameraYTextField.getText()),
+      tryParse(cameraZTextField.getText())
+    )));
+  }
+
+  private void updateRotation() {
+    producer.setFrameSettings(ObjSettingsFactory.rotation(new Vector3(
+      tryParse(rotateXTextField.getText()),
+      tryParse(rotateYTextField.getText()),
+      tryParse(rotateZTextField.getText())
+    )));
   }
 
   private double tryParse(String value) {
@@ -290,10 +300,14 @@ public class Controller implements Initializable {
     try {
       producer.stop();
       String path = file.getAbsolutePath();
+      resetCameraPos();
       producer = new FrameProducer<>(
         renderer,
         ParserFactory.getParser(path).parse()
       );
+      updateRotation();
+      updateObjectRotateSpeed();
+      updateFocalLength();
       executor.submit(producer);
 
       if (file.exists() && !file.isDirectory()) {
