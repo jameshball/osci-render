@@ -50,12 +50,9 @@ public class ObjParser extends FileParser<FrameSet<List<Shape>>> {
   @Override
   public FrameSet<List<Shape>> parse() throws IllegalArgumentException, IOException {
     object = new WorldObject(input);
+    camera.findZPos(object);
 
-    if (isDefaultPosition) {
-      camera.findZPos(object);
-    }
-
-    return new ObjFrameSet(object, camera, isDefaultPosition);
+    return new ObjFrameSet(object, camera);
   }
 
   // If camera position arguments haven't been specified, automatically work out the position of

@@ -31,7 +31,6 @@ import javax.xml.parsers.ParserConfigurationException;
 import org.xml.sax.SAXException;
 import sh.ball.audio.effect.TranslateEffect;
 import sh.ball.engine.Vector3;
-import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjSettingsFactory;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.ParserFactory;
@@ -163,7 +162,7 @@ public class Controller implements Initializable {
         tryParse(cameraXTextField.getText()),
         tryParse(cameraYTextField.getText()),
         tryParse(cameraZTextField.getText())
-    )), true);
+    )));
 
     cameraXTextField.textProperty().addListener(cameraPosUpdate);
     cameraYTextField.textProperty().addListener(cameraPosUpdate);
@@ -213,13 +212,7 @@ public class Controller implements Initializable {
   }
 
   private void setFocalLength(double focalLength) {
-    Vector3 pos = (Vector3) producer.setFrameSettings(
-      ObjSettingsFactory.focalLength(focalLength),
-      true
-    );
-    cameraXTextField.setText(String.valueOf(pos.getX()));
-    cameraYTextField.setText(String.valueOf(pos.getY()));
-    cameraZTextField.setText(String.valueOf(pos.getZ()));
+    producer.setFrameSettings(ObjSettingsFactory.focalLength(focalLength));
   }
 
   private void setObjectRotateSpeed(double rotateSpeed) {
