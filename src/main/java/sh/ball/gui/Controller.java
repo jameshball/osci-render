@@ -13,6 +13,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
@@ -202,6 +204,15 @@ public class Controller implements Initializable {
     bitCrushSlider.valueProperty().addListener(bitCrushListener);
     bitCrushCheckBox.selectedProperty().addListener(bitCrushListener);
 
+    fileChooser.setInitialFileName("out.wav");
+    fileChooser.getExtensionFilters().addAll(
+      new FileChooser.ExtensionFilter("All Files", "*.*"),
+      new FileChooser.ExtensionFilter("WAV Files", "*.wav"),
+      new FileChooser.ExtensionFilter("Wavefront OBJ Files", "*.obj"),
+      new FileChooser.ExtensionFilter("SVG Files", "*.svg"),
+      new FileChooser.ExtensionFilter("Text Files", "*.txt")
+    );
+
     chooseFileButton.setOnAction(e -> {
       File file = fileChooser.showOpenDialog(stage);
       if (file != null) {
@@ -209,24 +220,7 @@ public class Controller implements Initializable {
       }
     });
 
-    recordButton.setOnAction(event -> {
-      recording = !recording;
-      if (recording) {
-        recordLabel.setText("Recording...");
-        recordButton.setText("Stop Recording");
-        renderer.startRecord();
-      } else {
-        recordLabel.setText("");
-        recordButton.setText("Record");
-        AudioInputStream input = renderer.stopRecord();
-        try {
-          AudioSystem.write(input, AudioFileFormat.Type.WAVE, new File("out.wav"));
-          input.close();
-        } catch (IOException e) {
-          e.printStackTrace();
-        }
-      }
-    });
+    recordButton.setOnAction(event -> toggleRecord());
 
     setObjectRotateSpeed(DEFAULT_ROTATE_SPEED);
 
@@ -236,6 +230,32 @@ public class Controller implements Initializable {
 
     executor.submit(producer);
     new Thread(renderer).start();
+  }
+
+  private void toggleRecord() {
+    recording = !recording;
+    if (recording) {
+      recordLabel.setText("Recording...");
+      recordButton.setText("Stop Recording");
+      renderer.startRecord();
+    } else {
+      recordButton.setText("Record");
+      AudioInputStream input = renderer.stopRecord();
+      try {
+        File file = fileChooser.showSaveDialog(stage);
+        SimpleDateFormat formatter= new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
+        Date date = new Date(System.currentTimeMillis());
+        if (file == null) {
+          file = new File("out-" + formatter.format(date) + ".wav");
+        }
+        AudioSystem.write(input, AudioFileFormat.Type.WAVE, file);
+        input.close();
+        recordLabel.setText("Saved to " + file.getAbsolutePath());
+      } catch (IOException e) {
+        recordLabel.setText("");
+        e.printStackTrace();
+      }
+    }
   }
 
   private void setFocalLength(double focalLength) {
