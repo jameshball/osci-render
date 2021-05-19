@@ -59,8 +59,8 @@ public class AudioPlayer implements Renderer<List<Shape>> {
       double drawingProgress = totalAudioFrames == 0 ? 1 : audioFramesDrawn / totalAudioFrames;
       Vector2 nextVector = applyEffects(f, shape.nextVector(drawingProgress));
 
-      output[f * format.channels.outputs] = (float) nextVector.getX();
-      output[f * format.channels.outputs + 1] = (float) nextVector.getY();
+      output[f * format.channels.outputs] = cutoff((float) nextVector.getX());
+      output[f * format.channels.outputs + 1] = cutoff((float) nextVector.getY());
 
       audioFramesDrawn++;
 
@@ -76,6 +76,15 @@ public class AudioPlayer implements Renderer<List<Shape>> {
     }
     safe.unlock(buffer);
     return 0;
+  }
+
+  private float cutoff(float value) {
+    if (value < -1) {
+      return -1;
+    } else if (value > 1) {
+      return 1;
+    }
+    return value;
   }
 
   private Vector2 applyEffects(int frame, Vector2 vector) {
