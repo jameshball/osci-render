@@ -252,7 +252,7 @@ public class Controller implements Initializable {
         input.close();
         recordLabel.setText("Saved to " + file.getAbsolutePath());
       } catch (IOException e) {
-        recordLabel.setText("");
+        recordLabel.setText("Error saving file");
         e.printStackTrace();
       }
     }
