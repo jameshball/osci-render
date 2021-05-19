@@ -24,12 +24,22 @@ public class EffectFactory {
     return (double) tmp / factor;
   }
 
-  public static Effect edgeStretch(double value) {
+  public static Effect horizontalDistort(double value) {
     return (count, v) -> {
       if (count % 2 == 0) {
         return v.translate(new Vector2(value, 0));
       } else {
         return v.translate(new Vector2(-value, 0));
+      }
+    };
+  }
+
+  public static Effect verticalDistort(double value) {
+    return (count, v) -> {
+      if (count % 2 == 0) {
+        return v.translate(new Vector2(0, value));
+      } else {
+        return v.translate(new Vector2(0, -value));
       }
     };
   }

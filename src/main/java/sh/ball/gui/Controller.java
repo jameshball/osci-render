@@ -108,6 +108,14 @@ public class Controller implements Initializable {
   private CheckBox bitCrushCheckBox;
   @FXML
   private Slider bitCrushSlider;
+  @FXML
+  private CheckBox verticalDistortCheckBox;
+  @FXML
+  private Slider verticalDistortSlider;
+  @FXML
+  private CheckBox horizontalDistortCheckBox;
+  @FXML
+  private Slider horizontalDistortSlider;
 
   public Controller(Renderer<List<Shape>, AudioInputStream> renderer) throws IOException {
     this.renderer = renderer;
@@ -141,7 +149,11 @@ public class Controller implements Initializable {
       EffectType.VECTOR_CANCELLING,
       vectorCancellingSlider,
       EffectType.BIT_CRUSH,
-      bitCrushSlider
+      bitCrushSlider,
+      EffectType.VERTICAL_DISTORT,
+      verticalDistortSlider,
+      EffectType.HORIZONTAL_DISTORT,
+      horizontalDistortSlider
     );
   }
 
@@ -175,12 +187,24 @@ public class Controller implements Initializable {
     InvalidationListener bitCrushListener = e ->
       updateEffect(EffectType.BIT_CRUSH, bitCrushCheckBox.isSelected(),
         EffectFactory.bitCrush(bitCrushSlider.getValue()));
+    InvalidationListener verticalDistortListener = e ->
+      updateEffect(EffectType.VERTICAL_DISTORT, verticalDistortCheckBox.isSelected(),
+        EffectFactory.verticalDistort(verticalDistortSlider.getValue()));
+    InvalidationListener horizontalDistortListener = e ->
+      updateEffect(EffectType.HORIZONTAL_DISTORT, horizontalDistortCheckBox.isSelected(),
+        EffectFactory.horizontalDistort(horizontalDistortSlider.getValue()));
 
     vectorCancellingSlider.valueProperty().addListener(vectorCancellingListener);
     vectorCancellingCheckBox.selectedProperty().addListener(vectorCancellingListener);
 
     bitCrushSlider.valueProperty().addListener(bitCrushListener);
     bitCrushCheckBox.selectedProperty().addListener(bitCrushListener);
+
+    verticalDistortSlider.valueProperty().addListener(verticalDistortListener);
+    verticalDistortCheckBox.selectedProperty().addListener(verticalDistortListener);
+
+    horizontalDistortSlider.valueProperty().addListener(horizontalDistortListener);
+    horizontalDistortCheckBox.selectedProperty().addListener(horizontalDistortListener);
 
     fileChooser.setInitialFileName("out.wav");
     fileChooser.getExtensionFilters().addAll(

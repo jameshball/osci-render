@@ -12,17 +12,17 @@
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.RowConstraints?>
 
-<GridPane alignment="center" hgap="10" prefHeight="790.0" prefWidth="400.0" vgap="10" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1">
+<GridPane alignment="center" hgap="10" prefHeight="844.0" prefWidth="400.0" vgap="10" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1">
   <columnConstraints>
     <ColumnConstraints />
   </columnConstraints>
   <rowConstraints>
     <RowConstraints />
   </rowConstraints>
-  <AnchorPane prefHeight="810.0" prefWidth="400.0">
+  <AnchorPane prefHeight="874.0" prefWidth="400.0">
     <Button fx:id="chooseFileButton" layoutX="8.0" layoutY="24.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose File" />
-    <SplitPane dividerPositions="0.31499312242090777, 0.6158872077028884" layoutX="6.0" layoutY="118.0" orientation="VERTICAL" prefHeight="666.0" prefWidth="388.0">
-      <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="178.0" prefWidth="396.0">
+    <SplitPane dividerPositions="0.2943143812709029, 0.6148272017837234" layoutX="6.0" layoutY="107.0" orientation="VERTICAL" prefHeight="730.0" prefWidth="388.0">
+      <AnchorPane minHeight="0.0" minWidth="0.0">
         <Slider fx:id="rotateSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="90.0" majorTickUnit="1.0" max="10.0" prefHeight="38.0" prefWidth="247.0" showTickLabels="true" showTickMarks="true" />
         <Label layoutX="37.0" layoutY="88.0" text="Rotate speed" />
         <Slider fx:id="translationSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="128.0" majorTickUnit="1.0" max="10.0" prefHeight="38.0" prefWidth="247.0" showTickLabels="true" showTickMarks="true" />
@@ -37,14 +37,18 @@
         <TextField fx:id="translationYTextField" layoutX="234.0" layoutY="13.0" prefHeight="26.0" prefWidth="70.0" text="0" />
             <Slider fx:id="weightSlider" blockIncrement="1.0" layoutX="116.0" layoutY="52.0" majorTickUnit="100.0" max="1000.0" prefHeight="38.0" prefWidth="247.0" showTickLabels="true" showTickMarks="true" value="100.0" />
       </AnchorPane>
-         <TitledPane animated="false" collapsible="false" prefHeight="169.0" prefWidth="385.0" text="Effects" SplitPane.resizableWithParent="false">
+         <TitledPane animated="false" collapsible="false" text="Effects" SplitPane.resizableWithParent="false">
            <content>
-             <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="66.0" prefWidth="383.0">
+             <AnchorPane minHeight="0.0" minWidth="0.0">
                   <children>
                      <CheckBox fx:id="vectorCancellingCheckBox" layoutX="14.0" layoutY="14.0" mnemonicParsing="false" text="Vector cancelling" />
                      <Slider fx:id="vectorCancellingSlider" blockIncrement="0.05" disable="true" layoutX="141.0" layoutY="16.0" majorTickUnit="1.0" max="10.0" min="2.0" prefHeight="38.0" prefWidth="222.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" value="2.0" />
                      <CheckBox fx:id="bitCrushCheckBox" layoutX="14.0" layoutY="52.0" mnemonicParsing="false" text="Bit crush" />
                      <Slider fx:id="bitCrushSlider" blockIncrement="0.01" disable="true" layoutX="141.0" layoutY="55.0" majorTickUnit="0.5" max="3.0" prefHeight="38.0" prefWidth="222.0" showTickLabels="true" showTickMarks="true" value="2.0" />
+                     <CheckBox fx:id="verticalDistortCheckBox" layoutX="14.0" layoutY="93.0" mnemonicParsing="false" text="Vertical Distort" />
+                     <Slider fx:id="verticalDistortSlider" blockIncrement="0.005" disable="true" layoutX="141.0" layoutY="96.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="222.0" showTickLabels="true" showTickMarks="true" value="0.2" />
+                     <CheckBox fx:id="horizontalDistortCheckBox" layoutX="14.0" layoutY="136.0" mnemonicParsing="false" text="Horizontal Distort" />
+                     <Slider fx:id="horizontalDistortSlider" blockIncrement="0.005" disable="true" layoutX="141.0" layoutY="139.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="222.0" showTickLabels="true" showTickMarks="true" value="0.2" />
                   </children>
                </AnchorPane>
            </content>
