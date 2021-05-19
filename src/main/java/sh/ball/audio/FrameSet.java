@@ -4,5 +4,5 @@ public interface FrameSet<T> {
 
   T next();
 
-  Object setFrameSettings(Object settings);
+  void setFrameSettings(Object settings);
 }
