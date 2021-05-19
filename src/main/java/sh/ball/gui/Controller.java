@@ -26,6 +26,9 @@ import javafx.fxml.Initializable;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
+import javax.sound.sampled.AudioFileFormat;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.xml.sax.SAXException;
@@ -44,14 +47,15 @@ public class Controller implements Initializable {
   private static final double DEFAULT_ROTATE_SPEED = 0.1;
 
   private final FileChooser fileChooser = new FileChooser();
-  private final Renderer<List<Shape>> renderer;
+  private final Renderer<List<Shape>, AudioInputStream> renderer;
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
   private final RotateEffect rotateEffect = new RotateEffect(SAMPLE_RATE);
   private final TranslateEffect translateEffect = new TranslateEffect(SAMPLE_RATE);
   private final ScaleEffect scaleEffect = new ScaleEffect();
 
-  private FrameProducer<List<Shape>> producer;
+  private FrameProducer<List<Shape>, AudioInputStream> producer;
+  private boolean recording = false;
 
   private Stage stage;
 
@@ -59,6 +63,10 @@ public class Controller implements Initializable {
   private Button chooseFileButton;
   @FXML
   private Label fileLabel;
+  @FXML
+  private Button recordButton;
+  @FXML
+  private Label recordLabel;
   @FXML
   private TextField translationXTextField;
   @FXML
@@ -100,7 +108,7 @@ public class Controller implements Initializable {
   @FXML
   private Slider bitCrushSlider;
 
-  public Controller(Renderer<List<Shape>> renderer) throws IOException {
+  public Controller(Renderer<List<Shape>, AudioInputStream> renderer) throws IOException {
     this.renderer = renderer;
     this.producer = new FrameProducer<>(
       renderer,
@@ -198,6 +206,25 @@ public class Controller implements Initializable {
       File file = fileChooser.showOpenDialog(stage);
       if (file != null) {
         chooseFile(file);
+      }
+    });
+
+    recordButton.setOnAction(event -> {
+      recording = !recording;
+      if (recording) {
+        recordLabel.setText("Recording...");
+        recordButton.setText("Stop Recording");
+        renderer.startRecord();
+      } else {
+        recordLabel.setText("");
+        recordButton.setText("Record");
+        AudioInputStream input = renderer.stopRecord();
+        try {
+          AudioSystem.write(input, AudioFileFormat.Type.WAVE, new File("out.wav"));
+          input.close();
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
       }
     });
 
