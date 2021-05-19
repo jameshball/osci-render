@@ -12,16 +12,16 @@
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.RowConstraints?>
 
-<GridPane alignment="center" hgap="10" prefHeight="719.0" prefWidth="400.0" vgap="10" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1">
+<GridPane alignment="center" hgap="10" prefHeight="790.0" prefWidth="400.0" vgap="10" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1">
   <columnConstraints>
     <ColumnConstraints />
   </columnConstraints>
   <rowConstraints>
     <RowConstraints />
   </rowConstraints>
-  <AnchorPane prefHeight="737.0" prefWidth="400.0">
-    <Button fx:id="chooseFileButton" layoutX="8.0" layoutY="15.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="119.0" text="Choose File" />
-    <SplitPane dividerPositions="0.31499312242090777, 0.6158872077028884" layoutX="6.0" layoutY="63.0" orientation="VERTICAL" prefHeight="649.0" prefWidth="388.0">
+  <AnchorPane prefHeight="810.0" prefWidth="400.0">
+    <Button fx:id="chooseFileButton" layoutX="8.0" layoutY="24.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose File" />
+    <SplitPane dividerPositions="0.31499312242090777, 0.6158872077028884" layoutX="6.0" layoutY="118.0" orientation="VERTICAL" prefHeight="666.0" prefWidth="388.0">
       <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="178.0" prefWidth="396.0">
         <Slider fx:id="rotateSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="90.0" majorTickUnit="1.0" max="10.0" prefHeight="38.0" prefWidth="247.0" showTickLabels="true" showTickMarks="true" />
         <Label layoutX="37.0" layoutY="88.0" text="Rotate speed" />
@@ -69,10 +69,12 @@
                <TextField fx:id="rotateYTextField" layoutX="218.0" layoutY="139.0" prefHeight="26.0" prefWidth="58.0" text="0" />
                <Label layoutX="283.0" layoutY="143.0" text="z :" />
                <TextField fx:id="rotateZTextField" layoutX="302.0" layoutY="139.0" prefHeight="26.0" prefWidth="58.0" text="0" />
-               <Button fx:id="resetRotationButton" layoutX="145.0" layoutY="183.0" mnemonicParsing="false" text="Reset Rotation" />
+               <Button fx:id="resetRotationButton" layoutX="145.0" layoutY="189.0" mnemonicParsing="false" text="Reset Rotation" />
         </AnchorPane>
       </TitledPane>
     </SplitPane>
-    <Label fx:id="fileLabel" layoutX="134.0" layoutY="20.0" maxWidth="250.0" />
+    <Label fx:id="fileLabel" layoutX="140.0" layoutY="29.0" maxWidth="250.0" />
+      <Button fx:id="recordButton" layoutX="8.0" layoutY="68.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Record" />
+      <Label fx:id="recordLabel" layoutX="140.0" layoutY="73.0" maxWidth="250.0" />
   </AnchorPane>
 </GridPane>
