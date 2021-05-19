@@ -21,13 +21,12 @@ Some of this was built as part of a 24hr hackathon: IC Hack 20. The original rep
 - Scaling images
 - Translating images
 - Applying image effects
+- Save rendered audio to .wav file
 
 ## Proposed Features
 
 - Tune and transpose audio output
 - Support rendering of multiple objects
-- Saving pre-rendered frames to file for later loading
-- Saving audio output to file
 - (long term) Keyframing/animating objects and camera
 
 ## Usage
@@ -47,6 +46,13 @@ There are some additional controls for `.obj` files:
 
 - Focal length of camera
 - Position of camera
+- Rotation speed
+- Rotation direction
+
+Additional effects can be applied to the image such as:
+
+- Vector cancelling
+- Bit crush
 
 ## Screenshots
 
