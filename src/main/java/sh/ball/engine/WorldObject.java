@@ -91,6 +91,10 @@ public class WorldObject {
     }
   }
 
+  public void setRotation(Vector3 rotation) {
+    this.rotation = rotation;
+  }
+
   public void rotate(Vector3 theta) {
     rotation = rotation.add(theta);
   }

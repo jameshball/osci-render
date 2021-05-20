@@ -93,13 +93,7 @@ public class Controller implements Initializable {
   @FXML
   private Slider objectRotateSpeedSlider;
   @FXML
-  private TextField rotateXTextField;
-  @FXML
-  private TextField rotateYTextField;
-  @FXML
-  private TextField rotateZTextField;
-  @FXML
-  private Button resetRotationButton;
+  private CheckBox rotateCheckBox;
   @FXML
   private CheckBox vectorCancellingCheckBox;
   @FXML
@@ -174,12 +168,6 @@ public class Controller implements Initializable {
     cameraXTextField.textProperty().addListener(e -> updateCameraPos());
     cameraYTextField.textProperty().addListener(e -> updateCameraPos());
     cameraZTextField.textProperty().addListener(e -> updateCameraPos());
-
-    rotateXTextField.textProperty().addListener(e -> updateRotation());
-    rotateYTextField.textProperty().addListener(e -> updateRotation());
-    rotateZTextField.textProperty().addListener(e -> updateRotation());
-
-    resetRotationButton.setOnAction(e -> producer.setFrameSettings(ObjSettingsFactory.resetRotation()));
 
     InvalidationListener vectorCancellingListener = e ->
       updateEffect(EffectType.VECTOR_CANCELLING, vectorCancellingCheckBox.isSelected(),
@@ -294,14 +282,6 @@ public class Controller implements Initializable {
     )));
   }
 
-  private void updateRotation() {
-    producer.setFrameSettings(ObjSettingsFactory.rotation(new Vector3(
-      tryParse(rotateXTextField.getText()),
-      tryParse(rotateYTextField.getText()),
-      tryParse(rotateZTextField.getText())
-    )));
-  }
-
   private double tryParse(String value) {
     try {
       return Double.parseDouble(value);
@@ -329,7 +309,6 @@ public class Controller implements Initializable {
         renderer,
         ParserFactory.getParser(path).parse()
       );
-      updateRotation();
       updateObjectRotateSpeed();
       updateFocalLength();
       executor.submit(producer);
@@ -347,5 +326,20 @@ public class Controller implements Initializable {
 
   public void setStage(Stage stage) {
     this.stage = stage;
+  }
+
+  protected boolean mouseRotate() {
+    return rotateCheckBox.isSelected();
+  }
+
+  protected void disableMouseRotate() {
+    rotateCheckBox.setSelected(false);
+  }
+
+  protected void setObjRotate(Vector3 vector) {
+    if (!mouseRotate()) {
+      renderer.flushFrames();
+    }
+    producer.setFrameSettings(ObjSettingsFactory.rotation(vector));
   }
 }
