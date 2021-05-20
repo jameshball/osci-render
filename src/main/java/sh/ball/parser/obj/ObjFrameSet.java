@@ -23,7 +23,11 @@ public class ObjFrameSet implements FrameSet<List<Shape>> {
 
   @Override
   public List<Shape> next() {
-    object.rotate(rotation.scale(rotateSpeed));
+    if (rotateSpeed == 0) {
+      object.setRotation(rotation);
+    } else {
+      object.rotate(rotation.scale(rotateSpeed));
+    }
     return camera.draw(object);
   }
 

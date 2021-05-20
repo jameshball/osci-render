@@ -12,7 +12,7 @@
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.RowConstraints?>
 
-<GridPane alignment="center" hgap="10" prefHeight="844.0" prefWidth="400.0" vgap="10" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1">
+<GridPane alignment="center" hgap="10" prefHeight="765.0" prefWidth="400.0" vgap="10" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1">
   <columnConstraints>
     <ColumnConstraints />
   </columnConstraints>
@@ -21,7 +21,7 @@
   </rowConstraints>
   <AnchorPane prefHeight="874.0" prefWidth="400.0">
     <Button fx:id="chooseFileButton" layoutX="8.0" layoutY="24.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose File" />
-    <SplitPane dividerPositions="0.2943143812709029, 0.6148272017837234" layoutX="6.0" layoutY="107.0" orientation="VERTICAL" prefHeight="730.0" prefWidth="388.0">
+    <SplitPane dividerPositions="0.33168927250308256, 0.6707768187422933" layoutX="6.0" layoutY="107.0" orientation="VERTICAL" prefHeight="650.0" prefWidth="388.0">
       <AnchorPane minHeight="0.0" minWidth="0.0">
         <Slider fx:id="rotateSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="90.0" majorTickUnit="1.0" max="10.0" prefHeight="38.0" prefWidth="247.0" showTickLabels="true" showTickMarks="true" />
         <Label layoutX="37.0" layoutY="88.0" text="Rotate speed" />
@@ -64,16 +64,9 @@
                <TextField fx:id="cameraYTextField" layoutX="218.0" layoutY="56.0" prefHeight="26.0" prefWidth="58.0" text="0" />
                <Label layoutX="283.0" layoutY="60.0" text="z :" />
                <TextField fx:id="cameraZTextField" layoutX="302.0" layoutY="56.0" prefHeight="26.0" prefWidth="58.0" text="-2.5" />
-               <Slider fx:id="objectRotateSpeedSlider" blockIncrement="0.005" layoutX="116.0" layoutY="97.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="247.0" showTickLabels="true" showTickMarks="true" value="0.1" />
+               <Slider fx:id="objectRotateSpeedSlider" blockIncrement="0.005" layoutX="116.0" layoutY="97.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="247.0" showTickLabels="true" showTickMarks="true" />
                <Label layoutX="36.0" layoutY="96.0" text="Rotate speed" />
-               <TextField fx:id="rotateXTextField" layoutX="134.0" layoutY="139.0" prefHeight="26.0" prefWidth="58.0" text="0" />
-               <Label layoutX="62.0" layoutY="144.0" text="Rotation" />
-               <Label layoutX="118.0" layoutY="144.0" text="x :" />
-               <Label layoutX="199.0" layoutY="143.0" text="y :" />
-               <TextField fx:id="rotateYTextField" layoutX="218.0" layoutY="139.0" prefHeight="26.0" prefWidth="58.0" text="0" />
-               <Label layoutX="283.0" layoutY="143.0" text="z :" />
-               <TextField fx:id="rotateZTextField" layoutX="302.0" layoutY="139.0" prefHeight="26.0" prefWidth="58.0" text="0" />
-               <Button fx:id="resetRotationButton" layoutX="145.0" layoutY="189.0" mnemonicParsing="false" text="Reset Rotation" />
+               <CheckBox fx:id="rotateCheckBox" layoutX="90.0" layoutY="147.0" mnemonicParsing="false" text="Rotate with Mouse (Esc to disable)" />
         </AnchorPane>
       </TitledPane>
     </SplitPane>
