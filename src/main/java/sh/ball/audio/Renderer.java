@@ -10,8 +10,6 @@ public interface Renderer<S, T> extends Runnable {
 
   void addFrame(S frame);
 
-  void flushFrames();
-
   void addEffect(Object identifier, Effect effect);
 
   void removeEffect(Object identifier);

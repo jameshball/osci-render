@@ -28,10 +28,11 @@ import java.util.List;
 
 public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
 
-  private static final int BUFFER_SIZE = 20;
+  private static final int BUFFER_SIZE = 5;
   private static final int BITS_PER_SAMPLE = 16;
   private static final boolean SIGNED = true;
   private static final boolean BIG_ENDIAN = false;
+  private static final boolean WINDOWS = System.getProperty("os.name").startsWith("Windows");
 
   private final XtFormat format;
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
@@ -54,7 +55,7 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
     this.format = new XtFormat(mix, channels);
   }
 
-  private int render(XtStream stream, XtBuffer buffer, Object user) throws InterruptedException, IOException {
+  private int render(XtStream stream, XtBuffer buffer, Object user) throws InterruptedException {
     XtSafeBuffer safe = XtSafeBuffer.get(stream);
     safe.lock(buffer);
     float[] output = (float[]) safe.getOutput();
@@ -142,7 +143,7 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
     }
 
     try (XtPlatform platform = XtAudio.init(null, null)) {
-      XtSystem system = platform.setupToSystem(XtSetup.CONSUMER_AUDIO);
+      XtSystem system = WINDOWS ? XtSystem.WASAPI : platform.setupToSystem(XtSetup.CONSUMER_AUDIO);
       XtService service = platform.getService(system);
       if (service == null) return;
 
@@ -181,11 +182,6 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
       e.printStackTrace();
       System.err.println("Frame missed.");
     }
-  }
-
-  @Override
-  public void flushFrames() {
-    frameQueue.clear();
   }
 
   @Override
