@@ -1,6 +1,8 @@
 package sh.ball.gui;
 
 import javafx.scene.control.*;
+import sh.ball.audio.FrequencyAnalyser;
+import sh.ball.audio.FrequencyListener;
 import sh.ball.audio.Renderer;
 import sh.ball.audio.effect.Effect;
 import sh.ball.audio.effect.EffectType;
@@ -42,7 +44,7 @@ import sh.ball.parser.ParserFactory;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
-public class Controller implements Initializable {
+public class Controller implements Initializable, FrequencyListener {
 
   private static final int SAMPLE_RATE = 192000;
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
@@ -220,6 +222,7 @@ public class Controller implements Initializable {
 
     executor.submit(producer);
     new Thread(renderer).start();
+    new Thread(new FrequencyAnalyser<>(renderer, 2, SAMPLE_RATE)).start();
   }
 
   private void toggleRecord() {
@@ -337,5 +340,10 @@ public class Controller implements Initializable {
 
   protected void setObjRotate(Vector3 vector) {
     producer.setFrameSettings(ObjSettingsFactory.rotation(vector));
+  }
+
+  @Override
+  public void updateFrequency(double frequency) {
+
   }
 }
