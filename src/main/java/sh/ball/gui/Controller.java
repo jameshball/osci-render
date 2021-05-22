@@ -274,7 +274,6 @@ public class Controller implements Initializable {
   }
 
   private void updateCameraPos() {
-    renderer.flushFrames();
     producer.setFrameSettings(ObjSettingsFactory.cameraPosition(new Vector3(
       tryParse(cameraXTextField.getText()),
       tryParse(cameraYTextField.getText()),
@@ -337,9 +336,6 @@ public class Controller implements Initializable {
   }
 
   protected void setObjRotate(Vector3 vector) {
-    if (!mouseRotate()) {
-      renderer.flushFrames();
-    }
     producer.setFrameSettings(ObjSettingsFactory.rotation(vector));
   }
 }
