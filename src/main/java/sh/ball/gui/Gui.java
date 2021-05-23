@@ -2,7 +2,6 @@ package sh.ball.gui;
 
 import javafx.application.Application;
 import javafx.application.Platform;
-import javafx.event.EventType;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;

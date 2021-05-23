@@ -6,12 +6,14 @@ import sh.ball.engine.Vector3;
 import sh.ball.engine.WorldObject;
 import sh.ball.shapes.Shape;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class ObjFrameSet implements FrameSet<List<Shape>> {
 
   private final WorldObject object;
   private final Camera camera;
+  private final List<Listener> listeners = new ArrayList<>();
 
   private Vector3 rotation = new Vector3();
   private Double rotateSpeed = 0.0;
@@ -19,6 +21,20 @@ public class ObjFrameSet implements FrameSet<List<Shape>> {
   public ObjFrameSet(WorldObject object, Camera camera) {
     this.object = object;
     this.camera = camera;
+  }
+
+  @Override
+  public void addListener(Listener listener) {
+    listeners.add(listener);
+    notifyListener(listener);
+  }
+
+  private void notifyListener(Listener listener) {
+    listener.update(camera.getPos());
+  }
+
+  private void notifyListeners() {
+    listeners.forEach(this::notifyListener);
   }
 
   @Override
@@ -40,6 +56,7 @@ public class ObjFrameSet implements FrameSet<List<Shape>> {
       }
       if (obj.cameraPos != null && camera.getPos() != obj.cameraPos) {
         camera.setPos(obj.cameraPos);
+        notifyListeners();
       }
       if (obj.rotation != null) {
         this.rotation = obj.rotation;

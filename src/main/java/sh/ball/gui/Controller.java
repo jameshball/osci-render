@@ -2,15 +2,12 @@ package sh.ball.gui;
 
 import javafx.application.Platform;
 import javafx.scene.control.*;
-import sh.ball.audio.FrequencyAnalyser;
-import sh.ball.audio.FrequencyListener;
-import sh.ball.audio.Renderer;
+import sh.ball.audio.*;
 import sh.ball.audio.effect.Effect;
 import sh.ball.audio.effect.EffectType;
 import sh.ball.audio.effect.RotateEffect;
 import sh.ball.audio.effect.ScaleEffect;
 import sh.ball.audio.effect.EffectFactory;
-import sh.ball.audio.FrameProducer;
 
 import java.io.File;
 import java.io.IOException;
@@ -39,13 +36,14 @@ import javax.xml.parsers.ParserConfigurationException;
 import org.xml.sax.SAXException;
 import sh.ball.audio.effect.TranslateEffect;
 import sh.ball.engine.Vector3;
+import sh.ball.parser.obj.Listener;
 import sh.ball.parser.obj.ObjSettingsFactory;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.ParserFactory;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
-public class Controller implements Initializable, FrequencyListener {
+public class Controller implements Initializable, FrequencyListener, Listener {
 
   private static final int SAMPLE_RATE = 192000;
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
@@ -118,10 +116,9 @@ public class Controller implements Initializable, FrequencyListener {
 
   public Controller(Renderer<List<Shape>, AudioInputStream> renderer) throws IOException {
     this.renderer = renderer;
-    this.producer = new FrameProducer<>(
-      renderer,
-      new ObjParser(DEFAULT_OBJ).parse()
-    );
+    FrameSet<List<Shape>> frames = new ObjParser(DEFAULT_OBJ).parse();
+    frames.addListener(this);
+    this.producer = new FrameProducer<>(renderer, frames);
   }
 
   private Map<Slider, Consumer<Double>> initializeSliderMap() {
@@ -170,9 +167,9 @@ public class Controller implements Initializable, FrequencyListener {
     translationXTextField.textProperty().addListener(e -> updateTranslation());
     translationYTextField.textProperty().addListener(e -> updateTranslation());
 
-    cameraXTextField.textProperty().addListener(e -> updateCameraPos());
-    cameraYTextField.textProperty().addListener(e -> updateCameraPos());
-    cameraZTextField.textProperty().addListener(e -> updateCameraPos());
+    cameraXTextField.focusedProperty().addListener(e -> updateCameraPos());
+    cameraYTextField.focusedProperty().addListener(e -> updateCameraPos());
+    cameraZTextField.focusedProperty().addListener(e -> updateCameraPos());
 
     InvalidationListener vectorCancellingListener = e ->
       updateEffect(EffectType.VECTOR_CANCELLING, vectorCancellingCheckBox.isSelected(),
@@ -275,12 +272,6 @@ public class Controller implements Initializable, FrequencyListener {
     ));
   }
 
-  private void resetCameraPos() {
-    cameraXTextField.setText("");
-    cameraYTextField.setText("");
-    cameraZTextField.setText("");
-  }
-
   private void updateCameraPos() {
     producer.setFrameSettings(ObjSettingsFactory.cameraPosition(new Vector3(
       tryParse(cameraXTextField.getText()),
@@ -311,11 +302,9 @@ public class Controller implements Initializable, FrequencyListener {
     try {
       producer.stop();
       String path = file.getAbsolutePath();
-      resetCameraPos();
-      producer = new FrameProducer<>(
-        renderer,
-        ParserFactory.getParser(path).parse()
-      );
+      FrameSet<List<Shape>> frames = ParserFactory.getParser(path).parse();
+      frames.addListener(this);
+      producer = new FrameProducer<>(renderer, frames);
       updateObjectRotateSpeed();
       updateFocalLength();
       executor.submit(producer);
@@ -352,5 +341,16 @@ public class Controller implements Initializable, FrequencyListener {
     Platform.runLater(() ->
       frequencyLabel.setText(String.format("L Frequency: %d Hz\nR Frequency: %d Hz", Math.round(leftFrequency), Math.round(rightFrequency)))
     );
+  }
+
+  @Override
+  public void update(Object pos) {
+    if (pos instanceof Vector3 vector) {
+      Platform.runLater(() -> {
+        cameraXTextField.setText(String.valueOf(vector.getX()));
+        cameraYTextField.setText(String.valueOf(vector.getY()));
+        cameraZTextField.setText(String.valueOf(vector.getZ()));
+      });
+    }
   }
 }

@@ -1,13 +1,11 @@
 package sh.ball.shapes;
 
-import sh.ball.audio.FrameSet;
-
 import java.awt.geom.AffineTransform;
 import java.awt.geom.PathIterator;
 import java.util.ArrayList;
 import java.util.List;
 
-public abstract class Shape implements FrameSet<List<Shape>> {
+public abstract class Shape {
 
   public static final int DEFAULT_WEIGHT = 80;
 
@@ -33,14 +31,6 @@ public abstract class Shape implements FrameSet<List<Shape>> {
   public double getLength() {
     return length;
   }
-
-  @Override
-  public List<Shape> next() {
-    return List.of(this);
-  }
-
-  @Override
-  public void setFrameSettings(Object settings) {}
 
   /* SHAPE HELPER FUNCTIONS */
 
