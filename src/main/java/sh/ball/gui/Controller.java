@@ -1,13 +1,12 @@
 package sh.ball.gui;
 
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.scene.control.*;
+import javafx.util.Duration;
 import sh.ball.audio.*;
-import sh.ball.audio.effect.Effect;
-import sh.ball.audio.effect.EffectType;
-import sh.ball.audio.effect.RotateEffect;
-import sh.ball.audio.effect.ScaleEffect;
-import sh.ball.audio.effect.EffectFactory;
+import sh.ball.audio.effect.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -34,7 +33,8 @@ import javax.sound.sampled.AudioSystem;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.xml.sax.SAXException;
-import sh.ball.audio.effect.TranslateEffect;
+import sh.ball.audio.effect.Effect;
+import sh.ball.audio.effect.EffectType;
 import sh.ball.engine.Vector3;
 import sh.ball.parser.obj.Listener;
 import sh.ball.parser.obj.ObjSettingsFactory;
@@ -54,6 +54,7 @@ public class Controller implements Initializable, FrequencyListener, Listener {
 
   private final RotateEffect rotateEffect = new RotateEffect(SAMPLE_RATE);
   private final TranslateEffect translateEffect = new TranslateEffect(SAMPLE_RATE);
+  private final WobbleEffect wobbleEffect = new WobbleEffect(SAMPLE_RATE);
   private final ScaleEffect scaleEffect = new ScaleEffect();
 
   private FrameProducer<List<Shape>, AudioInputStream> producer;
@@ -113,6 +114,10 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   private CheckBox horizontalDistortCheckBox;
   @FXML
   private Slider horizontalDistortSlider;
+  @FXML
+  private CheckBox wobbleCheckBox;
+  @FXML
+  private Slider wobbleSlider;
 
   public Controller(Renderer<List<Shape>, AudioInputStream> renderer) throws IOException {
     this.renderer = renderer;
@@ -149,7 +154,9 @@ public class Controller implements Initializable, FrequencyListener, Listener {
       EffectType.VERTICAL_DISTORT,
       verticalDistortSlider,
       EffectType.HORIZONTAL_DISTORT,
-      horizontalDistortSlider
+      horizontalDistortSlider,
+      EffectType.WOBBLE,
+      wobbleSlider
     );
   }
 
@@ -183,6 +190,10 @@ public class Controller implements Initializable, FrequencyListener, Listener {
     InvalidationListener horizontalDistortListener = e ->
       updateEffect(EffectType.HORIZONTAL_DISTORT, horizontalDistortCheckBox.isSelected(),
         EffectFactory.horizontalDistort(horizontalDistortSlider.getValue()));
+    InvalidationListener wobbleListener = e -> {
+      wobbleEffect.setVolume(wobbleSlider.getValue());
+      updateEffect(EffectType.WOBBLE, wobbleCheckBox.isSelected(), wobbleEffect);
+    };
 
     vectorCancellingSlider.valueProperty().addListener(vectorCancellingListener);
     vectorCancellingCheckBox.selectedProperty().addListener(vectorCancellingListener);
@@ -195,6 +206,10 @@ public class Controller implements Initializable, FrequencyListener, Listener {
 
     horizontalDistortSlider.valueProperty().addListener(horizontalDistortListener);
     horizontalDistortCheckBox.selectedProperty().addListener(horizontalDistortListener);
+
+    wobbleSlider.valueProperty().addListener(wobbleListener);
+    wobbleCheckBox.selectedProperty().addListener(wobbleListener);
+    wobbleCheckBox.selectedProperty().addListener(e -> wobbleEffect.update());
 
     fileChooser.setInitialFileName("out.wav");
     fileChooser.getExtensionFilters().addAll(
@@ -224,6 +239,7 @@ public class Controller implements Initializable, FrequencyListener, Listener {
     new Thread(renderer).start();
     FrequencyAnalyser<List<Shape>, AudioInputStream> analyser = new FrequencyAnalyser<>(renderer, 2, SAMPLE_RATE);
     analyser.addListener(this);
+    analyser.addListener(wobbleEffect);
     new Thread(analyser).start();
   }
 
@@ -305,9 +321,18 @@ public class Controller implements Initializable, FrequencyListener, Listener {
       FrameSet<List<Shape>> frames = ParserFactory.getParser(path).parse();
       frames.addListener(this);
       producer = new FrameProducer<>(renderer, frames);
+
       updateObjectRotateSpeed();
       updateFocalLength();
       executor.submit(producer);
+
+      KeyFrame kf1 = new KeyFrame(Duration.seconds(0), e -> wobbleEffect.setVolume(0));
+      KeyFrame kf2 = new KeyFrame(Duration.seconds(1), e -> {
+        wobbleEffect.update();
+        wobbleEffect.setVolume(wobbleSlider.getValue());
+      });
+      Timeline timeline = new Timeline(kf1, kf2);
+      Platform.runLater(timeline::play);
 
       if (file.exists() && !file.isDirectory()) {
         fileLabel.setText(path);

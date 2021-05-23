@@ -2,10 +2,12 @@ package sh.ball.audio.effect;
 
 public abstract class PhaseEffect implements Effect {
 
+  private static final double LARGE_VAL = 2 << 20;
+
   protected final int sampleRate;
 
   protected double speed;
-  private double phase;
+  private double phase = -LARGE_VAL;
 
   protected PhaseEffect(int sampleRate, double speed) {
     this.sampleRate = sampleRate;
@@ -15,8 +17,8 @@ public abstract class PhaseEffect implements Effect {
   protected double nextTheta() {
     phase += speed / sampleRate;
 
-    if (phase >= 1.0) {
-      phase = -1.0;
+    if (phase >= LARGE_VAL) {
+      phase = -LARGE_VAL;
     }
 
     return phase * Math.PI;
