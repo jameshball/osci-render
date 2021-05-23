@@ -12,7 +12,7 @@
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.RowConstraints?>
 
-<GridPane alignment="center" hgap="10" prefHeight="765.0" prefWidth="400.0" vgap="10" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1">
+<GridPane alignment="center" hgap="10" prefHeight="791.0" prefWidth="400.0" vgap="10" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1">
   <columnConstraints>
     <ColumnConstraints />
   </columnConstraints>
@@ -20,8 +20,8 @@
     <RowConstraints />
   </rowConstraints>
   <AnchorPane prefHeight="874.0" prefWidth="400.0">
-    <Button fx:id="chooseFileButton" layoutX="8.0" layoutY="24.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose File" />
-    <SplitPane dividerPositions="0.33168927250308256, 0.6707768187422933" layoutX="6.0" layoutY="107.0" orientation="VERTICAL" prefHeight="650.0" prefWidth="388.0">
+    <Button fx:id="chooseFileButton" layoutX="8.0" layoutY="10.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose File" />
+    <SplitPane dividerPositions="0.33168927250308256, 0.6707768187422933" layoutX="6.0" layoutY="135.0" orientation="VERTICAL" prefHeight="650.0" prefWidth="388.0">
       <AnchorPane minHeight="0.0" minWidth="0.0">
         <Slider fx:id="rotateSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="90.0" majorTickUnit="1.0" max="10.0" prefHeight="38.0" prefWidth="247.0" showTickLabels="true" showTickMarks="true" />
         <Label layoutX="37.0" layoutY="88.0" text="Rotate speed" />
@@ -29,7 +29,7 @@
         <Label layoutX="14.0" layoutY="126.0" text="Translation speed" />
         <Slider fx:id="scaleSlider" blockIncrement="0.05" layoutX="116.0" layoutY="167.0" majorTickUnit="1.0" max="10.0" prefHeight="38.0" prefWidth="247.0" showTickLabels="true" showTickMarks="true" value="1.0" />
         <Label layoutX="80.0" layoutY="165.0" text="Scale" />
-        <Label layoutX="70.0" layoutY="50.0" text="Weight" />
+        <Label layoutX="47.0" layoutY="50.0" text="Line weight" />
         <TextField fx:id="translationXTextField" layoutX="136.0" layoutY="13.0" prefHeight="26.0" prefWidth="70.0" text="0" />
         <Label layoutX="51.0" layoutY="18.0" text="Translation" />
         <Label layoutX="120.0" layoutY="18.0" text="x :" />
@@ -70,8 +70,9 @@
         </AnchorPane>
       </TitledPane>
     </SplitPane>
-    <Label fx:id="fileLabel" layoutX="140.0" layoutY="29.0" maxWidth="250.0" />
-      <Button fx:id="recordButton" layoutX="8.0" layoutY="68.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Record" />
-      <Label fx:id="recordLabel" layoutX="140.0" layoutY="73.0" maxWidth="250.0" />
+    <Label fx:id="fileLabel" layoutX="140.0" layoutY="15.0" maxWidth="250.0" />
+      <Button fx:id="recordButton" layoutX="8.0" layoutY="50.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Record" />
+      <Label fx:id="recordLabel" layoutX="140.0" layoutY="55.0" maxWidth="250.0" prefWidth="1.0" />
+      <Label fx:id="frequencyLabel" layoutX="8.0" layoutY="90.0" />
   </AnchorPane>
 </GridPane>

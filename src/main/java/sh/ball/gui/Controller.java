@@ -1,5 +1,6 @@
 package sh.ball.gui;
 
+import javafx.application.Platform;
 import javafx.scene.control.*;
 import sh.ball.audio.FrequencyAnalyser;
 import sh.ball.audio.FrequencyListener;
@@ -62,6 +63,8 @@ public class Controller implements Initializable, FrequencyListener {
 
   private Stage stage;
 
+  @FXML
+  private Label frequencyLabel;
   @FXML
   private Button chooseFileButton;
   @FXML
@@ -222,7 +225,9 @@ public class Controller implements Initializable, FrequencyListener {
 
     executor.submit(producer);
     new Thread(renderer).start();
-    new Thread(new FrequencyAnalyser<>(renderer, 2, SAMPLE_RATE)).start();
+    FrequencyAnalyser<List<Shape>, AudioInputStream> analyser = new FrequencyAnalyser<>(renderer, 2, SAMPLE_RATE);
+    analyser.addListener(this);
+    new Thread(analyser).start();
   }
 
   private void toggleRecord() {
@@ -343,7 +348,9 @@ public class Controller implements Initializable, FrequencyListener {
   }
 
   @Override
-  public void updateFrequency(double frequency) {
-
+  public void updateFrequency(double leftFrequency, double rightFrequency) {
+    Platform.runLater(() ->
+      frequencyLabel.setText(String.format("L Frequency: %d Hz\nR Frequency: %d Hz", Math.round(leftFrequency), Math.round(rightFrequency)))
+    );
   }
 }
