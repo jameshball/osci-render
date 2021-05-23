@@ -14,6 +14,8 @@ public interface Renderer<S, T> extends Runnable {
 
   void removeEffect(Object identifier);
 
+  void read(byte[] buffer) throws InterruptedException;
+
   void startRecord();
 
   T stopRecord();

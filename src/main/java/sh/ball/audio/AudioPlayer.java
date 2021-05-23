@@ -14,6 +14,7 @@ import xt.audio.Structs.XtMix;
 import xt.audio.Structs.XtStreamParams;
 
 import java.io.*;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -25,6 +26,8 @@ import sh.ball.shapes.Vector2;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import java.util.List;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
 
@@ -37,6 +40,8 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
   private final XtFormat format;
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
   private final Map<Object, Effect> effects = new HashMap<>();
+  private final ReentrantLock lock = new ReentrantLock();
+  private final List<Listener> listeners = new ArrayList<>();
 
   private ByteArrayOutputStream outputStream;
   private boolean recording = false;
@@ -58,6 +63,7 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
   private int render(XtStream stream, XtBuffer buffer, Object user) throws InterruptedException {
     XtSafeBuffer safe = XtSafeBuffer.get(stream);
     safe.lock(buffer);
+    lock.lock();
     float[] output = (float[]) safe.getOutput();
 
     for (int f = 0; f < buffer.frames; f++) {
@@ -73,9 +79,7 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
       output[f * format.channels.outputs] = leftChannel;
       output[f * format.channels.outputs + 1] = rightChannel;
 
-      if (recording) {
-        writeVector(leftChannel, rightChannel);
-      }
+      writeChannels(leftChannel, rightChannel);
 
       audioFramesDrawn++;
 
@@ -90,17 +94,33 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
       }
     }
     safe.unlock(buffer);
+    lock.unlock();
     return 0;
   }
 
-  private void writeVector(float leftChannel, float rightChannel) {
+  private void writeChannels(float leftChannel, float rightChannel) {
     int left = (int)(leftChannel * Short.MAX_VALUE);
     int right = (int)(rightChannel * Short.MAX_VALUE);
 
-    outputStream.write((byte) left);
-    outputStream.write((byte)(left >> 8));
-    outputStream.write((byte) right);
-    outputStream.write((byte)(right >> 8));
+    byte b0 = (byte) left;
+    byte b1 = (byte)(left >> 8);
+    byte b2 = (byte) right;
+    byte b3 = (byte)(right >> 8);
+
+    if (recording) {
+      outputStream.write(b0);
+      outputStream.write(b1);
+      outputStream.write(b2);
+      outputStream.write(b3);
+    }
+
+    for (Listener listener : listeners) {
+      listener.write(b0);
+      listener.write(b1);
+      listener.write(b2);
+      listener.write(b3);
+      listener.notifyIfFull();
+    }
 
     framesRecorded++;
   }
@@ -195,6 +215,24 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
   }
 
   @Override
+  public void read(byte[] buffer) throws InterruptedException {
+    Listener listener = new Listener(buffer);
+    try {
+      lock.lock();
+      listeners.add(listener);
+    } finally {
+      lock.unlock();
+    }
+    listener.waitUntilFull();
+    try {
+      lock.lock();
+      listeners.remove(listener);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  @Override
   public void startRecord() {
     outputStream = new ByteArrayOutputStream();
     framesRecorded = 0;
@@ -210,5 +248,33 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
     AudioFormat audioFormat = new AudioFormat(format.mix.rate, BITS_PER_SAMPLE, format.channels.outputs, SIGNED, BIG_ENDIAN);
 
     return new AudioInputStream(new ByteArrayInputStream(input), audioFormat, framesRecorded);
+  }
+
+  private static class Listener {
+    private final byte[] buffer;
+    private final Semaphore sema;
+
+    private int offset;
+
+    private Listener(byte[] buffer) {
+      this.buffer = buffer;
+      this.sema = new Semaphore(0);
+    }
+
+    private void waitUntilFull() throws InterruptedException {
+      sema.acquire();
+    }
+
+    private void notifyIfFull() {
+      if (offset >= buffer.length) {
+        sema.release();
+      }
+    }
+
+    private void write(byte b) {
+      if (offset < buffer.length) {
+        buffer[offset++] = b;
+      }
+    }
   }
 }
