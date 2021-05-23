@@ -1,7 +1,6 @@
 package sh.ball.audio;
 
-import sh.ball.audio.fft.FFTFactory;
-import sh.ball.audio.fft.Transform;
+import sh.ball.audio.fft.FFT;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,20 +24,16 @@ public class FrequencyAnalyser<S, T> implements Runnable {
     listeners.add(listener);
   }
 
-  private void notifyListeners(double frequency) {
+  private void notifyListeners(double leftFrequency, double rightFrequency) {
     for (FrequencyListener listener : listeners) {
-      listener.updateFrequency(frequency);
+      listener.updateFrequency(leftFrequency, rightFrequency);
     }
   }
 
   // Adapted from https://stackoverflow.com/questions/53997426/java-how-to-get-current-frequency-of-audio-input
   @Override
   public void run() {
-    final byte[] buf = new byte[2 << 16]; // <--- increase this for higher frequency resolution
-    final int numberOfSamples = (buf.length / 2) / frameSize;
-    Transform fft = FFTFactory.getInstance().create(numberOfSamples);
-
-    int frequencyBin = sampleRate / (numberOfSamples / 2);
+    byte[] buf = new byte[2 << 18]; // <--- increase this for higher frequency resolution
 
     while (true) {
       try {
@@ -46,39 +41,52 @@ public class FrequencyAnalyser<S, T> implements Runnable {
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
-      // the stream represents each sample as two bytes -> decode
-      final float[] samples = decode(buf);
-      final float[][] transformed = fft.transform(samples);
-      final float[] realPart = transformed[0];
-      final float[] imaginaryPart = transformed[1];
-      final double[] magnitudes = toMagnitudes(realPart, imaginaryPart);
+      double[] leftSamples = decode(buf, true);
+      double[] rightSamples = decode(buf, false);
 
-      int maxIndex = 0;
-      double max = Double.NEGATIVE_INFINITY;
-      for (int i = 1; i < magnitudes.length / 2; i++) {
-        if (i * frequencyBin < 20 || i * frequencyBin > 20000) {
+      FFT leftFft = new FFT(leftSamples, null, false, true);
+      FFT rightFft = new FFT(rightSamples, null, false, true);
+
+      double[] leftMags = leftFft.getMagnitudeSpectrum();
+      double[] rightMags = rightFft.getMagnitudeSpectrum();
+      double[] bins = leftFft.getBinLabels(sampleRate);
+
+      int maxLeftIndex = 0;
+      double maxLeft = Double.NEGATIVE_INFINITY;
+      int maxRightIndex = 0;
+      double maxRight = Double.NEGATIVE_INFINITY;
+      for (int i = 1; i < leftMags.length; i++) {
+        if (bins[i] < 20 || bins[i] > 20000) {
           continue;
         }
-        if (magnitudes[i] > max) {
-          maxIndex = i;
-          max = magnitudes[i];
+        if (leftMags[i] > maxLeft) {
+          maxLeftIndex = i;
+          maxLeft = leftMags[i];
+        }
+        if (rightMags[i] > maxRight) {
+          maxRightIndex = i;
+          maxRight = rightMags[i];
         }
       }
 
-      System.out.println((maxIndex + 1) * frequencyBin * 1.05);
+      notifyListeners(bins[maxLeftIndex], bins[maxRightIndex]);
     }
   }
 
-  private float[] decode(final byte[] buf) {
-    final float[] fbuf = new float[(buf.length / 2) / frameSize];
+  private double[] decode(final byte[] buf, boolean decodeLeft) {
+    final double[] fbuf = new double[(buf.length / 2) / frameSize];
     int byteNum = 0;
     int i = 0;
     for (int pos = 0; pos < buf.length; pos += frameSize) {
-      if (byteNum < 2) {
-        int sample = byteToIntLittleEndian(buf, pos, frameSize);
-        // normalize to [0,1] (not strictly necessary, but makes things easier)
-        fbuf[i] = sample / NORMALIZATION_FACTOR_2_BYTES;
-        i++;
+      int sample = byteToIntLittleEndian(buf, pos, frameSize);
+      // normalize to [0,1] (not strictly necessary, but makes things easier)
+      double normalSample =  sample / NORMALIZATION_FACTOR_2_BYTES;
+      if (decodeLeft) {
+        if (byteNum < 2) {
+          fbuf[i++] = normalSample;
+        }
+      } else if (byteNum >= 2) {
+        fbuf[i++] = normalSample;
       }
       byteNum++;
       byteNum %= 4;
