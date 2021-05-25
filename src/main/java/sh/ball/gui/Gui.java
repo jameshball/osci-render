@@ -9,7 +9,9 @@ import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.text.Font;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 import sh.ball.audio.AudioPlayer;
 import sh.ball.engine.Vector3;
 
@@ -22,6 +24,7 @@ public class Gui extends Application {
   @Override
   public void start(Stage stage) throws Exception {
     Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
+    System.setProperty("prism.lcdtext", "false");
 
     FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/osci-render.fxml"));
     Controller controller = new Controller(new AudioPlayer(SAMPLE_RATE));
@@ -31,6 +34,7 @@ public class Gui extends Application {
     stage.getIcons().add(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/icons/icon.png"))));
     stage.setTitle("osci-render");
     Scene scene = new Scene(root);
+    scene.getStylesheets().add(getClass().getResource("/css/main.css").toExternalForm());
     scene.addEventFilter(MouseEvent.MOUSE_MOVED, event -> {
       if (controller.mouseRotate()) {
         controller.setObjRotate(new Vector3(

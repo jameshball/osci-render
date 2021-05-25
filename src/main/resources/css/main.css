@@ -1,0 +1,84 @@
+.root {
+    dark_color: #282828;
+    darker_color: #1d1d1d;
+    very_dark: #111111;
+    grey_color: #555555;
+    accent_color: #00CC00;
+    -fx-background-color: dark_color;
+    -fx-text-background-color: white;
+    -fx-text-inner-color: white;
+}
+
+
+
+.titled-pane, .text {
+    -fx-font-size: 13;
+    -fx-font-smoothing-type: gray;
+    -fx-text-fill: white;
+}
+
+.titled-pane > .title
+{
+    -fx-background-color: very_dark;
+    -fx-background-radius: 0;
+}
+
+.titled-pane > *.content
+{
+    -fx-background-color: darker_color;
+    -fx-border-width: 0;
+}
+
+.titled-pane:focused > .title > .arrow-button .arrow
+{
+    -fx-background-color: darker_color;
+}
+
+.button {
+    -fx-background-color: very_dark;
+    -fx-border-color: white;
+    -fx-border-width: 1;
+    -fx-text-fill: white;
+}
+
+.slider .thumb {
+    -fx-background-color: very_dark;
+    -fx-border-color: white;
+    -fx-border-radius: 1.0em; /* makes sure this remains circular */
+    -fx-effect: inherit;
+}
+.slider .track {
+    -fx-background-color: grey_color;
+    -fx-padding: 0.2em;
+}
+
+.check-box > .box {
+    -fx-background-radius: 0;
+    -fx-background-color: very_dark;
+    -fx-border-color: white;
+    -fx-border-width: 1;
+}
+.check-box > .box > .mark {
+    -fx-shape: "M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z";
+}
+
+.check-box:selected > .box > .mark,
+.check-box:indeterminate  > .box > .mark {
+    -fx-background-color: white;
+}
+
+.text-field {
+    -fx-background-color: very_dark;
+    -fx-border-color: white;
+    -fx-border-width: 1;
+    -fx-border-radius: 0;
+    -fx-padding: 0.2em;
+}
+
+.text-field .text {
+    -fx-text-fill: white;
+}
+
+#frequency .text {
+    -fx-font-size: 20;
+}
