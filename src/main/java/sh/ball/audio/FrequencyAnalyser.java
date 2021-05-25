@@ -94,14 +94,6 @@ public class FrequencyAnalyser<S, T> implements Runnable {
     return fbuf;
   }
 
-  private double[] toMagnitudes(final float[] realPart, final float[] imaginaryPart) {
-    final double[] powers = new double[realPart.length / 2];
-    for (int i = 0; i < powers.length; i++) {
-      powers[i] = Math.sqrt(realPart[i] * realPart[i] + imaginaryPart[i] * imaginaryPart[i]);
-    }
-    return powers;
-  }
-
   private static int byteToIntLittleEndian(final byte[] buf, final int offset, final int bytesPerSample) {
     int sample = 0;
     for (int byteIndex = 0; byteIndex < bytesPerSample; byteIndex++) {
