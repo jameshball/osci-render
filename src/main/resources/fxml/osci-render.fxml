@@ -7,88 +7,86 @@
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.TitledPane?>
 <?import javafx.scene.layout.AnchorPane?>
-<?import javafx.scene.layout.ColumnConstraints?>
-<?import javafx.scene.layout.GridPane?>
-<?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.text.Font?>
 
-<GridPane alignment="center" hgap="10" prefHeight="458.0" prefWidth="836.0" vgap="10" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1">
-  <columnConstraints>
-    <ColumnConstraints />
-  </columnConstraints>
-  <rowConstraints>
-    <RowConstraints />
-  </rowConstraints>
-  <AnchorPane prefHeight="458.0" prefWidth="885.0">
-      <AnchorPane layoutX="422.0" layoutY="26.0">
-         <children>
-          <Button fx:id="chooseFileButton" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose File" />
-          <Label fx:id="fileLabel" layoutX="132.0" layoutY="5.0" maxWidth="270.0" />
-            <Button fx:id="recordButton" layoutY="40.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Record" />
-            <Label fx:id="recordLabel" layoutX="132.0" layoutY="45.0" maxWidth="270.0" />
-            <Label id="frequency" fx:id="frequencyLabel" layoutY="80.0" />
-         </children>
-      </AnchorPane>
-      <TitledPane animated="false" collapsible="false" layoutX="422.0" layoutY="174.0" prefHeight="272.0" prefWidth="402.0" text="Effects">
-        <content>
-          <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="246.0" prefWidth="442.0">
-               <children>
-                  <CheckBox fx:id="vectorCancellingCheckBox" layoutX="14.0" layoutY="22.0" mnemonicParsing="false" text="Vector cancelling" />
-                  <Slider fx:id="vectorCancellingSlider" blockIncrement="0.05" disable="true" layoutX="167.0" layoutY="16.0" majorTickUnit="1.0" max="10.0" min="2.0" prefHeight="38.0" prefWidth="222.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" value="2.0" />
-                  <CheckBox fx:id="bitCrushCheckBox" layoutX="14.0" layoutY="60.0" mnemonicParsing="false" text="Bit crush" />
-                  <Slider fx:id="bitCrushSlider" blockIncrement="0.01" disable="true" layoutX="167.0" layoutY="55.0" majorTickUnit="0.5" max="3.0" prefHeight="38.0" prefWidth="222.0" showTickLabels="true" showTickMarks="true" value="2.0" />
-                  <CheckBox fx:id="verticalDistortCheckBox" layoutX="14.0" layoutY="101.0" mnemonicParsing="false" text="Vertical Distort" />
-                  <Slider fx:id="verticalDistortSlider" blockIncrement="0.005" disable="true" layoutX="167.0" layoutY="96.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="222.0" showTickLabels="true" showTickMarks="true" value="0.2" />
-                  <CheckBox fx:id="horizontalDistortCheckBox" layoutX="14.0" layoutY="144.0" mnemonicParsing="false" text="Horizontal Distort" />
-                  <Slider fx:id="horizontalDistortSlider" blockIncrement="0.005" disable="true" layoutX="167.0" layoutY="139.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="222.0" showTickLabels="true" showTickMarks="true" value="0.2" />
-                  <CheckBox fx:id="wobbleCheckBox" layoutX="14.0" layoutY="186.0" mnemonicParsing="false" text="Wobble" />
-                  <Slider fx:id="wobbleSlider" blockIncrement="0.005" disable="true" layoutX="167.0" layoutY="181.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="222.0" showTickLabels="true" showTickMarks="true" value="0.2" />
-               </children>
-            </AnchorPane>
-        </content>
-      </TitledPane>
-   <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="11.0" layoutY="240.0" maxHeight="-Infinity" maxWidth="-Infinity" prefHeight="206.0" prefWidth="402.0" text="3D .obj file settings">
-     <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="359.0">
-       <Slider fx:id="focalLengthSlider" blockIncrement="0.01" layoutX="116.0" layoutY="15.0" majorTickUnit="0.2" max="2.0" min="1.0E-5" prefHeight="38.0" prefWidth="270.0" showTickLabels="true" showTickMarks="true" value="1.0" />
-       <Label layoutX="30.0" layoutY="14.0" text="Focal length" />
-            <TextField fx:id="cameraXTextField" layoutX="134.0" layoutY="57.0" prefHeight="26.0" prefWidth="65.0" text="0" />
-            <Label layoutX="31.0" layoutY="61.0" text="Camera pos" />
-            <Label layoutX="118.0" layoutY="61.0" text="x :" />
-            <Label layoutX="207.0" layoutY="60.0" text="y :" />
-            <TextField fx:id="cameraYTextField" layoutX="224.0" layoutY="57.0" prefHeight="26.0" prefWidth="65.0" text="0" />
-            <Label layoutX="299.0" layoutY="60.0" text="z :" />
-            <TextField fx:id="cameraZTextField" layoutX="315.0" layoutY="57.0" prefHeight="26.0" prefWidth="65.0" text="-2.5" />
-            <Slider fx:id="objectRotateSpeedSlider" blockIncrement="0.005" layoutX="116.0" layoutY="97.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="270.0" showTickLabels="true" showTickMarks="true" />
-            <Label layoutX="24.0" layoutY="96.0" text="Rotate speed" />
-            <CheckBox fx:id="rotateCheckBox" layoutX="90.0" layoutY="147.0" mnemonicParsing="false" text="Rotate with Mouse (Esc to disable)" />
-     </AnchorPane>
-   </TitledPane>
-   <AnchorPane layoutX="11.0" layoutY="14.0" minHeight="0.0" minWidth="0.0">
-     <Slider fx:id="rotateSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="90.0" majorTickUnit="1.0" max="10.0" prefHeight="38.0" prefWidth="270.0" showTickLabels="true" showTickMarks="true" />
-     <Label layoutX="33.0" layoutY="88.0" text="Rotate speed">
-            <font>
-               <Font size="13.0" />
-            </font></Label>
-     <Slider fx:id="translationSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="128.0" majorTickUnit="1.0" max="10.0" prefHeight="38.0" prefWidth="270.0" showTickLabels="true" showTickMarks="true" />
-     <Label layoutX="7.0" layoutY="126.0" text="Translation speed">
-            <font>
-               <Font size="13.0" />
-            </font></Label>
-     <Slider fx:id="scaleSlider" blockIncrement="0.05" layoutX="116.0" layoutY="167.0" majorTickUnit="1.0" max="10.0" prefHeight="38.0" prefWidth="270.0" showTickLabels="true" showTickMarks="true" value="1.0" />
-     <Label layoutX="79.0" layoutY="164.0" text="Scale">
-            <font>
-               <Font size="13.0" />
-            </font></Label>
-     <Label layoutX="43.0" layoutY="49.0" text="Line weight">
-            <font>
-               <Font size="13.0" />
-            </font></Label>
-     <TextField fx:id="translationXTextField" layoutX="138.0" layoutY="15.0" prefHeight="26.0" prefWidth="70.0" text="0" />
-     <Label layoutX="47.0" layoutY="18.0" text="Translation" />
-     <Label layoutX="120.0" layoutY="18.0" text="x :" />
-     <Label layoutX="219.0" layoutY="18.0" text="y :" />
-     <TextField fx:id="translationYTextField" layoutX="238.0" layoutY="15.0" prefHeight="26.0" prefWidth="70.0" text="0" />
-         <Slider fx:id="weightSlider" blockIncrement="1.0" layoutX="116.0" layoutY="52.0" majorTickUnit="100.0" max="1000.0" prefHeight="38.0" prefWidth="269.0" showTickLabels="true" showTickMarks="true" value="100.0" />
+
+<AnchorPane prefHeight="498.0" prefWidth="837.0" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1">
+   <AnchorPane id="control-pane" layoutX="422.0" layoutY="19.0" prefHeight="185.0" prefWidth="402.0">
+      <children>
+       <Button fx:id="chooseFileButton" layoutX="14.0" layoutY="14.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose File" />
+       <Label fx:id="fileLabel" layoutX="146.0" layoutY="19.0" maxWidth="270.0" prefHeight="18.0" prefWidth="246.0" text="cube.obj" />
+         <Button fx:id="recordButton" layoutX="14.0" layoutY="54.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Record" />
+         <Label fx:id="recordLabel" layoutX="146.0" layoutY="59.0" maxWidth="270.0" prefHeight="18.0" prefWidth="245.0" />
+         <Label id="frequency" fx:id="frequencyLabel" layoutX="14.0" layoutY="113.0" prefHeight="58.0" prefWidth="376.0" text="L/R Frequency:&#10; &#10;" />
+      </children>
    </AnchorPane>
+   <TitledPane animated="false" collapsible="false" layoutX="422.0" layoutY="213.0" prefHeight="272.0" prefWidth="402.0" text="Effects">
+     <content>
+       <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="246.0" prefWidth="442.0">
+            <children>
+               <CheckBox fx:id="vectorCancellingCheckBox" layoutX="14.0" layoutY="15.0" mnemonicParsing="false" text="Vector cancelling" />
+               <Slider fx:id="vectorCancellingSlider" blockIncrement="0.05" disable="true" layoutX="167.0" layoutY="16.0" majorTickUnit="1.0" max="10.0" min="2.0" prefHeight="38.0" prefWidth="222.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" value="2.0" />
+               <CheckBox fx:id="bitCrushCheckBox" layoutX="14.0" layoutY="53.0" mnemonicParsing="false" text="Bit crush" />
+               <Slider fx:id="bitCrushSlider" blockIncrement="0.01" disable="true" layoutX="167.0" layoutY="55.0" majorTickUnit="0.5" max="3.0" prefHeight="38.0" prefWidth="222.0" showTickLabels="true" showTickMarks="true" value="2.0" />
+               <CheckBox fx:id="verticalDistortCheckBox" layoutX="14.0" layoutY="94.0" mnemonicParsing="false" text="Vertical Distort" />
+               <Slider fx:id="verticalDistortSlider" blockIncrement="0.005" disable="true" layoutX="167.0" layoutY="96.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="222.0" showTickLabels="true" showTickMarks="true" value="0.2" />
+               <CheckBox fx:id="horizontalDistortCheckBox" layoutX="14.0" layoutY="137.0" mnemonicParsing="false" text="Horizontal Distort" />
+               <Slider fx:id="horizontalDistortSlider" blockIncrement="0.005" disable="true" layoutX="167.0" layoutY="139.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="222.0" showTickLabels="true" showTickMarks="true" value="0.2" />
+               <CheckBox fx:id="wobbleCheckBox" layoutX="14.0" layoutY="179.0" mnemonicParsing="false" text="Wobble" />
+               <Slider fx:id="wobbleSlider" blockIncrement="0.005" disable="true" layoutX="167.0" layoutY="181.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="222.0" showTickLabels="true" showTickMarks="true" value="0.2" />
+            </children>
+         </AnchorPane>
+     </content>
+   </TitledPane>
+<TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="11.0" layoutY="275.0" maxHeight="-Infinity" maxWidth="-Infinity" prefHeight="210.0" prefWidth="402.0" text="3D .obj file settings">
+  <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="359.0">
+    <Slider fx:id="focalLengthSlider" blockIncrement="0.01" layoutX="116.0" layoutY="15.0" majorTickUnit="0.2" max="2.0" min="1.0E-5" prefHeight="38.0" prefWidth="270.0" showTickLabels="true" showTickMarks="true" value="1.0" />
+    <Label layoutX="30.0" layoutY="14.0" text="Focal length" />
+         <TextField fx:id="cameraXTextField" layoutX="134.0" layoutY="57.0" prefHeight="26.0" prefWidth="65.0" text="0" />
+         <Label layoutX="31.0" layoutY="61.0" text="Camera pos" />
+         <Label layoutX="118.0" layoutY="61.0" text="x :" />
+         <Label layoutX="207.0" layoutY="60.0" text="y :" />
+         <TextField fx:id="cameraYTextField" layoutX="224.0" layoutY="57.0" prefHeight="26.0" prefWidth="65.0" text="0" />
+         <Label layoutX="299.0" layoutY="60.0" text="z :" />
+         <TextField fx:id="cameraZTextField" layoutX="315.0" layoutY="57.0" prefHeight="26.0" prefWidth="65.0" text="-2.5" />
+         <Slider fx:id="objectRotateSpeedSlider" blockIncrement="0.005" layoutX="116.0" layoutY="97.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="270.0" showTickLabels="true" showTickMarks="true" />
+         <Label layoutX="24.0" layoutY="96.0" text="Rotate speed" />
+         <CheckBox fx:id="rotateCheckBox" layoutX="90.0" layoutY="147.0" mnemonicParsing="false" text="Rotate with Mouse (Esc to disable)" />
   </AnchorPane>
-</GridPane>
+</TitledPane>
+   <TitledPane collapsible="false" layoutX="11.0" layoutY="18.0" prefHeight="248.0" prefWidth="402.0" text="Image settings">
+      <content>
+      <AnchorPane minHeight="0.0" minWidth="0.0">
+        <Slider fx:id="rotateSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="90.0" majorTickUnit="1.0" max="10.0" prefHeight="38.0" prefWidth="270.0" showTickLabels="true" showTickMarks="true" />
+        <Label layoutX="33.0" layoutY="88.0" text="Rotate speed">
+               <font>
+                  <Font size="13.0" />
+               </font>
+            </Label>
+        <Slider fx:id="translationSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="128.0" majorTickUnit="1.0" max="10.0" prefHeight="38.0" prefWidth="270.0" showTickLabels="true" showTickMarks="true" />
+        <Label layoutX="7.0" layoutY="126.0" text="Translation speed">
+               <font>
+                  <Font size="13.0" />
+               </font>
+            </Label>
+        <Slider fx:id="scaleSlider" blockIncrement="0.05" layoutX="116.0" layoutY="167.0" majorTickUnit="1.0" max="10.0" prefHeight="38.0" prefWidth="270.0" showTickLabels="true" showTickMarks="true" value="1.0" />
+        <Label layoutX="79.0" layoutY="164.0" text="Scale">
+               <font>
+                  <Font size="13.0" />
+               </font>
+            </Label>
+        <Label layoutX="43.0" layoutY="49.0" text="Line weight">
+               <font>
+                  <Font size="13.0" />
+               </font>
+            </Label>
+        <TextField fx:id="translationXTextField" layoutX="138.0" layoutY="15.0" prefHeight="26.0" prefWidth="70.0" text="0" />
+        <Label layoutX="47.0" layoutY="18.0" text="Translation" />
+        <Label layoutX="120.0" layoutY="18.0" text="x :" />
+        <Label layoutX="219.0" layoutY="18.0" text="y :" />
+        <TextField fx:id="translationYTextField" layoutX="238.0" layoutY="15.0" prefHeight="26.0" prefWidth="70.0" text="0" />
+            <Slider fx:id="weightSlider" blockIncrement="1.0" layoutX="116.0" layoutY="52.0" majorTickUnit="100.0" max="1000.0" prefHeight="38.0" prefWidth="269.0" showTickLabels="true" showTickMarks="true" value="100.0" />
+      </AnchorPane>
+      </content>
+   </TitledPane>
+</AnchorPane>
