@@ -22,6 +22,7 @@ Some of this was built as part of a 24hr hackathon: IC Hack 20. The original rep
 - Translating images
 - Applying image effects
 - Save rendered audio to .wav file
+- Show current frequency of audio
 
 ## Proposed Features
 
