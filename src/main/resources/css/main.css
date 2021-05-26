@@ -1,6 +1,6 @@
 .root {
-    dark_color: #282828;
-    darker_color: #1d1d1d;
+    dark_color: #424242;
+    darker_color: #212121;
     very_dark: #111111;
     grey_color: #555555;
     accent_color: #00CC00;
@@ -8,8 +8,6 @@
     -fx-text-background-color: white;
     -fx-text-inner-color: white;
 }
-
-
 
 .titled-pane, .text {
     -fx-font-size: 13;
@@ -81,4 +79,9 @@
 
 #frequency .text {
     -fx-font-size: 20;
+}
+
+#control-pane, .titled-pane {
+    -fx-background-color: darker_color;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.8), 10, 0, 0, 0);
 }

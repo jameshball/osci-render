@@ -364,7 +364,7 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   @Override
   public void updateFrequency(double leftFrequency, double rightFrequency) {
     Platform.runLater(() ->
-      frequencyLabel.setText(String.format("L Frequency: %d Hz\nR Frequency: %d Hz", Math.round(leftFrequency), Math.round(rightFrequency)))
+      frequencyLabel.setText(String.format("L/R Frequency:\n%d Hz / %d Hz", Math.round(leftFrequency), Math.round(rightFrequency)))
     );
   }
 
@@ -372,10 +372,19 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   public void update(Object pos) {
     if (pos instanceof Vector3 vector) {
       Platform.runLater(() -> {
-        cameraXTextField.setText(String.valueOf(vector.getX()));
-        cameraYTextField.setText(String.valueOf(vector.getY()));
-        cameraZTextField.setText(String.valueOf(vector.getZ()));
+        cameraXTextField.setText(String.valueOf(round(vector.getX(), 3)));
+        cameraYTextField.setText(String.valueOf(round(vector.getY(), 3)));
+        cameraZTextField.setText(String.valueOf(round(vector.getZ(), 3)));
       });
     }
+  }
+
+  private static double round(double value, double places) {
+    if (places < 0) throw new IllegalArgumentException();
+
+    long factor = (long) Math.pow(10, places);
+    value = value * factor;
+    long tmp = Math.round(value);
+    return (double) tmp / factor;
   }
 }
