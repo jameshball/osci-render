@@ -14,9 +14,7 @@ import xt.audio.Structs.XtMix;
 import xt.audio.Structs.XtStreamParams;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
@@ -25,7 +23,6 @@ import sh.ball.shapes.Vector2;
 
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
-import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -164,12 +161,20 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
     try (XtPlatform platform = XtAudio.init(null, null)) {
       XtSystem system = platform.setupToSystem(XtSetup.SYSTEM_AUDIO);
       XtService service = platform.getService(system);
+      if (service == null) {
+        service = platform.getService(platform.setupToSystem(XtSetup.PRO_AUDIO));
+      }
+      if (service == null) {
+        service = platform.getService(platform.setupToSystem(XtSetup.CONSUMER_AUDIO));
+      }
       if (service == null) return;
 
-      String defaultOutput = service.getDefaultDeviceId(true);
-      if (defaultOutput == null) return;
+      String output = service.getDefaultDeviceId(true);
+      if (output == null) {
+        output = service.openDeviceList(EnumSet.of(Enums.XtEnumFlags.OUTPUT)).getId(0);
+      }
 
-      try (XtDevice device = service.openDevice(defaultOutput)) {
+      try (XtDevice device = service.openDevice(output)) {
         if (device.supportsFormat(format)) {
 
           XtBufferSize size = device.getBufferSize(format);
