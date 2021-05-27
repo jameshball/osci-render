@@ -34,7 +34,7 @@ Some of this was built as part of a 24hr hackathon: IC Hack 20. The original rep
 
 Using osci-render is very easy; run the program and choose the file you would like to render, and it will output as audio to visualise on your oscilloscope.
 
-By default, the program loads the example rotating cube. If this is working, you're good to go and should be able to load your own objects, files, or images!
+By default, the program loads the example cube object. If this is working, you're good to go and should be able to load your own objects, files, or images!
 
 Control the output using the sliders and text boxes provided. Currently the following can be controlled:
 
@@ -54,6 +54,8 @@ Additional effects can be applied to the image such as:
 
 - Vector cancelling
 - Bit crush
+- Horizontal/Vertical distortion
+- Wobble (plays sin wave at same frequency as output)
 
 ## Screenshots
 
