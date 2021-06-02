@@ -167,19 +167,25 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
       if (service == null) {
         service = platform.getService(platform.setupToSystem(XtSetup.CONSUMER_AUDIO));
       }
-      if (service == null) return;
+      if (service == null) {
+        throw new RuntimeException("Failed to connect to any audio service");
+      }
+
+      if (service.getCapabilities().contains(Enums.XtServiceCaps.NONE)) {
+        throw new RuntimeException("Audio service has no capabilities");
+      }
 
       String output = service.getDefaultDeviceId(true);
       if (output == null) {
-        output = service.openDeviceList(EnumSet.of(Enums.XtEnumFlags.OUTPUT)).getId(0);
+        output = getFirstDevice(service);
       }
 
       try (XtDevice device = service.openDevice(output)) {
         if (device.supportsFormat(format)) {
-
           XtBufferSize size = device.getBufferSize(format);
           XtStreamParams streamParams = new XtStreamParams(true, this::render, null, null);
           XtDeviceStreamParams deviceParams = new XtDeviceStreamParams(streamParams, format, size.current);
+
           try (XtStream stream = device.openStream(deviceParams, null);
                XtSafeBuffer safe = XtSafeBuffer.register(stream, true)) {
             stream.start();
@@ -188,9 +194,15 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
             }
             stream.stop();
           }
+        } else {
+          throw new RuntimeException("Audio device does not support audio format");
         }
       }
     }
+  }
+
+  private String getFirstDevice(XtService service) {
+    return service.openDeviceList(EnumSet.of(Enums.XtEnumFlags.OUTPUT)).getId(0);
   }
 
   @Override
