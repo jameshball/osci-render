@@ -80,21 +80,21 @@ To uninstall, use Windows control panel, as you would expect.
 ### Running using .jar
 
 - Download the latest `osci-render-VERSION.jar` from [Releases](https://github.com/jameshball/osci-render/releases)
-- Download and install [Java 15 or later](https://www.oracle.com/java/technologies/javase-jdk16-downloads.html)
+- Download and install [Java 16 or later](https://www.oracle.com/java/technologies/javase-jdk16-downloads.html)
 - Donwload and unpack [JavaFX 16 or later](https://gluonhq.com/products/javafx/)
   - Make sure you scroll down to `Latest Release`
   - Download the SDK for your platform
   - Unpack the `.zip` at your root directory (e.g. `C:\javafx-sdk-16` for me on Windows)
   - The `lib` subfolder should be located at `/javafx-sdk-16/lib`
 - Run the following command from your terminal to run the `.jar`, substituting the correct paths 
-- `java --enable-preview --module-path /javafx-sdk-16/lib --add-modules=javafx.controls,javafx.fxml -jar "path/to/osci-render-VERSION.jar"`
+- `java --module-path /javafx-sdk-16/lib --add-modules=javafx.controls,javafx.fxml -jar "PATH/TO/osci-render-VERSION.jar"`
 - Start rendering!
 
 ## Building
 
 I am using Maven for dependency management and to package the program. Doing the following will setup the project. I highly recommend using IntelliJ.
 
-- Download and install [Java 15 or later](https://www.oracle.com/java/technologies/javase-jdk16-downloads.html)
+- Download and install [Java 16 or later](https://www.oracle.com/java/technologies/javase-jdk16-downloads.html)
 - Run `git clone git@github.com:jameshball/osci-render.git`
 - `cd` into the `osci-render` directory
 - Run `mvn package`

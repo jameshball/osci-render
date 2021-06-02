@@ -236,7 +236,9 @@ public class Controller implements Initializable, FrequencyListener, Listener {
     renderer.addEffect(EffectType.TRANSLATE, translateEffect);
 
     executor.submit(producer);
-    new Thread(renderer).start();
+    Thread renderThread = new Thread(renderer);
+    renderThread.setUncaughtExceptionHandler((thread, throwable) -> throwable.printStackTrace());
+    renderThread.start();
     FrequencyAnalyser<List<Shape>, AudioInputStream> analyser = new FrequencyAnalyser<>(renderer, 2, SAMPLE_RATE);
     analyser.addListener(this);
     analyser.addListener(wobbleEffect);

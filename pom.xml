@@ -6,13 +6,13 @@
 
     <groupId>sh.ball</groupId>
     <artifactId>osci-render</artifactId>
-    <version>1.6.4</version>
+    <version>1.6.5</version>
 
     <name>osci-render</name>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.release>15</maven.compiler.release>
+        <maven.compiler.release>16</maven.compiler.release>
         <javafx.version>16</javafx.version>
         <project.modulePath>${project.build.directory}\modules</project.modulePath>
         <appModule>oscirender</appModule>
@@ -99,7 +99,6 @@
                     <source>${maven.compiler.release}</source>
                     <target>${maven.compiler.release}</target>
                     <compilerArgs>
-                        <compilerArg>--enable-preview</compilerArg>
                         <compilerArg>--module-path</compilerArg>
                         <compilerArg>${project.modulePath}</compilerArg>
                     </compilerArgs>
@@ -118,7 +117,6 @@
                     <modulePath>${project.build.directory}/modules;${project.build.directory}/classes</modulePath>
                     <destination>${project.build.directory}</destination>
                     <javaOptions>
-                        <option>--enable-preview</option>
                         <option>-Dfile.encoding=UTF-8</option>
                     </javaOptions>
                 </configuration>
