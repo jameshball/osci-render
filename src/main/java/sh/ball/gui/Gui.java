@@ -17,15 +17,13 @@ import java.util.Objects;
 
 public class Gui extends Application {
 
-  private static final int SAMPLE_RATE = 192000;
-
   @Override
   public void start(Stage stage) throws Exception {
     Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
     System.setProperty("prism.lcdtext", "false");
 
     FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/osci-render.fxml"));
-    Controller controller = new Controller(new AudioPlayer(SAMPLE_RATE));
+    Controller controller = new Controller(new AudioPlayer());
     loader.setController(controller);
     Parent root = loader.load();
 

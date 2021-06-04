@@ -45,17 +45,19 @@ import sh.ball.shapes.Vector2;
 
 public class Controller implements Initializable, FrequencyListener, Listener {
 
-  private static final int SAMPLE_RATE = 192000;
+
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
 
   private final FileChooser fileChooser = new FileChooser();
   private final Renderer<List<Shape>, AudioInputStream> renderer;
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
-  private final RotateEffect rotateEffect = new RotateEffect(SAMPLE_RATE);
-  private final TranslateEffect translateEffect = new TranslateEffect(SAMPLE_RATE);
-  private final WobbleEffect wobbleEffect = new WobbleEffect(SAMPLE_RATE);
-  private final ScaleEffect scaleEffect = new ScaleEffect();
+  private final int sampleRate;
+
+  private final RotateEffect rotateEffect;
+  private final TranslateEffect translateEffect;
+  private final WobbleEffect wobbleEffect;
+  private final ScaleEffect scaleEffect;
 
   private FrameProducer<List<Shape>, AudioInputStream> producer;
   private boolean recording = false;
@@ -124,6 +126,11 @@ public class Controller implements Initializable, FrequencyListener, Listener {
     FrameSet<List<Shape>> frames = new ObjParser(DEFAULT_OBJ).parse();
     frames.addListener(this);
     this.producer = new FrameProducer<>(renderer, frames);
+    this.sampleRate = renderer.samplesPerSecond();
+    this.rotateEffect = new RotateEffect(sampleRate);
+    this.translateEffect = new TranslateEffect(sampleRate);
+    this.wobbleEffect = new WobbleEffect(sampleRate);
+    this.scaleEffect = new ScaleEffect();
   }
 
   private Map<Slider, Consumer<Double>> initializeSliderMap() {
@@ -239,7 +246,7 @@ public class Controller implements Initializable, FrequencyListener, Listener {
     Thread renderThread = new Thread(renderer);
     renderThread.setUncaughtExceptionHandler((thread, throwable) -> throwable.printStackTrace());
     renderThread.start();
-    FrequencyAnalyser<List<Shape>, AudioInputStream> analyser = new FrequencyAnalyser<>(renderer, 2, SAMPLE_RATE);
+    FrequencyAnalyser<List<Shape>, AudioInputStream> analyser = new FrequencyAnalyser<>(renderer, 2, sampleRate);
     analyser.addListener(this);
     analyser.addListener(wobbleEffect);
     new Thread(analyser).start();

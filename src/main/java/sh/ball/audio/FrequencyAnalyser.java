@@ -8,16 +8,21 @@ import java.util.List;
 public class FrequencyAnalyser<S, T> implements Runnable {
 
   private static final float NORMALIZATION_FACTOR_2_BYTES = Short.MAX_VALUE + 1.0f;
+  private static final int DEFAULT_SAMPLE_RATE = 192000;
+  // increase this for higher frequency resolution, but less frequent frequency calculation
+  private static final int DEFAULT_POWER_OF_TWO = 18;
 
   private final Renderer<S, T> renderer;
   private final List<FrequencyListener> listeners = new ArrayList<>();
   private final int frameSize;
   private final int sampleRate;
+  private final int powerOfTwo;
 
   public FrequencyAnalyser(Renderer<S, T> renderer, int frameSize, int sampleRate) {
     this.renderer = renderer;
     this.frameSize = frameSize;
     this.sampleRate = sampleRate;
+    this.powerOfTwo = (int) (DEFAULT_POWER_OF_TWO - Math.log(DEFAULT_SAMPLE_RATE / sampleRate) / Math.log(2));
   }
 
   public void addListener(FrequencyListener listener) {
@@ -33,7 +38,7 @@ public class FrequencyAnalyser<S, T> implements Runnable {
   // Adapted from https://stackoverflow.com/questions/53997426/java-how-to-get-current-frequency-of-audio-input
   @Override
   public void run() {
-    byte[] buf = new byte[2 << 18]; // <--- increase this for higher frequency resolution
+    byte[] buf = new byte[2 << powerOfTwo];
 
     while (true) {
       try {
