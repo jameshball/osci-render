@@ -18,5 +18,7 @@ public interface Renderer<S, T> extends Runnable {
 
   void startRecord();
 
+  int samplesPerSecond();
+
   T stopRecord();
 }

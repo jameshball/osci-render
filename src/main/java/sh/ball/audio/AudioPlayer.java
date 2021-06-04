@@ -32,12 +32,15 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
   private static final int BITS_PER_SAMPLE = 16;
   private static final boolean SIGNED = true;
   private static final boolean BIG_ENDIAN = false;
+  // Stereo audio
+  private static final int NUM_OUTPUTS = 2;
 
-  private final XtFormat format;
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
   private final Map<Object, Effect> effects = new HashMap<>();
   private final ReentrantLock lock = new ReentrantLock();
   private final List<Listener> listeners = new ArrayList<>();
+
+  private final int sampleRate;
 
   private ByteArrayOutputStream outputStream;
   private boolean recording = false;
@@ -50,10 +53,45 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
 
   private volatile boolean stopped;
 
-  public AudioPlayer(int sampleRate) {
-    XtMix mix = new XtMix(sampleRate, XtSample.FLOAT32);
-    XtChannels channels = new XtChannels(0, 0, 2, 0);
-    this.format = new XtFormat(mix, channels);
+  public AudioPlayer() {
+    try (XtPlatform platform = XtAudio.init(null, null)) {
+      XtSystem system = platform.setupToSystem(XtSetup.SYSTEM_AUDIO);
+      XtService service = getService(platform, system);
+      String deviceId = getDeviceId(service);
+
+      try (XtDevice device = service.openDevice(deviceId)) {
+        // Gets the current mix of the device. E.g. 192000 hz and float 32.
+        XtMix deviceMix = device.getMix().orElseThrow(RuntimeException::new);
+        this.sampleRate = deviceMix.rate;
+      }
+    }
+  }
+
+  private XtService getService(XtPlatform platform, XtSystem system) {
+    XtService service = platform.getService(system);
+    if (service == null) {
+      service = platform.getService(platform.setupToSystem(XtSetup.PRO_AUDIO));
+    }
+    if (service == null) {
+      service = platform.getService(platform.setupToSystem(XtSetup.CONSUMER_AUDIO));
+    }
+    if (service == null) {
+      throw new RuntimeException("Failed to connect to any audio service");
+    }
+
+    if (service.getCapabilities().contains(Enums.XtServiceCaps.NONE)) {
+      throw new RuntimeException("Audio service has no capabilities");
+    }
+
+    return service;
+  }
+
+  private String getDeviceId(XtService service) {
+    String deviceId = service.getDefaultDeviceId(true);
+    if (deviceId == null) {
+      return  getFirstDevice(service);
+    }
+    return deviceId;
   }
 
   private int render(XtStream stream, XtBuffer buffer, Object user) throws InterruptedException {
@@ -72,8 +110,8 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
       float leftChannel = cutoff((float) nextVector.getX());
       float rightChannel = cutoff((float) nextVector.getY());
 
-      output[f * format.channels.outputs] = leftChannel;
-      output[f * format.channels.outputs + 1] = rightChannel;
+      output[f * NUM_OUTPUTS] = leftChannel;
+      output[f * NUM_OUTPUTS + 1] = rightChannel;
 
       writeChannels(leftChannel, rightChannel);
 
@@ -160,27 +198,15 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
 
     try (XtPlatform platform = XtAudio.init(null, null)) {
       XtSystem system = platform.setupToSystem(XtSetup.SYSTEM_AUDIO);
-      XtService service = platform.getService(system);
-      if (service == null) {
-        service = platform.getService(platform.setupToSystem(XtSetup.PRO_AUDIO));
-      }
-      if (service == null) {
-        service = platform.getService(platform.setupToSystem(XtSetup.CONSUMER_AUDIO));
-      }
-      if (service == null) {
-        throw new RuntimeException("Failed to connect to any audio service");
-      }
+      XtService service = getService(platform, system);
+      String deviceId = getDeviceId(service);
 
-      if (service.getCapabilities().contains(Enums.XtServiceCaps.NONE)) {
-        throw new RuntimeException("Audio service has no capabilities");
-      }
+      try (XtDevice device = service.openDevice(deviceId)) {
+        // TODO: Make this generic to the type of XtSample of the current device.
+        XtMix mix = new XtMix(sampleRate, XtSample.FLOAT32);
+        XtChannels channels = new XtChannels(0, 0, NUM_OUTPUTS, 0);
+        XtFormat format = new XtFormat(mix, channels);
 
-      String output = service.getDefaultDeviceId(true);
-      if (output == null) {
-        output = getFirstDevice(service);
-      }
-
-      try (XtDevice device = service.openDevice(output)) {
         if (device.supportsFormat(format)) {
           XtBufferSize size = device.getBufferSize(format);
           XtStreamParams streamParams = new XtStreamParams(true, this::render, null, null);
@@ -256,12 +282,17 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
   }
 
   @Override
+  public int samplesPerSecond() {
+    return sampleRate;
+  }
+
+  @Override
   public AudioInputStream stopRecord() {
     recording = false;
     byte[] input = outputStream.toByteArray();
     outputStream = null;
 
-    AudioFormat audioFormat = new AudioFormat(format.mix.rate, BITS_PER_SAMPLE, format.channels.outputs, SIGNED, BIG_ENDIAN);
+    AudioFormat audioFormat = new AudioFormat(sampleRate, BITS_PER_SAMPLE, NUM_OUTPUTS, SIGNED, BIG_ENDIAN);
 
     return new AudioInputStream(new ByteArrayInputStream(input), audioFormat, framesRecorded);
   }
