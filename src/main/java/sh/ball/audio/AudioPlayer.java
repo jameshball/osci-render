@@ -28,6 +28,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
 
+  private static final int DEFAULT_SAMPLE_RATE = 192000;
   private static final int BUFFER_SIZE = 5;
   private static final int BITS_PER_SAMPLE = 16;
   private static final boolean SIGNED = true;
@@ -60,9 +61,8 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
       String deviceId = getDeviceId(service);
 
       try (XtDevice device = service.openDevice(deviceId)) {
-        // Gets the current mix of the device. E.g. 192000 hz and float 32.
-        XtMix deviceMix = device.getMix().orElseThrow(RuntimeException::new);
-        this.sampleRate = deviceMix.rate;
+        // Gets the sample rate of the device. E.g. 192000 hz.
+        this.sampleRate = device.getMix().map(xtMix -> xtMix.rate).orElse(DEFAULT_SAMPLE_RATE);
       }
     }
   }
