@@ -91,7 +91,7 @@ To uninstall, use Windows control panel, as you would expect.
   - Unpack the `.zip` at your root directory (e.g. `C:\javafx-sdk-16` for me on Windows)
   - The `lib` subfolder should be located at `/javafx-sdk-16/lib`
 - Run the following command from your terminal to run the `.jar`, substituting the correct paths 
-- `java --module-path /javafx-sdk-16/lib --add-modules=javafx.controls,javafx.fxml -jar "PATH/TO/osci-render-VERSION.jar"`
+- `java "-Dfile.encoding=UTF8" --module-path /javafx-sdk-16/lib --add-modules=javafx.controls,javafx.fxml -jar "PATH/TO/osci-render-VERSION.jar"`
 - Start rendering!
 
 ## Building
