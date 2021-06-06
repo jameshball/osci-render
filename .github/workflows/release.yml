@@ -23,7 +23,7 @@ jobs:
         $version= mvn help:evaluate -Dexpression="project.version" -q -DforceStdout
         echo "VERSION=$version" >> $env:GITHUB_ENV
         echo "Release version $version" > CHANGELOG
-        mv target/lib/osci-render-${{ env.VERSION }}.jar target/lib/osci-render-win-${{ env.VERSION }}.jar
+        mv "target/lib/osci-render-$version.jar" "target/lib/osci-render-win-$version.jar"
     - name: Upload Windows binaries and jar
       uses: actions/upload-artifact@v2
       with:
@@ -48,7 +48,7 @@ jobs:
           mvn -B jpackage:jpackage@debian
           version=$(mvn help:evaluate -Dexpression="project.version" -q -DforceStdout)
           echo "VERSION=$version" >> $GITHUB_ENV
-          mv target/lib/osci-render-${{ env.VERSION }}.jar target/lib/osci-render-unix-${{ env.VERSION }}.jar
+          mv target/lib/osci-render-$version.jar target/lib/osci-render-unix-$version.jar
       - name: Download all workflow run artifacts
         uses: actions/download-artifact@v2
       - name: Release
