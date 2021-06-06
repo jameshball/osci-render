@@ -108,9 +108,6 @@
                     </execution>
                     <execution>
                         <id>debian</id>
-                        <configuration>
-                            <type>deb</type>
-                        </configuration>
                     </execution>
                 </executions>
             </plugin>
