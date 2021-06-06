@@ -14,9 +14,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>16</maven.compiler.release>
         <javafx.version>16</javafx.version>
-        <project.modulePath>${project.build.directory}\modules</project.modulePath>
-        <appModule>oscirender</appModule>
-        <appMainClass>sh.ball.gui.Gui</appMainClass>
+        <appMainClass>sh.ball.gui.Launcher</appMainClass>
     </properties>
 
     <build>
@@ -53,13 +51,14 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>sh.ball.gui.Gui</mainClass>
+                            <mainClass>${appMainClass}</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>
                         <descriptorRef>jar-with-dependencies</descriptorRef>
                     </descriptorRefs>
                     <appendAssemblyId>false</appendAssemblyId>
+                    <outputDirectory>${project.build.directory}/lib</outputDirectory>
                 </configuration>
                 <executions>
                     <execution>
@@ -73,35 +72,11 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-dependency-plugin</artifactId>
-                <version>3.1.2</version>
-                <executions>
-                    <execution>
-                        <id>copy-dependencies</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>copy-dependencies</goal>
-                        </goals>
-                        <configuration>
-                            <outputDirectory>${project.build.directory}/modules</outputDirectory>
-                            <overWriteReleases>true</overWriteReleases>
-                            <overWriteSnapshots>true</overWriteSnapshots>
-                            <overWriteIfNewer>true</overWriteIfNewer>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.8.1</version>
                 <configuration>
                     <source>${maven.compiler.release}</source>
                     <target>${maven.compiler.release}</target>
-                    <compilerArgs>
-                        <compilerArg>--module-path</compilerArg>
-                        <compilerArg>${project.modulePath}</compilerArg>
-                    </compilerArgs>
                 </configuration>
             </plugin>
             <plugin>
@@ -113,9 +88,10 @@
                     <name>osci-render</name>
                     <appVersion>${project.version}</appVersion>
                     <vendor>james.ball.sh</vendor>
-                    <module>${appModule}/${appMainClass}</module>
-                    <modulePath>${project.build.directory}/modules;${project.build.directory}/classes</modulePath>
-                    <destination>${project.build.directory}</destination>
+                    <input>${project.build.directory}/lib</input>
+                    <mainJar>osci-render-${project.version}.jar</mainJar>
+                    <mainClass>${appMainClass}</mainClass>
+                    <destination>${project.build.directory}/lib</destination>
                     <javaOptions>
                         <option>-Dfile.encoding=UTF-8</option>
                     </javaOptions>
@@ -134,106 +110,6 @@
                         <id>debian</id>
                         <configuration>
                             <type>deb</type>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.moditect</groupId>
-                <artifactId>moditect-maven-plugin</artifactId>
-                <version>1.0.0.Beta2</version>
-                <executions>
-                    <execution>
-                        <id>add-module-infos</id>
-                        <phase>generate-resources</phase>
-                        <goals>
-                            <goal>add-module-info</goal>
-                        </goals>
-                        <configuration>
-                            <overwriteExistingFiles>true</overwriteExistingFiles>
-                            <outputDirectory>${project.build.directory}/modules</outputDirectory>
-                            <modules>
-                                <module>
-                                    <artifact>
-                                        <groupId>org.unbescape</groupId>
-                                        <artifactId>unbescape</artifactId>
-                                        <version>1.1.6.RELEASE</version>
-                                    </artifact>
-                                    <moduleInfo>
-                                        <name>org.unbescape.html</name>
-                                    </moduleInfo>
-                                </module>
-                                <module>
-                                    <artifact>
-                                        <groupId>com.github.mokiat</groupId>
-                                        <artifactId>java-data-front</artifactId>
-                                        <version>2.0.0</version>
-                                    </artifact>
-                                    <moduleInfo>
-                                        <name>java.data.front</name>
-                                    </moduleInfo>
-                                </module>
-                                <module>
-                                    <artifact>
-                                        <groupId>org.openjfx</groupId>
-                                        <artifactId>javafx-controls</artifactId>
-                                        <version>${javafx.version}</version>
-                                    </artifact>
-                                    <moduleInfo>
-                                        <name>javafx.controls.exposed</name>
-                                    </moduleInfo>
-                                </module>
-                                <module>
-                                    <artifact>
-                                        <groupId>org.openjfx</groupId>
-                                        <artifactId>javafx-fxml</artifactId>
-                                        <version>${javafx.version}</version>
-                                    </artifact>
-                                    <moduleInfo>
-                                        <name>javafx.fxml.exposed</name>
-                                    </moduleInfo>
-                                </module>
-                                <module>
-                                    <artifact>
-                                        <groupId>org.openjfx</groupId>
-                                        <artifactId>javafx-graphics</artifactId>
-                                        <version>${javafx.version}</version>
-                                    </artifact>
-                                    <moduleInfo>
-                                        <name>javafx.graphics.exposed</name>
-                                    </moduleInfo>
-                                </module>
-                                <module>
-                                    <artifact>
-                                        <groupId>org.openjfx</groupId>
-                                        <artifactId>javafx-base</artifactId>
-                                        <version>${javafx.version}</version>
-                                    </artifact>
-                                    <moduleInfo>
-                                        <name>javafx.base.exposed</name>
-                                    </moduleInfo>
-                                </module>
-                                <module>
-                                    <artifact>
-                                        <groupId>net.java.dev.jna</groupId>
-                                        <artifactId>jna</artifactId>
-                                        <version>5.6.0</version>
-                                    </artifact>
-                                    <moduleInfo>
-                                        <name>com.sun.jna</name>
-                                    </moduleInfo>
-                                </module>
-                                <module>
-                                    <artifact>
-                                        <groupId>org.jheaps</groupId>
-                                        <artifactId>jheaps</artifactId>
-                                        <version>0.13</version>
-                                    </artifact>
-                                    <moduleInfo>
-                                        <name>org.jheaps</name>
-                                    </moduleInfo>
-                                </module>
-                            </modules>
                         </configuration>
                     </execution>
                 </executions>
@@ -283,4 +159,57 @@
         </dependency>
 
     </dependencies>
+    <profiles>
+        <profile>
+            <id>win</id>
+
+            <activation>
+                <os><family>windows</family></os>
+            </activation>
+
+            <dependencies>
+                <dependency>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>javafx-graphics </artifactId>
+                    <version>${javafx.version}</version>
+                    <classifier>win</classifier>
+                </dependency>
+            </dependencies>
+        </profile>
+
+        <profile>
+            <id>mac</id>
+
+            <activation>
+                <os><family>mac</family></os>
+            </activation>
+
+            <dependencies>
+                <dependency>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>javafx-graphics </artifactId>
+                    <version>${javafx.version}</version>
+                    <classifier>mac</classifier>
+                </dependency>
+            </dependencies>
+        </profile>
+
+        <profile>
+            <id>linux</id>
+
+            <activation>
+                <os><family>unix</family></os>
+            </activation>
+
+            <dependencies>
+                <dependency>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>javafx-graphics </artifactId>
+                    <version>${javafx.version}</version>
+                    <classifier>linux</classifier>
+                </dependency>
+            </dependencies>
+        </profile>
+
+    </profiles>
 </project>
