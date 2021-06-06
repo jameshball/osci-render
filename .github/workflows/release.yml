@@ -24,17 +24,23 @@ jobs:
         echo "VERSION=$version" >> $env:GITHUB_ENV
         echo "Release version $version" > CHANGELOG
         mv "target/lib/osci-render-$version.jar" "target/lib/osci-render-win-$version.jar"
-    - name: Upload Windows binaries and jar
-      uses: actions/upload-artifact@v2
+        ls target/lib/
+    - name: Release
+      uses: softprops/action-gh-release@v1
       with:
-        name: windows
-        path: target/lib
+        body_path: CHANGELOG
+        tag_name: v${{ env.VERSION }}
+        files: |
+          target/lib/osci-render-${{ env.VERSION }}.exe
+          target/lib/osci-render-win-${{ env.VERSION }}.jar
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_REPOSITORY: jameshball/osci-render
 
   build-debian:
 
     runs-on: ubuntu-latest
 
-    needs: build-windows
     steps:
       - uses: actions/checkout@v2
       - name: Set up JDK 16
@@ -49,15 +55,12 @@ jobs:
           version=$(mvn help:evaluate -Dexpression="project.version" -q -DforceStdout)
           echo "VERSION=$version" >> $GITHUB_ENV
           mv target/lib/osci-render-$version.jar target/lib/osci-render-unix-$version.jar
-      - name: Download all workflow run artifacts
-        uses: actions/download-artifact@v2
+          ls target/lib/
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ env.VERSION }}
           files: |
-            windows/osci-render-${{ env.VERSION }}.exe
-            windows/osci-render-win-${{ env.VERSION }}.jar
             target/lib/osci-render-${{ env.VERSION }}.deb
             target/lib/osci-render-unix-${{ env.VERSION }}.jar
         env:
