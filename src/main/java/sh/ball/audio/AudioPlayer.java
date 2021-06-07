@@ -1,23 +1,13 @@
 package sh.ball.audio;
 
 import sh.ball.audio.effect.Effect;
-import xt.audio.*;
-import xt.audio.Enums.XtSample;
-import xt.audio.Enums.XtSetup;
-import xt.audio.Enums.XtSystem;
-import xt.audio.Structs.XtBuffer;
-import xt.audio.Structs.XtBufferSize;
-import xt.audio.Structs.XtChannels;
-import xt.audio.Structs.XtDeviceStreamParams;
-import xt.audio.Structs.XtFormat;
-import xt.audio.Structs.XtMix;
-import xt.audio.Structs.XtStreamParams;
 
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
+import sh.ball.audio.engine.AudioEngine;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
@@ -28,20 +18,21 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
 
-  private static final int DEFAULT_SAMPLE_RATE = 192000;
+  // Arbitrary max count for effects
+  private static final int MAX_COUNT = 10000;
   private static final int BUFFER_SIZE = 5;
+  // Is this always true? Might need to check from AudioEngine
   private static final int BITS_PER_SAMPLE = 16;
   private static final boolean SIGNED = true;
   private static final boolean BIG_ENDIAN = false;
   // Stereo audio
   private static final int NUM_OUTPUTS = 2;
 
+  private final AudioEngine audioEngine;
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
   private final Map<Object, Effect> effects = new HashMap<>();
-  private final ReentrantLock lock = new ReentrantLock();
+  private final ReentrantLock renderLock = new ReentrantLock();
   private final List<Listener> listeners = new ArrayList<>();
-
-  private final int sampleRate;
 
   private ByteArrayOutputStream outputStream;
   private boolean recording = false;
@@ -49,87 +40,41 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
   private List<Shape> frame;
   private int currentShape = 0;
   private int audioFramesDrawn = 0;
+  private int count = 0;
 
   private double weight = Shape.DEFAULT_WEIGHT;
 
-  private volatile boolean stopped;
-
-  public AudioPlayer() {
-    try (XtPlatform platform = XtAudio.init(null, null)) {
-      XtSystem system = platform.setupToSystem(XtSetup.SYSTEM_AUDIO);
-      XtService service = getService(platform, system);
-      String deviceId = getDeviceId(service);
-
-      try (XtDevice device = service.openDevice(deviceId)) {
-        // Gets the sample rate of the device. E.g. 192000 hz.
-        this.sampleRate = device.getMix().map(xtMix -> xtMix.rate).orElse(DEFAULT_SAMPLE_RATE);
-      }
-    }
+  public AudioPlayer(AudioEngine audioEngine) {
+    this.audioEngine = audioEngine;
   }
 
-  private XtService getService(XtPlatform platform, XtSystem system) {
-    XtService service = platform.getService(system);
-    if (service == null) {
-      service = platform.getService(platform.setupToSystem(XtSetup.PRO_AUDIO));
+  private Vector2 generateChannels() throws InterruptedException {
+    Shape shape = getCurrentShape().setWeight(weight);
+
+    double totalAudioFrames = shape.getWeight() * shape.getLength();
+    double drawingProgress = totalAudioFrames == 0 ? 1 : audioFramesDrawn / totalAudioFrames;
+    Vector2 nextVector = applyEffects(count, shape.nextVector(drawingProgress));
+
+    Vector2 channels = cutoff(nextVector);
+    writeChannels((float) channels.getX(), (float) channels.getY());
+
+    audioFramesDrawn++;
+
+    if (++count > MAX_COUNT) {
+      count = 0;
     }
-    if (service == null) {
-      service = platform.getService(platform.setupToSystem(XtSetup.CONSUMER_AUDIO));
-    }
-    if (service == null) {
-      throw new RuntimeException("Failed to connect to any audio service");
-    }
 
-    if (service.getCapabilities().contains(Enums.XtServiceCaps.NONE)) {
-      throw new RuntimeException("Audio service has no capabilities");
+    if (audioFramesDrawn > totalAudioFrames) {
+      audioFramesDrawn = 0;
+      currentShape++;
     }
 
-    return service;
-  }
-
-  private String getDeviceId(XtService service) {
-    String deviceId = service.getDefaultDeviceId(true);
-    if (deviceId == null) {
-      return  getFirstDevice(service);
+    if (currentShape >= frame.size()) {
+      currentShape = 0;
+      frame = frameQueue.take();
     }
-    return deviceId;
-  }
 
-  private int render(XtStream stream, XtBuffer buffer, Object user) throws InterruptedException {
-    XtSafeBuffer safe = XtSafeBuffer.get(stream);
-    safe.lock(buffer);
-    lock.lock();
-    float[] output = (float[]) safe.getOutput();
-
-    for (int f = 0; f < buffer.frames; f++) {
-      Shape shape = getCurrentShape().setWeight(weight);
-
-      double totalAudioFrames = shape.getWeight() * shape.getLength();
-      double drawingProgress = totalAudioFrames == 0 ? 1 : audioFramesDrawn / totalAudioFrames;
-      Vector2 nextVector = applyEffects(f, shape.nextVector(drawingProgress));
-
-      float leftChannel = cutoff((float) nextVector.getX());
-      float rightChannel = cutoff((float) nextVector.getY());
-
-      output[f * NUM_OUTPUTS] = leftChannel;
-      output[f * NUM_OUTPUTS + 1] = rightChannel;
-
-      writeChannels(leftChannel, rightChannel);
-
-      audioFramesDrawn++;
-
-      if (audioFramesDrawn > totalAudioFrames) {
-        audioFramesDrawn = 0;
-        currentShape++;
-      }
-
-      if (currentShape >= frame.size()) {
-        currentShape = 0;
-        frame = frameQueue.take();
-      }
-    }
-    safe.unlock(buffer);
-    lock.unlock();
-    return 0;
+    return channels;
   }
 
   private void writeChannels(float leftChannel, float rightChannel) {
@@ -159,13 +104,18 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
     framesRecorded++;
   }
 
-  private float cutoff(float value) {
-    if (value < -1) {
-      return -1;
-    } else if (value > 1) {
-      return 1;
+  private Vector2 cutoff(Vector2 vector) {
+    if (vector.getX() < -1) {
+      vector = vector.setX(-1);
+    } else if (vector.getX() > 1) {
+      vector = vector.setX(1);
     }
-    return value;
+    if (vector.getY() < -1) {
+      vector = vector.setY(-1);
+    } else if (vector.getY() > 1) {
+      vector = vector.setY(1);
+    }
+    return vector;
   }
 
   private Vector2 applyEffects(int frame, Vector2 vector) {
@@ -196,44 +146,12 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
       throw new RuntimeException("Initial frame not found. Cannot continue.");
     }
 
-    try (XtPlatform platform = XtAudio.init(null, null)) {
-      XtSystem system = platform.setupToSystem(XtSetup.SYSTEM_AUDIO);
-      XtService service = getService(platform, system);
-      String deviceId = getDeviceId(service);
-
-      try (XtDevice device = service.openDevice(deviceId)) {
-        // TODO: Make this generic to the type of XtSample of the current device.
-        XtMix mix = new XtMix(sampleRate, XtSample.FLOAT32);
-        XtChannels channels = new XtChannels(0, 0, NUM_OUTPUTS, 0);
-        XtFormat format = new XtFormat(mix, channels);
-
-        if (device.supportsFormat(format)) {
-          XtBufferSize size = device.getBufferSize(format);
-          XtStreamParams streamParams = new XtStreamParams(true, this::render, null, null);
-          XtDeviceStreamParams deviceParams = new XtDeviceStreamParams(streamParams, format, size.current);
-
-          try (XtStream stream = device.openStream(deviceParams, null);
-               XtSafeBuffer safe = XtSafeBuffer.register(stream, true)) {
-            stream.start();
-            while (!stopped) {
-              Thread.onSpinWait();
-            }
-            stream.stop();
-          }
-        } else {
-          throw new RuntimeException("Audio device does not support audio format");
-        }
-      }
-    }
-  }
-
-  private String getFirstDevice(XtService service) {
-    return service.openDeviceList(EnumSet.of(Enums.XtEnumFlags.OUTPUT)).getId(0);
+    audioEngine.play(this::generateChannels, renderLock);
   }
 
   @Override
   public void stop() {
-    stopped = true;
+    audioEngine.stop();
   }
 
   @Override
@@ -260,17 +178,17 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
   public void read(byte[] buffer) throws InterruptedException {
     Listener listener = new Listener(buffer);
     try {
-      lock.lock();
+      renderLock.lock();
       listeners.add(listener);
     } finally {
-      lock.unlock();
+      renderLock.unlock();
     }
     listener.waitUntilFull();
     try {
-      lock.lock();
+      renderLock.lock();
       listeners.remove(listener);
     } finally {
-      lock.unlock();
+      renderLock.unlock();
     }
   }
 
@@ -283,7 +201,7 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
 
   @Override
   public int samplesPerSecond() {
-    return sampleRate;
+    return audioEngine.sampleRate();
   }
 
   @Override
@@ -292,7 +210,7 @@ public class AudioPlayer implements Renderer<List<Shape>, AudioInputStream> {
     byte[] input = outputStream.toByteArray();
     outputStream = null;
 
-    AudioFormat audioFormat = new AudioFormat(sampleRate, BITS_PER_SAMPLE, NUM_OUTPUTS, SIGNED, BIG_ENDIAN);
+    AudioFormat audioFormat = new AudioFormat(audioEngine.sampleRate(), BITS_PER_SAMPLE, NUM_OUTPUTS, SIGNED, BIG_ENDIAN);
 
     return new AudioInputStream(new ByteArrayInputStream(input), audioFormat, framesRecorded);
   }

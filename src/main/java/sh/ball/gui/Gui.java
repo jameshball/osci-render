@@ -11,6 +11,7 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.stage.Stage;
 import sh.ball.audio.AudioPlayer;
+import sh.ball.audio.engine.XtAudioEngine;
 import sh.ball.engine.Vector3;
 
 import java.util.Objects;
@@ -23,7 +24,7 @@ public class Gui extends Application {
     System.setProperty("prism.lcdtext", "false");
 
     FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/osci-render.fxml"));
-    Controller controller = new Controller(new AudioPlayer());
+    Controller controller = new Controller(new AudioPlayer(new XtAudioEngine()));
     loader.setController(controller);
     Parent root = loader.load();
 
