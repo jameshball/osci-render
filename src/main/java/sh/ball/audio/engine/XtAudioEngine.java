@@ -21,8 +21,7 @@ public class XtAudioEngine implements AudioEngine {
 
   public XtAudioEngine() {
     try (XtPlatform platform = XtAudio.init(null, null)) {
-      Enums.XtSystem system = platform.setupToSystem(Enums.XtSetup.SYSTEM_AUDIO);
-      XtService service = getService(platform, system);
+      XtService service = getService(platform);
       String deviceId = getDeviceId(service);
 
       try (XtDevice device = service.openDevice(deviceId)) {
@@ -57,8 +56,7 @@ public class XtAudioEngine implements AudioEngine {
     this.channelGenerator = channelGenerator;
     this.renderLock = renderLock;
     try (XtPlatform platform = XtAudio.init(null, null)) {
-      Enums.XtSystem system = platform.setupToSystem(Enums.XtSetup.SYSTEM_AUDIO);
-      XtService service = getService(platform, system);
+      XtService service = getService(platform);
       String deviceId = getDeviceId(service);
 
       try (XtDevice device = service.openDevice(deviceId)) {
@@ -97,8 +95,8 @@ public class XtAudioEngine implements AudioEngine {
     return sampleRate;
   }
 
-  private XtService getService(XtPlatform platform, Enums.XtSystem system) {
-    XtService service = platform.getService(system);
+  private XtService getService(XtPlatform platform) {
+    XtService service = platform.getService(platform.setupToSystem(Enums.XtSetup.SYSTEM_AUDIO));
     if (service == null) {
       service = platform.getService(platform.setupToSystem(Enums.XtSetup.PRO_AUDIO));
     }
