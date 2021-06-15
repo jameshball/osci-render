@@ -10,6 +10,8 @@ Read more about '[Rendering shapes through audio signals](https://felixonline.co
 
 Some of this was built as part of a 24hr hackathon: IC Hack 20. The original repository can be found here: https://github.com/wdhg/ICHack20 It won 'Best Newcomers Prize' at the event.
 
+Send an email to [james@ball.sh](mailto:james@ball.sh) if you have any issues, feedback, feature requests, or anything else!
+
 ### Video Demonstration
 
 [![osci-render demonstration](https://img.youtube.com/vi/feQzC_Tz5K4/0.jpg)](https://www.youtube.com/watch?v=feQzC_Tz5K4)
