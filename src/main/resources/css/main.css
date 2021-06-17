@@ -85,3 +85,80 @@
     -fx-background-color: darker_color;
     -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.8), 10, 0, 0, 0);
 }
+
+.combo-box .list-cell
+{
+    -fx-background: very_dark;
+    -fx-background-color: very_dark;
+    -fx-text-fill: white;
+    -fx-border-radius: 0;
+    -fx-border-width: 0.2 0 0.2 1;
+    -fx-border-color: white;
+}
+
+.combo-box-popup .list-view
+{
+    -fx-background-color: dark_color;
+    -fx-background-insets: 0;
+    -fx-border-radius: 0;
+    -fx-background-radius: 0;
+    -fx-border-width: 0;
+    -fx-padding: 1 1 0 1;
+    -fx-max-height: 0;
+}
+
+.combo-box-popup .list-view .list-cell
+{
+    -fx-padding: 6 0 6 5;
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
+    -fx-border-width: 0;
+    -fx-cell-size: 35;
+
+    /* No alternate highlighting */
+    -fx-background-color: dark_color;
+}
+
+.combo-box-popup .list-view .list-cell:filled:selected, .combo-box-popup .list-view .list-cell:filled:selected:hover
+{
+    -fx-background: darker_color;
+    -fx-background-color: darker_color;
+    -fx-border-radius: 0;
+    -fx-border-width: 0;
+    -fx-text-fill: white;
+}
+
+.combo-box-popup .list-view .list-cell:filled:hover
+{
+    -fx-background-color: darker_color;
+    -fx-border-radius: 0;
+    -fx-border-width: 0;
+    -fx-text-fill: white;
+}
+
+.combo-box-base
+{
+    -fx-background-color: white;
+    -fx-border-radius: 0;
+    -fx-border-width: 1 1 1 0;
+    -fx-border-color: white;
+    -fx-background-radius: 0;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.combo-box-base:hover
+{
+    -fx-color: white;
+}
+
+.combo-box-base:showing
+{
+    -fx-color: white;
+}
+
+.combo-box-base:focused {
+    -fx-background-color: white;
+    -fx-background-radius: 0;
+    -fx-background-insets: 0;
+}

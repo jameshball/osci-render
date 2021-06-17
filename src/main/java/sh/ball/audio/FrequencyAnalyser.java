@@ -5,21 +5,23 @@ import sh.ball.audio.fft.FFT;
 import java.util.ArrayList;
 import java.util.List;
 
-public class FrequencyAnalyser<S, T> implements Runnable {
+public class FrequencyAnalyser<S> implements Runnable {
 
   private static final float NORMALIZATION_FACTOR_2_BYTES = Short.MAX_VALUE + 1.0f;
   private static final int DEFAULT_SAMPLE_RATE = 192000;
   // increase this for higher frequency resolution, but less frequent frequency calculation
   private static final int DEFAULT_POWER_OF_TWO = 18;
 
-  private final Renderer<S, T> renderer;
+  private final AudioPlayer<S> audioPlayer;
   private final List<FrequencyListener> listeners = new ArrayList<>();
   private final int frameSize;
   private final int sampleRate;
   private final int powerOfTwo;
 
-  public FrequencyAnalyser(Renderer<S, T> renderer, int frameSize, int sampleRate) {
-    this.renderer = renderer;
+  private volatile boolean stopped;
+
+  public FrequencyAnalyser(AudioPlayer<S> audioPlayer, int frameSize, int sampleRate) {
+    this.audioPlayer = audioPlayer;
     this.frameSize = frameSize;
     this.sampleRate = sampleRate;
     this.powerOfTwo = (int) (DEFAULT_POWER_OF_TWO - Math.log(DEFAULT_SAMPLE_RATE / sampleRate) / Math.log(2));
@@ -40,9 +42,9 @@ public class FrequencyAnalyser<S, T> implements Runnable {
   public void run() {
     byte[] buf = new byte[2 << powerOfTwo];
 
-    while (true) {
+    while (!stopped) {
       try {
-        renderer.read(buf);
+        audioPlayer.read(buf);
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
@@ -76,6 +78,10 @@ public class FrequencyAnalyser<S, T> implements Runnable {
 
       notifyListeners(bins[maxLeftIndex], bins[maxRightIndex]);
     }
+  }
+
+  public void stop() {
+    stopped = true;
   }
 
   private double[] decode(final byte[] buf, boolean decodeLeft) {

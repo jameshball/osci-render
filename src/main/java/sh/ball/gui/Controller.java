@@ -3,6 +3,7 @@ package sh.ball.gui;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
 import javafx.scene.control.*;
 import javafx.util.Duration;
 import sh.ball.audio.*;
@@ -35,6 +36,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import org.xml.sax.SAXException;
 import sh.ball.audio.effect.Effect;
 import sh.ball.audio.effect.EffectType;
+import sh.ball.audio.engine.AudioDevice;
 import sh.ball.engine.Vector3;
 import sh.ball.parser.obj.Listener;
 import sh.ball.parser.obj.ObjSettingsFactory;
@@ -49,17 +51,19 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
 
   private final FileChooser fileChooser = new FileChooser();
-  private final Renderer<List<Shape>, AudioInputStream> renderer;
+  private final AudioPlayer<List<Shape>> audioPlayer;
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
-  private final int sampleRate;
 
   private final RotateEffect rotateEffect;
   private final TranslateEffect translateEffect;
   private final WobbleEffect wobbleEffect;
   private final ScaleEffect scaleEffect;
 
-  private FrameProducer<List<Shape>, AudioInputStream> producer;
+  private int sampleRate;
+  private FrequencyAnalyser<List<Shape>> analyser;
+  private final AudioDevice defaultDevice;
+  private FrameProducer<List<Shape>> producer;
   private boolean recording = false;
 
   private Stage stage;
@@ -120,13 +124,16 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   private CheckBox wobbleCheckBox;
   @FXML
   private Slider wobbleSlider;
+  @FXML
+  private ComboBox<AudioDevice> deviceComboBox;
 
-  public Controller(Renderer<List<Shape>, AudioInputStream> renderer) throws IOException {
-    this.renderer = renderer;
+  public Controller(AudioPlayer<List<Shape>> audioPlayer) throws IOException {
+    this.audioPlayer = audioPlayer;
     FrameSet<List<Shape>> frames = new ObjParser(DEFAULT_OBJ).parse();
     frames.addListener(this);
-    this.producer = new FrameProducer<>(renderer, frames);
-    this.sampleRate = renderer.samplesPerSecond();
+    this.producer = new FrameProducer<>(audioPlayer, frames);
+    this.defaultDevice = audioPlayer.getDefaultDevice();
+    this.sampleRate = defaultDevice.sampleRate();
     this.rotateEffect = new RotateEffect(sampleRate);
     this.translateEffect = new TranslateEffect(sampleRate);
     this.wobbleEffect = new WobbleEffect(sampleRate);
@@ -136,7 +143,7 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   private Map<Slider, Consumer<Double>> initializeSliderMap() {
     return Map.of(
       weightSlider,
-      renderer::setQuality,
+      audioPlayer::setQuality,
       rotateSpeedSlider,
       rotateEffect::setSpeed,
       translationSpeedSlider,
@@ -238,15 +245,47 @@ public class Controller implements Initializable, FrequencyListener, Listener {
 
     updateObjectRotateSpeed();
 
-    renderer.addEffect(EffectType.SCALE, scaleEffect);
-    renderer.addEffect(EffectType.ROTATE, rotateEffect);
-    renderer.addEffect(EffectType.TRANSLATE, translateEffect);
+    audioPlayer.addEffect(EffectType.SCALE, scaleEffect);
+    audioPlayer.addEffect(EffectType.ROTATE, rotateEffect);
+    audioPlayer.addEffect(EffectType.TRANSLATE, translateEffect);
+
+    audioPlayer.setDevice(defaultDevice);
+    deviceComboBox.setItems(FXCollections.observableList(audioPlayer.devices()));
+    deviceComboBox.setValue(defaultDevice);
 
     executor.submit(producer);
-    Thread renderThread = new Thread(renderer);
-    renderThread.setUncaughtExceptionHandler((thread, throwable) -> throwable.printStackTrace());
-    renderThread.start();
-    FrequencyAnalyser<List<Shape>, AudioInputStream> analyser = new FrequencyAnalyser<>(renderer, 2, sampleRate);
+    analyser = new FrequencyAnalyser<>(audioPlayer, 2, sampleRate);
+    startFrequencyAnalyser(analyser);
+    startAudioPlayerThread();
+
+    deviceComboBox.valueProperty().addListener((options, oldDevice, newDevice) -> {
+      if (newDevice != null) {
+        switchAudioDevice(newDevice);
+      }
+    });
+  }
+
+  private void switchAudioDevice(AudioDevice device) {
+    try {
+      audioPlayer.reset();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+    audioPlayer.setDevice(device);
+    analyser.stop();
+    sampleRate = device.sampleRate();
+    analyser = new FrequencyAnalyser<>(audioPlayer, 2, sampleRate);
+    startFrequencyAnalyser(analyser);
+    startAudioPlayerThread();
+  }
+
+  private void startAudioPlayerThread() {
+    Thread audioPlayerThread = new Thread(audioPlayer);
+    audioPlayerThread.setUncaughtExceptionHandler((thread, throwable) -> throwable.printStackTrace());
+    audioPlayerThread.start();
+  }
+
+  private void startFrequencyAnalyser(FrequencyAnalyser<List<Shape>> analyser) {
     analyser.addListener(this);
     analyser.addListener(wobbleEffect);
     new Thread(analyser).start();
@@ -257,13 +296,13 @@ public class Controller implements Initializable, FrequencyListener, Listener {
     if (recording) {
       recordLabel.setText("Recording...");
       recordButton.setText("Stop Recording");
-      renderer.startRecord();
+      audioPlayer.startRecord();
     } else {
       recordButton.setText("Record");
-      AudioInputStream input = renderer.stopRecord();
+      AudioInputStream input = audioPlayer.stopRecord();
       try {
         File file = fileChooser.showSaveDialog(stage);
-        SimpleDateFormat formatter= new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
+        SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
         Date date = new Date(System.currentTimeMillis());
         if (file == null) {
           file = new File("out-" + formatter.format(date) + ".wav");
@@ -315,10 +354,10 @@ public class Controller implements Initializable, FrequencyListener, Listener {
 
   private void updateEffect(EffectType type, boolean checked, Effect effect) {
     if (checked) {
-      renderer.addEffect(type, effect);
+      audioPlayer.addEffect(type, effect);
       effectTypes.get(type).setDisable(false);
     } else {
-      renderer.removeEffect(type);
+      audioPlayer.removeEffect(type);
       effectTypes.get(type).setDisable(true);
     }
   }
@@ -329,7 +368,7 @@ public class Controller implements Initializable, FrequencyListener, Listener {
       String path = file.getAbsolutePath();
       FrameSet<List<Shape>> frames = ParserFactory.getParser(path).parse();
       frames.addListener(this);
-      producer = new FrameProducer<>(renderer, frames);
+      producer = new FrameProducer<>(audioPlayer, frames);
 
       updateObjectRotateSpeed();
       updateFocalLength();

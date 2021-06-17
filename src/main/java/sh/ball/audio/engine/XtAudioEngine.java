@@ -3,33 +3,25 @@ package sh.ball.audio.engine;
 import sh.ball.shapes.Vector2;
 import xt.audio.*;
 
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class XtAudioEngine implements AudioEngine {
 
-  private static final int DEFAULT_SAMPLE_RATE = 192000;
   // Stereo audio
   private static final int NUM_OUTPUTS = 2;
 
-  private final int sampleRate;
-
   private volatile boolean stopped = false;
+
+  private boolean playing = false;
   private ReentrantLock renderLock;
   private Callable<Vector2> channelGenerator;
 
-  public XtAudioEngine() {
-    try (XtPlatform platform = XtAudio.init(null, null)) {
-      XtService service = getService(platform);
-      String deviceId = getDeviceId(service);
-
-      try (XtDevice device = service.openDevice(deviceId)) {
-        // Gets the sample rate of the device. E.g. 192000 hz.
-        this.sampleRate = device.getMix().map(xtMix -> xtMix.rate).orElse(DEFAULT_SAMPLE_RATE);
-      }
-    }
-  }
+  public XtAudioEngine() {}
 
   private int render(XtStream stream, Structs.XtBuffer buffer, Object user) throws Exception {
     XtSafeBuffer safe = XtSafeBuffer.get(stream);
@@ -52,25 +44,30 @@ public class XtAudioEngine implements AudioEngine {
   }
 
   @Override
-  public void play(Callable<Vector2> channelGenerator, ReentrantLock renderLock) {
+  public boolean isPlaying() {
+    return playing;
+  }
+
+  @Override
+  public void play(Callable<Vector2> channelGenerator, ReentrantLock renderLock, AudioDevice device) {
+    playing = true;
     this.channelGenerator = channelGenerator;
     this.renderLock = renderLock;
     try (XtPlatform platform = XtAudio.init(null, null)) {
       XtService service = getService(platform);
-      String deviceId = getDeviceId(service);
 
-      try (XtDevice device = service.openDevice(deviceId)) {
+      try (XtDevice xtDevice = service.openDevice(device.id())) {
         // TODO: Make this generic to the type of XtSample of the current device.
-        Structs.XtMix mix = new Structs.XtMix(sampleRate, Enums.XtSample.FLOAT32);
+        Structs.XtMix mix = new Structs.XtMix(xtDevice.getMix().orElseThrow().rate, Enums.XtSample.FLOAT32);
         Structs.XtChannels channels = new Structs.XtChannels(0, 0, NUM_OUTPUTS, 0);
         Structs.XtFormat format = new Structs.XtFormat(mix, channels);
 
-        if (device.supportsFormat(format)) {
-          Structs.XtBufferSize size = device.getBufferSize(format);
+        if (xtDevice.supportsFormat(format)) {
+          Structs.XtBufferSize size = xtDevice.getBufferSize(format);
           Structs.XtStreamParams streamParams = new Structs.XtStreamParams(true, this::render, null, null);
           Structs.XtDeviceStreamParams deviceParams = new Structs.XtDeviceStreamParams(streamParams, format, size.current);
 
-          try (XtStream stream = device.openStream(deviceParams, null);
+          try (XtStream stream = xtDevice.openStream(deviceParams, null);
                XtSafeBuffer safe = XtSafeBuffer.register(stream, true)) {
             stream.start();
             while (!stopped) {
@@ -83,6 +80,7 @@ public class XtAudioEngine implements AudioEngine {
         }
       }
     }
+    playing = false;
   }
 
   @Override
@@ -91,9 +89,64 @@ public class XtAudioEngine implements AudioEngine {
   }
 
   @Override
-  public int sampleRate() {
-    return sampleRate;
+  public List<AudioDevice> devices() {
+    List<AudioDevice> devices = new ArrayList<>();
+
+    try (XtPlatform platform = XtAudio.init(null, null)) {
+      XtService service = getService(platform);
+      XtDeviceList xtDevices = service.openDeviceList(EnumSet.of(Enums.XtEnumFlags.OUTPUT));
+
+      for (int i = 0; i < xtDevices.getCount(); i++) {
+        String deviceId = xtDevices.getId(i);
+        String deviceName = xtDevices.getName(deviceId);
+
+        try (XtDevice xtDevice = service.openDevice(deviceId)) {
+          Optional<Structs.XtMix> mix = xtDevice.getMix();
+
+          if (mix.isEmpty()) {
+            continue;
+          }
+
+          Structs.XtChannels channels = new Structs.XtChannels(0, 0, NUM_OUTPUTS, 0);
+          Structs.XtFormat format = new Structs.XtFormat(mix.get(), channels);
+
+          if (xtDevice.supportsFormat(format)) {
+            devices.add(new DefaultAudioDevice(deviceId, deviceName, mix.get().rate, XtSampleToAudioSample(mix.get().sample)));
+          }
+        }
+      }
+    }
+
+    return devices;
   }
+
+  @Override
+  public AudioDevice getDefaultDevice() {
+    try (XtPlatform platform = XtAudio.init(null, null)) {
+      XtService service = getService(platform);
+      String deviceId = service.getDefaultDeviceId(true);
+
+      try (XtDevice xtDevice = service.openDevice(deviceId)) {
+        Optional<Structs.XtMix> mix = xtDevice.getMix();
+
+        if (mix.isEmpty()) {
+          return null;
+        }
+
+        String deviceName = service.openDeviceList(EnumSet.of(Enums.XtEnumFlags.OUTPUT)).getName(deviceId);
+
+        Structs.XtChannels channels = new Structs.XtChannels(0, 0, NUM_OUTPUTS, 0);
+        Structs.XtFormat format = new Structs.XtFormat(mix.get(), channels);
+
+        if (xtDevice.supportsFormat(format)) {
+          return new DefaultAudioDevice(deviceId, deviceName, mix.get().rate, XtSampleToAudioSample(mix.get().sample));
+        } else {
+          return null;
+        }
+      }
+    }
+  }
+
 
   private XtService getService(XtPlatform platform) {
     XtService service = platform.getService(platform.setupToSystem(Enums.XtSetup.SYSTEM_AUDIO));
@@ -114,15 +167,13 @@ public class XtAudioEngine implements AudioEngine {
     return service;
   }
 
-  private String getDeviceId(XtService service) {
-    String deviceId = service.getDefaultDeviceId(true);
-    if (deviceId == null) {
-      return getFirstDevice(service);
-    }
-    return deviceId;
-  }
-
-  private String getFirstDevice(XtService service) {
-    return service.openDeviceList(EnumSet.of(Enums.XtEnumFlags.OUTPUT)).getId(0);
+  private AudioSample XtSampleToAudioSample(Enums.XtSample sample) {
+    return switch (sample) {
+      case UINT8 -> AudioSample.UINT8;
+      case INT16 -> AudioSample.INT16;
+      case INT24 -> AudioSample.INT24;
+      case INT32 -> AudioSample.INT32;
+      case FLOAT32 -> AudioSample.FLOAT32;
+    };
   }
 }
