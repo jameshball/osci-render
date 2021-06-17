@@ -48,7 +48,7 @@ public class XtAudioEngine implements AudioEngine {
     try (XtPlatform platform = XtAudio.init(null, null)) {
       XtService service = getService(platform);
 
-      try (XtDevice xtDevice = service.openDevice(device.name())) {
+      try (XtDevice xtDevice = service.openDevice(device.id())) {
         // TODO: Make this generic to the type of XtSample of the current device.
         Structs.XtMix mix = new Structs.XtMix(xtDevice.getMix().orElseThrow().rate, Enums.XtSample.FLOAT32);
         Structs.XtChannels channels = new Structs.XtChannels(0, 0, NUM_OUTPUTS, 0);
@@ -88,9 +88,10 @@ public class XtAudioEngine implements AudioEngine {
       XtDeviceList xtDevices = service.openDeviceList(EnumSet.of(Enums.XtEnumFlags.OUTPUT));
 
       for (int i = 0; i < xtDevices.getCount(); i++) {
-        String device = xtDevices.getId(i);
+        String deviceId = xtDevices.getId(i);
+        String deviceName = xtDevices.getName(deviceId);
 
-        try (XtDevice xtDevice = service.openDevice(device)) {
+        try (XtDevice xtDevice = service.openDevice(deviceId)) {
           Optional<Structs.XtMix> mix = xtDevice.getMix();
 
           if (mix.isEmpty()) {
@@ -101,7 +102,7 @@ public class XtAudioEngine implements AudioEngine {
           Structs.XtFormat format = new Structs.XtFormat(mix.get(), channels);
 
           if (xtDevice.supportsFormat(format)) {
-            devices.add(new DefaultAudioDevice(device, mix.get().rate, XtSampleToAudioSample(mix.get().sample)));
+            devices.add(new DefaultAudioDevice(deviceId, deviceName, mix.get().rate, XtSampleToAudioSample(mix.get().sample)));
           }
         }
       }
@@ -114,20 +115,22 @@ public class XtAudioEngine implements AudioEngine {
   public AudioDevice getDefaultDevice() {
     try (XtPlatform platform = XtAudio.init(null, null)) {
       XtService service = getService(platform);
-      String device = service.getDefaultDeviceId(true);
+      String deviceId = service.getDefaultDeviceId(true);
 
-      try (XtDevice xtDevice = service.openDevice(device)) {
+      try (XtDevice xtDevice = service.openDevice(deviceId)) {
         Optional<Structs.XtMix> mix = xtDevice.getMix();
 
         if (mix.isEmpty()) {
           return null;
         }
 
+        String deviceName = service.openDeviceList(EnumSet.of(Enums.XtEnumFlags.OUTPUT)).getName(deviceId);
+
         Structs.XtChannels channels = new Structs.XtChannels(0, 0, NUM_OUTPUTS, 0);
         Structs.XtFormat format = new Structs.XtFormat(mix.get(), channels);
 
         if (xtDevice.supportsFormat(format)) {
-          return new DefaultAudioDevice(device, mix.get().rate, XtSampleToAudioSample(mix.get().sample));
+          return new DefaultAudioDevice(deviceId, deviceName, mix.get().rate, XtSampleToAudioSample(mix.get().sample));
         } else {
           return null;
         }

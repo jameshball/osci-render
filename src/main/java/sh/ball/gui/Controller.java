@@ -3,6 +3,7 @@ package sh.ball.gui;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
 import javafx.scene.control.*;
 import javafx.util.Duration;
 import sh.ball.audio.*;
@@ -60,7 +61,7 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   private final WobbleEffect wobbleEffect;
   private final ScaleEffect scaleEffect;
 
-  private AudioDevice device;
+  private AudioDevice defaultDevice;
   private FrameProducer<List<Shape>> producer;
   private boolean recording = false;
 
@@ -122,14 +123,16 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   private CheckBox wobbleCheckBox;
   @FXML
   private Slider wobbleSlider;
+  @FXML
+  private ComboBox<AudioDevice> deviceComboBox;
 
   public Controller(AudioPlayer<List<Shape>> audioPlayer) throws IOException {
     this.audioPlayer = audioPlayer;
     FrameSet<List<Shape>> frames = new ObjParser(DEFAULT_OBJ).parse();
     frames.addListener(this);
     this.producer = new FrameProducer<>(audioPlayer, frames);
-    this.device = audioPlayer.getDefaultDevice();
-    this.sampleRate = device.sampleRate();
+    this.defaultDevice = audioPlayer.getDefaultDevice();
+    this.sampleRate = defaultDevice.sampleRate();
     this.rotateEffect = new RotateEffect(sampleRate);
     this.translateEffect = new TranslateEffect(sampleRate);
     this.wobbleEffect = new WobbleEffect(sampleRate);
@@ -246,7 +249,10 @@ public class Controller implements Initializable, FrequencyListener, Listener {
     audioPlayer.addEffect(EffectType.TRANSLATE, translateEffect);
 
     executor.submit(producer);
-    audioPlayer.setDevice(device);
+    audioPlayer.setDevice(defaultDevice);
+    System.out.println(audioPlayer.devices());
+    deviceComboBox.setItems(FXCollections.observableList(audioPlayer.devices()));
+    deviceComboBox.getSelectionModel().select(defaultDevice);
     Thread renderThread = new Thread(audioPlayer);
     renderThread.setUncaughtExceptionHandler((thread, throwable) -> throwable.printStackTrace());
     renderThread.start();
