@@ -24,7 +24,7 @@ public class Gui extends Application {
     System.setProperty("prism.lcdtext", "false");
 
     FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/osci-render.fxml"));
-    Controller controller = new Controller(new ShapeAudioPlayer(new XtAudioEngine()));
+    Controller controller = new Controller(new ShapeAudioPlayer(XtAudioEngine::new));
     loader.setController(controller);
     Parent root = loader.load();
 

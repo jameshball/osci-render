@@ -8,7 +8,11 @@ import java.util.List;
 
 public interface AudioPlayer<S> extends Runnable {
 
+  void reset() throws Exception;
+
   void stop();
+
+  boolean isPlaying();
 
   void setQuality(double quality);
 

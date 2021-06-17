@@ -54,14 +54,15 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   private final AudioPlayer<List<Shape>> audioPlayer;
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
-  private final int sampleRate;
 
   private final RotateEffect rotateEffect;
   private final TranslateEffect translateEffect;
   private final WobbleEffect wobbleEffect;
   private final ScaleEffect scaleEffect;
 
-  private AudioDevice defaultDevice;
+  private int sampleRate;
+  private FrequencyAnalyser<List<Shape>> analyser;
+  private final AudioDevice defaultDevice;
   private FrameProducer<List<Shape>> producer;
   private boolean recording = false;
 
@@ -248,15 +249,43 @@ public class Controller implements Initializable, FrequencyListener, Listener {
     audioPlayer.addEffect(EffectType.ROTATE, rotateEffect);
     audioPlayer.addEffect(EffectType.TRANSLATE, translateEffect);
 
-    executor.submit(producer);
     audioPlayer.setDevice(defaultDevice);
-    System.out.println(audioPlayer.devices());
     deviceComboBox.setItems(FXCollections.observableList(audioPlayer.devices()));
-    deviceComboBox.getSelectionModel().select(defaultDevice);
-    Thread renderThread = new Thread(audioPlayer);
-    renderThread.setUncaughtExceptionHandler((thread, throwable) -> throwable.printStackTrace());
-    renderThread.start();
-    FrequencyAnalyser<List<Shape>> analyser = new FrequencyAnalyser<>(audioPlayer, 2, sampleRate);
+    deviceComboBox.setValue(defaultDevice);
+
+    executor.submit(producer);
+    analyser = new FrequencyAnalyser<>(audioPlayer, 2, sampleRate);
+    startFrequencyAnalyser(analyser);
+    startAudioPlayerThread();
+
+    deviceComboBox.valueProperty().addListener((options, oldDevice, newDevice) -> {
+      if (newDevice != null) {
+        switchAudioDevice(newDevice);
+      }
+    });
+  }
+
+  private void switchAudioDevice(AudioDevice device) {
+    try {
+      audioPlayer.reset();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+    audioPlayer.setDevice(device);
+    analyser.stop();
+    sampleRate = device.sampleRate();
+    analyser = new FrequencyAnalyser<>(audioPlayer, 2, sampleRate);
+    startFrequencyAnalyser(analyser);
+    startAudioPlayerThread();
+  }
+
+  private void startAudioPlayerThread() {
+    Thread audioPlayerThread = new Thread(audioPlayer);
+    audioPlayerThread.setUncaughtExceptionHandler((thread, throwable) -> throwable.printStackTrace());
+    audioPlayerThread.start();
+  }
+
+  private void startFrequencyAnalyser(FrequencyAnalyser<List<Shape>> analyser) {
     analyser.addListener(this);
     analyser.addListener(wobbleEffect);
     new Thread(analyser).start();
@@ -273,7 +302,7 @@ public class Controller implements Initializable, FrequencyListener, Listener {
       AudioInputStream input = audioPlayer.stopRecord();
       try {
         File file = fileChooser.showSaveDialog(stage);
-        SimpleDateFormat formatter= new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
+        SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
         Date date = new Date(System.currentTimeMillis());
         if (file == null) {
           file = new File("out-" + formatter.format(date) + ".wav");

@@ -16,6 +16,8 @@ public class XtAudioEngine implements AudioEngine {
   private static final int NUM_OUTPUTS = 2;
 
   private volatile boolean stopped = false;
+
+  private boolean playing = false;
   private ReentrantLock renderLock;
   private Callable<Vector2> channelGenerator;
 
@@ -42,7 +44,13 @@ public class XtAudioEngine implements AudioEngine {
   }
 
   @Override
+  public boolean isPlaying() {
+    return playing;
+  }
+
+  @Override
   public void play(Callable<Vector2> channelGenerator, ReentrantLock renderLock, AudioDevice device) {
+    playing = true;
     this.channelGenerator = channelGenerator;
     this.renderLock = renderLock;
     try (XtPlatform platform = XtAudio.init(null, null)) {
@@ -72,6 +80,7 @@ public class XtAudioEngine implements AudioEngine {
         }
       }
     }
+    playing = false;
   }
 
   @Override
@@ -156,18 +165,6 @@ public class XtAudioEngine implements AudioEngine {
     }
 
     return service;
-  }
-
-  private String getDeviceId(XtService service) {
-    String deviceId = service.getDefaultDeviceId(true);
-    if (deviceId == null) {
-      return getFirstDevice(service);
-    }
-    return deviceId;
-  }
-
-  private String getFirstDevice(XtService service) {
-    return service.openDeviceList(EnumSet.of(Enums.XtEnumFlags.OUTPUT)).getId(0);
   }
 
   private AudioSample XtSampleToAudioSample(Enums.XtSample sample) {

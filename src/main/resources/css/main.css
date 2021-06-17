@@ -113,6 +113,7 @@
     -fx-background-radius: 0;
     -fx-border-radius: 0;
     -fx-border-width: 0;
+    -fx-cell-size: 35;
 
     /* No alternate highlighting */
     -fx-background-color: dark_color;
@@ -137,7 +138,7 @@
 
 .combo-box-base
 {
-    -fx-background-color: very_dark;
+    -fx-background-color: white;
     -fx-border-radius: 0;
     -fx-border-width: 1 1 1 0;
     -fx-border-color: white;
@@ -148,16 +149,16 @@
 
 .combo-box-base:hover
 {
-    -fx-color: very_dark;
+    -fx-color: white;
 }
 
 .combo-box-base:showing
 {
-    -fx-color: very_dark;
+    -fx-color: white;
 }
 
 .combo-box-base:focused {
-    -fx-background-color: very_dark;
+    -fx-background-color: white;
     -fx-background-radius: 0;
     -fx-background-insets: 0;
 }
