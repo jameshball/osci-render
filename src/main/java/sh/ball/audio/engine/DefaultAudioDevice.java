@@ -1,5 +1,7 @@
 package sh.ball.audio.engine;
 
+import java.util.Objects;
+
 public class DefaultAudioDevice implements AudioDevice {
 
   final String id;
@@ -36,6 +38,21 @@ public class DefaultAudioDevice implements AudioDevice {
 
   @Override
   public String toString() {
-    return name + " @ " + sampleRate + "KHz";
+    String simplifiedName = name.replaceFirst(" \\(Shared\\)", "");
+    simplifiedName = simplifiedName.replaceFirst(" \\(NVIDIA High Definition Audio\\)", "");
+    return simplifiedName + " @ " + sampleRate + "KHz";
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+    DefaultAudioDevice that = (DefaultAudioDevice) o;
+    return sampleRate == that.sampleRate && Objects.equals(id, that.id) && Objects.equals(name, that.name) && sample == that.sample;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(id, name, sampleRate, sample);
   }
 }

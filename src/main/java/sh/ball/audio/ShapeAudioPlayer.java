@@ -14,6 +14,7 @@ import sh.ball.shapes.Vector2;
 
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
+import java.util.concurrent.Callable;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -29,12 +30,13 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   // Stereo audio
   private static final int NUM_OUTPUTS = 2;
 
-  private final AudioEngine audioEngine;
+  private final Callable<AudioEngine> audioEngineBuilder;
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
   private final Map<Object, Effect> effects = new HashMap<>();
   private final ReentrantLock renderLock = new ReentrantLock();
   private final List<Listener> listeners = new ArrayList<>();
 
+  private AudioEngine audioEngine;
   private ByteArrayOutputStream outputStream;
   private boolean recording = false;
   private int framesRecorded = 0;
@@ -46,8 +48,9 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private double weight = Shape.DEFAULT_WEIGHT;
   private AudioDevice device;
 
-  public ShapeAudioPlayer(AudioEngine audioEngine) {
-    this.audioEngine = audioEngine;
+  public ShapeAudioPlayer(Callable<AudioEngine> audioEngineBuilder) throws Exception {
+    this.audioEngineBuilder = audioEngineBuilder;
+    this.audioEngine = audioEngineBuilder.call();
   }
 
   private Vector2 generateChannels() throws InterruptedException {
@@ -156,8 +159,22 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   @Override
+  public void reset() throws Exception {
+    audioEngine.stop();
+    while (isPlaying()) {
+      Thread.onSpinWait();
+    }
+    audioEngine = audioEngineBuilder.call();
+  }
+
+  @Override
   public void stop() {
     audioEngine.stop();
+  }
+
+  @Override
+  public boolean isPlaying() {
+    return audioEngine.isPlaying();
   }
 
   @Override

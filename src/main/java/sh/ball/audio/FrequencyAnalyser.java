@@ -18,6 +18,8 @@ public class FrequencyAnalyser<S> implements Runnable {
   private final int sampleRate;
   private final int powerOfTwo;
 
+  private volatile boolean stopped;
+
   public FrequencyAnalyser(AudioPlayer<S> audioPlayer, int frameSize, int sampleRate) {
     this.audioPlayer = audioPlayer;
     this.frameSize = frameSize;
@@ -40,7 +42,7 @@ public class FrequencyAnalyser<S> implements Runnable {
   public void run() {
     byte[] buf = new byte[2 << powerOfTwo];
 
-    while (true) {
+    while (!stopped) {
       try {
         audioPlayer.read(buf);
       } catch (InterruptedException e) {
@@ -76,6 +78,10 @@ public class FrequencyAnalyser<S> implements Runnable {
 
       notifyListeners(bins[maxLeftIndex], bins[maxRightIndex]);
     }
+  }
+
+  public void stop() {
+    stopped = true;
   }
 
   private double[] decode(final byte[] buf, boolean decodeLeft) {

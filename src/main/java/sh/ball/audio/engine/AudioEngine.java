@@ -7,6 +7,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.locks.ReentrantLock;
 
 public interface AudioEngine {
+  boolean isPlaying();
+
   void play(Callable<Vector2> channelGenerator, ReentrantLock renderLock, AudioDevice device);
 
   void stop();
