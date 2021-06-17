@@ -49,7 +49,7 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
 
   private final FileChooser fileChooser = new FileChooser();
-  private final Renderer<List<Shape>, AudioInputStream> renderer;
+  private final AudioPlayer<List<Shape>, AudioInputStream> audioPlayer;
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
   private final int sampleRate;
@@ -121,12 +121,12 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   @FXML
   private Slider wobbleSlider;
 
-  public Controller(Renderer<List<Shape>, AudioInputStream> renderer) throws IOException {
-    this.renderer = renderer;
+  public Controller(AudioPlayer<List<Shape>, AudioInputStream> audioPlayer) throws IOException {
+    this.audioPlayer = audioPlayer;
     FrameSet<List<Shape>> frames = new ObjParser(DEFAULT_OBJ).parse();
     frames.addListener(this);
-    this.producer = new FrameProducer<>(renderer, frames);
-    this.sampleRate = renderer.samplesPerSecond();
+    this.producer = new FrameProducer<>(audioPlayer, frames);
+    this.sampleRate = audioPlayer.samplesPerSecond();
     this.rotateEffect = new RotateEffect(sampleRate);
     this.translateEffect = new TranslateEffect(sampleRate);
     this.wobbleEffect = new WobbleEffect(sampleRate);
@@ -136,7 +136,7 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   private Map<Slider, Consumer<Double>> initializeSliderMap() {
     return Map.of(
       weightSlider,
-      renderer::setQuality,
+      audioPlayer::setQuality,
       rotateSpeedSlider,
       rotateEffect::setSpeed,
       translationSpeedSlider,
@@ -238,15 +238,15 @@ public class Controller implements Initializable, FrequencyListener, Listener {
 
     updateObjectRotateSpeed();
 
-    renderer.addEffect(EffectType.SCALE, scaleEffect);
-    renderer.addEffect(EffectType.ROTATE, rotateEffect);
-    renderer.addEffect(EffectType.TRANSLATE, translateEffect);
+    audioPlayer.addEffect(EffectType.SCALE, scaleEffect);
+    audioPlayer.addEffect(EffectType.ROTATE, rotateEffect);
+    audioPlayer.addEffect(EffectType.TRANSLATE, translateEffect);
 
     executor.submit(producer);
-    Thread renderThread = new Thread(renderer);
+    Thread renderThread = new Thread(audioPlayer);
     renderThread.setUncaughtExceptionHandler((thread, throwable) -> throwable.printStackTrace());
     renderThread.start();
-    FrequencyAnalyser<List<Shape>, AudioInputStream> analyser = new FrequencyAnalyser<>(renderer, 2, sampleRate);
+    FrequencyAnalyser<List<Shape>, AudioInputStream> analyser = new FrequencyAnalyser<>(audioPlayer, 2, sampleRate);
     analyser.addListener(this);
     analyser.addListener(wobbleEffect);
     new Thread(analyser).start();
@@ -257,10 +257,10 @@ public class Controller implements Initializable, FrequencyListener, Listener {
     if (recording) {
       recordLabel.setText("Recording...");
       recordButton.setText("Stop Recording");
-      renderer.startRecord();
+      audioPlayer.startRecord();
     } else {
       recordButton.setText("Record");
-      AudioInputStream input = renderer.stopRecord();
+      AudioInputStream input = audioPlayer.stopRecord();
       try {
         File file = fileChooser.showSaveDialog(stage);
         SimpleDateFormat formatter= new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
@@ -315,10 +315,10 @@ public class Controller implements Initializable, FrequencyListener, Listener {
 
   private void updateEffect(EffectType type, boolean checked, Effect effect) {
     if (checked) {
-      renderer.addEffect(type, effect);
+      audioPlayer.addEffect(type, effect);
       effectTypes.get(type).setDisable(false);
     } else {
-      renderer.removeEffect(type);
+      audioPlayer.removeEffect(type);
       effectTypes.get(type).setDisable(true);
     }
   }
@@ -329,7 +329,7 @@ public class Controller implements Initializable, FrequencyListener, Listener {
       String path = file.getAbsolutePath();
       FrameSet<List<Shape>> frames = ParserFactory.getParser(path).parse();
       frames.addListener(this);
-      producer = new FrameProducer<>(renderer, frames);
+      producer = new FrameProducer<>(audioPlayer, frames);
 
       updateObjectRotateSpeed();
       updateFocalLength();

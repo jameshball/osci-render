@@ -12,14 +12,14 @@ public class FrequencyAnalyser<S, T> implements Runnable {
   // increase this for higher frequency resolution, but less frequent frequency calculation
   private static final int DEFAULT_POWER_OF_TWO = 18;
 
-  private final Renderer<S, T> renderer;
+  private final AudioPlayer<S, T> audioPlayer;
   private final List<FrequencyListener> listeners = new ArrayList<>();
   private final int frameSize;
   private final int sampleRate;
   private final int powerOfTwo;
 
-  public FrequencyAnalyser(Renderer<S, T> renderer, int frameSize, int sampleRate) {
-    this.renderer = renderer;
+  public FrequencyAnalyser(AudioPlayer<S, T> audioPlayer, int frameSize, int sampleRate) {
+    this.audioPlayer = audioPlayer;
     this.frameSize = frameSize;
     this.sampleRate = sampleRate;
     this.powerOfTwo = (int) (DEFAULT_POWER_OF_TWO - Math.log(DEFAULT_SAMPLE_RATE / sampleRate) / Math.log(2));
@@ -42,7 +42,7 @@ public class FrequencyAnalyser<S, T> implements Runnable {
 
     while (true) {
       try {
-        renderer.read(buf);
+        audioPlayer.read(buf);
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
