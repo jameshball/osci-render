@@ -2,6 +2,7 @@
 
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Slider?>
 <?import javafx.scene.control.TextField?>
@@ -9,15 +10,15 @@
 <?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.text.Font?>
 
-
 <AnchorPane prefHeight="498.0" prefWidth="837.0" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1">
-   <AnchorPane id="control-pane" layoutX="422.0" layoutY="19.0" prefHeight="185.0" prefWidth="402.0">
+   <AnchorPane id="control-pane" layoutX="422.0" layoutY="10.0" prefHeight="195.0" prefWidth="402.0">
       <children>
-       <Button fx:id="chooseFileButton" layoutX="14.0" layoutY="14.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose File" />
-       <Label fx:id="fileLabel" layoutX="146.0" layoutY="19.0" maxWidth="270.0" prefHeight="18.0" prefWidth="246.0" text="cube.obj" />
-         <Button fx:id="recordButton" layoutX="14.0" layoutY="54.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Record" />
-         <Label fx:id="recordLabel" layoutX="146.0" layoutY="59.0" maxWidth="270.0" prefHeight="18.0" prefWidth="245.0" />
-         <Label id="frequency" fx:id="frequencyLabel" layoutX="14.0" layoutY="113.0" prefHeight="58.0" prefWidth="376.0" text="L/R Frequency:&#10; &#10;" />
+       <Button fx:id="chooseFileButton" layoutX="14.0" layoutY="53.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose File" />
+       <Label fx:id="fileLabel" layoutX="146.0" layoutY="58.0" maxWidth="270.0" prefHeight="18.0" prefWidth="246.0" text="cube.obj" />
+         <Button fx:id="recordButton" layoutX="14.0" layoutY="93.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Record" />
+         <Label fx:id="recordLabel" layoutX="146.0" layoutY="98.0" maxWidth="270.0" prefHeight="18.0" prefWidth="245.0" />
+         <Label id="frequency" fx:id="frequencyLabel" layoutX="14.0" layoutY="131.0" prefHeight="58.0" prefWidth="376.0" text="L/R Frequency:&#10; &#10;" />
+         <ComboBox fx:id="deviceComboBox" layoutX="14.0" layoutY="11.0" prefHeight="26.0" prefWidth="376.0" />
       </children>
    </AnchorPane>
    <TitledPane animated="false" collapsible="false" layoutX="422.0" layoutY="213.0" prefHeight="272.0" prefWidth="402.0" text="Effects">
@@ -54,7 +55,7 @@
          <CheckBox fx:id="rotateCheckBox" layoutX="90.0" layoutY="147.0" mnemonicParsing="false" text="Rotate with Mouse (Esc to disable)" />
   </AnchorPane>
 </TitledPane>
-   <TitledPane collapsible="false" layoutX="11.0" layoutY="18.0" prefHeight="248.0" prefWidth="402.0" text="Image settings">
+   <TitledPane collapsible="false" layoutX="11.0" layoutY="9.0" prefHeight="257.0" prefWidth="402.0" text="Image settings">
       <content>
       <AnchorPane minHeight="0.0" minWidth="0.0">
         <Slider fx:id="rotateSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="90.0" majorTickUnit="1.0" max="10.0" prefHeight="38.0" prefWidth="270.0" showTickLabels="true" showTickMarks="true" />
