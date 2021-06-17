@@ -7,6 +7,7 @@ import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
+import sh.ball.audio.engine.AudioDevice;
 import sh.ball.audio.engine.AudioEngine;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
@@ -16,7 +17,7 @@ import javax.sound.sampled.AudioInputStream;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class ShapeAudioPlayer implements AudioPlayer<List<Shape>, AudioInputStream> {
+public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
   // Arbitrary max count for effects
   private static final int MAX_COUNT = 10000;
@@ -43,6 +44,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>, AudioInputStre
   private int count = 0;
 
   private double weight = Shape.DEFAULT_WEIGHT;
+  private AudioDevice device;
 
   public ShapeAudioPlayer(AudioEngine audioEngine) {
     this.audioEngine = audioEngine;
@@ -146,7 +148,11 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>, AudioInputStre
       throw new RuntimeException("Initial frame not found. Cannot continue.");
     }
 
-    audioEngine.play(this::generateChannels, renderLock);
+    if (device == null) {
+      throw new IllegalArgumentException("No AudioDevice provided");
+    }
+
+    audioEngine.play(this::generateChannels, renderLock, device);
   }
 
   @Override
@@ -200,17 +206,35 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>, AudioInputStre
   }
 
   @Override
-  public int samplesPerSecond() {
-    return audioEngine.sampleRate();
+  public void setDevice(AudioDevice device) {
+    this.device = device;
+  }
+
+  @Override
+  public AudioDevice getDefaultDevice() {
+    return audioEngine.getDefaultDevice();
+  }
+
+  @Override
+  public AudioDevice getDevice() {
+    return device;
+  }
+
+  @Override
+  public List<AudioDevice> devices() {
+    return audioEngine.devices();
   }
 
   @Override
   public AudioInputStream stopRecord() {
     recording = false;
+    if (outputStream == null) {
+      throw new UnsupportedOperationException("Cannot stop recording before first starting to record");
+    }
     byte[] input = outputStream.toByteArray();
     outputStream = null;
 
-    AudioFormat audioFormat = new AudioFormat(audioEngine.sampleRate(), BITS_PER_SAMPLE, NUM_OUTPUTS, SIGNED, BIG_ENDIAN);
+    AudioFormat audioFormat = new AudioFormat(device.sampleRate(), BITS_PER_SAMPLE, NUM_OUTPUTS, SIGNED, BIG_ENDIAN);
 
     return new AudioInputStream(new ByteArrayInputStream(input), audioFormat, framesRecorded);
   }

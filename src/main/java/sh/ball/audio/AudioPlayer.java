@@ -1,8 +1,12 @@
 package sh.ball.audio;
 
 import sh.ball.audio.effect.Effect;
+import sh.ball.audio.engine.AudioDevice;
 
-public interface AudioPlayer<S, T> extends Runnable {
+import javax.sound.sampled.AudioInputStream;
+import java.util.List;
+
+public interface AudioPlayer<S> extends Runnable {
 
   void stop();
 
@@ -18,7 +22,13 @@ public interface AudioPlayer<S, T> extends Runnable {
 
   void startRecord();
 
-  int samplesPerSecond();
+  void setDevice(AudioDevice device);
 
-  T stopRecord();
+  AudioDevice getDefaultDevice();
+
+  AudioDevice getDevice();
+
+  List<AudioDevice> devices();
+
+  AudioInputStream stopRecord();
 }
