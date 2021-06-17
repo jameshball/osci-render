@@ -1,13 +1,13 @@
 package sh.ball.audio;
 
-public class FrameProducer<S, T> implements Runnable {
+public class FrameProducer<S> implements Runnable {
 
-  private final AudioPlayer<S, T> audioPlayer;
+  private final AudioPlayer<S> audioPlayer;
   private final FrameSet<S> frames;
 
   private boolean running;
 
-  public FrameProducer(AudioPlayer<S, T> audioPlayer, FrameSet<S> frames) {
+  public FrameProducer(AudioPlayer<S> audioPlayer, FrameSet<S> frames) {
     this.audioPlayer = audioPlayer;
     this.frames = frames;
   }

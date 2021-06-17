@@ -5,20 +5,20 @@ import sh.ball.audio.fft.FFT;
 import java.util.ArrayList;
 import java.util.List;
 
-public class FrequencyAnalyser<S, T> implements Runnable {
+public class FrequencyAnalyser<S> implements Runnable {
 
   private static final float NORMALIZATION_FACTOR_2_BYTES = Short.MAX_VALUE + 1.0f;
   private static final int DEFAULT_SAMPLE_RATE = 192000;
   // increase this for higher frequency resolution, but less frequent frequency calculation
   private static final int DEFAULT_POWER_OF_TWO = 18;
 
-  private final AudioPlayer<S, T> audioPlayer;
+  private final AudioPlayer<S> audioPlayer;
   private final List<FrequencyListener> listeners = new ArrayList<>();
   private final int frameSize;
   private final int sampleRate;
   private final int powerOfTwo;
 
-  public FrequencyAnalyser(AudioPlayer<S, T> audioPlayer, int frameSize, int sampleRate) {
+  public FrequencyAnalyser(AudioPlayer<S> audioPlayer, int frameSize, int sampleRate) {
     this.audioPlayer = audioPlayer;
     this.frameSize = frameSize;
     this.sampleRate = sampleRate;

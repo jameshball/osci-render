@@ -110,6 +110,31 @@ public class XtAudioEngine implements AudioEngine {
     return devices;
   }
 
+  @Override
+  public AudioDevice getDefaultDevice() {
+    try (XtPlatform platform = XtAudio.init(null, null)) {
+      XtService service = getService(platform);
+      String device = service.getDefaultDeviceId(true);
+
+      try (XtDevice xtDevice = service.openDevice(device)) {
+        Optional<Structs.XtMix> mix = xtDevice.getMix();
+
+        if (mix.isEmpty()) {
+          return null;
+        }
+
+        Structs.XtChannels channels = new Structs.XtChannels(0, 0, NUM_OUTPUTS, 0);
+        Structs.XtFormat format = new Structs.XtFormat(mix.get(), channels);
+
+        if (xtDevice.supportsFormat(format)) {
+          return new DefaultAudioDevice(device, mix.get().rate, XtSampleToAudioSample(mix.get().sample));
+        } else {
+          return null;
+        }
+      }
+    }
+  }
+
 
   private XtService getService(XtPlatform platform) {
     XtService service = platform.getService(platform.setupToSystem(Enums.XtSetup.SYSTEM_AUDIO));

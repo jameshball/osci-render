@@ -35,6 +35,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import org.xml.sax.SAXException;
 import sh.ball.audio.effect.Effect;
 import sh.ball.audio.effect.EffectType;
+import sh.ball.audio.engine.AudioDevice;
 import sh.ball.engine.Vector3;
 import sh.ball.parser.obj.Listener;
 import sh.ball.parser.obj.ObjSettingsFactory;
@@ -49,7 +50,7 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
 
   private final FileChooser fileChooser = new FileChooser();
-  private final AudioPlayer<List<Shape>, AudioInputStream> audioPlayer;
+  private final AudioPlayer<List<Shape>> audioPlayer;
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
   private final int sampleRate;
@@ -59,7 +60,8 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   private final WobbleEffect wobbleEffect;
   private final ScaleEffect scaleEffect;
 
-  private FrameProducer<List<Shape>, AudioInputStream> producer;
+  private AudioDevice device;
+  private FrameProducer<List<Shape>> producer;
   private boolean recording = false;
 
   private Stage stage;
@@ -121,12 +123,13 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   @FXML
   private Slider wobbleSlider;
 
-  public Controller(AudioPlayer<List<Shape>, AudioInputStream> audioPlayer) throws IOException {
+  public Controller(AudioPlayer<List<Shape>> audioPlayer) throws IOException {
     this.audioPlayer = audioPlayer;
     FrameSet<List<Shape>> frames = new ObjParser(DEFAULT_OBJ).parse();
     frames.addListener(this);
     this.producer = new FrameProducer<>(audioPlayer, frames);
-    this.sampleRate = audioPlayer.samplesPerSecond();
+    this.device = audioPlayer.getDefaultDevice();
+    this.sampleRate = device.sampleRate();
     this.rotateEffect = new RotateEffect(sampleRate);
     this.translateEffect = new TranslateEffect(sampleRate);
     this.wobbleEffect = new WobbleEffect(sampleRate);
@@ -243,10 +246,11 @@ public class Controller implements Initializable, FrequencyListener, Listener {
     audioPlayer.addEffect(EffectType.TRANSLATE, translateEffect);
 
     executor.submit(producer);
+    audioPlayer.setDevice(device);
     Thread renderThread = new Thread(audioPlayer);
     renderThread.setUncaughtExceptionHandler((thread, throwable) -> throwable.printStackTrace());
     renderThread.start();
-    FrequencyAnalyser<List<Shape>, AudioInputStream> analyser = new FrequencyAnalyser<>(audioPlayer, 2, sampleRate);
+    FrequencyAnalyser<List<Shape>> analyser = new FrequencyAnalyser<>(audioPlayer, 2, sampleRate);
     analyser.addListener(this);
     analyser.addListener(wobbleEffect);
     new Thread(analyser).start();
