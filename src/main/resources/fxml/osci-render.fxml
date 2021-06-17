@@ -18,7 +18,7 @@
          <Button fx:id="recordButton" layoutX="14.0" layoutY="54.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Record" />
          <Label fx:id="recordLabel" layoutX="146.0" layoutY="59.0" maxWidth="270.0" prefHeight="18.0" prefWidth="245.0" />
          <Label id="frequency" fx:id="frequencyLabel" layoutX="14.0" layoutY="113.0" prefHeight="58.0" prefWidth="376.0" text="L/R Frequency:&#10; &#10;" />
-         <ComboBox layoutX="251.0" layoutY="113.0" prefWidth="150.0" />
+         <ComboBox fx:id="deviceComboBox" layoutX="169.0" layoutY="113.0" prefHeight="26.0" prefWidth="221.0" />
       </children>
    </AnchorPane>
    <TitledPane animated="false" collapsible="false" layoutX="422.0" layoutY="213.0" prefHeight="272.0" prefWidth="402.0" text="Effects">
