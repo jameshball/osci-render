@@ -113,7 +113,6 @@
     -fx-background-radius: 0;
     -fx-border-radius: 0;
     -fx-border-width: 0;
-    -fx-cell-size: 35;
 
     /* No alternate highlighting */
     -fx-background-color: dark_color;
