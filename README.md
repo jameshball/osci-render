@@ -4,7 +4,7 @@
 
 Program for drawing objects, text, and images on an oscilloscope using audio output.
 
-This allows for 3D rendering of `.obj` files, `.svg` images, and `.txt` files.
+This allows for 3D rendering of `.obj` files, `.svg` images, and `.txt` files on Windows and Linux.
 
 Read more about '[Rendering shapes through audio signals](https://felixonline.co.uk/issue/1773/science/rendering-shapes-through-audio-signals)' in this article featuring osci-render!
 
