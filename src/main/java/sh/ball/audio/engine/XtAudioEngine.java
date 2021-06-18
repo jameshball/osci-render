@@ -106,7 +106,7 @@ public class XtAudioEngine implements AudioEngine {
       XtService service = getService(platform);
 
       try (XtDevice xtDevice = service.openDevice(device.id())) {
-        Structs.XtMix mix = xtDevice.getMix().orElseThrow();
+        Structs.XtMix mix = new Structs.XtMix(device.sampleRate(), AudioSampleToXtSample(device.sample()));
         Structs.XtChannels channels = new Structs.XtChannels(0, 0, NUM_OUTPUTS, 0);
         Structs.XtFormat format = new Structs.XtFormat(mix, channels);
 
@@ -148,11 +148,15 @@ public class XtAudioEngine implements AudioEngine {
         String deviceId = xtDevices.getId(i);
         String deviceName = xtDevices.getName(deviceId);
 
+        if (deviceName.startsWith("null")) {
+          continue;
+        }
+
         try (XtDevice xtDevice = service.openDevice(deviceId)) {
           Optional<Structs.XtMix> mix = xtDevice.getMix();
 
           if (mix.isEmpty()) {
-            continue;
+            mix = Optional.of(new Structs.XtMix(192000, Enums.XtSample.FLOAT32));
           }
 
           Structs.XtChannels channels = new Structs.XtChannels(0, 0, NUM_OUTPUTS, 0);
@@ -178,7 +182,7 @@ public class XtAudioEngine implements AudioEngine {
         Optional<Structs.XtMix> mix = xtDevice.getMix();
 
         if (mix.isEmpty()) {
-          return null;
+          mix = Optional.of(new Structs.XtMix(192000, Enums.XtSample.FLOAT32));
         }
 
         String deviceName = service.openDeviceList(EnumSet.of(Enums.XtEnumFlags.OUTPUT)).getName(deviceId);
@@ -222,6 +226,17 @@ public class XtAudioEngine implements AudioEngine {
       case INT24 -> AudioSample.INT24;
       case INT32 -> AudioSample.INT32;
       case FLOAT32 -> AudioSample.FLOAT32;
+    };
+  }
+
+  private Enums.XtSample AudioSampleToXtSample(AudioSample sample) {
+    return switch (sample) {
+      case UINT8 -> Enums.XtSample.UINT8;
+      case INT16 -> Enums.XtSample.INT16;
+      case INT24 -> Enums.XtSample.INT24;
+      case INT32 -> Enums.XtSample.INT32;
+      case FLOAT32 -> Enums.XtSample.FLOAT32;
+      case INT8, FLOAT64 -> throw new UnsupportedOperationException("Unsupported sample format");
     };
   }
 }
