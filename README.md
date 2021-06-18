@@ -92,10 +92,6 @@ To uninstall, use Windows control panel, as you would expect.
 - After installing, you can execute `/opt/osci-render/bin/osci-render` to run!
 - Start rendering!
 
-Updating to later versions is as simple as running the latest `osci-render-VERSION.exe` again.
-
-To uninstall, use Windows control panel, as you would expect.
-
 ### Running using .jar
 
 - Download the latest `osci-render-os-VERSION.jar` from [Releases](https://github.com/jameshball/osci-render/releases)
