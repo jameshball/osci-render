@@ -30,7 +30,7 @@ Send an email to [james@ball.sh](mailto:james@ball.sh) if you have any issues, f
 
 ## Proposed Features
 
-- Mac OS support (Coming soon)
+- Mac OS support
 - Tune and transpose audio output
 - Support rendering of multiple objects
 - (long term) Keyframing/animating objects and camera
