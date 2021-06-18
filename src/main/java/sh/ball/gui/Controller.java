@@ -133,6 +133,9 @@ public class Controller implements Initializable, FrequencyListener, Listener {
     frames.addListener(this);
     this.producer = new FrameProducer<>(audioPlayer, frames);
     this.defaultDevice = audioPlayer.getDefaultDevice();
+    if (defaultDevice == null) {
+      throw new RuntimeException("No default audio device found!");
+    }
     this.sampleRate = defaultDevice.sampleRate();
     this.rotateEffect = new RotateEffect(sampleRate);
     this.translateEffect = new TranslateEffect(sampleRate);
