@@ -17,6 +17,7 @@ public class XtAudioEngine implements AudioEngine {
 
   private volatile boolean stopped = false;
 
+  private AudioDevice device;
   private boolean playing = false;
   private ReentrantLock renderLock;
   private Callable<Vector2> channelGenerator;
@@ -29,18 +30,65 @@ public class XtAudioEngine implements AudioEngine {
     if (renderLock != null) {
       renderLock.lock();
     }
-    float[] output = (float[]) safe.getOutput();
+    Object output = safe.getOutput();
 
     for (int f = 0; f < buffer.frames; f++) {
       Vector2 channels = channelGenerator.call();
-      output[f * NUM_OUTPUTS] = (float) channels.getX();
-      output[f * NUM_OUTPUTS + 1] = (float) channels.getY();
+      writeChannels(channels, output, f);
     }
     safe.unlock(buffer);
     if (renderLock != null) {
       renderLock.unlock();
     }
     return 0;
+  }
+
+  private void writeChannels(Vector2 channels, Object output, int frame) {
+    int index = frame * NUM_OUTPUTS;
+    switch (device.sample()) {
+      case UINT8 -> {
+        byte[] byteOutput = (byte[]) output;
+        byteOutput[index] = (byte) ((int) (128 * (channels.getX() + 1)));
+        byteOutput[index + 1] = (byte) ((int) (128 * (channels.getY() + 1)));
+      }
+      case INT8 -> {
+        byte[] byteOutput = (byte[]) output;
+        byteOutput[index] = (byte) ((int) (128 * channels.getX()));
+        byteOutput[index + 1] = (byte) ((int) (128 * channels.getY()));
+      }
+      case INT16 -> {
+        short[] shortOutput = (short[]) output;
+        shortOutput[index] = (short) (channels.getX() * Short.MAX_VALUE);
+        shortOutput[index + 1] = (short) (channels.getY() * Short.MAX_VALUE);
+      }
+      case INT24 -> {
+        index *= 3;
+        byte[] byteOutput = (byte[]) output;
+        int leftChannel = (int) (channels.getX() * 8388607);
+        int rightChannel = (int) (channels.getX() * 8388607);
+        byteOutput[index] = (byte) (leftChannel >> 16);
+        byteOutput[index + 1] = (byte) (leftChannel >> 8);
+        byteOutput[index + 2] = (byte) leftChannel;
+        byteOutput[index + 3] = (byte) (rightChannel >> 16);
+        byteOutput[index + 4] = (byte) (rightChannel >> 8);
+        byteOutput[index + 5] = (byte) rightChannel;
+      }
+      case INT32 -> {
+        int[] intOutput = (int[]) output;
+        intOutput[index] = (int) (channels.getX() * Integer.MAX_VALUE);
+        intOutput[index + 1] = (int) (channels.getY() * Integer.MAX_VALUE);
+      }
+      case FLOAT32 -> {
+        float[] floatOutput = (float[]) output;
+        floatOutput[index] = (float) channels.getX();
+        floatOutput[index + 1] = (float) channels.getY();
+      }
+      case FLOAT64 -> {
+        double[] doubleOutput = (double[]) output;
+        doubleOutput[index] = channels.getX();
+        doubleOutput[index + 1] = channels.getY();
+      }
+    }
   }
 
   @Override
@@ -50,15 +98,15 @@ public class XtAudioEngine implements AudioEngine {
 
   @Override
   public void play(Callable<Vector2> channelGenerator, ReentrantLock renderLock, AudioDevice device) {
-    playing = true;
+    this.playing = true;
+    this.device = device;
     this.channelGenerator = channelGenerator;
     this.renderLock = renderLock;
     try (XtPlatform platform = XtAudio.init(null, null)) {
       XtService service = getService(platform);
 
       try (XtDevice xtDevice = service.openDevice(device.id())) {
-        // TODO: Make this generic to the type of XtSample of the current device.
-        Structs.XtMix mix = new Structs.XtMix(xtDevice.getMix().orElseThrow().rate, Enums.XtSample.FLOAT32);
+        Structs.XtMix mix = xtDevice.getMix().orElseThrow();
         Structs.XtChannels channels = new Structs.XtChannels(0, 0, NUM_OUTPUTS, 0);
         Structs.XtFormat format = new Structs.XtFormat(mix, channels);
 

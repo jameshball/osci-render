@@ -40,7 +40,7 @@ public class DefaultAudioDevice implements AudioDevice {
   public String toString() {
     String simplifiedName = name.replaceFirst(" \\(Shared\\)", "");
     simplifiedName = simplifiedName.replaceFirst(" \\(NVIDIA High Definition Audio\\)", "");
-    return simplifiedName + " @ " + sampleRate + "KHz";
+    return simplifiedName + " @ " + sampleRate + "kHz, " + sample;
   }
 
   @Override
