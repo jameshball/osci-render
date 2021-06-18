@@ -65,13 +65,13 @@ public class XtAudioEngine implements AudioEngine {
         index *= 3;
         byte[] byteOutput = (byte[]) output;
         int leftChannel = (int) (channels.getX() * 8388607);
-        int rightChannel = (int) (channels.getX() * 8388607);
-        byteOutput[index] = (byte) (leftChannel >> 16);
+        int rightChannel = (int) (channels.getY() * 8388607);
+        byteOutput[index] = (byte) leftChannel;
         byteOutput[index + 1] = (byte) (leftChannel >> 8);
-        byteOutput[index + 2] = (byte) leftChannel;
-        byteOutput[index + 3] = (byte) (rightChannel >> 16);
+        byteOutput[index + 2] = (byte) (leftChannel >> 16);
+        byteOutput[index + 3] = (byte) rightChannel;
         byteOutput[index + 4] = (byte) (rightChannel >> 8);
-        byteOutput[index + 5] = (byte) rightChannel;
+        byteOutput[index + 5] = (byte) (rightChannel >> 16);
       }
       case INT32 -> {
         int[] intOutput = (int[]) output;
