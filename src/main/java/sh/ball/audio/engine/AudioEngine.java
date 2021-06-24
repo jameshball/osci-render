@@ -4,12 +4,11 @@ import sh.ball.shapes.Vector2;
 
 import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.locks.ReentrantLock;
 
 public interface AudioEngine {
   boolean isPlaying();
 
-  void play(Callable<Vector2> channelGenerator, ReentrantLock renderLock, AudioDevice device);
+  void play(Callable<Vector2> channelGenerator, AudioDevice device) throws Exception;
 
   void stop();
 

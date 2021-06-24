@@ -8,7 +8,6 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
-import java.util.concurrent.locks.ReentrantLock;
 
 public class XtAudioEngine implements AudioEngine {
 
@@ -19,7 +18,6 @@ public class XtAudioEngine implements AudioEngine {
 
   private AudioDevice device;
   private boolean playing = false;
-  private ReentrantLock renderLock;
   private Callable<Vector2> channelGenerator;
 
   public XtAudioEngine() {}
@@ -27,9 +25,6 @@ public class XtAudioEngine implements AudioEngine {
   private int render(XtStream stream, Structs.XtBuffer buffer, Object user) throws Exception {
     XtSafeBuffer safe = XtSafeBuffer.get(stream);
     safe.lock(buffer);
-    if (renderLock != null) {
-      renderLock.lock();
-    }
     Object output = safe.getOutput();
 
     for (int f = 0; f < buffer.frames; f++) {
@@ -37,9 +32,6 @@ public class XtAudioEngine implements AudioEngine {
       writeChannels(channels, output, f);
     }
     safe.unlock(buffer);
-    if (renderLock != null) {
-      renderLock.unlock();
-    }
     return 0;
   }
 
@@ -97,11 +89,10 @@ public class XtAudioEngine implements AudioEngine {
   }
 
   @Override
-  public void play(Callable<Vector2> channelGenerator, ReentrantLock renderLock, AudioDevice device) {
+  public void play(Callable<Vector2> channelGenerator, AudioDevice device) {
     this.playing = true;
     this.device = device;
     this.channelGenerator = channelGenerator;
-    this.renderLock = renderLock;
     try (XtPlatform platform = XtAudio.init(null, null)) {
       XtService service = getService(platform);
 
