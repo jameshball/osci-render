@@ -156,8 +156,14 @@ public class XtAudioEngine implements AudioEngine {
           if (xtDevice.supportsFormat(format)) {
             devices.add(new DefaultAudioDevice(deviceId, deviceName, mix.get().rate, XtSampleToAudioSample(mix.get().sample)));
           }
+        } catch (XtException e) {
+          e.printStackTrace();
         }
       }
+    }
+
+    if (devices.isEmpty()) {
+      throw new RuntimeException("No suitable audio devices found");
     }
 
     return devices;
