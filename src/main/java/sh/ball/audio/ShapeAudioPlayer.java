@@ -4,8 +4,7 @@ import sh.ball.audio.effect.Effect;
 
 import java.io.*;
 import java.util.*;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.*;
 
 import sh.ball.audio.engine.AudioDevice;
 import sh.ball.audio.engine.AudioEngine;
@@ -14,8 +13,7 @@ import sh.ball.shapes.Vector2;
 
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
-import java.util.concurrent.Callable;
-import java.util.concurrent.Semaphore;
+import javax.sound.sampled.LineUnavailableException;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
@@ -33,8 +31,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private final Callable<AudioEngine> audioEngineBuilder;
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
   private final Map<Object, Effect> effects = new HashMap<>();
-  private final ReentrantLock renderLock = new ReentrantLock();
-  private final List<Listener> listeners = new ArrayList<>();
+  private final List<Listener> listeners = new CopyOnWriteArrayList<>();
 
   private AudioEngine audioEngine;
   private ByteArrayOutputStream outputStream;
@@ -83,13 +80,13 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   private void writeChannels(float leftChannel, float rightChannel) {
-    int left = (int)(leftChannel * Short.MAX_VALUE);
-    int right = (int)(rightChannel * Short.MAX_VALUE);
+    int left = (int) (leftChannel * Short.MAX_VALUE);
+    int right = (int) (rightChannel * Short.MAX_VALUE);
 
     byte b0 = (byte) left;
-    byte b1 = (byte)(left >> 8);
+    byte b1 = (byte) (left >> 8);
     byte b2 = (byte) right;
-    byte b3 = (byte)(right >> 8);
+    byte b3 = (byte) (right >> 8);
 
     if (recording) {
       outputStream.write(b0);
@@ -155,7 +152,11 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
       throw new IllegalArgumentException("No AudioDevice provided");
     }
 
-    audioEngine.play(this::generateChannels, renderLock, device);
+    try {
+      audioEngine.play(this::generateChannels, device);
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
   }
 
   @Override
@@ -200,19 +201,9 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   @Override
   public void read(byte[] buffer) throws InterruptedException {
     Listener listener = new Listener(buffer);
-    try {
-      renderLock.lock();
-      listeners.add(listener);
-    } finally {
-      renderLock.unlock();
-    }
+    listeners.add(listener);
     listener.waitUntilFull();
-    try {
-      renderLock.lock();
-      listeners.remove(listener);
-    } finally {
-      renderLock.unlock();
-    }
+    listeners.remove(listener);
   }
 
   @Override
