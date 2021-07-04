@@ -4,9 +4,13 @@ import sh.ball.shapes.Vector2;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.Callable;
 
 public class ConglomerateAudioEngine implements AudioEngine {
+
+  private static final String OS = System.getProperty("os.name", "generic").toLowerCase(Locale.ENGLISH);
+  private static final boolean MAC_OS = OS.contains("mac") || OS.contains("darwin");
 
   private final XtAudioEngine xtEngine = new XtAudioEngine();
   private final JavaAudioEngine javaEngine = new JavaAudioEngine();
@@ -42,7 +46,11 @@ public class ConglomerateAudioEngine implements AudioEngine {
   @Override
   public List<AudioDevice> devices() {
     if (xtDevices == null) {
-      xtDevices = xtEngine.devices();
+      if (MAC_OS) {
+        xtDevices = new ArrayList<>();
+      } else {
+        xtDevices = xtEngine.devices();
+      }
     }
     if (javaDevice == null) {
       javaDevice = javaEngine.getDefaultDevice();
