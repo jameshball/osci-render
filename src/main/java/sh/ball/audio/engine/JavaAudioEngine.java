@@ -18,11 +18,9 @@ public class JavaAudioEngine implements AudioEngine {
   private static final int FRAME_SIZE = NUM_CHANNELS * BIT_DEPTH / 8;
   private static final boolean BIG_ENDIAN = false;
   private static final boolean SIGNED_SAMPLE = true;
-  public static final double EPSILON = 0.1;
 
   private volatile boolean stopped = false;
 
-  private Callable<Vector2> channelGenerator;
   private SourceDataLine source;
 
   @Override
@@ -32,7 +30,7 @@ public class JavaAudioEngine implements AudioEngine {
 
   @Override
   public void play(Callable<Vector2> channelGenerator, AudioDevice device) throws Exception {
-    this.channelGenerator = channelGenerator;
+    this.stopped = false;
 
     AudioFormat format = new AudioFormat((float) device.sampleRate(), BIT_DEPTH, NUM_CHANNELS, SIGNED_SAMPLE, BIG_ENDIAN);
 
