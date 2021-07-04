@@ -4,11 +4,9 @@
 
 Program for drawing objects, text, and images on an oscilloscope using audio output.
 
-This allows for 3D rendering of `.obj` files, `.svg` images, and `.txt` files on Windows and Linux.
+This allows for 3D rendering of `.obj` files, `.svg` images, and `.txt` files on Windows, macOS, and Linux.
 
 Read more about '[Rendering shapes through audio signals](https://felixonline.co.uk/issue/1773/science/rendering-shapes-through-audio-signals)' in this article featuring osci-render!
-
-Some of this was built as part of a 24hr hackathon: IC Hack 20. The original repository can be found here: https://github.com/wdhg/ICHack20 It won 'Best Newcomers Prize' at the event.
 
 Send an email to [james@ball.sh](mailto:james@ball.sh) if you have any issues, feedback, feature requests, or anything else!
 
@@ -30,7 +28,8 @@ Send an email to [james@ball.sh](mailto:james@ball.sh) if you have any issues, f
 
 ## Proposed Features
 
-- Mac OS support
+- Move to a frequency-based rather than weight-based drawing system
+- Implement a trace effect
 - Tune and transpose audio output
 - Support rendering of multiple objects
 - (long term) Keyframing/animating objects and camera
