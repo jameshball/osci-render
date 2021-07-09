@@ -18,7 +18,7 @@ class LineTo {
     int expectedArgs = isHorizontal && isVertical ? 2 : 1;
 
     if (args.size() % expectedArgs != 0 || args.size() < expectedArgs) {
-      throw new IllegalArgumentException("SVG lineto command has incorrect number of arguments.");
+      throw new IllegalArgumentException("SVG lineto command has incorrect number of arguments. Expected multiple of " + expectedArgs + ", got " + args.size());
     }
 
     List<Shape> lines = new ArrayList<>();
