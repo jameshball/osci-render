@@ -20,13 +20,13 @@ class MoveTo {
       state.currPoint = vec;
       state.initialPoint = state.currPoint;
       if (args.size() > 2) {
-        return LineTo.absolute(state, args.subList(2, args.size() - 1));
+        return LineTo.absolute(state, args.subList(2, args.size()));
       }
     } else {
       state.currPoint = state.currPoint.translate(vec);
       state.initialPoint = state.currPoint;
       if (args.size() > 2) {
-        return LineTo.relative(state, args.subList(2, args.size() - 1));
+        return LineTo.relative(state, args.subList(2, args.size()));
       }
     }
 
