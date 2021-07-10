@@ -61,6 +61,7 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   private FrequencyAnalyser<List<Shape>> analyser;
   private final AudioDevice defaultDevice;
   private boolean recording = false;
+  private Timeline recordingTimeline;
   private String lastVisitedDirectory;
 
   private FrameProducer<List<Shape>> producer;
@@ -84,6 +85,12 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   private Button recordButton;
   @FXML
   private Label recordLabel;
+  @FXML
+  private TextField recordTextField;
+  @FXML
+  private CheckBox recordCheckBox;
+  @FXML
+  private Label recordLengthLabel;
   @FXML
   private TextField translationXTextField;
   @FXML
@@ -264,6 +271,11 @@ public class Controller implements Initializable, FrequencyListener, Listener {
 
     recordButton.setOnAction(event -> toggleRecord());
 
+    recordCheckBox.selectedProperty().addListener((e, oldVal, newVal) -> {
+      recordLengthLabel.setDisable(!newVal);
+      recordTextField.setDisable(!newVal);
+    });
+
     updateObjectRotateSpeed();
 
     audioPlayer.addEffect(EffectType.SCALE, scaleEffect);
@@ -321,27 +333,62 @@ public class Controller implements Initializable, FrequencyListener, Listener {
 
   private void toggleRecord() {
     recording = !recording;
+    boolean timedRecord = recordCheckBox.isSelected();
     if (recording) {
+      if (timedRecord) {
+        double recordingLength;
+        try {
+          recordingLength = Double.parseDouble(recordTextField.getText());
+        } catch (NumberFormatException e) {
+          recordLabel.setText("Please set a valid record length");
+          recording = false;
+          return;
+        }
+        recordButton.setText("Cancel");
+        KeyFrame kf1 = new KeyFrame(
+          Duration.seconds(0),
+          e -> audioPlayer.startRecord()
+        );
+        KeyFrame kf2 = new KeyFrame(
+          Duration.seconds(recordingLength),
+          e -> {
+            saveRecording();
+            recording = false;
+          }
+        );
+        recordingTimeline = new Timeline(kf1, kf2);
+        Platform.runLater(recordingTimeline::play);
+      } else {
+        recordButton.setText("Stop Recording");
+        audioPlayer.startRecord();
+      }
       recordLabel.setText("Recording...");
-      recordButton.setText("Stop Recording");
-      audioPlayer.startRecord();
+    } else if (timedRecord) {
+      recordingTimeline.stop();
+      recordLabel.setText("");
+      recordButton.setText("Record");
+      audioPlayer.stopRecord();
     } else {
+      saveRecording();
+    }
+  }
+
+  private void saveRecording() {
+    try {
       recordButton.setText("Record");
       AudioInputStream input = audioPlayer.stopRecord();
-      try {
-        File file = fileChooser.showSaveDialog(stage);
-        SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
-        Date date = new Date(System.currentTimeMillis());
-        if (file == null) {
-          file = new File("out-" + formatter.format(date) + ".wav");
-        }
-        AudioSystem.write(input, AudioFileFormat.Type.WAVE, file);
-        input.close();
-        recordLabel.setText("Saved to " + file.getAbsolutePath());
-      } catch (IOException e) {
-        recordLabel.setText("Error saving file");
-        e.printStackTrace();
+      File file = fileChooser.showSaveDialog(stage);
+      SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
+      Date date = new Date(System.currentTimeMillis());
+      if (file == null) {
+        file = new File("out-" + formatter.format(date) + ".wav");
       }
+      AudioSystem.write(input, AudioFileFormat.Type.WAVE, file);
+      input.close();
+      recordLabel.setText("Saved to " + file.getAbsolutePath());
+    } catch (IOException e) {
+      recordLabel.setText("Error saving file");
+      e.printStackTrace();
     }
   }
 
@@ -423,7 +470,8 @@ public class Controller implements Initializable, FrequencyListener, Listener {
             try {
               frameSets.add(ParserFactory.getParser(file.getAbsolutePath()).parse());
               frameSetPaths.add(file.getName());
-            } catch (IOException ignored) {}
+            } catch (IOException ignored) {
+            }
           }
         } else {
           jkLabel.setVisible(false);
