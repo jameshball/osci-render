@@ -36,8 +36,8 @@ public class Gui extends Application {
 
     scene.addEventHandler(KeyEvent.KEY_PRESSED, (event -> {
       switch (event.getCode()) {
-        case K -> controller.previousFrameSet();
         case J -> controller.nextFrameSet();
+        case K -> controller.previousFrameSet();
       }
     }));
 

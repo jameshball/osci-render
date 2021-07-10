@@ -134,6 +134,7 @@ public class Controller implements Initializable, FrequencyListener, Listener {
     this.audioPlayer = audioPlayer;
     FrameSet<List<Shape>> frames = new ObjParser(DEFAULT_OBJ).parse();
     frameSets.add(frames);
+    frameSetPaths.add("cube.obj");
     currentFrameSet = 0;
     frames.addListener(this);
     this.producer = new FrameProducer<>(audioPlayer, frames);
