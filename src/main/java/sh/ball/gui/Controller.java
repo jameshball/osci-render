@@ -61,6 +61,7 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   private FrequencyAnalyser<List<Shape>> analyser;
   private final AudioDevice defaultDevice;
   private boolean recording = false;
+  private String lastVisitedDirectory;
 
   private FrameProducer<List<Shape>> producer;
   private final List<FrameSet<List<Shape>>> frameSets = new ArrayList<>();
@@ -247,6 +248,7 @@ public class Controller implements Initializable, FrequencyListener, Listener {
       File file = fileChooser.showOpenDialog(stage);
       if (file != null) {
         chooseFile(file);
+        updateLastVisitedDirectory(new File(file.getParent()));
       }
     });
 
@@ -254,6 +256,7 @@ public class Controller implements Initializable, FrequencyListener, Listener {
       File file = folderChooser.showDialog(stage);
       if (file != null) {
         chooseFile(file);
+        updateLastVisitedDirectory(file);
       }
     });
 
@@ -279,6 +282,13 @@ public class Controller implements Initializable, FrequencyListener, Listener {
         switchAudioDevice(newDevice);
       }
     });
+  }
+
+  private void updateLastVisitedDirectory(File file) {
+    lastVisitedDirectory = file != null ? file.getAbsolutePath() : System.getProperty("user.home");
+    File dir = new File(lastVisitedDirectory);
+    fileChooser.setInitialDirectory(dir);
+    folderChooser.setInitialDirectory(dir);
   }
 
   private void switchAudioDevice(AudioDevice device) {
