@@ -16,10 +16,11 @@
        <Button fx:id="chooseFileButton" layoutX="14.0" layoutY="53.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose File" />
        <Label fx:id="fileLabel" layoutX="144.0" layoutY="57.0" maxWidth="270.0" prefHeight="18.0" prefWidth="246.0" text="cube.obj" />
          <Button fx:id="recordButton" layoutX="14.0" layoutY="129.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Record" />
-         <Label fx:id="recordLabel" layoutX="145.0" layoutY="140.0" maxWidth="270.0" prefHeight="18.0" prefWidth="245.0" />
+         <Label fx:id="recordLabel" layoutX="144.0" layoutY="133.0" maxWidth="270.0" prefHeight="18.0" prefWidth="245.0" />
          <Label id="frequency" fx:id="frequencyLabel" layoutX="13.0" layoutY="166.0" prefHeight="58.0" prefWidth="376.0" text="L/R Frequency:&#10; &#10;" />
          <ComboBox fx:id="deviceComboBox" layoutX="14.0" layoutY="11.0" prefHeight="26.0" prefWidth="376.0" />
          <Button fx:id="chooseFolderButton" layoutX="14.0" layoutY="91.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose Folder" />
+         <Label fx:id="jkLabel" layoutX="143.0" layoutY="95.0" maxWidth="270.0" prefHeight="18.0" prefWidth="246.0" text="Use j and k to cycle between files" visible="false" />
       </children>
    </AnchorPane>
    <TitledPane animated="false" collapsible="false" layoutX="423.0" layoutY="252.0" prefHeight="272.0" prefWidth="402.0" text="Effects">
