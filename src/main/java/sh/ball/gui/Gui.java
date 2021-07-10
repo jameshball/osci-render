@@ -12,7 +12,6 @@ import javafx.scene.input.MouseEvent;
 import javafx.stage.Stage;
 import sh.ball.audio.ShapeAudioPlayer;
 import sh.ball.audio.engine.ConglomerateAudioEngine;
-import sh.ball.audio.engine.JavaAudioEngine;
 import sh.ball.engine.Vector3;
 
 import java.util.Objects;
@@ -33,20 +32,30 @@ public class Gui extends Application {
     stage.setTitle("osci-render");
     Scene scene = new Scene(root);
     scene.getStylesheets().add(getClass().getResource("/css/main.css").toExternalForm());
+
+    scene.addEventHandler(KeyEvent.KEY_PRESSED, (event -> {
+      switch (event.getCode()) {
+        case J -> controller.nextFrameSet();
+        case K -> controller.previousFrameSet();
+      }
+    }));
+
     scene.addEventFilter(MouseEvent.MOUSE_MOVED, event -> {
       if (controller.mouseRotate()) {
         controller.setObjRotate(new Vector3(
           3 * Math.PI * (event.getSceneY() / scene.getHeight()),
-          3 * Math.PI * (event.getSceneX() /  scene.getWidth()),
+          3 * Math.PI * (event.getSceneX() / scene.getWidth()),
           0
         ));
       }
     });
+
     scene.addEventHandler(KeyEvent.KEY_PRESSED, t -> {
       if (t.getCode() == KeyCode.ESCAPE) {
         controller.disableMouseRotate();
       }
     });
+
     stage.setScene(scene);
     stage.setResizable(false);
 

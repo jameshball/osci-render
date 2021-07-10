@@ -5,6 +5,7 @@ import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.scene.control.*;
+import javafx.stage.DirectoryChooser;
 import javafx.util.Duration;
 import sh.ball.audio.*;
 import sh.ball.audio.effect.*;
@@ -14,10 +15,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.ResourceBundle;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -47,13 +45,12 @@ import sh.ball.shapes.Vector2;
 
 public class Controller implements Initializable, FrequencyListener, Listener {
 
-
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
 
   private final FileChooser fileChooser = new FileChooser();
+  private final DirectoryChooser folderChooser = new DirectoryChooser();
   private final AudioPlayer<List<Shape>> audioPlayer;
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
-
 
   private final RotateEffect rotateEffect;
   private final TranslateEffect translateEffect;
@@ -63,8 +60,13 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   private int sampleRate;
   private FrequencyAnalyser<List<Shape>> analyser;
   private final AudioDevice defaultDevice;
-  private FrameProducer<List<Shape>> producer;
   private boolean recording = false;
+  private String lastVisitedDirectory;
+
+  private FrameProducer<List<Shape>> producer;
+  private final List<FrameSet<List<Shape>>> frameSets = new ArrayList<>();
+  private final List<String> frameSetPaths = new ArrayList<>();
+  private int currentFrameSet;
 
   private Stage stage;
 
@@ -73,7 +75,11 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   @FXML
   private Button chooseFileButton;
   @FXML
+  private Button chooseFolderButton;
+  @FXML
   private Label fileLabel;
+  @FXML
+  private Label jkLabel;
   @FXML
   private Button recordButton;
   @FXML
@@ -130,6 +136,9 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   public Controller(AudioPlayer<List<Shape>> audioPlayer) throws IOException {
     this.audioPlayer = audioPlayer;
     FrameSet<List<Shape>> frames = new ObjParser(DEFAULT_OBJ).parse();
+    frameSets.add(frames);
+    frameSetPaths.add("cube.obj");
+    currentFrameSet = 0;
     frames.addListener(this);
     this.producer = new FrameProducer<>(audioPlayer, frames);
     this.defaultDevice = audioPlayer.getDefaultDevice();
@@ -241,6 +250,15 @@ public class Controller implements Initializable, FrequencyListener, Listener {
       File file = fileChooser.showOpenDialog(stage);
       if (file != null) {
         chooseFile(file);
+        updateLastVisitedDirectory(new File(file.getParent()));
+      }
+    });
+
+    chooseFolderButton.setOnAction(e -> {
+      File file = folderChooser.showDialog(stage);
+      if (file != null) {
+        chooseFile(file);
+        updateLastVisitedDirectory(file);
       }
     });
 
@@ -266,6 +284,13 @@ public class Controller implements Initializable, FrequencyListener, Listener {
         switchAudioDevice(newDevice);
       }
     });
+  }
+
+  private void updateLastVisitedDirectory(File file) {
+    lastVisitedDirectory = file != null ? file.getAbsolutePath() : System.getProperty("user.home");
+    File dir = new File(lastVisitedDirectory);
+    fileChooser.setInitialDirectory(dir);
+    folderChooser.setInitialDirectory(dir);
   }
 
   private void switchAudioDevice(AudioDevice device) {
@@ -365,39 +390,80 @@ public class Controller implements Initializable, FrequencyListener, Listener {
     }
   }
 
-  private void chooseFile(File file) {
+  private void changeFrameSet() {
+    FrameSet<List<Shape>> frames = frameSets.get(currentFrameSet);
+    producer.stop();
+    frames.addListener(this);
+    producer = new FrameProducer<>(audioPlayer, frames);
+
+    updateObjectRotateSpeed();
+    updateFocalLength();
+    executor.submit(producer);
+
+    KeyFrame kf1 = new KeyFrame(Duration.seconds(0), e -> wobbleEffect.setVolume(0));
+    KeyFrame kf2 = new KeyFrame(Duration.seconds(1), e -> {
+      wobbleEffect.update();
+      wobbleEffect.setVolume(wobbleSlider.getValue());
+    });
+    Timeline timeline = new Timeline(kf1, kf2);
+    Platform.runLater(timeline::play);
+    fileLabel.setText(frameSetPaths.get(currentFrameSet));
+    objTitledPane.setDisable(!ObjParser.isObjFile(frameSetPaths.get(currentFrameSet)));
+  }
+
+  private void chooseFile(File chosenFile) {
     try {
-      producer.stop();
-      String path = file.getAbsolutePath();
-      FrameSet<List<Shape>> frames = ParserFactory.getParser(path).parse();
-      frames.addListener(this);
-      producer = new FrameProducer<>(audioPlayer, frames);
+      if (chosenFile.exists()) {
+        frameSets.clear();
+        frameSetPaths.clear();
 
-      updateObjectRotateSpeed();
-      updateFocalLength();
-      executor.submit(producer);
+        if (chosenFile.isDirectory()) {
+          jkLabel.setVisible(true);
+          for (File file : chosenFile.listFiles()) {
+            try {
+              frameSets.add(ParserFactory.getParser(file.getAbsolutePath()).parse());
+              frameSetPaths.add(file.getName());
+            } catch (IOException ignored) {}
+          }
+        } else {
+          jkLabel.setVisible(false);
+          frameSets.add(ParserFactory.getParser(chosenFile.getAbsolutePath()).parse());
+          frameSetPaths.add(chosenFile.getName());
+        }
 
-      KeyFrame kf1 = new KeyFrame(Duration.seconds(0), e -> wobbleEffect.setVolume(0));
-      KeyFrame kf2 = new KeyFrame(Duration.seconds(1), e -> {
-        wobbleEffect.update();
-        wobbleEffect.setVolume(wobbleSlider.getValue());
-      });
-      Timeline timeline = new Timeline(kf1, kf2);
-      Platform.runLater(timeline::play);
-
-      if (file.exists() && !file.isDirectory()) {
-        fileLabel.setText(path);
-        objTitledPane.setDisable(!ObjParser.isObjFile(path));
-      } else {
-        objTitledPane.setDisable(true);
+        currentFrameSet = 0;
+        changeFrameSet();
       }
     } catch (IOException | ParserConfigurationException | SAXException ioException) {
       ioException.printStackTrace();
+
+      // display error to user (for debugging purposes)
+      String oldPath = fileLabel.getText();
+      KeyFrame kf1 = new KeyFrame(Duration.seconds(0), e -> fileLabel.setText(ioException.getMessage()));
+      KeyFrame kf2 = new KeyFrame(Duration.seconds(5), e -> fileLabel.setText(oldPath));
+      Timeline timeline = new Timeline(kf1, kf2);
+      Platform.runLater(timeline::play);
     }
   }
 
   public void setStage(Stage stage) {
     this.stage = stage;
+  }
+
+  public void nextFrameSet() {
+    currentFrameSet++;
+    if (currentFrameSet >= frameSets.size()) {
+      currentFrameSet = 0;
+    }
+    changeFrameSet();
+  }
+
+  public void previousFrameSet() {
+    currentFrameSet--;
+    if (currentFrameSet < 0) {
+      currentFrameSet = frameSets.size() - 1;
+    }
+    changeFrameSet();
   }
 
   protected boolean mouseRotate() {
