@@ -79,6 +79,8 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   @FXML
   private Label fileLabel;
   @FXML
+  private Label jkLabel;
+  @FXML
   private Button recordButton;
   @FXML
   private Label recordLabel;
@@ -412,20 +414,21 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   private void chooseFile(File chosenFile) {
     try {
       if (chosenFile.exists()) {
-        String path = chosenFile.getAbsolutePath();
         frameSets.clear();
         frameSetPaths.clear();
 
         if (chosenFile.isDirectory()) {
+          jkLabel.setVisible(true);
           for (File file : chosenFile.listFiles()) {
             try {
               frameSets.add(ParserFactory.getParser(file.getAbsolutePath()).parse());
-              frameSetPaths.add(file.getAbsolutePath());
+              frameSetPaths.add(file.getName());
             } catch (IOException ignored) {}
           }
         } else {
-          frameSets.add(ParserFactory.getParser(path).parse());
-          frameSetPaths.add(path);
+          jkLabel.setVisible(false);
+          frameSets.add(ParserFactory.getParser(chosenFile.getAbsolutePath()).parse());
+          frameSetPaths.add(chosenFile.getName());
         }
 
         currentFrameSet = 0;
