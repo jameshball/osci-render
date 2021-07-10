@@ -63,7 +63,7 @@ Additional effects can be applied to the image such as:
 
 ## Screenshots
 
-<img width="524px" height="330px" src="gui.png">
+<img width="524px" height="356px" src="gui.png">
 
 ## Running
 
