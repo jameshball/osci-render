@@ -365,25 +365,28 @@ public class Controller implements Initializable, FrequencyListener, Listener {
     }
   }
 
+  private void changeFrameSet(FrameSet<List<Shape>> frames) {
+    frames.addListener(this);
+    producer = new FrameProducer<>(audioPlayer, frames);
+
+    updateObjectRotateSpeed();
+    updateFocalLength();
+    executor.submit(producer);
+
+    KeyFrame kf1 = new KeyFrame(Duration.seconds(0), e -> wobbleEffect.setVolume(0));
+    KeyFrame kf2 = new KeyFrame(Duration.seconds(1), e -> {
+      wobbleEffect.update();
+      wobbleEffect.setVolume(wobbleSlider.getValue());
+    });
+    Timeline timeline = new Timeline(kf1, kf2);
+    Platform.runLater(timeline::play);
+  }
+
   private void chooseFile(File file) {
     try {
       producer.stop();
       String path = file.getAbsolutePath();
-      FrameSet<List<Shape>> frames = ParserFactory.getParser(path).parse();
-      frames.addListener(this);
-      producer = new FrameProducer<>(audioPlayer, frames);
-
-      updateObjectRotateSpeed();
-      updateFocalLength();
-      executor.submit(producer);
-
-      KeyFrame kf1 = new KeyFrame(Duration.seconds(0), e -> wobbleEffect.setVolume(0));
-      KeyFrame kf2 = new KeyFrame(Duration.seconds(1), e -> {
-        wobbleEffect.update();
-        wobbleEffect.setVolume(wobbleSlider.getValue());
-      });
-      Timeline timeline = new Timeline(kf1, kf2);
-      Platform.runLater(timeline::play);
+      changeFrameSet(ParserFactory.getParser(path).parse());
 
       if (file.exists() && !file.isDirectory()) {
         fileLabel.setText(path);
