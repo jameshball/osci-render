@@ -33,20 +33,30 @@ public class Gui extends Application {
     stage.setTitle("osci-render");
     Scene scene = new Scene(root);
     scene.getStylesheets().add(getClass().getResource("/css/main.css").toExternalForm());
+
+    scene.addEventHandler(KeyEvent.KEY_PRESSED, (event -> {
+      switch (event.getCode()) {
+        case K -> controller.previousFrameSet();
+        case J -> controller.nextFrameSet();
+      }
+    }));
+
     scene.addEventFilter(MouseEvent.MOUSE_MOVED, event -> {
       if (controller.mouseRotate()) {
         controller.setObjRotate(new Vector3(
           3 * Math.PI * (event.getSceneY() / scene.getHeight()),
-          3 * Math.PI * (event.getSceneX() /  scene.getWidth()),
+          3 * Math.PI * (event.getSceneX() / scene.getWidth()),
           0
         ));
       }
     });
+
     scene.addEventHandler(KeyEvent.KEY_PRESSED, t -> {
       if (t.getCode() == KeyCode.ESCAPE) {
         controller.disableMouseRotate();
       }
     });
+
     stage.setScene(scene);
     stage.setResizable(false);
 
