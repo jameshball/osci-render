@@ -26,6 +26,10 @@ Send an email to [james@ball.sh](mailto:james@ball.sh) if you have any issues, f
 - Save rendered audio to .wav file
 - Show current frequency of audio
 
+## Currently Working On
+
+- MIDI control
+
 ## Proposed Features
 
 - Move to a frequency-based rather than weight-based drawing system
