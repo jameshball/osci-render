@@ -35,6 +35,9 @@ import org.xml.sax.SAXException;
 import sh.ball.audio.effect.Effect;
 import sh.ball.audio.effect.EffectType;
 import sh.ball.audio.engine.AudioDevice;
+import sh.ball.audio.midi.MidiCommunicator;
+import sh.ball.audio.midi.MidiListener;
+import sh.ball.audio.midi.MidiNote;
 import sh.ball.engine.Vector3;
 import sh.ball.parser.obj.Listener;
 import sh.ball.parser.obj.ObjSettingsFactory;
@@ -43,7 +46,7 @@ import sh.ball.parser.ParserFactory;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
-public class Controller implements Initializable, FrequencyListener, Listener {
+public class Controller implements Initializable, FrequencyListener, MidiListener, Listener {
 
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
 
@@ -62,7 +65,6 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   private final AudioDevice defaultDevice;
   private boolean recording = false;
   private Timeline recordingTimeline;
-  private String lastVisitedDirectory;
 
   private FrameProducer<List<Shape>> producer;
   private final List<FrameSet<List<Shape>>> frameSets = new ArrayList<>();
@@ -290,6 +292,9 @@ public class Controller implements Initializable, FrequencyListener, Listener {
     analyser = new FrequencyAnalyser<>(audioPlayer, 2, sampleRate);
     startFrequencyAnalyser(analyser);
     startAudioPlayerThread();
+    MidiCommunicator midiCommunicator = new MidiCommunicator();
+    midiCommunicator.addListener(this);
+    new Thread(midiCommunicator).start();
 
     deviceComboBox.valueProperty().addListener((options, oldDevice, newDevice) -> {
       if (newDevice != null) {
@@ -299,7 +304,7 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   }
 
   private void updateLastVisitedDirectory(File file) {
-    lastVisitedDirectory = file != null ? file.getAbsolutePath() : System.getProperty("user.home");
+    String lastVisitedDirectory = file != null ? file.getAbsolutePath() : System.getProperty("user.home");
     File dir = new File(lastVisitedDirectory);
     fileChooser.setInitialDirectory(dir);
     folderChooser.setInitialDirectory(dir);
@@ -551,5 +556,18 @@ public class Controller implements Initializable, FrequencyListener, Listener {
     value = value * factor;
     long tmp = Math.round(value);
     return (double) tmp / factor;
+  }
+
+  @Override
+  public void sendMidiMessage(int status, MidiNote note, int pressure) {
+    if (note.key() == 1) {
+      double max = weightSlider.getMax();
+      double min = weightSlider.getMin();
+      double range = max - min;
+      weightSlider.setValue(min + (pressure / 127.0) * range);
+    }
+    System.out.println(status);
+    System.out.println(note);
+    System.out.println(pressure);
   }
 }
