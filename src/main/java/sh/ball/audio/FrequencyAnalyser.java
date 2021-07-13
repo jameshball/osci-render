@@ -62,7 +62,7 @@ public class FrequencyAnalyser<S> implements Runnable {
       double maxLeft = Double.NEGATIVE_INFINITY;
       int maxRightIndex = 0;
       double maxRight = Double.NEGATIVE_INFINITY;
-      for (int i = 1; i < leftMags.length; i++) {
+      for (int i = 0; i < leftMags.length; i++) {
         if (bins[i] < 20 || bins[i] > 20000) {
           continue;
         }
