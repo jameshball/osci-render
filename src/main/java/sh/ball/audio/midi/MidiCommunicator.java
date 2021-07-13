@@ -10,11 +10,6 @@ public class MidiCommunicator implements Runnable {
   private final List<MidiDevice> devices = new ArrayList<>();
   private final List<MidiListener> listeners = new ArrayList<>();
 
-  public static void main(String[] args) {
-    MidiCommunicator communicator = new MidiCommunicator();
-    communicator.run();
-  }
-
   @Override
   public void run() {
     MidiDevice.Info[] infos = MidiSystem.getMidiDeviceInfo();
@@ -32,8 +27,6 @@ public class MidiCommunicator implements Runnable {
 
         device.open();
         devices.add(device);
-        System.out.println(device.getDeviceInfo() + " Was Opened");
-
 
       } catch (MidiUnavailableException ignored) {
       }
@@ -48,9 +41,6 @@ public class MidiCommunicator implements Runnable {
     for (MidiListener listener : listeners) {
       listener.sendMidiMessage(status, note, pressure);
     }
-    System.out.println(status);
-    System.out.println(note);
-    System.out.println(pressure);
   }
 
   public void stop() {

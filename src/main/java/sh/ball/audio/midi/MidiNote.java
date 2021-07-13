@@ -17,7 +17,7 @@ public class MidiNote {
     this.name = NOTE_NAMES[note];
   }
 
-  public int getKey() {
+  public int key() {
     return key;
   }
 
