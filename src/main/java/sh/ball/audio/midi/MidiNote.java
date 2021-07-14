@@ -26,12 +26,12 @@ public class MidiNote {
     if (this == o) return true;
     if (o == null || getClass() != o.getClass()) return false;
     MidiNote midiNote = (MidiNote) o;
-    return key == midiNote.key && octave == midiNote.octave && name.equals(midiNote.name);
+    return key == midiNote.key;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(name, key, octave);
+    return Objects.hash(key);
   }
 
   @Override
