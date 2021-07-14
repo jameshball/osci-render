@@ -8,30 +8,36 @@
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.TitledPane?>
 <?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.shape.SVGPath?>
 <?import javafx.scene.text.Font?>
 
-<AnchorPane prefHeight="539.0" prefWidth="837.0" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1">
+<AnchorPane prefHeight="539.0" prefWidth="837.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1">
    <TitledPane animated="false" collapsible="false" layoutX="426.0" layoutY="8.0" prefHeight="303.0" prefWidth="402.0" text="Effects">
      <content>
        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="262.0" prefWidth="401.0">
             <children>
                <CheckBox fx:id="vectorCancellingCheckBox" layoutX="14.0" layoutY="15.0" mnemonicParsing="false" text="Vector cancelling" />
-               <Slider fx:id="vectorCancellingSlider" blockIncrement="0.05" disable="true" layoutX="167.0" layoutY="16.0" majorTickUnit="1.0" max="10.0" min="2.0" prefHeight="38.0" prefWidth="222.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" value="2.0" />
+               <Slider fx:id="vectorCancellingSlider" blockIncrement="0.05" disable="true" layoutX="154.0" layoutY="16.0" majorTickUnit="1.0" max="10.0" min="2.0" prefHeight="42.0" prefWidth="219.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" value="2.0" />
                <CheckBox fx:id="bitCrushCheckBox" layoutX="14.0" layoutY="53.0" mnemonicParsing="false" text="Bit crush" />
-               <Slider fx:id="bitCrushSlider" blockIncrement="0.01" disable="true" layoutX="167.0" layoutY="55.0" majorTickUnit="0.5" max="3.0" prefHeight="38.0" prefWidth="222.0" showTickLabels="true" showTickMarks="true" value="2.0" />
+               <Slider fx:id="bitCrushSlider" blockIncrement="0.01" disable="true" layoutX="154.0" layoutY="55.0" majorTickUnit="0.5" max="3.0" prefHeight="42.0" prefWidth="219.0" showTickLabels="true" showTickMarks="true" value="2.0" />
                <CheckBox fx:id="verticalDistortCheckBox" layoutX="14.0" layoutY="94.0" mnemonicParsing="false" text="Vertical Distort" />
-               <Slider fx:id="verticalDistortSlider" blockIncrement="0.005" disable="true" layoutX="167.0" layoutY="96.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="222.0" showTickLabels="true" showTickMarks="true" value="0.2" />
+               <Slider fx:id="verticalDistortSlider" blockIncrement="0.005" disable="true" layoutX="154.0" layoutY="96.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="219.0" showTickLabels="true" showTickMarks="true" value="0.2" />
                <CheckBox fx:id="horizontalDistortCheckBox" layoutX="14.0" layoutY="137.0" mnemonicParsing="false" text="Horizontal Distort" />
-               <Slider fx:id="horizontalDistortSlider" blockIncrement="0.005" disable="true" layoutX="167.0" layoutY="139.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="222.0" showTickLabels="true" showTickMarks="true" value="0.2" />
+               <Slider fx:id="horizontalDistortSlider" blockIncrement="0.005" disable="true" layoutX="154.0" layoutY="139.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="219.0" showTickLabels="true" showTickMarks="true" value="0.2" />
                <CheckBox fx:id="wobbleCheckBox" layoutX="14.0" layoutY="179.0" mnemonicParsing="false" text="Wobble" />
-               <Slider fx:id="wobbleSlider" blockIncrement="0.005" disable="true" layoutX="167.0" layoutY="181.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="222.0" showTickLabels="true" showTickMarks="true" value="0.2" />
+               <Slider fx:id="wobbleSlider" blockIncrement="0.005" disable="true" layoutX="154.0" layoutY="181.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="219.0" showTickLabels="true" showTickMarks="true" value="0.2" />
+               <SVGPath fx:id="vectorCancellingMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="373.0" layoutY="13.0" pickOnBounds="true" />
+               <SVGPath fx:id="bitCrushMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="373.0" layoutY="52.0" pickOnBounds="true" />
+               <SVGPath fx:id="verticalDistortMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="373.0" layoutY="92.0" pickOnBounds="true" />
+               <SVGPath fx:id="horizontalDistortMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="373.0" layoutY="135.0" pickOnBounds="true" />
+               <SVGPath fx:id="wobbleMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="373.0" layoutY="177.0" pickOnBounds="true" />
             </children>
          </AnchorPane>
      </content>
    </TitledPane>
 <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="426.0" layoutY="318.0" maxHeight="-Infinity" maxWidth="-Infinity" prefHeight="210.0" prefWidth="402.0" text="3D .obj file settings">
   <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="359.0">
-    <Slider fx:id="focalLengthSlider" blockIncrement="0.01" layoutX="116.0" layoutY="15.0" majorTickUnit="0.2" max="2.0" min="1.0E-5" prefHeight="38.0" prefWidth="270.0" showTickLabels="true" showTickMarks="true" value="1.0" />
+    <Slider fx:id="focalLengthSlider" blockIncrement="0.01" layoutX="116.0" layoutY="15.0" majorTickUnit="0.2" max="2.0" min="1.0E-5" prefHeight="42.0" prefWidth="258.0" showTickLabels="true" showTickMarks="true" value="1.0" />
     <Label layoutX="30.0" layoutY="14.0" text="Focal length" />
          <TextField fx:id="cameraXTextField" layoutX="134.0" layoutY="57.0" prefHeight="26.0" prefWidth="65.0" text="0" />
          <Label layoutX="31.0" layoutY="61.0" text="Camera pos" />
@@ -40,9 +46,11 @@
          <TextField fx:id="cameraYTextField" layoutX="224.0" layoutY="57.0" prefHeight="26.0" prefWidth="65.0" text="0" />
          <Label layoutX="299.0" layoutY="60.0" text="z :" />
          <TextField fx:id="cameraZTextField" layoutX="315.0" layoutY="57.0" prefHeight="26.0" prefWidth="65.0" text="-2.5" />
-         <Slider fx:id="objectRotateSpeedSlider" blockIncrement="0.005" layoutX="116.0" layoutY="97.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="270.0" showTickLabels="true" showTickMarks="true" />
+         <Slider fx:id="objectRotateSpeedSlider" blockIncrement="0.005" layoutX="116.0" layoutY="97.0" majorTickUnit="0.1" max="1.0" prefHeight="42.0" prefWidth="258.0" showTickLabels="true" showTickMarks="true" />
          <Label layoutX="24.0" layoutY="96.0" text="Rotate speed" />
          <CheckBox fx:id="rotateCheckBox" layoutX="90.0" layoutY="147.0" mnemonicParsing="false" text="Rotate with Mouse (Esc to disable)" />
+         <SVGPath fx:id="focalLengthMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="374.0" layoutY="12.0" pickOnBounds="true" />
+         <SVGPath fx:id="objectRotateSpeedMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="374.0" layoutY="94.0" pickOnBounds="true" />
   </AnchorPane>
 </TitledPane>
    <AnchorPane id="control-pane" layoutX="12.0" layoutY="7.0" prefHeight="274.0" prefWidth="402.0">
@@ -64,19 +72,19 @@
       <content>
          <AnchorPane minHeight="0.0" minWidth="0.0">
             <children>
-               <Slider fx:id="rotateSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="90.0" majorTickUnit="1.0" max="10.0" prefHeight="38.0" prefWidth="270.0" showTickLabels="true" showTickMarks="true" />
+               <Slider fx:id="rotateSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="90.0" majorTickUnit="1.0" max="10.0" prefHeight="42.0" prefWidth="254.0" showTickLabels="true" showTickMarks="true" />
                <Label layoutX="33.0" layoutY="88.0" text="Rotate speed">
                   <font>
                      <Font size="13.0" />
                   </font>
                </Label>
-               <Slider fx:id="translationSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="128.0" majorTickUnit="1.0" max="10.0" prefHeight="38.0" prefWidth="270.0" showTickLabels="true" showTickMarks="true" />
+               <Slider fx:id="translationSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="128.0" majorTickUnit="1.0" max="10.0" prefHeight="42.0" prefWidth="254.0" showTickLabels="true" showTickMarks="true" />
                <Label layoutX="7.0" layoutY="126.0" text="Translation speed">
                   <font>
                      <Font size="13.0" />
                   </font>
                </Label>
-               <Slider fx:id="scaleSlider" blockIncrement="0.05" layoutX="116.0" layoutY="167.0" majorTickUnit="1.0" max="10.0" prefHeight="38.0" prefWidth="270.0" showTickLabels="true" showTickMarks="true" value="1.0" />
+               <Slider fx:id="scaleSlider" blockIncrement="0.05" layoutX="116.0" layoutY="167.0" majorTickUnit="1.0" max="10.0" prefHeight="42.0" prefWidth="253.0" showTickLabels="true" showTickMarks="true" value="1.0" />
                <Label layoutX="79.0" layoutY="164.0" text="Scale">
                   <font>
                      <Font size="13.0" />
@@ -92,7 +100,11 @@
                <Label layoutX="120.0" layoutY="18.0" text="x :" />
                <Label layoutX="219.0" layoutY="18.0" text="y :" />
                <TextField fx:id="translationYTextField" layoutX="238.0" layoutY="15.0" prefHeight="26.0" prefWidth="70.0" text="0" />
-               <Slider fx:id="weightSlider" blockIncrement="1.0" layoutX="116.0" layoutY="52.0" majorTickUnit="100.0" max="1000.0" prefHeight="38.0" prefWidth="269.0" showTickLabels="true" showTickMarks="true" value="100.0" />
+               <Slider fx:id="weightSlider" blockIncrement="1.0" layoutX="116.0" layoutY="52.0" majorTickUnit="100.0" max="1000.0" prefHeight="42.0" prefWidth="253.0" showTickLabels="true" showTickMarks="true" value="100.0" />
+               <SVGPath fx:id="weightMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="49.0" pickOnBounds="true" />
+               <SVGPath fx:id="rotateSpeedMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="87.0" pickOnBounds="true" />
+               <SVGPath fx:id="translationSpeedMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="125.0" pickOnBounds="true" />
+               <SVGPath fx:id="scaleMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="164.0" pickOnBounds="true" />
             </children>
          </AnchorPane>
       </content>

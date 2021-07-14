@@ -5,6 +5,9 @@ import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.scene.control.*;
+import javafx.scene.paint.Color;
+import javafx.scene.paint.Paint;
+import javafx.scene.shape.SVGPath;
 import javafx.stage.DirectoryChooser;
 import javafx.util.Duration;
 import sh.ball.audio.*;
@@ -35,6 +38,9 @@ import org.xml.sax.SAXException;
 import sh.ball.audio.effect.Effect;
 import sh.ball.audio.effect.EffectType;
 import sh.ball.audio.engine.AudioDevice;
+import sh.ball.audio.midi.MidiCommunicator;
+import sh.ball.audio.midi.MidiListener;
+import sh.ball.audio.midi.MidiNote;
 import sh.ball.engine.Vector3;
 import sh.ball.parser.obj.Listener;
 import sh.ball.parser.obj.ObjSettingsFactory;
@@ -43,7 +49,7 @@ import sh.ball.parser.ParserFactory;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
-public class Controller implements Initializable, FrequencyListener, Listener {
+public class Controller implements Initializable, FrequencyListener, MidiListener, Listener {
 
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
 
@@ -51,6 +57,8 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   private final DirectoryChooser folderChooser = new DirectoryChooser();
   private final AudioPlayer<List<Shape>> audioPlayer;
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
+  private final Map<MidiNote, SVGPath> midiMap = new HashMap<>();
+  private Map<SVGPath, Slider> midiButtonMap;
 
   private final RotateEffect rotateEffect;
   private final TranslateEffect translateEffect;
@@ -62,7 +70,8 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   private final AudioDevice defaultDevice;
   private boolean recording = false;
   private Timeline recordingTimeline;
-  private String lastVisitedDirectory;
+  private Paint armedMidiPaint;
+  private SVGPath armedMidi;
 
   private FrameProducer<List<Shape>> producer;
   private final List<FrameSet<List<Shape>>> frameSets = new ArrayList<>();
@@ -98,15 +107,25 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   @FXML
   private Slider weightSlider;
   @FXML
+  private SVGPath weightMidi;
+  @FXML
   private Slider rotateSpeedSlider;
+  @FXML
+  private SVGPath rotateSpeedMidi;
   @FXML
   private Slider translationSpeedSlider;
   @FXML
+  private SVGPath translationSpeedMidi;
+  @FXML
   private Slider scaleSlider;
+  @FXML
+  private SVGPath scaleMidi;
   @FXML
   private TitledPane objTitledPane;
   @FXML
   private Slider focalLengthSlider;
+  @FXML
+  private SVGPath focalLengthMidi;
   @FXML
   private TextField cameraXTextField;
   @FXML
@@ -116,27 +135,39 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   @FXML
   private Slider objectRotateSpeedSlider;
   @FXML
+  private SVGPath objectRotateSpeedMidi;
+  @FXML
   private CheckBox rotateCheckBox;
   @FXML
   private CheckBox vectorCancellingCheckBox;
   @FXML
   private Slider vectorCancellingSlider;
   @FXML
+  private SVGPath vectorCancellingMidi;
+  @FXML
   private CheckBox bitCrushCheckBox;
   @FXML
   private Slider bitCrushSlider;
+  @FXML
+  private SVGPath bitCrushMidi;
   @FXML
   private CheckBox verticalDistortCheckBox;
   @FXML
   private Slider verticalDistortSlider;
   @FXML
+  private SVGPath verticalDistortMidi;
+  @FXML
   private CheckBox horizontalDistortCheckBox;
   @FXML
   private Slider horizontalDistortSlider;
   @FXML
+  private SVGPath horizontalDistortMidi;
+  @FXML
   private CheckBox wobbleCheckBox;
   @FXML
   private Slider wobbleSlider;
+  @FXML
+  private SVGPath wobbleMidi;
   @FXML
   private ComboBox<AudioDevice> deviceComboBox;
 
@@ -159,20 +190,30 @@ public class Controller implements Initializable, FrequencyListener, Listener {
     this.scaleEffect = new ScaleEffect();
   }
 
+  private Map<SVGPath, Slider> initializeMidiButtonMap() {
+    Map<SVGPath, Slider> midiMap = new HashMap<>();
+    midiMap.put(weightMidi, weightSlider);
+    midiMap.put(rotateSpeedMidi, rotateSpeedSlider);
+    midiMap.put(translationSpeedMidi, translationSpeedSlider);
+    midiMap.put(scaleMidi, scaleSlider);
+    midiMap.put(focalLengthMidi, focalLengthSlider);
+    midiMap.put(objectRotateSpeedMidi, objectRotateSpeedSlider);
+    midiMap.put(vectorCancellingMidi, vectorCancellingSlider);
+    midiMap.put(bitCrushMidi, bitCrushSlider);
+    midiMap.put(wobbleMidi, wobbleSlider);
+    midiMap.put(verticalDistortMidi, verticalDistortSlider);
+    midiMap.put(horizontalDistortMidi, horizontalDistortSlider);
+    return midiMap;
+  }
+
   private Map<Slider, Consumer<Double>> initializeSliderMap() {
     return Map.of(
-      weightSlider,
-      audioPlayer::setQuality,
-      rotateSpeedSlider,
-      rotateEffect::setSpeed,
-      translationSpeedSlider,
-      translateEffect::setSpeed,
-      scaleSlider,
-      scaleEffect::setScale,
-      focalLengthSlider,
-      d -> updateFocalLength(),
-      objectRotateSpeedSlider,
-      d -> updateObjectRotateSpeed()
+      weightSlider, audioPlayer::setQuality,
+      rotateSpeedSlider, rotateEffect::setSpeed,
+      translationSpeedSlider, translateEffect::setSpeed,
+      scaleSlider, scaleEffect::setScale,
+      focalLengthSlider, d -> updateFocalLength(),
+      objectRotateSpeedSlider, d -> updateObjectRotateSpeed()
     );
   }
 
@@ -195,6 +236,25 @@ public class Controller implements Initializable, FrequencyListener, Listener {
 
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
+    this.midiButtonMap = initializeMidiButtonMap();
+
+    midiButtonMap.keySet().forEach(midi -> midi.setOnMouseClicked(e -> {
+      if (armedMidi == midi) {
+        // we are already armed, so we should unarm
+        midi.setFill(armedMidiPaint);
+        armedMidiPaint = null;
+        armedMidi = null;
+      } else {
+        // not yet armed
+        if (armedMidi != null) {
+          armedMidi.setFill(armedMidiPaint);
+        }
+        armedMidiPaint = midi.getFill();
+        armedMidi = midi;
+        midi.setFill(Color.color(1, 0, 0));
+      }
+    }));
+
     Map<Slider, Consumer<Double>> sliders = initializeSliderMap();
     initializeEffectTypes();
 
@@ -290,6 +350,9 @@ public class Controller implements Initializable, FrequencyListener, Listener {
     analyser = new FrequencyAnalyser<>(audioPlayer, 2, sampleRate);
     startFrequencyAnalyser(analyser);
     startAudioPlayerThread();
+    MidiCommunicator midiCommunicator = new MidiCommunicator();
+    midiCommunicator.addListener(this);
+    new Thread(midiCommunicator).start();
 
     deviceComboBox.valueProperty().addListener((options, oldDevice, newDevice) -> {
       if (newDevice != null) {
@@ -299,7 +362,7 @@ public class Controller implements Initializable, FrequencyListener, Listener {
   }
 
   private void updateLastVisitedDirectory(File file) {
-    lastVisitedDirectory = file != null ? file.getAbsolutePath() : System.getProperty("user.home");
+    String lastVisitedDirectory = file != null ? file.getAbsolutePath() : System.getProperty("user.home");
     File dir = new File(lastVisitedDirectory);
     fileChooser.setInitialDirectory(dir);
     folderChooser.setInitialDirectory(dir);
@@ -551,5 +614,28 @@ public class Controller implements Initializable, FrequencyListener, Listener {
     value = value * factor;
     long tmp = Math.round(value);
     return (double) tmp / factor;
+  }
+
+  @Override
+  public void sendMidiMessage(int status, MidiNote note, int pressure) {
+    if (armedMidi != null) {
+      if (midiMap.containsValue(armedMidi)) {
+        midiMap.values().remove(armedMidi);
+      }
+      if (midiMap.containsKey(note)) {
+        midiMap.get(note).setFill(Color.color(1, 1, 1));
+      }
+      midiMap.put(note, armedMidi);
+      armedMidi.setFill(Color.color(0, 1, 0));
+      armedMidiPaint = null;
+      armedMidi = null;
+    }
+    if (midiMap.containsKey(note)) {
+      Slider slider = midiButtonMap.get(midiMap.get(note));
+      double max = slider.getMax();
+      double min = slider.getMin();
+      double range = max - min;
+      slider.setValue(min + (pressure / 127.0) * range);
+    }
   }
 }
