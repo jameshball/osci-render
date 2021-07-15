@@ -1,8 +1,8 @@
 package sh.ball.gui;
 
-import javafx.animation.KeyFrame;
-import javafx.animation.Timeline;
+import javafx.animation.*;
 import javafx.application.Platform;
+import javafx.beans.value.WritableValue;
 import javafx.collections.FXCollections;
 import javafx.scene.control.*;
 import javafx.scene.paint.Color;
@@ -49,10 +49,10 @@ import sh.ball.parser.ParserFactory;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
-public class Controller implements Initializable, FrequencyListener, MidiListener, Listener {
+public class Controller implements Initializable, FrequencyListener, MidiListener, Listener, WritableValue<Double> {
 
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
-  private static final double MAX_FREQUENCY = 20000;
+  private static final double MAX_FREQUENCY = 12000;
 
   private final FileChooser fileChooser = new FileChooser();
   private final DirectoryChooser folderChooser = new DirectoryChooser();
@@ -71,6 +71,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   private final AudioDevice defaultDevice;
   private boolean recording = false;
   private Timeline recordingTimeline;
+  private Timeline volumeTimeline;
   private Paint armedMidiPaint;
   private SVGPath armedMidi;
 
@@ -171,6 +172,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   private SVGPath wobbleMidi;
   @FXML
   private ComboBox<AudioDevice> deviceComboBox;
+
 
   public Controller(AudioPlayer<List<Shape>> audioPlayer) throws IOException {
     this.audioPlayer = audioPlayer;
@@ -617,26 +619,63 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     return (double) tmp / factor;
   }
 
+  private double midiPressureToPressure(Slider slider, int midiPressure) {
+    double max = slider.getMax();
+    double min = slider.getMin();
+    double range = max - min;
+    return min + (midiPressure / 127.0) * range;
+  }
+
   @Override
-  public void sendMidiMessage(int status, MidiNote note, int pressure) {
-    if (armedMidi != null) {
-      if (midiMap.containsValue(armedMidi)) {
-        midiMap.values().remove(armedMidi);
+  public void sendMidiMessage(int status, MidiNote note, int midiPressure) {
+    double frequency = note.frequency();
+    if (frequency > 32 && frequency < 8000) {
+      double scale = midiPressureToPressure(scaleSlider, midiPressure);
+      scale /= 10;
+
+      if (midiPressure == 0) {
+        KeyValue kv = new KeyValue(scaleSlider.valueProperty(), 0, Interpolator.EASE_OUT);
+        KeyFrame kf = new KeyFrame(Duration.millis(500), kv);
+        volumeTimeline = new Timeline(kf);
+
+        Platform.runLater(volumeTimeline::play);
+      } else {
+        if (volumeTimeline != null) {
+          volumeTimeline.stop();
+        }
+        frequencySlider.setValue(Math.log(frequency) / Math.log(MAX_FREQUENCY));
+        audioPlayer.setFrequency(frequency);
+        scaleSlider.setValue(scale);
+      }
+    } else {
+      if (armedMidi != null) {
+        if (midiMap.containsValue(armedMidi)) {
+          midiMap.values().remove(armedMidi);
+        }
+        if (midiMap.containsKey(note)) {
+          midiMap.get(note).setFill(Color.color(1, 1, 1));
+        }
+        midiMap.put(note, armedMidi);
+        armedMidi.setFill(Color.color(0, 1, 0));
+        armedMidiPaint = null;
+        armedMidi = null;
       }
       if (midiMap.containsKey(note)) {
-        midiMap.get(note).setFill(Color.color(1, 1, 1));
+        Slider slider = midiButtonMap.get(midiMap.get(note));
+
+        slider.setValue(midiPressureToPressure(slider, midiPressure));
       }
-      midiMap.put(note, armedMidi);
-      armedMidi.setFill(Color.color(0, 1, 0));
-      armedMidiPaint = null;
-      armedMidi = null;
     }
-    if (midiMap.containsKey(note)) {
-      Slider slider = midiButtonMap.get(midiMap.get(note));
-      double max = slider.getMax();
-      double min = slider.getMin();
-      double range = max - min;
-      slider.setValue(min + (pressure / 127.0) * range);
-    }
+  }
+
+  // gets the volume/scale
+  @Override
+  public Double getValue() {
+    return scaleSlider.getValue();
+  }
+
+  @Override
+  public void setValue(Double scale) {
+    scaleSlider.setValue(scale);
   }
 }

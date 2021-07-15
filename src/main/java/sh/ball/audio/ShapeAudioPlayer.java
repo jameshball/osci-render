@@ -25,7 +25,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private static final boolean BIG_ENDIAN = false;
   // Stereo audio
   private static final int NUM_OUTPUTS = 2;
-  private static final double MIN_LENGTH_INCREMENT = 0.0001;
+  private static final double MIN_LENGTH_INCREMENT = 0.0000000001;
 
   private final Callable<AudioEngine> audioEngineBuilder;
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
@@ -74,7 +74,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     if (currentShape >= frame.size()) {
       currentShape = 0;
       frame = frameQueue.take();
-      updateTotalAudioFrames();
+      updateLengthIncrement();
     }
 
     return channels;
@@ -131,6 +131,12 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   @Override
   public void setFrequency(double frequency) {
     this.frequency = frequency;
+    updateLengthIncrement();
+  }
+
+  @Override
+  public double getFrequency() {
+    return frequency;
   }
 
   private Shape getCurrentShape() {
@@ -141,7 +147,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     return frame.get(currentShape);
   }
 
-  private void updateTotalAudioFrames() {
+  private void updateLengthIncrement() {
     double totalLength = Shape.totalLength(frame);
     int sampleRate = device.sampleRate();
     lengthIncrement = Math.max(totalLength / (sampleRate / frequency), MIN_LENGTH_INCREMENT);
@@ -151,7 +157,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   public void run() {
     try {
       frame = frameQueue.take();
-      updateTotalAudioFrames();
+      updateLengthIncrement();
     } catch (InterruptedException e) {
       throw new RuntimeException("Initial frame not found. Cannot continue.");
     }
