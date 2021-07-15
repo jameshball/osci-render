@@ -52,6 +52,7 @@ import sh.ball.shapes.Vector2;
 public class Controller implements Initializable, FrequencyListener, MidiListener, Listener {
 
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
+  private static final double MAX_FREQUENCY = 20000;
 
   private final FileChooser fileChooser = new FileChooser();
   private final DirectoryChooser folderChooser = new DirectoryChooser();
@@ -208,7 +209,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
 
   private Map<Slider, Consumer<Double>> initializeSliderMap() {
     return Map.of(
-      frequencySlider, audioPlayer::setFrequency,
+      frequencySlider, f -> audioPlayer.setFrequency(Math.pow(MAX_FREQUENCY, f)),
       rotateSpeedSlider, rotateEffect::setSpeed,
       translationSpeedSlider, translateEffect::setSpeed,
       scaleSlider, scaleEffect::setScale,
