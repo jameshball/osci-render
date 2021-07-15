@@ -636,7 +636,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   @Override
   public void sendMidiMessage(int status, MidiNote note, int midiPressure) {
     double frequency = note.frequency();
-    if (frequency > 32 && frequency < 8000) {
+    if (frequency > 15 && frequency < 9000) {
       double oldVolume = scaleSlider.getValue();
       double volume = midiPressureToPressure(scaleSlider, midiPressure);
       volume /= 10;
