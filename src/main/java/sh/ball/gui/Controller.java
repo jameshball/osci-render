@@ -59,6 +59,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   private final AudioPlayer<List<Shape>> audioPlayer;
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
   private final Map<MidiNote, SVGPath> midiMap = new HashMap<>();
+  private final List<MidiNote> downKeys = new ArrayList<>();
   private Map<SVGPath, Slider> midiButtonMap;
 
   private final RotateEffect rotateEffect;
@@ -626,26 +627,38 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     return min + (midiPressure / 127.0) * range;
   }
 
+  private void playNote(double frequency, double volume) {
+    frequencySlider.setValue(Math.log(frequency) / Math.log(MAX_FREQUENCY));
+    audioPlayer.setFrequency(frequency);
+    scaleSlider.setValue(volume);
+  }
+
   @Override
   public void sendMidiMessage(int status, MidiNote note, int midiPressure) {
     double frequency = note.frequency();
     if (frequency > 32 && frequency < 8000) {
-      double scale = midiPressureToPressure(scaleSlider, midiPressure);
-      scale /= 10;
+      double oldVolume = scaleSlider.getValue();
+      double volume = midiPressureToPressure(scaleSlider, midiPressure);
+      volume /= 10;
 
       if (midiPressure == 0) {
-        KeyValue kv = new KeyValue(scaleSlider.valueProperty(), 0, Interpolator.EASE_OUT);
-        KeyFrame kf = new KeyFrame(Duration.millis(500), kv);
-        volumeTimeline = new Timeline(kf);
+        downKeys.remove(note);
+        if (downKeys.isEmpty()) {
+          KeyValue kv = new KeyValue(scaleSlider.valueProperty(), 0, Interpolator.EASE_OUT);
+          KeyFrame kf = new KeyFrame(Duration.millis(500), kv);
+          volumeTimeline = new Timeline(kf);
 
-        Platform.runLater(volumeTimeline::play);
+          Platform.runLater(volumeTimeline::play);
+        } else {
+          frequency = downKeys.get(downKeys.size() - 1).frequency();
+          playNote(frequency, oldVolume);
+        }
       } else {
+        downKeys.add(note);
         if (volumeTimeline != null) {
           volumeTimeline.stop();
         }
-        frequencySlider.setValue(Math.log(frequency) / Math.log(MAX_FREQUENCY));
-        audioPlayer.setFrequency(frequency);
-        scaleSlider.setValue(scale);
+        playNote(frequency, volume);
       }
     } else {
       if (armedMidi != null) {
