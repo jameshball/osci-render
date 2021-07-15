@@ -13,6 +13,7 @@ import sh.ball.shapes.Vector2;
 
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
+import javax.swing.*;
 
 public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
@@ -74,6 +75,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     if (currentShape >= frame.size()) {
       currentShape = 0;
       frame = frameQueue.take();
+      lengthDrawn = 0;
       updateLengthIncrement();
     }
 
