@@ -7,17 +7,12 @@ public class CubicBezierCurve extends Shape {
   private final Vector2 p2;
   private final Vector2 p3;
 
-  public CubicBezierCurve(Vector2 p0, Vector2 p1, Vector2 p2, Vector2 p3, double weight) {
+  public CubicBezierCurve(Vector2 p0, Vector2 p1, Vector2 p2, Vector2 p3) {
     this.p0 = p0;
     this.p1 = p1;
     this.p2 = p2;
     this.p3 = p3;
-    this.weight = weight;
     this.length = new Line(p0, p3).length;
-  }
-
-  public CubicBezierCurve(Vector2 p0, Vector2 p1, Vector2 p2, Vector2 p3) {
-    this(p0, p1, p2, p3, DEFAULT_WEIGHT);
   }
 
   @Override
@@ -31,7 +26,7 @@ public class CubicBezierCurve extends Shape {
   @Override
   public CubicBezierCurve rotate(double theta) {
     return new CubicBezierCurve(p0.rotate(theta), p1.rotate(theta), p2.rotate(theta),
-      p3.rotate(theta), weight);
+      p3.rotate(theta));
   }
 
   @Override
@@ -42,17 +37,12 @@ public class CubicBezierCurve extends Shape {
   @Override
   public CubicBezierCurve scale(Vector2 vector) {
     return new CubicBezierCurve(p0.scale(vector), p1.scale(vector), p2.scale(vector),
-      p3.scale(vector), weight);
+      p3.scale(vector));
   }
 
   @Override
   public CubicBezierCurve translate(Vector2 vector) {
     return new CubicBezierCurve(p0.translate(vector), p1.translate(vector), p2.translate(vector),
-      p3.translate(vector), weight);
-  }
-
-  @Override
-  public CubicBezierCurve setWeight(double weight) {
-    return new CubicBezierCurve(p0, p1, p2, p3, weight);
+      p3.translate(vector));
   }
 }

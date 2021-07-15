@@ -73,24 +73,24 @@
          <AnchorPane minHeight="0.0" minWidth="0.0">
             <children>
                <Slider fx:id="rotateSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="90.0" majorTickUnit="1.0" max="10.0" prefHeight="42.0" prefWidth="254.0" showTickLabels="true" showTickMarks="true" />
-               <Label layoutX="33.0" layoutY="88.0" text="Rotate speed">
+               <Label layoutX="33.0" layoutY="89.0" text="Rotate speed">
                   <font>
                      <Font size="13.0" />
                   </font>
                </Label>
                <Slider fx:id="translationSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="128.0" majorTickUnit="1.0" max="10.0" prefHeight="42.0" prefWidth="254.0" showTickLabels="true" showTickMarks="true" />
-               <Label layoutX="7.0" layoutY="126.0" text="Translation speed">
+               <Label layoutX="7.0" layoutY="127.0" text="Translation speed">
                   <font>
                      <Font size="13.0" />
                   </font>
                </Label>
                <Slider fx:id="scaleSlider" blockIncrement="0.05" layoutX="116.0" layoutY="167.0" majorTickUnit="1.0" max="10.0" prefHeight="42.0" prefWidth="253.0" showTickLabels="true" showTickMarks="true" value="1.0" />
-               <Label layoutX="79.0" layoutY="164.0" text="Scale">
+               <Label layoutX="79.0" layoutY="166.0" text="Scale">
                   <font>
                      <Font size="13.0" />
                   </font>
                </Label>
-               <Label layoutX="43.0" layoutY="49.0" text="Line weight">
+               <Label layoutX="11.0" layoutY="50.0" text="Target frequency">
                   <font>
                      <Font size="13.0" />
                   </font>
@@ -100,8 +100,8 @@
                <Label layoutX="120.0" layoutY="18.0" text="x :" />
                <Label layoutX="219.0" layoutY="18.0" text="y :" />
                <TextField fx:id="translationYTextField" layoutX="238.0" layoutY="15.0" prefHeight="26.0" prefWidth="70.0" text="0" />
-               <Slider fx:id="weightSlider" blockIncrement="1.0" layoutX="116.0" layoutY="52.0" majorTickUnit="100.0" max="1000.0" prefHeight="42.0" prefWidth="253.0" showTickLabels="true" showTickMarks="true" value="100.0" />
-               <SVGPath fx:id="weightMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="49.0" pickOnBounds="true" />
+               <Slider fx:id="frequencySlider" blockIncrement="1.0" layoutX="116.0" layoutY="52.0" majorTickUnit="200.0" max="1000.0" prefHeight="42.0" prefWidth="253.0" showTickLabels="true" showTickMarks="true" value="261.63" />
+               <SVGPath fx:id="frequencyMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="49.0" pickOnBounds="true" />
                <SVGPath fx:id="rotateSpeedMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="87.0" pickOnBounds="true" />
                <SVGPath fx:id="translationSpeedMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="125.0" pickOnBounds="true" />
                <SVGPath fx:id="scaleMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="164.0" pickOnBounds="true" />

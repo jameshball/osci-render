@@ -6,16 +6,11 @@ public class QuadraticBezierCurve extends Shape {
   private final Vector2 p1;
   private final Vector2 p2;
 
-  public QuadraticBezierCurve(Vector2 p0, Vector2 p1, Vector2 p2, double weight) {
+  public QuadraticBezierCurve(Vector2 p0, Vector2 p1, Vector2 p2) {
     this.p0 = p0;
     this.p1 = p1;
     this.p2 = p2;
-    this.weight = weight;
     this.length = new Line(p0, p2).length;
-  }
-
-  public QuadraticBezierCurve(Vector2 p0, Vector2 p1, Vector2 p2) {
-    this(p0, p1, p2, DEFAULT_WEIGHT);
   }
 
   @Override
@@ -26,27 +21,22 @@ public class QuadraticBezierCurve extends Shape {
 
   @Override
   public QuadraticBezierCurve rotate(double theta) {
-    return new QuadraticBezierCurve(p0.rotate(theta), p1.rotate(theta), p2.rotate(theta), weight);
+    return new QuadraticBezierCurve(p0.rotate(theta), p1.rotate(theta), p2.rotate(theta));
   }
 
   @Override
   public QuadraticBezierCurve scale(double factor) {
-    return new QuadraticBezierCurve(p0.scale(factor), p1.scale(factor), p2.scale(factor), weight);
+    return new QuadraticBezierCurve(p0.scale(factor), p1.scale(factor), p2.scale(factor));
   }
 
   @Override
   public QuadraticBezierCurve scale(Vector2 vector) {
-    return new QuadraticBezierCurve(p0.scale(vector), p1.scale(vector), p2.scale(vector), weight);
+    return new QuadraticBezierCurve(p0.scale(vector), p1.scale(vector), p2.scale(vector));
   }
 
   @Override
   public QuadraticBezierCurve translate(Vector2 vector) {
     return new QuadraticBezierCurve(p0.translate(vector), p1.translate(vector),
-      p2.translate(vector), weight);
-  }
-
-  @Override
-  public QuadraticBezierCurve setWeight(double weight) {
-    return new QuadraticBezierCurve(p0, p1, p2, weight);
+      p2.translate(vector));
   }
 }

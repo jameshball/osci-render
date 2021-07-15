@@ -8,19 +8,10 @@ public final class Line extends Shape {
   private final Vector2 a;
   private final Vector2 b;
 
-  public Line(Vector2 a, Vector2 b, double weight) {
+  public Line(Vector2 a, Vector2 b) {
     this.a = a;
     this.b = b;
-    this.weight = weight;
     this.length = calculateLength();
-  }
-
-  public Line(Vector2 a, Vector2 b) {
-    this(a, b, Shape.DEFAULT_WEIGHT);
-  }
-
-  public Line(double x1, double y1, double x2, double y2, double weight) {
-    this(new Vector2(x1, y1), new Vector2(x2, y2), weight);
   }
 
   public Line(double x1, double y1, double x2, double y2) {
@@ -33,26 +24,26 @@ public final class Line extends Shape {
 
   @Override
   public Line rotate(double theta) {
-    return new Line(a.rotate(theta), b.rotate(theta), weight);
+    return new Line(a.rotate(theta), b.rotate(theta));
   }
 
   @Override
   public Line translate(Vector2 vector) {
-    return new Line(a.translate(vector), b.translate(vector), weight);
+    return new Line(a.translate(vector), b.translate(vector));
   }
 
   @Override
   public Line scale(double factor) {
-    return new Line(a.scale(factor), b.scale(factor), weight);
+    return new Line(a.scale(factor), b.scale(factor));
   }
 
   @Override
   public Line scale(Vector2 vector) {
-    return new Line(a.scale(vector), b.scale(vector), weight);
+    return new Line(a.scale(vector), b.scale(vector));
   }
 
   public Line copy() {
-    return new Line(a.copy(), b.copy(), weight);
+    return new Line(a.copy(), b.copy());
   }
 
   @Override
@@ -112,11 +103,6 @@ public final class Line extends Shape {
     }
 
     return lines;
-  }
-
-  @Override
-  public Line setWeight(double weight) {
-    return new Line(getX1(), getY1(), getX2(), getY2(), weight);
   }
 
   @Override

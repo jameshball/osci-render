@@ -20,6 +20,7 @@ public class ConglomerateAudioEngine implements AudioEngine {
   private static AudioDevice javaDevice;
 
   private boolean playing = false;
+  private AudioDevice device;
 
   @Override
   public boolean isPlaying() {
@@ -29,12 +30,14 @@ public class ConglomerateAudioEngine implements AudioEngine {
   @Override
   public void play(Callable<Vector2> channelGenerator, AudioDevice device) throws Exception {
     playing = true;
+    this.device = device;
     if (xtDevices.contains(device)) {
       xtEngine.play(channelGenerator, device);
     } else {
       javaEngine.play(channelGenerator, javaDevice);
     }
     playing = false;
+    this.device = null;
   }
 
   @Override
@@ -65,5 +68,10 @@ public class ConglomerateAudioEngine implements AudioEngine {
   @Override
   public AudioDevice getDefaultDevice() {
     return javaEngine.getDefaultDevice();
+  }
+
+  @Override
+  public AudioDevice currentDevice() {
+    return device;
   }
 }
