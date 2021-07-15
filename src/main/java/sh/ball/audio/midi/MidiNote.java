@@ -21,6 +21,15 @@ public class MidiNote {
     return key;
   }
 
+  public double frequency() {
+    // Concert A Pitch is A4 and has the key number 69
+    final int KEY_A4 = 69;
+    // 440Hz
+    final int A4 = 440;
+    // Returns the frequency of the given key (equal temperament)
+    return (float) (440 * Math.pow(2, (key - KEY_A4) / 12d));
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;

@@ -100,11 +100,25 @@
                <Label layoutX="120.0" layoutY="18.0" text="x :" />
                <Label layoutX="219.0" layoutY="18.0" text="y :" />
                <TextField fx:id="translationYTextField" layoutX="238.0" layoutY="15.0" prefHeight="26.0" prefWidth="70.0" text="0" />
-               <Slider fx:id="frequencySlider" blockIncrement="0.001" layoutX="116.0" layoutY="45.0" majorTickUnit="0.1" max="1.0" prefHeight="42.0" prefWidth="253.0" showTickMarks="true" value="0.56212" />
+               <Slider fx:id="frequencySlider" blockIncrement="0.001" layoutX="116.0" layoutY="45.0" majorTickUnit="0.07389" max="1.0" minorTickCount="2" prefHeight="42.0" prefWidth="253.0" showTickMarks="true" value="0.59269" />
                <SVGPath fx:id="frequencyMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="49.0" pickOnBounds="true" />
                <SVGPath fx:id="rotateSpeedMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="87.0" pickOnBounds="true" />
                <SVGPath fx:id="translationSpeedMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="125.0" pickOnBounds="true" />
                <SVGPath fx:id="scaleMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="164.0" pickOnBounds="true" />
+               <Label layoutX="257.0" layoutY="71.0" text="C4" />
+               <Label layoutX="239.0" layoutY="71.0" text="C3" />
+               <Label layoutX="222.0" layoutY="71.0" text="C2" />
+               <Label layoutX="193.0" layoutY="71.0" text="20" />
+               <Label layoutX="274.0" layoutY="71.0" text="C5" />
+               <Label layoutX="292.0" layoutY="71.0" text="C6" />
+               <Label layoutX="310.0" layoutY="71.0" text="C7" />
+               <Label layoutX="344.0" layoutY="71.0" text="12000">
+                  <font>
+                     <Font size="11.0" />
+                  </font>
+               </Label>
+               <Label layoutX="162.0" layoutY="71.0" text="5" />
+               <Label layoutX="122.0" layoutY="71.0" text="0" />
             </children>
          </AnchorPane>
       </content>
