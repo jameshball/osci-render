@@ -15,4 +15,6 @@ public interface AudioEngine {
   List<AudioDevice> devices();
 
   AudioDevice getDefaultDevice();
+
+  AudioDevice currentDevice();
 }

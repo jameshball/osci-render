@@ -120,6 +120,7 @@ public class XtAudioEngine implements AudioEngine {
       }
     }
     playing = false;
+    this.device = null;
   }
 
   @Override
@@ -194,6 +195,11 @@ public class XtAudioEngine implements AudioEngine {
         }
       }
     }
+  }
+
+  @Override
+  public AudioDevice currentDevice() {
+    return device;
   }
 
 

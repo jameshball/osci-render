@@ -105,9 +105,9 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   @FXML
   private TextField translationYTextField;
   @FXML
-  private Slider weightSlider;
+  private Slider frequencySlider;
   @FXML
-  private SVGPath weightMidi;
+  private SVGPath frequencyMidi;
   @FXML
   private Slider rotateSpeedSlider;
   @FXML
@@ -192,7 +192,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
 
   private Map<SVGPath, Slider> initializeMidiButtonMap() {
     Map<SVGPath, Slider> midiMap = new HashMap<>();
-    midiMap.put(weightMidi, weightSlider);
+    midiMap.put(frequencyMidi, frequencySlider);
     midiMap.put(rotateSpeedMidi, rotateSpeedSlider);
     midiMap.put(translationSpeedMidi, translationSpeedSlider);
     midiMap.put(scaleMidi, scaleSlider);
@@ -208,7 +208,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
 
   private Map<Slider, Consumer<Double>> initializeSliderMap() {
     return Map.of(
-      weightSlider, audioPlayer::setQuality,
+      frequencySlider, audioPlayer::setFrequency,
       rotateSpeedSlider, rotateEffect::setSpeed,
       translationSpeedSlider, translateEffect::setSpeed,
       scaleSlider, scaleEffect::setScale,

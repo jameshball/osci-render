@@ -7,10 +7,9 @@ public final class Ellipse extends Shape {
   private final double rotation;
   private final Vector2 position;
 
-  public Ellipse(double a, double b, double weight, double rotation, Vector2 position) {
+  public Ellipse(double a, double b, double rotation, Vector2 position) {
     this.a = a;
     this.b = b;
-    this.weight = weight;
     this.rotation = rotation;
     this.position = position;
     // Approximation of length.
@@ -18,11 +17,11 @@ public final class Ellipse extends Shape {
   }
 
   public Ellipse(double a, double b, Vector2 position) {
-    this(a, b, Shape.DEFAULT_WEIGHT, 0, position);
+    this(a, b, 0, position);
   }
 
   public Ellipse(double a, double b) {
-    this(a, b, Shape.DEFAULT_WEIGHT, 0, new Vector2());
+    this(a, b, 0, new Vector2());
   }
 
   @Override
@@ -40,7 +39,7 @@ public final class Ellipse extends Shape {
       theta -= 2 * Math.PI;
     }
 
-    return new Ellipse(a, b, weight, theta, position);
+    return new Ellipse(a, b, theta, position);
   }
 
   @Override
@@ -50,17 +49,12 @@ public final class Ellipse extends Shape {
 
   @Override
   public Ellipse scale(Vector2 vector) {
-    return new Ellipse(a * vector.getX(), b * vector.getY(), weight, rotation,
+    return new Ellipse(a * vector.getX(), b * vector.getY(), rotation,
       position.scale(vector));
   }
 
   @Override
   public Ellipse translate(Vector2 vector) {
-    return new Ellipse(a, b, weight, rotation, position.translate(vector));
-  }
-
-  @Override
-  public Ellipse setWeight(double weight) {
-    return new Ellipse(a, b, weight, rotation, position);
+    return new Ellipse(a, b, rotation, position.translate(vector));
   }
 }

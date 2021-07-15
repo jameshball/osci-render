@@ -7,18 +7,13 @@ public final class Vector2 extends Shape {
   private final double x;
   private final double y;
 
-  public Vector2(double x, double y, double weight) {
+  public Vector2(double x, double y) {
     this.x = x;
     this.y = y;
-    this.weight = weight;
-  }
-
-  public Vector2(double x, double y) {
-    this(x, y, Shape.DEFAULT_WEIGHT);
   }
 
   public Vector2(double xy) {
-    this(xy, xy, Shape.DEFAULT_WEIGHT);
+    this(xy, xy);
   }
 
   public Vector2() {
@@ -83,11 +78,6 @@ public final class Vector2 extends Shape {
   @Override
   public Vector2 translate(Vector2 vector) {
     return new Vector2(getX() + vector.getX(), getY() + vector.getY());
-  }
-
-  @Override
-  public Vector2 setWeight(double weight) {
-    return new Vector2(x, y, weight);
   }
 
   @Override

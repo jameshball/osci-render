@@ -7,9 +7,6 @@ import java.util.List;
 
 public abstract class Shape {
 
-  public static final int DEFAULT_WEIGHT = 80;
-
-  protected double weight = DEFAULT_WEIGHT;
   protected double length;
 
   public abstract Vector2 nextVector(double drawingProgress);
@@ -21,12 +18,6 @@ public abstract class Shape {
   public abstract Shape scale(Vector2 vector);
 
   public abstract Shape translate(Vector2 vector);
-
-  public abstract Shape setWeight(double weight);
-
-  public double getWeight() {
-    return weight;
-  }
 
   public double getLength() {
     return length;
@@ -186,16 +177,15 @@ public abstract class Shape {
     return translatedShapes;
   }
 
-  public static List<Shape> generatePolygram(int sides, int angleJump, Vector2 start,
-                                             double weight) {
+  public static List<Shape> generatePolygram(int sides, int angleJump, Vector2 start) {
     List<Shape> polygon = new ArrayList<>();
 
     double theta = angleJump * 2 * Math.PI / sides;
     Vector2 rotated = start.rotate(theta);
-    polygon.add(new Line(start, rotated, weight));
+    polygon.add(new Line(start, rotated));
 
     while (!rotated.equals(start)) {
-      polygon.add(new Line(rotated.copy(), rotated.rotate(theta), weight));
+      polygon.add(new Line(rotated.copy(), rotated.rotate(theta)));
 
       rotated = rotated.rotate(theta);
     }
@@ -203,29 +193,12 @@ public abstract class Shape {
     return polygon;
   }
 
-  public static List<Shape> generatePolygram(int sides, int angleJump, Vector2 start) {
-    return generatePolygram(sides, angleJump, start, Line.DEFAULT_WEIGHT);
-  }
-
-  public static List<Shape> generatePolygram(int sides, int angleJump, double scale,
-                                             double weight) {
-    return generatePolygram(sides, angleJump, new Vector2(scale, scale), weight);
-  }
-
   public static List<Shape> generatePolygram(int sides, int angleJump, double scale) {
     return generatePolygram(sides, angleJump, new Vector2(scale, scale));
   }
 
-  public static List<Shape> generatePolygon(int sides, Vector2 start, double weight) {
-    return generatePolygram(sides, 1, start, weight);
-  }
-
   public static List<Shape> generatePolygon(int sides, Vector2 start) {
     return generatePolygram(sides, 1, start);
-  }
-
-  public static List<Shape> generatePolygon(int sides, double scale, double weight) {
-    return generatePolygon(sides, new Vector2(scale, scale), weight);
   }
 
   public static List<Shape> generatePolygon(int sides, double scale) {

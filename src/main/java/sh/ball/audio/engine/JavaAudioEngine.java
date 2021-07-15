@@ -22,6 +22,7 @@ public class JavaAudioEngine implements AudioEngine {
   private volatile boolean stopped = false;
 
   private SourceDataLine source;
+  private AudioDevice device;
 
   @Override
   public boolean isPlaying() {
@@ -31,6 +32,7 @@ public class JavaAudioEngine implements AudioEngine {
   @Override
   public void play(Callable<Vector2> channelGenerator, AudioDevice device) throws Exception {
     this.stopped = false;
+    this.device = device;
 
     AudioFormat format = new AudioFormat((float) device.sampleRate(), BIT_DEPTH, NUM_CHANNELS, SIGNED_SAMPLE, BIG_ENDIAN);
 
@@ -71,6 +73,7 @@ public class JavaAudioEngine implements AudioEngine {
       }
     }
     source.stop();
+    this.device = null;
   }
 
   @Override
@@ -86,5 +89,10 @@ public class JavaAudioEngine implements AudioEngine {
   @Override
   public AudioDevice getDefaultDevice() {
     return new DefaultAudioDevice("default", "default", DEFAULT_SAMPLE_RATE, AudioSample.INT16);
+  }
+
+  @Override
+  public AudioDevice currentDevice() {
+    return device;
   }
 }
