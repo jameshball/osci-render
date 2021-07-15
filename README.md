@@ -2,9 +2,11 @@
   <img width="267" height="256" src="osci.png" />
 </p>
 
-Program for drawing objects, text, and images on an oscilloscope using audio output.
+Program for making music by drawing objects, text, and images on an oscilloscope using audio output.
 
 This allows for 3D rendering of `.obj` files, `.svg` images, and `.txt` files on Windows, macOS, and Linux.
+
+You can use MIDI to interface with osci-render to make and record music.
 
 Read more about '[Rendering shapes through audio signals](https://felixonline.co.uk/issue/1773/science/rendering-shapes-through-audio-signals)' in this article featuring osci-render!
 
@@ -31,7 +33,6 @@ Send an email to [james@ball.sh](mailto:james@ball.sh) if you have any issues, f
 
 - Move to a frequency-based rather than weight-based drawing system
 - Implement a trace effect
-- Tune and transpose audio output
 - Support rendering of multiple objects
 - (long term) Keyframing/animating objects and camera
 
