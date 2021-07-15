@@ -38,6 +38,10 @@ Send an email to [james@ball.sh](mailto:james@ball.sh) if you have any issues, f
 - Support rendering of multiple objects
 - (long term) Keyframing/animating objects and camera
 
+## Screenshots
+
+<img width="100%" src="gui.png">
+
 ## Usage
 
 Using osci-render is very easy; run the program and choose the file you would like to render, and it will output as audio to visualise on your oscilloscope.
@@ -65,9 +69,16 @@ Additional effects can be applied to the image such as:
 - Horizontal/Vertical distortion
 - Wobble (plays sin wave at same frequency as output)
 
-## Screenshots
+### MIDI
 
-<img width="524px" height="356px" src="gui.png">
+To control the sliders using a MIDI slider or knob from a physical device, do the following:
+
+- First, plug-in MIDI device
+- Open osci-render
+- Click MIDI logo next to the slider you want to control
+- Red means the slider is 'armed' and waiting for you to choose a MIDI key to associate it with
+- Move a slider/knob etc. on your MIDI device
+- The MIDI logo now turns green, and is controlled by your MIDI device!
 
 ## Running
 
