@@ -25,10 +25,7 @@ Send an email to [james@ball.sh](mailto:james@ball.sh) if you have any issues, f
 - Applying image effects
 - Save rendered audio to .wav file
 - Show current frequency of audio
-
-## Currently Working On
-
-- MIDI control
+- MIDI control!
 
 ## Proposed Features
 
@@ -70,6 +67,8 @@ Additional effects can be applied to the image such as:
 - Wobble (plays sin wave at same frequency as output)
 
 ### MIDI
+
+You can use MIDI to control the frequency of the output - just plug in or open a MIDI software/hardware device and open osci-render and start playing notes!
 
 To control the sliders using a MIDI slider or knob from a physical device, do the following:
 
