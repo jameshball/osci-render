@@ -347,7 +347,8 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     audioPlayer.addEffect(EffectType.TRANSLATE, translateEffect);
 
     audioPlayer.setDevice(defaultDevice);
-    deviceComboBox.setItems(FXCollections.observableList(audioPlayer.devices()));
+    List<AudioDevice> devices = audioPlayer.devices();
+    deviceComboBox.setItems(FXCollections.observableList(devices));
     deviceComboBox.setValue(defaultDevice);
 
     executor.submit(producer);

@@ -104,7 +104,6 @@
     -fx-background-radius: 0;
     -fx-border-width: 0;
     -fx-padding: 1 1 0 1;
-    -fx-max-height: 0;
 }
 
 .combo-box-popup .list-view .list-cell

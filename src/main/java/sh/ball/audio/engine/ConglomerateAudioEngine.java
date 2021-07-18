@@ -48,6 +48,12 @@ public class ConglomerateAudioEngine implements AudioEngine {
 
   @Override
   public List<AudioDevice> devices() {
+    List<AudioDevice> devices = new ArrayList<>();
+
+    if (javaDevice == null) {
+      javaDevice = javaEngine.getDefaultDevice();
+    }
+
     if (xtDevices == null) {
       if (MAC_OS) {
         xtDevices = new ArrayList<>();
@@ -55,12 +61,9 @@ public class ConglomerateAudioEngine implements AudioEngine {
         xtDevices = xtEngine.devices();
       }
     }
-    if (javaDevice == null) {
-      javaDevice = javaEngine.getDefaultDevice();
-    }
 
-    List<AudioDevice> devices = new ArrayList<>(xtDevices);
     devices.add(javaDevice);
+    devices.addAll(xtDevices);
 
     return devices;
   }
