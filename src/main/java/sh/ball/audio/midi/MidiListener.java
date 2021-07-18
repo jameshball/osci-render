@@ -1,6 +1,8 @@
 package sh.ball.audio.midi;
 
+import javax.sound.midi.ShortMessage;
+
 public interface MidiListener {
 
-  void sendMidiMessage(int status, MidiNote note, int pressure);
+  void sendMidiMessage(ShortMessage message);
 }
