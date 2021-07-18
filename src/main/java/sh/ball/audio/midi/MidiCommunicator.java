@@ -37,9 +37,9 @@ public class MidiCommunicator implements Runnable {
     listeners.add(listener);
   }
 
-  private void notifyListeners(int status, MidiNote note, int pressure) {
+  private void notifyListeners(ShortMessage message) {
     for (MidiListener listener : listeners) {
-      listener.sendMidiMessage(status, note, pressure);
+      listener.sendMidiMessage(message);
     }
   }
 
@@ -51,8 +51,8 @@ public class MidiCommunicator implements Runnable {
     MidiCommunicator communicator) implements Receiver {
 
     public void send(MidiMessage message, long timeStamp) {
-      byte[] rawMessage = message.getMessage();
-      communicator.notifyListeners(message.getStatus(), new MidiNote(rawMessage[1]), rawMessage[2]);
+      if (message instanceof ShortMessage shortMessage)
+      communicator.notifyListeners(shortMessage);
     }
 
     public void close() {

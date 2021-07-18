@@ -29,6 +29,7 @@ import javafx.fxml.Initializable;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
+import javax.sound.midi.ShortMessage;
 import javax.sound.sampled.AudioFileFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
@@ -58,7 +59,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   private final DirectoryChooser folderChooser = new DirectoryChooser();
   private final AudioPlayer<List<Shape>> audioPlayer;
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
-  private final Map<MidiNote, SVGPath> midiMap = new HashMap<>();
+  private final Map<Integer, SVGPath> CCMap = new HashMap<>();
   private final List<MidiNote> downKeys = new ArrayList<>();
   private Map<SVGPath, Slider> midiButtonMap;
 
@@ -635,14 +636,40 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   }
 
   @Override
-  public void sendMidiMessage(int status, MidiNote note, int midiPressure) {
-    double frequency = note.frequency();
-    if (frequency > 15 && frequency < 9000) {
+  public void sendMidiMessage(ShortMessage message) {
+    int command = message.getCommand();
+
+    if (command == ShortMessage.CONTROL_CHANGE) {
+      int id = message.getData1();
+      int value = message.getData2();
+
+      if (armedMidi != null) {
+        if (CCMap.containsValue(armedMidi)) {
+          CCMap.values().remove(armedMidi);
+        }
+        if (CCMap.containsKey(id)) {
+          CCMap.get(id).setFill(Color.color(1, 1, 1));
+        }
+        CCMap.put(id, armedMidi);
+        armedMidi.setFill(Color.color(0, 1, 0));
+        armedMidiPaint = null;
+        armedMidi = null;
+      }
+      if (CCMap.containsKey(id)) {
+        Slider slider = midiButtonMap.get(CCMap.get(id));
+
+        slider.setValue(midiPressureToPressure(slider, value));
+      }
+    } else if (command == ShortMessage.NOTE_ON || command == ShortMessage.NOTE_OFF) {
+      MidiNote note = new MidiNote(message.getData1());
+      int velocity = message.getData2();
+
+      double frequency = note.frequency();
       double oldVolume = scaleSlider.getValue();
-      double volume = midiPressureToPressure(scaleSlider, midiPressure);
+      double volume = midiPressureToPressure(scaleSlider, velocity);
       volume /= 10;
 
-      if (midiPressure == 0) {
+      if (command == ShortMessage.NOTE_OFF) {
         downKeys.remove(note);
         if (downKeys.isEmpty()) {
           KeyValue kv = new KeyValue(scaleSlider.valueProperty(), 0, Interpolator.EASE_OUT);
@@ -660,24 +687,6 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
           volumeTimeline.stop();
         }
         playNote(frequency, volume);
-      }
-    } else {
-      if (armedMidi != null) {
-        if (midiMap.containsValue(armedMidi)) {
-          midiMap.values().remove(armedMidi);
-        }
-        if (midiMap.containsKey(note)) {
-          midiMap.get(note).setFill(Color.color(1, 1, 1));
-        }
-        midiMap.put(note, armedMidi);
-        armedMidi.setFill(Color.color(0, 1, 0));
-        armedMidiPaint = null;
-        armedMidi = null;
-      }
-      if (midiMap.containsKey(note)) {
-        Slider slider = midiButtonMap.get(midiMap.get(note));
-
-        slider.setValue(midiPressureToPressure(slider, midiPressure));
       }
     }
   }
