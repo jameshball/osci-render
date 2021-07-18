@@ -44,6 +44,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private double lengthDrawn = 0;
   private int count = 0;
   private double frequency = MIDDLE_C;
+  private double pitchBend = 1.0;
   private double trace = 0.5;
 
   private AudioDevice device;
@@ -133,14 +134,25 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   @Override
-  public void setFrequency(double frequency) {
+  public void setBaseFrequency(double frequency) {
     this.frequency = frequency;
     updateLengthIncrement();
   }
 
   @Override
-  public double getFrequency() {
+  public void setPitchBendFactor(double pitchBend) {
+    this.pitchBend = pitchBend;
+    updateLengthIncrement();
+  }
+
+  @Override
+  public double getBaseFrequency() {
     return frequency;
+  }
+
+  @Override
+  public double getFrequency() {
+    return frequency * pitchBend;
   }
 
   private Shape getCurrentShape() {
@@ -154,7 +166,8 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private void updateLengthIncrement() {
     double totalLength = Shape.totalLength(frame);
     int sampleRate = device.sampleRate();
-    lengthIncrement = Math.max(totalLength / (sampleRate / frequency), MIN_LENGTH_INCREMENT);
+    double actualFrequency = frequency * pitchBend;
+    lengthIncrement = Math.max(totalLength / (sampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
   }
 
   @Override
