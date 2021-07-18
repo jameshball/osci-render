@@ -60,7 +60,7 @@
          <Button fx:id="recordButton" layoutX="13.0" layoutY="142.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Record" />
          <Label fx:id="recordLabel" layoutX="13.0" layoutY="184.0" maxWidth="358.0" prefHeight="18.0" prefWidth="357.0" />
          <Label id="frequency" fx:id="frequencyLabel" layoutX="13.0" layoutY="212.0" prefHeight="58.0" prefWidth="376.0" text="L/R Frequency:&#10; &#10;" />
-         <ComboBox fx:id="deviceComboBox" layoutX="14.0" layoutY="11.0" prefHeight="26.0" prefWidth="376.0" />
+         <ComboBox fx:id="deviceComboBox" layoutX="14.0" layoutY="11.0" prefWidth="376.0" />
          <Button fx:id="chooseFolderButton" layoutX="14.0" layoutY="91.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose Folder" />
          <Label fx:id="jkLabel" layoutX="143.0" layoutY="95.0" maxWidth="270.0" prefHeight="18.0" prefWidth="246.0" text="Use j and k to cycle between files" visible="false" />
          <TextField fx:id="recordTextField" disable="true" layoutX="300.0" layoutY="154.0" prefHeight="26.0" prefWidth="70.0" text="2.0" />

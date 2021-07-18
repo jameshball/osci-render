@@ -27,6 +27,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   // Stereo audio
   private static final int NUM_OUTPUTS = 2;
   private static final double MIN_LENGTH_INCREMENT = 0.0000000001;
+  private static final double MIDDLE_C = 261.63;
 
   private final Callable<AudioEngine> audioEngineBuilder;
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
@@ -42,7 +43,8 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private double lengthIncrement = MIN_LENGTH_INCREMENT;
   private double lengthDrawn = 0;
   private int count = 0;
-  private double frequency = 261.63;
+  private double frequency = MIDDLE_C;
+  private double trace = 0.5;
 
   private AudioDevice device;
 
