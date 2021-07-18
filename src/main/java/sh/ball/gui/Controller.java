@@ -54,6 +54,9 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
 
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
   private static final double MAX_FREQUENCY = 12000;
+  private static final int PITCH_BEND_DATA_LENGTH = 7;
+  private static final int PITCH_BEND_MAX = 16383;
+  private static final int PITCH_BEND_SEMITONES = 2;
 
   private final FileChooser fileChooser = new FileChooser();
   private final DirectoryChooser folderChooser = new DirectoryChooser();
@@ -213,7 +216,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
 
   private Map<Slider, Consumer<Double>> initializeSliderMap() {
     return Map.of(
-      frequencySlider, f -> audioPlayer.setFrequency(Math.pow(MAX_FREQUENCY, f)),
+      frequencySlider, f -> audioPlayer.setBaseFrequency(Math.pow(MAX_FREQUENCY, f)),
       rotateSpeedSlider, rotateEffect::setSpeed,
       translationSpeedSlider, translateEffect::setSpeed,
       scaleSlider, scaleEffect::setScale,
@@ -631,7 +634,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
 
   private void playNote(double frequency, double volume) {
     frequencySlider.setValue(Math.log(frequency) / Math.log(MAX_FREQUENCY));
-    audioPlayer.setFrequency(frequency);
+    audioPlayer.setBaseFrequency(frequency);
     scaleSlider.setValue(volume);
   }
 
@@ -688,6 +691,19 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
         }
         playNote(frequency, volume);
       }
+    } else if (command == ShortMessage.PITCH_BEND) {
+      // using these instructions https://sites.uci.edu/camp2014/2014/04/30/managing-midi-pitchbend-messages/
+
+      int pitchBend = (message.getData2() << PITCH_BEND_DATA_LENGTH) | message.getData1();
+      // get pitch bend in range -1 to 1
+      double pitchBendFactor = (double) pitchBend / PITCH_BEND_MAX;
+      pitchBendFactor = 2 * pitchBendFactor - 1;
+      pitchBendFactor *= PITCH_BEND_SEMITONES;
+      // 12 tone equal temperament
+      pitchBendFactor /= 12;
+      pitchBendFactor = Math.pow(2, pitchBendFactor);
+
+      audioPlayer.setPitchBendFactor(pitchBendFactor);
     }
   }
 
