@@ -3,7 +3,7 @@ package sh.ball.audio.effect;
 import sh.ball.audio.FrequencyListener;
 import sh.ball.shapes.Vector2;
 
-public class WobbleEffect extends PhaseEffect implements FrequencyListener {
+public class SineEffect extends PhaseEffect implements FrequencyListener {
 
   private static final double DEFAULT_VOLUME = 0.2;
 
@@ -11,12 +11,12 @@ public class WobbleEffect extends PhaseEffect implements FrequencyListener {
   private double lastFrequency;
   private double volume;
 
-  public WobbleEffect(int sampleRate, double volume) {
+  public SineEffect(int sampleRate, double volume) {
     super(sampleRate, 2);
     this.volume = Math.max(Math.min(volume, 1), 0);
   }
 
-  public WobbleEffect(int sampleRate) {
+  public SineEffect(int sampleRate) {
     this(sampleRate, DEFAULT_VOLUME);
   }
 

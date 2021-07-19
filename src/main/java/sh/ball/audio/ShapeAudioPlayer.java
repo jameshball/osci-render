@@ -31,7 +31,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
   private final Callable<AudioEngine> audioEngineBuilder;
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
-  private final Map<Object, Effect> effects = new HashMap<>();
+  private final Map<Object, Effect> effects = new ConcurrentHashMap<>();
   private final List<Listener> listeners = new CopyOnWriteArrayList<>();
 
   private AudioEngine audioEngine;
