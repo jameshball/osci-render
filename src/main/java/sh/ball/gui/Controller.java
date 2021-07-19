@@ -19,6 +19,7 @@ import java.io.InputStream;
 import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -63,12 +64,12 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   private final AudioPlayer<List<Shape>> audioPlayer;
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
   private final Map<Integer, SVGPath> CCMap = new HashMap<>();
-  private final List<MidiNote> downKeys = new ArrayList<>();
+  private final List<MidiNote> downKeys = new CopyOnWriteArrayList<>();
   private Map<SVGPath, Slider> midiButtonMap;
 
   private final RotateEffect rotateEffect;
   private final TranslateEffect translateEffect;
-  private final WobbleEffect wobbleEffect;
+  private final SineEffect wobbleEffect;
   private final ScaleEffect scaleEffect;
 
   private int sampleRate;
@@ -194,7 +195,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     this.sampleRate = defaultDevice.sampleRate();
     this.rotateEffect = new RotateEffect(sampleRate);
     this.translateEffect = new TranslateEffect(sampleRate);
-    this.wobbleEffect = new WobbleEffect(sampleRate);
+    this.wobbleEffect = new SineEffect(sampleRate);
     this.scaleEffect = new ScaleEffect();
   }
 
@@ -678,8 +679,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
           KeyValue kv = new KeyValue(scaleSlider.valueProperty(), 0, Interpolator.EASE_OUT);
           KeyFrame kf = new KeyFrame(Duration.millis(500), kv);
           volumeTimeline = new Timeline(kf);
-
-          Platform.runLater(volumeTimeline::play);
+          volumeTimeline.play();
         } else {
           frequency = downKeys.get(downKeys.size() - 1).frequency();
           playNote(frequency, oldVolume);
@@ -688,8 +688,13 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
         downKeys.add(note);
         if (volumeTimeline != null) {
           volumeTimeline.stop();
+          volumeTimeline = null;
         }
         playNote(frequency, volume);
+        KeyValue kv = new KeyValue(scaleSlider.valueProperty(), scaleSlider.valueProperty().get() * 0.75, Interpolator.EASE_OUT);
+        KeyFrame kf = new KeyFrame(Duration.millis(250), kv);
+        volumeTimeline = new Timeline(kf);
+        volumeTimeline.play();
       }
     } else if (command == ShortMessage.PITCH_BEND) {
       // using these instructions https://sites.uci.edu/camp2014/2014/04/30/managing-midi-pitchbend-messages/
