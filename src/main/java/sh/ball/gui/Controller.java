@@ -178,6 +178,10 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   @FXML
   private SVGPath wobbleMidi;
   @FXML
+  private Slider octaveSlider;
+  @FXML
+  private SVGPath octaveMidi;
+  @FXML
   private ComboBox<AudioDevice> deviceComboBox;
 
 
@@ -211,6 +215,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     midiMap.put(vectorCancellingMidi, vectorCancellingSlider);
     midiMap.put(bitCrushMidi, bitCrushSlider);
     midiMap.put(wobbleMidi, wobbleSlider);
+    midiMap.put(octaveMidi, octaveSlider);
     midiMap.put(verticalDistortMidi, verticalDistortSlider);
     midiMap.put(horizontalDistortMidi, horizontalDistortSlider);
     return midiMap;
@@ -313,6 +318,8 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     wobbleSlider.valueProperty().addListener(wobbleListener);
     wobbleCheckBox.selectedProperty().addListener(wobbleListener);
     wobbleCheckBox.selectedProperty().addListener(e -> wobbleEffect.update());
+
+    octaveSlider.valueProperty().addListener((e, old, octave) -> audioPlayer.setOctave(octave.intValue()));
 
     fileChooser.setInitialFileName("out.wav");
     fileChooser.getExtensionFilters().addAll(
@@ -664,8 +671,13 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
       }
       if (CCMap.containsKey(id)) {
         Slider slider = midiButtonMap.get(CCMap.get(id));
+        double sliderValue = midiPressureToPressure(slider, value);
 
-        slider.setValue(midiPressureToPressure(slider, value));
+        if (slider.isSnapToTicks()) {
+          double increment = slider.getMajorTickUnit() / (slider.getMinorTickCount() + 1);
+          sliderValue = increment * (Math.round(sliderValue / increment));
+        }
+        slider.setValue(sliderValue);
       }
     } else if (command == ShortMessage.NOTE_ON || command == ShortMessage.NOTE_OFF) {
       MidiNote note = new MidiNote(message.getData1());
