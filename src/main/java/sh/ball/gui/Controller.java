@@ -23,6 +23,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import javafx.beans.InvalidationListener;
 import javafx.fxml.FXML;
@@ -69,7 +70,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
 
   private final RotateEffect rotateEffect;
   private final TranslateEffect translateEffect;
-  private final SineEffect wobbleEffect;
+  private final WobbleEffect wobbleEffect;
   private final ScaleEffect scaleEffect;
 
   private int sampleRate;
@@ -195,7 +196,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     this.sampleRate = defaultDevice.sampleRate();
     this.rotateEffect = new RotateEffect(sampleRate);
     this.translateEffect = new TranslateEffect(sampleRate);
-    this.wobbleEffect = new SineEffect(sampleRate);
+    this.wobbleEffect = new WobbleEffect(sampleRate);
     this.scaleEffect = new ScaleEffect();
   }
 
@@ -217,7 +218,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
 
   private Map<Slider, Consumer<Double>> initializeSliderMap() {
     return Map.of(
-      frequencySlider, f -> audioPlayer.setBaseFrequency(Math.pow(MAX_FREQUENCY, f)),
+      frequencySlider, f -> audioPlayer.setBaseFrequencies(List.of(Math.pow(MAX_FREQUENCY, f))),
       rotateSpeedSlider, rotateEffect::setSpeed,
       translationSpeedSlider, translateEffect::setSpeed,
       scaleSlider, scaleEffect::setScale,
@@ -633,9 +634,11 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     return min + (midiPressure / 127.0) * range;
   }
 
-  private void playNote(double frequency, double volume) {
-    frequencySlider.setValue(Math.log(frequency) / Math.log(MAX_FREQUENCY));
-    audioPlayer.setBaseFrequency(frequency);
+  private void playNotes(double volume) {
+    List<Double> frequencies = downKeys.stream().map(MidiNote::frequency).collect(Collectors.toList());
+    double mainFrequency = frequencies.get(frequencies.size() - 1);
+    frequencySlider.setValue(Math.log(mainFrequency) / Math.log(MAX_FREQUENCY));
+    audioPlayer.setBaseFrequencies(frequencies);
     scaleSlider.setValue(volume);
   }
 
@@ -668,7 +671,6 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
       MidiNote note = new MidiNote(message.getData1());
       int velocity = message.getData2();
 
-      double frequency = note.frequency();
       double oldVolume = scaleSlider.getValue();
       double volume = midiPressureToPressure(scaleSlider, velocity);
       volume /= 10;
@@ -681,8 +683,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
           volumeTimeline = new Timeline(kf);
           volumeTimeline.play();
         } else {
-          frequency = downKeys.get(downKeys.size() - 1).frequency();
-          playNote(frequency, oldVolume);
+          playNotes(oldVolume);
         }
       } else {
         downKeys.add(note);
@@ -690,7 +691,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
           volumeTimeline.stop();
           volumeTimeline = null;
         }
-        playNote(frequency, volume);
+        playNotes(volume);
         KeyValue kv = new KeyValue(scaleSlider.valueProperty(), scaleSlider.valueProperty().get() * 0.75, Interpolator.EASE_OUT);
         KeyFrame kf = new KeyFrame(Duration.millis(250), kv);
         volumeTimeline = new Timeline(kf);
