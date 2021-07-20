@@ -184,7 +184,6 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   @FXML
   private ComboBox<AudioDevice> deviceComboBox;
 
-
   public Controller(AudioPlayer<List<Shape>> audioPlayer) throws IOException {
     this.audioPlayer = audioPlayer;
     FrameSet<List<Shape>> frames = new ObjParser(DEFAULT_OBJ).parse();
