@@ -49,6 +49,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private double mainFrequency = MIDDLE_C;
   private double pitchBend = 1.0;
   private double trace = 0.5;
+  private int octave = 0;
 
   private AudioDevice device;
 
@@ -146,7 +147,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   public void setBaseFrequencies(List<Double> frequencies) {
     this.frequencies = frequencies;
     double maxFrequency = frequencies.stream().max(Double::compareTo).get();
-    this.mainFrequency = maxFrequency;
+    this.mainFrequency = maxFrequency * Math.pow(2, octave);
     updateLengthIncrement();
 
     sineEffects.clear();
@@ -225,6 +226,11 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   @Override
   public boolean isPlaying() {
     return audioEngine.isPlaying();
+  }
+
+  @Override
+  public void setOctave(int octave) {
+    this.octave = octave;
   }
 
   @Override
