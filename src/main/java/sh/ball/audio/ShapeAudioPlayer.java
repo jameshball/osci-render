@@ -5,7 +5,9 @@ import sh.ball.audio.effect.Effect;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
+import sh.ball.audio.effect.SineEffect;
 import sh.ball.audio.engine.AudioDevice;
 import sh.ball.audio.engine.AudioEngine;
 import sh.ball.shapes.Shape;
@@ -13,7 +15,6 @@ import sh.ball.shapes.Vector2;
 
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
-import javax.swing.*;
 
 public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
@@ -32,6 +33,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private final Callable<AudioEngine> audioEngineBuilder;
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
   private final Map<Object, Effect> effects = new ConcurrentHashMap<>();
+  private final List<SineEffect> sineEffects = new CopyOnWriteArrayList<>();
   private final List<Listener> listeners = new CopyOnWriteArrayList<>();
 
   private AudioEngine audioEngine;
@@ -43,7 +45,8 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private double lengthIncrement = MIN_LENGTH_INCREMENT;
   private double lengthDrawn = 0;
   private int count = 0;
-  private double frequency = MIDDLE_C;
+  private List<Double> frequencies = List.of(MIDDLE_C);
+  private double mainFrequency = MIDDLE_C;
   private double pitchBend = 1.0;
   private double trace = 0.5;
 
@@ -127,6 +130,12 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   private Vector2 applyEffects(int frame, Vector2 vector) {
+    int numNotes = sineEffects.size() + 1;
+    vector.scale(1.0 / numNotes);
+    for (SineEffect effect : sineEffects) {
+      effect.setVolume(1.0 / numNotes);
+      vector = effect.apply(frame, vector);
+    }
     for (Effect effect : effects.values()) {
       vector = effect.apply(frame, vector);
     }
@@ -134,9 +143,18 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   @Override
-  public void setBaseFrequency(double frequency) {
-    this.frequency = frequency;
+  public void setBaseFrequencies(List<Double> frequencies) {
+    this.frequencies = frequencies;
+    double maxFrequency = frequencies.stream().max(Double::compareTo).get();
+    this.mainFrequency = maxFrequency;
     updateLengthIncrement();
+
+    sineEffects.clear();
+    for (Double frequency : frequencies) {
+      if (frequency != maxFrequency) {
+        sineEffects.add(new SineEffect(device.sampleRate(), frequency));
+      }
+    }
   }
 
   @Override
@@ -146,13 +164,13 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   @Override
-  public double getBaseFrequency() {
-    return frequency;
+  public List<Double> getBaseFrequencies() {
+    return frequencies;
   }
 
   @Override
-  public double getFrequency() {
-    return frequency * pitchBend;
+  public List<Double> getFrequencies() {
+    return frequencies.stream().map(d -> d * pitchBend).collect(Collectors.toList());
   }
 
   private Shape getCurrentShape() {
@@ -166,7 +184,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private void updateLengthIncrement() {
     double totalLength = Shape.totalLength(frame);
     int sampleRate = device.sampleRate();
-    double actualFrequency = frequency * pitchBend;
+    double actualFrequency = mainFrequency * pitchBend;
     lengthIncrement = Math.max(totalLength / (sampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
   }
 

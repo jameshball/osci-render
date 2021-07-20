@@ -19,7 +19,10 @@ public final class Line extends Shape {
   }
 
   private double calculateLength() {
-    return Math.sqrt(Math.pow(getX1() - getX2(), 2) + Math.pow(getY1() - getY2(), 2));
+    double ac = Math.abs(getY2() - getY1());
+    double cb = Math.abs(getX2() - getX1());
+
+    return Math.hypot(ac, cb);
   }
 
   @Override

@@ -14,13 +14,13 @@ public interface AudioPlayer<S> extends Runnable {
 
   boolean isPlaying();
 
-  void setBaseFrequency(double frequency);
+  void setBaseFrequencies(List<Double> frequency);
 
   void setPitchBendFactor(double pitchBend);
 
-  double getFrequency();
+  List<Double> getFrequencies();
 
-  double getBaseFrequency();
+  List<Double> getBaseFrequencies();
 
   void addFrame(S frame);
 
