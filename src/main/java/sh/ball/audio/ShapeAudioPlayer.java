@@ -147,7 +147,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   public void setBaseFrequencies(List<Double> frequencies) {
     this.frequencies = frequencies;
     double maxFrequency = frequencies.stream().max(Double::compareTo).get();
-    this.mainFrequency = maxFrequency * Math.pow(2, octave);
+    this.mainFrequency = maxFrequency * Math.pow(2, octave - 1);
     updateLengthIncrement();
 
     sineEffects.clear();
