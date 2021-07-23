@@ -47,6 +47,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private int count = 0;
   private List<Double> frequencies = List.of(MIDDLE_C);
   private double mainFrequency = MIDDLE_C;
+  private double mainFrequencyScale = 0.5;
   private double maxFrequency = MIDDLE_C;
   private double pitchBend = 1.0;
   private double trace = 0.5;
@@ -132,10 +133,11 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   private Vector2 applyEffects(int frame, Vector2 vector) {
-    int numNotes = sineEffects.size() + 1;
-    vector.scale(1.0 / numNotes);
+    int numNotes = sineEffects.size();
+    vector = vector.scale(2 * mainFrequencyScale);
+    double scaledVolume = (1 - mainFrequencyScale) / numNotes;
     for (SineEffect effect : sineEffects) {
-      effect.setVolume(1.0 / numNotes);
+      effect.setVolume(scaledVolume);
       vector = effect.apply(frame, vector);
     }
     for (Effect effect : effects.values()) {
@@ -233,6 +235,11 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   public void setOctave(int octave) {
     this.octave = octave;
     this.mainFrequency = maxFrequency * Math.pow(2, octave - 1);
+  }
+
+  @Override
+  public void setMainFrequencyScale(double scale) {
+    this.mainFrequencyScale = scale;
   }
 
   @Override

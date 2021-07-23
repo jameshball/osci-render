@@ -11,7 +11,7 @@
 <?import javafx.scene.shape.SVGPath?>
 <?import javafx.scene.text.Font?>
 
-<AnchorPane prefHeight="539.0" prefWidth="837.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1">
+<AnchorPane prefHeight="589.0" prefWidth="837.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1">
    <TitledPane animated="false" collapsible="false" layoutX="426.0" layoutY="8.0" prefHeight="303.0" prefWidth="402.0" text="Audio Effects">
      <content>
        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="262.0" prefWidth="401.0">
@@ -38,22 +38,22 @@
          </AnchorPane>
      </content>
    </TitledPane>
-<TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="426.0" layoutY="318.0" maxHeight="-Infinity" maxWidth="-Infinity" prefHeight="210.0" prefWidth="402.0" text="3D .obj file settings">
+<TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="426.0" layoutY="318.0" maxHeight="-Infinity" maxWidth="-Infinity" prefHeight="257.0" prefWidth="402.0" text="3D .obj file settings">
   <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="359.0">
-    <Slider fx:id="focalLengthSlider" blockIncrement="0.01" layoutX="116.0" layoutY="15.0" majorTickUnit="0.2" max="2.0" min="1.0E-5" prefHeight="42.0" prefWidth="258.0" showTickLabels="true" showTickMarks="true" value="1.0" />
-    <Label layoutX="34.0" layoutY="14.0" text="Focal length" />
-         <TextField fx:id="cameraXTextField" layoutX="134.0" layoutY="57.0" prefHeight="26.0" prefWidth="65.0" text="0" />
-         <Label layoutX="35.0" layoutY="61.0" text="Camera pos" />
-         <Label layoutX="118.0" layoutY="61.0" text="x :" />
-         <Label layoutX="207.0" layoutY="60.0" text="y :" />
-         <TextField fx:id="cameraYTextField" layoutX="224.0" layoutY="57.0" prefHeight="26.0" prefWidth="65.0" text="0" />
-         <Label layoutX="299.0" layoutY="60.0" text="z :" />
-         <TextField fx:id="cameraZTextField" layoutX="315.0" layoutY="57.0" prefHeight="26.0" prefWidth="65.0" text="-2.5" />
-         <Slider fx:id="objectRotateSpeedSlider" blockIncrement="0.005" layoutX="116.0" layoutY="97.0" majorTickUnit="0.1" max="1.0" prefHeight="42.0" prefWidth="258.0" showTickLabels="true" showTickMarks="true" />
-         <Label layoutX="9.0" layoutY="96.0" text="3D Rotate speed" />
-         <CheckBox fx:id="rotateCheckBox" layoutX="90.0" layoutY="147.0" mnemonicParsing="false" text="Rotate with Mouse (Esc to disable)" />
-         <SVGPath fx:id="focalLengthMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="374.0" layoutY="12.0" pickOnBounds="true" />
-         <SVGPath fx:id="objectRotateSpeedMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="374.0" layoutY="94.0" pickOnBounds="true" />
+    <Slider fx:id="focalLengthSlider" blockIncrement="0.01" layoutX="116.0" layoutY="22.0" majorTickUnit="0.2" max="2.0" min="1.0E-5" prefHeight="42.0" prefWidth="258.0" showTickLabels="true" showTickMarks="true" value="1.0" />
+    <Label layoutX="34.0" layoutY="21.0" text="Focal length" />
+         <TextField fx:id="cameraXTextField" layoutX="134.0" layoutY="74.0" prefHeight="26.0" prefWidth="65.0" text="0" />
+         <Label layoutX="35.0" layoutY="78.0" text="Camera pos" />
+         <Label layoutX="118.0" layoutY="78.0" text="x :" />
+         <Label layoutX="207.0" layoutY="77.0" text="y :" />
+         <TextField fx:id="cameraYTextField" layoutX="224.0" layoutY="74.0" prefHeight="26.0" prefWidth="65.0" text="0" />
+         <Label layoutX="299.0" layoutY="77.0" text="z :" />
+         <TextField fx:id="cameraZTextField" layoutX="315.0" layoutY="74.0" prefHeight="26.0" prefWidth="65.0" text="-2.5" />
+         <Slider fx:id="objectRotateSpeedSlider" blockIncrement="0.005" layoutX="116.0" layoutY="121.0" majorTickUnit="0.1" max="1.0" prefHeight="42.0" prefWidth="258.0" showTickLabels="true" showTickMarks="true" />
+         <Label layoutX="9.0" layoutY="120.0" text="3D Rotate speed" />
+         <CheckBox fx:id="rotateCheckBox" layoutX="90.0" layoutY="179.0" mnemonicParsing="false" text="Rotate with Mouse (Esc to disable)" />
+         <SVGPath fx:id="focalLengthMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="374.0" layoutY="19.0" pickOnBounds="true" />
+         <SVGPath fx:id="objectRotateSpeedMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="374.0" layoutY="118.0" pickOnBounds="true" />
   </AnchorPane>
 </TitledPane>
    <AnchorPane id="control-pane" layoutX="12.0" layoutY="7.0" prefHeight="274.0" prefWidth="402.0">
@@ -71,9 +71,9 @@
          <CheckBox fx:id="recordCheckBox" layoutX="143.0" layoutY="146.0" mnemonicParsing="false" text="Timed record" />
       </children>
    </AnchorPane>
-   <TitledPane collapsible="false" layoutX="12.0" layoutY="289.0" prefHeight="239.0" prefWidth="402.0" text="Image settings">
+   <TitledPane collapsible="false" layoutX="12.0" layoutY="289.0" prefHeight="286.0" prefWidth="402.0" text="Image settings">
       <content>
-         <AnchorPane minHeight="0.0" minWidth="0.0">
+         <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="250.0" prefWidth="402.0">
             <children>
                <Slider fx:id="rotateSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="90.0" majorTickUnit="1.0" max="10.0" prefHeight="42.0" prefWidth="254.0" showTickLabels="true" showTickMarks="true" />
                <Label layoutX="13.0" layoutY="89.0" text="2D Rotate speed">
@@ -122,6 +122,13 @@
                </Label>
                <Label layoutX="162.0" layoutY="71.0" text="5" />
                <Label layoutX="122.0" layoutY="71.0" text="0" />
+               <Label layoutX="24.0" layoutY="206.0" text="Image visibility">
+                  <font>
+                     <Font size="13.0" />
+                  </font>
+               </Label>
+               <Slider fx:id="visibilitySlider" blockIncrement="0.005" layoutX="116.0" layoutY="207.0" majorTickUnit="0.1" max="1.0" prefHeight="42.0" prefWidth="253.0" showTickLabels="true" showTickMarks="true" value="0.5" />
+               <SVGPath fx:id="visibilityMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="204.0" pickOnBounds="true" />
             </children>
          </AnchorPane>
       </content>
