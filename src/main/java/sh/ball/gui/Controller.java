@@ -182,6 +182,10 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   @FXML
   private SVGPath octaveMidi;
   @FXML
+  private Slider visibilitySlider;
+  @FXML
+  private SVGPath visibilityMidi;
+  @FXML
   private ComboBox<AudioDevice> deviceComboBox;
 
   public Controller(AudioPlayer<List<Shape>> audioPlayer) throws IOException {
@@ -215,6 +219,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     midiMap.put(bitCrushMidi, bitCrushSlider);
     midiMap.put(wobbleMidi, wobbleSlider);
     midiMap.put(octaveMidi, octaveSlider);
+    midiMap.put(visibilityMidi, visibilitySlider);
     midiMap.put(verticalDistortMidi, verticalDistortSlider);
     midiMap.put(horizontalDistortMidi, horizontalDistortSlider);
     return midiMap;
@@ -227,7 +232,8 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
       translationSpeedSlider, translateEffect::setSpeed,
       scaleSlider, scaleEffect::setScale,
       focalLengthSlider, d -> updateFocalLength(),
-      objectRotateSpeedSlider, d -> updateObjectRotateSpeed()
+      objectRotateSpeedSlider, d -> updateObjectRotateSpeed(),
+      visibilitySlider, audioPlayer::setMainFrequencyScale
     );
   }
 
@@ -650,78 +656,80 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
 
   @Override
   public void sendMidiMessage(ShortMessage message) {
-    int command = message.getCommand();
+    Platform.runLater(() -> {
+      int command = message.getCommand();
 
-    if (command == ShortMessage.CONTROL_CHANGE) {
-      int id = message.getData1();
-      int value = message.getData2();
+      if (command == ShortMessage.CONTROL_CHANGE) {
+        int id = message.getData1();
+        int value = message.getData2();
 
-      if (armedMidi != null) {
-        if (CCMap.containsValue(armedMidi)) {
-          CCMap.values().remove(armedMidi);
+        if (armedMidi != null) {
+          if (CCMap.containsValue(armedMidi)) {
+            CCMap.values().remove(armedMidi);
+          }
+          if (CCMap.containsKey(id)) {
+            CCMap.get(id).setFill(Color.color(1, 1, 1));
+          }
+          CCMap.put(id, armedMidi);
+          armedMidi.setFill(Color.color(0, 1, 0));
+          armedMidiPaint = null;
+          armedMidi = null;
         }
         if (CCMap.containsKey(id)) {
-          CCMap.get(id).setFill(Color.color(1, 1, 1));
+          Slider slider = midiButtonMap.get(CCMap.get(id));
+          double sliderValue = midiPressureToPressure(slider, value);
+
+          if (slider.isSnapToTicks()) {
+            double increment = slider.getMajorTickUnit() / (slider.getMinorTickCount() + 1);
+            sliderValue = increment * (Math.round(sliderValue / increment));
+          }
+          slider.setValue(sliderValue);
         }
-        CCMap.put(id, armedMidi);
-        armedMidi.setFill(Color.color(0, 1, 0));
-        armedMidiPaint = null;
-        armedMidi = null;
-      }
-      if (CCMap.containsKey(id)) {
-        Slider slider = midiButtonMap.get(CCMap.get(id));
-        double sliderValue = midiPressureToPressure(slider, value);
+      } else if (command == ShortMessage.NOTE_ON || command == ShortMessage.NOTE_OFF) {
+        MidiNote note = new MidiNote(message.getData1());
+        int velocity = message.getData2();
 
-        if (slider.isSnapToTicks()) {
-          double increment = slider.getMajorTickUnit() / (slider.getMinorTickCount() + 1);
-          sliderValue = increment * (Math.round(sliderValue / increment));
-        }
-        slider.setValue(sliderValue);
-      }
-    } else if (command == ShortMessage.NOTE_ON || command == ShortMessage.NOTE_OFF) {
-      MidiNote note = new MidiNote(message.getData1());
-      int velocity = message.getData2();
+        double oldVolume = scaleSlider.getValue();
+        double volume = midiPressureToPressure(scaleSlider, velocity);
+        volume /= 10;
 
-      double oldVolume = scaleSlider.getValue();
-      double volume = midiPressureToPressure(scaleSlider, velocity);
-      volume /= 10;
-
-      if (command == ShortMessage.NOTE_OFF) {
-        downKeys.remove(note);
-        if (downKeys.isEmpty()) {
-          KeyValue kv = new KeyValue(scaleSlider.valueProperty(), 0, Interpolator.EASE_OUT);
-          KeyFrame kf = new KeyFrame(Duration.millis(500), kv);
-          volumeTimeline = new Timeline(kf);
-          volumeTimeline.play();
+        if (command == ShortMessage.NOTE_OFF) {
+          downKeys.remove(note);
+          if (downKeys.isEmpty()) {
+            KeyValue kv = new KeyValue(scaleSlider.valueProperty(), 0, Interpolator.EASE_OUT);
+            KeyFrame kf = new KeyFrame(Duration.millis(500), kv);
+            volumeTimeline = new Timeline(kf);
+            Platform.runLater(volumeTimeline::play);
+          } else {
+            playNotes(oldVolume);
+          }
         } else {
-          playNotes(oldVolume);
+          downKeys.add(note);
+          if (volumeTimeline != null) {
+            volumeTimeline.stop();
+            volumeTimeline = null;
+          }
+          playNotes(volume);
+          KeyValue kv = new KeyValue(scaleSlider.valueProperty(), scaleSlider.valueProperty().get() * 0.75, Interpolator.EASE_OUT);
+          KeyFrame kf = new KeyFrame(Duration.millis(250), kv);
+          volumeTimeline = new Timeline(kf);
+          Platform.runLater(volumeTimeline::play);
         }
-      } else {
-        downKeys.add(note);
-        if (volumeTimeline != null) {
-          volumeTimeline.stop();
-          volumeTimeline = null;
-        }
-        playNotes(volume);
-        KeyValue kv = new KeyValue(scaleSlider.valueProperty(), scaleSlider.valueProperty().get() * 0.75, Interpolator.EASE_OUT);
-        KeyFrame kf = new KeyFrame(Duration.millis(250), kv);
-        volumeTimeline = new Timeline(kf);
-        volumeTimeline.play();
+      } else if (command == ShortMessage.PITCH_BEND) {
+        // using these instructions https://sites.uci.edu/camp2014/2014/04/30/managing-midi-pitchbend-messages/
+
+        int pitchBend = (message.getData2() << PITCH_BEND_DATA_LENGTH) | message.getData1();
+        // get pitch bend in range -1 to 1
+        double pitchBendFactor = (double) pitchBend / PITCH_BEND_MAX;
+        pitchBendFactor = 2 * pitchBendFactor - 1;
+        pitchBendFactor *= PITCH_BEND_SEMITONES;
+        // 12 tone equal temperament
+        pitchBendFactor /= 12;
+        pitchBendFactor = Math.pow(2, pitchBendFactor);
+
+        audioPlayer.setPitchBendFactor(pitchBendFactor);
       }
-    } else if (command == ShortMessage.PITCH_BEND) {
-      // using these instructions https://sites.uci.edu/camp2014/2014/04/30/managing-midi-pitchbend-messages/
-
-      int pitchBend = (message.getData2() << PITCH_BEND_DATA_LENGTH) | message.getData1();
-      // get pitch bend in range -1 to 1
-      double pitchBendFactor = (double) pitchBend / PITCH_BEND_MAX;
-      pitchBendFactor = 2 * pitchBendFactor - 1;
-      pitchBendFactor *= PITCH_BEND_SEMITONES;
-      // 12 tone equal temperament
-      pitchBendFactor /= 12;
-      pitchBendFactor = Math.pow(2, pitchBendFactor);
-
-      audioPlayer.setPitchBendFactor(pitchBendFactor);
-    }
+    });
   }
 
   // gets the volume/scale

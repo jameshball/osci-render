@@ -16,6 +16,8 @@ public interface AudioPlayer<S> extends Runnable {
 
   void setOctave(int octave);
 
+  void setMainFrequencyScale(double scale);
+
   void setBaseFrequencies(List<Double> frequency);
 
   void setPitchBendFactor(double pitchBend);
