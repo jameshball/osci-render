@@ -2,6 +2,8 @@ package sh.ball.gui;
 
 import javafx.animation.*;
 import javafx.application.Platform;
+import javafx.beans.property.DoubleProperty;
+import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.value.WritableValue;
 import javafx.collections.FXCollections;
 import javafx.scene.control.*;
@@ -41,6 +43,7 @@ import org.xml.sax.SAXException;
 import sh.ball.audio.effect.Effect;
 import sh.ball.audio.effect.EffectType;
 import sh.ball.audio.engine.AudioDevice;
+import sh.ball.audio.engine.ConglomerateAudioEngine;
 import sh.ball.audio.midi.MidiCommunicator;
 import sh.ball.audio.midi.MidiListener;
 import sh.ball.audio.midi.MidiNote;
@@ -52,33 +55,30 @@ import sh.ball.parser.ParserFactory;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
-public class Controller implements Initializable, FrequencyListener, MidiListener, Listener, WritableValue<Double> {
+public class Controller implements Initializable, FrequencyListener, Listener, WritableValue<Double>, MidiListener {
 
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
   private static final double MAX_FREQUENCY = 12000;
-  private static final int PITCH_BEND_DATA_LENGTH = 7;
-  private static final int PITCH_BEND_MAX = 16383;
-  private static final int PITCH_BEND_SEMITONES = 2;
+  private static final double MIDDLE_C = 261.63;
 
   private final FileChooser fileChooser = new FileChooser();
   private final DirectoryChooser folderChooser = new DirectoryChooser();
-  private final AudioPlayer<List<Shape>> audioPlayer;
+  private final ShapeAudioPlayer audioPlayer;
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
   private final Map<Integer, SVGPath> CCMap = new HashMap<>();
-  private final List<MidiNote> downKeys = new CopyOnWriteArrayList<>();
   private Map<SVGPath, Slider> midiButtonMap;
 
   private final RotateEffect rotateEffect;
   private final TranslateEffect translateEffect;
   private final WobbleEffect wobbleEffect;
-  private final ScaleEffect scaleEffect;
+
+  private final DoubleProperty frequency;
 
   private int sampleRate;
   private FrequencyAnalyser<List<Shape>> analyser;
   private final AudioDevice defaultDevice;
   private boolean recording = false;
   private Timeline recordingTimeline;
-  private Timeline volumeTimeline;
   private Paint armedMidiPaint;
   private SVGPath armedMidi;
 
@@ -188,8 +188,12 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   @FXML
   private ComboBox<AudioDevice> deviceComboBox;
 
-  public Controller(AudioPlayer<List<Shape>> audioPlayer) throws IOException {
-    this.audioPlayer = audioPlayer;
+  public Controller() throws Exception {
+    MidiCommunicator midiCommunicator = new MidiCommunicator();
+    midiCommunicator.addListener(this);
+    new Thread(midiCommunicator).start();
+
+    this.audioPlayer = new ShapeAudioPlayer(ConglomerateAudioEngine::new, midiCommunicator);
     FrameSet<List<Shape>> frames = new ObjParser(DEFAULT_OBJ).parse();
     frameSets.add(frames);
     frameSetPaths.add("cube.obj");
@@ -204,7 +208,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     this.rotateEffect = new RotateEffect(sampleRate);
     this.translateEffect = new TranslateEffect(sampleRate);
     this.wobbleEffect = new WobbleEffect(sampleRate);
-    this.scaleEffect = new ScaleEffect();
+    this.frequency = new SimpleDoubleProperty(0);
   }
 
   private Map<SVGPath, Slider> initializeMidiButtonMap() {
@@ -227,10 +231,8 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
 
   private Map<Slider, Consumer<Double>> initializeSliderMap() {
     return Map.of(
-      frequencySlider, f -> audioPlayer.setBaseFrequencies(List.of(Math.pow(MAX_FREQUENCY, f))),
       rotateSpeedSlider, rotateEffect::setSpeed,
       translationSpeedSlider, translateEffect::setSpeed,
-      scaleSlider, scaleEffect::setScale,
       focalLengthSlider, d -> updateFocalLength(),
       objectRotateSpeedSlider, d -> updateObjectRotateSpeed(),
       visibilitySlider, audioPlayer::setMainFrequencyScale
@@ -256,6 +258,12 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
 
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
+    frequencySlider.valueProperty().addListener((o, old, f) -> frequency.set(Math.pow(MAX_FREQUENCY, f.doubleValue())));
+    frequency.addListener((o, old, f) -> frequencySlider.setValue(Math.log(f.doubleValue()) / Math.log(MAX_FREQUENCY)));
+    audioPlayer.setFrequency(frequency);
+    frequency.set(MIDDLE_C);
+    audioPlayer.setVolume(scaleSlider.valueProperty());
+
     this.midiButtonMap = initializeMidiButtonMap();
 
     midiButtonMap.keySet().forEach(midi -> midi.setOnMouseClicked(e -> {
@@ -271,7 +279,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
         }
         armedMidiPaint = midi.getFill();
         armedMidi = midi;
-        midi.setFill(Color.color(1, 0, 0));
+        midi.setFill(Color.RED);
       }
     }));
 
@@ -360,7 +368,6 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
 
     updateObjectRotateSpeed();
 
-    audioPlayer.addEffect(EffectType.SCALE, scaleEffect);
     audioPlayer.addEffect(EffectType.ROTATE, rotateEffect);
     audioPlayer.addEffect(EffectType.TRANSLATE, translateEffect);
 
@@ -373,9 +380,6 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     analyser = new FrequencyAnalyser<>(audioPlayer, 2, sampleRate);
     startFrequencyAnalyser(analyser);
     startAudioPlayerThread();
-    MidiCommunicator midiCommunicator = new MidiCommunicator();
-    midiCommunicator.addListener(this);
-    new Thread(midiCommunicator).start();
 
     deviceComboBox.valueProperty().addListener((options, oldDevice, newDevice) -> {
       if (newDevice != null) {
@@ -639,99 +643,6 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     return (double) tmp / factor;
   }
 
-  private double midiPressureToPressure(Slider slider, int midiPressure) {
-    double max = slider.getMax();
-    double min = slider.getMin();
-    double range = max - min;
-    return min + (midiPressure / 127.0) * range;
-  }
-
-  private void playNotes(double volume) {
-    List<Double> frequencies = downKeys.stream().map(MidiNote::frequency).collect(Collectors.toList());
-    double mainFrequency = frequencies.get(frequencies.size() - 1);
-    frequencySlider.setValue(Math.log(mainFrequency) / Math.log(MAX_FREQUENCY));
-    audioPlayer.setBaseFrequencies(frequencies);
-    scaleSlider.setValue(volume);
-  }
-
-  @Override
-  public void sendMidiMessage(ShortMessage message) {
-    Platform.runLater(() -> {
-      int command = message.getCommand();
-
-      if (command == ShortMessage.CONTROL_CHANGE) {
-        int id = message.getData1();
-        int value = message.getData2();
-
-        if (armedMidi != null) {
-          if (CCMap.containsValue(armedMidi)) {
-            CCMap.values().remove(armedMidi);
-          }
-          if (CCMap.containsKey(id)) {
-            CCMap.get(id).setFill(Color.color(1, 1, 1));
-          }
-          CCMap.put(id, armedMidi);
-          armedMidi.setFill(Color.color(0, 1, 0));
-          armedMidiPaint = null;
-          armedMidi = null;
-        }
-        if (CCMap.containsKey(id)) {
-          Slider slider = midiButtonMap.get(CCMap.get(id));
-          double sliderValue = midiPressureToPressure(slider, value);
-
-          if (slider.isSnapToTicks()) {
-            double increment = slider.getMajorTickUnit() / (slider.getMinorTickCount() + 1);
-            sliderValue = increment * (Math.round(sliderValue / increment));
-          }
-          slider.setValue(sliderValue);
-        }
-      } else if (command == ShortMessage.NOTE_ON || command == ShortMessage.NOTE_OFF) {
-        MidiNote note = new MidiNote(message.getData1());
-        int velocity = message.getData2();
-
-        double oldVolume = scaleSlider.getValue();
-        double volume = midiPressureToPressure(scaleSlider, velocity);
-        volume /= 10;
-
-        if (command == ShortMessage.NOTE_OFF) {
-          downKeys.remove(note);
-          if (downKeys.isEmpty()) {
-            KeyValue kv = new KeyValue(scaleSlider.valueProperty(), 0, Interpolator.EASE_OUT);
-            KeyFrame kf = new KeyFrame(Duration.millis(500), kv);
-            volumeTimeline = new Timeline(kf);
-            Platform.runLater(volumeTimeline::play);
-          } else {
-            playNotes(oldVolume);
-          }
-        } else {
-          downKeys.add(note);
-          if (volumeTimeline != null) {
-            volumeTimeline.stop();
-            volumeTimeline = null;
-          }
-          playNotes(volume);
-          KeyValue kv = new KeyValue(scaleSlider.valueProperty(), scaleSlider.valueProperty().get() * 0.75, Interpolator.EASE_OUT);
-          KeyFrame kf = new KeyFrame(Duration.millis(250), kv);
-          volumeTimeline = new Timeline(kf);
-          Platform.runLater(volumeTimeline::play);
-        }
-      } else if (command == ShortMessage.PITCH_BEND) {
-        // using these instructions https://sites.uci.edu/camp2014/2014/04/30/managing-midi-pitchbend-messages/
-
-        int pitchBend = (message.getData2() << PITCH_BEND_DATA_LENGTH) | message.getData1();
-        // get pitch bend in range -1 to 1
-        double pitchBendFactor = (double) pitchBend / PITCH_BEND_MAX;
-        pitchBendFactor = 2 * pitchBendFactor - 1;
-        pitchBendFactor *= PITCH_BEND_SEMITONES;
-        // 12 tone equal temperament
-        pitchBendFactor /= 12;
-        pitchBendFactor = Math.pow(2, pitchBendFactor);
-
-        audioPlayer.setPitchBendFactor(pitchBendFactor);
-      }
-    });
-  }
-
   // gets the volume/scale
   @Override
   public Double getValue() {
@@ -741,5 +652,45 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   @Override
   public void setValue(Double scale) {
     scaleSlider.setValue(scale);
+  }
+
+  private double midiPressureToPressure(Slider slider, int midiPressure) {
+    double max = slider.getMax();
+    double min = slider.getMin();
+    double range = max - min;
+    return min + (midiPressure / 127.0) * range;
+  }
+
+  @Override
+  public void sendMidiMessage(ShortMessage message) {
+    int command = message.getCommand();
+
+    if (command == ShortMessage.CONTROL_CHANGE) {
+      int id = message.getData1();
+      int value = message.getData2();
+
+      if (armedMidi != null) {
+        if (CCMap.containsValue(armedMidi)) {
+          CCMap.values().remove(armedMidi);
+        }
+        if (CCMap.containsKey(id)) {
+          CCMap.get(id).setFill(Color.WHITE);
+        }
+        CCMap.put(id, armedMidi);
+        armedMidi.setFill(Color.LIME);
+        armedMidiPaint = null;
+        armedMidi = null;
+      }
+      if (CCMap.containsKey(id)) {
+        Slider slider = midiButtonMap.get(CCMap.get(id));
+        double sliderValue = midiPressureToPressure(slider, value);
+
+        if (slider.isSnapToTicks()) {
+          double increment = slider.getMajorTickUnit() / (slider.getMinorTickCount() + 1);
+          sliderValue = increment * (Math.round(sliderValue / increment));
+        }
+        slider.setValue(sliderValue);
+      }
+    }
   }
 }
