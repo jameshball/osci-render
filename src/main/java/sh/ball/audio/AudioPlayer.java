@@ -2,11 +2,12 @@ package sh.ball.audio;
 
 import sh.ball.audio.effect.Effect;
 import sh.ball.audio.engine.AudioDevice;
+import sh.ball.audio.midi.MidiListener;
 
 import javax.sound.sampled.AudioInputStream;
 import java.util.List;
 
-public interface AudioPlayer<S> extends Runnable {
+public interface AudioPlayer<S> extends Runnable, MidiListener {
 
   void reset() throws Exception;
 
@@ -17,8 +18,6 @@ public interface AudioPlayer<S> extends Runnable {
   void setOctave(int octave);
 
   void setMainFrequencyScale(double scale);
-
-  void setBaseFrequencies(List<Double> frequency);
 
   void setPitchBendFactor(double pitchBend);
 

@@ -1,5 +1,13 @@
 package sh.ball.audio;
 
+import javafx.animation.Interpolator;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
+import javafx.application.Platform;
+import javafx.beans.property.DoubleProperty;
+import javafx.beans.property.SimpleDoubleProperty;
+import javafx.util.Duration;
 import sh.ball.audio.effect.Effect;
 
 import java.io.*;
@@ -10,9 +18,12 @@ import java.util.stream.Collectors;
 import sh.ball.audio.effect.SineEffect;
 import sh.ball.audio.engine.AudioDevice;
 import sh.ball.audio.engine.AudioEngine;
+import sh.ball.audio.midi.MidiCommunicator;
+import sh.ball.audio.midi.MidiNote;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
+import javax.sound.midi.ShortMessage;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 
@@ -30,6 +41,13 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private static final double MIN_LENGTH_INCREMENT = 0.0000000001;
   private static final double MIDDLE_C = 261.63;
 
+  // MIDI
+  private static final int PITCH_BEND_DATA_LENGTH = 7;
+  private static final int PITCH_BEND_MAX = 16383;
+  private static final int PITCH_BEND_SEMITONES = 2;
+  private final List<MidiNote> downKeys = new CopyOnWriteArrayList<>();
+  private Timeline volumeTimeline;
+
   private final Callable<AudioEngine> audioEngineBuilder;
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
   private final Map<Object, Effect> effects = new ConcurrentHashMap<>();
@@ -45,19 +63,35 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private double lengthIncrement = MIN_LENGTH_INCREMENT;
   private double lengthDrawn = 0;
   private int count = 0;
+  private DoubleProperty volume;
   private List<Double> frequencies = List.of(MIDDLE_C);
-  private double mainFrequency = MIDDLE_C;
+  private double octaveFrequency;
+  private DoubleProperty frequency;
   private double mainFrequencyScale = 0.5;
-  private double maxFrequency = MIDDLE_C;
+  private double maxFrequency;
   private double pitchBend = 1.0;
   private double trace = 0.5;
   private int octave = 0;
 
   private AudioDevice device;
 
-  public ShapeAudioPlayer(Callable<AudioEngine> audioEngineBuilder) throws Exception {
+  public ShapeAudioPlayer(Callable<AudioEngine> audioEngineBuilder, MidiCommunicator communicator) throws Exception {
     this.audioEngineBuilder = audioEngineBuilder;
     this.audioEngine = audioEngineBuilder.call();
+    setFrequency(new SimpleDoubleProperty(0));
+    this.maxFrequency = frequency.get();
+    setFrequency(new SimpleDoubleProperty(0));
+
+    communicator.addListener(this);
+  }
+
+  public void setFrequency(DoubleProperty frequency) {
+    this.frequency = frequency;
+    frequency.addListener((o, old, f) -> setBaseFrequencies(List.of(f.doubleValue())));
+  }
+
+  public void setVolume(DoubleProperty volume) {
+    this.volume = volume;
   }
 
   private Vector2 generateChannels() throws InterruptedException {
@@ -143,14 +177,14 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     for (Effect effect : effects.values()) {
       vector = effect.apply(frame, vector);
     }
-    return vector;
+
+    return vector.scale(volume.get());
   }
 
-  @Override
-  public void setBaseFrequencies(List<Double> frequencies) {
+  private void setBaseFrequencies(List<Double> frequencies) {
     this.frequencies = frequencies;
     this.maxFrequency = frequencies.stream().max(Double::compareTo).get();
-    this.mainFrequency = maxFrequency * Math.pow(2, octave - 1);
+    octaveFrequency = maxFrequency * Math.pow(2, octave - 1);
     updateLengthIncrement();
 
     sineEffects.clear();
@@ -186,10 +220,12 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   private void updateLengthIncrement() {
-    double totalLength = Shape.totalLength(frame);
-    int sampleRate = device.sampleRate();
-    double actualFrequency = mainFrequency * pitchBend;
-    lengthIncrement = Math.max(totalLength / (sampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
+    if (frame != null) {
+      double totalLength = Shape.totalLength(frame);
+      int sampleRate = device.sampleRate();
+      double actualFrequency = octaveFrequency * pitchBend;
+      lengthIncrement = Math.max(totalLength / (sampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
+    }
   }
 
   @Override
@@ -234,7 +270,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   @Override
   public void setOctave(int octave) {
     this.octave = octave;
-    this.mainFrequency = maxFrequency * Math.pow(2, octave - 1);
+    octaveFrequency = maxFrequency * Math.pow(2, octave - 1);
   }
 
   @Override
@@ -309,6 +345,63 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     AudioFormat audioFormat = new AudioFormat(device.sampleRate(), BITS_PER_SAMPLE, NUM_OUTPUTS, SIGNED, BIG_ENDIAN);
 
     return new AudioInputStream(new ByteArrayInputStream(input), audioFormat, framesRecorded);
+  }
+
+  private void playNotes(double noteVolume) {
+    List<Double> frequencies = downKeys.stream().map(MidiNote::frequency).collect(Collectors.toList());
+    double mainFrequency = frequencies.get(frequencies.size() - 1);
+    frequency.set(mainFrequency);
+    setBaseFrequencies(frequencies);
+    volume.set(noteVolume);
+  }
+
+  @Override
+  public void sendMidiMessage(ShortMessage message) {
+    int command = message.getCommand();
+
+    if (command == ShortMessage.NOTE_ON || command == ShortMessage.NOTE_OFF) {
+      MidiNote note = new MidiNote(message.getData1());
+      int velocity = message.getData2();
+
+      double oldVolume = volume.get();
+      double newVolume = velocity / 127.0;
+
+      if (command == ShortMessage.NOTE_OFF) {
+        downKeys.remove(note);
+        if (downKeys.isEmpty()) {
+          KeyValue kv = new KeyValue(volume, 0, Interpolator.EASE_OUT);
+          KeyFrame kf = new KeyFrame(Duration.millis(500), kv);
+          volumeTimeline = new Timeline(kf);
+          Platform.runLater(volumeTimeline::play);
+        } else {
+          playNotes(oldVolume);
+        }
+      } else {
+        downKeys.add(note);
+        if (volumeTimeline != null) {
+          volumeTimeline.stop();
+          volumeTimeline = null;
+        }
+        playNotes(newVolume);
+        KeyValue kv = new KeyValue(volume, volume.get() * 0.75, Interpolator.EASE_OUT);
+        KeyFrame kf = new KeyFrame(Duration.millis(250), kv);
+        volumeTimeline = new Timeline(kf);
+        Platform.runLater(volumeTimeline::play);
+      }
+    } else if (command == ShortMessage.PITCH_BEND) {
+      // using these instructions https://sites.uci.edu/camp2014/2014/04/30/managing-midi-pitchbend-messages/
+
+      int pitchBend = (message.getData2() << PITCH_BEND_DATA_LENGTH) | message.getData1();
+      // get pitch bend in range -1 to 1
+      double pitchBendFactor = (double) pitchBend / PITCH_BEND_MAX;
+      pitchBendFactor = 2 * pitchBendFactor - 1;
+      pitchBendFactor *= PITCH_BEND_SEMITONES;
+      // 12 tone equal temperament
+      pitchBendFactor /= 12;
+      pitchBendFactor = Math.pow(2, pitchBendFactor);
+
+      setPitchBendFactor(pitchBendFactor);
+    }
   }
 
   private static class Listener {
