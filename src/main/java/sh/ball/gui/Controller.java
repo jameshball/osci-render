@@ -21,11 +21,9 @@ import java.io.InputStream;
 import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 import javafx.beans.InvalidationListener;
 import javafx.fxml.FXML;
@@ -46,7 +44,6 @@ import sh.ball.audio.engine.AudioDevice;
 import sh.ball.audio.engine.ConglomerateAudioEngine;
 import sh.ball.audio.midi.MidiCommunicator;
 import sh.ball.audio.midi.MidiListener;
-import sh.ball.audio.midi.MidiNote;
 import sh.ball.engine.Vector3;
 import sh.ball.parser.obj.Listener;
 import sh.ball.parser.obj.ObjSettingsFactory;
@@ -61,7 +58,8 @@ public class Controller implements Initializable, FrequencyListener, Listener, W
   private static final double MAX_FREQUENCY = 12000;
   private static final double MIDDLE_C = 261.63;
 
-  private final FileChooser fileChooser = new FileChooser();
+  private final FileChooser wavFileChooser = new FileChooser();
+  private final FileChooser renderFileChooser = new FileChooser();
   private final DirectoryChooser folderChooser = new DirectoryChooser();
   private final ShapeAudioPlayer audioPlayer;
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -334,17 +332,20 @@ public class Controller implements Initializable, FrequencyListener, Listener, W
 
     octaveSlider.valueProperty().addListener((e, old, octave) -> audioPlayer.setOctave(octave.intValue()));
 
-    fileChooser.setInitialFileName("out.wav");
-    fileChooser.getExtensionFilters().addAll(
-      new FileChooser.ExtensionFilter("All Files", "*.*"),
+    wavFileChooser.setInitialFileName("out.wav");
+    wavFileChooser.getExtensionFilters().addAll(
       new FileChooser.ExtensionFilter("WAV Files", "*.wav"),
+      new FileChooser.ExtensionFilter("All Files", "*.*")
+    );
+    renderFileChooser.getExtensionFilters().addAll(
+      new FileChooser.ExtensionFilter("All Files", "*.*"),
       new FileChooser.ExtensionFilter("Wavefront OBJ Files", "*.obj"),
       new FileChooser.ExtensionFilter("SVG Files", "*.svg"),
       new FileChooser.ExtensionFilter("Text Files", "*.txt")
     );
 
     chooseFileButton.setOnAction(e -> {
-      File file = fileChooser.showOpenDialog(stage);
+      File file = renderFileChooser.showOpenDialog(stage);
       if (file != null) {
         chooseFile(file);
         updateLastVisitedDirectory(new File(file.getParent()));
@@ -391,7 +392,7 @@ public class Controller implements Initializable, FrequencyListener, Listener, W
   private void updateLastVisitedDirectory(File file) {
     String lastVisitedDirectory = file != null ? file.getAbsolutePath() : System.getProperty("user.home");
     File dir = new File(lastVisitedDirectory);
-    fileChooser.setInitialDirectory(dir);
+    wavFileChooser.setInitialDirectory(dir);
     folderChooser.setInitialDirectory(dir);
   }
 
@@ -467,7 +468,7 @@ public class Controller implements Initializable, FrequencyListener, Listener, W
     try {
       recordButton.setText("Record");
       AudioInputStream input = audioPlayer.stopRecord();
-      File file = fileChooser.showSaveDialog(stage);
+      File file = wavFileChooser.showSaveDialog(stage);
       SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
       Date date = new Date(System.currentTimeMillis());
       if (file == null) {
