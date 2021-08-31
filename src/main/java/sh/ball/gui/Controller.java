@@ -52,7 +52,7 @@ import sh.ball.parser.ParserFactory;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
-public class Controller implements Initializable, FrequencyListener, Listener, WritableValue<Double>, MidiListener {
+public class Controller implements Initializable, FrequencyListener, Listener, MidiListener {
 
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
   private static final double MAX_FREQUENCY = 12000;
@@ -642,17 +642,6 @@ public class Controller implements Initializable, FrequencyListener, Listener, W
     value = value * factor;
     long tmp = Math.round(value);
     return (double) tmp / factor;
-  }
-
-  // gets the volume/scale
-  @Override
-  public Double getValue() {
-    return scaleSlider.getValue();
-  }
-
-  @Override
-  public void setValue(Double scale) {
-    scaleSlider.setValue(scale);
   }
 
   private double midiPressureToPressure(Slider slider, int midiPressure) {
