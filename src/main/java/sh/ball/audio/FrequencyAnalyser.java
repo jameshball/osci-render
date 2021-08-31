@@ -1,6 +1,6 @@
 package sh.ball.audio;
 
-import sh.ball.audio.fft.FFT;
+import sh.ball.math.fft.FFT;
 
 import java.util.ArrayList;
 import java.util.List;

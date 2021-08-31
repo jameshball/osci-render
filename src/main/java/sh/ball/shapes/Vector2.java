@@ -2,6 +2,8 @@ package sh.ball.shapes;
 
 import java.util.Objects;
 
+import static sh.ball.math.Math.round;
+
 public final class Vector2 extends Shape {
 
   private final double x;
@@ -96,17 +98,6 @@ public final class Vector2 extends Shape {
   @Override
   public int hashCode() {
     return Objects.hash(round(x, 2), round(y, 2));
-  }
-
-  private static double round(double value, int places) {
-    if (places < 0) {
-      throw new IllegalArgumentException();
-    }
-
-    long factor = (long) Math.pow(10, places);
-    value *= factor;
-
-    return (double) Math.round(value) / factor;
   }
 
   @Override

@@ -50,6 +50,8 @@ import sh.ball.parser.ParserFactory;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
+import static sh.ball.math.Math.round;
+
 public class Controller implements Initializable, FrequencyListener, MidiListener {
 
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
@@ -624,15 +626,6 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     Platform.runLater(() ->
       frequencyLabel.setText(String.format("L/R Frequency:\n%d Hz / %d Hz", Math.round(leftFrequency), Math.round(rightFrequency)))
     );
-  }
-
-  private static double round(double value, double places) {
-    if (places < 0) throw new IllegalArgumentException();
-
-    long factor = (long) Math.pow(10, places);
-    value = value * factor;
-    long tmp = Math.round(value);
-    return (double) tmp / factor;
   }
 
   private double midiPressureToPressure(Slider slider, int midiPressure) {
