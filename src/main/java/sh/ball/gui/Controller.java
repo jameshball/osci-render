@@ -44,14 +44,13 @@ import sh.ball.audio.engine.ConglomerateAudioEngine;
 import sh.ball.audio.midi.MidiCommunicator;
 import sh.ball.audio.midi.MidiListener;
 import sh.ball.engine.Vector3;
-import sh.ball.parser.obj.Listener;
 import sh.ball.parser.obj.ObjSettingsFactory;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.ParserFactory;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
-public class Controller implements Initializable, FrequencyListener, Listener, MidiListener {
+public class Controller implements Initializable, FrequencyListener, MidiListener {
 
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
   private static final double MAX_FREQUENCY = 12000;
@@ -195,7 +194,6 @@ public class Controller implements Initializable, FrequencyListener, Listener, M
     frameSets.add(frames);
     frameSetPaths.add("cube.obj");
     currentFrameSet = 0;
-    frames.addListener(this);
     this.producer = new FrameProducer<>(audioPlayer, frames);
     this.defaultDevice = audioPlayer.getDefaultDevice();
     if (defaultDevice == null) {
@@ -502,11 +500,17 @@ public class Controller implements Initializable, FrequencyListener, Listener, M
   }
 
   private void updateCameraPos() {
-    producer.setFrameSettings(ObjSettingsFactory.cameraPosition(new Vector3(
+    Vector3 vector = new Vector3(
       tryParse(cameraXTextField.getText()),
       tryParse(cameraYTextField.getText()),
       tryParse(cameraZTextField.getText())
-    )));
+    );
+
+    producer.setFrameSettings(ObjSettingsFactory.cameraPosition(vector));
+
+    cameraXTextField.setText(String.valueOf(round(vector.getX(), 3)));
+    cameraYTextField.setText(String.valueOf(round(vector.getY(), 3)));
+    cameraZTextField.setText(String.valueOf(round(vector.getZ(), 3)));
   }
 
   private double tryParse(String value) {
@@ -530,7 +534,6 @@ public class Controller implements Initializable, FrequencyListener, Listener, M
   private void changeFrameSet() {
     FrameSet<List<Shape>> frames = frameSets.get(currentFrameSet);
     producer.stop();
-    frames.addListener(this);
     producer = new FrameProducer<>(audioPlayer, frames);
 
     updateObjectRotateSpeed();
@@ -621,17 +624,6 @@ public class Controller implements Initializable, FrequencyListener, Listener, M
     Platform.runLater(() ->
       frequencyLabel.setText(String.format("L/R Frequency:\n%d Hz / %d Hz", Math.round(leftFrequency), Math.round(rightFrequency)))
     );
-  }
-
-  @Override
-  public void update(Object pos) {
-    if (pos instanceof Vector3 vector) {
-      Platform.runLater(() -> {
-        cameraXTextField.setText(String.valueOf(round(vector.getX(), 3)));
-        cameraYTextField.setText(String.valueOf(round(vector.getY(), 3)));
-        cameraZTextField.setText(String.valueOf(round(vector.getZ(), 3)));
-      });
-    }
   }
 
   private static double round(double value, double places) {
