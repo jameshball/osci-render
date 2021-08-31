@@ -4,6 +4,9 @@ import java.util.Objects;
 
 public class MidiNote {
 
+  public static double MAX_PRESSURE = 127;
+  public static final double MIDDLE_C = 261.63;
+
   private static final String[] NOTE_NAMES = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 
   private final String name;

@@ -43,6 +43,7 @@ import sh.ball.audio.engine.AudioDevice;
 import sh.ball.audio.engine.ConglomerateAudioEngine;
 import sh.ball.audio.midi.MidiCommunicator;
 import sh.ball.audio.midi.MidiListener;
+import sh.ball.audio.midi.MidiNote;
 import sh.ball.engine.Vector3;
 import sh.ball.parser.obj.ObjSettingsFactory;
 import sh.ball.parser.obj.ObjParser;
@@ -51,12 +52,12 @@ import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
 import static sh.ball.math.Math.round;
+import static sh.ball.math.Math.tryParse;
 
 public class Controller implements Initializable, FrequencyListener, MidiListener {
 
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
   private static final double MAX_FREQUENCY = 12000;
-  private static final double MIDDLE_C = 261.63;
 
   private final FileChooser wavFileChooser = new FileChooser();
   private final FileChooser renderFileChooser = new FileChooser();
@@ -258,7 +259,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     frequencySlider.valueProperty().addListener((o, old, f) -> frequency.set(Math.pow(MAX_FREQUENCY, f.doubleValue())));
     frequency.addListener((o, old, f) -> frequencySlider.setValue(Math.log(f.doubleValue()) / Math.log(MAX_FREQUENCY)));
     audioPlayer.setFrequency(frequency);
-    frequency.set(MIDDLE_C);
+    frequency.set(MidiNote.MIDDLE_C);
     audioPlayer.setVolume(volumeSlider.valueProperty());
 
     this.midiButtonMap = initializeMidiButtonMap();
@@ -515,14 +516,6 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     cameraZTextField.setText(String.valueOf(round(vector.getZ(), 3)));
   }
 
-  private double tryParse(String value) {
-    try {
-      return Double.parseDouble(value);
-    } catch (NumberFormatException e) {
-      return 0;
-    }
-  }
-
   private void updateEffect(EffectType type, boolean checked, Effect effect) {
     if (checked) {
       audioPlayer.addEffect(type, effect);
@@ -561,7 +554,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
 
         if (chosenFile.isDirectory()) {
           jkLabel.setVisible(true);
-          for (File file : chosenFile.listFiles()) {
+          for (File file : Objects.requireNonNull(chosenFile.listFiles())) {
             try {
               frameSets.add(ParserFactory.getParser(file.getAbsolutePath()).parse());
               frameSetPaths.add(file.getName());
@@ -632,7 +625,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     double max = slider.getMax();
     double min = slider.getMin();
     double range = max - min;
-    return min + (midiPressure / 127.0) * range;
+    return min + (midiPressure / MidiNote.MAX_PRESSURE) * range;
   }
 
   @Override
