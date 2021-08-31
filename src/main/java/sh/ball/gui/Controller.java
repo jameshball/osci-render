@@ -4,7 +4,6 @@ import javafx.animation.*;
 import javafx.application.Platform;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
-import javafx.beans.value.WritableValue;
 import javafx.collections.FXCollections;
 import javafx.scene.control.*;
 import javafx.scene.paint.Color;
@@ -124,9 +123,9 @@ public class Controller implements Initializable, FrequencyListener, Listener, M
   @FXML
   private SVGPath translationSpeedMidi;
   @FXML
-  private Slider scaleSlider;
+  private Slider volumeSlider;
   @FXML
-  private SVGPath scaleMidi;
+  private SVGPath volumeMidi;
   @FXML
   private TitledPane objTitledPane;
   @FXML
@@ -214,7 +213,7 @@ public class Controller implements Initializable, FrequencyListener, Listener, M
     midiMap.put(frequencyMidi, frequencySlider);
     midiMap.put(rotateSpeedMidi, rotateSpeedSlider);
     midiMap.put(translationSpeedMidi, translationSpeedSlider);
-    midiMap.put(scaleMidi, scaleSlider);
+    midiMap.put(volumeMidi, volumeSlider);
     midiMap.put(focalLengthMidi, focalLengthSlider);
     midiMap.put(objectRotateSpeedMidi, objectRotateSpeedSlider);
     midiMap.put(vectorCancellingMidi, vectorCancellingSlider);
@@ -260,7 +259,7 @@ public class Controller implements Initializable, FrequencyListener, Listener, M
     frequency.addListener((o, old, f) -> frequencySlider.setValue(Math.log(f.doubleValue()) / Math.log(MAX_FREQUENCY)));
     audioPlayer.setFrequency(frequency);
     frequency.set(MIDDLE_C);
-    audioPlayer.setVolume(scaleSlider.valueProperty());
+    audioPlayer.setVolume(volumeSlider.valueProperty());
 
     this.midiButtonMap = initializeMidiButtonMap();
 
