@@ -11,4 +11,11 @@ public class Math {
     return (double) tmp / factor;
   }
 
+  public static double tryParse(String value) {
+    try {
+      return Double.parseDouble(value);
+    } catch (NumberFormatException e) {
+      return 0;
+    }
+  }
 }
