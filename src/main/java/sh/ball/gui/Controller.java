@@ -56,36 +56,37 @@ import static sh.ball.math.Math.tryParse;
 
 public class Controller implements Initializable, FrequencyListener, MidiListener {
 
-  private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
+  // audio
   private static final double MAX_FREQUENCY = 12000;
-
-  private final FileChooser wavFileChooser = new FileChooser();
-  private final FileChooser renderFileChooser = new FileChooser();
-  private final DirectoryChooser folderChooser = new DirectoryChooser();
   private final ShapeAudioPlayer audioPlayer;
-  private final ExecutorService executor = Executors.newSingleThreadExecutor();
-  private final Map<Integer, SVGPath> CCMap = new HashMap<>();
-  private Map<SVGPath, Slider> midiButtonMap;
-
   private final RotateEffect rotateEffect;
   private final TranslateEffect translateEffect;
   private final WobbleEffect wobbleEffect;
-
   private final DoubleProperty frequency;
-
+  private final AudioDevice defaultDevice;
   private int sampleRate;
   private FrequencyAnalyser<List<Shape>> analyser;
-  private final AudioDevice defaultDevice;
   private boolean recording = false;
   private Timeline recordingTimeline;
+
+  // midi
+  private final Map<Integer, SVGPath> CCMap = new HashMap<>();
   private Paint armedMidiPaint;
   private SVGPath armedMidi;
+  private Map<SVGPath, Slider> midiButtonMap;
 
-  private FrameProducer<List<Shape>> producer;
+  // frames
+  private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
+  private final ExecutorService executor = Executors.newSingleThreadExecutor();
   private final List<FrameSet<List<Shape>>> frameSets = new ArrayList<>();
   private final List<String> frameSetPaths = new ArrayList<>();
+  private FrameProducer<List<Shape>> producer;
   private int currentFrameSet;
 
+  // javafx
+  private final FileChooser wavFileChooser = new FileChooser();
+  private final FileChooser renderFileChooser = new FileChooser();
+  private final DirectoryChooser folderChooser = new DirectoryChooser();
   private Stage stage;
 
   @FXML
@@ -209,6 +210,8 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     this.frequency = new SimpleDoubleProperty(0);
   }
 
+  // initialises midiButtonMap by mapping MIDI logo SVGs to the slider that they
+  // control if they are selected.
   private Map<SVGPath, Slider> initializeMidiButtonMap() {
     Map<SVGPath, Slider> midiMap = new HashMap<>();
     midiMap.put(frequencyMidi, frequencySlider);
@@ -227,18 +230,22 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     return midiMap;
   }
 
+  // Maps sliders to the functions that they should call whenever their value
+  // changes.
   private Map<Slider, Consumer<Double>> initializeSliderMap() {
     return Map.of(
       rotateSpeedSlider, rotateEffect::setSpeed,
       translationSpeedSlider, translateEffect::setSpeed,
-      focalLengthSlider, d -> updateFocalLength(),
-      objectRotateSpeedSlider, d -> updateObjectRotateSpeed(),
+      focalLengthSlider, this::updateFocalLength,
+      objectRotateSpeedSlider, this::updateObjectRotateSpeed,
       visibilitySlider, audioPlayer::setMainFrequencyScale
     );
   }
 
   private Map<EffectType, Slider> effectTypes;
 
+  // Maps EffectTypes to the slider that controls the effect so that they can be
+  // toggled when the appropriate checkbox is ticked.
   private void initializeEffectTypes() {
     effectTypes = Map.of(
       EffectType.VECTOR_CANCELLING,
@@ -256,9 +263,12 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
 
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
+    // converts the value of frequencySlider to the actual frequency that it represents so that it
+    // can increase at an exponential scale.
     frequencySlider.valueProperty().addListener((o, old, f) -> frequency.set(Math.pow(MAX_FREQUENCY, f.doubleValue())));
     frequency.addListener((o, old, f) -> frequencySlider.setValue(Math.log(f.doubleValue()) / Math.log(MAX_FREQUENCY)));
     audioPlayer.setFrequency(frequency);
+    // default value is middle C
     frequency.set(MidiNote.MIDDLE_C);
     audioPlayer.setVolume(volumeSlider.valueProperty());
 
@@ -337,6 +347,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
       new FileChooser.ExtensionFilter("WAV Files", "*.wav"),
       new FileChooser.ExtensionFilter("All Files", "*.*")
     );
+    // when opening new files, we support .obj, .svg, and .txt
     renderFileChooser.getExtensionFilters().addAll(
       new FileChooser.ExtensionFilter("All Files", "*.*"),
       new FileChooser.ExtensionFilter("Wavefront OBJ Files", "*.obj"),
@@ -367,7 +378,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
       recordTextField.setDisable(!newVal);
     });
 
-    updateObjectRotateSpeed();
+    updateObjectRotateSpeed(rotateSpeedSlider.getValue());
 
     audioPlayer.addEffect(EffectType.ROTATE, rotateEffect);
     audioPlayer.addEffect(EffectType.TRANSLATE, translateEffect);
@@ -389,13 +400,17 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     });
   }
 
+  // used when a file is chosen so that the same folder is reopened when a
+  // file chooser opens
   private void updateLastVisitedDirectory(File file) {
     String lastVisitedDirectory = file != null ? file.getAbsolutePath() : System.getProperty("user.home");
     File dir = new File(lastVisitedDirectory);
     wavFileChooser.setInitialDirectory(dir);
+    renderFileChooser.setInitialDirectory(dir);
     folderChooser.setInitialDirectory(dir);
   }
 
+  // restarts audioPlayer and FrequencyAnalyser to support new device
   private void switchAudioDevice(AudioDevice device) {
     try {
       audioPlayer.reset();
@@ -410,22 +425,31 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     startAudioPlayerThread();
   }
 
+  // creates a new thread for the audioPlayer and starts it
   private void startAudioPlayerThread() {
     Thread audioPlayerThread = new Thread(audioPlayer);
     audioPlayerThread.setUncaughtExceptionHandler((thread, throwable) -> throwable.printStackTrace());
     audioPlayerThread.start();
   }
 
+  // creates a new thread for the frequency analyser and adds the wobble effect and the controller
+  // as listeners of it so that they can get updates as the frequency changes
   private void startFrequencyAnalyser(FrequencyAnalyser<List<Shape>> analyser) {
     analyser.addListener(this);
     analyser.addListener(wobbleEffect);
     new Thread(analyser).start();
   }
 
+  // alternates between recording and not recording when called.
+  // If it is a non-timed recording, it is saved when this is called and
+  // recording is stopped. If it is a time recording, this function will cancel
+  // the recording.
   private void toggleRecord() {
     recording = !recording;
     boolean timedRecord = recordCheckBox.isSelected();
     if (recording) {
+      // if it is a timed recording then a timeline is scheduled to start and
+      // stop recording at the predefined times.
       if (timedRecord) {
         double recordingLength;
         try {
@@ -440,6 +464,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
           Duration.seconds(0),
           e -> audioPlayer.startRecord()
         );
+        // save the recording after recordingLength seconds
         KeyFrame kf2 = new KeyFrame(
           Duration.seconds(recordingLength),
           e -> {
@@ -455,6 +480,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
       }
       recordLabel.setText("Recording...");
     } else if (timedRecord) {
+      // cancel the recording
       recordingTimeline.stop();
       recordLabel.setText("");
       recordButton.setText("Record");
@@ -464,6 +490,9 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     }
   }
 
+  // Stops recording and opens a fileChooser so that the user can choose a
+  // location to save the recording to. If no location is chosen then it will
+  // be saved as the current date-time of the machine.
   private void saveRecording() {
     try {
       recordButton.setText("Record");
@@ -483,18 +512,19 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     }
   }
 
-  private void updateFocalLength() {
-    double focalLength = focalLengthSlider.getValue();
+  // changes the focalLength of the FrameProducer
+  private void updateFocalLength(double focalLength) {
     producer.setFrameSettings(ObjSettingsFactory.focalLength(focalLength));
   }
 
-  private void updateObjectRotateSpeed() {
-    double rotateSpeed = objectRotateSpeedSlider.getValue();
+  // changes the rotateSpeed of the FrameProducer
+  private void updateObjectRotateSpeed(double rotateSpeed) {
     producer.setFrameSettings(
       ObjSettingsFactory.rotateSpeed((Math.exp(3 * rotateSpeed) - 1) / 50)
     );
   }
 
+  // changes the sinusoidal translation of the image rendered
   private void updateTranslation() {
     translateEffect.setTranslation(new Vector2(
       tryParse(translationXTextField.getText()),
@@ -502,6 +532,8 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     ));
   }
 
+  // updates the camera position of the FrameProducer, as well as rounding the
+  // text fields that control it
   private void updateCameraPos() {
     Vector3 vector = new Vector3(
       tryParse(cameraXTextField.getText()),
@@ -516,6 +548,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     cameraZTextField.setText(String.valueOf(round(vector.getZ(), 3)));
   }
 
+  // selects or deselects the given audio effect
   private void updateEffect(EffectType type, boolean checked, Effect effect) {
     if (checked) {
       audioPlayer.addEffect(type, effect);
@@ -526,15 +559,21 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     }
   }
 
+  // changes the FrameProducer e.g. could be changing from a 3D object to an
+  // SVG. The old FrameProducer is stopped and a new one created and initialised
+  // with the same settings that the original had.
   private void changeFrameSet() {
     FrameSet<List<Shape>> frames = frameSets.get(currentFrameSet);
     producer.stop();
     producer = new FrameProducer<>(audioPlayer, frames);
 
-    updateObjectRotateSpeed();
-    updateFocalLength();
+    // Apply the same settings that the previous frameSet had
+    updateObjectRotateSpeed(rotateSpeedSlider.getValue());
+    updateFocalLength(focalLengthSlider.getValue());
     executor.submit(producer);
 
+    // apply the wobble effect after a second as the frequency of the audio takes a while to
+    // propagate and send to its listeners.
     KeyFrame kf1 = new KeyFrame(Duration.seconds(0), e -> wobbleEffect.setVolume(0));
     KeyFrame kf2 = new KeyFrame(Duration.seconds(1), e -> {
       wobbleEffect.update();
@@ -542,10 +581,13 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     });
     Timeline timeline = new Timeline(kf1, kf2);
     Platform.runLater(timeline::play);
+
     fileLabel.setText(frameSetPaths.get(currentFrameSet));
+    // enable the .obj file settings iff the new frameSet is for a 3D object.
     objTitledPane.setDisable(!ObjParser.isObjFile(frameSetPaths.get(currentFrameSet)));
   }
 
+  // selects a new file or folder for files to be rendered from
   private void chooseFile(File chosenFile) {
     try {
       if (chosenFile.exists()) {
@@ -575,6 +617,8 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
 
       // display error to user (for debugging purposes)
       String oldPath = fileLabel.getText();
+      // shows the error message and later shows the old path as the file being rendered
+      // doesn't change
       KeyFrame kf1 = new KeyFrame(Duration.seconds(0), e -> fileLabel.setText(ioException.getMessage()));
       KeyFrame kf2 = new KeyFrame(Duration.seconds(5), e -> fileLabel.setText(oldPath));
       Timeline timeline = new Timeline(kf1, kf2);
@@ -582,10 +626,13 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     }
   }
 
+  // used so that the Controller has access to the stage, allowing it to open
+  // file directories etc.
   public void setStage(Stage stage) {
     this.stage = stage;
   }
 
+  // increments and changes the frameSet after pressing 'j'
   public void nextFrameSet() {
     currentFrameSet++;
     if (currentFrameSet >= frameSets.size()) {
@@ -594,6 +641,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     changeFrameSet();
   }
 
+  // decrements and changes the frameSet after pressing 'k'
   public void previousFrameSet() {
     currentFrameSet--;
     if (currentFrameSet < 0) {
@@ -602,14 +650,18 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     changeFrameSet();
   }
 
+  // determines whether the mouse is being used to rotate a 3D object
   protected boolean mouseRotate() {
     return rotateCheckBox.isSelected();
   }
 
+  // stops the mouse rotating the 3D object when ESC is pressed or checkbox is
+  // unchecked
   protected void disableMouseRotate() {
     rotateCheckBox.setSelected(false);
   }
 
+  // updates the 3D object rotation angle
   protected void setObjRotate(Vector3 vector) {
     producer.setFrameSettings(ObjSettingsFactory.rotation(vector));
   }
@@ -621,6 +673,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     );
   }
 
+  // converts MIDI pressure value into a valid value for a slider
   private double midiPressureToPressure(Slider slider, int midiPressure) {
     double max = slider.getMax();
     double min = slider.getMin();
@@ -628,14 +681,22 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     return min + (midiPressure / MidiNote.MAX_PRESSURE) * range;
   }
 
+  // handles newly received MIDI messages. For CC messages, this handles
+  // whether or not there is a slider that is associated with the CC channel,
+  // and the slider's value is updated if so. If there are channels that are
+  // looking to be armed, a new association will be created between the CC
+  // channel and the slider.
   @Override
   public void sendMidiMessage(ShortMessage message) {
     int command = message.getCommand();
 
+    // the audioPlayer handles all non-CC MIDI messages
     if (command == ShortMessage.CONTROL_CHANGE) {
       int id = message.getData1();
       int value = message.getData2();
 
+      // if a user has selected a MIDI logo next to a slider, create a mapping
+      // between the MIDI channel and the SVG MIDI logo
       if (armedMidi != null) {
         if (CCMap.containsValue(armedMidi)) {
           CCMap.values().remove(armedMidi);
@@ -648,6 +709,8 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
         armedMidiPaint = null;
         armedMidi = null;
       }
+      // If there is a slider associated with the MIDI channel, update the value
+      // of it
       if (CCMap.containsKey(id)) {
         Slider slider = midiButtonMap.get(CCMap.get(id));
         double sliderValue = midiPressureToPressure(slider, value);
