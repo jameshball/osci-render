@@ -4,6 +4,7 @@ import sh.ball.shapes.Vector2;
 
 import static sh.ball.math.Math.round;
 
+// Used for creating various audio effects
 public class EffectFactory {
   public static Effect vectorCancelling(int frequency) {
     return (count, v) -> count % frequency == 0 ? v.scale(-1) : v;

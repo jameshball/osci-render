@@ -2,14 +2,14 @@ package sh.ball.audio.engine;
 
 import java.util.Objects;
 
-public class DefaultAudioDevice implements AudioDevice {
+public class SimpleAudioDevice implements AudioDevice {
 
   final String id;
   final String name;
   final int sampleRate;
   final AudioSample sample;
 
-  public DefaultAudioDevice(String id, String name, int sampleRate, AudioSample sample) {
+  public SimpleAudioDevice(String id, String name, int sampleRate, AudioSample sample) {
     this.id = id;
     this.name = name;
     this.sampleRate = sampleRate;
@@ -47,7 +47,7 @@ public class DefaultAudioDevice implements AudioDevice {
   public boolean equals(Object o) {
     if (this == o) return true;
     if (o == null || getClass() != o.getClass()) return false;
-    DefaultAudioDevice that = (DefaultAudioDevice) o;
+    SimpleAudioDevice that = (SimpleAudioDevice) o;
     return sampleRate == that.sampleRate && Objects.equals(id, that.id) && Objects.equals(name, that.name) && sample == that.sample;
   }
 

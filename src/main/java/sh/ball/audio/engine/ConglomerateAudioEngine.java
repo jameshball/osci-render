@@ -7,8 +7,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.Callable;
 
+// combines all types of AudioEngines into a single AudioEngine to allow for
+// maximum compatibility and support for all audio drivers that have been
+// implemented
 public class ConglomerateAudioEngine implements AudioEngine {
 
+  // used to determine which OS we are on
   private static final String OS = System.getProperty("os.name", "generic").toLowerCase(Locale.ENGLISH);
   private static final boolean MAC_OS = OS.contains("mac") || OS.contains("darwin");
 
@@ -55,6 +59,7 @@ public class ConglomerateAudioEngine implements AudioEngine {
     }
 
     if (xtDevices == null) {
+      // XtAudio does not support MacOS so we should ignore all devices on XtAudio if on a mac
       if (MAC_OS) {
         xtDevices = new ArrayList<>();
       } else {

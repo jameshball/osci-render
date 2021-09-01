@@ -2,6 +2,8 @@ package sh.ball.audio.effect;
 
 public abstract class PhaseEffect implements Effect {
 
+  // sufficiently large so that nextTheta doesn't commonly reach it, otherwise
+  // there are audio artifacts
   private static final double LARGE_VAL = 2 << 20;
 
   protected final int sampleRate;
