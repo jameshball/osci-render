@@ -1,8 +1,8 @@
 package sh.ball.audio.effect;
 
-import sh.ball.audio.FrequencyListener;
 import sh.ball.shapes.Vector2;
 
+// Plays a sine wave at the given frequency and volume
 public class SineEffect extends PhaseEffect {
 
   private static final double DEFAULT_VOLUME = 1;

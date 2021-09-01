@@ -2,6 +2,7 @@ package sh.ball.audio.effect;
 
 import sh.ball.shapes.Vector2;
 
+// Translates the given vector in a sinusoidal fashion
 public class TranslateEffect extends PhaseEffect {
 
   private Vector2 translation;

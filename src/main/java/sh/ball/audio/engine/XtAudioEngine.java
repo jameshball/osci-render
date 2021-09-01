@@ -9,8 +9,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 
+// Audio engine that connects to devices using the XtAudio library
 public class XtAudioEngine implements AudioEngine {
 
+  private static final int DEFAULT_SAMPLE_RATE = 192000;
+  private static final Enums.XtSample DEFAULT_AUDIO_SAMPLE = Enums.XtSample.FLOAT32;
   // Stereo audio
   private static final int NUM_OUTPUTS = 2;
 
@@ -35,6 +38,8 @@ public class XtAudioEngine implements AudioEngine {
     return 0;
   }
 
+  // fully compatible function to write a Vector2 (i.e. stereo) channels to
+  // any AudioSample. This ensures maximum compatibility for audio devices.
   private void writeChannels(Vector2 channels, Object output, int frame) {
     int index = frame * NUM_OUTPUTS;
     switch (device.sample()) {
@@ -88,6 +93,7 @@ public class XtAudioEngine implements AudioEngine {
     return playing;
   }
 
+  // XtAudio boilerplate for connecting to an audio device and playing audio
   @Override
   public void play(Callable<Vector2> channelGenerator, AudioDevice device) {
     this.playing = true;
@@ -128,6 +134,7 @@ public class XtAudioEngine implements AudioEngine {
     stopped = true;
   }
 
+  // XtAudio boilerplate for getting a list of connected audio devices
   @Override
   public List<AudioDevice> devices() {
     List<AudioDevice> devices = new ArrayList<>();
@@ -148,14 +155,14 @@ public class XtAudioEngine implements AudioEngine {
           Optional<Structs.XtMix> mix = xtDevice.getMix();
 
           if (mix.isEmpty()) {
-            mix = Optional.of(new Structs.XtMix(192000, Enums.XtSample.FLOAT32));
+            mix = Optional.of(new Structs.XtMix(DEFAULT_SAMPLE_RATE, DEFAULT_AUDIO_SAMPLE));
           }
 
           Structs.XtChannels channels = new Structs.XtChannels(0, 0, NUM_OUTPUTS, 0);
           Structs.XtFormat format = new Structs.XtFormat(mix.get(), channels);
 
           if (xtDevice.supportsFormat(format)) {
-            devices.add(new DefaultAudioDevice(deviceId, deviceName, mix.get().rate, XtSampleToAudioSample(mix.get().sample)));
+            devices.add(new SimpleAudioDevice(deviceId, deviceName, mix.get().rate, XtSampleToAudioSample(mix.get().sample)));
           }
         } catch (XtException e) {
           e.printStackTrace();
@@ -170,6 +177,7 @@ public class XtAudioEngine implements AudioEngine {
     return devices;
   }
 
+  // XtAudio boilerplate for getting default device
   @Override
   public AudioDevice getDefaultDevice() {
     try (XtPlatform platform = XtAudio.init(null, null)) {
@@ -180,7 +188,7 @@ public class XtAudioEngine implements AudioEngine {
         Optional<Structs.XtMix> mix = xtDevice.getMix();
 
         if (mix.isEmpty()) {
-          mix = Optional.of(new Structs.XtMix(192000, Enums.XtSample.FLOAT32));
+          mix = Optional.of(new Structs.XtMix(DEFAULT_SAMPLE_RATE, DEFAULT_AUDIO_SAMPLE));
         }
 
         String deviceName = service.openDeviceList(EnumSet.of(Enums.XtEnumFlags.OUTPUT)).getName(deviceId);
@@ -189,7 +197,7 @@ public class XtAudioEngine implements AudioEngine {
         Structs.XtFormat format = new Structs.XtFormat(mix.get(), channels);
 
         if (xtDevice.supportsFormat(format)) {
-          return new DefaultAudioDevice(deviceId, deviceName, mix.get().rate, XtSampleToAudioSample(mix.get().sample));
+          return new SimpleAudioDevice(deviceId, deviceName, mix.get().rate, XtSampleToAudioSample(mix.get().sample));
         } else {
           return null;
         }
@@ -203,6 +211,7 @@ public class XtAudioEngine implements AudioEngine {
   }
 
 
+  // connects to an XtAudio XtService in order of lowest latency to highest latency
   private XtService getService(XtPlatform platform) {
     XtService service = platform.getService(platform.setupToSystem(Enums.XtSetup.SYSTEM_AUDIO));
     if (service == null) {
@@ -222,6 +231,7 @@ public class XtAudioEngine implements AudioEngine {
     return service;
   }
 
+  // helper for converting XtSamples into AudioSamples
   private AudioSample XtSampleToAudioSample(Enums.XtSample sample) {
     return switch (sample) {
       case UINT8 -> AudioSample.UINT8;
@@ -232,6 +242,7 @@ public class XtAudioEngine implements AudioEngine {
     };
   }
 
+  // helper for converting AudioSamples into XtSamples
   private Enums.XtSample AudioSampleToXtSample(AudioSample sample) {
     return switch (sample) {
       case UINT8 -> Enums.XtSample.UINT8;

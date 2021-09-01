@@ -2,6 +2,7 @@ package sh.ball.audio.effect;
 
 import sh.ball.shapes.Vector2;
 
+// rotates the vector about (0,0)
 public class RotateEffect extends PhaseEffect {
 
   public RotateEffect(int sampleRate, double speed) {
