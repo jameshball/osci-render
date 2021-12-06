@@ -16,6 +16,7 @@ import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 import sh.ball.audio.effect.SineEffect;
+import sh.ball.audio.effect.SmoothEffect;
 import sh.ball.audio.engine.AudioDevice;
 import sh.ball.audio.engine.AudioEngine;
 import sh.ball.audio.midi.MidiCommunicator;
@@ -42,9 +43,6 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private static final double MIDDLE_C = 261.63;
 
   // MIDI
-  private static final int PITCH_BEND_DATA_LENGTH = 7;
-  private static final int PITCH_BEND_MAX = 16383;
-  private static final int PITCH_BEND_SEMITONES = 2;
   private final List<MidiNote> downKeys = new CopyOnWriteArrayList<>();
   private Timeline volumeTimeline;
 
@@ -174,8 +172,18 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
       effect.setVolume(scaledVolume);
       vector = effect.apply(frame, vector);
     }
+    // Smooth effects MUST be applied last, consistently
+    SmoothEffect smoothEffect = null;
     for (Effect effect : effects.values()) {
-      vector = effect.apply(frame, vector);
+      if (effect instanceof SmoothEffect) {
+        smoothEffect = (SmoothEffect) effect;
+      } else {
+        vector = effect.apply(frame, vector);
+      }
+    }
+
+    if (smoothEffect != null) {
+      vector = smoothEffect.apply(frame, vector);
     }
 
     return vector.scale(volume.get());
@@ -364,7 +372,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
       int velocity = message.getData2();
 
       double oldVolume = volume.get();
-      double newVolume = velocity / 127.0;
+      double newVolume = velocity / MidiNote.MAX_PRESSURE;
 
       if (command == ShortMessage.NOTE_OFF) {
         downKeys.remove(note);
@@ -391,11 +399,11 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     } else if (command == ShortMessage.PITCH_BEND) {
       // using these instructions https://sites.uci.edu/camp2014/2014/04/30/managing-midi-pitchbend-messages/
 
-      int pitchBend = (message.getData2() << PITCH_BEND_DATA_LENGTH) | message.getData1();
+      int pitchBend = (message.getData2() << MidiNote.PITCH_BEND_DATA_LENGTH) | message.getData1();
       // get pitch bend in range -1 to 1
-      double pitchBendFactor = (double) pitchBend / PITCH_BEND_MAX;
+      double pitchBendFactor = (double) pitchBend / MidiNote.PITCH_BEND_MAX;
       pitchBendFactor = 2 * pitchBendFactor - 1;
-      pitchBendFactor *= PITCH_BEND_SEMITONES;
+      pitchBendFactor *= MidiNote.PITCH_BEND_SEMITONES;
       // 12 tone equal temperament
       pitchBendFactor /= 12;
       pitchBendFactor = Math.pow(2, pitchBendFactor);

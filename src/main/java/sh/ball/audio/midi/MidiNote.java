@@ -6,6 +6,13 @@ public class MidiNote {
 
   public static double MAX_PRESSURE = 127;
   public static final double MIDDLE_C = 261.63;
+  public static final int PITCH_BEND_DATA_LENGTH = 7;
+  public static final int PITCH_BEND_MAX = 16383;
+  public static final int PITCH_BEND_SEMITONES = 2;
+
+  // Concert A Pitch is A4 and has the key number 69
+  final int KEY_A4 = 69;
+  public static final double A4 = 440;
 
   private static final String[] NOTE_NAMES = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 
@@ -25,12 +32,8 @@ public class MidiNote {
   }
 
   public double frequency() {
-    // Concert A Pitch is A4 and has the key number 69
-    final int KEY_A4 = 69;
-    // 440Hz
-    final int A4 = 440;
     // Returns the frequency of the given key (equal temperament)
-    return (float) (440 * Math.pow(2, (key - KEY_A4) / 12d));
+    return (float) (A4 * Math.pow(2, (key - KEY_A4) / 12d));
   }
 
   @Override

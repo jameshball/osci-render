@@ -7,5 +7,6 @@ public enum EffectType {
   TRANSLATE,
   VERTICAL_DISTORT,
   HORIZONTAL_DISTORT,
-  WOBBLE
+  WOBBLE,
+  SMOOTH
 }

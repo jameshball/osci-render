@@ -62,6 +62,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   private final RotateEffect rotateEffect;
   private final TranslateEffect translateEffect;
   private final WobbleEffect wobbleEffect;
+  private final SmoothEffect smoothEffect;
   private final DoubleProperty frequency;
   private final AudioDevice defaultDevice;
   private int sampleRate;
@@ -178,6 +179,12 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   @FXML
   private SVGPath wobbleMidi;
   @FXML
+  private CheckBox smoothCheckBox;
+  @FXML
+  private Slider smoothSlider;
+  @FXML
+  private SVGPath smoothMidi;
+  @FXML
   private Slider octaveSlider;
   @FXML
   private SVGPath octaveMidi;
@@ -207,6 +214,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     this.rotateEffect = new RotateEffect(sampleRate);
     this.translateEffect = new TranslateEffect(sampleRate);
     this.wobbleEffect = new WobbleEffect(sampleRate);
+    this.smoothEffect = new SmoothEffect(1);
     this.frequency = new SimpleDoubleProperty(0);
   }
 
@@ -223,6 +231,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     midiMap.put(vectorCancellingMidi, vectorCancellingSlider);
     midiMap.put(bitCrushMidi, bitCrushSlider);
     midiMap.put(wobbleMidi, wobbleSlider);
+    midiMap.put(smoothMidi, smoothSlider);
     midiMap.put(octaveMidi, octaveSlider);
     midiMap.put(visibilityMidi, visibilitySlider);
     midiMap.put(verticalDistortMidi, verticalDistortSlider);
@@ -257,7 +266,9 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
       EffectType.HORIZONTAL_DISTORT,
       horizontalDistortSlider,
       EffectType.WOBBLE,
-      wobbleSlider
+      wobbleSlider,
+      EffectType.SMOOTH,
+      smoothSlider
     );
   }
 
@@ -323,6 +334,10 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
       wobbleEffect.setVolume(wobbleSlider.getValue());
       updateEffect(EffectType.WOBBLE, wobbleCheckBox.isSelected(), wobbleEffect);
     };
+    InvalidationListener smoothListener = e -> {
+      smoothEffect.setWindowSize((int) smoothSlider.getValue());
+      updateEffect(EffectType.SMOOTH, smoothCheckBox.isSelected(), smoothEffect);
+    };
 
     vectorCancellingSlider.valueProperty().addListener(vectorCancellingListener);
     vectorCancellingCheckBox.selectedProperty().addListener(vectorCancellingListener);
@@ -339,6 +354,9 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     wobbleSlider.valueProperty().addListener(wobbleListener);
     wobbleCheckBox.selectedProperty().addListener(wobbleListener);
     wobbleCheckBox.selectedProperty().addListener(e -> wobbleEffect.update());
+
+    smoothSlider.valueProperty().addListener(smoothListener);
+    smoothCheckBox.selectedProperty().addListener(smoothListener);
 
     octaveSlider.valueProperty().addListener((e, old, octave) -> audioPlayer.setOctave(octave.intValue()));
 
@@ -552,10 +570,14 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   private void updateEffect(EffectType type, boolean checked, Effect effect) {
     if (checked) {
       audioPlayer.addEffect(type, effect);
-      effectTypes.get(type).setDisable(false);
+      if (effectTypes.containsKey(type)) {
+        effectTypes.get(type).setDisable(false);
+      }
     } else {
       audioPlayer.removeEffect(type);
-      effectTypes.get(type).setDisable(true);
+      if (effectTypes.containsKey(type)) {
+        effectTypes.get(type).setDisable(true);
+      }
     }
   }
 

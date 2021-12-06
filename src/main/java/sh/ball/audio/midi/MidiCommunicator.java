@@ -1,4 +1,4 @@
-package sh.ball.audio.midi;// Java program showing the implementation of a simple record
+package sh.ball.audio.midi;
 
 import javax.sound.midi.*;
 
