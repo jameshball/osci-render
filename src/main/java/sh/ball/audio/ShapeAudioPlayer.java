@@ -30,6 +30,7 @@ import javax.sound.sampled.AudioInputStream;
 
 public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
+  private static final double MIN_TRACE = 0.001;
   // Arbitrary max count for effects
   private static final int MAX_COUNT = 10000;
   private static final int BUFFER_SIZE = 5;
@@ -57,9 +58,11 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private boolean recording = false;
   private int framesRecorded = 0;
   private List<Shape> frame;
+  private double frameLength;
+  private double frameDrawn = 0;
   private int currentShape = 0;
   private double lengthIncrement = MIN_LENGTH_INCREMENT;
-  private double lengthDrawn = 0;
+  private double shapeDrawn = 0;
   private int count = 0;
   private DoubleProperty volume;
   private List<Double> frequencies = List.of(MIDDLE_C);
@@ -68,7 +71,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private double mainFrequencyScale = 0.5;
   private double maxFrequency;
   private double pitchBend = 1.0;
-  private double trace = 0.5;
+  private double trace = 1;
   private int octave = 0;
 
   private AudioDevice device;
@@ -96,29 +99,37 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     Shape shape = getCurrentShape();
 
     double length = shape.getLength();
-    double drawingProgress = length == 0 ? 1 : lengthDrawn / length;
+    double drawingProgress = length == 0 ? 1 : shapeDrawn / length;
     Vector2 nextVector = applyEffects(count, shape.nextVector(drawingProgress));
 
     Vector2 channels = cutoff(nextVector);
     writeChannels((float) channels.getX(), (float) channels.getY());
 
-    lengthDrawn += lengthIncrement;
+    shapeDrawn += lengthIncrement;
+    frameDrawn += lengthIncrement;
 
     if (++count > MAX_COUNT) {
       count = 0;
     }
 
-    if (lengthDrawn > length) {
-      lengthDrawn = lengthDrawn - length;
+    if (shapeDrawn > length) {
+      // We do -= length here rather than resetting to 0 since it is correct
+      // to skip a small bit of the next shape, in line with the length increment
+      shapeDrawn -= length;
       currentShape++;
     }
 
-    if (currentShape >= frame.size()) {
+    double proportionalLength = trace * frameLength;
+
+    if (currentShape >= frame.size() || frameDrawn > proportionalLength) {
       currentShape = 0;
       frame = frameQueue.take();
-      lengthDrawn = 0;
-      updateLengthIncrement();
+      frameLength = Shape.totalLength(frame);
+      shapeDrawn = 0;
+      frameDrawn = 0;
     }
+
+    updateLengthIncrement();
 
     return channels;
   }
@@ -229,10 +240,10 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
   private void updateLengthIncrement() {
     if (frame != null) {
-      double totalLength = Shape.totalLength(frame);
+      double proportionalLength = trace * frameLength;
       int sampleRate = device.sampleRate();
       double actualFrequency = octaveFrequency * pitchBend;
-      lengthIncrement = Math.max(totalLength / (sampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
+      lengthIncrement = Math.max(proportionalLength / (sampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
     }
   }
 
@@ -240,6 +251,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   public void run() {
     try {
       frame = frameQueue.take();
+      frameLength = Shape.totalLength(frame);
       updateLengthIncrement();
     } catch (InterruptedException e) {
       throw new RuntimeException("Initial frame not found. Cannot continue.");
@@ -361,6 +373,10 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     frequency.set(mainFrequency);
     setBaseFrequencies(frequencies);
     volume.set(noteVolume);
+  }
+
+  public void setTrace(double trace) {
+    this.trace = Math.max(MIN_TRACE, Math.min(trace, 1));
   }
 
   @Override
