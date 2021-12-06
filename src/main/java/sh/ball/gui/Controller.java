@@ -189,6 +189,12 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   @FXML
   private SVGPath octaveMidi;
   @FXML
+  private CheckBox traceCheckBox;
+  @FXML
+  private Slider traceSlider;
+  @FXML
+  private SVGPath traceMidi;
+  @FXML
   private Slider visibilitySlider;
   @FXML
   private SVGPath visibilityMidi;
@@ -233,6 +239,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     midiMap.put(wobbleMidi, wobbleSlider);
     midiMap.put(smoothMidi, smoothSlider);
     midiMap.put(octaveMidi, octaveSlider);
+    midiMap.put(traceMidi, traceSlider);
     midiMap.put(visibilityMidi, visibilitySlider);
     midiMap.put(verticalDistortMidi, verticalDistortSlider);
     midiMap.put(horizontalDistortMidi, horizontalDistortSlider);
@@ -338,6 +345,11 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
       smoothEffect.setWindowSize((int) smoothSlider.getValue());
       updateEffect(EffectType.SMOOTH, smoothCheckBox.isSelected(), smoothEffect);
     };
+    InvalidationListener traceListener = e -> {
+      double trace = traceCheckBox.isSelected() ? traceSlider.valueProperty().getValue() : 1;
+      audioPlayer.setTrace(trace);
+      traceSlider.setDisable(!traceCheckBox.isSelected());
+    };
 
     vectorCancellingSlider.valueProperty().addListener(vectorCancellingListener);
     vectorCancellingCheckBox.selectedProperty().addListener(vectorCancellingListener);
@@ -359,6 +371,9 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     smoothCheckBox.selectedProperty().addListener(smoothListener);
 
     octaveSlider.valueProperty().addListener((e, old, octave) -> audioPlayer.setOctave(octave.intValue()));
+
+    traceSlider.valueProperty().addListener(traceListener);
+    traceCheckBox.selectedProperty().addListener(traceListener);
 
     wavFileChooser.setInitialFileName("out.wav");
     wavFileChooser.getExtensionFilters().addAll(
