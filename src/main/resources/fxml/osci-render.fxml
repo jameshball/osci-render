@@ -11,10 +11,10 @@
 <?import javafx.scene.shape.SVGPath?>
 <?import javafx.scene.text.Font?>
 
-<AnchorPane prefHeight="589.0" prefWidth="837.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1">
-   <TitledPane animated="false" collapsible="false" layoutX="426.0" layoutY="8.0" prefHeight="303.0" prefWidth="402.0" text="Audio Effects">
+<AnchorPane prefHeight="628.0" prefWidth="837.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1">
+   <TitledPane animated="false" collapsible="false" layoutX="426.0" layoutY="8.0" prefHeight="342.0" prefWidth="402.0" text="Audio Effects">
      <content>
-       <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="262.0" prefWidth="401.0">
+       <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="262.0" prefWidth="402.0">
             <children>
                <CheckBox fx:id="vectorCancellingCheckBox" layoutX="14.0" layoutY="15.0" mnemonicParsing="false" text="Vector cancelling" />
                <Slider fx:id="vectorCancellingSlider" blockIncrement="0.05" disable="true" layoutX="154.0" layoutY="16.0" majorTickUnit="1.0" max="10.0" min="2.0" minorTickCount="0" prefHeight="42.0" prefWidth="219.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" value="2.0" />
@@ -31,14 +31,17 @@
                <SVGPath fx:id="verticalDistortMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="373.0" layoutY="92.0" pickOnBounds="true" />
                <SVGPath fx:id="horizontalDistortMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="373.0" layoutY="135.0" pickOnBounds="true" />
                <SVGPath fx:id="wobbleMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="373.0" layoutY="177.0" pickOnBounds="true" />
-               <Slider fx:id="octaveSlider" blockIncrement="1.0" layoutX="67.0" layoutY="224.0" majorTickUnit="1.0" max="5.0" min="-5.0" minorTickCount="0" prefHeight="42.0" prefWidth="306.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" />
-               <SVGPath fx:id="octaveMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="373.0" layoutY="221.0" pickOnBounds="true" />
-               <Label layoutX="14.0" layoutY="223.0" text="Octave" />
+               <Slider fx:id="octaveSlider" blockIncrement="1.0" layoutX="67.0" layoutY="271.0" majorTickUnit="1.0" max="5.0" min="-5.0" minorTickCount="0" prefHeight="42.0" prefWidth="306.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" />
+               <SVGPath fx:id="octaveMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="373.0" layoutY="268.0" pickOnBounds="true" />
+               <Label layoutX="14.0" layoutY="270.0" text="Octave" />
+               <CheckBox fx:id="smoothCheckBox" layoutX="14.0" layoutY="223.0" mnemonicParsing="false" text="Smoothing" />
+               <Slider fx:id="smoothSlider" blockIncrement="1.0" disable="true" layoutX="154.0" layoutY="225.0" majorTickUnit="128.0" max="1024.0" minorTickCount="1" prefHeight="38.0" prefWidth="219.0" showTickLabels="true" showTickMarks="true" value="128.0" />
+               <SVGPath fx:id="smoothMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="373.0" layoutY="221.0" pickOnBounds="true" />
             </children>
          </AnchorPane>
      </content>
    </TitledPane>
-<TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="426.0" layoutY="318.0" maxHeight="-Infinity" maxWidth="-Infinity" prefHeight="257.0" prefWidth="402.0" text="3D .obj file settings">
+<TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="426.0" layoutY="361.0" maxHeight="-Infinity" maxWidth="-Infinity" prefHeight="257.0" prefWidth="402.0" text="3D .obj file settings">
   <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="359.0">
     <Slider fx:id="focalLengthSlider" blockIncrement="0.01" layoutX="116.0" layoutY="22.0" majorTickUnit="0.2" max="2.0" min="1.0E-5" prefHeight="42.0" prefWidth="258.0" showTickLabels="true" showTickMarks="true" value="1.0" />
     <Label layoutX="34.0" layoutY="21.0" text="Focal length" />
@@ -56,7 +59,7 @@
          <SVGPath fx:id="objectRotateSpeedMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="374.0" layoutY="118.0" pickOnBounds="true" />
   </AnchorPane>
 </TitledPane>
-   <AnchorPane id="control-pane" layoutX="12.0" layoutY="7.0" prefHeight="274.0" prefWidth="402.0">
+   <AnchorPane id="control-pane" layoutX="12.0" layoutY="7.0" prefHeight="313.0" prefWidth="402.0">
       <children>
          <Button fx:id="chooseFileButton" layoutX="14.0" layoutY="53.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose File" />
          <Label fx:id="fileLabel" layoutX="144.0" layoutY="57.0" maxWidth="270.0" prefHeight="18.0" prefWidth="246.0" text="cube.obj" />
@@ -71,7 +74,7 @@
          <CheckBox fx:id="recordCheckBox" layoutX="143.0" layoutY="146.0" mnemonicParsing="false" text="Timed record" />
       </children>
    </AnchorPane>
-   <TitledPane collapsible="false" layoutX="12.0" layoutY="289.0" prefHeight="286.0" prefWidth="402.0" text="Image settings">
+   <TitledPane collapsible="false" layoutX="12.0" layoutY="333.0" prefHeight="286.0" prefWidth="402.0" text="Image settings">
       <content>
          <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="250.0" prefWidth="402.0">
             <children>

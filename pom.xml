@@ -12,8 +12,8 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.release>16</maven.compiler.release>
-        <javafx.version>16</javafx.version>
+        <maven.compiler.release>17</maven.compiler.release>
+        <javafx.version>17</javafx.version>
         <appMainClass>sh.ball.gui.Launcher</appMainClass>
     </properties>
 
