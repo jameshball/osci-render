@@ -111,7 +111,7 @@ To uninstall, use Windows control panel, as you would expect.
 - Download the latest `osci-render-os-VERSION.jar` from [Releases](https://github.com/jameshball/osci-render/releases)
   - Download the version that is relevant to your OS, otherwise the program will not open
   - i.e. `osci-render-win-VERSION.jar` for Windows and `osci-render-unix-VERSION.jar` for Linux
-- Download and install [Java 16 or later](https://www.oracle.com/java/technologies/javase-jdk16-downloads.html)
+- Download and install [Java 17 or later](https://www.oracle.com/java/technologies/downloads/)
 - Run the following command from your terminal to run the `.jar`, substituting the correct path to your `.jar` file 
 - `java "-Dfile.encoding=UTF8" -jar "PATH/TO/osci-render-os-VERSION.jar"`
 - Start rendering!
@@ -120,7 +120,7 @@ To uninstall, use Windows control panel, as you would expect.
 
 I am using Maven for dependency management and to package the program. Doing the following will setup the project. I highly recommend using IntelliJ.
 
-- Download and install [Java 16 or later](https://www.oracle.com/java/technologies/javase-jdk16-downloads.html)
+- Download and install [Java 17 or later](https://www.oracle.com/java/technologies/downloads/)
 - Run `git clone git@github.com:jameshball/osci-render.git`
 - Open the project in IntelliJ
 - You're good to go!
