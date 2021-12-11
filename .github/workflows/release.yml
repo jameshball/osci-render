@@ -81,6 +81,7 @@ jobs:
       - name: Build with Maven
         run: |
           mvn -B package
+          mvn -B jpackage:jpackage@mac
           version=$(mvn help:evaluate -Dexpression="project.version" -q -DforceStdout)
           echo "VERSION=$version" >> $GITHUB_ENV
           mv target/lib/osci-render-$version.jar target/lib/osci-render-mac-$version.jar
@@ -89,7 +90,9 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ env.VERSION }}
-          files: target/lib/osci-render-mac-${{ env.VERSION }}.jar
+          files: |
+            target/lib/osci-render-${{ env.VERSION }}.dmg
+            target/lib/osci-render-mac-${{ env.VERSION }}.jar
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: jameshball/osci-render
