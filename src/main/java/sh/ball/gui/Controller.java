@@ -44,6 +44,7 @@ import sh.ball.audio.midi.MidiCommunicator;
 import sh.ball.audio.midi.MidiListener;
 import sh.ball.audio.midi.MidiNote;
 import sh.ball.engine.Vector3;
+import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjSettingsFactory;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.ParserFactory;
@@ -313,7 +314,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
 
     for (Slider slider : sliders.keySet()) {
       slider.valueProperty().addListener((source, oldValue, newValue) ->
-        sliders.get(slider).accept(slider.getValue())
+        sliders.get(slider).accept(newValue.doubleValue())
       );
     }
 
@@ -598,19 +599,18 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   // changes the FrameProducer e.g. could be changing from a 3D object to an
   // SVG. The old FrameProducer is stopped and a new one created and initialised
   // with the same settings that the original had.
-  private synchronized void changeFrameSource(int index) {
+  private void changeFrameSource(int index) {
     index = Math.max(0, Math.min(index, frameSources.size() - 1));
     currentFrameSource = index;
     FrameSource<List<Shape>> frames = frameSources.get(index);
     frameSources.forEach(FrameSource::disable);
     frames.enable();
-    FrameProducer<List<Shape>> newProducer = new FrameProducer<>(audioPlayer, frames);
+    producer = new FrameProducer<>(audioPlayer, frames);
 
     // Apply the same settings that the previous frameSource had
-    updateObjectRotateSpeed(rotateSpeedSlider.getValue());
+    updateObjectRotateSpeed(objectRotateSpeedSlider.getValue());
     updateFocalLength(focalLengthSlider.getValue());
-    producer = newProducer;
-    executor.submit(newProducer);
+    executor.submit(producer);
 
     // apply the wobble effect after a second as the frequency of the audio takes a while to
     // propagate and send to its listeners.
@@ -764,7 +764,6 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
       }
     } else if (command == ShortMessage.PROGRAM_CHANGE) {
       // We want to change the file that is currently playing
-
       Platform.runLater(() -> changeFrameSource(message.getMessage()[1]));
     }
   }
