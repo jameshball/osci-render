@@ -14,7 +14,7 @@ Send an email to [james@ball.sh](mailto:james@ball.sh) if you have any issues, f
 
 ### Video Demonstration
 
-[![osci-render demonstration](https://img.youtube.com/vi/feQzC_Tz5K4/0.jpg)](https://www.youtube.com/watch?v=feQzC_Tz5K4)
+[![osci-render demonstration](https://img.youtube.com/vi/enHPkFO6nZk/0.jpg)](https://www.youtube.com/watch?v=enHPkFO6nZk)
 
 ## Current Features
 
@@ -25,14 +25,18 @@ Send an email to [james@ball.sh](mailto:james@ball.sh) if you have any issues, f
 - Scaling images
 - Translating images
 - Applying image effects
+  - Bit Crush
+  - Vertical/Horizontal Distortion
+  - Image Wobble
+  - Smoothing
+  - Image Tracing
 - Save rendered audio to .wav file
 - Show current frequency of audio
 - MIDI control!
+- Frequency control
 
 ## Proposed Features
 
-- Move to a frequency-based rather than weight-based drawing system
-- Implement a trace effect
 - Support rendering of multiple objects
 - (long term) Keyframing/animating objects and camera
 
@@ -62,10 +66,12 @@ There are some additional controls for `.obj` files:
 
 Additional effects can be applied to the image such as:
 
-- Vector cancelling
+- Vector cancelling (every other audio sample is inverted)
 - Bit crush
 - Horizontal/Vertical distortion
-- Wobble (plays sin wave at same frequency as output)
+- Image Wobble (plays sin wave at same frequency as output)
+- Smoothing
+- Image Trace (traces out the image, drawing only a portion of the whole image)
 
 ### MIDI
 
@@ -77,7 +83,7 @@ To control the sliders using a MIDI slider or knob from a physical device, do th
 - Open osci-render
 - Click MIDI logo next to the slider you want to control
 - Red means the slider is 'armed' and waiting for you to choose a MIDI key to associate it with
-- Move a slider/knob etc. on your MIDI device
+- Move a CC slider/knob etc. on your MIDI device
 - The MIDI logo now turns green, and is controlled by your MIDI device!
 
 ## Running

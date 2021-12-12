@@ -10,14 +10,14 @@ import java.util.stream.Collectors;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.xml.sax.SAXException;
-import sh.ball.audio.FrameSet;
+import sh.ball.audio.FrameSource;
 import sh.ball.parser.FileParser;
-import sh.ball.shapes.ShapeFrameSet;
+import sh.ball.shapes.ShapeFrameSource;
 import sh.ball.parser.svg.SvgParser;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
-public class TextParser extends FileParser<FrameSet<List<Shape>>> {
+public class TextParser extends FileParser<FrameSource<List<Shape>>> {
 
   private static final char WIDE_CHAR = 'W';
   private static final double HEIGHT_SCALAR = 1.6;
@@ -44,7 +44,7 @@ public class TextParser extends FileParser<FrameSet<List<Shape>>> {
   }
 
   @Override
-  public FrameSet<List<Shape>> parse() throws IllegalArgumentException, IOException, ParserConfigurationException, SAXException {
+  public FrameSource<List<Shape>> parse() throws IllegalArgumentException, IOException, ParserConfigurationException, SAXException {
     List<String> text = new BufferedReader(new InputStreamReader(input, Charset.defaultCharset())).lines().collect(Collectors.toList());
     SvgParser fontParser = new SvgParser(font);
     fontParser.parse();
@@ -76,7 +76,7 @@ public class TextParser extends FileParser<FrameSet<List<Shape>>> {
       }
     }
 
-    return new ShapeFrameSet(Shape.flip(Shape.normalize(shapes)));
+    return new ShapeFrameSource(Shape.flip(Shape.normalize(shapes)));
   }
 
   public static boolean isTxtFile(String path) {

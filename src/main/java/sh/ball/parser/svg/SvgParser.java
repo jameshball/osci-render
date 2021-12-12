@@ -23,13 +23,13 @@ import org.unbescape.html.HtmlEscape;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.xml.sax.SAXException;
-import sh.ball.audio.FrameSet;
+import sh.ball.audio.FrameSource;
 import sh.ball.parser.FileParser;
-import sh.ball.shapes.ShapeFrameSet;
+import sh.ball.shapes.ShapeFrameSource;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
-public class SvgParser extends FileParser<FrameSet<List<Shape>>> {
+public class SvgParser extends FileParser<FrameSource<List<Shape>>> {
 
   private final Map<Character, BiFunction<SvgState, List<Float>, List<Shape>>> commandMap;
   private final SvgState state;
@@ -125,7 +125,7 @@ public class SvgParser extends FileParser<FrameSet<List<Shape>>> {
   }
 
   @Override
-  public FrameSet<List<Shape>> parse()
+  public FrameSource<List<Shape>> parse()
     throws ParserConfigurationException, IOException, SAXException, IllegalArgumentException {
     this.svg = getXMLDocument(input);
     List<Node> svgElem = asList(svg.getElementsByTagName("svg"));
@@ -140,7 +140,7 @@ public class SvgParser extends FileParser<FrameSet<List<Shape>>> {
       shapes.addAll(parsePath(node.getNodeValue()));
     }
 
-    return new ShapeFrameSet(Shape.normalize(shapes));
+    return new ShapeFrameSource(Shape.normalize(shapes));
   }
 
   /* Given a character, will return the glyph associated with it.
