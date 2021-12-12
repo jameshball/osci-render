@@ -83,6 +83,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   private List<FrameSource<List<Shape>>> frameSources = new ArrayList<>();
   private FrameProducer<List<Shape>> producer;
   private int currentFrameSource;
+  private Vector3 rotation;
 
   // javafx
   private final FileChooser wavFileChooser = new FileChooser();
@@ -136,12 +137,6 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   private Slider focalLengthSlider;
   @FXML
   private SVGPath focalLengthMidi;
-  @FXML
-  private TextField cameraXTextField;
-  @FXML
-  private TextField cameraYTextField;
-  @FXML
-  private TextField cameraZTextField;
   @FXML
   private Slider objectRotateSpeedSlider;
   @FXML
@@ -320,10 +315,6 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
 
     translationXTextField.textProperty().addListener(e -> updateTranslation());
     translationYTextField.textProperty().addListener(e -> updateTranslation());
-
-    cameraXTextField.focusedProperty().addListener(e -> updateCameraPos());
-    cameraYTextField.focusedProperty().addListener(e -> updateCameraPos());
-    cameraZTextField.focusedProperty().addListener(e -> updateCameraPos());
 
     InvalidationListener vectorCancellingListener = e ->
       updateEffect(EffectType.VECTOR_CANCELLING, vectorCancellingCheckBox.isSelected(),
@@ -565,22 +556,6 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     ));
   }
 
-  // updates the camera position of the FrameProducer, as well as rounding the
-  // text fields that control it
-  private void updateCameraPos() {
-    Vector3 vector = new Vector3(
-      tryParse(cameraXTextField.getText()),
-      tryParse(cameraYTextField.getText()),
-      tryParse(cameraZTextField.getText())
-    );
-
-    producer.setFrameSettings(ObjSettingsFactory.cameraPosition(vector));
-
-    cameraXTextField.setText(String.valueOf(round(vector.getX(), 3)));
-    cameraYTextField.setText(String.valueOf(round(vector.getY(), 3)));
-    cameraZTextField.setText(String.valueOf(round(vector.getZ(), 3)));
-  }
-
   // selects or deselects the given audio effect
   private void updateEffect(EffectType type, boolean checked, Effect effect) {
     if (checked) {
@@ -610,6 +585,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     // Apply the same settings that the previous frameSource had
     updateObjectRotateSpeed(objectRotateSpeedSlider.getValue());
     updateFocalLength(focalLengthSlider.getValue());
+    setObjRotate(rotation);
     executor.submit(producer);
 
     // apply the wobble effect after a second as the frequency of the audio takes a while to
@@ -704,6 +680,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
 
   // updates the 3D object rotation angle
   protected void setObjRotate(Vector3 vector) {
+    rotation = vector;
     producer.setFrameSettings(ObjSettingsFactory.rotation(vector));
   }
 
