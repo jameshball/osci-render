@@ -91,7 +91,7 @@ jobs:
         with:
           tag_name: v${{ env.VERSION }}
           files: |
-            target/lib/osci-render-${{ env.VERSION }}.dmg
+            target/lib/osci-render-${{ env.VERSION }}.pkg
             target/lib/osci-render-mac-${{ env.VERSION }}.jar
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
