@@ -1,23 +1,23 @@
 package sh.ball.parser.obj;
 
-import sh.ball.audio.FrameSet;
+import sh.ball.audio.FrameSource;
 import sh.ball.engine.Camera;
 import sh.ball.engine.Vector3;
 import sh.ball.engine.WorldObject;
 import sh.ball.shapes.Shape;
 
-import java.util.ArrayList;
 import java.util.List;
 
-public class ObjFrameSet implements FrameSet<List<Shape>> {
+public class ObjFrameSource implements FrameSource<List<Shape>> {
 
   private final WorldObject object;
   private final Camera camera;
 
   private Vector3 rotation = new Vector3();
   private Double rotateSpeed = 0.0;
+  private boolean active = true;
 
-  public ObjFrameSet(WorldObject object, Camera camera) {
+  public ObjFrameSource(WorldObject object, Camera camera) {
     this.object = object;
     this.camera = camera;
   }
@@ -30,6 +30,21 @@ public class ObjFrameSet implements FrameSet<List<Shape>> {
       object.rotate(rotation.scale(rotateSpeed));
     }
     return camera.draw(object);
+  }
+
+  @Override
+  public boolean isActive() {
+    return active;
+  }
+
+  @Override
+  public void disable() {
+    active = false;
+  }
+
+  @Override
+  public void enable() {
+    active = true;
   }
 
   // TODO: Refactor!

@@ -1,7 +1,7 @@
 package sh.ball.parser;
 
 import org.xml.sax.SAXException;
-import sh.ball.audio.FrameSet;
+import sh.ball.audio.FrameSource;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.svg.SvgParser;
 import sh.ball.parser.txt.TextParser;
@@ -14,7 +14,7 @@ import java.util.List;
 
 public class ParserFactory {
 
-  public static FileParser<FrameSet<List<Shape>>> getParser(String filePath) throws IOException, ParserConfigurationException, SAXException {
+  public static FileParser<FrameSource<List<Shape>>> getParser(String filePath) throws IOException, ParserConfigurationException, SAXException {
     if (ObjParser.isObjFile(filePath)) {
       return new ObjParser(filePath);
     } else if (SvgParser.isSvgFile(filePath)) {

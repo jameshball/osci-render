@@ -1,6 +1,6 @@
 package sh.ball.parser.obj;
 
-import sh.ball.audio.FrameSet;
+import sh.ball.audio.FrameSource;
 import sh.ball.engine.Camera;
 import sh.ball.engine.Vector3;
 import sh.ball.engine.WorldObject;
@@ -14,7 +14,7 @@ import java.util.List;
 import sh.ball.parser.FileParser;
 import sh.ball.shapes.Shape;
 
-public class ObjParser extends FileParser<FrameSet<List<Shape>>> {
+public class ObjParser extends FileParser<FrameSource<List<Shape>>> {
 
   private final boolean isDefaultPosition;
   private final InputStream input;
@@ -48,11 +48,11 @@ public class ObjParser extends FileParser<FrameSet<List<Shape>>> {
   }
 
   @Override
-  public FrameSet<List<Shape>> parse() throws IllegalArgumentException, IOException {
+  public FrameSource<List<Shape>> parse() throws IllegalArgumentException, IOException {
     object = new WorldObject(input);
     camera.findZPos(object);
 
-    return new ObjFrameSet(object, camera);
+    return new ObjFrameSource(object, camera);
   }
 
   // If camera position arguments haven't been specified, automatically work out the position of

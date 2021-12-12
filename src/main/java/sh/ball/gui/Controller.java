@@ -20,8 +20,7 @@ import java.io.InputStream;
 import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 import java.util.function.Consumer;
 
 import javafx.beans.InvalidationListener;
@@ -79,10 +78,10 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   // frames
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
-  private final List<FrameSet<List<Shape>>> frameSets = new ArrayList<>();
-  private final List<String> frameSetPaths = new ArrayList<>();
+  private final List<String> frameSourcePaths = new ArrayList<>();
+  private List<FrameSource<List<Shape>>> frameSources = new ArrayList<>();
   private FrameProducer<List<Shape>> producer;
-  private int currentFrameSet;
+  private int currentFrameSource;
 
   // javafx
   private final FileChooser wavFileChooser = new FileChooser();
@@ -207,10 +206,10 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     new Thread(midiCommunicator).start();
 
     this.audioPlayer = new ShapeAudioPlayer(ConglomerateAudioEngine::new, midiCommunicator);
-    FrameSet<List<Shape>> frames = new ObjParser(DEFAULT_OBJ).parse();
-    frameSets.add(frames);
-    frameSetPaths.add("cube.obj");
-    currentFrameSet = 0;
+    FrameSource<List<Shape>> frames = new ObjParser(DEFAULT_OBJ).parse();
+    frameSources.add(frames);
+    frameSourcePaths.add("cube.obj");
+    currentFrameSource = 0;
     this.producer = new FrameProducer<>(audioPlayer, frames);
     this.defaultDevice = audioPlayer.getDefaultDevice();
     if (defaultDevice == null) {
@@ -599,15 +598,19 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   // changes the FrameProducer e.g. could be changing from a 3D object to an
   // SVG. The old FrameProducer is stopped and a new one created and initialised
   // with the same settings that the original had.
-  private void changeFrameSet() {
-    FrameSet<List<Shape>> frames = frameSets.get(currentFrameSet);
-    producer.stop();
-    producer = new FrameProducer<>(audioPlayer, frames);
+  private synchronized void changeFrameSource(int index) {
+    index = Math.max(0, Math.min(index, frameSources.size() - 1));
+    currentFrameSource = index;
+    FrameSource<List<Shape>> frames = frameSources.get(index);
+    frameSources.forEach(FrameSource::disable);
+    frames.enable();
+    FrameProducer<List<Shape>> newProducer = new FrameProducer<>(audioPlayer, frames);
 
-    // Apply the same settings that the previous frameSet had
+    // Apply the same settings that the previous frameSource had
     updateObjectRotateSpeed(rotateSpeedSlider.getValue());
     updateFocalLength(focalLengthSlider.getValue());
-    executor.submit(producer);
+    producer = newProducer;
+    executor.submit(newProducer);
 
     // apply the wobble effect after a second as the frequency of the audio takes a while to
     // propagate and send to its listeners.
@@ -619,35 +622,36 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     Timeline timeline = new Timeline(kf1, kf2);
     Platform.runLater(timeline::play);
 
-    fileLabel.setText(frameSetPaths.get(currentFrameSet));
-    // enable the .obj file settings iff the new frameSet is for a 3D object.
-    objTitledPane.setDisable(!ObjParser.isObjFile(frameSetPaths.get(currentFrameSet)));
+    fileLabel.setText(frameSourcePaths.get(index));
+    // enable the .obj file settings iff the new frameSource is for a 3D object.
+    objTitledPane.setDisable(!ObjParser.isObjFile(frameSourcePaths.get(index)));
   }
 
   // selects a new file or folder for files to be rendered from
   private void chooseFile(File chosenFile) {
     try {
       if (chosenFile.exists()) {
-        frameSets.clear();
-        frameSetPaths.clear();
+        List<FrameSource<List<Shape>>> oldFrameSources = frameSources;
+        frameSources = new ArrayList<>();
+        frameSourcePaths.clear();
 
         if (chosenFile.isDirectory()) {
           jkLabel.setVisible(true);
           for (File file : Objects.requireNonNull(chosenFile.listFiles())) {
             try {
-              frameSets.add(ParserFactory.getParser(file.getAbsolutePath()).parse());
-              frameSetPaths.add(file.getName());
+              frameSources.add(ParserFactory.getParser(file.getAbsolutePath()).parse());
+              frameSourcePaths.add(file.getName());
             } catch (IOException ignored) {
             }
           }
         } else {
           jkLabel.setVisible(false);
-          frameSets.add(ParserFactory.getParser(chosenFile.getAbsolutePath()).parse());
-          frameSetPaths.add(chosenFile.getName());
+          frameSources.add(ParserFactory.getParser(chosenFile.getAbsolutePath()).parse());
+          frameSourcePaths.add(chosenFile.getName());
         }
 
-        currentFrameSet = 0;
-        changeFrameSet();
+        oldFrameSources.forEach(FrameSource::disable);
+        changeFrameSource(0);
       }
     } catch (IOException | ParserConfigurationException | SAXException ioException) {
       ioException.printStackTrace();
@@ -669,22 +673,22 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     this.stage = stage;
   }
 
-  // increments and changes the frameSet after pressing 'j'
+  // increments and changes the frameSource after pressing 'j'
   public void nextFrameSet() {
-    currentFrameSet++;
-    if (currentFrameSet >= frameSets.size()) {
-      currentFrameSet = 0;
+    int index = currentFrameSource + 1;
+    if (index >= frameSources.size()) {
+      index = 0;
     }
-    changeFrameSet();
+    changeFrameSource(index);
   }
 
-  // decrements and changes the frameSet after pressing 'k'
-  public void previousFrameSet() {
-    currentFrameSet--;
-    if (currentFrameSet < 0) {
-      currentFrameSet = frameSets.size() - 1;
+  // decrements and changes the frameSource after pressing 'k'
+  public void previousFrameSource() {
+    int index = currentFrameSource - 1;
+    if (index < 0) {
+      index = frameSources.size() - 1;
     }
-    changeFrameSet();
+    changeFrameSource(index);
   }
 
   // determines whether the mouse is being used to rotate a 3D object
@@ -758,6 +762,10 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
         }
         slider.setValue(sliderValue);
       }
+    } else if (command == ShortMessage.PROGRAM_CHANGE) {
+      // We want to change the file that is currently playing
+
+      Platform.runLater(() -> changeFrameSource(message.getMessage()[1]));
     }
   }
 }
