@@ -86,13 +86,13 @@ To control the sliders using a MIDI slider or knob from a physical device, do th
 - Move a CC slider/knob etc. on your MIDI device
 - The MIDI logo now turns green, and is controlled by your MIDI device!
 
-## Running
+## Installing
 
-Head over to [Releases](https://github.com/jameshball/osci-render/releases) and download the latest `.exe`, `.deb`, or `.jar`.
+Head over to [Releases](https://github.com/jameshball/osci-render/releases) and download the latest `.exe`, `.pkg`, `.deb`, or `.jar`.
 
-`.exe` or `.deb` is recommended, if possible, as it is simpler to get up and running.
+`.exe`, `.pkg`, or `.deb` is recommended, if possible, as it is simpler to get up and running.
 
-### Running using .exe
+### Installing using .exe (Windows)
 
 - Download the latest `osci-render-VERSION.exe` from [Releases](https://github.com/jameshball/osci-render/releases)
 - Open the `.exe` skipping any Windows security warnings
@@ -104,7 +104,19 @@ Updating to later versions is as simple as running the latest `osci-render-VERSI
 
 To uninstall, use Windows control panel, as you would expect.
 
-### Running using .deb
+### Installing using .pkg (macOS)
+
+- Download the latest `osci-render-VERSION.pkg` from [Releases](https://github.com/jameshball/osci-render/releases)
+- Since I haven't paid for a developer licence, you'll be warned that it is from an 'unidentified developer' when trying to run the installer
+- To mitigate this, do the following (explained on the [macOS User Guide](https://support.apple.com/en-gb/guide/mac-help/mh40616/mac))
+  - Locate the downloaded `.pkg` file in Finder
+  - Control-click the file, and choose Open from the shortcut menu
+  - Click Open
+- Follow the steps in the installer
+- Open `osci-render` from the Launchpad
+- Start rendering!
+
+### Installing using .deb (Ubuntu)
 
 - Download the latest `osci-render_VERSION-1_amd64.deb` from [Releases](https://github.com/jameshball/osci-render/releases)
 - Install as usual, according to your distro
@@ -112,7 +124,7 @@ To uninstall, use Windows control panel, as you would expect.
 - After installing, you can execute `/opt/osci-render/bin/osci-render` to run!
 - Start rendering!
 
-### Running using .jar
+### Running using .jar (all platforms)
 
 - Download the latest `osci-render-os-VERSION.jar` from [Releases](https://github.com/jameshball/osci-render/releases)
   - Download the version that is relevant to your OS, otherwise the program will not open
