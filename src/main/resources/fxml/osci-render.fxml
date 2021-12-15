@@ -4,15 +4,19 @@
 <?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Menu?>
+<?import javafx.scene.control.MenuBar?>
+<?import javafx.scene.control.MenuItem?>
 <?import javafx.scene.control.Slider?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.TitledPane?>
+<?import javafx.scene.input.KeyCodeCombination?>
 <?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.shape.SVGPath?>
 <?import javafx.scene.text.Font?>
 
-<AnchorPane prefHeight="628.0" prefWidth="837.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1">
-   <TitledPane animated="false" collapsible="false" layoutX="426.0" layoutY="8.0" prefHeight="387.0" prefWidth="402.0" text="Audio Effects">
+<AnchorPane prefHeight="658.0" prefWidth="837.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1">
+   <TitledPane animated="false" collapsible="false" layoutX="424.0" layoutY="38.0" prefHeight="387.0" prefWidth="402.0" text="Audio Effects">
      <content>
        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="262.0" prefWidth="402.0">
             <children>
@@ -41,7 +45,7 @@
          </AnchorPane>
      </content>
    </TitledPane>
-<TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="426.0" layoutY="406.0" maxHeight="-Infinity" maxWidth="-Infinity" prefHeight="213.0" prefWidth="402.0" text="3D .obj file settings">
+<TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="424.0" layoutY="436.0" maxHeight="-Infinity" maxWidth="-Infinity" prefHeight="213.0" prefWidth="402.0" text="3D .obj file settings">
   <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="359.0">
     <Slider fx:id="focalLengthSlider" blockIncrement="0.01" layoutX="116.0" layoutY="22.0" majorTickUnit="0.2" max="2.0" min="1.0E-5" prefHeight="42.0" prefWidth="258.0" showTickLabels="true" showTickMarks="true" value="1.0" />
     <Label layoutX="34.0" layoutY="21.0" text="Focal length" />
@@ -52,7 +56,7 @@
          <SVGPath fx:id="objectRotateSpeedMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="374.0" layoutY="78.0" pickOnBounds="true" />
   </AnchorPane>
 </TitledPane>
-   <AnchorPane id="control-pane" layoutX="12.0" layoutY="7.0" prefHeight="313.0" prefWidth="402.0">
+   <AnchorPane id="control-pane" layoutX="10.0" layoutY="37.0" prefHeight="313.0" prefWidth="402.0">
       <children>
          <Button fx:id="chooseFileButton" layoutX="14.0" layoutY="53.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose File" />
          <Label fx:id="fileLabel" layoutX="144.0" layoutY="57.0" maxWidth="270.0" prefHeight="18.0" prefWidth="246.0" text="cube.obj" />
@@ -70,7 +74,7 @@
          <Label layoutX="12.0" layoutY="270.0" text="Octave" />
       </children>
    </AnchorPane>
-   <TitledPane collapsible="false" layoutX="12.0" layoutY="333.0" prefHeight="286.0" prefWidth="402.0" text="Image settings">
+   <TitledPane collapsible="false" layoutX="10.0" layoutY="363.0" prefHeight="286.0" prefWidth="402.0" text="Image settings">
       <content>
          <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="250.0" prefWidth="402.0">
             <children>
@@ -132,4 +136,22 @@
          </AnchorPane>
       </content>
    </TitledPane>
+   <MenuBar prefHeight="27.0" prefWidth="838.0">
+     <menus>
+       <Menu mnemonicParsing="false" text="File">
+            <items>
+               <MenuItem fx:id="openProjectMenuItem" mnemonicParsing="false" text="Open Project">
+                  <accelerator>
+                     <KeyCodeCombination alt="UP" code="O" control="UP" meta="UP" shift="UP" shortcut="DOWN" />
+                  </accelerator>
+               </MenuItem>
+               <MenuItem fx:id="saveProjectMenuItem" mnemonicParsing="false" text="Save Project">
+                  <accelerator>
+                     <KeyCodeCombination alt="UP" code="S" control="UP" meta="UP" shift="UP" shortcut="DOWN" />
+                  </accelerator>
+               </MenuItem>
+            </items>
+       </Menu>
+     </menus>
+   </MenuBar>
 </AnchorPane>
