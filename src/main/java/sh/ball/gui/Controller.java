@@ -195,6 +195,10 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   private SVGPath visibilityMidi;
   @FXML
   private ComboBox<AudioDevice> deviceComboBox;
+  @FXML
+  private MenuItem openProjectMenuItem;
+  @FXML
+  private MenuItem saveProjectMenuItem;
 
   public Controller() throws Exception {
     MidiCommunicator midiCommunicator = new MidiCommunicator();
