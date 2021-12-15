@@ -1,6 +1,7 @@
 /target
 /.idea
 osci-render.iml
+*.osci
 
 # ignore temporary files
 *~

@@ -11,6 +11,10 @@ import javafx.scene.paint.Paint;
 import javafx.scene.shape.SVGPath;
 import javafx.stage.DirectoryChooser;
 import javafx.util.Duration;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 import sh.ball.audio.*;
 import sh.ball.audio.effect.*;
 
@@ -33,7 +37,16 @@ import javax.sound.midi.ShortMessage;
 import javax.sound.sampled.AudioFileFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerConfigurationException;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 
 import org.xml.sax.SAXException;
 import sh.ball.audio.effect.Effect;
@@ -369,6 +382,9 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
 
     traceSlider.valueProperty().addListener(traceListener);
     traceCheckBox.selectedProperty().addListener(traceListener);
+
+    saveProjectMenuItem.setOnAction(e -> saveProject());
+    openProjectMenuItem.setOnAction(e -> openProject());
 
     wavFileChooser.setInitialFileName("out.wav");
     wavFileChooser.getExtensionFilters().addAll(
@@ -746,6 +762,84 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     } else if (command == ShortMessage.PROGRAM_CHANGE) {
       // We want to change the file that is currently playing
       Platform.runLater(() -> changeFrameSource(message.getMessage()[1]));
+    }
+  }
+
+  // must be functions, otherwise they are not initialised
+  private List<Slider> checkBoxSliders() {
+    return List.of(vectorCancellingSlider, bitCrushSlider, verticalDistortSlider,
+      horizontalDistortSlider, wobbleSlider, smoothSlider, traceSlider);
+  }
+  private List<String> checkBoxLabels() {
+    return List.of("vectorCancelling", "bitCrush", "verticalDistort", "horizontalDistort",
+      "wobble", "smooth", "trace");
+  }
+  private List<Slider> otherSliders() {
+    return List.of(octaveSlider, frequencySlider, rotateSpeedSlider, translationSpeedSlider,
+      volumeSlider, visibilitySlider, focalLengthSlider, objectRotateSpeedSlider);
+  }
+  private List<String> otherLabels() {
+    return List.of("octave", "frequency", "rotateSpeed", "translationSpeed", "volume",
+      "visibility", "focalLength", "objectRotateSpeed");
+  }
+
+  private void appendSliders(List<Slider> sliders, List<String> labels, Element root, Document document) {
+    for (int i = 0; i < sliders.size(); i++) {
+      Element sliderElement = document.createElement(labels.get(i));
+      sliderElement.appendChild(
+        document.createTextNode(sliders.get(i).valueProperty().getValue().toString())
+      );
+      root.appendChild(sliderElement);
+    }
+  }
+
+  private void loadSliderValues(List<Slider> sliders, List<String> labels, Element root) {
+    for (int i = 0; i < sliders.size(); i++) {
+      String value = root.getElementsByTagName(labels.get(i)).item(0).getTextContent();
+      sliders.get(i).setValue(Float.parseFloat(value));
+    }
+  }
+
+  private void saveProject() {
+    try {
+      DocumentBuilderFactory documentFactory = DocumentBuilderFactory.newInstance();
+      DocumentBuilder documentBuilder = documentFactory.newDocumentBuilder();
+      Document document = documentBuilder.newDocument();
+
+      Element root = document.createElement("project");
+      document.appendChild(root);
+
+      Element sliders = document.createElement("sliders");
+      appendSliders(checkBoxSliders(), checkBoxLabels(), sliders, document);
+      appendSliders(otherSliders(), otherLabels(), sliders, document);
+      root.appendChild(sliders);
+
+      TransformerFactory transformerFactory = TransformerFactory.newInstance();
+      Transformer transformer = transformerFactory.newTransformer();
+      DOMSource domSource = new DOMSource(document);
+      StreamResult streamResult = new StreamResult(new File("test.osci"));
+
+      transformer.transform(domSource, streamResult);
+    } catch (ParserConfigurationException | TransformerException e) {
+      e.printStackTrace();
+    }
+  }
+
+  private void openProject() {
+    try {
+      DocumentBuilderFactory documentFactory = DocumentBuilderFactory.newInstance();
+      documentFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+      DocumentBuilder documentBuilder = documentFactory.newDocumentBuilder();
+
+      Document doc = documentBuilder.parse(new File("test.osci"));
+      doc.getDocumentElement().normalize();
+
+      Element root = doc.getDocumentElement();
+      Element sliders = (Element) root.getElementsByTagName("sliders").item(0);
+      loadSliderValues(checkBoxSliders(), checkBoxLabels(), sliders);
+      loadSliderValues(otherSliders(), otherLabels(), sliders);
+    } catch (ParserConfigurationException | SAXException | IOException e) {
+      e.printStackTrace();
     }
   }
 }
