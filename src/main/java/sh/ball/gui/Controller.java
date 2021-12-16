@@ -13,15 +13,13 @@ import javafx.stage.DirectoryChooser;
 import javafx.util.Duration;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import sh.ball.audio.*;
 import sh.ball.audio.effect.*;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URL;
+import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.*;
@@ -89,6 +87,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   // frames
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
+  private final List<byte[]> openFiles = new ArrayList<>();
   private final List<String> frameSourcePaths = new ArrayList<>();
   private List<FrameSource<List<Shape>>> frameSources = new ArrayList<>();
   private FrameProducer<List<Shape>> producer;
@@ -216,7 +215,15 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     new Thread(midiCommunicator).start();
 
     this.audioPlayer = new ShapeAudioPlayer(ConglomerateAudioEngine::new, midiCommunicator);
-    FrameSource<List<Shape>> frames = new ObjParser(DEFAULT_OBJ).parse();
+
+    // Clone DEFAULT_OBJ InputStream using a ByteArrayOutputStream
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    assert DEFAULT_OBJ != null;
+    DEFAULT_OBJ.transferTo(baos);
+    InputStream objClone = new ByteArrayInputStream(baos.toByteArray());
+    FrameSource<List<Shape>> frames = new ObjParser(objClone).parse();
+
+    openFiles.add(baos.toByteArray());
     frameSources.add(frames);
     frameSourcePaths.add("cube.obj");
     currentFrameSource = 0;
@@ -620,31 +627,42 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     objTitledPane.setDisable(!ObjParser.isObjFile(frameSourcePaths.get(index)));
   }
 
+  private void updateFiles(List<byte[]> files, List<String> names) throws IOException, ParserConfigurationException, SAXException {
+    List<FrameSource<List<Shape>>> oldFrameSources = frameSources;
+    frameSources = new ArrayList<>();
+    frameSourcePaths.clear();
+    openFiles.clear();
+    jkLabel.setVisible(files.size() > 1);
+
+    for (int i = 0; i < files.size(); i++) {
+      try {
+        frameSources.add(ParserFactory.getParser(names.get(i), files.get(i)).parse());
+        frameSourcePaths.add(names.get(i));
+        openFiles.add(files.get(i));
+      } catch (IOException ignored) {}
+    }
+
+    oldFrameSources.forEach(FrameSource::disable);
+    changeFrameSource(0);
+  }
+
   // selects a new file or folder for files to be rendered from
   private void chooseFile(File chosenFile) {
     try {
       if (chosenFile.exists()) {
-        List<FrameSource<List<Shape>>> oldFrameSources = frameSources;
-        frameSources = new ArrayList<>();
-        frameSourcePaths.clear();
-
+        List<byte[]> files = new ArrayList<>();
+        List<String> names = new ArrayList<>();
         if (chosenFile.isDirectory()) {
-          jkLabel.setVisible(true);
           for (File file : Objects.requireNonNull(chosenFile.listFiles())) {
-            try {
-              frameSources.add(ParserFactory.getParser(file.getAbsolutePath()).parse());
-              frameSourcePaths.add(file.getName());
-            } catch (IOException ignored) {
-            }
+            files.add(Files.readAllBytes(file.toPath()));
+            names.add(file.getName());
           }
         } else {
-          jkLabel.setVisible(false);
-          frameSources.add(ParserFactory.getParser(chosenFile.getAbsolutePath()).parse());
-          frameSourcePaths.add(chosenFile.getName());
+          files.add(Files.readAllBytes(chosenFile.toPath()));
+          names.add(chosenFile.getName());
         }
 
-        oldFrameSources.forEach(FrameSource::disable);
-        changeFrameSource(0);
+        updateFiles(files, names);
       }
     } catch (IOException | ParserConfigurationException | SAXException ioException) {
       ioException.printStackTrace();
@@ -668,6 +686,9 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
 
   // increments and changes the frameSource after pressing 'j'
   public void nextFrameSet() {
+    if (frameSources.size() == 1) {
+      return;
+    }
     int index = currentFrameSource + 1;
     if (index >= frameSources.size()) {
       index = 0;
@@ -677,6 +698,9 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
 
   // decrements and changes the frameSource after pressing 'k'
   public void previousFrameSource() {
+    if (frameSources.size() == 1) {
+      return;
+    }
     int index = currentFrameSource - 1;
     if (index < 0) {
       index = frameSources.size() - 1;
@@ -880,6 +904,20 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
       objectRotationElement.appendChild(objectRotationZElement);
       root.appendChild(objectRotationElement);
 
+      Element filesElement = document.createElement("files");
+      for (int i = 0; i < openFiles.size(); i++) {
+        Element fileElement = document.createElement("file");
+        Element fileNameElement = document.createElement("name");
+        fileNameElement.appendChild(document.createTextNode(frameSourcePaths.get(i)));
+        Element dataElement = document.createElement("data");
+        String encodedData = Base64.getEncoder().encodeToString(openFiles.get(i));
+        dataElement.appendChild(document.createTextNode(encodedData));
+        fileElement.appendChild(fileNameElement);
+        fileElement.appendChild(dataElement);
+        filesElement.appendChild(fileElement);
+      }
+      root.appendChild(filesElement);
+
       TransformerFactory transformerFactory = TransformerFactory.newInstance();
       Transformer transformer = transformerFactory.newTransformer();
       DOMSource domSource = new DOMSource(document);
@@ -958,6 +996,19 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
         Double.parseDouble(objectRotationZElement.getTextContent())
       );
       setObjRotate(rotation);
+
+      Element filesElement = (Element) root.getElementsByTagName("files").item(0);
+      List<byte[]> files = new ArrayList<>();
+      List<String> fileNames = new ArrayList<>();
+      NodeList fileElements = filesElement.getElementsByTagName("file");
+      for (int i = 0; i < fileElements.getLength(); i++) {
+        Element fileElement = (Element) fileElements.item(i);
+        String fileData = fileElement.getElementsByTagName("data").item(0).getTextContent();
+        files.add(Base64.getDecoder().decode(fileData));
+        String fileName = fileElement.getElementsByTagName("name").item(0).getTextContent();
+        fileNames.add(fileName);
+      }
+      updateFiles(files, fileNames);
     } catch (ParserConfigurationException | SAXException | IOException e) {
       e.printStackTrace();
     }

@@ -33,6 +33,10 @@ public class TextParser extends FileParser<FrameSource<List<Shape>>> {
     this.charToShape = new HashMap<>();
   }
 
+  public TextParser(InputStream input) {
+    this(input, TextParser.class.getResourceAsStream(DEFAULT_FONT));
+  }
+
   public TextParser(String path) throws FileNotFoundException {
     this(new FileInputStream(path), TextParser.class.getResourceAsStream(DEFAULT_FONT));
     checkFileExtension(path);
