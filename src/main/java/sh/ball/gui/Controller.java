@@ -766,6 +766,10 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   }
 
   // must be functions, otherwise they are not initialised
+  private List<CheckBox> checkBoxes() {
+    return List.of(vectorCancellingCheckBox, bitCrushCheckBox, verticalDistortCheckBox,
+      horizontalDistortCheckBox, wobbleCheckBox, smoothCheckBox, traceCheckBox);
+  }
   private List<Slider> checkBoxSliders() {
     return List.of(vectorCancellingSlider, bitCrushSlider, verticalDistortSlider,
       horizontalDistortSlider, wobbleSlider, smoothSlider, traceSlider);
@@ -809,10 +813,26 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
       Element root = document.createElement("project");
       document.appendChild(root);
 
+      List<CheckBox> checkBoxes = checkBoxes();
+      List<Slider> checkBoxSliders = checkBoxSliders();
+      List<String> checkBoxLabels = checkBoxLabels();
+      List<Slider> otherSliders = otherSliders();
+      List<String> otherLabels = otherLabels();
+
       Element sliders = document.createElement("sliders");
-      appendSliders(checkBoxSliders(), checkBoxLabels(), sliders, document);
-      appendSliders(otherSliders(), otherLabels(), sliders, document);
+      appendSliders(checkBoxSliders, checkBoxLabels, sliders, document);
+      appendSliders(otherSliders, otherLabels, sliders, document);
       root.appendChild(sliders);
+
+      Element checkBoxesElement = document.createElement("checkBoxes");
+      for (int i = 0; i < checkBoxes.size(); i++) {
+        Element checkBox = document.createElement(checkBoxLabels.get(i));
+        checkBox.appendChild(
+          document.createTextNode(checkBoxes.get(i).selectedProperty().getValue().toString())
+        );
+        checkBoxesElement.appendChild(checkBox);
+      }
+      root.appendChild(checkBoxesElement);
 
       TransformerFactory transformerFactory = TransformerFactory.newInstance();
       Transformer transformer = transformerFactory.newTransformer();
@@ -834,10 +854,22 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
       Document doc = documentBuilder.parse(new File("test.osci"));
       doc.getDocumentElement().normalize();
 
+      List<CheckBox> checkBoxes = checkBoxes();
+      List<Slider> checkBoxSliders = checkBoxSliders();
+      List<String> checkBoxLabels = checkBoxLabels();
+      List<Slider> otherSliders = otherSliders();
+      List<String> otherLabels = otherLabels();
+
       Element root = doc.getDocumentElement();
       Element sliders = (Element) root.getElementsByTagName("sliders").item(0);
-      loadSliderValues(checkBoxSliders(), checkBoxLabels(), sliders);
-      loadSliderValues(otherSliders(), otherLabels(), sliders);
+      loadSliderValues(checkBoxSliders, checkBoxLabels, sliders);
+      loadSliderValues(otherSliders, otherLabels, sliders);
+
+      Element checkBoxesElement = (Element) root.getElementsByTagName("checkBoxes").item(0);
+      for (int i = 0; i < checkBoxes.size(); i++) {
+        String value = checkBoxesElement.getElementsByTagName(checkBoxLabels.get(i)).item(0).getTextContent();
+        checkBoxes.get(i).setSelected(Boolean.parseBoolean(value));
+      }
     } catch (ParserConfigurationException | SAXException | IOException e) {
       e.printStackTrace();
     }
