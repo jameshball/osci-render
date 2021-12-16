@@ -42,7 +42,6 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
@@ -57,14 +56,12 @@ import sh.ball.audio.midi.MidiCommunicator;
 import sh.ball.audio.midi.MidiListener;
 import sh.ball.audio.midi.MidiNote;
 import sh.ball.engine.Vector3;
-import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjSettingsFactory;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.ParserFactory;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
-import static sh.ball.math.Math.round;
 import static sh.ball.math.Math.tryParse;
 
 public class Controller implements Initializable, FrequencyListener, MidiListener {
@@ -711,6 +708,17 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     );
   }
 
+  private void mapMidiCC(int cc, SVGPath midiButton) {
+    if (CCMap.containsValue(midiButton)) {
+      CCMap.values().remove(midiButton);
+    }
+    if (CCMap.containsKey(cc)) {
+      CCMap.get(cc).setFill(Color.WHITE);
+    }
+    CCMap.put(cc, midiButton);
+    midiButton.setFill(Color.LIME);
+  }
+
   // converts MIDI pressure value into a valid value for a slider
   private double midiPressureToPressure(Slider slider, int midiPressure) {
     double max = slider.getMax();
@@ -730,27 +738,20 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
 
     // the audioPlayer handles all non-CC MIDI messages
     if (command == ShortMessage.CONTROL_CHANGE) {
-      int id = message.getData1();
+      int cc = message.getData1();
       int value = message.getData2();
 
       // if a user has selected a MIDI logo next to a slider, create a mapping
       // between the MIDI channel and the SVG MIDI logo
       if (armedMidi != null) {
-        if (CCMap.containsValue(armedMidi)) {
-          CCMap.values().remove(armedMidi);
-        }
-        if (CCMap.containsKey(id)) {
-          CCMap.get(id).setFill(Color.WHITE);
-        }
-        CCMap.put(id, armedMidi);
-        armedMidi.setFill(Color.LIME);
+        mapMidiCC(cc, armedMidi);
         armedMidiPaint = null;
         armedMidi = null;
       }
       // If there is a slider associated with the MIDI channel, update the value
       // of it
-      if (CCMap.containsKey(id)) {
-        Slider slider = midiButtonMap.get(CCMap.get(id));
+      if (CCMap.containsKey(cc)) {
+        Slider slider = midiButtonMap.get(CCMap.get(cc));
         double sliderValue = midiPressureToPressure(slider, value);
 
         if (slider.isSnapToTicks()) {
@@ -786,6 +787,16 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     return List.of("octave", "frequency", "rotateSpeed", "translationSpeed", "volume",
       "visibility", "focalLength", "objectRotateSpeed");
   }
+  private List<Slider> allSliders() {
+    List<Slider> sliders = new ArrayList<>(checkBoxSliders());
+    sliders.addAll(otherSliders());
+    return sliders;
+  }
+  private List<String> allLabels() {
+    List<String> labels = new ArrayList<>(checkBoxLabels());
+    labels.addAll(otherLabels());
+    return labels;
+  }
 
   private void appendSliders(List<Slider> sliders, List<String> labels, Element root, Document document) {
     for (int i = 0; i < sliders.size(); i++) {
@@ -813,16 +824,19 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
       Element root = document.createElement("project");
       document.appendChild(root);
 
+      // Is there a nicer way of doing this?!
       List<CheckBox> checkBoxes = checkBoxes();
       List<Slider> checkBoxSliders = checkBoxSliders();
       List<String> checkBoxLabels = checkBoxLabels();
       List<Slider> otherSliders = otherSliders();
       List<String> otherLabels = otherLabels();
+      List<Slider> sliders = allSliders();
+      List<String> labels = allLabels();
 
-      Element sliders = document.createElement("sliders");
-      appendSliders(checkBoxSliders, checkBoxLabels, sliders, document);
-      appendSliders(otherSliders, otherLabels, sliders, document);
-      root.appendChild(sliders);
+      Element slidersElement = document.createElement("sliders");
+      appendSliders(checkBoxSliders, checkBoxLabels, slidersElement, document);
+      appendSliders(otherSliders, otherLabels, slidersElement, document);
+      root.appendChild(slidersElement);
 
       Element checkBoxesElement = document.createElement("checkBoxes");
       for (int i = 0; i < checkBoxes.size(); i++) {
@@ -834,6 +848,17 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
       }
       root.appendChild(checkBoxesElement);
 
+      Element midiElement = document.createElement("midi");
+      for (Map.Entry<Integer, SVGPath> entry : CCMap.entrySet()) {
+        Slider slider = midiButtonMap.get(entry.getValue());
+        int index = sliders.indexOf(slider);
+        Integer cc = entry.getKey();
+        Element midiChannel = document.createElement(labels.get(index));
+        midiChannel.appendChild(document.createTextNode(cc.toString()));
+        midiElement.appendChild(midiChannel);
+      }
+      root.appendChild(midiElement);
+
       TransformerFactory transformerFactory = TransformerFactory.newInstance();
       Transformer transformer = transformerFactory.newTransformer();
       DOMSource domSource = new DOMSource(document);
@@ -843,6 +868,13 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     } catch (ParserConfigurationException | TransformerException e) {
       e.printStackTrace();
     }
+  }
+
+  private void resetCCMap() {
+    armedMidi = null;
+    armedMidiPaint = null;
+    CCMap.clear();
+    midiButtonMap.keySet().forEach(button -> button.setFill(Color.WHITE));
   }
 
   private void openProject() {
@@ -859,17 +891,35 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
       List<String> checkBoxLabels = checkBoxLabels();
       List<Slider> otherSliders = otherSliders();
       List<String> otherLabels = otherLabels();
+      List<Slider> sliders = allSliders();
+      List<String> labels = allLabels();
 
       Element root = doc.getDocumentElement();
-      Element sliders = (Element) root.getElementsByTagName("sliders").item(0);
-      loadSliderValues(checkBoxSliders, checkBoxLabels, sliders);
-      loadSliderValues(otherSliders, otherLabels, sliders);
+      Element slidersElement = (Element) root.getElementsByTagName("sliders").item(0);
+      loadSliderValues(checkBoxSliders, checkBoxLabels, slidersElement);
+      loadSliderValues(otherSliders, otherLabels, slidersElement);
 
       Element checkBoxesElement = (Element) root.getElementsByTagName("checkBoxes").item(0);
       for (int i = 0; i < checkBoxes.size(); i++) {
         String value = checkBoxesElement.getElementsByTagName(checkBoxLabels.get(i)).item(0).getTextContent();
         checkBoxes.get(i).setSelected(Boolean.parseBoolean(value));
       }
+
+      Element midiElement = (Element) root.getElementsByTagName("midi").item(0);
+      resetCCMap();
+      for (int i = 0; i < labels.size(); i++) {
+        NodeList elements = midiElement.getElementsByTagName(labels.get(i));
+        if (elements.getLength() > 0) {
+          Element midi = (Element) elements.item(0);
+          int cc = Integer.parseInt(midi.getTextContent());
+          Slider slider = sliders.get(i);
+          SVGPath midiButton = midiButtonMap.entrySet().stream()
+            .filter(entry -> entry.getValue() == slider)
+            .findFirst().orElseThrow().getKey();
+          mapMidiCC(cc, midiButton);
+        }
+      }
+      root.appendChild(midiElement);
     } catch (ParserConfigurationException | SAXException | IOException e) {
       e.printStackTrace();
     }
