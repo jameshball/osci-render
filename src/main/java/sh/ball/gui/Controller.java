@@ -93,7 +93,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   private List<FrameSource<List<Shape>>> frameSources = new ArrayList<>();
   private FrameProducer<List<Shape>> producer;
   private int currentFrameSource;
-  private Vector3 rotation;
+  private Vector3 rotation = new Vector3();
 
   // javafx
   private final FileChooser wavFileChooser = new FileChooser();
@@ -859,6 +859,27 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
       }
       root.appendChild(midiElement);
 
+      Element translationElement = document.createElement("translation");
+      Element translationXElement = document.createElement("x");
+      translationXElement.appendChild(document.createTextNode(translationXTextField.getText()));
+      Element translationYElement = document.createElement("y");
+      translationYElement.appendChild(document.createTextNode(translationYTextField.getText()));
+      translationElement.appendChild(translationXElement);
+      translationElement.appendChild(translationYElement);
+      root.appendChild(translationElement);
+
+      Element objectRotationElement = document.createElement("objectRotation");
+      Element objectRotationXElement = document.createElement("x");
+      objectRotationXElement.appendChild(document.createTextNode(Double.toString(rotation.getX())));
+      Element objectRotationYElement = document.createElement("y");
+      objectRotationYElement.appendChild(document.createTextNode(Double.toString(rotation.getY())));
+      Element objectRotationZElement = document.createElement("z");
+      objectRotationZElement.appendChild(document.createTextNode(Double.toString(rotation.getZ())));
+      objectRotationElement.appendChild(objectRotationXElement);
+      objectRotationElement.appendChild(objectRotationYElement);
+      objectRotationElement.appendChild(objectRotationZElement);
+      root.appendChild(objectRotationElement);
+
       TransformerFactory transformerFactory = TransformerFactory.newInstance();
       Transformer transformer = transformerFactory.newTransformer();
       DOMSource domSource = new DOMSource(document);
@@ -920,6 +941,23 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
         }
       }
       root.appendChild(midiElement);
+
+      Element translationElement = (Element) root.getElementsByTagName("translation").item(0);
+      Element translationXElement = (Element) translationElement.getElementsByTagName("x").item(0);
+      Element translationYElement = (Element) translationElement.getElementsByTagName("y").item(0);
+      translationXTextField.setText(translationXElement.getTextContent());
+      translationYTextField.setText(translationYElement.getTextContent());
+
+      Element objectRotationElement = (Element) root.getElementsByTagName("objectRotation").item(0);
+      Element objectRotationXElement = (Element) objectRotationElement.getElementsByTagName("x").item(0);
+      Element objectRotationYElement = (Element) objectRotationElement.getElementsByTagName("y").item(0);
+      Element objectRotationZElement = (Element) objectRotationElement.getElementsByTagName("z").item(0);
+      rotation = new Vector3(
+        Double.parseDouble(objectRotationXElement.getTextContent()),
+        Double.parseDouble(objectRotationYElement.getTextContent()),
+        Double.parseDouble(objectRotationZElement.getTextContent())
+      );
+      setObjRotate(rotation);
     } catch (ParserConfigurationException | SAXException | IOException e) {
       e.printStackTrace();
     }
