@@ -95,6 +95,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   private Vector3 rotation = new Vector3();
 
   // javafx
+  private final FileChooser osciFileChooser = new FileChooser();
   private final FileChooser wavFileChooser = new FileChooser();
   private final FileChooser renderFileChooser = new FileChooser();
   private final DirectoryChooser folderChooser = new DirectoryChooser();
@@ -387,9 +388,10 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     traceSlider.valueProperty().addListener(traceListener);
     traceCheckBox.selectedProperty().addListener(traceListener);
 
-    saveProjectMenuItem.setOnAction(e -> saveProject());
-    openProjectMenuItem.setOnAction(e -> openProject());
-
+    osciFileChooser.setInitialFileName("project.osci");
+    osciFileChooser.getExtensionFilters().add(
+      new FileChooser.ExtensionFilter("osci-render files", "*.osci")
+    );
     wavFileChooser.setInitialFileName("out.wav");
     wavFileChooser.getExtensionFilters().addAll(
       new FileChooser.ExtensionFilter("WAV Files", "*.wav"),
@@ -402,6 +404,22 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
       new FileChooser.ExtensionFilter("SVG Files", "*.svg"),
       new FileChooser.ExtensionFilter("Text Files", "*.txt")
     );
+
+    saveProjectMenuItem.setOnAction(e -> {
+      File file = osciFileChooser.showSaveDialog(stage);
+      if (file != null) {
+        updateLastVisitedDirectory(new File(file.getParent()));
+        saveProject(file.getAbsolutePath());
+      }
+    });
+
+    openProjectMenuItem.setOnAction(e -> {
+      File file = osciFileChooser.showOpenDialog(stage);
+      if (file != null) {
+        updateLastVisitedDirectory(new File(file.getParent()));
+        openProject(file.getAbsolutePath());
+      }
+    });
 
     chooseFileButton.setOnAction(e -> {
       File file = renderFileChooser.showOpenDialog(stage);
@@ -453,6 +471,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   private void updateLastVisitedDirectory(File file) {
     String lastVisitedDirectory = file != null ? file.getAbsolutePath() : System.getProperty("user.home");
     File dir = new File(lastVisitedDirectory);
+    osciFileChooser.setInitialDirectory(dir);
     wavFileChooser.setInitialDirectory(dir);
     renderFileChooser.setInitialDirectory(dir);
     folderChooser.setInitialDirectory(dir);
@@ -839,7 +858,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     }
   }
 
-  private void saveProject() {
+  private void saveProject(String projectFileName) {
     try {
       DocumentBuilderFactory documentFactory = DocumentBuilderFactory.newInstance();
       DocumentBuilder documentBuilder = documentFactory.newDocumentBuilder();
@@ -921,7 +940,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
       TransformerFactory transformerFactory = TransformerFactory.newInstance();
       Transformer transformer = transformerFactory.newTransformer();
       DOMSource domSource = new DOMSource(document);
-      StreamResult streamResult = new StreamResult(new File("test.osci"));
+      StreamResult streamResult = new StreamResult(new File(projectFileName));
 
       transformer.transform(domSource, streamResult);
     } catch (ParserConfigurationException | TransformerException e) {
@@ -936,14 +955,14 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     midiButtonMap.keySet().forEach(button -> button.setFill(Color.WHITE));
   }
 
-  private void openProject() {
+  private void openProject(String projectFileName) {
     try {
       DocumentBuilderFactory documentFactory = DocumentBuilderFactory.newInstance();
       documentFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
       DocumentBuilder documentBuilder = documentFactory.newDocumentBuilder();
 
-      Document doc = documentBuilder.parse(new File("test.osci"));
-      doc.getDocumentElement().normalize();
+      Document document = documentBuilder.parse(new File(projectFileName));
+      document.getDocumentElement().normalize();
 
       List<CheckBox> checkBoxes = checkBoxes();
       List<Slider> checkBoxSliders = checkBoxSliders();
@@ -953,7 +972,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
       List<Slider> sliders = allSliders();
       List<String> labels = allLabels();
 
-      Element root = doc.getDocumentElement();
+      Element root = document.getDocumentElement();
       Element slidersElement = (Element) root.getElementsByTagName("sliders").item(0);
       loadSliderValues(checkBoxSliders, checkBoxLabels, slidersElement);
       loadSliderValues(otherSliders, otherLabels, slidersElement);
