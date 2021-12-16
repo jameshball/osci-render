@@ -65,7 +65,7 @@
          <Label id="frequency" fx:id="frequencyLabel" layoutX="13.0" layoutY="206.0" prefHeight="58.0" prefWidth="376.0" text="L/R Frequency:&#10; &#10;" />
          <ComboBox fx:id="deviceComboBox" layoutX="14.0" layoutY="11.0" prefWidth="376.0" />
          <Button fx:id="chooseFolderButton" layoutX="14.0" layoutY="91.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose Folder" />
-         <Label fx:id="jkLabel" layoutX="143.0" layoutY="95.0" maxWidth="270.0" prefHeight="18.0" prefWidth="246.0" text="Use j and k to cycle between files" visible="false" />
+         <Label fx:id="jkLabel" layoutX="143.0" layoutY="84.0" maxWidth="270.0" prefHeight="43.0" prefWidth="246.0" text="Use j and k (or MIDI Program Change) to cycle between files" visible="false" wrapText="true" />
          <TextField fx:id="recordTextField" disable="true" layoutX="300.0" layoutY="154.0" prefHeight="26.0" prefWidth="70.0" text="2.0" />
          <Label fx:id="recordLengthLabel" disable="true" layoutX="290.0" layoutY="128.0" text="Record length (s)" />
          <CheckBox fx:id="recordCheckBox" layoutX="143.0" layoutY="146.0" mnemonicParsing="false" text="Timed record" />
@@ -145,9 +145,14 @@
                      <KeyCodeCombination alt="UP" code="O" control="UP" meta="UP" shift="UP" shortcut="DOWN" />
                   </accelerator>
                </MenuItem>
-               <MenuItem fx:id="saveProjectMenuItem" mnemonicParsing="false" text="Save Project">
+               <MenuItem fx:id="saveProjectMenuItem" mnemonicParsing="false" text="Save">
                   <accelerator>
                      <KeyCodeCombination alt="UP" code="S" control="UP" meta="UP" shift="UP" shortcut="DOWN" />
+                  </accelerator>
+               </MenuItem>
+               <MenuItem fx:id="saveAsProjectMenuItem" mnemonicParsing="false" text="Save As">
+                  <accelerator>
+                     <KeyCodeCombination alt="UP" code="S" control="UP" meta="UP" shift="DOWN" shortcut="DOWN" />
                   </accelerator>
                </MenuItem>
             </items>

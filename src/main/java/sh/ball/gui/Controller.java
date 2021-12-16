@@ -64,6 +64,8 @@ import static sh.ball.math.Math.tryParse;
 
 public class Controller implements Initializable, FrequencyListener, MidiListener {
 
+  private String openProjectPath;
+
   // audio
   private static final double MAX_FREQUENCY = 12000;
   private final ShapeAudioPlayer audioPlayer;
@@ -209,6 +211,8 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   private MenuItem openProjectMenuItem;
   @FXML
   private MenuItem saveProjectMenuItem;
+  @FXML
+  private MenuItem saveAsProjectMenuItem;
 
   public Controller() throws Exception {
     MidiCommunicator midiCommunicator = new MidiCommunicator();
@@ -406,6 +410,18 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     );
 
     saveProjectMenuItem.setOnAction(e -> {
+      if (openProjectPath != null) {
+        saveProject(openProjectPath);
+      } else {
+        File file = osciFileChooser.showSaveDialog(stage);
+        if (file != null) {
+          updateLastVisitedDirectory(new File(file.getParent()));
+          saveProject(file.getAbsolutePath());
+        }
+      }
+    });
+
+    saveAsProjectMenuItem.setOnAction(e -> {
       File file = osciFileChooser.showSaveDialog(stage);
       if (file != null) {
         updateLastVisitedDirectory(new File(file.getParent()));
@@ -943,6 +959,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
       StreamResult streamResult = new StreamResult(new File(projectFileName));
 
       transformer.transform(domSource, streamResult);
+      openProjectPath = projectFileName;
     } catch (ParserConfigurationException | TransformerException e) {
       e.printStackTrace();
     }
@@ -1028,6 +1045,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
         fileNames.add(fileName);
       }
       updateFiles(files, fileNames);
+      openProjectPath = projectFileName;
     } catch (ParserConfigurationException | SAXException | IOException e) {
       e.printStackTrace();
     }
