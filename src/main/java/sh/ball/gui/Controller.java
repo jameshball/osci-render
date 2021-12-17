@@ -759,9 +759,10 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
 
   // ==================== Start code block by DJ_Level_3 ====================
   //
-  //     Quickly written code by DJ_Level_3, a programmer who is quite
-  // inexperienced with Java. Almost definitely could be made better
-  // somehow. However, testing so far shows that (insert results).
+  //     Quickly written code by DJ_Level_3, a programmer who is not super
+  // experienced with Java. It almost definitely could be made better in one
+  // way or another, but testing so far shows that the code is stable and
+  // doesn't noticeably decrease performance.
   //
 
   // toggles frameSource playback after pressing 'i'
