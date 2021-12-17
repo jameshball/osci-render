@@ -96,6 +96,11 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   private int currentFrameSource;
   private Vector3 rotation = new Vector3();
 
+  // frame playback (code by DJ_Level_3)
+  private boolean playing;  // default to not playing
+  private int frameRate; // default to 10 frames per second
+  private double frameTime; // should always be (1 / frameRate)
+
   // javafx
   private final FileChooser osciFileChooser = new FileChooser();
   private final FileChooser wavFileChooser = new FileChooser();
@@ -113,6 +118,8 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   private Label fileLabel;
   @FXML
   private Label jkLabel;
+  @FXML
+  private Label uioLabel;
   @FXML
   private Button recordButton;
   @FXML
@@ -232,6 +239,9 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     frameSources.add(frames);
     frameSourcePaths.add("cube.obj");
     currentFrameSource = 0;
+    playing = false;
+    frameRate = 10;
+    frameTime = 0.1;
     this.producer = new FrameProducer<>(audioPlayer, frames);
     this.defaultDevice = audioPlayer.getDefaultDevice();
     if (defaultDevice == null) {
@@ -657,7 +667,11 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     Timeline timeline = new Timeline(kf1, kf2);
     Platform.runLater(timeline::play);
 
-    fileLabel.setText(frameSourcePaths.get(index));
+    if (playing) {
+      fileLabel.setText("(i to stop) framerate = " + frameRate);
+    } else {
+      fileLabel.setText("(i to play) " + frameSourcePaths.get(index));
+    }
     // enable the .obj file settings iff the new frameSource is for a 3D object.
     objTitledPane.setDisable(!ObjParser.isObjFile(frameSourcePaths.get(index)));
   }
@@ -742,6 +756,64 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     }
     changeFrameSource(index);
   }
+
+  // ==================== Start code block by DJ_Level_3 ====================
+  //
+  //     Quickly written code by DJ_Level_3, a programmer who is quite
+  // inexperienced with Java. Almost definitely could be made better
+  // somehow. However, testing so far shows that (insert results).
+  //
+
+  // toggles frameSource playback after pressing 'i'
+  public void togglePlayback() {
+    if (playing) {
+      playing = false;
+      jkLabel.setVisible(true);
+      uioLabel.setVisible(false);
+    } else {
+      playing = true;
+      jkLabel.setVisible(false);
+      uioLabel.setVisible(true);
+      doPlayback();
+    }
+  }
+
+  // increments frameRate (up to maximum) after pressing 'u'
+  public void increaseFrameRate() {
+    final int maxFrameRate = 120; // set max frameRate here
+    if (frameRate < maxFrameRate) {
+      frameRate += 1;
+    } else {
+      frameRate = maxFrameRate;
+    }
+    frameTime = 1.0 / frameRate;
+  }
+
+  // decrements frameRate (minimum 1) after pressing 'o'
+  public void decreaseFrameRate() {
+    if (frameRate > 1) {
+      frameRate -= 1;
+    } else {
+      frameRate = 1;
+    }
+    frameTime = 1.0 / frameRate;
+  }
+
+  // repeatedly swaps frameSource when playback is enabled
+  public void doPlayback() {
+    if (playing) {
+      KeyFrame now = new KeyFrame(Duration.seconds(0), e -> nextFrameSet());
+      KeyFrame next = new KeyFrame(Duration.seconds(frameTime), e -> {
+        doPlayback();
+      });
+      Timeline timeline = new Timeline(now, next);
+      Platform.runLater(timeline::play);
+    } else {
+      nextFrameSet();
+    }
+  }
+
+  // ====================  End code block by DJ_Level_3  ====================
 
   // determines whether the mouse is being used to rotate a 3D object
   protected boolean mouseRotate() {

@@ -33,8 +33,13 @@ public class Gui extends Application {
 
     scene.addEventHandler(KeyEvent.KEY_PRESSED, (event -> {
       switch (event.getCode()) {
+        // frame selection controls
         case J -> controller.nextFrameSet();
         case K -> controller.previousFrameSource();
+        // playback controls
+        case U -> controller.decreaseFrameRate();
+        case I -> controller.togglePlayback();
+        case O -> controller.increaseFrameRate();
       }
     }));
 
