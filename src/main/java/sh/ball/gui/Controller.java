@@ -695,7 +695,9 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
         List<byte[]> files = new ArrayList<>();
         List<String> names = new ArrayList<>();
         if (chosenFile.isDirectory()) {
-          for (File file : Objects.requireNonNull(chosenFile.listFiles())) {
+          File[] fileList = Objects.requireNonNull(chosenFile.listFiles());
+          Arrays.sort(fileList);
+          for (File file : fileList) {
             files.add(Files.readAllBytes(file.toPath()));
             names.add(file.getName());
           }
