@@ -97,9 +97,10 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   private Vector3 rotation = new Vector3();
 
   // frame playback (code by DJ_Level_3)
-  private boolean playing;  // default to not playing
-  private int frameRate; // default to 10 frames per second
-  private double frameTime; // should always be (1 / frameRate)
+  private static final int MAX_FRAME_RATE = 120;
+  private static final int MIN_FRAME_RATE = 1;
+  private boolean framesPlaying = false; // default to not playing
+  private int frameRate = 10; // default to 10 frames per second
 
   // javafx
   private final FileChooser osciFileChooser = new FileChooser();
@@ -118,8 +119,6 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   private Label fileLabel;
   @FXML
   private Label jkLabel;
-  @FXML
-  private Label uioLabel;
   @FXML
   private Button recordButton;
   @FXML
@@ -239,9 +238,6 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     frameSources.add(frames);
     frameSourcePaths.add("cube.obj");
     currentFrameSource = 0;
-    playing = false;
-    frameRate = 10;
-    frameTime = 0.1;
     this.producer = new FrameProducer<>(audioPlayer, frames);
     this.defaultDevice = audioPlayer.getDefaultDevice();
     if (defaultDevice == null) {
@@ -667,11 +663,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     Timeline timeline = new Timeline(kf1, kf2);
     Platform.runLater(timeline::play);
 
-    if (playing) {
-      fileLabel.setText("(i to stop) framerate = " + frameRate);
-    } else {
-      fileLabel.setText("(i to play) " + frameSourcePaths.get(index));
-    }
+    updateFrameLabels();
     // enable the .obj file settings iff the new frameSource is for a 3D object.
     objTitledPane.setDisable(!ObjParser.isObjFile(frameSourcePaths.get(index)));
   }
@@ -682,6 +674,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     frameSourcePaths.clear();
     openFiles.clear();
     jkLabel.setVisible(files.size() > 1);
+    framesPlaying = framesPlaying && files.size() > 1;
 
     for (int i = 0; i < files.size(); i++) {
       try {
@@ -734,7 +727,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   }
 
   // increments and changes the frameSource after pressing 'j'
-  public void nextFrameSet() {
+  public void nextFrameSource() {
     if (frameSources.size() == 1) {
       return;
     }
@@ -765,52 +758,69 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   // doesn't noticeably decrease performance.
   //
 
+  private void updateFrameLabels() {
+    if (framesPlaying) {
+      fileLabel.setText("Frame rate: " + frameRate);
+      jkLabel.setText("Use u and o to decrease and increase the frame rate, or i to toggle playback");
+    } else {
+      fileLabel.setText(frameSourcePaths.get(currentFrameSource));
+      jkLabel.setText("Use j and k (or MIDI Program Change) to cycle between files, or i to toggle playback");
+    }
+  }
+
+  private void disablePlayback() {
+    framesPlaying = false;
+  }
+
+  private void enablePlayback() {
+    framesPlaying = true;
+    doPlayback();
+  }
+
   // toggles frameSource playback after pressing 'i'
   public void togglePlayback() {
-    if (playing) {
-      playing = false;
-      jkLabel.setVisible(true);
-      uioLabel.setVisible(false);
-    } else {
-      playing = true;
-      jkLabel.setVisible(false);
-      uioLabel.setVisible(true);
-      doPlayback();
+    if (frameSources.size() == 1) {
+      return;
     }
+    if (framesPlaying) {
+      disablePlayback();
+    } else {
+      enablePlayback();
+    }
+    updateFrameLabels();
   }
 
   // increments frameRate (up to maximum) after pressing 'u'
   public void increaseFrameRate() {
-    final int maxFrameRate = 120; // set max frameRate here
-    if (frameRate < maxFrameRate) {
-      frameRate += 1;
+    updateFrameLabels();
+    if (frameRate < MAX_FRAME_RATE) {
+      frameRate++;
     } else {
-      frameRate = maxFrameRate;
+      frameRate = MAX_FRAME_RATE;
     }
-    frameTime = 1.0 / frameRate;
   }
 
-  // decrements frameRate (minimum 1) after pressing 'o'
+  // decrements frameRate (down to minimum) after pressing 'o'
   public void decreaseFrameRate() {
-    if (frameRate > 1) {
-      frameRate -= 1;
+    updateFrameLabels();
+    if (frameRate > MIN_FRAME_RATE) {
+      frameRate--;
     } else {
-      frameRate = 1;
+      frameRate = MIN_FRAME_RATE;
     }
-    frameTime = 1.0 / frameRate;
   }
 
   // repeatedly swaps frameSource when playback is enabled
-  public void doPlayback() {
-    if (playing) {
-      KeyFrame now = new KeyFrame(Duration.seconds(0), e -> nextFrameSet());
-      KeyFrame next = new KeyFrame(Duration.seconds(frameTime), e -> {
+  private void doPlayback() {
+    if (framesPlaying) {
+      KeyFrame now = new KeyFrame(Duration.seconds(0), e -> nextFrameSource());
+      KeyFrame next = new KeyFrame(Duration.seconds(1.0 / frameRate), e -> {
         doPlayback();
       });
       Timeline timeline = new Timeline(now, next);
       Platform.runLater(timeline::play);
     } else {
-      nextFrameSet();
+      nextFrameSource();
     }
   }
 
@@ -1061,6 +1071,9 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
       List<String> otherLabels = otherLabels();
       List<Slider> sliders = allSliders();
       List<String> labels = allLabels();
+
+      // Disable cycling through frames
+      disablePlayback();
 
       Element root = document.getDocumentElement();
       Element slidersElement = (Element) root.getElementsByTagName("sliders").item(0);
