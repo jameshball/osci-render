@@ -761,10 +761,10 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   private void updateFrameLabels() {
     if (framesPlaying) {
       fileLabel.setText("Frame rate: " + frameRate);
-      jkLabel.setText("Use u and o to decrease and increase the frame rate, or i to toggle playback");
+      jkLabel.setText("Use u and o to decrease and increase the frame rate, or i to stop playback");
     } else {
       fileLabel.setText(frameSourcePaths.get(currentFrameSource));
-      jkLabel.setText("Use j and k (or MIDI Program Change) to cycle between files, or i to toggle playback");
+      jkLabel.setText("Use j and k (or MIDI Program Change) to cycle between files, or i to start playback");
     }
   }
 
