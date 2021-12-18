@@ -112,11 +112,17 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
       count = 0;
     }
 
-    if (shapeDrawn > length) {
-      // We do -= length here rather than resetting to 0 since it is correct
-      // to skip a small bit of the next shape, in line with the length increment
+    // Need to skip all shapes that the lengthIncrement draws over.
+    // This is especially an issue when there are lots of small lines being
+    // drawn.
+    while (shapeDrawn > length) {
       shapeDrawn -= length;
       currentShape++;
+      // otherwise, index out of bounds
+      if (currentShape >= frame.size()) {
+        break;
+      }
+      length = getCurrentShape().getLength();
     }
 
     double proportionalLength = trace * frameLength;

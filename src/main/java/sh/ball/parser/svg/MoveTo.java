@@ -11,7 +11,10 @@ class MoveTo {
   // Parses moveto commands (M and m commands)
   private static List<Shape> parseMoveTo(SvgState state, List<Float> args, boolean isAbsolute) {
     if (args.size() % 2 != 0 || args.size() < 2) {
-      throw new IllegalArgumentException("SVG moveto command has incorrect number of arguments.");
+      for (Float arg : args) {
+        System.out.println(arg);
+      }
+      throw new IllegalArgumentException("SVG moveto command has incorrect number of arguments.\n");
     }
 
     Vector2 vec = new Vector2(args.get(0), args.get(1));
