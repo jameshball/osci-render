@@ -89,8 +89,8 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   // frames
   private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
-  private final List<byte[]> openFiles = new ArrayList<>();
-  private final List<String> frameSourcePaths = new ArrayList<>();
+  private List<byte[]> openFiles = new ArrayList<>();
+  private List<String> frameSourcePaths = new ArrayList<>();
   private List<FrameSource<List<Shape>>> frameSources = new ArrayList<>();
   private FrameProducer<List<Shape>> producer;
   private int currentFrameSource;
@@ -669,23 +669,27 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   }
 
   private void updateFiles(List<byte[]> files, List<String> names) throws IOException, ParserConfigurationException, SAXException {
-    List<FrameSource<List<Shape>>> oldFrameSources = frameSources;
-    frameSources = new ArrayList<>();
-    frameSourcePaths.clear();
-    openFiles.clear();
-    jkLabel.setVisible(files.size() > 1);
-    framesPlaying = framesPlaying && files.size() > 1;
+    List<FrameSource<List<Shape>>> newFrameSources = new ArrayList<>();
+    List<String> newFrameSourcePaths = new ArrayList<>();
+    List<byte[]> newOpenFiles = new ArrayList<>();
 
     for (int i = 0; i < files.size(); i++) {
       try {
-        frameSources.add(ParserFactory.getParser(names.get(i), files.get(i)).parse());
-        frameSourcePaths.add(names.get(i));
-        openFiles.add(files.get(i));
+        newFrameSources.add(ParserFactory.getParser(names.get(i), files.get(i)).parse());
+        newFrameSourcePaths.add(names.get(i));
+        newOpenFiles.add(files.get(i));
       } catch (IOException ignored) {}
     }
 
-    oldFrameSources.forEach(FrameSource::disable);
-    changeFrameSource(0);
+    if (newFrameSources.size() > 0) {
+      jkLabel.setVisible(newFrameSources.size() > 1);
+      framesPlaying = framesPlaying && newFrameSources.size() > 1;
+      frameSources.forEach(FrameSource::disable);
+      frameSources = newFrameSources;
+      frameSourcePaths = newFrameSourcePaths;
+      openFiles = newOpenFiles;
+      changeFrameSource(0);
+    }
   }
 
   // selects a new file or folder for files to be rendered from

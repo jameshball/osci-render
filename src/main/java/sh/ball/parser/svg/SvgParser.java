@@ -77,7 +77,7 @@ public class SvgParser extends FileParser<FrameSource<List<Shape>>> {
   private String[] preProcessPath(String path) throws IllegalArgumentException {
     // Replace all commas with spaces and then remove unnecessary whitespace
     path = path.replace(',', ' ');
-    path = path.replace("-", " -");
+    path = path.replaceAll("(?<!e)-", " -");
     path = path.replaceAll("\\s+", " ");
     path = path.replaceAll("(^\\s|\\s$)", "");
 
@@ -112,6 +112,7 @@ public class SvgParser extends FileParser<FrameSource<List<Shape>>> {
         }
       }
     } catch (Exception e) {
+      e.printStackTrace();
       System.out.println(Arrays.toString(decimalSplit));
       System.out.println(command);
     }
