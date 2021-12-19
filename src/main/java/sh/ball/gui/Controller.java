@@ -54,6 +54,7 @@ import sh.ball.audio.midi.MidiCommunicator;
 import sh.ball.audio.midi.MidiListener;
 import sh.ball.audio.midi.MidiNote;
 import sh.ball.engine.Vector3;
+import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjSettingsFactory;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.ParserFactory;
@@ -645,12 +646,16 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     FrameSource<List<Shape>> frames = frameSources.get(index);
     frameSources.forEach(FrameSource::disable);
     frames.enable();
+
+    Object oldSettings = producer.getFrameSettings();
     producer = new FrameProducer<>(audioPlayer, frames);
 
     // Apply the same settings that the previous frameSource had
     updateObjectRotateSpeed(objectRotateSpeedSlider.getValue());
     updateFocalLength(focalLengthSlider.getValue());
-    setObjRotate(rotation);
+    if (oldSettings instanceof ObjFrameSettings settings) {
+      setObjRotate(settings.baseRotation, settings.currentRotation);
+    }
     executor.submit(producer);
 
     // apply the wobble effect after a second as the frequency of the audio takes a while to
@@ -843,10 +848,15 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
     rotateCheckBox.setSelected(false);
   }
 
-  // updates the 3D object rotation angle
+  // updates the 3D object base rotation angle
   protected void setObjRotate(Vector3 vector) {
     rotation = vector;
-    producer.setFrameSettings(ObjSettingsFactory.rotation(vector));
+    producer.setFrameSettings(ObjSettingsFactory.baseRotation(vector));
+  }
+
+  // updates the 3D object base and current rotation angle
+  protected void setObjRotate(Vector3 baseRotation, Vector3 currentRotation) {
+    producer.setFrameSettings(ObjSettingsFactory.rotation(baseRotation, currentRotation));
   }
 
   @Override

@@ -4,11 +4,21 @@ import sh.ball.engine.Vector3;
 
 public class ObjFrameSettings {
 
-  protected Double focalLength;
-  protected Vector3 cameraPos;
-  protected Vector3 rotation;
-  protected Double rotateSpeed;
-  protected boolean resetRotation = false;
+  public Double focalLength;
+  public Vector3 cameraPos;
+  public Vector3 baseRotation;
+  public Vector3 currentRotation;
+  public Double rotateSpeed;
+  public boolean resetRotation = false;
+
+  protected ObjFrameSettings(Double focalLength, Vector3 cameraPos, Vector3 baseRotation, Vector3 currentRotation, Double rotateSpeed, boolean resetRotation) {
+    this.focalLength = focalLength;
+    this.cameraPos = cameraPos;
+    this.baseRotation = baseRotation;
+    this.currentRotation = currentRotation;
+    this.rotateSpeed = rotateSpeed;
+    this.resetRotation = resetRotation;
+  }
 
   protected ObjFrameSettings(double focalLength) {
     this.focalLength = focalLength;
@@ -18,8 +28,8 @@ public class ObjFrameSettings {
     this.cameraPos = cameraPos;
   }
 
-  protected ObjFrameSettings(Vector3 rotation, Double rotateSpeed) {
-    this.rotation = rotation;
+  protected ObjFrameSettings(Vector3 baseRotation, Double rotateSpeed) {
+    this.baseRotation = baseRotation;
     this.rotateSpeed = rotateSpeed;
   }
 

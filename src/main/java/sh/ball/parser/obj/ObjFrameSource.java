@@ -13,7 +13,8 @@ public class ObjFrameSource implements FrameSource<List<Shape>> {
   private final WorldObject object;
   private final Camera camera;
 
-  private Vector3 rotation = new Vector3(Math.PI, Math.PI, 0);
+  private Vector3 baseRotation = new Vector3(Math.PI, Math.PI, 0);
+  private Vector3 currentRotation = baseRotation;
   private Double rotateSpeed = 0.0;
   private boolean active = true;
 
@@ -24,10 +25,11 @@ public class ObjFrameSource implements FrameSource<List<Shape>> {
 
   @Override
   public List<Shape> next() {
+    currentRotation = currentRotation.add(baseRotation.scale(rotateSpeed));
     if (rotateSpeed == 0) {
-      object.setRotation(rotation);
+      object.setRotation(baseRotation);
     } else {
-      object.rotate(rotation.scale(rotateSpeed));
+      object.setRotation(currentRotation);
     }
     return camera.draw(object);
   }
@@ -57,8 +59,11 @@ public class ObjFrameSource implements FrameSource<List<Shape>> {
       if (obj.cameraPos != null && camera.getPos() != obj.cameraPos) {
         camera.setPos(obj.cameraPos);
       }
-      if (obj.rotation != null) {
-        this.rotation = obj.rotation;
+      if (obj.baseRotation != null) {
+        this.baseRotation = obj.baseRotation;
+      }
+      if (obj.currentRotation != null) {
+        this.currentRotation = obj.currentRotation;
       }
       if (obj.rotateSpeed != null) {
         this.rotateSpeed = obj.rotateSpeed;
@@ -67,5 +72,11 @@ public class ObjFrameSource implements FrameSource<List<Shape>> {
         object.resetRotation();
       }
     }
+  }
+
+  // TODO: Refactor!
+  @Override
+  public Object getFrameSettings() {
+    return ObjSettingsFactory.rotation(baseRotation, currentRotation);
   }
 }

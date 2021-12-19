@@ -20,4 +20,8 @@ public class FrameProducer<S> implements Runnable {
   public void setFrameSettings(Object settings) {
     frames.setFrameSettings(settings);
   }
+
+  public Object getFrameSettings() {
+    return frames.getFrameSettings();
+  }
 }
