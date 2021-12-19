@@ -36,4 +36,7 @@ public class ShapeFrameSource implements FrameSource<List<Shape>> {
 
   @Override
   public void setFrameSettings(Object settings) {}
+
+  @Override
+  public Object getFrameSettings() { return null; }
 }

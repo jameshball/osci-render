@@ -4,10 +4,7 @@ import com.mokiat.data.front.parser.*;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import org.jgrapht.Graph;
 import org.jgrapht.alg.connectivity.ConnectivityInspector;
@@ -131,7 +128,7 @@ public class WorldObject {
       return Set.of();
     }
 
-    Set<Line3D> edges = new HashSet<>();
+    Set<Line3D> edges = new LinkedHashSet<>();
 
     for (OBJVertex vertex : model.getVertices()) {
       objVertices.add(new Vector3(vertex.x, vertex.y, vertex.z));

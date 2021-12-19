@@ -11,4 +11,6 @@ public interface FrameSource<T> {
   void enable();
 
   void setFrameSettings(Object settings);
+
+  Object getFrameSettings();
 }

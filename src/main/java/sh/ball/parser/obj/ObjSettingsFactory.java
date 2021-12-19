@@ -12,8 +12,12 @@ public class ObjSettingsFactory {
     return new ObjFrameSettings(cameraPos);
   }
 
-  public static ObjFrameSettings rotation(Vector3 rotation) {
-    return new ObjFrameSettings(rotation, null);
+  public static ObjFrameSettings baseRotation(Vector3 baseRotation) {
+    return new ObjFrameSettings(baseRotation, null);
+  }
+
+  public static ObjFrameSettings rotation(Vector3 baseRotation, Vector3 currentRotation) {
+    return new ObjFrameSettings(null, null, baseRotation, currentRotation, null, false);
   }
 
   public static ObjFrameSettings rotateSpeed(double rotateSpeed) {

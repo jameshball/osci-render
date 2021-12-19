@@ -33,7 +33,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private static final double MIN_TRACE = 0.001;
   // Arbitrary max count for effects
   private static final int MAX_COUNT = 10000;
-  private static final int BUFFER_SIZE = 5;
+  private static final int BUFFER_SIZE = 10;
   // Is this always true? Might need to check from AudioEngine
   private static final int BITS_PER_SAMPLE = 16;
   private static final boolean SIGNED = true;
