@@ -88,6 +88,8 @@ public abstract class Shape {
     return translate(normalizedShapes, new Vector2(-1, -maxVector.getY() + height / 2));
   }
 
+  // TODO: Ideally this should cut off any width/height that is less than maxDim.
+  // If this is confusing, compare the output of a square viewBox vs non-square.
   public static List<Shape> normalize(List<Shape> shapes, double width, double height) {
     double maxDim = Math.max(width, height);
     List<Shape> normalizedShapes = new ArrayList<>();
