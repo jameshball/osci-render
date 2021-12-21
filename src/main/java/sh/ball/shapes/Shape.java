@@ -4,6 +4,7 @@ import java.awt.geom.AffineTransform;
 import java.awt.geom.PathIterator;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 public abstract class Shape {
 
@@ -81,14 +82,46 @@ public abstract class Shape {
       normalizedShapes.add(shape.scale(new Vector2(2 / maxAbsVertex, -2 / maxAbsVertex)));
     }
 
-    return center(normalizedShapes);
+    Vector2 maxVector = maxVector(normalizedShapes);
+    double height = height(normalizedShapes);
+
+    return translate(normalizedShapes, new Vector2(-1, -maxVector.getY() + height / 2));
   }
 
-  public static List<Shape> center(List<Shape> shapes) {
-    Vector2 maxVector = maxVector(shapes);
-    double height = height(shapes);
+  public static List<Shape> normalize(List<Shape> shapes, double width, double height) {
+    double maxDim = Math.max(width, height);
+    List<Shape> normalizedShapes = new ArrayList<>();
 
-    return translate(shapes, new Vector2(-1, -maxVector.getY() + height / 2));
+    for (Shape shape : shapes) {
+      normalizedShapes.add(shape.scale(new Vector2(2 / maxDim, -2 / maxDim)));
+    }
+
+    normalizedShapes = translate(normalizedShapes, new Vector2(-1, 1));
+    return removeOutOfBounds(normalizedShapes);
+  }
+
+  public static List<Shape> removeOutOfBounds(List<Shape> shapes) {
+    List<Shape> culledShapes = new ArrayList<>();
+
+    for (Shape shape : shapes) {
+      Vector2 start = shape.nextVector(0);
+      Vector2 end = shape.nextVector(1);
+      if ((start.getX() < 1 && start.getX() > -1) || (start.getY() < 1 && start.getY() > -1)) {
+        if ((end.getX() < 1 && end.getX() > -1) || (end.getY() < 1 && end.getY() > -1)) {
+          Function<Double, Double> between = (val) -> Math.min(Math.max(val, -1), 1);
+
+          if (shape instanceof Line) {
+            Vector2 newStart = new Vector2(between.apply(start.getX()), between.apply(start.getY()));
+            Vector2 newEnd = new Vector2(between.apply(end.getX()), between.apply(end.getY()));
+            culledShapes.add(new Line(newStart, newEnd));
+          } else {
+            culledShapes.add(shape);
+          }
+        }
+      }
+    }
+
+    return culledShapes;
   }
 
   public static Vector2 maxAbsVector(List<Shape> shapes) {
