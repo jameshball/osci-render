@@ -13,7 +13,7 @@ public class ObjFrameSource implements FrameSource<List<Shape>> {
   private final WorldObject object;
   private final Camera camera;
 
-  private Vector3 baseRotation = new Vector3(Math.PI, Math.PI, 0);
+  private Vector3 baseRotation = new Vector3(2 * Math.PI, 2 * Math.PI, 0);
   private Vector3 currentRotation = baseRotation;
   private Double rotateSpeed = 0.0;
   private boolean active = true;
