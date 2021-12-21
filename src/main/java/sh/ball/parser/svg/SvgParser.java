@@ -19,8 +19,10 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.xml.parsers.ParserConfigurationException;
 
+import javafx.util.Pair;
 import org.unbescape.html.HtmlEscape;
 import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.xml.sax.SAXException;
 import sh.ball.audio.FrameSource;
@@ -125,14 +127,50 @@ public class SvgParser extends FileParser<FrameSource<List<Shape>>> {
     return "svg";
   }
 
+  private String simplifyLength(String length) {
+    return length.replaceAll("em|ex|px|in|cm|mm|pt|pc", "");
+  }
+
+  // Returns the width and height of the svg element, as defined by either
+  // viewBox or height/width attributes, or null if they are not present,
+  // percentage-based, or malformed.
+  private Pair<Double, Double> getDimensions(Element svg) {
+    String viewBoxAttribute = svg.getAttribute("viewBox");
+    String widthAttribute = svg.getAttribute("width");
+    String heightAttribute = svg.getAttribute("height");
+
+    Double width = null;
+    Double height = null;
+    try {
+      if (!viewBoxAttribute.equals("")) {
+        viewBoxAttribute = simplifyLength(viewBoxAttribute);
+        String[] viewBox = viewBoxAttribute.split(" ");
+        width = Double.parseDouble(viewBox[2]);
+        height = Double.parseDouble(viewBox[3]);
+      }
+      if (!widthAttribute.equals("")) {
+        width = Double.parseDouble(simplifyLength(widthAttribute));
+      }
+      if (!heightAttribute.equals("")) {
+        height = Double.parseDouble(simplifyLength(heightAttribute));
+      }
+    } catch (NumberFormatException ignored) {}
+
+    if (width != null && height != null) {
+      return new Pair<>(width, height);
+    } else {
+      return null;
+    }
+  }
+
   @Override
   public FrameSource<List<Shape>> parse()
     throws ParserConfigurationException, IOException, SAXException, IllegalArgumentException {
     this.svg = getXMLDocument(input);
-    List<Node> svgElem = asList(svg.getElementsByTagName("svg"));
+    List<Node> svgElems = asList(svg.getElementsByTagName("svg"));
     List<Shape> shapes = new ArrayList<>();
 
-    if (svgElem.size() != 1) {
+    if (svgElems.size() != 1) {
       throw new IllegalArgumentException("SVG has either zero or more than one svg element.");
     }
 
@@ -141,7 +179,15 @@ public class SvgParser extends FileParser<FrameSource<List<Shape>>> {
       shapes.addAll(parsePath(node.getNodeValue()));
     }
 
-    return new ShapeFrameSource(Shape.normalize(shapes));
+    Pair<Double, Double> dimensions = getDimensions((Element) svgElems.get(0));
+
+    if (dimensions != null) {
+      double width = dimensions.getKey();
+      double height = dimensions.getValue();
+      return new ShapeFrameSource(Shape.normalize(shapes, width, height));
+    } else {
+      return new ShapeFrameSource(Shape.normalize(shapes));
+    }
   }
 
   /* Given a character, will return the glyph associated with it.
