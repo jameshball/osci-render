@@ -2,11 +2,11 @@ package sh.ball.audio.engine;
 
 import sh.ball.shapes.Vector2;
 
-import javax.sound.sampled.AudioFormat;
-import javax.sound.sampled.AudioSystem;
-import javax.sound.sampled.SourceDataLine;
+import javax.sound.sampled.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.stream.Stream;
 
 public class JavaAudioEngine implements AudioEngine {
 
@@ -88,7 +88,8 @@ public class JavaAudioEngine implements AudioEngine {
 
   @Override
   public List<AudioDevice> devices() {
-    return List.of(getDefaultDevice());
+    return Stream.of(44100, 48000, 96000, 192000).map(rate ->
+      (AudioDevice) new SimpleAudioDevice("default-" + rate, "default", rate, AudioSample.INT16)).toList();
   }
 
   @Override

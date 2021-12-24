@@ -21,7 +21,7 @@ public class ConglomerateAudioEngine implements AudioEngine {
 
   // TODO: Try and make non-static
   private static List<AudioDevice> xtDevices;
-  private static AudioDevice javaDevice;
+  private static List<AudioDevice> javaDevices;
 
   private boolean playing = false;
   private AudioDevice device;
@@ -38,7 +38,7 @@ public class ConglomerateAudioEngine implements AudioEngine {
     if (xtDevices.contains(device)) {
       xtEngine.play(channelGenerator, device);
     } else {
-      javaEngine.play(channelGenerator, javaDevice);
+      javaEngine.play(channelGenerator, device);
     }
     playing = false;
     this.device = null;
@@ -54,8 +54,8 @@ public class ConglomerateAudioEngine implements AudioEngine {
   public List<AudioDevice> devices() {
     List<AudioDevice> devices = new ArrayList<>();
 
-    if (javaDevice == null) {
-      javaDevice = javaEngine.getDefaultDevice();
+    if (javaDevices == null) {
+      javaDevices = javaEngine.devices();
     }
 
     if (xtDevices == null) {
@@ -67,7 +67,7 @@ public class ConglomerateAudioEngine implements AudioEngine {
       }
     }
 
-    devices.add(javaDevice);
+    devices.addAll(javaDevices);
     devices.addAll(xtDevices);
 
     return devices;

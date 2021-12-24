@@ -16,34 +16,10 @@
 <?import javafx.scene.text.Font?>
 
 <AnchorPane prefHeight="658.0" prefWidth="837.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.MainController">
-   <TitledPane animated="false" collapsible="false" layoutX="424.0" layoutY="38.0" prefHeight="387.0" prefWidth="402.0" text="Audio Effects">
-     <content>
-       <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="262.0" prefWidth="402.0">
-            <children>
-               <CheckBox fx:id="vectorCancellingCheckBox" layoutX="14.0" layoutY="15.0" mnemonicParsing="false" text="Vector cancelling" />
-               <Slider fx:id="vectorCancellingSlider" blockIncrement="0.05" disable="true" layoutX="154.0" layoutY="16.0" majorTickUnit="1.0" max="10.0" min="2.0" minorTickCount="0" prefHeight="42.0" prefWidth="219.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" value="2.0" />
-               <CheckBox fx:id="bitCrushCheckBox" layoutX="14.0" layoutY="62.0" mnemonicParsing="false" text="Bit crush" />
-               <Slider fx:id="bitCrushSlider" blockIncrement="0.01" disable="true" layoutX="154.0" layoutY="64.0" majorTickUnit="0.5" max="3.0" prefHeight="42.0" prefWidth="219.0" showTickLabels="true" showTickMarks="true" value="2.0" />
-               <CheckBox fx:id="verticalDistortCheckBox" layoutX="14.0" layoutY="110.0" mnemonicParsing="false" text="Vertical Distort" />
-               <Slider fx:id="verticalDistortSlider" blockIncrement="0.005" disable="true" layoutX="154.0" layoutY="112.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="219.0" showTickLabels="true" showTickMarks="true" value="0.2" />
-               <CheckBox fx:id="horizontalDistortCheckBox" layoutX="14.0" layoutY="159.0" mnemonicParsing="false" text="Horizontal Distort" />
-               <Slider fx:id="horizontalDistortSlider" blockIncrement="0.005" disable="true" layoutX="154.0" layoutY="161.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="219.0" showTickLabels="true" showTickMarks="true" value="0.2" />
-               <CheckBox fx:id="wobbleCheckBox" layoutX="14.0" layoutY="208.0" mnemonicParsing="false" text="Wobble" />
-               <Slider fx:id="wobbleSlider" blockIncrement="0.005" disable="true" layoutX="154.0" layoutY="210.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="219.0" showTickLabels="true" showTickMarks="true" value="0.2" />
-               <SVGPath fx:id="vectorCancellingMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="373.0" layoutY="13.0" pickOnBounds="true" />
-               <SVGPath fx:id="bitCrushMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="373.0" layoutY="61.0" pickOnBounds="true" />
-               <SVGPath fx:id="verticalDistortMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="373.0" layoutY="108.0" pickOnBounds="true" />
-               <SVGPath fx:id="horizontalDistortMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="373.0" layoutY="157.0" pickOnBounds="true" />
-               <SVGPath fx:id="wobbleMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="373.0" layoutY="206.0" pickOnBounds="true" />
-               <CheckBox fx:id="smoothCheckBox" layoutX="14.0" layoutY="255.0" mnemonicParsing="false" text="Smoothing" />
-               <Slider fx:id="smoothSlider" blockIncrement="1.0" disable="true" layoutX="154.0" layoutY="257.0" majorTickUnit="128.0" max="1024.0" minorTickCount="1" prefHeight="38.0" prefWidth="219.0" showTickLabels="true" showTickMarks="true" value="128.0" />
-               <SVGPath fx:id="smoothMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="373.0" layoutY="253.0" pickOnBounds="true" />
-               <CheckBox fx:id="traceCheckBox" layoutX="14.0" layoutY="304.0" mnemonicParsing="false" text="Trace" />
-               <Slider fx:id="traceSlider" blockIncrement="0.005" disable="true" layoutX="154.0" layoutY="306.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="219.0" showTickLabels="true" showTickMarks="true" value="0.5" />
-               <SVGPath fx:id="traceMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="373.0" layoutY="302.0" pickOnBounds="true" />
-            </children>
-         </AnchorPane>
-     </content>
+   <TitledPane animated="false" collapsible="false" layoutX="424.0"
+               layoutY="38.0" prefHeight="387.0" prefWidth="402.0"
+               text="Audio Effects">
+      <fx:include fx:id="effects" source="effects.fxml"/>
    </TitledPane>
 <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="424.0" layoutY="436.0" maxHeight="-Infinity" maxWidth="-Infinity" prefHeight="213.0" prefWidth="402.0" text="3D .obj file settings">
   <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="359.0">
