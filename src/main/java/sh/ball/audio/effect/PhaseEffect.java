@@ -6,7 +6,7 @@ public abstract class PhaseEffect implements Effect {
   // there are audio artifacts
   private static final double LARGE_VAL = 2 << 20;
 
-  protected final int sampleRate;
+  protected int sampleRate;
 
   protected double speed;
   private double phase = -LARGE_VAL;
@@ -28,5 +28,9 @@ public abstract class PhaseEffect implements Effect {
 
   public void setSpeed(double speed) {
     this.speed = speed;
+  }
+
+  public void setSampleRate(int sampleRate) {
+    this.sampleRate = sampleRate;
   }
 }

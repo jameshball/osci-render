@@ -52,6 +52,7 @@ import sh.ball.audio.midi.MidiCommunicator;
 import sh.ball.audio.midi.MidiListener;
 import sh.ball.audio.midi.MidiNote;
 import sh.ball.engine.Vector3;
+import sh.ball.gui.Gui;
 import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjSettingsFactory;
 import sh.ball.parser.obj.ObjParser;
@@ -59,6 +60,7 @@ import sh.ball.parser.ParserFactory;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
+import static sh.ball.gui.Gui.audioPlayer;
 import static sh.ball.math.Math.tryParse;
 
 public class MainController implements Initializable, FrequencyListener, MidiListener {
@@ -66,11 +68,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private String openProjectPath;
 
   // audio
-  private static final double MAX_FREQUENCY = 12000;
-  private final ShapeAudioPlayer audioPlayer;
-  private final RotateEffect rotateEffect;
-  private final TranslateEffect translateEffect;
-  private final DoubleProperty frequency;
   private final AudioDevice defaultDevice;
   private int sampleRate;
   private FrequencyAnalyser<List<Shape>> analyser;
@@ -110,6 +107,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private ObjController objController;
   @FXML
+  private ImageController imageController;
+  @FXML
   private Label frequencyLabel;
   @FXML
   private Button chooseFileButton;
@@ -130,35 +129,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private Label recordLengthLabel;
   @FXML
-  private TextField translationXTextField;
-  @FXML
-  private TextField translationYTextField;
-  @FXML
-  private Slider frequencySlider;
-  @FXML
-  private SVGPath frequencyMidi;
-  @FXML
-  private Slider rotateSpeedSlider;
-  @FXML
-  private SVGPath rotateSpeedMidi;
-  @FXML
-  private Slider translationSpeedSlider;
-  @FXML
-  private SVGPath translationSpeedMidi;
-  @FXML
-  private Slider volumeSlider;
-  @FXML
-  private SVGPath volumeMidi;
-  @FXML
   private TitledPane objTitledPane;
   @FXML
   private Slider octaveSlider;
   @FXML
   private SVGPath octaveMidi;
-  @FXML
-  private Slider visibilitySlider;
-  @FXML
-  private SVGPath visibilityMidi;
   @FXML
   private ComboBox<AudioDevice> deviceComboBox;
   @FXML
@@ -169,11 +144,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private MenuItem saveAsProjectMenuItem;
 
   public MainController() throws Exception {
-    MidiCommunicator midiCommunicator = new MidiCommunicator();
-    midiCommunicator.addListener(this);
-    new Thread(midiCommunicator).start();
-
-    this.audioPlayer = new ShapeAudioPlayer(ConglomerateAudioEngine::new, midiCommunicator);
+    Gui.midiCommunicator.addListener(this);
 
     // Clone DEFAULT_OBJ InputStream using a ByteArrayOutputStream
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -192,48 +163,21 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       throw new RuntimeException("No default audio device found!");
     }
     this.sampleRate = defaultDevice.sampleRate();
-    this.rotateEffect = new RotateEffect(sampleRate);
-    this.translateEffect = new TranslateEffect(sampleRate);
-    this.frequency = new SimpleDoubleProperty(0);
   }
 
   // initialises midiButtonMap by mapping MIDI logo SVGs to the slider that they
   // control if they are selected.
   private Map<SVGPath, Slider> initializeMidiButtonMap() {
     Map<SVGPath, Slider> midiMap = new HashMap<>();
-    midiMap.put(frequencyMidi, frequencySlider);
-    midiMap.put(rotateSpeedMidi, rotateSpeedSlider);
-    midiMap.put(translationSpeedMidi, translationSpeedSlider);
-    midiMap.put(volumeMidi, volumeSlider);
     midiMap.put(octaveMidi, octaveSlider);
-    midiMap.put(visibilityMidi, visibilitySlider);
+    midiMap.putAll(imageController.getMidiButtonMap());
     midiMap.putAll(objController.getMidiButtonMap());
     midiMap.putAll(effectsController.getMidiButtonMap());
     return midiMap;
   }
 
-  // Maps sliders to the functions that they should call whenever their value
-  // changes.
-  private Map<Slider, Consumer<Double>> initializeSliderMap() {
-    return Map.of(
-      rotateSpeedSlider, rotateEffect::setSpeed,
-      translationSpeedSlider, translateEffect::setSpeed,
-      visibilitySlider, audioPlayer::setMainFrequencyScale
-    );
-  }
-
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
-    // converts the value of frequencySlider to the actual frequency that it represents so that it
-    // can increase at an exponential scale.
-    frequencySlider.valueProperty().addListener((o, old, f) -> frequency.set(Math.pow(MAX_FREQUENCY, f.doubleValue())));
-    frequency.addListener((o, old, f) -> frequencySlider.setValue(Math.log(f.doubleValue()) / Math.log(MAX_FREQUENCY)));
-    audioPlayer.setFrequency(frequency);
-    // default value is middle C
-    frequency.set(MidiNote.MIDDLE_C);
-    audioPlayer.setVolume(volumeSlider.valueProperty());
-
-    effectsController.setAudioPlayer(audioPlayer);
     objController.setAudioProducer(producer);
 
     this.midiButtonMap = initializeMidiButtonMap();
@@ -254,17 +198,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         midi.setFill(Color.RED);
       }
     }));
-
-    Map<Slider, Consumer<Double>> sliders = initializeSliderMap();
-
-    for (Slider slider : sliders.keySet()) {
-      slider.valueProperty().addListener((source, oldValue, newValue) ->
-        sliders.get(slider).accept(newValue.doubleValue())
-      );
-    }
-
-    translationXTextField.textProperty().addListener(e -> updateTranslation());
-    translationYTextField.textProperty().addListener(e -> updateTranslation());
 
     octaveSlider.valueProperty().addListener((e, old, octave) -> audioPlayer.setOctave(octave.intValue()));
 
@@ -338,19 +271,12 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
     objController.updateObjectRotateSpeed();
 
-    audioPlayer.addEffect(EffectType.ROTATE, rotateEffect);
-    audioPlayer.addEffect(EffectType.TRANSLATE, translateEffect);
-
-    audioPlayer.setDevice(defaultDevice);
-    effectsController.setAudioDevice(defaultDevice);
     List<AudioDevice> devices = audioPlayer.devices();
     deviceComboBox.setItems(FXCollections.observableList(devices));
     deviceComboBox.setValue(defaultDevice);
 
+    switchAudioDevice(defaultDevice, false);
     executor.submit(producer);
-    analyser = new FrequencyAnalyser<>(audioPlayer, 2, sampleRate);
-    startFrequencyAnalyser(analyser);
-    startAudioPlayerThread();
 
     deviceComboBox.valueProperty().addListener((options, oldDevice, newDevice) -> {
       if (newDevice != null) {
@@ -370,17 +296,26 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     folderChooser.setInitialDirectory(dir);
   }
 
-  // restarts audioPlayer and FrequencyAnalyser to support new device
   private void switchAudioDevice(AudioDevice device) {
-    try {
-      audioPlayer.reset();
-    } catch (Exception e) {
-      e.printStackTrace();
+    switchAudioDevice(device, true);
+  }
+
+  // restarts audioPlayer and FrequencyAnalyser to support new device
+  private void switchAudioDevice(AudioDevice device, boolean reset) {
+    if (reset) {
+      try {
+        audioPlayer.reset();
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
     }
     audioPlayer.setDevice(device);
     effectsController.setAudioDevice(device);
-    analyser.stop();
+    imageController.setAudioDevice(device);
     sampleRate = device.sampleRate();
+    if (analyser != null) {
+      analyser.stop();
+    }
     analyser = new FrequencyAnalyser<>(audioPlayer, 2, sampleRate);
     startFrequencyAnalyser(analyser);
     effectsController.setFrequencyAnalyser(analyser);
@@ -472,14 +407,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       recordLabel.setText("Error saving file");
       e.printStackTrace();
     }
-  }
-
-  // changes the sinusoidal translation of the image rendered
-  private void updateTranslation() {
-    translateEffect.setTranslation(new Vector2(
-      tryParse(translationXTextField.getText()),
-      tryParse(translationYTextField.getText())
-    ));
   }
 
   // changes the FrameProducer e.g. could be changing from a 3D object to an
@@ -762,14 +689,14 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
   // must be functions, otherwise they are not initialised
   private List<Slider> otherSliders() {
-    List<Slider> sliders = new ArrayList<>(List.of(octaveSlider, frequencySlider, rotateSpeedSlider, translationSpeedSlider,
-      volumeSlider, visibilitySlider));
+    List<Slider> sliders = new ArrayList<>(List.of(octaveSlider));
+    sliders.addAll(imageController.sliders());
     sliders.addAll(objController.sliders());
     return sliders;
   }
   private List<String> otherLabels() {
-    List<String> labels = new ArrayList<>(List.of("octave", "frequency", "rotateSpeed", "translationSpeed", "volume",
-      "visibility"));
+    List<String> labels = new ArrayList<>(List.of("octave"));
+    labels.addAll(imageController.labels());
     labels.addAll(objController.labels());
     return labels;
   }
@@ -830,14 +757,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
       root.appendChild(midiElement);
 
-      Element translationElement = document.createElement("translation");
-      Element translationXElement = document.createElement("x");
-      translationXElement.appendChild(document.createTextNode(translationXTextField.getText()));
-      Element translationYElement = document.createElement("y");
-      translationYElement.appendChild(document.createTextNode(translationYTextField.getText()));
-      translationElement.appendChild(translationXElement);
-      translationElement.appendChild(translationYElement);
-      root.appendChild(translationElement);
+      root.appendChild(imageController.save(document));
 
       root.appendChild(objController.save(document));
 
@@ -911,11 +831,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
       root.appendChild(midiElement);
 
-      Element translationElement = (Element) root.getElementsByTagName("translation").item(0);
-      Element translationXElement = (Element) translationElement.getElementsByTagName("x").item(0);
-      Element translationYElement = (Element) translationElement.getElementsByTagName("y").item(0);
-      translationXTextField.setText(translationXElement.getTextContent());
-      translationYTextField.setText(translationYElement.getTextContent());
+      imageController.load(root);
 
       objController.load(root);
 

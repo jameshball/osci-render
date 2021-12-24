@@ -10,12 +10,28 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.stage.Stage;
+import sh.ball.audio.ShapeAudioPlayer;
+import sh.ball.audio.engine.ConglomerateAudioEngine;
+import sh.ball.audio.midi.MidiCommunicator;
 import sh.ball.engine.Vector3;
 import sh.ball.gui.controller.MainController;
 
 import java.util.Objects;
 
 public class Gui extends Application {
+
+  // These need to be global so that we can guarantee they can be accessed by Controllers
+  public static final MidiCommunicator midiCommunicator = new MidiCommunicator();
+  public static ShapeAudioPlayer audioPlayer;
+
+  static {
+    try {
+      audioPlayer = new ShapeAudioPlayer(ConglomerateAudioEngine::new, midiCommunicator);
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+    new Thread(midiCommunicator).start();
+  }
 
   @Override
   public void start(Stage stage) throws Exception {
