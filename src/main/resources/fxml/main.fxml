@@ -22,15 +22,7 @@
       <fx:include fx:id="effects" source="effects.fxml"/>
    </TitledPane>
 <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="424.0" layoutY="436.0" maxHeight="-Infinity" maxWidth="-Infinity" prefHeight="213.0" prefWidth="402.0" text="3D .obj file settings">
-  <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="359.0">
-    <Slider fx:id="focalLengthSlider" blockIncrement="0.01" layoutX="116.0" layoutY="22.0" majorTickUnit="0.2" max="2.0" min="1.0E-5" prefHeight="42.0" prefWidth="258.0" showTickLabels="true" showTickMarks="true" value="1.0" />
-    <Label layoutX="34.0" layoutY="21.0" text="Focal length" />
-         <Slider fx:id="objectRotateSpeedSlider" blockIncrement="0.005" layoutX="116.0" layoutY="81.0" majorTickUnit="0.1" max="1.0" prefHeight="42.0" prefWidth="258.0" showTickLabels="true" showTickMarks="true" />
-         <Label layoutX="9.0" layoutY="80.0" text="3D Rotate speed" />
-         <CheckBox fx:id="rotateCheckBox" layoutX="90.0" layoutY="143.0" mnemonicParsing="false" text="Rotate with Mouse (Esc to disable)" />
-         <SVGPath fx:id="focalLengthMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="374.0" layoutY="19.0" pickOnBounds="true" />
-         <SVGPath fx:id="objectRotateSpeedMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="374.0" layoutY="78.0" pickOnBounds="true" />
-  </AnchorPane>
+   <fx:include fx:id="obj" source="obj.fxml"/>
 </TitledPane>
    <AnchorPane id="control-pane" layoutX="10.0" layoutY="37.0" prefHeight="313.0" prefWidth="402.0">
       <children>
