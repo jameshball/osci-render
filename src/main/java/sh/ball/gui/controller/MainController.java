@@ -6,6 +6,7 @@ import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.collections.FXCollections;
 import javafx.scene.control.*;
+import javafx.scene.layout.AnchorPane;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.scene.shape.SVGPath;
@@ -72,8 +73,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private final ShapeAudioPlayer audioPlayer;
   private final RotateEffect rotateEffect;
   private final TranslateEffect translateEffect;
-  private final WobbleEffect wobbleEffect;
-  private final SmoothEffect smoothEffect;
   private final DoubleProperty frequency;
   private final AudioDevice defaultDevice;
   private int sampleRate;
@@ -110,6 +109,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private final DirectoryChooser folderChooser = new DirectoryChooser();
   private Stage stage;
 
+  @FXML
+  private EffectsController effectsController;
   @FXML
   private Label frequencyLabel;
   @FXML
@@ -163,51 +164,9 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private CheckBox rotateCheckBox;
   @FXML
-  private CheckBox vectorCancellingCheckBox;
-  @FXML
-  private Slider vectorCancellingSlider;
-  @FXML
-  private SVGPath vectorCancellingMidi;
-  @FXML
-  private CheckBox bitCrushCheckBox;
-  @FXML
-  private Slider bitCrushSlider;
-  @FXML
-  private SVGPath bitCrushMidi;
-  @FXML
-  private CheckBox verticalDistortCheckBox;
-  @FXML
-  private Slider verticalDistortSlider;
-  @FXML
-  private SVGPath verticalDistortMidi;
-  @FXML
-  private CheckBox horizontalDistortCheckBox;
-  @FXML
-  private Slider horizontalDistortSlider;
-  @FXML
-  private SVGPath horizontalDistortMidi;
-  @FXML
-  private CheckBox wobbleCheckBox;
-  @FXML
-  private Slider wobbleSlider;
-  @FXML
-  private SVGPath wobbleMidi;
-  @FXML
-  private CheckBox smoothCheckBox;
-  @FXML
-  private Slider smoothSlider;
-  @FXML
-  private SVGPath smoothMidi;
-  @FXML
   private Slider octaveSlider;
   @FXML
   private SVGPath octaveMidi;
-  @FXML
-  private CheckBox traceCheckBox;
-  @FXML
-  private Slider traceSlider;
-  @FXML
-  private SVGPath traceMidi;
   @FXML
   private Slider visibilitySlider;
   @FXML
@@ -247,8 +206,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     this.sampleRate = defaultDevice.sampleRate();
     this.rotateEffect = new RotateEffect(sampleRate);
     this.translateEffect = new TranslateEffect(sampleRate);
-    this.wobbleEffect = new WobbleEffect(sampleRate);
-    this.smoothEffect = new SmoothEffect(1);
     this.frequency = new SimpleDoubleProperty(0);
   }
 
@@ -262,15 +219,9 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     midiMap.put(volumeMidi, volumeSlider);
     midiMap.put(focalLengthMidi, focalLengthSlider);
     midiMap.put(objectRotateSpeedMidi, objectRotateSpeedSlider);
-    midiMap.put(vectorCancellingMidi, vectorCancellingSlider);
-    midiMap.put(bitCrushMidi, bitCrushSlider);
-    midiMap.put(wobbleMidi, wobbleSlider);
-    midiMap.put(smoothMidi, smoothSlider);
     midiMap.put(octaveMidi, octaveSlider);
-    midiMap.put(traceMidi, traceSlider);
     midiMap.put(visibilityMidi, visibilitySlider);
-    midiMap.put(verticalDistortMidi, verticalDistortSlider);
-    midiMap.put(horizontalDistortMidi, horizontalDistortSlider);
+    midiMap.putAll(effectsController.getMidiButtonMap());
     return midiMap;
   }
 
@@ -286,27 +237,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     );
   }
 
-  private Map<EffectType, Slider> effectTypes;
-
-  // Maps EffectTypes to the slider that controls the effect so that they can be
-  // toggled when the appropriate checkbox is ticked.
-  private void initializeEffectTypes() {
-    effectTypes = Map.of(
-      EffectType.VECTOR_CANCELLING,
-      vectorCancellingSlider,
-      EffectType.BIT_CRUSH,
-      bitCrushSlider,
-      EffectType.VERTICAL_DISTORT,
-      verticalDistortSlider,
-      EffectType.HORIZONTAL_DISTORT,
-      horizontalDistortSlider,
-      EffectType.WOBBLE,
-      wobbleSlider,
-      EffectType.SMOOTH,
-      smoothSlider
-    );
-  }
-
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
     // converts the value of frequencySlider to the actual frequency that it represents so that it
@@ -317,6 +247,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     // default value is middle C
     frequency.set(MidiNote.MIDDLE_C);
     audioPlayer.setVolume(volumeSlider.valueProperty());
+
+    effectsController.setAudioPlayer(audioPlayer);
 
     this.midiButtonMap = initializeMidiButtonMap();
 
@@ -338,7 +270,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     }));
 
     Map<Slider, Consumer<Double>> sliders = initializeSliderMap();
-    initializeEffectTypes();
 
     for (Slider slider : sliders.keySet()) {
       slider.valueProperty().addListener((source, oldValue, newValue) ->
@@ -349,55 +280,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     translationXTextField.textProperty().addListener(e -> updateTranslation());
     translationYTextField.textProperty().addListener(e -> updateTranslation());
 
-    InvalidationListener vectorCancellingListener = e ->
-      updateEffect(EffectType.VECTOR_CANCELLING, vectorCancellingCheckBox.isSelected(),
-        EffectFactory.vectorCancelling((int) vectorCancellingSlider.getValue()));
-    InvalidationListener bitCrushListener = e ->
-      updateEffect(EffectType.BIT_CRUSH, bitCrushCheckBox.isSelected(),
-        EffectFactory.bitCrush(bitCrushSlider.getValue()));
-    InvalidationListener verticalDistortListener = e ->
-      updateEffect(EffectType.VERTICAL_DISTORT, verticalDistortCheckBox.isSelected(),
-        EffectFactory.verticalDistort(verticalDistortSlider.getValue()));
-    InvalidationListener horizontalDistortListener = e ->
-      updateEffect(EffectType.HORIZONTAL_DISTORT, horizontalDistortCheckBox.isSelected(),
-        EffectFactory.horizontalDistort(horizontalDistortSlider.getValue()));
-    InvalidationListener wobbleListener = e -> {
-      wobbleEffect.setVolume(wobbleSlider.getValue());
-      updateEffect(EffectType.WOBBLE, wobbleCheckBox.isSelected(), wobbleEffect);
-    };
-    InvalidationListener smoothListener = e -> {
-      smoothEffect.setWindowSize((int) smoothSlider.getValue());
-      updateEffect(EffectType.SMOOTH, smoothCheckBox.isSelected(), smoothEffect);
-    };
-    InvalidationListener traceListener = e -> {
-      double trace = traceCheckBox.isSelected() ? traceSlider.valueProperty().getValue() : 1;
-      audioPlayer.setTrace(trace);
-      traceSlider.setDisable(!traceCheckBox.isSelected());
-    };
-
-    vectorCancellingSlider.valueProperty().addListener(vectorCancellingListener);
-    vectorCancellingCheckBox.selectedProperty().addListener(vectorCancellingListener);
-
-    bitCrushSlider.valueProperty().addListener(bitCrushListener);
-    bitCrushCheckBox.selectedProperty().addListener(bitCrushListener);
-
-    verticalDistortSlider.valueProperty().addListener(verticalDistortListener);
-    verticalDistortCheckBox.selectedProperty().addListener(verticalDistortListener);
-
-    horizontalDistortSlider.valueProperty().addListener(horizontalDistortListener);
-    horizontalDistortCheckBox.selectedProperty().addListener(horizontalDistortListener);
-
-    wobbleSlider.valueProperty().addListener(wobbleListener);
-    wobbleCheckBox.selectedProperty().addListener(wobbleListener);
-    wobbleCheckBox.selectedProperty().addListener(e -> wobbleEffect.update());
-
-    smoothSlider.valueProperty().addListener(smoothListener);
-    smoothCheckBox.selectedProperty().addListener(smoothListener);
-
     octaveSlider.valueProperty().addListener((e, old, octave) -> audioPlayer.setOctave(octave.intValue()));
-
-    traceSlider.valueProperty().addListener(traceListener);
-    traceCheckBox.selectedProperty().addListener(traceListener);
 
     osciFileChooser.setInitialFileName("project.osci");
     osciFileChooser.getExtensionFilters().add(
@@ -473,6 +356,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     audioPlayer.addEffect(EffectType.TRANSLATE, translateEffect);
 
     audioPlayer.setDevice(defaultDevice);
+    effectsController.setAudioDevice(defaultDevice);
     List<AudioDevice> devices = audioPlayer.devices();
     deviceComboBox.setItems(FXCollections.observableList(devices));
     deviceComboBox.setValue(defaultDevice);
@@ -508,10 +392,12 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       e.printStackTrace();
     }
     audioPlayer.setDevice(device);
+    effectsController.setAudioDevice(device);
     analyser.stop();
     sampleRate = device.sampleRate();
     analyser = new FrequencyAnalyser<>(audioPlayer, 2, sampleRate);
     startFrequencyAnalyser(analyser);
+    effectsController.setFrequencyAnalyser(analyser);
     startAudioPlayerThread();
   }
 
@@ -526,7 +412,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   // as listeners of it so that they can get updates as the frequency changes
   private void startFrequencyAnalyser(FrequencyAnalyser<List<Shape>> analyser) {
     analyser.addListener(this);
-    analyser.addListener(wobbleEffect);
+    effectsController.setFrequencyAnalyser(analyser);
     new Thread(analyser).start();
   }
 
@@ -622,21 +508,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     ));
   }
 
-  // selects or deselects the given audio effect
-  private void updateEffect(EffectType type, boolean checked, Effect effect) {
-    if (checked) {
-      audioPlayer.addEffect(type, effect);
-      if (effectTypes.containsKey(type)) {
-        effectTypes.get(type).setDisable(false);
-      }
-    } else {
-      audioPlayer.removeEffect(type);
-      if (effectTypes.containsKey(type)) {
-        effectTypes.get(type).setDisable(true);
-      }
-    }
-  }
-
   // changes the FrameProducer e.g. could be changing from a 3D object to an
   // SVG. The old FrameProducer is stopped and a new one created and initialised
   // with the same settings that the original had.
@@ -657,16 +528,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       setObjRotate(settings.baseRotation, settings.currentRotation);
     }
     executor.submit(producer);
-
-    // apply the wobble effect after a second as the frequency of the audio takes a while to
-    // propagate and send to its listeners.
-    KeyFrame kf1 = new KeyFrame(Duration.seconds(0), e -> wobbleEffect.setVolume(0));
-    KeyFrame kf2 = new KeyFrame(Duration.seconds(1), e -> {
-      wobbleEffect.update();
-      wobbleEffect.setVolume(wobbleSlider.getValue());
-    });
-    Timeline timeline = new Timeline(kf1, kf2);
-    Platform.runLater(timeline::play);
+    effectsController.restartEffects();
 
     updateFrameLabels();
     // enable the .obj file settings iff the new frameSource is for a 3D object.
@@ -925,14 +787,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   }
 
   // must be functions, otherwise they are not initialised
-  private List<CheckBox> checkBoxes() {
-    return List.of(vectorCancellingCheckBox, bitCrushCheckBox, verticalDistortCheckBox,
-      horizontalDistortCheckBox, wobbleCheckBox, smoothCheckBox, traceCheckBox);
-  }
-  private List<Slider> checkBoxSliders() {
-    return List.of(vectorCancellingSlider, bitCrushSlider, verticalDistortSlider,
-      horizontalDistortSlider, wobbleSlider, smoothSlider, traceSlider);
-  }
   private List<String> checkBoxLabels() {
     return List.of("vectorCancelling", "bitCrush", "verticalDistort", "horizontalDistort",
       "wobble", "smooth", "trace");
@@ -946,7 +800,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       "visibility", "focalLength", "objectRotateSpeed");
   }
   private List<Slider> allSliders() {
-    List<Slider> sliders = new ArrayList<>(checkBoxSliders());
+    List<Slider> sliders = new ArrayList<>(effectsController.effectSliders());
     sliders.addAll(otherSliders());
     return sliders;
   }
@@ -983,8 +837,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       document.appendChild(root);
 
       // Is there a nicer way of doing this?!
-      List<CheckBox> checkBoxes = checkBoxes();
-      List<Slider> checkBoxSliders = checkBoxSliders();
+      List<CheckBox> checkBoxes = effectsController.effectCheckBoxes();
+      List<Slider> checkBoxSliders = effectsController.effectSliders();
       List<String> checkBoxLabels = checkBoxLabels();
       List<Slider> otherSliders = otherSliders();
       List<String> otherLabels = otherLabels();
@@ -1080,8 +934,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       Document document = documentBuilder.parse(new File(projectFileName));
       document.getDocumentElement().normalize();
 
-      List<CheckBox> checkBoxes = checkBoxes();
-      List<Slider> checkBoxSliders = checkBoxSliders();
+      List<CheckBox> checkBoxes = effectsController.effectCheckBoxes();
+      List<Slider> checkBoxSliders = effectsController.effectSliders();
       List<String> checkBoxLabels = checkBoxLabels();
       List<Slider> otherSliders = otherSliders();
       List<String> otherLabels = otherLabels();
