@@ -10,6 +10,8 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.Slider;
 import javafx.scene.shape.SVGPath;
 import javafx.util.Duration;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 import sh.ball.audio.FrequencyAnalyser;
 import sh.ball.audio.ShapeAudioPlayer;
 import sh.ball.audio.effect.*;
@@ -17,10 +19,7 @@ import sh.ball.audio.engine.AudioDevice;
 import sh.ball.shapes.Shape;
 
 import java.net.URL;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.ResourceBundle;
+import java.util.*;
 
 public class EffectsController implements Initializable {
 
@@ -203,12 +202,40 @@ public class EffectsController implements Initializable {
     traceCheckBox.selectedProperty().addListener(traceListener);
   }
 
-  public List<CheckBox> effectCheckBoxes() {
+  public List<CheckBox> checkBoxes() {
     return List.of(vectorCancellingCheckBox, bitCrushCheckBox, verticalDistortCheckBox,
       horizontalDistortCheckBox, wobbleCheckBox, smoothCheckBox, traceCheckBox);
   }
-  public List<Slider> effectSliders() {
+  public List<Slider> sliders() {
     return List.of(vectorCancellingSlider, bitCrushSlider, verticalDistortSlider,
       horizontalDistortSlider, wobbleSlider, smoothSlider, traceSlider);
+  }
+  public List<String> labels() {
+    return List.of("vectorCancelling", "bitCrush", "verticalDistort", "horizontalDistort",
+      "wobble", "smooth", "trace");
+  }
+
+  public Element save(Document document) {
+    Element element = document.createElement("checkBoxes");
+    List<CheckBox> checkBoxes = checkBoxes();
+    List<String> labels = labels();
+    for (int i = 0; i < checkBoxes.size(); i++) {
+      Element checkBox = document.createElement(labels.get(i));
+      checkBox.appendChild(
+        document.createTextNode(checkBoxes.get(i).selectedProperty().getValue().toString())
+      );
+      element.appendChild(checkBox);
+    }
+    return element;
+  }
+
+  public void load(Element root) {
+    Element element = (Element) root.getElementsByTagName("checkBoxes").item(0);
+    List<CheckBox> checkBoxes = checkBoxes();
+    List<String> labels = labels();
+    for (int i = 0; i < checkBoxes.size(); i++) {
+      String value = element.getElementsByTagName(labels.get(i)).item(0).getTextContent();
+      checkBoxes.get(i).setSelected(Boolean.parseBoolean(value));
+    }
   }
 }

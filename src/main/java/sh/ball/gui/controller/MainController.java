@@ -6,7 +6,6 @@ import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.collections.FXCollections;
 import javafx.scene.control.*;
-import javafx.scene.layout.AnchorPane;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.scene.shape.SVGPath;
@@ -26,7 +25,6 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
 
-import javafx.beans.InvalidationListener;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.stage.FileChooser;
@@ -47,7 +45,6 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
 import org.xml.sax.SAXException;
-import sh.ball.audio.effect.Effect;
 import sh.ball.audio.effect.EffectType;
 import sh.ball.audio.engine.AudioDevice;
 import sh.ball.audio.engine.ConglomerateAudioEngine;
@@ -94,7 +91,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private List<FrameSource<List<Shape>>> frameSources = new ArrayList<>();
   private FrameProducer<List<Shape>> producer;
   private int currentFrameSource;
-  private Vector3 rotation = new Vector3();
 
   // frame playback (code by DJ_Level_3)
   private static final int MAX_FRAME_RATE = 120;
@@ -111,6 +107,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
   @FXML
   private EffectsController effectsController;
+  @FXML
+  private ObjController objController;
   @FXML
   private Label frequencyLabel;
   @FXML
@@ -153,16 +151,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private SVGPath volumeMidi;
   @FXML
   private TitledPane objTitledPane;
-  @FXML
-  private Slider focalLengthSlider;
-  @FXML
-  private SVGPath focalLengthMidi;
-  @FXML
-  private Slider objectRotateSpeedSlider;
-  @FXML
-  private SVGPath objectRotateSpeedMidi;
-  @FXML
-  private CheckBox rotateCheckBox;
   @FXML
   private Slider octaveSlider;
   @FXML
@@ -217,10 +205,9 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     midiMap.put(rotateSpeedMidi, rotateSpeedSlider);
     midiMap.put(translationSpeedMidi, translationSpeedSlider);
     midiMap.put(volumeMidi, volumeSlider);
-    midiMap.put(focalLengthMidi, focalLengthSlider);
-    midiMap.put(objectRotateSpeedMidi, objectRotateSpeedSlider);
     midiMap.put(octaveMidi, octaveSlider);
     midiMap.put(visibilityMidi, visibilitySlider);
+    midiMap.putAll(objController.getMidiButtonMap());
     midiMap.putAll(effectsController.getMidiButtonMap());
     return midiMap;
   }
@@ -231,8 +218,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     return Map.of(
       rotateSpeedSlider, rotateEffect::setSpeed,
       translationSpeedSlider, translateEffect::setSpeed,
-      focalLengthSlider, this::updateFocalLength,
-      objectRotateSpeedSlider, this::updateObjectRotateSpeed,
       visibilitySlider, audioPlayer::setMainFrequencyScale
     );
   }
@@ -249,6 +234,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     audioPlayer.setVolume(volumeSlider.valueProperty());
 
     effectsController.setAudioPlayer(audioPlayer);
+    objController.setAudioProducer(producer);
 
     this.midiButtonMap = initializeMidiButtonMap();
 
@@ -350,7 +336,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       recordTextField.setDisable(!newVal);
     });
 
-    updateObjectRotateSpeed(rotateSpeedSlider.getValue());
+    objController.updateObjectRotateSpeed();
 
     audioPlayer.addEffect(EffectType.ROTATE, rotateEffect);
     audioPlayer.addEffect(EffectType.TRANSLATE, translateEffect);
@@ -488,18 +474,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     }
   }
 
-  // changes the focalLength of the FrameProducer
-  private void updateFocalLength(double focalLength) {
-    producer.setFrameSettings(ObjSettingsFactory.focalLength(focalLength));
-  }
-
-  // changes the rotateSpeed of the FrameProducer
-  private void updateObjectRotateSpeed(double rotateSpeed) {
-    producer.setFrameSettings(
-      ObjSettingsFactory.rotateSpeed((Math.exp(3 * rotateSpeed) - 1) / 50)
-    );
-  }
-
   // changes the sinusoidal translation of the image rendered
   private void updateTranslation() {
     translateEffect.setTranslation(new Vector2(
@@ -520,10 +494,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
     Object oldSettings = producer.getFrameSettings();
     producer = new FrameProducer<>(audioPlayer, frames);
+    objController.setAudioProducer(producer);
 
     // Apply the same settings that the previous frameSource had
-    updateObjectRotateSpeed(objectRotateSpeedSlider.getValue());
-    updateFocalLength(focalLengthSlider.getValue());
+    objController.updateObjectRotateSpeed();
+    objController.updateFocalLength();
     if (oldSettings instanceof ObjFrameSettings settings) {
       setObjRotate(settings.baseRotation, settings.currentRotation);
     }
@@ -701,24 +676,23 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
   // determines whether the mouse is being used to rotate a 3D object
   public boolean mouseRotate() {
-    return rotateCheckBox.isSelected();
+    return objController.mouseRotate();
   }
 
   // stops the mouse rotating the 3D object when ESC is pressed or checkbox is
   // unchecked
   public void disableMouseRotate() {
-    rotateCheckBox.setSelected(false);
+    objController.disableMouseRotate();
   }
 
   // updates the 3D object base rotation angle
   public void setObjRotate(Vector3 vector) {
-    rotation = vector;
-    producer.setFrameSettings(ObjSettingsFactory.baseRotation(vector));
+    objController.setObjRotate(vector);
   }
 
   // updates the 3D object base and current rotation angle
   protected void setObjRotate(Vector3 baseRotation, Vector3 currentRotation) {
-    producer.setFrameSettings(ObjSettingsFactory.rotation(baseRotation, currentRotation));
+    objController.setObjRotate(baseRotation, currentRotation);
   }
 
   @Override
@@ -787,25 +761,25 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   }
 
   // must be functions, otherwise they are not initialised
-  private List<String> checkBoxLabels() {
-    return List.of("vectorCancelling", "bitCrush", "verticalDistort", "horizontalDistort",
-      "wobble", "smooth", "trace");
-  }
   private List<Slider> otherSliders() {
-    return List.of(octaveSlider, frequencySlider, rotateSpeedSlider, translationSpeedSlider,
-      volumeSlider, visibilitySlider, focalLengthSlider, objectRotateSpeedSlider);
+    List<Slider> sliders = new ArrayList<>(List.of(octaveSlider, frequencySlider, rotateSpeedSlider, translationSpeedSlider,
+      volumeSlider, visibilitySlider));
+    sliders.addAll(objController.sliders());
+    return sliders;
   }
   private List<String> otherLabels() {
-    return List.of("octave", "frequency", "rotateSpeed", "translationSpeed", "volume",
-      "visibility", "focalLength", "objectRotateSpeed");
+    List<String> labels = new ArrayList<>(List.of("octave", "frequency", "rotateSpeed", "translationSpeed", "volume",
+      "visibility"));
+    labels.addAll(objController.labels());
+    return labels;
   }
   private List<Slider> allSliders() {
-    List<Slider> sliders = new ArrayList<>(effectsController.effectSliders());
+    List<Slider> sliders = new ArrayList<>(effectsController.sliders());
     sliders.addAll(otherSliders());
     return sliders;
   }
   private List<String> allLabels() {
-    List<String> labels = new ArrayList<>(checkBoxLabels());
+    List<String> labels = new ArrayList<>(effectsController.labels());
     labels.addAll(otherLabels());
     return labels;
   }
@@ -836,29 +810,14 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       Element root = document.createElement("project");
       document.appendChild(root);
 
-      // Is there a nicer way of doing this?!
-      List<CheckBox> checkBoxes = effectsController.effectCheckBoxes();
-      List<Slider> checkBoxSliders = effectsController.effectSliders();
-      List<String> checkBoxLabels = checkBoxLabels();
-      List<Slider> otherSliders = otherSliders();
-      List<String> otherLabels = otherLabels();
       List<Slider> sliders = allSliders();
       List<String> labels = allLabels();
 
       Element slidersElement = document.createElement("sliders");
-      appendSliders(checkBoxSliders, checkBoxLabels, slidersElement, document);
-      appendSliders(otherSliders, otherLabels, slidersElement, document);
+      appendSliders(sliders, labels, slidersElement, document);
       root.appendChild(slidersElement);
 
-      Element checkBoxesElement = document.createElement("checkBoxes");
-      for (int i = 0; i < checkBoxes.size(); i++) {
-        Element checkBox = document.createElement(checkBoxLabels.get(i));
-        checkBox.appendChild(
-          document.createTextNode(checkBoxes.get(i).selectedProperty().getValue().toString())
-        );
-        checkBoxesElement.appendChild(checkBox);
-      }
-      root.appendChild(checkBoxesElement);
+      root.appendChild(effectsController.save(document));
 
       Element midiElement = document.createElement("midi");
       for (Map.Entry<Integer, SVGPath> entry : CCMap.entrySet()) {
@@ -880,17 +839,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       translationElement.appendChild(translationYElement);
       root.appendChild(translationElement);
 
-      Element objectRotationElement = document.createElement("objectRotation");
-      Element objectRotationXElement = document.createElement("x");
-      objectRotationXElement.appendChild(document.createTextNode(Double.toString(rotation.getX())));
-      Element objectRotationYElement = document.createElement("y");
-      objectRotationYElement.appendChild(document.createTextNode(Double.toString(rotation.getY())));
-      Element objectRotationZElement = document.createElement("z");
-      objectRotationZElement.appendChild(document.createTextNode(Double.toString(rotation.getZ())));
-      objectRotationElement.appendChild(objectRotationXElement);
-      objectRotationElement.appendChild(objectRotationYElement);
-      objectRotationElement.appendChild(objectRotationZElement);
-      root.appendChild(objectRotationElement);
+      root.appendChild(objController.save(document));
 
       Element filesElement = document.createElement("files");
       for (int i = 0; i < openFiles.size(); i++) {
@@ -934,11 +883,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       Document document = documentBuilder.parse(new File(projectFileName));
       document.getDocumentElement().normalize();
 
-      List<CheckBox> checkBoxes = effectsController.effectCheckBoxes();
-      List<Slider> checkBoxSliders = effectsController.effectSliders();
-      List<String> checkBoxLabels = checkBoxLabels();
-      List<Slider> otherSliders = otherSliders();
-      List<String> otherLabels = otherLabels();
       List<Slider> sliders = allSliders();
       List<String> labels = allLabels();
 
@@ -947,14 +891,9 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
       Element root = document.getDocumentElement();
       Element slidersElement = (Element) root.getElementsByTagName("sliders").item(0);
-      loadSliderValues(checkBoxSliders, checkBoxLabels, slidersElement);
-      loadSliderValues(otherSliders, otherLabels, slidersElement);
+      loadSliderValues(sliders, labels, slidersElement);
 
-      Element checkBoxesElement = (Element) root.getElementsByTagName("checkBoxes").item(0);
-      for (int i = 0; i < checkBoxes.size(); i++) {
-        String value = checkBoxesElement.getElementsByTagName(checkBoxLabels.get(i)).item(0).getTextContent();
-        checkBoxes.get(i).setSelected(Boolean.parseBoolean(value));
-      }
+      effectsController.load(root);
 
       Element midiElement = (Element) root.getElementsByTagName("midi").item(0);
       resetCCMap();
@@ -978,16 +917,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       translationXTextField.setText(translationXElement.getTextContent());
       translationYTextField.setText(translationYElement.getTextContent());
 
-      Element objectRotationElement = (Element) root.getElementsByTagName("objectRotation").item(0);
-      Element objectRotationXElement = (Element) objectRotationElement.getElementsByTagName("x").item(0);
-      Element objectRotationYElement = (Element) objectRotationElement.getElementsByTagName("y").item(0);
-      Element objectRotationZElement = (Element) objectRotationElement.getElementsByTagName("z").item(0);
-      rotation = new Vector3(
-        Double.parseDouble(objectRotationXElement.getTextContent()),
-        Double.parseDouble(objectRotationYElement.getTextContent()),
-        Double.parseDouble(objectRotationZElement.getTextContent())
-      );
-      setObjRotate(rotation);
+      objController.load(root);
 
       Element filesElement = (Element) root.getElementsByTagName("files").item(0);
       List<byte[]> files = new ArrayList<>();
