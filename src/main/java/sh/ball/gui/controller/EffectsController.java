@@ -13,7 +13,6 @@ import javafx.util.Duration;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import sh.ball.audio.FrequencyAnalyser;
-import sh.ball.audio.ShapeAudioPlayer;
 import sh.ball.audio.effect.*;
 import sh.ball.audio.engine.AudioDevice;
 import sh.ball.shapes.Shape;
@@ -21,14 +20,16 @@ import sh.ball.shapes.Shape;
 import java.net.URL;
 import java.util.*;
 
+import static sh.ball.gui.Gui.audioPlayer;
+
 public class EffectsController implements Initializable {
 
-  private ShapeAudioPlayer audioPlayer;
+  private static final int DEFAULT_SAMPLE_RATE = 192000;
 
   private Map<EffectType, Slider> effectTypes;
 
   private final SmoothEffect smoothEffect;
-  private WobbleEffect wobbleEffect;
+  private final WobbleEffect wobbleEffect;
 
   @FXML
   private CheckBox vectorCancellingCheckBox;
@@ -75,6 +76,7 @@ public class EffectsController implements Initializable {
 
   public EffectsController() {
     this.smoothEffect = new SmoothEffect(1);
+    this.wobbleEffect = new WobbleEffect(DEFAULT_SAMPLE_RATE);
   }
 
   public Map<SVGPath, Slider> getMidiButtonMap() {
@@ -109,7 +111,7 @@ public class EffectsController implements Initializable {
   }
 
   // selects or deselects the given audio effect
-  private void updateEffect(EffectType type, boolean checked, Effect effect) {
+  public void updateEffect(EffectType type, boolean checked, Effect effect) {
     if (checked) {
       audioPlayer.addEffect(type, effect);
       if (effectTypes.containsKey(type)) {
@@ -123,13 +125,8 @@ public class EffectsController implements Initializable {
     }
   }
 
-  public void setAudioPlayer(ShapeAudioPlayer audioPlayer) {
-    this.audioPlayer = audioPlayer;
-  }
-
   public void setAudioDevice(AudioDevice device) {
-    this.wobbleEffect = new WobbleEffect(device.sampleRate());
-    updateEffect(EffectType.WOBBLE, wobbleCheckBox.isSelected(), wobbleEffect);
+    wobbleEffect.setSampleRate(device.sampleRate());
     restartEffects();
   }
 
