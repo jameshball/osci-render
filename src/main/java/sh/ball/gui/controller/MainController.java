@@ -1,4 +1,4 @@
-package sh.ball.gui;
+package sh.ball.gui.controller;
 
 import javafx.animation.*;
 import javafx.application.Platform;
@@ -63,7 +63,7 @@ import sh.ball.shapes.Vector2;
 
 import static sh.ball.math.Math.tryParse;
 
-public class Controller implements Initializable, FrequencyListener, MidiListener {
+public class MainController implements Initializable, FrequencyListener, MidiListener {
 
   private String openProjectPath;
 
@@ -88,7 +88,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   private Map<SVGPath, Slider> midiButtonMap;
 
   // frames
-  private static final InputStream DEFAULT_OBJ = Controller.class.getResourceAsStream("/models/cube.obj");
+  private static final InputStream DEFAULT_OBJ = MainController.class.getResourceAsStream("/models/cube.obj");
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
   private List<byte[]> openFiles = new ArrayList<>();
   private List<String> frameSourcePaths = new ArrayList<>();
@@ -221,7 +221,7 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   @FXML
   private MenuItem saveAsProjectMenuItem;
 
-  public Controller() throws Exception {
+  public MainController() throws Exception {
     MidiCommunicator midiCommunicator = new MidiCommunicator();
     midiCommunicator.addListener(this);
     new Thread(midiCommunicator).start();
@@ -838,18 +838,18 @@ public class Controller implements Initializable, FrequencyListener, MidiListene
   // ====================  End code block by DJ_Level_3  ====================
 
   // determines whether the mouse is being used to rotate a 3D object
-  protected boolean mouseRotate() {
+  public boolean mouseRotate() {
     return rotateCheckBox.isSelected();
   }
 
   // stops the mouse rotating the 3D object when ESC is pressed or checkbox is
   // unchecked
-  protected void disableMouseRotate() {
+  public void disableMouseRotate() {
     rotateCheckBox.setSelected(false);
   }
 
   // updates the 3D object base rotation angle
-  protected void setObjRotate(Vector3 vector) {
+  public void setObjRotate(Vector3 vector) {
     rotation = vector;
     producer.setFrameSettings(ObjSettingsFactory.baseRotation(vector));
   }

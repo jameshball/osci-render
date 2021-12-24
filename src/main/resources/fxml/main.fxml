@@ -15,7 +15,7 @@
 <?import javafx.scene.shape.SVGPath?>
 <?import javafx.scene.text.Font?>
 
-<AnchorPane prefHeight="658.0" prefWidth="837.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1">
+<AnchorPane prefHeight="658.0" prefWidth="837.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.MainController">
    <TitledPane animated="false" collapsible="false" layoutX="424.0" layoutY="38.0" prefHeight="387.0" prefWidth="402.0" text="Audio Effects">
      <content>
        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="262.0" prefWidth="402.0">
