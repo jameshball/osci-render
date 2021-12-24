@@ -11,6 +11,7 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.stage.Stage;
 import sh.ball.engine.Vector3;
+import sh.ball.gui.controller.MainController;
 
 import java.util.Objects;
 
@@ -21,10 +22,9 @@ public class Gui extends Application {
     Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
     System.setProperty("prism.lcdtext", "false");
 
-    FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/osci-render.fxml"));
-    Controller controller = new Controller();
-    loader.setController(controller);
+    FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/main.fxml"));
     Parent root = loader.load();
+    MainController controller = loader.getController();
 
     stage.getIcons().add(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/icons/icon.png"))));
     stage.setTitle("osci-render");
