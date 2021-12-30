@@ -11,6 +11,7 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.stage.Stage;
 import sh.ball.audio.ShapeAudioPlayer;
+import sh.ball.audio.engine.AudioDevice;
 import sh.ball.audio.engine.ConglomerateAudioEngine;
 import sh.ball.audio.midi.MidiCommunicator;
 import sh.ball.engine.Vector3;
@@ -23,10 +24,12 @@ public class Gui extends Application {
   // These need to be global so that we can guarantee they can be accessed by Controllers
   public static final MidiCommunicator midiCommunicator = new MidiCommunicator();
   public static ShapeAudioPlayer audioPlayer;
+  public static AudioDevice defaultDevice;
 
   static {
     try {
       audioPlayer = new ShapeAudioPlayer(ConglomerateAudioEngine::new, midiCommunicator);
+      defaultDevice = audioPlayer.getDefaultDevice();
     } catch (Exception e) {
       e.printStackTrace();
     }

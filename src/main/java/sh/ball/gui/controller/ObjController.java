@@ -32,10 +32,10 @@ public class ObjController implements Initializable {
   private CheckBox rotateCheckBox;
 
   public Map<SVGPath, Slider> getMidiButtonMap() {
-    Map<SVGPath, Slider> midiMap = new HashMap<>();
-    midiMap.put(focalLengthMidi, focalLengthSlider);
-    midiMap.put(objectRotateSpeedMidi, objectRotateSpeedSlider);
-    return midiMap;
+    return Map.of(
+      focalLengthMidi, focalLengthSlider,
+      objectRotateSpeedMidi, objectRotateSpeedSlider
+    );
   }
 
   public void updateFocalLength() {

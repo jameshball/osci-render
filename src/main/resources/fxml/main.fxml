@@ -1,18 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.scene.control.Button?>
-<?import javafx.scene.control.CheckBox?>
-<?import javafx.scene.control.ComboBox?>
-<?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Menu?>
 <?import javafx.scene.control.MenuBar?>
 <?import javafx.scene.control.MenuItem?>
-<?import javafx.scene.control.Slider?>
-<?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.TitledPane?>
 <?import javafx.scene.input.KeyCodeCombination?>
 <?import javafx.scene.layout.AnchorPane?>
-<?import javafx.scene.shape.SVGPath?>
 
 <AnchorPane prefHeight="658.0" prefWidth="837.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.MainController">
    <TitledPane animated="false" collapsible="false" layoutX="424.0"
@@ -20,27 +13,10 @@
                text="Audio Effects">
       <fx:include fx:id="effects" source="effects.fxml"/>
    </TitledPane>
-<TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="424.0" layoutY="436.0" maxHeight="-Infinity" maxWidth="-Infinity" prefHeight="213.0" prefWidth="402.0" text="3D .obj file settings">
-   <fx:include fx:id="obj" source="obj.fxml"/>
-</TitledPane>
-   <AnchorPane id="control-pane" layoutX="10.0" layoutY="37.0" prefHeight="313.0" prefWidth="402.0">
-      <children>
-         <Button fx:id="chooseFileButton" layoutX="14.0" layoutY="53.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose File" />
-         <Label fx:id="fileLabel" layoutX="143.0" layoutY="57.0" maxWidth="270.0" prefHeight="18.0" prefWidth="246.0" text="cube.obj" />
-         <Button fx:id="recordButton" layoutX="13.0" layoutY="142.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Record" />
-         <Label fx:id="recordLabel" layoutX="13.0" layoutY="184.0" maxWidth="358.0" prefHeight="18.0" prefWidth="357.0" />
-         <Label id="frequency" fx:id="frequencyLabel" layoutX="13.0" layoutY="206.0" prefHeight="58.0" prefWidth="376.0" text="L/R Frequency:&#10; &#10;" />
-         <ComboBox fx:id="deviceComboBox" layoutX="14.0" layoutY="11.0" prefWidth="376.0" />
-         <Button fx:id="chooseFolderButton" layoutX="14.0" layoutY="91.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose Folder" />
-         <Label fx:id="jkLabel" layoutX="143.0" layoutY="84.0" maxWidth="270.0" prefHeight="43.0" prefWidth="246.0" text="Use j and k (or MIDI Program Change) to cycle between files, or i to start playback" visible="false" wrapText="true" />
-         <TextField fx:id="recordTextField" disable="true" layoutX="300.0" layoutY="154.0" prefHeight="26.0" prefWidth="70.0" text="2.0" />
-         <Label fx:id="recordLengthLabel" disable="true" layoutX="290.0" layoutY="128.0" text="Record length (s)" />
-         <CheckBox fx:id="recordCheckBox" layoutX="143.0" layoutY="146.0" mnemonicParsing="false" text="Timed record" />
-         <Slider fx:id="octaveSlider" blockIncrement="1.0" layoutX="65.0" layoutY="271.0" majorTickUnit="1.0" max="5.0" min="-5.0" minorTickCount="0" prefHeight="42.0" prefWidth="306.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" />
-         <SVGPath fx:id="octaveMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="268.0" pickOnBounds="true" />
-         <Label layoutX="12.0" layoutY="270.0" text="Octave" />
-      </children>
-   </AnchorPane>
+   <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="424.0" layoutY="436.0" maxHeight="-Infinity" maxWidth="-Infinity" prefHeight="213.0" prefWidth="402.0" text="3D .obj file settings">
+      <fx:include fx:id="obj" source="obj.fxml"/>
+   </TitledPane>
+   <fx:include fx:id="general" source="general.fxml"/>
    <TitledPane collapsible="false" layoutX="10.0" layoutY="363.0" prefHeight="286.0" prefWidth="402.0" text="Image settings">
       <fx:include fx:id="image" source="image.fxml"/>
    </TitledPane>
