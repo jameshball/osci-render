@@ -4,8 +4,8 @@ import java.util.Objects;
 
 public class MidiNote {
 
-  public static double MAX_PRESSURE = 127;
-  public static final double MIDDLE_C = 261.63;
+  public static double MAX_VELOCITY = 127;
+  public static final double MIDDLE_C = 261.6255798;
   public static final int PITCH_BEND_DATA_LENGTH = 7;
   public static final int PITCH_BEND_MAX = 16383;
   public static final int PITCH_BEND_SEMITONES = 2;

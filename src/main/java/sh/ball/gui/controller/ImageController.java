@@ -88,7 +88,7 @@ public class ImageController implements Initializable, SubController {
     Map<Slider, Consumer<Double>> sliderMap = Map.of(
       rotateSpeedSlider, rotateEffect::setSpeed,
       translationSpeedSlider, translateEffect::setSpeed,
-      visibilitySlider, audioPlayer::setMainFrequencyScale
+      visibilitySlider, audioPlayer::setBaseFrequencyVolumeScale
     );
     sliderMap.keySet().forEach(slider ->
       slider.valueProperty().addListener((source, oldValue, newValue) ->

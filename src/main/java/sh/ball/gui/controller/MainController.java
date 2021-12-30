@@ -362,7 +362,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     double max = slider.getMax();
     double min = slider.getMin();
     double range = max - min;
-    return min + (midiPressure / MidiNote.MAX_PRESSURE) * range;
+    return min + (midiPressure / MidiNote.MAX_VELOCITY) * range;
   }
 
   // handles newly received MIDI messages. For CC messages, this handles
@@ -401,6 +401,19 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     } else if (command == ShortMessage.PROGRAM_CHANGE) {
       // We want to change the file that is currently playing
       Platform.runLater(() -> changeFrameSource(message.getMessage()[1]));
+    } else if (command == ShortMessage.PITCH_BEND) {
+      // using these instructions https://sites.uci.edu/camp2014/2014/04/30/managing-midi-pitchbend-messages/
+
+      int pitchBend = (message.getData2() << MidiNote.PITCH_BEND_DATA_LENGTH) | message.getData1();
+      // get pitch bend in range -1 to 1
+      double pitchBendFactor = (double) pitchBend / MidiNote.PITCH_BEND_MAX;
+      pitchBendFactor = 2 * pitchBendFactor - 1;
+      pitchBendFactor *= MidiNote.PITCH_BEND_SEMITONES;
+      // 12 tone equal temperament
+      pitchBendFactor /= 12;
+      pitchBendFactor = Math.pow(2, pitchBendFactor);
+
+      audioPlayer.setPitchBendFactor(pitchBendFactor);
     }
   }
 

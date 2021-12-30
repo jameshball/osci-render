@@ -17,13 +17,13 @@ public interface AudioPlayer<S> extends Runnable, MidiListener {
 
   void setOctave(int octave);
 
-  void setMainFrequencyScale(double scale);
+  void setBaseFrequencyVolumeScale(double scale);
 
   void setPitchBendFactor(double pitchBend);
 
-  List<Double> getFrequencies();
+  void setDecay(double decaySeconds);
 
-  List<Double> getBaseFrequencies();
+  void setAttack(double attackSeconds);
 
   void addFrame(S frame);
 

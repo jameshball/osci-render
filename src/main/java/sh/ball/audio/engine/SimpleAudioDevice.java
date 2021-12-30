@@ -2,39 +2,7 @@ package sh.ball.audio.engine;
 
 import java.util.Objects;
 
-public class SimpleAudioDevice implements AudioDevice {
-
-  final String id;
-  final String name;
-  final int sampleRate;
-  final AudioSample sample;
-
-  public SimpleAudioDevice(String id, String name, int sampleRate, AudioSample sample) {
-    this.id = id;
-    this.name = name;
-    this.sampleRate = sampleRate;
-    this.sample = sample;
-  }
-
-  @Override
-  public String id() {
-    return id;
-  }
-
-  @Override
-  public String name() {
-    return name;
-  }
-
-  @Override
-  public int sampleRate() {
-    return sampleRate;
-  }
-
-  @Override
-  public AudioSample sample() {
-    return sample;
-  }
+public record SimpleAudioDevice(String id, String name, int sampleRate, AudioSample sample) implements AudioDevice {
 
   @Override
   public String toString() {
