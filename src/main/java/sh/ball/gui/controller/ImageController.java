@@ -25,7 +25,7 @@ import java.util.function.Consumer;
 import static sh.ball.gui.Gui.audioPlayer;
 import static sh.ball.math.Math.tryParse;
 
-public class ImageController implements Initializable {
+public class ImageController implements Initializable, SubController {
 
   private static final double MAX_FREQUENCY = 12000;
   private static final int DEFAULT_SAMPLE_RATE = 192000;
@@ -109,6 +109,7 @@ public class ImageController implements Initializable {
     audioPlayer.setVolume(volumeSlider.valueProperty());
   }
 
+  @Override
   public Map<SVGPath, Slider> getMidiButtonMap() {
     return Map.of(
       frequencyMidi, frequencySlider,
@@ -119,16 +120,19 @@ public class ImageController implements Initializable {
     );
   }
 
+  @Override
   public List<Slider> sliders() {
     return List.of(frequencySlider, rotateSpeedSlider, translationSpeedSlider,
       volumeSlider, visibilitySlider);
   }
 
+  @Override
   public List<String> labels() {
     return List.of("frequency", "rotateSpeed", "translationSpeed", "volume",
       "visibility");
   }
 
+  @Override
   public Element save(Document document) {
     Element element = document.createElement("translation");
     Element x = document.createElement("x");
@@ -140,6 +144,7 @@ public class ImageController implements Initializable {
     return element;
   }
 
+  @Override
   public void load(Element root) {
     Element element = (Element) root.getElementsByTagName("translation").item(0);
     Element x = (Element) element.getElementsByTagName("x").item(0);

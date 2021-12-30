@@ -15,7 +15,7 @@ import sh.ball.shapes.Shape;
 import java.net.URL;
 import java.util.*;
 
-public class ObjController implements Initializable {
+public class ObjController implements Initializable, SubController {
 
   private Vector3 rotation = new Vector3(2 * Math.PI, 2 * Math.PI, 0);
   private FrameProducer<List<Shape>> producer;
@@ -31,6 +31,7 @@ public class ObjController implements Initializable {
   @FXML
   private CheckBox rotateCheckBox;
 
+  @Override
   public Map<SVGPath, Slider> getMidiButtonMap() {
     return Map.of(
       focalLengthMidi, focalLengthSlider,
@@ -94,14 +95,17 @@ public class ObjController implements Initializable {
     );
   }
 
+  @Override
   public List<Slider> sliders() {
     return List.of(focalLengthSlider, objectRotateSpeedSlider);
   }
 
+  @Override
   public List<String> labels() {
     return List.of("focalLength", "objectRotateSpeed");
   }
 
+  @Override
   public Element save(Document document) {
     Element element = document.createElement("objectRotation");
     Element x = document.createElement("x");
@@ -116,6 +120,7 @@ public class ObjController implements Initializable {
     return element;
   }
 
+  @Override
   public void load(Element root) {
     Element element = (Element) root.getElementsByTagName("objectRotation").item(0);
     Element x = (Element) element.getElementsByTagName("x").item(0);
