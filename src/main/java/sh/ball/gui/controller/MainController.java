@@ -1,29 +1,19 @@
 package sh.ball.gui.controller;
 
-import javafx.animation.*;
 import javafx.application.Platform;
-import javafx.beans.property.DoubleProperty;
-import javafx.beans.property.SimpleDoubleProperty;
-import javafx.collections.FXCollections;
 import javafx.scene.control.*;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.scene.shape.SVGPath;
-import javafx.stage.DirectoryChooser;
-import javafx.util.Duration;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import sh.ball.audio.*;
-import sh.ball.audio.effect.*;
 
 import java.io.*;
 import java.net.URL;
-import java.nio.file.Files;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.function.Consumer;
 
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -31,9 +21,6 @@ import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
 import javax.sound.midi.ShortMessage;
-import javax.sound.sampled.AudioFileFormat;
-import javax.sound.sampled.AudioInputStream;
-import javax.sound.sampled.AudioSystem;
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -45,34 +32,26 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
 import org.xml.sax.SAXException;
-import sh.ball.audio.effect.EffectType;
 import sh.ball.audio.engine.AudioDevice;
-import sh.ball.audio.engine.ConglomerateAudioEngine;
-import sh.ball.audio.midi.MidiCommunicator;
 import sh.ball.audio.midi.MidiListener;
 import sh.ball.audio.midi.MidiNote;
 import sh.ball.engine.Vector3;
 import sh.ball.gui.Gui;
 import sh.ball.parser.obj.ObjFrameSettings;
-import sh.ball.parser.obj.ObjSettingsFactory;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.ParserFactory;
 import sh.ball.shapes.Shape;
-import sh.ball.shapes.Vector2;
 
 import static sh.ball.gui.Gui.audioPlayer;
-import static sh.ball.math.Math.tryParse;
+import static sh.ball.gui.Gui.defaultDevice;
 
 public class MainController implements Initializable, FrequencyListener, MidiListener {
 
   private String openProjectPath;
 
   // audio
-  private final AudioDevice defaultDevice;
   private int sampleRate;
   private FrequencyAnalyser<List<Shape>> analyser;
-  private boolean recording = false;
-  private Timeline recordingTimeline;
 
   // midi
   private final Map<Integer, SVGPath> CCMap = new HashMap<>();
@@ -89,17 +68,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private FrameProducer<List<Shape>> producer;
   private int currentFrameSource;
 
-  // frame playback (code by DJ_Level_3)
-  private static final int MAX_FRAME_RATE = 120;
-  private static final int MIN_FRAME_RATE = 1;
-  private boolean framesPlaying = false; // default to not playing
-  private int frameRate = 10; // default to 10 frames per second
-
   // javafx
   private final FileChooser osciFileChooser = new FileChooser();
-  private final FileChooser wavFileChooser = new FileChooser();
-  private final FileChooser renderFileChooser = new FileChooser();
-  private final DirectoryChooser folderChooser = new DirectoryChooser();
   private Stage stage;
 
   @FXML
@@ -109,33 +79,9 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private ImageController imageController;
   @FXML
-  private Label frequencyLabel;
-  @FXML
-  private Button chooseFileButton;
-  @FXML
-  private Button chooseFolderButton;
-  @FXML
-  private Label fileLabel;
-  @FXML
-  private Label jkLabel;
-  @FXML
-  private Button recordButton;
-  @FXML
-  private Label recordLabel;
-  @FXML
-  private TextField recordTextField;
-  @FXML
-  private CheckBox recordCheckBox;
-  @FXML
-  private Label recordLengthLabel;
+  private GeneralController generalController;
   @FXML
   private TitledPane objTitledPane;
-  @FXML
-  private Slider octaveSlider;
-  @FXML
-  private SVGPath octaveMidi;
-  @FXML
-  private ComboBox<AudioDevice> deviceComboBox;
   @FXML
   private MenuItem openProjectMenuItem;
   @FXML
@@ -144,8 +90,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private MenuItem saveAsProjectMenuItem;
 
   public MainController() throws Exception {
-    Gui.midiCommunicator.addListener(this);
-
     // Clone DEFAULT_OBJ InputStream using a ByteArrayOutputStream
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     assert DEFAULT_OBJ != null;
@@ -158,7 +102,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     frameSourcePaths.add("cube.obj");
     currentFrameSource = 0;
     this.producer = new FrameProducer<>(audioPlayer, frames);
-    this.defaultDevice = audioPlayer.getDefaultDevice();
     if (defaultDevice == null) {
       throw new RuntimeException("No default audio device found!");
     }
@@ -169,7 +112,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   // control if they are selected.
   private Map<SVGPath, Slider> initializeMidiButtonMap() {
     Map<SVGPath, Slider> midiMap = new HashMap<>();
-    midiMap.put(octaveMidi, octaveSlider);
+    midiMap.putAll(generalController.getMidiButtonMap());
     midiMap.putAll(imageController.getMidiButtonMap());
     midiMap.putAll(objController.getMidiButtonMap());
     midiMap.putAll(effectsController.getMidiButtonMap());
@@ -179,6 +122,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
     objController.setAudioProducer(producer);
+    generalController.setMainController(this);
 
     this.midiButtonMap = initializeMidiButtonMap();
 
@@ -199,23 +143,9 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
     }));
 
-    octaveSlider.valueProperty().addListener((e, old, octave) -> audioPlayer.setOctave(octave.intValue()));
-
     osciFileChooser.setInitialFileName("project.osci");
     osciFileChooser.getExtensionFilters().add(
       new FileChooser.ExtensionFilter("osci-render files", "*.osci")
-    );
-    wavFileChooser.setInitialFileName("out.wav");
-    wavFileChooser.getExtensionFilters().addAll(
-      new FileChooser.ExtensionFilter("WAV Files", "*.wav"),
-      new FileChooser.ExtensionFilter("All Files", "*.*")
-    );
-    // when opening new files, we support .obj, .svg, and .txt
-    renderFileChooser.getExtensionFilters().addAll(
-      new FileChooser.ExtensionFilter("All Files", "*.*"),
-      new FileChooser.ExtensionFilter("Wavefront OBJ Files", "*.obj"),
-      new FileChooser.ExtensionFilter("SVG Files", "*.svg"),
-      new FileChooser.ExtensionFilter("Text Files", "*.txt")
     );
 
     saveProjectMenuItem.setOnAction(e -> {
@@ -246,43 +176,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
     });
 
-    chooseFileButton.setOnAction(e -> {
-      File file = renderFileChooser.showOpenDialog(stage);
-      if (file != null) {
-        chooseFile(file);
-        updateLastVisitedDirectory(new File(file.getParent()));
-      }
-    });
-
-    chooseFolderButton.setOnAction(e -> {
-      File file = folderChooser.showDialog(stage);
-      if (file != null) {
-        chooseFile(file);
-        updateLastVisitedDirectory(file);
-      }
-    });
-
-    recordButton.setOnAction(event -> toggleRecord());
-
-    recordCheckBox.selectedProperty().addListener((e, oldVal, newVal) -> {
-      recordLengthLabel.setDisable(!newVal);
-      recordTextField.setDisable(!newVal);
-    });
-
     objController.updateObjectRotateSpeed();
-
-    List<AudioDevice> devices = audioPlayer.devices();
-    deviceComboBox.setItems(FXCollections.observableList(devices));
-    deviceComboBox.setValue(defaultDevice);
 
     switchAudioDevice(defaultDevice, false);
     executor.submit(producer);
-
-    deviceComboBox.valueProperty().addListener((options, oldDevice, newDevice) -> {
-      if (newDevice != null) {
-        switchAudioDevice(newDevice);
-      }
-    });
+    Gui.midiCommunicator.addListener(this);
   }
 
   // used when a file is chosen so that the same folder is reopened when a
@@ -291,12 +189,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     String lastVisitedDirectory = file != null ? file.getAbsolutePath() : System.getProperty("user.home");
     File dir = new File(lastVisitedDirectory);
     osciFileChooser.setInitialDirectory(dir);
-    wavFileChooser.setInitialDirectory(dir);
-    renderFileChooser.setInitialDirectory(dir);
-    folderChooser.setInitialDirectory(dir);
+    generalController.updateLastVisitedDirectory(dir);
   }
 
-  private void switchAudioDevice(AudioDevice device) {
+  void switchAudioDevice(AudioDevice device) {
     switchAudioDevice(device, true);
   }
 
@@ -337,78 +233,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     new Thread(analyser).start();
   }
 
-  // alternates between recording and not recording when called.
-  // If it is a non-timed recording, it is saved when this is called and
-  // recording is stopped. If it is a time recording, this function will cancel
-  // the recording.
-  private void toggleRecord() {
-    recording = !recording;
-    boolean timedRecord = recordCheckBox.isSelected();
-    if (recording) {
-      // if it is a timed recording then a timeline is scheduled to start and
-      // stop recording at the predefined times.
-      if (timedRecord) {
-        double recordingLength;
-        try {
-          recordingLength = Double.parseDouble(recordTextField.getText());
-        } catch (NumberFormatException e) {
-          recordLabel.setText("Please set a valid record length");
-          recording = false;
-          return;
-        }
-        recordButton.setText("Cancel");
-        KeyFrame kf1 = new KeyFrame(
-          Duration.seconds(0),
-          e -> audioPlayer.startRecord()
-        );
-        // save the recording after recordingLength seconds
-        KeyFrame kf2 = new KeyFrame(
-          Duration.seconds(recordingLength),
-          e -> {
-            saveRecording();
-            recording = false;
-          }
-        );
-        recordingTimeline = new Timeline(kf1, kf2);
-        Platform.runLater(recordingTimeline::play);
-      } else {
-        recordButton.setText("Stop Recording");
-        audioPlayer.startRecord();
-      }
-      recordLabel.setText("Recording...");
-    } else if (timedRecord) {
-      // cancel the recording
-      recordingTimeline.stop();
-      recordLabel.setText("");
-      recordButton.setText("Record");
-      audioPlayer.stopRecord();
-    } else {
-      saveRecording();
-    }
-  }
-
-  // Stops recording and opens a fileChooser so that the user can choose a
-  // location to save the recording to. If no location is chosen then it will
-  // be saved as the current date-time of the machine.
-  private void saveRecording() {
-    try {
-      recordButton.setText("Record");
-      AudioInputStream input = audioPlayer.stopRecord();
-      File file = wavFileChooser.showSaveDialog(stage);
-      SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
-      Date date = new Date(System.currentTimeMillis());
-      if (file == null) {
-        file = new File("out-" + formatter.format(date) + ".wav");
-      }
-      AudioSystem.write(input, AudioFileFormat.Type.WAVE, file);
-      input.close();
-      recordLabel.setText("Saved to " + file.getAbsolutePath());
-    } catch (IOException e) {
-      recordLabel.setText("Error saving file");
-      e.printStackTrace();
-    }
-  }
-
   // changes the FrameProducer e.g. could be changing from a 3D object to an
   // SVG. The old FrameProducer is stopped and a new one created and initialised
   // with the same settings that the original had.
@@ -432,12 +256,13 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     executor.submit(producer);
     effectsController.restartEffects();
 
-    updateFrameLabels();
+    generalController.setFrameSourceName(frameSourcePaths.get(currentFrameSource));
+    generalController.updateFrameLabels();
     // enable the .obj file settings iff the new frameSource is for a 3D object.
     objTitledPane.setDisable(!ObjParser.isObjFile(frameSourcePaths.get(index)));
   }
 
-  private void updateFiles(List<byte[]> files, List<String> names) throws IOException, ParserConfigurationException, SAXException {
+  void updateFiles(List<byte[]> files, List<String> names) throws IOException, ParserConfigurationException, SAXException {
     List<FrameSource<List<Shape>>> newFrameSources = new ArrayList<>();
     List<String> newFrameSourcePaths = new ArrayList<>();
     List<byte[]> newOpenFiles = new ArrayList<>();
@@ -451,8 +276,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     }
 
     if (newFrameSources.size() > 0) {
-      jkLabel.setVisible(newFrameSources.size() > 1);
-      framesPlaying = framesPlaying && newFrameSources.size() > 1;
+      generalController.showMultiFileTooltip(newFrameSources.size() > 1);
+      if (generalController.framesPlaying() && newFrameSources.size() == 1) {
+        generalController.disablePlayback();
+      }
       frameSources.forEach(FrameSource::disable);
       frameSources = newFrameSources;
       frameSourcePaths = newFrameSourcePaths;
@@ -461,44 +288,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     }
   }
 
-  // selects a new file or folder for files to be rendered from
-  private void chooseFile(File chosenFile) {
-    try {
-      if (chosenFile.exists()) {
-        List<byte[]> files = new ArrayList<>();
-        List<String> names = new ArrayList<>();
-        if (chosenFile.isDirectory()) {
-          File[] fileList = Objects.requireNonNull(chosenFile.listFiles());
-          Arrays.sort(fileList);
-          for (File file : fileList) {
-            files.add(Files.readAllBytes(file.toPath()));
-            names.add(file.getName());
-          }
-        } else {
-          files.add(Files.readAllBytes(chosenFile.toPath()));
-          names.add(chosenFile.getName());
-        }
-
-        updateFiles(files, names);
-      }
-    } catch (IOException | ParserConfigurationException | SAXException ioException) {
-      ioException.printStackTrace();
-
-      // display error to user (for debugging purposes)
-      String oldPath = fileLabel.getText();
-      // shows the error message and later shows the old path as the file being rendered
-      // doesn't change
-      KeyFrame kf1 = new KeyFrame(Duration.seconds(0), e -> fileLabel.setText(ioException.getMessage()));
-      KeyFrame kf2 = new KeyFrame(Duration.seconds(5), e -> fileLabel.setText(oldPath));
-      Timeline timeline = new Timeline(kf1, kf2);
-      Platform.runLater(timeline::play);
-    }
-  }
-
   // used so that the Controller has access to the stage, allowing it to open
   // file directories etc.
   public void setStage(Stage stage) {
     this.stage = stage;
+    generalController.setStage(stage);
   }
 
   // increments and changes the frameSource after pressing 'j'
@@ -525,82 +319,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     changeFrameSource(index);
   }
 
-  // ==================== Start code block by DJ_Level_3 ====================
-  //
-  //     Quickly written code by DJ_Level_3, a programmer who is not super
-  // experienced with Java. It almost definitely could be made better in one
-  // way or another, but testing so far shows that the code is stable and
-  // doesn't noticeably decrease performance.
-  //
-
-  private void updateFrameLabels() {
-    if (framesPlaying) {
-      fileLabel.setText("Frame rate: " + frameRate);
-      jkLabel.setText("Use u and o to decrease and increase the frame rate, or i to stop playback");
-    } else {
-      fileLabel.setText(frameSourcePaths.get(currentFrameSource));
-      jkLabel.setText("Use j and k (or MIDI Program Change) to cycle between files, or i to start playback");
-    }
-  }
-
-  private void disablePlayback() {
-    framesPlaying = false;
-  }
-
-  private void enablePlayback() {
-    framesPlaying = true;
-    doPlayback();
-  }
-
-  // toggles frameSource playback after pressing 'i'
-  public void togglePlayback() {
-    if (frameSources.size() == 1) {
-      return;
-    }
-    if (framesPlaying) {
-      disablePlayback();
-    } else {
-      enablePlayback();
-    }
-    updateFrameLabels();
-  }
-
-  // increments frameRate (up to maximum) after pressing 'u'
-  public void increaseFrameRate() {
-    updateFrameLabels();
-    if (frameRate < MAX_FRAME_RATE) {
-      frameRate++;
-    } else {
-      frameRate = MAX_FRAME_RATE;
-    }
-  }
-
-  // decrements frameRate (down to minimum) after pressing 'o'
-  public void decreaseFrameRate() {
-    updateFrameLabels();
-    if (frameRate > MIN_FRAME_RATE) {
-      frameRate--;
-    } else {
-      frameRate = MIN_FRAME_RATE;
-    }
-  }
-
-  // repeatedly swaps frameSource when playback is enabled
-  private void doPlayback() {
-    if (framesPlaying) {
-      KeyFrame now = new KeyFrame(Duration.seconds(0), e -> nextFrameSource());
-      KeyFrame next = new KeyFrame(Duration.seconds(1.0 / frameRate), e -> {
-        doPlayback();
-      });
-      Timeline timeline = new Timeline(now, next);
-      Platform.runLater(timeline::play);
-    } else {
-      nextFrameSource();
-    }
-  }
-
-  // ====================  End code block by DJ_Level_3  ====================
-
   // determines whether the mouse is being used to rotate a 3D object
   public boolean mouseRotate() {
     return objController.mouseRotate();
@@ -624,9 +342,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
   @Override
   public void updateFrequency(double leftFrequency, double rightFrequency) {
-    Platform.runLater(() ->
-      frequencyLabel.setText(String.format("L/R Frequency:\n%d Hz / %d Hz", Math.round(leftFrequency), Math.round(rightFrequency)))
-    );
+    generalController.updateFrequency(leftFrequency, rightFrequency);
   }
 
   private void mapMidiCC(int cc, SVGPath midiButton) {
@@ -689,13 +405,15 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
   // must be functions, otherwise they are not initialised
   private List<Slider> otherSliders() {
-    List<Slider> sliders = new ArrayList<>(List.of(octaveSlider));
+    List<Slider> sliders = new ArrayList<>();
+    sliders.addAll(generalController.sliders());
     sliders.addAll(imageController.sliders());
     sliders.addAll(objController.sliders());
     return sliders;
   }
   private List<String> otherLabels() {
-    List<String> labels = new ArrayList<>(List.of("octave"));
+    List<String> labels = new ArrayList<>();
+    labels.addAll(generalController.labels());
     labels.addAll(imageController.labels());
     labels.addAll(objController.labels());
     return labels;
@@ -807,7 +525,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       List<String> labels = allLabels();
 
       // Disable cycling through frames
-      disablePlayback();
+      generalController.disablePlayback();
 
       Element root = document.getDocumentElement();
       Element slidersElement = (Element) root.getElementsByTagName("sliders").item(0);
@@ -851,5 +569,19 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     } catch (ParserConfigurationException | SAXException | IOException e) {
       e.printStackTrace();
     }
+  }
+
+  public void decreaseFrameRate() {
+    generalController.decreaseFrameRate();
+  }
+
+  public void togglePlayback() {
+    if (frameSources.size() != 1) {
+      generalController.togglePlayback();
+    }
+  }
+
+  public void increaseFrameRate() {
+    generalController.increaseFrameRate();
   }
 }

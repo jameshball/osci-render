@@ -80,15 +80,15 @@ public class EffectsController implements Initializable {
   }
 
   public Map<SVGPath, Slider> getMidiButtonMap() {
-    Map<SVGPath, Slider> midiMap = new HashMap<>();
-    midiMap.put(vectorCancellingMidi, vectorCancellingSlider);
-    midiMap.put(bitCrushMidi, bitCrushSlider);
-    midiMap.put(wobbleMidi, wobbleSlider);
-    midiMap.put(smoothMidi, smoothSlider);
-    midiMap.put(traceMidi, traceSlider);
-    midiMap.put(verticalDistortMidi, verticalDistortSlider);
-    midiMap.put(horizontalDistortMidi, horizontalDistortSlider);
-    return midiMap;
+    return Map.of(
+      vectorCancellingMidi, vectorCancellingSlider,
+      bitCrushMidi, bitCrushSlider,
+      wobbleMidi, wobbleSlider,
+      smoothMidi, smoothSlider,
+      traceMidi, traceSlider,
+      verticalDistortMidi, verticalDistortSlider,
+      horizontalDistortMidi, horizontalDistortSlider
+    );
   }
 
   // Maps EffectTypes to the slider that controls the effect so that they can be

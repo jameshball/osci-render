@@ -17,7 +17,6 @@ import sh.ball.audio.midi.MidiNote;
 import sh.ball.shapes.Vector2;
 
 import java.net.URL;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
@@ -111,13 +110,13 @@ public class ImageController implements Initializable {
   }
 
   public Map<SVGPath, Slider> getMidiButtonMap() {
-    Map<SVGPath, Slider> midiMap = new HashMap<>();
-    midiMap.put(frequencyMidi, frequencySlider);
-    midiMap.put(rotateSpeedMidi, rotateSpeedSlider);
-    midiMap.put(translationSpeedMidi, translationSpeedSlider);
-    midiMap.put(volumeMidi, volumeSlider);
-    midiMap.put(visibilityMidi, visibilitySlider);
-    return midiMap;
+    return Map.of(
+      frequencyMidi, frequencySlider,
+      rotateSpeedMidi, rotateSpeedSlider,
+      translationSpeedMidi, translationSpeedSlider,
+      volumeMidi, volumeSlider,
+      visibilityMidi, visibilitySlider
+    );
   }
 
   public List<Slider> sliders() {

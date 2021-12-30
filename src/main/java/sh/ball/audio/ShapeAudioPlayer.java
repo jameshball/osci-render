@@ -64,7 +64,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private double lengthIncrement = MIN_LENGTH_INCREMENT;
   private double shapeDrawn = 0;
   private int count = 0;
-  private DoubleProperty volume;
+  private DoubleProperty volume = new SimpleDoubleProperty(1);
   private List<Double> frequencies = List.of(MIDDLE_C);
   private double octaveFrequency;
   private DoubleProperty frequency;
@@ -92,7 +92,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   public void setVolume(DoubleProperty volume) {
-    this.volume = volume;
+    this.volume = Objects.requireNonNullElseGet(volume, () -> new SimpleDoubleProperty(1));
   }
 
   private Vector2 generateChannels() throws InterruptedException {
@@ -387,6 +387,9 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
   @Override
   public void sendMidiMessage(ShortMessage message) {
+    if (!isPlaying()) {
+      return;
+    }
     int command = message.getCommand();
 
     if (command == ShortMessage.NOTE_ON || command == ShortMessage.NOTE_OFF) {
