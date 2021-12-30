@@ -112,11 +112,12 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   // control if they are selected.
   private Map<SVGPath, Slider> initializeMidiButtonMap() {
     Map<SVGPath, Slider> midiMap = new HashMap<>();
-    midiMap.putAll(generalController.getMidiButtonMap());
-    midiMap.putAll(imageController.getMidiButtonMap());
-    midiMap.putAll(objController.getMidiButtonMap());
-    midiMap.putAll(effectsController.getMidiButtonMap());
+    subControllers().forEach(controller -> midiMap.putAll(controller.getMidiButtonMap()));
     return midiMap;
+  }
+
+  private List<SubController> subControllers() {
+    return List.of(effectsController, objController, imageController, generalController);
   }
 
   @Override
@@ -404,28 +405,14 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   }
 
   // must be functions, otherwise they are not initialised
-  private List<Slider> otherSliders() {
+  private List<Slider> sliders() {
     List<Slider> sliders = new ArrayList<>();
-    sliders.addAll(generalController.sliders());
-    sliders.addAll(imageController.sliders());
-    sliders.addAll(objController.sliders());
+    subControllers().forEach(controller -> sliders.addAll(controller.sliders()));
     return sliders;
   }
-  private List<String> otherLabels() {
+  private List<String> labels() {
     List<String> labels = new ArrayList<>();
-    labels.addAll(generalController.labels());
-    labels.addAll(imageController.labels());
-    labels.addAll(objController.labels());
-    return labels;
-  }
-  private List<Slider> allSliders() {
-    List<Slider> sliders = new ArrayList<>(effectsController.sliders());
-    sliders.addAll(otherSliders());
-    return sliders;
-  }
-  private List<String> allLabels() {
-    List<String> labels = new ArrayList<>(effectsController.labels());
-    labels.addAll(otherLabels());
+    subControllers().forEach(controller -> labels.addAll(controller.labels()));
     return labels;
   }
 
@@ -455,14 +442,13 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       Element root = document.createElement("project");
       document.appendChild(root);
 
-      List<Slider> sliders = allSliders();
-      List<String> labels = allLabels();
+      List<Slider> sliders = sliders();
+      List<String> labels = labels();
 
       Element slidersElement = document.createElement("sliders");
       appendSliders(sliders, labels, slidersElement, document);
       root.appendChild(slidersElement);
 
-      root.appendChild(effectsController.save(document));
 
       Element midiElement = document.createElement("midi");
       for (Map.Entry<Integer, SVGPath> entry : CCMap.entrySet()) {
@@ -475,9 +461,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
       root.appendChild(midiElement);
 
-      root.appendChild(imageController.save(document));
-
-      root.appendChild(objController.save(document));
+      subControllers().forEach(controller -> root.appendChild(controller.save(document)));
 
       Element filesElement = document.createElement("files");
       for (int i = 0; i < openFiles.size(); i++) {
@@ -521,8 +505,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       Document document = documentBuilder.parse(new File(projectFileName));
       document.getDocumentElement().normalize();
 
-      List<Slider> sliders = allSliders();
-      List<String> labels = allLabels();
+      List<Slider> sliders = sliders();
+      List<String> labels = labels();
 
       // Disable cycling through frames
       generalController.disablePlayback();
@@ -531,7 +515,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       Element slidersElement = (Element) root.getElementsByTagName("sliders").item(0);
       loadSliderValues(sliders, labels, slidersElement);
 
-      effectsController.load(root);
 
       Element midiElement = (Element) root.getElementsByTagName("midi").item(0);
       resetCCMap();
@@ -549,9 +532,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
       root.appendChild(midiElement);
 
-      imageController.load(root);
-
-      objController.load(root);
+      subControllers().forEach(controller -> controller.load(root));
 
       Element filesElement = (Element) root.getElementsByTagName("files").item(0);
       List<byte[]> files = new ArrayList<>();

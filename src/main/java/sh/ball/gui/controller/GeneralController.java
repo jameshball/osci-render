@@ -12,6 +12,8 @@ import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 import org.xml.sax.SAXException;
 import sh.ball.audio.engine.AudioDevice;
 
@@ -29,7 +31,7 @@ import java.util.*;
 import static sh.ball.gui.Gui.audioPlayer;
 import static sh.ball.gui.Gui.defaultDevice;
 
-public class GeneralController implements Initializable {
+public class GeneralController implements Initializable, SubController {
 
   private MainController mainController;
 
@@ -312,6 +314,7 @@ public class GeneralController implements Initializable {
     });
   }
 
+  @Override
   public Map<SVGPath, Slider> getMidiButtonMap() {
     return Map.of(octaveMidi, octaveSlider);
   }
@@ -328,12 +331,34 @@ public class GeneralController implements Initializable {
     );
   }
 
+  @Override
   public List<Slider> sliders() {
     return List.of(octaveSlider);
   }
 
+  @Override
   public List<String> labels() {
     return List.of("octave");
+  }
+
+  @Override
+  public Element save(Document document) {
+    Element element = document.createElement("general");
+    Element frameRate = document.createElement("frameRate");
+    frameRate.appendChild(document.createTextNode(Integer.toString(this.frameRate)));
+    element.appendChild(frameRate);
+    return element;
+  }
+
+  @Override
+  public void load(Element root) {
+    Element element = (Element) root.getElementsByTagName("general").item(0);
+    if (element != null) {
+      Element frameRate = (Element) element.getElementsByTagName("frameRate").item(0);
+      if (frameRate != null) {
+        this.frameRate = Integer.parseInt(frameRate.getTextContent());
+      }
+    }
   }
 
   public void setFrameSourceName(String name) {

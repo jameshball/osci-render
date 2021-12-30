@@ -22,7 +22,7 @@ import java.util.*;
 
 import static sh.ball.gui.Gui.audioPlayer;
 
-public class EffectsController implements Initializable {
+public class EffectsController implements Initializable, SubController {
 
   private static final int DEFAULT_SAMPLE_RATE = 192000;
 
@@ -79,6 +79,7 @@ public class EffectsController implements Initializable {
     this.wobbleEffect = new WobbleEffect(DEFAULT_SAMPLE_RATE);
   }
 
+  @Override
   public Map<SVGPath, Slider> getMidiButtonMap() {
     return Map.of(
       vectorCancellingMidi, vectorCancellingSlider,
@@ -199,19 +200,22 @@ public class EffectsController implements Initializable {
     traceCheckBox.selectedProperty().addListener(traceListener);
   }
 
-  public List<CheckBox> checkBoxes() {
+  private List<CheckBox> checkBoxes() {
     return List.of(vectorCancellingCheckBox, bitCrushCheckBox, verticalDistortCheckBox,
       horizontalDistortCheckBox, wobbleCheckBox, smoothCheckBox, traceCheckBox);
   }
+  @Override
   public List<Slider> sliders() {
     return List.of(vectorCancellingSlider, bitCrushSlider, verticalDistortSlider,
       horizontalDistortSlider, wobbleSlider, smoothSlider, traceSlider);
   }
+  @Override
   public List<String> labels() {
     return List.of("vectorCancelling", "bitCrush", "verticalDistort", "horizontalDistort",
       "wobble", "smooth", "trace");
   }
 
+  @Override
   public Element save(Document document) {
     Element element = document.createElement("checkBoxes");
     List<CheckBox> checkBoxes = checkBoxes();
@@ -226,6 +230,7 @@ public class EffectsController implements Initializable {
     return element;
   }
 
+  @Override
   public void load(Element root) {
     Element element = (Element) root.getElementsByTagName("checkBoxes").item(0);
     List<CheckBox> checkBoxes = checkBoxes();
