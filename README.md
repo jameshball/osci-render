@@ -164,7 +164,7 @@ I am using Maven for dependency management and to package the program. Doing the
 - Run `git clone git@github.com:jameshball/osci-render.git`
 - Open the project in IntelliJ
 - I use [SceneBuilder](https://gluonhq.com/products/scene-builder/) to edit the GUI
-  - The FXML project file is located in `src/main/resources/fxml`
+  - The FXML project files for each GUI element are located in `src/main/resources/fxml`
 - You're good to go!
 
 You should now be able to run `sh.ball.gui.Launcher` and start the program 😊
