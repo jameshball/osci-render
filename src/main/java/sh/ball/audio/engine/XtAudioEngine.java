@@ -113,7 +113,7 @@ public class XtAudioEngine implements AudioEngine {
           Structs.XtDeviceStreamParams deviceParams = new Structs.XtDeviceStreamParams(streamParams, format, size.current);
 
           try (XtStream stream = xtDevice.openStream(deviceParams, null);
-               XtSafeBuffer safe = XtSafeBuffer.register(stream, true)) {
+               XtSafeBuffer safe = XtSafeBuffer.register(stream)) {
             stream.start();
             while (!stopped) {
               Thread.onSpinWait();
