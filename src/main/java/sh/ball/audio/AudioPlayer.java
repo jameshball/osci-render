@@ -19,8 +19,6 @@ public interface AudioPlayer<S> extends Runnable, MidiListener {
 
   void setBaseFrequencyVolumeScale(double scale);
 
-  void setPitchBendFactor(double pitchBend);
-
   void setDecay(double decaySeconds);
 
   void setAttack(double attackSeconds);

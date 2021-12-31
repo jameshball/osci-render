@@ -7,6 +7,7 @@ public class MidiNote {
   public static double MAX_VELOCITY = 127;
   public static short MAX_CC = 0x78;
   public static short MAX_CHANNEL = 15;
+  public static short NUM_CHANNELS = (short) (MAX_CHANNEL + 1);
   public static short ALL_NOTES_OFF = 0x7B;
   public static final double MIDDLE_C = 261.6255798;
   public static final int PITCH_BEND_DATA_LENGTH = 7;
