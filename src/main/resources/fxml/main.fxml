@@ -1,24 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.scene.control.CustomMenuItem?>
+<?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Menu?>
 <?import javafx.scene.control.MenuBar?>
 <?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.Spinner?>
 <?import javafx.scene.control.TitledPane?>
 <?import javafx.scene.input.KeyCodeCombination?>
 <?import javafx.scene.layout.AnchorPane?>
 
 <AnchorPane prefHeight="658.0" prefWidth="837.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.MainController">
-   <TitledPane animated="false" collapsible="false" layoutX="424.0"
-               layoutY="38.0" prefHeight="387.0" prefWidth="402.0"
-               text="Audio Effects">
-      <fx:include fx:id="effects" source="effects.fxml"/>
+   <TitledPane animated="false" collapsible="false" layoutX="424.0" layoutY="38.0" prefHeight="387.0" prefWidth="402.0" text="Audio Effects">
+      <fx:include fx:id="effects" source="effects.fxml" />
    </TitledPane>
    <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="424.0" layoutY="436.0" maxHeight="-Infinity" maxWidth="-Infinity" prefHeight="213.0" prefWidth="402.0" text="3D .obj file settings">
-      <fx:include fx:id="obj" source="obj.fxml"/>
+      <fx:include fx:id="obj" source="obj.fxml" />
    </TitledPane>
-   <fx:include fx:id="general" source="general.fxml"/>
+   <fx:include fx:id="general" source="general.fxml" />
    <TitledPane collapsible="false" layoutX="10.0" layoutY="363.0" prefHeight="286.0" prefWidth="402.0" text="Image settings">
-      <fx:include fx:id="image" source="image.fxml"/>
+      <fx:include fx:id="image" source="image.fxml" />
    </TitledPane>
    <MenuBar prefHeight="27.0" prefWidth="838.0">
      <menus>
@@ -41,6 +42,25 @@
                </MenuItem>
             </items>
        </Menu>
+         <Menu mnemonicParsing="false" text="MIDI">
+           <items>
+               <MenuItem fx:id="resetMidiMappingMenuItem" mnemonicParsing="false" text="Reset MIDI Mappings">
+                  <accelerator>
+                     <KeyCodeCombination alt="UP" code="M" control="UP" meta="UP" shift="UP" shortcut="DOWN" />
+                  </accelerator></MenuItem>
+             <MenuItem fx:id="stopMidiNotesMenuItem" mnemonicParsing="false" text="Stop MIDI Notes" />
+               <CustomMenuItem hideOnClick="false" mnemonicParsing="false" text="MIDI Channel">
+                  <content>
+                     <AnchorPane>
+                        <children>
+                           <Label prefHeight="25.0" text="Main MIDI Channel" textFill="WHITE" />
+                            <Spinner fx:id="midiChannelSpinner" editable="true" layoutY="25.0" />
+                        </children>
+                     </AnchorPane>
+                  </content>
+               </CustomMenuItem>
+           </items>
+         </Menu>
      </menus>
    </MenuBar>
 </AnchorPane>

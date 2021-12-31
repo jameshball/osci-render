@@ -5,6 +5,7 @@ import javafx.scene.control.*;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.scene.shape.SVGPath;
+import javafx.util.converter.IntegerStringConverter;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -12,8 +13,11 @@ import sh.ball.audio.*;
 
 import java.io.*;
 import java.net.URL;
+import java.text.NumberFormat;
+import java.text.ParsePosition;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.UnaryOperator;
 
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -88,6 +92,12 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private MenuItem saveProjectMenuItem;
   @FXML
   private MenuItem saveAsProjectMenuItem;
+  @FXML
+  private MenuItem resetMidiMappingMenuItem;
+  @FXML
+  private MenuItem stopMidiNotesMenuItem;
+  @FXML
+  private Spinner<Integer> midiChannelSpinner;
 
   public MainController() throws Exception {
     // Clone DEFAULT_OBJ InputStream using a ByteArrayOutputStream
@@ -107,9 +117,9 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     }
     this.sampleRate = defaultDevice.sampleRate();
   }
-
   // initialises midiButtonMap by mapping MIDI logo SVGs to the slider that they
   // control if they are selected.
+
   private Map<SVGPath, Slider> initializeMidiButtonMap() {
     Map<SVGPath, Slider> midiMap = new HashMap<>();
     subControllers().forEach(controller -> midiMap.putAll(controller.getMidiButtonMap()));
@@ -176,6 +186,29 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         openProject(file.getAbsolutePath());
       }
     });
+
+    resetMidiMappingMenuItem.setOnAction(e -> resetCCMap());
+
+    stopMidiNotesMenuItem.setOnAction(e -> audioPlayer.stopMidiNotes());
+
+    NumberFormat format = NumberFormat.getIntegerInstance();
+    UnaryOperator<TextFormatter.Change> filter = c -> {
+      if (c.isContentChange()) {
+        ParsePosition parsePosition = new ParsePosition(0);
+        // NumberFormat evaluates the beginning of the text
+        format.parse(c.getControlNewText(), parsePosition);
+        if (parsePosition.getIndex() == 0 ||
+          parsePosition.getIndex() < c.getControlNewText().length()) {
+          // reject parsing the complete text failed
+          return null;
+        }
+      }
+      return c;
+    };
+
+    midiChannelSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(0, MidiNote.MAX_CHANNEL));
+    midiChannelSpinner.getEditor().setTextFormatter(new TextFormatter<>(new IntegerStringConverter(), 0, filter));
+    midiChannelSpinner.valueProperty().addListener((o, oldValue, newValue) -> audioPlayer.setMainMidiChannel(newValue));
 
     objController.updateObjectRotateSpeed();
 
@@ -388,7 +421,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
       // If there is a slider associated with the MIDI channel, update the value
       // of it
-      if (CCMap.containsKey(cc)) {
+      if (cc <= MidiNote.MAX_CC && CCMap.containsKey(cc)) {
         Slider slider = midiButtonMap.get(CCMap.get(cc));
         double sliderValue = midiPressureToPressure(slider, value);
 
@@ -397,23 +430,12 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
           sliderValue = increment * (Math.round(sliderValue / increment));
         }
         slider.setValue(sliderValue);
+      } else if (cc == MidiNote.ALL_NOTES_OFF) {
+        audioPlayer.stopMidiNotes();
       }
     } else if (command == ShortMessage.PROGRAM_CHANGE) {
       // We want to change the file that is currently playing
       Platform.runLater(() -> changeFrameSource(message.getMessage()[1]));
-    } else if (command == ShortMessage.PITCH_BEND) {
-      // using these instructions https://sites.uci.edu/camp2014/2014/04/30/managing-midi-pitchbend-messages/
-
-      int pitchBend = (message.getData2() << MidiNote.PITCH_BEND_DATA_LENGTH) | message.getData1();
-      // get pitch bend in range -1 to 1
-      double pitchBendFactor = (double) pitchBend / MidiNote.PITCH_BEND_MAX;
-      pitchBendFactor = 2 * pitchBendFactor - 1;
-      pitchBendFactor *= MidiNote.PITCH_BEND_SEMITONES;
-      // 12 tone equal temperament
-      pitchBendFactor /= 12;
-      pitchBendFactor = Math.pow(2, pitchBendFactor);
-
-      audioPlayer.setPitchBendFactor(pitchBendFactor);
     }
   }
 

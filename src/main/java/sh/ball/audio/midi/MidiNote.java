@@ -5,6 +5,9 @@ import java.util.Objects;
 public class MidiNote {
 
   public static double MAX_VELOCITY = 127;
+  public static short MAX_CC = 0x78;
+  public static short MAX_CHANNEL = 15;
+  public static short ALL_NOTES_OFF = 0x7B;
   public static final double MIDDLE_C = 261.6255798;
   public static final int PITCH_BEND_DATA_LENGTH = 7;
   public static final int PITCH_BEND_MAX = 16383;
@@ -19,12 +22,18 @@ public class MidiNote {
   private final String name;
   private final int key;
   private final int octave;
+  private final int channel;
 
-  public MidiNote(int key) {
+  public MidiNote(int key, int channel) {
     this.key = key;
+    this.channel = channel;
     this.octave = (key / 12)-1;
     int note = key % 12;
     this.name = NOTE_NAMES[note];
+  }
+
+  public MidiNote(int key) {
+    this(key, 0);
   }
 
   public int key() {
@@ -36,17 +45,21 @@ public class MidiNote {
     return (float) (A4 * Math.pow(2, (key - KEY_A4) / 12d));
   }
 
+  public int channel() {
+    return channel;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
     if (o == null || getClass() != o.getClass()) return false;
     MidiNote midiNote = (MidiNote) o;
-    return key == midiNote.key;
+    return key == midiNote.key && channel == midiNote.channel;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(key);
+    return Objects.hash(key, channel);
   }
 
   @Override
