@@ -16,6 +16,10 @@ public abstract class PhaseEffect implements Effect {
     this.speed = speed;
   }
 
+  protected void resetTheta() {
+    phase = -LARGE_VAL;
+  }
+
   protected double nextTheta() {
     phase += speed / sampleRate;
 

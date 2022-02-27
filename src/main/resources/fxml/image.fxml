@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Slider?>
 <?import javafx.scene.control.TextField?>
@@ -7,9 +8,9 @@
 <?import javafx.scene.shape.SVGPath?>
 <?import javafx.scene.text.Font?>
 
-
 <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="250.0" prefWidth="402.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.ImageController">
     <children>
+      <CheckBox fx:id="translateEllipseCheckBox" layoutX="325.0" layoutY="19.0" mnemonicParsing="false" selected="true" text="Ellipse" />
         <Slider fx:id="rotateSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="90.0" majorTickUnit="1.0" max="10.0" prefHeight="42.0" prefWidth="254.0" showTickLabels="true" showTickMarks="true" />
         <Label layoutX="13.0" layoutY="89.0" text="2D Rotate speed">
             <font>

@@ -4,6 +4,7 @@ import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.Slider;
 import javafx.scene.control.TextField;
 import javafx.scene.shape.SVGPath;
@@ -17,6 +18,7 @@ import sh.ball.audio.midi.MidiNote;
 import sh.ball.shapes.Vector2;
 
 import java.net.URL;
+import java.text.DecimalFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
@@ -29,6 +31,8 @@ public class ImageController implements Initializable, SubController {
 
   private static final double MAX_FREQUENCY = 12000;
   private static final int DEFAULT_SAMPLE_RATE = 192000;
+  private static final double SCROLL_DELTA = 0.05;
+  private static final DecimalFormat df = new DecimalFormat("0.00");
 
   private final RotateEffect rotateEffect;
   private final TranslateEffect translateEffect;
@@ -39,6 +43,8 @@ public class ImageController implements Initializable, SubController {
   private TextField translationXTextField;
   @FXML
   private TextField translationYTextField;
+  @FXML
+  private CheckBox translateEllipseCheckBox;
   @FXML
   private Slider frequencySlider;
   @FXML
@@ -80,6 +86,12 @@ public class ImageController implements Initializable, SubController {
     ));
   }
 
+  private void changeTranslation(boolean increase, TextField field) {
+    double old = tryParse(field.getText());
+    double delta = increase ? SCROLL_DELTA : -SCROLL_DELTA;
+    field.setText(df.format(old + delta));
+  }
+
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
     audioPlayer.addEffect(EffectType.ROTATE, rotateEffect);
@@ -97,7 +109,11 @@ public class ImageController implements Initializable, SubController {
     );
 
     translationXTextField.textProperty().addListener(e -> updateTranslation());
+    translationXTextField.setOnScroll((e) -> changeTranslation(e.getDeltaY() > 0, translationXTextField));
     translationYTextField.textProperty().addListener(e -> updateTranslation());
+    translationYTextField.setOnScroll((e) -> changeTranslation(e.getDeltaY() > 0, translationYTextField));
+
+    translateEllipseCheckBox.selectedProperty().addListener((e, old, ellipse) -> translateEffect.setEllipse(ellipse));
 
     // converts the value of frequencySlider to the actual frequency that it represents so that it
     // can increase at an exponential scale.
@@ -139,8 +155,11 @@ public class ImageController implements Initializable, SubController {
     x.appendChild(document.createTextNode(translationXTextField.getText()));
     Element y = document.createElement("y");
     y.appendChild(document.createTextNode(translationYTextField.getText()));
+    Element ellipse = document.createElement("ellipse");
+    ellipse.appendChild(document.createTextNode(Boolean.toString(translateEllipseCheckBox.isSelected())));
     element.appendChild(x);
     element.appendChild(y);
+    element.appendChild(ellipse);
     return element;
   }
 
@@ -151,5 +170,9 @@ public class ImageController implements Initializable, SubController {
     Element y = (Element) element.getElementsByTagName("y").item(0);
     translationXTextField.setText(x.getTextContent());
     translationYTextField.setText(y.getTextContent());
+
+    // For backwards compatibility we assume a default value
+    Element ellipse = (Element) element.getElementsByTagName("ellipse").item(0);
+    translateEllipseCheckBox.setSelected(ellipse == null || Boolean.parseBoolean(ellipse.getTextContent()));
   }
 }

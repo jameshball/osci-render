@@ -19,6 +19,8 @@ public class RotateEffect extends PhaseEffect {
       return vector.rotate(nextTheta());
     }
 
+    resetTheta();
+
     return vector;
   }
 }
