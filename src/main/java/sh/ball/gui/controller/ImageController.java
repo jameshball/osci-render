@@ -46,6 +46,8 @@ public class ImageController implements Initializable, SubController {
   @FXML
   private CheckBox translateEllipseCheckBox;
   @FXML
+  private CheckBox translateCheckBox;
+  @FXML
   private Slider frequencySlider;
   @FXML
   private SVGPath frequencyMidi;
@@ -69,13 +71,18 @@ public class ImageController implements Initializable, SubController {
   public ImageController() {
     this.frequency = new SimpleDoubleProperty(0);
     this.rotateEffect = new RotateEffect(DEFAULT_SAMPLE_RATE);
-    this.translateEffect = new TranslateEffect(DEFAULT_SAMPLE_RATE);
+    this.translateEffect = new TranslateEffect(DEFAULT_SAMPLE_RATE, 1, new Vector2());
   }
 
   public void setAudioDevice(AudioDevice device) {
     int sampleRate = device.sampleRate();
     rotateEffect.setSampleRate(sampleRate);
     translateEffect.setSampleRate(sampleRate);
+  }
+
+  public void setTranslation(Vector2 translation) {
+    translationXTextField.setText(df.format(translation.getX()));
+    translationYTextField.setText(df.format(translation.getY()));
   }
 
   // changes the sinusoidal translation of the image rendered
@@ -90,6 +97,14 @@ public class ImageController implements Initializable, SubController {
     double old = tryParse(field.getText());
     double delta = increase ? SCROLL_DELTA : -SCROLL_DELTA;
     field.setText(df.format(old + delta));
+  }
+
+  public boolean mouseTranslate() {
+    return translateCheckBox.isSelected();
+  }
+
+  public void disableMouseTranslate() {
+    translateCheckBox.setSelected(false);
   }
 
   @Override
@@ -173,6 +188,6 @@ public class ImageController implements Initializable, SubController {
 
     // For backwards compatibility we assume a default value
     Element ellipse = (Element) element.getElementsByTagName("ellipse").item(0);
-    translateEllipseCheckBox.setSelected(ellipse == null || Boolean.parseBoolean(ellipse.getTextContent()));
+    translateEllipseCheckBox.setSelected(ellipse != null && Boolean.parseBoolean(ellipse.getTextContent()));
   }
 }

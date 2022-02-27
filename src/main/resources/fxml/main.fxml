@@ -10,15 +10,15 @@
 <?import javafx.scene.input.KeyCodeCombination?>
 <?import javafx.scene.layout.AnchorPane?>
 
-<AnchorPane prefHeight="658.0" prefWidth="837.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.MainController">
+<AnchorPane prefHeight="692.0" prefWidth="838.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.MainController">
    <TitledPane animated="false" collapsible="false" layoutX="424.0" layoutY="38.0" prefHeight="387.0" prefWidth="402.0" text="Audio Effects">
       <fx:include fx:id="effects" source="effects.fxml" />
    </TitledPane>
-   <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="424.0" layoutY="436.0" maxHeight="-Infinity" maxWidth="-Infinity" prefHeight="213.0" prefWidth="402.0" text="3D .obj file settings">
+   <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="424.0" layoutY="436.0" maxHeight="-Infinity" maxWidth="-Infinity" prefHeight="246.0" prefWidth="402.0" text="3D .obj file settings">
       <fx:include fx:id="obj" source="obj.fxml" />
    </TitledPane>
    <fx:include fx:id="general" source="general.fxml" />
-   <TitledPane collapsible="false" layoutX="10.0" layoutY="363.0" prefHeight="286.0" prefWidth="402.0" text="Image settings">
+   <TitledPane collapsible="false" layoutX="10.0" layoutY="363.0" prefHeight="320.0" prefWidth="402.0" text="Image settings">
       <fx:include fx:id="image" source="image.fxml" />
    </TitledPane>
    <MenuBar prefHeight="27.0" prefWidth="838.0">

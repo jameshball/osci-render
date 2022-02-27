@@ -16,6 +16,7 @@ import sh.ball.audio.engine.ConglomerateAudioEngine;
 import sh.ball.audio.midi.MidiCommunicator;
 import sh.ball.engine.Vector3;
 import sh.ball.gui.controller.MainController;
+import sh.ball.shapes.Vector2;
 
 import java.util.Objects;
 
@@ -70,11 +71,18 @@ public class Gui extends Application {
           0
         ));
       }
+      if (controller.mouseTranslate()) {
+        controller.setTranslation(new Vector2(
+          2 * event.getSceneX() / scene.getWidth() - 1,
+          1 - 2 * event.getSceneY() / scene.getHeight()
+        ));
+      }
     });
 
     scene.addEventHandler(KeyEvent.KEY_PRESSED, t -> {
       if (t.getCode() == KeyCode.ESCAPE) {
         controller.disableMouseRotate();
+        controller.disableMouseTranslate();
       }
     });
 

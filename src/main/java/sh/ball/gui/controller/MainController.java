@@ -45,6 +45,7 @@ import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.ParserFactory;
 import sh.ball.shapes.Shape;
+import sh.ball.shapes.Vector2;
 
 import static sh.ball.gui.Gui.audioPlayer;
 import static sh.ball.gui.Gui.defaultDevice;
@@ -358,10 +359,26 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     return objController.mouseRotate();
   }
 
+  // determines whether the mouse is being used to translate the screen
+  public boolean mouseTranslate() {
+    return imageController.mouseTranslate();
+  }
+
+  // updates the screen translation
+  public void setTranslation(Vector2 translation) {
+    imageController.setTranslation(translation);
+  }
+
   // stops the mouse rotating the 3D object when ESC is pressed or checkbox is
   // unchecked
   public void disableMouseRotate() {
     objController.disableMouseRotate();
+  }
+
+  // stops the mouse translating the screen when ESC is pressed or checkbox is
+  // unchecked
+  public void disableMouseTranslate() {
+    imageController.disableMouseTranslate();
   }
 
   // updates the 3D object base rotation angle

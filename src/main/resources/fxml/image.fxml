@@ -8,28 +8,28 @@
 <?import javafx.scene.shape.SVGPath?>
 <?import javafx.scene.text.Font?>
 
-<AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="250.0" prefWidth="402.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.ImageController">
+<AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="296.0" prefWidth="402.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.ImageController">
     <children>
-      <CheckBox fx:id="translateEllipseCheckBox" layoutX="325.0" layoutY="19.0" mnemonicParsing="false" selected="true" text="Ellipse" />
-        <Slider fx:id="rotateSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="90.0" majorTickUnit="1.0" max="10.0" prefHeight="42.0" prefWidth="254.0" showTickLabels="true" showTickMarks="true" />
-        <Label layoutX="13.0" layoutY="89.0" text="2D Rotate speed">
+      <CheckBox fx:id="translateEllipseCheckBox" layoutX="324.0" layoutY="19.0" mnemonicParsing="false" text="Ellipse" />
+        <Slider fx:id="rotateSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="122.0" majorTickUnit="1.0" max="10.0" prefHeight="42.0" prefWidth="254.0" showTickLabels="true" showTickMarks="true" />
+        <Label layoutX="13.0" layoutY="121.0" text="2D Rotate speed">
             <font>
                 <Font size="13.0" />
             </font>
         </Label>
-        <Slider fx:id="translationSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="128.0" majorTickUnit="1.0" max="10.0" prefHeight="42.0" prefWidth="254.0" showTickLabels="true" showTickMarks="true" />
-        <Label layoutX="7.0" layoutY="127.0" text="Translation speed">
+        <Slider fx:id="translationSpeedSlider" blockIncrement="0.05" layoutX="116.0" layoutY="160.0" majorTickUnit="1.0" max="10.0" prefHeight="42.0" prefWidth="254.0" showTickLabels="true" showTickMarks="true" value="1.0" />
+        <Label layoutX="7.0" layoutY="159.0" text="Translation speed">
             <font>
                 <Font size="13.0" />
             </font>
         </Label>
-        <Slider fx:id="volumeSlider" blockIncrement="0.05" layoutX="116.0" layoutY="167.0" majorTickUnit="1.0" max="10.0" prefHeight="42.0" prefWidth="253.0" showTickLabels="true" showTickMarks="true" value="1.0" />
-        <Label layoutX="33" layoutY="166.0" text="Volume scale">
+        <Slider fx:id="volumeSlider" blockIncrement="0.05" layoutX="116.0" layoutY="199.0" majorTickUnit="1.0" max="10.0" prefHeight="42.0" prefWidth="253.0" showTickLabels="true" showTickMarks="true" value="1.0" />
+        <Label layoutX="33.0" layoutY="198.0" text="Volume scale">
             <font>
                 <Font size="13.0" />
             </font>
         </Label>
-        <Label layoutX="11.0" layoutY="50.0" text="Target frequency">
+        <Label layoutX="11.0" layoutY="82.0" text="Target frequency">
             <font>
                 <Font size="13.0" />
             </font>
@@ -37,33 +37,34 @@
         <TextField fx:id="translationXTextField" layoutX="138.0" layoutY="15.0" prefHeight="26.0" prefWidth="70.0" text="0.0" />
         <Label layoutX="47.0" layoutY="18.0" text="Translation" />
         <Label layoutX="120.0" layoutY="18.0" text="x :" />
-        <Label layoutX="219.0" layoutY="18.0" text="y :" />
-        <TextField fx:id="translationYTextField" layoutX="238.0" layoutY="15.0" prefHeight="26.0" prefWidth="70.0" text="0.0" />
-        <Slider fx:id="frequencySlider" blockIncrement="0.001" layoutX="116.0" layoutY="45.0" majorTickUnit="0.07389" max="1.0" minorTickCount="2" prefHeight="42.0" prefWidth="253.0" showTickMarks="true" value="0.59269" />
-        <SVGPath fx:id="frequencyMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="49.0" pickOnBounds="true" />
-        <SVGPath fx:id="rotateSpeedMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="87.0" pickOnBounds="true" />
-        <SVGPath fx:id="translationSpeedMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="125.0" pickOnBounds="true" />
-        <SVGPath fx:id="volumeMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="164.0" pickOnBounds="true" />
-        <Label layoutX="257.0" layoutY="71.0" text="C4" />
-        <Label layoutX="239.0" layoutY="71.0" text="C3" />
-        <Label layoutX="222.0" layoutY="71.0" text="C2" />
-        <Label layoutX="193.0" layoutY="71.0" text="20" />
-        <Label layoutX="274.0" layoutY="71.0" text="C5" />
-        <Label layoutX="292.0" layoutY="71.0" text="C6" />
-        <Label layoutX="310.0" layoutY="71.0" text="C7" />
-        <Label layoutX="344.0" layoutY="71.0" text="12000">
+        <Label layoutX="222.0" layoutY="18.0" text="y :" />
+        <TextField fx:id="translationYTextField" layoutX="241.0" layoutY="15.0" prefHeight="26.0" prefWidth="69.0" text="0.0" />
+        <Slider fx:id="frequencySlider" blockIncrement="0.001" layoutX="116.0" layoutY="77.0" majorTickUnit="0.07389" max="1.0" minorTickCount="2" prefHeight="42.0" prefWidth="253.0" showTickMarks="true" value="0.59269" />
+        <SVGPath fx:id="frequencyMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="81.0" pickOnBounds="true" />
+        <SVGPath fx:id="rotateSpeedMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="119.0" pickOnBounds="true" />
+        <SVGPath fx:id="translationSpeedMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="157.0" pickOnBounds="true" />
+        <SVGPath fx:id="volumeMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="196.0" pickOnBounds="true" />
+        <Label layoutX="257.0" layoutY="103.0" text="C4" />
+        <Label layoutX="239.0" layoutY="103.0" text="C3" />
+        <Label layoutX="222.0" layoutY="103.0" text="C2" />
+        <Label layoutX="193.0" layoutY="103.0" text="20" />
+        <Label layoutX="274.0" layoutY="103.0" text="C5" />
+        <Label layoutX="292.0" layoutY="103.0" text="C6" />
+        <Label layoutX="310.0" layoutY="103.0" text="C7" />
+        <Label layoutX="344.0" layoutY="103.0" text="12000">
             <font>
                 <Font size="11.0" />
             </font>
         </Label>
-        <Label layoutX="162.0" layoutY="71.0" text="5" />
-        <Label layoutX="122.0" layoutY="71.0" text="0" />
-        <Label layoutX="24.0" layoutY="206.0" text="Image visibility">
+        <Label layoutX="162.0" layoutY="103.0" text="5" />
+        <Label layoutX="122.0" layoutY="103.0" text="0" />
+        <Label layoutX="24.0" layoutY="238.0" text="Image visibility">
             <font>
                 <Font size="13.0" />
             </font>
         </Label>
-        <Slider fx:id="visibilitySlider" blockIncrement="0.005" layoutX="116.0" layoutY="207.0" majorTickUnit="0.1" max="1.0" prefHeight="42.0" prefWidth="253.0" showTickLabels="true" showTickMarks="true" value="0.5" />
-        <SVGPath fx:id="visibilityMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="204.0" pickOnBounds="true" />
+        <Slider fx:id="visibilitySlider" blockIncrement="0.005" layoutX="116.0" layoutY="239.0" majorTickUnit="0.1" max="1.0" prefHeight="42.0" prefWidth="253.0" showTickLabels="true" showTickMarks="true" value="0.5" />
+        <SVGPath fx:id="visibilityMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="371.0" layoutY="236.0" pickOnBounds="true" />
+      <CheckBox fx:id="translateCheckBox" layoutX="104.0" layoutY="53.0" mnemonicParsing="false" text="Translate with Mouse (Esc to disable)" />
     </children>
 </AnchorPane>
