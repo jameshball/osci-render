@@ -76,6 +76,7 @@ public class WorldObject {
 
     // Chinese Postman can only be performed on connected graphs, so iterate over all connected
     // sub-graphs.
+    // TODO: parallelize?
     for (Set<Vector3> vertices : inspector.connectedSets()) {
       AsSubgraph<Vector3, DefaultWeightedEdge> subgraph = new AsSubgraph<>(graph, vertices);
       ChinesePostman<Vector3, DefaultWeightedEdge> cp = new ChinesePostman<>();
@@ -108,14 +109,12 @@ public class WorldObject {
     position = new Vector3();
   }
 
-  public List<Vector3> getVertices() {
-    List<Vector3> newVertices = new ArrayList<>();
+  public Vector3 getVertex(int i) {
+    return objVertices.get(i).rotate(rotation).add(position);
+  }
 
-    for (Vector3 vertex : objVertices) {
-      newVertices.add(vertex.rotate(rotation).add(position));
-    }
-
-    return newVertices;
+  public int numVertices() {
+    return objVertices.size();
   }
 
   private Set<Line3D> loadFromInput(InputStream input) {

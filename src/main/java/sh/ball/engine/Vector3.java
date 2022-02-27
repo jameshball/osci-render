@@ -35,53 +35,61 @@ public final class Vector3 {
 
   public Vector3 add(Vector3 other) {
     return new Vector3(
-      getX() + other.getX(),
-      getY() + other.getY(),
-      getZ() + other.getZ()
+      x + other.x,
+      y + other.y,
+      z + other.z
     );
   }
 
   public Vector3 scale(double factor) {
     return new Vector3(
-      getX() * factor,
-      getY() * factor,
-      getZ() * factor
+      x * factor,
+      y * factor,
+      z * factor
     );
   }
 
   public Vector3 rotate(Vector3 rotation) {
-    return rotateX(rotation.getX())
-      .rotateY(rotation.getY())
-      .rotateZ(rotation.getZ());
+    return rotateX(rotation.x)
+      .rotateY(rotation.y)
+      .rotateZ(rotation.z);
   }
 
   public Vector3 rotateX(double theta) {
+    double cos = Math.cos(theta);
+    double sin = Math.sin(theta);
     return new Vector3(
-      getX(),
-      Math.cos(theta) * getY() - Math.sin(theta) * getZ(),
-      Math.sin(theta) * getY() + Math.cos(theta) * getZ()
+      x,
+      cos * y - sin * z,
+      sin * y + cos * z
     );
   }
 
   public Vector3 rotateY(double theta) {
+    double cos = Math.cos(theta);
+    double sin = Math.sin(theta);
     return new Vector3(
-      Math.cos(theta) * getX() + Math.sin(theta) * getZ(),
-      getY(),
-      -Math.sin(theta) * getX() + Math.cos(theta) * getZ()
+      cos * x + sin * z,
+      y,
+      -sin * x + cos * z
     );
   }
 
   public Vector3 rotateZ(double theta) {
+    double cos = Math.cos(theta);
+    double sin = Math.sin(theta);
     return new Vector3(
-      Math.cos(theta) * getX() - Math.sin(theta) * getY(),
-      Math.sin(theta) * getX() + Math.cos(theta) * getY(),
-      getZ()
+      cos * x - sin * y,
+      sin * x + cos * y,
+      z
     );
   }
 
-  // TODO: Is this correctly used?!
   public double distance(Vector3 vector) {
-    return Math.sqrt(Math.pow(vector.x, 2) + Math.pow(vector.y, 2) + Math.pow(vector.z, 2));
+    double xDiff = x - vector.x;
+    double yDiff = y - vector.y;
+    double zDiff = z - vector.z;
+    return Math.sqrt(xDiff * xDiff + yDiff * yDiff + zDiff * zDiff);
   }
 
   public static Vector3 meanPoint(List<Vector3> points) {

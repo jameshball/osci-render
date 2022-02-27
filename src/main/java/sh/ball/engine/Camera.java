@@ -21,6 +21,7 @@ public class Camera {
   private static final double VERTEX_VALUE_THRESHOLD = 1;
   private static final double CAMERA_MOVE_INCREMENT = -0.1;
   private static final int SAMPLE_RENDER_SAMPLES = 50;
+  private static final int VERTEX_SAMPLES = 1000;
 
   private double focalLength;
   private Vector3 pos;
@@ -35,17 +36,7 @@ public class Camera {
   }
 
   public List<Shape> draw(WorldObject worldObject) {
-    return getFrame(getProjectedVertices(worldObject), worldObject.getVertexPath());
-  }
-
-  public Map<Vector3, Vector2> getProjectedVertices(WorldObject worldObject) {
-    Map<Vector3, Vector2> projectionMap = new HashMap<>();
-
-    for (Vector3 vertex : worldObject.getVertices()) {
-      projectionMap.put(vertex, project(vertex));
-    }
-
-    return projectionMap;
+    return getFrame(worldObject.getVertexPath());
   }
 
   // Automatically finds the correct Z position to use to view the world object properly.
@@ -70,7 +61,9 @@ public class Camera {
     List<Vector2> vertices = new ArrayList<>();
 
     for (int i = 0; i < SAMPLE_RENDER_SAMPLES - 1; i++) {
-      vertices.addAll(getProjectedVertices(clone).values());
+      for (int j = 0; j < Math.min(VERTEX_SAMPLES, clone.numVertices()); j++) {
+        vertices.add(project(clone.getVertex(j)));
+      }
       clone.rotate(rotation);
     }
 
@@ -106,13 +99,13 @@ public class Camera {
     );
   }
 
-  public List<Shape> getFrame(Map<Vector3, Vector2> projectionMap, List<Vector3> vertexPath) {
+  public List<Shape> getFrame(List<Vector3> vertexPath) {
     List<Shape> lines = new ArrayList<>();
 
     for (int i = 0; i < vertexPath.size(); i += 2) {
       lines.add(new Line(
-        projectionMap.get(vertexPath.get(i)),
-        projectionMap.get(vertexPath.get(i + 1))
+        project(vertexPath.get(i)),
+        project(vertexPath.get(i + 1))
       ));
     }
 
