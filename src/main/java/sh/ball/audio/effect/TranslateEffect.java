@@ -19,7 +19,8 @@ public class TranslateEffect extends PhaseEffect {
   @Override
   public Vector2 apply(int count, Vector2 vector) {
     if (speed != 0 && !translation.equals(new Vector2())) {
-      return vector.translate(translation.scale(Math.sin(nextTheta())));
+      double theta = nextTheta();
+      return vector.translate(translation.scale(new Vector2(Math.sin(theta), Math.cos(theta))));
     }
 
     return vector;
