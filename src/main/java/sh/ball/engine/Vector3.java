@@ -41,6 +41,14 @@ public final class Vector3 {
     );
   }
 
+  public Vector3 sub(Vector3 other) {
+    return new Vector3(
+      x - other.x,
+      y - other.y,
+      z - other.z
+    );
+  }
+
   public Vector3 scale(double factor) {
     return new Vector3(
       x * factor,

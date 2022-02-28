@@ -129,8 +129,26 @@ public class WorldObject {
 
     Set<Line3D> edges = new LinkedHashSet<>();
 
+    // auto-centre around origin
+    Vector3 offset = new Vector3();
+    double max = 1.0;
     for (OBJVertex vertex : model.getVertices()) {
-      objVertices.add(new Vector3(vertex.x, vertex.y, vertex.z));
+      offset = offset.add(new Vector3(vertex.x, vertex.y, vertex.z));
+      if (Math.abs(vertex.x) > max) {
+        max = Math.abs(vertex.x);
+      }
+      if (Math.abs(vertex.y) > max) {
+        max = Math.abs(vertex.y);
+      }
+      if (Math.abs(vertex.z) > max) {
+        max = Math.abs(vertex.z);
+      }
+    }
+    offset = offset.scale(1.0/model.getVertices().size());
+
+    for (OBJVertex vertex : model.getVertices()) {
+      // normalise coordinates between
+      objVertices.add(new Vector3(vertex.x, vertex.y, vertex.z).sub(offset).scale(1.0/max));
     }
 
     for (OBJObject object : model.getObjects()) {
