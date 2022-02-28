@@ -19,7 +19,9 @@ import sh.ball.shapes.Vector2;
 
 import java.net.URL;
 import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.function.Consumer;
@@ -32,7 +34,8 @@ public class ImageController implements Initializable, SubController {
   private static final double MAX_FREQUENCY = 12000;
   private static final int DEFAULT_SAMPLE_RATE = 192000;
   private static final double SCROLL_DELTA = 0.05;
-  private static final DecimalFormat df = new DecimalFormat("0.00");
+  // need a set a locale, otherwise there is inconsistent casting to/from doubles/strings
+  private static final DecimalFormat df = new DecimalFormat("0.00", new DecimalFormatSymbols(Locale.UK));
 
   private final RotateEffect rotateEffect;
   private final TranslateEffect translateEffect;

@@ -5,10 +5,10 @@
 <?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.shape.SVGPath?>
 
-<AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="262.0" prefWidth="402.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.EffectsController">
+<AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="356.0" prefWidth="402.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.EffectsController">
     <children>
         <CheckBox fx:id="vectorCancellingCheckBox" layoutX="14.0" layoutY="15.0" mnemonicParsing="false" text="Vector cancelling" />
-        <Slider fx:id="vectorCancellingSlider" blockIncrement="0.05" disable="true" layoutX="154.0" layoutY="16.0" majorTickUnit="1.0" max="10.0" min="2.0" minorTickCount="0" prefHeight="42.0" prefWidth="219.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" value="2.0" />
+        <Slider fx:id="vectorCancellingSlider" blockIncrement="0.05" disable="true" layoutX="154.0" layoutY="16.0" majorTickUnit="1.0" max="10.0" min="1.0" prefHeight="42.0" prefWidth="219.0" showTickLabels="true" showTickMarks="true" value="2.0" />
         <CheckBox fx:id="bitCrushCheckBox" layoutX="14.0" layoutY="62.0" mnemonicParsing="false" text="Bit crush" />
         <Slider fx:id="bitCrushSlider" blockIncrement="0.01" disable="true" layoutX="154.0" layoutY="64.0" majorTickUnit="0.5" max="3.0" prefHeight="42.0" prefWidth="219.0" showTickLabels="true" showTickMarks="true" value="2.0" />
         <CheckBox fx:id="verticalDistortCheckBox" layoutX="14.0" layoutY="110.0" mnemonicParsing="false" text="Vertical Distort" />

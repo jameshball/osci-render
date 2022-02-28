@@ -30,6 +30,7 @@ public class EffectsController implements Initializable, SubController {
 
   private final SmoothEffect smoothEffect;
   private final WobbleEffect wobbleEffect;
+  private final VectorCancellingEffect vectorCancellingEffect;
 
   @FXML
   private CheckBox vectorCancellingCheckBox;
@@ -77,6 +78,7 @@ public class EffectsController implements Initializable, SubController {
   public EffectsController() {
     this.smoothEffect = new SmoothEffect(1);
     this.wobbleEffect = new WobbleEffect(DEFAULT_SAMPLE_RATE);
+    this.vectorCancellingEffect = new VectorCancellingEffect(1);
   }
 
   @Override
@@ -151,9 +153,6 @@ public class EffectsController implements Initializable, SubController {
   public void initialize(URL url, ResourceBundle resourceBundle) {
     initializeEffectTypes();
 
-    InvalidationListener vectorCancellingListener = e ->
-      updateEffect(EffectType.VECTOR_CANCELLING, vectorCancellingCheckBox.isSelected(),
-        EffectFactory.vectorCancelling((int) vectorCancellingSlider.getValue()));
     InvalidationListener bitCrushListener = e ->
       updateEffect(EffectType.BIT_CRUSH, bitCrushCheckBox.isSelected(),
         EffectFactory.bitCrush(bitCrushSlider.getValue()));
@@ -170,6 +169,10 @@ public class EffectsController implements Initializable, SubController {
     InvalidationListener smoothListener = e -> {
       smoothEffect.setWindowSize((int) smoothSlider.getValue());
       updateEffect(EffectType.SMOOTH, smoothCheckBox.isSelected(), smoothEffect);
+    };
+    InvalidationListener vectorCancellingListener = e -> {
+      vectorCancellingEffect.setFrequency((float) vectorCancellingSlider.getValue());
+      updateEffect(EffectType.VECTOR_CANCELLING, vectorCancellingCheckBox.isSelected(), vectorCancellingEffect);
     };
     InvalidationListener traceListener = e -> {
       double trace = traceCheckBox.isSelected() ? traceSlider.valueProperty().getValue() : 1;

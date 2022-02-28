@@ -6,10 +6,6 @@ import static sh.ball.math.Math.round;
 
 // Used for creating various audio effects
 public class EffectFactory {
-  public static Effect vectorCancelling(int frequency) {
-    return (count, v) -> count % frequency == 0 ? v.scale(-1) : v;
-  }
-
   public static Effect bitCrush(double value) {
     return (count, v) -> {
       double x = v.getX();
