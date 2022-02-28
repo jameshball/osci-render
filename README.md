@@ -176,3 +176,5 @@ James Ball, [james@ball.sh](mailto:james@ball.sh)
 ## Special Thanks
 
 'Rendering shapes through audio signals' article author: [Sudarshan Sreeram](https://github.com/Sudarshan-Sreeram)
+
+[@javierplano_videonix](https://www.instagram.com/javierplano_videonix/) for testing and providing advice as an artist
