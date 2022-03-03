@@ -1,27 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.CustomMenuItem?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Menu?>
 <?import javafx.scene.control.MenuBar?>
 <?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.Spinner?>
 <?import javafx.scene.control.TitledPane?>
 <?import javafx.scene.input.KeyCodeCombination?>
 <?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.VBox?>
 
-<AnchorPane prefHeight="692.0" prefWidth="838.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.MainController">
-   <TitledPane animated="false" collapsible="false" layoutX="424.0" layoutY="38.0" prefHeight="387.0" prefWidth="402.0" text="Audio Effects">
-      <fx:include fx:id="effects" source="effects.fxml" />
-   </TitledPane>
-   <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="424.0" layoutY="436.0" maxHeight="-Infinity" maxWidth="-Infinity" prefHeight="246.0" prefWidth="402.0" text="3D .obj file settings">
-      <fx:include fx:id="obj" source="obj.fxml" />
-   </TitledPane>
-   <fx:include fx:id="general" source="general.fxml" />
-   <TitledPane collapsible="false" layoutX="10.0" layoutY="363.0" prefHeight="320.0" prefWidth="402.0" text="Image settings">
-      <fx:include fx:id="image" source="image.fxml" />
-   </TitledPane>
-   <MenuBar prefHeight="27.0" prefWidth="838.0">
+<AnchorPane prefHeight="692.0" prefWidth="546.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.MainController">
+   <MenuBar prefHeight="27.0" prefWidth="546.0">
      <menus>
        <Menu mnemonicParsing="false" text="File">
             <items>
@@ -47,7 +40,8 @@
                <MenuItem fx:id="resetMidiMappingMenuItem" mnemonicParsing="false" text="Reset MIDI Mappings">
                   <accelerator>
                      <KeyCodeCombination alt="UP" code="M" control="UP" meta="UP" shift="UP" shortcut="DOWN" />
-                  </accelerator></MenuItem>
+                  </accelerator>
+               </MenuItem>
              <MenuItem fx:id="stopMidiNotesMenuItem" mnemonicParsing="false" text="Stop MIDI Notes" />
                <CustomMenuItem hideOnClick="false" mnemonicParsing="false" text="MIDI Channel">
                   <content>
@@ -63,4 +57,27 @@
          </Menu>
      </menus>
    </MenuBar>
+   <ScrollPane fx:id="scrollPane" fitToWidth="true" layoutY="27.0" prefHeight="662.0" prefWidth="546.0">
+      <content>
+         <VBox prefWidth="524.0" spacing="10.0">
+            <children>
+               <TitledPane text="Main settings">
+                  <fx:include fx:id="general" source="general.fxml" />
+               </TitledPane>
+               <TitledPane text="Image settings">
+                  <fx:include fx:id="image" source="image.fxml" />
+               </TitledPane>
+               <TitledPane text="Audio Effects">
+                  <fx:include fx:id="effects" source="effects.fxml" />
+               </TitledPane>
+               <TitledPane text="3D .obj file settings">
+                  <fx:include fx:id="obj" source="obj.fxml" />
+               </TitledPane>
+            </children>
+            <padding>
+               <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+            </padding>
+         </VBox>
+      </content>
+   </ScrollPane>
 </AnchorPane>

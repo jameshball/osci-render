@@ -52,6 +52,8 @@ import static sh.ball.gui.Gui.defaultDevice;
 
 public class MainController implements Initializable, FrequencyListener, MidiListener {
 
+  private static final double SCROLL_SPEED = 0.003;
+
   private String openProjectPath;
 
   // audio
@@ -77,6 +79,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private final FileChooser osciFileChooser = new FileChooser();
   private Stage stage;
 
+  @FXML
+  private ScrollPane scrollPane;
   @FXML
   private EffectsController effectsController;
   @FXML
@@ -133,6 +137,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
+    scrollPane.getContent().setOnScroll(scrollEvent -> {
+      double deltaY = scrollEvent.getDeltaY() * SCROLL_SPEED;
+      scrollPane.setVvalue(scrollPane.getVvalue() - deltaY);
+    });
+
     objController.setAudioProducer(producer);
     generalController.setMainController(this);
 
