@@ -6,7 +6,7 @@ import sh.ball.shapes.Vector2;
 // Plays a sine wave at the same frequency as provided by the FrequencyListener
 // to apply an audio effect that when visualised makes the image slightly wobble
 // because it is played at a similar frequency
-public class WobbleEffect extends PhaseEffect implements FrequencyListener {
+public class WobbleEffect extends PhaseEffect implements FrequencyListener, SettableEffect {
 
   private static final double DEFAULT_VOLUME = 0.2;
 
@@ -43,5 +43,10 @@ public class WobbleEffect extends PhaseEffect implements FrequencyListener {
     double y = vector.getY() + volume * Math.sin(frequency * theta);
 
     return new Vector2(x, y);
+  }
+
+  @Override
+  public void setValue(double value) {
+    this.volume = value;
   }
 }

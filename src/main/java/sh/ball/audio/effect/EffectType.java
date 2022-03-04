@@ -8,5 +8,5 @@ public enum EffectType {
   VERTICAL_DISTORT,
   HORIZONTAL_DISTORT,
   WOBBLE,
-  SMOOTH
+  TRACE, SMOOTH
 }

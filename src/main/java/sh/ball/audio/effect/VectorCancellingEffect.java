@@ -2,18 +2,18 @@ package sh.ball.audio.effect;
 
 import sh.ball.shapes.Vector2;
 
-public class VectorCancellingEffect implements Effect {
+public class VectorCancellingEffect implements SettableEffect {
 
-  private float frequency;
-  private float nextInvert;
+  private double frequency = 1;
+  private double nextInvert;
   private int lastCount = 0;
 
-  public VectorCancellingEffect(float frequency) {
-    this.frequency = frequency;
+  public VectorCancellingEffect() {
   }
 
-  public void setFrequency(float frequency) {
-    this.frequency = frequency;
+  @Override
+  public void setValue(double value) {
+    this.frequency = 1.0 + 9.0 * value;
   }
 
   @Override

@@ -70,7 +70,7 @@
                <TitledPane text="Audio Effects">
                   <fx:include fx:id="effects" source="effects.fxml" />
                </TitledPane>
-               <TitledPane text="3D .obj file settings">
+               <TitledPane fx:id="objTitledPane" text="3D .obj file settings">
                   <fx:include fx:id="obj" source="obj.fxml" />
                </TitledPane>
             </children>

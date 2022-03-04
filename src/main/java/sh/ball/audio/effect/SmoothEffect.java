@@ -5,7 +5,7 @@ import sh.ball.shapes.Vector2;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SmoothEffect implements Effect {
+public class SmoothEffect implements SettableEffect {
 
   private List<Vector2> window;
   private int windowSize;
@@ -19,7 +19,9 @@ public class SmoothEffect implements Effect {
     }
   }
 
-  public synchronized void setWindowSize(int windowSize) {
+  @Override
+  public synchronized void setValue(double value) {
+    int windowSize = (int) (256 * value);
     int oldWindowSize = this.windowSize;
     this.windowSize = windowSize <= 0 ? 1 : windowSize;
     List<Vector2> newWindow = new ArrayList<>();
