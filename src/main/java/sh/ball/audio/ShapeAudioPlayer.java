@@ -91,7 +91,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     communicator.addListener(this);
   }
 
-  private void resetMidi() {
+  public void resetMidi() {
     keysDown.clear();
     for (int i = 0; i < keyTargetVolumes.length; i++) {
       Arrays.fill(keyTargetVolumes[i], (short) 0);
@@ -102,6 +102,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     keyActualVolumes[0][60] = (short) MidiNote.MAX_VELOCITY;
     keysDown.add(new MidiNote(60));
     midiStarted = false;
+    notesChanged();
   }
 
   public void stopMidiNotes() {
@@ -118,6 +119,11 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
   public void setVolume(DoubleProperty volume) {
     this.volume = Objects.requireNonNullElseGet(volume, () -> new SimpleDoubleProperty(1));
+    this.volume.addListener(e -> {
+      if (keysDown.size() == 0) {
+        resetMidi();
+      }
+    });
   }
 
   private Vector2 generateChannels() throws InterruptedException {
@@ -477,6 +483,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
         return;
       }
     }
+
   }
 
   public void setTrace(double trace) {
@@ -489,7 +496,8 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
       return;
     }
     int command = message.getCommand();
-    if (!midiStarted) {
+
+    if (!midiStarted && (command == ShortMessage.NOTE_ON || command == ShortMessage.NOTE_OFF)) {
       stopMidiNotes();
       midiStarted = true;
     }

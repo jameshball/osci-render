@@ -43,6 +43,7 @@
                   </accelerator>
                </MenuItem>
              <MenuItem fx:id="stopMidiNotesMenuItem" mnemonicParsing="false" text="Stop MIDI Notes" />
+               <MenuItem fx:id="resetMidiMenuItem" mnemonicParsing="false" text="Reset MIDI" />
                <CustomMenuItem hideOnClick="false" mnemonicParsing="false" text="MIDI Channel">
                   <content>
                      <AnchorPane>

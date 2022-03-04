@@ -8,6 +8,7 @@ public class TranslateEffect extends PhaseEffect {
 
   private Vector2 translation;
   private boolean ellipse = false;
+  private double scale;
 
   public TranslateEffect(int sampleRate, double speed, Vector2 translation) {
     super(sampleRate, speed);
@@ -22,9 +23,9 @@ public class TranslateEffect extends PhaseEffect {
   public Vector2 apply(int count, Vector2 vector) {
     if (ellipse) {
       double theta = nextTheta();
-      return vector.translate(translation.scale(new Vector2(Math.sin(theta), Math.cos(theta))));
+      return vector.translate(translation.scale(new Vector2(Math.sin(theta), Math.cos(theta))).scale(scale));
     } else {
-      return vector.translate(translation);
+      return vector.translate(translation.scale(scale));
     }
   }
 
@@ -37,5 +38,9 @@ public class TranslateEffect extends PhaseEffect {
       resetTheta();
     }
     this.ellipse = ellipse;
+  }
+
+  public void setScale(double scale) {
+    this.scale = scale;
   }
 }

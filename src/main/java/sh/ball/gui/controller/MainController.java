@@ -102,6 +102,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private MenuItem stopMidiNotesMenuItem;
   @FXML
+  private MenuItem resetMidiMenuItem;
+  @FXML
   private Spinner<Integer> midiChannelSpinner;
 
   public MainController() throws Exception {
@@ -198,8 +200,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     });
 
     resetMidiMappingMenuItem.setOnAction(e -> resetCCMap());
-
     stopMidiNotesMenuItem.setOnAction(e -> audioPlayer.stopMidiNotes());
+    resetMidiMenuItem.setOnAction(e -> audioPlayer.resetMidi());
 
     NumberFormat format = NumberFormat.getIntegerInstance();
     UnaryOperator<TextFormatter.Change> filter = c -> {
@@ -489,8 +491,12 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
   private void loadSliderValues(List<Slider> sliders, List<String> labels, Element root) {
     for (int i = 0; i < sliders.size(); i++) {
-      String value = root.getElementsByTagName(labels.get(i)).item(0).getTextContent();
-      sliders.get(i).setValue(Float.parseFloat(value));
+      NodeList nodes = root.getElementsByTagName(labels.get(i));
+      // backwards compatibility
+      if (nodes.getLength() > 0) {
+        String value = nodes.item(0).getTextContent();
+        sliders.get(i).setValue(Float.parseFloat(value));
+      }
     }
   }
 
@@ -581,6 +587,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       resetCCMap();
       for (int i = 0; i < labels.size(); i++) {
         NodeList elements = midiElement.getElementsByTagName(labels.get(i));
+        // backwards compatibility
         if (elements.getLength() > 0) {
           Element midi = (Element) elements.item(0);
           int cc = Integer.parseInt(midi.getTextContent());

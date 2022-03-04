@@ -51,6 +51,10 @@ public class ImageController implements Initializable, SubController {
   @FXML
   private CheckBox translateCheckBox;
   @FXML
+  private Slider translationScaleSlider;
+  @FXML
+  private SVGPath translationScaleMidi;
+  @FXML
   private Slider frequencySlider;
   @FXML
   private SVGPath frequencyMidi;
@@ -133,6 +137,8 @@ public class ImageController implements Initializable, SubController {
 
     translateEllipseCheckBox.selectedProperty().addListener((e, old, ellipse) -> translateEffect.setEllipse(ellipse));
 
+    translationScaleSlider.valueProperty().addListener((e, old, scale) -> translateEffect.setScale(scale.doubleValue()));
+
     // converts the value of frequencySlider to the actual frequency that it represents so that it
     // can increase at an exponential scale.
     frequencySlider.valueProperty().addListener((o, old, f) -> frequency.set(Math.pow(MAX_FREQUENCY, f.doubleValue())));
@@ -150,20 +156,21 @@ public class ImageController implements Initializable, SubController {
       rotateSpeedMidi, rotateSpeedSlider,
       translationSpeedMidi, translationSpeedSlider,
       volumeMidi, volumeSlider,
-      visibilityMidi, visibilitySlider
+      visibilityMidi, visibilitySlider,
+      translationScaleMidi, translationScaleSlider
     );
   }
 
   @Override
   public List<Slider> sliders() {
     return List.of(frequencySlider, rotateSpeedSlider, translationSpeedSlider,
-      volumeSlider, visibilitySlider);
+      volumeSlider, visibilitySlider, translationScaleSlider);
   }
 
   @Override
   public List<String> labels() {
     return List.of("frequency", "rotateSpeed", "translationSpeed", "volume",
-      "visibility");
+      "visibility", "translationScale");
   }
 
   @Override
