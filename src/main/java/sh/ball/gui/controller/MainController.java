@@ -55,7 +55,6 @@ import static sh.ball.gui.Gui.defaultDevice;
 
 public class MainController implements Initializable, FrequencyListener, MidiListener, AudioInputListener {
 
-  private static final double SCROLL_SPEED = 0.003;
   public static final double MIN_MIC_VOLUME = 0.025;
 
   private String openProjectPath;
@@ -86,8 +85,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private final FileChooser osciFileChooser = new FileChooser();
   private Stage stage;
 
-  @FXML
-  private ScrollPane scrollPane;
   @FXML
   private EffectsController effectsController;
   @FXML
@@ -161,11 +158,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         });
       }
     }
-
-    scrollPane.getContent().setOnScroll(scrollEvent -> {
-      double deltaY = scrollEvent.getDeltaY() * SCROLL_SPEED;
-      scrollPane.setVvalue(scrollPane.getVvalue() - deltaY);
-    });
 
     objController.setAudioProducer(producer);
     generalController.setMainController(this);
