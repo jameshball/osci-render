@@ -470,9 +470,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       // If there is a slider associated with the MIDI channel, update the value
       // of it
       if (cc <= MidiNote.MAX_CC && CCMap.containsKey(cc)) {
-        Slider slider = midiButtonMap.get(CCMap.get(cc));
-        double sliderValue = getValueInSliderRange(slider, value / MidiNote.MAX_VELOCITY);
-        slider.setValue(sliderValue);
+        Platform.runLater(() -> {
+          Slider slider = midiButtonMap.get(CCMap.get(cc));
+          double sliderValue = getValueInSliderRange(slider, value / MidiNote.MAX_VELOCITY);
+          slider.setValue(sliderValue);
+        });
       } else if (cc == MidiNote.ALL_NOTES_OFF) {
         audioPlayer.stopMidiNotes();
       }

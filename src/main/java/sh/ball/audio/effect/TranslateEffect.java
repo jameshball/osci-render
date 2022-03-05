@@ -8,7 +8,7 @@ public class TranslateEffect extends PhaseEffect {
 
   private Vector2 translation;
   private boolean ellipse = false;
-  private double scale;
+  private double scale = 1;
 
   public TranslateEffect(int sampleRate, double speed, Vector2 translation) {
     super(sampleRate, speed);
