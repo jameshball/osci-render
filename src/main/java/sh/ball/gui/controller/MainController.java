@@ -56,6 +56,7 @@ import static sh.ball.gui.Gui.defaultDevice;
 public class MainController implements Initializable, FrequencyListener, MidiListener, AudioInputListener {
 
   private static final double SCROLL_SPEED = 0.003;
+  public static final double MIN_MIC_VOLUME = 0.025;
 
   private String openProjectPath;
 
@@ -64,6 +65,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private FrequencyAnalyser<List<Shape>> analyser;
   private final double[] micSamples = new double[64];
   private int micSampleIndex = 0;
+  private double[] targetSliderValue;
 
   // midi
   private final Map<Integer, SVGPath> CCMap = new HashMap<>();
@@ -144,6 +146,22 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
+    List<Slider> sliders = sliders();
+    List<CheckBox> micCheckBoxes = micCheckBoxes();
+    targetSliderValue = new double[sliders.size()];
+    for (int i = 0; i < sliders.size(); i++) {
+      targetSliderValue[i] = sliders.get(i).getValue();
+      if (micCheckBoxes.get(i) != null) {
+        CheckBox checkBox = micCheckBoxes.get(i);
+        int finalI = i;
+        sliders.get(i).valueProperty().addListener((e, old, value) -> {
+          if (!checkBox.isSelected()) {
+            targetSliderValue[finalI] = value.doubleValue();
+          }
+        });
+      }
+    }
+
     scrollPane.getContent().setOnScroll(scrollEvent -> {
       double deltaY = scrollEvent.getDeltaY() * SCROLL_SPEED;
       scrollPane.setVvalue(scrollPane.getVvalue() - deltaY);
@@ -518,6 +536,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       if (nodes.getLength() > 0) {
         String value = nodes.item(0).getTextContent();
         sliders.get(i).setValue(Float.parseFloat(value));
+        targetSliderValue[i] = Float.parseFloat(value);
       }
     }
   }
@@ -700,7 +719,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       volume += Math.abs(micSample);
     }
     volume /= micSamples.length;
-    volume = Math.min(1.0, volume * 2);
+    volume = Math.min(1.0, Math.max(-1.0, volume * generalController.getMicVolume()));
+    if (volume < MIN_MIC_VOLUME && volume > -MIN_MIC_VOLUME) {
+      volume = 0;
+    }
 
     List<Slider> sliders = sliders();
     List<CheckBox> checkBoxes = micCheckBoxes();
@@ -711,7 +733,13 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         // allow for sliders without a mic checkbox
         if (checkBoxes.get(i) != null) {
           if (checkBoxes.get(i).isSelected()) {
-            double sliderValue = getValueInSliderRange(sliders.get(i), finalVolume);
+            Slider slider = sliders.get(i);
+            double sliderValue = targetSliderValue[i] + getValueInSliderRange(slider, finalVolume);
+            if (sliderValue > slider.getMax()) {
+              sliderValue = slider.getMax();
+            } else if (sliderValue < slider.getMin()) {
+              sliderValue = slider.getMin();
+            }
             sliders.get(i).setValue(sliderValue);
           }
         }

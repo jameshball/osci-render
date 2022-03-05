@@ -70,7 +70,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private double lengthIncrement = MIN_LENGTH_INCREMENT;
   private double shapeDrawn = 0;
   private int count = 0;
-  private DoubleProperty volume = new SimpleDoubleProperty(1);
+  private double volume = 1;
   private double octaveFrequency;
   private DoubleProperty frequency;
   private double baseFrequencyVolumeScale = 0.5;
@@ -89,6 +89,10 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     resetMidi();
 
     communicator.addListener(this);
+  }
+
+  public boolean midiPlaying() {
+    return keysDown.size() > 0;
   }
 
   public void resetMidi() {
@@ -117,13 +121,8 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     frequency.addListener((o, old, f) -> setBaseFrequency(f.doubleValue()));
   }
 
-  public void setVolume(DoubleProperty volume) {
-    this.volume = Objects.requireNonNullElseGet(volume, () -> new SimpleDoubleProperty(1));
-    this.volume.addListener(e -> {
-      if (keysDown.size() == 0) {
-        resetMidi();
-      }
-    });
+  public void setVolume(double volume) {
+    this.volume = volume;
   }
 
   private Vector2 generateChannels() throws InterruptedException {
@@ -257,7 +256,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
       vector = smoothEffect.apply(frame, vector);
     }
 
-    return vector.scale(volume.get());
+    return vector.scale(volume);
   }
 
   private void setBaseFrequency(double baseFrequency) {

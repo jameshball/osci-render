@@ -23,7 +23,7 @@
                 <Font size="13.0" />
             </font>
         </Label>
-        <Slider fx:id="volumeSlider" blockIncrement="0.05" layoutX="116.0" layoutY="236.0" majorTickUnit="1.0" max="10.0" prefHeight="42.0" prefWidth="253.0" showTickLabels="true" showTickMarks="true" value="1.0" />
+        <Slider fx:id="volumeSlider" blockIncrement="0.05" layoutX="116.0" layoutY="236.0" majorTickUnit="1.0" max="10.0" prefHeight="42.0" prefWidth="253.0" showTickLabels="true" showTickMarks="true" value="3.0" />
         <Label layoutX="33.0" layoutY="235.0" text="Volume scale">
             <font>
                 <Font size="13.0" />

@@ -19,6 +19,6 @@ public class BitCrushEffect implements SettableEffect {
 
   @Override
   public void setValue(double value) {
-    this.crush = 3.0 * value;
+    this.crush = 3.0 * (1 - value);
   }
 }

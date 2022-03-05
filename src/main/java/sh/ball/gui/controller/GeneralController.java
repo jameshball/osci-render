@@ -75,6 +75,10 @@ public class GeneralController implements Initializable, SubController {
   @FXML
   private SVGPath octaveMidi;
   @FXML
+  private Slider micVolumeSlider;
+  @FXML
+  private SVGPath micVolumeMidi;
+  @FXML
   private ComboBox<AudioDevice> deviceComboBox;
 
   // alternates between recording and not recording when called.
@@ -316,7 +320,10 @@ public class GeneralController implements Initializable, SubController {
 
   @Override
   public Map<SVGPath, Slider> getMidiButtonMap() {
-    return Map.of(octaveMidi, octaveSlider);
+    return Map.of(
+      octaveMidi, octaveSlider,
+      micVolumeMidi, micVolumeSlider
+    );
   }
 
   public void updateLastVisitedDirectory(File dir) {
@@ -331,20 +338,25 @@ public class GeneralController implements Initializable, SubController {
     );
   }
 
+  public double getMicVolume() {
+    return micVolumeSlider.getValue();
+  }
+
   @Override
   public List<CheckBox> micCheckBoxes() {
     List<CheckBox> checkboxes = new ArrayList<>();
+    checkboxes.add(null);
     checkboxes.add(null);
     return checkboxes;
   }
   @Override
   public List<Slider> sliders() {
-    return List.of(octaveSlider);
+    return List.of(octaveSlider, micVolumeSlider);
   }
 
   @Override
   public List<String> labels() {
-    return List.of("octave");
+    return List.of("octave", "micVolume");
   }
 
   @Override

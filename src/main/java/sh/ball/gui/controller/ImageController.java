@@ -158,7 +158,14 @@ public class ImageController implements Initializable, SubController {
     audioPlayer.setFrequency(frequency);
     // default value is middle C
     frequency.set(MidiNote.MIDDLE_C);
-    audioPlayer.setVolume(volumeSlider.valueProperty());
+    volumeSlider.valueProperty().addListener((e, old, value) -> {
+      audioPlayer.setVolume(value.doubleValue() / 3.0);
+    });
+    volumeSlider.valueProperty().addListener(e -> {
+      if (!audioPlayer.midiPlaying()) {
+        audioPlayer.resetMidi();
+      }
+    });
   }
 
   @Override

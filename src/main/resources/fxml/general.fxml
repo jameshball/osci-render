@@ -9,7 +9,7 @@
 <?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.shape.SVGPath?>
 
-<AnchorPane id="control-pane" prefHeight="315.0" prefWidth="511.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.GeneralController">
+<AnchorPane id="control-pane" prefHeight="352.0" prefWidth="511.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.GeneralController">
     <children>
         <Button fx:id="chooseFileButton" layoutX="14.0" layoutY="53.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose File" />
         <Label fx:id="fileLabel" layoutX="143.0" layoutY="57.0" maxWidth="270.0" prefHeight="18.0" prefWidth="246.0" text="cube.obj" />
@@ -22,8 +22,11 @@
         <TextField fx:id="recordTextField" disable="true" layoutX="370.0" layoutY="154.0" prefHeight="26.0" prefWidth="70.0" text="2.0" />
         <Label fx:id="recordLengthLabel" disable="true" layoutX="360.0" layoutY="128.0" text="Record length (s)" />
         <CheckBox fx:id="recordCheckBox" layoutX="154.0" layoutY="146.0" mnemonicParsing="false" text="Timed record" />
-        <Slider fx:id="octaveSlider" blockIncrement="1.0" layoutX="65.0" layoutY="271.0" majorTickUnit="1.0" max="5.0" min="-5.0" minorTickCount="0" prefHeight="42.0" prefWidth="358.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" />
+        <Slider fx:id="octaveSlider" blockIncrement="1.0" layoutX="81.0" layoutY="271.0" majorTickUnit="1.0" max="5.0" min="-5.0" minorTickCount="0" prefHeight="42.0" prefWidth="342.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" />
         <SVGPath fx:id="octaveMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="433.0" layoutY="267.0" pickOnBounds="true" />
         <Label layoutX="12.0" layoutY="270.0" text="Octave" />
+      <Slider fx:id="micVolumeSlider" blockIncrement="1.0" layoutX="81.0" layoutY="310.0" majorTickUnit="1.0" max="10.0" prefHeight="42.0" prefWidth="342.0" showTickLabels="true" showTickMarks="true" value="1.0" />
+      <SVGPath fx:id="micVolumeMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="433.0" layoutY="306.0" pickOnBounds="true" />
+      <Label layoutX="12.0" layoutY="309.0" text="Mic Volume" />
     </children>
 </AnchorPane>
