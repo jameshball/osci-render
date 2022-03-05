@@ -51,6 +51,8 @@ public class ImageController implements Initializable, SubController {
   @FXML
   private CheckBox translateCheckBox;
   @FXML
+  private CheckBox translationScaleMic;
+  @FXML
   private Slider translationScaleSlider;
   @FXML
   private SVGPath translationScaleMidi;
@@ -59,21 +61,31 @@ public class ImageController implements Initializable, SubController {
   @FXML
   private SVGPath frequencyMidi;
   @FXML
+  private CheckBox frequencyMic;
+  @FXML
   private Slider rotateSpeedSlider;
   @FXML
   private SVGPath rotateSpeedMidi;
+  @FXML
+  private CheckBox rotateSpeedMic;
   @FXML
   private Slider translationSpeedSlider;
   @FXML
   private SVGPath translationSpeedMidi;
   @FXML
+  private CheckBox translationSpeedMic;
+  @FXML
   private Slider volumeSlider;
   @FXML
   private SVGPath volumeMidi;
   @FXML
+  private CheckBox volumeMic;
+  @FXML
   private Slider visibilitySlider;
   @FXML
   private SVGPath visibilityMidi;
+  @FXML
+  private CheckBox visibilityMic;
 
   public ImageController() {
     this.frequency = new SimpleDoubleProperty(0);
@@ -159,6 +171,12 @@ public class ImageController implements Initializable, SubController {
       visibilityMidi, visibilitySlider,
       translationScaleMidi, translationScaleSlider
     );
+  }
+
+  @Override
+  public List<CheckBox> micCheckBoxes() {
+    return List.of(frequencyMic, rotateSpeedMic, translationSpeedMic, volumeMic,
+      visibilityMic, translationScaleMic);
   }
 
   @Override

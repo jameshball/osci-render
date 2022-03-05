@@ -29,6 +29,8 @@ public class ObjController implements Initializable, SubController {
   @FXML
   private SVGPath objectRotateSpeedMidi;
   @FXML
+  private CheckBox objectRotateSpeedMic;
+  @FXML
   private CheckBox rotateCheckBox;
 
   @Override
@@ -93,6 +95,14 @@ public class ObjController implements Initializable, SubController {
     objectRotateSpeedSlider.valueProperty().addListener((source, oldValue, newValue) ->
       setObjectRotateSpeed(newValue.doubleValue())
     );
+  }
+
+  @Override
+  public List<CheckBox> micCheckBoxes() {
+    List<CheckBox> checkboxes = new ArrayList<>();
+    checkboxes.add(null);
+    checkboxes.add(objectRotateSpeedMic);
+    return checkboxes;
   }
 
   @Override

@@ -49,6 +49,8 @@ public class EffectsController implements Initializable, SubController {
   @FXML
   private ComboBox<AnimationType> vectorCancellingComboBox;
   @FXML
+  private CheckBox vectorCancellingMic;
+  @FXML
   private CheckBox bitCrushCheckBox;
   @FXML
   private Slider bitCrushSlider;
@@ -56,6 +58,8 @@ public class EffectsController implements Initializable, SubController {
   private SVGPath bitCrushMidi;
   @FXML
   private ComboBox<AnimationType> bitCrushComboBox;
+  @FXML
+  private CheckBox bitCrushMic;
   @FXML
   private CheckBox verticalDistortCheckBox;
   @FXML
@@ -65,6 +69,8 @@ public class EffectsController implements Initializable, SubController {
   @FXML
   private ComboBox<AnimationType> verticalDistortComboBox;
   @FXML
+  private CheckBox verticalDistortMic;
+  @FXML
   private CheckBox horizontalDistortCheckBox;
   @FXML
   private Slider horizontalDistortSlider;
@@ -72,6 +78,8 @@ public class EffectsController implements Initializable, SubController {
   private SVGPath horizontalDistortMidi;
   @FXML
   private ComboBox<AnimationType> horizontalDistortComboBox;
+  @FXML
+  private CheckBox horizontalDistortMic;
   @FXML
   private CheckBox wobbleCheckBox;
   @FXML
@@ -81,6 +89,8 @@ public class EffectsController implements Initializable, SubController {
   @FXML
   private ComboBox<AnimationType> wobbleComboBox;
   @FXML
+  private CheckBox wobbleMic;
+  @FXML
   private CheckBox smoothCheckBox;
   @FXML
   private Slider smoothSlider;
@@ -89,6 +99,8 @@ public class EffectsController implements Initializable, SubController {
   @FXML
   private ComboBox<AnimationType> smoothComboBox;
   @FXML
+  private CheckBox smoothMic;
+  @FXML
   private CheckBox traceCheckBox;
   @FXML
   private Slider traceSlider;
@@ -96,6 +108,8 @@ public class EffectsController implements Initializable, SubController {
   private SVGPath traceMidi;
   @FXML
   private ComboBox<AnimationType> traceComboBox;
+  @FXML
+  private CheckBox traceMic;
 
   public EffectsController() {
     this.wobbleEffect = new WobbleEffect(DEFAULT_SAMPLE_RATE);
@@ -156,8 +170,8 @@ public class EffectsController implements Initializable, SubController {
 
   // selects or deselects the given audio effect
   public void updateEffect(EffectType type, boolean checked, SettableEffect effect, double value) {
-    effect.setValue(value);
     if (checked) {
+      effect.setValue(value);
       audioPlayer.addEffect(type, effect);
       effectTypes.get(type).setDisable(false);
     } else {
@@ -256,6 +270,11 @@ public class EffectsController implements Initializable, SubController {
   private List<CheckBox> checkBoxes() {
     return List.of(vectorCancellingCheckBox, bitCrushCheckBox, verticalDistortCheckBox,
       horizontalDistortCheckBox, wobbleCheckBox, smoothCheckBox, traceCheckBox);
+  }
+  @Override
+  public List<CheckBox> micCheckBoxes() {
+    return List.of(vectorCancellingMic, bitCrushMic, verticalDistortMic, horizontalDistortMic,
+      wobbleMic, smoothMic, traceMic);
   }
   @Override
   public List<Slider> sliders() {

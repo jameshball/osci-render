@@ -37,6 +37,9 @@ import javax.xml.transform.stream.StreamResult;
 
 import org.xml.sax.SAXException;
 import sh.ball.audio.engine.AudioDevice;
+import sh.ball.audio.engine.AudioInput;
+import sh.ball.audio.engine.AudioInputListener;
+import sh.ball.audio.engine.JavaAudioInput;
 import sh.ball.audio.midi.MidiListener;
 import sh.ball.audio.midi.MidiNote;
 import sh.ball.engine.Vector3;
@@ -50,7 +53,7 @@ import sh.ball.shapes.Vector2;
 import static sh.ball.gui.Gui.audioPlayer;
 import static sh.ball.gui.Gui.defaultDevice;
 
-public class MainController implements Initializable, FrequencyListener, MidiListener {
+public class MainController implements Initializable, FrequencyListener, MidiListener, AudioInputListener {
 
   private static final double SCROLL_SPEED = 0.003;
 
@@ -59,6 +62,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   // audio
   private int sampleRate;
   private FrequencyAnalyser<List<Shape>> analyser;
+  private final double[] micSamples = new double[64];
+  private int micSampleIndex = 0;
 
   // midi
   private final Map<Integer, SVGPath> CCMap = new HashMap<>();
@@ -227,6 +232,17 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     switchAudioDevice(defaultDevice, false);
     executor.submit(producer);
     Gui.midiCommunicator.addListener(this);
+    AudioInput audioInput = new JavaAudioInput();
+    if (audioInput.isAvailable()) {
+      audioInput.addListener(this);
+      new Thread(audioInput).start();
+    } else {
+      for (CheckBox checkBox : micCheckBoxes()) {
+        if (checkBox != null) {
+          checkBox.setDisable(true);
+        }
+      }
+    }
   }
 
   // used when a file is chosen so that the same folder is reopened when a
@@ -418,12 +434,16 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     midiButton.setFill(Color.LIME);
   }
 
-  // converts MIDI pressure value into a valid value for a slider
-  private double midiPressureToPressure(Slider slider, int midiPressure) {
+  private double getValueInSliderRange(Slider slider, double value) {
     double max = slider.getMax();
     double min = slider.getMin();
     double range = max - min;
-    return min + (midiPressure / MidiNote.MAX_VELOCITY) * range;
+    double sliderValue = min + value * range;
+    if (slider.isSnapToTicks()) {
+      double increment = slider.getMajorTickUnit() / (slider.getMinorTickCount() + 1);
+      sliderValue = increment * (Math.round(sliderValue / increment));
+    }
+    return  sliderValue;
   }
 
   // handles newly received MIDI messages. For CC messages, this handles
@@ -451,12 +471,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       // of it
       if (cc <= MidiNote.MAX_CC && CCMap.containsKey(cc)) {
         Slider slider = midiButtonMap.get(CCMap.get(cc));
-        double sliderValue = midiPressureToPressure(slider, value);
-
-        if (slider.isSnapToTicks()) {
-          double increment = slider.getMajorTickUnit() / (slider.getMinorTickCount() + 1);
-          sliderValue = increment * (Math.round(sliderValue / increment));
-        }
+        double sliderValue = getValueInSliderRange(slider, value / MidiNote.MAX_VELOCITY);
         slider.setValue(sliderValue);
       } else if (cc == MidiNote.ALL_NOTES_OFF) {
         audioPlayer.stopMidiNotes();
@@ -468,6 +483,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   }
 
   // must be functions, otherwise they are not initialised
+  private List<CheckBox> micCheckBoxes() {
+    List<CheckBox> checkBoxes = new ArrayList<>();
+    subControllers().forEach(controller -> checkBoxes.addAll(controller.micCheckBoxes()));
+    return checkBoxes;
+  }
   private List<Slider> sliders() {
     List<Slider> sliders = new ArrayList<>();
     subControllers().forEach(controller -> sliders.addAll(controller.sliders()));
@@ -500,6 +520,28 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     }
   }
 
+  private void appendMicCheckBoxes(List<CheckBox> checkBoxes, List<String> labels, Element root, Document document) {
+    for (int i = 0; i < checkBoxes.size(); i++) {
+      if (checkBoxes.get(i) != null) {
+        Element checkBox = document.createElement(labels.get(i));
+        checkBox.appendChild(
+          document.createTextNode(String.valueOf(checkBoxes.get(i).isSelected()))
+        );
+        root.appendChild(checkBox);
+      }
+    }
+  }
+
+  private void loadMicCheckBoxes(List<CheckBox> checkBoxes, List<String> labels, Element root) {
+    for (int i = 0; i < checkBoxes.size(); i++) {
+      NodeList nodes = root.getElementsByTagName(labels.get(i));
+      if (nodes.getLength() > 0) {
+        String value = nodes.item(0).getTextContent();
+        checkBoxes.get(i).setSelected(Boolean.parseBoolean(value));
+      }
+    }
+  }
+
   private void saveProject(String projectFileName) {
     try {
       DocumentBuilderFactory documentFactory = DocumentBuilderFactory.newInstance();
@@ -509,6 +551,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       Element root = document.createElement("project");
       document.appendChild(root);
 
+      List<CheckBox> micCheckBoxes = micCheckBoxes();
       List<Slider> sliders = sliders();
       List<String> labels = labels();
 
@@ -516,6 +559,9 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       appendSliders(sliders, labels, slidersElement, document);
       root.appendChild(slidersElement);
 
+      Element micCheckBoxesElement = document.createElement("micCheckBoxes");
+      appendMicCheckBoxes(micCheckBoxes, labels, micCheckBoxesElement, document);
+      root.appendChild(micCheckBoxesElement);
 
       Element midiElement = document.createElement("midi");
       for (Map.Entry<Integer, SVGPath> entry : CCMap.entrySet()) {
@@ -572,6 +618,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       Document document = documentBuilder.parse(new File(projectFileName));
       document.getDocumentElement().normalize();
 
+      List<CheckBox> micCheckBoxes = micCheckBoxes();
       List<Slider> sliders = sliders();
       List<String> labels = labels();
 
@@ -582,6 +629,12 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       Element slidersElement = (Element) root.getElementsByTagName("sliders").item(0);
       loadSliderValues(sliders, labels, slidersElement);
 
+      NodeList nodes = root.getElementsByTagName("micCheckBoxes");
+      // backwards compatibility
+      if (nodes.getLength() > 0) {
+        Element micCheckBoxesElement = (Element) nodes.item(0);
+        loadMicCheckBoxes(micCheckBoxes, labels, micCheckBoxesElement);
+      }
 
       Element midiElement = (Element) root.getElementsByTagName("midi").item(0);
       resetCCMap();
@@ -632,5 +685,35 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
   public void increaseFrameRate() {
     generalController.increaseFrameRate();
+  }
+
+  @Override
+  public void transmit(double sample) {
+    micSamples[micSampleIndex++] = sample;
+    if (micSampleIndex >= micSamples.length) {
+      micSampleIndex = 0;
+    }
+    double volume = 0;
+    for (double micSample : micSamples) {
+      volume += Math.abs(micSample);
+    }
+    volume /= micSamples.length;
+    volume = Math.min(1.0, volume * 2);
+
+    List<Slider> sliders = sliders();
+    List<CheckBox> checkBoxes = micCheckBoxes();
+
+    double finalVolume = volume;
+    Platform.runLater(() -> {
+      for (int i = 0; i < checkBoxes.size(); i++) {
+        // allow for sliders without a mic checkbox
+        if (checkBoxes.get(i) != null) {
+          if (checkBoxes.get(i).isSelected()) {
+            double sliderValue = getValueInSliderRange(sliders.get(i), finalVolume);
+            sliders.get(i).setValue(sliderValue);
+          }
+        }
+      }
+    });
   }
 }

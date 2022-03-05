@@ -1,5 +1,6 @@
 package sh.ball.gui.controller;
 
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.Slider;
 import javafx.scene.shape.SVGPath;
 import org.w3c.dom.Document;
@@ -11,6 +12,8 @@ import java.util.Map;
 public interface SubController {
 
   Map<SVGPath, Slider> getMidiButtonMap();
+
+  List<CheckBox> micCheckBoxes();
 
   List<Slider> sliders();
 

@@ -14,7 +14,7 @@
 <?import javafx.scene.layout.VBox?>
 
 <AnchorPane prefHeight="692.0" prefWidth="546.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.MainController">
-   <MenuBar prefHeight="27.0" prefWidth="546.0">
+   <MenuBar prefHeight="27.0" prefWidth="612.0">
      <menus>
        <Menu mnemonicParsing="false" text="File">
             <items>
@@ -58,7 +58,7 @@
          </Menu>
      </menus>
    </MenuBar>
-   <ScrollPane fx:id="scrollPane" fitToWidth="true" layoutY="27.0" prefHeight="662.0" prefWidth="546.0">
+   <ScrollPane fx:id="scrollPane" fitToWidth="true" layoutY="27.0" prefHeight="662.0" prefWidth="612.0">
       <content>
          <VBox prefWidth="524.0" spacing="10.0">
             <children>

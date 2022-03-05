@@ -332,6 +332,12 @@ public class GeneralController implements Initializable, SubController {
   }
 
   @Override
+  public List<CheckBox> micCheckBoxes() {
+    List<CheckBox> checkboxes = new ArrayList<>();
+    checkboxes.add(null);
+    return checkboxes;
+  }
+  @Override
   public List<Slider> sliders() {
     return List.of(octaveSlider);
   }
