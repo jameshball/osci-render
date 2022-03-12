@@ -265,14 +265,16 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     });
     sliderComboBox.setValue(printableSliders.get(0));
 
-    sliderMinTextField.textProperty().addListener((e, old, text) -> {
-      if (parseable(text)) {
+    sliderMinTextField.focusedProperty().addListener((e, old, focused) -> {
+      String text = sliderMinTextField.getText();
+      if (!focused && parseable(text)) {
         sliderComboBox.getValue().slider.setMin(Double.parseDouble(text));
         updateSliderUnits(sliderComboBox.getValue().slider);
       }
     });
-    sliderMaxTextField.textProperty().addListener((e, old, text) -> {
-      if (parseable(text)) {
+    sliderMaxTextField.focusedProperty().addListener((e, old, focused) -> {
+      String text = sliderMaxTextField.getText();
+      if (!focused && parseable(text)) {
         sliderComboBox.getValue().slider.setMax(Double.parseDouble(text));
         updateSliderUnits(sliderComboBox.getValue().slider);
       }
