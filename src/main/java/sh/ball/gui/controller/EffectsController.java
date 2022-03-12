@@ -14,7 +14,6 @@ import javafx.scene.shape.SVGPath;
 import javafx.util.Duration;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.w3c.dom.NodeList;
 import sh.ball.audio.FrequencyAnalyser;
 import sh.ball.audio.effect.*;
 import sh.ball.audio.engine.AudioDevice;
@@ -91,15 +90,15 @@ public class EffectsController implements Initializable, SubController {
   @FXML
   private CheckBox wobbleMic;
   @FXML
-  private CheckBox smoothCheckBox;
+  private CheckBox smoothingCheckBox;
   @FXML
-  private Slider smoothSlider;
+  private Slider smoothingSlider;
   @FXML
-  private SVGPath smoothMidi;
+  private SVGPath smoothingMidi;
   @FXML
-  private ComboBox<AnimationType> smoothComboBox;
+  private ComboBox<AnimationType> smoothingComboBox;
   @FXML
-  private CheckBox smoothMic;
+  private CheckBox smoothingMic;
   @FXML
   private CheckBox traceCheckBox;
   @FXML
@@ -128,7 +127,7 @@ public class EffectsController implements Initializable, SubController {
       vectorCancellingMidi, vectorCancellingSlider,
       bitCrushMidi, bitCrushSlider,
       wobbleMidi, wobbleSlider,
-      smoothMidi, smoothSlider,
+      smoothingMidi, smoothingSlider,
       traceMidi, traceSlider,
       verticalDistortMidi, verticalDistortSlider,
       horizontalDistortMidi, horizontalDistortSlider
@@ -140,7 +139,7 @@ public class EffectsController implements Initializable, SubController {
       vectorCancellingComboBox, vectorCancellingAnimator,
       bitCrushComboBox, bitCrushAnimator,
       wobbleComboBox, wobbleAnimator,
-      smoothComboBox, smoothAnimator,
+      smoothingComboBox, smoothAnimator,
       traceComboBox, traceAnimator,
       verticalDistortComboBox, verticalDistortAnimator,
       horizontalDistortComboBox, horizontalDistortAnimator
@@ -162,7 +161,7 @@ public class EffectsController implements Initializable, SubController {
       EffectType.WOBBLE,
       wobbleSlider,
       EffectType.SMOOTH,
-      smoothSlider,
+      smoothingSlider,
       EffectType.TRACE,
       traceSlider
     );
@@ -218,7 +217,7 @@ public class EffectsController implements Initializable, SubController {
     InvalidationListener wobbleListener = e ->
       updateEffect(EffectType.WOBBLE, wobbleCheckBox.isSelected(), wobbleAnimator, wobbleSlider.getValue());
     InvalidationListener smoothListener = e ->
-      updateEffect(EffectType.SMOOTH, smoothCheckBox.isSelected(), smoothAnimator, smoothSlider.getValue());
+      updateEffect(EffectType.SMOOTH, smoothingCheckBox.isSelected(), smoothAnimator, smoothingSlider.getValue());
     InvalidationListener vectorCancellingListener = e ->
       updateEffect(EffectType.VECTOR_CANCELLING, vectorCancellingCheckBox.isSelected(), vectorCancellingAnimator, vectorCancellingSlider.getValue());
     InvalidationListener traceListener = e ->
@@ -240,8 +239,8 @@ public class EffectsController implements Initializable, SubController {
     wobbleCheckBox.selectedProperty().addListener(wobbleListener);
     wobbleCheckBox.selectedProperty().addListener(e -> wobbleEffect.update());
 
-    smoothSlider.valueProperty().addListener(smoothListener);
-    smoothCheckBox.selectedProperty().addListener(smoothListener);
+    smoothingSlider.valueProperty().addListener(smoothListener);
+    smoothingCheckBox.selectedProperty().addListener(smoothListener);
 
     traceSlider.valueProperty().addListener(traceListener);
     traceCheckBox.selectedProperty().addListener(traceListener);
@@ -269,17 +268,17 @@ public class EffectsController implements Initializable, SubController {
   }
   private List<CheckBox> checkBoxes() {
     return List.of(vectorCancellingCheckBox, bitCrushCheckBox, verticalDistortCheckBox,
-      horizontalDistortCheckBox, wobbleCheckBox, smoothCheckBox, traceCheckBox);
+      horizontalDistortCheckBox, wobbleCheckBox, smoothingCheckBox, traceCheckBox);
   }
   @Override
   public List<CheckBox> micCheckBoxes() {
     return List.of(vectorCancellingMic, bitCrushMic, verticalDistortMic, horizontalDistortMic,
-      wobbleMic, smoothMic, traceMic);
+      wobbleMic, smoothingMic, traceMic);
   }
   @Override
   public List<Slider> sliders() {
     return List.of(vectorCancellingSlider, bitCrushSlider, verticalDistortSlider,
-      horizontalDistortSlider, wobbleSlider, smoothSlider, traceSlider);
+      horizontalDistortSlider, wobbleSlider, smoothingSlider, traceSlider);
   }
   @Override
   public List<String> labels() {

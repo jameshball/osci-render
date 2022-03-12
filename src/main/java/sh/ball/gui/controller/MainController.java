@@ -1,6 +1,7 @@
 package sh.ball.gui.controller;
 
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
 import javafx.scene.control.*;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
@@ -13,6 +14,8 @@ import sh.ball.audio.*;
 
 import java.io.*;
 import java.net.URL;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.text.NumberFormat;
 import java.text.ParsePosition;
 import java.util.*;
@@ -52,10 +55,15 @@ import sh.ball.shapes.Vector2;
 
 import static sh.ball.gui.Gui.audioPlayer;
 import static sh.ball.gui.Gui.defaultDevice;
+import static sh.ball.math.Math.parseable;
 
 public class MainController implements Initializable, FrequencyListener, MidiListener, AudioInputListener {
 
-  public static final double MIN_MIC_VOLUME = 0.025;
+  private static final double MIN_MIC_VOLUME = 0.025;
+  // need a set a locale, otherwise there is inconsistent casting to/from doubles/strings
+  public static final DecimalFormat FORMAT = new DecimalFormat("0.00", new DecimalFormatSymbols(Locale.UK));
+  private static final double BLOCK_INCREMENT = 0.005;
+  private static final double MAJOR_TICK_UNIT = 0.1;
 
   private String openProjectPath;
 
@@ -109,6 +117,12 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private MenuItem resetMidiMenuItem;
   @FXML
   private Spinner<Integer> midiChannelSpinner;
+  @FXML
+  private ComboBox<PrintableSlider> sliderComboBox;
+  @FXML
+  private TextField sliderMinTextField;
+  @FXML
+  private TextField sliderMaxTextField;
 
   public MainController() throws Exception {
     // Clone DEFAULT_OBJ InputStream using a ByteArrayOutputStream
@@ -139,6 +153,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
   private List<SubController> subControllers() {
     return List.of(effectsController, objController, imageController, generalController);
+  }
+
+  private void updateSliderUnits(Slider slider) {
+    slider.setBlockIncrement(BLOCK_INCREMENT * (slider.getMax() - slider.getMin()));
+    slider.setMajorTickUnit(Math.max(sh.ball.math.Math.EPSILON, MAJOR_TICK_UNIT * (slider.getMax() - slider.getMin())));
   }
 
   @Override
@@ -236,6 +255,28 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     midiChannelSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(0, MidiNote.MAX_CHANNEL));
     midiChannelSpinner.getEditor().setTextFormatter(new TextFormatter<>(new IntegerStringConverter(), 0, filter));
     midiChannelSpinner.valueProperty().addListener((o, oldValue, newValue) -> audioPlayer.setMainMidiChannel(newValue));
+
+    List<PrintableSlider> printableSliders = new ArrayList<>();
+    sliders.forEach(slider -> printableSliders.add(new PrintableSlider(slider)));
+    sliderComboBox.setItems(FXCollections.observableList(printableSliders));
+    sliderComboBox.valueProperty().addListener((e, old, slider) -> {
+      sliderMinTextField.setText(FORMAT.format(slider.slider.getMin()));
+      sliderMaxTextField.setText(FORMAT.format(slider.slider.getMax()));
+    });
+    sliderComboBox.setValue(printableSliders.get(0));
+
+    sliderMinTextField.textProperty().addListener((e, old, text) -> {
+      if (parseable(text)) {
+        sliderComboBox.getValue().slider.setMin(Double.parseDouble(text));
+        updateSliderUnits(sliderComboBox.getValue().slider);
+      }
+    });
+    sliderMaxTextField.textProperty().addListener((e, old, text) -> {
+      if (parseable(text)) {
+        sliderComboBox.getValue().slider.setMax(Double.parseDouble(text));
+        updateSliderUnits(sliderComboBox.getValue().slider);
+      }
+    });
 
     objController.updateObjectRotateSpeed();
 
@@ -737,5 +778,23 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         }
       }
     });
+  }
+
+  private record PrintableSlider(Slider slider) {
+    @Override
+    public String toString() {
+      // from https://stackoverflow.com/a/2560017/9707097
+      String humanReadable = slider.getId()
+        .replaceFirst("Slider$", "")
+        .replaceAll(
+          String.format("%s|%s|%s",
+            "(?<=[A-Z])(?=[A-Z][a-z])",
+            "(?<=[^A-Z])(?=[A-Z])",
+            "(?<=[A-Za-z])(?=[^A-Za-z])"
+          ),
+          " "
+      );
+      return humanReadable.substring(0, 1).toUpperCase() + humanReadable.substring(1);
+    }
   }
 }

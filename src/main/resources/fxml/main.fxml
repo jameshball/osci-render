@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.CustomMenuItem?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Menu?>
 <?import javafx.scene.control.MenuBar?>
 <?import javafx.scene.control.MenuItem?>
 <?import javafx.scene.control.Spinner?>
+<?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.TitledPane?>
 <?import javafx.scene.input.KeyCodeCombination?>
 <?import javafx.scene.layout.AnchorPane?>
@@ -66,5 +68,18 @@
    </TitledPane>
    <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="7.0" layoutY="444.0" prefHeight="207.0" prefWidth="411.0" text="3D .obj file settings">
       <fx:include fx:id="obj" source="obj.fxml" />
+   </TitledPane>
+   <TitledPane animated="false" collapsible="false" layoutX="7.0" layoutY="658.0" prefHeight="122.0" prefWidth="411.0" text="Slider settings">
+     <content>
+       <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="322.0">
+            <children>
+               <TextField fx:id="sliderMinTextField" layoutX="48.0" layoutY="53.0" prefHeight="26.0" prefWidth="70.0" text="0.0" />
+               <Label layoutX="14.0" layoutY="56.0" text="min :" />
+               <Label layoutX="133.0" layoutY="56.0" text="max :" />
+               <TextField fx:id="sliderMaxTextField" layoutX="168.0" layoutY="53.0" prefHeight="26.0" prefWidth="69.0" text="0.0" />
+               <ComboBox fx:id="sliderComboBox" layoutX="14.0" layoutY="12.0" prefHeight="30.0" prefWidth="376.0" />
+            </children>
+         </AnchorPane>
+     </content>
    </TitledPane>
 </AnchorPane>
