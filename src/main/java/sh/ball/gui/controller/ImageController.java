@@ -34,8 +34,6 @@ public class ImageController implements Initializable, SubController {
   private static final double MAX_FREQUENCY = 12000;
   private static final int DEFAULT_SAMPLE_RATE = 192000;
   private static final double SCROLL_DELTA = 0.05;
-  // need a set a locale, otherwise there is inconsistent casting to/from doubles/strings
-  private static final DecimalFormat df = new DecimalFormat("0.00", new DecimalFormatSymbols(Locale.UK));
 
   private final RotateEffect rotateEffect;
   private final TranslateEffect translateEffect;
@@ -100,8 +98,8 @@ public class ImageController implements Initializable, SubController {
   }
 
   public void setTranslation(Vector2 translation) {
-    translationXTextField.setText(df.format(translation.getX()));
-    translationYTextField.setText(df.format(translation.getY()));
+    translationXTextField.setText(MainController.FORMAT.format(translation.getX()));
+    translationYTextField.setText(MainController.FORMAT.format(translation.getY()));
   }
 
   // changes the sinusoidal translation of the image rendered
@@ -115,7 +113,7 @@ public class ImageController implements Initializable, SubController {
   private void changeTranslation(boolean increase, TextField field) {
     double old = tryParse(field.getText());
     double delta = increase ? SCROLL_DELTA : -SCROLL_DELTA;
-    field.setText(df.format(old + delta));
+    field.setText(MainController.FORMAT.format(old + delta));
   }
 
   public boolean mouseTranslate() {
