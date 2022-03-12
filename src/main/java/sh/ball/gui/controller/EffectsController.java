@@ -32,7 +32,8 @@ public class EffectsController implements Initializable, SubController {
 
   private final WobbleEffect wobbleEffect;
   private final EffectAnimator wobbleAnimator;
-  private final EffectAnimator traceAnimator;
+  private final EffectAnimator traceMinAnimator;
+  private final EffectAnimator traceMaxAnimator;
   private final EffectAnimator vectorCancellingAnimator;
   private final EffectAnimator bitCrushAnimator;
   private final EffectAnimator smoothingAnimator;
@@ -100,20 +101,31 @@ public class EffectsController implements Initializable, SubController {
   @FXML
   private CheckBox smoothingMic;
   @FXML
-  private CheckBox traceCheckBox;
+  private CheckBox traceMinCheckBox;
   @FXML
-  private Slider traceSlider;
+  private Slider traceMinSlider;
   @FXML
-  private SVGPath traceMidi;
+  private SVGPath traceMinMidi;
   @FXML
-  private ComboBox<AnimationType> traceComboBox;
+  private ComboBox<AnimationType> traceMinComboBox;
   @FXML
-  private CheckBox traceMic;
+  private CheckBox traceMinMic;
+  @FXML
+  private CheckBox traceMaxCheckBox;
+  @FXML
+  private Slider traceMaxSlider;
+  @FXML
+  private SVGPath traceMaxMidi;
+  @FXML
+  private ComboBox<AnimationType> traceMaxComboBox;
+  @FXML
+  private CheckBox traceMaxMic;
 
   public EffectsController() {
     this.wobbleEffect = new WobbleEffect(DEFAULT_SAMPLE_RATE);
     this.wobbleAnimator = new EffectAnimator(DEFAULT_SAMPLE_RATE, wobbleEffect);
-    this.traceAnimator = new EffectAnimator(DEFAULT_SAMPLE_RATE, new TraceEffect(audioPlayer));
+    this.traceMinAnimator = new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(audioPlayer::setTraceMin));
+    this.traceMaxAnimator = new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(audioPlayer::setTraceMax));
     this.vectorCancellingAnimator = new EffectAnimator(DEFAULT_SAMPLE_RATE, new VectorCancellingEffect());
     this.bitCrushAnimator = new EffectAnimator(DEFAULT_SAMPLE_RATE, new BitCrushEffect());
     this.smoothingAnimator = new EffectAnimator(DEFAULT_SAMPLE_RATE, new SmoothEffect(1));
@@ -128,7 +140,8 @@ public class EffectsController implements Initializable, SubController {
       bitCrushMidi, bitCrushSlider,
       wobbleMidi, wobbleSlider,
       smoothingMidi, smoothingSlider,
-      traceMidi, traceSlider,
+      traceMinMidi, traceMinSlider,
+      traceMaxMidi, traceMaxSlider,
       verticalDistortMidi, verticalDistortSlider,
       horizontalDistortMidi, horizontalDistortSlider
     );
@@ -140,7 +153,8 @@ public class EffectsController implements Initializable, SubController {
       bitCrushComboBox, bitCrushAnimator,
       wobbleComboBox, wobbleAnimator,
       smoothingComboBox, smoothingAnimator,
-      traceComboBox, traceAnimator,
+      traceMinComboBox, traceMinAnimator,
+      traceMaxComboBox, traceMaxAnimator,
       verticalDistortComboBox, verticalDistortAnimator,
       horizontalDistortComboBox, horizontalDistortAnimator
     );
@@ -162,8 +176,10 @@ public class EffectsController implements Initializable, SubController {
       wobbleSlider,
       EffectType.SMOOTH,
       smoothingSlider,
-      EffectType.TRACE,
-      traceSlider
+      EffectType.TRACE_MIN,
+      traceMinSlider,
+      EffectType.TRACE_MAX,
+      traceMaxSlider
     );
   }
 
@@ -220,8 +236,10 @@ public class EffectsController implements Initializable, SubController {
       updateEffect(EffectType.SMOOTH, smoothingCheckBox.isSelected(), smoothingAnimator, smoothingSlider.getValue());
     InvalidationListener vectorCancellingListener = e ->
       updateEffect(EffectType.VECTOR_CANCELLING, vectorCancellingCheckBox.isSelected(), vectorCancellingAnimator, vectorCancellingSlider.getValue());
-    InvalidationListener traceListener = e ->
-      updateEffect(EffectType.TRACE, traceCheckBox.isSelected(), traceAnimator, traceSlider.getValue());
+    InvalidationListener traceMinListener = e ->
+      updateEffect(EffectType.TRACE_MIN, traceMinCheckBox.isSelected(), traceMinAnimator, traceMinSlider.getValue());
+    InvalidationListener traceMaxListener = e ->
+      updateEffect(EffectType.TRACE_MAX, traceMaxCheckBox.isSelected(), traceMaxAnimator, traceMaxSlider.getValue());
 
     vectorCancellingSlider.valueProperty().addListener(vectorCancellingListener);
     vectorCancellingCheckBox.selectedProperty().addListener(vectorCancellingListener);
@@ -242,13 +260,23 @@ public class EffectsController implements Initializable, SubController {
     smoothingSlider.valueProperty().addListener(smoothListener);
     smoothingCheckBox.selectedProperty().addListener(smoothListener);
 
-    traceSlider.valueProperty().addListener(traceListener);
-    traceCheckBox.selectedProperty().addListener(traceListener);
-    traceCheckBox.selectedProperty().addListener((e, old, selected) -> {
+    traceMinSlider.valueProperty().addListener(traceMinListener);
+    traceMinCheckBox.selectedProperty().addListener(traceMinListener);
+    traceMinCheckBox.selectedProperty().addListener((e, old, selected) -> {
       if (selected) {
-        traceAnimator.setValue(traceSlider.getValue());
+        traceMinAnimator.setValue(traceMinSlider.getValue());
       } else {
-        traceAnimator.setValue(1.0);
+        traceMinAnimator.setValue(0.0);
+      }
+    });
+
+    traceMaxSlider.valueProperty().addListener(traceMaxListener);
+    traceMaxCheckBox.selectedProperty().addListener(traceMaxListener);
+    traceMaxCheckBox.selectedProperty().addListener((e, old, selected) -> {
+      if (selected) {
+        traceMaxAnimator.setValue(traceMaxSlider.getValue());
+      } else {
+        traceMaxAnimator.setValue(1.0);
       }
     });
 
@@ -278,26 +306,28 @@ public class EffectsController implements Initializable, SubController {
   }
   private List<CheckBox> checkBoxes() {
     return List.of(vectorCancellingCheckBox, bitCrushCheckBox, verticalDistortCheckBox,
-      horizontalDistortCheckBox, wobbleCheckBox, smoothingCheckBox, traceCheckBox);
+      horizontalDistortCheckBox, wobbleCheckBox, smoothingCheckBox, traceMinCheckBox,
+      traceMaxCheckBox);
   }
   private List<EffectAnimator> animators() {
     return List.of(vectorCancellingAnimator, bitCrushAnimator, verticalDistortAnimator,
-      horizontalDistortAnimator, wobbleAnimator, smoothingAnimator, traceAnimator);
+      horizontalDistortAnimator, wobbleAnimator, smoothingAnimator, traceMinAnimator,
+      traceMaxAnimator);
   }
   @Override
   public List<CheckBox> micCheckBoxes() {
     return List.of(vectorCancellingMic, bitCrushMic, verticalDistortMic, horizontalDistortMic,
-      wobbleMic, smoothingMic, traceMic);
+      wobbleMic, smoothingMic, traceMinMic, traceMaxMic);
   }
   @Override
   public List<Slider> sliders() {
     return List.of(vectorCancellingSlider, bitCrushSlider, verticalDistortSlider,
-      horizontalDistortSlider, wobbleSlider, smoothingSlider, traceSlider);
+      horizontalDistortSlider, wobbleSlider, smoothingSlider, traceMinSlider, traceMaxSlider);
   }
   @Override
   public List<String> labels() {
     return List.of("vectorCancelling", "bitCrush", "verticalDistort", "horizontalDistort",
-      "wobble", "smooth", "trace");
+      "wobble", "smooth", "traceMin", "traceMax");
   }
 
   @Override
