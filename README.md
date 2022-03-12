@@ -34,11 +34,7 @@ Send an email to [james@ball.sh](mailto:james@ball.sh) if you have any issues, f
 - Show current frequency of audio
 - MIDI control!
 - Frequency control
-
-## Proposed Features
-
-- Support rendering of multiple objects
-- (long term) Keyframing/animating objects and camera
+- Animating image effects
 
 ## Screenshots
 
@@ -52,15 +48,15 @@ By default, the program loads the example cube object. If this is working, you'r
 
 Control the output using the sliders and text boxes provided. Currently the following can be controlled:
 
-- Translation and speed of translation of the output
+- Translation and speed of translation
 - Weight of the lines drawn
 - Rotation speed
-- Scale of the image
+- Volume/scale of the image
+- Frequency
 
 There are some additional controls for `.obj` files:
 
 - Focal length of camera
-- Position of camera
 - Rotation speed
 - Rotation direction
 
