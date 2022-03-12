@@ -359,6 +359,11 @@ public class EffectsController implements Initializable, SubController {
     List<String> labels = labels();
     for (int i = 0; i < checkBoxes.size(); i++) {
       Element checkBox = (Element) element.getElementsByTagName(labels.get(i)).item(0);
+      // backwards compatibility
+      if (checkBox == null) {
+        checkBoxes.get(i).setSelected(false);
+        continue;
+      }
       String selected;
       // backwards compatibility
       if (checkBox.getElementsByTagName("selected").getLength() > 0) {

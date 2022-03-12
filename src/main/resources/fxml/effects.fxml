@@ -26,11 +26,11 @@
         <CheckBox fx:id="smoothingCheckBox" layoutX="14.0" layoutY="220.0" mnemonicParsing="false" text="Smoothing" />
         <Slider fx:id="smoothingSlider" blockIncrement="0.005" disable="true" layoutX="154.0" layoutY="222.0" majorTickUnit="0.1" max="1.0" minorTickCount="1" prefHeight="38.0" prefWidth="219.0" showTickLabels="true" showTickMarks="true" value="0.125" />
         <SVGPath fx:id="smoothingMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="373.0" layoutY="218.0" pickOnBounds="true" />
-        <CheckBox fx:id="traceMaxCheckBox" layoutX="15.0" layoutY="302.0" mnemonicParsing="false" text="Trace Max" />
-        <Slider fx:id="traceMaxSlider" blockIncrement="0.005" disable="true" layoutX="155.0" layoutY="304.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="219.0" showTickLabels="true" showTickMarks="true" value="0.5" />
-        <SVGPath fx:id="traceMaxMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="374.0" layoutY="300.0" pickOnBounds="true" />
+        <CheckBox fx:id="traceMaxCheckBox" layoutX="15.0" layoutY="300.0" mnemonicParsing="false" text="Trace Max" />
+        <Slider fx:id="traceMaxSlider" blockIncrement="0.005" disable="true" layoutX="155.0" layoutY="302.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="219.0" showTickLabels="true" showTickMarks="true" value="0.5" />
+        <SVGPath fx:id="traceMaxMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="374.0" layoutY="298.0" pickOnBounds="true" />
       <ComboBox fx:id="wobbleComboBox" layoutX="404.0" layoutY="175.0" prefHeight="26.0" prefWidth="102.0" />
-      <ComboBox fx:id="traceMaxComboBox" layoutX="405.0" layoutY="297.0" prefHeight="26.0" prefWidth="102.0" />
+      <ComboBox fx:id="traceMaxComboBox" layoutX="405.0" layoutY="295.0" prefHeight="26.0" prefWidth="102.0" />
       <ComboBox fx:id="smoothingComboBox" layoutX="404.0" layoutY="215.0" prefHeight="26.0" prefWidth="102.0" />
       <ComboBox fx:id="horizontalDistortComboBox" layoutX="404.0" layoutY="133.0" prefHeight="26.0" prefWidth="102.0" />
       <ComboBox fx:id="verticalDistortComboBox" layoutX="404.0" layoutY="91.0" prefHeight="26.0" prefWidth="102.0" />
@@ -42,7 +42,7 @@
       <CheckBox fx:id="horizontalDistortMic" layoutX="517.0" layoutY="137.0" mnemonicParsing="false" text="Mic" />
       <CheckBox fx:id="wobbleMic" layoutX="517.0" layoutY="179.0" mnemonicParsing="false" text="Mic" />
       <CheckBox fx:id="smoothingMic" layoutX="517.0" layoutY="219.0" mnemonicParsing="false" text="Mic" />
-      <CheckBox fx:id="traceMaxMic" layoutX="518.0" layoutY="301.0" mnemonicParsing="false" text="Mic" />
+      <CheckBox fx:id="traceMaxMic" layoutX="518.0" layoutY="299.0" mnemonicParsing="false" text="Mic" />
       <CheckBox fx:id="traceMinCheckBox" layoutX="15.0" layoutY="260.0" mnemonicParsing="false" text="Trace Min" />
       <Slider fx:id="traceMinSlider" blockIncrement="0.005" disable="true" layoutX="155.0" layoutY="262.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="219.0" showTickLabels="true" showTickMarks="true" value="0.5" />
       <SVGPath fx:id="traceMinMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="374.0" layoutY="258.0" pickOnBounds="true" />

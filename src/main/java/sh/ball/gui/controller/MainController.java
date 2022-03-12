@@ -557,9 +557,21 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private void appendSliders(List<Slider> sliders, List<String> labels, Element root, Document document) {
     for (int i = 0; i < sliders.size(); i++) {
       Element sliderElement = document.createElement(labels.get(i));
-      sliderElement.appendChild(
+      Element value = document.createElement("value");
+      Element min = document.createElement("min");
+      Element max = document.createElement("max");
+      value.appendChild(
         document.createTextNode(sliders.get(i).valueProperty().getValue().toString())
       );
+      min.appendChild(
+        document.createTextNode(sliders.get(i).minProperty().getValue().toString())
+      );
+      max.appendChild(
+        document.createTextNode(sliders.get(i).maxProperty().getValue().toString())
+      );
+      sliderElement.appendChild(value);
+      sliderElement.appendChild(min);
+      sliderElement.appendChild(max);
       root.appendChild(sliderElement);
     }
   }
@@ -569,11 +581,28 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       NodeList nodes = root.getElementsByTagName(labels.get(i));
       // backwards compatibility
       if (nodes.getLength() > 0) {
-        String value = nodes.item(0).getTextContent();
-        sliders.get(i).setValue(Float.parseFloat(value));
-        targetSliderValue[i] = Float.parseFloat(value);
+        Element sliderElement = (Element) nodes.item(0);
+        Slider slider = sliders.get(i);
+        String value;
+        // backwards compatibility
+        if (sliderElement.getChildNodes().getLength() == 1) {
+          value = sliderElement.getTextContent();
+        } else {
+          value = sliderElement.getElementsByTagName("value").item(0).getTextContent();
+          String min = sliderElement.getElementsByTagName("min").item(0).getTextContent();
+          String max = sliderElement.getElementsByTagName("max").item(0).getTextContent();
+          slider.setMin(Double.parseDouble(min));
+          slider.setMax(Double.parseDouble(max));
+          updateSliderUnits(slider);
+        }
+
+        slider.setValue(Double.parseDouble(value));
+        targetSliderValue[i] = Double.parseDouble(value);
       }
     }
+
+    sliderMinTextField.setText(String.valueOf(sliderComboBox.getValue().slider.getMin()));
+    sliderMaxTextField.setText(String.valueOf(sliderComboBox.getValue().slider.getMax()));
   }
 
   private void appendMicCheckBoxes(List<CheckBox> checkBoxes, List<String> labels, Element root, Document document) {
