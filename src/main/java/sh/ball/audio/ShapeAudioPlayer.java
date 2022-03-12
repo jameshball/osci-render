@@ -22,8 +22,6 @@ import javax.sound.midi.ShortMessage;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 
-import static sh.ball.gui.Gui.audioPlayer;
-
 public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
   private static final double MIN_TRACE = 0.001;
@@ -75,7 +73,8 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private DoubleProperty frequency;
   private double baseFrequencyVolumeScale = 0.5;
   private double baseFrequency;
-  private double trace = 1;
+  private double traceMin = 0;
+  private double traceMax = 1;
   private int octave = 0;
   private int sampleRate;
 
@@ -125,22 +124,11 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     this.volume = volume;
   }
 
-  private Vector2 generateChannels() throws InterruptedException {
-    Shape shape = getCurrentShape();
+  private void incrementShapeDrawing() {
+    double length = getCurrentShape().getLength();
 
-    double length = shape.getLength();
-    double drawingProgress = length == 0 ? 1 : shapeDrawn / length;
-    Vector2 nextVector = applyEffects(count, shape.nextVector(drawingProgress));
-
-    Vector2 channels = cutoff(nextVector);
-    writeChannels((float) channels.getX(), (float) channels.getY());
-
-    shapeDrawn += lengthIncrement;
     frameDrawn += lengthIncrement;
-
-    if (++count > MAX_COUNT) {
-      count = 0;
-    }
+    shapeDrawn += lengthIncrement;
 
     // Need to skip all shapes that the lengthIncrement draws over.
     // This is especially an issue when there are lots of small lines being
@@ -154,8 +142,25 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
       }
       length = getCurrentShape().getLength();
     }
+  }
 
-    double proportionalLength = trace * frameLength;
+  private Vector2 generateChannels() throws InterruptedException {
+    Shape shape = getCurrentShape();
+
+    double length = shape.getLength();
+    double drawingProgress = length == 0 ? 1 : shapeDrawn / length;
+    Vector2 nextVector = applyEffects(count, shape.nextVector(drawingProgress));
+
+    Vector2 channels = cutoff(nextVector);
+    writeChannels((float) channels.getX(), (float) channels.getY());
+
+    if (++count > MAX_COUNT) {
+      count = 0;
+    }
+
+    incrementShapeDrawing();
+
+    double proportionalLength = traceMax * frameLength;
 
     if (currentShape >= frame.size() || frameDrawn > proportionalLength) {
       currentShape = 0;
@@ -163,6 +168,10 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
       frameLength = Shape.totalLength(frame);
       shapeDrawn = 0;
       frameDrawn = 0;
+
+      while (frameDrawn < traceMin * frameLength) {
+        incrementShapeDrawing();
+      }
     }
 
     updateLengthIncrement();
@@ -294,7 +303,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
   private void updateLengthIncrement() {
     if (frame != null) {
-      double proportionalLength = trace * frameLength;
+      double proportionalLength = (traceMax - traceMin) * frameLength;
       int sampleRate = device.sampleRate();
       double actualFrequency = octaveFrequency * pitchBends[mainChannel];
       lengthIncrement = Math.max(proportionalLength / (sampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
@@ -485,8 +494,12 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
   }
 
-  public void setTrace(double trace) {
-    this.trace = Math.max(MIN_TRACE, Math.min(trace, 1));
+  public void setTraceMin(double traceMin) {
+    this.traceMin = Math.max(MIN_TRACE, Math.min(traceMin, traceMax - MIN_TRACE));
+  }
+
+  public void setTraceMax(double traceMax) {
+    this.traceMax = Math.max(traceMin + MIN_TRACE, Math.min(traceMax, 1));
   }
 
   @Override
