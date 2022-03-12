@@ -35,7 +35,7 @@ public class EffectsController implements Initializable, SubController {
   private final EffectAnimator traceAnimator;
   private final EffectAnimator vectorCancellingAnimator;
   private final EffectAnimator bitCrushAnimator;
-  private final EffectAnimator smoothAnimator;
+  private final EffectAnimator smoothingAnimator;
   private final EffectAnimator verticalDistortAnimator;
   private final EffectAnimator horizontalDistortAnimator;
 
@@ -116,7 +116,7 @@ public class EffectsController implements Initializable, SubController {
     this.traceAnimator = new EffectAnimator(DEFAULT_SAMPLE_RATE, new TraceEffect(audioPlayer));
     this.vectorCancellingAnimator = new EffectAnimator(DEFAULT_SAMPLE_RATE, new VectorCancellingEffect());
     this.bitCrushAnimator = new EffectAnimator(DEFAULT_SAMPLE_RATE, new BitCrushEffect());
-    this.smoothAnimator = new EffectAnimator(DEFAULT_SAMPLE_RATE, new SmoothEffect(1));
+    this.smoothingAnimator = new EffectAnimator(DEFAULT_SAMPLE_RATE, new SmoothEffect(1));
     this.verticalDistortAnimator = new EffectAnimator(DEFAULT_SAMPLE_RATE, new VerticalDistortEffect(0.2));
     this.horizontalDistortAnimator = new EffectAnimator(DEFAULT_SAMPLE_RATE, new HorizontalDistortEffect(0.2));
   }
@@ -139,7 +139,7 @@ public class EffectsController implements Initializable, SubController {
       vectorCancellingComboBox, vectorCancellingAnimator,
       bitCrushComboBox, bitCrushAnimator,
       wobbleComboBox, wobbleAnimator,
-      smoothingComboBox, smoothAnimator,
+      smoothingComboBox, smoothingAnimator,
       traceComboBox, traceAnimator,
       verticalDistortComboBox, verticalDistortAnimator,
       horizontalDistortComboBox, horizontalDistortAnimator
@@ -217,7 +217,7 @@ public class EffectsController implements Initializable, SubController {
     InvalidationListener wobbleListener = e ->
       updateEffect(EffectType.WOBBLE, wobbleCheckBox.isSelected(), wobbleAnimator, wobbleSlider.getValue());
     InvalidationListener smoothListener = e ->
-      updateEffect(EffectType.SMOOTH, smoothingCheckBox.isSelected(), smoothAnimator, smoothingSlider.getValue());
+      updateEffect(EffectType.SMOOTH, smoothingCheckBox.isSelected(), smoothingAnimator, smoothingSlider.getValue());
     InvalidationListener vectorCancellingListener = e ->
       updateEffect(EffectType.VECTOR_CANCELLING, vectorCancellingCheckBox.isSelected(), vectorCancellingAnimator, vectorCancellingSlider.getValue());
     InvalidationListener traceListener = e ->
@@ -261,6 +261,16 @@ public class EffectsController implements Initializable, SubController {
         entry.getValue().setAnimation(animationType);
       });
     }
+
+    List<EffectAnimator> animators = animators();
+    List<Slider> sliders = sliders();
+    for (int i = 0; i < sliders.size(); i++) {
+      int finalI = i;
+      sliders.get(i).minProperty().addListener((e, old, min) ->
+        animators.get(finalI).setMin(min.doubleValue()));
+      sliders.get(i).maxProperty().addListener((e, old, max) ->
+        animators.get(finalI).setMax(max.doubleValue()));
+    }
   }
 
   private List<ComboBox<AnimationType>> comboBoxes() {
@@ -269,6 +279,10 @@ public class EffectsController implements Initializable, SubController {
   private List<CheckBox> checkBoxes() {
     return List.of(vectorCancellingCheckBox, bitCrushCheckBox, verticalDistortCheckBox,
       horizontalDistortCheckBox, wobbleCheckBox, smoothingCheckBox, traceCheckBox);
+  }
+  private List<EffectAnimator> animators() {
+    return List.of(vectorCancellingAnimator, bitCrushAnimator, verticalDistortAnimator,
+      horizontalDistortAnimator, wobbleAnimator, smoothingAnimator, traceAnimator);
   }
   @Override
   public List<CheckBox> micCheckBoxes() {
