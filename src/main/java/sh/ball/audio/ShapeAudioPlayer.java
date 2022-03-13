@@ -7,6 +7,7 @@ import sh.ball.audio.effect.Effect;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import sh.ball.audio.effect.PhaseEffect;
 import sh.ball.audio.effect.SineEffect;
@@ -39,11 +40,13 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   // MIDI
   private final short[][] keyTargetVolumes = new short[MidiNote.NUM_CHANNELS][128];
   private final short[][] keyActualVolumes = new short[MidiNote.NUM_CHANNELS][128];
-  private final Set<MidiNote> keysDown = ConcurrentHashMap.newKeySet();
+  private final AtomicInteger numKeysDown = new AtomicInteger(1);
+  private final MidiNote[][] keysDown = new MidiNote[MidiNote.NUM_CHANNELS][128];
+  private final SineEffect[][] sineEffects = new SineEffect[MidiNote.NUM_CHANNELS][128];
   private boolean midiStarted = false;
   private int mainChannel = 0;
   private MidiNote baseNote = new MidiNote(60, mainChannel);
-  private double[] pitchBends = new double[MidiNote.NUM_CHANNELS];
+  private final double[] pitchBends = new double[MidiNote.NUM_CHANNELS];
   private int lastDecay = 0;
   private double decaySeconds = 0.2;
   private int decayFrames;
@@ -54,7 +57,6 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private final Callable<AudioEngine> audioEngineBuilder;
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
   private final Map<Object, Effect> effects = new ConcurrentHashMap<>();
-  private final Map<MidiNote, SineEffect> sineEffects = new ConcurrentHashMap<>();
   private final List<Listener> listeners = new CopyOnWriteArrayList<>();
 
   private AudioEngine audioEngine;
@@ -91,27 +93,28 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   public boolean midiPlaying() {
-    return keysDown.size() > 0;
+    return numKeysDown.get() > 0;
   }
 
   public void resetMidi() {
-    keysDown.clear();
-    for (int i = 0; i < keyTargetVolumes.length; i++) {
+    for (int i = 0; i < MidiNote.NUM_CHANNELS; i++) {
+      Arrays.fill(keysDown[i], null);
       Arrays.fill(keyTargetVolumes[i], (short) 0);
       Arrays.fill(keyActualVolumes[i], (short) 0);
     }
     // Middle C is down by default
     keyTargetVolumes[0][60] = (short) MidiNote.MAX_VELOCITY;
     keyActualVolumes[0][60] = (short) MidiNote.MAX_VELOCITY;
-    keysDown.add(new MidiNote(60));
+    MidiNote note = new MidiNote(60);
+    keysDown[note.channel()][note.key()] = note;
     midiStarted = false;
     notesChanged();
   }
 
   public void stopMidiNotes() {
-    keysDown.clear();
-    for (short[] keyTargetVolume : keyTargetVolumes) {
-      Arrays.fill(keyTargetVolume, (short) 0);
+    for (int i = 0; i < MidiNote.NUM_CHANNELS; i++) {
+      Arrays.fill(keysDown[i], null);
+      Arrays.fill(keyTargetVolumes[i], (short) 0);
     }
   }
 
@@ -245,9 +248,11 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
         lastAttack = 0;
       }
       lastAttack++;
-      for (MidiNote note : keysDown) {
-        if (!note.equals(baseNote)) {
-          vector = sineEffects.get(note).apply(frame, vector);
+      for (int channel = 0; channel < keysDown.length; channel++) {
+        for (int key = 0; key < keysDown[0].length; key++) {
+          if (keysDown[channel][key] != null && !keysDown[channel][key].equals(baseNote)) {
+            vector = sineEffects[channel][key].apply(frame, vector);
+          }
         }
       }
     }
@@ -405,12 +410,14 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   @Override
   public void setDevice(AudioDevice device) {
     this.device = device;
-    sineEffects.clear();
+    for (int i = 0; i < MidiNote.NUM_CHANNELS; i++) {
+      Arrays.fill(sineEffects[i], null);
+    }
     this.sampleRate = device.sampleRate();
     for (int channel = 0; channel < keyActualVolumes.length; channel++) {
       for (int key = 0; key < keyActualVolumes[channel].length; key++) {
         MidiNote note = new MidiNote(key, channel);
-        sineEffects.put(note, new SineEffect(sampleRate, note.frequency(), keyActualVolumes[channel][key] / MidiNote.MAX_VELOCITY));
+        sineEffects[channel][key] = new SineEffect(sampleRate, note.frequency(), keyActualVolumes[channel][key] / MidiNote.MAX_VELOCITY);
       }
     }
     for (Effect effect : effects.values()) {
@@ -471,10 +478,12 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
       for (int channel = 0; channel < keyActualVolumes.length; channel++) {
         for (int key = 0; key < keyActualVolumes[channel].length; key++) {
           MidiNote note = new MidiNote(key, channel);
-          if (keyActualVolumes[channel][key] > 0 && sineEffects.size() != 0) {
-            SineEffect effect = sineEffects.get(note);
-            effect.setVolume(scaledVolume * keyActualVolumes[channel][key] / MidiNote.MAX_VELOCITY);
-            effect.setFrequency(note.frequency() * pitchBends[channel]);
+          if (keyActualVolumes[channel][key] > 0) {
+            SineEffect effect = sineEffects[channel][key];
+            if (effect != null) {
+              effect.setVolume(scaledVolume * keyActualVolumes[channel][key] / MidiNote.MAX_VELOCITY);
+              effect.setFrequency(note.frequency() * pitchBends[channel]);
+            }
           }
         }
       }
@@ -520,10 +529,12 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
       if (command == ShortMessage.NOTE_OFF || velocity == 0) {
         keyTargetVolumes[note.channel()][note.key()] = 0;
-        keysDown.remove(note);
+        keysDown[note.channel()][note.key()] = null;
+        numKeysDown.getAndDecrement();
       } else {
         keyTargetVolumes[note.channel()][note.key()] = (short) velocity;
-        keysDown.add(note);
+        keysDown[note.channel()][note.key()] = note;
+        numKeysDown.getAndIncrement();
       }
       notesChanged();
     } else if (command == ShortMessage.PITCH_BEND) {

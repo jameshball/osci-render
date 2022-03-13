@@ -9,6 +9,7 @@ public class EffectAnimator extends PhaseEffect implements SettableEffect {
   private final SettableEffect effect;
 
   private AnimationType type = AnimationType.STATIC;
+  private boolean justSetToStatic = true;
   private double targetValue = 0.5;
   private double actualValue = 0.5;
   private boolean linearDirection = true;
@@ -29,6 +30,9 @@ public class EffectAnimator extends PhaseEffect implements SettableEffect {
   public void setAnimation(AnimationType type) {
     this.type = type;
     this.linearDirection = true;
+    if (type == AnimationType.STATIC) {
+      justSetToStatic = true;
+    }
   }
 
   public void setMin(double min) {
@@ -50,7 +54,14 @@ public class EffectAnimator extends PhaseEffect implements SettableEffect {
     double normalisedTargetValue = (targetValue - minValue) / range;
     double normalisedActualValue = (actualValue - minValue) / range;
     switch (type) {
-      case STATIC -> actualValue = targetValue;
+      case STATIC -> {
+        if (justSetToStatic) {
+          actualValue = targetValue;
+          justSetToStatic = false;
+          effect.setValue(actualValue);
+        }
+        return effect.apply(count, vector);
+      }
       case SEESAW -> {
         double scalar = 10 * Math.max(Math.min(normalisedActualValue, 1 - normalisedActualValue), 0.01);
         double change = range * scalar * SPEED_SCALE * normalisedTargetValue / sampleRate;

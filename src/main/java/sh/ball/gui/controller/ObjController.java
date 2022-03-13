@@ -60,8 +60,9 @@ public class ObjController implements Initializable, SubController {
 
   // changes the rotateSpeed of the FrameProducer
   public void setObjectRotateSpeed(double rotateSpeed) {
+    double actualSpeed = (Math.exp(3 * Math.min(10, Math.abs(rotateSpeed))) - 1) / 50;
     producer.setFrameSettings(
-      ObjSettingsFactory.rotateSpeed((Math.exp(3 * rotateSpeed) - 1) / 50)
+      ObjSettingsFactory.rotateSpeed(rotateSpeed > 0 ? actualSpeed : -actualSpeed)
     );
   }
 

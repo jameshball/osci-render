@@ -7,56 +7,47 @@ import java.util.List;
 
 public class SmoothEffect implements SettableEffect {
 
-  private List<Vector2> window;
+  private static final int MAX_WINDOW_SIZE = 2048;
+
+  private final Vector2[] window;
   private int windowSize;
   private int head = 0;
 
   public SmoothEffect(int windowSize) {
     this.windowSize = windowSize <= 0 ? 1 : windowSize;
-    this.window = new ArrayList<>();
-    for (int i = 0; i < windowSize; i++) {
-      window.add(null);
-    }
+    this.window = new Vector2[MAX_WINDOW_SIZE];
   }
 
   @Override
   public synchronized void setValue(double value) {
     int windowSize = (int) (256 * value);
-    int oldWindowSize = this.windowSize;
-    this.windowSize = windowSize <= 0 ? 1 : windowSize;
-    List<Vector2> newWindow = new ArrayList<>();
-    for (int i = 0; i < this.windowSize; i++) {
-      newWindow.add(null);
-    }
-    for (int i = 0; i < Math.min(this.windowSize, oldWindowSize); i++) {
-      newWindow.set(i, window.get(head++));
-      if (head >= window.size()) {
-        head = 0;
-      }
-    }
-    head = 0;
-    window = newWindow;
+    this.windowSize = Math.max(1, Math.min(MAX_WINDOW_SIZE, windowSize));
   }
 
+  // could be made much more efficient by just subbing prev vector and adding
+  // new vector to the aggregate previous average
   @Override
   public synchronized Vector2 apply(int count, Vector2 vector) {
-    window.set(head, vector);
-    head++;
-    if (head >= windowSize) {
+    window[head++] = vector;
+    if (head >= MAX_WINDOW_SIZE) {
       head = 0;
     }
     double totalX = 0;
     double totalY = 0;
-    int size = 0;
-
-    for (Vector2 v : window) {
-      if (v != null) {
-        totalX += v.getX();
-        totalY += v.getY();
-        size++;
+    int newHead = head - 1;
+    for (int i = 0; i < windowSize; i++) {
+      if (newHead < 0) {
+        newHead = MAX_WINDOW_SIZE - 1;
       }
+
+      if (window[newHead] != null) {
+        totalX += window[newHead].getX();
+        totalY += window[newHead].getY();
+      }
+
+      newHead--;
     }
 
-    return new Vector2(totalX / size, totalY / size);
+    return new Vector2(totalX / windowSize, totalY / windowSize);
   }
 }

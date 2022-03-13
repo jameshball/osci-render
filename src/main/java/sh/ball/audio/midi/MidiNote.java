@@ -60,7 +60,7 @@ public class MidiNote {
 
   @Override
   public int hashCode() {
-    return Objects.hash(key, channel);
+    return (key << 16) + channel;
   }
 
   @Override
