@@ -2,6 +2,7 @@ package sh.ball.gui.controller;
 
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Slider;
 import javafx.scene.shape.SVGPath;
@@ -32,6 +33,8 @@ public class ObjController implements Initializable, SubController {
   private CheckBox objectRotateSpeedMic;
   @FXML
   private CheckBox rotateCheckBox;
+  @FXML
+  private Button resetObjectRotationButton;
 
   @Override
   public Map<SVGPath, Slider> getMidiButtonMap() {
@@ -96,6 +99,7 @@ public class ObjController implements Initializable, SubController {
     objectRotateSpeedSlider.valueProperty().addListener((source, oldValue, newValue) ->
       setObjectRotateSpeed(newValue.doubleValue())
     );
+    resetObjectRotationButton.setOnAction(e -> setObjRotate(new Vector3(2 * Math.PI, 2 * Math.PI, 0), new Vector3()));
   }
 
   @Override

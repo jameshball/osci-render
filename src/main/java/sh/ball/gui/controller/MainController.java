@@ -461,13 +461,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     imageController.disableMouseTranslate();
   }
 
-  // updates the 3D object base rotation angle
-  public void setObjRotate(Vector3 vector) {
-    objController.setObjRotate(vector);
-  }
-
   // updates the 3D object base and current rotation angle
-  protected void setObjRotate(Vector3 baseRotation, Vector3 currentRotation) {
+  public void setObjRotate(Vector3 baseRotation, Vector3 currentRotation) {
     objController.setObjRotate(baseRotation, currentRotation);
   }
 

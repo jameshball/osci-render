@@ -4,6 +4,7 @@ import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Slider;
 import javafx.scene.control.TextField;
@@ -84,6 +85,8 @@ public class ImageController implements Initializable, SubController {
   private SVGPath visibilityMidi;
   @FXML
   private CheckBox visibilityMic;
+  @FXML
+  private Button resetRotationButton;
 
   public ImageController() {
     this.frequency = new SimpleDoubleProperty(0);
@@ -139,6 +142,8 @@ public class ImageController implements Initializable, SubController {
         sliderMap.get(slider).accept(newValue.doubleValue())
       )
     );
+
+    resetRotationButton.setOnAction(e -> rotateEffect.resetTheta());
 
     translationXTextField.textProperty().addListener(e -> updateTranslation());
     translationXTextField.setOnScroll((e) -> changeTranslation(e.getDeltaY() > 0, translationXTextField));

@@ -15,12 +15,6 @@ public class RotateEffect extends PhaseEffect {
 
   @Override
   public Vector2 apply(int count, Vector2 vector) {
-    if (speed != 0) {
-      return vector.rotate(nextTheta());
-    }
-
-    resetTheta();
-
-    return vector;
+    return vector.rotate(nextTheta());
   }
 }
