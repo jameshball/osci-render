@@ -8,21 +8,15 @@ public final class Line extends Shape {
   private final Vector2 a;
   private final Vector2 b;
 
+  private double length = INVALID_LENGTH;
+
   public Line(Vector2 a, Vector2 b) {
     this.a = a;
     this.b = b;
-    this.length = calculateLength();
   }
 
   public Line(double x1, double y1, double x2, double y2) {
     this(new Vector2(x1, y1), new Vector2(x2, y2));
-  }
-
-  private double calculateLength() {
-    double ac = Math.abs(getY2() - getY1());
-    double cb = Math.abs(getX2() - getX1());
-
-    return Math.hypot(ac, cb);
   }
 
   @Override
@@ -33,6 +27,17 @@ public final class Line extends Shape {
   @Override
   public Line translate(Vector2 vector) {
     return new Line(a.translate(vector), b.translate(vector));
+  }
+
+  @Override
+  public double getLength() {
+    if (length == INVALID_LENGTH) {
+      double ac = Math.abs(getY2() - getY1());
+      double cb = Math.abs(getX2() - getX1());
+
+      length = Math.hypot(ac, cb);
+    }
+    return length;
   }
 
   @Override

@@ -8,7 +8,7 @@ import java.util.function.Function;
 
 public abstract class Shape {
 
-  protected double length;
+  protected static final double INVALID_LENGTH = -1;
 
   public abstract Vector2 nextVector(double drawingProgress);
 
@@ -20,9 +20,7 @@ public abstract class Shape {
 
   public abstract Shape translate(Vector2 vector);
 
-  public double getLength() {
-    return length;
-  }
+  public abstract double getLength();
 
   /* SHAPE HELPER FUNCTIONS */
 

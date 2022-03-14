@@ -44,13 +44,7 @@ public class WorldObject {
   }
 
   public List<Vector3> getVertexPath() {
-    List<Vector3> newVertices = new ArrayList<>();
-
-    for (Vector3 vertex : vertexPath) {
-      newVertices.add(vertex.rotate(rotation).add(position));
-    }
-
-    return newVertices;
+    return vertexPath;
   }
 
   public void getDrawPath(Set<Line3D> edges) {
@@ -89,6 +83,10 @@ public class WorldObject {
     }
   }
 
+  public Vector3 getRotation() {
+    return rotation;
+  }
+
   public void setRotation(Vector3 rotation) {
     this.rotation = rotation;
   }
@@ -103,6 +101,10 @@ public class WorldObject {
 
   public void move(Vector3 translation) {
     position = position.add(translation);
+  }
+
+  public Vector3 getPosition() {
+    return position;
   }
 
   public void resetPosition() {

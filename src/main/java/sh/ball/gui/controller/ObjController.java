@@ -124,11 +124,11 @@ public class ObjController implements Initializable, SubController {
   public Element save(Document document) {
     Element element = document.createElement("objectRotation");
     Element x = document.createElement("x");
-    x.appendChild(document.createTextNode(Double.toString(rotation.getX())));
+    x.appendChild(document.createTextNode(Double.toString(rotation.x)));
     Element y = document.createElement("y");
-    y.appendChild(document.createTextNode(Double.toString(rotation.getY())));
+    y.appendChild(document.createTextNode(Double.toString(rotation.y)));
     Element z = document.createElement("z");
-    z.appendChild(document.createTextNode(Double.toString(rotation.getZ())));
+    z.appendChild(document.createTextNode(Double.toString(rotation.z)));
     element.appendChild(x);
     element.appendChild(y);
     element.appendChild(z);
