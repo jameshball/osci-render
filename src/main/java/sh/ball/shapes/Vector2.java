@@ -83,6 +83,11 @@ public final class Vector2 extends Shape {
   }
 
   @Override
+  public double getLength() {
+    return 0;
+  }
+
+  @Override
   public boolean equals(Object obj) {
     if (this == obj) {
       return true;

@@ -7,13 +7,13 @@ public final class Ellipse extends Shape {
   private final double rotation;
   private final Vector2 position;
 
+  private double length = INVALID_LENGTH;
+
   public Ellipse(double a, double b, double rotation, Vector2 position) {
     this.a = a;
     this.b = b;
     this.rotation = rotation;
     this.position = position;
-    // Approximation of length.
-    this.length = 2 * Math.PI * Math.sqrt((a * a + b * b) / 2);
   }
 
   public Ellipse(double a, double b, Vector2 position) {
@@ -56,5 +56,14 @@ public final class Ellipse extends Shape {
   @Override
   public Ellipse translate(Vector2 vector) {
     return new Ellipse(a, b, rotation, position.translate(vector));
+  }
+
+  @Override
+  public double getLength() {
+    if (length == INVALID_LENGTH) {
+      // Approximation of length.
+      length = 2 * Math.PI * Math.sqrt((a * a + b * b) / 2);
+    }
+    return length;
   }
 }

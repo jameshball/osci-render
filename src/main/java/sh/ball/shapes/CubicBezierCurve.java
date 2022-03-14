@@ -7,12 +7,13 @@ public class CubicBezierCurve extends Shape {
   private final Vector2 p2;
   private final Vector2 p3;
 
+  private double length = INVALID_LENGTH;
+
   public CubicBezierCurve(Vector2 p0, Vector2 p1, Vector2 p2, Vector2 p3) {
     this.p0 = p0;
     this.p1 = p1;
     this.p2 = p2;
     this.p3 = p3;
-    this.length = new Line(p0, p3).length;
   }
 
   @Override
@@ -44,5 +45,13 @@ public class CubicBezierCurve extends Shape {
   public CubicBezierCurve translate(Vector2 vector) {
     return new CubicBezierCurve(p0.translate(vector), p1.translate(vector), p2.translate(vector),
       p3.translate(vector));
+  }
+
+  @Override
+  public double getLength() {
+    if (length == INVALID_LENGTH) {
+      length = new Line(p0, p3).getLength();
+    }
+    return length;
   }
 }

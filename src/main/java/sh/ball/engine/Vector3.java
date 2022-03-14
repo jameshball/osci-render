@@ -5,7 +5,7 @@ import java.util.Objects;
 
 public final class Vector3 {
 
-  private final double x, y, z;
+  public final double x, y, z;
 
   public Vector3(double x, double y, double z) {
     this.x = x;
@@ -19,18 +19,6 @@ public final class Vector3 {
 
   public Vector3() {
     this(0, 0, 0);
-  }
-
-  public double getX() {
-    return x;
-  }
-
-  public double getY() {
-    return y;
-  }
-
-  public double getZ() {
-    return z;
   }
 
   public Vector3 add(Vector3 other) {

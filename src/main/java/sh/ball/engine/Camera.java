@@ -1,8 +1,5 @@
 package sh.ball.engine;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import sh.ball.shapes.Line;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
@@ -23,6 +20,8 @@ public class Camera {
   private static final int SAMPLE_RENDER_SAMPLES = 50;
   private static final int VERTEX_SAMPLES = 1000;
 
+  public final CameraDrawKernel kernel = new CameraDrawKernel();
+
   private double focalLength;
   private Vector3 pos;
 
@@ -36,7 +35,7 @@ public class Camera {
   }
 
   public List<Shape> draw(WorldObject worldObject) {
-    return getFrame(worldObject.getVertexPath());
+    return kernel.draw(this, worldObject);
   }
 
   // Automatically finds the correct Z position to use to view the world object properly.
@@ -94,22 +93,9 @@ public class Camera {
     double focal = focalLength;
 
     return new Vector2(
-      vertex.getX() * focal / (vertex.getZ() - pos.getZ()) + pos.getX(),
-      vertex.getY() * focal / (vertex.getZ() - pos.getZ()) + pos.getY()
+      vertex.x * focal / (vertex.z - pos.z) + pos.x,
+      vertex.y * focal / (vertex.z - pos.z) + pos.y
     );
-  }
-
-  public List<Shape> getFrame(List<Vector3> vertexPath) {
-    List<Shape> lines = new ArrayList<>();
-
-    for (int i = 0; i < vertexPath.size(); i += 2) {
-      lines.add(new Line(
-        project(vertexPath.get(i)),
-        project(vertexPath.get(i + 1))
-      ));
-    }
-
-    return lines;
   }
 
   public void setFocalLength(double focalLength) {
