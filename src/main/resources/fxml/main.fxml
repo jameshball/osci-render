@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.scene.control.CheckMenuItem?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.CustomMenuItem?>
 <?import javafx.scene.control.Label?>
@@ -53,6 +54,12 @@
                      </AnchorPane>
                   </content>
                </CustomMenuItem>
+           </items>
+         </Menu>
+         <Menu mnemonicParsing="false" text="View">
+           <items>
+               <CheckMenuItem fx:id="flipXCheckMenuItem" mnemonicParsing="false" text="Flip X Direction" />
+               <CheckMenuItem fx:id="flipYCheckMenuItem" mnemonicParsing="false" text="Flip Y Direction" />
            </items>
          </Menu>
      </menus>

@@ -79,6 +79,8 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private double traceMax = 1;
   private int octave = 0;
   private int sampleRate;
+  private boolean flipX = false;
+  private boolean flipY = false;
 
   private AudioDevice device;
 
@@ -155,6 +157,12 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     Vector2 nextVector = applyEffects(count, shape.nextVector(drawingProgress));
 
     Vector2 channels = cutoff(nextVector);
+    if (flipX) {
+      channels = channels.setX(-channels.getX());
+    }
+    if (flipY) {
+      channels = channels.setY(-channels.getY());
+    }
     writeChannels((float) channels.getX(), (float) channels.getY());
 
     if (++count > MAX_COUNT) {
@@ -551,6 +559,14 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
       setPitchBendFactor(message.getChannel(), pitchBendFactor);
     }
+  }
+
+  public void flipXChannel(boolean flip) {
+    this.flipX = flip;
+  }
+
+  public void flipYChannel(boolean flip) {
+    this.flipY = flip;
   }
 
   private static class Listener {

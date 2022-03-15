@@ -116,6 +116,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private MenuItem resetMidiMenuItem;
   @FXML
+  private CheckMenuItem flipXCheckMenuItem;
+  @FXML
+  private CheckMenuItem flipYCheckMenuItem;
+  @FXML
   private Spinner<Integer> midiChannelSpinner;
   @FXML
   private ComboBox<PrintableSlider> sliderComboBox;
@@ -236,6 +240,9 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     resetMidiMappingMenuItem.setOnAction(e -> resetCCMap());
     stopMidiNotesMenuItem.setOnAction(e -> audioPlayer.stopMidiNotes());
     resetMidiMenuItem.setOnAction(e -> audioPlayer.resetMidi());
+
+    flipXCheckMenuItem.selectedProperty().addListener((e, old, flip) -> audioPlayer.flipXChannel(flip));
+    flipYCheckMenuItem.selectedProperty().addListener((e, old, flip) -> audioPlayer.flipYChannel(flip));
 
     NumberFormat format = NumberFormat.getIntegerInstance();
     UnaryOperator<TextFormatter.Change> filter = c -> {
@@ -656,6 +663,13 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
       subControllers().forEach(controller -> root.appendChild(controller.save(document)));
 
+      Element flipX = document.createElement("flipX");
+      Element flipY = document.createElement("flipY");
+      flipX.appendChild(document.createTextNode(String.valueOf(flipXCheckMenuItem.isSelected())));
+      flipY.appendChild(document.createTextNode(String.valueOf(flipYCheckMenuItem.isSelected())));
+      root.appendChild(flipX);
+      root.appendChild(flipY);
+
       Element filesElement = document.createElement("files");
       for (int i = 0; i < openFiles.size(); i++) {
         Element fileElement = document.createElement("file");
@@ -734,6 +748,15 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       root.appendChild(midiElement);
 
       subControllers().forEach(controller -> controller.load(root));
+
+      Element flipX = (Element) root.getElementsByTagName("flipX").item(0);
+      Element flipY = (Element) root.getElementsByTagName("flipY").item(0);
+      if (flipX != null) {
+        flipXCheckMenuItem.setSelected(Boolean.parseBoolean(flipX.getTextContent()));
+      }
+      if (flipY != null) {
+        flipYCheckMenuItem.setSelected(Boolean.parseBoolean(flipY.getTextContent()));
+      }
 
       Element filesElement = (Element) root.getElementsByTagName("files").item(0);
       List<byte[]> files = new ArrayList<>();
