@@ -18,6 +18,7 @@ public class WorldObject {
   private final List<Vector3> objVertices;
 
   // These should be a path of vertices from the above vertex list.
+  float[] objTriangles;
   private List<Vector3> vertexPath;
   private Vector3 position;
   private Vector3 rotation;
@@ -153,16 +154,51 @@ public class WorldObject {
       objVertices.add(new Vector3(vertex.x, vertex.y, vertex.z).sub(offset).scale(1.0/max));
     }
 
+    int numTriangles = 0;
+
     for (OBJObject object : model.getObjects()) {
       for (OBJMesh mesh : object.getMeshes()) {
         for (OBJFace face : mesh.getFaces()) {
           List<OBJDataReference> references = face.getReferences();
+          numTriangles += references.size() - 2;
+
 
           for (int i = 0; i < references.size(); i++) {
             edges.add(new Line3D(
               objVertices.get(references.get(i).vertexIndex),
               objVertices.get(references.get((i + 1) % references.size()).vertexIndex)
             ));
+          }
+        }
+      }
+    }
+
+    objTriangles = new float[9 * numTriangles];
+    int triangle = 0;
+
+    for (OBJObject object : model.getObjects()) {
+      for (OBJMesh mesh : object.getMeshes()) {
+        for (OBJFace face : mesh.getFaces()) {
+          List<OBJDataReference> references = face.getReferences();
+          Vector3 v1 = objVertices.get(references.get(0).vertexIndex);
+          Vector3 curr = null;
+          Vector3 prev;
+
+          for (int i = 0; i < references.size() - 1; i++) {
+            prev = curr;
+            curr = objVertices.get(references.get(i + 1).vertexIndex);
+            if (prev != null) {
+              objTriangles[9 * triangle] = (float) v1.x;
+              objTriangles[9 * triangle + 1] = (float) v1.y;
+              objTriangles[9 * triangle + 2] = (float) v1.z;
+              objTriangles[9 * triangle + 3] = (float) prev.x;
+              objTriangles[9 * triangle + 4] = (float) prev.y;
+              objTriangles[9 * triangle + 5] = (float) prev.z;
+              objTriangles[9 * triangle + 6] = (float) curr.x;
+              objTriangles[9 * triangle + 7] = (float) curr.y;
+              objTriangles[9 * triangle + 8] = (float) curr.z;
+              triangle++;
+            }
           }
         }
       }
