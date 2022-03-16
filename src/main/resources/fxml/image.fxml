@@ -77,5 +77,6 @@
       <CheckBox fx:id="volumeMic" layoutX="408.0" layoutY="237.0" mnemonicParsing="false" text="Mic" />
       <CheckBox fx:id="visibilityMic" layoutX="408.0" layoutY="276.0" mnemonicParsing="false" text="Mic" />
       <Button fx:id="resetRotationButton" layoutX="464.0" layoutY="195.0" mnemonicParsing="false" text="Reset Rotation" />
+      <Button fx:id="resetTranslationButton" layoutX="396.0" layoutY="14.0" mnemonicParsing="false" text="Reset Translation" />
     </children>
 </AnchorPane>

@@ -26,7 +26,7 @@ public class ObjFrameSource implements FrameSource<List<Shape>> {
   @Override
   public List<Shape> next() {
     currentRotation = currentRotation.add(baseRotation.scale(rotateSpeed));
-    object.setRotation(currentRotation);
+    object.setRotation(baseRotation.add(currentRotation));
     return camera.draw(object);
   }
 

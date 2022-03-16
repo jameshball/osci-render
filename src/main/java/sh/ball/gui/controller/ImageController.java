@@ -85,6 +85,8 @@ public class ImageController implements Initializable, SubController {
   private CheckBox visibilityMic;
   @FXML
   private Button resetRotationButton;
+  @FXML
+  private Button resetTranslationButton;
 
   public ImageController() {
     this.frequency = new SimpleDoubleProperty(0);
@@ -146,6 +148,10 @@ public class ImageController implements Initializable, SubController {
     );
 
     resetRotationButton.setOnAction(e -> rotateEffect.resetTheta());
+    resetTranslationButton.setOnAction(e -> {
+      translationXTextField.setText("0.00");
+      translationYTextField.setText("0.00");
+    });
 
     translationXTextField.textProperty().addListener(e -> updateTranslation());
     translationXTextField.setOnScroll((e) -> changeTranslation(e.getDeltaY() > 0, translationXTextField));

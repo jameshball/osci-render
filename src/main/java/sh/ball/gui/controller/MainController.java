@@ -79,6 +79,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private Paint armedMidiPaint;
   private SVGPath armedMidi;
   private Map<SVGPath, Slider> midiButtonMap;
+  private final Map<Slider, Short> channelClosestToZero = new HashMap<>();
 
   // frames
   private static final InputStream DEFAULT_OBJ = MainController.class.getResourceAsStream("/models/cube.obj");
@@ -189,22 +190,35 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
     this.midiButtonMap = initializeMidiButtonMap();
 
-    midiButtonMap.keySet().forEach(midi -> midi.setOnMouseClicked(e -> {
-      if (armedMidi == midi) {
-        // we are already armed, so we should unarm
-        midi.setFill(armedMidiPaint);
-        armedMidiPaint = null;
-        armedMidi = null;
-      } else {
-        // not yet armed
-        if (armedMidi != null) {
-          armedMidi.setFill(armedMidiPaint);
+    midiButtonMap.keySet().forEach(midi -> {
+      midi.setOnMouseClicked(e -> {
+        if (armedMidi == midi) {
+          // we are already armed, so we should unarm
+          midi.setFill(armedMidiPaint);
+          armedMidiPaint = null;
+          armedMidi = null;
+        } else {
+          // not yet armed
+          if (armedMidi != null) {
+            armedMidi.setFill(armedMidiPaint);
+          }
+          armedMidiPaint = midi.getFill();
+          armedMidi = midi;
+          midi.setFill(Color.RED);
         }
-        armedMidiPaint = midi.getFill();
-        armedMidi = midi;
-        midi.setFill(Color.RED);
+      });
+      short closestToZero = 0;
+      double closestValue = Double.MAX_VALUE;
+      Slider slider = midiButtonMap.get(midi);
+      for (short i = 0; i <= MidiNote.MAX_VELOCITY; i++) {
+        double value = getValueInSliderRange(slider, i / (float) MidiNote.MAX_VELOCITY);
+        if (Math.abs(value) < closestValue) {
+          closestValue = Math.abs(value);
+          closestToZero = i;
+        }
       }
-    }));
+      channelClosestToZero.put(slider, closestToZero);
+    });
 
     osciFileChooser.setInitialFileName("project.osci");
     osciFileChooser.getExtensionFilters().add(
@@ -378,7 +392,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     objController.updateObjectRotateSpeed();
     objController.updateFocalLength();
     if (oldSettings instanceof ObjFrameSettings settings) {
-      setObjRotate(settings.baseRotation, settings.currentRotation);
+      objController.setObjRotate(settings.baseRotation, settings.currentRotation);
     }
     executor.submit(producer);
     effectsController.restartEffects();
@@ -474,8 +488,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   }
 
   // updates the 3D object base and current rotation angle
-  public void setObjRotate(Vector3 baseRotation, Vector3 currentRotation) {
-    objController.setObjRotate(baseRotation, currentRotation);
+  public void setMouseXY(double mouseX, double mouseY) {
+    objController.setRotateXY(new Vector2(mouseX, mouseY));
   }
 
   @Override
@@ -532,8 +546,14 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       if (cc <= MidiNote.MAX_CC && CCMap.containsKey(cc)) {
         Platform.runLater(() -> {
           Slider slider = midiButtonMap.get(CCMap.get(cc));
-          double sliderValue = getValueInSliderRange(slider, value / MidiNote.MAX_VELOCITY);
-          slider.setValue(sliderValue);
+          short closestToZero = channelClosestToZero.get(slider);
+          double sliderValue = getValueInSliderRange(slider, value / (float) MidiNote.MAX_VELOCITY);
+          // deadzone
+          if (value >= closestToZero - 1 && value <= closestToZero + 1 && sliderValue < 1) {
+            slider.setValue(0);
+          } else {
+            slider.setValue(sliderValue);
+          }
         });
       } else if (cc == MidiNote.ALL_NOTES_OFF) {
         audioPlayer.stopMidiNotes();
@@ -830,7 +850,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         if (checkBoxes.get(i) != null) {
           if (checkBoxes.get(i).isSelected()) {
             Slider slider = sliders.get(i);
-            double sliderValue = targetSliderValue[i] + getValueInSliderRange(slider, finalVolume);
+            double sliderValue = targetSliderValue[i] + (slider.getMax() - slider.getMin()) * finalVolume;
             if (sliderValue > slider.getMax()) {
               sliderValue = slider.getMax();
             } else if (sliderValue < slider.getMin()) {
