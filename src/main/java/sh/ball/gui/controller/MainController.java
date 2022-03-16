@@ -122,6 +122,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private Spinner<Integer> midiChannelSpinner;
   @FXML
+  private Spinner<Double> translationIncrementSpinner;
+  @FXML
   private ComboBox<PrintableSlider> sliderComboBox;
   @FXML
   private TextField sliderMinTextField;
@@ -262,6 +264,9 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     midiChannelSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(0, MidiNote.MAX_CHANNEL));
     midiChannelSpinner.getEditor().setTextFormatter(new TextFormatter<>(new IntegerStringConverter(), 0, filter));
     midiChannelSpinner.valueProperty().addListener((o, oldValue, newValue) -> audioPlayer.setMainMidiChannel(newValue));
+
+    translationIncrementSpinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(-2, 2, 0.05, 0.01));
+    translationIncrementSpinner.valueProperty().addListener((o, oldValue, newValue) -> imageController.setTranslationIncrement(newValue));
 
     List<PrintableSlider> printableSliders = new ArrayList<>();
     sliders.forEach(slider -> printableSliders.add(new PrintableSlider(slider)));
@@ -670,6 +675,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       root.appendChild(flipX);
       root.appendChild(flipY);
 
+      Element translationIncrement = document.createElement("translationIncrement");
+      translationIncrement.appendChild(document.createTextNode(translationIncrementSpinner.getValue().toString()));
+      root.appendChild(translationIncrement);
+
       Element filesElement = document.createElement("files");
       for (int i = 0; i < openFiles.size(); i++) {
         Element fileElement = document.createElement("file");
@@ -756,6 +765,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
       if (flipY != null) {
         flipYCheckMenuItem.setSelected(Boolean.parseBoolean(flipY.getTextContent()));
+      }
+
+      Element translationIncrement = (Element) root.getElementsByTagName("translationIncrement").item(0);
+      if (translationIncrement != null) {
+        translationIncrementSpinner.getValueFactory().setValue(Double.parseDouble(translationIncrement.getTextContent()));
       }
 
       Element filesElement = (Element) root.getElementsByTagName("files").item(0);

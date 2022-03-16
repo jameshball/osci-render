@@ -62,6 +62,20 @@
                <CheckMenuItem fx:id="flipYCheckMenuItem" mnemonicParsing="false" text="Flip Y Direction" />
            </items>
          </Menu>
+         <Menu mnemonicParsing="false" text="Controls">
+           <items>
+               <CustomMenuItem hideOnClick="false" mnemonicParsing="false" text="Translation Increment">
+                  <content>
+                     <AnchorPane>
+                        <children>
+                           <Label prefHeight="25.0" text="Translation Increment" textFill="WHITE" />
+                           <Spinner fx:id="translationIncrementSpinner" editable="true" layoutY="25.0" />
+                        </children>
+                     </AnchorPane>
+                  </content>
+               </CustomMenuItem>
+           </items>
+         </Menu>
      </menus>
    </MenuBar>
    <TitledPane animated="false" collapsible="false" layoutX="7.0" layoutY="33.0" prefHeight="401.0" prefWidth="390.0" text="Main settings">
