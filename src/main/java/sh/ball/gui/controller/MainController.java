@@ -180,6 +180,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         closestToZero = i;
       }
     }
+    System.out.println(closestToZero);
     channelClosestToZero.put(slider, closestToZero);
   }
 
@@ -191,17 +192,17 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     for (int i = 0; i < sliders.size(); i++) {
       updateClosestChannelToZero(sliders.get(i));
       targetSliderValue[i] = sliders.get(i).getValue();
+      int finalI = i;
       if (micCheckBoxes.get(i) != null) {
         CheckBox checkBox = micCheckBoxes.get(i);
-        int finalI = i;
         sliders.get(i).valueProperty().addListener((e, old, value) -> {
           if (!checkBox.isSelected()) {
             targetSliderValue[finalI] = value.doubleValue();
           }
         });
-        sliders.get(i).minProperty().addListener(e -> updateClosestChannelToZero(sliders.get(finalI)));
-        sliders.get(i).maxProperty().addListener(e -> updateClosestChannelToZero(sliders.get(finalI)));
       }
+      sliders.get(i).minProperty().addListener(e -> updateClosestChannelToZero(sliders.get(finalI)));
+      sliders.get(i).maxProperty().addListener(e -> updateClosestChannelToZero(sliders.get(finalI)));
     }
 
     objController.setAudioProducer(producer);
