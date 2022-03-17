@@ -140,7 +140,7 @@ public class ObjController implements Initializable, SubController {
       objectYRotateSlider.setValue(0);
       objectZRotateSlider.setValue(0);
       objectRotateSpeedSlider.setValue(0);
-      setObjRotate(new Vector3(2 * Math.PI, 2 * Math.PI, 0), new Vector3(2 * Math.PI, 2 * Math.PI, 0));
+      setObjRotate(new Vector3(), new Vector3());
     });
 
     objectRotateSpeedSlider.valueProperty().addListener((e, old, speed) -> {

@@ -10,14 +10,14 @@
 <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="313.0" prefWidth="408.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.ObjController">
     <Slider fx:id="focalLengthSlider" blockIncrement="0.01" layoutX="106.0" layoutY="16.0" majorTickUnit="0.2" max="2.0" min="1.0E-5" prefHeight="42.0" prefWidth="205.0" showTickLabels="true" showTickMarks="true" value="1.0" />
     <Label layoutX="32.0" layoutY="15.0" text="Focal length" />
-    <Slider fx:id="objectXRotateSlider" blockIncrement="0.005" layoutX="106.0" layoutY="65.0" majorTickUnit="0.2" max="1.0" min="-1.0" prefHeight="42.0" prefWidth="205.0" showTickLabels="true" showTickMarks="true" />
+    <Slider fx:id="objectXRotateSlider" blockIncrement="0.005" layoutX="106.0" layoutY="65.0" majorTickUnit="0.2" max="1.0" min="-1.0" prefHeight="42.0" prefWidth="205.0" showTickLabels="true" showTickMarks="true" value="1.0" />
     <Label layoutX="52.0" layoutY="65.0" text="Rotate x" />
     <CheckBox fx:id="rotateCheckBox" layoutX="133.0" layoutY="264.0" mnemonicParsing="false" text="Rotate with Mouse (Esc to disable)" />
     <SVGPath fx:id="focalLengthMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="316.0" layoutY="13.0" pickOnBounds="true" />
     <SVGPath fx:id="objectXRotateMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="316.0" layoutY="62.0" pickOnBounds="true" />
    <CheckBox fx:id="objectXRotateMic" layoutX="353.0" layoutY="65.0" mnemonicParsing="false" text="Mic" />
    <Button fx:id="resetObjectRotationButton" layoutX="16.0" layoutY="260.0" mnemonicParsing="false" text="Reset Rotation" />
-   <Slider fx:id="objectYRotateSlider" blockIncrement="0.005" layoutX="106.0" layoutY="114.0" majorTickUnit="0.2" max="1.0" min="-1.0" prefHeight="42.0" prefWidth="205.0" showTickLabels="true" showTickMarks="true" />
+   <Slider fx:id="objectYRotateSlider" blockIncrement="0.005" layoutX="106.0" layoutY="114.0" majorTickUnit="0.2" max="1.0" min="-1.0" prefHeight="42.0" prefWidth="205.0" showTickLabels="true" showTickMarks="true" value="1.0" />
    <Label layoutX="52.0" layoutY="114.0" text="Rotate y" />
    <SVGPath fx:id="objectYRotateMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="316.0" layoutY="111.0" pickOnBounds="true" />
    <CheckBox fx:id="objectYRotateMic" layoutX="353.0" layoutY="114.0" mnemonicParsing="false" text="Mic" />
