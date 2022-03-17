@@ -80,6 +80,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private SVGPath armedMidi;
   private Map<SVGPath, Slider> midiButtonMap;
   private final Map<Slider, Short> channelClosestToZero = new HashMap<>();
+  private int midiDeadzone = 5;
 
   // frames
   private static final InputStream DEFAULT_OBJ = MainController.class.getResourceAsStream("/models/cube.obj");
@@ -130,6 +131,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private TextField sliderMinTextField;
   @FXML
   private TextField sliderMaxTextField;
+  @FXML
+  private Spinner<Integer> deadzoneSpinner;
 
   public MainController() throws Exception {
     // Clone DEFAULT_OBJ InputStream using a ByteArrayOutputStream
@@ -167,12 +170,26 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     slider.setMajorTickUnit(Math.max(sh.ball.math.Math.EPSILON, MAJOR_TICK_UNIT * (slider.getMax() - slider.getMin())));
   }
 
+  private void updateClosestChannelToZero(Slider slider) {
+    short closestToZero = 0;
+    double closestValue = Double.MAX_VALUE;
+    for (short i = 0; i <= MidiNote.MAX_VELOCITY; i++) {
+      double value = getValueInSliderRange(slider, i / (float) MidiNote.MAX_VELOCITY);
+      if (Math.abs(value) < closestValue) {
+        closestValue = Math.abs(value);
+        closestToZero = i;
+      }
+    }
+    channelClosestToZero.put(slider, closestToZero);
+  }
+
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
     List<Slider> sliders = sliders();
     List<CheckBox> micCheckBoxes = micCheckBoxes();
     targetSliderValue = new double[sliders.size()];
     for (int i = 0; i < sliders.size(); i++) {
+      updateClosestChannelToZero(sliders.get(i));
       targetSliderValue[i] = sliders.get(i).getValue();
       if (micCheckBoxes.get(i) != null) {
         CheckBox checkBox = micCheckBoxes.get(i);
@@ -182,6 +199,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
             targetSliderValue[finalI] = value.doubleValue();
           }
         });
+        sliders.get(i).minProperty().addListener(e -> updateClosestChannelToZero(sliders.get(finalI)));
+        sliders.get(i).maxProperty().addListener(e -> updateClosestChannelToZero(sliders.get(finalI)));
       }
     }
 
@@ -207,17 +226,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
           midi.setFill(Color.RED);
         }
       });
-      short closestToZero = 0;
-      double closestValue = Double.MAX_VALUE;
-      Slider slider = midiButtonMap.get(midi);
-      for (short i = 0; i <= MidiNote.MAX_VELOCITY; i++) {
-        double value = getValueInSliderRange(slider, i / (float) MidiNote.MAX_VELOCITY);
-        if (Math.abs(value) < closestValue) {
-          closestValue = Math.abs(value);
-          closestToZero = i;
-        }
-      }
-      channelClosestToZero.put(slider, closestToZero);
     });
 
     osciFileChooser.setInitialFileName("project.osci");
@@ -281,6 +289,9 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
     translationIncrementSpinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(-2, 2, 0.05, 0.01));
     translationIncrementSpinner.valueProperty().addListener((o, oldValue, newValue) -> imageController.setTranslationIncrement(newValue));
+
+    deadzoneSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(0, 20, 5));
+    deadzoneSpinner.valueProperty().addListener((e, old, deadzone) -> this.midiDeadzone = deadzone);
 
     List<PrintableSlider> printableSliders = new ArrayList<>();
     sliders.forEach(slider -> printableSliders.add(new PrintableSlider(slider)));
@@ -549,10 +560,22 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
           short closestToZero = channelClosestToZero.get(slider);
           double sliderValue = getValueInSliderRange(slider, value / (float) MidiNote.MAX_VELOCITY);
           // deadzone
-          if (value >= closestToZero - 1 && value <= closestToZero + 1 && sliderValue < 1) {
+          if (value >= closestToZero - midiDeadzone && value <= closestToZero + midiDeadzone && sliderValue < 1) {
             slider.setValue(0);
           } else {
-            slider.setValue(sliderValue);
+            int leftDeadzone = Math.min(closestToZero, midiDeadzone);
+            int rightDeadzone = Math.min(MidiNote.MAX_VELOCITY - closestToZero, midiDeadzone);
+            int actualChannels = MidiNote.MAX_VELOCITY - (leftDeadzone + 1 + rightDeadzone);
+            int correctedValue;
+            if (value > closestToZero) {
+              correctedValue = value - midiDeadzone;
+            } else {
+              correctedValue = value + midiDeadzone;
+            }
+
+            double scale = MidiNote.MAX_VELOCITY / (double) actualChannels;
+            double zeroPoint = closestToZero / (double) MidiNote.MAX_VELOCITY;
+            slider.setValue(getValueInSliderRange(slider, scale * ((correctedValue / (double) MidiNote.MAX_VELOCITY) - zeroPoint) + zeroPoint));
           }
         });
       } else if (cc == MidiNote.ALL_NOTES_OFF) {
@@ -699,6 +722,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       translationIncrement.appendChild(document.createTextNode(translationIncrementSpinner.getValue().toString()));
       root.appendChild(translationIncrement);
 
+      Element deadzone = document.createElement("deadzone");
+      deadzone.appendChild(document.createTextNode(deadzoneSpinner.getValue().toString()));
+      root.appendChild(deadzone);
+
       Element filesElement = document.createElement("files");
       for (int i = 0; i < openFiles.size(); i++) {
         Element fileElement = document.createElement("file");
@@ -790,6 +817,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       Element translationIncrement = (Element) root.getElementsByTagName("translationIncrement").item(0);
       if (translationIncrement != null) {
         translationIncrementSpinner.getValueFactory().setValue(Double.parseDouble(translationIncrement.getTextContent()));
+      }
+
+      Element deadzone = (Element) root.getElementsByTagName("deadzone").item(0);
+      if (deadzone != null) {
+        deadzoneSpinner.getValueFactory().setValue(Integer.parseInt(deadzone.getTextContent()));
       }
 
       Element filesElement = (Element) root.getElementsByTagName("files").item(0);

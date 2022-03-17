@@ -127,9 +127,9 @@ public class ObjController implements Initializable, SubController {
       setFocalLength(newValue.doubleValue())
     );
     InvalidationListener rotateSpeedListener = e -> setObjRotate(new Vector3(
-      objectXRotateSlider.getValue() * 2 * Math.PI,
-      objectYRotateSlider.getValue() * 2 * Math.PI,
-      objectZRotateSlider.getValue() * 2 * Math.PI
+      objectXRotateSlider.getValue() * Math.PI,
+      objectYRotateSlider.getValue() * Math.PI,
+      objectZRotateSlider.getValue() * Math.PI
     ));
     objectXRotateSlider.valueProperty().addListener(rotateSpeedListener);
     objectYRotateSlider.valueProperty().addListener(rotateSpeedListener);

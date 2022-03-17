@@ -13,7 +13,7 @@
 <?import javafx.scene.input.KeyCodeCombination?>
 <?import javafx.scene.layout.AnchorPane?>
 
-<AnchorPane prefHeight="820.0" prefWidth="1008.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.MainController">
+<AnchorPane prefHeight="798.0" prefWidth="1008.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.MainController">
    <MenuBar prefHeight="27.0" prefWidth="1008.0">
      <menus>
        <Menu mnemonicParsing="false" text="File">
@@ -44,6 +44,16 @@
                </MenuItem>
              <MenuItem fx:id="stopMidiNotesMenuItem" mnemonicParsing="false" text="Stop MIDI Notes" />
                <MenuItem fx:id="resetMidiMenuItem" mnemonicParsing="false" text="Reset MIDI" />
+               <CustomMenuItem hideOnClick="false" mnemonicParsing="false" text="Deadzone">
+                  <content>
+                     <AnchorPane>
+                        <children>
+                           <Label prefHeight="25.0" text="Deadzone" textFill="WHITE" />
+                           <Spinner fx:id="deadzoneSpinner" editable="true" layoutY="25.0" />
+                        </children>
+                     </AnchorPane>
+                  </content>
+               </CustomMenuItem>
                <CustomMenuItem hideOnClick="false" mnemonicParsing="false" text="MIDI Channel">
                   <content>
                      <AnchorPane>
@@ -111,16 +121,16 @@
          </Menu>
      </menus>
    </MenuBar>
-   <TitledPane animated="false" collapsible="false" layoutX="7.0" layoutY="33.0" prefHeight="401.0" prefWidth="390.0" text="Main settings">
+   <TitledPane animated="false" collapsible="false" layoutX="7.0" layoutY="33.0" prefHeight="401.0" prefWidth="411.0" text="Main settings">
       <fx:include fx:id="general" source="general.fxml" />
    </TitledPane>
-   <TitledPane animated="false" collapsible="false" layoutX="425.0" layoutY="444.0" prefHeight="370.0" prefWidth="576.0" text="Image settings">
+   <TitledPane animated="false" collapsible="false" layoutX="425.0" layoutY="444.0" prefHeight="348.0" prefWidth="576.0" text="Image settings">
       <fx:include fx:id="image" source="image.fxml" />
    </TitledPane>
    <TitledPane animated="false" collapsible="false" layoutX="425.0" layoutY="33.0" prefHeight="402.0" prefWidth="576.0" text="Audio Effects">
       <fx:include fx:id="effects" source="effects.fxml" />
    </TitledPane>
-   <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="7.0" layoutY="444.0" prefHeight="370.0" prefWidth="411.0" text="3D .obj file settings">
+   <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="7.0" layoutY="444.0" prefHeight="348.0" prefWidth="411.0" text="3D .obj file settings">
       <fx:include fx:id="obj" source="obj.fxml" />
    </TitledPane>
 </AnchorPane>
