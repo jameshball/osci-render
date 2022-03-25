@@ -65,12 +65,7 @@ public class Gui extends Application {
 
     scene.addEventFilter(MouseEvent.MOUSE_MOVED, event -> {
       if (controller.mouseRotate()) {
-        Vector3 rotate = new Vector3(
-          3 * Math.PI * (event.getSceneY() / scene.getHeight()),
-          3 * Math.PI * (event.getSceneX() / scene.getWidth()),
-          0
-        );
-        controller.setObjRotate(rotate, rotate);
+        controller.setMouseXY(event.getSceneX() / scene.getWidth(), event.getSceneY() / scene.getHeight());
       }
       if (controller.mouseTranslate()) {
         controller.setTranslation(new Vector2(

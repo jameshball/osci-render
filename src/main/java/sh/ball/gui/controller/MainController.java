@@ -79,6 +79,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private Paint armedMidiPaint;
   private SVGPath armedMidi;
   private Map<SVGPath, Slider> midiButtonMap;
+  private final Map<Slider, Short> channelClosestToZero = new HashMap<>();
+  private int midiDeadzone = 5;
 
   // frames
   private static final InputStream DEFAULT_OBJ = MainController.class.getResourceAsStream("/models/cube.obj");
@@ -122,11 +124,15 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private Spinner<Integer> midiChannelSpinner;
   @FXML
+  private Spinner<Double> translationIncrementSpinner;
+  @FXML
   private ComboBox<PrintableSlider> sliderComboBox;
   @FXML
   private TextField sliderMinTextField;
   @FXML
   private TextField sliderMaxTextField;
+  @FXML
+  private Spinner<Integer> deadzoneSpinner;
 
   public MainController() throws Exception {
     // Clone DEFAULT_OBJ InputStream using a ByteArrayOutputStream
@@ -164,22 +170,39 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     slider.setMajorTickUnit(Math.max(sh.ball.math.Math.EPSILON, MAJOR_TICK_UNIT * (slider.getMax() - slider.getMin())));
   }
 
+  private void updateClosestChannelToZero(Slider slider) {
+    short closestToZero = 0;
+    double closestValue = Double.MAX_VALUE;
+    for (short i = 0; i <= MidiNote.MAX_VELOCITY; i++) {
+      double value = getValueInSliderRange(slider, i / (float) MidiNote.MAX_VELOCITY);
+      if (Math.abs(value) < closestValue) {
+        closestValue = Math.abs(value);
+        closestToZero = i;
+      }
+    }
+    System.out.println(closestToZero);
+    channelClosestToZero.put(slider, closestToZero);
+  }
+
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
     List<Slider> sliders = sliders();
     List<CheckBox> micCheckBoxes = micCheckBoxes();
     targetSliderValue = new double[sliders.size()];
     for (int i = 0; i < sliders.size(); i++) {
+      updateClosestChannelToZero(sliders.get(i));
       targetSliderValue[i] = sliders.get(i).getValue();
+      int finalI = i;
       if (micCheckBoxes.get(i) != null) {
         CheckBox checkBox = micCheckBoxes.get(i);
-        int finalI = i;
         sliders.get(i).valueProperty().addListener((e, old, value) -> {
           if (!checkBox.isSelected()) {
             targetSliderValue[finalI] = value.doubleValue();
           }
         });
       }
+      sliders.get(i).minProperty().addListener(e -> updateClosestChannelToZero(sliders.get(finalI)));
+      sliders.get(i).maxProperty().addListener(e -> updateClosestChannelToZero(sliders.get(finalI)));
     }
 
     objController.setAudioProducer(producer);
@@ -187,22 +210,24 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
     this.midiButtonMap = initializeMidiButtonMap();
 
-    midiButtonMap.keySet().forEach(midi -> midi.setOnMouseClicked(e -> {
-      if (armedMidi == midi) {
-        // we are already armed, so we should unarm
-        midi.setFill(armedMidiPaint);
-        armedMidiPaint = null;
-        armedMidi = null;
-      } else {
-        // not yet armed
-        if (armedMidi != null) {
-          armedMidi.setFill(armedMidiPaint);
+    midiButtonMap.keySet().forEach(midi -> {
+      midi.setOnMouseClicked(e -> {
+        if (armedMidi == midi) {
+          // we are already armed, so we should unarm
+          midi.setFill(armedMidiPaint);
+          armedMidiPaint = null;
+          armedMidi = null;
+        } else {
+          // not yet armed
+          if (armedMidi != null) {
+            armedMidi.setFill(armedMidiPaint);
+          }
+          armedMidiPaint = midi.getFill();
+          armedMidi = midi;
+          midi.setFill(Color.RED);
         }
-        armedMidiPaint = midi.getFill();
-        armedMidi = midi;
-        midi.setFill(Color.RED);
-      }
-    }));
+      });
+    });
 
     osciFileChooser.setInitialFileName("project.osci");
     osciFileChooser.getExtensionFilters().add(
@@ -262,6 +287,12 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     midiChannelSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(0, MidiNote.MAX_CHANNEL));
     midiChannelSpinner.getEditor().setTextFormatter(new TextFormatter<>(new IntegerStringConverter(), 0, filter));
     midiChannelSpinner.valueProperty().addListener((o, oldValue, newValue) -> audioPlayer.setMainMidiChannel(newValue));
+
+    translationIncrementSpinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(-2, 2, 0.05, 0.01));
+    translationIncrementSpinner.valueProperty().addListener((o, oldValue, newValue) -> imageController.setTranslationIncrement(newValue));
+
+    deadzoneSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(0, 20, 5));
+    deadzoneSpinner.valueProperty().addListener((e, old, deadzone) -> this.midiDeadzone = deadzone);
 
     List<PrintableSlider> printableSliders = new ArrayList<>();
     sliders.forEach(slider -> printableSliders.add(new PrintableSlider(slider)));
@@ -373,7 +404,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     objController.updateObjectRotateSpeed();
     objController.updateFocalLength();
     if (oldSettings instanceof ObjFrameSettings settings) {
-      setObjRotate(settings.baseRotation, settings.currentRotation);
+      objController.setObjRotate(settings.baseRotation, settings.currentRotation);
     }
     executor.submit(producer);
     effectsController.restartEffects();
@@ -469,8 +500,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   }
 
   // updates the 3D object base and current rotation angle
-  public void setObjRotate(Vector3 baseRotation, Vector3 currentRotation) {
-    objController.setObjRotate(baseRotation, currentRotation);
+  public void setMouseXY(double mouseX, double mouseY) {
+    objController.setRotateXY(new Vector2(mouseX, mouseY));
   }
 
   @Override
@@ -527,8 +558,26 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       if (cc <= MidiNote.MAX_CC && CCMap.containsKey(cc)) {
         Platform.runLater(() -> {
           Slider slider = midiButtonMap.get(CCMap.get(cc));
-          double sliderValue = getValueInSliderRange(slider, value / MidiNote.MAX_VELOCITY);
-          slider.setValue(sliderValue);
+          short closestToZero = channelClosestToZero.get(slider);
+          double sliderValue = getValueInSliderRange(slider, value / (float) MidiNote.MAX_VELOCITY);
+          // deadzone
+          if (value >= closestToZero - midiDeadzone && value <= closestToZero + midiDeadzone && sliderValue < 1) {
+            slider.setValue(0);
+          } else {
+            int leftDeadzone = Math.min(closestToZero, midiDeadzone);
+            int rightDeadzone = Math.min(MidiNote.MAX_VELOCITY - closestToZero, midiDeadzone);
+            int actualChannels = MidiNote.MAX_VELOCITY - (leftDeadzone + 1 + rightDeadzone);
+            int correctedValue;
+            if (value > closestToZero) {
+              correctedValue = value - midiDeadzone;
+            } else {
+              correctedValue = value + midiDeadzone;
+            }
+
+            double scale = MidiNote.MAX_VELOCITY / (double) actualChannels;
+            double zeroPoint = closestToZero / (double) MidiNote.MAX_VELOCITY;
+            slider.setValue(getValueInSliderRange(slider, scale * ((correctedValue / (double) MidiNote.MAX_VELOCITY) - zeroPoint) + zeroPoint));
+          }
         });
       } else if (cc == MidiNote.ALL_NOTES_OFF) {
         audioPlayer.stopMidiNotes();
@@ -670,6 +719,14 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       root.appendChild(flipX);
       root.appendChild(flipY);
 
+      Element translationIncrement = document.createElement("translationIncrement");
+      translationIncrement.appendChild(document.createTextNode(translationIncrementSpinner.getValue().toString()));
+      root.appendChild(translationIncrement);
+
+      Element deadzone = document.createElement("deadzone");
+      deadzone.appendChild(document.createTextNode(deadzoneSpinner.getValue().toString()));
+      root.appendChild(deadzone);
+
       Element filesElement = document.createElement("files");
       for (int i = 0; i < openFiles.size(); i++) {
         Element fileElement = document.createElement("file");
@@ -758,6 +815,16 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         flipYCheckMenuItem.setSelected(Boolean.parseBoolean(flipY.getTextContent()));
       }
 
+      Element translationIncrement = (Element) root.getElementsByTagName("translationIncrement").item(0);
+      if (translationIncrement != null) {
+        translationIncrementSpinner.getValueFactory().setValue(Double.parseDouble(translationIncrement.getTextContent()));
+      }
+
+      Element deadzone = (Element) root.getElementsByTagName("deadzone").item(0);
+      if (deadzone != null) {
+        deadzoneSpinner.getValueFactory().setValue(Integer.parseInt(deadzone.getTextContent()));
+      }
+
       Element filesElement = (Element) root.getElementsByTagName("files").item(0);
       List<byte[]> files = new ArrayList<>();
       List<String> fileNames = new ArrayList<>();
@@ -816,7 +883,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         if (checkBoxes.get(i) != null) {
           if (checkBoxes.get(i).isSelected()) {
             Slider slider = sliders.get(i);
-            double sliderValue = targetSliderValue[i] + getValueInSliderRange(slider, finalVolume);
+            double sliderValue = targetSliderValue[i] + (slider.getMax() - slider.getMin()) * finalVolume;
             if (sliderValue > slider.getMax()) {
               sliderValue = slider.getMax();
             } else if (sliderValue < slider.getMin()) {

@@ -13,7 +13,7 @@
 <?import javafx.scene.input.KeyCodeCombination?>
 <?import javafx.scene.layout.AnchorPane?>
 
-<AnchorPane prefHeight="788.0" prefWidth="1008.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.MainController">
+<AnchorPane prefHeight="798.0" prefWidth="1008.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.MainController">
    <MenuBar prefHeight="27.0" prefWidth="1008.0">
      <menus>
        <Menu mnemonicParsing="false" text="File">
@@ -44,6 +44,16 @@
                </MenuItem>
              <MenuItem fx:id="stopMidiNotesMenuItem" mnemonicParsing="false" text="Stop MIDI Notes" />
                <MenuItem fx:id="resetMidiMenuItem" mnemonicParsing="false" text="Reset MIDI" />
+               <CustomMenuItem hideOnClick="false" mnemonicParsing="false" text="Deadzone">
+                  <content>
+                     <AnchorPane>
+                        <children>
+                           <Label prefHeight="25.0" text="Deadzone" textFill="WHITE" />
+                           <Spinner fx:id="deadzoneSpinner" editable="true" layoutY="25.0" />
+                        </children>
+                     </AnchorPane>
+                  </content>
+               </CustomMenuItem>
                <CustomMenuItem hideOnClick="false" mnemonicParsing="false" text="MIDI Channel">
                   <content>
                      <AnchorPane>
@@ -62,31 +72,65 @@
                <CheckMenuItem fx:id="flipYCheckMenuItem" mnemonicParsing="false" text="Flip Y Direction" />
            </items>
          </Menu>
+         <Menu mnemonicParsing="false" text="Controls">
+           <items>
+               <CustomMenuItem hideOnClick="false" mnemonicParsing="false" text="Translation Increment">
+                  <content>
+                     <AnchorPane>
+                        <children>
+                           <Label prefHeight="25.0" text="Translation Increment" textFill="WHITE" />
+                           <Spinner fx:id="translationIncrementSpinner" editable="true" layoutY="25.0" />
+                        </children>
+                     </AnchorPane>
+                  </content>
+               </CustomMenuItem>
+           </items>
+         </Menu>
+         <Menu mnemonicParsing="false" text="Sliders">
+           <items>
+               <CustomMenuItem hideOnClick="false" mnemonicParsing="false">
+                  <content>
+                     <AnchorPane>
+                        <children>
+                           <ComboBox fx:id="sliderComboBox" prefHeight="30.0" prefWidth="376.0" />
+                        </children>
+                     </AnchorPane>
+                  </content>
+               </CustomMenuItem>
+               <CustomMenuItem hideOnClick="false" mnemonicParsing="false">
+                  <content>
+                     <AnchorPane>
+                        <children>
+                           <Label prefHeight="25.0" text="Min" textFill="WHITE" />
+                           <TextField fx:id="sliderMinTextField" layoutY="25.0" prefHeight="26.0" prefWidth="70.0" text="0.0" />
+                        </children>
+                     </AnchorPane>
+                  </content>
+               </CustomMenuItem>
+               <CustomMenuItem hideOnClick="false" mnemonicParsing="false">
+                  <content>
+                     <AnchorPane>
+                        <children>
+                           <Label prefHeight="25.0" text="Max" textFill="WHITE" />
+                           <TextField fx:id="sliderMaxTextField" layoutY="25.0" prefHeight="26.0" prefWidth="69.0" text="0.0" />
+                        </children>
+                     </AnchorPane>
+                  </content>
+               </CustomMenuItem>
+           </items>
+         </Menu>
      </menus>
    </MenuBar>
-   <TitledPane animated="false" collapsible="false" layoutX="7.0" layoutY="33.0" prefHeight="401.0" prefWidth="390.0" text="Main settings">
+   <TitledPane animated="false" collapsible="false" layoutX="7.0" layoutY="33.0" prefHeight="401.0" prefWidth="411.0" text="Main settings">
       <fx:include fx:id="general" source="general.fxml" />
    </TitledPane>
-   <TitledPane animated="false" collapsible="false" layoutX="425.0" layoutY="424.0" text="Image settings">
+   <TitledPane animated="false" collapsible="false" layoutX="425.0" layoutY="444.0" prefHeight="348.0" prefWidth="576.0" text="Image settings">
       <fx:include fx:id="image" source="image.fxml" />
    </TitledPane>
-   <TitledPane animated="false" collapsible="false" layoutX="425.0" layoutY="33.0" text="Audio Effects">
+   <TitledPane animated="false" collapsible="false" layoutX="425.0" layoutY="33.0" prefHeight="402.0" prefWidth="576.0" text="Audio Effects">
       <fx:include fx:id="effects" source="effects.fxml" />
    </TitledPane>
-   <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="7.0" layoutY="444.0" prefHeight="207.0" prefWidth="411.0" text="3D .obj file settings">
+   <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="7.0" layoutY="444.0" prefHeight="348.0" prefWidth="411.0" text="3D .obj file settings">
       <fx:include fx:id="obj" source="obj.fxml" />
-   </TitledPane>
-   <TitledPane animated="false" collapsible="false" layoutX="7.0" layoutY="658.0" prefHeight="122.0" prefWidth="411.0" text="Slider settings">
-     <content>
-       <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="322.0">
-            <children>
-               <TextField fx:id="sliderMinTextField" layoutX="48.0" layoutY="53.0" prefHeight="26.0" prefWidth="70.0" text="0.0" />
-               <Label layoutX="14.0" layoutY="56.0" text="min :" />
-               <Label layoutX="133.0" layoutY="56.0" text="max :" />
-               <TextField fx:id="sliderMaxTextField" layoutX="168.0" layoutY="53.0" prefHeight="26.0" prefWidth="69.0" text="0.0" />
-               <ComboBox fx:id="sliderComboBox" layoutX="14.0" layoutY="12.0" prefHeight="30.0" prefWidth="376.0" />
-            </children>
-         </AnchorPane>
-     </content>
    </TitledPane>
 </AnchorPane>

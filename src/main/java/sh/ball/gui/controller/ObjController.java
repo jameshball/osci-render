@@ -1,5 +1,6 @@
 package sh.ball.gui.controller;
 
+import javafx.beans.InvalidationListener;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
@@ -12,19 +13,37 @@ import sh.ball.audio.FrameProducer;
 import sh.ball.engine.Vector3;
 import sh.ball.parser.obj.ObjSettingsFactory;
 import sh.ball.shapes.Shape;
+import sh.ball.shapes.Vector2;
 
 import java.net.URL;
 import java.util.*;
 
 public class ObjController implements Initializable, SubController {
 
-  private Vector3 rotation = new Vector3(2 * Math.PI, 2 * Math.PI, 0);
   private FrameProducer<List<Shape>> producer;
 
   @FXML
   private Slider focalLengthSlider;
   @FXML
   private SVGPath focalLengthMidi;
+  @FXML
+  private Slider objectXRotateSlider;
+  @FXML
+  private SVGPath objectXRotateMidi;
+  @FXML
+  private CheckBox objectXRotateMic;
+  @FXML
+  private Slider objectYRotateSlider;
+  @FXML
+  private SVGPath objectYRotateMidi;
+  @FXML
+  private CheckBox objectYRotateMic;
+  @FXML
+  private Slider objectZRotateSlider;
+  @FXML
+  private SVGPath objectZRotateMidi;
+  @FXML
+  private CheckBox objectZRotateMic;
   @FXML
   private Slider objectRotateSpeedSlider;
   @FXML
@@ -40,6 +59,9 @@ public class ObjController implements Initializable, SubController {
   public Map<SVGPath, Slider> getMidiButtonMap() {
     return Map.of(
       focalLengthMidi, focalLengthSlider,
+      objectXRotateMidi, objectXRotateSlider,
+      objectYRotateMidi, objectYRotateSlider,
+      objectZRotateMidi, objectZRotateSlider,
       objectRotateSpeedMidi, objectRotateSpeedSlider
     );
   }
@@ -61,12 +83,21 @@ public class ObjController implements Initializable, SubController {
     setObjectRotateSpeed(objectRotateSpeedSlider.getValue());
   }
 
+  private double linearSpeedToActualSpeed(double rotateSpeed) {
+    return (Math.exp(3 * Math.min(10, Math.abs(rotateSpeed))) - 1) / 50;
+  }
+
   // changes the rotateSpeed of the FrameProducer
-  public void setObjectRotateSpeed(double rotateSpeed) {
-    double actualSpeed = (Math.exp(3 * Math.min(10, Math.abs(rotateSpeed))) - 1) / 50;
+  private void setObjectRotateSpeed(double rotateSpeed) {
+    double actualSpeed = linearSpeedToActualSpeed(rotateSpeed);
     producer.setFrameSettings(
       ObjSettingsFactory.rotateSpeed(rotateSpeed > 0 ? actualSpeed : -actualSpeed)
     );
+  }
+
+  public void setRotateXY(Vector2 rotate) {
+    objectXRotateSlider.setValue(rotate.getX());
+    objectYRotateSlider.setValue(rotate.getY());
   }
 
   // determines whether the mouse is being used to rotate a 3D object
@@ -81,8 +112,7 @@ public class ObjController implements Initializable, SubController {
   }
 
   // updates the 3D object base rotation angle
-  public void setObjRotate(Vector3 vector) {
-    rotation = vector;
+  private void setObjRotate(Vector3 vector) {
     producer.setFrameSettings(ObjSettingsFactory.baseRotation(vector));
   }
 
@@ -96,56 +126,57 @@ public class ObjController implements Initializable, SubController {
     focalLengthSlider.valueProperty().addListener((source, oldValue, newValue) ->
       setFocalLength(newValue.doubleValue())
     );
-    objectRotateSpeedSlider.valueProperty().addListener((source, oldValue, newValue) ->
-      setObjectRotateSpeed(newValue.doubleValue())
-    );
-    resetObjectRotationButton.setOnAction(e -> setObjRotate(new Vector3(2 * Math.PI, 2 * Math.PI, 0), new Vector3()));
+    InvalidationListener rotateSpeedListener = e -> setObjRotate(new Vector3(
+      objectXRotateSlider.getValue() * Math.PI,
+      objectYRotateSlider.getValue() * Math.PI,
+      objectZRotateSlider.getValue() * Math.PI
+    ));
+    objectXRotateSlider.valueProperty().addListener(rotateSpeedListener);
+    objectYRotateSlider.valueProperty().addListener(rotateSpeedListener);
+    objectZRotateSlider.valueProperty().addListener(rotateSpeedListener);
+
+    resetObjectRotationButton.setOnAction(e -> {
+      objectXRotateSlider.setValue(0);
+      objectYRotateSlider.setValue(0);
+      objectZRotateSlider.setValue(0);
+      objectRotateSpeedSlider.setValue(0);
+      setObjRotate(new Vector3(), new Vector3());
+    });
+
+    objectRotateSpeedSlider.valueProperty().addListener((e, old, speed) -> {
+      setObjectRotateSpeed(speed.doubleValue());
+    });
   }
 
   @Override
   public List<CheckBox> micCheckBoxes() {
     List<CheckBox> checkboxes = new ArrayList<>();
     checkboxes.add(null);
+    checkboxes.add(objectXRotateMic);
+    checkboxes.add(objectYRotateMic);
+    checkboxes.add(objectZRotateMic);
     checkboxes.add(objectRotateSpeedMic);
     return checkboxes;
   }
 
   @Override
   public List<Slider> sliders() {
-    return List.of(focalLengthSlider, objectRotateSpeedSlider);
+    return List.of(focalLengthSlider, objectXRotateSlider, objectYRotateSlider,
+      objectZRotateSlider, objectRotateSpeedSlider);
   }
 
   @Override
   public List<String> labels() {
-    return List.of("focalLength", "objectRotateSpeed");
+    return List.of("focalLength", "objectXRotate", "objectYRotate", "objectZRotate",
+      "objectRotateSpeed");
   }
 
   @Override
   public Element save(Document document) {
-    Element element = document.createElement("objectRotation");
-    Element x = document.createElement("x");
-    x.appendChild(document.createTextNode(Double.toString(rotation.x)));
-    Element y = document.createElement("y");
-    y.appendChild(document.createTextNode(Double.toString(rotation.y)));
-    Element z = document.createElement("z");
-    z.appendChild(document.createTextNode(Double.toString(rotation.z)));
-    element.appendChild(x);
-    element.appendChild(y);
-    element.appendChild(z);
-    return element;
+    return document.createElement("null");
   }
 
   @Override
   public void load(Element root) {
-    Element element = (Element) root.getElementsByTagName("objectRotation").item(0);
-    Element x = (Element) element.getElementsByTagName("x").item(0);
-    Element y = (Element) element.getElementsByTagName("y").item(0);
-    Element z = (Element) element.getElementsByTagName("z").item(0);
-    rotation = new Vector3(
-      Double.parseDouble(x.getTextContent()),
-      Double.parseDouble(y.getTextContent()),
-      Double.parseDouble(z.getTextContent())
-    );
-    setObjRotate(rotation);
   }
 }

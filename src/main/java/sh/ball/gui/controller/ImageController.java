@@ -19,10 +19,7 @@ import sh.ball.audio.midi.MidiNote;
 import sh.ball.shapes.Vector2;
 
 import java.net.URL;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.function.Consumer;
@@ -34,12 +31,13 @@ public class ImageController implements Initializable, SubController {
 
   private static final double MAX_FREQUENCY = 12000;
   private static final int DEFAULT_SAMPLE_RATE = 192000;
-  private static final double SCROLL_DELTA = 0.05;
 
   private final RotateEffect rotateEffect;
   private final TranslateEffect translateEffect;
 
   private final DoubleProperty frequency;
+
+  private double scrollDelta = 0.05;
 
   @FXML
   private TextField translationXTextField;
@@ -87,6 +85,8 @@ public class ImageController implements Initializable, SubController {
   private CheckBox visibilityMic;
   @FXML
   private Button resetRotationButton;
+  @FXML
+  private Button resetTranslationButton;
 
   public ImageController() {
     this.frequency = new SimpleDoubleProperty(0);
@@ -105,6 +105,10 @@ public class ImageController implements Initializable, SubController {
     translationYTextField.setText(MainController.FORMAT.format(translation.getY()));
   }
 
+  public void setTranslationIncrement(double increment) {
+    this.scrollDelta = increment;
+  }
+
   // changes the sinusoidal translation of the image rendered
   private void updateTranslation() {
     translateEffect.setTranslation(new Vector2(
@@ -115,7 +119,7 @@ public class ImageController implements Initializable, SubController {
 
   private void changeTranslation(boolean increase, TextField field) {
     double old = tryParse(field.getText());
-    double delta = increase ? SCROLL_DELTA : -SCROLL_DELTA;
+    double delta = increase ? scrollDelta : -scrollDelta;
     field.setText(MainController.FORMAT.format(old + delta));
   }
 
@@ -144,6 +148,10 @@ public class ImageController implements Initializable, SubController {
     );
 
     resetRotationButton.setOnAction(e -> rotateEffect.resetTheta());
+    resetTranslationButton.setOnAction(e -> {
+      translationXTextField.setText("0.00");
+      translationYTextField.setText("0.00");
+    });
 
     translationXTextField.textProperty().addListener(e -> updateTranslation());
     translationXTextField.setOnScroll((e) -> changeTranslation(e.getDeltaY() > 0, translationXTextField));
