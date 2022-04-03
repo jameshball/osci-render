@@ -18,7 +18,7 @@ public class WorldObject {
   private final List<Vector3> objVertices;
 
   // These should be a path of vertices from the above vertex list.
-  float[] objTriangles;
+  private float[] triangles;
   private List<Vector3> vertexPath;
   private Vector3 position;
   private Vector3 rotation;
@@ -46,6 +46,10 @@ public class WorldObject {
 
   public List<Vector3> getVertexPath() {
     return vertexPath;
+  }
+
+  public float[] getTriangles() {
+    return triangles;
   }
 
   public void getDrawPath(Set<Line3D> edges) {
@@ -173,7 +177,7 @@ public class WorldObject {
       }
     }
 
-    objTriangles = new float[9 * numTriangles];
+    triangles = new float[9 * numTriangles];
     int triangle = 0;
 
     for (OBJObject object : model.getObjects()) {
@@ -188,15 +192,15 @@ public class WorldObject {
             prev = curr;
             curr = objVertices.get(references.get(i + 1).vertexIndex);
             if (prev != null) {
-              objTriangles[9 * triangle] = (float) v1.x;
-              objTriangles[9 * triangle + 1] = (float) v1.y;
-              objTriangles[9 * triangle + 2] = (float) v1.z;
-              objTriangles[9 * triangle + 3] = (float) prev.x;
-              objTriangles[9 * triangle + 4] = (float) prev.y;
-              objTriangles[9 * triangle + 5] = (float) prev.z;
-              objTriangles[9 * triangle + 6] = (float) curr.x;
-              objTriangles[9 * triangle + 7] = (float) curr.y;
-              objTriangles[9 * triangle + 8] = (float) curr.z;
+              triangles[9 * triangle] = (float) v1.x;
+              triangles[9 * triangle + 1] = (float) v1.y;
+              triangles[9 * triangle + 2] = (float) v1.z;
+              triangles[9 * triangle + 3] = (float) prev.x;
+              triangles[9 * triangle + 4] = (float) prev.y;
+              triangles[9 * triangle + 5] = (float) prev.z;
+              triangles[9 * triangle + 6] = (float) curr.x;
+              triangles[9 * triangle + 7] = (float) curr.y;
+              triangles[9 * triangle + 8] = (float) curr.z;
               triangle++;
             }
           }

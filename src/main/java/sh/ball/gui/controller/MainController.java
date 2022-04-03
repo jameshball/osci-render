@@ -180,7 +180,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         closestToZero = i;
       }
     }
-    System.out.println(closestToZero);
     channelClosestToZero.put(slider, closestToZero);
   }
 
