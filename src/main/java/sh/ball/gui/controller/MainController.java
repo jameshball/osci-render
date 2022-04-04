@@ -122,6 +122,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private CheckMenuItem flipYCheckMenuItem;
   @FXML
+  private CheckMenuItem hideHiddenMeshesCheckMenuItem;
+  @FXML
   private Spinner<Integer> midiChannelSpinner;
   @FXML
   private Spinner<Double> translationIncrementSpinner;
@@ -268,6 +270,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     flipXCheckMenuItem.selectedProperty().addListener((e, old, flip) -> audioPlayer.flipXChannel(flip));
     flipYCheckMenuItem.selectedProperty().addListener((e, old, flip) -> audioPlayer.flipYChannel(flip));
 
+    hideHiddenMeshesCheckMenuItem.selectedProperty().addListener((e, old, hidden) -> objController.hideHiddenMeshes(hidden));
+
     NumberFormat format = NumberFormat.getIntegerInstance();
     UnaryOperator<TextFormatter.Change> filter = c -> {
       if (c.isContentChange()) {
@@ -404,6 +408,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     objController.updateFocalLength();
     if (oldSettings instanceof ObjFrameSettings settings) {
       objController.setObjRotate(settings.baseRotation, settings.currentRotation);
+      objController.hideHiddenMeshes(settings.hideEdges);
     }
     executor.submit(producer);
     effectsController.restartEffects();
@@ -718,6 +723,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       root.appendChild(flipX);
       root.appendChild(flipY);
 
+      Element hiddenEdges = document.createElement("hiddenEdges");
+      hiddenEdges.appendChild(document.createTextNode(String.valueOf(hideHiddenMeshesCheckMenuItem.isSelected())));
+      root.appendChild(hiddenEdges);
+
       Element translationIncrement = document.createElement("translationIncrement");
       translationIncrement.appendChild(document.createTextNode(translationIncrementSpinner.getValue().toString()));
       root.appendChild(translationIncrement);
@@ -812,6 +821,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
       if (flipY != null) {
         flipYCheckMenuItem.setSelected(Boolean.parseBoolean(flipY.getTextContent()));
+      }
+
+      Element hiddenEdges = (Element) root.getElementsByTagName("hiddenEdges").item(0);
+      if (hiddenEdges != null) {
+        hideHiddenMeshesCheckMenuItem.setSelected(Boolean.parseBoolean(hiddenEdges.getTextContent()));
       }
 
       Element translationIncrement = (Element) root.getElementsByTagName("translationIncrement").item(0);

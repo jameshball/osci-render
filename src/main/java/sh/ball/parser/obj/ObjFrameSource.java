@@ -67,12 +67,15 @@ public class ObjFrameSource implements FrameSource<List<Shape>> {
       if (obj.resetRotation) {
         object.resetRotation();
       }
+      if (obj.hideEdges != null) {
+        object.hideEdges(obj.hideEdges);
+      }
     }
   }
 
   // TODO: Refactor!
   @Override
   public Object getFrameSettings() {
-    return ObjSettingsFactory.rotation(baseRotation, currentRotation);
+    return new ObjFrameSettings(null, null, baseRotation, currentRotation, null, false, object.edgesHidden());
   }
 }

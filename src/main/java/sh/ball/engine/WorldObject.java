@@ -22,6 +22,7 @@ public class WorldObject {
   private List<Vector3> vertexPath;
   private Vector3 position;
   private Vector3 rotation;
+  private boolean hideEdges = false;
 
   private WorldObject(List<Vector3> objVertices, List<Vector3> vertexPath, Vector3 position,
                       Vector3 rotation) {
@@ -56,8 +57,6 @@ public class WorldObject {
     Graph<Vector3, DefaultWeightedEdge> graph = new DefaultUndirectedWeightedGraph<>(
       DefaultWeightedEdge.class);
 
-    vertexPath = new ArrayList<>();
-
     // Add all lines in frame to graph as vertices and edges. Edge weight is determined by the
     // length of the line as this is directly proportional to draw time.
     for (Line3D edge : edges) {
@@ -79,12 +78,7 @@ public class WorldObject {
     for (Set<Vector3> vertices : inspector.connectedSets()) {
       AsSubgraph<Vector3, DefaultWeightedEdge> subgraph = new AsSubgraph<>(graph, vertices);
       ChinesePostman<Vector3, DefaultWeightedEdge> cp = new ChinesePostman<>();
-      List<Vector3> path = cp.getCPPSolution(subgraph).getVertexList();
-
-      for (int i = 1; i < path.size(); i++) {
-        vertexPath.add(path.get(i - 1));
-        vertexPath.add(path.get(i));
-      }
+      vertexPath.addAll(cp.getCPPSolution(subgraph).getVertexList());
     }
   }
 
@@ -214,5 +208,13 @@ public class WorldObject {
   public WorldObject clone() {
     return new WorldObject(new ArrayList<>(objVertices), new ArrayList<>(vertexPath), position,
       rotation);
+  }
+
+  public void hideEdges(boolean hideEdges) {
+    this.hideEdges = hideEdges;
+  }
+
+  public boolean edgesHidden() {
+    return hideEdges;
   }
 }

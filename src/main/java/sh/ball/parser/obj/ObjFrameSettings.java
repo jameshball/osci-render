@@ -10,14 +10,16 @@ public class ObjFrameSettings {
   public Vector3 currentRotation;
   public Double rotateSpeed;
   public boolean resetRotation = false;
+  public Boolean hideEdges = null;
 
-  protected ObjFrameSettings(Double focalLength, Vector3 cameraPos, Vector3 baseRotation, Vector3 currentRotation, Double rotateSpeed, boolean resetRotation) {
+  protected ObjFrameSettings(Double focalLength, Vector3 cameraPos, Vector3 baseRotation, Vector3 currentRotation, Double rotateSpeed, boolean resetRotation, Boolean hideEdges) {
     this.focalLength = focalLength;
     this.cameraPos = cameraPos;
     this.baseRotation = baseRotation;
     this.currentRotation = currentRotation;
     this.rotateSpeed = rotateSpeed;
     this.resetRotation = resetRotation;
+    this.hideEdges = hideEdges;
   }
 
   protected ObjFrameSettings(double focalLength) {

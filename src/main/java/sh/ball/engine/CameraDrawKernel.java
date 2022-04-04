@@ -28,6 +28,7 @@ public class CameraDrawKernel extends Kernel {
   private float cameraPosY;
   private float cameraPosZ;
   private float focalLength;
+  private int hideEdges = 0;
 
   public CameraDrawKernel() {}
 
@@ -45,6 +46,7 @@ public class CameraDrawKernel extends Kernel {
       }
     }
     prevObject = object;
+    hideEdges = object.edgesHidden() ? 1 : 0;
     Vector3 rotation = object.getRotation();
     Vector3 position = object.getPosition();
     this.rotationX = (float) rotation.x;
@@ -70,11 +72,15 @@ public class CameraDrawKernel extends Kernel {
 
     linesList = new ArrayList<>();
 
-    for (int i = 0; i < vertices.length / 3; i += 2) {
-      if (!Float.isNaN(vertexResult[2 * i]) && !Float.isNaN(vertexResult[2 * i + 2])) {
+    for (int i = 0; i < vertices.length / 3; i++) {
+      int nextOffset = 0;
+      if (i < vertices.length / 3 - 1) {
+        nextOffset = 2 * i + 2;
+      }
+      if (!Float.isNaN(vertexResult[2 * i]) && !Float.isNaN(vertexResult[nextOffset])) {
         linesList.add(new Line(
           new Vector2(vertexResult[2 * i], vertexResult[2 * i + 1]),
-          new Vector2(vertexResult[2 * i + 2], vertexResult[2 * i + 3])
+          new Vector2(vertexResult[nextOffset], vertexResult[nextOffset + 1])
         ));
       }
     }
@@ -127,95 +133,97 @@ public class CameraDrawKernel extends Kernel {
     float rotatedY = y3 + positionY;
     float rotatedZ = z3 + positionZ;
 
-    float rotatedCameraPosX = cameraPosX - positionX;
-    float rotatedCameraPosY = cameraPosY - positionY;
-    float rotatedCameraPosZ = cameraPosZ - positionZ;
-
-    cosValue = cos(-rotationZ);
-    sinValue = sin(-rotationZ);
-    x2 = cosValue * rotatedCameraPosX - sinValue * rotatedCameraPosY;
-    y2 = sinValue * rotatedCameraPosX + cosValue * rotatedCameraPosY;
-
-    cosValue = cos(-rotationY);
-    sinValue = sin(-rotationY);
-    rotatedCameraPosX = cosValue * x2 + sinValue * rotatedCameraPosZ;
-    z2 = -sinValue * x2 + cosValue * rotatedCameraPosZ;
-
-    cosValue = cos(-rotationX);
-    sinValue = sin(-rotationX);
-    rotatedCameraPosY = cosValue * y2 - sinValue * z2;
-    rotatedCameraPosZ = sinValue * y2 + cosValue * z2;
-
-    float dirx = rotatedCameraPosX - x1;
-    float diry = rotatedCameraPosY - y1;
-    float dirz = rotatedCameraPosZ - z1;
-    float length = sqrt(dirx * dirx + diry * diry + dirz * dirz);
-    dirx /= length;
-    diry /= length;
-    dirz /= length;
-
     boolean intersects = false;
 
-    for (int j = 0; j < triangles.length / 9 && !intersects; j++) {
-      float v1x = triangles[9 * j];
-      float v1y = triangles[9 * j + 1];
-      float v1z = triangles[9 * j + 2];
-      float v2x = triangles[9 * j + 3];
-      float v2y = triangles[9 * j + 4];
-      float v2z = triangles[9 * j + 5];
-      float v3x = triangles[9 * j + 6];
-      float v3y = triangles[9 * j + 7];
-      float v3z = triangles[9 * j + 8];
+    if (hideEdges == 1) {
+      float rotatedCameraPosX = cameraPosX - positionX;
+      float rotatedCameraPosY = cameraPosY - positionY;
+      float rotatedCameraPosZ = cameraPosZ - positionZ;
 
-      // vec3 edge1 = v2 - v1;
-      float edge1x = v2x - v1x;
-      float edge1y = v2y - v1y;
-      float edge1z = v2z - v1z;
+      cosValue = cos(-rotationZ);
+      sinValue = sin(-rotationZ);
+      x2 = cosValue * rotatedCameraPosX - sinValue * rotatedCameraPosY;
+      y2 = sinValue * rotatedCameraPosX + cosValue * rotatedCameraPosY;
 
-      // vec3 edge2 = v3 - v1;
-      float edge2x = v3x - v1x;
-      float edge2y = v3y - v1y;
-      float edge2z = v3z - v1z;
+      cosValue = cos(-rotationY);
+      sinValue = sin(-rotationY);
+      rotatedCameraPosX = cosValue * x2 + sinValue * rotatedCameraPosZ;
+      z2 = -sinValue * x2 + cosValue * rotatedCameraPosZ;
 
-      // vec3 p = cross(dir, edge2);
-      float px = crossX(dirx, diry, dirz, edge2x, edge2y, edge2z);
-      float py = crossY(dirx, diry, dirz, edge2x, edge2y, edge2z);
-      float pz = crossZ(dirx, diry, dirz, edge2x, edge2y, edge2z);
+      cosValue = cos(-rotationX);
+      sinValue = sin(-rotationX);
+      rotatedCameraPosY = cosValue * y2 - sinValue * z2;
+      rotatedCameraPosZ = sinValue * y2 + cosValue * z2;
 
-      float det = dot(edge1x, edge1y, edge1z, px, py, pz);
+      float dirx = rotatedCameraPosX - x1;
+      float diry = rotatedCameraPosY - y1;
+      float dirz = rotatedCameraPosZ - z1;
+      float length = sqrt(dirx * dirx + diry * diry + dirz * dirz);
+      dirx /= length;
+      diry /= length;
+      dirz /= length;
 
-      if (det > -EPSILON && det < EPSILON) {
-        continue;
-      }
+      for (int j = 0; j < triangles.length / 9 && !intersects; j++) {
+        float v1x = triangles[9 * j];
+        float v1y = triangles[9 * j + 1];
+        float v1z = triangles[9 * j + 2];
+        float v2x = triangles[9 * j + 3];
+        float v2y = triangles[9 * j + 4];
+        float v2z = triangles[9 * j + 5];
+        float v3x = triangles[9 * j + 6];
+        float v3y = triangles[9 * j + 7];
+        float v3z = triangles[9 * j + 8];
 
-      float inv_det = 1.0f / det;
+        // vec3 edge1 = v2 - v1;
+        float edge1x = v2x - v1x;
+        float edge1y = v2y - v1y;
+        float edge1z = v2z - v1z;
 
-      // vec3 t = origin - v1;
-      float tx = x1 - v1x;
-      float ty = y1 - v1y;
-      float tz = z1 - v1z;
+        // vec3 edge2 = v3 - v1;
+        float edge2x = v3x - v1x;
+        float edge2y = v3y - v1y;
+        float edge2z = v3z - v1z;
 
-      float u = dot(tx, ty, tz, px, py, pz) * inv_det;
+        // vec3 p = cross(dir, edge2);
+        float px = crossX(dirx, diry, dirz, edge2x, edge2y, edge2z);
+        float py = crossY(dirx, diry, dirz, edge2x, edge2y, edge2z);
+        float pz = crossZ(dirx, diry, dirz, edge2x, edge2y, edge2z);
 
-      if (u < 0 || u > 1) {
-        continue;
-      }
+        float det = dot(edge1x, edge1y, edge1z, px, py, pz);
 
-      // vec3 q = cross(t, edge1);
-      float qx = crossX(tx, ty, tz, edge1x, edge1y, edge1z);
-      float qy = crossY(tx, ty, tz, edge1x, edge1y, edge1z);
-      float qz = crossZ(tx, ty, tz, edge1x, edge1y, edge1z);
+        if (det > -EPSILON && det < EPSILON) {
+          continue;
+        }
 
-      float v = dot(dirx, diry, dirz, qx, qy, qz) * inv_det;
+        float inv_det = 1.0f / det;
 
-      if (v < 0 || u + v > 1) {
-        continue;
-      }
+        // vec3 t = origin - v1;
+        float tx = x1 - v1x;
+        float ty = y1 - v1y;
+        float tz = z1 - v1z;
 
-      float mu = dot(edge2x, edge2y, edge2z, qx, qy, qz) * inv_det;
+        float u = dot(tx, ty, tz, px, py, pz) * inv_det;
 
-      if (mu > EPSILON) {
-        intersects = true;
+        if (u < 0 || u > 1) {
+          continue;
+        }
+
+        // vec3 q = cross(t, edge1);
+        float qx = crossX(tx, ty, tz, edge1x, edge1y, edge1z);
+        float qy = crossY(tx, ty, tz, edge1x, edge1y, edge1z);
+        float qz = crossZ(tx, ty, tz, edge1x, edge1y, edge1z);
+
+        float v = dot(dirx, diry, dirz, qx, qy, qz) * inv_det;
+
+        if (v < 0 || u + v > 1) {
+          continue;
+        }
+
+        float mu = dot(edge2x, edge2y, edge2z, qx, qy, qz) * inv_det;
+
+        if (mu > EPSILON) {
+          intersects = true;
+        }
       }
     }
 

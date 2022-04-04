@@ -121,6 +121,10 @@ public class ObjController implements Initializable, SubController {
     producer.setFrameSettings(ObjSettingsFactory.rotation(baseRotation, currentRotation));
   }
 
+  public void hideHiddenMeshes(Boolean hidden) {
+    producer.setFrameSettings(ObjSettingsFactory.hideEdges(hidden));
+  }
+
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
     focalLengthSlider.valueProperty().addListener((source, oldValue, newValue) ->
