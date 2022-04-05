@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.CheckMenuItem?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.CustomMenuItem?>
@@ -13,7 +14,7 @@
 <?import javafx.scene.input.KeyCodeCombination?>
 <?import javafx.scene.layout.AnchorPane?>
 
-<AnchorPane prefHeight="798.0" prefWidth="1008.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.MainController">
+<AnchorPane prefHeight="752.0" prefWidth="1008.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.MainController">
    <MenuBar prefHeight="27.0" prefWidth="1008.0">
      <menus>
        <Menu mnemonicParsing="false" text="File">
@@ -35,6 +36,39 @@
                </MenuItem>
             </items>
        </Menu>
+         <Menu mnemonicParsing="false" text="Audio">
+            <items>
+               <CustomMenuItem hideOnClick="false" mnemonicParsing="false" text="Audio Device">
+                  <content>
+                     <AnchorPane>
+                        <children>
+                           <ComboBox fx:id="deviceComboBox" prefHeight="26.0" prefWidth="376.0" />
+                        </children>
+                     </AnchorPane>
+                  </content>
+               </CustomMenuItem>
+               <MenuItem fx:id="recordMenuItem" mnemonicParsing="false" text="Start Recording">
+                  <accelerator>
+                     <KeyCodeCombination alt="UP" code="R" control="UP" meta="UP" shift="UP" shortcut="DOWN" />
+                  </accelerator>
+               </MenuItem>
+               <CustomMenuItem hideOnClick="false" mnemonicParsing="false" text="Timed recording?">
+                 <content>
+                   <CheckBox fx:id="recordCheckBox" text="Timed recording?" />
+                 </content>
+               </CustomMenuItem>
+               <CustomMenuItem fx:id="recordLengthMenuItem" disable="true" hideOnClick="false" mnemonicParsing="false" text="Record Length (s)">
+                  <content>
+                     <AnchorPane>
+                        <children>
+                           <Label prefHeight="25.0" text="Record length (s)" textFill="WHITE" />
+                           <Spinner fx:id="recordLengthSpinner" editable="true" layoutY="25.0" />
+                        </children>
+                     </AnchorPane>
+                  </content>
+               </CustomMenuItem>
+            </items>
+         </Menu>
          <Menu mnemonicParsing="false" text="MIDI">
            <items>
                <MenuItem fx:id="resetMidiMappingMenuItem" mnemonicParsing="false" text="Reset MIDI Mappings">
@@ -122,16 +156,16 @@
          </Menu>
      </menus>
    </MenuBar>
-   <TitledPane animated="false" collapsible="false" layoutX="7.0" layoutY="33.0" prefHeight="401.0" prefWidth="411.0" text="Main settings">
+   <TitledPane animated="false" collapsible="false" layoutX="7.0" layoutY="33.0" prefHeight="371.0" prefWidth="378.0" text="Main settings">
       <fx:include fx:id="general" source="general.fxml" />
    </TitledPane>
-   <TitledPane animated="false" collapsible="false" layoutX="425.0" layoutY="444.0" prefHeight="348.0" prefWidth="576.0" text="Image settings">
+   <TitledPane animated="false" collapsible="false" layoutX="478.0" layoutY="411.0" prefHeight="334.0" prefWidth="523.0" text="Image settings">
       <fx:include fx:id="image" source="image.fxml" />
    </TitledPane>
-   <TitledPane animated="false" collapsible="false" layoutX="425.0" layoutY="33.0" prefHeight="402.0" prefWidth="576.0" text="Audio Effects">
+   <TitledPane animated="false" collapsible="false" layoutX="392.0" layoutY="33.0" prefHeight="371.0" prefWidth="610.0" text="Audio Effects">
       <fx:include fx:id="effects" source="effects.fxml" />
    </TitledPane>
-   <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="7.0" layoutY="444.0" prefHeight="348.0" prefWidth="411.0" text="3D .obj file settings">
+   <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="7.0" layoutY="411.0" prefHeight="334.0" prefWidth="464.0" text="3D .obj file settings">
       <fx:include fx:id="obj" source="obj.fxml" />
    </TitledPane>
 </AnchorPane>
