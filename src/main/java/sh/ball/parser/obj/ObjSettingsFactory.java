@@ -17,7 +17,7 @@ public class ObjSettingsFactory {
   }
 
   public static ObjFrameSettings rotation(Vector3 baseRotation, Vector3 currentRotation) {
-    return new ObjFrameSettings(null, null, baseRotation, currentRotation, null, false);
+    return new ObjFrameSettings(null, null, baseRotation, currentRotation, null, false, null);
   }
 
   public static ObjFrameSettings rotateSpeed(double rotateSpeed) {
@@ -26,5 +26,9 @@ public class ObjSettingsFactory {
 
   public static ObjFrameSettings resetRotation() {
     return new ObjFrameSettings(true);
+  }
+
+  public static ObjFrameSettings hideEdges(Boolean hideEdges) {
+    return new ObjFrameSettings(null, null, null, null, null, false, hideEdges);
   }
 }

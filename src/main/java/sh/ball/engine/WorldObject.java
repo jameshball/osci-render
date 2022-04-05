@@ -18,9 +18,11 @@ public class WorldObject {
   private final List<Vector3> objVertices;
 
   // These should be a path of vertices from the above vertex list.
+  private float[] triangles;
   private List<Vector3> vertexPath;
   private Vector3 position;
   private Vector3 rotation;
+  private boolean hideEdges = false;
 
   private WorldObject(List<Vector3> objVertices, List<Vector3> vertexPath, Vector3 position,
                       Vector3 rotation) {
@@ -44,20 +46,16 @@ public class WorldObject {
   }
 
   public List<Vector3> getVertexPath() {
-    List<Vector3> newVertices = new ArrayList<>();
+    return vertexPath;
+  }
 
-    for (Vector3 vertex : vertexPath) {
-      newVertices.add(vertex.rotate(rotation).add(position));
-    }
-
-    return newVertices;
+  public float[] getTriangles() {
+    return triangles;
   }
 
   public void getDrawPath(Set<Line3D> edges) {
     Graph<Vector3, DefaultWeightedEdge> graph = new DefaultUndirectedWeightedGraph<>(
       DefaultWeightedEdge.class);
-
-    vertexPath = new ArrayList<>();
 
     // Add all lines in frame to graph as vertices and edges. Edge weight is determined by the
     // length of the line as this is directly proportional to draw time.
@@ -80,13 +78,12 @@ public class WorldObject {
     for (Set<Vector3> vertices : inspector.connectedSets()) {
       AsSubgraph<Vector3, DefaultWeightedEdge> subgraph = new AsSubgraph<>(graph, vertices);
       ChinesePostman<Vector3, DefaultWeightedEdge> cp = new ChinesePostman<>();
-      List<Vector3> path = cp.getCPPSolution(subgraph).getVertexList();
-
-      for (int i = 1; i < path.size(); i++) {
-        vertexPath.add(path.get(i - 1));
-        vertexPath.add(path.get(i));
-      }
+      vertexPath.addAll(cp.getCPPSolution(subgraph).getVertexList());
     }
+  }
+
+  public Vector3 getRotation() {
+    return rotation;
   }
 
   public void setRotation(Vector3 rotation) {
@@ -103,6 +100,10 @@ public class WorldObject {
 
   public void move(Vector3 translation) {
     position = position.add(translation);
+  }
+
+  public Vector3 getPosition() {
+    return position;
   }
 
   public void resetPosition() {
@@ -151,10 +152,14 @@ public class WorldObject {
       objVertices.add(new Vector3(vertex.x, vertex.y, vertex.z).sub(offset).scale(1.0/max));
     }
 
+    int numTriangles = 0;
+
     for (OBJObject object : model.getObjects()) {
       for (OBJMesh mesh : object.getMeshes()) {
         for (OBJFace face : mesh.getFaces()) {
           List<OBJDataReference> references = face.getReferences();
+          numTriangles += references.size() - 2;
+
 
           for (int i = 0; i < references.size(); i++) {
             edges.add(new Line3D(
@@ -166,11 +171,50 @@ public class WorldObject {
       }
     }
 
+    triangles = new float[9 * numTriangles];
+    int triangle = 0;
+
+    for (OBJObject object : model.getObjects()) {
+      for (OBJMesh mesh : object.getMeshes()) {
+        for (OBJFace face : mesh.getFaces()) {
+          List<OBJDataReference> references = face.getReferences();
+          Vector3 v1 = objVertices.get(references.get(0).vertexIndex);
+          Vector3 curr = null;
+          Vector3 prev;
+
+          for (int i = 0; i < references.size() - 1; i++) {
+            prev = curr;
+            curr = objVertices.get(references.get(i + 1).vertexIndex);
+            if (prev != null) {
+              triangles[9 * triangle] = (float) v1.x;
+              triangles[9 * triangle + 1] = (float) v1.y;
+              triangles[9 * triangle + 2] = (float) v1.z;
+              triangles[9 * triangle + 3] = (float) prev.x;
+              triangles[9 * triangle + 4] = (float) prev.y;
+              triangles[9 * triangle + 5] = (float) prev.z;
+              triangles[9 * triangle + 6] = (float) curr.x;
+              triangles[9 * triangle + 7] = (float) curr.y;
+              triangles[9 * triangle + 8] = (float) curr.z;
+              triangle++;
+            }
+          }
+        }
+      }
+    }
+
     return edges;
   }
 
   public WorldObject clone() {
     return new WorldObject(new ArrayList<>(objVertices), new ArrayList<>(vertexPath), position,
       rotation);
+  }
+
+  public void hideEdges(boolean hideEdges) {
+    this.hideEdges = hideEdges;
+  }
+
+  public boolean edgesHidden() {
+    return hideEdges;
   }
 }

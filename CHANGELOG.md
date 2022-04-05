@@ -1,0 +1,9 @@
+- 1.21.0
+  - Introduced GPU-based processing of objects
+    - THIS IS POTENTIALLY UNSTABLE - PLEASE REPORT ANY ISSUES
+  - Added option to remove hidden edges from meshes
+    - This can be toggled in View > Hide Hidden Edges
+  - Moved device options and recording options to Audio on the menu bar
+  - Reshuffled interface to reduce height and increase length of sliders
+
+Versions prior to 1.21.0 are undocumented!

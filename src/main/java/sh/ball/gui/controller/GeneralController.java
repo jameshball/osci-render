@@ -3,7 +3,6 @@ package sh.ball.gui.controller;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
-import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
@@ -15,33 +14,23 @@ import javafx.util.Duration;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.xml.sax.SAXException;
-import sh.ball.audio.engine.AudioDevice;
 
-import javax.sound.sampled.AudioFileFormat;
-import javax.sound.sampled.AudioInputStream;
-import javax.sound.sampled.AudioSystem;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Files;
-import java.text.SimpleDateFormat;
 import java.util.*;
 
 import static sh.ball.gui.Gui.audioPlayer;
-import static sh.ball.gui.Gui.defaultDevice;
 
 public class GeneralController implements Initializable, SubController {
 
   private MainController mainController;
 
-  private final FileChooser wavFileChooser = new FileChooser();
   private final FileChooser renderFileChooser = new FileChooser();
   private final DirectoryChooser folderChooser = new DirectoryChooser();
   private Stage stage;
-
-  private boolean recording = false;
-  private Timeline recordingTimeline;
 
   // frame playback (code by DJ_Level_3)
   private static final int MAX_FRAME_RATE = 120;
@@ -61,15 +50,7 @@ public class GeneralController implements Initializable, SubController {
   @FXML
   private Label jkLabel;
   @FXML
-  private Button recordButton;
-  @FXML
   private Label recordLabel;
-  @FXML
-  private TextField recordTextField;
-  @FXML
-  private CheckBox recordCheckBox;
-  @FXML
-  private Label recordLengthLabel;
   @FXML
   private Slider octaveSlider;
   @FXML
@@ -78,79 +59,9 @@ public class GeneralController implements Initializable, SubController {
   private Slider micVolumeSlider;
   @FXML
   private SVGPath micVolumeMidi;
-  @FXML
-  private ComboBox<AudioDevice> deviceComboBox;
 
-  // alternates between recording and not recording when called.
-  // If it is a non-timed recording, it is saved when this is called and
-  // recording is stopped. If it is a time recording, this function will cancel
-  // the recording.
-  private void toggleRecord() {
-    recording = !recording;
-    boolean timedRecord = recordCheckBox.isSelected();
-    if (recording) {
-      // if it is a timed recording then a timeline is scheduled to start and
-      // stop recording at the predefined times.
-      if (timedRecord) {
-        double recordingLength;
-        try {
-          recordingLength = Double.parseDouble(recordTextField.getText());
-        } catch (NumberFormatException e) {
-          recordLabel.setText("Please set a valid record length");
-          recording = false;
-          return;
-        }
-        recordButton.setText("Cancel");
-        KeyFrame kf1 = new KeyFrame(
-          Duration.seconds(0),
-          e -> audioPlayer.startRecord()
-        );
-        // save the recording after recordingLength seconds
-        KeyFrame kf2 = new KeyFrame(
-          Duration.seconds(recordingLength),
-          e -> {
-            saveRecording();
-            recording = false;
-          }
-        );
-        recordingTimeline = new Timeline(kf1, kf2);
-        Platform.runLater(recordingTimeline::play);
-      } else {
-        recordButton.setText("Stop Recording");
-        audioPlayer.startRecord();
-      }
-      recordLabel.setText("Recording...");
-    } else if (timedRecord) {
-      // cancel the recording
-      recordingTimeline.stop();
-      recordLabel.setText("");
-      recordButton.setText("Record");
-      audioPlayer.stopRecord();
-    } else {
-      saveRecording();
-    }
-  }
-
-  // Stops recording and opens a fileChooser so that the user can choose a
-  // location to save the recording to. If no location is chosen then it will
-  // be saved as the current date-time of the machine.
-  private void saveRecording() {
-    try {
-      recordButton.setText("Record");
-      AudioInputStream input = audioPlayer.stopRecord();
-      File file = wavFileChooser.showSaveDialog(stage);
-      SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
-      Date date = new Date(System.currentTimeMillis());
-      if (file == null) {
-        file = new File("out-" + formatter.format(date) + ".wav");
-      }
-      AudioSystem.write(input, AudioFileFormat.Type.WAVE, file);
-      input.close();
-      recordLabel.setText("Saved to " + file.getAbsolutePath());
-    } catch (IOException e) {
-      recordLabel.setText("Error saving file");
-      e.printStackTrace();
-    }
+  public void setRecordResult(String result) {
+    recordLabel.setText(result);
   }
 
   // selects a new file or folder for files to be rendered from
@@ -272,11 +183,6 @@ public class GeneralController implements Initializable, SubController {
   public void initialize(URL url, ResourceBundle resourceBundle) {
     octaveSlider.valueProperty().addListener((e, old, octave) -> audioPlayer.setOctave(octave.intValue()));
 
-    wavFileChooser.setInitialFileName("out.wav");
-    wavFileChooser.getExtensionFilters().addAll(
-      new FileChooser.ExtensionFilter("WAV Files", "*.wav"),
-      new FileChooser.ExtensionFilter("All Files", "*.*")
-    );
     // when opening new files, we support .obj, .svg, and .txt
     renderFileChooser.getExtensionFilters().addAll(
       new FileChooser.ExtensionFilter("All Files", "*.*"),
@@ -300,22 +206,6 @@ public class GeneralController implements Initializable, SubController {
         updateLastVisitedDirectory(file);
       }
     });
-
-    recordButton.setOnAction(event -> toggleRecord());
-
-    recordCheckBox.selectedProperty().addListener((e, oldVal, newVal) -> {
-      recordLengthLabel.setDisable(!newVal);
-      recordTextField.setDisable(!newVal);
-    });
-
-    List<AudioDevice> devices = audioPlayer.devices();
-    deviceComboBox.setItems(FXCollections.observableList(devices));
-    deviceComboBox.setValue(defaultDevice);
-    deviceComboBox.valueProperty().addListener((options, oldDevice, newDevice) -> {
-      if (newDevice != null) {
-        mainController.switchAudioDevice(newDevice);
-      }
-    });
   }
 
   @Override
@@ -327,7 +217,6 @@ public class GeneralController implements Initializable, SubController {
   }
 
   public void updateLastVisitedDirectory(File dir) {
-    wavFileChooser.setInitialDirectory(dir);
     renderFileChooser.setInitialDirectory(dir);
     folderChooser.setInitialDirectory(dir);
   }

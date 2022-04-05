@@ -1,11 +1,14 @@
 package sh.ball.gui.controller;
 
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.scene.control.*;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.scene.shape.SVGPath;
+import javafx.util.Duration;
 import javafx.util.converter.IntegerStringConverter;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -14,10 +17,7 @@ import sh.ball.audio.*;
 
 import java.io.*;
 import java.net.URL;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
-import java.text.NumberFormat;
-import java.text.ParsePosition;
+import java.text.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.UnaryOperator;
@@ -28,6 +28,9 @@ import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
 import javax.sound.midi.ShortMessage;
+import javax.sound.sampled.AudioFileFormat;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -45,7 +48,6 @@ import sh.ball.audio.engine.AudioInputListener;
 import sh.ball.audio.engine.JavaAudioInput;
 import sh.ball.audio.midi.MidiListener;
 import sh.ball.audio.midi.MidiNote;
-import sh.ball.engine.Vector3;
 import sh.ball.gui.Gui;
 import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjParser;
@@ -66,6 +68,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private static final double MAJOR_TICK_UNIT = 0.1;
 
   private String openProjectPath;
+  private final FileChooser wavFileChooser = new FileChooser();
 
   // audio
   private int sampleRate;
@@ -73,6 +76,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private final double[] micSamples = new double[64];
   private int micSampleIndex = 0;
   private double[] targetSliderValue;
+  private boolean recording = false;
+  private Timeline recordingTimeline;
 
   // midi
   private final Map<Integer, SVGPath> CCMap = new HashMap<>();
@@ -122,6 +127,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private CheckMenuItem flipYCheckMenuItem;
   @FXML
+  private CheckMenuItem hideHiddenMeshesCheckMenuItem;
+  @FXML
   private Spinner<Integer> midiChannelSpinner;
   @FXML
   private Spinner<Double> translationIncrementSpinner;
@@ -133,6 +140,16 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private TextField sliderMaxTextField;
   @FXML
   private Spinner<Integer> deadzoneSpinner;
+  @FXML
+  private ComboBox<AudioDevice> deviceComboBox;
+  @FXML
+  private CustomMenuItem recordLengthMenuItem;
+  @FXML
+  private CheckBox recordCheckBox;
+  @FXML
+  private MenuItem recordMenuItem;
+  @FXML
+  private Spinner<Double> recordLengthSpinner;
 
   public MainController() throws Exception {
     // Clone DEFAULT_OBJ InputStream using a ByteArrayOutputStream
@@ -180,8 +197,82 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         closestToZero = i;
       }
     }
-    System.out.println(closestToZero);
     channelClosestToZero.put(slider, closestToZero);
+  }
+
+  // alternates between recording and not recording when called.
+  // If it is a non-timed recording, it is saved when this is called and
+  // recording is stopped. If it is a time recording, this function will cancel
+  // the recording.
+  private void toggleRecord() {
+    recording = !recording;
+    boolean timedRecord = recordCheckBox.isSelected();
+    if (recording) {
+      // if it is a timed recording then a timeline is scheduled to start and
+      // stop recording at the predefined times.
+      if (timedRecord) {
+        double recordingLength;
+        try {
+          recordingLength = recordLengthSpinner.getValue();
+        } catch (NumberFormatException e) {
+          generalController.setRecordResult("Please set a valid record length");
+          recording = false;
+          return;
+        }
+        recordMenuItem.setText("Cancel");
+        KeyFrame kf1 = new KeyFrame(
+          Duration.seconds(0),
+          e -> audioPlayer.startRecord()
+        );
+        // save the recording after recordingLength seconds
+        KeyFrame kf2 = new KeyFrame(
+          Duration.seconds(recordingLength),
+          e -> {
+            saveRecording();
+            recording = false;
+          }
+        );
+        recordingTimeline = new Timeline(kf1, kf2);
+        Platform.runLater(recordingTimeline::play);
+      } else {
+        recordMenuItem.setText("Stop Recording");
+        audioPlayer.startRecord();
+      }
+      generalController.setRecordResult("Recording...");
+    } else if (timedRecord) {
+      // cancel the recording
+      recordingTimeline.stop();
+      generalController.setRecordResult("");
+      recordMenuItem.setText("Start Recording");
+      audioPlayer.stopRecord();
+    } else {
+      saveRecording();
+    }
+  }
+
+  // Stops recording and opens a fileChooser so that the user can choose a
+  // location to save the recording to. If no location is chosen then it will
+  // be saved as the current date-time of the machine.
+  private void saveRecording() {
+    try {
+      recordMenuItem.setText("Record");
+      AudioInputStream input = audioPlayer.stopRecord();
+      File file = wavFileChooser.showSaveDialog(stage);
+      if (file != null) {
+        updateLastVisitedDirectory(new File(file.getParent()));
+      }
+      SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
+      Date date = new Date(System.currentTimeMillis());
+      if (file == null) {
+        file = new File("out-" + formatter.format(date) + ".wav");
+      }
+      AudioSystem.write(input, AudioFileFormat.Type.WAVE, file);
+      input.close();
+      generalController.setRecordResult("Saved to " + file.getAbsolutePath());
+    } catch (IOException e) {
+      generalController.setRecordResult("Error saving file");
+      e.printStackTrace();
+    }
   }
 
   @Override
@@ -269,6 +360,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     flipXCheckMenuItem.selectedProperty().addListener((e, old, flip) -> audioPlayer.flipXChannel(flip));
     flipYCheckMenuItem.selectedProperty().addListener((e, old, flip) -> audioPlayer.flipYChannel(flip));
 
+    hideHiddenMeshesCheckMenuItem.selectedProperty().addListener((e, old, hidden) -> objController.hideHiddenMeshes(hidden));
+
     NumberFormat format = NumberFormat.getIntegerInstance();
     UnaryOperator<TextFormatter.Change> filter = c -> {
       if (c.isContentChange()) {
@@ -318,6 +411,29 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
     });
 
+    recordLengthSpinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(0.1, 100000000, 2.0, 0.1));
+
+    wavFileChooser.setInitialFileName("out.wav");
+    wavFileChooser.getExtensionFilters().addAll(
+      new FileChooser.ExtensionFilter("WAV Files", "*.wav"),
+      new FileChooser.ExtensionFilter("All Files", "*.*")
+    );
+
+    recordMenuItem.setOnAction(event -> toggleRecord());
+
+    recordCheckBox.selectedProperty().addListener((e, oldVal, newVal) -> {
+      recordLengthMenuItem.setDisable(!newVal);
+    });
+
+    List<AudioDevice> devices = audioPlayer.devices();
+    deviceComboBox.setItems(FXCollections.observableList(devices));
+    deviceComboBox.setValue(defaultDevice);
+    deviceComboBox.valueProperty().addListener((options, oldDevice, newDevice) -> {
+      if (newDevice != null) {
+        switchAudioDevice(newDevice);
+      }
+    });
+
     objController.updateObjectRotateSpeed();
 
     switchAudioDevice(defaultDevice, false);
@@ -341,11 +457,12 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private void updateLastVisitedDirectory(File file) {
     String lastVisitedDirectory = file != null ? file.getAbsolutePath() : System.getProperty("user.home");
     File dir = new File(lastVisitedDirectory);
+    wavFileChooser.setInitialDirectory(dir);
     osciFileChooser.setInitialDirectory(dir);
     generalController.updateLastVisitedDirectory(dir);
   }
 
-  void switchAudioDevice(AudioDevice device) {
+  private void switchAudioDevice(AudioDevice device) {
     switchAudioDevice(device, true);
   }
 
@@ -406,6 +523,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     if (oldSettings instanceof ObjFrameSettings settings) {
       objController.setObjRotate(settings.baseRotation, settings.currentRotation);
     }
+    objController.hideHiddenMeshes(hideHiddenMeshesCheckMenuItem.isSelected());
     executor.submit(producer);
     effectsController.restartEffects();
 
@@ -719,6 +837,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       root.appendChild(flipX);
       root.appendChild(flipY);
 
+      Element hiddenEdges = document.createElement("hiddenEdges");
+      hiddenEdges.appendChild(document.createTextNode(String.valueOf(hideHiddenMeshesCheckMenuItem.isSelected())));
+      root.appendChild(hiddenEdges);
+
       Element translationIncrement = document.createElement("translationIncrement");
       translationIncrement.appendChild(document.createTextNode(translationIncrementSpinner.getValue().toString()));
       root.appendChild(translationIncrement);
@@ -813,6 +935,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
       if (flipY != null) {
         flipYCheckMenuItem.setSelected(Boolean.parseBoolean(flipY.getTextContent()));
+      }
+
+      Element hiddenEdges = (Element) root.getElementsByTagName("hiddenEdges").item(0);
+      if (hiddenEdges != null) {
+        hideHiddenMeshesCheckMenuItem.setSelected(Boolean.parseBoolean(hiddenEdges.getTextContent()));
       }
 
       Element translationIncrement = (Element) root.getElementsByTagName("translationIncrement").item(0);
