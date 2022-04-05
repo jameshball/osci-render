@@ -28,7 +28,7 @@ jobs:
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
-        body_path: CHANGELOG
+        body_path: GPU VERSION - This is potentially unstable on Mac/Linux!! Please report any issues. If you hear nothing, but you see the program interface, then please let me know.
         tag_name: v${{ env.VERSION }}
         files: |
           target/lib/osci-render-${{ env.VERSION }}.exe
