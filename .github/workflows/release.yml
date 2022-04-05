@@ -22,13 +22,13 @@ jobs:
         mvn -B jpackage:jpackage@win
         $version= mvn help:evaluate -Dexpression="project.version" -q -DforceStdout
         echo "VERSION=$version" >> $env:GITHUB_ENV
-        echo "Release version $version" > CHANGELOG
+        echo "GPU VERSION - This is potentially unstable on Mac/Linux!! Please report any issues. If you hear nothing, but you see the program interface, then please let me know." > CHANGELOG
         mv "target/lib/osci-render-$version.jar" "target/lib/osci-render-win-$version.jar"
         ls target/lib/
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
-        body_path: GPU VERSION - This is potentially unstable on Mac/Linux!! Please report any issues. If you hear nothing, but you see the program interface, then please let me know.
+        body_path: CHANGELOG
         tag_name: v${{ env.VERSION }}
         files: |
           target/lib/osci-render-${{ env.VERSION }}.exe
