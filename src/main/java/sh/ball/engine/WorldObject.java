@@ -19,12 +19,12 @@ public class WorldObject {
 
   // These should be a path of vertices from the above vertex list.
   private float[] triangles;
-  private List<Vector3> vertexPath;
+  private List<List<Vector3>> vertexPath;
   private Vector3 position;
   private Vector3 rotation;
   private boolean hideEdges = false;
 
-  private WorldObject(List<Vector3> objVertices, List<Vector3> vertexPath, Vector3 position,
+  private WorldObject(List<Vector3> objVertices, List<List<Vector3>> vertexPath, Vector3 position,
                       Vector3 rotation) {
     this.objVertices = objVertices;
     this.position = position;
@@ -45,7 +45,7 @@ public class WorldObject {
     this(input, new Vector3(), new Vector3());
   }
 
-  public List<Vector3> getVertexPath() {
+  public List<List<Vector3>> getVertexPath() {
     return vertexPath;
   }
 
@@ -78,7 +78,7 @@ public class WorldObject {
     for (Set<Vector3> vertices : inspector.connectedSets()) {
       AsSubgraph<Vector3, DefaultWeightedEdge> subgraph = new AsSubgraph<>(graph, vertices);
       ChinesePostman<Vector3, DefaultWeightedEdge> cp = new ChinesePostman<>();
-      vertexPath.addAll(cp.getCPPSolution(subgraph).getVertexList());
+      vertexPath.add(cp.getCPPSolution(subgraph).getVertexList());
     }
   }
 

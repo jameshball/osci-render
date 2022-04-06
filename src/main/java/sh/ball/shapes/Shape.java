@@ -239,10 +239,10 @@ public abstract class Shape {
   }
 
   public static double totalLength(List<? extends Shape> shapes) {
-    return shapes
-      .stream()
-      .map(Shape::getLength)
-      .reduce(Double::sum)
-      .orElse(0d);
+    double total = 0;
+    for (Shape shape : shapes) {
+      total += shape.getLength();
+    }
+    return total;
   }
 }

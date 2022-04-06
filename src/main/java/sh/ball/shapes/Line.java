@@ -32,10 +32,13 @@ public final class Line extends Shape {
   @Override
   public double getLength() {
     if (length == INVALID_LENGTH) {
-      double ac = Math.abs(getY2() - getY1());
-      double cb = Math.abs(getX2() - getX1());
+      // Euclidean distance approximation based on octagonal boundary
+      double dx = Math.abs(b.x - a.x);
+      double dy = Math.abs(b.y - a.y);
+      double min = dy <= dx ? dx : dy;
+      double max = dy > dx ? dy : dx;
 
-      length = Math.hypot(ac, cb);
+      length = 0.41 * min + 0.941246 * max;
     }
     return length;
   }

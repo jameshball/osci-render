@@ -10,13 +10,13 @@ import sh.ball.shapes.Vector2;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class CameraDrawKernel extends Kernel {
 
   private WorldObject prevObject = null;
   private float[] vertices;
   private float[] vertexResult;
-  private List<Shape> linesList;
   private float[] triangles;
   private float rotationX;
   private float rotationY;
@@ -34,15 +34,26 @@ public class CameraDrawKernel extends Kernel {
 
   public List<Shape> draw(Camera camera, WorldObject object) {
     if (prevObject != object) {
-      List<Vector3> vertices = object.getVertexPath();
-      this.vertices = new float[vertices.size() * 3];
-      this.vertexResult = new float[vertices.size() * 2];
+      List<List<Vector3>> vertices = object.getVertexPath();
+      int numVertices = vertices.stream().map(List::size).reduce(Integer::sum).orElse(0) + vertices.size();
+      this.vertices = new float[numVertices * 3];
+      this.vertexResult = new float[numVertices * 2];
       this.triangles = object.getTriangles();
+      int count = 0;
       for (int i = 0; i < vertices.size(); i++) {
-        Vector3 vertex = vertices.get(i);
-        this.vertices[3 * i] = (float) vertex.x;
-        this.vertices[3 * i + 1] = (float) vertex.y;
-        this.vertices[3 * i + 2] = (float) vertex.z;
+        for (int j = 0; j < vertices.get(i).size(); j++) {
+          Vector3 vertex = vertices.get(i).get(j);
+          this.vertices[3 * count] = (float) vertex.x;
+          this.vertices[3 * count + 1] = (float) vertex.y;
+          this.vertices[3 * count + 2] = (float) vertex.z;
+          count++;
+        }
+        // Set it to NaN so that the line connecting the vertex before and after
+        // this path segment is not drawn.
+        this.vertices[3 * count] = Float.NaN;
+        this.vertices[3 * count + 1] = Float.NaN;
+        this.vertices[3 * count + 2] = Float.NaN;
+        count++;
       }
     }
     prevObject = object;
@@ -70,7 +81,7 @@ public class CameraDrawKernel extends Kernel {
 
     execute(Range.create(roundUp(vertices.length / 3, maxGroupSize), maxGroupSize));
 
-    linesList = new ArrayList<>();
+    List<Shape> linesList = new ArrayList<>();
 
     for (int i = 0; i < vertices.length / 3; i++) {
       int nextOffset = 0;
@@ -109,6 +120,13 @@ public class CameraDrawKernel extends Kernel {
     float x1 = vertices[3 * i];
     float y1 = vertices[3 * i + 1];
     float z1 = vertices[3 * i + 2];
+
+    // Check for NaN and return NaN projected vertices immediately
+    if (x1 != x1 || y1 != y1 || z1 != z1) {
+      vertexResult[2 * i] = Float.NaN;
+      vertexResult[2 * i + 1] = Float.NaN;
+      return;
+    }
 
     // rotate around x-axis
     float cosValue = cos(rotationX);

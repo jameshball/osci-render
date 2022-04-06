@@ -149,7 +149,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     }
   }
 
-  private Vector2 generateChannels() throws InterruptedException {
+  private Vector2 generateChannels() {
     Shape shape = getCurrentShape();
 
     double length = shape.getLength();
@@ -175,8 +175,13 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
     if (currentShape >= frame.size() || frameDrawn > proportionalLength) {
       currentShape = 0;
-      frame = frameQueue.take();
-      frameLength = Shape.totalLength(frame);
+      List<Shape> oldFrame = frame;
+      frame = frameQueue.poll();
+      if (frame == null) {
+        frame = oldFrame;
+      } else {
+        frameLength = Shape.totalLength(frame);
+      }
       shapeDrawn = 0;
       frameDrawn = 0;
 
@@ -425,7 +430,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     for (int channel = 0; channel < keyActualVolumes.length; channel++) {
       for (int key = 0; key < keyActualVolumes[channel].length; key++) {
         MidiNote note = new MidiNote(key, channel);
-        sineEffects[channel][key] = new SineEffect(sampleRate, note.frequency(), keyActualVolumes[channel][key] / MidiNote.MAX_VELOCITY);
+        sineEffects[channel][key] = new SineEffect(sampleRate, note.frequency(), (float) keyActualVolumes[channel][key] / MidiNote.MAX_VELOCITY);
       }
     }
     for (Effect effect : effects.values()) {
@@ -478,7 +483,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     double totalVolume = 0;
     for (short[] volumes : keyActualVolumes) {
       for (short volume : volumes) {
-        totalVolume += volume / MidiNote.MAX_VELOCITY;
+        totalVolume += (float) volume / MidiNote.MAX_VELOCITY;
       }
     }
     if (totalVolume != 0) {

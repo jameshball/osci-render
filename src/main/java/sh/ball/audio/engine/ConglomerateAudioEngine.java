@@ -5,6 +5,7 @@ import sh.ball.shapes.Vector2;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
 
 // combines all types of AudioEngines into a single AudioEngine to allow for
@@ -25,6 +26,7 @@ public class ConglomerateAudioEngine implements AudioEngine {
 
   private boolean playing = false;
   private AudioDevice device;
+  private BufferedChannelGenerator bufferedChannelGenerator;
 
   @Override
   public boolean isPlaying() {
@@ -35,10 +37,15 @@ public class ConglomerateAudioEngine implements AudioEngine {
   public void play(Callable<Vector2> channelGenerator, AudioDevice device) throws Exception {
     playing = true;
     this.device = device;
+    if (bufferedChannelGenerator != null) {
+      bufferedChannelGenerator.stop();
+    }
+    bufferedChannelGenerator = new BufferedChannelGenerator(channelGenerator);
+    new Thread(bufferedChannelGenerator).start();
     if (xtDevices.contains(device)) {
-      xtEngine.play(channelGenerator, device);
+      xtEngine.play(bufferedChannelGenerator, device);
     } else {
-      javaEngine.play(channelGenerator, device);
+      javaEngine.play(bufferedChannelGenerator, device);
     }
     playing = false;
     this.device = null;
@@ -48,6 +55,7 @@ public class ConglomerateAudioEngine implements AudioEngine {
   public void stop() {
     xtEngine.stop();
     javaEngine.stop();
+    bufferedChannelGenerator.stop();
   }
 
   @Override
@@ -81,5 +89,61 @@ public class ConglomerateAudioEngine implements AudioEngine {
   @Override
   public AudioDevice currentDevice() {
     return device;
+  }
+
+  // This ensures that the channelGenerator is ALWAYS being called regardless
+  // of whether the underlying AudioEngine is requesting channels as soon as they
+  // are needed. This significantly improves performance of JavaAudioEngine and
+  // keeps expensive computation out of the audio thread, in exchange for
+  // potentially blocking on a buffer.
+  private static class BufferedChannelGenerator implements Callable<Vector2>, Runnable {
+
+    private static final int BLOCK_SIZE = 4096;
+    private static final int BUFFER_SIZE = 2;
+
+    private final ArrayBlockingQueue<Vector2[]> buffer;
+    private final Callable<Vector2> channelGenerator;
+
+    private Vector2[] currentBlock = null;
+    private int currentVector = 0;
+    private boolean stopped = true;
+
+    private BufferedChannelGenerator(Callable<Vector2> channelGenerator) {
+      this.buffer = new ArrayBlockingQueue<>(BUFFER_SIZE);
+      this.channelGenerator = channelGenerator;
+    }
+
+    public void stop() {
+      stopped = true;
+    }
+
+    @Override
+    public void run() {
+      stopped = false;
+      while (!stopped) {
+        Vector2[] block = new Vector2[BLOCK_SIZE];
+        for (int i = 0; i < block.length; i++) {
+          try {
+            block[i] = channelGenerator.call();
+          } catch (Exception e) {
+            e.printStackTrace();
+          }
+        }
+        try {
+          buffer.put(block);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+      }
+    }
+
+    @Override
+    public Vector2 call() throws Exception {
+      if (currentBlock == null || currentVector >= BLOCK_SIZE) {
+        currentBlock = buffer.take();
+        currentVector = 0;
+      }
+      return currentBlock[currentVector++];
+    }
   }
 }

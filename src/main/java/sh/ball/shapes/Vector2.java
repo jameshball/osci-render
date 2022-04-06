@@ -6,8 +6,8 @@ import static sh.ball.math.Math.round;
 
 public final class Vector2 extends Shape {
 
-  private final double x;
-  private final double y;
+  public final double x;
+  public final double y;
 
   public Vector2(double x, double y) {
     this.x = x;

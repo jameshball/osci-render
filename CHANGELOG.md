@@ -1,3 +1,8 @@
+- 1.21.1
+  - Significantly improved .obj rendering performance on larger objects
+  - Reduce framerate when drawing too computationally intensive scenes rather than pausing audio (less jarring framerate changes)
+  - Correctly skip lines between objects with disconnected sections
+
 - 1.21.0
   - Introduced GPU-based processing of objects
     - THIS IS POTENTIALLY UNSTABLE - PLEASE REPORT ANY ISSUES
