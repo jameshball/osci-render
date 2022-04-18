@@ -8,9 +8,7 @@ import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 
 public class CameraDrawKernel extends Kernel {
 

@@ -24,6 +24,15 @@ public class WorldObject {
   private Vector3 rotation;
   private boolean hideEdges = false;
 
+  private WorldObject(Vector3[] vertices, int[] edgeIndices) {
+    objVertices = Arrays.stream(vertices).toList();
+    Set<Line3D> edges = new HashSet<>();
+    for (int i = 0; i < edgeIndices.length; i += 2) {
+      edges.add(new Line3D(vertices[i], vertices[i + 1]));
+    }
+    getDrawPath(edges);
+  }
+
   private WorldObject(List<Vector3> objVertices, List<List<Vector3>> vertexPath, Vector3 position,
                       Vector3 rotation) {
     this.objVertices = objVertices;

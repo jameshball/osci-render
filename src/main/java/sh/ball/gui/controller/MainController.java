@@ -48,6 +48,7 @@ import sh.ball.audio.engine.AudioInputListener;
 import sh.ball.audio.engine.JavaAudioInput;
 import sh.ball.audio.midi.MidiListener;
 import sh.ball.audio.midi.MidiNote;
+import sh.ball.engine.ObjectServer;
 import sh.ball.gui.Gui;
 import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjParser;
@@ -450,6 +451,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         }
       }
     }
+
+    new Thread(new ObjectServer()).start();
   }
 
   // used when a file is chosen so that the same folder is reopened when a
