@@ -71,6 +71,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private String openProjectPath;
   private final FileChooser wavFileChooser = new FileChooser();
 
+  private ObjectServer server;
+
   // audio
   private int sampleRate;
   private FrequencyAnalyser<List<Shape>> analyser;
@@ -452,7 +454,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
     }
 
-    new Thread(new ObjectServer()).start();
+    server = new ObjectServer();
+    openFiles.add(null);
+    frameSources.add(server.getObjectSet());
+    frameSourcePaths.add("BLENDER");
+    new Thread(server).start();
   }
 
   // used when a file is chosen so that the same folder is reopened when a
