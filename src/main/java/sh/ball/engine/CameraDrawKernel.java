@@ -9,12 +9,12 @@ import sh.ball.shapes.Vector2;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 
 public class CameraDrawKernel extends Kernel {
 
   private WorldObject prevObject = null;
+  private List<WorldObject> prevObjects = null;
   private float[] vertices;
   private float[] vertexResult;
   private float[] triangles;
@@ -57,32 +57,37 @@ public class CameraDrawKernel extends Kernel {
   public List<Shape> draw(ObjectSet objects, float focalLength) {
     this.focalLength = focalLength;
     usingObjectSet = 1;
-    List<List<List<Vector3>>> vertices = objects.objects.stream().map(WorldObject::getVertexPath).toList();
-    this.vertexNums = vertices.stream().mapToInt(
-      l -> l.stream()
-        .map(List::size)
-        .reduce(0, Integer::sum) + l.size()
-    ).toArray();
-    int numVertices = Arrays.stream(vertexNums).sum();
-    this.vertices = new float[numVertices * 3];
-    this.vertexResult = new float[numVertices * 2];
-    this.matrices = new float[vertices.size() * 16];
+    List<WorldObject> objectList = objects.objects.stream().toList();
+    if (!objectList.equals(prevObjects)) {
+      prevObjects = objectList;
+      List<List<List<Vector3>>> vertices = objectList.stream().map(WorldObject::getVertexPath).toList();
+      this.vertexNums = vertices.stream().mapToInt(
+        l -> l.stream()
+          .map(List::size)
+          .reduce(0, Integer::sum) + l.size()
+      ).toArray();
+      int numVertices = Arrays.stream(vertexNums).sum();
+      this.vertices = new float[numVertices * 3];
+      this.vertexResult = new float[numVertices * 2];
+      this.matrices = new float[vertices.size() * 16];
+      List<float[]> triangles = objectList.stream().map(WorldObject::getTriangles).toList();
+      int numTriangles = triangles.stream().map(arr -> arr.length).reduce(0, Integer::sum);
+      this.triangles = new float[numTriangles];
+      int offset = 0;
+      for (float[] triangleArray : triangles) {
+        System.arraycopy(triangleArray, 0, this.triangles, offset, triangleArray.length);
+        offset += triangleArray.length;
+      }
+      int count = 0;
+      for (List<List<Vector3>> vertexList : vertices) {
+        count = initialiseVertices(count, vertexList);
+      }
+    }
+
     int offset = 0;
     for (float[] matrix : objects.cameraSpaceMatrices) {
       System.arraycopy(matrix, 0, this.matrices, offset, matrix.length);
       offset += matrix.length;
-    }
-    List<float[]> triangles = objects.objects.stream().map(WorldObject::getTriangles).toList();
-    int numTriangles = triangles.stream().map(arr -> arr.length).reduce(0, Integer::sum);
-    this.triangles = new float[numTriangles];
-    offset = 0;
-    for (float[] triangleArray : triangles) {
-      System.arraycopy(triangleArray, 0, this.triangles, offset, triangleArray.length);
-      offset += triangleArray.length;
-    }
-    int count = 0;
-    for (List<List<Vector3>> vertexList : vertices) {
-      count = initialiseVertices(count, vertexList);
     }
 
     this.cameraPosX = 0;

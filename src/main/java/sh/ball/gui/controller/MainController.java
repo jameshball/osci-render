@@ -49,6 +49,7 @@ import sh.ball.audio.engine.JavaAudioInput;
 import sh.ball.audio.midi.MidiListener;
 import sh.ball.audio.midi.MidiNote;
 import sh.ball.engine.ObjectServer;
+import sh.ball.engine.ObjectSet;
 import sh.ball.gui.Gui;
 import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjParser;
@@ -98,6 +99,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private List<FrameSource<List<Shape>>> frameSources = new ArrayList<>();
   private FrameProducer<List<Shape>> producer;
   private int currentFrameSource;
+  private boolean objectServerRendering = false;
 
   // javafx
   private final FileChooser osciFileChooser = new FileChooser();
@@ -454,11 +456,35 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
     }
 
-    server = new ObjectServer();
-    openFiles.add(null);
-    frameSources.add(server.getObjectSet());
-    frameSourcePaths.add("BLENDER");
+    server = new ObjectServer(this::enableObjectServerRendering, this::disableObjectServerRendering);
     new Thread(server).start();
+  }
+
+  private void enableObjectServerRendering() {
+    Platform.runLater(() -> {
+      objectServerRendering = true;
+      ObjectSet set = server.getObjectSet();
+      frameSources.forEach(FrameSource::disable);
+      set.enable();
+
+      producer = new FrameProducer<>(audioPlayer, set);
+      objController.setAudioProducer(producer);
+
+      executor.submit(producer);
+      effectsController.restartEffects();
+
+      generalController.setFrameSourceName("Rendering from external input");
+      generalController.updateFrameLabels();
+      objTitledPane.setDisable(true);
+    });
+  }
+
+  private void disableObjectServerRendering() {
+    Platform.runLater(() -> {
+      server.getObjectSet().disable();
+      objectServerRendering = false;
+      changeFrameSource(currentFrameSource);
+    });
   }
 
   // used when a file is chosen so that the same folder is reopened when a
@@ -577,7 +603,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
   // increments and changes the frameSource after pressing 'j'
   public void nextFrameSource() {
-    if (frameSources.size() == 1) {
+    if (objectServerRendering || frameSources.size() == 1) {
       return;
     }
     int index = currentFrameSource + 1;
@@ -589,7 +615,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
   // decrements and changes the frameSource after pressing 'k'
   public void previousFrameSource() {
-    if (frameSources.size() == 1) {
+    if (objectServerRendering || frameSources.size() == 1) {
       return;
     }
     int index = currentFrameSource - 1;
