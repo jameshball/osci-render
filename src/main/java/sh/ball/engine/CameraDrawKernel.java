@@ -10,14 +10,16 @@ import sh.ball.shapes.Vector2;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.IntStream;
 
 public class CameraDrawKernel extends Kernel {
 
   private WorldObject prevObject = null;
   private List<WorldObject> prevObjects = null;
+  private List<Vector3[]> prevPaths = null;
   private float[] vertices;
   private float[] vertexResult;
-  private float[] triangles;
+  private float[] triangles = new float[1];
   private float[] matrices = new float[1];
   private int[] vertexNums = new int[1];
   private float rotationX;
@@ -54,38 +56,57 @@ public class CameraDrawKernel extends Kernel {
     return count;
   }
 
-  public List<Shape> draw(ObjectSet objects, float focalLength) {
+  public synchronized List<Shape> draw(ObjectSet objects, float focalLength) {
     this.focalLength = focalLength;
     usingObjectSet = 1;
-    List<WorldObject> objectList = objects.objects.stream().toList();
-    if (!objectList.equals(prevObjects)) {
-      prevObjects = objectList;
-      List<List<List<Vector3>>> vertices = objectList.stream().map(WorldObject::getVertexPath).toList();
-      this.vertexNums = vertices.stream().mapToInt(
-        l -> l.stream()
-          .map(List::size)
-          .reduce(0, Integer::sum) + l.size()
+    if (!objects.objects.equals(prevObjects) || !objects.pathObjects.equals(prevPaths)) {
+      prevObjects = objects.objects;
+      prevPaths = objects.pathObjects;
+      List<List<List<Vector3>>> vertices = objects.objects.stream().map(WorldObject::getVertexPath).toList();
+      this.vertexNums = IntStream.concat(
+        vertices.stream().mapToInt(
+          l -> l.stream()
+            .map(List::size)
+            .reduce(0, Integer::sum) + l.size()
+        ),
+        objects.pathObjects.stream().mapToInt(
+          arr -> arr.length
+        )
       ).toArray();
       int numVertices = Arrays.stream(vertexNums).sum();
       this.vertices = new float[numVertices * 3];
       this.vertexResult = new float[numVertices * 2];
-      this.matrices = new float[vertices.size() * 16];
-      List<float[]> triangles = objectList.stream().map(WorldObject::getTriangles).toList();
-      int numTriangles = triangles.stream().map(arr -> arr.length).reduce(0, Integer::sum);
-      this.triangles = new float[numTriangles];
-      int offset = 0;
-      for (float[] triangleArray : triangles) {
-        System.arraycopy(triangleArray, 0, this.triangles, offset, triangleArray.length);
-        offset += triangleArray.length;
+      this.matrices = new float[(vertices.size() + objects.pathObjects.size()) * 16];
+      if (!objects.objects.isEmpty()) {
+        List<float[]> triangles = objects.objects.stream().map(WorldObject::getTriangles).toList();
+        int numTriangles = triangles.stream().map(arr -> arr.length).reduce(0, Integer::sum);
+        this.triangles = new float[numTriangles];
+        int offset = 0;
+        for (float[] triangleArray : triangles) {
+          System.arraycopy(triangleArray, 0, this.triangles, offset, triangleArray.length);
+          offset += triangleArray.length;
+        }
       }
       int count = 0;
       for (List<List<Vector3>> vertexList : vertices) {
         count = initialiseVertices(count, vertexList);
       }
+      for (Vector3[] vectors : objects.pathObjects) {
+        for (Vector3 vertex : vectors) {
+          this.vertices[3 * count] = (float) vertex.x;
+          this.vertices[3 * count + 1] = (float) vertex.y;
+          this.vertices[3 * count + 2] = (float) vertex.z;
+          count++;
+        }
+      }
     }
 
     int offset = 0;
-    for (float[] matrix : objects.cameraSpaceMatrices) {
+    for (float[] matrix : objects.objectMatrices) {
+      System.arraycopy(matrix, 0, this.matrices, offset, matrix.length);
+      offset += matrix.length;
+    }
+    for (float[] matrix : objects.pathMatrices) {
       System.arraycopy(matrix, 0, this.matrices, offset, matrix.length);
       offset += matrix.length;
     }
@@ -134,7 +155,11 @@ public class CameraDrawKernel extends Kernel {
       e.printStackTrace();
     }
 
-    execute(Range.create(roundUp(vertices.length / 3, maxGroupSize), maxGroupSize));
+    for (int i = 0; i < vertices.length / 3; i++) {
+      processVertex(i);
+    }
+
+    //execute(Range.create(roundUp(vertices.length / 3, maxGroupSize), maxGroupSize));
 
     List<Shape> linesList = new ArrayList<>();
 
@@ -167,9 +192,7 @@ public class CameraDrawKernel extends Kernel {
     return round + multiple - remainder;
   }
 
-  @Override
-  public void run() {
-    int i = getGlobalId();
+  private void processVertex(int i) {
     float EPSILON = 0.00001f;
 
     float x1 = vertices[3 * i];
@@ -214,10 +237,11 @@ public class CameraDrawKernel extends Kernel {
       int obj = -1;
       for (int j = 0; j < vertexNums.length; j++) {
         totalVertices += vertexNums[j];
-        if (totalVertices >= i && obj == -1) {
+        if (totalVertices > i && obj == -1) {
           obj = j;
         }
       }
+      // TODO: This matrix multiplication somehow causes a NaN
       rotatedX = matrices[16 * obj] * x1 + matrices[16 * obj + 1] * y1 + matrices[16 * obj + 2] * z1 + matrices[16 * obj + 3];
       rotatedY = matrices[16 * obj + 4] * x1 + matrices[16 * obj + 5] * y1 + matrices[16 * obj + 6] * z1 + matrices[16 * obj + 7];
       rotatedZ = matrices[16 * obj + 8] * x1 + matrices[16 * obj + 9] * y1 + matrices[16 * obj + 10] * z1 + matrices[16 * obj + 11];
@@ -326,6 +350,11 @@ public class CameraDrawKernel extends Kernel {
       vertexResult[2 * i] = rotatedX * focalLength / (rotatedZ - cameraPosZ) + cameraPosX;
       vertexResult[2 * i + 1] = rotatedY * focalLength / (rotatedZ - cameraPosZ) + cameraPosY;
     }
+  }
+
+  @Override
+  public void run() {
+    processVertex(getGlobalId());
   }
 
   float crossX(float x0, float x1, float x2, float y0, float y1, float y2) {

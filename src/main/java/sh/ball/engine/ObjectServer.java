@@ -8,7 +8,6 @@ import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class ObjectServer implements Runnable {
 
@@ -41,16 +40,33 @@ public class ObjectServer implements Runnable {
           }
           EngineInfo info = gson.fromJson(json, EngineInfo.class);
 
+          List<WorldObject> objectsToRender = new ArrayList<>();
+          List<float[]> objectMatrices = new ArrayList<>();
+
+          List<Vector3[]> pathObjects = new ArrayList<>();
+          List<float[]> pathMatrices = new ArrayList<>();
+
+          Set<String> currentObjects = new HashSet<>();
+
           for (ObjectInfo obj : info.objects) {
+            currentObjects.add(obj.name);
             if (!objects.containsKey(obj.name)) {
-              objects.put(obj.name, new WorldObject(obj.vertices, obj.edges, obj.faces));
+              if (obj.vertices != null) {
+                objects.put(obj.name, new WorldObject(obj.vertices, obj.edges, obj.faces));
+              }
+            }
+            if (obj.pathVertices == null) {
+              objectsToRender.add(objects.get(obj.name));
+              objectMatrices.add(obj.matrix);
+            } else {
+              pathObjects.add(obj.pathVertices);
+              pathMatrices.add(obj.matrix);
             }
           }
 
-          Set<String> currentObjects = Arrays.stream(info.objects).map(obj -> obj.name).collect(Collectors.toSet());
           objects.entrySet().removeIf(obj -> !currentObjects.contains(obj.getKey()));
 
-          objectSet.setObjects(objects.values(), Arrays.stream(info.objects).map(obj -> obj.matrix).toList(), info.focalLength);
+          objectSet.setObjects(objectsToRender, objectMatrices, pathObjects, pathMatrices, info.focalLength);
         }
         disableRendering.run();
       }
@@ -79,6 +95,7 @@ public class ObjectServer implements Runnable {
   private static class ObjectInfo {
     private String name;
     private Vector3[] vertices;
+    private Vector3[] pathVertices;
     private int[] edges;
     private int[][] faces;
     // Camera space matrix

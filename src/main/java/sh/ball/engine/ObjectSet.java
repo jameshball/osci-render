@@ -4,7 +4,6 @@ import sh.ball.audio.FrameSource;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
@@ -12,16 +11,20 @@ public class ObjectSet implements FrameSource<List<Shape>> {
 
   private final CameraDrawKernel kernel = new CameraDrawKernel();
 
-  public Collection<WorldObject> objects;
-  public Collection<float[]> cameraSpaceMatrices;
+  public List<WorldObject> objects;
+  public List<float[]> objectMatrices;
+  public List<Vector3[]> pathObjects;
+  public List<float[]> pathMatrices;
   private boolean active = true;
   private float focalLength;
 
   public ObjectSet() {}
 
-  public void setObjects(Collection<WorldObject> objects, Collection<float[]> matrices, float focalLength) {
+  public synchronized void setObjects(List<WorldObject> objects, List<float[]> matrices, List<Vector3[]> pathObjects, List<float[]> pathMatrices, float focalLength) {
     this.objects = objects;
-    this.cameraSpaceMatrices = matrices;
+    this.objectMatrices = matrices;
+    this.pathObjects = pathObjects;
+    this.pathMatrices = pathMatrices;
     this.focalLength = focalLength;
   }
 
@@ -34,19 +37,21 @@ public class ObjectSet implements FrameSource<List<Shape>> {
 
     if (!Objects.equals(objects, objectSet.objects))
       return false;
-    return Objects.equals(cameraSpaceMatrices, objectSet.cameraSpaceMatrices);
+    return Objects.equals(objectMatrices, objectSet.objectMatrices);
   }
 
   @Override
   public int hashCode() {
     int result = objects != null ? objects.hashCode() : 0;
-    result = 31 * result + (cameraSpaceMatrices != null ? cameraSpaceMatrices.hashCode() : 0);
+    result = 31 * result + (objectMatrices != null ? objectMatrices.hashCode() : 0);
     return result;
   }
 
   @Override
-  public List<Shape> next() {
-    if (objects == null || cameraSpaceMatrices == null) {
+  public synchronized List<Shape> next() {
+    if ((objects == null || objectMatrices == null || objects.isEmpty() || objectMatrices.isEmpty())
+        && (pathObjects == null || pathMatrices == null || pathObjects.isEmpty() || pathMatrices.isEmpty())) {
+      System.out.println("nothing to draw!");
       return List.of(new Vector2());
     }
     return kernel.draw(this, focalLength);
