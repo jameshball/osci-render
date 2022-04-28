@@ -10,13 +10,10 @@ import sh.ball.shapes.Vector2;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.IntStream;
 
 public class CameraDrawKernel extends Kernel {
 
   private WorldObject prevObject = null;
-  private List<WorldObject> prevObjects = null;
-  private List<Vector3[]> prevPaths = null;
   private float[] vertices;
   private float[] vertexResult;
   private float[] triangles = new float[1];
@@ -56,57 +53,40 @@ public class CameraDrawKernel extends Kernel {
     return count;
   }
 
+  private int initialiseVertices(int count, Vector3[][] vertices) {
+    for (Vector3[] vectors : vertices) {
+      for (Vector3 vertex : vectors) {
+        this.vertices[3 * count] = (float) vertex.x;
+        this.vertices[3 * count + 1] = (float) vertex.y;
+        this.vertices[3 * count + 2] = (float) vertex.z;
+        count++;
+      }
+      // Set it to NaN so that the line connecting the vertex before and after
+      // this path segment is not drawn.
+      this.vertices[3 * count] = Float.NaN;
+      this.vertices[3 * count + 1] = Float.NaN;
+      this.vertices[3 * count + 2] = Float.NaN;
+      count++;
+    }
+
+    return count;
+  }
+
   public synchronized List<Shape> draw(ObjectSet objects, float focalLength) {
     this.focalLength = focalLength;
     usingObjectSet = 1;
-    if (!objects.objects.equals(prevObjects) || !objects.pathObjects.equals(prevPaths)) {
-      prevObjects = objects.objects;
-      prevPaths = objects.pathObjects;
-      List<List<List<Vector3>>> vertices = objects.objects.stream().map(WorldObject::getVertexPath).toList();
-      this.vertexNums = IntStream.concat(
-        vertices.stream().mapToInt(
-          l -> l.stream()
-            .map(List::size)
-            .reduce(0, Integer::sum) + l.size()
-        ),
-        objects.pathObjects.stream().mapToInt(
-          arr -> arr.length
-        )
-      ).toArray();
-      int numVertices = Arrays.stream(vertexNums).sum();
-      this.vertices = new float[numVertices * 3];
-      this.vertexResult = new float[numVertices * 2];
-      this.matrices = new float[(vertices.size() + objects.pathObjects.size()) * 16];
-      if (!objects.objects.isEmpty()) {
-        List<float[]> triangles = objects.objects.stream().map(WorldObject::getTriangles).toList();
-        int numTriangles = triangles.stream().map(arr -> arr.length).reduce(0, Integer::sum);
-        this.triangles = new float[numTriangles];
-        int offset = 0;
-        for (float[] triangleArray : triangles) {
-          System.arraycopy(triangleArray, 0, this.triangles, offset, triangleArray.length);
-          offset += triangleArray.length;
-        }
-      }
-      int count = 0;
-      for (List<List<Vector3>> vertexList : vertices) {
-        count = initialiseVertices(count, vertexList);
-      }
-      for (Vector3[] vectors : objects.pathObjects) {
-        for (Vector3 vertex : vectors) {
-          this.vertices[3 * count] = (float) vertex.x;
-          this.vertices[3 * count + 1] = (float) vertex.y;
-          this.vertices[3 * count + 2] = (float) vertex.z;
-          count++;
-        }
-      }
+    this.vertexNums = objects.paths.stream().mapToInt(arr -> Arrays.stream(arr).mapToInt(arr2 -> arr2.length + 1).sum()).toArray();
+    int numVertices = Arrays.stream(vertexNums).sum();
+    this.vertices = new float[numVertices * 3];
+    this.vertexResult = new float[numVertices * 2];
+    this.matrices = new float[objects.paths.size() * 16];
+    int count = 0;
+    for (Vector3[][] path : objects.paths) {
+      count = initialiseVertices(count, path);
     }
 
     int offset = 0;
-    for (float[] matrix : objects.objectMatrices) {
-      System.arraycopy(matrix, 0, this.matrices, offset, matrix.length);
-      offset += matrix.length;
-    }
-    for (float[] matrix : objects.pathMatrices) {
+    for (float[] matrix : objects.matrices) {
       System.arraycopy(matrix, 0, this.matrices, offset, matrix.length);
       offset += matrix.length;
     }

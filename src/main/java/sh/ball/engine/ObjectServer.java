@@ -13,7 +13,6 @@ public class ObjectServer implements Runnable {
 
   private static final int PORT = 51677;
   private final Gson gson = new Gson();
-  private final Map<String, WorldObject> objects = new HashMap<>();
   private final ObjectSet objectSet = new ObjectSet();
   private final Runnable enableRendering;
   private final Runnable disableRendering;
@@ -40,33 +39,48 @@ public class ObjectServer implements Runnable {
           }
           EngineInfo info = gson.fromJson(json, EngineInfo.class);
 
-          List<WorldObject> objectsToRender = new ArrayList<>();
-          List<float[]> objectMatrices = new ArrayList<>();
+          List<Map.Entry<Vector3[][], float[]>> orderedVertices = Arrays.stream(info.objects)
+            .parallel()
+            .filter(obj -> obj.vertices.length > 0)
+            .map(obj -> {
+              boolean[] visited = new boolean[obj.vertices.length];
+              int[] order = new int[obj.vertices.length];
+              visited[0] = true;
+              order[0] = 0;
+              Vector3 endPoint = obj.vertices[0][obj.vertices[0].length - 1];
 
-          List<Vector3[]> pathObjects = new ArrayList<>();
-          List<float[]> pathMatrices = new ArrayList<>();
-
-          Set<String> currentObjects = new HashSet<>();
-
-          for (ObjectInfo obj : info.objects) {
-            currentObjects.add(obj.name);
-            if (!objects.containsKey(obj.name)) {
-              if (obj.vertices != null) {
-                objects.put(obj.name, new WorldObject(obj.vertices, obj.edges, obj.faces));
+              for (int i = 1; i < obj.vertices.length; i++) {
+                int minPath = -1;
+                double minDistance = Double.POSITIVE_INFINITY;
+                for (int j = 0; j < obj.vertices.length; j++) {
+                  if (!visited[j]) {
+                    double distance = endPoint.distance(obj.vertices[j][0]);
+                    if (distance < minDistance) {
+                      minPath = j;
+                      minDistance = distance;
+                    }
+                  }
+                }
+                visited[minPath] = true;
+                order[i] = minPath;
+                endPoint = obj.vertices[minPath][obj.vertices[minPath].length - 1];
               }
-            }
-            if (obj.pathVertices == null) {
-              objectsToRender.add(objects.get(obj.name));
-              objectMatrices.add(obj.matrix);
-            } else {
-              pathObjects.add(obj.pathVertices);
-              pathMatrices.add(obj.matrix);
-            }
-          }
 
-          objects.entrySet().removeIf(obj -> !currentObjects.contains(obj.getKey()));
+              Vector3[][] reorderedVertices = new Vector3[obj.vertices.length][];
+              for (int i = 0; i < reorderedVertices.length; i++) {
+                reorderedVertices[i] = obj.vertices[order[i]];
+              }
 
-          objectSet.setObjects(objectsToRender, objectMatrices, pathObjects, pathMatrices, info.focalLength);
+              return Map.entry(reorderedVertices, obj.matrix);
+            }).toList();
+
+          List<Vector3[][]> vertices = orderedVertices.stream().map(Map.Entry::getKey).toList();
+          List<float[]> matrices = orderedVertices.stream().map(Map.Entry::getValue).toList();
+
+//          List<Vector3[][]> vertices = Arrays.stream(info.objects).map(obj -> obj.vertices).toList();
+//          List<float[]> matrices = Arrays.stream(info.objects).map(obj -> obj.matrix).toList();
+
+          objectSet.setObjects(vertices, matrices, info.focalLength);
         }
         disableRendering.run();
       }
@@ -94,22 +108,8 @@ public class ObjectServer implements Runnable {
 
   private static class ObjectInfo {
     private String name;
-    private Vector3[] vertices;
-    private Vector3[] pathVertices;
-    private int[] edges;
-    private int[][] faces;
+    private Vector3[][] vertices;
     // Camera space matrix
     private float[] matrix;
-
-    @Override
-    public String toString() {
-      return "ObjectInfo{" +
-        "name='" + name + '\'' +
-        ", vertices=" + Arrays.toString(vertices) +
-        ", edges=" + Arrays.toString(edges) +
-        ", faces=" + Arrays.deepToString(faces) +
-        ", matrix=" + Arrays.toString(matrix) +
-        '}';
-    }
   }
 }

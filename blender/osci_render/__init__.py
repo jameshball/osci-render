@@ -4,8 +4,8 @@ bl_info = {
     "version": (1, 0, 0),
     "blender": (3, 1, 2),
     "location": "View3D",
-    "description": "Addon to send frames over to osci-render",
-    "warning": "Requires a camera and objects",
+    "description": "Addon to send gpencil frames over to osci-render",
+    "warning": "Requires a camera and gpencil object",
     "wiki_url": "https://github.com/jameshball/osci-render",
     "category": "Development",
 }
@@ -48,8 +48,6 @@ class osci_render_connect(bpy.types.Operator):
         global sock
         if sock is None:
             try:
-                bpy.context.scene.collection["osci_render"] = {}
-                bpy.context.scene.collection["osci_render"]["seen_objs"] = {}
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.connect((HOST, PORT))
                 send_scene_to_osci_render(bpy.context.scene)
@@ -62,7 +60,7 @@ class osci_render_connect(bpy.types.Operator):
 
 class osci_render_close(bpy.types.Operator):
     bl_label = "Close osci-render connection"
-    bl_idname="render.osci_render_close"
+    bl_idname = "render.osci_render_close"
 
     def execute(self, context):
         global sock
@@ -86,103 +84,29 @@ def append_matrix(object_info, obj):
 
 def send_scene_to_osci_render(scene):
     col = bpy.context.scene.collection["osci_render"]
+    engine_info = {"objects": []}
     
     if sock is not None:
-        engine_info = {"objects": []}
-        new_objs = []
-
         for obj in bpy.data.objects:
-            if obj.visible_get():
-#                if obj.type == 'MESH':
-#                    object_info = {"name": obj.name}
-#                    if obj.name not in col["seen_objs"]:
-#                        col["seen_objs"][obj.name] = 1
-#                        new_objs.append(obj.name)
-
-#                        mesh = bmesh.new()
-#                        mesh.from_mesh(obj.data)
-
-#                        object_info["vertices"] = []
-#                        # If there are bugs, the vertices here might not match up with the vert.index in edges/faces
-#                        for vert in mesh.verts:
-#                            object_info["vertices"].append({
-#                                "x": vert.co[0],
-#                                "y": vert.co[1],
-#                                "z": vert.co[2],
-#                            })
-
-#                        object_info["edges"] = [vert.index for edge in mesh.edges for vert in edge.verts]
-#                        object_info["faces"] = [[vert.index for vert in face.verts] for face in mesh.faces]
-
-#                    engine_info["objects"].append(append_matrix(object_info, obj))
-                if obj.type == 'GPENCIL':
-                    object_info = {"name": obj.name}
-                    strokes = obj.data.layers.active.frames.data.active_frame.strokes
-                    
-                    print("found gpencil!")
-                    print(strokes)
-                    
-                    
-                    object_info["pathVertices"] = []
-                    for stroke in strokes:
-                        for vert in stroke.points:
-                            object_info["pathVertices"].append({
-                                "x": vert.co[0],
-                                "y": vert.co[1],
-                                "z": vert.co[2],
-                            })
-                        # end of path
-                        object_info["pathVertices"].append({
-                            "x": float("nan"),
-                            "y": float("nan"),
-                            "z": float("nan"),
-                        })
-                    
-                    engine_info["objects"].append(append_matrix(object_info, obj))
-    #            elif obj.type == 'CURVE':
-    #                object_info = {"name": obj.name}
-    #                for curve in obj.data.splines:
-    #                    if curve.type == 'BEZIER':
-    #                        object_info["bezierPoints"] = []
-    #                        points = list(curve.bezier_points)
-    #                        if is_cyclic(curve) and len(points) > 0:
-    #                            points.append(points[0])
-    #                        
-    #                        for point in points:
-    #                            for co in [point.co, point.handle_left, point.handle_right]:
-    #                                object_info["bezierPoints"].append({
-    #                                    "x": co[0],
-    #                                    "y": co[1],
-    #                                    "z": co[2],
-    #                                })
-    #                                
-    #                        engine_info["objects"].append(append_matrix(object_info, obj))
-    #                    elif curve.type == 'POLY':
-    #                        object_info["polyPoints"] = []
-    #                        points = list(curve.points)
-    #                        if is_cyclic(curve) and len(points) > 0:
-    #                            points.append(points[0])
-    #                        
-    #                        object_info["polyPoints"] = [{
-    #                            "x": point.co[0],
-    #                            "y": point.co[1],
-    #                            "z": point.co[2],
-    #                        } for point in points]
-    #                        
-    #                        engine_info["objects"].append(append_matrix(object_info, obj))
+            if obj.visible_get() and obj.type == 'GPENCIL':
+                object_info = {"name": obj.name}
+                strokes = obj.data.layers.active.frames.data.active_frame.strokes                    
+                
+                object_info["vertices"] = []
+                for stroke in strokes:
+                    object_info["vertices"].append([{
+                        "x": vert.co[0],
+                        "y": vert.co[1],
+                        "z": vert.co[2],
+                    } for vert in stroke.points])
+                
+                engine_info["objects"].append(append_matrix(object_info, obj))
                         
 
+        engine_info["focalLength"] = -0.05 * bpy.data.cameras[0].lens
 
-        engine_info["focalLength"] = -0.1 * bpy.data.cameras[0].lens
-
-        try:
-            json_str = json.dumps(engine_info, separators=(',', ':')) + '\n'
-            sock.sendall(json_str.encode('utf-8'))
-        except OSError as exc:
-            # Remove all newly added objects if no connection was made
-            # so that the object data will be sent on next attempt
-            for obj_name in new_objs:
-                col["seen_objs"].pop(obj_name)
+        json_str = json.dumps(engine_info, separators=(',', ':')) + '\n'
+        sock.sendall(json_str.encode('utf-8'))
 
 
 operations = [OBJECT_PT_osci_render_settings, osci_render_connect, osci_render_close]
