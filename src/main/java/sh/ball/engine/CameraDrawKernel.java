@@ -95,7 +95,9 @@ public class CameraDrawKernel extends Kernel {
     this.cameraPosY = 0;
     this.cameraPosZ = 0;
 
-    return executeKernel();
+    this.hideEdges = 0;
+
+    return executeKernel(true);
   }
 
   public List<Shape> draw(Camera camera, WorldObject object) {
@@ -123,23 +125,26 @@ public class CameraDrawKernel extends Kernel {
     this.cameraPosZ = (float) cameraPos.z;
     this.focalLength = (float) camera.getFocalLength();
 
-    hideEdges = object.edgesHidden() ? 1 : 0;
-    return executeKernel();
+    this.hideEdges = object.edgesHidden() ? 1 : 0;
+
+    return executeKernel(false);
   }
 
-  private List<Shape> executeKernel() {
-    int maxGroupSize = 256;
-    try {
-      maxGroupSize = getKernelMaxWorkGroupSize(getTargetDevice());
-    } catch (QueryFailedException e) {
-      e.printStackTrace();
-    }
+  private List<Shape> executeKernel(boolean cpu) {
+    if (cpu) {
+      for (int i = 0; i < vertices.length / 3; i++) {
+        processVertex(i);
+      }
+    } else {
+      int maxGroupSize = 256;
+      try {
+        maxGroupSize = getKernelMaxWorkGroupSize(getTargetDevice());
+      } catch (QueryFailedException e) {
+        e.printStackTrace();
+      }
 
-    for (int i = 0; i < vertices.length / 3; i++) {
-      processVertex(i);
+      execute(Range.create(roundUp(vertices.length / 3, maxGroupSize), maxGroupSize));
     }
-
-    //execute(Range.create(roundUp(vertices.length / 3, maxGroupSize), maxGroupSize));
 
     List<Shape> linesList = new ArrayList<>();
 

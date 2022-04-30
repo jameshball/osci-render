@@ -1,7 +1,7 @@
 bl_info = {
     "name": "osci-render",
     "author": "James Ball", 
-    "version": (1, 0, 0),
+    "version": (1, 0, 2),
     "blender": (3, 1, 2),
     "location": "View3D",
     "description": "Addon to send gpencil frames over to osci-render",
@@ -14,6 +14,7 @@ import bpy
 import bmesh
 import socket
 import json
+from bpy.app.handlers import persistent
 
 HOST = "localhost"
 PORT = 51677
@@ -82,8 +83,8 @@ def append_matrix(object_info, obj):
     return object_info
 
 
+@persistent
 def send_scene_to_osci_render(scene):
-    col = bpy.context.scene.collection["osci_render"]
     engine_info = {"objects": []}
     
     if sock is not None:
@@ -120,9 +121,9 @@ def register():
 
 
 def unregister():
-    bpy.app.handlers.frame_change_pre.clear()
-    bpy.app.handlers.depsgraph_update_post.clear()
-    for operation in operations.reverse():
+    bpy.app.handlers.frame_change_pre.remove(send_scene_to_osci_render)
+    bpy.app.handlers.depsgraph_update_post.remove(send_scene_to_osci_render)
+    for operation in reversed(operations):
         bpy.utils.unregister_class(operation)
 
 
