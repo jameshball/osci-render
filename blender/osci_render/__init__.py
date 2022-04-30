@@ -14,6 +14,7 @@ import bpy
 import bmesh
 import socket
 import json
+import atexit
 from bpy.app.handlers import persistent
 
 HOST = "localhost"
@@ -50,11 +51,13 @@ class osci_render_connect(bpy.types.Operator):
         if sock is None:
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(1)
                 sock.connect((HOST, PORT))
                 send_scene_to_osci_render(bpy.context.scene)
-            except OSError as exp:
-                sock.close()
+            except socket.error as exp:
                 sock = None
+                self.report({"WARNING"}, "Failed to connect to osci-render - make sure it is running first!")
+                return {"CANCELLED"}
                 
         return {"FINISHED"}
 
@@ -64,17 +67,20 @@ class osci_render_close(bpy.types.Operator):
     bl_idname = "render.osci_render_close"
 
     def execute(self, context):
-        global sock
-        if sock is not None:
-            sock.send("CLOSE\n".encode('utf-8'))
-            sock.close()
-            sock = None
+        close_osci_render()
         
         return {"FINISHED"}
 
 
-def is_cyclic(spline):
-    return spline.use_cyclic_u or spline.use_cyclic_v
+@persistent
+def close_osci_render():
+    global sock
+    if sock is not None:
+        try:
+            sock.send("CLOSE\n".encode('utf-8'))
+            sock.close()
+        except socket.error as exp:
+            sock = None
 
 
 def append_matrix(object_info, obj):
@@ -85,8 +91,9 @@ def append_matrix(object_info, obj):
 
 @persistent
 def send_scene_to_osci_render(scene):
+    global sock
     engine_info = {"objects": []}
-    
+
     if sock is not None:
         for obj in bpy.data.objects:
             if obj.visible_get() and obj.type == 'GPENCIL':
@@ -102,12 +109,15 @@ def send_scene_to_osci_render(scene):
                     } for vert in stroke.points])
                 
                 engine_info["objects"].append(append_matrix(object_info, obj))
-                        
+
 
         engine_info["focalLength"] = -0.05 * bpy.data.cameras[0].lens
 
         json_str = json.dumps(engine_info, separators=(',', ':')) + '\n'
-        sock.sendall(json_str.encode('utf-8'))
+        try:
+            sock.sendall(json_str.encode('utf-8'))
+        except socket.error as exp:
+            sock = None
 
 
 operations = [OBJECT_PT_osci_render_settings, osci_render_connect, osci_render_close]
@@ -116,6 +126,7 @@ operations = [OBJECT_PT_osci_render_settings, osci_render_connect, osci_render_c
 def register():
     bpy.app.handlers.frame_change_pre.append(send_scene_to_osci_render)
     bpy.app.handlers.depsgraph_update_post.append(send_scene_to_osci_render)
+    atexit.register(close_osci_render)
     for operation in operations:
         bpy.utils.register_class(operation)
 
@@ -123,6 +134,7 @@ def register():
 def unregister():
     bpy.app.handlers.frame_change_pre.remove(send_scene_to_osci_render)
     bpy.app.handlers.depsgraph_update_post.remove(send_scene_to_osci_render)
+    atexit.unregister(close_osci_render)
     for operation in reversed(operations):
         bpy.utils.unregister_class(operation)
 

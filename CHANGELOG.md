@@ -1,3 +1,7 @@
+- 1.22.1
+  - Gracefully handle disconnects from both Blender and osci-render to prevent restarts!
+
+
 - 1.22.0
   - Add support for externally rendered lines!
   - This means there is now Blender support!

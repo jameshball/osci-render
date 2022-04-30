@@ -33,7 +33,7 @@ public class ObjectServer implements Runnable {
         BufferedReader clientReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
         while (socket.isConnected()) {
           String json = clientReader.readLine();
-          if (json.equals("CLOSE")) {
+          if (json == null || json.equals("CLOSE")) {
             socket.close();
             break;
           }
