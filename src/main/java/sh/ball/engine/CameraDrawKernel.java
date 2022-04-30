@@ -13,6 +13,8 @@ import java.util.List;
 
 public class CameraDrawKernel extends Kernel {
 
+  private static final int MIN_GPU_VERTICES = 50;
+
   private WorldObject prevObject = null;
   private float[] vertices;
   private float[] vertexResult;
@@ -131,6 +133,8 @@ public class CameraDrawKernel extends Kernel {
   }
 
   private List<Shape> executeKernel(boolean cpu) {
+    cpu |= vertices.length / 3 < MIN_GPU_VERTICES;
+
     if (cpu) {
       for (int i = 0; i < vertices.length / 3; i++) {
         processVertex(i);
