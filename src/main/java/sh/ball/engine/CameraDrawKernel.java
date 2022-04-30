@@ -33,6 +33,7 @@ public class CameraDrawKernel extends Kernel {
   private float focalLength;
   private int hideEdges = 0;
   private int usingObjectSet = 0;
+  private boolean failedGpu = false;
 
   public CameraDrawKernel() {}
 
@@ -99,7 +100,7 @@ public class CameraDrawKernel extends Kernel {
 
     this.hideEdges = 0;
 
-    return executeKernel(true);
+    return executeCpu();
   }
 
   public List<Shape> draw(Camera camera, WorldObject object) {
@@ -129,17 +130,42 @@ public class CameraDrawKernel extends Kernel {
 
     this.hideEdges = object.edgesHidden() ? 1 : 0;
 
-    return executeKernel(false);
+    return executeGpu();
   }
 
-  private List<Shape> executeKernel(boolean cpu) {
-    cpu |= vertices.length / 3 < MIN_GPU_VERTICES;
+  private List<Shape> postProcessVertices() {
+    List<Shape> lines = new ArrayList<>();
 
-    if (cpu) {
-      for (int i = 0; i < vertices.length / 3; i++) {
-        processVertex(i);
+    for (int i = 0; i < vertices.length / 3; i++) {
+      int nextOffset = 0;
+      if (i < vertices.length / 3 - 1) {
+        nextOffset = 2 * i + 2;
       }
-    } else {
+      if (!Float.isNaN(vertexResult[2 * i]) && !Float.isNaN(vertexResult[nextOffset])) {
+        lines.add(new Line(
+          new Vector2(vertexResult[2 * i], vertexResult[2 * i + 1]),
+          new Vector2(vertexResult[nextOffset], vertexResult[nextOffset + 1])
+        ));
+      }
+    }
+
+    return lines;
+  }
+
+  private List<Shape> executeCpu() {
+    for (int i = 0; i < vertices.length / 3; i++) {
+      processVertex(i);
+    }
+
+    return postProcessVertices();
+  }
+
+  private List<Shape> executeGpu() {
+    if (failedGpu || vertices.length / 3 < MIN_GPU_VERTICES) {
+      return executeCpu();
+    }
+
+    try {
       int maxGroupSize = 256;
       try {
         maxGroupSize = getKernelMaxWorkGroupSize(getTargetDevice());
@@ -148,24 +174,12 @@ public class CameraDrawKernel extends Kernel {
       }
 
       execute(Range.create(roundUp(vertices.length / 3, maxGroupSize), maxGroupSize));
+    } catch (Exception e) {
+      e.printStackTrace();
+      failedGpu = true;
     }
 
-    List<Shape> linesList = new ArrayList<>();
-
-    for (int i = 0; i < vertices.length / 3; i++) {
-      int nextOffset = 0;
-      if (i < vertices.length / 3 - 1) {
-        nextOffset = 2 * i + 2;
-      }
-      if (!Float.isNaN(vertexResult[2 * i]) && !Float.isNaN(vertexResult[nextOffset])) {
-        linesList.add(new Line(
-          new Vector2(vertexResult[2 * i], vertexResult[2 * i + 1]),
-          new Vector2(vertexResult[nextOffset], vertexResult[nextOffset + 1])
-        ));
-      }
-    }
-
-    return linesList;
+    return postProcessVertices();
   }
 
   int roundUp(int round, int multiple) {
