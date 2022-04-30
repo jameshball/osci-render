@@ -1,3 +1,7 @@
+- 1.22.2
+  - Revert to CPU execution if an exception occurs when trying to use GPU
+
+
 - 1.22.1
   - Gracefully handle disconnects from both Blender and osci-render to prevent restarts!
 

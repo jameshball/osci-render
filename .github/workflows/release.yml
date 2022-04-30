@@ -22,7 +22,7 @@ jobs:
         mvn -B jpackage:jpackage@win
         $version= mvn help:evaluate -Dexpression="project.version" -q -DforceStdout
         echo "VERSION=$version" >> $env:GITHUB_ENV
-        echo "GPU VERSION - This is potentially unstable on Mac/Linux!! Please report any issues. If you hear nothing, but you see the program interface, then please let me know." > CHANGELOG
+        echo "See [/CHANGELOG.md](https://github.com/jameshball/osci-render/blob/master/CHANGELOG.md) for changes to this version.\nGPU VERSION - This is potentially unstable on Mac/Linux!! Please report any issues. If you hear nothing, but you see the program interface, then please let me know." > CHANGELOG
         mv "target/lib/osci-render-$version.jar" "target/lib/osci-render-win-$version.jar"
         ls target/lib/
     - name: Release
