@@ -24,6 +24,13 @@ public class WorldObject {
   private Vector3 rotation;
   private boolean hideEdges = false;
 
+  public WorldObject(Vector3[] vertices, int[] edgeIndices, int[][] faceIndices) {
+    vertexPath = new ArrayList<>();
+    objVertices = Arrays.stream(vertices).toList();
+    Set<Line3D> edges = loadFromArrays(vertices, edgeIndices, faceIndices);
+    getDrawPath(edges);
+  }
+
   private WorldObject(List<Vector3> objVertices, List<List<Vector3>> vertexPath, Vector3 position,
                       Vector3 rotation) {
     this.objVertices = objVertices;
@@ -116,6 +123,48 @@ public class WorldObject {
 
   public int numVertices() {
     return objVertices.size();
+  }
+
+  private Set<Line3D> loadFromArrays(Vector3[] vertices, int[] edgeIndices, int[][] faceIndices) {
+    Set<Line3D> edges = new LinkedHashSet<>();
+
+    int numTriangles = 0;
+
+    for (int i = 0; i < edgeIndices.length; i += 2) {
+      edges.add(new Line3D(vertices[edgeIndices[i]], vertices[edgeIndices[i + 1]]));
+    }
+
+    for (int[] face : faceIndices) {
+      numTriangles += face.length - 2;
+    }
+
+    triangles = new float[9 * numTriangles];
+    int triangle = 0;
+
+    for (int[] face : faceIndices) {
+      Vector3 v1 = objVertices.get(face[0]);
+      Vector3 curr = null;
+      Vector3 prev;
+
+      for (int i = 0; i < face.length - 1; i++) {
+        prev = curr;
+        curr = objVertices.get(face[i + 1]);
+        if (prev != null) {
+          triangles[9 * triangle] = (float) v1.x;
+          triangles[9 * triangle + 1] = (float) v1.y;
+          triangles[9 * triangle + 2] = (float) v1.z;
+          triangles[9 * triangle + 3] = (float) prev.x;
+          triangles[9 * triangle + 4] = (float) prev.y;
+          triangles[9 * triangle + 5] = (float) prev.z;
+          triangles[9 * triangle + 6] = (float) curr.x;
+          triangles[9 * triangle + 7] = (float) curr.y;
+          triangles[9 * triangle + 8] = (float) curr.z;
+          triangle++;
+        }
+      }
+    }
+
+    return edges;
   }
 
   private Set<Line3D> loadFromInput(InputStream input) {

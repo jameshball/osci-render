@@ -10,14 +10,17 @@ import sh.ball.shapes.Vector2;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 
 public class CameraDrawKernel extends Kernel {
+
+  private static final int MIN_GPU_VERTICES = 50;
 
   private WorldObject prevObject = null;
   private float[] vertices;
   private float[] vertexResult;
-  private float[] triangles;
+  private float[] triangles = new float[1];
+  private float[] matrices = new float[1];
+  private int[] vertexNums = new int[1];
   private float rotationX;
   private float rotationY;
   private float rotationZ;
@@ -29,35 +32,87 @@ public class CameraDrawKernel extends Kernel {
   private float cameraPosZ;
   private float focalLength;
   private int hideEdges = 0;
+  private int usingObjectSet = 0;
 
   public CameraDrawKernel() {}
 
+  private int initialiseVertices(int count, List<List<Vector3>> vertices) {
+    for (List<Vector3> vectors : vertices) {
+      for (Vector3 vertex : vectors) {
+        this.vertices[3 * count] = (float) vertex.x;
+        this.vertices[3 * count + 1] = (float) vertex.y;
+        this.vertices[3 * count + 2] = (float) vertex.z;
+        count++;
+      }
+      // Set it to NaN so that the line connecting the vertex before and after
+      // this path segment is not drawn.
+      this.vertices[3 * count] = Float.NaN;
+      this.vertices[3 * count + 1] = Float.NaN;
+      this.vertices[3 * count + 2] = Float.NaN;
+      count++;
+    }
+
+    return count;
+  }
+
+  private int initialiseVertices(int count, Vector3[][] vertices) {
+    for (Vector3[] vectors : vertices) {
+      for (Vector3 vertex : vectors) {
+        this.vertices[3 * count] = (float) vertex.x;
+        this.vertices[3 * count + 1] = (float) vertex.y;
+        this.vertices[3 * count + 2] = (float) vertex.z;
+        count++;
+      }
+      // Set it to NaN so that the line connecting the vertex before and after
+      // this path segment is not drawn.
+      this.vertices[3 * count] = Float.NaN;
+      this.vertices[3 * count + 1] = Float.NaN;
+      this.vertices[3 * count + 2] = Float.NaN;
+      count++;
+    }
+
+    return count;
+  }
+
+  public synchronized List<Shape> draw(ObjectSet objects, float focalLength) {
+    this.focalLength = focalLength;
+    usingObjectSet = 1;
+    this.vertexNums = objects.paths.stream().mapToInt(arr -> Arrays.stream(arr).mapToInt(arr2 -> arr2.length + 1).sum()).toArray();
+    int numVertices = Arrays.stream(vertexNums).sum();
+    this.vertices = new float[numVertices * 3];
+    this.vertexResult = new float[numVertices * 2];
+    this.matrices = new float[objects.paths.size() * 16];
+    int count = 0;
+    for (Vector3[][] path : objects.paths) {
+      count = initialiseVertices(count, path);
+    }
+
+    int offset = 0;
+    for (float[] matrix : objects.matrices) {
+      System.arraycopy(matrix, 0, this.matrices, offset, matrix.length);
+      offset += matrix.length;
+    }
+
+    this.cameraPosX = 0;
+    this.cameraPosY = 0;
+    this.cameraPosZ = 0;
+
+    this.hideEdges = 0;
+
+    return executeKernel(true);
+  }
+
   public List<Shape> draw(Camera camera, WorldObject object) {
+    usingObjectSet = 0;
     if (prevObject != object) {
       List<List<Vector3>> vertices = object.getVertexPath();
-      int numVertices = vertices.stream().map(List::size).reduce(Integer::sum).orElse(0) + vertices.size();
+      int numVertices = vertices.stream().map(List::size).reduce(0, Integer::sum) + vertices.size();
       this.vertices = new float[numVertices * 3];
       this.vertexResult = new float[numVertices * 2];
       this.triangles = object.getTriangles();
-      int count = 0;
-      for (int i = 0; i < vertices.size(); i++) {
-        for (int j = 0; j < vertices.get(i).size(); j++) {
-          Vector3 vertex = vertices.get(i).get(j);
-          this.vertices[3 * count] = (float) vertex.x;
-          this.vertices[3 * count + 1] = (float) vertex.y;
-          this.vertices[3 * count + 2] = (float) vertex.z;
-          count++;
-        }
-        // Set it to NaN so that the line connecting the vertex before and after
-        // this path segment is not drawn.
-        this.vertices[3 * count] = Float.NaN;
-        this.vertices[3 * count + 1] = Float.NaN;
-        this.vertices[3 * count + 2] = Float.NaN;
-        count++;
-      }
+      initialiseVertices(0, vertices);
     }
     prevObject = object;
-    hideEdges = object.edgesHidden() ? 1 : 0;
     Vector3 rotation = object.getRotation();
     Vector3 position = object.getPosition();
     this.rotationX = (float) rotation.x;
@@ -72,14 +127,28 @@ public class CameraDrawKernel extends Kernel {
     this.cameraPosZ = (float) cameraPos.z;
     this.focalLength = (float) camera.getFocalLength();
 
-    int maxGroupSize = 256;
-    try {
-      maxGroupSize = getKernelMaxWorkGroupSize(getTargetDevice());
-    } catch (QueryFailedException e) {
-      e.printStackTrace();
-    }
+    this.hideEdges = object.edgesHidden() ? 1 : 0;
 
-    execute(Range.create(roundUp(vertices.length / 3, maxGroupSize), maxGroupSize));
+    return executeKernel(false);
+  }
+
+  private List<Shape> executeKernel(boolean cpu) {
+    cpu |= vertices.length / 3 < MIN_GPU_VERTICES;
+
+    if (cpu) {
+      for (int i = 0; i < vertices.length / 3; i++) {
+        processVertex(i);
+      }
+    } else {
+      int maxGroupSize = 256;
+      try {
+        maxGroupSize = getKernelMaxWorkGroupSize(getTargetDevice());
+      } catch (QueryFailedException e) {
+        e.printStackTrace();
+      }
+
+      execute(Range.create(roundUp(vertices.length / 3, maxGroupSize), maxGroupSize));
+    }
 
     List<Shape> linesList = new ArrayList<>();
 
@@ -112,9 +181,7 @@ public class CameraDrawKernel extends Kernel {
     return round + multiple - remainder;
   }
 
-  @Override
-  public void run() {
-    int i = getGlobalId();
+  private void processVertex(int i) {
     float EPSILON = 0.00001f;
 
     float x1 = vertices[3 * i];
@@ -128,28 +195,47 @@ public class CameraDrawKernel extends Kernel {
       return;
     }
 
-    // rotate around x-axis
-    float cosValue = cos(rotationX);
-    float sinValue = sin(rotationX);
-    float y2 = cosValue * y1 - sinValue * z1;
-    float z2 = sinValue * y1 + cosValue * z1;
+    // Initialisation required otherwise aparapi doesn't work (bug)
+    float cosValue = 0, sinValue = 0, x2 = 0, x3 = 0, y2 = 0, y3 = 0, z2 = 0, z3 = 0, rotatedX = 0, rotatedY = 0, rotatedZ = 0;
 
-    // rotate around y-axis
-    cosValue = cos(rotationY);
-    sinValue = sin(rotationY);
-    float x2 = cosValue * x1 + sinValue * z2;
-    float z3 = -sinValue * x1 + cosValue * z2;
+    if (usingObjectSet == 0) {
+      // rotate around x-axis
+      cosValue = cos(rotationX);
+      sinValue = sin(rotationX);
+      y2 = cosValue * y1 - sinValue * z1;
+      z2 = sinValue * y1 + cosValue * z1;
 
-    // rotate around z-axis
-    cosValue = cos(rotationZ);
-    sinValue = sin(rotationZ);
-    float x3 = cosValue * x2 - sinValue * y2;
-    float y3 = sinValue * x2 + cosValue * y2;
+      // rotate around y-axis
+      cosValue = cos(rotationY);
+      sinValue = sin(rotationY);
+      x2 = cosValue * x1 + sinValue * z2;
+      z3 = -sinValue * x1 + cosValue * z2;
 
-    // add position
-    float rotatedX = x3 + positionX;
-    float rotatedY = y3 + positionY;
-    float rotatedZ = z3 + positionZ;
+      // rotate around z-axis
+      cosValue = cos(rotationZ);
+      sinValue = sin(rotationZ);
+      x3 = cosValue * x2 - sinValue * y2;
+      y3 = sinValue * x2 + cosValue * y2;
+
+      // add position
+      rotatedX = x3 + positionX;
+      rotatedY = y3 + positionY;
+      rotatedZ = z3 + positionZ;
+    } else {
+      int totalVertices = 0;
+      int obj = -1;
+      for (int j = 0; j < vertexNums.length; j++) {
+        totalVertices += vertexNums[j];
+        if (totalVertices > i && obj == -1) {
+          obj = j;
+        }
+      }
+      // TODO: This matrix multiplication somehow causes a NaN
+      rotatedX = matrices[16 * obj] * x1 + matrices[16 * obj + 1] * y1 + matrices[16 * obj + 2] * z1 + matrices[16 * obj + 3];
+      rotatedY = matrices[16 * obj + 4] * x1 + matrices[16 * obj + 5] * y1 + matrices[16 * obj + 6] * z1 + matrices[16 * obj + 7];
+      rotatedZ = matrices[16 * obj + 8] * x1 + matrices[16 * obj + 9] * y1 + matrices[16 * obj + 10] * z1 + matrices[16 * obj + 11];
+      // Also need to consider homogeneous coordinates here
+    }
 
     boolean intersects = false;
 
@@ -253,6 +339,11 @@ public class CameraDrawKernel extends Kernel {
       vertexResult[2 * i] = rotatedX * focalLength / (rotatedZ - cameraPosZ) + cameraPosX;
       vertexResult[2 * i + 1] = rotatedY * focalLength / (rotatedZ - cameraPosZ) + cameraPosY;
     }
+  }
+
+  @Override
+  public void run() {
+    processVertex(getGlobalId());
   }
 
   float crossX(float x0, float x1, float x2, float y0, float y1, float y2) {

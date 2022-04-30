@@ -6,7 +6,7 @@
 
     <groupId>sh.ball</groupId>
     <artifactId>osci-render</artifactId>
-    <version>1.21.1</version>
+    <version>1.22.0</version>
 
     <name>osci-render</name>
 
@@ -169,6 +169,12 @@
             <groupId>com.aparapi</groupId>
             <artifactId>aparapi</artifactId>
             <version>3.0.0</version>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/com.google.code.gson/gson -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.9.0</version>
         </dependency>
 
     </dependencies>
