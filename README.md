@@ -4,7 +4,7 @@
 
 Program for making music by drawing objects, text, and images on an oscilloscope using audio output.
 
-This allows for 3D rendering of `.obj` files, `.svg` images, and `.txt` files on Windows, macOS, and Linux.
+This allows for 3D rendering of `.obj` files, `.svg` images, `.txt` files, and Blender scenes on Windows, macOS, and Linux.
 
 You can use MIDI to interface with osci-render to make and record music.
 
@@ -21,6 +21,7 @@ Send an email to [james@ball.sh](mailto:james@ball.sh) if you have any issues, f
 - Render `.obj` files on an oscilloscope
 - Render `.svg` files
 - Render text
+- [Blender integration](https://www.youtube.com/watch?v=pCn297Ejvlw)
 - Rotation of objects
 - Scaling images
 - Translating images
@@ -68,6 +69,25 @@ Additional effects can be applied to the image such as:
 - Image Wobble (plays sin wave at same frequency as output)
 - Smoothing
 - Image Trace (traces out the image, drawing only a portion of the whole image)
+
+### Using osci-render with Blender
+
+This [video](https://www.youtube.com/watch?v=pCn297Ejvlw) explains how to install and use osci-render with Blender. Below is an overview of the process, assuming you've already [installed osci-render](#installing).
+
+- Download the latest Blender add-on from [Releases](https://github.com/jameshball/osci-render/releases) named `osci-render-blender-addon.zip`
+- [Install and enable the add-on](https://docs.blender.org/manual/en/latest/editors/preferences/addons.html#installing-add-ons) in Blender
+- 'osci-render settings' menu will now appear under 'Render Properties'
+- Open osci-render
+- Click 'Connect to osci-render'
+  - If the filename in osci-render changes to 'Rendering from external input' you have successfully connected
+- Add a camera to the scene (if not already present)
+- Add a Scene Line Art object to the scene
+  - Press Shift+A and navigate to Grease Pencil > Scene Line Art
+- Go to 'Modifier Properties' of the newly created Line Art object
+- Click 'Bake Line Art' under the the 'Bake' settings to generate line art for the current animation/scene/camera
+- You should now see the scene on your oscilloscope!
+
+If there are any problems, please create an [issue](https://github.com/jameshball/osci-render/issues)!
 
 ### Using osci-render without an oscilloscope
 
