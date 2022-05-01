@@ -22,17 +22,18 @@ jobs:
         mvn -B jpackage:jpackage@win
         $version= mvn help:evaluate -Dexpression="project.version" -q -DforceStdout
         echo "VERSION=$version" >> $env:GITHUB_ENV
-        echo "See [/CHANGELOG.md](https://github.com/jameshball/osci-render/blob/master/CHANGELOG.md) for changes to this version.\nGPU VERSION - This is potentially unstable on Mac/Linux!! Please report any issues. If you hear nothing, but you see the program interface, then please let me know." > CHANGELOG
         mv "target/lib/osci-render-$version.jar" "target/lib/osci-render-win-$version.jar"
+        Compress-Archive -Path "blender/osci_render" -DestinationPath "target/lib/osci-render-blender-addon.zip"
         ls target/lib/
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
-        body_path: CHANGELOG
+        body_path: .github/workflows/RELEASE.md
         tag_name: v${{ env.VERSION }}
         files: |
           target/lib/osci-render-${{ env.VERSION }}.exe
           target/lib/osci-render-win-${{ env.VERSION }}.jar
+          target/lib/osci-render-blender-addon.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_REPOSITORY: jameshball/osci-render
