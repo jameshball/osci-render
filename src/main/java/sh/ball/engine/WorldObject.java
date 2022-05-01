@@ -5,13 +5,14 @@ import com.mokiat.data.front.parser.*;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.jgrapht.Graph;
 import org.jgrapht.alg.connectivity.ConnectivityInspector;
 import org.jgrapht.alg.cycle.ChinesePostman;
-import org.jgrapht.graph.AsSubgraph;
-import org.jgrapht.graph.DefaultUndirectedWeightedGraph;
-import org.jgrapht.graph.DefaultWeightedEdge;
+import org.jgrapht.alg.shortestpath.DijkstraShortestPath;
+import org.jgrapht.graph.*;
 
 public class WorldObject {
 
@@ -60,33 +61,89 @@ public class WorldObject {
     return triangles;
   }
 
-  public void getDrawPath(Set<Line3D> edges) {
-    Graph<Vector3, DefaultWeightedEdge> graph = new DefaultUndirectedWeightedGraph<>(
-      DefaultWeightedEdge.class);
+  private Vector3 addEdgeToPath(Vector3 realSource, Graph<Vector3, DefaultEdge> graph, DefaultEdge edge, Set<DefaultEdge> visited, Set<DefaultEdge> notVisited, List<Vector3> path) {
+    visited.add(edge);
+    notVisited.remove(edge);
 
-    // Add all lines in frame to graph as vertices and edges. Edge weight is determined by the
-    // length of the line as this is directly proportional to draw time.
-    for (Line3D edge : edges) {
-      graph.addVertex(edge.getStart());
-      graph.addVertex(edge.getEnd());
+    Vector3 supposedSource = graph.getEdgeSource(edge);
+    Vector3 supposedSink = graph.getEdgeTarget(edge);
+    // no guarantee on order since the graph is undirected
+    Vector3 source = supposedSource == realSource ? supposedSource : supposedSink;
+    Vector3 sink = supposedSink == realSource ? supposedSource : supposedSink;
 
-      DefaultWeightedEdge weightedEdge = new DefaultWeightedEdge();
-      graph.addEdge(edge.getStart(), edge.getEnd(), weightedEdge);
-      graph.addEdge(edge.getStart(), edge.getEnd());
-      graph.setEdgeWeight(weightedEdge, edge.getStart().distance(edge.getEnd()));
+    path.add(source);
+    path.add(sink);
+
+    return sink;
+  }
+
+  // Unused but faster than chinese postman - not good at handling with lots of vertices
+  private void fasterPath(Graph<Vector3, DefaultEdge> graph, Set<Vector3> vertices) {
+    Set<DefaultEdge> visited = new HashSet<>();
+    List<Vector3> path = new ArrayList<>();
+    AsSubgraph<Vector3, DefaultEdge> subgraph = new AsSubgraph<>(graph, vertices);
+    Set<DefaultEdge> notVisited = new HashSet<>(subgraph.edgeSet());
+
+    DefaultEdge outgoingEdge = notVisited.stream().findFirst().orElseThrow();
+    Vector3 currentVertex = subgraph.getEdgeSource(outgoingEdge);
+    Vector3 startVertex = currentVertex;
+    visited.add(outgoingEdge);
+    notVisited.remove(outgoingEdge);
+    path.add(currentVertex);
+    path.add(subgraph.getEdgeTarget(outgoingEdge));
+
+    while (!notVisited.isEmpty()) {
+      Set<DefaultEdge> outgoing = subgraph.outgoingEdgesOf(currentVertex);
+      DefaultEdge newEdge = null;
+      for (DefaultEdge edge : outgoing) {
+        if (!visited.contains(edge)) {
+          newEdge = edge;
+          currentVertex = addEdgeToPath(currentVertex, subgraph, edge, visited, notVisited, path);
+          break;
+        }
+      }
+
+      if (newEdge == null) {
+        newEdge = notVisited.stream().findFirst().orElseThrow();
+        Vector3 dest = subgraph.getEdgeSource(newEdge);
+
+        List<DefaultEdge> shortestPath = DijkstraShortestPath.findPathBetween(subgraph, currentVertex, dest).getEdgeList();
+        for (DefaultEdge edge : shortestPath) {
+          addEdgeToPath(currentVertex, subgraph, edge, visited, notVisited, path);
+        }
+
+        currentVertex = dest;
+      }
     }
 
-    ConnectivityInspector<Vector3, DefaultWeightedEdge> inspector = new ConnectivityInspector<>(
+    // return back to start vertex
+    path.addAll(DijkstraShortestPath.findPathBetween(subgraph, currentVertex, startVertex).getVertexList());
+    vertexPath.add(path);
+  }
+
+  public void getDrawPath(Set<Line3D> edges) {
+    Graph<Vector3, DefaultEdge> graph = new DefaultUndirectedGraph<>(DefaultEdge.class);
+
+    // Add all lines in frame to graph as vertices and edges.
+    Stream.concat(
+      edges.stream().map(Line3D::getStart),
+      edges.stream().map(Line3D::getEnd)
+    ).distinct().forEach(graph::addVertex);
+
+    for (Line3D edge : edges) {
+      graph.addEdge(edge.getStart(), edge.getEnd());
+    }
+
+    ConnectivityInspector<Vector3, DefaultEdge> inspector = new ConnectivityInspector<>(
       graph);
 
     // Chinese Postman can only be performed on connected graphs, so iterate over all connected
     // sub-graphs.
-    // TODO: parallelize?
-    for (Set<Vector3> vertices : inspector.connectedSets()) {
-      AsSubgraph<Vector3, DefaultWeightedEdge> subgraph = new AsSubgraph<>(graph, vertices);
-      ChinesePostman<Vector3, DefaultWeightedEdge> cp = new ChinesePostman<>();
-      vertexPath.add(cp.getCPPSolution(subgraph).getVertexList());
-    }
+    vertexPath = inspector.connectedSets().parallelStream().map(vertices -> {
+      ChinesePostman<Vector3, DefaultEdge> cp = new ChinesePostman<>();
+      AsSubgraph<Vector3, DefaultEdge> subgraph = new AsSubgraph<>(graph, vertices);
+      return cp.getCPPSolution(subgraph).getVertexList();
+    }).toList();
   }
 
   public Vector3 getRotation() {
