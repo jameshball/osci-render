@@ -527,6 +527,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private void startAudioPlayerThread() {
     Thread audioPlayerThread = new Thread(audioPlayer);
     audioPlayerThread.setUncaughtExceptionHandler((thread, throwable) -> throwable.printStackTrace());
+    audioPlayerThread.setPriority(Thread.MAX_PRIORITY);
     audioPlayerThread.start();
   }
 
@@ -573,6 +574,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     List<String> newFrameSourcePaths = new ArrayList<>();
     List<byte[]> newOpenFiles = new ArrayList<>();
 
+    Platform.runLater(() -> {
+      generalController.setFrameSourceName("Loading file" + (names.size() > 1 ? "s" : "") + " - audio may stutter!");
+      generalController.updateFrameLabels();
+    });
+
     for (int i = 0; i < files.size(); i++) {
       try {
         newFrameSources.add(ParserFactory.getParser(names.get(i), files.get(i)).parse());
@@ -581,17 +587,19 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       } catch (IOException ignored) {}
     }
 
-    if (newFrameSources.size() > 0) {
-      generalController.showMultiFileTooltip(newFrameSources.size() > 1);
-      if (generalController.framesPlaying() && newFrameSources.size() == 1) {
-        generalController.disablePlayback();
+    Platform.runLater(() -> {
+      if (newFrameSources.size() > 0) {
+        generalController.showMultiFileTooltip(newFrameSources.size() > 1);
+        if (generalController.framesPlaying() && newFrameSources.size() == 1) {
+          generalController.disablePlayback();
+        }
+        frameSources.forEach(FrameSource::disable);
+        frameSources = newFrameSources;
+        frameSourcePaths = newFrameSourcePaths;
+        openFiles = newOpenFiles;
+        changeFrameSource(0);
       }
-      frameSources.forEach(FrameSource::disable);
-      frameSources = newFrameSources;
-      frameSourcePaths = newFrameSourcePaths;
-      openFiles = newOpenFiles;
-      changeFrameSource(0);
-    }
+    });
   }
 
   // used so that the Controller has access to the stage, allowing it to open

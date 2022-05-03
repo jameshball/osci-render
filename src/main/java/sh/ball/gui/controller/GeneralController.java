@@ -82,9 +82,15 @@ public class GeneralController implements Initializable, SubController {
           names.add(chosenFile.getName());
         }
 
-        mainController.updateFiles(files, names);
+        new Thread(() -> {
+          try {
+            mainController.updateFiles(files, names);
+          } catch (IOException | ParserConfigurationException | SAXException e) {
+            e.printStackTrace();
+          }
+        }).start();
       }
-    } catch (IOException | ParserConfigurationException | SAXException ioException) {
+    } catch (IOException ioException) {
       ioException.printStackTrace();
 
       // display error to user (for debugging purposes)
