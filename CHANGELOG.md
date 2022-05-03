@@ -1,3 +1,7 @@
+- 1.22.3
+  - Make interface usable whilst loading files
+
+
 - 1.22.2
   - Revert to CPU execution if an exception occurs when trying to use GPU
 

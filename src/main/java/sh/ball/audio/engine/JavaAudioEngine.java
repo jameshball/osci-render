@@ -13,7 +13,7 @@ public class JavaAudioEngine implements AudioEngine {
   private static final int DEFAULT_SAMPLE_RATE = 192000;
   // stereo audio
   private static final int NUM_CHANNELS = 2;
-  private static final int LATENCY_MS = 10;
+  private static final int LATENCY_MS = 30;
   private static final int MAX_FRAME_LATENCY = 512;
   // java sound doesn't support anything more than 16 bit :(
   private static final int BIT_DEPTH = 16;
