@@ -51,6 +51,7 @@ import sh.ball.audio.midi.MidiNote;
 import sh.ball.engine.ObjectServer;
 import sh.ball.engine.ObjectSet;
 import sh.ball.gui.Gui;
+import sh.ball.oscilloscope.OscilloscopeServer;
 import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.ParserFactory;
@@ -458,6 +459,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
     server = new ObjectServer(this::enableObjectServerRendering, this::disableObjectServerRendering);
     new Thread(server).start();
+    new OscilloscopeServer<>(audioPlayer, 2).start();
   }
 
   private void enableObjectServerRendering() {

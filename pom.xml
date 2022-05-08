@@ -176,7 +176,11 @@
             <artifactId>gson</artifactId>
             <version>2.9.0</version>
         </dependency>
-
+        <dependency>
+            <groupId>org.java-websocket</groupId>
+            <artifactId>Java-WebSocket</artifactId>
+            <version>1.5.3</version>
+        </dependency>
     </dependencies>
     <profiles>
         <profile>
