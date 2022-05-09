@@ -13,6 +13,8 @@ public interface AudioPlayer<S> extends Runnable, MidiListener {
 
   void stop();
 
+  void setAudioStability(boolean stable);
+
   boolean isPlaying();
 
   void setOctave(int octave);

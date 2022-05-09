@@ -3,7 +3,6 @@ package sh.ball.audio.engine;
 import sh.ball.shapes.Vector2;
 
 import javax.sound.sampled.*;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.stream.Stream;
@@ -13,7 +12,8 @@ public class JavaAudioEngine implements AudioEngine {
   private static final int DEFAULT_SAMPLE_RATE = 192000;
   // stereo audio
   private static final int NUM_CHANNELS = 2;
-  private static final int LATENCY_MS = 30;
+  private static final int UNSTABLE_LATENCY_MS = 30;
+  private static final int STABLE_LATENCY_MS = 100;
   private static final int MAX_FRAME_LATENCY = 512;
   // java sound doesn't support anything more than 16 bit :(
   private static final int BIT_DEPTH = 16;
@@ -25,10 +25,17 @@ public class JavaAudioEngine implements AudioEngine {
 
   private SourceDataLine source;
   private AudioDevice device;
+  private boolean makeMoreStable = false;
+  private boolean makeLessStable = false;
+  private boolean isStable = false;
 
   @Override
   public boolean isPlaying() {
     return source.isRunning();
+  }
+
+  private int calculateBufferSize(AudioDevice device, int latencyMs) {
+    return Math.max((int) (device.sampleRate() * latencyMs * 0.0005), MAX_FRAME_LATENCY) * FRAME_SIZE;
   }
 
   @Override
@@ -42,14 +49,23 @@ public class JavaAudioEngine implements AudioEngine {
     this.source = AudioSystem.getSourceDataLine(format);
     source.open(format);
 
-    int frameLatency = Math.max((int) (device.sampleRate() * LATENCY_MS * 0.0005), MAX_FRAME_LATENCY);
-    int bufferSize = frameLatency * FRAME_SIZE;
+    int bufferSize = calculateBufferSize(device, UNSTABLE_LATENCY_MS);
     int remainingBufferSpace = source.getBufferSize() - bufferSize;
 
     byte[] buffer = new byte[bufferSize * 2];
 
     source.start();
     while (!stopped) {
+      if (makeMoreStable || makeLessStable) {
+        int newLatency = makeMoreStable ? STABLE_LATENCY_MS : UNSTABLE_LATENCY_MS;
+        bufferSize = calculateBufferSize(device, newLatency);
+        remainingBufferSpace = source.getBufferSize() - bufferSize;
+
+        buffer = new byte[bufferSize * 2];
+        isStable = makeMoreStable;
+        makeMoreStable = false;
+        makeLessStable = false;
+      }
       int delta = source.available() - remainingBufferSpace;
       if (delta > 0) {
         int requiredSamples = (delta + bufferSize) / FRAME_SIZE;
@@ -84,6 +100,15 @@ public class JavaAudioEngine implements AudioEngine {
   @Override
   public void stop() {
     stopped = true;
+  }
+
+  @Override
+  public void setAudioStability(boolean stable) {
+    if (stable && !isStable) {
+      this.makeMoreStable = true;
+    } else if (!stable && isStable) {
+      this.makeLessStable = true;
+    }
   }
 
   @Override
