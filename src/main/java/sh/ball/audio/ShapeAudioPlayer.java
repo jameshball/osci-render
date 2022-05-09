@@ -364,6 +364,11 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   @Override
+  public void setAudioStability(boolean stable) {
+    audioEngine.setAudioStability(stable);
+  }
+
+  @Override
   public boolean isPlaying() {
     return audioEngine.isPlaying();
   }

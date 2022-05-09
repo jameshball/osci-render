@@ -134,6 +134,11 @@ public class XtAudioEngine implements AudioEngine {
     stopped = true;
   }
 
+  @Override
+  public void setAudioStability(boolean stable) {
+    // TODO: unimplemented
+  }
+
   // XtAudio boilerplate for getting a list of connected audio devices
   @Override
   public List<AudioDevice> devices() {
