@@ -90,6 +90,7 @@ public class Gui extends Application {
     stage.show();
 
     stage.setOnCloseRequest(t -> {
+      controller.shutdown();
       Platform.exit();
       System.exit(0);
     });

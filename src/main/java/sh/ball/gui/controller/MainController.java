@@ -51,7 +51,7 @@ import sh.ball.audio.midi.MidiNote;
 import sh.ball.engine.ObjectServer;
 import sh.ball.engine.ObjectSet;
 import sh.ball.gui.Gui;
-import sh.ball.oscilloscope.OscilloscopeServer;
+import sh.ball.oscilloscope.ByteWebSocketServer;
 import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.ParserFactory;
@@ -73,7 +73,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private String openProjectPath;
   private final FileChooser wavFileChooser = new FileChooser();
 
-  private ObjectServer server;
+  private ObjectServer objectServer;
 
   // audio
   private int sampleRate;
@@ -105,6 +105,13 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   // javafx
   private final FileChooser osciFileChooser = new FileChooser();
   private Stage stage;
+
+  // software oscilloscope
+  private static final int SOSCI_NUM_VERTICES = 4096;
+  private static final int SOSCI_VERTEX_SIZE = 2;
+  private static final int FRAME_SIZE = 2;
+  private byte[] buffer;
+  private ByteWebSocketServer webSocketServer;
 
   @FXML
   private EffectsController effectsController;
@@ -204,6 +211,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
     }
     channelClosestToZero.put(slider, closestToZero);
+  }
+
+  public void shutdown() {
+    webSocketServer.shutdown();
   }
 
   // alternates between recording and not recording when called.
@@ -457,15 +468,30 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
     }
 
-    server = new ObjectServer(this::enableObjectServerRendering, this::disableObjectServerRendering);
-    new Thread(server).start();
-    new OscilloscopeServer<>(audioPlayer, 2).start();
+    objectServer = new ObjectServer(this::enableObjectServerRendering, this::disableObjectServerRendering);
+    new Thread(objectServer).start();
+
+    webSocketServer = new ByteWebSocketServer();
+    webSocketServer.start();
+    this.buffer = new byte[FRAME_SIZE * SOSCI_NUM_VERTICES * SOSCI_VERTEX_SIZE];
+    new Thread(() -> sendAudioDataToWebSocket(webSocketServer)).start();
+  }
+
+  private void sendAudioDataToWebSocket(ByteWebSocketServer server) {
+    while (true) {
+      try {
+        audioPlayer.read(buffer);
+        server.send(buffer);
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      }
+    }
   }
 
   private void enableObjectServerRendering() {
     Platform.runLater(() -> {
       objectServerRendering = true;
-      ObjectSet set = server.getObjectSet();
+      ObjectSet set = objectServer.getObjectSet();
       frameSources.forEach(FrameSource::disable);
       set.enable();
 
@@ -483,7 +509,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
   private void disableObjectServerRendering() {
     Platform.runLater(() -> {
-      server.getObjectSet().disable();
+      objectServer.getObjectSet().disable();
       objectServerRendering = false;
       changeFrameSource(currentFrameSource);
     });
