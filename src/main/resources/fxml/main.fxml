@@ -155,6 +155,11 @@
                </CustomMenuItem>
            </items>
          </Menu>
+         <Menu mnemonicParsing="false" text="Window">
+            <items>
+               <MenuItem fx:id="softwareOscilloscopeMenuItem" mnemonicParsing="false" text="Open Software Oscilloscope" />
+            </items>
+         </Menu>
      </menus>
    </MenuBar>
    <TitledPane animated="false" collapsible="false" layoutX="7.0" layoutY="33.0" prefHeight="371.0" prefWidth="378.0" text="Main settings">

@@ -6,7 +6,7 @@
 
     <groupId>sh.ball</groupId>
     <artifactId>osci-render</artifactId>
-    <version>1.22.4</version>
+    <version>1.23.0</version>
 
     <name>osci-render</name>
 
@@ -176,7 +176,21 @@
             <artifactId>gson</artifactId>
             <version>2.9.0</version>
         </dependency>
-
+        <dependency>
+            <groupId>org.java-websocket</groupId>
+            <artifactId>Java-WebSocket</artifactId>
+            <version>1.5.3</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>1.7.36</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>1.7.36</version>
+        </dependency>
     </dependencies>
     <profiles>
         <profile>

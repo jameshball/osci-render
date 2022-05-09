@@ -1,3 +1,8 @@
+- 1.23.0
+  - Add software oscilloscope to visualise output!
+  - Open from Window > Open Software Oscilloscope
+
+
 - 1.22.4
   - Add option Audio > High Audio Stability
   - This increases audio latency but significantly improves audio stability - especially on lower-end machines

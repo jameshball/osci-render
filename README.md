@@ -22,6 +22,7 @@ Send an email to [james@ball.sh](mailto:james@ball.sh) if you have any issues, f
 - Render `.svg` files
 - Render text
 - [Blender integration](https://www.youtube.com/watch?v=pCn297Ejvlw)
+- [Software oscilloscope visualisation](https://james.ball.sh/oscilloscope)
 - Rotation of objects
 - Scaling images
 - Translating images
@@ -91,25 +92,11 @@ If there are any problems, please create an [issue](https://github.com/jameshbal
 
 ### Using osci-render without an oscilloscope
 
-Obviously, not everyone has access to an oscilloscope, let alone an analogue oscilloscope. Luckily there are some decent software alternatives that are a good option once they're setup.
+osci-render now has a software oscilloscope built-in! It is a modified version of [m1el/woscope](https://github.com/m1el/woscope), an amazing web-based software oscilloscope.
 
-- First, download a virtual audio input/output device
-  - This routes audio from osci-render to the software oscilloscope
-  - On Windows, I use [VB-CABLE](https://vb-audio.com/Cable/)
-    - Set the digital input to be your default output device
-    - Set the digital output to be your default input device
-    - Then you can listen to the digital output to duplicate the audio to your headphones/speakers
-  - On macOS, [VB-CABLE](https://vb-audio.com/Cable/) is also available
-  - [Soundflower](https://github.com/mattingalls/Soundflower) and [Loopback](https://rogueamoeba.com/loopback/) (paid, but better) are also options for macOS
-- Then, download a software oscilloscope
-  - There are quite a few options available
-  - My preferred option is https://dood.al/oscilloscope/
-    - You need to click [reset all] when you first load the page otherwise there are no visuals
-    - Just tick the microphone checkbox and it should listen to your default input device!
-  - https://asdfg.me/osci/ is another good option
-    - This can be buggy, and doesn't look as realistic
-    - Just press the mic icon and choose your digital audio device you have routed osci-render to
-- Contact [james@ball.sh](mailto:james@ball.sh) if you need any help
+You can open it from Window > Open Software Oscilloscope which will open [james.ball.sh/oscilloscope](https://james.ball.sh/oscilloscope) in your default browser.
+
+If there are any problems, please create an [issue](https://github.com/jameshball/osci-render/issues)!
 
 ### MIDI
 
