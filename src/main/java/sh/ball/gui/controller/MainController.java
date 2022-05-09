@@ -163,6 +163,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private MenuItem recordMenuItem;
   @FXML
   private Spinner<Double> recordLengthSpinner;
+  @FXML
+  private MenuItem softwareOscilloscopeMenuItem;
 
   public MainController() throws Exception {
     // Clone DEFAULT_OBJ InputStream using a ByteArrayOutputStream
@@ -475,6 +477,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     webSocketServer.start();
     this.buffer = new byte[FRAME_SIZE * SOSCI_NUM_VERTICES * SOSCI_VERTEX_SIZE];
     new Thread(() -> sendAudioDataToWebSocket(webSocketServer)).start();
+  }
+
+  public void setSoftwareOscilloscopeAction(Runnable openBrowser) {
+    softwareOscilloscopeMenuItem.setOnAction((e) -> openBrowser.run());
   }
 
   private void sendAudioDataToWebSocket(ByteWebSocketServer server) {

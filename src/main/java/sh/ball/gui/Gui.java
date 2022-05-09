@@ -51,6 +51,10 @@ public class Gui extends Application {
     Scene scene = new Scene(root);
     scene.getStylesheets().add(getClass().getResource("/css/main.css").toExternalForm());
 
+    controller.setSoftwareOscilloscopeAction(() -> {
+      getHostServices().showDocument("https://james.ball.sh/oscilloscope");
+    });
+
     scene.addEventHandler(KeyEvent.KEY_PRESSED, (event -> {
       switch (event.getCode()) {
         // frame selection controls
