@@ -1,3 +1,8 @@
+- 1.22.4
+  - Add option Audio > High Audio Stability
+  - This increases audio latency but significantly improves audio stability - especially on lower-end machines
+
+
 - 1.22.3
   - Make interface usable whilst loading files
 
