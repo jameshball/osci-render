@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Slider?>
+<?import javafx.scene.control.Spinner?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.shape.SVGPath?>
+
+
+<HBox alignment="TOP_CENTER" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="44.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1">
+   <children>
+      <CheckBox fx:id="vectorCancellingCheckBox" mnemonicParsing="false" prefHeight="18.0" prefWidth="131.0" text="Vector cancel">
+         <HBox.margin>
+            <Insets top="11.0" />
+         </HBox.margin>
+      </CheckBox>
+      <Slider fx:id="vectorCancellingSlider" blockIncrement="0.005" disable="true" majorTickUnit="0.1" max="1.0" prefHeight="42.0" prefWidth="230.0" showTickLabels="true" showTickMarks="true" value="0.11111111">
+         <HBox.margin>
+            <Insets right="5.0" />
+         </HBox.margin>
+      </Slider>
+      <Spinner prefHeight="26.0" prefWidth="109.0">
+         <HBox.margin>
+            <Insets top="6.0" />
+         </HBox.margin>
+      </Spinner>
+      <SVGPath fx:id="vectorCancellingMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" pickOnBounds="true">
+         <HBox.margin>
+            <Insets left="5.0" right="5.0" top="15.0" />
+         </HBox.margin>
+      </SVGPath>
+      <ComboBox fx:id="vectorCancellingComboBox" prefHeight="26.0" prefWidth="88.0">
+         <HBox.margin>
+            <Insets right="5.0" top="6.0" />
+         </HBox.margin>
+      </ComboBox>
+      <CheckBox fx:id="vectorCancellingMic" mnemonicParsing="false" prefHeight="18.0" prefWidth="52.0" text="Mic">
+         <HBox.margin>
+            <Insets top="10.0" />
+         </HBox.margin>
+      </CheckBox>
+   </children>
+</HBox>
