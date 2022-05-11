@@ -8,26 +8,26 @@
 
 <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="355.0" prefWidth="606.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.EffectsController">
     <children>
-        <CheckBox fx:id="vectorCancellingCheckBox" layoutX="14.0" layoutY="15.0" mnemonicParsing="false" text="Vector cancelling" />
-        <Slider fx:id="vectorCancellingSlider" blockIncrement="0.005" disable="true" layoutX="154.0" layoutY="16.0" majorTickUnit="0.1" max="1.0" prefHeight="42.0" prefWidth="254.0" showTickLabels="true" showTickMarks="true" value="0.11111111" />
-        <CheckBox fx:id="bitCrushCheckBox" layoutX="14.0" layoutY="55.0" mnemonicParsing="false" text="Bit crush" />
-        <Slider fx:id="bitCrushSlider" blockIncrement="0.005" disable="true" layoutX="154.0" layoutY="57.0" majorTickUnit="0.1" max="1.0" prefHeight="42.0" prefWidth="254.0" showTickLabels="true" showTickMarks="true" value="0.6666666" />
-        <CheckBox fx:id="verticalDistortCheckBox" layoutX="14.0" layoutY="96.0" mnemonicParsing="false" text="Vertical Distort" />
-        <Slider fx:id="verticalDistortSlider" blockIncrement="0.005" disable="true" layoutX="154.0" layoutY="98.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="254.0" showTickLabels="true" showTickMarks="true" value="0.2" />
-        <CheckBox fx:id="horizontalDistortCheckBox" layoutX="14.0" layoutY="138.0" mnemonicParsing="false" text="Horizontal Distort" />
-        <Slider fx:id="horizontalDistortSlider" blockIncrement="0.005" disable="true" layoutX="154.0" layoutY="140.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="254.0" showTickLabels="true" showTickMarks="true" value="0.2" />
-        <CheckBox fx:id="wobbleCheckBox" layoutX="14.0" layoutY="180.0" mnemonicParsing="false" text="Wobble" />
-        <Slider fx:id="wobbleSlider" blockIncrement="0.005" disable="true" layoutX="154.0" layoutY="182.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="254.0" showTickLabels="true" showTickMarks="true" value="0.2" />
+        <CheckBox fx:id="vectorCancellingCheckBox" layoutX="7.0" layoutY="15.0" mnemonicParsing="false" text="Vector cancel" />
+        <Slider fx:id="vectorCancellingSlider" blockIncrement="0.005" disable="true" layoutX="124.0" layoutY="16.0" majorTickUnit="0.1" max="1.0" prefHeight="42.0" prefWidth="230.0" showTickLabels="true" showTickMarks="true" value="0.11111111" />
+        <CheckBox fx:id="bitCrushCheckBox" layoutX="7.0" layoutY="55.0" mnemonicParsing="false" text="Bit crush" />
+        <Slider fx:id="bitCrushSlider" blockIncrement="0.005" disable="true" layoutX="124.0" layoutY="57.0" majorTickUnit="0.1" max="1.0" prefHeight="42.0" prefWidth="230.0" showTickLabels="true" showTickMarks="true" value="0.6666666" />
+        <CheckBox fx:id="verticalDistortCheckBox" layoutX="7.0" layoutY="96.0" mnemonicParsing="false" text="Vertical shift" />
+        <Slider fx:id="verticalDistortSlider" blockIncrement="0.005" disable="true" layoutX="124.0" layoutY="98.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="230.0" showTickLabels="true" showTickMarks="true" value="0.2" />
+        <CheckBox fx:id="horizontalDistortCheckBox" layoutX="7.0" layoutY="138.0" mnemonicParsing="false" text="Horizontal shift" />
+        <Slider fx:id="horizontalDistortSlider" blockIncrement="0.005" disable="true" layoutX="124.0" layoutY="140.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="230.0" showTickLabels="true" showTickMarks="true" value="0.2" />
+        <CheckBox fx:id="wobbleCheckBox" layoutX="7.0" layoutY="180.0" mnemonicParsing="false" text="Wobble" />
+        <Slider fx:id="wobbleSlider" blockIncrement="0.005" disable="true" layoutX="124.0" layoutY="182.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="230.0" showTickLabels="true" showTickMarks="true" value="0.2" />
         <SVGPath fx:id="vectorCancellingMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="414.0" layoutY="13.0" pickOnBounds="true" />
         <SVGPath fx:id="bitCrushMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="414.0" layoutY="54.0" pickOnBounds="true" />
         <SVGPath fx:id="verticalDistortMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="414.0" layoutY="94.0" pickOnBounds="true" />
         <SVGPath fx:id="horizontalDistortMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="414.0" layoutY="136.0" pickOnBounds="true" />
         <SVGPath fx:id="wobbleMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="414.0" layoutY="178.0" pickOnBounds="true" />
-        <CheckBox fx:id="smoothingCheckBox" layoutX="14.0" layoutY="220.0" mnemonicParsing="false" text="Smoothing" />
-        <Slider fx:id="smoothingSlider" blockIncrement="0.005" disable="true" layoutX="154.0" layoutY="222.0" majorTickUnit="0.1" max="1.0" minorTickCount="1" prefHeight="38.0" prefWidth="254.0" showTickLabels="true" showTickMarks="true" value="0.125" />
+        <CheckBox fx:id="smoothingCheckBox" layoutX="7.0" layoutY="220.0" mnemonicParsing="false" text="Smoothing" />
+        <Slider fx:id="smoothingSlider" blockIncrement="0.005" disable="true" layoutX="124.0" layoutY="222.0" majorTickUnit="0.1" max="1.0" minorTickCount="1" prefHeight="38.0" prefWidth="230.0" showTickLabels="true" showTickMarks="true" value="0.125" />
         <SVGPath fx:id="smoothingMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="414.0" layoutY="218.0" pickOnBounds="true" />
-        <CheckBox fx:id="traceMaxCheckBox" layoutX="15.0" layoutY="300.0" mnemonicParsing="false" text="Trace Max" />
-        <Slider fx:id="traceMaxSlider" blockIncrement="0.005" disable="true" layoutX="155.0" layoutY="302.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="254.0" showTickLabels="true" showTickMarks="true" value="0.5" />
+        <CheckBox fx:id="traceMaxCheckBox" layoutX="8.0" layoutY="300.0" mnemonicParsing="false" text="Trace max" />
+        <Slider fx:id="traceMaxSlider" blockIncrement="0.005" disable="true" layoutX="125.0" layoutY="302.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="230.0" showTickLabels="true" showTickMarks="true" value="0.5" />
         <SVGPath fx:id="traceMaxMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="415.0" layoutY="298.0" pickOnBounds="true" />
       <ComboBox fx:id="wobbleComboBox" layoutX="445.0" layoutY="175.0" prefHeight="26.0" prefWidth="102.0" />
       <ComboBox fx:id="traceMaxComboBox" layoutX="446.0" layoutY="295.0" prefHeight="26.0" prefWidth="102.0" />
@@ -43,8 +43,8 @@
       <CheckBox fx:id="wobbleMic" layoutX="558.0" layoutY="179.0" mnemonicParsing="false" text="Mic" />
       <CheckBox fx:id="smoothingMic" layoutX="558.0" layoutY="219.0" mnemonicParsing="false" text="Mic" />
       <CheckBox fx:id="traceMaxMic" layoutX="559.0" layoutY="299.0" mnemonicParsing="false" text="Mic" />
-      <CheckBox fx:id="traceMinCheckBox" layoutX="15.0" layoutY="260.0" mnemonicParsing="false" text="Trace Min" />
-      <Slider fx:id="traceMinSlider" blockIncrement="0.005" disable="true" layoutX="155.0" layoutY="262.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="254.0" showTickLabels="true" showTickMarks="true" value="0.5" />
+      <CheckBox fx:id="traceMinCheckBox" layoutX="8.0" layoutY="260.0" mnemonicParsing="false" text="Trace min" />
+      <Slider fx:id="traceMinSlider" blockIncrement="0.005" disable="true" layoutX="125.0" layoutY="262.0" majorTickUnit="0.1" max="1.0" prefHeight="38.0" prefWidth="230.0" showTickLabels="true" showTickMarks="true" value="0.5" />
       <SVGPath fx:id="traceMinMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="415.0" layoutY="258.0" pickOnBounds="true" />
       <ComboBox fx:id="traceMinComboBox" layoutX="446.0" layoutY="255.0" prefHeight="26.0" prefWidth="102.0" />
       <CheckBox fx:id="traceMinMic" layoutX="559.0" layoutY="259.0" mnemonicParsing="false" text="Mic" />
