@@ -409,7 +409,12 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     deadzoneSpinner.valueProperty().addListener((e, old, deadzone) -> this.midiDeadzone = deadzone);
 
     List<PrintableSlider> printableSliders = new ArrayList<>();
-    sliders.forEach(slider -> printableSliders.add(new PrintableSlider(slider)));
+    sliders.forEach(slider -> {
+      // don't allow frequency slider to be changed
+      if (!slider.getId().contains("frequency")) {
+        printableSliders.add(new PrintableSlider(slider));
+      }
+    });
     sliderComboBox.setItems(FXCollections.observableList(printableSliders));
     sliderComboBox.valueProperty().addListener((e, old, slider) -> {
       sliderMinTextField.setText(FORMAT.format(slider.slider.getMin()));

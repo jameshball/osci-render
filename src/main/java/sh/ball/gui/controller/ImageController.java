@@ -4,10 +4,8 @@ import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.scene.control.Button;
-import javafx.scene.control.CheckBox;
-import javafx.scene.control.Slider;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
 import javafx.scene.shape.SVGPath;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -55,6 +53,8 @@ public class ImageController implements Initializable, SubController {
   private SVGPath translationScaleMidi;
   @FXML
   private Slider frequencySlider;
+  @FXML
+  private Spinner<Double> frequencySpinner;
   @FXML
   private SVGPath frequencyMidi;
   @FXML
@@ -162,13 +162,27 @@ public class ImageController implements Initializable, SubController {
 
     translationScaleSlider.valueProperty().addListener((e, old, scale) -> translateEffect.setScale(scale.doubleValue()));
 
-    // converts the value of frequencySlider to the actual frequency that it represents so that it
-    // can increase at an exponential scale.
-    frequencySlider.valueProperty().addListener((o, old, f) -> frequency.set(Math.pow(MAX_FREQUENCY, f.doubleValue())));
-    frequency.addListener((o, old, f) -> frequencySlider.setValue(Math.log(f.doubleValue()) / Math.log(MAX_FREQUENCY)));
+    frequencySpinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(0, MAX_FREQUENCY, MidiNote.MIDDLE_C, 1));
+    frequencySpinner.valueProperty().addListener((o, old, f) -> {
+      frequency.set(f);
+    });
+
+    frequency.addListener((o, old, f) -> {
+      frequencySlider.setValue(Math.log(f.doubleValue()) / Math.log(MAX_FREQUENCY));
+      frequencySpinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(0, MAX_FREQUENCY, f.doubleValue(), 1));
+    });
     audioPlayer.setFrequency(frequency);
     // default value is middle C
     frequency.set(MidiNote.MIDDLE_C);
+    frequencySlider.setOnKeyPressed(e -> {
+      if (e.getCode() == KeyCode.LEFT || e.getCode() == KeyCode.RIGHT) {
+        frequency.set(Math.pow(MAX_FREQUENCY, frequencySlider.getValue()));
+      }
+    });
+    frequencySlider.setOnMouseDragged(e -> {
+      frequency.set(Math.pow(MAX_FREQUENCY, frequencySlider.getValue()));
+    });
+
     volumeSlider.valueProperty().addListener((e, old, value) -> {
       audioPlayer.setVolume(value.doubleValue() / 3.0);
     });
@@ -231,6 +245,8 @@ public class ImageController implements Initializable, SubController {
     Element y = (Element) element.getElementsByTagName("y").item(0);
     translationXTextField.setText(x.getTextContent());
     translationYTextField.setText(y.getTextContent());
+
+    frequency.set(Math.pow(MAX_FREQUENCY, frequencySlider.getValue()));
 
     // For backwards compatibility we assume a default value
     Element ellipse = (Element) element.getElementsByTagName("ellipse").item(0);
