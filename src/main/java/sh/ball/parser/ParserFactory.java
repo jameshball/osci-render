@@ -22,7 +22,7 @@ public class ParserFactory {
     } else if (TextParser.isTxtFile(filePath)) {
       return new TextParser(bais);
     }
-    throw new IOException("No known parser that can parse " + new File(filePath).getName());
+    throw new IOException("Can't parse " + new File(filePath).getName());
   }
 
 }

@@ -17,10 +17,13 @@ import org.w3c.dom.Element;
 import sh.ball.audio.FrequencyAnalyser;
 import sh.ball.audio.effect.*;
 import sh.ball.audio.engine.AudioDevice;
+import sh.ball.gui.components.EffectComponentGroup;
 import sh.ball.shapes.Shape;
 
 import java.net.URL;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static sh.ball.gui.Gui.audioPlayer;
 
@@ -31,167 +34,57 @@ public class EffectsController implements Initializable, SubController {
   private Map<EffectType, Slider> effectTypes;
 
   private final WobbleEffect wobbleEffect;
-  private final EffectAnimator wobbleAnimator;
-  private final EffectAnimator traceMinAnimator;
-  private final EffectAnimator traceMaxAnimator;
-  private final EffectAnimator vectorCancellingAnimator;
-  private final EffectAnimator bitCrushAnimator;
-  private final EffectAnimator smoothingAnimator;
-  private final EffectAnimator verticalDistortAnimator;
-  private final EffectAnimator horizontalDistortAnimator;
 
   @FXML
-  private CheckBox vectorCancellingCheckBox;
+  private EffectComponentGroup vectorCancelling;
   @FXML
-  private Slider vectorCancellingSlider;
+  private EffectComponentGroup bitCrush;
   @FXML
-  private SVGPath vectorCancellingMidi;
+  private EffectComponentGroup verticalDistort;
   @FXML
-  private ComboBox<AnimationType> vectorCancellingComboBox;
+  private EffectComponentGroup horizontalDistort;
   @FXML
-  private CheckBox vectorCancellingMic;
+  private EffectComponentGroup wobble;
   @FXML
-  private CheckBox bitCrushCheckBox;
+  private EffectComponentGroup smoothing;
   @FXML
-  private Slider bitCrushSlider;
+  private EffectComponentGroup traceMax;
   @FXML
-  private SVGPath bitCrushMidi;
-  @FXML
-  private ComboBox<AnimationType> bitCrushComboBox;
-  @FXML
-  private CheckBox bitCrushMic;
-  @FXML
-  private CheckBox verticalDistortCheckBox;
-  @FXML
-  private Slider verticalDistortSlider;
-  @FXML
-  private SVGPath verticalDistortMidi;
-  @FXML
-  private ComboBox<AnimationType> verticalDistortComboBox;
-  @FXML
-  private CheckBox verticalDistortMic;
-  @FXML
-  private CheckBox horizontalDistortCheckBox;
-  @FXML
-  private Slider horizontalDistortSlider;
-  @FXML
-  private SVGPath horizontalDistortMidi;
-  @FXML
-  private ComboBox<AnimationType> horizontalDistortComboBox;
-  @FXML
-  private CheckBox horizontalDistortMic;
-  @FXML
-  private CheckBox wobbleCheckBox;
-  @FXML
-  private Slider wobbleSlider;
-  @FXML
-  private SVGPath wobbleMidi;
-  @FXML
-  private ComboBox<AnimationType> wobbleComboBox;
-  @FXML
-  private CheckBox wobbleMic;
-  @FXML
-  private CheckBox smoothingCheckBox;
-  @FXML
-  private Slider smoothingSlider;
-  @FXML
-  private SVGPath smoothingMidi;
-  @FXML
-  private ComboBox<AnimationType> smoothingComboBox;
-  @FXML
-  private CheckBox smoothingMic;
-  @FXML
-  private CheckBox traceMinCheckBox;
-  @FXML
-  private Slider traceMinSlider;
-  @FXML
-  private SVGPath traceMinMidi;
-  @FXML
-  private ComboBox<AnimationType> traceMinComboBox;
-  @FXML
-  private CheckBox traceMinMic;
-  @FXML
-  private CheckBox traceMaxCheckBox;
-  @FXML
-  private Slider traceMaxSlider;
-  @FXML
-  private SVGPath traceMaxMidi;
-  @FXML
-  private ComboBox<AnimationType> traceMaxComboBox;
-  @FXML
-  private CheckBox traceMaxMic;
+  private EffectComponentGroup traceMin;
 
   public EffectsController() {
     this.wobbleEffect = new WobbleEffect(DEFAULT_SAMPLE_RATE);
-    this.wobbleAnimator = new EffectAnimator(DEFAULT_SAMPLE_RATE, wobbleEffect);
-    this.traceMinAnimator = new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(audioPlayer::setTraceMin));
-    this.traceMaxAnimator = new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(audioPlayer::setTraceMax));
-    this.vectorCancellingAnimator = new EffectAnimator(DEFAULT_SAMPLE_RATE, new VectorCancellingEffect());
-    this.bitCrushAnimator = new EffectAnimator(DEFAULT_SAMPLE_RATE, new BitCrushEffect());
-    this.smoothingAnimator = new EffectAnimator(DEFAULT_SAMPLE_RATE, new SmoothEffect(1));
-    this.verticalDistortAnimator = new EffectAnimator(DEFAULT_SAMPLE_RATE, new VerticalDistortEffect(0.2));
-    this.horizontalDistortAnimator = new EffectAnimator(DEFAULT_SAMPLE_RATE, new HorizontalDistortEffect(0.2));
+  }
+
+  private <K, V> Map<K, V> mergeEffectMaps(Function<EffectComponentGroup, Map<K, V>> map) {
+    return effects()
+      .stream()
+      .map(map)
+      .flatMap(m -> m.entrySet().stream())
+      .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   @Override
   public Map<SVGPath, Slider> getMidiButtonMap() {
-    return Map.of(
-      vectorCancellingMidi, vectorCancellingSlider,
-      bitCrushMidi, bitCrushSlider,
-      wobbleMidi, wobbleSlider,
-      smoothingMidi, smoothingSlider,
-      traceMinMidi, traceMinSlider,
-      traceMaxMidi, traceMaxSlider,
-      verticalDistortMidi, verticalDistortSlider,
-      horizontalDistortMidi, horizontalDistortSlider
-    );
+    return mergeEffectMaps(effect -> effect.controller.getMidiButtonMap());
   }
 
   public Map<ComboBox<AnimationType>, EffectAnimator> getComboBoxAnimatorMap() {
-    return Map.of(
-      vectorCancellingComboBox, vectorCancellingAnimator,
-      bitCrushComboBox, bitCrushAnimator,
-      wobbleComboBox, wobbleAnimator,
-      smoothingComboBox, smoothingAnimator,
-      traceMinComboBox, traceMinAnimator,
-      traceMaxComboBox, traceMaxAnimator,
-      verticalDistortComboBox, verticalDistortAnimator,
-      horizontalDistortComboBox, horizontalDistortAnimator
-    );
+    return mergeEffectMaps(effect -> effect.controller.getComboBoxAnimatorMap());
   }
 
   // Maps EffectTypes to the slider that controls the effect so that they can be
   // toggled when the appropriate checkbox is ticked.
   private void initializeEffectTypes() {
-    effectTypes = Map.of(
-      EffectType.VECTOR_CANCELLING,
-      vectorCancellingSlider,
-      EffectType.BIT_CRUSH,
-      bitCrushSlider,
-      EffectType.VERTICAL_DISTORT,
-      verticalDistortSlider,
-      EffectType.HORIZONTAL_DISTORT,
-      horizontalDistortSlider,
-      EffectType.WOBBLE,
-      wobbleSlider,
-      EffectType.SMOOTH,
-      smoothingSlider,
-      EffectType.TRACE_MIN,
-      traceMinSlider,
-      EffectType.TRACE_MAX,
-      traceMaxSlider
-    );
+    effectTypes = mergeEffectMaps(effect -> effect.controller.getEffectSliderMap());
   }
 
   // selects or deselects the given audio effect
   public void updateEffect(EffectType type, boolean checked, SettableEffect effect, double value) {
     if (checked) {
-      effect.setValue(value);
       audioPlayer.addEffect(type, effect);
-      effectTypes.get(type).setDisable(false);
     } else {
       audioPlayer.removeEffect(type);
-      effectTypes.get(type).setDisable(true);
     }
   }
 
@@ -211,10 +104,10 @@ public class EffectsController implements Initializable, SubController {
   public void restartEffects() {
     // apply the wobble effect after a second as the frequency of the audio takes a while to
     // propagate and send to its listeners.
-    KeyFrame kf1 = new KeyFrame(Duration.seconds(0), e -> wobbleAnimator.setValue(0));
+    KeyFrame kf1 = new KeyFrame(Duration.seconds(0), e -> wobble.controller.getAnimator().setValue(0));
     KeyFrame kf2 = new KeyFrame(Duration.seconds(1), e -> {
       wobbleEffect.update();
-      wobbleAnimator.setValue(wobbleSlider.getValue());
+      wobble.controller.updateAnimatorValue();
     });
     Timeline timeline = new Timeline(kf1, kf2);
     Platform.runLater(timeline::play);
@@ -224,159 +117,63 @@ public class EffectsController implements Initializable, SubController {
   public void initialize(URL url, ResourceBundle resourceBundle) {
     initializeEffectTypes();
 
-    InvalidationListener bitCrushListener = e ->
-      updateEffect(EffectType.BIT_CRUSH, bitCrushCheckBox.isSelected(), bitCrushAnimator, bitCrushSlider.getValue());
-    InvalidationListener verticalDistortListener = e ->
-      updateEffect(EffectType.VERTICAL_DISTORT, verticalDistortCheckBox.isSelected(), verticalDistortAnimator, verticalDistortSlider.getValue());
-    InvalidationListener horizontalDistortListener = e ->
-      updateEffect(EffectType.HORIZONTAL_DISTORT, horizontalDistortCheckBox.isSelected(), horizontalDistortAnimator, horizontalDistortSlider.getValue());
-    InvalidationListener wobbleListener = e ->
-      updateEffect(EffectType.WOBBLE, wobbleCheckBox.isSelected(), wobbleAnimator, wobbleSlider.getValue());
-    InvalidationListener smoothListener = e ->
-      updateEffect(EffectType.SMOOTH, smoothingCheckBox.isSelected(), smoothingAnimator, smoothingSlider.getValue());
-    InvalidationListener vectorCancellingListener = e ->
-      updateEffect(EffectType.VECTOR_CANCELLING, vectorCancellingCheckBox.isSelected(), vectorCancellingAnimator, vectorCancellingSlider.getValue());
-    InvalidationListener traceMinListener = e ->
-      updateEffect(EffectType.TRACE_MIN, traceMinCheckBox.isSelected(), traceMinAnimator, traceMinSlider.getValue());
-    InvalidationListener traceMaxListener = e ->
-      updateEffect(EffectType.TRACE_MAX, traceMaxCheckBox.isSelected(), traceMaxAnimator, traceMaxSlider.getValue());
+    wobble.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, wobbleEffect));
+    traceMin.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(audioPlayer::setTraceMin)));
+    traceMax.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(audioPlayer::setTraceMax)));
+    vectorCancelling.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new VectorCancellingEffect()));
+    bitCrush.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new BitCrushEffect()));
+    smoothing.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new SmoothEffect(1)));
+    verticalDistort.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new VerticalDistortEffect(0.2)));
+    horizontalDistort.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new HorizontalDistortEffect(0.2)));
 
-    vectorCancellingSlider.valueProperty().addListener(vectorCancellingListener);
-    vectorCancellingCheckBox.selectedProperty().addListener(vectorCancellingListener);
+    effects().forEach(effect -> {
+      effect.controller.setEffectUpdater(this::updateEffect);
 
-    bitCrushSlider.valueProperty().addListener(bitCrushListener);
-    bitCrushCheckBox.selectedProperty().addListener(bitCrushListener);
-
-    verticalDistortSlider.valueProperty().addListener(verticalDistortListener);
-    verticalDistortCheckBox.selectedProperty().addListener(verticalDistortListener);
-
-    horizontalDistortSlider.valueProperty().addListener(horizontalDistortListener);
-    horizontalDistortCheckBox.selectedProperty().addListener(horizontalDistortListener);
-
-    wobbleSlider.valueProperty().addListener(wobbleListener);
-    wobbleCheckBox.selectedProperty().addListener(wobbleListener);
-    wobbleCheckBox.selectedProperty().addListener(e -> wobbleEffect.update());
-
-    smoothingSlider.valueProperty().addListener(smoothListener);
-    smoothingCheckBox.selectedProperty().addListener(smoothListener);
-
-    traceMinSlider.valueProperty().addListener(traceMinListener);
-    traceMinCheckBox.selectedProperty().addListener(traceMinListener);
-    traceMinCheckBox.selectedProperty().addListener((e, old, selected) -> {
-      if (selected) {
-        traceMinAnimator.setValue(traceMinSlider.getValue());
-      } else {
-        traceMinAnimator.setValue(0.0);
+      // specific functionality for some effects
+      switch (effect.getType()) {
+        case WOBBLE -> effect.controller.onToggle((animator, value, selected) -> wobbleEffect.update());
+        case TRACE_MIN, TRACE_MAX -> effect.controller.onToggle((animator, value, selected) -> {
+          if (selected) {
+            animator.setValue(value);
+          } else if (effect.getType().equals(EffectType.TRACE_MAX)) {
+            animator.setValue(1.0);
+          } else {
+            animator.setValue(0.0);
+          }
+        });
       }
+
+      effect.controller.lateInitialize();
     });
-
-    traceMaxSlider.valueProperty().addListener(traceMaxListener);
-    traceMaxCheckBox.selectedProperty().addListener(traceMaxListener);
-    traceMaxCheckBox.selectedProperty().addListener((e, old, selected) -> {
-      if (selected) {
-        traceMaxAnimator.setValue(traceMaxSlider.getValue());
-      } else {
-        traceMaxAnimator.setValue(1.0);
-      }
-    });
-
-    List<AnimationType> animations = List.of(AnimationType.STATIC, AnimationType.SEESAW, AnimationType.LINEAR, AnimationType.FORWARD, AnimationType.REVERSE);
-    Map<ComboBox<AnimationType>, EffectAnimator> comboAnimatorMap = getComboBoxAnimatorMap();
-    for (Map.Entry<ComboBox<AnimationType>, EffectAnimator> entry : comboAnimatorMap.entrySet()) {
-      entry.getKey().setItems(FXCollections.observableList(animations));
-      entry.getKey().setValue(AnimationType.STATIC);
-      entry.getKey().valueProperty().addListener((options, old, animationType) -> {
-        entry.getValue().setAnimation(animationType);
-      });
-    }
-
-    List<EffectAnimator> animators = animators();
-    List<Slider> sliders = sliders();
-    for (int i = 0; i < sliders.size(); i++) {
-      int finalI = i;
-      sliders.get(i).minProperty().addListener((e, old, min) ->
-        animators.get(finalI).setMin(min.doubleValue()));
-      sliders.get(i).maxProperty().addListener((e, old, max) ->
-        animators.get(finalI).setMax(max.doubleValue()));
-    }
   }
 
-  private List<ComboBox<AnimationType>> comboBoxes() {
-    return getComboBoxAnimatorMap().keySet().stream().toList();
+  private List<EffectComponentGroup> effects() {
+    return List.of(vectorCancelling, bitCrush, verticalDistort, horizontalDistort, wobble, smoothing, traceMin, traceMax);
   }
-  private List<CheckBox> checkBoxes() {
-    return List.of(vectorCancellingCheckBox, bitCrushCheckBox, verticalDistortCheckBox,
-      horizontalDistortCheckBox, wobbleCheckBox, smoothingCheckBox, traceMinCheckBox,
-      traceMaxCheckBox);
-  }
-  private List<EffectAnimator> animators() {
-    return List.of(vectorCancellingAnimator, bitCrushAnimator, verticalDistortAnimator,
-      horizontalDistortAnimator, wobbleAnimator, smoothingAnimator, traceMinAnimator,
-      traceMaxAnimator);
-  }
+
   @Override
   public List<CheckBox> micCheckBoxes() {
-    return List.of(vectorCancellingMic, bitCrushMic, verticalDistortMic, horizontalDistortMic,
-      wobbleMic, smoothingMic, traceMinMic, traceMaxMic);
+    return effects().stream().flatMap(effect -> effect.controller.micCheckBoxes().stream()).toList();
   }
   @Override
   public List<Slider> sliders() {
-    return List.of(vectorCancellingSlider, bitCrushSlider, verticalDistortSlider,
-      horizontalDistortSlider, wobbleSlider, smoothingSlider, traceMinSlider, traceMaxSlider);
+    return effects().stream().flatMap(effect -> effect.controller.sliders().stream()).toList();
   }
   @Override
   public List<String> labels() {
-    return List.of("vectorCancelling", "bitCrush", "verticalDistort", "horizontalDistort",
-      "wobble", "smooth", "traceMin", "traceMax");
+    return effects().stream().flatMap(effect -> effect.controller.labels().stream()).toList();
   }
 
   @Override
   public Element save(Document document) {
     Element element = document.createElement("checkBoxes");
-    List<ComboBox<AnimationType>> comboBoxes = comboBoxes();
-    List<CheckBox> checkBoxes = checkBoxes();
-    List<String> labels = labels();
-    for (int i = 0; i < checkBoxes.size(); i++) {
-      Element checkBox = document.createElement(labels.get(i));
-      Element selected = document.createElement("selected");
-      selected.appendChild(
-        document.createTextNode(checkBoxes.get(i).selectedProperty().getValue().toString())
-      );
-      Element animation = document.createElement("animation");
-      animation.appendChild(document.createTextNode(comboBoxes.get(i).getValue().toString()));
-      checkBox.appendChild(selected);
-      checkBox.appendChild(animation);
-      element.appendChild(checkBox);
-    }
+    effects().forEach(effect -> element.appendChild(effect.controller.save(document)));
     return element;
   }
 
   @Override
   public void load(Element root) {
     Element element = (Element) root.getElementsByTagName("checkBoxes").item(0);
-    List<ComboBox<AnimationType>> comboBoxes = comboBoxes();
-    List<CheckBox> checkBoxes = checkBoxes();
-    List<String> labels = labels();
-    for (int i = 0; i < checkBoxes.size(); i++) {
-      Element checkBox = (Element) element.getElementsByTagName(labels.get(i)).item(0);
-      // backwards compatibility
-      if (checkBox == null) {
-        checkBoxes.get(i).setSelected(false);
-        continue;
-      }
-      String selected;
-      // backwards compatibility
-      if (checkBox.getElementsByTagName("selected").getLength() > 0) {
-        selected = checkBox.getElementsByTagName("selected").item(0).getTextContent();
-        if (checkBox.getElementsByTagName("animation").getLength() > 0) {
-          String animation = checkBox.getElementsByTagName("animation").item(0).getTextContent();
-          comboBoxes.get(i).setValue(AnimationType.fromString(animation));
-        }
-      } else {
-        selected = checkBox.getTextContent();
-        comboBoxes.get(i).setValue(AnimationType.STATIC);
-      }
-      checkBoxes.get(i).setSelected(Boolean.parseBoolean(selected));
-    }
+    effects().forEach(effect -> effect.controller.load(element));
   }
 }
