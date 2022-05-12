@@ -52,6 +52,8 @@ public class EffectComponentGroupController implements Initializable, SubControl
   }
 
   public void lateInitialize() {
+    slider.setId(label);
+
     List<AnimationType> animations = List.of(AnimationType.STATIC, AnimationType.SEESAW, AnimationType.LINEAR, AnimationType.FORWARD, AnimationType.REVERSE);
 
     comboBox.setItems(FXCollections.observableList(animations));
