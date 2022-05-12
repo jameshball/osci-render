@@ -9,7 +9,7 @@
     <children>
       <VBox>
          <children>
-              <EffectComponentGroup fx:id="vectorCancelling" label="vectorCancelling" max="1.0" min="0.0" name="Vector cancel" type="VECTOR_CANCELLING" value="0.11111111" />
+              <EffectComponentGroup fx:id="vectorCancelling" label="vectorCancelling" max="1.0" min="0.0" name="Vector cancelling" type="VECTOR_CANCELLING" value="0.11111111" />
               <EffectComponentGroup fx:id="bitCrush" label="bitCrush" max="1.0" min="0.0" name="Bit crush" type="BIT_CRUSH" value="0.6666666" />
               <EffectComponentGroup fx:id="verticalDistort" label="verticalDistort" max="1.0" min="0.0" name="Vertical shift" type="VERTICAL_DISTORT" value="0.2" />
               <EffectComponentGroup fx:id="horizontalDistort" label="horizontalDistort" max="1.0" min="0.0" name="Horizontal shift" type="HORIZONTAL_DISTORT" value="0.2" />
