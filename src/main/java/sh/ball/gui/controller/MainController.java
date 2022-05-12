@@ -624,7 +624,12 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         newFrameSources.add(ParserFactory.getParser(names.get(i), files.get(i)).parse());
         newFrameSourcePaths.add(names.get(i));
         newOpenFiles.add(files.get(i));
-      } catch (IOException ignored) {}
+      } catch (IOException | IllegalArgumentException e) {
+        Platform.runLater(() -> {
+          generalController.setFrameSourceName(e.getMessage());
+          generalController.updateFrameLabels();
+        });
+      }
     }
 
     Platform.runLater(() -> {
