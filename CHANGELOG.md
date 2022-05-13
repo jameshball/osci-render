@@ -1,3 +1,8 @@
+- 1.24.0
+  - Add spinners to all effect sliders
+  - Add spinner to frequency slider
+
+
 - 1.23.0
   - Add software oscilloscope to visualise output!
   - Open from Window > Open Software Oscilloscope
