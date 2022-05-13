@@ -118,7 +118,7 @@
     -fx-background-color: white;
 }
 
-.text-field {
+.text-field, .text-input:disabled {
     -fx-background-color: very_dark;
     -fx-border-color: white;
     -fx-border-width: 1;
@@ -288,6 +288,14 @@
 /*** The context menu that contains a menu's menu items ***/
 .context-menu {
     -fx-background-color: -fx-my-menu-color;
+}
+
+.spinner {
+    -fx-background-color: very_dark;
+    -fx-border-radius: 0;
+    -fx-color: white;
+    -fx-border-color: white;
+    -fx-padding: -1px;
 }
 
 .spinner .increment-arrow-button {
