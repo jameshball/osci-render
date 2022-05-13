@@ -143,6 +143,9 @@ public class EffectComponentGroupController implements Initializable, SubControl
     effectCheckBox.setSelected(Boolean.parseBoolean(selected));
   }
 
+  @Override
+  public void micSignalReceived() {}
+
   public void setType(EffectType type) {
     this.type = type;
   }

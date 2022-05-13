@@ -274,6 +274,9 @@ public class GeneralController implements Initializable, SubController {
     }
   }
 
+  @Override
+  public void micSignalReceived() {}
+
   public void setFrameSourceName(String name) {
     this.frameSourceName = name;
   }

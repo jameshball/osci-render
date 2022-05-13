@@ -23,4 +23,6 @@ public interface SubController {
   Node save(Document document);
 
   void load(Element root);
+
+  void micSignalReceived();
 }

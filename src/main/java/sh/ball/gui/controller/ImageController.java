@@ -163,9 +163,7 @@ public class ImageController implements Initializable, SubController {
     translationScaleSlider.valueProperty().addListener((e, old, scale) -> translateEffect.setScale(scale.doubleValue()));
 
     frequencySpinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(0, MAX_FREQUENCY, MidiNote.MIDDLE_C, 1));
-    frequencySpinner.valueProperty().addListener((o, old, f) -> {
-      frequency.set(f);
-    });
+    frequencySpinner.valueProperty().addListener((o, old, f) -> frequency.set(f));
 
     frequency.addListener((o, old, f) -> {
       frequencySlider.setValue(Math.log(f.doubleValue()) / Math.log(MAX_FREQUENCY));
@@ -179,13 +177,13 @@ public class ImageController implements Initializable, SubController {
         frequency.set(Math.pow(MAX_FREQUENCY, frequencySlider.getValue()));
       }
     });
-    frequencySlider.setOnMouseDragged(e -> {
-      frequency.set(Math.pow(MAX_FREQUENCY, frequencySlider.getValue()));
-    });
+    frequencySlider.setOnMouseDragged(e ->
+      frequency.set(Math.pow(MAX_FREQUENCY, frequencySlider.getValue()))
+    );
 
-    volumeSlider.valueProperty().addListener((e, old, value) -> {
-      audioPlayer.setVolume(value.doubleValue() / 3.0);
-    });
+    volumeSlider.valueProperty().addListener((e, old, value) ->
+      audioPlayer.setVolume(value.doubleValue() / 3.0)
+    );
     volumeSlider.valueProperty().addListener(e -> {
       if (!audioPlayer.midiPlaying()) {
         audioPlayer.resetMidi();
@@ -251,5 +249,10 @@ public class ImageController implements Initializable, SubController {
     // For backwards compatibility we assume a default value
     Element ellipse = (Element) element.getElementsByTagName("ellipse").item(0);
     translateEllipseCheckBox.setSelected(ellipse != null && Boolean.parseBoolean(ellipse.getTextContent()));
+  }
+
+  @Override
+  public void micSignalReceived() {
+    frequency.set(Math.pow(MAX_FREQUENCY, frequencySlider.getValue()));
   }
 }
