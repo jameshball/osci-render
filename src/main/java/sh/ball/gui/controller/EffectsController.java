@@ -176,4 +176,7 @@ public class EffectsController implements Initializable, SubController {
     Element element = (Element) root.getElementsByTagName("checkBoxes").item(0);
     effects().forEach(effect -> effect.controller.load(element));
   }
+
+  @Override
+  public void micSignalReceived() {}
 }
