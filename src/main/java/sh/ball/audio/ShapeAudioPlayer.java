@@ -57,7 +57,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private final Callable<AudioEngine> audioEngineBuilder;
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
   private final Map<Object, Effect> effects = new ConcurrentHashMap<>();
-  private final List<Listener> listeners = new CopyOnWriteArrayList<>();
+  private final Queue<Listener> listeners = new ConcurrentLinkedQueue<>();
 
   private AudioEngine audioEngine;
   private ByteArrayOutputStream outputStream;
@@ -223,17 +223,19 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   private Vector2 cutoff(Vector2 vector) {
-    if (vector.getX() < -1) {
-      vector = vector.setX(-1);
-    } else if (vector.getX() > 1) {
-      vector = vector.setX(1);
+    double x = vector.x;
+    double y = vector.y;
+    if (x < -1) {
+      x = -1;
+    } else if (x > 1) {
+      x = 1;
     }
-    if (vector.getY() < -1) {
-      vector = vector.setY(-1);
-    } else if (vector.getY() > 1) {
-      vector = vector.setY(1);
+    if (y < -1) {
+      y = -1;
+    } else if (y > 1) {
+      y = 1;
     }
-    return vector;
+    return new Vector2(x, y);
   }
 
   private Vector2 applyEffects(int frame, Vector2 vector) {

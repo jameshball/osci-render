@@ -39,8 +39,9 @@ public class WobbleEffect extends PhaseEffect implements FrequencyListener, Sett
   @Override
   public Vector2 apply(int count, Vector2 vector) {
     double theta = nextTheta();
-    double x = vector.getX() + volume * Math.sin(frequency * theta);
-    double y = vector.getY() + volume * Math.sin(frequency * theta);
+    double delta = volume * Math.sin(frequency * theta);
+    double x = vector.x + delta;
+    double y = vector.y + delta;
 
     return new Vector2(x, y);
   }

@@ -9,7 +9,8 @@ import java.util.List;
 public class JavaAudioInput implements AudioInput {
 
   private static final int DEFAULT_SAMPLE_RATE = 44100;
-  private static final int BUFFER_SIZE = 50;
+  private static final int CHUNK_SIZE = 512;
+  private static final int STEP_SIZE = 32;
   // java sound doesn't support anything more than 16 bit :(
   private static final int BIT_DEPTH = 16;
   // mono
@@ -45,17 +46,19 @@ public class JavaAudioInput implements AudioInput {
       return;
     }
     try {
-      microphone.open(format, BUFFER_SIZE);
+      microphone.open(format);
 
-      // I am well aware this is inefficient - sufficient for the needs of
-      // modifying sliders
-      byte[] data = new byte[2];
+      byte[] data = new byte[CHUNK_SIZE];
       microphone.start();
       while (!stopped) {
-        microphone.read(data, 0, 2);
-        short sample = (short) ((data[1] << 8) + data[0]);
-        for (AudioInputListener listener : listeners) {
-          listener.transmit((double) sample / Short.MAX_VALUE);
+        if (microphone.available() >= CHUNK_SIZE) {
+          microphone.read(data, 0, CHUNK_SIZE);
+          for (int i = 0; i < CHUNK_SIZE / 2; i += 2 * STEP_SIZE) {
+            short sample = (short) ((data[2 * i + 1] << 8) + data[2 * i]);
+            for (AudioInputListener listener : listeners) {
+              listener.transmit((double) sample / Short.MAX_VALUE);
+            }
+          }
         }
       }
       microphone.close();

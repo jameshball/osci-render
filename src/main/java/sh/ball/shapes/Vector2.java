@@ -61,10 +61,12 @@ public final class Vector2 extends Shape {
 
   @Override
   public Vector2 rotate(double theta) {
-    Vector2 vector = setX(getX() * Math.cos(theta) - getY() * Math.sin(theta));
-    vector = vector.setY(getX() * Math.sin(theta) + getY() * Math.cos(theta));
-
-    return vector;
+    double cosTheta = Math.cos(theta);
+    double sinTheta = Math.sin(theta);
+    return new Vector2(
+      x * cosTheta - y * sinTheta,
+      x * sinTheta + y * cosTheta
+    );
   }
 
   @Override
@@ -74,12 +76,12 @@ public final class Vector2 extends Shape {
 
   @Override
   public Vector2 scale(Vector2 vector) {
-    return new Vector2(getX() * vector.getX(), getY() * vector.getY());
+    return new Vector2(x * vector.x, y * vector.y);
   }
 
   @Override
   public Vector2 translate(Vector2 vector) {
-    return new Vector2(getX() + vector.getX(), getY() + vector.getY());
+    return new Vector2(x + vector.x, y + vector.y);
   }
 
   @Override
@@ -96,13 +98,12 @@ public final class Vector2 extends Shape {
       return false;
     }
     Vector2 point = (Vector2) obj;
-    return round(x, 2) == round(point.x, 2)
-      && round(y, 2) == round(point.y, 2);
+    return x == point.x && y == point.y;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(round(x, 2), round(y, 2));
+    return Objects.hash(x, y);
   }
 
   @Override

@@ -12,9 +12,7 @@ public class BitCrushEffect implements SettableEffect {
 
   @Override
   public Vector2 apply(int count, Vector2 vector) {
-    double x = vector.getX();
-    double y = vector.getY();
-    return new Vector2(round(x, crush), round(y, crush));
+    return new Vector2(round(vector.x, crush), round(vector.y, crush));
   }
 
   @Override

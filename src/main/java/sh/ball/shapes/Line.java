@@ -59,7 +59,10 @@ public final class Line extends Shape {
 
   @Override
   public Vector2 nextVector(double drawingProgress) {
-    return a.add(b.sub(a).scale(drawingProgress));
+    return new Vector2(
+      a.x + drawingProgress * (b.x - a.x),
+      a.y + drawingProgress * (b.y - a.y)
+    );
   }
 
   public Vector2 getA() {

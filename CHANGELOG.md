@@ -1,3 +1,8 @@
+- 1.24.1
+  - Various optimisations
+  - Mic-based control is now slightly smoother
+
+
 - 1.24.0
   - Add spinners to all effect sliders
   - Add spinner to frequency slider
