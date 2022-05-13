@@ -60,7 +60,7 @@ public class EffectComponentGroup extends HBox {
     controller.slider.setMin(min);
     controller.spinner.setValueFactory(
       new SpinnerValueFactory.DoubleSpinnerValueFactory(
-        min, controller.slider.getMax(), controller.slider.getValue(), 0.01
+        min, controller.slider.getMax(), controller.slider.getValue(), controller.getIncrement()
       )
     );
   }
@@ -73,7 +73,7 @@ public class EffectComponentGroup extends HBox {
     controller.slider.setMax(max);
     controller.spinner.setValueFactory(
       new SpinnerValueFactory.DoubleSpinnerValueFactory(
-        controller.slider.getMin(), max, controller.slider.getValue(), 0.01
+        controller.slider.getMin(), max, controller.slider.getValue(), controller.getIncrement()
       )
     );
   }
@@ -90,7 +90,7 @@ public class EffectComponentGroup extends HBox {
     controller.slider.setValue(value);
     controller.spinner.setValueFactory(
       new SpinnerValueFactory.DoubleSpinnerValueFactory(
-        controller.slider.getMin(), controller.slider.getMax(), value, 0.01
+        controller.slider.getMin(), controller.slider.getMax(), value, controller.getIncrement()
       )
     );
   }
@@ -101,5 +101,13 @@ public class EffectComponentGroup extends HBox {
 
   public String getLabel() {
     return controller.getLabel();
+  }
+
+  public void setIncrement(double increment) {
+    controller.setIncrement(increment);
+  }
+
+  public double getIncrement() {
+    return controller.getIncrement();
   }
 }
