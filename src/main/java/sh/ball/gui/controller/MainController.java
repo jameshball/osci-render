@@ -1109,8 +1109,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
             } else if (sliderValue < slider.getMin()) {
               sliderValue = slider.getMin();
             }
-            // TODO: Correctly update frequency spinner!
-            subControllers().forEach(sub -> sub.micSignalReceived());
+            subControllers().forEach(SubController::micSignalReceived);
             sliders.get(i).setValue(sliderValue);
           }
         }
