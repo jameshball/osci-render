@@ -9,14 +9,14 @@
     <children>
       <VBox>
          <children>
-              <EffectComponentGroup fx:id="vectorCancelling" label="vectorCancelling" max="1.0" min="0.0" name="Vector cancelling" type="VECTOR_CANCELLING" value="0.11111111" />
-              <EffectComponentGroup fx:id="bitCrush" label="bitCrush" max="1.0" min="0.0" name="Bit crush" type="BIT_CRUSH" value="0.6666666" />
-              <EffectComponentGroup fx:id="verticalDistort" label="verticalDistort" max="1.0" min="0.0" name="Vertical shift" type="VERTICAL_DISTORT" value="0.2" />
-              <EffectComponentGroup fx:id="horizontalDistort" label="horizontalDistort" max="1.0" min="0.0" name="Horizontal shift" type="HORIZONTAL_DISTORT" value="0.2" />
-              <EffectComponentGroup fx:id="wobble" label="wobble" max="1.0" min="0.0" name="Wobble" type="WOBBLE" value="0.2" />
-              <EffectComponentGroup fx:id="smoothing" label="smoothing" max="1.0" min="0.0" name="Smoothing" type="SMOOTH" value="0.125" />
-              <EffectComponentGroup fx:id="traceMax" label="traceMax" max="1.0" min="0.0" name="Trace max" type="TRACE_MAX" value="0.5" />
-              <EffectComponentGroup fx:id="traceMin" label="traceMin" max="1.0" min="0.0" name="Trace min" type="TRACE_MIN" value="0.5" />
+              <EffectComponentGroup fx:id="vectorCancelling" label="vectorCancelling" max="1.0" min="0.0" increment="0.005" name="Vector cancelling" type="VECTOR_CANCELLING" value="0.11111111" />
+              <EffectComponentGroup fx:id="bitCrush" label="bitCrush" max="1.0" min="0.0" increment="0.005" name="Bit crush" type="BIT_CRUSH" value="0.6666666" />
+              <EffectComponentGroup fx:id="verticalDistort" label="verticalDistort" max="1.0" min="0.0" increment="0.005" name="Vertical shift" type="VERTICAL_DISTORT" value="0.2" />
+              <EffectComponentGroup fx:id="horizontalDistort" label="horizontalDistort" max="1.0" min="0.0" increment="0.005" name="Horizontal shift" type="HORIZONTAL_DISTORT" value="0.2" />
+              <EffectComponentGroup fx:id="wobble" label="wobble" max="1.0" min="0.0" increment="0.005" name="Wobble" type="WOBBLE" value="0.2" />
+              <EffectComponentGroup fx:id="smoothing" label="smoothing" max="1.0" min="0.0" increment="0.005" name="Smoothing" type="SMOOTH" value="0.125" />
+              <EffectComponentGroup fx:id="traceMax" label="traceMax" max="1.0" min="0.0" increment="0.005" name="Trace max" type="TRACE_MAX" value="0.5" />
+              <EffectComponentGroup fx:id="traceMin" label="traceMin" max="1.0" min="0.0" increment="0.005" name="Trace min" type="TRACE_MIN" value="0.5" />
          </children>
          <padding>
             <Insets top="5.0" />

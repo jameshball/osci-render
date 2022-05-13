@@ -26,6 +26,7 @@ public class EffectComponentGroupController implements Initializable, SubControl
   private EffectAnimator animator;
   private EffectType type;
   private String label;
+  private double increment;
 
   @FXML
   CheckBox effectCheckBox;
@@ -45,10 +46,16 @@ public class EffectComponentGroupController implements Initializable, SubControl
     slider.valueProperty().addListener((o, oldValue, newValue) ->
       spinner.setValueFactory(
         new SpinnerValueFactory.DoubleSpinnerValueFactory(
-          slider.getMin(), slider.getMax(), newValue.doubleValue(), 0.01
+          slider.getMin(), slider.getMax(), newValue.doubleValue(), increment
         )
       ));
     spinner.valueProperty().addListener((o, oldValue, newValue) -> slider.setValue(newValue));
+    spinner.setOnScroll((e) -> {
+      double delta = e.getDeltaY() > 0 ? increment : -increment;
+      spinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(
+        slider.getMin(), slider.getMax(), slider.getValue() + delta, increment
+      ));
+    });
   }
 
   public void lateInitialize() {
@@ -65,7 +72,7 @@ public class EffectComponentGroupController implements Initializable, SubControl
       animator.setMin(min.doubleValue());
       spinner.setValueFactory(
         new SpinnerValueFactory.DoubleSpinnerValueFactory(
-          min.doubleValue(), slider.getMax(), slider.getValue(), 0.01
+          min.doubleValue(), slider.getMax(), slider.getValue(), increment
         )
       );
     });
@@ -73,7 +80,7 @@ public class EffectComponentGroupController implements Initializable, SubControl
       animator.setMax(max.doubleValue());
       spinner.setValueFactory(
         new SpinnerValueFactory.DoubleSpinnerValueFactory(
-          slider.getMin(), max.doubleValue(), slider.getValue(), 0.01
+          slider.getMin(), max.doubleValue(), slider.getValue(), increment
         )
       );
     });
@@ -189,5 +196,13 @@ public class EffectComponentGroupController implements Initializable, SubControl
 
   public void updateAnimatorValue() {
     animator.setValue(slider.getValue());
+  }
+
+  public void setIncrement(double increment) {
+    this.increment = increment;
+  }
+
+  public double getIncrement() {
+    return increment;
   }
 }
