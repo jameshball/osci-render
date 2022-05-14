@@ -165,8 +165,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private Spinner<Double> recordLengthSpinner;
   @FXML
   private MenuItem softwareOscilloscopeMenuItem;
-  @FXML
-  private CheckMenuItem audioStabilityCheckMenuItem;
 
   public MainController() throws Exception {
     // Clone DEFAULT_OBJ InputStream using a ByteArrayOutputStream
@@ -461,10 +459,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     });
 
     objController.updateObjectRotateSpeed();
-
-    audioStabilityCheckMenuItem.selectedProperty().addListener((o, old, selected) -> {
-      audioPlayer.setAudioStability(selected);
-    });
 
     switchAudioDevice(defaultDevice, false);
     executor.submit(producer);

@@ -12,8 +12,6 @@ public interface AudioEngine {
 
   void stop();
 
-  void setAudioStability(boolean stable);
-
   List<AudioDevice> devices();
 
   AudioDevice getDefaultDevice();

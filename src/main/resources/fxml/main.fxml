@@ -67,7 +67,6 @@
                      </AnchorPane>
                   </content>
                </CustomMenuItem>
-               <CheckMenuItem fx:id="audioStabilityCheckMenuItem" mnemonicParsing="false" text="High Audio Stability" />
             </items>
          </Menu>
          <Menu mnemonicParsing="false" text="MIDI">

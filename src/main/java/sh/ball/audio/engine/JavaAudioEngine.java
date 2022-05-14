@@ -12,8 +12,7 @@ public class JavaAudioEngine implements AudioEngine {
   private static final int DEFAULT_SAMPLE_RATE = 192000;
   // stereo audio
   private static final int NUM_CHANNELS = 2;
-  private static final int UNSTABLE_LATENCY_MS = 30;
-  private static final int STABLE_LATENCY_MS = 100;
+  private static final int LATENCY_MS = 30;
   private static final int MAX_FRAME_LATENCY = 512;
   // java sound doesn't support anything more than 16 bit :(
   private static final int BIT_DEPTH = 16;
@@ -25,9 +24,6 @@ public class JavaAudioEngine implements AudioEngine {
 
   private SourceDataLine source;
   private AudioDevice device;
-  private boolean makeMoreStable = false;
-  private boolean makeLessStable = false;
-  private boolean isStable = false;
 
   @Override
   public boolean isPlaying() {
@@ -48,7 +44,7 @@ public class JavaAudioEngine implements AudioEngine {
     // connects to a device that can support the format above (i.e. default audio device)
     this.source = AudioSystem.getSourceDataLine(format);
 
-    int bufferSize = calculateBufferSize(device, UNSTABLE_LATENCY_MS);
+    int bufferSize = calculateBufferSize(device, LATENCY_MS);
 
     byte[] buffer = new byte[bufferSize * 2];
 
@@ -56,16 +52,6 @@ public class JavaAudioEngine implements AudioEngine {
 
     source.start();
     while (!stopped) {
-      if (makeMoreStable || makeLessStable) {
-        int newLatency = makeMoreStable ? STABLE_LATENCY_MS : UNSTABLE_LATENCY_MS;
-        bufferSize = calculateBufferSize(device, newLatency);
-
-        buffer = new byte[bufferSize * 2];
-        isStable = makeMoreStable;
-        makeMoreStable = false;
-        makeLessStable = false;
-      }
-
       int requiredSamples = bufferSize / FRAME_SIZE;
 
       if (requiredSamples * NUM_CHANNELS > buffer.length / 2) {
@@ -97,15 +83,6 @@ public class JavaAudioEngine implements AudioEngine {
   @Override
   public void stop() {
     stopped = true;
-  }
-
-  @Override
-  public void setAudioStability(boolean stable) {
-    if (stable && !isStable) {
-      this.makeMoreStable = true;
-    } else if (!stable && isStable) {
-      this.makeLessStable = true;
-    }
   }
 
   @Override
