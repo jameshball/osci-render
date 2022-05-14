@@ -1,3 +1,7 @@
+- 1.24.3
+  - Update description of osci-render application
+
+
 - 1.24.2
   - Massively improve audio stability on Mac
   - Remove audio stability toggle as no longer needed!
