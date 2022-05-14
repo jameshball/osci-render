@@ -6,7 +6,7 @@
 
     <groupId>sh.ball</groupId>
     <artifactId>osci-render</artifactId>
-    <version>1.24.2</version>
+    <version>1.24.3</version>
 
     <name>osci-render</name>
 
@@ -86,7 +86,7 @@
 
                 <configuration>
                     <name>osci-render</name>
-                    <description>Program for making music by drawing objects on an oscilloscope using audio.</description>
+                    <description>osci-render</description>
                     <appVersion>${project.version}</appVersion>
                     <vendor>james.ball.sh</vendor>
                     <input>${project.build.directory}/lib</input>
