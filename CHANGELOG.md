@@ -1,3 +1,8 @@
+- 1.24.2
+  - Massively improve audio stability on Mac
+  - Remove audio stability toggle as no longer needed!
+
+
 - 1.24.1
   - Various optimisations
   - Mic-based control is now slightly smoother
