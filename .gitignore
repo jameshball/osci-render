@@ -2,6 +2,7 @@
 /.idea
 osci-render.iml
 *.osci
+*.log
 
 # ignore temporary files
 *~

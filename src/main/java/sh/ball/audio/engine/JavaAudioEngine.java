@@ -47,51 +47,48 @@ public class JavaAudioEngine implements AudioEngine {
 
     // connects to a device that can support the format above (i.e. default audio device)
     this.source = AudioSystem.getSourceDataLine(format);
-    source.open(format);
 
     int bufferSize = calculateBufferSize(device, UNSTABLE_LATENCY_MS);
-    int remainingBufferSpace = source.getBufferSize() - bufferSize;
 
     byte[] buffer = new byte[bufferSize * 2];
+
+    source.open(format, buffer.length);
 
     source.start();
     while (!stopped) {
       if (makeMoreStable || makeLessStable) {
         int newLatency = makeMoreStable ? STABLE_LATENCY_MS : UNSTABLE_LATENCY_MS;
         bufferSize = calculateBufferSize(device, newLatency);
-        remainingBufferSpace = source.getBufferSize() - bufferSize;
 
         buffer = new byte[bufferSize * 2];
         isStable = makeMoreStable;
         makeMoreStable = false;
         makeLessStable = false;
       }
-      int delta = source.available() - remainingBufferSpace;
-      if (delta > 0) {
-        int requiredSamples = (delta + bufferSize) / FRAME_SIZE;
 
-        if (requiredSamples * NUM_CHANNELS > buffer.length / 2) {
-          buffer = new byte[requiredSamples * NUM_CHANNELS * 2];
-        }
+      int requiredSamples = bufferSize / FRAME_SIZE;
 
-        for (int i = 0; i < requiredSamples; i++) {
-          try {
-            Vector2 channels = channelGenerator.call();
-            // converting doubles from Vector2 into shorts and then bytes so
-            // that the byte buffer supports them
-            short left = (short) (channels.getX() * Short.MAX_VALUE);
-            short right = (short) (channels.getY() * Short.MAX_VALUE);
-            buffer[i * 4] = (byte) left;
-            buffer[i * 4 + 1] = (byte) (left >> 8);
-            buffer[i * 4 + 2] = (byte) right;
-            buffer[i * 4 + 3] = (byte) (right >> 8);
-          } catch (Exception e) {
-            e.printStackTrace();
-          }
-        }
-
-        source.write(buffer, 0, requiredSamples * FRAME_SIZE);
+      if (requiredSamples * NUM_CHANNELS > buffer.length / 2) {
+        buffer = new byte[requiredSamples * NUM_CHANNELS * 2];
       }
+
+      for (int i = 0; i < requiredSamples; i++) {
+        try {
+          Vector2 channels = channelGenerator.call();
+          // converting doubles from Vector2 into shorts and then bytes so
+          // that the byte buffer supports them
+          short left = (short) (channels.getX() * Short.MAX_VALUE);
+          short right = (short) (channels.getY() * Short.MAX_VALUE);
+          buffer[i * 4] = (byte) left;
+          buffer[i * 4 + 1] = (byte) (left >> 8);
+          buffer[i * 4 + 2] = (byte) right;
+          buffer[i * 4 + 3] = (byte) (right >> 8);
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+      }
+
+      source.write(buffer, 0, requiredSamples * FRAME_SIZE);
     }
     source.stop();
     this.device = null;
