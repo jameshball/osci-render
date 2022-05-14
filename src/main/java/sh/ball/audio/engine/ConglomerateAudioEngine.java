@@ -59,12 +59,6 @@ public class ConglomerateAudioEngine implements AudioEngine {
   }
 
   @Override
-  public void setAudioStability(boolean stable) {
-    xtEngine.setAudioStability(stable);
-    javaEngine.setAudioStability(stable);
-  }
-
-  @Override
   public List<AudioDevice> devices() {
     List<AudioDevice> devices = new ArrayList<>();
 
