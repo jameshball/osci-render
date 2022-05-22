@@ -24,5 +24,5 @@ public interface SubController {
 
   void load(Element root);
 
-  void micSignalReceived();
+  void slidersUpdated();
 }

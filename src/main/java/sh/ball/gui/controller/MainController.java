@@ -792,6 +792,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
             double scale = MidiNote.MAX_VELOCITY / (double) actualChannels;
             double zeroPoint = closestToZero / (double) MidiNote.MAX_VELOCITY;
             slider.setValue(getValueInSliderRange(slider, scale * ((correctedValue / (double) MidiNote.MAX_VELOCITY) - zeroPoint) + zeroPoint));
+            subControllers().forEach(SubController::slidersUpdated);
           }
         });
       } else if (cc == MidiNote.ALL_NOTES_OFF) {
@@ -1140,7 +1141,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
             } else if (sliderValue < slider.getMin()) {
               sliderValue = slider.getMin();
             }
-            subControllers().forEach(SubController::micSignalReceived);
+            subControllers().forEach(SubController::slidersUpdated);
             sliders.get(i).setValue(sliderValue);
           }
         }

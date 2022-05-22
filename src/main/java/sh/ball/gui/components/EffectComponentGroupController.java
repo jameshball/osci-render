@@ -144,7 +144,7 @@ public class EffectComponentGroupController implements Initializable, SubControl
   }
 
   @Override
-  public void micSignalReceived() {}
+  public void slidersUpdated() {}
 
   public void setType(EffectType type) {
     this.type = type;

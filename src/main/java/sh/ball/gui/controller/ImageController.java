@@ -247,7 +247,7 @@ public class ImageController implements Initializable, SubController {
   }
 
   @Override
-  public void micSignalReceived() {
+  public void slidersUpdated() {
     frequency.set(Math.pow(MAX_FREQUENCY, frequencySlider.getValue()));
   }
 }
