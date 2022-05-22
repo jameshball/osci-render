@@ -1,3 +1,7 @@
+- 1.24.5
+  - Bug fix: MIDI CC signals can now be used to change frequency slider
+
+
 - 1.24.4
   - Fix various bugs with MIDI synthesis
     - Attack and decay now applied to sine waves in background

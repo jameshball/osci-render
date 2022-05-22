@@ -185,5 +185,5 @@ public class ObjController implements Initializable, SubController {
   }
 
   @Override
-  public void micSignalReceived() {}
+  public void slidersUpdated() {}
 }
