@@ -1,3 +1,10 @@
+- 1.24.4
+  - Fix various bugs with MIDI synthesis
+    - Attack and decay now applied to sine waves in background
+    - MIDI synthesis now sounds far cleaner
+  - MIDI attack and decay is now configurable from the MIDI menu
+
+
 - 1.24.3
   - Update description of osci-render application
 
