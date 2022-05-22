@@ -144,6 +144,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private Spinner<Integer> midiChannelSpinner;
   @FXML
+  private Spinner<Double> attackSpinner;
+  @FXML
+  private Spinner<Double> decaySpinner;
+  @FXML
   private Spinner<Double> translationIncrementSpinner;
   @FXML
   private ComboBox<PrintableSlider> sliderComboBox;
@@ -434,6 +438,12 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         updateSliderUnits(sliderComboBox.getValue().slider);
       }
     });
+
+    attackSpinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(0, 10, 0.2, 0.01));
+    attackSpinner.valueProperty().addListener((o, oldValue, newValue) -> audioPlayer.setAttack(newValue));
+
+    decaySpinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(0, 10, 0.1, 0.01));
+    decaySpinner.valueProperty().addListener((o, oldValue, newValue) -> audioPlayer.setDecay(newValue));
 
     recordLengthSpinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(0.1, 100000000, 2.0, 0.1));
 
@@ -936,6 +946,18 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       deadzone.appendChild(document.createTextNode(deadzoneSpinner.getValue().toString()));
       root.appendChild(deadzone);
 
+      Element mainMidiChannel = document.createElement("mainMidiChannel");
+      mainMidiChannel.appendChild(document.createTextNode(midiChannelSpinner.getValue().toString()));
+      root.appendChild(mainMidiChannel);
+
+      Element midiAttack = document.createElement("midiAttack");
+      midiAttack.appendChild(document.createTextNode(attackSpinner.getValue().toString()));
+      root.appendChild(midiAttack);
+
+      Element midiDecay = document.createElement("midiDecay");
+      midiDecay.appendChild(document.createTextNode(decaySpinner.getValue().toString()));
+      root.appendChild(midiDecay);
+
       Element filesElement = document.createElement("files");
       for (int i = 0; i < openFiles.size(); i++) {
         Element fileElement = document.createElement("file");
@@ -1037,6 +1059,21 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       Element deadzone = (Element) root.getElementsByTagName("deadzone").item(0);
       if (deadzone != null) {
         deadzoneSpinner.getValueFactory().setValue(Integer.parseInt(deadzone.getTextContent()));
+      }
+
+      Element mainMidiChannel = (Element) root.getElementsByTagName("mainMidiChannel").item(0);
+      if (mainMidiChannel != null) {
+        midiChannelSpinner.getValueFactory().setValue(Integer.parseInt(mainMidiChannel.getTextContent()));
+      }
+
+      Element midiAttack = (Element) root.getElementsByTagName("midiAttack").item(0);
+      if (midiAttack != null) {
+        attackSpinner.getValueFactory().setValue(Double.parseDouble(midiAttack.getTextContent()));
+      }
+
+      Element midiDecay = (Element) root.getElementsByTagName("midiDecay").item(0);
+      if (midiDecay != null) {
+        decaySpinner.getValueFactory().setValue(Double.parseDouble(midiDecay.getTextContent()));
       }
 
       Element filesElement = (Element) root.getElementsByTagName("files").item(0);
