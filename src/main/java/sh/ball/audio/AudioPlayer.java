@@ -17,7 +17,7 @@ public interface AudioPlayer<S> extends Runnable, MidiListener {
 
   void setOctave(int octave);
 
-  void setBaseFrequencyVolumeScale(double scale);
+  void setBackingMidiVolume(double scale);
 
   void setDecay(double decaySeconds);
 

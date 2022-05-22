@@ -73,7 +73,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private double volume = 1;
   private double octaveFrequency;
   private DoubleProperty frequency;
-  private double baseFrequencyVolumeScale = 0.75;
+  private double backingMidiVolume = 0.25;
   private double baseFrequency;
   private double traceMin = 0;
   private double traceMax = 1;
@@ -239,7 +239,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   private Vector2 applyEffects(int frame, Vector2 vector) {
-    vector = vector.scale(2 * baseFrequencyVolumeScale * keyActualVolumes[mainChannel][baseNote.key()] / MidiNote.MAX_VELOCITY);
+    vector = vector.scale((double) keyActualVolumes[mainChannel][baseNote.key()] / MidiNote.MAX_VELOCITY);
     if (midiStarted) {
       if (lastDecay > decayFrames) {
         for (int i = 0; i < keyActualVolumes.length; i++) {
@@ -264,15 +264,12 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
       }
       lastAttack++;
 
-      double scaledVolume = 1 - baseFrequencyVolumeScale;
       for (int channel = 0; channel < keysDown.length; channel++) {
         for (int key = 0; key < keysDown[0].length; key++) {
-          if (keysDown[channel][key] != null && !keysDown[channel][key].equals(baseNote)) {
-            if (keyActualVolumes[channel][key] > 0) {
-              Vector2 sine = sineEffects[channel][key].apply(frame, new Vector2());
-              double volume = scaledVolume * keyActualVolumes[channel][key] / MidiNote.MAX_VELOCITY;
-              vector = new Vector2(vector.x + volume * sine.x, vector.y + volume * sine.y);
-            }
+          if (keyActualVolumes[channel][key] > 0 && !(baseNote.key() == key && baseNote.channel() == channel)) {
+            Vector2 sine = sineEffects[channel][key].apply(frame, new Vector2());
+            double volume = backingMidiVolume * keyActualVolumes[channel][key] / MidiNote.MAX_VELOCITY;
+            vector = new Vector2(vector.x + volume * sine.x, vector.y + volume * sine.y);
           }
         }
       }
@@ -383,8 +380,8 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   @Override
-  public void setBaseFrequencyVolumeScale(double scale) {
-    this.baseFrequencyVolumeScale = scale;
+  public void setBackingMidiVolume(double scale) {
+    this.backingMidiVolume = scale;
     updateSineEffects();
   }
 
@@ -510,7 +507,6 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
         return;
       }
     }
-
   }
 
   public void setTraceMin(double traceMin) {
