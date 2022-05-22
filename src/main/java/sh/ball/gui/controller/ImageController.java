@@ -78,11 +78,11 @@ public class ImageController implements Initializable, SubController {
   @FXML
   private CheckBox volumeMic;
   @FXML
-  private Slider visibilitySlider;
+  private Slider backingMidiSlider;
   @FXML
-  private SVGPath visibilityMidi;
+  private SVGPath backingMidiMidi;
   @FXML
-  private CheckBox visibilityMic;
+  private CheckBox backingMidiCheckBox;
   @FXML
   private Button resetRotationButton;
   @FXML
@@ -139,7 +139,7 @@ public class ImageController implements Initializable, SubController {
     Map<Slider, Consumer<Double>> sliderMap = Map.of(
       rotateSpeedSlider, rotateEffect::setSpeed,
       translationSpeedSlider, translateEffect::setSpeed,
-      visibilitySlider, audioPlayer::setBaseFrequencyVolumeScale
+      backingMidiSlider, audioPlayer::setBackingMidiVolume
     );
     sliderMap.keySet().forEach(slider ->
       slider.valueProperty().addListener((source, oldValue, newValue) ->
@@ -184,11 +184,6 @@ public class ImageController implements Initializable, SubController {
     volumeSlider.valueProperty().addListener((e, old, value) ->
       audioPlayer.setVolume(value.doubleValue() / 3.0)
     );
-    volumeSlider.valueProperty().addListener(e -> {
-      if (!audioPlayer.midiPlaying()) {
-        audioPlayer.resetMidi();
-      }
-    });
   }
 
   @Override
@@ -198,7 +193,7 @@ public class ImageController implements Initializable, SubController {
       rotateSpeedMidi, rotateSpeedSlider,
       translationSpeedMidi, translationSpeedSlider,
       volumeMidi, volumeSlider,
-      visibilityMidi, visibilitySlider,
+      backingMidiMidi, backingMidiSlider,
       translationScaleMidi, translationScaleSlider
     );
   }
@@ -206,13 +201,13 @@ public class ImageController implements Initializable, SubController {
   @Override
   public List<CheckBox> micCheckBoxes() {
     return List.of(frequencyMic, rotateSpeedMic, translationSpeedMic, volumeMic,
-      visibilityMic, translationScaleMic);
+      backingMidiCheckBox, translationScaleMic);
   }
 
   @Override
   public List<Slider> sliders() {
     return List.of(frequencySlider, rotateSpeedSlider, translationSpeedSlider,
-      volumeSlider, visibilitySlider, translationScaleSlider);
+      volumeSlider, backingMidiSlider, translationScaleSlider);
   }
 
   @Override

@@ -56,13 +56,13 @@
         <Label layoutX="335.0" layoutY="171.0" text="12000" />
         <Label layoutX="152.0" layoutY="171.0" text="5" />
         <Label layoutX="112.0" layoutY="171.0" text="0" />
-        <Label layoutX="19.0" layoutY="265.0" text="Image visibility">
+        <Label layoutX="29.0" layoutY="265.0" text="MIDI volume">
             <font>
                 <Font size="13.0" />
             </font>
         </Label>
-        <Slider fx:id="visibilitySlider" blockIncrement="0.005" layoutX="106.0" layoutY="266.0" majorTickUnit="0.1" max="1.0" prefHeight="42.0" prefWidth="253.0" showTickLabels="true" showTickMarks="true" value="0.75" />
-        <SVGPath fx:id="visibilityMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="361.0" layoutY="263.0" pickOnBounds="true" />
+        <Slider fx:id="backingMidiSlider" blockIncrement="0.005" layoutX="106.0" layoutY="266.0" majorTickUnit="0.1" max="1.0" prefHeight="42.0" prefWidth="253.0" showTickLabels="true" showTickMarks="true" value="0.25" />
+        <SVGPath fx:id="backingMidiMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="361.0" layoutY="263.0" pickOnBounds="true" />
       <CheckBox fx:id="translateCheckBox" layoutX="137.0" layoutY="43.0" mnemonicParsing="false" text="Translate with Mouse (Esc to disable)" />
       <Slider fx:id="translationScaleSlider" blockIncrement="0.05" layoutX="105.0" layoutY="73.0" majorTickUnit="1.0" max="10.0" prefHeight="42.0" prefWidth="254.0" showTickLabels="true" showTickMarks="true" value="1.0" />
       <Label layoutX="7.0" layoutY="72.0" text="Translation Scale">
@@ -76,7 +76,7 @@
       <CheckBox fx:id="rotateSpeedMic" layoutX="389.0" layoutY="189.0" mnemonicParsing="false" text="Mic" />
       <CheckBox fx:id="translationSpeedMic" layoutX="389.0" layoutY="113.0" mnemonicParsing="false" text="Mic" />
       <CheckBox fx:id="volumeMic" layoutX="389.0" layoutY="227.0" mnemonicParsing="false" text="Mic" />
-      <CheckBox fx:id="visibilityMic" layoutX="389.0" layoutY="266.0" mnemonicParsing="false" text="Mic" />
+      <CheckBox fx:id="backingMidiCheckBox" layoutX="389.0" layoutY="266.0" mnemonicParsing="false" text="Mic" />
       <Button fx:id="resetRotationButton" layoutX="455.0" layoutY="185.0" mnemonicParsing="false" text="Reset" />
       <Button fx:id="resetTranslationButton" layoutX="396.0" layoutY="4.0" mnemonicParsing="false" text="Reset Translation" />
       <Spinner fx:id="frequencySpinner" editable="true" layoutX="440.0" layoutY="149.0" prefHeight="26.0" prefWidth="80.0" />
