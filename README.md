@@ -14,7 +14,9 @@ Send an email to [james@ball.sh](mailto:james@ball.sh) if you have any issues, f
 
 ### Video Demonstration
 
-[![osci-render demonstration](https://img.youtube.com/vi/enHPkFO6nZk/0.jpg)](https://www.youtube.com/watch?v=enHPkFO6nZk)
+[![osci-render full overview](https://img.youtube.com/vi/PKVCx7rs_r8/0.jpg)](https://www.youtube.com/watch?v=PKVCx7rs_r8)
+
+[youtube.com/watch?v=PKVCx7rs_r8](https://www.youtube.com/watch?v=PKVCx7rs_r8)
 
 ## Current Features
 
