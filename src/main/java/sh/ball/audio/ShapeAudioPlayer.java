@@ -73,7 +73,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private double volume = 1;
   private double octaveFrequency;
   private DoubleProperty frequency;
-  private double baseFrequencyVolumeScale = 0.5;
+  private double baseFrequencyVolumeScale = 0.75;
   private double baseFrequency;
   private double traceMin = 0;
   private double traceMax = 1;
@@ -263,10 +263,16 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
         lastAttack = 0;
       }
       lastAttack++;
+
+      double scaledVolume = 1 - baseFrequencyVolumeScale;
       for (int channel = 0; channel < keysDown.length; channel++) {
         for (int key = 0; key < keysDown[0].length; key++) {
           if (keysDown[channel][key] != null && !keysDown[channel][key].equals(baseNote)) {
-            vector = sineEffects[channel][key].apply(frame, vector);
+            if (keyActualVolumes[channel][key] > 0) {
+              Vector2 sine = sineEffects[channel][key].apply(frame, new Vector2());
+              double volume = scaledVolume * keyActualVolumes[channel][key] / MidiNote.MAX_VELOCITY;
+              vector = new Vector2(vector.x + volume * sine.x, vector.y + volume * sine.y);
+            }
           }
         }
       }
@@ -432,7 +438,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     for (int channel = 0; channel < keyActualVolumes.length; channel++) {
       for (int key = 0; key < keyActualVolumes[channel].length; key++) {
         MidiNote note = new MidiNote(key, channel);
-        sineEffects[channel][key] = new SineEffect(sampleRate, note.frequency(), (float) keyActualVolumes[channel][key] / MidiNote.MAX_VELOCITY);
+        sineEffects[channel][key] = new SineEffect(sampleRate, note.frequency());
       }
     }
     for (Effect effect : effects.values()) {
@@ -482,23 +488,13 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   private void updateSineEffects() {
-    double totalVolume = 0;
-    for (short[] volumes : keyActualVolumes) {
-      for (short volume : volumes) {
-        totalVolume += (float) volume / MidiNote.MAX_VELOCITY;
-      }
-    }
-    if (totalVolume != 0) {
-      double scaledVolume = (1 - baseFrequencyVolumeScale) / totalVolume;
-      for (int channel = 0; channel < keyActualVolumes.length; channel++) {
-        for (int key = 0; key < keyActualVolumes[channel].length; key++) {
-          MidiNote note = new MidiNote(key, channel);
-          if (keyActualVolumes[channel][key] > 0) {
-            SineEffect effect = sineEffects[channel][key];
-            if (effect != null) {
-              effect.setVolume(scaledVolume * keyActualVolumes[channel][key] / MidiNote.MAX_VELOCITY);
-              effect.setFrequency(note.frequency() * pitchBends[channel]);
-            }
+    for (int channel = 0; channel < keyActualVolumes.length; channel++) {
+      for (int key = 0; key < keyActualVolumes[channel].length; key++) {
+        MidiNote note = new MidiNote(key, channel);
+        if (keyActualVolumes[channel][key] > 0) {
+          SineEffect effect = sineEffects[channel][key];
+          if (effect != null) {
+            effect.setFrequency(note.frequency() * pitchBends[channel]);
           }
         }
       }
@@ -511,7 +507,6 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
         MidiNote note = new MidiNote(key, mainChannel);
         frequency.set(note.frequency());
         baseNote = note;
-        updateSineEffects();
         return;
       }
     }
