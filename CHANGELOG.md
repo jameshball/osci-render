@@ -1,3 +1,9 @@
+- 1.24.6
+  - Effect text boxes are now editable
+  - Version number now visible in File menu
+  - You can now double-click sliders to reset their values to minimum
+
+
 - 1.24.5
   - Bug fix: MIDI CC signals can now be used to change frequency slider
 
