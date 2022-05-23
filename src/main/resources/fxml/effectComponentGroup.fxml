@@ -20,7 +20,7 @@
             <Insets right="5.0" />
          </HBox.margin>
       </Slider>
-      <Spinner fx:id="spinner" disable="true" prefHeight="26.0" prefWidth="66.0">
+      <Spinner fx:id="spinner" editable="true" disable="true" prefHeight="26.0" prefWidth="66.0">
          <HBox.margin>
             <Insets top="1.0" />
          </HBox.margin>

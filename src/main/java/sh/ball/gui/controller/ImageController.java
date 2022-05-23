@@ -174,12 +174,10 @@ public class ImageController implements Initializable, SubController {
     frequency.set(MidiNote.MIDDLE_C);
     frequencySlider.setOnKeyPressed(e -> {
       if (e.getCode() == KeyCode.LEFT || e.getCode() == KeyCode.RIGHT) {
-        frequency.set(Math.pow(MAX_FREQUENCY, frequencySlider.getValue()));
+        slidersUpdated();
       }
     });
-    frequencySlider.setOnMouseDragged(e ->
-      frequency.set(Math.pow(MAX_FREQUENCY, frequencySlider.getValue()))
-    );
+    frequencySlider.setOnMouseDragged(e -> slidersUpdated());
 
     volumeSlider.valueProperty().addListener((e, old, value) ->
       audioPlayer.setVolume(value.doubleValue() / 3.0)
@@ -239,7 +237,7 @@ public class ImageController implements Initializable, SubController {
     translationXTextField.setText(x.getTextContent());
     translationYTextField.setText(y.getTextContent());
 
-    frequency.set(Math.pow(MAX_FREQUENCY, frequencySlider.getValue()));
+    slidersUpdated();
 
     // For backwards compatibility we assume a default value
     Element ellipse = (Element) element.getElementsByTagName("ellipse").item(0);
