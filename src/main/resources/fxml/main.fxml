@@ -19,7 +19,7 @@
      <menus>
        <Menu mnemonicParsing="false" text="File">
             <items>
-               <MenuItem disable="true" mnemonicParsing="false" text="osci-render v1.24.6" />
+               <MenuItem disable="true" mnemonicParsing="false" text="osci-render v1.24.7" />
                <MenuItem fx:id="openProjectMenuItem" mnemonicParsing="false" text="Open Project">
                   <accelerator>
                      <KeyCodeCombination alt="UP" code="O" control="UP" meta="UP" shift="UP" shortcut="DOWN" />

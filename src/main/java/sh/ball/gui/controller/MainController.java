@@ -319,7 +319,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       sliders.get(i).maxProperty().addListener(e -> updateClosestChannelToZero(sliders.get(finalI)));
       sliders.get(i).setOnMouseClicked(event -> {
         if (event.getClickCount() == 2) {
-          sliders.get(finalI).setValue(sliders.get(finalI).getMin());
+          sliders.get(finalI).setValue(0);
         }
         subControllers().forEach(SubController::slidersUpdated);
       });
