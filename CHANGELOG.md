@@ -1,3 +1,7 @@
+- 1.24.7
+  - Double-click of slider resets value to 0 rather than min
+
+
 - 1.24.6
   - Effect text boxes are now editable
   - Version number now visible in File menu
