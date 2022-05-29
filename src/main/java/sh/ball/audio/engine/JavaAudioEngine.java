@@ -3,6 +3,7 @@ package sh.ball.audio.engine;
 import sh.ball.shapes.Vector2;
 
 import javax.sound.sampled.*;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.stream.Stream;
@@ -11,12 +12,12 @@ public class JavaAudioEngine implements AudioEngine {
 
   private static final int DEFAULT_SAMPLE_RATE = 192000;
   // stereo audio
-  private static final int NUM_CHANNELS = 2;
+  private int NUM_CHANNELS = 4;
   private static final int LATENCY_MS = 30;
   private static final int MAX_FRAME_LATENCY = 512;
   // java sound doesn't support anything more than 16 bit :(
   private static final int BIT_DEPTH = 16;
-  private static final int FRAME_SIZE = NUM_CHANNELS * BIT_DEPTH / 8;
+  private int FRAME_SIZE = NUM_CHANNELS * BIT_DEPTH / 8;
   private static final boolean BIG_ENDIAN = false;
   private static final boolean SIGNED_SAMPLE = true;
 
@@ -38,15 +39,27 @@ public class JavaAudioEngine implements AudioEngine {
   public void play(Callable<Vector2> channelGenerator, AudioDevice device) throws Exception {
     this.stopped = false;
     this.device = device;
+    AudioFormat format;
 
-    AudioFormat format = new AudioFormat((float) device.sampleRate(), BIT_DEPTH, NUM_CHANNELS, SIGNED_SAMPLE, BIG_ENDIAN);
+    while (true) {
+      format = new AudioFormat((float) device.sampleRate(), BIT_DEPTH, NUM_CHANNELS, SIGNED_SAMPLE, BIG_ENDIAN);
 
-    // connects to a device that can support the format above (i.e. default audio device)
-    this.source = AudioSystem.getSourceDataLine(format);
+      try {
+        // connects to a device that can support the format above (i.e. default audio device)
+        this.source = AudioSystem.getSourceDataLine(format);
+        break;
+      } catch (IllegalArgumentException e) {
+        System.out.println(e.getMessage());
+        NUM_CHANNELS--;
+        FRAME_SIZE = NUM_CHANNELS * BIT_DEPTH / 8;
+      }
+    }
 
     int bufferSize = calculateBufferSize(device, LATENCY_MS);
 
     byte[] buffer = new byte[bufferSize * 2];
+    short[] channels = new short[NUM_CHANNELS];
+    Arrays.fill(channels, Short.MAX_VALUE);
 
     source.open(format, buffer.length);
 
@@ -60,15 +73,20 @@ public class JavaAudioEngine implements AudioEngine {
 
       for (int i = 0; i < requiredSamples; i++) {
         try {
-          Vector2 channels = channelGenerator.call();
+          Vector2 vector = channelGenerator.call();
           // converting doubles from Vector2 into shorts and then bytes so
           // that the byte buffer supports them
-          short left = (short) (channels.getX() * Short.MAX_VALUE);
-          short right = (short) (channels.getY() * Short.MAX_VALUE);
-          buffer[i * 4] = (byte) left;
-          buffer[i * 4 + 1] = (byte) (left >> 8);
-          buffer[i * 4 + 2] = (byte) right;
-          buffer[i * 4 + 3] = (byte) (right >> 8);
+          if (NUM_CHANNELS > 0) {
+            channels[0] = (short) (vector.getX() * Short.MAX_VALUE);
+          }
+          if (NUM_CHANNELS > 1) {
+            channels[1] = (short) (vector.getY() * Short.MAX_VALUE);
+          }
+
+          for (int j = 0; j < NUM_CHANNELS; j++) {
+            buffer[i * NUM_CHANNELS * 2 + j * 2] = (byte) channels[j];
+            buffer[i * NUM_CHANNELS * 2 + j * 2 + 1] = (byte) (channels[j] >> 8);
+          }
         } catch (Exception e) {
           e.printStackTrace();
         }

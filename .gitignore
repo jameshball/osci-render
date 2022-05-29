@@ -3,6 +3,7 @@
 osci-render.iml
 *.osci
 *.log
+.DS_Store
 
 # ignore temporary files
 *~
