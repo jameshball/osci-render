@@ -42,4 +42,6 @@ public interface AudioPlayer<S> extends Runnable, MidiListener {
   List<AudioDevice> devices();
 
   AudioInputStream stopRecord();
+
+  void setBrightness(double brightness);
 }

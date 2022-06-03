@@ -3,6 +3,7 @@ package sh.ball.audio.engine;
 import sh.ball.shapes.Vector2;
 
 import javax.sound.sampled.*;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -12,12 +13,11 @@ public class JavaAudioEngine implements AudioEngine {
 
   private static final int DEFAULT_SAMPLE_RATE = 192000;
   // stereo audio
-  private int NUM_CHANNELS = 4;
+  private static final int DEFAULT_NUM_CHANNELS = 2;
   private static final int LATENCY_MS = 30;
   private static final int MAX_FRAME_LATENCY = 512;
   // java sound doesn't support anything more than 16 bit :(
   private static final int BIT_DEPTH = 16;
-  private int FRAME_SIZE = NUM_CHANNELS * BIT_DEPTH / 8;
   private static final boolean BIG_ENDIAN = false;
   private static final boolean SIGNED_SAMPLE = true;
 
@@ -25,74 +25,65 @@ public class JavaAudioEngine implements AudioEngine {
 
   private SourceDataLine source;
   private AudioDevice device;
+  private double brightness = 1.0;
 
   @Override
   public boolean isPlaying() {
     return source.isRunning();
   }
 
-  private int calculateBufferSize(AudioDevice device, int latencyMs) {
-    return Math.max((int) (device.sampleRate() * latencyMs * 0.0005), MAX_FRAME_LATENCY) * FRAME_SIZE;
+  private int calculateBufferSize(AudioDevice device, int frameSize, int latencyMs) {
+    return Math.max((int) (device.sampleRate() * latencyMs * 0.0005), MAX_FRAME_LATENCY) * frameSize;
   }
 
   @Override
   public void play(Callable<Vector2> channelGenerator, AudioDevice device) throws Exception {
-    this.stopped = false;
     this.device = device;
-    AudioFormat format;
 
-    while (true) {
-      format = new AudioFormat((float) device.sampleRate(), BIT_DEPTH, NUM_CHANNELS, SIGNED_SAMPLE, BIG_ENDIAN);
+    AudioFormat format = new AudioFormat((float) device.sampleRate(), BIT_DEPTH, device.channels(), SIGNED_SAMPLE, BIG_ENDIAN);
+    this.source = AudioSystem.getSourceDataLine(format);
 
-      try {
-        // connects to a device that can support the format above (i.e. default audio device)
-        this.source = AudioSystem.getSourceDataLine(format);
-        break;
-      } catch (IllegalArgumentException e) {
-        System.out.println(e.getMessage());
-        NUM_CHANNELS--;
-        FRAME_SIZE = NUM_CHANNELS * BIT_DEPTH / 8;
-      }
-    }
+    int frameSize = device.channels() * BIT_DEPTH / 8;
 
-    int bufferSize = calculateBufferSize(device, LATENCY_MS);
+    int bufferSize = calculateBufferSize(device, frameSize, LATENCY_MS);
 
     byte[] buffer = new byte[bufferSize * 2];
-    short[] channels = new short[NUM_CHANNELS];
-    Arrays.fill(channels, Short.MAX_VALUE);
+    short[] channels = new short[device.channels()];
 
     source.open(format, buffer.length);
 
     source.start();
+    this.stopped = false;
     while (!stopped) {
-      int requiredSamples = bufferSize / FRAME_SIZE;
+      int requiredSamples = bufferSize / frameSize;
 
-      if (requiredSamples * NUM_CHANNELS > buffer.length / 2) {
-        buffer = new byte[requiredSamples * NUM_CHANNELS * 2];
+      if (requiredSamples * channels.length > buffer.length / 2) {
+        buffer = new byte[requiredSamples * channels.length * 2];
       }
 
       for (int i = 0; i < requiredSamples; i++) {
         try {
+          Arrays.fill(channels, (short) (Short.MAX_VALUE * brightness));
           Vector2 vector = channelGenerator.call();
           // converting doubles from Vector2 into shorts and then bytes so
           // that the byte buffer supports them
-          if (NUM_CHANNELS > 0) {
+          if (channels.length > 0) {
             channels[0] = (short) (vector.getX() * Short.MAX_VALUE);
           }
-          if (NUM_CHANNELS > 1) {
+          if (channels.length > 1) {
             channels[1] = (short) (vector.getY() * Short.MAX_VALUE);
           }
 
-          for (int j = 0; j < NUM_CHANNELS; j++) {
-            buffer[i * NUM_CHANNELS * 2 + j * 2] = (byte) channels[j];
-            buffer[i * NUM_CHANNELS * 2 + j * 2 + 1] = (byte) (channels[j] >> 8);
+          for (int j = 0; j < channels.length; j++) {
+            buffer[i * channels.length * 2 + j * 2] = (byte) channels[j];
+            buffer[i * channels.length * 2 + j * 2 + 1] = (byte) (channels[j] >> 8);
           }
         } catch (Exception e) {
           e.printStackTrace();
         }
       }
 
-      source.write(buffer, 0, requiredSamples * FRAME_SIZE);
+      source.write(buffer, 0, requiredSamples * frameSize);
     }
     source.stop();
     this.device = null;
@@ -105,17 +96,33 @@ public class JavaAudioEngine implements AudioEngine {
 
   @Override
   public List<AudioDevice> devices() {
-    return Stream.of(44100, 48000, 96000, 192000).map(rate ->
-      (AudioDevice) new SimpleAudioDevice("default-" + rate, "default", rate, AudioSample.INT16)).toList();
+    List<AudioDevice> devices = new ArrayList<>();
+
+    Stream.of(192000, 96000, 48000, 44100).forEach(rate ->
+      Stream.of(1, 2, 3, 4, 6, 8).forEach(channels -> {
+        try {
+          AudioFormat format = new AudioFormat((float) rate, BIT_DEPTH, channels, SIGNED_SAMPLE, BIG_ENDIAN);
+          this.source = AudioSystem.getSourceDataLine(format);
+          devices.add(new SimpleAudioDevice("default-" + rate, "default", rate, AudioSample.INT16, channels));
+        } catch (Exception ignored) {}
+      })
+    );
+
+    return devices;
   }
 
   @Override
   public AudioDevice getDefaultDevice() {
-    return new SimpleAudioDevice("default", "default", DEFAULT_SAMPLE_RATE, AudioSample.INT16);
+    return new SimpleAudioDevice("default", "default", DEFAULT_SAMPLE_RATE, AudioSample.INT16, DEFAULT_NUM_CHANNELS);
   }
 
   @Override
   public AudioDevice currentDevice() {
     return device;
+  }
+
+  @Override
+  public void setBrightness(double brightness) {
+    this.brightness = brightness;
   }
 }

@@ -17,4 +17,6 @@ public interface AudioEngine {
   AudioDevice getDefaultDevice();
 
   AudioDevice currentDevice();
+
+  void setBrightness(double brightness);
 }

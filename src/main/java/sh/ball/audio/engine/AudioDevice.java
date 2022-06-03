@@ -8,4 +8,6 @@ public interface AudioDevice {
   int sampleRate();
 
   AudioSample sample();
+
+  int channels();
 }

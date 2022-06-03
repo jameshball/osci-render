@@ -1,3 +1,10 @@
+- 1.24.8
+  - Mono and more than 2 audio outputs supported
+  - Any audio output after the first L and R channels are used for brightness
+    - The brightness is controllable under Audio > Brightness
+    - This will only work if the audio interface being used is DC-coupled as it is a static voltage signal
+
+
 - 1.24.7
   - Double-click of slider resets value to 0 rather than min
 

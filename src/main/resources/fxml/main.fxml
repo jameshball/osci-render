@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.CheckMenuItem?>
 <?import javafx.scene.control.ComboBox?>
@@ -8,6 +9,7 @@
 <?import javafx.scene.control.Menu?>
 <?import javafx.scene.control.MenuBar?>
 <?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.Slider?>
 <?import javafx.scene.control.Spinner?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.TitledPane?>
@@ -19,7 +21,7 @@
      <menus>
        <Menu mnemonicParsing="false" text="File">
             <items>
-               <MenuItem disable="true" mnemonicParsing="false" text="osci-render v1.24.7" />
+               <MenuItem disable="true" mnemonicParsing="false" text="osci-render v1.24.8" />
                <MenuItem fx:id="openProjectMenuItem" mnemonicParsing="false" text="Open Project">
                   <accelerator>
                      <KeyCodeCombination alt="UP" code="O" control="UP" meta="UP" shift="UP" shortcut="DOWN" />
@@ -44,6 +46,20 @@
                      <AnchorPane>
                         <children>
                            <ComboBox fx:id="deviceComboBox" prefHeight="26.0" prefWidth="376.0" />
+                        </children>
+                     </AnchorPane>
+                  </content>
+               </CustomMenuItem>
+               <CustomMenuItem fx:id="recordLengthMenuItem1" hideOnClick="false" mnemonicParsing="false" text="Brightness">
+                  <content>
+                     <AnchorPane>
+                        <children>
+                           <Label prefHeight="25.0" text="Brightness" textFill="WHITE" />
+                           <Slider fx:id="brightnessSlider" blockIncrement="0.01" disable="true" majorTickUnit="0.2" max="1.0" min="-1.0" prefHeight="42.0" prefWidth="253.0" showTickLabels="true" showTickMarks="true" value="1.0">
+                              <padding>
+                                 <Insets top="25.0" />
+                              </padding>
+                           </Slider>
                         </children>
                      </AnchorPane>
                   </content>
