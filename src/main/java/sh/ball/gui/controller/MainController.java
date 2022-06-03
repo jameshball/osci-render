@@ -160,6 +160,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private ComboBox<AudioDevice> deviceComboBox;
   @FXML
+  private Slider brightnessSlider;
+  @FXML
   private CustomMenuItem recordLengthMenuItem;
   @FXML
   private CheckBox recordCheckBox;
@@ -474,6 +476,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
     });
 
+    brightnessSlider.valueProperty().addListener((e, old, brightness) -> audioPlayer.setBrightness(brightness.doubleValue()));
+
     objController.updateObjectRotateSpeed();
 
     switchAudioDevice(defaultDevice, false);
@@ -566,9 +570,14 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
     }
     audioPlayer.setDevice(device);
+    audioPlayer.setBrightness(brightnessSlider.getValue());
     effectsController.setAudioDevice(device);
     imageController.setAudioDevice(device);
     sampleRate = device.sampleRate();
+    // brightness is configurable for many-output audio interfaces
+    if (device.channels() > 2) {
+      brightnessSlider.setDisable(false);
+    }
     if (analyser != null) {
       analyser.stop();
     }
@@ -814,16 +823,19 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private List<CheckBox> micCheckBoxes() {
     List<CheckBox> checkBoxes = new ArrayList<>();
     subControllers().forEach(controller -> checkBoxes.addAll(controller.micCheckBoxes()));
+    checkBoxes.add(null);
     return checkBoxes;
   }
   private List<Slider> sliders() {
     List<Slider> sliders = new ArrayList<>();
     subControllers().forEach(controller -> sliders.addAll(controller.sliders()));
+    sliders.add(brightnessSlider);
     return sliders;
   }
   private List<String> labels() {
     List<String> labels = new ArrayList<>();
     subControllers().forEach(controller -> labels.addAll(controller.labels()));
+    labels.add("brightness");
     return labels;
   }
 

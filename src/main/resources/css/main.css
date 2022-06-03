@@ -103,6 +103,11 @@
     -fx-padding: 0.2em;
 }
 
+.slider .axis .axis-tick-mark, .slider .axis .axis-minor-tick-mark {
+    -fx-fill: null;
+    -fx-stroke: white;
+}
+
 .check-box > .box {
     -fx-background-radius: 0;
     -fx-background-color: very_dark;

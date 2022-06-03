@@ -3,25 +3,23 @@ package sh.ball.audio.engine;
 import sh.ball.shapes.Vector2;
 import xt.audio.*;
 
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.Callable;
+import java.util.stream.Stream;
 
 // Audio engine that connects to devices using the XtAudio library
 public class XtAudioEngine implements AudioEngine {
 
   private static final int DEFAULT_SAMPLE_RATE = 192000;
+  private static final int DEFAULT_NUM_CHANNELS = 2;
   private static final Enums.XtSample DEFAULT_AUDIO_SAMPLE = Enums.XtSample.FLOAT32;
-  // Stereo audio
-  private static final int NUM_OUTPUTS = 2;
 
   private volatile boolean stopped = false;
 
   private AudioDevice device;
   private boolean playing = false;
   private Callable<Vector2> channelGenerator;
+  private double brightness = 1.0;
 
   public XtAudioEngine() {}
 
@@ -40,50 +38,64 @@ public class XtAudioEngine implements AudioEngine {
 
   // fully compatible function to write a Vector2 (i.e. stereo) channels to
   // any AudioSample. This ensures maximum compatibility for audio devices.
-  private void writeChannels(Vector2 channels, Object output, int frame) {
-    int index = frame * NUM_OUTPUTS;
+  private void writeChannels(Vector2 vector, Object output, int frame) {
+    int index = frame * device.channels();
+    double[] channels = new double[device.channels()];
+    Arrays.fill(channels, brightness);
+
+    if (channels.length > 0) {
+      channels[0] = vector.getX();
+    }
+    if (channels.length > 1) {
+      channels[1] = vector.getY();
+    }
+
     switch (device.sample()) {
       case UINT8 -> {
         byte[] byteOutput = (byte[]) output;
-        byteOutput[index] = (byte) ((int) (128 * (channels.getX() + 1)));
-        byteOutput[index + 1] = (byte) ((int) (128 * (channels.getY() + 1)));
+        for (int i = 0; i < channels.length; i++) {
+          byteOutput[index + i] = (byte) ((int) (128 * (channels[i] + 1)));
+        }
       }
       case INT8 -> {
         byte[] byteOutput = (byte[]) output;
-        byteOutput[index] = (byte) ((int) (128 * channels.getX()));
-        byteOutput[index + 1] = (byte) ((int) (128 * channels.getY()));
+        for (int i = 0; i < channels.length; i++) {
+          byteOutput[index + i] = (byte) ((int) (128 * channels[i]));
+        }
       }
       case INT16 -> {
         short[] shortOutput = (short[]) output;
-        shortOutput[index] = (short) (channels.getX() * Short.MAX_VALUE);
-        shortOutput[index + 1] = (short) (channels.getY() * Short.MAX_VALUE);
+        for (int i = 0; i < channels.length; i++) {
+          shortOutput[index + i] = (short) (channels[i] * Short.MAX_VALUE);
+        }
       }
       case INT24 -> {
         index *= 3;
         byte[] byteOutput = (byte[]) output;
-        int leftChannel = (int) (channels.getX() * 8388607);
-        int rightChannel = (int) (channels.getY() * 8388607);
-        byteOutput[index] = (byte) leftChannel;
-        byteOutput[index + 1] = (byte) (leftChannel >> 8);
-        byteOutput[index + 2] = (byte) (leftChannel >> 16);
-        byteOutput[index + 3] = (byte) rightChannel;
-        byteOutput[index + 4] = (byte) (rightChannel >> 8);
-        byteOutput[index + 5] = (byte) (rightChannel >> 16);
+        for (int i = 0; i < channels.length; i++) {
+          int channel = (int) (channels[i] * 8388607);
+          byteOutput[index + 3 * i] = (byte) channel;
+          byteOutput[index + 3 * i + 1] = (byte) (channel >> 8);
+          byteOutput[index + 3 * i + 2] = (byte) (channel >> 16);
+        }
       }
       case INT32 -> {
         int[] intOutput = (int[]) output;
-        intOutput[index] = (int) (channels.getX() * Integer.MAX_VALUE);
-        intOutput[index + 1] = (int) (channels.getY() * Integer.MAX_VALUE);
+        for (int i = 0; i < channels.length; i++) {
+          intOutput[index + i] = (int) (channels[i] * Integer.MAX_VALUE);
+        }
       }
       case FLOAT32 -> {
         float[] floatOutput = (float[]) output;
-        floatOutput[index] = (float) channels.getX();
-        floatOutput[index + 1] = (float) channels.getY();
+        for (int i = 0; i < channels.length; i++) {
+          floatOutput[index + i] = (float) channels[i];
+        }
       }
       case FLOAT64 -> {
         double[] doubleOutput = (double[]) output;
-        doubleOutput[index] = channels.getX();
-        doubleOutput[index + 1] = channels.getY();
+        for (int i = 0; i < channels.length; i++) {
+          doubleOutput[index + i] = channels[i];
+        }
       }
     }
   }
@@ -104,7 +116,7 @@ public class XtAudioEngine implements AudioEngine {
 
       try (XtDevice xtDevice = service.openDevice(device.id())) {
         Structs.XtMix mix = new Structs.XtMix(device.sampleRate(), AudioSampleToXtSample(device.sample()));
-        Structs.XtChannels channels = new Structs.XtChannels(0, 0, NUM_OUTPUTS, 0);
+        Structs.XtChannels channels = new Structs.XtChannels(0, 0, device.channels(), 0);
         Structs.XtFormat format = new Structs.XtFormat(mix, channels);
 
         if (xtDevice.supportsFormat(format)) {
@@ -158,12 +170,15 @@ public class XtAudioEngine implements AudioEngine {
             mix = Optional.of(new Structs.XtMix(DEFAULT_SAMPLE_RATE, DEFAULT_AUDIO_SAMPLE));
           }
 
-          Structs.XtChannels channels = new Structs.XtChannels(0, 0, NUM_OUTPUTS, 0);
-          Structs.XtFormat format = new Structs.XtFormat(mix.get(), channels);
+          Optional<Structs.XtMix> finalMix = mix;
+          Stream.of(1, 2, 4, 6, 8).forEach(numChannels -> {
+            Structs.XtChannels channels = new Structs.XtChannels(0, 0, numChannels, 0);
+            Structs.XtFormat format = new Structs.XtFormat(finalMix.get(), channels);
 
-          if (xtDevice.supportsFormat(format)) {
-            devices.add(new SimpleAudioDevice(deviceId, deviceName, mix.get().rate, XtSampleToAudioSample(mix.get().sample)));
-          }
+            if (xtDevice.supportsFormat(format)) {
+              devices.add(new SimpleAudioDevice(deviceId, deviceName, finalMix.get().rate, XtSampleToAudioSample(finalMix.get().sample), numChannels));
+            }
+          });
         } catch (XtException e) {
           e.printStackTrace();
         }
@@ -193,11 +208,11 @@ public class XtAudioEngine implements AudioEngine {
 
         String deviceName = service.openDeviceList(EnumSet.of(Enums.XtEnumFlags.OUTPUT)).getName(deviceId);
 
-        Structs.XtChannels channels = new Structs.XtChannels(0, 0, NUM_OUTPUTS, 0);
+        Structs.XtChannels channels = new Structs.XtChannels(0, 0, DEFAULT_NUM_CHANNELS, 0);
         Structs.XtFormat format = new Structs.XtFormat(mix.get(), channels);
 
         if (xtDevice.supportsFormat(format)) {
-          return new SimpleAudioDevice(deviceId, deviceName, mix.get().rate, XtSampleToAudioSample(mix.get().sample));
+          return new SimpleAudioDevice(deviceId, deviceName, mix.get().rate, XtSampleToAudioSample(mix.get().sample), DEFAULT_NUM_CHANNELS);
         } else {
           return null;
         }
@@ -208,6 +223,11 @@ public class XtAudioEngine implements AudioEngine {
   @Override
   public AudioDevice currentDevice() {
     return device;
+  }
+
+  @Override
+  public void setBrightness(double brightness) {
+    this.brightness = brightness;
   }
 
 

@@ -91,6 +91,12 @@ public class ConglomerateAudioEngine implements AudioEngine {
     return device;
   }
 
+  @Override
+  public void setBrightness(double brightness) {
+    javaEngine.setBrightness(brightness);
+    xtEngine.setBrightness(brightness);
+  }
+
   // This ensures that the channelGenerator is ALWAYS being called regardless
   // of whether the underlying AudioEngine is requesting channels as soon as they
   // are needed. This significantly improves performance of JavaAudioEngine and

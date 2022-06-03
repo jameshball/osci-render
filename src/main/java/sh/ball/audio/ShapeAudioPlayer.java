@@ -484,6 +484,11 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     return new AudioInputStream(new ByteArrayInputStream(input), audioFormat, framesRecorded);
   }
 
+  @Override
+  public void setBrightness(double brightness) {
+    audioEngine.setBrightness(brightness);
+  }
+
   private void updateSineEffects() {
     for (int channel = 0; channel < keyActualVolumes.length; channel++) {
       for (int key = 0; key < keyActualVolumes[channel].length; key++) {
