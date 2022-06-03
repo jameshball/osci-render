@@ -420,8 +420,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
     List<PrintableSlider> printableSliders = new ArrayList<>();
     sliders.forEach(slider -> {
-      // don't allow frequency slider to be changed
-      if (!slider.getId().contains("frequency")) {
+      // don't allow frequency or brightness slider to be changed
+      if (!slider.getId().equals("frequencySlider") && !slider.getId().equals("brightnessSlider")) {
         printableSliders.add(new PrintableSlider(slider));
       }
     });
