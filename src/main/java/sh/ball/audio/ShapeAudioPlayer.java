@@ -56,6 +56,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
   private final Callable<AudioEngine> audioEngineBuilder;
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
+  private FrameSource<Vector2> sampleSource;
   private final Map<Object, Effect> effects = new ConcurrentHashMap<>();
   private final Queue<Listener> listeners = new ConcurrentLinkedQueue<>();
 
@@ -150,13 +151,21 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   private Vector2 generateChannels() {
-    Shape shape = getCurrentShape();
+    Vector2 channels;
 
-    double length = shape.getLength();
-    double drawingProgress = length == 0 ? 1 : shapeDrawn / length;
-    Vector2 nextVector = applyEffects(count, shape.nextVector(drawingProgress));
+    if (sampleSource != null) {
+      channels = sampleSource.next();
+    } else {
+      Shape shape = getCurrentShape();
 
-    Vector2 channels = cutoff(nextVector);
+      double length = shape.getLength();
+      double drawingProgress = length == 0 ? 1 : shapeDrawn / length;
+      channels = shape.nextVector(drawingProgress);
+    }
+
+    channels = applyEffects(count, channels);
+    channels = cutoff(channels);
+
     if (flipX) {
       channels = channels.setX(-channels.getX());
     }
@@ -570,6 +579,14 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
   public void flipYChannel(boolean flip) {
     this.flipY = flip;
+  }
+
+  public void setSampleSource(FrameSource<Vector2> sampleSource) {
+    this.sampleSource = sampleSource;
+  }
+
+  public void removeSampleSource() {
+    this.sampleSource = null;
   }
 
   private static class Listener {

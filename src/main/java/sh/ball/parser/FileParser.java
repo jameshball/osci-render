@@ -20,6 +20,5 @@ public abstract class FileParser<T> {
     return path.matches(".*\\." + getFileExtension());
   }
 
-  public abstract T parse()
-    throws ParserConfigurationException, IOException, SAXException, IllegalArgumentException;
+  public abstract T parse() throws Exception;
 }
