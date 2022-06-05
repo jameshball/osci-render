@@ -41,7 +41,6 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
-import org.xml.sax.SAXException;
 import sh.ball.audio.engine.AudioDevice;
 import sh.ball.audio.engine.AudioInput;
 import sh.ball.audio.engine.AudioInputListener;
@@ -52,6 +51,8 @@ import sh.ball.engine.ObjectServer;
 import sh.ball.engine.ObjectSet;
 import sh.ball.gui.Gui;
 import sh.ball.oscilloscope.ByteWebSocketServer;
+import sh.ball.parser.lua.LuaSampleSource;
+import sh.ball.parser.lua.LuaParser;
 import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.ParserFactory;
@@ -97,7 +98,9 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
   private List<byte[]> openFiles = new ArrayList<>();
   private List<String> frameSourcePaths = new ArrayList<>();
+  private List<FrameSource<Vector2>> sampleSources = new ArrayList<>();
   private List<FrameSource<List<Shape>>> frameSources = new ArrayList<>();
+  private FrameSource<Vector2> sampleSource;
   private FrameProducer<List<Shape>> producer;
   private int currentFrameSource;
   private boolean objectServerRendering = false;
@@ -609,22 +612,33 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private void changeFrameSource(int index) {
     index = Math.max(0, Math.min(index, frameSources.size() - 1));
     currentFrameSource = index;
+    frameSources.stream().filter(Objects::nonNull).forEach(FrameSource::disable);
+    sampleSources.stream().filter(Objects::nonNull).forEach(FrameSource::disable);
+
     FrameSource<List<Shape>> frames = frameSources.get(index);
-    frameSources.forEach(FrameSource::disable);
-    frames.enable();
+    FrameSource<Vector2> samples = sampleSources.get(index);
+    if (frames != null) {
+      frames.enable();
+      audioPlayer.removeSampleSource();
 
-    Object oldSettings = producer.getFrameSettings();
-    producer = new FrameProducer<>(audioPlayer, frames);
-    objController.setAudioProducer(producer);
+      Object oldSettings = producer.getFrameSettings();
+      producer = new FrameProducer<>(audioPlayer, frames);
+      objController.setAudioProducer(producer);
 
-    // Apply the same settings that the previous frameSource had
-    objController.updateObjectRotateSpeed();
-    objController.updateFocalLength();
-    if (oldSettings instanceof ObjFrameSettings settings) {
-      objController.setObjRotate(settings.baseRotation, settings.currentRotation);
+      // Apply the same settings that the previous frameSource had
+      objController.updateObjectRotateSpeed();
+      objController.updateFocalLength();
+      if (oldSettings instanceof ObjFrameSettings settings) {
+        objController.setObjRotate(settings.baseRotation, settings.currentRotation);
+      }
+      objController.hideHiddenMeshes(hideHiddenMeshesCheckMenuItem.isSelected());
+      executor.submit(producer);
+    } else if (samples != null) {
+      samples.enable();
+      audioPlayer.setSampleSource(samples);
+    } else {
+      throw new RuntimeException("Expected to have either a frame source or sample source");
     }
-    objController.hideHiddenMeshes(hideHiddenMeshesCheckMenuItem.isSelected());
-    executor.submit(producer);
     effectsController.restartEffects();
 
     generalController.setFrameSourceName(frameSourcePaths.get(currentFrameSource));
@@ -633,7 +647,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     objTitledPane.setDisable(!ObjParser.isObjFile(frameSourcePaths.get(index)));
   }
 
-  void updateFiles(List<byte[]> files, List<String> names) throws IOException, ParserConfigurationException, SAXException {
+  void updateFiles(List<byte[]> files, List<String> names) throws Exception {
+    List<FrameSource<Vector2>> newSampleSources = new ArrayList<>();
     List<FrameSource<List<Shape>>> newFrameSources = new ArrayList<>();
     List<String> newFrameSourcePaths = new ArrayList<>();
     List<byte[]> newOpenFiles = new ArrayList<>();
@@ -645,7 +660,13 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
     for (int i = 0; i < files.size(); i++) {
       try {
-        newFrameSources.add(ParserFactory.getParser(names.get(i), files.get(i)).parse());
+        if (LuaParser.isLuaFile(names.get(i))) {
+          newFrameSources.add(null);
+          newSampleSources.add(new LuaParser(new ByteArrayInputStream(files.get(i))).parse());
+        } else {
+          newSampleSources.add(null);
+          newFrameSources.add(ParserFactory.getParser(names.get(i), files.get(i)).parse());
+        }
         newFrameSourcePaths.add(names.get(i));
         newOpenFiles.add(files.get(i));
       } catch (IOException | IllegalArgumentException e) {
@@ -662,7 +683,9 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         if (generalController.framesPlaying() && newFrameSources.size() == 1) {
           generalController.disablePlayback();
         }
-        frameSources.forEach(FrameSource::disable);
+        frameSources.stream().filter(Objects::nonNull).forEach(FrameSource::disable);
+        sampleSources.stream().filter(Objects::nonNull).forEach(FrameSource::disable);
+        sampleSources = newSampleSources;
         frameSources = newFrameSources;
         frameSourcePaths = newFrameSourcePaths;
         openFiles = newOpenFiles;
@@ -1108,7 +1131,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
       updateFiles(files, fileNames);
       openProjectPath = projectFileName;
-    } catch (ParserConfigurationException | SAXException | IOException e) {
+    } catch (Exception e) {
       e.printStackTrace();
     }
   }

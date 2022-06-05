@@ -85,7 +85,7 @@ public class GeneralController implements Initializable, SubController {
         new Thread(() -> {
           try {
             mainController.updateFiles(files, names);
-          } catch (IOException | ParserConfigurationException | SAXException e) {
+          } catch (Exception e) {
             e.printStackTrace();
           }
         }).start();

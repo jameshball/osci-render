@@ -1,6 +1,7 @@
 package sh.ball.parser;
 
 import sh.ball.audio.FrameSource;
+import sh.ball.parser.lua.LuaParser;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.svg.SvgParser;
 import sh.ball.parser.txt.TextParser;
