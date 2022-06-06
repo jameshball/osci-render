@@ -22,6 +22,8 @@ public class ParserFactory {
       return new SvgParser(bais);
     } else if (TextParser.isTxtFile(filePath)) {
       return new TextParser(bais);
+    } else if (filePath.matches(".*\\.osci")) {
+      throw new IOException(".osci project files should be opened using File > Open Project");
     }
     throw new IOException("Can't parse " + new File(filePath).getName());
   }

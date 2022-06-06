@@ -647,7 +647,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     objTitledPane.setDisable(!ObjParser.isObjFile(frameSourcePaths.get(index)));
   }
 
-  void updateFiles(List<byte[]> files, List<String> names) throws Exception {
+  void updateFiles(List<byte[]> files, List<String> names, int startingFrameSource) throws Exception {
     List<FrameSource<Vector2>> newSampleSources = new ArrayList<>();
     List<FrameSource<List<Shape>>> newFrameSources = new ArrayList<>();
     List<String> newFrameSourcePaths = new ArrayList<>();
@@ -661,11 +661,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     for (int i = 0; i < files.size(); i++) {
       try {
         if (LuaParser.isLuaFile(names.get(i))) {
-          newFrameSources.add(null);
           newSampleSources.add(new LuaParser(new ByteArrayInputStream(files.get(i))).parse());
+          newFrameSources.add(null);
         } else {
-          newSampleSources.add(null);
           newFrameSources.add(ParserFactory.getParser(names.get(i), files.get(i)).parse());
+          newSampleSources.add(null);
         }
         newFrameSourcePaths.add(names.get(i));
         newOpenFiles.add(files.get(i));
@@ -689,7 +689,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         frameSources = newFrameSources;
         frameSourcePaths = newFrameSourcePaths;
         openFiles = newOpenFiles;
-        changeFrameSource(0);
+        changeFrameSource(startingFrameSource);
       }
     });
   }
@@ -1014,6 +1014,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
       root.appendChild(filesElement);
 
+      Element frameSource = document.createElement("frameSource");
+      frameSource.appendChild(document.createTextNode(String.valueOf(currentFrameSource)));
+      root.appendChild(frameSource);
+
       TransformerFactory transformerFactory = TransformerFactory.newInstance();
       Transformer transformer = transformerFactory.newTransformer();
       DOMSource domSource = new DOMSource(document);
@@ -1129,7 +1133,14 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         String fileName = fileElement.getElementsByTagName("name").item(0).getTextContent();
         fileNames.add(fileName);
       }
-      updateFiles(files, fileNames);
+
+      Element frameSource = (Element) root.getElementsByTagName("frameSource").item(0);
+      if (frameSource != null) {
+        updateFiles(files, fileNames, Integer.parseInt(frameSource.getTextContent()));
+      } else {
+        updateFiles(files, fileNames, 0);
+      }
+
       openProjectPath = projectFileName;
     } catch (Exception e) {
       e.printStackTrace();
