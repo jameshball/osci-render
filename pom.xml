@@ -13,7 +13,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>17</maven.compiler.release>
-        <javafx.version>17.0.0.1</javafx.version>
+        <javafx.version>17.0.1</javafx.version>
         <appMainClass>sh.ball.gui.Launcher</appMainClass>
     </properties>
 
@@ -146,6 +146,11 @@
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-web</artifactId>
             <version>${javafx.version}</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/org.unbescape/unbescape -->

@@ -5,16 +5,21 @@ import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import sh.ball.audio.ShapeAudioPlayer;
 import sh.ball.audio.engine.AudioDevice;
 import sh.ball.audio.engine.ConglomerateAudioEngine;
 import sh.ball.audio.midi.MidiCommunicator;
 import sh.ball.engine.Vector3;
+import sh.ball.gui.components.CodeEditor;
 import sh.ball.gui.controller.MainController;
 import sh.ball.shapes.Vector2;
 
@@ -97,6 +102,19 @@ public class Gui extends Application {
       Platform.exit();
       System.exit(0);
     });
+
+    CodeEditor editor = new CodeEditor("theta = theta + math.sqrt(step) / 1000000000\n" +
+      "return {0.3 * math.tan(theta * step), 0.3 * math.tan(theta * step + math.pi / 2), theta}");
+
+    // display the scene.
+    Scene editorScene = new Scene(editor);
+    Stage editorStage = new Stage();
+
+    editor.prefHeightProperty().bind(stage.heightProperty());
+    editor.prefWidthProperty().bind(stage.widthProperty());
+
+    editorStage.setScene(editorScene);
+    editorStage.show();
   }
 
   public static void main(String[] args) {
