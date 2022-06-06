@@ -12428,7 +12428,7 @@
         });
     </script>
     <style>
-        body {
+        body, html {
             margin: 0;
         }
 
@@ -12449,6 +12449,9 @@
         mode: "text/x-lua"
     });
     editor.setSize("100vw", "100vh");
+    editor.on("change", function (cm) {
+        javaCodeEditor.updateCode();
+    })
 </script>
 </body>
 </html>

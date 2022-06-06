@@ -2,53 +2,48 @@
 
 package sh.ball.gui.components;
 
+import com.sun.javafx.webkit.WebConsoleListener;
+import javafx.concurrent.Worker;
 import javafx.scene.layout.StackPane;
 import javafx.scene.web.WebView;
+import netscape.javascript.JSObject;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-/**
- * A syntax highlighting code editor for JavaFX created by wrapping a
- * CodeMirror code editor in a WebView.
- *
- * See http://codemirror.net for more information on using the codemirror editor.
- */
 public class CodeEditor extends StackPane {
-  /** a webview used to encapsulate the CodeMirror JavaScript. */
+
   final WebView webview = new WebView();
 
-  /** a snapshot of the code to be edited kept for easy initilization and reversion of editable code. */
   private String editingCode;
 
-  /** applies the editing template to the editing code to create the html+javascript source for a code editor. */
   private String applyEditingTemplate() throws URISyntaxException, IOException {
     String template = Files.readString(Path.of(getClass().getResource("/html/code_editor.html").toURI()));
     return template.replace("${code}", editingCode);
   }
 
-  /** sets the current code in the editor and creates an editing snapshot of the code which can be reverted to. */
-  public void setCode(String newCode) throws URISyntaxException, IOException {
-    this.editingCode = newCode;
-    webview.getEngine().loadContent(applyEditingTemplate());
-  }
-
-  /** returns the current code in the editor and updates an editing snapshot of the code which can be reverted to. */
-  public String getCodeAndSnapshot() {
+  public void updateCode() {
     this.editingCode = (String) webview.getEngine().executeScript("editor.getValue();");
-    return editingCode;
+    System.out.println(editingCode);
   }
 
-  /**
-   * Create a new code editor.
-   * @param editingCode the initial code to be edited in the code editor.
-   */
   public CodeEditor(String editingCode) throws URISyntaxException, IOException {
     this.editingCode = editingCode;
 
+    webview.getEngine().getLoadWorker().stateProperty().addListener((e, old, state) -> {
+      if (state == Worker.State.SUCCEEDED) {
+        JSObject window = (JSObject) webview.getEngine().executeScript("window");
+        window.setMember("javaCodeEditor", this);
+      }
+    });
+
     webview.getEngine().loadContent(applyEditingTemplate());
+
+    WebConsoleListener.setDefaultListener((webView, message, lineNumber, sourceId) ->
+      System.out.println(message + "[at " + lineNumber + "]")
+    );
 
     this.getChildren().add(webview);
   }
