@@ -84,7 +84,7 @@ public class GeneralController implements Initializable, SubController {
 
         new Thread(() -> {
           try {
-            mainController.updateFiles(files, names);
+            mainController.updateFiles(files, names, 0);
           } catch (Exception e) {
             e.printStackTrace();
           }

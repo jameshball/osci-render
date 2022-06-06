@@ -9,7 +9,7 @@
 <AnchorPane id="control-pane" prefHeight="324.0" prefWidth="364.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.GeneralController">
     <children>
         <Button fx:id="chooseFileButton" layoutX="14.0" layoutY="26.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose File" />
-        <Label fx:id="fileLabel" layoutX="143.0" layoutY="30.0" maxWidth="270.0" prefHeight="18.0" prefWidth="210.0" text="cube.obj" />
+        <Label fx:id="fileLabel" alignment="TOP_LEFT" layoutX="143.0" layoutY="30.0" maxWidth="270.0" prefHeight="42.0" prefWidth="210.0" text="cube.obj" wrapText="true" />
         <Label fx:id="recordLabel" layoutX="13.0" layoutY="304.0" maxWidth="451.0" prefHeight="18.0" prefWidth="343.0" />
         <Label id="frequency" fx:id="frequencyLabel" layoutX="14.0" layoutY="141.0" prefHeight="58.0" prefWidth="343.0" text="L/R Frequency:&#10; &#10;" />
         <Button fx:id="chooseFolderButton" layoutX="14.0" layoutY="76.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose Folder" />
