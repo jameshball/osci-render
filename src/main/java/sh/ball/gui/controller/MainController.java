@@ -16,7 +16,9 @@ import org.w3c.dom.NodeList;
 import sh.ball.audio.*;
 
 import java.io.*;
+import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.text.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -59,8 +61,7 @@ import sh.ball.parser.ParserFactory;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
-import static sh.ball.gui.Gui.audioPlayer;
-import static sh.ball.gui.Gui.defaultDevice;
+import static sh.ball.gui.Gui.*;
 import static sh.ball.math.Math.parseable;
 
 public class MainController implements Initializable, FrequencyListener, MidiListener, AudioInputListener {
@@ -100,6 +101,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private List<String> frameSourcePaths = new ArrayList<>();
   private List<FrameSource<Vector2>> sampleSources = new ArrayList<>();
   private List<FrameSource<List<Shape>>> frameSources = new ArrayList<>();
+  private LuaParser luaParser = new LuaParser();
   private FrameSource<Vector2> sampleSource;
   private FrameProducer<List<Shape>> producer;
   private int currentFrameSource;
@@ -498,6 +500,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
     }
 
+    editor.setCallback(this::updateFileData);
+
     objectServer = new ObjectServer(this::enableObjectServerRendering, this::disableObjectServerRendering);
     new Thread(objectServer).start();
 
@@ -620,6 +624,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     if (frames != null) {
       frames.enable();
       audioPlayer.removeSampleSource();
+      closeCodeEditor();
 
       Object oldSettings = producer.getFrameSettings();
       producer = new FrameProducer<>(audioPlayer, frames);
@@ -635,6 +640,9 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       executor.submit(producer);
     } else if (samples != null) {
       samples.enable();
+      String code = new String(openFiles.get(currentFrameSource), StandardCharsets.UTF_8);
+      closeCodeEditor();
+      launchCodeEditor(code, frameSourcePaths.get(currentFrameSource));
       audioPlayer.setSampleSource(samples);
     } else {
       throw new RuntimeException("Expected to have either a frame source or sample source");
@@ -645,6 +653,32 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     generalController.updateFrameLabels();
     // enable the .obj file settings iff the new frameSource is for a 3D object.
     objTitledPane.setDisable(!ObjParser.isObjFile(frameSourcePaths.get(index)));
+  }
+
+  void updateFileData(byte[] file, String name) throws Exception {
+    int index = frameSourcePaths.indexOf(name);
+    if (index == -1) {
+      throw new RuntimeException("Can't find open file with name: " + name);
+    }
+    if (LuaParser.isLuaFile(name)) {
+      luaParser.setScriptFromInputStream(new ByteArrayInputStream(file));
+      sampleSources.set(index, luaParser.parse());
+      frameSources.set(index, null);
+    } else {
+      frameSources.set(index, ParserFactory.getParser(name, file).parse());
+      sampleSources.set(index, null);
+    }
+    frameSourcePaths.set(index, name);
+    openFiles.set(index, file);
+
+    frameSources.stream().filter(Objects::nonNull).forEach(FrameSource::disable);
+    sampleSources.stream().filter(Objects::nonNull).forEach(FrameSource::disable);
+
+    FrameSource<Vector2> samples = sampleSources.get(index);
+    if (samples != null) {
+      samples.enable();
+      audioPlayer.setSampleSource(samples);
+    }
   }
 
   void updateFiles(List<byte[]> files, List<String> names, int startingFrameSource) throws Exception {
@@ -661,7 +695,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     for (int i = 0; i < files.size(); i++) {
       try {
         if (LuaParser.isLuaFile(names.get(i))) {
-          newSampleSources.add(new LuaParser(new ByteArrayInputStream(files.get(i))).parse());
+          luaParser.setScriptFromInputStream(new ByteArrayInputStream(files.get(i)));
+          newSampleSources.add(luaParser.parse());
           newFrameSources.add(null);
         } else {
           newFrameSources.add(ParserFactory.getParser(names.get(i), files.get(i)).parse());

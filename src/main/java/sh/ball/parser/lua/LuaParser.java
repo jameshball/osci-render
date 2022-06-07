@@ -1,6 +1,5 @@
 package sh.ball.parser.lua;
 
-import org.luaj.vm2.lib.jse.JsePlatform;
 import sh.ball.audio.FrameSource;
 import sh.ball.parser.FileParser;
 import sh.ball.shapes.Vector2;
@@ -11,9 +10,11 @@ import java.util.stream.Collectors;
 
 public class LuaParser extends FileParser<FrameSource<Vector2>> {
 
+  private final LuaSampleSource sampleSource = new LuaSampleSource();
+
   private String script;
 
-  public LuaParser(InputStream inputStream) {
+  public void setScriptFromInputStream(InputStream inputStream) {
     this.script = new BufferedReader(new InputStreamReader(inputStream))
       .lines().collect(Collectors.joining("\n"));
   }
@@ -29,7 +30,9 @@ public class LuaParser extends FileParser<FrameSource<Vector2>> {
     Compilable e = (Compilable) sem.getEngineByName("luaj");
     CompiledScript compiledScript = e.compile(script);
 
-    return new LuaSampleSource(compiledScript);
+    sampleSource.setScript(script, compiledScript);
+
+    return sampleSource;
   }
 
   public static boolean isLuaFile(String path) {

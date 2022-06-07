@@ -10,29 +10,56 @@ import javax.script.SimpleBindings;
 
 public class LuaSampleSource implements FrameSource<Vector2> {
 
-  private final CompiledScript script;
   private final Bindings bindings = new SimpleBindings();
 
+  private CompiledScript lastWorkingScript;
+  private String lastWorkingTextScript;
+  private CompiledScript script;
+  private String textScript;
   private boolean active = true;
   private long step = 1;
   private double theta = 0.0;
 
-  public LuaSampleSource(CompiledScript script) {
+  public void setScript(String textScript, CompiledScript script) {
+    if (lastWorkingScript == null) {
+      lastWorkingScript = script;
+      lastWorkingTextScript = textScript;
+    }
     this.script = script;
+    this.textScript = textScript;
   }
 
   @Override
   public Vector2 next() {
     try {
+      boolean updatedFile = false;
+
       bindings.put("step", (double) step);
       bindings.put("theta", theta);
-      LuaValue result = (LuaValue) script.eval(bindings);
+
+      LuaValue result;
+      try {
+        result = (LuaValue) script.eval(bindings);
+        if (!lastWorkingTextScript.equals(textScript)) {
+          lastWorkingScript = script;
+          lastWorkingTextScript = textScript;
+          updatedFile = true;
+        }
+      } catch (Exception e) {
+        result = (LuaValue) lastWorkingScript.eval(bindings);
+      }
       step++;
       theta = result.get(3).checkdouble();
+
+      if (updatedFile) {
+        // reset variables
+        step = 1;
+        theta = 0;
+      }
+
       return new Vector2(result.get(1).checkdouble(), result.get(2).checkdouble());
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
+    } catch (Exception ignored) {}
+
     return new Vector2();
   }
 
