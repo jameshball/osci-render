@@ -9,7 +9,7 @@
 <AnchorPane id="control-pane" prefHeight="324.0" prefWidth="364.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.GeneralController">
     <children>
         <Button fx:id="chooseFileButton" layoutX="14.0" layoutY="26.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose File" />
-        <Label fx:id="fileLabel" alignment="TOP_LEFT" layoutX="143.0" layoutY="30.0" maxWidth="270.0" prefHeight="42.0" prefWidth="210.0" text="cube.obj" wrapText="true" />
+        <Label fx:id="fileLabel" alignment="TOP_LEFT" layoutX="143.0" layoutY="30.0" maxWidth="270.0" prefHeight="42.0" prefWidth="174.0" text="cube.obj" wrapText="true" />
         <Label fx:id="recordLabel" layoutX="13.0" layoutY="304.0" maxWidth="451.0" prefHeight="18.0" prefWidth="343.0" />
         <Label id="frequency" fx:id="frequencyLabel" layoutX="14.0" layoutY="141.0" prefHeight="58.0" prefWidth="343.0" text="L/R Frequency:&#10; &#10;" />
         <Button fx:id="chooseFolderButton" layoutX="14.0" layoutY="76.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose Folder" />
@@ -20,5 +20,6 @@
       <Slider fx:id="micVolumeSlider" blockIncrement="1.0" layoutX="82.0" layoutY="254.0" majorTickUnit="1.0" max="10.0" prefHeight="42.0" prefWidth="246.0" showTickLabels="true" showTickMarks="true" value="1.0" />
       <SVGPath fx:id="micVolumeMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="333.0" layoutY="250.0" pickOnBounds="true" />
       <Label layoutX="13.0" layoutY="253.0" text="Mic Volume" />
+      <Button fx:id="editFileButton" disable="true" layoutX="325.0" layoutY="26.0" mnemonicParsing="false" text="Edit" />
     </children>
 </AnchorPane>
