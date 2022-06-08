@@ -50,6 +50,8 @@ public class Gui extends Application {
     editorScene = new Scene(editor);
     editorStage.setScene(editorScene);
     editorStage.getIcons().add(new Image(Objects.requireNonNull(Gui.class.getResourceAsStream("/icons/icon.png"))));
+    editorStage.setWidth(900);
+    editorStage.setHeight(600);
     editor.prefHeightProperty().bind(editorStage.heightProperty());
     editor.prefWidthProperty().bind(editorStage.widthProperty());
 

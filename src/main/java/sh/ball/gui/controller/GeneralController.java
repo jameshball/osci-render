@@ -44,6 +44,8 @@ public class GeneralController implements Initializable, SubController {
   @FXML
   private Button chooseFileButton;
   @FXML
+  private Button editFileButton;
+  @FXML
   private Button chooseFolderButton;
   @FXML
   private Label fileLabel;
@@ -212,6 +214,8 @@ public class GeneralController implements Initializable, SubController {
         updateLastVisitedDirectory(file);
       }
     });
+
+    editFileButton.setOnAction(e -> mainController.openCodeEditor());
   }
 
   @Override
@@ -287,5 +291,13 @@ public class GeneralController implements Initializable, SubController {
 
   public void setStage(Stage stage) {
     this.stage = stage;
+  }
+
+  public void disableEditButton() {
+    editFileButton.setDisable(true);
+  }
+
+  public void enableEditButton() {
+    editFileButton.setDisable(false);
   }
 }

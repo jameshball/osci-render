@@ -97,12 +97,12 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   // frames
   private static final InputStream DEFAULT_OBJ = MainController.class.getResourceAsStream("/models/cube.obj");
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
+  private final LuaParser luaParser = new LuaParser();
+  private final Set<String> unsavedFileNames = new LinkedHashSet<>();
   private List<byte[]> openFiles = new ArrayList<>();
   private List<String> frameSourcePaths = new ArrayList<>();
   private List<FrameSource<Vector2>> sampleSources = new ArrayList<>();
   private List<FrameSource<List<Shape>>> frameSources = new ArrayList<>();
-  private LuaParser luaParser = new LuaParser();
-  private FrameSource<Vector2> sampleSource;
   private FrameProducer<List<Shape>> producer;
   private int currentFrameSource;
   private boolean objectServerRendering = false;
@@ -624,7 +624,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     if (frames != null) {
       frames.enable();
       audioPlayer.removeSampleSource();
-      closeCodeEditor();
+      generalController.disableEditButton();
 
       Object oldSettings = producer.getFrameSettings();
       producer = new FrameProducer<>(audioPlayer, frames);
@@ -640,9 +640,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       executor.submit(producer);
     } else if (samples != null) {
       samples.enable();
-      String code = new String(openFiles.get(currentFrameSource), StandardCharsets.UTF_8);
-      closeCodeEditor();
-      launchCodeEditor(code, frameSourcePaths.get(currentFrameSource));
+      generalController.enableEditButton();
       audioPlayer.setSampleSource(samples);
     } else {
       throw new RuntimeException("Expected to have either a frame source or sample source");
@@ -671,14 +669,30 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     frameSourcePaths.set(index, name);
     openFiles.set(index, file);
 
-    frameSources.stream().filter(Objects::nonNull).forEach(FrameSource::disable);
-    sampleSources.stream().filter(Objects::nonNull).forEach(FrameSource::disable);
+    if (index == currentFrameSource) {
+      frameSources.stream().filter(Objects::nonNull).forEach(FrameSource::disable);
+      sampleSources.stream().filter(Objects::nonNull).forEach(FrameSource::disable);
 
-    FrameSource<Vector2> samples = sampleSources.get(index);
-    if (samples != null) {
-      samples.enable();
-      audioPlayer.setSampleSource(samples);
+      FrameSource<Vector2> samples = sampleSources.get(index);
+      if (samples != null) {
+        samples.enable();
+        audioPlayer.setSampleSource(samples);
+      }
     }
+
+    unsavedFileNames.add(name);
+    setUnsavedFileWarning();
+  }
+
+  void setUnsavedFileWarning() {
+    Platform.runLater(() -> {
+      if (!unsavedFileNames.isEmpty()) {
+        String warning = "(unsaved file changes: " + String.join(", ", unsavedFileNames) + ")";
+        updateTitle(warning, openProjectPath);
+      } else {
+        updateTitle(null, openProjectPath);
+      }
+    });
   }
 
   void updateFiles(List<byte[]> files, List<String> names, int startingFrameSource) throws Exception {
@@ -686,6 +700,9 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     List<FrameSource<List<Shape>>> newFrameSources = new ArrayList<>();
     List<String> newFrameSourcePaths = new ArrayList<>();
     List<byte[]> newOpenFiles = new ArrayList<>();
+
+    unsavedFileNames.removeIf(fileName -> !names.contains(fileName));
+    setUnsavedFileWarning();
 
     Platform.runLater(() -> {
       generalController.setFrameSourceName("Loading file" + (names.size() > 1 ? "s" : "") + " - audio may stutter!");
@@ -1060,6 +1077,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
       transformer.transform(domSource, streamResult);
       openProjectPath = projectFileName;
+      updateTitle(null, projectFileName);
     } catch (ParserConfigurationException | TransformerException e) {
       e.printStackTrace();
     }
@@ -1177,6 +1195,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
 
       openProjectPath = projectFileName;
+      updateTitle(null, projectFileName);
     } catch (Exception e) {
       e.printStackTrace();
     }
@@ -1234,6 +1253,23 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         }
       }
     });
+  }
+
+  void openCodeEditor() {
+    String code = new String(openFiles.get(currentFrameSource), StandardCharsets.UTF_8);
+    closeCodeEditor();
+    launchCodeEditor(code, frameSourcePaths.get(currentFrameSource));
+  }
+
+  private void updateTitle(String message, String projectName) {
+    String title = "osci-render";
+    if (projectName != null) {
+      title += " - " + projectName;
+    }
+    if (message != null) {
+      title += " - " + message;
+    }
+    stage.setTitle(title);
   }
 
   private record PrintableSlider(Slider slider) {

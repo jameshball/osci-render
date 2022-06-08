@@ -21,6 +21,7 @@ public class CodeEditor extends StackPane {
   private String editingCode = "";
   private String fileName = "";
   private BiConsumer<byte[], String> callback;
+  private boolean newFile = true;
 
   private String applyEditingTemplate() throws URISyntaxException, IOException {
     String template = Files.readString(Path.of(getClass().getResource("/html/code_editor.html").toURI()));
@@ -30,6 +31,7 @@ public class CodeEditor extends StackPane {
   public void setCode(String editingCode, String fileName) {
     this.fileName = fileName;
     this.editingCode = editingCode;
+    this.newFile = true;
     JSObject window = (JSObject) webview.getEngine().executeScript("window");
     window.setMember("newCode", editingCode);
     webview.getEngine().executeScript("editor.setValue(newCode);");
@@ -37,9 +39,10 @@ public class CodeEditor extends StackPane {
 
   public void updateCode() throws Exception {
     editingCode = (String) webview.getEngine().executeScript("editor.getValue();");
-    if (callback != null) {
+    if (!newFile && callback != null) {
       callback.accept(editingCode.getBytes(StandardCharsets.UTF_8), fileName);
     }
+    newFile = false;
   }
 
   public void setCallback(BiConsumer<byte[], String> callback) {
