@@ -701,7 +701,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     List<String> newFrameSourcePaths = new ArrayList<>();
     List<byte[]> newOpenFiles = new ArrayList<>();
 
-    unsavedFileNames.removeIf(fileName -> !names.contains(fileName));
+    unsavedFileNames.clear();
     setUnsavedFileWarning();
 
     Platform.runLater(() -> {

@@ -10,15 +10,13 @@ import javax.script.SimpleBindings;
 
 public class LuaSampleSource implements FrameSource<Vector2> {
 
-  private final Bindings bindings = new SimpleBindings();
-
+  private Bindings bindings = new SimpleBindings();
   private CompiledScript lastWorkingScript;
   private String lastWorkingTextScript;
   private CompiledScript script;
   private String textScript;
   private boolean active = true;
   private long step = 1;
-  private double theta = 0.0;
 
   public void setScript(String textScript, CompiledScript script) {
     if (lastWorkingScript == null) {
@@ -35,7 +33,6 @@ public class LuaSampleSource implements FrameSource<Vector2> {
       boolean updatedFile = false;
 
       bindings.put("step", (double) step);
-      bindings.put("theta", theta);
 
       LuaValue result;
       try {
@@ -49,12 +46,11 @@ public class LuaSampleSource implements FrameSource<Vector2> {
         result = (LuaValue) lastWorkingScript.eval(bindings);
       }
       step++;
-      theta = result.get(3).checkdouble();
 
       if (updatedFile) {
         // reset variables
         step = 1;
-        theta = 0;
+        bindings = new SimpleBindings();
       }
 
       return new Vector2(result.get(1).checkdouble(), result.get(2).checkdouble());
