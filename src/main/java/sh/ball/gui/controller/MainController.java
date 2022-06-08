@@ -187,6 +187,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
     openFiles.add(baos.toByteArray());
     frameSources.add(frames);
+    sampleSources.add(null);
     frameSourcePaths.add("cube.obj");
     currentFrameSource = 0;
     this.producer = new FrameProducer<>(audioPlayer, frames);
@@ -624,7 +625,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     if (frames != null) {
       frames.enable();
       audioPlayer.removeSampleSource();
-      generalController.disableEditButton();
 
       Object oldSettings = producer.getFrameSettings();
       producer = new FrameProducer<>(audioPlayer, frames);
@@ -640,7 +640,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       executor.submit(producer);
     } else if (samples != null) {
       samples.enable();
-      generalController.enableEditButton();
       audioPlayer.setSampleSource(samples);
     } else {
       throw new RuntimeException("Expected to have either a frame source or sample source");
@@ -653,35 +652,36 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     objTitledPane.setDisable(!ObjParser.isObjFile(frameSourcePaths.get(index)));
   }
 
-  void updateFileData(byte[] file, String name) throws Exception {
+  void updateFileData(byte[] file, String name) {
     int index = frameSourcePaths.indexOf(name);
     if (index == -1) {
       throw new RuntimeException("Can't find open file with name: " + name);
     }
-    if (LuaParser.isLuaFile(name)) {
-      luaParser.setScriptFromInputStream(new ByteArrayInputStream(file));
-      sampleSources.set(index, luaParser.parse());
-      frameSources.set(index, null);
-    } else {
-      frameSources.set(index, ParserFactory.getParser(name, file).parse());
-      sampleSources.set(index, null);
-    }
     frameSourcePaths.set(index, name);
     openFiles.set(index, file);
-
-    if (index == currentFrameSource) {
-      frameSources.stream().filter(Objects::nonNull).forEach(FrameSource::disable);
-      sampleSources.stream().filter(Objects::nonNull).forEach(FrameSource::disable);
-
-      FrameSource<Vector2> samples = sampleSources.get(index);
-      if (samples != null) {
-        samples.enable();
-        audioPlayer.setSampleSource(samples);
+    try {
+      if (LuaParser.isLuaFile(name)) {
+        luaParser.setScriptFromInputStream(new ByteArrayInputStream(file));
+        FrameSource<Vector2> sampleSource = sampleSources.get(index);
+        sampleSources.set(index, luaParser.parse());
+        sampleSource.disable();
+        frameSources.set(index, null);
+      } else {
+        FrameSource<List<Shape>> frameSource = frameSources.get(index);
+        frameSources.set(index, ParserFactory.getParser(name, file).parse());
+        frameSource.disable();
+        sampleSources.set(index, null);
       }
+
+      unsavedFileNames.add(name);
+      setUnsavedFileWarning();
+    } catch (Exception e) {
+      System.out.println(e.getMessage());
     }
 
-    unsavedFileNames.add(name);
-    setUnsavedFileWarning();
+    if (index == currentFrameSource) {
+      changeFrameSource(index);
+    }
   }
 
   void setUnsavedFileWarning() {

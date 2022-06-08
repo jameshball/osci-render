@@ -292,12 +292,4 @@ public class GeneralController implements Initializable, SubController {
   public void setStage(Stage stage) {
     this.stage = stage;
   }
-
-  public void disableEditButton() {
-    editFileButton.setDisable(true);
-  }
-
-  public void enableEditButton() {
-    editFileButton.setDisable(false);
-  }
 }

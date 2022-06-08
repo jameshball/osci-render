@@ -13,6 +13,7 @@ import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.function.BiConsumer;
 
 public class CodeEditor extends StackPane {
 
@@ -37,7 +38,7 @@ public class CodeEditor extends StackPane {
     webview.getEngine().executeScript("editor.setValue(newCode);");
   }
 
-  public void updateCode() throws Exception {
+  public void updateCode() {
     editingCode = (String) webview.getEngine().executeScript("editor.getValue();");
     if (!newFile && callback != null) {
       callback.accept(editingCode.getBytes(StandardCharsets.UTF_8), fileName);
@@ -67,10 +68,5 @@ public class CodeEditor extends StackPane {
     );
 
     this.getChildren().add(webview);
-  }
-
-  @FunctionalInterface
-  public interface BiConsumer<T, U> {
-    void accept(T t, U u) throws Exception;
   }
 }
