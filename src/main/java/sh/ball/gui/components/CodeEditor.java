@@ -50,6 +50,12 @@ public class CodeEditor extends StackPane {
     this.callback = callback;
   }
 
+  public void setMode(String mode) {
+    JSObject window = (JSObject) webview.getEngine().executeScript("window");
+    window.setMember("language", mode);
+    webview.getEngine().executeScript("editor.setOption(\"mode\", language);");
+  }
+
   public CodeEditor() {}
 
   public void initialize() throws URISyntaxException, IOException {

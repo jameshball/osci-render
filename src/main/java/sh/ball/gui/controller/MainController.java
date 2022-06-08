@@ -58,6 +58,8 @@ import sh.ball.parser.lua.LuaParser;
 import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.ParserFactory;
+import sh.ball.parser.svg.SvgParser;
+import sh.ball.parser.txt.TextParser;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 

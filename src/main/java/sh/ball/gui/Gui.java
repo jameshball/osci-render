@@ -16,6 +16,10 @@ import sh.ball.audio.engine.ConglomerateAudioEngine;
 import sh.ball.audio.midi.MidiCommunicator;
 import sh.ball.gui.components.CodeEditor;
 import sh.ball.gui.controller.MainController;
+import sh.ball.parser.lua.LuaParser;
+import sh.ball.parser.obj.ObjParser;
+import sh.ball.parser.svg.SvgParser;
+import sh.ball.parser.txt.TextParser;
 import sh.ball.shapes.Vector2;
 
 import java.util.Objects;
@@ -117,6 +121,16 @@ public class Gui extends Application {
     editor.setCode(code, fileName);
     editorStage.show();
     editorStage.setTitle(fileName);
+
+    if (LuaParser.isLuaFile(fileName)) {
+      editor.setMode("text/x-lua");
+    } else if (ObjParser.isObjFile(fileName)) {
+      editor.setMode("");
+    } else if (SvgParser.isSvgFile(fileName)) {
+      editor.setMode("text/html");
+    } else if (TextParser.isTxtFile(fileName)) {
+      editor.setMode("");
+    }
   }
 
   public static void closeCodeEditor() {
