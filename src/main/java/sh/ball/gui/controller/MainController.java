@@ -53,13 +53,10 @@ import sh.ball.engine.ObjectServer;
 import sh.ball.engine.ObjectSet;
 import sh.ball.gui.Gui;
 import sh.ball.oscilloscope.ByteWebSocketServer;
-import sh.ball.parser.lua.LuaSampleSource;
 import sh.ball.parser.lua.LuaParser;
 import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.ParserFactory;
-import sh.ball.parser.svg.SvgParser;
-import sh.ball.parser.txt.TextParser;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
@@ -125,11 +122,15 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private ObjController objController;
   @FXML
+  private LuaController luaController;
+  @FXML
   private ImageController imageController;
   @FXML
   private GeneralController generalController;
   @FXML
   private TitledPane objTitledPane;
+  @FXML
+  private TitledPane luaTitledPane;
   @FXML
   private MenuItem openProjectMenuItem;
   @FXML
@@ -208,7 +209,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   }
 
   private List<SubController> subControllers() {
-    return List.of(effectsController, objController, imageController, generalController);
+    return List.of(effectsController, objController, imageController, generalController, luaController);
   }
 
   private void updateSliderUnits(Slider slider) {
@@ -337,6 +338,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
     objController.setAudioProducer(producer);
     generalController.setMainController(this);
+    luaController.setMainController(this);
 
     this.midiButtonMap = initializeMidiButtonMap();
 
@@ -504,6 +506,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     }
 
     editor.setCallback(this::updateFileData);
+    luaController.updateLuaVariables();
 
     objectServer = new ObjectServer(this::enableObjectServerRendering, this::disableObjectServerRendering);
     new Thread(objectServer).start();
@@ -512,6 +515,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     webSocketServer.start();
     this.buffer = new byte[FRAME_SIZE * SOSCI_NUM_VERTICES * SOSCI_VERTEX_SIZE];
     new Thread(() -> sendAudioDataToWebSocket(webSocketServer)).start();
+  }
+
+  public void setLuaVariable(String variableName, Object value) {
+    luaParser.setVariable(variableName, value);
   }
 
   public void setSoftwareOscilloscopeAction(Runnable openBrowser) {
@@ -650,8 +657,23 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
     generalController.setFrameSourceName(frameSourcePaths.get(currentFrameSource));
     generalController.updateFrameLabels();
-    // enable the .obj file settings iff the new frameSource is for a 3D object.
-    objTitledPane.setDisable(!ObjParser.isObjFile(frameSourcePaths.get(index)));
+
+    String fileName = frameSourcePaths.get(index);
+
+    Platform.runLater(() -> {
+      if (ObjParser.isObjFile(fileName)) {
+        objTitledPane.setVisible(true);
+        objTitledPane.setDisable(false);
+        luaTitledPane.setVisible(false);
+      } else if (LuaParser.isLuaFile(fileName)) {
+        objTitledPane.setVisible(false);
+        luaTitledPane.setVisible(true);
+      } else {
+        objTitledPane.setVisible(true);
+        objTitledPane.setDisable(true);
+        luaTitledPane.setVisible(false);
+      }
+    });
   }
 
   void updateFileData(byte[] file, String name) {
@@ -1272,6 +1294,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       title += " - " + message;
     }
     stage.setTitle(title);
+  }
+
+  public void resetLuaStep() {
+    luaParser.resetStep();
   }
 
   private record PrintableSlider(Slider slider) {

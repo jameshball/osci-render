@@ -7,6 +7,10 @@ import sh.ball.shapes.Vector2;
 import javax.script.Bindings;
 import javax.script.CompiledScript;
 import javax.script.SimpleBindings;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 public class LuaSampleSource implements FrameSource<Vector2> {
 
@@ -17,6 +21,7 @@ public class LuaSampleSource implements FrameSource<Vector2> {
   private String textScript;
   private boolean active = true;
   private long step = 1;
+  private Set<String> programDefinedVariables = new HashSet<>();
 
   public void setScript(String textScript, CompiledScript script) {
     if (lastWorkingScript == null) {
@@ -50,7 +55,13 @@ public class LuaSampleSource implements FrameSource<Vector2> {
       if (updatedFile) {
         // reset variables
         step = 1;
-        bindings = new SimpleBindings();
+        List<String> variablesToRemove = new ArrayList<>();
+        bindings.keySet().forEach(name -> {
+          if (!programDefinedVariables.contains(name)) {
+            variablesToRemove.add(name);
+          }
+        });
+        variablesToRemove.forEach(name -> bindings.remove(name));
       }
 
       return new Vector2(result.get(1).checkdouble(), result.get(2).checkdouble());
@@ -80,5 +91,14 @@ public class LuaSampleSource implements FrameSource<Vector2> {
   @Override
   public Object getFrameSettings() {
     return null;
+  }
+
+  public void setVariable(String variableName, Object value) {
+    programDefinedVariables.add(variableName);
+    bindings.put(variableName, value);
+  }
+
+  public void resetStep() {
+    step = 1;
   }
 }
