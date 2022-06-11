@@ -345,9 +345,11 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   @Override
   public void run() {
     try {
-      frame = frameQueue.take();
-      frameLength = Shape.totalLength(frame);
-      updateLengthIncrement();
+      if (sampleSource == null) {
+        frame = frameQueue.take();
+        frameLength = Shape.totalLength(frame);
+        updateLengthIncrement();
+      }
     } catch (InterruptedException e) {
       throw new RuntimeException("Initial frame not found. Cannot continue.");
     }

@@ -684,12 +684,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     }
     effectsController.restartEffects();
 
-    generalController.setFrameSourceName(frameSourcePaths.get(currentFrameSource));
-    generalController.updateFrameLabels();
-
     String fileName = frameSourcePaths.get(index);
 
     Platform.runLater(() -> {
+      generalController.setFrameSourceName(frameSourcePaths.get(currentFrameSource));
+      generalController.updateFrameLabels();
       if (ObjParser.isObjFile(fileName)) {
         objTitledPane.setVisible(true);
         objTitledPane.setDisable(false);

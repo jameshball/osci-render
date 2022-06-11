@@ -104,7 +104,7 @@ public class ConglomerateAudioEngine implements AudioEngine {
   // potentially blocking on a buffer.
   private static class BufferedChannelGenerator implements Callable<Vector2>, Runnable {
 
-    private static final int BLOCK_SIZE = 4096;
+    private static final int BLOCK_SIZE = 1024;
     private static final int BUFFER_SIZE = 2;
 
     private final ArrayBlockingQueue<Vector2[]> buffer;
