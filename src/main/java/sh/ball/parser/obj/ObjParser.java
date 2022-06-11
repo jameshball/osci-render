@@ -55,6 +55,11 @@ public class ObjParser extends FileParser<FrameSource<List<Shape>>> {
     return new ObjFrameSource(object, camera);
   }
 
+  @Override
+  public FrameSource<List<Shape>> get() throws IOException {
+    return parse();
+  }
+
   // If camera position arguments haven't been specified, automatically work out the position of
   // the camera based on the size of the object in the camera's view.
   public void setFocalLength(double focalLength) {

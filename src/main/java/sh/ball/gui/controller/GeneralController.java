@@ -3,9 +3,11 @@ package sh.ball.gui.controller;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
 import javafx.scene.shape.SVGPath;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
@@ -19,10 +21,12 @@ import javax.xml.parsers.ParserConfigurationException;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.*;
 
 import static sh.ball.gui.Gui.audioPlayer;
+import static sh.ball.gui.Gui.main;
 
 public class GeneralController implements Initializable, SubController {
 
@@ -61,6 +65,14 @@ public class GeneralController implements Initializable, SubController {
   private Slider micVolumeSlider;
   @FXML
   private SVGPath micVolumeMidi;
+  @FXML
+  private TextField createFileTextField;
+  @FXML
+  private ComboBox<String> createFileComboBox;
+  @FXML
+  private Button createFileButton;
+  @FXML
+  private Button deleteFileButton;
 
   public void setRecordResult(String result) {
     recordLabel.setText(result);
@@ -216,6 +228,38 @@ public class GeneralController implements Initializable, SubController {
     });
 
     editFileButton.setOnAction(e -> mainController.openCodeEditor());
+    deleteFileButton.setOnAction(e -> mainController.deleteCurrentFile());
+
+    createFileComboBox.setItems(FXCollections.observableList(List.of(".lua", ".svg", ".obj", ".txt")));
+    createFileComboBox.setValue(".lua");
+
+    try {
+      Map<String, byte[]> defaultFileMap = Map.of(
+        ".lua", getClass().getResourceAsStream("/lua/demo.lua").readAllBytes(),
+        ".svg", getClass().getResourceAsStream("/svg/demo.svg").readAllBytes(),
+        ".obj", getClass().getResourceAsStream("/models/cube.obj").readAllBytes(),
+        ".txt", "hello".getBytes(StandardCharsets.UTF_8)
+      );
+
+      createFileButton.setOnAction(e -> {
+        try {
+          String fileName = createFileTextField.getText() + createFileComboBox.getValue();
+          byte[] fileData = defaultFileMap.get(createFileComboBox.getValue());
+          mainController.createFile(fileName, fileData);
+          createFileTextField.setText("");
+        } catch (Exception ex) {
+          ex.printStackTrace();
+        }
+      });
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+
+    createFileTextField.setOnKeyPressed(event -> {
+      if (event.getCode() == KeyCode.ENTER) {
+        createFileButton.getOnAction().handle(null);
+      }
+    });
   }
 
   @Override
@@ -233,7 +277,7 @@ public class GeneralController implements Initializable, SubController {
 
   public void updateFrequency(double leftFrequency, double rightFrequency) {
     Platform.runLater(() ->
-      frequencyLabel.setText(String.format("L/R Frequency:\n%d Hz / %d Hz", Math.round(leftFrequency), Math.round(rightFrequency)))
+      frequencyLabel.setText(String.format("L/R Frequency: %5d Hz\t / %5d Hz", Math.round(leftFrequency), Math.round(rightFrequency)))
     );
   }
 

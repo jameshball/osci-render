@@ -198,7 +198,7 @@
          </Menu>
      </menus>
    </MenuBar>
-   <TitledPane animated="false" collapsible="false" layoutX="7.0" layoutY="33.0" minWidth="378.0" prefHeight="371.0" prefWidth="370.0" text="Main settings">
+   <TitledPane animated="false" collapsible="false" layoutX="7.0" layoutY="33.0" minHeight="371.0" minWidth="378.0" prefHeight="364.0" prefWidth="378.0" text="Main settings">
       <fx:include fx:id="general" source="general.fxml" />
    </TitledPane>
    <TitledPane animated="false" collapsible="false" layoutX="478.0" layoutY="411.0" prefHeight="334.0" prefWidth="523.0" text="Image settings">

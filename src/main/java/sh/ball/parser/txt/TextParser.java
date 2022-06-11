@@ -83,6 +83,11 @@ public class TextParser extends FileParser<FrameSource<List<Shape>>> {
     return new ShapeFrameSource(Shape.flip(Shape.normalize(shapes)));
   }
 
+  @Override
+  public FrameSource<List<Shape>> get() throws Exception {
+    return parse();
+  }
+
   public static boolean isTxtFile(String path) {
     return path.matches(".*\\.txt");
   }
