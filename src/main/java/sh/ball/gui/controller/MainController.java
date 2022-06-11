@@ -53,6 +53,7 @@ import sh.ball.engine.ObjectServer;
 import sh.ball.engine.ObjectSet;
 import sh.ball.gui.Gui;
 import sh.ball.oscilloscope.ByteWebSocketServer;
+import sh.ball.parser.FileParser;
 import sh.ball.parser.lua.LuaParser;
 import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjParser;
@@ -96,11 +97,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   // frames
   private static final InputStream DEFAULT_OBJ = MainController.class.getResourceAsStream("/models/cube.obj");
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
-  private final LuaParser luaParser = new LuaParser();
   private final Set<String> unsavedFileNames = new LinkedHashSet<>();
   private List<byte[]> openFiles = new ArrayList<>();
   private List<String> frameSourcePaths = new ArrayList<>();
-  private List<FrameSource<Vector2>> sampleSources = new ArrayList<>();
+  private List<FileParser<FrameSource<Vector2>>> sampleParsers = new ArrayList<>();
   private List<FrameSource<List<Shape>>> frameSources = new ArrayList<>();
   private FrameProducer<List<Shape>> producer;
   private int currentFrameSource;
@@ -190,7 +190,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
     openFiles.add(baos.toByteArray());
     frameSources.add(frames);
-    sampleSources.add(null);
+    sampleParsers.add(null);
     frameSourcePaths.add("cube.obj");
     currentFrameSource = 0;
     this.producer = new FrameProducer<>(audioPlayer, frames);
@@ -518,7 +518,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   }
 
   public void setLuaVariable(String variableName, Object value) {
-    luaParser.setVariable(variableName, value);
+    sampleParsers.forEach(sampleParser -> {
+      if (sampleParser instanceof LuaParser luaParser) {
+        luaParser.setVariable(variableName, value);
+      }
+    });
   }
 
   public void setSoftwareOscilloscopeAction(Runnable openBrowser) {
@@ -620,17 +624,42 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     new Thread(analyser).start();
   }
 
+  private void disableSources() {
+    frameSources.stream().filter(Objects::nonNull).forEach(FrameSource::disable);
+    sampleParsers.stream().filter(Objects::nonNull).forEach(parser -> {
+      try {
+        parser.get().disable();
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+    });
+  }
+
   // changes the FrameProducer e.g. could be changing from a 3D object to an
   // SVG. The old FrameProducer is stopped and a new one created and initialised
   // with the same settings that the original had.
   private void changeFrameSource(int index) {
+    if (frameSources.size() == 0) {
+      generalController.setFrameSourceName("No file open!");
+      generalController.updateFrameLabels();
+      audioPlayer.removeSampleSource();
+      audioPlayer.addFrame(List.of(new Vector2()));
+      return;
+    }
     index = Math.max(0, Math.min(index, frameSources.size() - 1));
     currentFrameSource = index;
-    frameSources.stream().filter(Objects::nonNull).forEach(FrameSource::disable);
-    sampleSources.stream().filter(Objects::nonNull).forEach(FrameSource::disable);
+    disableSources();
 
     FrameSource<List<Shape>> frames = frameSources.get(index);
-    FrameSource<Vector2> samples = sampleSources.get(index);
+    FrameSource<Vector2> samples = null;
+    try {
+      FileParser<FrameSource<Vector2>> sampleParser = sampleParsers.get(index);
+      if (sampleParser != null ) {
+        samples = sampleParser.get();
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
     if (frames != null) {
       frames.enable();
       audioPlayer.removeSampleSource();
@@ -676,6 +705,56 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     });
   }
 
+  private void createFile(String name, byte[] fileData, List<FileParser<FrameSource<Vector2>>> sampleParsers, List<FrameSource<List<Shape>>> frameSources, List<String> frameSourcePaths, List<byte[]> openFiles) throws Exception {
+    if (frameSourcePaths.contains(name)) {
+      throw new IOException("File already exists with this name");
+    }
+    if (LuaParser.isLuaFile(name)) {
+      LuaParser luaParser = new LuaParser();
+      luaParser.setScriptFromInputStream(new ByteArrayInputStream(fileData));
+      luaParser.parse();
+      sampleParsers.add(luaParser);
+      luaController.updateLuaVariables();
+      frameSources.add(null);
+    } else {
+      frameSources.add(ParserFactory.getParser(name, fileData).parse());
+      sampleParsers.add(null);
+    }
+    frameSourcePaths.add(name);
+    openFiles.add(fileData);
+    Platform.runLater(() -> {
+      generalController.showMultiFileTooltip(frameSources.size() > 1);
+      if (generalController.framesPlaying() && frameSources.size() == 1) {
+        generalController.disablePlayback();
+      }
+    });
+  }
+
+  public void createFile(String name, byte[] fileData) throws Exception {
+    createFile(name, fileData, sampleParsers, frameSources, frameSourcePaths, openFiles);
+    changeFrameSource(frameSources.size() - 1);
+    unsavedFileNames.add(name);
+    setUnsavedFileWarning();
+  }
+
+  public void deleteCurrentFile() {
+    if (frameSources.isEmpty()) {
+      return;
+    }
+    disableSources();
+    sampleParsers.remove(currentFrameSource);
+    frameSources.remove(currentFrameSource);
+    String name = frameSourcePaths.get(currentFrameSource);
+    unsavedFileNames.remove(name);
+    setUnsavedFileWarning();
+    frameSourcePaths.remove(currentFrameSource);
+    openFiles.remove(currentFrameSource);
+    if (currentFrameSource >= frameSources.size()) {
+      currentFrameSource--;
+    }
+    changeFrameSource(currentFrameSource);
+  }
+
   void updateFileData(byte[] file, String name) {
     int index = frameSourcePaths.indexOf(name);
     if (index == -1) {
@@ -685,16 +764,18 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     openFiles.set(index, file);
     try {
       if (LuaParser.isLuaFile(name)) {
-        luaParser.setScriptFromInputStream(new ByteArrayInputStream(file));
-        FrameSource<Vector2> sampleSource = sampleSources.get(index);
-        sampleSources.set(index, luaParser.parse());
-        sampleSource.disable();
+        FileParser<FrameSource<Vector2>> sampleParser = sampleParsers.get(index);
+        if (sampleParser instanceof LuaParser luaParser) {
+          luaParser.setScriptFromInputStream(new ByteArrayInputStream(file));
+        }
+        sampleParser.parse().disable();
+        sampleParsers.set(index, sampleParser);
         frameSources.set(index, null);
       } else {
         FrameSource<List<Shape>> frameSource = frameSources.get(index);
         frameSources.set(index, ParserFactory.getParser(name, file).parse());
         frameSource.disable();
-        sampleSources.set(index, null);
+        sampleParsers.set(index, null);
       }
 
       unsavedFileNames.add(name);
@@ -711,7 +792,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   void setUnsavedFileWarning() {
     Platform.runLater(() -> {
       if (!unsavedFileNames.isEmpty()) {
-        String warning = "(unsaved file changes: " + String.join(", ", unsavedFileNames) + ")";
+        String warning = "(unsaved files: " + String.join(", ", unsavedFileNames) + ")";
         updateTitle(warning, openProjectPath);
       } else {
         updateTitle(null, openProjectPath);
@@ -720,7 +801,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   }
 
   void updateFiles(List<byte[]> files, List<String> names, int startingFrameSource) throws Exception {
-    List<FrameSource<Vector2>> newSampleSources = new ArrayList<>();
+    List<FileParser<FrameSource<Vector2>>> newSampleParsers = new ArrayList<>();
     List<FrameSource<List<Shape>>> newFrameSources = new ArrayList<>();
     List<String> newFrameSourcePaths = new ArrayList<>();
     List<byte[]> newOpenFiles = new ArrayList<>();
@@ -735,17 +816,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
     for (int i = 0; i < files.size(); i++) {
       try {
-        if (LuaParser.isLuaFile(names.get(i))) {
-          luaParser.setScriptFromInputStream(new ByteArrayInputStream(files.get(i)));
-          newSampleSources.add(luaParser.parse());
-          newFrameSources.add(null);
-        } else {
-          newFrameSources.add(ParserFactory.getParser(names.get(i), files.get(i)).parse());
-          newSampleSources.add(null);
-        }
-        newFrameSourcePaths.add(names.get(i));
-        newOpenFiles.add(files.get(i));
-      } catch (IOException | IllegalArgumentException e) {
+        createFile(names.get(i), files.get(i), newSampleParsers, newFrameSources, newFrameSourcePaths, newOpenFiles);
+      } catch (Exception e) {
         Platform.runLater(() -> {
           generalController.setFrameSourceName(e.getMessage());
           generalController.updateFrameLabels();
@@ -753,21 +825,14 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
     }
 
-    Platform.runLater(() -> {
-      if (newFrameSources.size() > 0) {
-        generalController.showMultiFileTooltip(newFrameSources.size() > 1);
-        if (generalController.framesPlaying() && newFrameSources.size() == 1) {
-          generalController.disablePlayback();
-        }
-        frameSources.stream().filter(Objects::nonNull).forEach(FrameSource::disable);
-        sampleSources.stream().filter(Objects::nonNull).forEach(FrameSource::disable);
-        sampleSources = newSampleSources;
-        frameSources = newFrameSources;
-        frameSourcePaths = newFrameSourcePaths;
-        openFiles = newOpenFiles;
-        changeFrameSource(startingFrameSource);
-      }
-    });
+    if (newFrameSources.size() > 0) {
+      disableSources();
+      sampleParsers = newSampleParsers;
+      frameSources = newFrameSources;
+      frameSourcePaths = newFrameSourcePaths;
+      openFiles = newOpenFiles;
+      changeFrameSource(startingFrameSource);
+    }
   }
 
   // used so that the Controller has access to the stage, allowing it to open
@@ -1218,6 +1283,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         updateFiles(files, fileNames, 0);
       }
 
+      luaController.updateLuaVariables();
+
       openProjectPath = projectFileName;
       updateTitle(null, projectFileName);
     } catch (Exception e) {
@@ -1297,7 +1364,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   }
 
   public void resetLuaStep() {
-    luaParser.resetStep();
+    sampleParsers.forEach(sampleParser -> {
+      if (sampleParser instanceof LuaParser luaParser) {
+        luaParser.resetStep();
+      }
+    });
   }
 
   private record PrintableSlider(Slider slider) {

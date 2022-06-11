@@ -190,6 +190,11 @@ public class SvgParser extends FileParser<FrameSource<List<Shape>>> {
     }
   }
 
+  @Override
+  public FrameSource<List<Shape>> get() throws IOException, ParserConfigurationException, SAXException {
+    return parse();
+  }
+
   /* Given a character, will return the glyph associated with it.
    * Assumes that the .svg loaded has character glyphs. */
   public List<Shape> parseGlyphsWithUnicode(char unicode) {

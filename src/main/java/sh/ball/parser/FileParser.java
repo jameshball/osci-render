@@ -1,9 +1,9 @@
 package sh.ball.parser;
 
-import java.io.IOException;
-import javax.xml.parsers.ParserConfigurationException;
-
 import org.xml.sax.SAXException;
+
+import javax.xml.parsers.ParserConfigurationException;
+import java.io.IOException;
 
 public abstract class FileParser<T> {
 
@@ -21,4 +21,6 @@ public abstract class FileParser<T> {
   }
 
   public abstract T parse() throws Exception;
+
+  public abstract T get() throws Exception;
 }

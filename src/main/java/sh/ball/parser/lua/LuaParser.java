@@ -35,6 +35,11 @@ public class LuaParser extends FileParser<FrameSource<Vector2>> {
     return sampleSource;
   }
 
+  @Override
+  public FrameSource<Vector2> get() {
+    return sampleSource;
+  }
+
   public static boolean isLuaFile(String path) {
     return path.matches(".*\\.lua");
   }
