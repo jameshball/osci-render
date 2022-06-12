@@ -51,11 +51,13 @@ public class JavaAudioInput implements AudioInput {
       byte[] data = new byte[CHUNK_SIZE];
       microphone.start();
       while (!stopped) {
-        microphone.read(data, 0, CHUNK_SIZE);
-        for (int i = 0; i < CHUNK_SIZE / 2; i += 2 * STEP_SIZE) {
-          short sample = (short) ((data[2 * i + 1] << 8) + data[2 * i]);
-          for (AudioInputListener listener : listeners) {
-            listener.transmit((double) sample / Short.MAX_VALUE);
+        if (microphone.available() >= CHUNK_SIZE) {
+          microphone.read(data, 0, CHUNK_SIZE);
+          for (int i = 0; i < CHUNK_SIZE / 2; i += 2 * STEP_SIZE) {
+            short sample = (short) ((data[2 * i + 1] << 8) + data[2 * i]);
+            for (AudioInputListener listener : listeners) {
+              listener.transmit((double) sample / Short.MAX_VALUE);
+            }
           }
         }
       }
