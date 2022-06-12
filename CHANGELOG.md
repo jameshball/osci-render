@@ -1,3 +1,31 @@
+- 1.25.0
+  - Live-coding and editing/creating/deleting files!
+  - Files can now be created, edited, and closed by using the respective buttons in the "Main settings" panel
+    - To create a new file, enter a file name, and select the file type from the dropdown before clicking "Create File"
+      - Each supported file type has a demo/example file:
+        - `.obj` displays the default cube
+        - `.svg` renders a circle from an SVG path
+        - `.lua` is an example of audio synthesis using Lua that displays an oscillating `tan` function
+        - `.txt` renders the word "hello"
+    - Closing a file will remove it from the current project
+    - Editing a file will open a code editor, allowing you to change the text for all supported file types
+      - Any edits will update the image being displayed immediately
+      - You can safely close the editor whenever you are finished editing - your edits are saved automatically
+    - When you create or edit a file, the title of the window will update to remind you to save the current project in order to save your changes
+    - Any changes to files are only made to the osci-render project, and will NOT modify real files on your computer
+  - `.lua` file support added
+    - Scripts using the [Lua language](https://www.lua.org/) can be opened and live-edited to create your own completely custom audio source!
+    - Slider values under ".lua file settings" can be accessed within the script
+      - Accessed as variable names: `slider_a`, `slider_b`, `slider_c`, `slider_d`, and `slider_e`
+      - Can be used to control parameters in your script, e.g. frequency, volume, or anything else!
+    - Variable `step` is passed in and incremented every time the script is called
+      - This can be used as a 'phase' or 'theta' input into a sine, cosine, etc. wave
+      - e.g. `return { math.sin(step / 1000), math.cos(step / 1000) }` would draw a circle
+    - Variables declared in a script are maintained between calls to the script
+    - Demo/example `.lua` script can be viewed and edited by creating a new `.lua` file in the "Main settings" panel
+      - This gives a practical example of how this can be used to synthesise audio
+
+
 - 1.24.8
   - Mono and more than 2 audio outputs supported
   - Any audio output after the first L and R channels are used for brightness
