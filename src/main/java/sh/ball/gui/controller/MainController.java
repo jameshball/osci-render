@@ -544,7 +544,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     Platform.runLater(() -> {
       objectServerRendering = true;
       ObjectSet set = objectServer.getObjectSet();
-      frameSources.forEach(FrameSource::disable);
+      disableSources();
+      audioPlayer.removeSampleSource();
       set.enable();
 
       producer = new FrameProducer<>(audioPlayer, set);
@@ -731,7 +732,9 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
   public void createFile(String name, byte[] fileData) throws Exception {
     createFile(name, fileData, sampleParsers, frameSources, frameSourcePaths, openFiles);
-    changeFrameSource(frameSources.size() - 1);
+    if (!objectServerRendering) {
+      changeFrameSource(frameSources.size() - 1);
+    }
     unsavedFileNames.add(name);
     setUnsavedFileWarning();
   }
@@ -751,7 +754,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     if (currentFrameSource >= frameSources.size()) {
       currentFrameSource--;
     }
-    changeFrameSource(currentFrameSource);
+    if (!objectServerRendering) {
+      changeFrameSource(currentFrameSource);
+    }
+    Platform.runLater(() -> generalController.showMultiFileTooltip(frameSources.size() > 1));
   }
 
   void updateFileData(byte[] file, String name) {
