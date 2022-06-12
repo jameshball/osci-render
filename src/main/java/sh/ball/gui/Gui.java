@@ -47,6 +47,7 @@ public class Gui extends Application {
   @Override
   public void start(Stage stage) throws Exception {
     System.setProperty("prism.lcdtext", "false");
+    System.setProperty("org.luaj.luajc", "true");
 
     editor = new CodeEditor();
     editor.initialize();

@@ -1,5 +1,8 @@
 package sh.ball.parser.lua;
 
+import org.luaj.vm2.Globals;
+import org.luaj.vm2.LuaFunction;
+import org.luaj.vm2.lib.jse.JsePlatform;
 import sh.ball.audio.FrameSource;
 import sh.ball.parser.FileParser;
 import sh.ball.shapes.Vector2;
@@ -10,7 +13,13 @@ import java.util.stream.Collectors;
 
 public class LuaParser extends FileParser<FrameSource<Vector2>> {
 
-  private final LuaSampleSource sampleSource = new LuaSampleSource();
+  private static final Globals globals = JsePlatform.standardGlobals();
+
+  static {
+    org.luaj.vm2.luajc.LuaJC.install(globals);
+  }
+
+  private final LuaSampleSource sampleSource = new LuaSampleSource(globals);
 
   private String script;
 
@@ -26,11 +35,9 @@ public class LuaParser extends FileParser<FrameSource<Vector2>> {
 
   @Override
   public FrameSource<Vector2> parse() throws Exception {
-    ScriptEngineManager sem = new ScriptEngineManager();
-    Compilable e = (Compilable) sem.getEngineByName("luaj");
-    CompiledScript compiledScript = e.compile(script);
+    LuaFunction f = globals.load(new StringReader(script), "script").checkfunction();
 
-    sampleSource.setScript(script, compiledScript);
+    sampleSource.setFunction(script, f);
 
     return sampleSource;
   }
