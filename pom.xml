@@ -201,6 +201,12 @@
             <artifactId>luaj-jse</artifactId>
             <version>3.0.1</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/org.apache.bcel/bcel -->
+        <dependency>
+            <groupId>org.apache.bcel</groupId>
+            <artifactId>bcel</artifactId>
+            <version>6.5.0</version>
+        </dependency>
     </dependencies>
     <profiles>
         <profile>
