@@ -31,11 +31,14 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private static final int BUFFER_SIZE = 10;
   // Is this always true? Might need to check from AudioEngine
   private static final int BITS_PER_SAMPLE = 16;
+  private static final int BITS_PER_SAMPLE_HQ = 24;
+
   private static final boolean SIGNED = true;
   private static final boolean BIG_ENDIAN = false;
   // Stereo audio
   private static final int NUM_OUTPUTS = 2;
   private static final double MIN_LENGTH_INCREMENT = 0.0000000001;
+
 
   // MIDI
   private final short[][] keyTargetVolumes = new short[MidiNote.NUM_CHANNELS][128];
@@ -82,6 +85,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private int sampleRate;
   private boolean flipX = false;
   private boolean flipY = false;
+  private boolean recordHQ = true;
 
   private AudioDevice device;
 
@@ -95,6 +99,10 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     communicator.addListener(this);
   }
 
+  public boolean toggleHQRecording() {
+    recordHQ = !recordHQ;
+    return recordHQ;
+  }
   public boolean midiPlaying() {
     return numKeysDown.get() > 0;
   }
@@ -214,10 +222,29 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     byte b3 = (byte) (right >> 8);
 
     if (recording) {
-      outputStream.write(b0);
-      outputStream.write(b1);
-      outputStream.write(b2);
-      outputStream.write(b3);
+      if (recordHQ) {
+        int leftR = (int) (leftChannel * 8388607);
+        int rightR = (int) (rightChannel * 8388607);
+
+        byte b0R = (byte) (leftR);
+        byte b1R = (byte) (leftR >> 8);
+        byte b2R = (byte) (leftR >> 16);
+        byte b3R = (byte) (rightR);
+        byte b4R = (byte) (rightR >> 8);
+        byte b5R = (byte) (rightR >> 16);
+
+        outputStream.write(b0R);
+        outputStream.write(b1R);
+        outputStream.write(b2R);
+        outputStream.write(b3R);
+        outputStream.write(b4R);
+        outputStream.write(b5R);
+      } else {
+        outputStream.write(b0);
+        outputStream.write(b1);
+        outputStream.write(b2);
+        outputStream.write(b3);
+      }
     }
 
     for (Listener listener : listeners) {
@@ -490,7 +517,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     byte[] input = outputStream.toByteArray();
     outputStream = null;
 
-    AudioFormat audioFormat = new AudioFormat(sampleRate, BITS_PER_SAMPLE, NUM_OUTPUTS, SIGNED, BIG_ENDIAN);
+    AudioFormat audioFormat = new AudioFormat(sampleRate, (recordHQ ? BITS_PER_SAMPLE_HQ : BITS_PER_SAMPLE), NUM_OUTPUTS, SIGNED, BIG_ENDIAN);
 
     return new AudioInputStream(new ByteArrayInputStream(input), audioFormat, framesRecorded);
   }
