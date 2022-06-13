@@ -69,6 +69,16 @@
                      <KeyCodeCombination alt="UP" code="R" control="UP" meta="UP" shift="UP" shortcut="DOWN" />
                   </accelerator>
                </MenuItem>
+               <CustomMenuItem hideOnClick="false" mnemonicParsing="false" text="Recording Bit Depth">
+                  <content>
+                     <AnchorPane>
+                        <children>
+                           <Label prefHeight="25.0" text="Recording Audio Sample" textFill="WHITE" />
+                           <ComboBox fx:id="audioSampleComboBox" layoutY="25.0" prefHeight="26.0" prefWidth="376.0" />
+                        </children>
+                     </AnchorPane>
+                  </content>
+               </CustomMenuItem>
                <CustomMenuItem hideOnClick="false" mnemonicParsing="false" text="Timed recording?">
                  <content>
                    <CheckBox fx:id="recordCheckBox" text="Timed recording?" />

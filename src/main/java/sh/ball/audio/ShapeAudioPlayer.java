@@ -14,6 +14,7 @@ import sh.ball.audio.effect.SineEffect;
 import sh.ball.audio.effect.SmoothEffect;
 import sh.ball.audio.engine.AudioDevice;
 import sh.ball.audio.engine.AudioEngine;
+import sh.ball.audio.engine.AudioSample;
 import sh.ball.audio.midi.MidiCommunicator;
 import sh.ball.audio.midi.MidiNote;
 import sh.ball.shapes.Shape;
@@ -85,7 +86,8 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private int sampleRate;
   private boolean flipX = false;
   private boolean flipY = false;
-  private boolean recordHQ = true;
+  private double brightness = 1.0;
+  private AudioSample audioSample = AudioSample.INT16;
 
   private AudioDevice device;
 
@@ -99,9 +101,8 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     communicator.addListener(this);
   }
 
-  public boolean toggleHQRecording() {
-    recordHQ = !recordHQ;
-    return recordHQ;
+  public void setAudioSample(AudioSample sample) {
+    this.audioSample = sample;
   }
   public boolean midiPlaying() {
     return numKeysDown.get() > 0;
@@ -213,6 +214,20 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   private void writeChannels(float leftChannel, float rightChannel) {
+    double[] channels = new double[device.channels()];
+    Arrays.fill(channels, brightness);
+
+    if (channels.length > 0) {
+      channels[0] = leftChannel;
+    }
+    if (channels.length > 1) {
+      channels[1] = rightChannel;
+    }
+
+    if (recording) {
+      AudioSample.writeAudioSample(audioSample, channels, outputStream::write);
+    }
+
     int left = (int) (leftChannel * Short.MAX_VALUE);
     int right = (int) (rightChannel * Short.MAX_VALUE);
 
@@ -220,32 +235,6 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     byte b1 = (byte) (left >> 8);
     byte b2 = (byte) right;
     byte b3 = (byte) (right >> 8);
-
-    if (recording) {
-      if (recordHQ) {
-        int leftR = (int) (leftChannel * 8388606);
-        int rightR = (int) (rightChannel * 8388606);
-
-        byte b0R = (byte) (leftR);
-        byte b1R = (byte) (leftR >> 8);
-        byte b2R = (byte) (leftR >> 16);
-        byte b3R = (byte) (rightR);
-        byte b4R = (byte) (rightR >> 8);
-        byte b5R = (byte) (rightR >> 16);
-
-        outputStream.write(b0R);
-        outputStream.write(b1R);
-        outputStream.write(b2R);
-        outputStream.write(b3R);
-        outputStream.write(b4R);
-        outputStream.write(b5R);
-      } else {
-        outputStream.write(b0);
-        outputStream.write(b1);
-        outputStream.write(b2);
-        outputStream.write(b3);
-      }
-    }
 
     for (Listener listener : listeners) {
       listener.write(b0);
@@ -517,13 +506,14 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     byte[] input = outputStream.toByteArray();
     outputStream = null;
 
-    AudioFormat audioFormat = new AudioFormat(sampleRate, (recordHQ ? BITS_PER_SAMPLE_HQ : BITS_PER_SAMPLE), NUM_OUTPUTS, SIGNED, BIG_ENDIAN);
+    AudioFormat audioFormat = new AudioFormat(sampleRate, audioSample.size, device.channels(), audioSample.signed, BIG_ENDIAN);
 
     return new AudioInputStream(new ByteArrayInputStream(input), audioFormat, framesRecorded);
   }
 
   @Override
   public void setBrightness(double brightness) {
+    this.brightness = brightness;
     audioEngine.setBrightness(brightness);
   }
 
