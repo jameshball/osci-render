@@ -43,10 +43,7 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
-import sh.ball.audio.engine.AudioDevice;
-import sh.ball.audio.engine.AudioInput;
-import sh.ball.audio.engine.AudioInputListener;
-import sh.ball.audio.engine.JavaAudioInput;
+import sh.ball.audio.engine.*;
 import sh.ball.audio.midi.MidiListener;
 import sh.ball.audio.midi.MidiNote;
 import sh.ball.engine.ObjectServer;
@@ -179,6 +176,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private Spinner<Double> recordLengthSpinner;
   @FXML
   private MenuItem softwareOscilloscopeMenuItem;
+  @FXML
+  private ComboBox<AudioSample> audioSampleComboBox;
 
   public MainController() throws Exception {
     // Clone DEFAULT_OBJ InputStream using a ByteArrayOutputStream
@@ -240,6 +239,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   // the recording.
   private void toggleRecord() {
     recording = !recording;
+    audioSampleComboBox.setDisable(recording);
+    deviceComboBox.setDisable(recording);
     boolean timedRecord = recordCheckBox.isSelected();
     if (recording) {
       // if it is a timed recording then a timeline is scheduled to start and
@@ -483,6 +484,14 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     deviceComboBox.valueProperty().addListener((options, oldDevice, newDevice) -> {
       if (newDevice != null) {
         switchAudioDevice(newDevice);
+      }
+    });
+
+    audioSampleComboBox.setItems(FXCollections.observableList(List.of(AudioSample.UINT8, AudioSample.INT8, AudioSample.INT16, AudioSample.INT24, AudioSample.INT32)));
+    audioSampleComboBox.setValue(AudioSample.INT16);
+    audioSampleComboBox.valueProperty().addListener((options, oldSample, sample) -> {
+      if (sample != null) {
+        audioPlayer.setAudioSample(sample);
       }
     });
 
@@ -1146,6 +1155,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       midiDecay.appendChild(document.createTextNode(decaySpinner.getValue().toString()));
       root.appendChild(midiDecay);
 
+      Element audioSample = document.createElement("audioSample");
+      audioSample.appendChild(document.createTextNode(audioSampleComboBox.getValue().name()));
+      root.appendChild(audioSample);
+
       Element filesElement = document.createElement("files");
       for (int i = 0; i < openFiles.size(); i++) {
         Element fileElement = document.createElement("file");
@@ -1267,6 +1280,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       Element midiDecay = (Element) root.getElementsByTagName("midiDecay").item(0);
       if (midiDecay != null) {
         decaySpinner.getValueFactory().setValue(Double.parseDouble(midiDecay.getTextContent()));
+      }
+
+      Element audioSample = (Element) root.getElementsByTagName("audioSample").item(0);
+      if (audioSample != null) {
+        audioSampleComboBox.setValue(AudioSample.valueOf(audioSample.getTextContent()));
       }
 
       Element filesElement = (Element) root.getElementsByTagName("files").item(0);
