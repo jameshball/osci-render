@@ -30,16 +30,9 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   // Arbitrary max count for effects
   private static final int MAX_COUNT = 10000;
   private static final int BUFFER_SIZE = 10;
-  // Is this always true? Might need to check from AudioEngine
-  private static final int BITS_PER_SAMPLE = 16;
-  private static final int BITS_PER_SAMPLE_HQ = 24;
 
-  private static final boolean SIGNED = true;
   private static final boolean BIG_ENDIAN = false;
-  // Stereo audio
-  private static final int NUM_OUTPUTS = 2;
   private static final double MIN_LENGTH_INCREMENT = 0.0000000001;
-
 
   // MIDI
   private final short[][] keyTargetVolumes = new short[MidiNote.NUM_CHANNELS][128];
