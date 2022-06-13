@@ -223,8 +223,8 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
     if (recording) {
       if (recordHQ) {
-        int leftR = (int) (leftChannel * 8388607);
-        int rightR = (int) (rightChannel * 8388607);
+        int leftR = (int) (leftChannel * 8388606);
+        int rightR = (int) (rightChannel * 8388606);
 
         byte b0R = (byte) (leftR);
         byte b1R = (byte) (leftR >> 8);
