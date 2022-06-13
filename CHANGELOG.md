@@ -1,3 +1,9 @@
+- 1.25.1
+  - Add drop-down under Audio settings for recording with different audio samples
+  - Supports `UINT8`, `INT8`, `INT16`, `INT24`, and `INT32`
+  - Thanks very much to [DJLevel3](https://github.com/DJLevel3) for the suggestion and contribution!
+
+
 - 1.25.0
   - Live-coding and editing/creating/deleting files!
   - Files can now be created, edited, and closed by using the respective buttons in the "Main settings" panel
