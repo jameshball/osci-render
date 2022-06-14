@@ -265,6 +265,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
           e -> {
             saveRecording();
             recording = false;
+            Platform.runLater(() -> {
+              audioSampleComboBox.setDisable(false);
+              deviceComboBox.setDisable(false);
+            });
           }
         );
         recordingTimeline = new Timeline(kf1, kf2);
