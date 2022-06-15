@@ -10,5 +10,6 @@ public enum EffectType {
   WOBBLE,
   TRACE_MIN,
   TRACE_MAX,
-  SMOOTH
+  SMOOTH,
+  ROTATE_3D
 }
