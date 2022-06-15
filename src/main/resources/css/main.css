@@ -54,6 +54,16 @@
     -fx-background-radius: 0;
 }
 
+.scroll-pane .scroll-bar:vertical {
+    -fx-unit-increment: 10 ;
+    -fx-block-increment: 50 ;
+}
+
+.scroll-pane .scroll-bar:horizontal {
+    -fx-unit-increment: 5 ;
+    -fx-block-increment: 20 ;
+}
+
 .titled-pane > .title > .arrow-button .arrow {
     -fx-background-color: white, white;
     -fx-background-insets: 1 0 -1 0, 0;

@@ -34,6 +34,7 @@ public class EffectsController implements Initializable, SubController {
   private Map<EffectType, Slider> effectTypes;
 
   private final WobbleEffect wobbleEffect;
+  private final PerspectiveEffect perspectiveEffect;
 
   @FXML
   private EffectComponentGroup vectorCancelling;
@@ -51,9 +52,12 @@ public class EffectsController implements Initializable, SubController {
   private EffectComponentGroup traceMax;
   @FXML
   private EffectComponentGroup traceMin;
+  @FXML
+  private EffectComponentGroup perspective;
 
   public EffectsController() {
     this.wobbleEffect = new WobbleEffect(DEFAULT_SAMPLE_RATE);
+    this.perspectiveEffect = new PerspectiveEffect(DEFAULT_SAMPLE_RATE);
   }
 
   private <K, V> Map<K, V> mergeEffectMaps(Function<EffectComponentGroup, Map<K, V>> map) {
@@ -90,6 +94,7 @@ public class EffectsController implements Initializable, SubController {
 
   public void setAudioDevice(AudioDevice device) {
     wobbleEffect.setSampleRate(device.sampleRate());
+    perspectiveEffect.setSampleRate(device.sampleRate());
     Map<ComboBox<AnimationType>, EffectAnimator> comboAnimatorMap = getComboBoxAnimatorMap();
     for (EffectAnimator animator : comboAnimatorMap.values()) {
       animator.setSampleRate(device.sampleRate());
@@ -118,6 +123,7 @@ public class EffectsController implements Initializable, SubController {
     initializeEffectTypes();
 
     wobble.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, wobbleEffect));
+    perspective.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, perspectiveEffect));
     traceMin.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(audioPlayer::setTraceMin)));
     traceMax.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(audioPlayer::setTraceMax)));
     vectorCancelling.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new VectorCancellingEffect()));
@@ -148,7 +154,7 @@ public class EffectsController implements Initializable, SubController {
   }
 
   private List<EffectComponentGroup> effects() {
-    return List.of(vectorCancelling, bitCrush, verticalDistort, horizontalDistort, wobble, smoothing, traceMin, traceMax);
+    return List.of(vectorCancelling, bitCrush, verticalDistort, horizontalDistort, wobble, smoothing, traceMin, traceMax, perspective);
   }
 
   @Override
