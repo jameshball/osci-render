@@ -11,8 +11,6 @@ import netscape.javascript.JSObject;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.function.BiConsumer;
 
 public class CodeEditor extends StackPane {
@@ -24,8 +22,8 @@ public class CodeEditor extends StackPane {
   private BiConsumer<byte[], String> callback;
   private boolean newFile = true;
 
-  private String applyEditingTemplate() throws URISyntaxException, IOException {
-    String template = Files.readString(Path.of(getClass().getResource("/html/code_editor.html").toURI()));
+  private String applyEditingTemplate() throws IOException {
+    String template = new String(getClass().getResourceAsStream("/html/code_editor.html").readAllBytes(), StandardCharsets.UTF_8);
     return template.replace("${code}", editingCode);
   }
 
