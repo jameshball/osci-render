@@ -4,7 +4,7 @@ import sh.ball.shapes.Vector2;
 
 // Translates the given vector in a sinusoidal fashion if ellipse is true,
 // otherwise applies a constant translation
-public class TranslateEffect extends PhaseEffect {
+public class TranslateEffect extends PhaseEffect implements SettableEffect {
 
   private Vector2 translation;
   private boolean ellipse = false;
@@ -42,5 +42,10 @@ public class TranslateEffect extends PhaseEffect {
 
   public void setScale(double scale) {
     this.scale = scale;
+  }
+
+  @Override
+  public void setValue(double value) {
+    setScale(value);
   }
 }

@@ -48,6 +48,11 @@ public class EffectComponentGroup extends HBox {
     return controller.effectCheckBox.getText();
   }
 
+  public void removeCheckBox() {
+    controller.effectCheckBox.setSelected(true);
+    controller.effectCheckBox.setVisible(false);
+  }
+
   public void setType(EffectType type) {
     controller.setType(type);
   }
@@ -109,5 +114,13 @@ public class EffectComponentGroup extends HBox {
 
   public double getIncrement() {
     return controller.getIncrement();
+  }
+
+  public void setMajorTickUnit(double tickUnit) {
+    controller.setMajorTickUnit(tickUnit);
+  }
+
+  public double getMajorTickUnit() {
+    return controller.getMajorTickUnit();
   }
 }

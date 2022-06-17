@@ -208,4 +208,12 @@ public class EffectComponentGroupController implements Initializable, SubControl
   public double getIncrement() {
     return increment;
   }
+
+  public void setMajorTickUnit(double tickUnit) {
+    slider.setMajorTickUnit(tickUnit);
+  }
+
+  public double getMajorTickUnit() {
+    return slider.getMajorTickUnit();
+  }
 }

@@ -19,6 +19,7 @@ import sh.ball.audio.effect.*;
 import sh.ball.audio.engine.AudioDevice;
 import sh.ball.gui.components.EffectComponentGroup;
 import sh.ball.shapes.Shape;
+import sh.ball.shapes.Vector2;
 
 import java.net.URL;
 import java.util.*;
@@ -31,10 +32,10 @@ public class EffectsController implements Initializable, SubController {
 
   private static final int DEFAULT_SAMPLE_RATE = 192000;
 
-  private Map<EffectType, Slider> effectTypes;
-
   private final WobbleEffect wobbleEffect;
   private final PerspectiveEffect perspectiveEffect;
+  private final TranslateEffect translateEffect;
+  private final RotateEffect rotateEffect;
 
   @FXML
   private EffectComponentGroup vectorCancelling;
@@ -54,10 +55,22 @@ public class EffectsController implements Initializable, SubController {
   private EffectComponentGroup traceMin;
   @FXML
   private EffectComponentGroup perspective;
+  @FXML
+  private EffectComponentGroup translationScale;
+  @FXML
+  private EffectComponentGroup translationSpeed;
+  @FXML
+  private EffectComponentGroup rotateSpeed;
+  @FXML
+  private EffectComponentGroup volume;
+  @FXML
+  private EffectComponentGroup backingMidi;
 
   public EffectsController() {
     this.wobbleEffect = new WobbleEffect(DEFAULT_SAMPLE_RATE);
     this.perspectiveEffect = new PerspectiveEffect(DEFAULT_SAMPLE_RATE);
+    this.translateEffect = new TranslateEffect(DEFAULT_SAMPLE_RATE, 1, new Vector2());
+    this.rotateEffect = new RotateEffect(DEFAULT_SAMPLE_RATE);
   }
 
   private <K, V> Map<K, V> mergeEffectMaps(Function<EffectComponentGroup, Map<K, V>> map) {
@@ -77,18 +90,14 @@ public class EffectsController implements Initializable, SubController {
     return mergeEffectMaps(effect -> effect.controller.getComboBoxAnimatorMap());
   }
 
-  // Maps EffectTypes to the slider that controls the effect so that they can be
-  // toggled when the appropriate checkbox is ticked.
-  private void initializeEffectTypes() {
-    effectTypes = mergeEffectMaps(effect -> effect.controller.getEffectSliderMap());
-  }
-
   // selects or deselects the given audio effect
   public void updateEffect(EffectType type, boolean checked, SettableEffect effect, double value) {
-    if (checked) {
-      audioPlayer.addEffect(type, effect);
-    } else {
-      audioPlayer.removeEffect(type);
+    if (type != null) {
+      if (checked) {
+        audioPlayer.addEffect(type, effect);
+      } else {
+        audioPlayer.removeEffect(type);
+      }
     }
   }
 
@@ -120,8 +129,6 @@ public class EffectsController implements Initializable, SubController {
 
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
-    initializeEffectTypes();
-
     wobble.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, wobbleEffect));
     perspective.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, perspectiveEffect));
     traceMin.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(audioPlayer::setTraceMin)));
@@ -131,30 +138,56 @@ public class EffectsController implements Initializable, SubController {
     smoothing.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new SmoothEffect(1)));
     verticalDistort.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new VerticalDistortEffect(0.2)));
     horizontalDistort.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new HorizontalDistortEffect(0.2)));
+    translationScale.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, translateEffect));
+    translationSpeed.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(translateEffect::setSpeed)));
+    rotateSpeed.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, rotateEffect));
+    volume.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect((value) -> audioPlayer.setVolume(value / 3.0))));
+    backingMidi.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(audioPlayer::setBackingMidiVolume)));
 
     effects().forEach(effect -> {
       effect.controller.setEffectUpdater(this::updateEffect);
 
-      // specific functionality for some effects
-      switch (effect.getType()) {
-        case WOBBLE -> effect.controller.onToggle((animator, value, selected) -> wobbleEffect.update());
-        case TRACE_MIN, TRACE_MAX -> effect.controller.onToggle((animator, value, selected) -> {
-          if (selected) {
-            animator.setValue(value);
-          } else if (effect.getType().equals(EffectType.TRACE_MAX)) {
-            animator.setValue(1.0);
-          } else {
-            animator.setValue(0.0);
-          }
-        });
+      if (effect.getType() != null) {
+        // specific functionality for some effects
+        switch (effect.getType()) {
+          case WOBBLE -> effect.controller.onToggle((animator, value, selected) -> wobbleEffect.update());
+          case TRACE_MIN, TRACE_MAX -> effect.controller.onToggle((animator, value, selected) -> {
+            if (selected) {
+              animator.setValue(value);
+            } else if (effect.getType().equals(EffectType.TRACE_MAX)) {
+              animator.setValue(1.0);
+            } else {
+              animator.setValue(0.0);
+            }
+          });
+        }
       }
 
       effect.controller.lateInitialize();
+
+      if (effect.getType() == null) {
+        effect.removeCheckBox();
+      }
     });
   }
 
   private List<EffectComponentGroup> effects() {
-    return List.of(vectorCancelling, bitCrush, verticalDistort, horizontalDistort, wobble, smoothing, traceMin, traceMax, perspective);
+    return List.of(
+      vectorCancelling,
+      bitCrush,
+      verticalDistort,
+      horizontalDistort,
+      wobble,
+      smoothing,
+      traceMin,
+      traceMax,
+      perspective,
+      translationScale,
+      translationSpeed,
+      rotateSpeed,
+      volume,
+      backingMidi
+    );
   }
 
   @Override

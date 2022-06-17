@@ -6,22 +6,26 @@
 <?import javafx.scene.layout.VBox?>
 <?import sh.ball.gui.components.EffectComponentGroup?>
 
-
-<ScrollPane hbarPolicy="NEVER" prefHeight="381.0" prefWidth="608.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.EffectsController">
+<ScrollPane hbarPolicy="NEVER" prefHeight="590.0" prefWidth="608.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.EffectsController">
    <content>
-      <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="380.0" prefWidth="606.0">
+      <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="588.0" prefWidth="606.0">
           <children>
             <VBox>
                <children>
-                    <EffectComponentGroup fx:id="vectorCancelling" increment="0.005" label="vectorCancelling" max="1.0" min="0.0" name="Vector cancelling" type="VECTOR_CANCELLING" value="0.11111111" />
-                    <EffectComponentGroup fx:id="bitCrush" increment="0.005" label="bitCrush" max="1.0" min="0.0" name="Bit crush" type="BIT_CRUSH" value="0.6666666" />
-                    <EffectComponentGroup fx:id="verticalDistort" increment="0.005" label="verticalDistort" max="1.0" min="0.0" name="Vertical shift" type="VERTICAL_DISTORT" value="0.2" />
-                    <EffectComponentGroup fx:id="horizontalDistort" increment="0.005" label="horizontalDistort" max="1.0" min="0.0" name="Horizontal shift" type="HORIZONTAL_DISTORT" value="0.2" />
-                    <EffectComponentGroup fx:id="wobble" increment="0.005" label="wobble" max="1.0" min="0.0" name="Wobble" type="WOBBLE" value="0.2" />
-                    <EffectComponentGroup fx:id="smoothing" increment="0.005" label="smoothing" max="1.0" min="0.0" name="Smoothing" type="SMOOTH" value="0.125" />
-                    <EffectComponentGroup fx:id="traceMax" increment="0.005" label="traceMax" max="1.0" min="0.0" name="Trace max" type="TRACE_MAX" value="0.5" />
-                    <EffectComponentGroup fx:id="traceMin" increment="0.005" label="traceMin" max="1.0" min="0.0" name="Trace min" type="TRACE_MIN" value="0.5" />
-                    <EffectComponentGroup fx:id="perspective" increment="0.005" label="perspective" max="1.0" min="0.0" name="3D Rotation" type="ROTATE_3D" value="0.5" />
+                   <EffectComponentGroup fx:id="vectorCancelling" increment="0.005" majorTickUnit="0.1" label="vectorCancelling" max="1.0" min="0.0" name="Vector cancelling" type="VECTOR_CANCELLING" value="0.11111111" />
+                   <EffectComponentGroup fx:id="bitCrush" increment="0.005" majorTickUnit="0.1" label="bitCrush" max="1.0" min="0.0" name="Bit crush" type="BIT_CRUSH" value="0.6666666" />
+                   <EffectComponentGroup fx:id="wobble" increment="0.005" majorTickUnit="0.1" label="wobble" max="1.0" min="0.0" name="Wobble" type="WOBBLE" value="0.2" />
+                   <EffectComponentGroup fx:id="smoothing" increment="0.005" majorTickUnit="0.1" label="smoothing" max="1.0" min="0.0" name="Smoothing" type="SMOOTH" value="0.125" />
+                   <EffectComponentGroup fx:id="traceMax" increment="0.005" majorTickUnit="0.1" label="traceMax" max="1.0" min="0.0" name="Trace max" type="TRACE_MAX" value="0.5" />
+                   <EffectComponentGroup fx:id="traceMin" increment="0.005" majorTickUnit="0.1" label="traceMin" max="1.0" min="0.0" name="Trace min" type="TRACE_MIN" value="0.5" />
+                   <EffectComponentGroup fx:id="perspective" increment="0.005" majorTickUnit="0.1" label="perspective" max="1.0" min="0.0" name="3D Rotation" type="ROTATE_3D" value="0.5" />
+                   <EffectComponentGroup fx:id="verticalDistort" increment="0.005" majorTickUnit="0.1" label="verticalDistort" max="1.0" min="0.0" name="Vertical shift" type="VERTICAL_DISTORT" value="0.2" />
+                   <EffectComponentGroup fx:id="horizontalDistort" increment="0.005" majorTickUnit="0.1" label="horizontalDistort" max="1.0" min="0.0" name="Horizontal shift" type="HORIZONTAL_DISTORT" value="0.2" />
+                   <EffectComponentGroup fx:id="translationScale" increment="0.05" majorTickUnit="1.0" label="translationScale" max="10.0" min="0.0" name="Translation scale" type="TRANSLATE" value="1.0" />
+                   <EffectComponentGroup fx:id="translationSpeed" increment="0.05" majorTickUnit="1.0" label="translationSpeed" max="10.0" min="0.0" name="Translation speed" value="1.0" />
+                   <EffectComponentGroup fx:id="rotateSpeed" increment="0.05" majorTickUnit="1.0" label="rotateSpeed" max="10.0" min="0.0" name="2D Rotate speed" type="ROTATE" value="0.0" />
+                   <EffectComponentGroup fx:id="volume" increment="0.05" majorTickUnit="1.0" label="volume" max="10.0" min="0.0" name="Volume scale" value="3.0" />
+                   <EffectComponentGroup fx:id="backingMidi" increment="0.005" majorTickUnit="0.1" label="backingMidi" max="1.0" min="0.0" name="MIDI volume" value="0.25" />
                </children>
                <padding>
                   <Insets top="5.0" />
