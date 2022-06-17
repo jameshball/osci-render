@@ -217,7 +217,7 @@
    <TitledPane animated="false" collapsible="false" layoutX="392.0" layoutY="33.0" prefHeight="371.0" prefWidth="610.0" text="Audio Effects">
       <fx:include fx:id="effects" source="effects.fxml" />
    </TitledPane>
-   <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="7.0" layoutY="411.0" prefHeight="334.0" prefWidth="464.0" text="3D .obj file settings">
+   <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="7.0" layoutY="411.0" prefHeight="334.0" prefWidth="378.0" text="3D .obj file settings">
       <fx:include fx:id="obj" source="obj.fxml" />
    </TitledPane>
     <TitledPane fx:id="luaTitledPane" animated="false" collapsible="false" layoutX="7.0" layoutY="411.0" prefHeight="334.0" prefWidth="464.0" text=".lua file settings" visible="false">
