@@ -1,3 +1,7 @@
+- 1.25.2
+  - Bug fix: Fix FileSystemNotFoundException on start-up due to faulty loading of code editor file
+
+
 - 1.25.1
   - Add drop-down under Audio settings for recording with different audio samples
   - Supports `UINT8`, `INT8`, `INT16`, `INT24`, and `INT32`
