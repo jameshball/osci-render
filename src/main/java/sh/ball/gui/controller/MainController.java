@@ -428,7 +428,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     midiChannelSpinner.valueProperty().addListener((o, oldValue, newValue) -> audioPlayer.setMainMidiChannel(newValue));
 
     translationIncrementSpinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(-2, 2, 0.05, 0.01));
-    translationIncrementSpinner.valueProperty().addListener((o, oldValue, newValue) -> imageController.setTranslationIncrement(newValue));
+    translationIncrementSpinner.valueProperty().addListener((o, oldValue, newValue) -> effectsController.setTranslationIncrement(newValue));
 
     deadzoneSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(0, 20, 5));
     deadzoneSpinner.valueProperty().addListener((e, old, deadzone) -> this.midiDeadzone = deadzone);
@@ -502,8 +502,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     brightnessSlider.valueProperty().addListener((e, old, brightness) -> audioPlayer.setBrightness(brightness.doubleValue()));
 
     objController.updateObjectRotateSpeed();
-
-    imageController.setTranslateEffect(effectsController.getTranslateEffect());
 
     switchAudioDevice(defaultDevice, false);
     executor.submit(producer);
@@ -892,12 +890,12 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
   // determines whether the mouse is being used to translate the screen
   public boolean mouseTranslate() {
-    return imageController.mouseTranslate();
+    return effectsController.mouseTranslate();
   }
 
   // updates the screen translation
   public void setTranslation(Vector2 translation) {
-    imageController.setTranslation(translation);
+    effectsController.setTranslation(translation);
   }
 
   // stops the mouse rotating the 3D object when ESC is pressed or checkbox is
@@ -909,7 +907,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   // stops the mouse translating the screen when ESC is pressed or checkbox is
   // unchecked
   public void disableMouseTranslate() {
-    imageController.disableMouseTranslate();
+    effectsController.disableMouseTranslate();
   }
 
   // updates the 3D object base and current rotation angle
@@ -1127,7 +1125,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
       root.appendChild(midiElement);
 
-      subControllers().forEach(controller -> root.appendChild(controller.save(document)));
+      subControllers().forEach(controller -> controller.save(document).forEach(root::appendChild));
 
       Element flipX = document.createElement("flipX");
       Element flipY = document.createElement("flipY");

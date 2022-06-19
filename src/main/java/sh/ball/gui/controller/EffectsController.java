@@ -5,9 +5,7 @@ import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.scene.control.CheckBox;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.Slider;
+import javafx.scene.control.*;
 import javafx.scene.shape.SVGPath;
 import javafx.util.Duration;
 import org.w3c.dom.Document;
@@ -25,6 +23,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static sh.ball.gui.Gui.audioPlayer;
+import static sh.ball.math.Math.tryParse;
 
 public class EffectsController implements Initializable, SubController {
 
@@ -34,6 +33,8 @@ public class EffectsController implements Initializable, SubController {
   private final PerspectiveEffect perspectiveEffect;
   private final TranslateEffect translateEffect;
   private final RotateEffect rotateEffect;
+
+  private double scrollDelta = 0.05;
 
   @FXML
   private EffectComponentGroup vectorCancelling;
@@ -52,7 +53,15 @@ public class EffectsController implements Initializable, SubController {
   @FXML
   private EffectComponentGroup traceMin;
   @FXML
-  private EffectComponentGroup perspective;
+  private EffectComponentGroup depthScale;
+  @FXML
+  private EffectComponentGroup rotateSpeed3D;
+  @FXML
+  private EffectComponentGroup rotateX;
+  @FXML
+  private EffectComponentGroup rotateY;
+  @FXML
+  private EffectComponentGroup rotateZ;
   @FXML
   private EffectComponentGroup translationScale;
   @FXML
@@ -63,10 +72,20 @@ public class EffectsController implements Initializable, SubController {
   private EffectComponentGroup volume;
   @FXML
   private EffectComponentGroup backingMidi;
+  @FXML
+  private TextField translationXTextField;
+  @FXML
+  private TextField translationYTextField;
+  @FXML
+  private CheckBox translateEllipseCheckBox;
+  @FXML
+  private CheckBox translateCheckBox;
+  @FXML
+  private Button resetTranslationButton;
 
   public EffectsController() {
     this.wobbleEffect = new WobbleEffect(DEFAULT_SAMPLE_RATE);
-    this.perspectiveEffect = new PerspectiveEffect(DEFAULT_SAMPLE_RATE);
+    this.perspectiveEffect = new PerspectiveEffect();
     this.translateEffect = new TranslateEffect(DEFAULT_SAMPLE_RATE, 1, new Vector2());
     this.rotateEffect = new RotateEffect(DEFAULT_SAMPLE_RATE);
   }
@@ -97,11 +116,21 @@ public class EffectsController implements Initializable, SubController {
         audioPlayer.removeEffect(type);
       }
     }
+
+    if (type == EffectType.DEPTH_3D) {
+      Platform.runLater(() ->
+        List.of(rotateSpeed3D, rotateX, rotateY, rotateZ).forEach(ecg -> {
+          ecg.controller.slider.setDisable(!checked);
+          ecg.controller.spinner.setDisable(!checked);
+        })
+      );
+    }
   }
 
   public void setAudioDevice(AudioDevice device) {
     wobbleEffect.setSampleRate(device.sampleRate());
-    perspectiveEffect.setSampleRate(device.sampleRate());
+    translateEffect.setSampleRate(device.sampleRate());
+    rotateEffect.setSampleRate(device.sampleRate());
     Map<ComboBox<AnimationType>, EffectAnimator> comboAnimatorMap = getComboBoxAnimatorMap();
     for (EffectAnimator animator : comboAnimatorMap.values()) {
       animator.setSampleRate(device.sampleRate());
@@ -128,7 +157,11 @@ public class EffectsController implements Initializable, SubController {
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
     wobble.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, wobbleEffect));
-    perspective.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, perspectiveEffect));
+    depthScale.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, perspectiveEffect));
+    rotateSpeed3D.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(perspectiveEffect::setRotateSpeed)));
+    rotateX.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect((perspectiveEffect::setRotationX))));
+    rotateY.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect((perspectiveEffect::setRotationY))));
+    rotateZ.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect((perspectiveEffect::setRotationZ))));
     traceMin.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(audioPlayer::setTraceMin)));
     traceMax.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(audioPlayer::setTraceMax)));
     vectorCancelling.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new VectorCancellingEffect()));
@@ -167,6 +200,23 @@ public class EffectsController implements Initializable, SubController {
         effect.removeCheckBox();
       }
     });
+
+    resetTranslationButton.setOnAction(e -> {
+      translationXTextField.setText("0.00");
+      translationYTextField.setText("0.00");
+    });
+
+    translationXTextField.textProperty().addListener(e -> updateTranslation());
+    translationXTextField.setOnScroll((e) -> changeTranslation(e.getDeltaY() > 0, translationXTextField));
+    translationYTextField.textProperty().addListener(e -> updateTranslation());
+    translationYTextField.setOnScroll((e) -> changeTranslation(e.getDeltaY() > 0, translationYTextField));
+
+    translateEllipseCheckBox.selectedProperty().addListener((e, old, ellipse) -> translateEffect.setEllipse(ellipse));
+
+    List.of(rotateSpeed3D, rotateX, rotateY, rotateZ).forEach(ecg -> {
+      ecg.controller.slider.setDisable(true);
+      ecg.controller.spinner.setDisable(true);
+    });
   }
 
   private List<EffectComponentGroup> effects() {
@@ -179,7 +229,11 @@ public class EffectsController implements Initializable, SubController {
       smoothing,
       traceMin,
       traceMax,
-      perspective,
+      rotateSpeed3D,
+      rotateX,
+      rotateY,
+      rotateZ,
+      depthScale,
       translationScale,
       translationSpeed,
       rotateSpeed,
@@ -202,16 +256,37 @@ public class EffectsController implements Initializable, SubController {
   }
 
   @Override
-  public Element save(Document document) {
+  public List<Element> save(Document document) {
     Element element = document.createElement("checkBoxes");
-    effects().forEach(effect -> element.appendChild(effect.controller.save(document)));
-    return element;
+    effects().forEach(effect -> effect.controller.save(document).forEach(element::appendChild));
+    Element translation = document.createElement("translation");
+    Element x = document.createElement("x");
+    x.appendChild(document.createTextNode(translationXTextField.getText()));
+    Element y = document.createElement("y");
+    y.appendChild(document.createTextNode(translationYTextField.getText()));
+    Element ellipse = document.createElement("ellipse");
+    ellipse.appendChild(document.createTextNode(Boolean.toString(translateEllipseCheckBox.isSelected())));
+    translation.appendChild(x);
+    translation.appendChild(y);
+    translation.appendChild(ellipse);
+    return List.of(element, translation);
   }
 
   @Override
   public void load(Element root) {
     Element element = (Element) root.getElementsByTagName("checkBoxes").item(0);
     effects().forEach(effect -> effect.controller.load(element));
+    Element translation = (Element) root.getElementsByTagName("translation").item(0);
+    Element x = (Element) translation.getElementsByTagName("x").item(0);
+    Element y = (Element) translation.getElementsByTagName("y").item(0);
+    translationXTextField.setText(x.getTextContent());
+    translationYTextField.setText(y.getTextContent());
+
+    slidersUpdated();
+
+    // For backwards compatibility we assume a default value
+    Element ellipse = (Element) translation.getElementsByTagName("ellipse").item(0);
+    translateEllipseCheckBox.setSelected(ellipse != null && Boolean.parseBoolean(ellipse.getTextContent()));
   }
 
   @Override
@@ -219,5 +294,36 @@ public class EffectsController implements Initializable, SubController {
 
   public TranslateEffect getTranslateEffect() {
     return translateEffect;
+  }
+
+  public void setTranslation(Vector2 translation) {
+    translationXTextField.setText(MainController.FORMAT.format(translation.getX()));
+    translationYTextField.setText(MainController.FORMAT.format(translation.getY()));
+  }
+
+  public void setTranslationIncrement(double increment) {
+    this.scrollDelta = increment;
+  }
+
+  // changes the sinusoidal translation of the image rendered
+  private void updateTranslation() {
+    translateEffect.setTranslation(new Vector2(
+      tryParse(translationXTextField.getText()),
+      tryParse(translationYTextField.getText())
+    ));
+  }
+
+  private void changeTranslation(boolean increase, TextField field) {
+    double old = tryParse(field.getText());
+    double delta = increase ? scrollDelta : -scrollDelta;
+    field.setText(MainController.FORMAT.format(old + delta));
+  }
+
+  public boolean mouseTranslate() {
+    return translateCheckBox.isSelected();
+  }
+
+  public void disableMouseTranslate() {
+    translateCheckBox.setSelected(false);
   }
 }

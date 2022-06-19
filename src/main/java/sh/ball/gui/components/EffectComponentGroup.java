@@ -11,7 +11,6 @@ import java.io.IOException;
 public class EffectComponentGroup extends HBox {
 
   public final EffectComponentGroupController controller;
-  private boolean alwaysEnabled = false;
 
   public EffectComponentGroup() {
     EffectComponentGroupController temp;
@@ -116,10 +115,10 @@ public class EffectComponentGroup extends HBox {
   }
 
   public void setAlwaysEnabled(boolean alwaysEnabled) {
-    this.alwaysEnabled = alwaysEnabled;
+    controller.setAlwaysEnabled(alwaysEnabled);
   }
 
   public boolean getAlwaysEnabled() {
-    return alwaysEnabled;
+    return controller.getAlwaysEnabled();
   }
 }

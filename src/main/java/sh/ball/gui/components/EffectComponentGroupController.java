@@ -26,19 +26,20 @@ public class EffectComponentGroupController implements Initializable, SubControl
   private EffectType type;
   private String label;
   private double increment;
+  private boolean alwaysEnabled = false;
 
   @FXML
-  CheckBox effectCheckBox;
+  public CheckBox effectCheckBox;
   @FXML
-  Slider slider;
+  public Slider slider;
   @FXML
-  Spinner<Double> spinner;
+  public Spinner<Double> spinner;
   @FXML
-  SVGPath midi;
+  public SVGPath midi;
   @FXML
-  ComboBox<AnimationType> comboBox;
+  public ComboBox<AnimationType> comboBox;
   @FXML
-  CheckBox micCheckBox;
+  public CheckBox micCheckBox;
 
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
@@ -49,12 +50,6 @@ public class EffectComponentGroupController implements Initializable, SubControl
         )
       ));
     spinner.valueProperty().addListener((o, oldValue, newValue) -> slider.setValue(newValue));
-    spinner.setOnScroll((e) -> {
-      double delta = e.getDeltaY() > 0 ? increment : -increment;
-      spinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(
-        slider.getMin(), slider.getMax(), slider.getValue() + delta, increment
-      ));
-    });
   }
 
   public void lateInitialize() {
@@ -106,7 +101,7 @@ public class EffectComponentGroupController implements Initializable, SubControl
   }
 
   @Override
-  public Element save(Document document) {
+  public List<Element> save(Document document) {
     Element checkBox = document.createElement(label);
     Element selected = document.createElement("selected");
     selected.appendChild(
@@ -116,7 +111,7 @@ public class EffectComponentGroupController implements Initializable, SubControl
     animation.appendChild(document.createTextNode(comboBox.getValue().toString()));
     checkBox.appendChild(selected);
     checkBox.appendChild(animation);
-    return checkBox;
+    return List.of(checkBox);
   }
 
   @Override
@@ -124,7 +119,9 @@ public class EffectComponentGroupController implements Initializable, SubControl
     Element checkBox = (Element) element.getElementsByTagName(label).item(0);
     // backwards compatibility
     if (checkBox == null) {
-      effectCheckBox.setSelected(false);
+      if (!alwaysEnabled) {
+        effectCheckBox.setSelected(false);
+      }
       return;
     }
     String selected;
@@ -139,7 +136,7 @@ public class EffectComponentGroupController implements Initializable, SubControl
       selected = checkBox.getTextContent();
       comboBox.setValue(AnimationType.STATIC);
     }
-    effectCheckBox.setSelected(Boolean.parseBoolean(selected));
+    effectCheckBox.setSelected(Boolean.parseBoolean(selected) || alwaysEnabled);
   }
 
   @Override
@@ -211,5 +208,13 @@ public class EffectComponentGroupController implements Initializable, SubControl
 
   public double getMajorTickUnit() {
     return slider.getMajorTickUnit();
+  }
+
+  public void setAlwaysEnabled(boolean alwaysEnabled) {
+    this.alwaysEnabled = alwaysEnabled;
+  }
+
+  public boolean getAlwaysEnabled() {
+    return alwaysEnabled;
   }
 }

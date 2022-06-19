@@ -8,12 +8,16 @@ public enum EffectType {
   VERTICAL_DISTORT(2),
   HORIZONTAL_DISTORT(3),
   WOBBLE(4),
-  TRACE_MIN(-5),
-  TRACE_MAX(-4),
+  TRACE_MIN(-1),
+  TRACE_MAX(-1),
   SMOOTH(100),
-  ROTATE_3D(52),
-  TRANSLATE_SPEED(-3),
-  VISIBILITY(-2),
+  DEPTH_3D(52),
+  ROTATE_SPEED_3D(-1),
+  ROTATE_X(-1),
+  ROTATE_Y(-1),
+  ROTATE_Z(-1),
+  TRANSLATE_SPEED(-1),
+  VISIBILITY(-1),
   SCALE(-1);
 
   public final int precedence;
