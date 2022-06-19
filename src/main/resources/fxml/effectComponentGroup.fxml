@@ -8,7 +8,7 @@
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.shape.SVGPath?>
 
-<fx:root alignment="TOP_CENTER" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="41.0" prefWidth="601.0" type="HBox" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.components.EffectComponentGroupController">
+<fx:root alignment="TOP_RIGHT" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="41.0" prefWidth="601.0" type="HBox" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.components.EffectComponentGroupController">
    <children>
       <CheckBox fx:id="effectCheckBox" mnemonicParsing="false" prefHeight="18.0" prefWidth="128.0" text="Vector cancel">
          <HBox.margin>
@@ -20,7 +20,7 @@
             <Insets right="5.0" />
          </HBox.margin>
       </Slider>
-      <Spinner fx:id="spinner" editable="true" disable="true" prefHeight="26.0" prefWidth="66.0">
+      <Spinner fx:id="spinner" disable="true" editable="true" prefHeight="26.0" prefWidth="66.0">
          <HBox.margin>
             <Insets top="1.0" />
          </HBox.margin>

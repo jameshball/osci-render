@@ -11,5 +11,8 @@ public enum EffectType {
   TRACE_MIN,
   TRACE_MAX,
   SMOOTH,
-  ROTATE_3D
+  ROTATE_3D,
+  TRANSLATE_SPEED,
+  VISIBILITY,
+  SCALE
 }

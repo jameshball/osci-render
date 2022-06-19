@@ -211,10 +211,10 @@
    <TitledPane animated="false" collapsible="false" layoutX="7.0" layoutY="33.0" minHeight="371.0" minWidth="378.0" prefHeight="364.0" prefWidth="378.0" text="Main settings">
       <fx:include fx:id="general" source="general.fxml" />
    </TitledPane>
-   <TitledPane animated="false" collapsible="false" layoutX="478.0" layoutY="411.0" prefHeight="334.0" prefWidth="523.0" text="Image settings">
+   <TitledPane animated="false" collapsible="false" layoutX="391.0" layoutY="607.0" prefHeight="138.0" prefWidth="610.0" text="Image settings">
       <fx:include fx:id="image" source="image.fxml" />
    </TitledPane>
-   <TitledPane animated="false" collapsible="false" layoutX="392.0" layoutY="33.0" prefHeight="371.0" prefWidth="610.0" text="Audio Effects">
+   <TitledPane animated="false" collapsible="false" layoutX="392.0" layoutY="33.0" prefHeight="569.0" prefWidth="610.0" text="Audio Effects">
       <fx:include fx:id="effects" source="effects.fxml" />
    </TitledPane>
    <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="7.0" layoutY="411.0" prefHeight="334.0" prefWidth="378.0" text="3D .obj file settings">

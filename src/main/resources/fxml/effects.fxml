@@ -22,10 +22,10 @@
                    <EffectComponentGroup fx:id="verticalDistort" increment="0.005" majorTickUnit="0.1" label="verticalDistort" max="1.0" min="0.0" name="Vertical shift" type="VERTICAL_DISTORT" value="0.2" />
                    <EffectComponentGroup fx:id="horizontalDistort" increment="0.005" majorTickUnit="0.1" label="horizontalDistort" max="1.0" min="0.0" name="Horizontal shift" type="HORIZONTAL_DISTORT" value="0.2" />
                    <EffectComponentGroup fx:id="translationScale" increment="0.05" majorTickUnit="1.0" label="translationScale" max="10.0" min="0.0" name="Translation scale" type="TRANSLATE" value="1.0" />
-                   <EffectComponentGroup fx:id="translationSpeed" increment="0.05" majorTickUnit="1.0" label="translationSpeed" max="10.0" min="0.0" name="Translation speed" value="1.0" />
+                   <EffectComponentGroup fx:id="translationSpeed" increment="0.05" majorTickUnit="1.0" label="translationSpeed" max="10.0" min="0.0" name="Translation speed" type="TRANSLATE_SPEED" alwaysEnabled="true" value="1.0" />
                    <EffectComponentGroup fx:id="rotateSpeed" increment="0.05" majorTickUnit="1.0" label="rotateSpeed" max="10.0" min="0.0" name="2D Rotate speed" type="ROTATE" value="0.0" />
-                   <EffectComponentGroup fx:id="volume" increment="0.05" majorTickUnit="1.0" label="volume" max="10.0" min="0.0" name="Volume scale" value="3.0" />
-                   <EffectComponentGroup fx:id="backingMidi" increment="0.005" majorTickUnit="0.1" label="backingMidi" max="1.0" min="0.0" name="MIDI volume" value="0.25" />
+                   <EffectComponentGroup fx:id="volume" increment="0.05" majorTickUnit="1.0" label="volume" max="10.0" min="0.0" name="Volume scale" type="SCALE" alwaysEnabled="true" value="3.0" />
+                   <EffectComponentGroup fx:id="backingMidi" increment="0.005" majorTickUnit="0.1" label="visibility" max="1.0" min="0.0" name="MIDI volume" type="VISIBILITY" alwaysEnabled="true" value="0.25" />
                </children>
                <padding>
                   <Insets top="5.0" />

@@ -3,8 +3,6 @@ package sh.ball.gui.controller;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
-import javafx.beans.InvalidationListener;
-import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.CheckBox;
@@ -145,27 +143,27 @@ public class EffectsController implements Initializable, SubController {
     backingMidi.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(audioPlayer::setBackingMidiVolume)));
 
     effects().forEach(effect -> {
+      effect.controller.getAnimator().setMin(effect.getMin());
+      effect.controller.getAnimator().setMax(effect.getMax());
       effect.controller.setEffectUpdater(this::updateEffect);
 
-      if (effect.getType() != null) {
-        // specific functionality for some effects
-        switch (effect.getType()) {
-          case WOBBLE -> effect.controller.onToggle((animator, value, selected) -> wobbleEffect.update());
-          case TRACE_MIN, TRACE_MAX -> effect.controller.onToggle((animator, value, selected) -> {
-            if (selected) {
-              animator.setValue(value);
-            } else if (effect.getType().equals(EffectType.TRACE_MAX)) {
-              animator.setValue(1.0);
-            } else {
-              animator.setValue(0.0);
-            }
-          });
-        }
+      // specific functionality for some effects
+      switch (effect.getType()) {
+        case WOBBLE -> effect.controller.onToggle((animator, value, selected) -> wobbleEffect.update());
+        case TRACE_MIN, TRACE_MAX -> effect.controller.onToggle((animator, value, selected) -> {
+          if (selected) {
+            animator.setValue(value);
+          } else if (effect.getType().equals(EffectType.TRACE_MAX)) {
+            animator.setValue(1.0);
+          } else {
+            animator.setValue(0.0);
+          }
+        });
       }
 
       effect.controller.lateInitialize();
 
-      if (effect.getType() == null) {
+      if (effect.getAlwaysEnabled()) {
         effect.removeCheckBox();
       }
     });
@@ -218,4 +216,8 @@ public class EffectsController implements Initializable, SubController {
 
   @Override
   public void slidersUpdated() {}
+
+  public TranslateEffect getTranslateEffect() {
+    return translateEffect;
+  }
 }
