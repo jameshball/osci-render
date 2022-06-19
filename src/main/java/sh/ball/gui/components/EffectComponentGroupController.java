@@ -12,7 +12,6 @@ import sh.ball.audio.effect.AnimationType;
 import sh.ball.audio.effect.EffectAnimator;
 import sh.ball.audio.effect.EffectType;
 import sh.ball.audio.effect.SettableEffect;
-import sh.ball.gui.FourParamRunnable;
 import sh.ball.gui.ThreeParamRunnable;
 import sh.ball.gui.controller.SubController;
 
@@ -170,18 +169,15 @@ public class EffectComponentGroupController implements Initializable, SubControl
     return Map.of(type, slider);
   }
 
-  public void setEffectUpdater(FourParamRunnable<EffectType, Boolean, SettableEffect, Double> updater) {
-    InvalidationListener listener = e -> {
-      double value = slider.getValue();
+  public void setEffectUpdater(ThreeParamRunnable<EffectType, Boolean, SettableEffect> updater) {
+    slider.valueProperty().addListener((e, old, value) -> animator.setValue(value.doubleValue()));
+    effectCheckBox.selectedProperty().addListener(e -> {
+      animator.setValue(slider.getValue());
       boolean selected = effectCheckBox.isSelected();
-      updater.run(type, selected, animator, value);
-      animator.setValue(value);
+      updater.run(type, selected, animator);
       slider.setDisable(!selected);
       spinner.setDisable(!selected);
-    };
-
-    slider.valueProperty().addListener(listener);
-    effectCheckBox.selectedProperty().addListener(listener);
+    });
   }
 
   public void onToggle(ThreeParamRunnable<EffectAnimator, Double, Boolean> onToggle) {

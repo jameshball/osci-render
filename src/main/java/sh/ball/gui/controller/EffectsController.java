@@ -89,7 +89,7 @@ public class EffectsController implements Initializable, SubController {
   }
 
   // selects or deselects the given audio effect
-  public void updateEffect(EffectType type, boolean checked, SettableEffect effect, double value) {
+  public void updateEffect(EffectType type, boolean checked, SettableEffect effect) {
     if (type != null) {
       if (checked) {
         audioPlayer.addEffect(type, effect);
