@@ -80,10 +80,10 @@
                   </Separator>
                    <EffectComponentGroup fx:id="rotateSpeed" increment="0.05" label="rotateSpeed" majorTickUnit="1.0" max="10.0" min="0.0" name="2D Rotate speed" type="ROTATE" value="0.0" />
                   <EffectComponentGroup fx:id="depthScale" increment="0.005" label="depthScale" majorTickUnit="0.1" max="1.0" min="0.0" name="3D Depth" type="DEPTH_3D" value="0.1" />
-                  <EffectComponentGroup fx:id="rotateSpeed3D" alwaysEnabled="true" increment="0.005" label="rotateSpeed3D" majorTickUnit="0.2" max="1.0" min="-1.0" name="3D Rotate speed" type="ROTATE_SPEED_3D" value="0.0" />
-                  <EffectComponentGroup fx:id="rotateX" alwaysEnabled="true" increment="0.01" label="perspective" majorTickUnit="0.2" max="1.0" min="-1.0" name="Rotate x" type="ROTATE_X" value="1.0" />
-                  <EffectComponentGroup fx:id="rotateY" alwaysEnabled="true" increment="0.01" label="perspective" majorTickUnit="0.2" max="1.0" min="-1.0" name="Rotate y" type="ROTATE_Y" value="1.0" />
-                  <EffectComponentGroup fx:id="rotateZ" alwaysEnabled="true" increment="0.01" label="perspective" majorTickUnit="0.2" max="1.0" min="-1.0" name="Rotate z" type="ROTATE_Z" value="0.0" />
+                  <EffectComponentGroup fx:id="rotateSpeed3D" alwaysEnabled="true" increment="0.005" label="rotateSpeed3d" majorTickUnit="0.2" max="1.0" min="-1.0" name="3D Rotate speed" type="ROTATE_SPEED_3D" value="0.0" />
+                  <EffectComponentGroup fx:id="rotateX" alwaysEnabled="true" increment="0.01" label="imageRotateX" majorTickUnit="0.2" max="1.0" min="-1.0" name="Rotate x" type="ROTATE_X" value="1.0" />
+                  <EffectComponentGroup fx:id="rotateY" alwaysEnabled="true" increment="0.01" label="imageRotateY" majorTickUnit="0.2" max="1.0" min="-1.0" name="Rotate y" type="ROTATE_Y" value="1.0" />
+                  <EffectComponentGroup fx:id="rotateZ" alwaysEnabled="true" increment="0.01" label="imageRotateZ" majorTickUnit="0.2" max="1.0" min="-1.0" name="Rotate z" type="ROTATE_Z" value="0.0" />
                   <Label alignment="CENTER" prefWidth="601.0" text="Other" textAlignment="JUSTIFY">
                      <padding>
                         <Insets bottom="5.0" />
