@@ -1,31 +1,104 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.layout.VBox?>
 <?import sh.ball.gui.components.EffectComponentGroup?>
 
-<ScrollPane hbarPolicy="NEVER" prefHeight="590.0" prefWidth="608.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.EffectsController">
+<ScrollPane hbarPolicy="NEVER" prefHeight="954.0" prefWidth="608.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.EffectsController">
    <content>
-      <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="588.0" prefWidth="606.0">
+      <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="951.0" prefWidth="606.0">
           <children>
             <VBox>
                <children>
-                   <EffectComponentGroup fx:id="vectorCancelling" increment="0.005" majorTickUnit="0.1" label="vectorCancelling" max="1.0" min="0.0" name="Vector cancelling" type="VECTOR_CANCELLING" value="0.11111111" />
-                   <EffectComponentGroup fx:id="bitCrush" increment="0.005" majorTickUnit="0.1" label="bitCrush" max="1.0" min="0.0" name="Bit crush" type="BIT_CRUSH" value="0.6666666" />
-                   <EffectComponentGroup fx:id="wobble" increment="0.005" majorTickUnit="0.1" label="wobble" max="1.0" min="0.0" name="Wobble" type="WOBBLE" value="0.2" />
-                   <EffectComponentGroup fx:id="smoothing" increment="0.005" majorTickUnit="0.1" label="smoothing" max="1.0" min="0.0" name="Smoothing" type="SMOOTH" value="0.125" />
-                   <EffectComponentGroup fx:id="traceMax" increment="0.005" majorTickUnit="0.1" label="traceMax" max="1.0" min="0.0" name="Trace max" type="TRACE_MAX" value="0.5" />
-                   <EffectComponentGroup fx:id="traceMin" increment="0.005" majorTickUnit="0.1" label="traceMin" max="1.0" min="0.0" name="Trace min" type="TRACE_MIN" value="0.5" />
-                   <EffectComponentGroup fx:id="perspective" increment="0.005" majorTickUnit="0.1" label="perspective" max="1.0" min="0.0" name="3D Rotation" type="ROTATE_3D" value="0.5" />
-                   <EffectComponentGroup fx:id="verticalDistort" increment="0.005" majorTickUnit="0.1" label="verticalDistort" max="1.0" min="0.0" name="Vertical shift" type="VERTICAL_DISTORT" value="0.2" />
-                   <EffectComponentGroup fx:id="horizontalDistort" increment="0.005" majorTickUnit="0.1" label="horizontalDistort" max="1.0" min="0.0" name="Horizontal shift" type="HORIZONTAL_DISTORT" value="0.2" />
-                   <EffectComponentGroup fx:id="translationScale" increment="0.05" majorTickUnit="1.0" label="translationScale" max="10.0" min="0.0" name="Translation scale" type="TRANSLATE" value="1.0" />
-                   <EffectComponentGroup fx:id="translationSpeed" increment="0.05" majorTickUnit="1.0" label="translationSpeed" max="10.0" min="0.0" name="Translation speed" type="TRANSLATE_SPEED" alwaysEnabled="true" value="1.0" />
-                   <EffectComponentGroup fx:id="rotateSpeed" increment="0.05" majorTickUnit="1.0" label="rotateSpeed" max="10.0" min="0.0" name="2D Rotate speed" type="ROTATE" value="0.0" />
-                   <EffectComponentGroup fx:id="volume" increment="0.05" majorTickUnit="1.0" label="volume" max="10.0" min="0.0" name="Volume scale" type="SCALE" alwaysEnabled="true" value="3.0" />
-                   <EffectComponentGroup fx:id="backingMidi" increment="0.005" majorTickUnit="0.1" label="visibility" max="1.0" min="0.0" name="MIDI volume" type="VISIBILITY" alwaysEnabled="true" value="0.25" />
+                  <Label alignment="CENTER" prefWidth="601.0" text="Image" textAlignment="JUSTIFY">
+                     <padding>
+                        <Insets bottom="5.0" />
+                     </padding>
+                  </Label>
+                  <Separator prefWidth="200.0">
+                     <opaqueInsets>
+                        <Insets />
+                     </opaqueInsets>
+                     <padding>
+                        <Insets bottom="5.0" />
+                     </padding>
+                  </Separator>
+                   <EffectComponentGroup fx:id="vectorCancelling" increment="0.005" label="vectorCancelling" majorTickUnit="0.1" max="1.0" min="0.0" name="Vector cancelling" type="VECTOR_CANCELLING" value="0.11111111" />
+                   <EffectComponentGroup fx:id="bitCrush" increment="0.005" label="bitCrush" majorTickUnit="0.1" max="1.0" min="0.0" name="Bit crush" type="BIT_CRUSH" value="0.6666666" />
+                   <EffectComponentGroup fx:id="wobble" increment="0.005" label="wobble" majorTickUnit="0.1" max="1.0" min="0.0" name="Wobble" type="WOBBLE" value="0.2" />
+                   <EffectComponentGroup fx:id="smoothing" increment="0.005" label="smoothing" majorTickUnit="0.1" max="1.0" min="0.0" name="Smoothing" type="SMOOTH" value="0.125" />
+                   <EffectComponentGroup fx:id="verticalDistort" increment="0.005" label="verticalDistort" majorTickUnit="0.1" max="1.0" min="0.0" name="Vertical shift" type="VERTICAL_DISTORT" value="0.2" />
+                   <EffectComponentGroup fx:id="horizontalDistort" increment="0.005" label="horizontalDistort" majorTickUnit="0.1" max="1.0" min="0.0" name="Horizontal shift" type="HORIZONTAL_DISTORT" value="0.2" />
+                  <Label alignment="CENTER" prefWidth="601.0" text="Translation and Scale" textAlignment="JUSTIFY">
+                     <padding>
+                        <Insets bottom="5.0" />
+                     </padding>
+                  </Label>
+                  <Separator prefWidth="200.0">
+                     <opaqueInsets>
+                        <Insets />
+                     </opaqueInsets>
+                     <padding>
+                        <Insets bottom="5.0" />
+                     </padding>
+                  </Separator>
+                  <AnchorPane minHeight="70.0" prefHeight="60.0" prefWidth="602.0">
+                     <children>
+                        <CheckBox fx:id="translateEllipseCheckBox" layoutX="485.0" layoutY="17.0" mnemonicParsing="false" text="Ellipse" />
+                        <TextField fx:id="translationXTextField" layoutX="159.0" layoutY="13.0" prefHeight="26.0" prefWidth="70.0" text="0.0" />
+                        <Label layoutX="7.0" layoutY="18.0" text="Translation" />
+                        <Label layoutX="139.0" layoutY="17.0" text="x :" />
+                        <Label layoutX="248.0" layoutY="17.0" text="y :" />
+                        <TextField fx:id="translationYTextField" layoutX="267.0" layoutY="13.0" prefHeight="26.0" prefWidth="69.0" text="0.0" />
+                        <CheckBox fx:id="translateCheckBox" layoutX="192.0" layoutY="47.0" mnemonicParsing="false" text="Translate with Mouse (Esc to disable)" />
+                        <Button fx:id="resetTranslationButton" layoutX="357.0" layoutY="13.0" mnemonicParsing="false" text="Reset Translation" />
+                     </children>
+                  </AnchorPane>
+                   <EffectComponentGroup fx:id="translationScale" alwaysEnabled="true" increment="0.05" label="translationScale" majorTickUnit="1.0" max="10.0" min="0.0" name="Translation scale" type="TRANSLATE" value="1.0" />
+                   <EffectComponentGroup fx:id="translationSpeed" alwaysEnabled="true" increment="0.05" label="translationSpeed" majorTickUnit="1.0" max="10.0" min="0.0" name="Translation speed" type="TRANSLATE_SPEED" value="1.0" />
+                   <EffectComponentGroup fx:id="volume" alwaysEnabled="true" increment="0.05" label="volume" majorTickUnit="1.0" max="10.0" min="0.0" name="Volume scale" type="SCALE" value="3.0" />
+                   <EffectComponentGroup fx:id="backingMidi" alwaysEnabled="true" increment="0.005" label="visibility" majorTickUnit="0.1" max="1.0" min="0.0" name="MIDI volume" type="VISIBILITY" value="0.25" />
+                  <Label alignment="CENTER" prefWidth="601.0" text="Rotation" textAlignment="JUSTIFY">
+                     <padding>
+                        <Insets bottom="5.0" />
+                     </padding>
+                  </Label>
+                  <Separator prefWidth="200.0">
+                     <opaqueInsets>
+                        <Insets />
+                     </opaqueInsets>
+                     <padding>
+                        <Insets bottom="5.0" />
+                     </padding>
+                  </Separator>
+                   <EffectComponentGroup fx:id="rotateSpeed" increment="0.05" label="rotateSpeed" majorTickUnit="1.0" max="10.0" min="0.0" name="2D Rotate speed" type="ROTATE" value="0.0" />
+                  <EffectComponentGroup fx:id="depthScale" increment="0.005" label="depthScale" majorTickUnit="0.1" max="1.0" min="0.0" name="3D Depth" type="DEPTH_3D" value="0.1" />
+                  <EffectComponentGroup fx:id="rotateSpeed3D" alwaysEnabled="true" increment="0.005" label="rotateSpeed3D" majorTickUnit="0.2" max="1.0" min="-1.0" name="3D Rotate speed" type="ROTATE_SPEED_3D" value="0.0" />
+                  <EffectComponentGroup fx:id="rotateX" alwaysEnabled="true" increment="0.01" label="perspective" majorTickUnit="0.2" max="1.0" min="-1.0" name="Rotate x" type="ROTATE_X" value="1.0" />
+                  <EffectComponentGroup fx:id="rotateY" alwaysEnabled="true" increment="0.01" label="perspective" majorTickUnit="0.2" max="1.0" min="-1.0" name="Rotate y" type="ROTATE_Y" value="1.0" />
+                  <EffectComponentGroup fx:id="rotateZ" alwaysEnabled="true" increment="0.01" label="perspective" majorTickUnit="0.2" max="1.0" min="-1.0" name="Rotate z" type="ROTATE_Z" value="0.0" />
+                  <Label alignment="CENTER" prefWidth="601.0" text="Other" textAlignment="JUSTIFY">
+                     <padding>
+                        <Insets bottom="5.0" />
+                     </padding>
+                  </Label>
+                  <Separator prefWidth="200.0">
+                     <opaqueInsets>
+                        <Insets />
+                     </opaqueInsets>
+                     <padding>
+                        <Insets bottom="5.0" />
+                     </padding>
+                  </Separator>
+                   <EffectComponentGroup fx:id="traceMax" increment="0.005" label="traceMax" majorTickUnit="0.1" max="1.0" min="0.0" name="Trace max" type="TRACE_MAX" value="0.5" />
+                   <EffectComponentGroup fx:id="traceMin" increment="0.005" label="traceMin" majorTickUnit="0.1" max="1.0" min="0.0" name="Trace min" type="TRACE_MIN" value="0.5" />
                </children>
                <padding>
                   <Insets top="5.0" />

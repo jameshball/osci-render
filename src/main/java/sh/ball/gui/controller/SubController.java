@@ -20,7 +20,7 @@ public interface SubController {
 
   List<String> labels();
 
-  Node save(Document document);
+  List<? extends Node> save(Document document);
 
   void load(Element root);
 

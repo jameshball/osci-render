@@ -4,25 +4,21 @@ import sh.ball.engine.Vector3;
 import sh.ball.shapes.Vector2;
 
 // 3D rotation effect
-public class PerspectiveEffect extends PhaseEffect implements SettableEffect {
+public class PerspectiveEffect implements SettableEffect {
 
-  private double focalLength = 1.0;
   private double zPos = 1.0;
-
-  public PerspectiveEffect(int sampleRate, double speed) {
-    super(sampleRate, speed);
-  }
-
-  public PerspectiveEffect(int sampleRate) {
-    this(sampleRate, 1);
-  }
+  private Vector3 baseRotation = new Vector3(Math.PI, Math.PI, 0);
+  private Vector3 currentRotation = baseRotation;
+  private double rotateSpeed = 0.0;
 
   @Override
   public Vector2 apply(int count, Vector2 vector) {
-    Vector3 vertex = new Vector3(vector.x, vector.y, 0.0);
-    double theta = nextTheta();
-    vertex = vertex.rotate(new Vector3(0, theta, theta));
+    currentRotation = currentRotation.add(baseRotation.scale(rotateSpeed));
 
+    Vector3 vertex = new Vector3(vector.x, vector.y, 0.0);
+    vertex = vertex.rotate(baseRotation.add(currentRotation));
+
+    double focalLength = 1.0;
     return new Vector2(
       vertex.x * focalLength / (vertex.z - zPos),
       vertex.y * focalLength / (vertex.z - zPos)
@@ -31,6 +27,26 @@ public class PerspectiveEffect extends PhaseEffect implements SettableEffect {
 
   @Override
   public void setValue(double value) {
-    zPos = 1.0 + (value - 0.5) * 3;
+    zPos = 1.0 + (value - 0.1) * 3;
+  }
+
+  public void setRotateSpeed(double rotateSpeed) {
+    this.rotateSpeed = linearSpeedToActualSpeed(rotateSpeed);
+  }
+
+  private double linearSpeedToActualSpeed(double rotateSpeed) {
+    return (Math.exp(3 * Math.min(10, Math.abs(rotateSpeed))) - 1) / 50000;
+  }
+
+  public void setRotationX(double rotateX) {
+    this.baseRotation = new Vector3(rotateX * Math.PI, baseRotation.y, baseRotation.z);
+  }
+
+  public void setRotationY(double rotateY) {
+    this.baseRotation = new Vector3(baseRotation.x, rotateY * Math.PI, baseRotation.z);
+  }
+
+  public void setRotationZ(double rotateZ) {
+    this.baseRotation = new Vector3(baseRotation.x, baseRotation.y, rotateZ * Math.PI);
   }
 }

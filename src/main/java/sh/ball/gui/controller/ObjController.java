@@ -176,8 +176,8 @@ public class ObjController implements Initializable, SubController {
   }
 
   @Override
-  public Element save(Document document) {
-    return document.createElement("null");
+  public List<Element> save(Document document) {
+    return List.of(document.createElement("null"));
   }
 
   @Override

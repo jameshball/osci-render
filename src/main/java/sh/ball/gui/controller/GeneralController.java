@@ -303,12 +303,12 @@ public class GeneralController implements Initializable, SubController {
   }
 
   @Override
-  public Element save(Document document) {
+  public List<Element> save(Document document) {
     Element element = document.createElement("general");
     Element frameRate = document.createElement("frameRate");
     frameRate.appendChild(document.createTextNode(Integer.toString(this.frameRate)));
     element.appendChild(frameRate);
-    return element;
+    return List.of(element);
   }
 
   @Override
