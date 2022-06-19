@@ -162,10 +162,6 @@ public class EffectComponentGroupController implements Initializable, SubControl
     return Map.of(comboBox, animator);
   }
 
-  public Map<EffectType, Slider> getEffectSliderMap() {
-    return Map.of(type, slider);
-  }
-
   public void setEffectUpdater(ThreeParamRunnable<EffectType, Boolean, SettableEffect> updater) {
     slider.valueProperty().addListener((e, old, value) -> animator.setValue(value.doubleValue()));
     effectCheckBox.selectedProperty().addListener(e -> {
