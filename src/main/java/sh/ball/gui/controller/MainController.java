@@ -16,7 +16,6 @@ import org.w3c.dom.NodeList;
 import sh.ball.audio.*;
 
 import java.io.*;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.*;
@@ -43,6 +42,7 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
+import sh.ball.audio.effect.EffectType;
 import sh.ball.audio.engine.*;
 import sh.ball.audio.midi.MidiListener;
 import sh.ball.audio.midi.MidiNote;
@@ -503,6 +503,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
     objController.updateObjectRotateSpeed();
 
+    imageController.setTranslateEffect(effectsController.getTranslateEffect());
+
     switchAudioDevice(defaultDevice, false);
     executor.submit(producer);
     Gui.midiCommunicator.addListener(this);
@@ -607,7 +609,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     audioPlayer.setDevice(device);
     audioPlayer.setBrightness(brightnessSlider.getValue());
     effectsController.setAudioDevice(device);
-    imageController.setAudioDevice(device);
     sampleRate = device.sampleRate();
     // brightness is configurable for many-output audio interfaces
     if (device.channels() > 2) {

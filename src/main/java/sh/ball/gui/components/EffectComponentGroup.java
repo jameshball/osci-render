@@ -1,12 +1,10 @@
 package sh.ball.gui.components;
 
 import javafx.fxml.FXMLLoader;
-import javafx.scene.control.CheckBox;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.Slider;
-import javafx.scene.control.SpinnerValueFactory;
+import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
 import javafx.scene.shape.SVGPath;
+import javafx.scene.text.TextAlignment;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import sh.ball.audio.effect.AnimationType;
@@ -24,6 +22,7 @@ import java.util.Map;
 public class EffectComponentGroup extends HBox {
 
   public final EffectComponentGroupController controller;
+  private boolean alwaysEnabled = false;
 
   public EffectComponentGroup() {
     EffectComponentGroupController temp;
@@ -50,7 +49,10 @@ public class EffectComponentGroup extends HBox {
 
   public void removeCheckBox() {
     controller.effectCheckBox.setSelected(true);
-    controller.effectCheckBox.setVisible(false);
+    Label label = new Label(getName());
+    label.setTextAlignment(TextAlignment.LEFT);
+    label.setPrefWidth(128);
+    getChildren().set(0, label);
   }
 
   public void setType(EffectType type) {
@@ -122,5 +124,13 @@ public class EffectComponentGroup extends HBox {
 
   public double getMajorTickUnit() {
     return controller.getMajorTickUnit();
+  }
+
+  public void setAlwaysEnabled(boolean alwaysEnabled) {
+    this.alwaysEnabled = alwaysEnabled;
+  }
+
+  public boolean getAlwaysEnabled() {
+    return alwaysEnabled;
   }
 }

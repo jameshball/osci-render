@@ -149,7 +149,7 @@
     -fx-font-size: 20;
 }
 
-#control-pane, .titled-pane {
+#control-pane, .titled-pane, .pane {
     -fx-background-color: darker_color;
     -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.8), 10, 0, 0, 0);
 }

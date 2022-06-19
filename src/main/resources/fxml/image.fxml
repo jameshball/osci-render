@@ -10,75 +10,34 @@
 <?import javafx.scene.shape.SVGPath?>
 <?import javafx.scene.text.Font?>
 
-<AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="307.0" prefWidth="519.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.ImageController">
+<AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="114.0" prefWidth="610.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.ImageController">
     <children>
-      <CheckBox fx:id="translateEllipseCheckBox" layoutX="324.0" layoutY="9.0" mnemonicParsing="false" text="Ellipse" />
-        <Slider fx:id="rotateSpeedSlider" blockIncrement="0.05" layoutX="106.0" layoutY="189.0" majorTickUnit="1.0" max="10.0" prefHeight="42.0" prefWidth="254.0" showTickLabels="true" showTickMarks="true" />
-        <Label layoutX="7.0" layoutY="188.0" text="2D Rotate speed">
+      <CheckBox fx:id="translateEllipseCheckBox" layoutX="360.0" layoutY="9.0" mnemonicParsing="false" text="Ellipse" />
+        <Label layoutX="42.0" layoutY="66.0" text="Target frequency">
             <font>
                 <Font size="13.0" />
             </font>
         </Label>
-        <Slider fx:id="translationSpeedSlider" blockIncrement="0.05" layoutX="106.0" layoutY="113.0" majorTickUnit="1.0" max="10.0" prefHeight="42.0" prefWidth="254.0" showTickLabels="true" showTickMarks="true" value="1.0" />
-        <Label layoutX="2.0" layoutY="112.0" text="Translation speed">
-            <font>
-                <Font size="13.0" />
-            </font>
-        </Label>
-        <Slider fx:id="volumeSlider" blockIncrement="0.05" layoutX="106.0" layoutY="227.0" majorTickUnit="1.0" max="10.0" prefHeight="42.0" prefWidth="253.0" showTickLabels="true" showTickMarks="true" value="3.0" />
-        <Label layoutX="28.0" layoutY="226.0" text="Volume scale">
-            <font>
-                <Font size="13.0" />
-            </font>
-        </Label>
-        <Label layoutX="6.0" layoutY="150.0" text="Target frequency">
-            <font>
-                <Font size="13.0" />
-            </font>
-        </Label>
-        <TextField fx:id="translationXTextField" layoutX="138.0" layoutY="5.0" prefHeight="26.0" prefWidth="70.0" text="0.0" />
-        <Label layoutX="47.0" layoutY="8.0" text="Translation" />
-        <Label layoutX="120.0" layoutY="8.0" text="x :" />
-        <Label layoutX="222.0" layoutY="8.0" text="y :" />
-        <TextField fx:id="translationYTextField" layoutX="241.0" layoutY="5.0" prefHeight="26.0" prefWidth="69.0" text="0.0" />
-        <Slider fx:id="frequencySlider" blockIncrement="0.001" layoutX="106.0" layoutY="145.0" majorTickUnit="0.07389" max="1.0" minorTickCount="2" prefHeight="42.0" prefWidth="253.0" showTickMarks="true" value="0.59269" />
-        <SVGPath fx:id="frequencyMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="361.0" layoutY="149.0" pickOnBounds="true" />
-        <SVGPath fx:id="rotateSpeedMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="361.0" layoutY="186.0" pickOnBounds="true" />
-        <SVGPath fx:id="translationSpeedMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="361.0" layoutY="110.0" pickOnBounds="true" />
-        <SVGPath fx:id="volumeMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="361.0" layoutY="224.0" pickOnBounds="true" />
-        <Label layoutX="247.0" layoutY="171.0" text="C4" />
-        <Label layoutX="229.0" layoutY="171.0" text="C3" />
-        <Label layoutX="212.0" layoutY="171.0" text="C2" />
-        <Label layoutX="183.0" layoutY="171.0" text="20" />
-        <Label layoutX="264.0" layoutY="171.0" text="C5" />
-        <Label layoutX="282.0" layoutY="171.0" text="C6" />
-        <Label layoutX="300.0" layoutY="171.0" text="C7" />
-        <Label layoutX="335.0" layoutY="171.0" text="12000" />
-        <Label layoutX="152.0" layoutY="171.0" text="5" />
-        <Label layoutX="112.0" layoutY="171.0" text="0" />
-        <Label layoutX="29.0" layoutY="265.0" text="MIDI volume">
-            <font>
-                <Font size="13.0" />
-            </font>
-        </Label>
-        <Slider fx:id="backingMidiSlider" blockIncrement="0.005" layoutX="106.0" layoutY="266.0" majorTickUnit="0.1" max="1.0" prefHeight="42.0" prefWidth="253.0" showTickLabels="true" showTickMarks="true" value="0.25" />
-        <SVGPath fx:id="backingMidiMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="361.0" layoutY="263.0" pickOnBounds="true" />
-      <CheckBox fx:id="translateCheckBox" layoutX="137.0" layoutY="43.0" mnemonicParsing="false" text="Translate with Mouse (Esc to disable)" />
-      <Slider fx:id="translationScaleSlider" blockIncrement="0.05" layoutX="105.0" layoutY="73.0" majorTickUnit="1.0" max="10.0" prefHeight="42.0" prefWidth="254.0" showTickLabels="true" showTickMarks="true" value="1.0" />
-      <Label layoutX="7.0" layoutY="72.0" text="Translation Scale">
-         <font>
-            <Font size="13.0" />
-         </font>
-      </Label>
-      <SVGPath fx:id="translationScaleMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="360.0" layoutY="70.0" pickOnBounds="true" />
-      <CheckBox fx:id="translationScaleMic" layoutX="389.0" layoutY="73.0" mnemonicParsing="false" text="Mic" />
-      <CheckBox fx:id="frequencyMic" layoutX="389.0" layoutY="152.0" mnemonicParsing="false" text="Mic" />
-      <CheckBox fx:id="rotateSpeedMic" layoutX="389.0" layoutY="189.0" mnemonicParsing="false" text="Mic" />
-      <CheckBox fx:id="translationSpeedMic" layoutX="389.0" layoutY="113.0" mnemonicParsing="false" text="Mic" />
-      <CheckBox fx:id="volumeMic" layoutX="389.0" layoutY="227.0" mnemonicParsing="false" text="Mic" />
-      <CheckBox fx:id="backingMidiCheckBox" layoutX="389.0" layoutY="266.0" mnemonicParsing="false" text="Mic" />
-      <Button fx:id="resetRotationButton" layoutX="455.0" layoutY="185.0" mnemonicParsing="false" text="Reset" />
-      <Button fx:id="resetTranslationButton" layoutX="396.0" layoutY="4.0" mnemonicParsing="false" text="Reset Translation" />
-      <Spinner fx:id="frequencySpinner" editable="true" layoutX="440.0" layoutY="149.0" prefHeight="26.0" prefWidth="80.0" />
+        <TextField fx:id="translationXTextField" layoutX="174.0" layoutY="5.0" prefHeight="26.0" prefWidth="70.0" text="0.0" />
+        <Label layoutX="83.0" layoutY="8.0" text="Translation" />
+        <Label layoutX="156.0" layoutY="8.0" text="x :" />
+        <Label layoutX="258.0" layoutY="8.0" text="y :" />
+        <TextField fx:id="translationYTextField" layoutX="277.0" layoutY="5.0" prefHeight="26.0" prefWidth="69.0" text="0.0" />
+        <Slider fx:id="frequencySlider" blockIncrement="0.001" layoutX="142.0" layoutY="61.0" majorTickUnit="0.07389" max="1.0" minorTickCount="2" prefHeight="42.0" prefWidth="253.0" showTickMarks="true" value="0.59269" />
+        <SVGPath fx:id="frequencyMidi" content="M20.15 8.26H22V15.74H20.15M13 8.26H18.43C19 8.26 19.3 8.74 19.3 9.3V14.81C19.3 15.5 19 15.74 18.38 15.74H13V11H14.87V13.91H17.5V9.95H13M10.32 8.26H12.14V15.74H10.32M2 8.26H8.55C9.1 8.26 9.41 8.74 9.41 9.3V15.74H7.59V10.15H6.5V15.74H4.87V10.15H3.83V15.74H2Z" fill="WHITE" layoutX="397.0" layoutY="65.0" pickOnBounds="true" />
+        <Label layoutX="283.0" layoutY="87.0" text="C4" />
+        <Label layoutX="265.0" layoutY="87.0" text="C3" />
+        <Label layoutX="248.0" layoutY="87.0" text="C2" />
+        <Label layoutX="219.0" layoutY="87.0" text="20" />
+        <Label layoutX="300.0" layoutY="87.0" text="C5" />
+        <Label layoutX="318.0" layoutY="87.0" text="C6" />
+        <Label layoutX="336.0" layoutY="87.0" text="C7" />
+        <Label layoutX="371.0" layoutY="87.0" text="12000" />
+        <Label layoutX="188.0" layoutY="87.0" text="5" />
+        <Label layoutX="148.0" layoutY="87.0" text="0" />
+      <CheckBox fx:id="translateCheckBox" layoutX="173.0" layoutY="38.0" mnemonicParsing="false" text="Translate with Mouse (Esc to disable)" />
+      <CheckBox fx:id="frequencyMic" layoutX="425.0" layoutY="68.0" mnemonicParsing="false" text="Mic" />
+      <Button fx:id="resetTranslationButton" layoutX="432.0" layoutY="4.0" mnemonicParsing="false" text="Reset Translation" />
+      <Spinner fx:id="frequencySpinner" editable="true" layoutX="476.0" layoutY="65.0" prefHeight="26.0" prefWidth="80.0" />
     </children>
 </AnchorPane>

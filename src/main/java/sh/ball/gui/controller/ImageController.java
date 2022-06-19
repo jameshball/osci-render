@@ -28,13 +28,9 @@ import static sh.ball.math.Math.tryParse;
 public class ImageController implements Initializable, SubController {
 
   private static final double MAX_FREQUENCY = 12000;
-  private static final int DEFAULT_SAMPLE_RATE = 192000;
-
-  private final RotateEffect rotateEffect;
-  private final TranslateEffect translateEffect;
-
   private final DoubleProperty frequency;
 
+  private TranslateEffect translateEffect;
   private double scrollDelta = 0.05;
 
   @FXML
@@ -46,12 +42,6 @@ public class ImageController implements Initializable, SubController {
   @FXML
   private CheckBox translateCheckBox;
   @FXML
-  private CheckBox translationScaleMic;
-  @FXML
-  private Slider translationScaleSlider;
-  @FXML
-  private SVGPath translationScaleMidi;
-  @FXML
   private Slider frequencySlider;
   @FXML
   private Spinner<Double> frequencySpinner;
@@ -60,44 +50,14 @@ public class ImageController implements Initializable, SubController {
   @FXML
   private CheckBox frequencyMic;
   @FXML
-  private Slider rotateSpeedSlider;
-  @FXML
-  private SVGPath rotateSpeedMidi;
-  @FXML
-  private CheckBox rotateSpeedMic;
-  @FXML
-  private Slider translationSpeedSlider;
-  @FXML
-  private SVGPath translationSpeedMidi;
-  @FXML
-  private CheckBox translationSpeedMic;
-  @FXML
-  private Slider volumeSlider;
-  @FXML
-  private SVGPath volumeMidi;
-  @FXML
-  private CheckBox volumeMic;
-  @FXML
-  private Slider backingMidiSlider;
-  @FXML
-  private SVGPath backingMidiMidi;
-  @FXML
-  private CheckBox backingMidiCheckBox;
-  @FXML
-  private Button resetRotationButton;
-  @FXML
   private Button resetTranslationButton;
 
   public ImageController() {
     this.frequency = new SimpleDoubleProperty(0);
-    this.rotateEffect = new RotateEffect(DEFAULT_SAMPLE_RATE);
-    this.translateEffect = new TranslateEffect(DEFAULT_SAMPLE_RATE, 1, new Vector2());
   }
 
-  public void setAudioDevice(AudioDevice device) {
-    int sampleRate = device.sampleRate();
-    rotateEffect.setSampleRate(sampleRate);
-    translateEffect.setSampleRate(sampleRate);
+  public void setTranslateEffect(TranslateEffect effect) {
+    this.translateEffect = effect;
   }
 
   public void setTranslation(Vector2 translation) {
@@ -133,21 +93,6 @@ public class ImageController implements Initializable, SubController {
 
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
-    audioPlayer.addEffect(EffectType.ROTATE, rotateEffect);
-    audioPlayer.addEffect(EffectType.TRANSLATE, translateEffect);
-
-    Map<Slider, Consumer<Double>> sliderMap = Map.of(
-      rotateSpeedSlider, rotateEffect::setSpeed,
-      translationSpeedSlider, translateEffect::setSpeed,
-      backingMidiSlider, audioPlayer::setBackingMidiVolume
-    );
-    sliderMap.keySet().forEach(slider ->
-      slider.valueProperty().addListener((source, oldValue, newValue) ->
-        sliderMap.get(slider).accept(newValue.doubleValue())
-      )
-    );
-
-    resetRotationButton.setOnAction(e -> rotateEffect.resetTheta());
     resetTranslationButton.setOnAction(e -> {
       translationXTextField.setText("0.00");
       translationYTextField.setText("0.00");
@@ -159,8 +104,6 @@ public class ImageController implements Initializable, SubController {
     translationYTextField.setOnScroll((e) -> changeTranslation(e.getDeltaY() > 0, translationYTextField));
 
     translateEllipseCheckBox.selectedProperty().addListener((e, old, ellipse) -> translateEffect.setEllipse(ellipse));
-
-    translationScaleSlider.valueProperty().addListener((e, old, scale) -> translateEffect.setScale(scale.doubleValue()));
 
     frequencySpinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(0, MAX_FREQUENCY, MidiNote.MIDDLE_C, 1));
     frequencySpinner.valueProperty().addListener((o, old, f) -> frequency.set(f));
@@ -178,40 +121,28 @@ public class ImageController implements Initializable, SubController {
       }
     });
     frequencySlider.setOnMouseDragged(e -> slidersUpdated());
-
-    volumeSlider.valueProperty().addListener((e, old, value) ->
-      audioPlayer.setVolume(value.doubleValue() / 3.0)
-    );
   }
 
   @Override
   public Map<SVGPath, Slider> getMidiButtonMap() {
     return Map.of(
-      frequencyMidi, frequencySlider,
-      rotateSpeedMidi, rotateSpeedSlider,
-      translationSpeedMidi, translationSpeedSlider,
-      volumeMidi, volumeSlider,
-      backingMidiMidi, backingMidiSlider,
-      translationScaleMidi, translationScaleSlider
+      frequencyMidi, frequencySlider
     );
   }
 
   @Override
   public List<CheckBox> micCheckBoxes() {
-    return List.of(frequencyMic, rotateSpeedMic, translationSpeedMic, volumeMic,
-      backingMidiCheckBox, translationScaleMic);
+    return List.of(frequencyMic);
   }
 
   @Override
   public List<Slider> sliders() {
-    return List.of(frequencySlider, rotateSpeedSlider, translationSpeedSlider,
-      volumeSlider, backingMidiSlider, translationScaleSlider);
+    return List.of(frequencySlider);
   }
 
   @Override
   public List<String> labels() {
-    return List.of("frequency", "rotateSpeed", "translationSpeed", "volume",
-      "visibility", "translationScale");
+    return List.of("frequency");
   }
 
   @Override
