@@ -39,8 +39,8 @@ public class EffectComponentGroup extends HBox {
     controller.effectCheckBox.setSelected(true);
     Label label = new Label(getName());
     label.setTextAlignment(TextAlignment.LEFT);
-    label.setPrefWidth(128);
-    getChildren().set(0, label);
+    label.setPrefWidth(controller.effectCheckBox.getPrefWidth());
+    getChildren().set(1, label);
   }
 
   public void setType(EffectType type) {
