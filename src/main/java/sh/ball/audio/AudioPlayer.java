@@ -1,6 +1,7 @@
 package sh.ball.audio;
 
 import sh.ball.audio.effect.Effect;
+import sh.ball.audio.effect.EffectType;
 import sh.ball.audio.engine.AudioDevice;
 import sh.ball.audio.midi.MidiListener;
 
@@ -25,9 +26,9 @@ public interface AudioPlayer<S> extends Runnable, MidiListener {
 
   void addFrame(S frame);
 
-  void addEffect(Object identifier, Effect effect);
+  void addEffect(EffectType type, Effect effect);
 
-  void removeEffect(Object identifier);
+  void removeEffect(EffectType type);
 
   void read(byte[] buffer) throws InterruptedException;
 

@@ -3,21 +3,10 @@ package sh.ball.gui.components;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
-import javafx.scene.shape.SVGPath;
 import javafx.scene.text.TextAlignment;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import sh.ball.audio.effect.AnimationType;
-import sh.ball.audio.effect.EffectAnimator;
 import sh.ball.audio.effect.EffectType;
-import sh.ball.audio.effect.SettableEffect;
-import sh.ball.gui.FourParamRunnable;
-import sh.ball.gui.ThreeParamRunnable;
-import sh.ball.gui.controller.SubController;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Map;
 
 public class EffectComponentGroup extends HBox {
 

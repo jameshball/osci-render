@@ -2,16 +2,13 @@ package sh.ball.audio;
 
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
-import sh.ball.audio.effect.Effect;
+import sh.ball.audio.effect.*;
 
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import sh.ball.audio.effect.PhaseEffect;
-import sh.ball.audio.effect.SineEffect;
-import sh.ball.audio.effect.SmoothEffect;
 import sh.ball.audio.engine.AudioDevice;
 import sh.ball.audio.engine.AudioEngine;
 import sh.ball.audio.engine.AudioSample;
@@ -54,7 +51,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private final Callable<AudioEngine> audioEngineBuilder;
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
   private FrameSource<Vector2> sampleSource;
-  private final Map<Object, Effect> effects = new ConcurrentHashMap<>();
+  private final List<EffectTypePair> effects = new CopyOnWriteArrayList<>();
   private final Queue<Listener> listeners = new ConcurrentLinkedQueue<>();
 
   private AudioEngine audioEngine;
@@ -292,18 +289,10 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
         }
       }
     }
-    // Smooth effects MUST be applied last, consistently
-    SmoothEffect smoothEffect = null;
-    for (Effect effect : effects.values()) {
-      if (effect instanceof SmoothEffect) {
-        smoothEffect = (SmoothEffect) effect;
-      } else {
-        vector = effect.apply(frame, vector);
-      }
-    }
 
-    if (smoothEffect != null) {
-      vector = smoothEffect.apply(frame, vector);
+    for (EffectTypePair pair : effects) {
+      Effect effect = pair.effect();
+      vector = effect.apply(frame, vector);
     }
 
     return vector.scale(volume);
@@ -421,13 +410,14 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   @Override
-  public void addEffect(Object identifier, Effect effect) {
-    effects.put(identifier, effect);
+  public void addEffect(EffectType type, Effect effect) {
+    effects.add(new EffectTypePair(type, effect));
+    Collections.sort(effects);
   }
 
   @Override
-  public void removeEffect(Object identifier) {
-    effects.remove(identifier);
+  public void removeEffect(EffectType type) {
+    effects.removeIf(e -> e.type == type);
   }
 
   @Override
@@ -458,7 +448,8 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
         sineEffects[channel][key] = new SineEffect(sampleRate, note.frequency());
       }
     }
-    for (Effect effect : effects.values()) {
+    for (EffectTypePair pair : effects) {
+      Effect effect = pair.effect();
       if (effect instanceof PhaseEffect phase) {
         phase.setSampleRate(sampleRate);
       }
@@ -626,6 +617,14 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
       if (offset < buffer.length) {
         buffer[offset++] = b;
       }
+    }
+  }
+
+  private record EffectTypePair(EffectType type, Effect effect) implements Comparable<EffectTypePair> {
+
+    @Override
+    public int compareTo(EffectTypePair pair) {
+      return Integer.compare(type.precedence, pair.type.precedence);
     }
   }
 }
