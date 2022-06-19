@@ -1,3 +1,25 @@
+- 1.26.0
+  - Reorganise the interface so that more sliders are considered audio effects
+    - This means you can animate things like volume, rotation, and translation!
+  - Add a precedence to audio effects so that they are consistently applied in the same order
+    - Lower precedence means the effect will be applied earlier
+    - Precedence of current effects from lowest to highest:
+      - Vector cancelling
+      - Bit crush
+      - Vertical distort
+      - Horizontal distort
+      - Wobble
+      - Rotate 2D
+      - Translation
+      - Depth 3D
+      - Smoothing
+    - This means that smoothing is always applied last
+  - Add 3D audio effects
+    - This treats the image being displayed as a 3D object and rotates it
+    - This means you can now rotate 2D images, like SVGs and text files
+    - COMING SOON: A way to control the depth or Z-coordinate of the image using a depth-map/displacement-map image
+
+
 - 1.25.2
   - Bug fix: Fix FileSystemNotFoundException on start-up due to faulty loading of code editor file
 
