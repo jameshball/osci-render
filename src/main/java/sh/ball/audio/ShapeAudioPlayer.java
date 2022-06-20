@@ -8,6 +8,7 @@ import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
 
 import sh.ball.audio.engine.AudioDevice;
 import sh.ball.audio.engine.AudioEngine;
@@ -20,6 +21,8 @@ import sh.ball.shapes.Vector2;
 import javax.sound.midi.ShortMessage;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
+
+import static sh.ball.gui.Gui.logger;
 
 public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
@@ -349,11 +352,16 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
         updateLengthIncrement();
       }
     } catch (InterruptedException e) {
-      throw new RuntimeException("Initial frame not found. Cannot continue.");
+      logger.log(Level.SEVERE, e.getMessage(), e);
+      RuntimeException exception = new RuntimeException("Initial frame not found. Cannot continue.");
+      logger.log(Level.SEVERE, exception.getMessage(), exception);
+      throw exception;
     }
 
     if (device == null) {
-      throw new IllegalArgumentException("No AudioDevice provided");
+      IllegalArgumentException e = new IllegalArgumentException("No AudioDevice provided");
+      logger.log(Level.SEVERE, e.getMessage(), e);
+      throw e;
     }
 
     try {
@@ -404,8 +412,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     try {
       frameQueue.put(frame);
     } catch (InterruptedException e) {
-      e.printStackTrace();
-      System.err.println("Frame missed.");
+      logger.log(Level.SEVERE, "Frame missed", e);
     }
   }
 

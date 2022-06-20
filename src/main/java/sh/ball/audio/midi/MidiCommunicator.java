@@ -4,6 +4,9 @@ import javax.sound.midi.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+
+import static sh.ball.gui.Gui.logger;
 
 public class MidiCommunicator implements Runnable {
 
@@ -28,8 +31,7 @@ public class MidiCommunicator implements Runnable {
         device.open();
         devices.add(device);
 
-      } catch (MidiUnavailableException ignored) {
-      }
+      } catch (MidiUnavailableException ignored) {}
     }
   }
 

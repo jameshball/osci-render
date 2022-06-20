@@ -1,5 +1,6 @@
 package sh.ball.gui;
 
+import com.sun.javafx.PlatformUtil;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
@@ -22,12 +23,19 @@ import sh.ball.parser.svg.SvgParser;
 import sh.ball.parser.txt.TextParser;
 import sh.ball.shapes.Vector2;
 
+import java.io.File;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Objects;
+import java.util.logging.*;
 
 public class Gui extends Application {
 
   // These need to be global so that we can guarantee they can be accessed by Controllers
   public static final MidiCommunicator midiCommunicator = new MidiCommunicator();
+  public static String LOG_DIR = "./logs/";
+  public static final Logger logger = Logger.getLogger(Gui.class.getName());
+
   public static ShapeAudioPlayer audioPlayer;
   public static AudioDevice defaultDevice;
   public static CodeEditor editor;
@@ -38,8 +46,28 @@ public class Gui extends Application {
     try {
       audioPlayer = new ShapeAudioPlayer(ConglomerateAudioEngine::new, midiCommunicator);
       defaultDevice = audioPlayer.getDefaultDevice();
+
+      if (PlatformUtil.isWindows()) {
+        LOG_DIR = System.getenv("AppData");
+      } else if (PlatformUtil.isUnix() || PlatformUtil.isMac()) {
+        LOG_DIR = System.getProperty("user.home");
+      } else {
+        throw new RuntimeException("OS not recognised");
+      }
+
+      LOG_DIR += "/osci-render/logs/";
+
+      File directory = new File(LOG_DIR);
+      if (!directory.exists()){
+        directory.mkdirs();
+      }
+      Handler fileHandler = new FileHandler(LOG_DIR + new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date()) + ".log");
+      fileHandler.setLevel(Level.WARNING);
+      fileHandler.setFormatter(new SimpleFormatter());
+
+      logger.addHandler(fileHandler);
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.log(Level.SEVERE, e.getMessage(), e);
     }
     new Thread(midiCommunicator).start();
   }
@@ -141,6 +169,10 @@ public class Gui extends Application {
   }
 
   public static void main(String[] args) {
-    launch(args);
+    try {
+      launch(args);
+    } catch (Exception e) {
+      logger.log(Level.SEVERE, e.getMessage(), e);
+    }
   }
 }

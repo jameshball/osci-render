@@ -5,6 +5,7 @@ import com.mokiat.data.front.parser.*;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -13,6 +14,8 @@ import org.jgrapht.alg.connectivity.ConnectivityInspector;
 import org.jgrapht.alg.cycle.ChinesePostman;
 import org.jgrapht.alg.shortestpath.DijkstraShortestPath;
 import org.jgrapht.graph.*;
+
+import static sh.ball.gui.Gui.logger;
 
 public class WorldObject {
 
@@ -231,6 +234,7 @@ public class WorldObject {
       IOBJParser parser = new OBJParser();
       model = parser.parse(input);
     } catch (IOException e) {
+      logger.log(Level.WARNING, e.getMessage(), e);
       return Set.of();
     }
 

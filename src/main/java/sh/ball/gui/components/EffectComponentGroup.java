@@ -7,6 +7,9 @@ import javafx.scene.text.TextAlignment;
 import sh.ball.audio.effect.EffectType;
 
 import java.io.IOException;
+import java.util.logging.Level;
+
+import static sh.ball.gui.Gui.logger;
 
 public class EffectComponentGroup extends HBox {
 
@@ -20,8 +23,8 @@ public class EffectComponentGroup extends HBox {
     try {
       loader.load();
       temp = loader.getController();
-    } catch (IOException ex) {
-      ex.printStackTrace();
+    } catch (IOException e) {
+      logger.log(Level.SEVERE, e.getMessage(), e);
       temp = null;
     }
     controller = temp;

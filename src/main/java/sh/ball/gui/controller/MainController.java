@@ -22,6 +22,7 @@ import java.text.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.UnaryOperator;
+import java.util.logging.Level;
 
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -310,7 +311,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       generalController.setRecordResult("Saved to " + file.getAbsolutePath());
     } catch (IOException e) {
       generalController.setRecordResult("Error saving file");
-      e.printStackTrace();
+      logger.log(Level.SEVERE, e.getMessage(), e);
     }
   }
 
@@ -548,7 +549,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         audioPlayer.read(buffer);
         server.send(buffer);
       } catch (InterruptedException e) {
-        e.printStackTrace();
+        logger.log(Level.WARNING, e.getMessage(), e);
       }
     }
   }
@@ -601,7 +602,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       try {
         audioPlayer.reset();
       } catch (Exception e) {
-        e.printStackTrace();
+        logger.log(Level.SEVERE, e.getMessage(), e);
       }
     }
     audioPlayer.setDevice(device);
@@ -643,7 +644,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       try {
         parser.get().disable();
       } catch (Exception e) {
-        e.printStackTrace();
+        logger.log(Level.SEVERE, e.getMessage(), e);
       }
     });
   }
@@ -671,7 +672,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         samples = sampleParser.get();
       }
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.log(Level.SEVERE, e.getMessage(), e);
     }
     if (frames != null) {
       frames.enable();
@@ -798,7 +799,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       unsavedFileNames.add(name);
       setUnsavedFileWarning();
     } catch (Exception e) {
-      System.out.println(e.getMessage());
+      logger.log(Level.SEVERE, e.getMessage(), e);
     }
 
     if (index == currentFrameSource) {
@@ -835,6 +836,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       try {
         createFile(names.get(i), files.get(i), newSampleParsers, newFrameSources, newFrameSourcePaths, newOpenFiles);
       } catch (Exception e) {
+        logger.log(Level.WARNING, e.getMessage(), e);
         Platform.runLater(() -> {
           generalController.setFrameSourceName(e.getMessage());
           generalController.updateFrameLabels();
@@ -1189,7 +1191,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       openProjectPath = projectFileName;
       updateTitle(null, projectFileName);
     } catch (ParserConfigurationException | TransformerException e) {
-      e.printStackTrace();
+      logger.log(Level.SEVERE, e.getMessage(), e);
     }
   }
 
@@ -1314,7 +1316,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       openProjectPath = projectFileName;
       updateTitle(null, projectFileName);
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.log(Level.SEVERE, e.getMessage(), e);
     }
   }
 

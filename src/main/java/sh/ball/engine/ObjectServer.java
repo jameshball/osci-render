@@ -8,6 +8,9 @@ import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.*;
+import java.util.logging.Level;
+
+import static sh.ball.gui.Gui.logger;
 
 public class ObjectServer implements Runnable {
 
@@ -77,15 +80,12 @@ public class ObjectServer implements Runnable {
           List<Vector3[][]> vertices = orderedVertices.stream().map(Map.Entry::getKey).toList();
           List<float[]> matrices = orderedVertices.stream().map(Map.Entry::getValue).toList();
 
-//          List<Vector3[][]> vertices = Arrays.stream(info.objects).map(obj -> obj.vertices).toList();
-//          List<float[]> matrices = Arrays.stream(info.objects).map(obj -> obj.matrix).toList();
-
           objectSet.setObjects(vertices, matrices, info.focalLength);
         }
         disableRendering.run();
       }
     } catch (IOException e) {
-      e.printStackTrace();
+      logger.log(Level.SEVERE, e.getMessage(), e);
     }
   }
 

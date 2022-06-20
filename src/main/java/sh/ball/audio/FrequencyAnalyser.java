@@ -4,6 +4,9 @@ import sh.ball.math.fft.FFT;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+
+import static sh.ball.gui.Gui.logger;
 
 public class FrequencyAnalyser<S> implements Runnable {
 
@@ -46,7 +49,7 @@ public class FrequencyAnalyser<S> implements Runnable {
       try {
         audioPlayer.read(buf);
       } catch (InterruptedException e) {
-        e.printStackTrace();
+        logger.log(Level.SEVERE, e.getMessage(), e);
       }
       double[] leftSamples = decode(buf, true);
       double[] rightSamples = decode(buf, false);

@@ -10,6 +10,9 @@ import sh.ball.shapes.Vector2;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.logging.Level;
+
+import static sh.ball.gui.Gui.logger;
 
 public class CameraDrawKernel extends Kernel {
 
@@ -170,12 +173,12 @@ public class CameraDrawKernel extends Kernel {
       try {
         maxGroupSize = getKernelMaxWorkGroupSize(getTargetDevice());
       } catch (QueryFailedException e) {
-        e.printStackTrace();
+        logger.log(Level.WARNING, e.getMessage(), e);
       }
 
       execute(Range.create(roundUp(vertices.length / 3, maxGroupSize), maxGroupSize));
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.log(Level.WARNING, e.getMessage(), e);
       failedGpu = true;
     }
 

@@ -7,7 +7,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.logging.Level;
 import java.util.stream.Stream;
+
+import static sh.ball.gui.Gui.logger;
 
 public class JavaAudioEngine implements AudioEngine {
 
@@ -79,7 +82,7 @@ public class JavaAudioEngine implements AudioEngine {
             buffer[i * channels.length * 2 + j * 2 + 1] = (byte) (channels[j] >> 8);
           }
         } catch (Exception e) {
-          e.printStackTrace();
+          logger.log(Level.SEVERE, e.getMessage(), e);
         }
       }
 
@@ -104,7 +107,9 @@ public class JavaAudioEngine implements AudioEngine {
           AudioFormat format = new AudioFormat((float) rate, BIT_DEPTH, channels, SIGNED_SAMPLE, BIG_ENDIAN);
           this.source = AudioSystem.getSourceDataLine(format);
           devices.add(new SimpleAudioDevice("default-" + rate, "default", rate, AudioSample.INT16, channels));
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+          logger.log(Level.INFO, e.getMessage(), e);
+        }
       })
     );
 

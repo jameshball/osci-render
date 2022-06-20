@@ -7,6 +7,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
+import java.util.logging.Level;
+
+import static sh.ball.gui.Gui.logger;
 
 // combines all types of AudioEngines into a single AudioEngine to allow for
 // maximum compatibility and support for all audio drivers that have been
@@ -132,13 +135,13 @@ public class ConglomerateAudioEngine implements AudioEngine {
           try {
             block[i] = channelGenerator.call();
           } catch (Exception e) {
-            e.printStackTrace();
+            logger.log(Level.SEVERE, e.getMessage(), e);
           }
         }
         try {
           buffer.put(block);
         } catch (InterruptedException e) {
-          e.printStackTrace();
+          logger.log(Level.SEVERE, e.getMessage(), e);
         }
       }
     }

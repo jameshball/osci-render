@@ -12,6 +12,9 @@ import javax.script.CompiledScript;
 import javax.script.ScriptException;
 import javax.script.SimpleBindings;
 import java.util.*;
+import java.util.logging.Level;
+
+import static sh.ball.gui.Gui.logger;
 
 public class LuaSampleSource implements FrameSource<Vector2> {
 
@@ -55,6 +58,7 @@ public class LuaSampleSource implements FrameSource<Vector2> {
           updatedFile = true;
         }
       } catch (Exception e) {
+        logger.log(Level.INFO, e.getMessage(), e);
         result = (LuaValue) LuaSampleSource.eval(lastWorkingFunction, globals);
       }
       step++;
@@ -72,7 +76,9 @@ public class LuaSampleSource implements FrameSource<Vector2> {
       }
 
       return new Vector2(result.get(1).checkdouble(), result.get(2).checkdouble());
-    } catch (Exception ignored) {}
+    } catch (Exception e) {
+      logger.log(Level.INFO, e.getMessage(), e);
+    }
 
     return new Vector2();
   }
@@ -201,6 +207,7 @@ on machines with poorer performance.
     try {
       f = f.getClass().newInstance();
     } catch (Exception e) {
+      logger.log(Level.SEVERE, e.getMessage(), e);
       throw new ScriptException(e);
     }
     f.initupvalue1(g);
