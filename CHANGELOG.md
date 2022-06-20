@@ -1,3 +1,7 @@
+- 1.26.1
+  - Add error logging to the directory osci-render is run from `/logs/`
+
+
 - 1.26.0
   - Reorganise the interface so that more sliders are considered audio effects
     - This means you can animate things like volume, rotation, and translation!

@@ -24,9 +24,9 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.*;
+import java.util.logging.Level;
 
-import static sh.ball.gui.Gui.audioPlayer;
-import static sh.ball.gui.Gui.main;
+import static sh.ball.gui.Gui.*;
 
 public class GeneralController implements Initializable, SubController {
 
@@ -100,12 +100,12 @@ public class GeneralController implements Initializable, SubController {
           try {
             mainController.updateFiles(files, names, 0);
           } catch (Exception e) {
-            e.printStackTrace();
+            logger.log(Level.SEVERE, e.getMessage(), e);
           }
         }).start();
       }
     } catch (IOException ioException) {
-      ioException.printStackTrace();
+      logger.log(Level.SEVERE, ioException.getMessage(), ioException);
 
       // display error to user (for debugging purposes)
       String oldPath = fileLabel.getText();
@@ -248,11 +248,11 @@ public class GeneralController implements Initializable, SubController {
           mainController.createFile(fileName, fileData);
           createFileTextField.setText("");
         } catch (Exception ex) {
-          ex.printStackTrace();
+          logger.log(Level.SEVERE, ex.getMessage(), ex);
         }
       });
     } catch (IOException e) {
-      e.printStackTrace();
+      logger.log(Level.SEVERE, e.getMessage(), e);
     }
 
     createFileTextField.setOnKeyPressed(event -> {

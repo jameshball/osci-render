@@ -5,7 +5,10 @@ import xt.audio.*;
 
 import java.util.*;
 import java.util.concurrent.Callable;
+import java.util.logging.Level;
 import java.util.stream.Stream;
+
+import static sh.ball.gui.Gui.logger;
 
 // Audio engine that connects to devices using the XtAudio library
 public class XtAudioEngine implements AudioEngine {
@@ -180,7 +183,7 @@ public class XtAudioEngine implements AudioEngine {
             }
           });
         } catch (XtException e) {
-          e.printStackTrace();
+          logger.log(Level.SEVERE, e.getMessage(), e);
         }
       }
     }

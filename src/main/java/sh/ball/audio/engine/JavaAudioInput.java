@@ -3,6 +3,9 @@ package sh.ball.audio.engine;
 import javax.sound.sampled.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+
+import static sh.ball.gui.Gui.logger;
 
 // really rough microphone listener - not intended for actual playback of audio
 // but more for using the microphone as a signal.
@@ -30,6 +33,7 @@ public class JavaAudioInput implements AudioInput {
       DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
       mic = (TargetDataLine) AudioSystem.getLine(info);
     } catch (LineUnavailableException | IllegalArgumentException e) {
+      logger.log(Level.INFO, e.getMessage(), e);
       mic = null;
     }
     microphone = mic;
@@ -63,7 +67,7 @@ public class JavaAudioInput implements AudioInput {
       }
       microphone.close();
     } catch (LineUnavailableException e) {
-      e.printStackTrace();
+      logger.log(Level.SEVERE, e.getMessage(), e);
     }
   }
 

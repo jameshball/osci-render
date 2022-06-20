@@ -1,5 +1,6 @@
 package sh.ball.parser.svg;
 
+import static sh.ball.gui.Gui.logger;
 import static sh.ball.parser.XmlUtil.asList;
 import static sh.ball.parser.XmlUtil.getAttributesOnTags;
 import static sh.ball.parser.XmlUtil.getNodeValue;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 import javax.xml.parsers.ParserConfigurationException;
 
@@ -114,9 +116,7 @@ public class SvgParser extends FileParser<FrameSource<List<Shape>>> {
         }
       }
     } catch (Exception e) {
-      e.printStackTrace();
-      System.out.println(Arrays.toString(decimalSplit));
-      System.out.println(command);
+      logger.log(Level.SEVERE, Arrays.toString(decimalSplit) + "\n" + command, e);
     }
 
     return nums;
@@ -154,7 +154,9 @@ public class SvgParser extends FileParser<FrameSource<List<Shape>>> {
       if (!heightAttribute.equals("")) {
         height = Double.parseDouble(simplifyLength(heightAttribute));
       }
-    } catch (NumberFormatException ignored) {}
+    } catch (NumberFormatException e) {
+      logger.log(Level.INFO, e.getMessage(), e);
+    }
 
     if (width != null && height != null) {
       return new Pair<>(width, height);
