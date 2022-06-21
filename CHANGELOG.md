@@ -1,3 +1,7 @@
+- 1.26.2
+  - Add more error logging
+
+
 - 1.26.1
   - Add error logging to the directory osci-render is run from `/logs/`
 
