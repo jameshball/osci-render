@@ -12,11 +12,19 @@ Read more about '[Rendering shapes through audio signals](https://felixonline.co
 
 Send an email to [james@ball.sh](mailto:james@ball.sh) if you have any issues, feedback, feature requests, or anything else!
 
-### Video Demonstration
+### Video Demonstrations
+
+#### Full overview
 
 [![osci-render full overview](https://img.youtube.com/vi/PKVCx7rs_r8/0.jpg)](https://www.youtube.com/watch?v=PKVCx7rs_r8)
 
 [youtube.com/watch?v=PKVCx7rs_r8](https://www.youtube.com/watch?v=PKVCx7rs_r8)
+
+#### Getting started
+
+[![getting started with osci-render](https://img.youtube.com/vi/ZeP-0U8ebKU/0.jpg)](https://www.youtube.com/watch?v=ZeP-0U8ebKU)
+
+[youtube.com/watch?v=ZeP-0U8ebKU](https://www.youtube.com/watch?v=ZeP-0U8ebKU)
 
 ## Current Features
 
