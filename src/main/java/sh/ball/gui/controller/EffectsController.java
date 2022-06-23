@@ -282,15 +282,10 @@ public class EffectsController implements Initializable, SubController {
     translationXTextField.setText(x.getTextContent());
     translationYTextField.setText(y.getTextContent());
 
-    slidersUpdated();
-
     // For backwards compatibility we assume a default value
     Element ellipse = (Element) translation.getElementsByTagName("ellipse").item(0);
     translateEllipseCheckBox.setSelected(ellipse != null && Boolean.parseBoolean(ellipse.getTextContent()));
   }
-
-  @Override
-  public void slidersUpdated() {}
 
   public TranslateEffect getTranslateEffect() {
     return translateEffect;

@@ -338,7 +338,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         if (event.getClickCount() == 2) {
           sliders.get(finalI).setValue(0);
         }
-        subControllers().forEach(SubController::slidersUpdated);
       });
     }
 
@@ -654,8 +653,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   // with the same settings that the original had.
   private void changeFrameSource(int index) {
     if (frameSources.size() == 0) {
-      generalController.setFrameSourceName("No file open!");
-      generalController.updateFrameLabels();
+      Platform.runLater(() -> {
+        generalController.setFrameSourceName("No file open!");
+        generalController.updateFrameLabels();
+      });
       audioPlayer.removeSampleSource();
       audioPlayer.addFrame(List.of(new Vector2()));
       return;
@@ -688,6 +689,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       if (oldSettings instanceof ObjFrameSettings settings) {
         objController.setObjRotate(settings.baseRotation, settings.currentRotation);
       }
+      // FIXME: Is this safe since we are accessing GUI object in non-GUI thread?
       objController.hideHiddenMeshes(hideHiddenMeshesCheckMenuItem.isSelected());
       executor.submit(producer);
     } else if (samples != null) {
@@ -727,7 +729,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       luaParser.setScriptFromInputStream(new ByteArrayInputStream(fileData));
       luaParser.parse();
       sampleParsers.add(luaParser);
-      luaController.updateLuaVariables();
+      Platform.runLater(() -> luaController.updateLuaVariables());
       frameSources.add(null);
     } else {
       frameSources.add(ParserFactory.getParser(name, fileData).parse());
@@ -990,7 +992,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
             double scale = MidiNote.MAX_VELOCITY / (double) actualChannels;
             double zeroPoint = closestToZero / (double) MidiNote.MAX_VELOCITY;
             slider.setValue(getValueInSliderRange(slider, scale * ((correctedValue / (double) MidiNote.MAX_VELOCITY) - zeroPoint) + zeroPoint));
-            subControllers().forEach(SubController::slidersUpdated);
           }
         });
       } else if (cc == MidiNote.ALL_NOTES_OFF) {
@@ -1366,7 +1367,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
             } else if (sliderValue < slider.getMin()) {
               sliderValue = slider.getMin();
             }
-            subControllers().forEach(SubController::slidersUpdated);
             sliders.get(i).setValue(sliderValue);
           }
         }
