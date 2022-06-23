@@ -1,3 +1,7 @@
+- 1.26.3
+  - Fix potential bug with updating frequency spinner and slider from not-GUI thread
+
+
 - 1.26.2
   - Add more error logging
 
