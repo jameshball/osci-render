@@ -181,9 +181,5 @@ public class ObjController implements Initializable, SubController {
   }
 
   @Override
-  public void load(Element root) {
-  }
-
-  @Override
-  public void slidersUpdated() {}
+  public void load(Element root) {}
 }

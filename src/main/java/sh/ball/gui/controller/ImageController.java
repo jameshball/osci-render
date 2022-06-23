@@ -1,15 +1,11 @@
 package sh.ball.gui.controller;
 
-import javafx.beans.property.DoubleProperty;
-import javafx.beans.property.SimpleDoubleProperty;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
-import javafx.scene.input.KeyCode;
 import javafx.scene.shape.SVGPath;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import sh.ball.audio.effect.TranslateEffect;
 import sh.ball.audio.midi.MidiNote;
 
 import java.net.URL;
@@ -22,7 +18,6 @@ import static sh.ball.gui.Gui.audioPlayer;
 public class ImageController implements Initializable, SubController {
 
   private static final double MAX_FREQUENCY = 12000;
-  private final DoubleProperty frequency;
 
   @FXML
   private Slider frequencySlider;
@@ -33,28 +28,25 @@ public class ImageController implements Initializable, SubController {
   @FXML
   private CheckBox frequencyMic;
 
-  public ImageController() {
-    this.frequency = new SimpleDoubleProperty(0);
-  }
+  public ImageController() {}
 
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
     frequencySpinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(0, MAX_FREQUENCY, MidiNote.MIDDLE_C, 1));
-    frequencySpinner.valueProperty().addListener((o, old, f) -> frequency.set(f));
 
-    frequency.addListener((o, old, f) -> {
-      frequencySlider.setValue(Math.log(f.doubleValue()) / Math.log(MAX_FREQUENCY));
-      frequencySpinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(0, MAX_FREQUENCY, f.doubleValue(), 1));
+    frequencySpinner.valueProperty().addListener((o, old, f) -> {
+      frequencySlider.setValue(Math.log(f) / Math.log(MAX_FREQUENCY));
+      audioPlayer.setFrequency(f);
     });
-    audioPlayer.setFrequency(frequency);
+
+    frequencySlider.valueProperty().addListener((o, old, f) -> {
+      double frequency = Math.pow(MAX_FREQUENCY, f.doubleValue());
+      frequencySpinner.getValueFactory().setValue(frequency);
+      audioPlayer.setFrequency(frequency);
+    });
+
     // default value is middle C
-    frequency.set(MidiNote.MIDDLE_C);
-    frequencySlider.setOnKeyPressed(e -> {
-      if (e.getCode() == KeyCode.LEFT || e.getCode() == KeyCode.RIGHT) {
-        slidersUpdated();
-      }
-    });
-    frequencySlider.setOnMouseDragged(e -> slidersUpdated());
+    audioPlayer.setFrequency(MidiNote.MIDDLE_C);
   }
 
   @Override
@@ -85,12 +77,5 @@ public class ImageController implements Initializable, SubController {
   }
 
   @Override
-  public void load(Element root) {
-    slidersUpdated();
-  }
-
-  @Override
-  public void slidersUpdated() {
-    frequency.set(Math.pow(MAX_FREQUENCY, frequencySlider.getValue()));
-  }
+  public void load(Element root) {}
 }

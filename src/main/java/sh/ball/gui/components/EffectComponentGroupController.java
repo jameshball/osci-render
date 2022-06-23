@@ -139,9 +139,6 @@ public class EffectComponentGroupController implements Initializable, SubControl
     effectCheckBox.setSelected(Boolean.parseBoolean(selected) || alwaysEnabled);
   }
 
-  @Override
-  public void slidersUpdated() {}
-
   public void setType(EffectType type) {
     this.type = type;
   }

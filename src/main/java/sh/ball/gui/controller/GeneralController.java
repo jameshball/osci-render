@@ -106,15 +106,6 @@ public class GeneralController implements Initializable, SubController {
       }
     } catch (IOException ioException) {
       logger.log(Level.SEVERE, ioException.getMessage(), ioException);
-
-      // display error to user (for debugging purposes)
-      String oldPath = fileLabel.getText();
-      // shows the error message and later shows the old path as the file being rendered
-      // doesn't change
-      KeyFrame kf1 = new KeyFrame(Duration.seconds(0), e -> fileLabel.setText(ioException.getMessage()));
-      KeyFrame kf2 = new KeyFrame(Duration.seconds(5), e -> fileLabel.setText(oldPath));
-      Timeline timeline = new Timeline(kf1, kf2);
-      Platform.runLater(timeline::play);
     }
   }
 
@@ -321,9 +312,6 @@ public class GeneralController implements Initializable, SubController {
       }
     }
   }
-
-  @Override
-  public void slidersUpdated() {}
 
   public void setFrameSourceName(String name) {
     this.frameSourceName = name;

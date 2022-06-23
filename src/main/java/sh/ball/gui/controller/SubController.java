@@ -23,6 +23,4 @@ public interface SubController {
   List<? extends Node> save(Document document);
 
   void load(Element root);
-
-  void slidersUpdated();
 }

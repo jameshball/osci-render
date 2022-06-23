@@ -107,7 +107,4 @@ public class LuaController implements Initializable, SubController {
   @Override
   public void load(Element root) {
   }
-
-  @Override
-  public void slidersUpdated() {}
 }

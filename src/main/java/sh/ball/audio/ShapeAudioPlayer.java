@@ -1,5 +1,6 @@
 package sh.ball.audio;
 
+import javafx.application.Platform;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import sh.ball.audio.effect.*;
@@ -38,7 +39,6 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private final short[][] keyTargetVolumes = new short[MidiNote.NUM_CHANNELS][128];
   private final short[][] keyActualVolumes = new short[MidiNote.NUM_CHANNELS][128];
   private final AtomicInteger numKeysDown = new AtomicInteger(1);
-  private final MidiNote[][] keysDown = new MidiNote[MidiNote.NUM_CHANNELS][128];
   private final SineEffect[][] sineEffects = new SineEffect[MidiNote.NUM_CHANNELS][128];
   private boolean midiStarted = false;
   private int mainChannel = 0;
@@ -70,7 +70,6 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private int count = 0;
   private double volume = 1;
   private double octaveFrequency;
-  private DoubleProperty frequency;
   private double backingMidiVolume = 0.25;
   private double baseFrequency;
   private double traceMin = 0;
@@ -88,7 +87,6 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     this.audioEngineBuilder = audioEngineBuilder;
     this.audioEngine = audioEngineBuilder.call();
     Arrays.fill(pitchBends, 1.0);
-    setFrequency(new SimpleDoubleProperty(0));
     resetMidi();
 
     communicator.addListener(this);
@@ -103,29 +101,24 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
   public void resetMidi() {
     for (int i = 0; i < MidiNote.NUM_CHANNELS; i++) {
-      Arrays.fill(keysDown[i], null);
       Arrays.fill(keyTargetVolumes[i], (short) 0);
       Arrays.fill(keyActualVolumes[i], (short) 0);
     }
     // Middle C is down by default
     keyTargetVolumes[0][60] = (short) MidiNote.MAX_VELOCITY;
     keyActualVolumes[0][60] = (short) MidiNote.MAX_VELOCITY;
-    MidiNote note = new MidiNote(60);
-    keysDown[note.channel()][note.key()] = note;
     midiStarted = false;
     notesChanged();
   }
 
   public void stopMidiNotes() {
     for (int i = 0; i < MidiNote.NUM_CHANNELS; i++) {
-      Arrays.fill(keysDown[i], null);
       Arrays.fill(keyTargetVolumes[i], (short) 0);
     }
   }
 
-  public void setFrequency(DoubleProperty frequency) {
-    this.frequency = frequency;
-    frequency.addListener((o, old, f) -> setBaseFrequency(f.doubleValue()));
+  public void setFrequency(double frequency) {
+    setBaseFrequency(frequency);
   }
 
   public void setVolume(double volume) {
@@ -282,8 +275,8 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
       }
       lastAttack++;
 
-      for (int channel = 0; channel < keysDown.length; channel++) {
-        for (int key = 0; key < keysDown[0].length; key++) {
+      for (int channel = 0; channel < keyActualVolumes.length; channel++) {
+        for (int key = 0; key < keyActualVolumes[0].length; key++) {
           if (keyActualVolumes[channel][key] > 0 && !(baseNote.key() == key && baseNote.channel() == channel)) {
             Vector2 sine = sineEffects[channel][key].apply(frame, new Vector2());
             double volume = backingMidiVolume * keyActualVolumes[channel][key] / MidiNote.MAX_VELOCITY;
@@ -526,7 +519,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     for (int key = keyTargetVolumes[mainChannel].length - 1; key >= 0; key--) {
       if (keyTargetVolumes[mainChannel][key] > 0) {
         MidiNote note = new MidiNote(key, mainChannel);
-        frequency.set(note.frequency());
+        setBaseFrequency(note.frequency());
         baseNote = note;
         return;
       }
@@ -559,11 +552,9 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
       if (command == ShortMessage.NOTE_OFF || velocity == 0) {
         keyTargetVolumes[note.channel()][note.key()] = 0;
-        keysDown[note.channel()][note.key()] = null;
         numKeysDown.getAndDecrement();
       } else {
         keyTargetVolumes[note.channel()][note.key()] = (short) velocity;
-        keysDown[note.channel()][note.key()] = note;
         numKeysDown.getAndIncrement();
       }
       notesChanged();
