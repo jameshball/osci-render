@@ -65,7 +65,9 @@ public class Gui extends Application {
       fileHandler.setLevel(Level.WARNING);
       fileHandler.setFormatter(new SimpleFormatter());
 
+      Logger javafxLogger = Logger.getLogger("javafx");
       logger.addHandler(fileHandler);
+      javafxLogger.addHandler(fileHandler);
     } catch (Exception e) {
       logger.log(Level.SEVERE, e.getMessage(), e);
     }
@@ -76,6 +78,8 @@ public class Gui extends Application {
   public void start(Stage stage) throws Exception {
     System.setProperty("prism.lcdtext", "false");
     System.setProperty("org.luaj.luajc", "true");
+
+    Thread.setDefaultUncaughtExceptionHandler((t, e) -> logger.log(Level.SEVERE, e.getMessage(), e));
 
     editor = new CodeEditor();
     editor.initialize();
