@@ -1,3 +1,7 @@
+- 1.26.4
+  - Make GPU rendering toggleable to prevent crashes due to bad initialisation
+
+
 - 1.26.3
   - Fix potential bug with updating frequency spinner and slider from not-GUI thread
 

@@ -68,7 +68,10 @@ public class ObjFrameSource implements FrameSource<List<Shape>> {
         object.resetRotation();
       }
       if (obj.hideEdges != null) {
-        object.hideEdges(obj.hideEdges);
+        camera.hideEdges(obj.hideEdges);
+      }
+      if (obj.usingGpu != null) {
+        camera.usingGpu(obj.usingGpu);
       }
     }
   }
@@ -76,6 +79,6 @@ public class ObjFrameSource implements FrameSource<List<Shape>> {
   // TODO: Refactor!
   @Override
   public Object getFrameSettings() {
-    return new ObjFrameSettings(null, null, baseRotation, currentRotation, null, false, object.edgesHidden());
+    return new ObjFrameSettings(null, null, baseRotation, currentRotation, null, false, camera.edgesHidden(), camera.isUsingGpu());
   }
 }

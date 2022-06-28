@@ -26,7 +26,6 @@ public class WorldObject {
   private List<List<Vector3>> vertexPath;
   private Vector3 position;
   private Vector3 rotation;
-  private boolean hideEdges = false;
 
   public WorldObject(Vector3[] vertices, int[] edgeIndices, int[][] faceIndices) {
     vertexPath = new ArrayList<>();
@@ -318,13 +317,5 @@ public class WorldObject {
   public WorldObject clone() {
     return new WorldObject(new ArrayList<>(objVertices), new ArrayList<>(vertexPath), position,
       rotation);
-  }
-
-  public void hideEdges(boolean hideEdges) {
-    this.hideEdges = hideEdges;
-  }
-
-  public boolean edgesHidden() {
-    return hideEdges;
   }
 }
