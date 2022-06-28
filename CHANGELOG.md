@@ -1,5 +1,6 @@
 - 1.26.4
   - Make GPU rendering toggleable to prevent crashes due to bad initialisation
+  - Can be toggled under View > Render Using GPU
 
 
 - 1.26.3
