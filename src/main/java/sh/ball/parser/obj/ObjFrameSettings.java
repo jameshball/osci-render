@@ -11,8 +11,9 @@ public class ObjFrameSettings {
   public Double rotateSpeed;
   public boolean resetRotation = false;
   public Boolean hideEdges = null;
+  public Boolean usingGpu = null;
 
-  protected ObjFrameSettings(Double focalLength, Vector3 cameraPos, Vector3 baseRotation, Vector3 currentRotation, Double rotateSpeed, boolean resetRotation, Boolean hideEdges) {
+  protected ObjFrameSettings(Double focalLength, Vector3 cameraPos, Vector3 baseRotation, Vector3 currentRotation, Double rotateSpeed, boolean resetRotation, Boolean hideEdges, Boolean usingGpu) {
     this.focalLength = focalLength;
     this.cameraPos = cameraPos;
     this.baseRotation = baseRotation;
@@ -20,6 +21,7 @@ public class ObjFrameSettings {
     this.rotateSpeed = rotateSpeed;
     this.resetRotation = resetRotation;
     this.hideEdges = hideEdges;
+    this.usingGpu = usingGpu;
   }
 
   protected ObjFrameSettings(double focalLength) {

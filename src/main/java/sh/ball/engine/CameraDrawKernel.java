@@ -36,7 +36,9 @@ public class CameraDrawKernel extends Kernel {
   private float focalLength;
   private int hideEdges = 0;
   private int usingObjectSet = 0;
+  private boolean initialisedGpu = false;
   private boolean failedGpu = false;
+  private int maxGroupSize = 256;
 
   public CameraDrawKernel() {}
 
@@ -131,9 +133,13 @@ public class CameraDrawKernel extends Kernel {
     this.cameraPosZ = (float) cameraPos.z;
     this.focalLength = (float) camera.getFocalLength();
 
-    this.hideEdges = object.edgesHidden() ? 1 : 0;
+    this.hideEdges = camera.edgesHidden() ? 1 : 0;
 
-    return executeGpu();
+    if (!camera.isUsingGpu() || failedGpu || vertices.length / 3 < MIN_GPU_VERTICES) {
+      return executeCpu();
+    } else {
+      return executeGpu();
+    }
   }
 
   private List<Shape> postProcessVertices() {
@@ -164,16 +170,14 @@ public class CameraDrawKernel extends Kernel {
   }
 
   private List<Shape> executeGpu() {
-    if (failedGpu || vertices.length / 3 < MIN_GPU_VERTICES) {
-      return executeCpu();
-    }
-
     try {
-      int maxGroupSize = 256;
-      try {
-        maxGroupSize = getKernelMaxWorkGroupSize(getTargetDevice());
-      } catch (QueryFailedException e) {
-        logger.log(Level.WARNING, e.getMessage(), e);
+      if (!initialisedGpu) {
+        try {
+          maxGroupSize = getKernelMaxWorkGroupSize(getTargetDevice());
+          initialisedGpu = true;
+        } catch (QueryFailedException e) {
+          logger.log(Level.WARNING, e.getMessage(), e);
+        }
       }
 
       execute(Range.create(roundUp(vertices.length / 3, maxGroupSize), maxGroupSize));

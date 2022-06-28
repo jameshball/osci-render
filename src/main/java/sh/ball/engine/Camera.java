@@ -24,6 +24,8 @@ public class Camera {
 
   private double focalLength;
   private Vector3 pos;
+  private boolean hideEdges = false;
+  private boolean usingGpu = false;
 
   public Camera(double focalLength, Vector3 pos) {
     this.focalLength = focalLength;
@@ -104,5 +106,21 @@ public class Camera {
 
   public double getFocalLength() {
     return focalLength;
+  }
+
+  public void hideEdges(boolean hideEdges) {
+    this.hideEdges = hideEdges;
+  }
+
+  public boolean edgesHidden() {
+    return hideEdges;
+  }
+
+  public void usingGpu(boolean usingGpu) {
+    this.usingGpu = usingGpu;
+  }
+
+  public boolean isUsingGpu() {
+    return usingGpu;
   }
 }

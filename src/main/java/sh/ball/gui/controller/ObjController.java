@@ -182,4 +182,8 @@ public class ObjController implements Initializable, SubController {
 
   @Override
   public void load(Element root) {}
+
+  public void renderUsingGpu(boolean usingGpu) {
+    producer.setFrameSettings(ObjSettingsFactory.renderUsingGpu(usingGpu));
+  }
 }

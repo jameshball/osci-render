@@ -148,6 +148,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private CheckMenuItem hideHiddenMeshesCheckMenuItem;
   @FXML
+  private CheckMenuItem renderUsingGpuCheckMenuItem;
+  @FXML
   private Spinner<Integer> midiChannelSpinner;
   @FXML
   private Spinner<Double> attackSpinner;
@@ -407,6 +409,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     flipYCheckMenuItem.selectedProperty().addListener((e, old, flip) -> audioPlayer.flipYChannel(flip));
 
     hideHiddenMeshesCheckMenuItem.selectedProperty().addListener((e, old, hidden) -> objController.hideHiddenMeshes(hidden));
+
+    renderUsingGpuCheckMenuItem.selectedProperty().addListener((e, old, usingGpu) -> objController.renderUsingGpu(usingGpu));
 
     NumberFormat format = NumberFormat.getIntegerInstance();
     UnaryOperator<TextFormatter.Change> filter = c -> {
@@ -691,6 +695,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
       // FIXME: Is this safe since we are accessing GUI object in non-GUI thread?
       objController.hideHiddenMeshes(hideHiddenMeshesCheckMenuItem.isSelected());
+      objController.renderUsingGpu(renderUsingGpuCheckMenuItem.isSelected());
       executor.submit(producer);
     } else if (samples != null) {
       samples.enable();
@@ -1141,6 +1146,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       hiddenEdges.appendChild(document.createTextNode(String.valueOf(hideHiddenMeshesCheckMenuItem.isSelected())));
       root.appendChild(hiddenEdges);
 
+      Element usingGpu = document.createElement("usingGpu");
+      usingGpu.appendChild(document.createTextNode(String.valueOf(renderUsingGpuCheckMenuItem.isSelected())));
+      root.appendChild(usingGpu);
+
       Element translationIncrement = document.createElement("translationIncrement");
       translationIncrement.appendChild(document.createTextNode(translationIncrementSpinner.getValue().toString()));
       root.appendChild(translationIncrement);
@@ -1261,6 +1270,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       Element hiddenEdges = (Element) root.getElementsByTagName("hiddenEdges").item(0);
       if (hiddenEdges != null) {
         hideHiddenMeshesCheckMenuItem.setSelected(Boolean.parseBoolean(hiddenEdges.getTextContent()));
+      }
+
+      Element usingGpu = (Element) root.getElementsByTagName("usingGpu").item(0);
+      if (usingGpu != null) {
+        renderUsingGpuCheckMenuItem.setSelected(Boolean.parseBoolean(usingGpu.getTextContent()));
       }
 
       Element translationIncrement = (Element) root.getElementsByTagName("translationIncrement").item(0);
