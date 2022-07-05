@@ -17,6 +17,7 @@ import sh.ball.audio.engine.ConglomerateAudioEngine;
 import sh.ball.audio.midi.MidiCommunicator;
 import sh.ball.gui.components.CodeEditor;
 import sh.ball.gui.controller.MainController;
+import sh.ball.gui.controller.ProjectSelectController;
 import sh.ball.parser.lua.LuaParser;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.svg.SvgParser;
@@ -24,6 +25,7 @@ import sh.ball.parser.txt.TextParser;
 import sh.ball.shapes.Vector2;
 
 import java.io.File;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Objects;
@@ -36,6 +38,7 @@ public class Gui extends Application {
   public static String LOG_DIR = "./logs/";
   public static final Logger logger = Logger.getLogger(Gui.class.getName());
 
+  public static ProjectSelectController projectSelectController;
   public static ShapeAudioPlayer audioPlayer;
   public static AudioDevice defaultDevice;
   public static CodeEditor editor;
@@ -74,8 +77,13 @@ public class Gui extends Application {
     new Thread(midiCommunicator).start();
   }
 
+  private Stage stage;
+  private Scene scene;
+  private Parent root;
+
   @Override
   public void start(Stage stage) throws Exception {
+    this.stage = stage;
     System.setProperty("prism.lcdtext", "false");
     System.setProperty("org.luaj.luajc", "true");
 
@@ -92,14 +100,31 @@ public class Gui extends Application {
     editor.prefHeightProperty().bind(editorStage.heightProperty());
     editor.prefWidthProperty().bind(editorStage.widthProperty());
 
-    FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/main.fxml"));
-    Parent root = loader.load();
-    MainController controller = loader.getController();
+    FXMLLoader projectSelectLoader = new FXMLLoader(getClass().getResource("/fxml/projectSelect.fxml"));
+    Parent projectSelectRoot = projectSelectLoader.load();
+    projectSelectController = projectSelectLoader.getController();
+    projectSelectController.setApplicationLauncher(this::launchMainApplication);
 
     stage.getIcons().add(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/icons/icon.png"))));
     stage.setTitle("osci-render");
-    Scene scene = new Scene(root);
+    scene = new Scene(projectSelectRoot);
     scene.getStylesheets().add(getClass().getResource("/css/main.css").toExternalForm());
+
+    stage.setScene(scene);
+    stage.setResizable(false);
+
+    stage.setOnCloseRequest(t -> {
+      Platform.exit();
+      System.exit(0);
+    });
+
+    stage.show();
+
+    FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/main.fxml"));
+    root = loader.load();
+    MainController controller = loader.getController();
+
+    controller.setAddRecentFile(projectSelectController::addRecentFile);
 
     controller.setSoftwareOscilloscopeAction(() -> {
       getHostServices().showDocument("https://james.ball.sh/oscilloscope");
@@ -136,18 +161,17 @@ public class Gui extends Application {
       }
     });
 
-    stage.setScene(scene);
-    stage.setResizable(false);
-
     controller.setStage(stage);
-
-    stage.show();
 
     stage.setOnCloseRequest(t -> {
       controller.shutdown();
       Platform.exit();
       System.exit(0);
     });
+  }
+
+  public void launchMainApplication() {
+    scene.setRoot(root);
   }
 
   public static void launchCodeEditor(String code, String fileName) {

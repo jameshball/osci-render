@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 
@@ -70,6 +71,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private static final double BLOCK_INCREMENT = 0.005;
   private static final double MAJOR_TICK_UNIT = 0.1;
 
+  private Consumer<String> addRecentFile;
   private String openProjectPath;
   private final FileChooser wavFileChooser = new FileChooser();
 
@@ -1200,6 +1202,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       transformer.transform(domSource, streamResult);
       openProjectPath = projectFileName;
       updateTitle(null, projectFileName);
+      addRecentFile.accept(openProjectPath);
     } catch (ParserConfigurationException | TransformerException e) {
       logger.log(Level.SEVERE, e.getMessage(), e);
     }
@@ -1411,6 +1414,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         luaParser.resetStep();
       }
     });
+  }
+
+  public void setAddRecentFile(Consumer<String> addRecentFile) {
+    this.addRecentFile = addRecentFile;
   }
 
   private record PrintableSlider(Slider slider) {

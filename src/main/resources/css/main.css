@@ -72,7 +72,7 @@
 }
 
 .titled-pane, .text {
-    -fx-font-size: 13;
+    -fx-font-size: 1em;
     -fx-font-smoothing-type: gray;
     -fx-text-fill: white;
 }
@@ -146,12 +146,43 @@
 }
 
 #frequency .text {
-    -fx-font-size: 20;
+    -fx-font-size: 1.5em;
 }
 
-#control-pane, .titled-pane, .pane, #frequencyPane {
+#control-pane, .titled-pane, .pane, .darkPane {
     -fx-background-color: darker_color;
     -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.8), 10, 0, 0, 0);
+}
+
+.list-cell {
+    -fx-background-color: transparent;
+}
+.list-view {
+    -fx-background-color: very_dark;
+    -fx-border-width: 1px;
+    -fx-border-color: white;
+}
+
+.progress-indicator:indeterminate .segment {
+    -fx-background-color: white;
+}
+
+.progress-indicator:indeterminate {
+    -fx-border-width: 0;
+    -fx-background-color: transparent;
+}
+
+.progress-indicator:indeterminate > .spinner {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+    -fx-border-width: 0;
+}
+
+.list-cell:filled:selected:focused, .list-cell:filled:hover {
+    -fx-background-color: grey_color;
+    -fx-text-fill: white;
+    -fx-cursor: hand;
 }
 
 .combo-box .list-cell
@@ -339,4 +370,8 @@
 .spinner .increment-arrow-button .increment-arrow,
 .spinner .decrement-arrow-button .decrement-arrow {
     -fx-background-color: white;
+}
+
+.label.title .text {
+    -fx-font-size: 1.5em;
 }
