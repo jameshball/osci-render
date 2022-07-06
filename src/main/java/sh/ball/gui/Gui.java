@@ -114,7 +114,7 @@ public class Gui extends Application {
     root = loader.load();
     MainController controller = loader.getController();
 
-    projectSelectController.setApplicationLauncher(path -> launchMainApplication(controller, path));
+    projectSelectController.setApplicationLauncher((path, muted) -> launchMainApplication(controller, path, muted));
 
     controller.setAddRecentFile(projectSelectController::addRecentFile);
 
@@ -172,9 +172,12 @@ public class Gui extends Application {
     editor.setCallback(controller::updateFileData);
   }
 
-  public void launchMainApplication(MainController controller, String projectPath) throws Exception {
+  public void launchMainApplication(MainController controller, String projectPath, Boolean muted) throws Exception {
     scene.setRoot(root);
     controller.openProject(projectPath);
+    if (muted) {
+      controller.setVolume(0);
+    }
   }
 
   public static void launchCodeEditor(String code, String fileName) {

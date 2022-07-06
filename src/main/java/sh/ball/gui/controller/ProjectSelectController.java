@@ -15,7 +15,7 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.w3c.dom.events.EventTarget;
 import org.w3c.dom.html.HTMLAnchorElement;
-import sh.ball.gui.ExceptionConsumer;
+import sh.ball.gui.ExceptionBiConsumer;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -32,10 +32,11 @@ public class ProjectSelectController implements Initializable {
 
   private static final int MAX_ITEMS = 20;
   private static final String RECENT_FILE = "RECENT_FILE_";
+  private static final String START_MUTED = "START_MUTED";
 
   private final Preferences userPreferences = Preferences.userNodeForPackage(getClass());
   private final ObservableList<String> recentFiles = FXCollections.observableArrayList();
-  private ExceptionConsumer<String> launchMainApplication;
+  private ExceptionBiConsumer<String, Boolean> launchMainApplication;
   private Consumer<String> openBrowser;
 
   @FXML
@@ -61,7 +62,7 @@ public class ProjectSelectController implements Initializable {
     recentFilesListView.setItems(recentFiles);
     recentFilesListView.setOnMouseClicked(e -> {
       try {
-        launchMainApplication.accept(recentFilesListView.getSelectionModel().getSelectedItem());
+        launchMainApplication.accept(recentFilesListView.getSelectionModel().getSelectedItem(), startMutedCheckBox.isSelected());
       } catch (Exception ex) {
         logger.log(Level.SEVERE, ex.getMessage(), ex);
       }
@@ -69,11 +70,14 @@ public class ProjectSelectController implements Initializable {
 
     newProjectButton.setOnAction(e -> {
       try {
-        launchMainApplication.accept(null);
+        launchMainApplication.accept(null, startMutedCheckBox.isSelected());
       } catch (Exception ex) {
         logger.log(Level.SEVERE, ex.getMessage(), ex);
       }
     });
+
+    startMutedCheckBox.setSelected(userPreferences.getBoolean(START_MUTED, false));
+    startMutedCheckBox.selectedProperty().addListener((e, old, startMuted) -> userPreferences.putBoolean(START_MUTED, startMuted));
 
     try {
       String changelogHtml = new String(getClass().getResourceAsStream("/html/changelog.html").readAllBytes(), StandardCharsets.UTF_8);
@@ -132,7 +136,7 @@ public class ProjectSelectController implements Initializable {
     }
   }
 
-  public void setApplicationLauncher(ExceptionConsumer<String> launchMainApplication) {
+  public void setApplicationLauncher(ExceptionBiConsumer<String, Boolean> launchMainApplication) {
     this.launchMainApplication = launchMainApplication;
   }
 

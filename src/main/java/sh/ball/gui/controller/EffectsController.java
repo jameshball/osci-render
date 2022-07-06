@@ -321,4 +321,8 @@ public class EffectsController implements Initializable, SubController {
   public void disableMouseTranslate() {
     translateCheckBox.setSelected(false);
   }
+
+  public void setVolume(double volumeValue) {
+    volume.controller.slider.setValue(volumeValue);
+  }
 }
