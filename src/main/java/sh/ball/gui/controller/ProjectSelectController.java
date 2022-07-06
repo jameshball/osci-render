@@ -62,7 +62,10 @@ public class ProjectSelectController implements Initializable {
     recentFilesListView.setItems(recentFiles);
     recentFilesListView.setOnMouseClicked(e -> {
       try {
-        launchMainApplication.accept(recentFilesListView.getSelectionModel().getSelectedItem(), startMutedCheckBox.isSelected());
+        String selectedItem = recentFilesListView.getSelectionModel().getSelectedItem();
+        if (selectedItem != null) {
+          launchMainApplication.accept(selectedItem, startMutedCheckBox.isSelected());
+        }
       } catch (Exception ex) {
         logger.log(Level.SEVERE, ex.getMessage(), ex);
       }
