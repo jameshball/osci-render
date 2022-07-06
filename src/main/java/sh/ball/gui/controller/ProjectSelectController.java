@@ -8,18 +8,14 @@ import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ListView;
-import javafx.scene.control.TextArea;
-import javafx.scene.layout.AnchorPane;
 import javafx.scene.web.WebView;
 import netscape.javascript.JSObject;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
-import org.w3c.dom.events.Event;
-import org.w3c.dom.events.EventListener;
 import org.w3c.dom.events.EventTarget;
 import org.w3c.dom.html.HTMLAnchorElement;
-import sh.ball.gui.ExceptionRunnable;
+import sh.ball.gui.ExceptionConsumer;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,7 +35,7 @@ public class ProjectSelectController implements Initializable {
 
   private final Preferences userPreferences = Preferences.userNodeForPackage(getClass());
   private final ObservableList<String> recentFiles = FXCollections.observableArrayList();
-  private ExceptionRunnable launchMainApplication;
+  private ExceptionConsumer<String> launchMainApplication;
   private Consumer<String> openBrowser;
 
   @FXML
@@ -63,10 +59,17 @@ public class ProjectSelectController implements Initializable {
     }
 
     recentFilesListView.setItems(recentFiles);
+    recentFilesListView.setOnMouseClicked(e -> {
+      try {
+        launchMainApplication.accept(recentFilesListView.getSelectionModel().getSelectedItem());
+      } catch (Exception ex) {
+        logger.log(Level.SEVERE, ex.getMessage(), ex);
+      }
+    });
 
     newProjectButton.setOnAction(e -> {
       try {
-        launchMainApplication.run();
+        launchMainApplication.accept(null);
       } catch (Exception ex) {
         logger.log(Level.SEVERE, ex.getMessage(), ex);
       }
@@ -129,7 +132,7 @@ public class ProjectSelectController implements Initializable {
     }
   }
 
-  public void setApplicationLauncher(ExceptionRunnable launchMainApplication) {
+  public void setApplicationLauncher(ExceptionConsumer<String> launchMainApplication) {
     this.launchMainApplication = launchMainApplication;
   }
 

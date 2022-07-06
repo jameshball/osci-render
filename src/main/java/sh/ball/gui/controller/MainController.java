@@ -58,6 +58,7 @@ import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.ParserFactory;
 import sh.ball.shapes.Shape;
+import sh.ball.shapes.ShapeFrameSource;
 import sh.ball.shapes.Vector2;
 
 import static sh.ball.gui.Gui.*;
@@ -184,18 +185,12 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private ComboBox<AudioSample> audioSampleComboBox;
 
-  public MainController() throws Exception {
-    // Clone DEFAULT_OBJ InputStream using a ByteArrayOutputStream
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    assert DEFAULT_OBJ != null;
-    DEFAULT_OBJ.transferTo(baos);
-    InputStream objClone = new ByteArrayInputStream(baos.toByteArray());
-    FrameSource<List<Shape>> frames = new ObjParser(objClone).parse();
-
-    openFiles.add(baos.toByteArray());
+  public MainController() {
+    FrameSource<List<Shape>> frames = new ShapeFrameSource(List.of(new Vector2()));
+    openFiles.add(new byte[0]);
     frameSources.add(frames);
     sampleParsers.add(null);
-    frameSourcePaths.add("cube.obj");
+    frameSourcePaths.add("Empty file");
     currentFrameSource = 0;
     this.producer = new FrameProducer<>(audioPlayer, frames);
     if (defaultDevice == null) {
@@ -399,7 +394,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       File file = osciFileChooser.showOpenDialog(stage);
       if (file != null) {
         updateLastVisitedDirectory(new File(file.getParent()));
-        openProject(file.getAbsolutePath());
+        try {
+          openProject(file.getAbsolutePath());
+        } catch (Exception ex) {
+          logger.log(Level.SEVERE, ex.getMessage(), ex);
+        }
       }
     });
 
@@ -488,14 +487,19 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       recordLengthMenuItem.setDisable(!newVal);
     });
 
-    List<AudioDevice> devices = audioPlayer.devices();
-    deviceComboBox.setItems(FXCollections.observableList(devices));
-    deviceComboBox.setValue(defaultDevice);
-    deviceComboBox.valueProperty().addListener((options, oldDevice, newDevice) -> {
-      if (newDevice != null) {
-        switchAudioDevice(newDevice);
-      }
-    });
+    new Thread(() -> {
+      List<AudioDevice> devices = audioPlayer.devices();
+      Platform.runLater(() -> {
+        deviceComboBox.setItems(FXCollections.observableList(devices));
+        deviceComboBox.setValue(defaultDevice);
+        deviceComboBox.valueProperty().addListener((options, oldDevice, newDevice) -> {
+          if (newDevice != null) {
+            switchAudioDevice(newDevice);
+          }
+        });
+      });
+      switchAudioDevice(defaultDevice, false);
+    }).start();
 
     audioSampleComboBox.setItems(FXCollections.observableList(List.of(AudioSample.UINT8, AudioSample.INT8, AudioSample.INT16, AudioSample.INT24, AudioSample.INT32)));
     audioSampleComboBox.setValue(AudioSample.INT16);
@@ -509,7 +513,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
     objController.updateObjectRotateSpeed();
 
-    switchAudioDevice(defaultDevice, false);
     executor.submit(producer);
     Gui.midiCommunicator.addListener(this);
     AudioInput audioInput = new JavaAudioInput();
@@ -524,7 +527,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
     }
 
-    editor.setCallback(this::updateFileData);
     luaController.updateLuaVariables();
 
     objectServer = new ObjectServer(this::enableObjectServerRendering, this::disableObjectServerRendering);
@@ -616,7 +618,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     sampleRate = device.sampleRate();
     // brightness is configurable for many-output audio interfaces
     if (device.channels() > 2) {
-      brightnessSlider.setDisable(false);
+      Platform.runLater(() -> brightnessSlider.setDisable(false));
     }
     if (analyser != null) {
       analyser.stop();
@@ -782,7 +784,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     Platform.runLater(() -> generalController.showMultiFileTooltip(frameSources.size() > 1));
   }
 
-  void updateFileData(byte[] file, String name) {
+  public void updateFileData(byte[] file, String name) {
     int index = frameSourcePaths.indexOf(name);
     if (index == -1) {
       throw new RuntimeException("Can't find open file with name: " + name);
@@ -1215,7 +1217,18 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     midiButtonMap.keySet().forEach(button -> button.setFill(Color.WHITE));
   }
 
-  private void openProject(String projectFileName) {
+  public void openProject(String projectFileName) throws Exception {
+    if (projectFileName == null) {
+      // default project
+      // Clone DEFAULT_OBJ InputStream using a ByteArrayOutputStream
+      ByteArrayOutputStream baos = new ByteArrayOutputStream();
+      DEFAULT_OBJ.transferTo(baos);
+      InputStream objClone = new ByteArrayInputStream(baos.toByteArray());
+
+      deleteCurrentFile();
+      createFile("cube.obj", objClone.readAllBytes());
+      return;
+    }
     try {
       DocumentBuilderFactory documentFactory = DocumentBuilderFactory.newInstance();
       documentFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
