@@ -1433,6 +1433,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     this.addRecentFile = addRecentFile;
   }
 
+  public void setVolume(double volume) {
+    effectsController.setVolume(volume);
+  }
+
   private record PrintableSlider(Slider slider) {
     @Override
     public String toString() {
