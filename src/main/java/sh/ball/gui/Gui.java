@@ -90,19 +90,9 @@ public class Gui extends Application {
 
     Thread.setDefaultUncaughtExceptionHandler((t, e) -> logger.log(Level.SEVERE, e.getMessage(), e));
 
-    editor = new CodeEditor();
-    editor.initialize();
-    editorStage = new Stage();
-    editorScene = new Scene(editor, 900, 600, false, SceneAntialiasing.BALANCED);
-    editorStage.setScene(editorScene);
-    editorStage.getIcons().add(new Image(Objects.requireNonNull(Gui.class.getResourceAsStream("/icons/icon.png"))));
-    editor.prefHeightProperty().bind(editorStage.heightProperty());
-    editor.prefWidthProperty().bind(editorStage.widthProperty());
-
     FXMLLoader projectSelectLoader = new FXMLLoader(getClass().getResource("/fxml/projectSelect.fxml"));
     Parent projectSelectRoot = projectSelectLoader.load();
     projectSelectController = projectSelectLoader.getController();
-    projectSelectController.setApplicationLauncher(this::launchMainApplication);
     projectSelectController.setOpenBrowser(url -> getHostServices().showDocument(url));
 
     stage.getIcons().add(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/icons/icon.png"))));
@@ -123,6 +113,8 @@ public class Gui extends Application {
     FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/main.fxml"));
     root = loader.load();
     MainController controller = loader.getController();
+
+    projectSelectController.setApplicationLauncher(path -> launchMainApplication(controller, path));
 
     controller.setAddRecentFile(projectSelectController::addRecentFile);
 
@@ -168,10 +160,21 @@ public class Gui extends Application {
       Platform.exit();
       System.exit(0);
     });
+
+    editor = new CodeEditor();
+    editor.initialize();
+    editorStage = new Stage();
+    editorScene = new Scene(editor, 900, 600, false, SceneAntialiasing.BALANCED);
+    editorStage.setScene(editorScene);
+    editorStage.getIcons().add(new Image(Objects.requireNonNull(Gui.class.getResourceAsStream("/icons/icon.png"))));
+    editor.prefHeightProperty().bind(editorStage.heightProperty());
+    editor.prefWidthProperty().bind(editorStage.widthProperty());
+    editor.setCallback(controller::updateFileData);
   }
 
-  public void launchMainApplication() {
+  public void launchMainApplication(MainController controller, String projectPath) throws Exception {
     scene.setRoot(root);
+    controller.openProject(projectPath);
   }
 
   public static void launchCodeEditor(String code, String fileName) {

@@ -107,9 +107,7 @@ public class JavaAudioEngine implements AudioEngine {
           AudioFormat format = new AudioFormat((float) rate, BIT_DEPTH, channels, SIGNED_SAMPLE, BIG_ENDIAN);
           this.source = AudioSystem.getSourceDataLine(format);
           devices.add(new SimpleAudioDevice("default-" + rate, "default", rate, AudioSample.INT16, channels));
-        } catch (Exception e) {
-          logger.log(Level.INFO, e.getMessage(), e);
-        }
+        } catch (Exception ignored) {}
       })
     );
 
