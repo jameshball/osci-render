@@ -6,6 +6,7 @@ import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.SceneAntialiasing;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
@@ -92,11 +93,9 @@ public class Gui extends Application {
     editor = new CodeEditor();
     editor.initialize();
     editorStage = new Stage();
-    editorScene = new Scene(editor);
+    editorScene = new Scene(editor, 900, 600, false, SceneAntialiasing.BALANCED);
     editorStage.setScene(editorScene);
     editorStage.getIcons().add(new Image(Objects.requireNonNull(Gui.class.getResourceAsStream("/icons/icon.png"))));
-    editorStage.setWidth(900);
-    editorStage.setHeight(600);
     editor.prefHeightProperty().bind(editorStage.heightProperty());
     editor.prefWidthProperty().bind(editorStage.widthProperty());
 
@@ -104,6 +103,7 @@ public class Gui extends Application {
     Parent projectSelectRoot = projectSelectLoader.load();
     projectSelectController = projectSelectLoader.getController();
     projectSelectController.setApplicationLauncher(this::launchMainApplication);
+    projectSelectController.setOpenBrowser(url -> getHostServices().showDocument(url));
 
     stage.getIcons().add(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/icons/icon.png"))));
     stage.setTitle("osci-render");
