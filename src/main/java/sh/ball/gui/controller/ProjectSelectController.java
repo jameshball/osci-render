@@ -16,7 +16,10 @@ import org.w3c.dom.NodeList;
 import org.w3c.dom.events.EventTarget;
 import org.w3c.dom.html.HTMLAnchorElement;
 import sh.ball.gui.ExceptionBiConsumer;
+import sh.ball.gui.Gui;
 
+import java.awt.*;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
@@ -26,6 +29,7 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.prefs.Preferences;
 
+import static sh.ball.gui.Gui.LOG_DIR;
 import static sh.ball.gui.Gui.logger;
 
 public class ProjectSelectController implements Initializable {
@@ -47,6 +51,8 @@ public class ProjectSelectController implements Initializable {
   private CheckBox startMutedCheckBox;
   @FXML
   private WebView changelogWebView;
+  @FXML
+  private Button logButton;
 
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
@@ -81,6 +87,14 @@ public class ProjectSelectController implements Initializable {
 
     startMutedCheckBox.setSelected(userPreferences.getBoolean(START_MUTED, false));
     startMutedCheckBox.selectedProperty().addListener((e, old, startMuted) -> userPreferences.putBoolean(START_MUTED, startMuted));
+
+    logButton.setOnAction(e -> {
+      try {
+        Gui.openFileExplorer(LOG_DIR);
+      } catch (IOException ex) {
+        logger.log(Level.SEVERE, ex.getMessage(), ex);
+      }
+    });
 
     try {
       String changelogHtml = new String(getClass().getResourceAsStream("/html/changelog.html").readAllBytes(), StandardCharsets.UTF_8);
