@@ -27,6 +27,7 @@ import sh.ball.shapes.Vector2;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Objects;
@@ -177,6 +178,17 @@ public class Gui extends Application {
     controller.openProject(projectPath);
     if (muted) {
       controller.setVolume(0);
+    }
+  }
+
+  public static void openFileExplorer(String directory) throws IOException {
+    String path = Path.of(directory).toAbsolutePath().toString();
+    if (PlatformUtil.isWindows()) {
+      Runtime.getRuntime().exec("explorer /root, " + path);
+    } else if (PlatformUtil.isMac()) {
+      Runtime.getRuntime().exec("open " + path);
+    } else {
+      Runtime.getRuntime().exec("xdg-open " + path);
     }
   }
 

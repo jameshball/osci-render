@@ -29,9 +29,9 @@
          <Label layoutX="188.0" layoutY="247.0" styleClass="title" text="Recently opened projects" />
          <Label layoutX="14.0" layoutY="700.0" text="v1.26.4" />
          <Label layoutX="727.0" layoutY="20.0" styleClass="title" text="Changelog" />
-         <AnchorPane layoutX="582.0" layoutY="65.0" prefHeight="200.0" prefWidth="376.0">
+         <AnchorPane layoutX="582.0" layoutY="65.0" prefHeight="200.0" prefWidth="380.0">
             <children>
-               <WebView fx:id="changelogWebView" layoutX="2.0" layoutY="2.0" prefHeight="638.0" prefWidth="376.0" />
+               <WebView fx:id="changelogWebView" layoutX="2.0" layoutY="2.0" prefHeight="644.0" prefWidth="382.0" />
             </children>
             <opaqueInsets>
                <Insets />
@@ -41,6 +41,7 @@
                <String fx:value="darkPane" />
             </styleClass>
          </AnchorPane>
-         <Label layoutX="108.0" layoutY="679.0" prefHeight="40.0" prefWidth="379.0" text="Email me at james@ball.sh or create an issue on GitHub for feature suggestions, issues, or opportunites I might be interested in!" textAlignment="CENTER" wrapText="true" />
+         <Label layoutX="66.0" layoutY="679.0" prefHeight="40.0" prefWidth="379.0" text="Email me at james@ball.sh or create an issue on GitHub for feature suggestions, issues, or opportunites I might be interested in!" textAlignment="CENTER" wrapText="true" />
+         <Button fx:id="logButton" layoutX="458.0" layoutY="686.0" mnemonicParsing="false" text="Open log folder" />
       </children></AnchorPane>
 </AnchorPane>
