@@ -5,6 +5,8 @@ import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.scene.control.*;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.TextField;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.scene.shape.SVGPath;
@@ -15,11 +17,13 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import sh.ball.audio.*;
 
+import java.awt.*;
 import java.io.*;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.*;
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
@@ -57,6 +61,7 @@ import sh.ball.parser.lua.LuaParser;
 import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.ParserFactory;
+import sh.ball.parser.txt.FontStyle;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.ShapeFrameSource;
 import sh.ball.shapes.Vector2;
@@ -152,6 +157,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private CheckMenuItem hideHiddenMeshesCheckMenuItem;
   @FXML
   private CheckMenuItem renderUsingGpuCheckMenuItem;
+  @FXML
+  private ComboBox<String> fontFamilyComboBox;
+  @FXML
+  private ComboBox<FontStyle> fontStyleComboBox;
   @FXML
   private Spinner<Integer> midiChannelSpinner;
   @FXML
@@ -452,6 +461,19 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     });
     sliderComboBox.setValue(printableSliders.get(0));
 
+    String[] installedFonts = GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames();
+    fontFamilyComboBox.setItems(FXCollections.observableList(Arrays.stream(installedFonts).toList()));
+    if (fontFamilyComboBox.getItems().contains("SansSerif")) {
+      fontFamilyComboBox.setValue("SansSerif");
+    } else {
+      fontFamilyComboBox.setValue(installedFonts[0]);
+    }
+    fontFamilyComboBox.valueProperty().addListener((e, old, family) -> updateFileData(openFiles.get(currentFrameSource), frameSourcePaths.get(currentFrameSource)));
+
+    fontStyleComboBox.setItems(FXCollections.observableList(Arrays.stream(FontStyle.values()).toList()));
+    fontStyleComboBox.setValue(FontStyle.PLAIN);
+    fontStyleComboBox.valueProperty().addListener((e, old, family) -> updateFileData(openFiles.get(currentFrameSource), frameSourcePaths.get(currentFrameSource)));
+
     sliderMinTextField.focusedProperty().addListener((e, old, focused) -> {
       String text = sliderMinTextField.getText();
       if (!focused && parseable(text)) {
@@ -741,7 +763,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       Platform.runLater(() -> luaController.updateLuaVariables());
       frameSources.add(null);
     } else {
-      frameSources.add(ParserFactory.getParser(name, fileData).parse());
+      frameSources.add(ParserFactory.getParser(name, fileData, fontFamilyComboBox.getValue(), fontStyleComboBox.getValue()).parse());
       sampleParsers.add(null);
     }
     frameSourcePaths.add(name);
@@ -802,7 +824,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         frameSources.set(index, null);
       } else {
         FrameSource<List<Shape>> frameSource = frameSources.get(index);
-        frameSources.set(index, ParserFactory.getParser(name, file).parse());
+        frameSources.set(index, ParserFactory.getParser(name, file, fontFamilyComboBox.getValue(), fontStyleComboBox.getValue()).parse());
         frameSource.disable();
         sampleParsers.set(index, null);
       }

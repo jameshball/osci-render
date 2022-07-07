@@ -73,11 +73,13 @@ public abstract class Shape {
   // Normalises sh.ball.shapes between the coords -1 and 1 for proper scaling on an oscilloscope. May not
   // work perfectly with curves that heavily deviate from their start and end points.
   public static List<Shape> normalize(List<Shape> shapes) {
-    double maxAbsVertex = maxAbsVector(shapes).getX();
+    double oldHeight = height(shapes);
+    double oldWidth = width(shapes);
+    double maxDim = Math.max(oldHeight, oldWidth);
     List<Shape> normalizedShapes = new ArrayList<>();
 
     for (Shape shape : shapes) {
-      normalizedShapes.add(shape.scale(new Vector2(2 / maxAbsVertex, -2 / maxAbsVertex)));
+      normalizedShapes.add(shape.scale(new Vector2(2 / maxDim, -2 / maxDim)));
     }
 
     Vector2 maxVector = maxVector(normalizedShapes);
@@ -124,7 +126,7 @@ public abstract class Shape {
     return culledShapes;
   }
 
-  public static Vector2 maxAbsVector(List<Shape> shapes) {
+  public static Vector2 maxAbsVector(List<? extends Shape> shapes) {
     double maxX = 0;
     double maxY = 0;
 
@@ -174,12 +176,17 @@ public abstract class Shape {
     double maxY = Double.NEGATIVE_INFINITY;
     double minY = Double.POSITIVE_INFINITY;
 
-    for (Shape shape : shapes) {
-      Vector2 startVector = shape.nextVector(0);
-      Vector2 endVector = shape.nextVector(1);
+    Vector2[] vectors = new Vector2[4];
 
-      maxY = Math.max(maxY, Math.max(startVector.getY(), endVector.getY()));
-      minY = Math.min(minY, Math.min(startVector.getY(), endVector.getY()));
+    for (Shape shape : shapes) {
+      for (int i = 0; i < vectors.length; i++) {
+        vectors[i] = shape.nextVector(i * 1.0 / vectors.length);
+      }
+
+      for (Vector2 vector : vectors) {
+        maxY = Math.max(maxY, vector.y);
+        minY = Math.min(minY, vector.y);
+      }
     }
 
     return Math.abs(maxY - minY);
@@ -189,12 +196,17 @@ public abstract class Shape {
     double maxX = Double.NEGATIVE_INFINITY;
     double minX = Double.POSITIVE_INFINITY;
 
-    for (Shape shape : shapes) {
-      Vector2 startVector = shape.nextVector(0);
-      Vector2 endVector = shape.nextVector(1);
+    Vector2[] vectors = new Vector2[4];
 
-      maxX = Math.max(maxX, Math.max(startVector.getX(), endVector.getX()));
-      minX = Math.min(minX, Math.min(startVector.getX(), endVector.getX()));
+    for (Shape shape : shapes) {
+      for (int i = 0; i < vectors.length; i++) {
+        vectors[i] = shape.nextVector(i * 1.0 / vectors.length);
+      }
+
+      for (Vector2 vector : vectors) {
+        maxX = Math.max(maxX, vector.x);
+        minX = Math.min(minX, vector.x);
+      }
     }
 
     return Math.abs(maxX - minX);
