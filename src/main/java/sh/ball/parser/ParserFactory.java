@@ -4,6 +4,7 @@ import sh.ball.audio.FrameSource;
 import sh.ball.parser.lua.LuaParser;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.svg.SvgParser;
+import sh.ball.parser.txt.FontStyle;
 import sh.ball.parser.txt.TextParser;
 import sh.ball.shapes.Shape;
 
@@ -14,14 +15,14 @@ import java.util.List;
 
 public class ParserFactory {
 
-  public static FileParser<FrameSource<List<Shape>>> getParser(String filePath, byte[] fileData) throws IOException {
+  public static FileParser<FrameSource<List<Shape>>> getParser(String filePath, byte[] fileData, String fontFamilyName, FontStyle style) throws IOException {
     ByteArrayInputStream bais = new ByteArrayInputStream(fileData);
     if (ObjParser.isObjFile(filePath)) {
       return new ObjParser(bais);
     } else if (SvgParser.isSvgFile(filePath)) {
       return new SvgParser(bais);
     } else if (TextParser.isTxtFile(filePath)) {
-      return new TextParser(bais);
+      return new TextParser(bais, fontFamilyName, style.style);
     } else if (filePath.matches(".*\\.osci")) {
       throw new IOException(".osci project files should be opened using File > Open Project");
     }

@@ -7,6 +7,7 @@ import org.java_websocket.server.WebSocketServer;
 import java.net.InetSocketAddress;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ByteWebSocketServer extends WebSocketServer {
 
@@ -16,12 +17,16 @@ public class ByteWebSocketServer extends WebSocketServer {
 
   public ByteWebSocketServer() {
     super(new InetSocketAddress(TCP_PORT));
-    this.conns = new HashSet<>();
+    this.conns = ConcurrentHashMap.newKeySet();
   }
 
   public synchronized void send(byte[] bytes) {
     for (WebSocket sock : conns) {
-      sock.send(bytes);
+      try {
+        sock.send(bytes);
+      } catch (Exception e) {
+        conns.remove(sock);
+      }
     }
   }
 

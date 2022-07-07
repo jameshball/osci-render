@@ -152,6 +152,26 @@
                <CheckMenuItem fx:id="flipYCheckMenuItem" mnemonicParsing="false" text="Flip Y Direction" />
                <CheckMenuItem fx:id="hideHiddenMeshesCheckMenuItem" mnemonicParsing="false" text="Hide Hidden Meshes" />
                <CheckMenuItem fx:id="renderUsingGpuCheckMenuItem" mnemonicParsing="false" text="Render Using GPU" />
+               <CustomMenuItem hideOnClick="false" mnemonicParsing="false" text=".txt File Font">
+                  <content>
+                     <AnchorPane>
+                        <children>
+                           <Label prefHeight="25.0" text="Text File Font" textFill="WHITE" />
+                           <ComboBox fx:id="fontFamilyComboBox" layoutY="25.0" prefHeight="26.0" prefWidth="376.0" />
+                        </children>
+                     </AnchorPane>
+                  </content>
+               </CustomMenuItem>
+               <CustomMenuItem hideOnClick="false" mnemonicParsing="false" text="Text File Font Style">
+                  <content>
+                     <AnchorPane>
+                        <children>
+                           <Label prefHeight="25.0" text="Text File Font Style" textFill="WHITE" />
+                           <ComboBox fx:id="fontStyleComboBox" layoutY="25.0" prefHeight="26.0" prefWidth="376.0" />
+                        </children>
+                     </AnchorPane>
+                  </content>
+               </CustomMenuItem>
            </items>
          </Menu>
          <Menu mnemonicParsing="false" text="Controls">
