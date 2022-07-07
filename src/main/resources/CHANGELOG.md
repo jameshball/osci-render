@@ -1,3 +1,14 @@
+- 1.27.0
+  - PRE-RELEASE BUILD - NOT FULLY TESTED!
+  - Add project select screen!
+    - Includes this changelog
+    - Adds toggle that is permanently saved to start osci-render muted
+    - Adds button to easily open the folder where logs are saved
+    - Shows last 20 previously opened projects
+      - These can be clicked on to open a previous project
+  - Allow any font that has been installed on your machine to be used with text files
+
+
 - 1.26.4
   - Make GPU rendering toggleable to prevent crashes due to bad initialisation
   - Can be toggled under View > Render Using GPU
