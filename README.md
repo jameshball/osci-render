@@ -50,6 +50,8 @@ Send an email to [james@ball.sh](mailto:james@ball.sh) if you have any issues, f
 
 ## Screenshots
 
+<img width="100%" src="project-select.png">
+
 <img width="100%" src="gui.png">
 
 ## Usage
