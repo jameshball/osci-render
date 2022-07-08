@@ -8,6 +8,9 @@ import java.net.InetSocketAddress;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+
+import static sh.ball.gui.Gui.logger;
 
 public class ByteWebSocketServer extends WebSocketServer {
 
@@ -26,6 +29,7 @@ public class ByteWebSocketServer extends WebSocketServer {
         sock.send(bytes);
       } catch (Exception e) {
         conns.remove(sock);
+        logger.log(Level.SEVERE, e.getMessage(), e);
       }
     }
   }

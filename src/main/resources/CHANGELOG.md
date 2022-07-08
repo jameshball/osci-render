@@ -7,6 +7,8 @@
     - Shows last 20 previously opened projects
       - These can be clicked on to open a previous project
   - Allow any font that has been installed on your machine to be used with text files
+    - Change font by selecting a font from the drop-down under View > Text File Font
+    - Change font style (i.e. plain, bold, italic) by selecting a font style from the drop-down under View > Text File Font Style
 
 
 - 1.26.4

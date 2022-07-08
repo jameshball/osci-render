@@ -33,7 +33,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private static final int BUFFER_SIZE = 10;
 
   private static final boolean BIG_ENDIAN = false;
-  private static final double MIN_LENGTH_INCREMENT = 0.0000000001;
+  private static final double MIN_LENGTH_INCREMENT = 0.000001;
 
   // MIDI
   private final short[][] keyTargetVolumes = new short[MidiNote.NUM_CHANNELS][128];
