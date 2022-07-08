@@ -24,6 +24,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.ResourceBundle;
 import java.util.function.Consumer;
 import java.util.logging.Level;
@@ -151,6 +153,20 @@ public class ProjectSelectController implements Initializable {
     for (int i = 0; i < recentFiles.size(); i++) {
       userPreferences.put(RECENT_FILE + i, recentFiles.get(i));
     }
+  }
+
+  public List<String> recentFiles() {
+    List<String> paths = new ArrayList<>();
+
+    for (int i = 0; i < MAX_ITEMS; i++) {
+      String path = userPreferences.get(RECENT_FILE + i, null);
+      if (path == null) {
+        return paths;
+      }
+      paths.add(path);
+    }
+
+    return paths;
   }
 
   public void setApplicationLauncher(ExceptionBiConsumer<String, Boolean> launchMainApplication) {
