@@ -21,6 +21,7 @@
      <menus>
        <Menu mnemonicParsing="false" text="File">
             <items>
+               <Menu fx:id="recentProjectMenu" mnemonicParsing="false" text="Open Recent Project" />
                <MenuItem fx:id="openProjectMenuItem" mnemonicParsing="false" text="Open Project">
                   <accelerator>
                      <KeyCodeCombination alt="UP" code="O" control="UP" meta="UP" shift="UP" shortcut="DOWN" />

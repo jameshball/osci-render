@@ -5,6 +5,7 @@ import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.scene.control.*;
+import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextField;
 import javafx.scene.paint.Color;
@@ -48,7 +49,6 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
-import sh.ball.audio.effect.EffectType;
 import sh.ball.audio.engine.*;
 import sh.ball.audio.midi.MidiListener;
 import sh.ball.audio.midi.MidiNote;
@@ -76,6 +76,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   public static final DecimalFormat FORMAT = new DecimalFormat("0.00", new DecimalFormatSymbols(Locale.UK));
   private static final double BLOCK_INCREMENT = 0.005;
   private static final double MAJOR_TICK_UNIT = 0.1;
+  private static final long MAX_RECENT_FILES = 15;
 
   private Consumer<String> addRecentFile;
   private String openProjectPath;
@@ -113,6 +114,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private boolean objectServerRendering = false;
 
   // javafx
+  private Callable<List<String>> recentFiles;
   private final FileChooser osciFileChooser = new FileChooser();
   private Stage stage;
 
@@ -139,6 +141,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private TitledPane luaTitledPane;
   @FXML
   private MenuItem openProjectMenuItem;
+  @FXML
+  private Menu recentProjectMenu;
   @FXML
   private MenuItem saveProjectMenuItem;
   @FXML
@@ -1188,7 +1192,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       openProjectPath = projectFileName;
       updateTitle(null, projectFileName);
       addRecentFile.accept(openProjectPath);
-    } catch (ParserConfigurationException | TransformerException e) {
+      updateRecentFiles();
+    } catch (Exception e) {
       logger.log(Level.SEVERE, e.getMessage(), e);
     }
   }
@@ -1330,6 +1335,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       openProjectPath = projectFileName;
       updateTitle(null, projectFileName);
       addRecentFile.accept(openProjectPath);
+      updateRecentFiles();
     } catch (Exception e) {
       logger.log(Level.SEVERE, e.getMessage(), e);
     }
@@ -1421,7 +1427,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     effectsController.setVolume(volume);
   }
 
-  public void initialiseAudioEngine() {
+  public void initialiseAudioEngine() throws Exception {
     FrameSource<List<Shape>> frames = new ShapeFrameSource(List.of(new Vector2()));
     openFiles.add(new byte[0]);
     frameSources.add(frames);
@@ -1461,6 +1467,31 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     webSocketServer.start();
     this.buffer = new byte[FRAME_SIZE * SOSCI_NUM_VERTICES * SOSCI_VERTEX_SIZE];
     new Thread(() -> sendAudioDataToWebSocket(webSocketServer)).start();
+  }
+
+  public void setRecentFiles(Callable<List<String>> recentFiles) {
+    this.recentFiles = recentFiles;
+  }
+
+  private void updateRecentFiles() throws Exception {
+    recentProjectMenu.getItems().clear();
+    recentProjectMenu.getItems().addAll(
+      recentFiles
+        .call()
+        .stream()
+        .limit(MAX_RECENT_FILES)
+        .map(MenuItem::new)
+        .toList()
+    );
+    recentProjectMenu.getItems().forEach(item -> {
+      item.setOnAction(e -> {
+        try {
+          openProject(item.getText());
+        } catch (Exception ex) {
+          logger.log(Level.SEVERE, ex.getMessage(), ex);
+        }
+      });
+    });
   }
 
   private record PrintableSlider(Slider slider) {

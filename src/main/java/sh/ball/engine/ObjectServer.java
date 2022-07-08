@@ -28,6 +28,8 @@ public class ObjectServer implements Runnable {
   @Override
   public void run() {
     try {
+      // TODO: Need to make this resilient to ports already in use
+      // will require using a range of ports rather than just one
       ServerSocket Server = new ServerSocket(PORT);
 
       while (true) {

@@ -118,6 +118,7 @@ public class Gui extends Application {
     projectSelectController.setApplicationLauncher((path, muted) -> launchMainApplication(controller, path, muted));
 
     controller.setAddRecentFile(projectSelectController::addRecentFile);
+    controller.setRecentFiles(projectSelectController::recentFiles);
 
     controller.setSoftwareOscilloscopeAction(() -> {
       getHostServices().showDocument("https://james.ball.sh/oscilloscope");
