@@ -175,6 +175,7 @@ public class Gui extends Application {
 
   public void launchMainApplication(MainController controller, String projectPath, Boolean muted) throws Exception {
     scene.setRoot(root);
+    controller.initialiseAudioEngine();
     controller.openProject(projectPath);
     if (muted) {
       controller.setVolume(0);

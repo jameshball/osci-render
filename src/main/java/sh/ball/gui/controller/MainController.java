@@ -194,22 +194,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private ComboBox<AudioSample> audioSampleComboBox;
 
-  public MainController() {
-    FrameSource<List<Shape>> frames = new ShapeFrameSource(List.of(new Vector2()));
-    openFiles.add(new byte[0]);
-    frameSources.add(frames);
-    sampleParsers.add(null);
-    frameSourcePaths.add("Empty file");
-    currentFrameSource = 0;
-    this.producer = new FrameProducer<>(audioPlayer, frames);
-    if (defaultDevice == null) {
-      throw new RuntimeException("No default audio device found!");
-    }
-    this.sampleRate = defaultDevice.sampleRate();
-  }
   // initialises midiButtonMap by mapping MIDI logo SVGs to the slider that they
   // control if they are selected.
-
   private Map<SVGPath, Slider> initializeMidiButtonMap() {
     Map<SVGPath, Slider> midiMap = new HashMap<>();
     subControllers().forEach(controller -> midiMap.putAll(controller.getMidiButtonMap()));
@@ -349,7 +335,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       });
     }
 
-    objController.setAudioProducer(producer);
     generalController.setMainController(this);
     luaController.setMainController(this);
 
@@ -532,32 +517,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     });
 
     brightnessSlider.valueProperty().addListener((e, old, brightness) -> audioPlayer.setBrightness(brightness.doubleValue()));
-
-    objController.updateObjectRotateSpeed();
-
-    executor.submit(producer);
-    Gui.midiCommunicator.addListener(this);
-    AudioInput audioInput = new JavaAudioInput();
-    if (audioInput.isAvailable()) {
-      audioInput.addListener(this);
-      new Thread(audioInput).start();
-    } else {
-      for (CheckBox checkBox : micCheckBoxes()) {
-        if (checkBox != null) {
-          checkBox.setDisable(true);
-        }
-      }
-    }
-
-    luaController.updateLuaVariables();
-
-    objectServer = new ObjectServer(this::enableObjectServerRendering, this::disableObjectServerRendering);
-    new Thread(objectServer).start();
-
-    webSocketServer = new ByteWebSocketServer();
-    webSocketServer.start();
-    this.buffer = new byte[FRAME_SIZE * SOSCI_NUM_VERTICES * SOSCI_VERTEX_SIZE];
-    new Thread(() -> sendAudioDataToWebSocket(webSocketServer)).start();
   }
 
   public void setLuaVariable(String variableName, Object value) {
@@ -1457,6 +1416,48 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
   public void setVolume(double volume) {
     effectsController.setVolume(volume);
+  }
+
+  public void initialiseAudioEngine() {
+    FrameSource<List<Shape>> frames = new ShapeFrameSource(List.of(new Vector2()));
+    openFiles.add(new byte[0]);
+    frameSources.add(frames);
+    sampleParsers.add(null);
+    frameSourcePaths.add("Empty file");
+    currentFrameSource = 0;
+    producer = new FrameProducer<>(audioPlayer, frames);
+    objController.setAudioProducer(producer);
+
+    if (defaultDevice == null) {
+      throw new RuntimeException("No default audio device found!");
+    }
+    sampleRate = defaultDevice.sampleRate();
+
+    objController.updateObjectRotateSpeed();
+
+    executor.submit(producer);
+    Gui.midiCommunicator.addListener(this);
+    AudioInput audioInput = new JavaAudioInput();
+    if (audioInput.isAvailable()) {
+      audioInput.addListener(this);
+      new Thread(audioInput).start();
+    } else {
+      for (CheckBox checkBox : micCheckBoxes()) {
+        if (checkBox != null) {
+          checkBox.setDisable(true);
+        }
+      }
+    }
+
+    luaController.updateLuaVariables();
+
+    objectServer = new ObjectServer(this::enableObjectServerRendering, this::disableObjectServerRendering);
+    new Thread(objectServer).start();
+
+    webSocketServer = new ByteWebSocketServer();
+    webSocketServer.start();
+    this.buffer = new byte[FRAME_SIZE * SOSCI_NUM_VERTICES * SOSCI_VERTEX_SIZE];
+    new Thread(() -> sendAudioDataToWebSocket(webSocketServer)).start();
   }
 
   private record PrintableSlider(Slider slider) {
