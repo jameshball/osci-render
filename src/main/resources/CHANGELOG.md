@@ -1,5 +1,11 @@
+- 1.27.1
+  - Improve performance of project select screen by only starting main osci-render program after a project is opened/created
+  - Fix bug where images could be drawn so slowly that the frame would never finish drawing
+  - Add recent projects under File > Open Recent Project
+  - Update recent projects when a project is opened
+
+
 - 1.27.0
-  - PRE-RELEASE BUILD - NOT FULLY TESTED!
   - Add project select screen!
     - Includes this changelog
     - Adds toggle that is permanently saved to start osci-render muted
