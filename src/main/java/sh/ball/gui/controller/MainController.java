@@ -225,7 +225,9 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   }
 
   public void shutdown() {
-    webSocketServer.shutdown();
+    if (webSocketServer != null) {
+      webSocketServer.shutdown();
+    }
   }
 
   // alternates between recording and not recording when called.
@@ -1327,6 +1329,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
       openProjectPath = projectFileName;
       updateTitle(null, projectFileName);
+      addRecentFile.accept(openProjectPath);
     } catch (Exception e) {
       logger.log(Level.SEVERE, e.getMessage(), e);
     }
