@@ -57,6 +57,6 @@ public class PerspectiveEffect implements SettableEffect {
 
   public void resetRotation() {
     baseRotation = new Vector3();
-    currentRotation = new Vector3();
+    currentRotation = new Vector3(Math.PI, Math.PI, 0);
   }
 }
