@@ -63,6 +63,8 @@ public class EffectsController implements Initializable, SubController {
   @FXML
   private EffectComponentGroup rotateZ;
   @FXML
+  private EffectComponentGroup zPos;
+  @FXML
   private EffectComponentGroup translationScale;
   @FXML
   private EffectComponentGroup translationSpeed;
@@ -82,6 +84,10 @@ public class EffectsController implements Initializable, SubController {
   private CheckBox translateCheckBox;
   @FXML
   private Button resetTranslationButton;
+  @FXML
+  private Button resetRotationButton;
+  @FXML
+  private Button resetPerspectiveRotationButton;
 
   public EffectsController() {
     this.wobbleEffect = new WobbleEffect(DEFAULT_SAMPLE_RATE);
@@ -119,7 +125,7 @@ public class EffectsController implements Initializable, SubController {
 
     if (type == EffectType.DEPTH_3D) {
       Platform.runLater(() ->
-        List.of(rotateSpeed3D, rotateX, rotateY, rotateZ).forEach(ecg -> {
+        List.of(rotateSpeed3D, rotateX, rotateY, rotateZ, zPos).forEach(ecg -> {
           ecg.controller.slider.setDisable(!checked);
           ecg.controller.spinner.setDisable(!checked);
         })
@@ -162,6 +168,7 @@ public class EffectsController implements Initializable, SubController {
     rotateX.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect((perspectiveEffect::setRotationX))));
     rotateY.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect((perspectiveEffect::setRotationY))));
     rotateZ.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect((perspectiveEffect::setRotationZ))));
+    zPos.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect((perspectiveEffect::setZPos))));
     traceMin.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(audioPlayer::setTraceMin)));
     traceMax.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(audioPlayer::setTraceMax)));
     vectorCancelling.controller.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new VectorCancellingEffect()));
@@ -213,9 +220,22 @@ public class EffectsController implements Initializable, SubController {
 
     translateEllipseCheckBox.selectedProperty().addListener((e, old, ellipse) -> translateEffect.setEllipse(ellipse));
 
-    List.of(rotateSpeed3D, rotateX, rotateY, rotateZ).forEach(ecg -> {
+    List.of(rotateSpeed3D, rotateX, rotateY, rotateZ, zPos).forEach(ecg -> {
       ecg.controller.slider.setDisable(true);
       ecg.controller.spinner.setDisable(true);
+    });
+
+    resetRotationButton.setOnAction(e -> {
+      rotateEffect.resetTheta();
+      rotateSpeed.controller.slider.setValue(0);
+    });
+
+    resetPerspectiveRotationButton.setOnAction(e -> {
+      rotateX.controller.slider.setValue(0);
+      rotateY.controller.slider.setValue(0);
+      rotateZ.controller.slider.setValue(0);
+      rotateSpeed3D.controller.slider.setValue(0);
+      perspectiveEffect.resetRotation();
     });
   }
 
@@ -230,6 +250,7 @@ public class EffectsController implements Initializable, SubController {
       traceMin,
       traceMax,
       rotateSpeed3D,
+      zPos,
       rotateX,
       rotateY,
       rotateZ,
