@@ -1458,6 +1458,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       }
     }
 
+    updateRecentFiles();
+
     luaController.updateLuaVariables();
 
     objectServer = new ObjectServer(this::enableObjectServerRendering, this::disableObjectServerRendering);

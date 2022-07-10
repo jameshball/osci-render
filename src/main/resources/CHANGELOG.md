@@ -1,6 +1,7 @@
 - 1.27.2
   - Add reset 2D rotation button to effects
   - Add reset 3D perspective rotation button to effects
+  - Correctly show recent files under File menu when starting a new project
   - Minor changes to perspective effect
     - Added a new '3D Distance' effect that functions the same as the '3D Perspective' effect in the previous version
     - Changed the '3D Perspective' effect so that a value of 0 applies no change to the image

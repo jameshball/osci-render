@@ -226,8 +226,8 @@ public class EffectsController implements Initializable, SubController {
     });
 
     resetRotationButton.setOnAction(e -> {
-      rotateEffect.resetTheta();
       rotateSpeed.controller.slider.setValue(0);
+      rotateEffect.resetTheta();
     });
 
     resetPerspectiveRotationButton.setOnAction(e -> {
