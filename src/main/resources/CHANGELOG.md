@@ -1,3 +1,14 @@
+- 1.27.2
+  - Add reset 2D rotation button to effects
+  - Add reset 3D perspective rotation button to effects
+  - Minor changes to perspective effect
+    - Added a new '3D Distance' effect that functions the same as the '3D Perspective' effect in the previous version
+    - Changed the '3D Perspective' effect so that a value of 0 applies no change to the image
+      - This makes it in-line with most other effects, where a value of 0 doesn't affect the image
+      - Default value is 1.0 which has the depth effect fully applied
+      - Values between 0.0 and 1.0 mix the effect to make a cool image!
+
+
 - 1.27.1
   - Improve performance of project select screen by only starting main osci-render program after a project is opened/created
   - Fix bug where images could be drawn so slowly that the frame would never finish drawing
