@@ -12,6 +12,7 @@ public enum EffectType {
   TRACE_MAX(-1),
   SMOOTH(100),
   DEPTH_3D(52),
+  Z_POS_3D(-1),
   ROTATE_SPEED_3D(-1),
   ROTATE_X(-1),
   ROTATE_Y(-1),
