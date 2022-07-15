@@ -1,5 +1,6 @@
 package sh.ball.audio.engine;
 
+import com.sun.javafx.PlatformUtil;
 import sh.ball.shapes.Vector2;
 import xt.audio.*;
 
@@ -236,7 +237,13 @@ public class XtAudioEngine implements AudioEngine {
 
   // connects to an XtAudio XtService in order of lowest latency to highest latency
   private XtService getService(XtPlatform platform) {
-    XtService service = platform.getService(platform.setupToSystem(Enums.XtSetup.SYSTEM_AUDIO));
+    XtService service = null;
+    if ((PlatformUtil.isLinux() || PlatformUtil.isUnix()) && !PlatformUtil.isMac()) {
+      service = platform.getService(Enums.XtSystem.JACK);
+    }
+    if (service == null) {
+      service = platform.getService(platform.setupToSystem(Enums.XtSetup.SYSTEM_AUDIO));
+    }
     if (service == null) {
       service = platform.getService(platform.setupToSystem(Enums.XtSetup.PRO_AUDIO));
     }
