@@ -26,15 +26,14 @@ public class PerspectiveEffect implements SettableEffect {
   public Vector2 apply(int count, Vector2 vector) {
     currentRotation = currentRotation.add(baseRotation.scale(rotateSpeed));
 
-    Vector3 vertex = new Vector3(vector.x, vector.y, 0.0);
-    vertex = vertex.rotate(baseRotation.add(currentRotation));
+    double x = vector.x;
+    double y = vector.y;
+    double z = 0.0;
 
-    executor.setVariable("x", vertex.x);
-    executor.setVariable("y", vertex.y);
-    executor.setVariable("z", -zPos);
-    double x = vertex.x;
-    double y = vertex.y;
-    double z = -zPos;
+    executor.setVariable("x", x);
+    executor.setVariable("y", y);
+    executor.setVariable("z", z);
+
     try {
       LuaValue result = executor.execute();
       x = result.get(1).checkdouble();
@@ -42,10 +41,13 @@ public class PerspectiveEffect implements SettableEffect {
       z = result.get(3).checkdouble();
     } catch (Exception ignored) {}
 
+    Vector3 vertex = new Vector3(x, y, z);
+    vertex = vertex.rotate(baseRotation.add(currentRotation));
+
     double focalLength = 1.0;
     return new Vector2(
-      (1 - effectScale) * vector.x + effectScale * (x * focalLength / z),
-      (1 - effectScale) * vector.y + effectScale * (y * focalLength / z)
+      (1 - effectScale) * vector.x + effectScale * (vertex.x * focalLength / (vertex.z - zPos)),
+      (1 - effectScale) * vector.y + effectScale * (vertex.y * focalLength / (vertex.z - zPos))
     );
   }
 
