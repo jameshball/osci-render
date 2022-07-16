@@ -4,10 +4,15 @@ import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
+import javafx.event.Event;
 import javafx.scene.control.*;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextField;
+import javafx.scene.control.skin.ComboBoxListViewSkin;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.scene.shape.SVGPath;
@@ -61,6 +66,7 @@ import sh.ball.parser.lua.LuaParser;
 import sh.ball.parser.obj.ObjFrameSettings;
 import sh.ball.parser.obj.ObjParser;
 import sh.ball.parser.ParserFactory;
+import sh.ball.parser.svg.SvgParser;
 import sh.ball.parser.txt.FontStyle;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.ShapeFrameSource;
@@ -142,6 +148,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private MenuItem openProjectMenuItem;
   @FXML
+  private Menu audioMenu;
+  @FXML
   private Menu recentProjectMenu;
   @FXML
   private MenuItem saveProjectMenuItem;
@@ -183,6 +191,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private Spinner<Integer> deadzoneSpinner;
   @FXML
   private ComboBox<AudioDevice> deviceComboBox;
+  @FXML
+  private CustomMenuItem audioDeviceMenuItem;
   @FXML
   private Slider brightnessSlider;
   @FXML
@@ -1397,7 +1407,14 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   void openCodeEditor() {
     String code = new String(openFiles.get(currentFrameSource), StandardCharsets.UTF_8);
     closeCodeEditor();
-    launchCodeEditor(code, frameSourcePaths.get(currentFrameSource));
+    String name = frameSourcePaths.get(currentFrameSource);
+    String mimeType = "";
+    if (LuaParser.isLuaFile(name)) {
+      mimeType = "text/x-lua";
+    } else if (SvgParser.isSvgFile(name)) {
+      mimeType = "text/html";
+    }
+    launchCodeEditor(code, frameSourcePaths.get(currentFrameSource), mimeType, this::updateFileData);
   }
 
   private void updateTitle(String message, String projectName) {

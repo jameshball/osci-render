@@ -13,11 +13,15 @@ import org.w3c.dom.Element;
 import sh.ball.audio.FrequencyAnalyser;
 import sh.ball.audio.effect.*;
 import sh.ball.audio.engine.AudioDevice;
+import sh.ball.gui.Gui;
 import sh.ball.gui.components.EffectComponentGroup;
+import sh.ball.parser.lua.LuaExecutor;
+import sh.ball.parser.lua.LuaParser;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -28,6 +32,8 @@ import static sh.ball.math.Math.tryParse;
 public class EffectsController implements Initializable, SubController {
 
   private static final int DEFAULT_SAMPLE_RATE = 192000;
+
+  private final LuaExecutor executor = new LuaExecutor(LuaExecutor.STANDARD_GLOBALS);
 
   private final WobbleEffect wobbleEffect;
   private final PerspectiveEffect perspectiveEffect;
@@ -88,10 +94,12 @@ public class EffectsController implements Initializable, SubController {
   private Button resetRotationButton;
   @FXML
   private Button resetPerspectiveRotationButton;
+  @FXML
+  private Button depthFunctionButton;
 
   public EffectsController() {
     this.wobbleEffect = new WobbleEffect(DEFAULT_SAMPLE_RATE);
-    this.perspectiveEffect = new PerspectiveEffect();
+    this.perspectiveEffect = new PerspectiveEffect(executor);
     this.translateEffect = new TranslateEffect(DEFAULT_SAMPLE_RATE, 1, new Vector2());
     this.rotateEffect = new RotateEffect(DEFAULT_SAMPLE_RATE);
   }
@@ -237,6 +245,14 @@ public class EffectsController implements Initializable, SubController {
       rotateSpeed3D.controller.slider.setValue(0);
       perspectiveEffect.resetRotation();
     });
+
+    String script = "return { x, y, z }";
+    executor.setScript(script);
+    depthFunctionButton.setOnAction(e -> Gui.launchCodeEditor(script, "3D Perspective Effect Depth Function", "text/x-lua", this::updateDepthFunction));
+  }
+
+  private void updateDepthFunction(byte[] fileData, String fileName) {
+    executor.setScript(new String(fileData, StandardCharsets.UTF_8));
   }
 
   private List<EffectComponentGroup> effects() {

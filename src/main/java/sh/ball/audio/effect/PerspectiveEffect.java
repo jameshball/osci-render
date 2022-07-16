@@ -1,16 +1,26 @@
 package sh.ball.audio.effect;
 
+import org.luaj.vm2.LuaValue;
 import sh.ball.engine.Vector3;
+import sh.ball.parser.lua.LuaExecutor;
 import sh.ball.shapes.Vector2;
+
+import javax.xml.transform.Result;
 
 // 3D rotation effect
 public class PerspectiveEffect implements SettableEffect {
+
+  private final LuaExecutor executor;
 
   private double zPos = 1.0;
   private Vector3 baseRotation = new Vector3(Math.PI, Math.PI, 0);
   private Vector3 currentRotation = new Vector3();
   private double rotateSpeed = 0.0;
   private double effectScale = 1.0;
+
+  public PerspectiveEffect(LuaExecutor executor) {
+    this.executor = executor;
+  }
 
   @Override
   public Vector2 apply(int count, Vector2 vector) {
@@ -19,10 +29,23 @@ public class PerspectiveEffect implements SettableEffect {
     Vector3 vertex = new Vector3(vector.x, vector.y, 0.0);
     vertex = vertex.rotate(baseRotation.add(currentRotation));
 
+    executor.setVariable("x", vertex.x);
+    executor.setVariable("y", vertex.y);
+    executor.setVariable("z", -zPos);
+    double x = vertex.x;
+    double y = vertex.y;
+    double z = -zPos;
+    try {
+      LuaValue result = executor.execute();
+      x = result.get(1).checkdouble();
+      y = result.get(2).checkdouble();
+      z = result.get(3).checkdouble();
+    } catch (Exception ignored) {}
+
     double focalLength = 1.0;
     return new Vector2(
-      (1 - effectScale) * vector.x + effectScale * (vertex.x * focalLength / (vertex.z - zPos)),
-      (1 - effectScale) * vector.y + effectScale * (vertex.y * focalLength / (vertex.z - zPos))
+      (1 - effectScale) * vector.x + effectScale * (x * focalLength / z),
+      (1 - effectScale) * vector.y + effectScale * (y * focalLength / z)
     );
   }
 

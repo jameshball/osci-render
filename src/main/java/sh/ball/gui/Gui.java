@@ -31,6 +31,7 @@ import java.nio.file.Path;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 import java.util.logging.*;
 
 public class Gui extends Application {
@@ -40,12 +41,11 @@ public class Gui extends Application {
   public static String LOG_DIR = "./logs/";
   public static final Logger logger = Logger.getLogger(Gui.class.getName());
 
-  public static ProjectSelectController projectSelectController;
   public static ShapeAudioPlayer audioPlayer;
   public static AudioDevice defaultDevice;
-  public static CodeEditor editor;
-  public static Stage editorStage;
-  public static Scene editorScene;
+
+  private static CodeEditor editor;
+  private static Stage editorStage;
 
   static {
     try {
@@ -79,13 +79,11 @@ public class Gui extends Application {
     new Thread(midiCommunicator).start();
   }
 
-  private Stage stage;
   private Scene scene;
   private Parent root;
 
   @Override
   public void start(Stage stage) throws Exception {
-    this.stage = stage;
     System.setProperty("prism.lcdtext", "false");
     System.setProperty("org.luaj.luajc", "true");
 
@@ -93,7 +91,7 @@ public class Gui extends Application {
 
     FXMLLoader projectSelectLoader = new FXMLLoader(getClass().getResource("/fxml/projectSelect.fxml"));
     Parent projectSelectRoot = projectSelectLoader.load();
-    projectSelectController = projectSelectLoader.getController();
+    ProjectSelectController projectSelectController = projectSelectLoader.getController();
     projectSelectController.setOpenBrowser(url -> getHostServices().showDocument(url));
 
     stage.getIcons().add(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/icons/icon.png"))));
@@ -166,12 +164,11 @@ public class Gui extends Application {
     editor = new CodeEditor();
     editor.initialize();
     editorStage = new Stage();
-    editorScene = new Scene(editor, 900, 600, false, SceneAntialiasing.BALANCED);
+    Scene editorScene = new Scene(editor, 900, 600, false, SceneAntialiasing.BALANCED);
     editorStage.setScene(editorScene);
     editorStage.getIcons().add(new Image(Objects.requireNonNull(Gui.class.getResourceAsStream("/icons/icon.png"))));
     editor.prefHeightProperty().bind(editorStage.heightProperty());
     editor.prefWidthProperty().bind(editorStage.widthProperty());
-    editor.setCallback(controller::updateFileData);
   }
 
   public void launchMainApplication(MainController controller, String projectPath, Boolean muted) throws Exception {
@@ -194,20 +191,12 @@ public class Gui extends Application {
     }
   }
 
-  public static void launchCodeEditor(String code, String fileName) {
+  public static void launchCodeEditor(String code, String fileName, String mimeType, BiConsumer<byte[], String> callback) {
     editor.setCode(code, fileName);
+    editor.setCallback(callback);
     editorStage.show();
     editorStage.setTitle(fileName);
-
-    if (LuaParser.isLuaFile(fileName)) {
-      editor.setMode("text/x-lua");
-    } else if (ObjParser.isObjFile(fileName)) {
-      editor.setMode("");
-    } else if (SvgParser.isSvgFile(fileName)) {
-      editor.setMode("text/html");
-    } else if (TextParser.isTxtFile(fileName)) {
-      editor.setMode("");
-    }
+    editor.setMode(mimeType);
   }
 
   public static void closeCodeEditor() {
