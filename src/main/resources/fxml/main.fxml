@@ -39,11 +39,11 @@
                </MenuItem>
             </items>
        </Menu>
-         <Menu mnemonicParsing="false" text="Audio">
+         <Menu fx:id="audioMenu" mnemonicParsing="false" text="Audio">
             <items>
-               <CustomMenuItem hideOnClick="false" mnemonicParsing="false" text="Audio Device">
+               <CustomMenuItem fx:id="audioDeviceMenuItem" hideOnClick="false" mnemonicParsing="false" text="Audio Device">
                   <content>
-                     <AnchorPane>
+                     <AnchorPane focusTraversable="true">
                         <children>
                            <ComboBox fx:id="deviceComboBox" prefHeight="26.0" prefWidth="376.0" />
                         </children>
