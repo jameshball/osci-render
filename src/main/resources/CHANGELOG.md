@@ -1,3 +1,9 @@
+- 1.27.3
+  - Fix [#102](https://github.com/jameshball/osci-render/issues/102) which caused errors when using trace min and small focal lengths at the same time
+    - Thanks [Luiginotcool](https://github.com/Luiginotcool) for reporting this issue!
+  - Reduce max log file size to 1MiB (was previously unlimited)
+
+
 - 1.27.2
   - Add reset 2D rotation button to effects
   - Add reset 3D perspective rotation button to effects
