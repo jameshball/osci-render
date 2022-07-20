@@ -66,7 +66,7 @@ public class Gui extends Application {
       if (!directory.exists()){
         directory.mkdirs();
       }
-      Handler fileHandler = new FileHandler(LOG_DIR + new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date()) + ".log");
+      Handler fileHandler = new FileHandler(LOG_DIR + new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date()) + ".log", 1024 * 1024, 1);
       fileHandler.setLevel(Level.WARNING);
       fileHandler.setFormatter(new SimpleFormatter());
 

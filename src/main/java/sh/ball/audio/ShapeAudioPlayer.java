@@ -136,6 +136,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
       currentShape++;
       // otherwise, index out of bounds
       if (currentShape >= frame.size()) {
+        currentShape = 0;
         break;
       }
       length = getCurrentShape().getLength();
