@@ -32,6 +32,7 @@ import static sh.ball.math.Math.tryParse;
 public class EffectsController implements Initializable, SubController {
 
   private static final int DEFAULT_SAMPLE_RATE = 192000;
+  private static final String DEFAULT_SCRIPT = "return { x, y, z }";
 
   private final LuaExecutor executor = new LuaExecutor(LuaExecutor.STANDARD_GLOBALS);
 
@@ -41,6 +42,7 @@ public class EffectsController implements Initializable, SubController {
   private final RotateEffect rotateEffect;
 
   private double scrollDelta = 0.05;
+  private String script = DEFAULT_SCRIPT;
 
   @FXML
   private EffectComponentGroup vectorCancelling;
@@ -246,13 +248,13 @@ public class EffectsController implements Initializable, SubController {
       perspectiveEffect.resetRotation();
     });
 
-    String script = "return { x, y, z }";
     executor.setScript(script);
     depthFunctionButton.setOnAction(e -> Gui.launchCodeEditor(script, "3D Perspective Effect Depth Function", "text/x-lua", this::updateDepthFunction));
   }
 
   private void updateDepthFunction(byte[] fileData, String fileName) {
-    executor.setScript(new String(fileData, StandardCharsets.UTF_8));
+    script = new String(fileData, StandardCharsets.UTF_8);
+    executor.setScript(script);
   }
 
   private List<EffectComponentGroup> effects() {
@@ -303,10 +305,13 @@ public class EffectsController implements Initializable, SubController {
     y.appendChild(document.createTextNode(translationYTextField.getText()));
     Element ellipse = document.createElement("ellipse");
     ellipse.appendChild(document.createTextNode(Boolean.toString(translateEllipseCheckBox.isSelected())));
+    Element depthFunction = document.createElement("depthFunction");
+    String encodedData = Base64.getEncoder().encodeToString(script.getBytes(StandardCharsets.UTF_8));
+    depthFunction.appendChild(document.createTextNode(encodedData));
     translation.appendChild(x);
     translation.appendChild(y);
     translation.appendChild(ellipse);
-    return List.of(element, translation);
+    return List.of(element, translation, depthFunction);
   }
 
   @Override
@@ -322,10 +327,16 @@ public class EffectsController implements Initializable, SubController {
     // For backwards compatibility we assume a default value
     Element ellipse = (Element) translation.getElementsByTagName("ellipse").item(0);
     translateEllipseCheckBox.setSelected(ellipse != null && Boolean.parseBoolean(ellipse.getTextContent()));
-  }
 
-  public TranslateEffect getTranslateEffect() {
-    return translateEffect;
+    Element depthFunction = (Element) root.getElementsByTagName("depthFunction").item(0);
+    // backwards compatibility
+    if (depthFunction == null) {
+      script = DEFAULT_SCRIPT;
+    } else {
+      String encodedScript = depthFunction.getTextContent();
+      script = new String(Base64.getDecoder().decode(encodedScript), StandardCharsets.UTF_8);
+      executor.setScript(script);
+    }
   }
 
   public void setTranslation(Vector2 translation) {

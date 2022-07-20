@@ -1,8 +1,5 @@
 package sh.ball.audio;
 
-import javafx.application.Platform;
-import javafx.beans.property.DoubleProperty;
-import javafx.beans.property.SimpleDoubleProperty;
 import sh.ball.audio.effect.*;
 
 import java.io.*;

@@ -196,6 +196,9 @@ public class Gui extends Application {
     editor.setCallback(callback);
     editorStage.show();
     editorStage.setTitle(fileName);
+    // hacky way to bring the window to the front
+    editorStage.setAlwaysOnTop(true);
+    editorStage.setAlwaysOnTop(false);
     editor.setMode(mimeType);
   }
 
