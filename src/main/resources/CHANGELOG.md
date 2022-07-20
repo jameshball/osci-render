@@ -1,3 +1,15 @@
+- 1.27.4
+  - Allow the 3D perspective effect to be live-programmed with Lua
+  - By default, the behaviour is the same as before and the image is not modified
+  - Variables `x`, `y`, and `z` are available to used to transform the 3D position of the image
+  - `step` is also available as with regular live-coding
+    - This lets you animate the effects you apply
+  - Most interesting transformations include modifying the depth to be a function of `x` and `y`
+    - Example: `return { x, y, z + 0.1 * math.sin(x * 10 + step / 100000) }`
+    - This creates a wave effect for the image which can be visualised more clearly by rotating the image
+  - Functions written are saved with the project
+
+
 - 1.27.3
   - Fix [#102](https://github.com/jameshball/osci-render/issues/102) which caused errors when using trace min and small focal lengths at the same time
     - Thanks [Luiginotcool](https://github.com/Luiginotcool) for reporting this issue!
