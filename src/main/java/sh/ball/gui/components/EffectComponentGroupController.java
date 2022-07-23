@@ -1,11 +1,11 @@
 package sh.ball.gui.components;
 
-import javafx.beans.InvalidationListener;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
 import javafx.scene.shape.SVGPath;
+import javafx.util.StringConverter;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import sh.ball.audio.effect.AnimationType;
@@ -16,9 +16,14 @@ import sh.ball.gui.ThreeParamRunnable;
 import sh.ball.gui.controller.SubController;
 
 import java.net.URL;
+import java.text.DecimalFormat;
+import java.text.ParseException;
 import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
+import java.util.logging.Level;
+
+import static sh.ball.gui.Gui.logger;
 
 public class EffectComponentGroupController implements Initializable, SubController {
 
@@ -27,6 +32,33 @@ public class EffectComponentGroupController implements Initializable, SubControl
   private String label;
   private double increment;
   private boolean alwaysEnabled = false;
+
+  private final StringConverter<Double> doubleConverter = new StringConverter<>() {
+    private final DecimalFormat df = new DecimalFormat("###.###");
+
+    @Override
+    public String toString(Double object) {
+      if (object == null) {return "";}
+      return df.format(object);
+    }
+
+    @Override
+    public Double fromString(String string) {
+      try {
+        if (string == null) {
+          return null;
+        }
+        string = string.trim();
+        if (string.length() < 1) {
+          return null;
+        }
+        return df.parse(string).doubleValue();
+      } catch (ParseException ex) {
+        logger.log(Level.WARNING, ex.getMessage(), ex);
+        return null;
+      }
+    }
+  };
 
   @FXML
   public CheckBox effectCheckBox;
@@ -43,13 +75,8 @@ public class EffectComponentGroupController implements Initializable, SubControl
 
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
-    slider.valueProperty().addListener((o, oldValue, newValue) ->
-      spinner.setValueFactory(
-        new SpinnerValueFactory.DoubleSpinnerValueFactory(
-          slider.getMin(), slider.getMax(), newValue.doubleValue(), increment
-        )
-      ));
     spinner.valueProperty().addListener((o, oldValue, newValue) -> slider.setValue(newValue));
+    slider.valueProperty().addListener((o, oldValue, newValue) -> spinner.getValueFactory().setValue(newValue.doubleValue()));
   }
 
   public void lateInitialize() {
@@ -64,19 +91,11 @@ public class EffectComponentGroupController implements Initializable, SubControl
 
     slider.minProperty().addListener((e, old, min) -> {
       animator.setMin(min.doubleValue());
-      spinner.setValueFactory(
-        new SpinnerValueFactory.DoubleSpinnerValueFactory(
-          min.doubleValue(), slider.getMax(), slider.getValue(), increment
-        )
-      );
+      updateSpinnerValueFactory(min.doubleValue(), slider.getMax(), slider.getValue(), increment);
     });
     slider.maxProperty().addListener((e, old, max) -> {
       animator.setMax(max.doubleValue());
-      spinner.setValueFactory(
-        new SpinnerValueFactory.DoubleSpinnerValueFactory(
-          slider.getMin(), max.doubleValue(), slider.getValue(), increment
-        )
-      );
+      updateSpinnerValueFactory(slider.getMin(), max.doubleValue(), slider.getValue(), increment);
     });
   }
 
@@ -209,5 +228,11 @@ public class EffectComponentGroupController implements Initializable, SubControl
 
   public boolean getAlwaysEnabled() {
     return alwaysEnabled;
+  }
+
+  public void updateSpinnerValueFactory(double min, double max, double value, double increment) {
+    SpinnerValueFactory<Double> svf = new SpinnerValueFactory.DoubleSpinnerValueFactory(min, max, value, increment);
+    svf.setConverter(doubleConverter);
+    spinner.setValueFactory(svf);
   }
 }
