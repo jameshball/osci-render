@@ -1,3 +1,8 @@
+- 1.27.5
+  - Add additional decimal place on effect spinners so that the values change correctly
+    - Fixes [#80](https://github.com/jameshball/osci-render/issues/80)
+
+
 - 1.27.4
   - Allow the 3D perspective effect to be live-programmed with Lua
   - By default, the behaviour is the same as before and the image is not modified
