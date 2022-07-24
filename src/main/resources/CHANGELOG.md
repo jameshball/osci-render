@@ -1,3 +1,7 @@
+- 1.27.6
+  - Fix trace min effect being hidden at bottom of effects section
+
+
 - 1.27.5
   - Add additional decimal place on effect spinners so that the values change correctly
     - Fixes [#80](https://github.com/jameshball/osci-render/issues/80)
