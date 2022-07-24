@@ -11,9 +11,9 @@
 <?import javafx.scene.layout.VBox?>
 <?import sh.ball.gui.components.EffectComponentGroup?>
 
-<ScrollPane hbarPolicy="NEVER" prefHeight="1065.0" prefWidth="608.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.EffectsController">
+<ScrollPane hbarPolicy="NEVER" prefHeight="1094.0" prefWidth="608.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.EffectsController">
    <content>
-      <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="1049.0" prefWidth="606.0">
+      <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="1092.0" prefWidth="606.0">
           <children>
             <VBox>
                <children>
