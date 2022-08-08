@@ -6,6 +6,7 @@
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.CustomMenuItem?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.Menu?>
 <?import javafx.scene.control.MenuBar?>
 <?import javafx.scene.control.MenuItem?>
@@ -45,7 +46,8 @@
                   <content>
                      <AnchorPane focusTraversable="true">
                         <children>
-                           <ComboBox fx:id="deviceComboBox" prefHeight="26.0" prefWidth="376.0" />
+                           <Label prefHeight="25.0" text="Audio Device" textFill="WHITE" />
+                           <ListView fx:id="deviceListView" layoutY="25.0" prefHeight="200.0" prefWidth="400.0" />
                         </children>
                      </AnchorPane>
                   </content>
@@ -158,7 +160,7 @@
                      <AnchorPane>
                         <children>
                            <Label prefHeight="25.0" text="Text File Font" textFill="WHITE" />
-                           <ComboBox fx:id="fontFamilyComboBox" layoutY="25.0" prefHeight="26.0" prefWidth="376.0" />
+                           <ListView fx:id="fontFamilyListView" layoutY="25.0" prefHeight="200.0" prefWidth="400.0" />
                         </children>
                      </AnchorPane>
                   </content>

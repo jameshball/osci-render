@@ -4,10 +4,15 @@ import java.util.Objects;
 
 public record SimpleAudioDevice(String id, String name, int sampleRate, AudioSample sample, int channels) implements AudioDevice {
 
+  private static final int MAX_NAME_LENGTH = 30;
+
   @Override
   public String toString() {
     String simplifiedName = name.replaceFirst(" \\(Shared\\)", "");
     simplifiedName = simplifiedName.replaceFirst(" \\(NVIDIA High Definition Audio\\)", "");
+    if (simplifiedName.length() > MAX_NAME_LENGTH) {
+      simplifiedName = simplifiedName.substring(0, MAX_NAME_LENGTH - 3) + "...";
+    }
     simplifiedName += " @ " + sampleRate + "Hz, " + sample + ", ";
     if (channels == 1) {
       simplifiedName += "mono";

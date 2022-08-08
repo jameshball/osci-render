@@ -170,7 +170,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private CheckMenuItem renderUsingGpuCheckMenuItem;
   @FXML
-  private ComboBox<String> fontFamilyComboBox;
+  private ListView<String> fontFamilyListView;
   @FXML
   private ComboBox<FontStyle> fontStyleComboBox;
   @FXML
@@ -190,7 +190,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private Spinner<Integer> deadzoneSpinner;
   @FXML
-  private ComboBox<AudioDevice> deviceComboBox;
+  private ListView<AudioDevice> deviceListView;
   @FXML
   private CustomMenuItem audioDeviceMenuItem;
   @FXML
@@ -251,7 +251,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private void toggleRecord() {
     recording = !recording;
     audioSampleComboBox.setDisable(recording);
-    deviceComboBox.setDisable(recording);
+    deviceListView.setDisable(recording);
     boolean timedRecord = recordCheckBox.isSelected();
     if (recording) {
       // if it is a timed recording then a timeline is scheduled to start and
@@ -278,7 +278,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
             recording = false;
             Platform.runLater(() -> {
               audioSampleComboBox.setDisable(false);
-              deviceComboBox.setDisable(false);
+              deviceListView.setDisable(false);
             });
           }
         );
@@ -463,13 +463,14 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     sliderComboBox.setValue(printableSliders.get(0));
 
     String[] installedFonts = GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames();
-    fontFamilyComboBox.setItems(FXCollections.observableList(Arrays.stream(installedFonts).toList()));
-    if (fontFamilyComboBox.getItems().contains("SansSerif")) {
-      fontFamilyComboBox.setValue("SansSerif");
+    fontFamilyListView.setItems(FXCollections.observableList(Arrays.stream(installedFonts).toList()));
+    if (fontFamilyListView.getItems().contains("SansSerif")) {
+      fontFamilyListView.getSelectionModel().select("SansSerif");
     } else {
-      fontFamilyComboBox.setValue(installedFonts[0]);
+      fontFamilyListView.getSelectionModel().select(installedFonts[0]);
     }
-    fontFamilyComboBox.valueProperty().addListener((e, old, family) -> updateFileData(openFiles.get(currentFrameSource), frameSourcePaths.get(currentFrameSource)));
+    fontFamilyListView.getSelectionModel().selectedItemProperty().addListener((e, old, family) -> updateFileData(openFiles.get(currentFrameSource), frameSourcePaths.get(currentFrameSource)));
+
 
     fontStyleComboBox.setItems(FXCollections.observableList(Arrays.stream(FontStyle.values()).toList()));
     fontStyleComboBox.setValue(FontStyle.PLAIN);
@@ -513,9 +514,9 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     new Thread(() -> {
       List<AudioDevice> devices = audioPlayer.devices();
       Platform.runLater(() -> {
-        deviceComboBox.setItems(FXCollections.observableList(devices));
-        deviceComboBox.setValue(defaultDevice);
-        deviceComboBox.valueProperty().addListener((options, oldDevice, newDevice) -> {
+        deviceListView.setItems(FXCollections.observableList(devices));
+        deviceListView.getSelectionModel().select(defaultDevice);
+        deviceListView.getSelectionModel().selectedItemProperty().addListener((options, oldDevice, newDevice) -> {
           if (newDevice != null) {
             switchAudioDevice(newDevice);
           }
@@ -738,7 +739,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       Platform.runLater(() -> luaController.updateLuaVariables());
       frameSources.add(null);
     } else {
-      frameSources.add(ParserFactory.getParser(name, fileData, fontFamilyComboBox.getValue(), fontStyleComboBox.getValue()).parse());
+      frameSources.add(ParserFactory.getParser(name, fileData, fontFamilyListView.getSelectionModel().getSelectedItem(), fontStyleComboBox.getValue()).parse());
       sampleParsers.add(null);
     }
     frameSourcePaths.add(name);
@@ -799,7 +800,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         frameSources.set(index, null);
       } else {
         FrameSource<List<Shape>> frameSource = frameSources.get(index);
-        frameSources.set(index, ParserFactory.getParser(name, file, fontFamilyComboBox.getValue(), fontStyleComboBox.getValue()).parse());
+        frameSources.set(index, ParserFactory.getParser(name, file, fontFamilyListView.getSelectionModel().getSelectedItem(), fontStyleComboBox.getValue()).parse());
         frameSource.disable();
         sampleParsers.set(index, null);
       }
