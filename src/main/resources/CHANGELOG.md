@@ -1,3 +1,7 @@
+- 1.27.7
+  - Change audio selection and text font selection to be lists rather than dropdowns
+
+
 - 1.27.6
   - Fix trace min effect being hidden at bottom of effects section
 
