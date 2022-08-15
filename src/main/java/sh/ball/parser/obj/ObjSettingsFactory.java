@@ -35,4 +35,16 @@ public class ObjSettingsFactory {
   public static ObjFrameSettings renderUsingGpu(Boolean usingGpu) {
     return new ObjFrameSettings(null, null, null, null, null, false, null, usingGpu);
   }
+
+  public static ObjFrameSettings baseRotationX(double x) {
+    return new ObjFrameSettings().withRotateX(x * Math.PI);
+  }
+
+  public static ObjFrameSettings baseRotationY(double y) {
+    return new ObjFrameSettings().withRotateY(y * Math.PI);
+  }
+
+  public static ObjFrameSettings baseRotationZ(double z) {
+    return new ObjFrameSettings().withRotateZ(z * Math.PI);
+  }
 }

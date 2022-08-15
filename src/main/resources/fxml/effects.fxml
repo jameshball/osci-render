@@ -92,9 +92,16 @@
                   </AnchorPane>
                   <EffectComponentGroup fx:id="zPos" alwaysEnabled="true" increment="0.005" label="zPos" max="1.0" name="3D Distance (z)" type="Z_POS_3D" value="0.1" />
                   <EffectComponentGroup fx:id="rotateSpeed3D" alwaysEnabled="true" increment="0.005" label="rotateSpeed3d" majorTickUnit="0.2" max="1.0" min="-1.0" name="3D Rotate speed" type="ROTATE_SPEED_3D" value="0.0" />
-                  <EffectComponentGroup fx:id="rotateX" alwaysEnabled="true" increment="0.01" label="imageRotateX" majorTickUnit="0.2" max="1.0" min="-1.0" name="Rotate x" type="ROTATE_X" value="1.0" />
-                  <EffectComponentGroup fx:id="rotateY" alwaysEnabled="true" increment="0.01" label="imageRotateY" majorTickUnit="0.2" max="1.0" min="-1.0" name="Rotate y" type="ROTATE_Y" value="1.0" />
-                  <EffectComponentGroup fx:id="rotateZ" alwaysEnabled="true" increment="0.01" label="imageRotateZ" majorTickUnit="0.2" max="1.0" min="-1.0" name="Rotate z" type="ROTATE_Z" value="0.0" />
+                  <AnchorPane prefHeight="86.0" prefWidth="602.0">
+                     <children>
+                        <EffectComponentGroup fx:id="rotateX" alwaysEnabled="true" increment="0.01" label="imageRotateX" majorTickUnit="0.2" max="1.0" maxHeight="-Infinity" maxWidth="-Infinity" min="-1.0" minHeight="-Infinity" minWidth="-Infinity" name="Rotate x" type="ROTATE_X" value="1.0" />
+                        <EffectComponentGroup fx:id="rotateY" alwaysEnabled="true" increment="0.01" label="imageRotateY" layoutY="42.0" majorTickUnit="0.2" max="1.0" min="-1.0" name="Rotate y" type="ROTATE_Y" value="1.0" />
+                        <EffectComponentGroup fx:id="rotateZ" alwaysEnabled="true" increment="0.01" label="imageRotateZ" layoutY="85.0" majorTickUnit="0.2" max="1.0" min="-1.0" name="Rotate z" type="ROTATE_Z" value="0.0" />
+                        <CheckBox layoutX="571.0" layoutY="5.0" mnemonicParsing="false" />
+                        <CheckBox layoutX="571.0" layoutY="47.0" mnemonicParsing="false" />
+                        <CheckBox layoutX="571.0" layoutY="90.0" mnemonicParsing="false" />
+                     </children>
+                  </AnchorPane>
                   <AnchorPane prefHeight="34.0" prefWidth="602.0">
                      <children>
                         <Button fx:id="resetPerspectiveRotationButton" layoutX="245.0" layoutY="1.0" mnemonicParsing="false" text="Reset 3D Rotation" />

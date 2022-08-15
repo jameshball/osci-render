@@ -4,6 +4,8 @@ import sh.ball.shapes.Vector2;
 
 public class EffectAnimator extends PhaseEffect implements SettableEffect {
 
+  public static final int DEFAULT_SAMPLE_RATE = 192000;
+
   private static final double SPEED_SCALE = 20.0;
 
   private final SettableEffect effect;

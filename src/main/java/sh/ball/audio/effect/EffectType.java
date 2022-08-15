@@ -19,7 +19,12 @@ public enum EffectType {
   ROTATE_Z(-1),
   TRANSLATE_SPEED(-1),
   VISIBILITY(-1),
-  SCALE(-1);
+  SCALE(-1),
+  FOCAL_LENGTH(-1),
+  OBJ_ROTATE_X(-1),
+  OBJ_ROTATE_Y(-1),
+  OBJ_ROTATE_Z(-1),
+  OBJ_ROTATE_SPEED(-1);
 
   public final int precedence;
 
