@@ -73,6 +73,15 @@ public class ObjFrameSource implements FrameSource<List<Shape>> {
       if (obj.usingGpu != null) {
         camera.usingGpu(obj.usingGpu);
       }
+      if (obj.rotateX != null) {
+        this.baseRotation = new Vector3(obj.rotateX, baseRotation.y, baseRotation.z);
+      }
+      if (obj.rotateY != null) {
+        this.baseRotation = new Vector3(baseRotation.x, obj.rotateY, baseRotation.z);
+      }
+      if (obj.rotateZ != null) {
+        this.baseRotation = new Vector3(baseRotation.x, baseRotation.y, obj.rotateZ);
+      }
     }
   }
 

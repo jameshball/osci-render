@@ -1,5 +1,6 @@
 package sh.ball.gui.controller;
 
+import javafx.beans.property.BooleanProperty;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
@@ -57,8 +58,8 @@ public class ImageController implements Initializable, SubController {
   }
 
   @Override
-  public List<CheckBox> micCheckBoxes() {
-    return List.of(frequencyMic);
+  public List<BooleanProperty> micSelected() {
+    return List.of(frequencyMic.selectedProperty());
   }
 
   @Override
@@ -78,4 +79,7 @@ public class ImageController implements Initializable, SubController {
 
   @Override
   public void load(Element root) {}
+
+  @Override
+  public void micNotAvailable() {}
 }

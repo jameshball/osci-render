@@ -3,6 +3,7 @@ package sh.ball.gui.controller;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
+import javafx.beans.property.BooleanProperty;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -15,9 +16,7 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.xml.sax.SAXException;
 
-import javax.xml.parsers.ParserConfigurationException;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -277,8 +276,8 @@ public class GeneralController implements Initializable, SubController {
   }
 
   @Override
-  public List<CheckBox> micCheckBoxes() {
-    List<CheckBox> checkboxes = new ArrayList<>();
+  public List<BooleanProperty> micSelected() {
+    List<BooleanProperty> checkboxes = new ArrayList<>();
     checkboxes.add(null);
     checkboxes.add(null);
     return checkboxes;
@@ -312,6 +311,9 @@ public class GeneralController implements Initializable, SubController {
       }
     }
   }
+
+  @Override
+  public void micNotAvailable() {}
 
   public void setFrameSourceName(String name) {
     this.frameSourceName = name;

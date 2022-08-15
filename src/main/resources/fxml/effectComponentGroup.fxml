@@ -9,7 +9,7 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.shape.SVGPath?>
 
-<fx:root maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="41.0" prefWidth="601.0" type="HBox" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.components.EffectComponentGroupController">
+<fx:root maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="41.0" prefWidth="567.0" type="HBox" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.components.EffectComponentGroupController">
    <children>
       <Region prefHeight="0.0" prefWidth="5.0" />
       <CheckBox fx:id="effectCheckBox" mnemonicParsing="false" prefHeight="18.0" prefWidth="125.0" text="Vector cancel">
@@ -32,15 +32,15 @@
             <Insets left="3.0" right="3.0" top="11.0" />
          </HBox.margin>
       </SVGPath>
-      <ComboBox fx:id="comboBox" prefHeight="26.0" prefWidth="102.0">
+      <ComboBox fx:id="comboBox" minWidth="80.0" prefHeight="26.0" prefWidth="102.0">
          <HBox.margin>
             <Insets right="3.0" />
          </HBox.margin>
       </ComboBox>
-      <CheckBox fx:id="micCheckBox" mnemonicParsing="false" prefHeight="18.0" prefWidth="52.0" text="Mic">
+      <SVGPath fx:id="mic" content="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3m7 9c0 3.53-2.61 6.44-6 6.93V21h-2v-3.07c-3.39-.49-6-3.4-6-6.93h2a5 5 0 0 0 5 5a5 5 0 0 0 5-5h2Z" fill="WHITE" pickOnBounds="true">
          <HBox.margin>
-            <Insets top="5.0" />
+            <Insets left="5.0" top="5.0" />
          </HBox.margin>
-      </CheckBox>
+      </SVGPath>
    </children>
 </fx:root>

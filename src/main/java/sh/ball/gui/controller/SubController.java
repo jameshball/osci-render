@@ -1,6 +1,6 @@
 package sh.ball.gui.controller;
 
-import javafx.scene.control.CheckBox;
+import javafx.beans.property.BooleanProperty;
 import javafx.scene.control.Slider;
 import javafx.scene.shape.SVGPath;
 import org.w3c.dom.Document;
@@ -14,7 +14,7 @@ public interface SubController {
 
   Map<SVGPath, Slider> getMidiButtonMap();
 
-  List<CheckBox> micCheckBoxes();
+  List<BooleanProperty> micSelected();
 
   List<Slider> sliders();
 
@@ -23,4 +23,6 @@ public interface SubController {
   List<? extends Node> save(Document document);
 
   void load(Element root);
+
+  void micNotAvailable();
 }

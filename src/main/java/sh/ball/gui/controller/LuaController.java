@@ -1,6 +1,6 @@
 package sh.ball.gui.controller;
 
-import javafx.application.Platform;
+import javafx.beans.property.BooleanProperty;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
@@ -85,8 +85,14 @@ public class LuaController implements Initializable, SubController {
   }
 
   @Override
-  public List<CheckBox> micCheckBoxes() {
-    return List.of(luaAMic, luaBMic, luaCMic, luaDMic, luaEMic);
+  public List<BooleanProperty> micSelected() {
+    return List.of(
+      luaAMic.selectedProperty(),
+      luaBMic.selectedProperty(),
+      luaCMic.selectedProperty(),
+      luaDMic.selectedProperty(),
+      luaEMic.selectedProperty()
+    );
   }
 
   @Override
@@ -106,5 +112,14 @@ public class LuaController implements Initializable, SubController {
 
   @Override
   public void load(Element root) {
+  }
+
+  @Override
+  public void micNotAvailable() {
+    luaAMic.setDisable(true);
+    luaBMic.setDisable(true);
+    luaCMic.setDisable(true);
+    luaDMic.setDisable(true);
+    luaEMic.setDisable(true);
   }
 }
