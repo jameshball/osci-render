@@ -24,7 +24,12 @@ public enum EffectType {
   OBJ_ROTATE_X(-1),
   OBJ_ROTATE_Y(-1),
   OBJ_ROTATE_Z(-1),
-  OBJ_ROTATE_SPEED(-1);
+  OBJ_ROTATE_SPEED(-1),
+  LUA_A(-1),
+  LUA_B(-1),
+  LUA_C(-1),
+  LUA_D(-1),
+  LUA_E(-1);
 
   public final int precedence;
 
