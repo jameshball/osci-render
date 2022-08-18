@@ -34,6 +34,7 @@ public class EffectComponentGroup extends HBox {
   private final DoubleProperty min = new SimpleDoubleProperty();
   private final DoubleProperty max = new SimpleDoubleProperty();
   private final BooleanProperty micSelected = new SimpleBooleanProperty(false);
+  private final BooleanProperty enabled = new SimpleBooleanProperty(false);
 
   public EffectComponentGroup() {
     EffectComponentGroupController temp;
@@ -218,6 +219,18 @@ public class EffectComponentGroup extends HBox {
 
   public BooleanProperty isMicSelectedProperty() {
     return micSelected;
+  }
+
+  public boolean isEnabled() {
+    return controller.effectCheckBox.isSelected();
+  }
+
+  public void setEnabled(boolean enabled) {
+    controller.effectCheckBox.setSelected(enabled);
+  }
+
+  public BooleanProperty isEnabledProperty() {
+    return controller.effectCheckBox.selectedProperty();
   }
 
   public List<BooleanProperty> micSelected() {

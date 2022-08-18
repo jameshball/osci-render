@@ -20,6 +20,8 @@ import javax.sound.midi.ShortMessage;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 
+import static sh.ball.audio.effect.EffectType.TRACE_MAX;
+import static sh.ball.audio.effect.EffectType.TRACE_MIN;
 import static sh.ball.gui.Gui.audioPlayer;
 import static sh.ball.gui.Gui.logger;
 
@@ -72,6 +74,8 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private double baseFrequency;
   private double traceMin = 0;
   private double traceMax = 1;
+  private boolean traceMinEnabled = false;
+  private boolean traceMaxEnabled = false;
   private int octave = 0;
   private int sampleRate;
   private boolean flipX = false;
@@ -174,7 +178,10 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
     incrementShapeDrawing();
 
-    double proportionalLength = traceMax * frameLength;
+    double actualTraceMax = traceMaxEnabled ? traceMax : 1.0;
+    double actualTraceMin = traceMinEnabled ? traceMin : 0.0;
+
+    double proportionalLength = actualTraceMax * frameLength;
 
     if (currentShape >= frame.size() || frameDrawn > proportionalLength) {
       currentShape = 0;
@@ -188,7 +195,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
       shapeDrawn = 0;
       frameDrawn = 0;
 
-      while (frameDrawn < traceMin * frameLength) {
+      while (frameDrawn < actualTraceMin * frameLength) {
         incrementShapeDrawing();
       }
     }
@@ -328,7 +335,9 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
   private void updateLengthIncrement() {
     if (frame != null) {
-      double proportionalLength = (traceMax - traceMin) * frameLength;
+      double actualTraceMax = traceMaxEnabled ? traceMax : 1.0;
+      double actualTraceMin = traceMinEnabled ? traceMin : 0.0;
+      double proportionalLength = (actualTraceMax - actualTraceMin) * frameLength;
       int sampleRate = device.sampleRate();
       double actualFrequency = octaveFrequency * pitchBends[mainChannel];
       lengthIncrement = Math.max(proportionalLength / (sampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
@@ -410,12 +419,24 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
   @Override
   public void addEffect(EffectType type, Effect effect) {
+    if (type.equals(TRACE_MAX)) {
+      traceMaxEnabled = true;
+    }
+    if (type.equals(TRACE_MIN)) {
+      traceMinEnabled = true;
+    }
     effects.add(new EffectTypePair(type, effect));
     Collections.sort(effects);
   }
 
   @Override
   public void removeEffect(EffectType type) {
+    if (type.equals(TRACE_MAX)) {
+      traceMaxEnabled = false;
+    }
+    if (type.equals(TRACE_MIN)) {
+      traceMinEnabled = false;
+    }
     effects.removeIf(e -> e.type == type);
   }
 

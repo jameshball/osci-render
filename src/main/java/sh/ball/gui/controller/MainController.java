@@ -1138,8 +1138,9 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
       subControllers().forEach(controller -> controller.save(document).forEach(root::appendChild));
 
-      Element element = document.createElement("checkBoxes");
-      effects().forEach(effect -> effect.save(document).forEach(element::appendChild));
+      Element checkBoxes = document.createElement("checkBoxes");
+      effects().forEach(effect -> effect.save(document).forEach(checkBoxes::appendChild));
+      root.appendChild(checkBoxes);
 
       Element flipX = document.createElement("flipX");
       Element flipY = document.createElement("flipY");
