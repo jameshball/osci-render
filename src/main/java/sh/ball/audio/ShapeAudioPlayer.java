@@ -20,6 +20,7 @@ import javax.sound.midi.ShortMessage;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 
+import static sh.ball.gui.Gui.audioPlayer;
 import static sh.ball.gui.Gui.logger;
 
 public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
@@ -416,6 +417,17 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   @Override
   public void removeEffect(EffectType type) {
     effects.removeIf(e -> e.type == type);
+  }
+
+  // selects or deselects the given audio effect
+  public void updateEffect(EffectType type, boolean checked, SettableEffect effect) {
+    if (type != null) {
+      if (checked) {
+        audioPlayer.addEffect(type, effect);
+      } else {
+        audioPlayer.removeEffect(type);
+      }
+    }
   }
 
   @Override

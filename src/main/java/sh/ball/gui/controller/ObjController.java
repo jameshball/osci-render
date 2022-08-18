@@ -44,14 +44,10 @@ public class ObjController implements Initializable, SubController {
   @FXML
   private Button resetObjectRotationButton;
 
-  private List<EffectComponentGroup> effectComponentGroups() {
-    return List.of(focalLength, rotateX, rotateY, rotateZ, rotateSpeed);
-  }
-
   @Override
   public Map<SVGPath, Slider> getMidiButtonMap() {
     Map<SVGPath, Slider> map = new HashMap<>();
-    effectComponentGroups().forEach(ecg -> map.putAll(ecg.getMidiButtonMap()));
+    effects().forEach(effect -> map.putAll(effect.getMidiButtonMap()));
     return map;
   }
 
@@ -151,55 +147,40 @@ public class ObjController implements Initializable, SubController {
     rotateZ.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(this::setObjRotateZ)));
     rotateSpeed.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(this::setObjectRotateSpeed)));
 
-    effectComponentGroups().forEach(effect -> effect.setEffectUpdater(this::updateEffect));
-  }
-
-  // selects or deselects the given audio effect
-  public void updateEffect(EffectType type, boolean checked, SettableEffect effect) {
-    if (type != null) {
-      if (checked) {
-        audioPlayer.addEffect(type, effect);
-      } else {
-        audioPlayer.removeEffect(type);
-      }
-    }
+    effects().forEach(effect -> effect.setEffectUpdater(audioPlayer::updateEffect));
   }
 
   @Override
   public List<BooleanProperty> micSelected() {
-    return effectComponentGroups().stream().map(EffectComponentGroup::isMicSelectedProperty).toList();
+    return effects().stream().map(EffectComponentGroup::isMicSelectedProperty).toList();
   }
 
   @Override
   public List<Slider> sliders() {
-    return effectComponentGroups().stream().map(EffectComponentGroup::sliders).flatMap(List::stream).toList();
+    return effects().stream().map(EffectComponentGroup::sliders).flatMap(List::stream).toList();
   }
 
   @Override
   public List<String> labels() {
-    return effectComponentGroups().stream().map(EffectComponentGroup::getLabel).toList();
+    return effects().stream().map(EffectComponentGroup::getLabel).toList();
+  }
+
+  @Override
+  public List<EffectComponentGroup> effects() {
+    return List.of(focalLength, rotateX, rotateY, rotateZ, rotateSpeed);
   }
 
   @Override
   public List<Element> save(Document document) {
-    Element element = document.createElement("objController");
-    effectComponentGroups().forEach(effect -> effect.save(document).forEach(element::appendChild));
-    return List.of(element);
+    return List.of(document.createElement("null"));
   }
 
   @Override
-  public void load(Element root) {
-    Element element = (Element) root.getElementsByTagName("objController").item(0);
-    if (element != null) {
-      effectComponentGroups().forEach(effect -> effect.load(element));
-    } else {
-      effectComponentGroups().forEach(effect -> effect.setAnimationType(AnimationType.STATIC));
-    }
-  }
+  public void load(Element root) {}
 
   @Override
   public void micNotAvailable() {
-    effectComponentGroups().forEach(EffectComponentGroup::micNotAvailable);
+    effects().forEach(EffectComponentGroup::micNotAvailable);
   }
 
   public void renderUsingGpu(boolean usingGpu) {

@@ -48,12 +48,14 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
+import sh.ball.audio.effect.AnimationType;
 import sh.ball.audio.engine.*;
 import sh.ball.audio.midi.MidiListener;
 import sh.ball.audio.midi.MidiNote;
 import sh.ball.engine.ObjectServer;
 import sh.ball.engine.ObjectSet;
 import sh.ball.gui.Gui;
+import sh.ball.gui.components.EffectComponentGroup;
 import sh.ball.oscilloscope.ByteWebSocketServer;
 import sh.ball.parser.FileParser;
 import sh.ball.parser.lua.LuaParser;
@@ -1017,6 +1019,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     sliders.add(brightnessSlider);
     return sliders;
   }
+
+  private List<EffectComponentGroup> effects() {
+    return subControllers().stream().map(SubController::effects).flatMap(Collection::stream).toList();
+  }
+
   private List<String> labels() {
     List<String> labels = new ArrayList<>();
     subControllers().forEach(controller -> labels.addAll(controller.labels()));
@@ -1130,6 +1137,9 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       root.appendChild(midiElement);
 
       subControllers().forEach(controller -> controller.save(document).forEach(root::appendChild));
+
+      Element element = document.createElement("checkBoxes");
+      effects().forEach(effect -> effect.save(document).forEach(element::appendChild));
 
       Element flipX = document.createElement("flipX");
       Element flipY = document.createElement("flipY");
@@ -1266,6 +1276,13 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       root.appendChild(midiElement);
 
       subControllers().forEach(controller -> controller.load(root));
+
+      Element element = (Element) root.getElementsByTagName("checkBoxes").item(0);
+      if (element != null) {
+        effects().forEach(effect -> effect.load(element));
+      } else {
+        effects().forEach(effect -> effect.setAnimationType(AnimationType.STATIC));
+      }
 
       Element flipX = (Element) root.getElementsByTagName("flipX").item(0);
       Element flipY = (Element) root.getElementsByTagName("flipY").item(0);

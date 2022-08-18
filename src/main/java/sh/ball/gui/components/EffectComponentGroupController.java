@@ -164,6 +164,11 @@ public class EffectComponentGroupController implements Initializable, SubControl
   }
 
   @Override
+  public List<EffectComponentGroup> effects() {
+    return List.of(model);
+  }
+
+  @Override
   public List<Element> save(Document document) {
     Element checkBox = document.createElement(model.getLabel());
     Element selected = document.createElement("selected");

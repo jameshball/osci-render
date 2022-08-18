@@ -124,13 +124,7 @@ public class EffectsController implements Initializable, SubController {
 
   // selects or deselects the given audio effect
   public void updateEffect(EffectType type, boolean checked, SettableEffect effect) {
-    if (type != null) {
-      if (checked) {
-        audioPlayer.addEffect(type, effect);
-      } else {
-        audioPlayer.removeEffect(type);
-      }
-    }
+    audioPlayer.updateEffect(type, checked, effect);
 
     if (type == EffectType.DEPTH_3D) {
       Platform.runLater(() ->
@@ -242,7 +236,8 @@ public class EffectsController implements Initializable, SubController {
     executor.setScript(script);
   }
 
-  private List<EffectComponentGroup> effects() {
+  @Override
+  public List<EffectComponentGroup> effects() {
     return List.of(
       vectorCancelling,
       bitCrush,
@@ -281,8 +276,6 @@ public class EffectsController implements Initializable, SubController {
 
   @Override
   public List<Element> save(Document document) {
-    Element element = document.createElement("checkBoxes");
-    effects().forEach(effect -> effect.save(document).forEach(element::appendChild));
     Element translation = document.createElement("translation");
     Element x = document.createElement("x");
     x.appendChild(document.createTextNode(translationXTextField.getText()));
@@ -296,13 +289,11 @@ public class EffectsController implements Initializable, SubController {
     translation.appendChild(x);
     translation.appendChild(y);
     translation.appendChild(ellipse);
-    return List.of(element, translation, depthFunction);
+    return List.of(translation, depthFunction);
   }
 
   @Override
   public void load(Element root) {
-    Element element = (Element) root.getElementsByTagName("checkBoxes").item(0);
-    effects().forEach(effect -> effect.load(element));
     Element translation = (Element) root.getElementsByTagName("translation").item(0);
     Element x = (Element) translation.getElementsByTagName("x").item(0);
     Element y = (Element) translation.getElementsByTagName("y").item(0);
