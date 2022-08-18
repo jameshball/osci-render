@@ -128,9 +128,7 @@ public class EffectsController implements Initializable, SubController {
 
     if (type == EffectType.DEPTH_3D) {
       Platform.runLater(() ->
-        List.of(rotateSpeed3D, rotateX, rotateY, rotateZ, zPos).forEach(ecg -> {
-          ecg.setInactive(!checked);
-        })
+        List.of(rotateSpeed3D, rotateX, rotateY, rotateZ, zPos).forEach(ecg -> ecg.setInactive(!checked))
       );
     }
   }
@@ -229,6 +227,8 @@ public class EffectsController implements Initializable, SubController {
 
     executor.setScript(script);
     depthFunctionButton.setOnAction(e -> Gui.launchCodeEditor(script, "3D Perspective Effect Depth Function", "text/x-lua", this::updateDepthFunction));
+
+    List.of(rotateSpeed3D, rotateX, rotateY, rotateZ, zPos).forEach(ecg -> ecg.setInactive(true));
   }
 
   private void updateDepthFunction(byte[] fileData, String fileName) {

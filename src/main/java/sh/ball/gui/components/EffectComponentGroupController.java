@@ -87,7 +87,7 @@ public class EffectComponentGroupController implements Initializable, SubControl
       if (model.isAlwaysEnabled()) {
         model.removeCheckBox();
       }
-      setInactive(model.isAlwaysEnabled());
+      setInactive(!model.isAlwaysEnabled());
       label.setText(name);
     });
 
@@ -96,7 +96,7 @@ public class EffectComponentGroupController implements Initializable, SubControl
       if (alwaysEnabled) {
         model.removeCheckBox();
       }
-      setInactive(alwaysEnabled);
+      setInactive(!alwaysEnabled);
     });
 
     ChangeListener<Number> listener = (e, old, value) -> {
@@ -269,8 +269,8 @@ public class EffectComponentGroupController implements Initializable, SubControl
   }
 
   public void setInactive(boolean inactive) {
-    slider.setDisable(!inactive);
-    spinner.setDisable(!inactive);
+    slider.setDisable(inactive);
+    spinner.setDisable(inactive);
   }
 
   public void setValue(double value) {
