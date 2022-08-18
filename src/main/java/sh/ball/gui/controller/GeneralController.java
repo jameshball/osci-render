@@ -16,6 +16,7 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import sh.ball.gui.components.EffectComponentGroup;
 
 import java.io.File;
 import java.io.IOException;
@@ -290,6 +291,11 @@ public class GeneralController implements Initializable, SubController {
   @Override
   public List<String> labels() {
     return List.of("octave", "micVolume");
+  }
+
+  @Override
+  public List<EffectComponentGroup> effects() {
+    return List.of();
   }
 
   @Override

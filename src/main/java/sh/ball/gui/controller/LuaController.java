@@ -37,7 +37,8 @@ public class LuaController implements Initializable, SubController {
     this.mainController = mainController;
   }
 
-  private List<EffectComponentGroup> effects() {
+  @Override
+  public List<EffectComponentGroup> effects() {
     return List.of(luaA, luaB, luaC, luaD, luaE);
   }
 
@@ -54,7 +55,7 @@ public class LuaController implements Initializable, SubController {
       effect.setAnimator(new EffectAnimator(EffectAnimator.DEFAULT_SAMPLE_RATE, new ConsumerEffect(value -> updateLuaVariable(effect.getId(), value))))
     );
 
-    effects().forEach(effect -> effect.setEffectUpdater(this::updateEffect));
+    effects().forEach(effect -> effect.setEffectUpdater(audioPlayer::updateEffect));
 
     resetStepCounterButton.setOnAction(e -> mainController.resetLuaStep());
   }
@@ -86,34 +87,14 @@ public class LuaController implements Initializable, SubController {
 
   @Override
   public List<Element> save(Document document) {
-    Element element = document.createElement("luaController");
-    effects().forEach(effect -> effect.save(document).forEach(element::appendChild));
-    return List.of(element);
+    return List.of(document.createElement("null"));
   }
 
   @Override
-  public void load(Element root) {
-    Element element = (Element) root.getElementsByTagName("luaController").item(0);
-    if (element != null) {
-      effects().forEach(effect -> effect.load(element));
-    } else {
-      effects().forEach(effect -> effect.setAnimationType(AnimationType.STATIC));
-    }
-  }
+  public void load(Element root) {}
 
   @Override
   public void micNotAvailable() {
     effects().forEach(EffectComponentGroup::micNotAvailable);
-  }
-
-  // selects or deselects the given audio effect
-  public void updateEffect(EffectType type, boolean checked, SettableEffect effect) {
-    if (type != null) {
-      if (checked) {
-        audioPlayer.addEffect(type, effect);
-      } else {
-        audioPlayer.removeEffect(type);
-      }
-    }
   }
 }

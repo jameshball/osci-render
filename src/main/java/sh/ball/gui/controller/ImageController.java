@@ -8,6 +8,7 @@ import javafx.scene.shape.SVGPath;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import sh.ball.audio.midi.MidiNote;
+import sh.ball.gui.components.EffectComponentGroup;
 
 import java.net.URL;
 import java.util.List;
@@ -70,6 +71,11 @@ public class ImageController implements Initializable, SubController {
   @Override
   public List<String> labels() {
     return List.of("frequency");
+  }
+
+  @Override
+  public List<EffectComponentGroup> effects() {
+    return List.of();
   }
 
   @Override
