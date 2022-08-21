@@ -80,8 +80,23 @@ public class PerspectiveEffect implements SettableEffect {
     this.baseRotation = new Vector3(baseRotation.x, baseRotation.y, rotateZ * Math.PI);
   }
 
+  public void setActualRotationX(double rotateX) {
+    this.baseRotation = new Vector3(0, baseRotation.y, baseRotation.z);
+    this.currentRotation = new Vector3(rotateX * Math.PI, currentRotation.y, currentRotation.z);
+  }
+
+  public void setActualRotationY(double rotateY) {
+    this.baseRotation = new Vector3(baseRotation.x, 0, baseRotation.z);
+    this.currentRotation = new Vector3(currentRotation.x, rotateY * Math.PI, currentRotation.z);
+  }
+
+  public void setActualRotationZ(double rotateZ) {
+    this.baseRotation = new Vector3(baseRotation.x, baseRotation.y, 0);
+    this.currentRotation = new Vector3(currentRotation.x, currentRotation.y, rotateZ * Math.PI);
+  }
+
   public void resetRotation() {
     baseRotation = new Vector3();
-    currentRotation = new Vector3(Math.PI, Math.PI, 0);
+    currentRotation = new Vector3();
   }
 }

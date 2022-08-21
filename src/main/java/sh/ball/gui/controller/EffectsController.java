@@ -7,6 +7,9 @@ import javafx.beans.property.BooleanProperty;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
+import javafx.scene.control.Button;
+import javafx.scene.control.TextField;
+import javafx.scene.paint.Color;
 import javafx.scene.shape.SVGPath;
 import javafx.util.Duration;
 import org.w3c.dom.Document;
@@ -20,9 +23,11 @@ import sh.ball.parser.lua.LuaExecutor;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
+import java.awt.*;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -42,6 +47,10 @@ public class EffectsController implements Initializable, SubController {
 
   private double scrollDelta = 0.05;
   private String script = DEFAULT_SCRIPT;
+
+  private boolean setFixedAngleX = false;
+  private boolean setFixedAngleY = false;
+  private boolean setFixedAngleZ = false;
 
   @FXML
   private EffectComponentGroup vectorCancelling;
@@ -97,6 +106,12 @@ public class EffectsController implements Initializable, SubController {
   private Button resetPerspectiveRotationButton;
   @FXML
   private Button depthFunctionButton;
+  @FXML
+  private SVGPath fixedAngleX;
+  @FXML
+  private SVGPath fixedAngleY;
+  @FXML
+  private SVGPath fixedAngleZ;
 
   public EffectsController() {
     this.wobbleEffect = new WobbleEffect(DEFAULT_SAMPLE_RATE);
@@ -165,9 +180,9 @@ public class EffectsController implements Initializable, SubController {
     wobble.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, wobbleEffect));
     depthScale.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, perspectiveEffect));
     rotateSpeed3D.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(perspectiveEffect::setRotateSpeed)));
-    rotateX.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect((perspectiveEffect::setRotationX))));
-    rotateY.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect((perspectiveEffect::setRotationY))));
-    rotateZ.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect((perspectiveEffect::setRotationZ))));
+    rotateX.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect((this::setRotationX))));
+    rotateY.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect((this::setRotationY))));
+    rotateZ.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect((this::setRotationZ))));
     zPos.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect((perspectiveEffect::setZPos))));
     traceMin.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(audioPlayer::setTraceMin)));
     traceMax.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(audioPlayer::setTraceMax)));
@@ -229,6 +244,34 @@ public class EffectsController implements Initializable, SubController {
     depthFunctionButton.setOnAction(e -> Gui.launchCodeEditor(script, "3D Perspective Effect Depth Function", "text/x-lua", this::updateDepthFunction));
 
     List.of(rotateSpeed3D, rotateX, rotateY, rotateZ, zPos).forEach(ecg -> ecg.setInactive(true));
+
+    fixedAngleX.setOnMouseClicked(e -> {
+      setFixedAngleX = !setFixedAngleX;
+      if (setFixedAngleX) {
+        fixedAngleX.setFill(Color.RED);
+      } else {
+        fixedAngleX.setFill(Color.WHITE);
+      }
+      rotateX.getAnimator().updateValue();
+    });
+    fixedAngleY.setOnMouseClicked(e -> {
+      setFixedAngleY = !setFixedAngleY;
+      if (setFixedAngleY) {
+        fixedAngleY.setFill(Color.RED);
+      } else {
+        fixedAngleY.setFill(Color.WHITE);
+      }
+      rotateY.getAnimator().updateValue();
+    });
+    fixedAngleZ.setOnMouseClicked(e -> {
+      setFixedAngleZ = !setFixedAngleZ;
+      if (setFixedAngleZ) {
+        fixedAngleZ.setFill(Color.RED);
+      } else {
+        fixedAngleZ.setFill(Color.WHITE);
+      }
+      rotateZ.getAnimator().updateValue();
+    });
   }
 
   private void updateDepthFunction(byte[] fileData, String fileName) {
@@ -259,6 +302,30 @@ public class EffectsController implements Initializable, SubController {
       volume,
       backingMidi
     );
+  }
+
+  private void setRotationX(double x) {
+    if (setFixedAngleX) {
+      perspectiveEffect.setActualRotationX(x);
+    } else {
+      perspectiveEffect.setRotationX(x);
+    }
+  }
+
+  private void setRotationY(double y) {
+    if (setFixedAngleY) {
+      perspectiveEffect.setActualRotationY(y);
+    } else {
+      perspectiveEffect.setRotationY(y);
+    }
+  }
+
+  private void setRotationZ(double z) {
+    if (setFixedAngleZ) {
+      perspectiveEffect.setActualRotationZ(z);
+    } else {
+      perspectiveEffect.setRotationZ(z);
+    }
   }
 
   @Override
