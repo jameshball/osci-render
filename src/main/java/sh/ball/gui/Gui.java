@@ -116,6 +116,7 @@ public class Gui extends Application {
     projectSelectController.setApplicationLauncher((path, muted) -> launchMainApplication(controller, path, muted));
 
     controller.setAddRecentFile(projectSelectController::addRecentFile);
+    controller.setRemoveRecentFile(projectSelectController::removeRecentFile);
     controller.setRecentFiles(projectSelectController::recentFiles);
 
     controller.setSoftwareOscilloscopeAction(() -> {

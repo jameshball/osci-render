@@ -72,6 +72,10 @@ public class ProjectSelectController implements Initializable {
       try {
         String selectedItem = recentFilesListView.getSelectionModel().getSelectedItem();
         if (selectedItem != null) {
+          if (!new File(selectedItem).exists()) {
+            removeRecentFile(selectedItem);
+            return;
+          }
           launchMainApplication.accept(selectedItem, startMutedCheckBox.isSelected());
         }
       } catch (Exception ex) {
@@ -175,5 +179,10 @@ public class ProjectSelectController implements Initializable {
 
   public void setOpenBrowser(Consumer<String> openBrowser) {
     this.openBrowser = openBrowser;
+  }
+
+  public void removeRecentFile(String path) {
+    recentFiles.remove(path);
+    resetRecentFiles();
   }
 }
