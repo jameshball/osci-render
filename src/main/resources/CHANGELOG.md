@@ -1,3 +1,23 @@
+- 1.28.0
+  - Add buttons next to 3D rotation effects to change the rotation in the selected axis to be fixed
+    - These appear next to the 3 sliders for 3D object rotation, as well as the 3 sliders for the 3D perspective effect rotation
+    - This means that it will never move in this axis when the rotation speed is non-zero
+    - Allows you to rotate one axis, whilst specifying the exact rotation of the object in another axis
+    - Thanks again to [@javierplano_videonix](https://www.instagram.com/javierplano_videonix/) for the suggestion!
+  - Update all sliders (except frequency slider) to use the same (updated) design with the following:
+    - Slider
+    - Value spinner
+    - MIDI button
+    - Animation type dropdown
+    - Mic button
+      - This has been changed to a mic icon rather than a checkbox
+    - This means that the 3D object sliders and Lua sliders can now all be animated and controlled with a microphone!
+  - Various project-related bugfixes
+    - Backwards compatibility with old project files should be better
+    - Opening projects should be more consistent with how it would look if you opened the project right after starting osci-render
+    - Project files that don't exist are removed from the list when you try and open them
+
+
 - 1.27.7
   - Change audio selection and text font selection to be lists rather than dropdowns
 
