@@ -350,13 +350,26 @@ public class EffectsController implements Initializable, SubController {
     y.appendChild(document.createTextNode(translationYTextField.getText()));
     Element ellipse = document.createElement("ellipse");
     ellipse.appendChild(document.createTextNode(Boolean.toString(translateEllipseCheckBox.isSelected())));
-    Element depthFunction = document.createElement("depthFunction");
-    String encodedData = Base64.getEncoder().encodeToString(script.getBytes(StandardCharsets.UTF_8));
-    depthFunction.appendChild(document.createTextNode(encodedData));
     translation.appendChild(x);
     translation.appendChild(y);
     translation.appendChild(ellipse);
-    return List.of(translation, depthFunction);
+
+    Element depthFunction = document.createElement("depthFunction");
+    String encodedData = Base64.getEncoder().encodeToString(script.getBytes(StandardCharsets.UTF_8));
+    depthFunction.appendChild(document.createTextNode(encodedData));
+
+    Element perspectiveFixedRotate = document.createElement("perspectiveFixedRotate");
+    Element fixedRotateX = document.createElement("x");
+    fixedRotateX.appendChild(document.createTextNode(String.valueOf(setFixedAngleX)));
+    Element fixedRotateY = document.createElement("y");
+    fixedRotateY.appendChild(document.createTextNode(String.valueOf(setFixedAngleY)));
+    Element fixedRotateZ = document.createElement("z");
+    fixedRotateZ.appendChild(document.createTextNode(String.valueOf(setFixedAngleZ)));
+    perspectiveFixedRotate.appendChild(fixedRotateX);
+    perspectiveFixedRotate.appendChild(fixedRotateY);
+    perspectiveFixedRotate.appendChild(fixedRotateZ);
+
+    return List.of(translation, depthFunction, perspectiveFixedRotate);
   }
 
   @Override
@@ -380,6 +393,26 @@ public class EffectsController implements Initializable, SubController {
       script = new String(Base64.getDecoder().decode(encodedScript), StandardCharsets.UTF_8);
       executor.setScript(script);
     }
+
+    Element perspectiveFixedRotate = (Element) root.getElementsByTagName("perspectiveFixedRotate").item(0);
+    if (perspectiveFixedRotate == null) {
+      setFixedAngleX = false;
+      setFixedAngleY = false;
+      setFixedAngleZ = false;
+    } else {
+      Element fixedRotateX = (Element) perspectiveFixedRotate.getElementsByTagName("x").item(0);
+      setFixedAngleX = fixedRotateX != null && Boolean.parseBoolean(fixedRotateX.getTextContent());
+
+      Element fixedRotateY = (Element) perspectiveFixedRotate.getElementsByTagName("y").item(0);
+      setFixedAngleY = fixedRotateY != null && Boolean.parseBoolean(fixedRotateY.getTextContent());
+
+      Element fixedRotateZ = (Element) perspectiveFixedRotate.getElementsByTagName("z").item(0);
+      setFixedAngleZ = fixedRotateZ != null && Boolean.parseBoolean(fixedRotateZ.getTextContent());
+    }
+
+    fixedAngleX.setFill(setFixedAngleX ? Color.RED : Color.WHITE);
+    fixedAngleY.setFill(setFixedAngleY ? Color.RED : Color.WHITE);
+    fixedAngleZ.setFill(setFixedAngleZ ? Color.RED : Color.WHITE);
   }
 
   @Override
