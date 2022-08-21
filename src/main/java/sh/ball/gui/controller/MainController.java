@@ -81,6 +81,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private static final long MAX_RECENT_FILES = 15;
 
   private Consumer<String> addRecentFile;
+  private Consumer<String> removeRecentFile;
   private String openProjectPath;
   private final FileChooser wavFileChooser = new FileChooser();
 
@@ -1238,7 +1239,15 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       documentFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
       DocumentBuilder documentBuilder = documentFactory.newDocumentBuilder();
 
-      Document document = documentBuilder.parse(new File(projectFileName));
+      Document document;
+      try {
+        document = documentBuilder.parse(new File(projectFileName));
+      } catch (Exception e) {
+        logger.log(Level.WARNING, e.getMessage(), e);
+        removeRecentFile.accept(projectFileName);
+        openProject(null);
+        return;
+      }
       document.getDocumentElement().normalize();
 
       List<BooleanProperty> micSelected = micSelected();
@@ -1471,6 +1480,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
   public void setAddRecentFile(Consumer<String> addRecentFile) {
     this.addRecentFile = addRecentFile;
+  }
+
+  public void setRemoveRecentFile(Consumer<String> removeRecentFile) {
+    this.removeRecentFile = removeRecentFile;
   }
 
   public void setVolume(double volume) {
