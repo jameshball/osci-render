@@ -1252,11 +1252,31 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       Element slidersElement = (Element) root.getElementsByTagName("sliders").item(0);
       loadSliderValues(sliders, labels, slidersElement);
 
+      // doesn't exist on newer projects - backwards compatibility
+      Element objectRotation = (Element) root.getElementsByTagName("objectRotation").item(0);
+      if (objectRotation != null) {
+        Element x = (Element) objectRotation.getElementsByTagName("x").item(0);
+        Element y = (Element) objectRotation.getElementsByTagName("y").item(0);
+        Element z = (Element) objectRotation.getElementsByTagName("z").item(0);
+        Slider xSlider = sliders.get(labels.indexOf("objectXRotate"));
+        Slider ySlider = sliders.get(labels.indexOf("objectYRotate"));
+        Slider zSlider = sliders.get(labels.indexOf("objectZRotate"));
+        xSlider.setValue(Double.parseDouble(x.getTextContent()));
+        ySlider.setValue(Double.parseDouble(y.getTextContent()));
+        zSlider.setValue(Double.parseDouble(z.getTextContent()));
+      }
+
       NodeList nodes = root.getElementsByTagName("micCheckBoxes");
       // backwards compatibility
       if (nodes.getLength() > 0) {
         Element micCheckBoxesElement = (Element) nodes.item(0);
         loadMicCheckBoxes(micSelected, labels, micCheckBoxesElement);
+      } else {
+        micSelected.forEach(selected -> {
+          if (selected != null) {
+            selected.setValue(false);
+          }
+        });
       }
 
       Element midiElement = (Element) root.getElementsByTagName("midi").item(0);

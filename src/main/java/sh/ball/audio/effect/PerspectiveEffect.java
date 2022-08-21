@@ -5,8 +5,6 @@ import sh.ball.engine.Vector3;
 import sh.ball.parser.lua.LuaExecutor;
 import sh.ball.shapes.Vector2;
 
-import javax.xml.transform.Result;
-
 // 3D rotation effect
 public class PerspectiveEffect implements SettableEffect {
 

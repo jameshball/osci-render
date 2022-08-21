@@ -190,6 +190,7 @@ public class EffectComponentGroupController implements Initializable, SubControl
       if (!model.isAlwaysEnabled()) {
         effectCheckBox.setSelected(false);
       }
+      comboBox.setValue(AnimationType.STATIC);
       return;
     }
     String selected;

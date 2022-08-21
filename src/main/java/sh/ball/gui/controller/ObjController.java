@@ -225,11 +225,44 @@ public class ObjController implements Initializable, SubController {
 
   @Override
   public List<Element> save(Document document) {
-    return List.of(document.createElement("null"));
+    // TODO: Remove duplication with EffectsController
+    Element objectFixedRotate = document.createElement("objectFixedRotate");
+    Element fixedRotateX = document.createElement("x");
+    fixedRotateX.appendChild(document.createTextNode(String.valueOf(setFixedAngleX)));
+    Element fixedRotateY = document.createElement("y");
+    fixedRotateY.appendChild(document.createTextNode(String.valueOf(setFixedAngleY)));
+    Element fixedRotateZ = document.createElement("z");
+    fixedRotateZ.appendChild(document.createTextNode(String.valueOf(setFixedAngleZ)));
+    objectFixedRotate.appendChild(fixedRotateX);
+    objectFixedRotate.appendChild(fixedRotateY);
+    objectFixedRotate.appendChild(fixedRotateZ);
+
+    return List.of(objectFixedRotate);
   }
 
   @Override
-  public void load(Element root) {}
+  public void load(Element root) {
+    Element objectFixedRotate = (Element) root.getElementsByTagName("objectFixedRotate").item(0);
+
+    if (objectFixedRotate == null) {
+      setFixedAngleX = false;
+      setFixedAngleY = false;
+      setFixedAngleZ = false;
+    } else {
+      Element fixedRotateX = (Element) objectFixedRotate.getElementsByTagName("x").item(0);
+      setFixedAngleX = fixedRotateX != null && Boolean.parseBoolean(fixedRotateX.getTextContent());
+
+      Element fixedRotateY = (Element) objectFixedRotate.getElementsByTagName("y").item(0);
+      setFixedAngleY = fixedRotateY != null && Boolean.parseBoolean(fixedRotateY.getTextContent());
+
+      Element fixedRotateZ = (Element) objectFixedRotate.getElementsByTagName("z").item(0);
+      setFixedAngleZ = fixedRotateZ != null && Boolean.parseBoolean(fixedRotateZ.getTextContent());
+    }
+
+    fixedAngleX.setFill(setFixedAngleX ? Color.RED : Color.WHITE);
+    fixedAngleY.setFill(setFixedAngleY ? Color.RED : Color.WHITE);
+    fixedAngleZ.setFill(setFixedAngleZ ? Color.RED : Color.WHITE);
+  }
 
   @Override
   public void micNotAvailable() {
