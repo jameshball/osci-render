@@ -14,7 +14,7 @@ public class ObjFrameSource implements FrameSource<List<Shape>> {
   private final Camera camera;
 
   private Vector3 baseRotation = new Vector3(Math.PI, Math.PI, 0);
-  private Vector3 currentRotation = baseRotation;
+  private Vector3 currentRotation = new Vector3();
   private Double rotateSpeed = 0.0;
   private boolean active = true;
 
@@ -81,6 +81,18 @@ public class ObjFrameSource implements FrameSource<List<Shape>> {
       }
       if (obj.rotateZ != null) {
         this.baseRotation = new Vector3(baseRotation.x, baseRotation.y, obj.rotateZ);
+      }
+      if (obj.actualRotateX != null) {
+        this.baseRotation = new Vector3(0, baseRotation.y, baseRotation.z);
+        this.currentRotation = new Vector3(obj.actualRotateX, currentRotation.y, currentRotation.z);
+      }
+      if (obj.actualRotateY != null) {
+        this.baseRotation = new Vector3(baseRotation.x, 0, baseRotation.z);
+        this.currentRotation = new Vector3(currentRotation.x, obj.actualRotateY, currentRotation.z);
+      }
+      if (obj.actualRotateZ != null) {
+        this.baseRotation = new Vector3(baseRotation.x, baseRotation.y, 0);
+        this.currentRotation = new Vector3(currentRotation.x, currentRotation.y, obj.actualRotateZ);
       }
     }
   }

@@ -9,6 +9,7 @@
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.layout.VBox?>
+<?import javafx.scene.shape.SVGPath?>
 <?import sh.ball.gui.components.EffectComponentGroup?>
 
 <ScrollPane hbarPolicy="NEVER" prefHeight="1094.0" prefWidth="608.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.EffectsController">
@@ -97,9 +98,9 @@
                         <EffectComponentGroup fx:id="rotateX" alwaysEnabled="true" increment="0.01" label="imageRotateX" majorTickUnit="0.2" max="1.0" maxHeight="-Infinity" maxWidth="-Infinity" min="-1.0" minHeight="-Infinity" minWidth="-Infinity" name="Rotate x" type="ROTATE_X" value="1.0" />
                         <EffectComponentGroup fx:id="rotateY" alwaysEnabled="true" increment="0.01" label="imageRotateY" layoutY="42.0" majorTickUnit="0.2" max="1.0" min="-1.0" name="Rotate y" type="ROTATE_Y" value="1.0" />
                         <EffectComponentGroup fx:id="rotateZ" alwaysEnabled="true" increment="0.01" label="imageRotateZ" layoutY="85.0" majorTickUnit="0.2" max="1.0" min="-1.0" name="Rotate z" type="ROTATE_Z" value="0.0" />
-                        <CheckBox layoutX="571.0" layoutY="5.0" mnemonicParsing="false" />
-                        <CheckBox layoutX="571.0" layoutY="47.0" mnemonicParsing="false" />
-                        <CheckBox layoutX="571.0" layoutY="90.0" mnemonicParsing="false" />
+                        <SVGPath fx:id="fixedAngleX" content="M12,10H14.91C14.57,6.55 13.4,4 12,4C10.42,4 9.12,7.27 9,11.42L7,12.57V12C7,6.5 9.24,2 12,2C14.42,2 16.44,5.44 16.9,10H20L16,14L12,10M12,22C10.12,22 8.47,19.92 7.62,16.84L9.37,15.83C9.87,18.31 10.86,20 12,20C13.27,20 14.36,17.89 14.79,14.92L16,16.12L16.7,15.42C16,19.26 14.16,22 12,22M2.11,18.87L1.11,17.13L1.06,17.06L11.12,11.25L12.72,12.84L2.15,18.94L2.11,18.87M21.89,5.13L22.89,6.87L19.2,9H17.77L17.5,7.66L21.89,5.13Z" fill="white" layoutX="570.0" layoutY="2.0" pickOnBounds="true" />
+                        <SVGPath fx:id="fixedAngleY" content="M12,10H14.91C14.57,6.55 13.4,4 12,4C10.42,4 9.12,7.27 9,11.42L7,12.57V12C7,6.5 9.24,2 12,2C14.42,2 16.44,5.44 16.9,10H20L16,14L12,10M12,22C10.12,22 8.47,19.92 7.62,16.84L9.37,15.83C9.87,18.31 10.86,20 12,20C13.27,20 14.36,17.89 14.79,14.92L16,16.12L16.7,15.42C16,19.26 14.16,22 12,22M2.11,18.87L1.11,17.13L1.06,17.06L11.12,11.25L12.72,12.84L2.15,18.94L2.11,18.87M21.89,5.13L22.89,6.87L19.2,9H17.77L17.5,7.66L21.89,5.13Z" fill="white" layoutX="570.0" layoutY="44.0" pickOnBounds="true" />
+                        <SVGPath fx:id="fixedAngleZ" content="M12,10H14.91C14.57,6.55 13.4,4 12,4C10.42,4 9.12,7.27 9,11.42L7,12.57V12C7,6.5 9.24,2 12,2C14.42,2 16.44,5.44 16.9,10H20L16,14L12,10M12,22C10.12,22 8.47,19.92 7.62,16.84L9.37,15.83C9.87,18.31 10.86,20 12,20C13.27,20 14.36,17.89 14.79,14.92L16,16.12L16.7,15.42C16,19.26 14.16,22 12,22M2.11,18.87L1.11,17.13L1.06,17.06L11.12,11.25L12.72,12.84L2.15,18.94L2.11,18.87M21.89,5.13L22.89,6.87L19.2,9H17.77L17.5,7.66L21.89,5.13Z" fill="white" layoutX="570.0" layoutY="87.0" pickOnBounds="true" />
                      </children>
                   </AnchorPane>
                   <AnchorPane prefHeight="34.0" prefWidth="602.0">

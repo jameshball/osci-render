@@ -47,4 +47,16 @@ public class ObjSettingsFactory {
   public static ObjFrameSettings baseRotationZ(double z) {
     return new ObjFrameSettings().withRotateZ(z * Math.PI);
   }
+
+  public static ObjFrameSettings actualRotationX(double x) {
+    return new ObjFrameSettings().withActualRotateX(x * Math.PI);
+  }
+
+  public static ObjFrameSettings actualRotationY(double y) {
+    return new ObjFrameSettings().withActualRotateY(y * Math.PI);
+  }
+
+  public static ObjFrameSettings actualRotationZ(double z) {
+    return new ObjFrameSettings().withActualRotateZ(z * Math.PI);
+  }
 }

@@ -15,6 +15,9 @@ public class ObjFrameSettings {
   public Double rotateX = null;
   public Double rotateY = null;
   public Double rotateZ = null;
+  public Double actualRotateX = null;
+  public Double actualRotateY = null;
+  public Double actualRotateZ = null;
 
   protected ObjFrameSettings() {}
 
@@ -58,6 +61,21 @@ public class ObjFrameSettings {
 
   protected ObjFrameSettings withRotateZ(double z) {
     this.rotateZ = z;
+    return this;
+  }
+
+  protected ObjFrameSettings withActualRotateX(double x) {
+    this.actualRotateX = x;
+    return this;
+  }
+
+  protected ObjFrameSettings withActualRotateY(double y) {
+    this.actualRotateY = y;
+    return this;
+  }
+
+  protected ObjFrameSettings withActualRotateZ(double z) {
+    this.actualRotateZ = z;
     return this;
   }
 }

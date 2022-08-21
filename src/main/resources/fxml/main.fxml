@@ -17,8 +17,8 @@
 <?import javafx.scene.input.KeyCodeCombination?>
 <?import javafx.scene.layout.AnchorPane?>
 
-<AnchorPane prefHeight="752.0" prefWidth="1008.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.MainController">
-   <MenuBar prefHeight="27.0" prefWidth="1008.0">
+<AnchorPane maxHeight="752.0" maxWidth="1046.0" minHeight="752.0" minWidth="1046.0" prefHeight="752.0" prefWidth="1046.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.MainController">
+   <MenuBar prefHeight="27.0" prefWidth="1046.0">
      <menus>
        <Menu mnemonicParsing="false" text="File">
             <items>
@@ -231,18 +231,18 @@
          </Menu>
      </menus>
    </MenuBar>
-   <TitledPane animated="false" collapsible="false" layoutX="7.0" layoutY="33.0" minHeight="371.0" minWidth="378.0" prefHeight="364.0" prefWidth="378.0" text="Main settings">
+   <TitledPane animated="false" collapsible="false" layoutX="7.0" layoutY="33.0" minHeight="371.0" minWidth="378.0" prefHeight="371.0" prefWidth="416.0" text="Main settings">
       <fx:include fx:id="general" source="general.fxml" />
    </TitledPane>
-   <AnchorPane fx:id="frequencyPane" layoutX="392.0" layoutY="692.0" prefHeight="53.0" prefWidth="610.0" styleClass="darkPane">
+   <AnchorPane fx:id="frequencyPane" layoutX="429.0" layoutY="692.0" prefHeight="53.0" prefWidth="610.0" styleClass="darkPane">
       <children>
          <fx:include fx:id="image" layoutX="34.0" source="image.fxml" />
       </children>
    </AnchorPane>
-   <TitledPane animated="false" collapsible="false" layoutX="392.0" layoutY="33.0" prefHeight="652.0" prefWidth="610.0" text="Audio Effects">
+   <TitledPane animated="false" collapsible="false" layoutX="429.0" layoutY="33.0" prefHeight="652.0" prefWidth="610.0" text="Audio Effects">
       <fx:include fx:id="effects" source="effects.fxml" />
    </TitledPane>
-   <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="7.0" layoutY="411.0" prefHeight="334.0" prefWidth="378.0" text="3D .obj file settings">
+   <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="7.0" layoutY="411.0" prefHeight="334.0" prefWidth="416.0" text="3D .obj file settings">
       <fx:include fx:id="obj" source="obj.fxml" />
    </TitledPane>
     <TitledPane fx:id="luaTitledPane" animated="false" collapsible="false" layoutX="7.0" layoutY="411.0" prefHeight="334.0" prefWidth="378.0" text=".lua file settings" visible="false">

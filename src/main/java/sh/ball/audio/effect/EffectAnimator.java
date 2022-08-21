@@ -104,6 +104,10 @@ public class EffectAnimator extends PhaseEffect implements SettableEffect {
     return effect.apply(count, vector);
   }
 
+  public void updateValue() {
+    effect.setValue(targetValue);
+  }
+
   @Override
   public void setValue(double value) {
     this.targetValue = value;

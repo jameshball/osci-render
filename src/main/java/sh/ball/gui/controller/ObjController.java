@@ -8,6 +8,7 @@ import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Slider;
+import javafx.scene.paint.Color;
 import javafx.scene.shape.SVGPath;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -29,6 +30,10 @@ public class ObjController implements Initializable, SubController {
 
   private FrameProducer<List<Shape>> producer;
 
+  private boolean setFixedAngleX = false;
+  private boolean setFixedAngleY = false;
+  private boolean setFixedAngleZ = false;
+
   @FXML
   private EffectComponentGroup focalLength;
   @FXML
@@ -43,6 +48,12 @@ public class ObjController implements Initializable, SubController {
   private CheckBox rotateCheckBox;
   @FXML
   private Button resetObjectRotationButton;
+  @FXML
+  private SVGPath fixedAngleX;
+  @FXML
+  private SVGPath fixedAngleY;
+  @FXML
+  private SVGPath fixedAngleZ;
 
   @Override
   public Map<SVGPath, Slider> getMidiButtonMap() {
@@ -103,21 +114,33 @@ public class ObjController implements Initializable, SubController {
   // updates the 3D object X angle
   private void setObjRotateX(double x) {
     if (producer != null) {
-      producer.setFrameSettings(ObjSettingsFactory.baseRotationX(x));
+      if (setFixedAngleX) {
+        producer.setFrameSettings(ObjSettingsFactory.actualRotationX(x));
+      } else {
+        producer.setFrameSettings(ObjSettingsFactory.baseRotationX(x));
+      }
     }
   }
 
   // updates the 3D object Y angle
   private void setObjRotateY(double y) {
     if (producer != null) {
-      producer.setFrameSettings(ObjSettingsFactory.baseRotationY(y));
+      if (setFixedAngleY) {
+        producer.setFrameSettings(ObjSettingsFactory.actualRotationY(y));
+      } else {
+        producer.setFrameSettings(ObjSettingsFactory.baseRotationY(y));
+      }
     }
   }
 
   // updates the 3D object Z angle
   private void setObjRotateZ(double z) {
     if (producer != null) {
-      producer.setFrameSettings(ObjSettingsFactory.baseRotationZ(z));
+      if (setFixedAngleZ) {
+        producer.setFrameSettings(ObjSettingsFactory.actualRotationZ(z));
+      } else {
+        producer.setFrameSettings(ObjSettingsFactory.baseRotationZ(z));
+      }
     }
   }
 
@@ -148,6 +171,36 @@ public class ObjController implements Initializable, SubController {
     rotateSpeed.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(this::setObjectRotateSpeed)));
 
     effects().forEach(effect -> effect.setEffectUpdater(audioPlayer::updateEffect));
+
+
+    // TODO: Remove duplicate code with EffectsController
+    fixedAngleX.setOnMouseClicked(e -> {
+      setFixedAngleX = !setFixedAngleX;
+      if (setFixedAngleX) {
+        fixedAngleX.setFill(Color.RED);
+      } else {
+        fixedAngleX.setFill(Color.WHITE);
+      }
+      rotateX.getAnimator().updateValue();
+    });
+    fixedAngleY.setOnMouseClicked(e -> {
+      setFixedAngleY = !setFixedAngleY;
+      if (setFixedAngleY) {
+        fixedAngleY.setFill(Color.RED);
+      } else {
+        fixedAngleY.setFill(Color.WHITE);
+      }
+      rotateY.getAnimator().updateValue();
+    });
+    fixedAngleZ.setOnMouseClicked(e -> {
+      setFixedAngleZ = !setFixedAngleZ;
+      if (setFixedAngleZ) {
+        fixedAngleZ.setFill(Color.RED);
+      } else {
+        fixedAngleZ.setFill(Color.WHITE);
+      }
+      rotateZ.getAnimator().updateValue();
+    });
   }
 
   @Override
