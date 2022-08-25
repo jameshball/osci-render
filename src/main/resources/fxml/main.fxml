@@ -177,20 +177,7 @@
                </CustomMenuItem>
            </items>
          </Menu>
-         <Menu mnemonicParsing="false" text="Controls">
-           <items>
-               <CustomMenuItem hideOnClick="false" mnemonicParsing="false" text="Translation Increment">
-                  <content>
-                     <AnchorPane>
-                        <children>
-                           <Label prefHeight="25.0" text="Translation Increment" textFill="WHITE" />
-                           <Spinner fx:id="translationIncrementSpinner" editable="true" layoutY="25.0" />
-                        </children>
-                     </AnchorPane>
-                  </content>
-               </CustomMenuItem>
-           </items>
-         </Menu>
+
          <Menu mnemonicParsing="false" text="Sliders">
            <items>
                <CustomMenuItem hideOnClick="false" mnemonicParsing="false">
