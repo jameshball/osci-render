@@ -439,8 +439,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     midiChannelSpinner.getEditor().setTextFormatter(new TextFormatter<>(new IntegerStringConverter(), 0, filter));
     midiChannelSpinner.valueProperty().addListener((o, oldValue, newValue) -> audioPlayer.setMainMidiChannel(newValue));
 
-    translationIncrementSpinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(-2, 2, 0.05, 0.01));
-    translationIncrementSpinner.valueProperty().addListener((o, oldValue, newValue) -> effectsController.setTranslationIncrement(newValue));
 
     deadzoneSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(0, 20, 5));
     deadzoneSpinner.valueProperty().addListener((e, old, deadzone) -> this.midiDeadzone = deadzone);
