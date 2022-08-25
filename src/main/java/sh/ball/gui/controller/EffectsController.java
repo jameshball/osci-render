@@ -220,10 +220,7 @@ public class EffectsController implements Initializable, SubController {
       translationYTextField.setText("0.00");
     });
 
-    translationXTextField.textProperty().addListener(e -> updateTranslation());
-    translationXTextField.setOnScroll((e) -> changeTranslation(e.getDeltaY() > 0, translationXTextField));
-    translationYTextField.textProperty().addListener(e -> updateTranslation());
-    translationYTextField.setOnScroll((e) -> changeTranslation(e.getDeltaY() > 0, translationYTextField));
+
 
     translateEllipseCheckBox.selectedProperty().addListener((e, old, ellipse) -> translateEffect.setEllipse(ellipse));
 
@@ -437,11 +434,7 @@ public class EffectsController implements Initializable, SubController {
     ));
   }
 
-  private void changeTranslation(boolean increase, TextField field) {
-    double old = tryParse(field.getText());
-    double delta = increase ? scrollDelta : -scrollDelta;
-    field.setText(MainController.FORMAT.format(old + delta));
-  }
+
 
   public boolean mouseTranslate() {
     return translateCheckBox.isSelected();
