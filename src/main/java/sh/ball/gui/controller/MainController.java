@@ -177,8 +177,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private Spinner<Double> decaySpinner;
   @FXML
-  private Spinner<Double> translationIncrementSpinner;
-  @FXML
   private ComboBox<PrintableSlider> sliderComboBox;
   @FXML
   private TextField sliderMinTextField;
