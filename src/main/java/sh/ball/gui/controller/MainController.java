@@ -1156,10 +1156,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       usingGpu.appendChild(document.createTextNode(String.valueOf(renderUsingGpuCheckMenuItem.isSelected())));
       root.appendChild(usingGpu);
 
-      Element translationIncrement = document.createElement("translationIncrement");
-      translationIncrement.appendChild(document.createTextNode(translationIncrementSpinner.getValue().toString()));
-      root.appendChild(translationIncrement);
-
       Element deadzone = document.createElement("deadzone");
       deadzone.appendChild(document.createTextNode(deadzoneSpinner.getValue().toString()));
       root.appendChild(deadzone);
@@ -1329,11 +1325,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       Element usingGpu = (Element) root.getElementsByTagName("usingGpu").item(0);
       if (usingGpu != null) {
         renderUsingGpuCheckMenuItem.setSelected(Boolean.parseBoolean(usingGpu.getTextContent()));
-      }
-
-      Element translationIncrement = (Element) root.getElementsByTagName("translationIncrement").item(0);
-      if (translationIncrement != null) {
-        translationIncrementSpinner.getValueFactory().setValue(Double.parseDouble(translationIncrement.getTextContent()));
       }
 
       Element deadzone = (Element) root.getElementsByTagName("deadzone").item(0);
