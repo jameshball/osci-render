@@ -1,3 +1,8 @@
+- 1.28.2
+  - Fix slider minimum and maximum value changes
+  - Change size of .lua file settings panel
+
+
 - 1.28.1
   - Remove the scrollability of the translation effect text boxes since they are on a scrollable pane making them confusing to use
   - Fixes [#111](https://github.com/jameshball/osci-render/issues/111)

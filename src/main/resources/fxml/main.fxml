@@ -232,7 +232,7 @@
    <TitledPane fx:id="objTitledPane" animated="false" collapsible="false" layoutX="7.0" layoutY="411.0" prefHeight="334.0" prefWidth="416.0" text="3D .obj file settings">
       <fx:include fx:id="obj" source="obj.fxml" />
    </TitledPane>
-    <TitledPane fx:id="luaTitledPane" animated="false" collapsible="false" layoutX="7.0" layoutY="411.0" prefHeight="334.0" prefWidth="378.0" text=".lua file settings" visible="false">
+    <TitledPane fx:id="luaTitledPane" animated="false" collapsible="false" layoutX="7.0" layoutY="411.0" prefHeight="334.0" prefWidth="416.0" text=".lua file settings" visible="false">
         <fx:include fx:id="lua" source="lua.fxml" />
     </TitledPane>
 </AnchorPane>
