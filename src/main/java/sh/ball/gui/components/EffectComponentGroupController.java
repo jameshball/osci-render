@@ -125,6 +125,10 @@ public class EffectComponentGroupController implements Initializable, SubControl
         model.hideSpinner();
       }
     });
+
+    slider.minProperty().addListener((e, old, min) -> model.setMin(min.doubleValue()));
+    slider.maxProperty().addListener((e, old, max) -> model.setMax(max.doubleValue()));
+    slider.blockIncrementProperty().addListener((e, old, increment) -> model.setIncrement(increment.doubleValue()));
   }
 
   @Override
