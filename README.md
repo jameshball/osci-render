@@ -54,6 +54,8 @@ Send an email to [james@ball.sh](mailto:james@ball.sh) if you have any issues, f
 
 <img width="100%" src="gui.png">
 
+<img width="100%" src="https://user-images.githubusercontent.com/38670946/187044888-0c3d1957-dab7-4532-9e7c-d9dccf34e33f.png">
+
 ## Usage
 
 Using osci-render is very easy; run the program and choose the file you would like to render, and it will output as audio to visualise on your oscilloscope.
