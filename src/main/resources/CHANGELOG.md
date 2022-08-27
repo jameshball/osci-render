@@ -1,3 +1,9 @@
+- 1.28.1
+  - Remove the scrollability of the translation effect text boxes since they are on a scrollable pane making them confusing to use
+  - Fixes [#111](https://github.com/jameshball/osci-render/issues/111)
+  - Thank you [Kar-3kn](https://github.com/Kar-3kn) for this fix and for your first ever open-source contribution!
+
+
 - 1.28.0
   - Add buttons next to 3D rotation effects to change the rotation in the selected axis to be fixed
     - These appear next to the 3 sliders for 3D object rotation, as well as the 3 sliders for the 3D perspective effect rotation
