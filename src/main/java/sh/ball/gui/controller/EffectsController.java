@@ -220,7 +220,8 @@ public class EffectsController implements Initializable, SubController {
       translationYTextField.setText("0.00");
     });
 
-
+    translationXTextField.textProperty().addListener(e -> updateTranslation());
+    translationYTextField.textProperty().addListener(e -> updateTranslation());
 
     translateEllipseCheckBox.selectedProperty().addListener((e, old, ellipse) -> translateEffect.setEllipse(ellipse));
 
