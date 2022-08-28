@@ -1,3 +1,7 @@
+- 1.28.3
+  - Fixed bug: Update animator minimum and maximum values whenever the slider min/max changes
+
+
 - 1.28.2
   - Fix slider minimum and maximum value changes
   - Change size of .lua file settings panel
