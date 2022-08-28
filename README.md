@@ -54,7 +54,7 @@ Send an email to [james@ball.sh](mailto:james@ball.sh) if you have any issues, f
 
 <img width="100%" src="gui.png">
 
-<img width="100%" src="https://user-images.githubusercontent.com/38670946/187044888-0c3d1957-dab7-4532-9e7c-d9dccf34e33f.png">
+<img width="100%" src="https://user-images.githubusercontent.com/38670946/187076731-a0ce3af2-4860-436f-a458-8cc334ca8fc9.gif">
 
 ## Usage
 
