@@ -247,6 +247,8 @@ public class EffectComponentGroupController implements Initializable, SubControl
     this.animator = animator;
     animator.setMin(model.getMin());
     animator.setMax(model.getMax());
+    slider.minProperty().addListener((e, old, min) -> this.animator.setMin(min.doubleValue()));
+    slider.maxProperty().addListener((e, old, max) -> this.animator.setMax(max.doubleValue()));
     slider.valueProperty().addListener((e, old, value) -> this.animator.setValue(value.doubleValue()));
     comboBox.valueProperty().addListener((options, old, animationType) -> this.animator.setAnimation(animationType));
   }
