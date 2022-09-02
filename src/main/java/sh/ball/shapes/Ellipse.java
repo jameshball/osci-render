@@ -39,7 +39,7 @@ public final class Ellipse extends Shape {
       theta -= 2 * Math.PI;
     }
 
-    return new Ellipse(a, b, theta, position);
+    return new Ellipse(a, b, theta + rotation, position);
   }
 
   @Override
