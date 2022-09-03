@@ -125,7 +125,8 @@ jobs:
           sudo npm install -g github-wikito-converter
           cd wiki
           ls | grep -xv "User-Documentation.md" | parallel rm
-          gwtc -v -f pdf -t "osci-render documentation" --logo-img "osci-render/osci.png" .
+          cd ..
+          gwtc -v -f pdf -t "osci-render documentation" --logo-img "osci-render/osci.png" wiki
           cd ../osci-render
           version=$(mvn help:evaluate -Dexpression="project.version" -q -DforceStdout)
           echo "VERSION=$version" >> $GITHUB_ENV
@@ -133,7 +134,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ env.VERSION }}
-          files: wiki/documentation.pdf
+          files: documentation.pdf
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: jameshball/osci-render
