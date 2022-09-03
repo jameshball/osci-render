@@ -97,4 +97,34 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: jameshball/osci-render
+          
+  build-docs:
+  
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@master
+        with:
+          name: jameshball/osci-render.wiki
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - name: Convert wiki to PDF
+        run: |
+          apt update
+          apt install xfonts-75dpi xfonts-base gvfs colord glew-utils libvisual-0.4-plugins gstreamer1.0-tools opus-tools qt5-image-formats-plugins qtwayland5 qt5-qmltooling-plugins librsvg2-bin lm-sensors
+          apt install wget
+          wget https://github.com/wkhtmltopdf/wkhtmltopdf/releases/download/0.12.5/wkhtmltox_0.12.5-1.bionic_amd64.deb
+          dpkg -i wkhtmltox_0.12.5-1.bionic_amd64.deb
+          npm install -g github-wikito-converter
+          gwtc -v -f pdf .
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ env.VERSION }}
+          files: documentation.pdf
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: jameshball/osci-render
+          
 
