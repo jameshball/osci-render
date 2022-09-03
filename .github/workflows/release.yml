@@ -123,7 +123,8 @@ jobs:
           wget https://github.com/wkhtmltopdf/wkhtmltopdf/releases/download/0.12.5/wkhtmltox_0.12.5-1.bionic_amd64.deb
           sudo dpkg -i wkhtmltox_0.12.5-1.bionic_amd64.deb
           sudo npm install -g github-wikito-converter
-          gwtc -v -f pdf wiki
+          ls | grep -xv "User-Documentation.md" | parallel rm
+          gwtc -v -f pdf -t "osci-render documentation" --logo-img "osci-render/osci.png" wiki
           cd osci-render
           version=$(mvn help:evaluate -Dexpression="project.version" -q -DforceStdout)
           echo "VERSION=$version" >> $GITHUB_ENV
