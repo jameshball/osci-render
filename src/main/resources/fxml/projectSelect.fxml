@@ -27,7 +27,7 @@
          <Button fx:id="newProjectButton" layoutX="222.0" layoutY="562.0" mnemonicParsing="false" prefHeight="40.0" prefWidth="131.0" text="Start new project" />
          <CheckBox fx:id="startMutedCheckBox" layoutX="240.0" layoutY="623.0" mnemonicParsing="false" text="Start muted" />
          <Label layoutX="188.0" layoutY="247.0" styleClass="title" text="Recently opened projects" />
-         <Label layoutX="14.0" layoutY="700.0" text="v1.28.3" />
+         <Label layoutX="14.0" layoutY="700.0" text="v1.28.4" />
          <Label layoutX="752.0" layoutY="19.0" styleClass="title" text="Changelog" />
          <AnchorPane layoutX="582.0" layoutY="65.0" prefHeight="200.0" prefWidth="380.0">
             <children>
