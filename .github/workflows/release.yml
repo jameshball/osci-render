@@ -125,7 +125,7 @@ jobs:
           sudo npm install -g github-wikito-converter
           cd wiki
           ls | grep -xv "User-Documentation.md" | parallel rm
-          gwtc -v -f pdf -t "osci-render documentation" --logo-img "osci-render/osci.png" wiki
+          gwtc -v -f pdf -t "osci-render documentation" --logo-img "osci-render/osci.png" .
           cd ../osci-render
           version=$(mvn help:evaluate -Dexpression="project.version" -q -DforceStdout)
           echo "VERSION=$version" >> $GITHUB_ENV
