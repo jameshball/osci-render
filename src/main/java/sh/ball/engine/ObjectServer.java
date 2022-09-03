@@ -30,10 +30,11 @@ public class ObjectServer implements Runnable {
     try {
       // TODO: Need to make this resilient to ports already in use
       // will require using a range of ports rather than just one
-      ServerSocket Server = new ServerSocket(PORT);
+      ServerSocket server = new ServerSocket(PORT);
+      server.setReuseAddress(true);
 
       while (true) {
-        Socket socket = Server.accept();
+        Socket socket = server.accept();
         enableRendering.run();
         BufferedReader clientReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
         while (socket.isConnected()) {
