@@ -1,3 +1,10 @@
+- 1.28.4
+  - Fix calculation of line length
+  - Use rotation for Ellipse shapes
+  - Thank you [DJLevel3](https://github.com/DJLevel3) for the contributions!
+  - Use setReuseAddr(true) for server socket
+
+
 - 1.28.3
   - Fixed bug: Update animator minimum and maximum values whenever the slider min/max changes
 
