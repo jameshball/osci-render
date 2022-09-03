@@ -1517,6 +1517,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     new Thread(objectServer).start();
 
     webSocketServer = new ByteWebSocketServer();
+    webSocketServer.setReuseAddr(true);
     webSocketServer.start();
     this.buffer = new byte[FRAME_SIZE * SOSCI_NUM_VERTICES * SOSCI_VERTEX_SIZE];
     new Thread(() -> sendAudioDataToWebSocket(webSocketServer)).start();
