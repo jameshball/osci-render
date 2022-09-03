@@ -103,9 +103,15 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - uses: actions/checkout@master
+      - name: Checkout wiki
+        uses: actions/checkout@master
         with:
-          name: jameshball/osci-render.wiki
+          repository: jameshball/osci-render.wiki
+          path: wiki
+      - name: Checkout osci-render
+        uses: actions/checkout@master
+        with:
+          path: osci-render
       - uses: actions/setup-node@v3
         with:
           node-version: 16
@@ -117,7 +123,10 @@ jobs:
           wget https://github.com/wkhtmltopdf/wkhtmltopdf/releases/download/0.12.5/wkhtmltox_0.12.5-1.bionic_amd64.deb
           sudo dpkg -i wkhtmltox_0.12.5-1.bionic_amd64.deb
           sudo npm install -g github-wikito-converter
-          gwtc -v -f pdf .
+          gwtc -v -f pdf wiki
+          cd osci-render
+          version=$(mvn help:evaluate -Dexpression="project.version" -q -DforceStdout)
+          echo "VERSION=$version" >> $GITHUB_ENV
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
