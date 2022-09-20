@@ -1,3 +1,10 @@
+- 1.28.5
+  - Fixed various bugs:
+    - Fixed rotation setting isn't set correctly when opening a project [#128](https://github.com/jameshball/osci-render/issues/128)
+    - Undo/redo carries over between different files in the text editor [#120](https://github.com/jameshball/osci-render/issues/120)
+    - Fonts and font styles chosen for text file rendering are not saved to a project [#113](https://github.com/jameshball/osci-render/issues/113)
+
+
 - 1.28.4
   - Fix calculation of line length
   - Use rotation for Ellipse shapes
