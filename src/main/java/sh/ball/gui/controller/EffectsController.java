@@ -245,31 +245,21 @@ public class EffectsController implements Initializable, SubController {
 
     fixedAngleX.setOnMouseClicked(e -> {
       setFixedAngleX = !setFixedAngleX;
-      if (setFixedAngleX) {
-        fixedAngleX.setFill(Color.RED);
-      } else {
-        fixedAngleX.setFill(Color.WHITE);
-      }
-      rotateX.getAnimator().updateValue();
+      setFixedAngle(setFixedAngleX, fixedAngleX, rotateX);
     });
     fixedAngleY.setOnMouseClicked(e -> {
       setFixedAngleY = !setFixedAngleY;
-      if (setFixedAngleY) {
-        fixedAngleY.setFill(Color.RED);
-      } else {
-        fixedAngleY.setFill(Color.WHITE);
-      }
-      rotateY.getAnimator().updateValue();
+      setFixedAngle(setFixedAngleY, fixedAngleY, rotateY);
     });
     fixedAngleZ.setOnMouseClicked(e -> {
       setFixedAngleZ = !setFixedAngleZ;
-      if (setFixedAngleZ) {
-        fixedAngleZ.setFill(Color.RED);
-      } else {
-        fixedAngleZ.setFill(Color.WHITE);
-      }
-      rotateZ.getAnimator().updateValue();
+      setFixedAngle(setFixedAngleZ, fixedAngleZ, rotateZ);
     });
+  }
+
+  private void setFixedAngle(boolean fixedAngle, SVGPath fixedAngleButton, EffectComponentGroup rotate) {
+    fixedAngleButton.setFill(fixedAngle ? Color.RED : Color.WHITE);
+    rotate.getAnimator().updateValue();
   }
 
   private void updateDepthFunction(byte[] fileData, String fileName) {
@@ -408,9 +398,9 @@ public class EffectsController implements Initializable, SubController {
       setFixedAngleZ = fixedRotateZ != null && Boolean.parseBoolean(fixedRotateZ.getTextContent());
     }
 
-    fixedAngleX.setFill(setFixedAngleX ? Color.RED : Color.WHITE);
-    fixedAngleY.setFill(setFixedAngleY ? Color.RED : Color.WHITE);
-    fixedAngleZ.setFill(setFixedAngleZ ? Color.RED : Color.WHITE);
+    setFixedAngle(setFixedAngleX, fixedAngleX, rotateX);
+    setFixedAngle(setFixedAngleY, fixedAngleY, rotateY);
+    setFixedAngle(setFixedAngleZ, fixedAngleZ, rotateZ);
   }
 
   @Override
