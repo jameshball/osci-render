@@ -32,6 +32,9 @@ public class LuaSampleSource implements FrameSource<Vector2> {
   @Override
   public Vector2 next() {
     LuaValue result = executor.execute();
+    if (result.isnil()) {
+      return new Vector2();
+    }
     return new Vector2(result.get(1).checkdouble(), result.get(2).checkdouble());
   }
 
