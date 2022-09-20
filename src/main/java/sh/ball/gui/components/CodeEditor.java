@@ -33,7 +33,10 @@ public class CodeEditor extends StackPane {
     this.newFile = true;
     JSObject window = (JSObject) webview.getEngine().executeScript("window");
     window.setMember("newCode", editingCode);
-    webview.getEngine().executeScript("editor.setValue(newCode);");
+    webview.getEngine().executeScript("""
+      editor.setValue(newCode);
+      editor.clearHistory();
+    """);
   }
 
   public void updateCode() {
