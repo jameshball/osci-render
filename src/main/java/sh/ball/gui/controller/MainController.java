@@ -30,6 +30,7 @@ import java.util.concurrent.*;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 import java.util.logging.Level;
+import java.util.stream.Collectors;
 
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -462,12 +463,12 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     } else {
       fontFamilyListView.getSelectionModel().select(installedFonts[0]);
     }
-    fontFamilyListView.getSelectionModel().selectedItemProperty().addListener((e, old, family) -> updateFileData(openFiles.get(currentFrameSource), frameSourcePaths.get(currentFrameSource)));
+    fontFamilyListView.getSelectionModel().selectedItemProperty().addListener((e, old, family) -> updateTextFiles());
 
 
     fontStyleComboBox.setItems(FXCollections.observableList(Arrays.stream(FontStyle.values()).toList()));
     fontStyleComboBox.setValue(FontStyle.PLAIN);
-    fontStyleComboBox.valueProperty().addListener((e, old, family) -> updateFileData(openFiles.get(currentFrameSource), frameSourcePaths.get(currentFrameSource)));
+    fontStyleComboBox.valueProperty().addListener((e, old, family) -> updateTextFiles());
 
     sliderMinTextField.focusedProperty().addListener((e, old, focused) -> {
       String text = sliderMinTextField.getText();
@@ -527,6 +528,15 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     });
 
     brightnessSlider.valueProperty().addListener((e, old, brightness) -> audioPlayer.setBrightness(brightness.doubleValue()));
+  }
+
+  private void updateTextFiles() {
+    List<Integer> textFrameSources = frameSourcePaths.stream()
+      .filter(path -> path.endsWith(".txt"))
+      .map(path -> frameSourcePaths.indexOf(path))
+      .toList();
+
+    textFrameSources.forEach(i -> updateFileData(openFiles.get(i), frameSourcePaths.get(i), false));
   }
 
   public void setLuaVariable(String variableName, Object value) {
@@ -775,7 +785,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     Platform.runLater(() -> generalController.showMultiFileTooltip(frameSources.size() > 1));
   }
 
-  public void updateFileData(byte[] file, String name) {
+  public void updateFileData(byte[] file, String name, boolean updateUnsavedFiles) {
     int index = frameSourcePaths.indexOf(name);
     if (index == -1) {
       throw new RuntimeException("Can't find open file with name: " + name);
@@ -798,8 +808,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         sampleParsers.set(index, null);
       }
 
-      unsavedFileNames.add(name);
-      setUnsavedFileWarning();
+      if (updateUnsavedFiles) {
+        unsavedFileNames.add(name);
+        setUnsavedFileWarning();
+      }
     } catch (Exception e) {
       logger.log(Level.SEVERE, e.getMessage(), e);
     }
@@ -1192,6 +1204,14 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       frameSource.appendChild(document.createTextNode(String.valueOf(currentFrameSource)));
       root.appendChild(frameSource);
 
+      Element fontFamily = document.createElement("fontFamily");
+      fontFamily.appendChild(document.createTextNode(fontFamilyListView.getSelectionModel().getSelectedItem()));
+      root.appendChild(fontFamily);
+
+      Element fontStyle = document.createElement("fontStyle");
+      fontStyle.appendChild(document.createTextNode(String.valueOf(fontStyleComboBox.getValue().style)));
+      root.appendChild(fontStyle);
+
       TransformerFactory transformerFactory = TransformerFactory.newInstance();
       Transformer transformer = transformerFactory.newTransformer();
       DOMSource domSource = new DOMSource(document);
@@ -1369,6 +1389,16 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         updateFiles(files, fileNames, 0);
       }
 
+      Element fontFamily = (Element) root.getElementsByTagName("fontFamily").item(0);
+      if (fontFamily != null) {
+        fontFamilyListView.getSelectionModel().select(fontFamily.getTextContent());
+      }
+
+      Element fontStyle = (Element) root.getElementsByTagName("fontStyle").item(0);
+      if (fontStyle != null) {
+        fontStyleComboBox.setValue(FontStyle.getStyle(Integer.parseInt(fontStyle.getTextContent())));
+      }
+
       luaController.updateLuaVariables();
 
       openProjectPath = projectFileName;
@@ -1443,7 +1473,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     } else if (SvgParser.isSvgFile(name)) {
       mimeType = "text/html";
     }
-    launchCodeEditor(code, frameSourcePaths.get(currentFrameSource), mimeType, this::updateFileData);
+    launchCodeEditor(code, frameSourcePaths.get(currentFrameSource), mimeType, (data, fileName) -> updateFileData(data, fileName, true));
   }
 
   private void updateTitle(String message, String projectName) {
