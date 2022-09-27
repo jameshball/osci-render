@@ -8,14 +8,16 @@
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.shape.SVGPath?>
 <?import sh.ball.gui.components.EffectComponentGroup?>
 
-<ScrollPane hbarPolicy="NEVER" prefHeight="1094.0" prefWidth="608.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.EffectsController">
+
+<ScrollPane fitToHeight="true" fitToWidth="true" hbarPolicy="NEVER" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.EffectsController">
    <content>
-      <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="1092.0" prefWidth="606.0">
-          <children>
+      <FlowPane prefHeight="1094.0" prefWidth="603.0" prefWrapLength="100.0" rowValignment="BASELINE">
+         <children>
             <VBox>
                <children>
                   <Label alignment="CENTER" prefWidth="601.0" text="Image" textAlignment="JUSTIFY">
@@ -37,6 +39,10 @@
                    <EffectComponentGroup fx:id="smoothing" increment="0.005" label="smoothing" majorTickUnit="0.1" max="1.0" min="0.0" name="Smoothing" type="SMOOTH" value="0.125" />
                    <EffectComponentGroup fx:id="verticalDistort" increment="0.005" label="verticalDistort" majorTickUnit="0.1" max="1.0" min="0.0" name="Vertical shift" type="VERTICAL_DISTORT" value="0.2" />
                    <EffectComponentGroup fx:id="horizontalDistort" increment="0.005" label="horizontalDistort" majorTickUnit="0.1" max="1.0" min="0.0" name="Horizontal shift" type="HORIZONTAL_DISTORT" value="0.2" />
+               </children>
+            </VBox>
+            <VBox>
+               <children>
                   <Label alignment="CENTER" prefWidth="601.0" text="Translation and Scale" textAlignment="JUSTIFY">
                      <padding>
                         <Insets bottom="5.0" />
@@ -66,7 +72,11 @@
                    <EffectComponentGroup fx:id="translationSpeed" alwaysEnabled="true" increment="0.05" label="translationSpeed" majorTickUnit="1.0" max="10.0" min="0.0" name="Translation speed" type="TRANSLATE_SPEED" value="1.0" />
                    <EffectComponentGroup fx:id="volume" alwaysEnabled="true" increment="0.05" label="volume" majorTickUnit="1.0" max="10.0" min="0.0" name="Master volume" type="SCALE" value="3.0" />
                    <EffectComponentGroup fx:id="backingMidi" alwaysEnabled="true" increment="0.005" label="visibility" majorTickUnit="0.1" max="1.0" min="0.0" name="MIDI volume" type="VISIBILITY" value="0.25" />
-                  <Label alignment="CENTER" prefWidth="601.0" text="Rotation" textAlignment="JUSTIFY">
+               </children>
+            </VBox>
+            <VBox>
+               <children>
+                  <Label alignment="CENTER" prefWidth="601.0" text="3D Rotation" textAlignment="JUSTIFY">
                      <padding>
                         <Insets bottom="5.0" />
                      </padding>
@@ -79,12 +89,6 @@
                         <Insets bottom="5.0" />
                      </padding>
                   </Separator>
-                   <EffectComponentGroup fx:id="rotateSpeed" increment="0.05" label="rotateSpeed" majorTickUnit="1.0" max="10.0" min="0.0" name="2D Rotate speed" type="ROTATE" value="0.0" />
-                  <AnchorPane prefHeight="34.0" prefWidth="602.0">
-                     <children>
-                        <Button fx:id="resetRotationButton" layoutX="245.0" layoutY="1.0" mnemonicParsing="false" text="Reset 2D Rotation" />
-                     </children>
-                  </AnchorPane>
                   <EffectComponentGroup fx:id="depthScale" increment="0.005" label="depthScale" majorTickUnit="0.1" max="1.0" min="0.0" name="3D Perspective" type="DEPTH_3D" value="1.0" />
                   <AnchorPane prefHeight="34.0" prefWidth="602.0">
                      <children>
@@ -108,6 +112,10 @@
                         <Button fx:id="resetPerspectiveRotationButton" layoutX="245.0" layoutY="1.0" mnemonicParsing="false" text="Reset 3D Rotation" />
                      </children>
                   </AnchorPane>
+               </children>
+            </VBox>
+            <VBox>
+               <children>
                   <Label alignment="CENTER" prefWidth="601.0" text="Other" textAlignment="JUSTIFY">
                      <padding>
                         <Insets bottom="5.0" />
@@ -121,14 +129,20 @@
                         <Insets bottom="5.0" />
                      </padding>
                   </Separator>
+                   <EffectComponentGroup fx:id="rotateSpeed" increment="0.05" label="rotateSpeed" majorTickUnit="1.0" max="10.0" min="0.0" name="2D Rotate speed" type="ROTATE" value="0.0" />
+                  <AnchorPane prefHeight="34.0" prefWidth="602.0">
+                     <children>
+                        <Button fx:id="resetRotationButton" layoutX="245.0" layoutY="1.0" mnemonicParsing="false" text="Reset 2D Rotation" />
+                     </children>
+                  </AnchorPane>
                    <EffectComponentGroup fx:id="traceMax" increment="0.005" label="traceMax" majorTickUnit="0.1" max="1.0" min="0.0" name="Trace max" type="TRACE_MAX" value="0.5" />
                    <EffectComponentGroup fx:id="traceMin" increment="0.005" label="traceMin" majorTickUnit="0.1" max="1.0" min="0.0" name="Trace min" type="TRACE_MIN" value="0.5" />
                </children>
-               <padding>
-                  <Insets top="5.0" />
-               </padding>
             </VBox>
-          </children>
-      </AnchorPane>
+         </children>
+         <padding>
+            <Insets top="5.0" />
+         </padding>
+      </FlowPane>
    </content>
 </ScrollPane>
