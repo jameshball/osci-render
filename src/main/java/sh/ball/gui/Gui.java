@@ -100,7 +100,7 @@ public class Gui extends Application {
     scene.getStylesheets().add(getClass().getResource("/css/main.css").toExternalForm());
 
     stage.setScene(scene);
-    stage.setResizable(false);
+    stage.setResizable(true);
 
     stage.setOnCloseRequest(t -> {
       Platform.exit();
