@@ -1,3 +1,9 @@
+- 1.29.0
+  - Updated the project select interface and main interface to be resizable
+  - This means you can make osci-render full screen now
+  - The default size is the same as before, and should look almost identical
+
+
 - 1.28.5
   - Fixed various bugs:
     - Fixed rotation setting isn't set correctly when opening a project [#128](https://github.com/jameshball/osci-render/issues/128)
