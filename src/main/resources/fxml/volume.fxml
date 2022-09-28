@@ -17,7 +17,7 @@
             <StackPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="378.0" prefWidth="24.0">
                <children>
                   <Canvas fx:id="volumeCanvas" height="365.0" styleClass="volumeCanvas" width="14.0" />
-                  <Slider fx:id="volumeSlider" blockIncrement="0.05" majorTickUnit="1.0" max="6.0" orientation="VERTICAL" prefWidth="14.0" styleClass="volumeSlider" value="6.0" />
+                  <Slider fx:id="volumeSlider" blockIncrement="0.05" majorTickUnit="1.0" max="6.0" orientation="VERTICAL" prefWidth="14.0" styleClass="volumeSlider" value="3.0" />
                </children>
             </StackPane>
          </children>
