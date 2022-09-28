@@ -32,6 +32,8 @@ public interface AudioPlayer<S> extends Runnable, MidiListener {
 
   void read(byte[] buffer) throws InterruptedException;
 
+  void read(double[] buffer) throws InterruptedException;
+
   void startRecord();
 
   void setDevice(AudioDevice device);
@@ -45,4 +47,6 @@ public interface AudioPlayer<S> extends Runnable, MidiListener {
   AudioInputStream stopRecord();
 
   void setBrightness(double brightness);
+
+  void setThreshold(double doubleValue);
 }

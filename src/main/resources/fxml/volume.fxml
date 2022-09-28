@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.canvas.Canvas?>
+<?import javafx.scene.control.Slider?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.shape.SVGPath?>
+
+
+<HBox prefHeight="379.0" prefWidth="37.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.VolumeController">
+   <children>
+      <VBox alignment="CENTER" spacing="5.0">
+         <children>
+            <SVGPath content="M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z" fill="WHITE" scaleX="0.8" scaleY="0.8" />
+            <StackPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="378.0" prefWidth="24.0">
+               <children>
+                  <Canvas fx:id="volumeCanvas" height="365.0" styleClass="volumeCanvas" width="14.0" />
+                  <Slider fx:id="volumeSlider" blockIncrement="0.05" majorTickUnit="1.0" max="6.0" orientation="VERTICAL" prefWidth="14.0" styleClass="volumeSlider" value="6.0" />
+               </children>
+            </StackPane>
+         </children>
+      </VBox>
+      <VBox spacing="5.0">
+         <HBox.margin>
+            <Insets left="-2.0" />
+         </HBox.margin>
+         <children>
+            <SVGPath content="M18.5,2.27L5,10.14L18.5,18L19.5,16.27L8.97,10.14L19.5,4L18.5,2.27M5,20V22H20V20H5Z" fill="WHITE" scaleX="0.8" scaleY="0.8">
+               <VBox.margin>
+                  <Insets top="-2.0" />
+               </VBox.margin>
+            </SVGPath>
+            <Slider fx:id="thresholdSlider" blockIncrement="0.005" majorTickUnit="1.0" max="1.0" orientation="VERTICAL" prefHeight="377.0" prefWidth="14.0" styleClass="thresholdSlider" value="1.0">
+               <VBox.margin>
+                  <Insets top="-2.0" />
+               </VBox.margin>
+            </Slider>
+         </children>
+      </VBox>
+   </children>
+</HBox>

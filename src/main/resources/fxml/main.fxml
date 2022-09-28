@@ -19,7 +19,7 @@
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 
-<AnchorPane maxHeight="752.0" maxWidth="1046.0" minHeight="752.0" minWidth="1046.0" prefHeight="752.0" prefWidth="1046.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.MainController">
+<AnchorPane maxHeight="752.0" maxWidth="1105.0" minHeight="752.0" minWidth="1046.0" prefHeight="752.0" prefWidth="1096.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.MainController">
    <MenuBar prefHeight="27.0" prefWidth="1046.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
      <menus>
        <Menu mnemonicParsing="false" text="File">
@@ -220,7 +220,7 @@
          </Menu>
      </menus>
    </MenuBar>
-   <AnchorPane fx:id="frequencyPane" prefHeight="53.0" prefWidth="610.0" styleClass="darkPane" AnchorPane.bottomAnchor="7.0" AnchorPane.leftAnchor="429.0" AnchorPane.rightAnchor="7.0">
+   <AnchorPane fx:id="frequencyPane" prefHeight="53.0" prefWidth="610.0" styleClass="darkPane" AnchorPane.bottomAnchor="7.0" AnchorPane.leftAnchor="429.0" AnchorPane.rightAnchor="60.0">
       <children>
          <HBox alignment="CENTER" prefHeight="53.0" prefWidth="610.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
             <children>
@@ -229,7 +229,7 @@
          </HBox>
       </children>
    </AnchorPane>
-   <TitledPane animated="false" collapsible="false" layoutX="429.0" layoutY="33.0" prefHeight="652.0" prefWidth="610.0" text="Audio Effects" AnchorPane.bottomAnchor="67.0" AnchorPane.leftAnchor="429.0" AnchorPane.rightAnchor="7.0" AnchorPane.topAnchor="33.0">
+   <TitledPane animated="false" collapsible="false" layoutX="429.0" layoutY="33.0" prefHeight="652.0" prefWidth="610.0" text="Audio Effects" AnchorPane.bottomAnchor="67.0" AnchorPane.leftAnchor="429.0" AnchorPane.rightAnchor="60.0" AnchorPane.topAnchor="33.0">
       <fx:include fx:id="effects" source="effects.fxml" />
    </TitledPane>
    <VBox alignment="CENTER" layoutX="7.0" layoutY="-91.0" prefHeight="836.0" prefWidth="416.0" spacing="7.0" AnchorPane.bottomAnchor="7.0" AnchorPane.leftAnchor="7.0" AnchorPane.topAnchor="33.0">
@@ -249,4 +249,13 @@
          </AnchorPane>
       </children>
    </VBox>
+    <AnchorPane fx:id="volumePane" layoutX="10.0" layoutY="10.0" minWidth="45.0" prefHeight="712.0" prefWidth="0.0" styleClass="darkPane" AnchorPane.bottomAnchor="7.0" AnchorPane.rightAnchor="7.0" AnchorPane.topAnchor="33.0">
+      <children>
+         <VBox alignment="CENTER" prefHeight="712.0" prefWidth="45.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+            <children>
+                  <fx:include fx:id="volume" source="volume.fxml" />
+            </children>
+         </VBox>
+      </children>
+    </AnchorPane>
 </AnchorPane>

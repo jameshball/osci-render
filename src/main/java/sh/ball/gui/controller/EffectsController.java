@@ -87,8 +87,6 @@ public class EffectsController implements Initializable, SubController {
   @FXML
   private EffectComponentGroup rotateSpeed;
   @FXML
-  private EffectComponentGroup volume;
-  @FXML
   private EffectComponentGroup backingMidi;
   @FXML
   private TextField translationXTextField;
@@ -194,7 +192,6 @@ public class EffectsController implements Initializable, SubController {
     translationScale.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, translateEffect));
     translationSpeed.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(translateEffect::setSpeed)));
     rotateSpeed.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, rotateEffect));
-    volume.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect((value) -> audioPlayer.setVolume(value / 3.0))));
     backingMidi.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(audioPlayer::setBackingMidiVolume)));
 
     effects().forEach(effect -> {
@@ -287,7 +284,6 @@ public class EffectsController implements Initializable, SubController {
       translationScale,
       translationSpeed,
       rotateSpeed,
-      volume,
       backingMidi
     );
   }
@@ -413,10 +409,6 @@ public class EffectsController implements Initializable, SubController {
     translationYTextField.setText(MainController.FORMAT.format(translation.getY()));
   }
 
-  public void setTranslationIncrement(double increment) {
-    this.scrollDelta = increment;
-  }
-
   // changes the sinusoidal translation of the image rendered
   private void updateTranslation() {
     translateEffect.setTranslation(new Vector2(
@@ -425,17 +417,11 @@ public class EffectsController implements Initializable, SubController {
     ));
   }
 
-
-
   public boolean mouseTranslate() {
     return translateCheckBox.isSelected();
   }
 
   public void disableMouseTranslate() {
     translateCheckBox.setSelected(false);
-  }
-
-  public void setVolume(double volumeValue) {
-    volume.setValue(volumeValue);
   }
 }

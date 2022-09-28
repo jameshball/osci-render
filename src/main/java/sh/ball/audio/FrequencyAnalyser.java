@@ -10,7 +10,6 @@ import static sh.ball.gui.Gui.logger;
 
 public class FrequencyAnalyser<S> implements Runnable {
 
-  private static final float NORMALIZATION_FACTOR_2_BYTES = Short.MAX_VALUE + 1.0f;
   private static final int DEFAULT_SAMPLE_RATE = 192000;
   // increase this for higher frequency resolution, but less frequent frequency calculation
   private static final int DEFAULT_POWER_OF_TWO = 18;
@@ -43,7 +42,7 @@ public class FrequencyAnalyser<S> implements Runnable {
   // Adapted from https://stackoverflow.com/questions/53997426/java-how-to-get-current-frequency-of-audio-input
   @Override
   public void run() {
-    byte[] buf = new byte[2 << powerOfTwo];
+    double[] buf = new double[2 << (powerOfTwo - 1)];
 
     while (!stopped) {
       try {
@@ -51,8 +50,12 @@ public class FrequencyAnalyser<S> implements Runnable {
       } catch (InterruptedException e) {
         logger.log(Level.SEVERE, e.getMessage(), e);
       }
-      double[] leftSamples = decode(buf, true);
-      double[] rightSamples = decode(buf, false);
+      double[] leftSamples = new double[buf.length / 2];
+      double[] rightSamples = new double[buf.length / 2];
+      for (int i = 0; i < buf.length; i += 2) {
+        leftSamples[i / 2] = buf[i];
+        rightSamples[i / 2] = buf[i + 1];
+      }
 
       FFT leftFft = new FFT(leftSamples, null, false, true);
       FFT rightFft = new FFT(rightSamples, null, false, true);
@@ -85,35 +88,5 @@ public class FrequencyAnalyser<S> implements Runnable {
 
   public void stop() {
     stopped = true;
-  }
-
-  private double[] decode(final byte[] buf, boolean decodeLeft) {
-    final double[] fbuf = new double[(buf.length / 2) / frameSize];
-    int byteNum = 0;
-    int i = 0;
-    for (int pos = 0; pos < buf.length; pos += frameSize) {
-      int sample = byteToIntLittleEndian(buf, pos, frameSize);
-      // normalize to [0,1] (not strictly necessary, but makes things easier)
-      double normalSample =  sample / NORMALIZATION_FACTOR_2_BYTES;
-      if (decodeLeft) {
-        if (byteNum < 2) {
-          fbuf[i++] = normalSample;
-        }
-      } else if (byteNum >= 2) {
-        fbuf[i++] = normalSample;
-      }
-      byteNum++;
-      byteNum %= 4;
-    }
-    return fbuf;
-  }
-
-  private static int byteToIntLittleEndian(final byte[] buf, final int offset, final int bytesPerSample) {
-    int sample = 0;
-    for (int byteIndex = 0; byteIndex < bytesPerSample; byteIndex++) {
-      final int aByte = buf[offset + byteIndex] & 0xff;
-      sample += aByte << 8 * (byteIndex);
-    }
-    return sample;
   }
 }

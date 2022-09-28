@@ -113,6 +113,22 @@
     -fx-padding: 0.2em;
 }
 
+/*.volumeSlider > .thumb {*/
+/*    -fx-shape: "M460,265.87 1,265.87 1,0.866 460,0.866z";*/
+/*}*/
+
+.volumeSlider > .track {
+    -fx-background-color: transparent;
+}
+
+.thresholdSlider > .thumb {
+    -fx-shape: "M460,530.874 1,265.87 460,0.866z";
+}
+
+.thresholdSlider > .track {
+    -fx-background-color: transparent;
+}
+
 .slider .axis .axis-tick-mark, .slider .axis .axis-minor-tick-mark {
     -fx-fill: null;
     -fx-stroke: white;

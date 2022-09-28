@@ -140,6 +140,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private GeneralController generalController;
   @FXML
+  private VolumeController volumeController;
+  @FXML
   private TitledPane objTitledPane;
   @FXML
   private TitledPane luaTitledPane;
@@ -213,7 +215,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   }
 
   private List<SubController> subControllers() {
-    return List.of(effectsController, objController, imageController, generalController, luaController);
+    return List.of(effectsController, objController, imageController, generalController, luaController, volumeController);
   }
 
   private void updateSliderUnits(Slider slider) {
@@ -1108,7 +1110,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       NodeList nodes = root.getElementsByTagName(labels.get(i));
       if (nodes.getLength() > 0) {
         String value = nodes.item(0).getTextContent();
-        micSelected.get(i).setValue(Boolean.parseBoolean(value));
+        BooleanProperty selected = micSelected.get(i);
+        if (selected != null) {
+          selected.setValue(Boolean.parseBoolean(value));
+        }
       }
     }
   }
@@ -1504,7 +1509,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   }
 
   public void setVolume(double volume) {
-    effectsController.setVolume(volume);
+    volumeController.setVolume(volume);
   }
 
   public void initialiseAudioEngine() throws Exception {
