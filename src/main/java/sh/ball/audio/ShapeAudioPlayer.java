@@ -82,6 +82,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private boolean flipY = false;
   private double brightness = 1.0;
   private AudioSample audioSample = AudioSample.INT16;
+  private double threshold = 1.0;
 
   private AudioDevice device;
 
@@ -125,6 +126,10 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
   public void setVolume(double volume) {
     this.volume = volume;
+  }
+
+  public void setThreshold(double threshold) {
+    this.threshold = threshold;
   }
 
   private void incrementShapeDrawing() {
@@ -229,10 +234,15 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     byte b3 = (byte) (right >> 8);
 
     for (Listener listener : listeners) {
-      listener.write(b0);
-      listener.write(b1);
-      listener.write(b2);
-      listener.write(b3);
+      if (listener.isDoubleBuffer) {
+        listener.write(leftChannel);
+        listener.write(rightChannel);
+      } else {
+        listener.write(b0);
+        listener.write(b1);
+        listener.write(b2);
+        listener.write(b3);
+      }
       listener.notifyIfFull();
     }
 
@@ -242,15 +252,15 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private Vector2 cutoff(Vector2 vector) {
     double x = vector.x;
     double y = vector.y;
-    if (x < -1) {
-      x = -1;
-    } else if (x > 1) {
-      x = 1;
+    if (x < -threshold) {
+      x = -threshold;
+    } else if (x > threshold) {
+      x = threshold;
     }
-    if (y < -1) {
-      y = -1;
-    } else if (y > 1) {
-      y = 1;
+    if (y < -threshold) {
+      y = -threshold;
+    } else if (y > threshold) {
+      y = threshold;
     }
     return new Vector2(x, y);
   }
@@ -460,6 +470,14 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   @Override
+  public void read(double[] buffer) throws InterruptedException {
+    Listener listener = new Listener(buffer);
+    listeners.add(listener);
+    listener.waitUntilFull();
+    listeners.remove(listener);
+  }
+
+  @Override
   public void startRecord() {
     outputStream = new ByteArrayOutputStream();
     framesRecorded = 0;
@@ -623,12 +641,23 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
   private static class Listener {
     private final byte[] buffer;
+    private final double[] doubleBuffer;
+    private final boolean isDoubleBuffer;
     private final Semaphore sema;
 
     private int offset;
 
     private Listener(byte[] buffer) {
       this.buffer = buffer;
+      this.doubleBuffer = null;
+      this.isDoubleBuffer = false;
+      this.sema = new Semaphore(0);
+    }
+
+    private Listener(double[] buffer) {
+      this.buffer = null;
+      this.doubleBuffer = buffer;
+      this.isDoubleBuffer = true;
       this.sema = new Semaphore(0);
     }
 
@@ -637,14 +666,20 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     }
 
     private void notifyIfFull() {
-      if (offset >= buffer.length) {
+      if (doubleBuffer != null && offset >= doubleBuffer.length || buffer != null && offset >= buffer.length) {
         sema.release();
       }
     }
 
     private void write(byte b) {
-      if (offset < buffer.length) {
+      if (buffer != null && offset < buffer.length) {
         buffer[offset++] = b;
+      }
+    }
+
+    private void write(double d) {
+      if (doubleBuffer != null && offset < doubleBuffer.length) {
+        doubleBuffer[offset++] = d;
       }
     }
   }

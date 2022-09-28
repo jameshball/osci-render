@@ -13,7 +13,7 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.web.WebView?>
 
-<AnchorPane prefHeight="752.0" prefWidth="1046.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.ProjectSelectController">
+<AnchorPane prefHeight="752.0" prefWidth="1096.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.ProjectSelectController">
    <AnchorPane layoutX="11.0" layoutY="12.0" prefHeight="727.0" prefWidth="1023.0" styleClass="darkPane" AnchorPane.bottomAnchor="12.0" AnchorPane.leftAnchor="12.0" AnchorPane.rightAnchor="12.0" AnchorPane.topAnchor="12.0">
       <children>
          <HBox alignment="TOP_CENTER" layoutX="-3.0" prefHeight="693.0" prefWidth="992.0" spacing="20.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="15.0" AnchorPane.rightAnchor="15.0" AnchorPane.topAnchor="0.0">
