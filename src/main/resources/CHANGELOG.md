@@ -1,3 +1,15 @@
+- 1.30.0
+  - Updated osci-render to Java 19 (please report any new issues you think could be related to this!)
+  - Added volume slider on right side of main interface
+    - This replaces the volume scale slider under audio effects
+    - The slider has a volume visualiser that shows the current volume in the left and right audio channels
+    - It also shows the average volume
+    - There is also another slider that points to the volume slider that controls the hard clipping point of the audio
+      - The hard clipping point is the point at which the audio is clipped to the maximum volume
+      - Any samples above this point are set to this point
+      - By default, this is set to 1 meaning that any values less than -1 or greater than 1 are set to -1 or 1 respectively
+
+
 - 1.29.0
   - Updated the project select interface and main interface to be resizable
   - This means you can make osci-render full screen now
