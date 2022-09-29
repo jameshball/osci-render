@@ -1,3 +1,8 @@
+- 1.30.1
+  - Changed Lua demo file to the mini osci-render demo that emulates a basic version of osci-render within osci-render
+  - Done this as the old demo's audio was quite jarring and the new one shows off more of Lua
+
+
 - 1.30.0
   - Updated osci-render to Java 19 (please report any new issues you think could be related to this!)
   - Added volume slider on right side of main interface
