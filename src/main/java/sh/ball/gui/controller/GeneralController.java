@@ -9,6 +9,7 @@ import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
+import javafx.scene.paint.Color;
 import javafx.scene.shape.SVGPath;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
@@ -35,6 +36,7 @@ public class GeneralController implements Initializable, SubController {
   private final FileChooser renderFileChooser = new FileChooser();
   private final DirectoryChooser folderChooser = new DirectoryChooser();
   private Stage stage;
+  private boolean lineInSelected = false;
 
   // frame playback (code by DJ_Level_3)
   private static final int MAX_FRAME_RATE = 120;
@@ -73,6 +75,8 @@ public class GeneralController implements Initializable, SubController {
   private Button createFileButton;
   @FXML
   private Button deleteFileButton;
+  @FXML
+  private SVGPath lineInToggle;
 
   public void setRecordResult(String result) {
     recordLabel.setText(result);
@@ -250,6 +254,12 @@ public class GeneralController implements Initializable, SubController {
       if (event.getCode() == KeyCode.ENTER) {
         createFileButton.getOnAction().handle(null);
       }
+    });
+
+    lineInToggle.setOnMouseClicked(e -> {
+      lineInSelected = !lineInSelected;
+      audioPlayer.toggleLineIn();
+      lineInToggle.setFill(lineInSelected ? Color.RED : Color.WHITE);
     });
   }
 
