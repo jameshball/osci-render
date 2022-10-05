@@ -8,10 +8,10 @@
 <?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.shape.SVGPath?>
 
-<AnchorPane id="control-pane" prefHeight="341.0" prefWidth="364.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.GeneralController">
+<AnchorPane id="control-pane" prefHeight="341.0" prefWidth="364.0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.GeneralController">
     <children>
         <Button fx:id="chooseFileButton" layoutX="14.0" layoutY="17.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose File" />
-        <Label fx:id="fileLabel" alignment="TOP_LEFT" layoutX="143.0" layoutY="22.0" maxWidth="270.0" prefHeight="58.0" prefWidth="210.0" text="cube.obj" wrapText="true" />
+        <Label fx:id="fileLabel" alignment="TOP_LEFT" layoutX="166.0" layoutY="22.0" maxWidth="270.0" prefHeight="58.0" prefWidth="192.0" text="cube.obj" wrapText="true" />
         <Label fx:id="recordLabel" layoutX="14.0" layoutY="323.0" maxWidth="451.0" prefHeight="18.0" prefWidth="343.0" />
         <Label id="frequency" fx:id="frequencyLabel" layoutX="14.0" layoutY="152.0" prefHeight="58.0" prefWidth="343.0" text="L/R Frequency:&#10; &#10;" />
         <Button fx:id="chooseFolderButton" layoutX="14.0" layoutY="118.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Choose Folder" />
@@ -27,5 +27,6 @@
       <ComboBox fx:id="createFileComboBox" layoutX="166.0" layoutY="286.0" minHeight="30.0" prefHeight="30.0" prefWidth="78.0" />
       <TextField fx:id="createFileTextField" alignment="CENTER_RIGHT" layoutX="35.0" layoutY="286.0" prefHeight="30.0" prefWidth="127.0" />
       <Button fx:id="editFileButton" layoutX="14.0" layoutY="51.0" mnemonicParsing="false" prefHeight="26.0" prefWidth="114.0" text="Edit File" />
+      <SVGPath fx:id="lineInToggle" content="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3m7 9c0 3.53-2.61 6.44-6 6.93V21h-2v-3.07c-3.39-.49-6-3.4-6-6.93h2a5 5 0 0 0 5 5a5 5 0 0 0 5-5h2Z" fill="WHITE" layoutX="138.0" layoutY="19.0" pickOnBounds="true" />
     </children>
 </AnchorPane>

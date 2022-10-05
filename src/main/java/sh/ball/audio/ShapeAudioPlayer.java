@@ -83,6 +83,10 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private double brightness = 1.0;
   private AudioSample audioSample = AudioSample.INT16;
   private double threshold = 1.0;
+  private int micSampleIndex = 0;
+  private ArrayBlockingQueue<double[]> micSampleQueue = new ArrayBlockingQueue<>(10);
+  private double[] micSamples;
+  private boolean lineInEnabled = false;
 
   private AudioDevice device;
 
@@ -150,14 +154,34 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private Vector2 generateChannels() {
     Vector2 channels;
 
-    if (sampleSource != null) {
-      channels = sampleSource.next();
-    } else {
-      Shape shape = getCurrentShape();
+    if (micSamples == null) {
+      try {
+        micSamples = micSampleQueue.take();
+      } catch (InterruptedException e) {
+        logger.log(Level.SEVERE, "Interrupted while waiting for mic samples", e);
+      }
+    }
 
-      double length = shape.getLength();
-      double drawingProgress = length == 0 ? 1 : shapeDrawn / length;
-      channels = shape.nextVector(drawingProgress);
+    channels = new Vector2(micSamples[micSampleIndex++], micSamples[micSampleIndex++]);
+    if (micSampleIndex >= micSamples.length) {
+      try {
+        micSamples = micSampleQueue.take();
+      } catch (InterruptedException e) {
+        logger.log(Level.SEVERE, "Failed to get mic samples", e);
+      }
+      micSampleIndex = 0;
+    }
+
+    if (!lineInEnabled) {
+      if (sampleSource != null) {
+        channels = sampleSource.next();
+      } else {
+        Shape shape = getCurrentShape();
+
+        double length = shape.getLength();
+        double drawingProgress = length == 0 ? 1 : shapeDrawn / length;
+        channels = shape.nextVector(drawingProgress);
+      }
     }
 
     channels = applyEffects(count, channels);
@@ -653,6 +677,19 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
   public void removeSampleSource() {
     this.sampleSource = null;
+  }
+
+  @Override
+  public void transmit(double[] samples) {
+    try {
+      micSampleQueue.put(samples);
+    } catch (InterruptedException e) {
+      logger.log(Level.SEVERE, e.getMessage(), e);
+    }
+  }
+
+  public void toggleLineIn() {
+    lineInEnabled = !lineInEnabled;
   }
 
   private static class Listener {

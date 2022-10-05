@@ -91,8 +91,6 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   // audio
   private int sampleRate;
   private FrequencyAnalyser<List<Shape>> analyser;
-  private final double[] micSamples = new double[64];
-  private int micSampleIndex = 0;
   private double[] targetSliderValue;
   private boolean recording = false;
   private Timeline recordingTimeline;
@@ -329,22 +327,28 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     List<BooleanProperty> micCheckBoxes = micSelected();
     targetSliderValue = new double[sliders.size()];
     for (int i = 0; i < sliders.size(); i++) {
-      updateClosestChannelToZero(sliders.get(i));
-      targetSliderValue[i] = sliders.get(i).getValue();
+      Slider slider = sliders.get(i);
+      updateClosestChannelToZero(slider);
+      targetSliderValue[i] = slider.getValue();
       int finalI = i;
       if (micCheckBoxes.get(i) != null) {
         BooleanProperty selected = micCheckBoxes.get(i);
-        sliders.get(i).valueProperty().addListener((e, old, value) -> {
+        selected.addListener((e, old, isSelected) -> {
+          if (!isSelected) {
+            slider.setValue(targetSliderValue[finalI]);
+          }
+        });
+        slider.valueProperty().addListener((e, old, value) -> {
           if (!selected.getValue()) {
             targetSliderValue[finalI] = value.doubleValue();
           }
         });
       }
-      sliders.get(i).minProperty().addListener(e -> updateClosestChannelToZero(sliders.get(finalI)));
-      sliders.get(i).maxProperty().addListener(e -> updateClosestChannelToZero(sliders.get(finalI)));
-      sliders.get(i).setOnMouseClicked(event -> {
+      slider.minProperty().addListener(e -> updateClosestChannelToZero(slider));
+      slider.maxProperty().addListener(e -> updateClosestChannelToZero(slider));
+      slider.setOnMouseClicked(event -> {
         if (event.getClickCount() == 2) {
-          sliders.get(finalI).setValue(0);
+          slider.setValue(0);
         }
       });
     }
@@ -1434,16 +1438,12 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   }
 
   @Override
-  public void transmit(double sample) {
-    micSamples[micSampleIndex++] = sample;
-    if (micSampleIndex >= micSamples.length) {
-      micSampleIndex = 0;
-    }
+  public void transmit(double[] samples) {
     double volume = 0;
-    for (double micSample : micSamples) {
-      volume += Math.abs(micSample);
+    for (double micSample : samples) {
+      volume += Math.sqrt(micSample * micSample);
     }
-    volume /= micSamples.length;
+    volume /= samples.length;
     volume = Math.min(1.0, Math.max(-1.0, volume * generalController.getMicVolume()));
     if (volume < MIN_MIC_VOLUME && volume > -MIN_MIC_VOLUME) {
       volume = 0;
@@ -1538,6 +1538,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     AudioInput audioInput = new JavaAudioInput();
     if (audioInput.isAvailable()) {
       audioInput.addListener(this);
+      audioInput.addListener(audioPlayer);
       new Thread(audioInput).start();
     } else {
       subControllers().forEach(SubController::micNotAvailable);
