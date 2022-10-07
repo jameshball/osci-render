@@ -1,8 +1,9 @@
 package sh.ball.audio.engine;
 
+import javax.sound.sampled.Mixer;
 import java.util.Objects;
 
-public record SimpleAudioDevice(String id, String name, int sampleRate, AudioSample sample, int channels) implements AudioDevice {
+public record SimpleAudioDevice(String id, String name, int sampleRate, AudioSample sample, int channels, Mixer.Info mixerInfo) implements AudioDevice {
 
   private static final int MAX_NAME_LENGTH = 30;
 

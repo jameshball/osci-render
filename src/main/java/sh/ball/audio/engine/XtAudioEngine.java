@@ -179,7 +179,7 @@ public class XtAudioEngine implements AudioEngine {
             Structs.XtFormat format = new Structs.XtFormat(finalMix.get(), channels);
 
             if (xtDevice.supportsFormat(format)) {
-              devices.add(new SimpleAudioDevice(deviceId, deviceName, finalMix.get().rate, XtSampleToAudioSample(finalMix.get().sample), numChannels));
+              devices.add(new SimpleAudioDevice(deviceId, deviceName, finalMix.get().rate, XtSampleToAudioSample(finalMix.get().sample), numChannels, null));
             }
           });
         } catch (XtException e) {
@@ -215,7 +215,7 @@ public class XtAudioEngine implements AudioEngine {
         Structs.XtFormat format = new Structs.XtFormat(mix.get(), channels);
 
         if (xtDevice.supportsFormat(format)) {
-          return new SimpleAudioDevice(deviceId, deviceName, mix.get().rate, XtSampleToAudioSample(mix.get().sample), DEFAULT_NUM_CHANNELS);
+          return new SimpleAudioDevice(deviceId, deviceName, mix.get().rate, XtSampleToAudioSample(mix.get().sample), DEFAULT_NUM_CHANNELS, null);
         } else {
           return null;
         }

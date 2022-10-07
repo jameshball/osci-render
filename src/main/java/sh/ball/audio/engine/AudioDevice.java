@@ -1,5 +1,7 @@
 package sh.ball.audio.engine;
 
+import javax.sound.sampled.Mixer;
+
 public interface AudioDevice {
   String id();
 
@@ -10,4 +12,6 @@ public interface AudioDevice {
   AudioSample sample();
 
   int channels();
+
+  Mixer.Info mixerInfo();
 }
