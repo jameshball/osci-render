@@ -27,6 +27,13 @@ public class JavaAudioInput implements AudioInput {
 
   public JavaAudioInput() {
     TargetDataLine mic;
+
+    Mixer.Info[] mixerInfos = AudioSystem.getMixerInfo();
+
+    for (Mixer.Info info : mixerInfos) {
+      logger.log(Level.INFO, "Found mixer: " + info.getName() + " " + info.getDescription());
+    }
+
     try {
       DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
       mic = (TargetDataLine) AudioSystem.getLine(info);

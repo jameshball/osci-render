@@ -44,7 +44,11 @@ public class JavaAudioEngine implements AudioEngine {
     this.device = device;
 
     AudioFormat format = new AudioFormat((float) device.sampleRate(), BIT_DEPTH, device.channels(), SIGNED_SAMPLE, BIG_ENDIAN);
-    this.source = AudioSystem.getSourceDataLine(format);
+    if (device.mixerInfo() != null) {
+      this.source = AudioSystem.getSourceDataLine(format, device.mixerInfo());
+    } else {
+      this.source = AudioSystem.getSourceDataLine(format);
+    }
 
     int frameSize = device.channels() * BIT_DEPTH / 8;
 
@@ -101,22 +105,35 @@ public class JavaAudioEngine implements AudioEngine {
   public List<AudioDevice> devices() {
     List<AudioDevice> devices = new ArrayList<>();
 
-    Stream.of(192000, 96000, 48000, 44100).forEach(rate ->
-      Stream.of(1, 2, 3, 4, 6, 8).forEach(channels -> {
-        try {
-          AudioFormat format = new AudioFormat((float) rate, BIT_DEPTH, channels, SIGNED_SAMPLE, BIG_ENDIAN);
-          this.source = AudioSystem.getSourceDataLine(format);
-          devices.add(new SimpleAudioDevice("default-" + rate, "default", rate, AudioSample.INT16, channels));
-        } catch (Exception ignored) {}
-      })
-    );
+    Line.Info audioOutput = new Line.Info(SourceDataLine.class);
+    List<Mixer.Info> outputDeviceInfos = new ArrayList<>();
+
+    Mixer.Info[] infos = AudioSystem.getMixerInfo();
+    for (Mixer.Info info : infos) {
+      Mixer mixer = AudioSystem.getMixer(info);
+      if (mixer.isLineSupported(audioOutput)) {
+        outputDeviceInfos.add(info);
+      }
+    }
+
+    for (Mixer.Info info : outputDeviceInfos) {
+      Stream.of(192000, 96000, 48000, 44100).forEach(rate ->
+        Stream.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12).forEach(channels -> {
+          try {
+            AudioFormat format = new AudioFormat((float) rate, BIT_DEPTH, channels, SIGNED_SAMPLE, BIG_ENDIAN);
+            this.source = AudioSystem.getSourceDataLine(format, info);
+            devices.add(new SimpleAudioDevice(info.getName() + "-" + rate, info.getName(), rate, AudioSample.INT16, channels, info));
+          } catch (Exception ignored) {}
+        })
+      );
+    }
 
     return devices;
   }
 
   @Override
   public AudioDevice getDefaultDevice() {
-    return new SimpleAudioDevice("default", "default", DEFAULT_SAMPLE_RATE, AudioSample.INT16, DEFAULT_NUM_CHANNELS);
+    return new SimpleAudioDevice("default", "default", DEFAULT_SAMPLE_RATE, AudioSample.INT16, DEFAULT_NUM_CHANNELS, null);
   }
 
   @Override
