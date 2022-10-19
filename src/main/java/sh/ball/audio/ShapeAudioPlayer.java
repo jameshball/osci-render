@@ -87,6 +87,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private final ArrayBlockingQueue<double[]> micSampleQueue = new ArrayBlockingQueue<>(10);
   private double[] micSamples;
   private boolean lineInEnabled = false;
+  private boolean inputConnected = false;
 
   private AudioDevice device;
 
@@ -160,14 +161,22 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private Vector2 generateChannels() {
     Vector2 channels = new Vector2();
 
-    if (micSamples == null) {
-      micSamples = micSampleQueue.poll();
-    }
+    if (inputConnected) {
+      if (micSamples == null) {
+        try {
+          micSamples = micSampleQueue.take();
+        } catch (InterruptedException e) {
+          logger.log(Level.SEVERE, "Failed to get mic samples", e);
+        }
+      }
 
-    if (micSamples != null) {
       channels = new Vector2(micSamples[micSampleIndex++], micSamples[micSampleIndex++]);
       if (micSampleIndex >= micSamples.length) {
-        micSamples = null;
+        try {
+          micSamples = micSampleQueue.take();
+        } catch (InterruptedException e) {
+          logger.log(Level.SEVERE, "Failed to get mic samples", e);
+        }
         micSampleIndex = 0;
       }
     }
@@ -659,11 +668,19 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
   @Override
   public void transmit(double[] samples) {
-    micSampleQueue.offer(samples);
+    try {
+      micSampleQueue.put(samples);
+    } catch (InterruptedException e) {
+      logger.log(Level.SEVERE, "Interrupted while transmitting", e);
+    }
   }
 
   public void toggleLineIn() {
     lineInEnabled = !lineInEnabled;
+  }
+
+  public void inputConnected() {
+    inputConnected = true;
   }
 
   private static class Listener {
