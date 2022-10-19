@@ -116,6 +116,9 @@ public class XtAudioEngine implements AudioEngine {
     this.channelGenerator = channelGenerator;
     try (XtPlatform platform = XtAudio.init(null, null)) {
       XtService service = getService(platform);
+      if (service == null) {
+        return;
+      }
 
       try (XtDevice xtDevice = service.openDevice(device.id())) {
         Structs.XtMix mix = new Structs.XtMix(device.sampleRate(), AudioSampleToXtSample(device.sample()));
@@ -156,6 +159,9 @@ public class XtAudioEngine implements AudioEngine {
 
     try (XtPlatform platform = XtAudio.init(null, null)) {
       XtService service = getService(platform);
+      if (service == null) {
+        return devices;
+      }
       XtDeviceList xtDevices = service.openDeviceList(EnumSet.of(Enums.XtEnumFlags.OUTPUT));
 
       for (int i = 0; i < xtDevices.getCount(); i++) {
@@ -179,7 +185,7 @@ public class XtAudioEngine implements AudioEngine {
             Structs.XtFormat format = new Structs.XtFormat(finalMix.get(), channels);
 
             if (xtDevice.supportsFormat(format)) {
-              devices.add(new SimpleAudioDevice(deviceId, deviceName, finalMix.get().rate, XtSampleToAudioSample(finalMix.get().sample), numChannels, null));
+              devices.add(new SimpleAudioDevice(deviceId, deviceName, finalMix.get().rate, XtSampleToAudioSample(finalMix.get().sample), numChannels, null, true));
             }
           });
         } catch (XtException e) {
@@ -200,6 +206,9 @@ public class XtAudioEngine implements AudioEngine {
   public AudioDevice getDefaultDevice() {
     try (XtPlatform platform = XtAudio.init(null, null)) {
       XtService service = getService(platform);
+      if (service == null) {
+        return null;
+      }
       String deviceId = service.getDefaultDeviceId(true);
 
       try (XtDevice xtDevice = service.openDevice(deviceId)) {
@@ -215,7 +224,7 @@ public class XtAudioEngine implements AudioEngine {
         Structs.XtFormat format = new Structs.XtFormat(mix.get(), channels);
 
         if (xtDevice.supportsFormat(format)) {
-          return new SimpleAudioDevice(deviceId, deviceName, mix.get().rate, XtSampleToAudioSample(mix.get().sample), DEFAULT_NUM_CHANNELS, null);
+          return new SimpleAudioDevice(deviceId, deviceName, mix.get().rate, XtSampleToAudioSample(mix.get().sample), DEFAULT_NUM_CHANNELS, null, true);
         } else {
           return null;
         }
@@ -236,19 +245,11 @@ public class XtAudioEngine implements AudioEngine {
 
   // connects to an XtAudio XtService in order of lowest latency to highest latency
   private XtService getService(XtPlatform platform) {
-    XtService service = platform.getService(platform.setupToSystem(Enums.XtSetup.SYSTEM_AUDIO));
+    XtService service = platform.getService(Enums.XtSystem.JACK);
     if (service == null) {
-      service = platform.getService(platform.setupToSystem(Enums.XtSetup.PRO_AUDIO));
-    }
-    if (service == null) {
-      service = platform.getService(platform.setupToSystem(Enums.XtSetup.CONSUMER_AUDIO));
-    }
-    if (service == null) {
-      throw new RuntimeException("Failed to connect to any audio service");
-    }
-
-    if (service.getCapabilities().contains(Enums.XtServiceCaps.NONE)) {
-      throw new RuntimeException("Audio service has no capabilities");
+      logger.log(Level.SEVERE, "No XtAudio service found");
+    } else if (service.getCapabilities().contains(Enums.XtServiceCaps.NONE)) {
+      logger.log(Level.SEVERE, "Audio service has no capabilities");
     }
 
     return service;

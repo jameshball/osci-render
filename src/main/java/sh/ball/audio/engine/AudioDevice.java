@@ -14,4 +14,6 @@ public interface AudioDevice {
   int channels();
 
   Mixer.Info mixerInfo();
+
+  boolean output();
 }

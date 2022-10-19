@@ -84,7 +84,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private AudioSample audioSample = AudioSample.INT16;
   private double threshold = 1.0;
   private int micSampleIndex = 0;
-  private ArrayBlockingQueue<double[]> micSampleQueue = new ArrayBlockingQueue<>(10);
+  private final ArrayBlockingQueue<double[]> micSampleQueue = new ArrayBlockingQueue<>(10);
   private double[] micSamples;
   private boolean lineInEnabled = false;
 
@@ -158,24 +158,18 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   private Vector2 generateChannels() {
-    Vector2 channels;
+    Vector2 channels = new Vector2();
 
     if (micSamples == null) {
-      try {
-        micSamples = micSampleQueue.take();
-      } catch (InterruptedException e) {
-        logger.log(Level.SEVERE, "Interrupted while waiting for mic samples", e);
-      }
+      micSamples = micSampleQueue.poll();
     }
 
-    channels = new Vector2(micSamples[micSampleIndex++], micSamples[micSampleIndex++]);
-    if (micSampleIndex >= micSamples.length) {
-      try {
-        micSamples = micSampleQueue.take();
-      } catch (InterruptedException e) {
-        logger.log(Level.SEVERE, "Failed to get mic samples", e);
+    if (micSamples != null) {
+      channels = new Vector2(micSamples[micSampleIndex++], micSamples[micSampleIndex++]);
+      if (micSampleIndex >= micSamples.length) {
+        micSamples = null;
+        micSampleIndex = 0;
       }
-      micSampleIndex = 0;
     }
 
     if (!lineInEnabled) {
@@ -665,11 +659,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
   @Override
   public void transmit(double[] samples) {
-    try {
-      micSampleQueue.put(samples);
-    } catch (InterruptedException e) {
-      logger.log(Level.SEVERE, e.getMessage(), e);
-    }
+    micSampleQueue.offer(samples);
   }
 
   public void toggleLineIn() {
