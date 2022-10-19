@@ -41,6 +41,9 @@ public class JavaAudioEngine implements AudioEngine {
 
   @Override
   public void play(Callable<Vector2> channelGenerator, AudioDevice device) throws Exception {
+    if (!device.output()) {
+      throw new RuntimeException("Device is not an output device");
+    }
     this.device = device;
 
     AudioFormat format = new AudioFormat((float) device.sampleRate(), BIT_DEPTH, device.channels(), SIGNED_SAMPLE, BIG_ENDIAN);
@@ -122,7 +125,7 @@ public class JavaAudioEngine implements AudioEngine {
           try {
             AudioFormat format = new AudioFormat((float) rate, BIT_DEPTH, channels, SIGNED_SAMPLE, BIG_ENDIAN);
             this.source = AudioSystem.getSourceDataLine(format, info);
-            devices.add(new SimpleAudioDevice(info.getName() + "-" + rate, info.getName(), rate, AudioSample.INT16, channels, info));
+            devices.add(new SimpleAudioDevice(info.getName() + "-" + rate, info.getName(), rate, AudioSample.INT16, channels, info, true));
           } catch (Exception ignored) {}
         })
       );
@@ -133,7 +136,7 @@ public class JavaAudioEngine implements AudioEngine {
 
   @Override
   public AudioDevice getDefaultDevice() {
-    return new SimpleAudioDevice("default", "default", DEFAULT_SAMPLE_RATE, AudioSample.INT16, DEFAULT_NUM_CHANNELS, null);
+    return new SimpleAudioDevice("default", "default", DEFAULT_SAMPLE_RATE, AudioSample.INT16, DEFAULT_NUM_CHANNELS, null, true);
   }
 
   @Override

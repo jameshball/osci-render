@@ -1,11 +1,17 @@
 package sh.ball.audio.engine;
 
-public interface AudioInput extends Runnable {
+import java.util.List;
+
+public interface AudioInput {
   void addListener(AudioInputListener listener);
 
-  void run();
+  void listen(AudioDevice device);
 
   void stop();
 
   boolean isAvailable();
+
+  List<AudioDevice> devices();
+
+  AudioDevice getDefaultDevice();
 }

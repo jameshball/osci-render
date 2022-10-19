@@ -3,7 +3,7 @@ package sh.ball.audio.engine;
 import javax.sound.sampled.Mixer;
 import java.util.Objects;
 
-public record SimpleAudioDevice(String id, String name, int sampleRate, AudioSample sample, int channels, Mixer.Info mixerInfo) implements AudioDevice {
+public record SimpleAudioDevice(String id, String name, int sampleRate, AudioSample sample, int channels, Mixer.Info mixerInfo, boolean output) implements AudioDevice {
 
   private static final int MAX_NAME_LENGTH = 30;
 
@@ -34,7 +34,9 @@ public record SimpleAudioDevice(String id, String name, int sampleRate, AudioSam
       && Objects.equals(id, that.id)
       && Objects.equals(name, that.name)
       && sample == that.sample
-      && channels == that.channels;
+      && channels == that.channels
+      && Objects.equals(mixerInfo, that.mixerInfo)
+      && output == that.output;
   }
 
   @Override

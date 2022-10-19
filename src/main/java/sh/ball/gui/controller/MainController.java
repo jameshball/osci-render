@@ -94,6 +94,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private double[] targetSliderValue;
   private boolean recording = false;
   private Timeline recordingTimeline;
+  private final List<double[]> sampleList = new ArrayList<>();
 
   // midi
   private final Map<Integer, SVGPath> CCMap = new HashMap<>();
@@ -1539,7 +1540,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     if (audioInput.isAvailable()) {
       audioInput.addListener(this);
       audioInput.addListener(audioPlayer);
-      new Thread(audioInput).start();
+      new Thread(() -> audioInput.listen(audioInput.getDefaultDevice())).start();
     } else {
       subControllers().forEach(SubController::micNotAvailable);
       micSelected().forEach(prop -> {
