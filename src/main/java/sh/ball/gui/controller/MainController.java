@@ -1540,6 +1540,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     if (audioInput.isAvailable()) {
       audioInput.addListener(this);
       audioInput.addListener(audioPlayer);
+      audioPlayer.inputConnected();
       new Thread(() -> audioInput.listen(audioInput.getDefaultDevice())).start();
     } else {
       subControllers().forEach(SubController::micNotAvailable);
