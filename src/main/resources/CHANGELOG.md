@@ -1,3 +1,14 @@
+- 1.30.2
+  - Allow text size to be specified when creating .txt files
+    - Write "$text_size=" followed by a number to change the text size for that line
+    - e.g. "$text_size=50" will make the text size 50 for that line
+    - The default text size is 100
+    - If for some reason you still want to write "$text_size=", you can escape it with a backslash. e.g. "\$text_size=50"
+    - This slightly changes the syntax for writing a backslash, as you now need to write "\\" instead of "\"
+  - Fix a bug where the animations would get stuck if the bounds of the slider/effect were changed while the animation was playing
+  - The knobs/thumbs of sliders now change to green when the slider/effect is being animated
+
+
 - 1.30.1
   - Changed Lua demo file to the mini osci-render demo that emulates a basic version of osci-render within osci-render
   - Done this as the old demo's audio was quite jarring and the new one shows off more of Lua
