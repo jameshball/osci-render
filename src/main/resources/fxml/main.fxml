@@ -139,12 +139,12 @@
                      </AnchorPane>
                   </content>
                </CustomMenuItem>
-               <CustomMenuItem hideOnClick="false" mnemonicParsing="false" text="Note Decay (sec)">
+               <CustomMenuItem hideOnClick="false" mnemonicParsing="false" text="Note Release (sec)">
                   <content>
                      <AnchorPane>
                         <children>
-                           <Label prefHeight="25.0" text="Note Decay (sec)" textFill="WHITE" />
-                           <Spinner fx:id="decaySpinner" editable="true" layoutY="25.0" />
+                           <Label prefHeight="25.0" text="Note Release (sec)" textFill="WHITE" />
+                           <Spinner fx:id="releaseSpinner" editable="true" layoutY="25.0" />
                         </children>
                      </AnchorPane>
                   </content>

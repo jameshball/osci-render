@@ -5,7 +5,6 @@ import sh.ball.audio.effect.*;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 
 import sh.ball.audio.engine.AudioDevice;
@@ -45,13 +44,12 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private int mainChannel = 0;
   private MidiNote baseNote = new MidiNote(60, mainChannel);
   private final double[] pitchBends = new double[MidiNote.NUM_CHANNELS];
-  private int lastDecay = 0;
-  private double decaySeconds = 0.2;
-  private int decayFrames;
+  private int lastRelease = 0;
+  private double releaseSeconds = 0.2;
+  private int releaseFrames;
   private int lastAttack = 0;
   private double attackSeconds = 0.1;
   private int attackFrames;
-  private int totalVolume = MidiNote.MAX_VELOCITY;
 
   private final Callable<AudioEngine> audioEngineBuilder;
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
@@ -269,16 +267,16 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
       try {
         keyOnLock.acquire();
 
-        totalVolume = MidiNote.MAX_VELOCITY;
+        int totalVolume = MidiNote.MAX_VELOCITY;
 
-        boolean resetDecay = false;
+        boolean resetRelease = false;
         boolean resetAttack = false;
 
         for (int i = keyOn.nextSetBit(0); i >= 0; i = keyOn.nextSetBit(i + 1)) {
           int noteVolume = keyActualVolumes[i];
 
-          if (lastDecay > decayFrames) {
-            resetDecay = true;
+          if (lastRelease > releaseFrames) {
+            resetRelease = true;
             if (noteVolume > keyTargetVolumes[i]) {
               int newVolume = --keyActualVolumes[i];
               if (newVolume <= 0) {
@@ -316,8 +314,8 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
           }
         }
 
-        if (resetDecay) {
-          lastDecay = 0;
+        if (resetRelease) {
+          lastRelease = 0;
         }
 
         if (resetAttack) {
@@ -330,7 +328,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
         keyOnLock.release();
       }
 
-      lastDecay++;
+      lastRelease++;
       lastAttack++;
 
       vector = new Vector2(
@@ -359,9 +357,9 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   @Override
-  public void setDecay(double decaySeconds) {
-    this.decaySeconds = decaySeconds;
-    updateDecay();
+  public void setRelease(double releaseSeconds) {
+    this.releaseSeconds = releaseSeconds;
+    updateRelease();
   }
 
   @Override
@@ -528,12 +526,12 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
         phase.setSampleRate(sampleRate);
       }
     }
-    updateDecay();
+    updateRelease();
     updateAttack();
   }
 
-  private void updateDecay() {
-    this.decayFrames = (int) (decaySeconds * sampleRate / MidiNote.MAX_VELOCITY);
+  private void updateRelease() {
+    this.releaseFrames = (int) (releaseSeconds * sampleRate / MidiNote.MAX_VELOCITY);
   }
 
   private void updateAttack() {
