@@ -43,7 +43,7 @@
                      <CheckBox fx:id="startMutedCheckBox" mnemonicParsing="false" text="Start muted" />
                      <HBox alignment="CENTER" spacing="20.0">
                         <children>
-                           <Label fx:id="versionLabel" minWidth="42.0" prefHeight="18.0" prefWidth="42.0" text="v1.30.2" />
+                           <Label fx:id="versionLabel" minWidth="42.0" prefHeight="18.0" prefWidth="42.0" text="v1.30.3" />
                            <Label prefHeight="54.0" prefWidth="379.0" text="Email me at james@ball.sh or create an issue on GitHub for feature suggestions, issues, or opportunites I might be interested in!" textAlignment="CENTER" wrapText="true" />
                            <Button fx:id="logButton" minWidth="102.0" mnemonicParsing="false" prefWidth="102.0" text="Open log folder" />
                         </children>
