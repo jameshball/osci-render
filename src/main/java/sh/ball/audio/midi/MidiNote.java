@@ -1,7 +1,5 @@
 package sh.ball.audio.midi;
 
-import java.util.Objects;
-
 public class MidiNote {
 
   public static final int MAX_VELOCITY = 127;
@@ -16,7 +14,7 @@ public class MidiNote {
   public static final int PITCH_BEND_SEMITONES = 2;
 
   // Concert A Pitch is A4 and has the key number 69
-  final int KEY_A4 = 69;
+  final static int KEY_A4 = 69;
   public static final double A4 = 440;
 
   private static final String[] NOTE_NAMES = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
@@ -25,6 +23,15 @@ public class MidiNote {
   private final int key;
   private final int octave;
   private final int channel;
+
+  // pre-calculated map from midi key to frequency
+  public static final double[] KEY_TO_FREQUENCY = new double[NUM_KEYS];
+
+  static {
+    for (int i = 0; i < NUM_KEYS; i++) {
+      KEY_TO_FREQUENCY[i] = Math.pow(2, (i - KEY_A4) / 12.0) * A4;
+    }
+  }
 
   public MidiNote(int key, int channel) {
     this.key = key;
@@ -44,7 +51,7 @@ public class MidiNote {
 
   public double frequency() {
     // Returns the frequency of the given key (equal temperament)
-    return (float) (A4 * Math.pow(2, (key - KEY_A4) / 12d));
+    return KEY_TO_FREQUENCY[key];
   }
 
   public int channel() {
