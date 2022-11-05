@@ -85,6 +85,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private Consumer<String> removeRecentFile;
   private String openProjectPath;
   private final FileChooser wavFileChooser = new FileChooser();
+  private String version;
 
   private ObjectServer objectServer;
 
@@ -1217,6 +1218,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       fontStyle.appendChild(document.createTextNode(String.valueOf(fontStyleComboBox.getValue().style)));
       root.appendChild(fontStyle);
 
+      Element version = document.createElement("version");
+      version.appendChild(document.createTextNode(this.version));
+      root.appendChild(version);
+
       TransformerFactory transformerFactory = TransformerFactory.newInstance();
       Transformer transformer = transformerFactory.newTransformer();
       DOMSource domSource = new DOMSource(document);
@@ -1581,6 +1586,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         }
       });
     });
+  }
+
+  public void setVersion(String version) {
+    this.version = version;
   }
 
   private record PrintableSlider(Slider slider) {

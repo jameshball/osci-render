@@ -7,6 +7,7 @@ import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.web.WebView;
 import netscape.javascript.JSObject;
@@ -55,6 +56,8 @@ public class ProjectSelectController implements Initializable {
   private WebView changelogWebView;
   @FXML
   private Button logButton;
+  @FXML
+  private Label versionLabel;
 
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
@@ -184,5 +187,9 @@ public class ProjectSelectController implements Initializable {
   public void removeRecentFile(String path) {
     recentFiles.remove(path);
     resetRecentFiles();
+  }
+
+  public String version() {
+    return versionLabel.getText();
   }
 }

@@ -113,7 +113,8 @@ public class Gui extends Application {
     root = loader.load();
     MainController controller = loader.getController();
 
-    projectSelectController.setApplicationLauncher((path, muted) -> launchMainApplication(controller, path, muted));
+    String version = projectSelectController.version();
+    projectSelectController.setApplicationLauncher((path, muted) -> launchMainApplication(controller, path, muted, version));
 
     controller.setAddRecentFile(projectSelectController::addRecentFile);
     controller.setRemoveRecentFile(projectSelectController::removeRecentFile);
@@ -172,10 +173,11 @@ public class Gui extends Application {
     editor.prefWidthProperty().bind(editorStage.widthProperty());
   }
 
-  public void launchMainApplication(MainController controller, String projectPath, Boolean muted) throws Exception {
+  public void launchMainApplication(MainController controller, String projectPath, Boolean muted, String version) throws Exception {
     scene.setRoot(root);
     controller.initialiseAudioEngine();
     controller.openProject(projectPath);
+    controller.setVersion(version);
     if (muted) {
       controller.setVolume(0);
     }
