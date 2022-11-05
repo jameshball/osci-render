@@ -1,3 +1,9 @@
+- 1.30.3
+  - Dramatically improved MIDI performance! Should now be pretty resilient to anything you throw at it
+  - Renamed decay to release in MIDI settings
+  - Version number is now saved with .osci project file
+
+
 - 1.30.2
   - Allow text size to be specified when creating .txt files
     - Write "$text_size=" followed by a number to change the text size for that line
