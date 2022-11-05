@@ -30,7 +30,6 @@ import java.util.concurrent.*;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 import java.util.logging.Level;
-import java.util.stream.Collectors;
 
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -179,7 +178,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private Spinner<Double> attackSpinner;
   @FXML
-  private Spinner<Double> decaySpinner;
+  private Spinner<Double> releaseSpinner;
   @FXML
   private ComboBox<PrintableSlider> sliderComboBox;
   @FXML
@@ -491,8 +490,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     attackSpinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(0, 10, 0.2, 0.01));
     attackSpinner.valueProperty().addListener((o, oldValue, newValue) -> audioPlayer.setAttack(newValue));
 
-    decaySpinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(0, 10, 0.1, 0.01));
-    decaySpinner.valueProperty().addListener((o, oldValue, newValue) -> audioPlayer.setDecay(newValue));
+    releaseSpinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(0, 10, 0.1, 0.01));
+    releaseSpinner.valueProperty().addListener((o, oldValue, newValue) -> audioPlayer.setRelease(newValue));
 
     recordLengthSpinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(0.1, 100000000, 2.0, 0.1));
 
@@ -1185,7 +1184,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       root.appendChild(midiAttack);
 
       Element midiDecay = document.createElement("midiDecay");
-      midiDecay.appendChild(document.createTextNode(decaySpinner.getValue().toString()));
+      midiDecay.appendChild(document.createTextNode(releaseSpinner.getValue().toString()));
       root.appendChild(midiDecay);
 
       Element audioSample = document.createElement("audioSample");
@@ -1370,9 +1369,9 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         attackSpinner.getValueFactory().setValue(Double.parseDouble(midiAttack.getTextContent()));
       }
 
-      Element midiDecay = (Element) root.getElementsByTagName("midiDecay").item(0);
-      if (midiDecay != null) {
-        decaySpinner.getValueFactory().setValue(Double.parseDouble(midiDecay.getTextContent()));
+      Element midiRelease = (Element) root.getElementsByTagName("midiDecay").item(0);
+      if (midiRelease != null) {
+        releaseSpinner.getValueFactory().setValue(Double.parseDouble(midiRelease.getTextContent()));
       }
 
       Element audioSample = (Element) root.getElementsByTagName("audioSample").item(0);
