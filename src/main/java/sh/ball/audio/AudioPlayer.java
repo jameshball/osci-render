@@ -11,7 +11,7 @@ import java.util.List;
 
 public interface AudioPlayer<S> extends Runnable, MidiListener, AudioInputListener {
 
-  void reset() throws Exception;
+  void resetOutput() throws Exception;
 
   void stop();
 
@@ -39,9 +39,13 @@ public interface AudioPlayer<S> extends Runnable, MidiListener, AudioInputListen
 
   void setDevice(AudioDevice device);
 
-  AudioDevice getDefaultDevice();
+  AudioDevice getDefaultOutputDevice();
 
-  AudioDevice getDevice();
+  AudioDevice getDefaultInputDevice();
+
+  void addListener(AudioInputListener listener);
+
+  void listen(AudioDevice device);
 
   List<AudioDevice> devices();
 
@@ -50,4 +54,6 @@ public interface AudioPlayer<S> extends Runnable, MidiListener, AudioInputListen
   void setBrightness(double brightness);
 
   void setThreshold(double doubleValue);
+
+  boolean inputAvailable();
 }

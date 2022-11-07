@@ -14,9 +14,17 @@ public interface AudioEngine {
 
   List<AudioDevice> devices();
 
-  AudioDevice getDefaultDevice();
+  AudioDevice getDefaultOutputDevice();
+  AudioDevice getDefaultInputDevice();
 
-  AudioDevice currentDevice();
+  AudioDevice currentOutputDevice();
+  AudioDevice currentInputDevice();
 
   void setBrightness(double brightness);
+
+  void addListener(AudioInputListener listener);
+
+  void listen(AudioDevice device);
+
+  boolean inputAvailable();
 }

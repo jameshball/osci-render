@@ -49,7 +49,7 @@
                      <AnchorPane focusTraversable="true">
                         <children>
                            <Label prefHeight="25.0" text="Audio Device" textFill="WHITE" />
-                           <ListView fx:id="deviceListView" layoutY="25.0" prefHeight="200.0" prefWidth="400.0" />
+                           <ListView fx:id="outputDeviceListView" layoutY="25.0" prefHeight="200.0" prefWidth="400.0" />
                         </children>
                      </AnchorPane>
                   </content>

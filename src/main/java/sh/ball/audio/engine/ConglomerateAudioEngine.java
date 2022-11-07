@@ -28,7 +28,8 @@ public class ConglomerateAudioEngine implements AudioEngine {
   private static List<AudioDevice> javaDevices;
 
   private boolean playing = false;
-  private AudioDevice device;
+  private AudioDevice outputDevice;
+  private AudioDevice inputDevice;
   private BufferedChannelGenerator bufferedChannelGenerator;
 
   @Override
@@ -39,7 +40,7 @@ public class ConglomerateAudioEngine implements AudioEngine {
   @Override
   public void play(Callable<Vector2> channelGenerator, AudioDevice device) throws Exception {
     playing = true;
-    this.device = device;
+    this.outputDevice = device;
     if (bufferedChannelGenerator != null) {
       bufferedChannelGenerator.stop();
     }
@@ -51,7 +52,7 @@ public class ConglomerateAudioEngine implements AudioEngine {
       javaEngine.play(bufferedChannelGenerator, device);
     }
     playing = false;
-    this.device = null;
+    this.outputDevice = null;
   }
 
   @Override
@@ -85,19 +86,51 @@ public class ConglomerateAudioEngine implements AudioEngine {
   }
 
   @Override
-  public AudioDevice getDefaultDevice() {
-    return javaEngine.getDefaultDevice();
+  public AudioDevice getDefaultOutputDevice() {
+    return javaEngine.getDefaultOutputDevice();
   }
 
   @Override
-  public AudioDevice currentDevice() {
-    return device;
+  public AudioDevice getDefaultInputDevice() {
+    return javaEngine.getDefaultInputDevice();
+  }
+
+  @Override
+  public AudioDevice currentOutputDevice() {
+    return outputDevice;
+  }
+
+  @Override
+  public AudioDevice currentInputDevice() {
+    return inputDevice;
   }
 
   @Override
   public void setBrightness(double brightness) {
     javaEngine.setBrightness(brightness);
     xtEngine.setBrightness(brightness);
+  }
+
+  @Override
+  public void addListener(AudioInputListener listener) {
+    javaEngine.addListener(listener);
+    xtEngine.addListener(listener);
+  }
+
+  @Override
+  public void listen(AudioDevice device) {
+    this.inputDevice = device;
+    if (xtDevices.contains(device)) {
+      xtEngine.listen(device);
+    } else {
+      javaEngine.listen(device);
+    }
+    this.inputDevice = null;
+  }
+
+  @Override
+  public boolean inputAvailable() {
+    return javaEngine.inputAvailable() || xtEngine.inputAvailable();
   }
 
   // This ensures that the channelGenerator is ALWAYS being called regardless

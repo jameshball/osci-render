@@ -28,6 +28,7 @@ import java.util.*;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 
@@ -187,7 +188,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private Spinner<Integer> deadzoneSpinner;
   @FXML
-  private ListView<AudioDevice> deviceListView;
+  private ListView<AudioDevice> outputDeviceListView;
   @FXML
   private CustomMenuItem audioDeviceMenuItem;
   @FXML
@@ -248,7 +249,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   private void toggleRecord() {
     recording = !recording;
     audioSampleComboBox.setDisable(recording);
-    deviceListView.setDisable(recording);
+    outputDeviceListView.setDisable(recording);
     boolean timedRecord = recordCheckBox.isSelected();
     if (recording) {
       // if it is a timed recording then a timeline is scheduled to start and
@@ -275,7 +276,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
             recording = false;
             Platform.runLater(() -> {
               audioSampleComboBox.setDisable(false);
-              deviceListView.setDisable(false);
+              outputDeviceListView.setDisable(false);
             });
           }
         );
@@ -514,16 +515,19 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
     new Thread(() -> {
       List<AudioDevice> devices = audioPlayer.devices();
+      List<AudioDevice> outputDevices = devices.stream().filter(AudioDevice::output).toList();
+      List<AudioDevice> inputDevices = devices.stream().filter(Predicate.not(AudioDevice::output)).toList();
+
       Platform.runLater(() -> {
-        deviceListView.setItems(FXCollections.observableList(devices));
-        deviceListView.getSelectionModel().select(defaultDevice);
-        deviceListView.getSelectionModel().selectedItemProperty().addListener((options, oldDevice, newDevice) -> {
+        outputDeviceListView.setItems(FXCollections.observableList(outputDevices));
+        outputDeviceListView.getSelectionModel().select(defaultDevice);
+        outputDeviceListView.getSelectionModel().selectedItemProperty().addListener((options, oldDevice, newDevice) -> {
           if (newDevice != null) {
-            switchAudioDevice(newDevice);
+            switchOutputDevice(newDevice);
           }
         });
       });
-      switchAudioDevice(defaultDevice, false);
+      switchOutputDevice(defaultDevice, false);
     }).start();
 
     audioSampleComboBox.setItems(FXCollections.observableList(List.of(AudioSample.UINT8, AudioSample.INT8, AudioSample.INT16, AudioSample.INT24, AudioSample.INT32)));
@@ -607,15 +611,15 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     generalController.updateLastVisitedDirectory(dir);
   }
 
-  private void switchAudioDevice(AudioDevice device) {
-    switchAudioDevice(device, true);
+  private void switchOutputDevice(AudioDevice device) {
+    switchOutputDevice(device, true);
   }
 
   // restarts audioPlayer and FrequencyAnalyser to support new device
-  private void switchAudioDevice(AudioDevice device, boolean reset) {
+  private void switchOutputDevice(AudioDevice device, boolean reset) {
     if (reset) {
       try {
-        audioPlayer.reset();
+        audioPlayer.resetOutput();
       } catch (Exception e) {
         logger.log(Level.SEVERE, e.getMessage(), e);
       }
@@ -1536,12 +1540,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
     executor.submit(producer);
     Gui.midiCommunicator.addListener(this);
-    AudioInput audioInput = new JavaAudioInput();
-    if (audioInput.isAvailable()) {
-      audioInput.addListener(this);
-      audioInput.addListener(audioPlayer);
+    if (audioPlayer.inputAvailable()) {
+      audioPlayer.addListener(this);
+      audioPlayer.addListener(audioPlayer);
       audioPlayer.inputConnected();
-      new Thread(() -> audioInput.listen(audioInput.getDefaultDevice())).start();
+      new Thread(() -> audioPlayer.listen(audioPlayer.getDefaultInputDevice())).start();
     } else {
       subControllers().forEach(SubController::micNotAvailable);
       micSelected().forEach(prop -> {
