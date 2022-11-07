@@ -100,6 +100,11 @@ public class EffectAnimator extends PhaseEffect implements SettableEffect {
         }
       }
     }
+    if (actualValue > maxValue) {
+      actualValue = maxValue;
+    } else if (actualValue < minValue) {
+      actualValue = minValue;
+    }
     effect.setValue(actualValue);
     return effect.apply(count, vector);
   }

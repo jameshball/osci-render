@@ -21,7 +21,7 @@ public interface AudioPlayer<S> extends Runnable, MidiListener, AudioInputListen
 
   void setBackingMidiVolume(double scale);
 
-  void setDecay(double decaySeconds);
+  void setRelease(double decaySeconds);
 
   void setAttack(double attackSeconds);
 

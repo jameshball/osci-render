@@ -102,9 +102,13 @@
     -fx-text-fill: white;
 }
 
+.slider {
+    -thumb-color: white;
+}
+
 .slider .thumb {
     -fx-background-color: very_dark;
-    -fx-border-color: white;
+    -fx-border-color: -thumb-color;
     -fx-border-radius: 1.0em; /* makes sure this remains circular */
     -fx-effect: inherit;
 }

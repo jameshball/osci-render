@@ -250,7 +250,14 @@ public class EffectComponentGroupController implements Initializable, SubControl
     slider.minProperty().addListener((e, old, min) -> this.animator.setMin(min.doubleValue()));
     slider.maxProperty().addListener((e, old, max) -> this.animator.setMax(max.doubleValue()));
     slider.valueProperty().addListener((e, old, value) -> this.animator.setValue(value.doubleValue()));
-    comboBox.valueProperty().addListener((options, old, animationType) -> this.animator.setAnimation(animationType));
+    comboBox.valueProperty().addListener((options, old, animationType) -> {
+      this.animator.setAnimation(animationType);
+      if (animationType != AnimationType.STATIC) {
+        slider.setStyle("-thumb-color: #00ff00;");
+      } else {
+        slider.setStyle("");
+      }
+    });
   }
 
   public EffectAnimator getAnimator() {
