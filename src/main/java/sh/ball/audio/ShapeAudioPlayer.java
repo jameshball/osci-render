@@ -9,6 +9,7 @@ import java.util.logging.Level;
 
 import sh.ball.audio.engine.AudioDevice;
 import sh.ball.audio.engine.AudioEngine;
+import sh.ball.audio.engine.AudioInputListener;
 import sh.ball.audio.engine.AudioSample;
 import sh.ball.audio.midi.MidiCommunicator;
 import sh.ball.audio.midi.MidiNote;
@@ -57,7 +58,8 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private final List<EffectTypePair> effects = new CopyOnWriteArrayList<>();
   private final Queue<Listener> listeners = new ConcurrentLinkedQueue<>();
 
-  private AudioEngine audioEngine;
+  private AudioEngine audioOutputEngine;
+  private final AudioEngine audioInputEngine;
   private ByteArrayOutputStream outputStream;
   private boolean recording = false;
   private int framesRecorded = 0;
@@ -93,7 +95,8 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
   public ShapeAudioPlayer(Callable<AudioEngine> audioEngineBuilder, MidiCommunicator communicator) throws Exception {
     this.audioEngineBuilder = audioEngineBuilder;
-    this.audioEngine = audioEngineBuilder.call();
+    this.audioOutputEngine = audioEngineBuilder.call();
+    this.audioInputEngine = audioEngineBuilder.call();
     Arrays.fill(pitchBends, 1.0);
     resetMidi();
 
@@ -129,6 +132,11 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
   public void setThreshold(double threshold) {
     this.threshold = threshold;
+  }
+
+  @Override
+  public boolean inputAvailable() {
+    return audioInputEngine.inputAvailable();
   }
 
   private void incrementShapeDrawing() {
@@ -436,29 +444,29 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     }
 
     try {
-      audioEngine.play(this::generateChannels, device);
+      audioOutputEngine.play(this::generateChannels, device);
     } catch (Exception e) {
       e.printStackTrace();
     }
   }
 
   @Override
-  public void reset() throws Exception {
-    audioEngine.stop();
+  public void resetOutput() throws Exception {
+    audioOutputEngine.stop();
     while (isPlaying()) {
       Thread.onSpinWait();
     }
-    audioEngine = audioEngineBuilder.call();
+    audioOutputEngine = audioEngineBuilder.call();
   }
 
   @Override
   public void stop() {
-    audioEngine.stop();
+    audioOutputEngine.stop();
   }
 
   @Override
   public boolean isPlaying() {
-    return audioEngine.isPlaying();
+    return audioOutputEngine.isPlaying();
   }
 
   @Override
@@ -566,18 +574,28 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   @Override
-  public AudioDevice getDefaultDevice() {
-    return audioEngine.getDefaultDevice();
+  public AudioDevice getDefaultOutputDevice() {
+    return audioOutputEngine.getDefaultOutputDevice();
   }
 
   @Override
-  public AudioDevice getDevice() {
-    return device;
+  public AudioDevice getDefaultInputDevice() {
+    return audioInputEngine.getDefaultInputDevice();
+  }
+
+  @Override
+  public void addListener(AudioInputListener listener) {
+    audioInputEngine.addListener(listener);
+  }
+
+  @Override
+  public void listen(AudioDevice device) {
+    audioInputEngine.listen(device);
   }
 
   @Override
   public List<AudioDevice> devices() {
-    return audioEngine.devices();
+    return audioOutputEngine.devices();
   }
 
   @Override
@@ -597,7 +615,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   @Override
   public void setBrightness(double brightness) {
     this.brightness = brightness;
-    audioEngine.setBrightness(brightness);
+    audioOutputEngine.setBrightness(brightness);
   }
 
   private void notesChanged() {

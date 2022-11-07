@@ -19,10 +19,6 @@ import sh.ball.audio.midi.MidiCommunicator;
 import sh.ball.gui.components.CodeEditor;
 import sh.ball.gui.controller.MainController;
 import sh.ball.gui.controller.ProjectSelectController;
-import sh.ball.parser.lua.LuaParser;
-import sh.ball.parser.obj.ObjParser;
-import sh.ball.parser.svg.SvgParser;
-import sh.ball.parser.txt.TextParser;
 import sh.ball.shapes.Vector2;
 
 import java.io.File;
@@ -50,7 +46,7 @@ public class Gui extends Application {
   static {
     try {
       audioPlayer = new ShapeAudioPlayer(ConglomerateAudioEngine::new, midiCommunicator);
-      defaultDevice = audioPlayer.getDefaultDevice();
+      defaultDevice = audioPlayer.getDefaultOutputDevice();
 
       if (PlatformUtil.isWindows()) {
         LOG_DIR = System.getenv("AppData");

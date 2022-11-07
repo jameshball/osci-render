@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.stream.Stream;
 
@@ -27,8 +28,15 @@ public class JavaAudioEngine implements AudioEngine {
   private volatile boolean stopped = false;
 
   private SourceDataLine source;
-  private AudioDevice device;
+  private AudioDevice outputDevice;
   private double brightness = 1.0;
+
+  // microphone
+  private static final AudioFormat inputFormat = new AudioFormat(DEFAULT_SAMPLE_RATE, BIT_DEPTH, DEFAULT_NUM_CHANNELS, SIGNED_SAMPLE, BIG_ENDIAN);
+  private final List<AudioInputListener> listeners = new ArrayList<>();
+
+  private TargetDataLine microphone;
+  private AudioDevice inputDevice;
 
   @Override
   public boolean isPlaying() {
@@ -44,7 +52,7 @@ public class JavaAudioEngine implements AudioEngine {
     if (!device.output()) {
       throw new RuntimeException("Device is not an output device");
     }
-    this.device = device;
+    this.outputDevice = device;
 
     AudioFormat format = new AudioFormat((float) device.sampleRate(), BIT_DEPTH, device.channels(), SIGNED_SAMPLE, BIG_ENDIAN);
     if (device.mixerInfo() != null) {
@@ -96,7 +104,7 @@ public class JavaAudioEngine implements AudioEngine {
       source.write(buffer, 0, requiredSamples * frameSize);
     }
     source.stop();
-    this.device = null;
+    this.outputDevice = null;
   }
 
   @Override
@@ -111,11 +119,17 @@ public class JavaAudioEngine implements AudioEngine {
     Line.Info audioOutput = new Line.Info(SourceDataLine.class);
     List<Mixer.Info> outputDeviceInfos = new ArrayList<>();
 
+    Line.Info audioInput = new Line.Info(TargetDataLine.class);
+    List<Mixer.Info> inputDeviceInfos = new ArrayList<>();
+
     Mixer.Info[] infos = AudioSystem.getMixerInfo();
     for (Mixer.Info info : infos) {
       Mixer mixer = AudioSystem.getMixer(info);
       if (mixer.isLineSupported(audioOutput)) {
         outputDeviceInfos.add(info);
+      }
+      if (mixer.isLineSupported(audioInput)) {
+        inputDeviceInfos.add(info);
       }
     }
 
@@ -124,8 +138,20 @@ public class JavaAudioEngine implements AudioEngine {
         Stream.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12).forEach(channels -> {
           try {
             AudioFormat format = new AudioFormat((float) rate, BIT_DEPTH, channels, SIGNED_SAMPLE, BIG_ENDIAN);
-            this.source = AudioSystem.getSourceDataLine(format, info);
+            AudioSystem.getSourceDataLine(format, info);
             devices.add(new SimpleAudioDevice(info.getName() + "-" + rate, info.getName(), rate, AudioSample.INT16, channels, info, true));
+          } catch (Exception ignored) {}
+        })
+      );
+    }
+
+    for (Mixer.Info info : inputDeviceInfos) {
+      Stream.of(192000, 96000, 48000, 44100).forEach(rate ->
+        Stream.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12).forEach(channels -> {
+          try {
+            AudioFormat format = new AudioFormat((float) rate, BIT_DEPTH, channels, SIGNED_SAMPLE, BIG_ENDIAN);
+            AudioSystem.getTargetDataLine(format, info);
+            devices.add(new SimpleAudioDevice(info.getName() + "-" + rate, info.getName(), rate, AudioSample.INT16, channels, info, false));
           } catch (Exception ignored) {}
         })
       );
@@ -135,17 +161,78 @@ public class JavaAudioEngine implements AudioEngine {
   }
 
   @Override
-  public AudioDevice getDefaultDevice() {
+  public AudioDevice getDefaultOutputDevice() {
     return new SimpleAudioDevice("default", "default", DEFAULT_SAMPLE_RATE, AudioSample.INT16, DEFAULT_NUM_CHANNELS, null, true);
   }
 
   @Override
-  public AudioDevice currentDevice() {
-    return device;
+  public AudioDevice getDefaultInputDevice() {
+    return new SimpleAudioDevice("default", "default", DEFAULT_SAMPLE_RATE, AudioSample.INT16, DEFAULT_NUM_CHANNELS, null, false);
+  }
+
+  @Override
+  public AudioDevice currentOutputDevice() {
+    return outputDevice;
+  }
+
+  @Override
+  public AudioDevice currentInputDevice() {
+    return inputDevice;
   }
 
   @Override
   public void setBrightness(double brightness) {
     this.brightness = brightness;
+  }
+
+  @Override
+  public void addListener(AudioInputListener listener) {
+    listeners.add(listener);
+  }
+
+  @Override
+  public void listen(AudioDevice device) {
+    if (device.output()) {
+      throw new RuntimeException("Device is not an input device");
+    }
+
+    this.inputDevice = device;
+
+    try {
+      AudioFormat format = new AudioFormat((float) device.sampleRate(), BIT_DEPTH, device.channels(), SIGNED_SAMPLE, BIG_ENDIAN);
+      if (device.mixerInfo() != null) {
+        this.microphone = AudioSystem.getTargetDataLine(format, device.mixerInfo());
+      } else {
+        this.microphone = AudioSystem.getTargetDataLine(format);
+      }
+
+      microphone.open(format);
+
+      byte[] data = new byte[10000];
+      double[] samples;
+      microphone.start();
+      while (!stopped) {
+        microphone.read(data, 0, data.length);
+        samples = new double[data.length / 2];
+
+        for (int i = 0; i < data.length; i += 2) {
+          samples[i / 2] = (double) ((data[i] & 0xFF) | (data[i + 1] << 8)) / 32768.0;
+        }
+
+        for (AudioInputListener listener : listeners) {
+          listener.transmit(samples);
+        }
+      }
+      microphone.close();
+    } catch (LineUnavailableException e) {
+      logger.log(Level.SEVERE, e.getMessage(), e);
+    }
+
+    this.inputDevice = null;
+  }
+
+  @Override
+  public boolean inputAvailable() {
+    return devices().stream().anyMatch(Predicate.not(AudioDevice::output));
   }
 }
