@@ -28,6 +28,7 @@ public class ConglomerateAudioEngine implements AudioEngine {
   private static List<AudioDevice> javaDevices;
 
   private boolean playing = false;
+  private boolean listening = false;
   private AudioDevice outputDevice;
   private AudioDevice inputDevice;
   private BufferedChannelGenerator bufferedChannelGenerator;
@@ -59,7 +60,9 @@ public class ConglomerateAudioEngine implements AudioEngine {
   public void stop() {
     xtEngine.stop();
     javaEngine.stop();
-    bufferedChannelGenerator.stop();
+    if (bufferedChannelGenerator != null) {
+      bufferedChannelGenerator.stop();
+    }
   }
 
   @Override
@@ -119,6 +122,7 @@ public class ConglomerateAudioEngine implements AudioEngine {
 
   @Override
   public void listen(AudioDevice device) {
+    this.listening = true;
     this.inputDevice = device;
     if (xtDevices.contains(device)) {
       xtEngine.listen(device);
@@ -126,11 +130,23 @@ public class ConglomerateAudioEngine implements AudioEngine {
       javaEngine.listen(device);
     }
     this.inputDevice = null;
+    this.listening = false;
   }
 
   @Override
   public boolean inputAvailable() {
     return javaEngine.inputAvailable() || xtEngine.inputAvailable();
+  }
+
+  @Override
+  public boolean isListening() {
+    return listening;
+  }
+
+  @Override
+  public void setSampleRate(int sampleRate) {
+    javaEngine.setSampleRate(sampleRate);
+    xtEngine.setSampleRate(sampleRate);
   }
 
   // This ensures that the channelGenerator is ALWAYS being called regardless
