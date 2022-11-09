@@ -1,5 +1,6 @@
 package sh.ball.audio.engine;
 
+import be.tarsos.dsp.resample.Resampler;
 import sh.ball.shapes.Vector2;
 
 import javax.sound.sampled.*;
@@ -24,6 +25,7 @@ public class JavaAudioEngine implements AudioEngine {
   private static final int BIT_DEPTH = 16;
   private static final boolean BIG_ENDIAN = false;
   private static final boolean SIGNED_SAMPLE = true;
+  private static final int MAX_RESAMPLE_FACTOR = 10;
 
   private volatile boolean stopped = false;
 
@@ -37,6 +39,7 @@ public class JavaAudioEngine implements AudioEngine {
 
   private TargetDataLine microphone;
   private AudioDevice inputDevice;
+  private int sampleRate = DEFAULT_SAMPLE_RATE;
 
   @Override
   public boolean isPlaying() {
@@ -198,6 +201,8 @@ public class JavaAudioEngine implements AudioEngine {
 
     this.inputDevice = device;
 
+    Resampler r = new Resampler(false, 0.1, 10.0);
+
     try {
       AudioFormat format = new AudioFormat((float) device.sampleRate(), BIT_DEPTH, device.channels(), SIGNED_SAMPLE, BIG_ENDIAN);
       if (device.mixerInfo() != null) {
@@ -208,19 +213,39 @@ public class JavaAudioEngine implements AudioEngine {
 
       microphone.open(format);
 
-      byte[] data = new byte[10000];
-      double[] samples;
+      int frameSize = device.channels() * BIT_DEPTH / 8;
+
+      int bufferSize = calculateBufferSize(device, frameSize, LATENCY_MS);
+
+      byte[] buffer = new byte[bufferSize];
+      int channelScalar = device.channels() == 1 ? 2 : 1;
+      float[] floatSrc = new float[channelScalar * buffer.length / 2];
+      float[] floatOut = new float[channelScalar * MAX_RESAMPLE_FACTOR * buffer.length / 2];
+
       microphone.start();
       while (!stopped) {
-        microphone.read(data, 0, data.length);
-        samples = new double[data.length / 2];
+        float resampleFactor = (float) sampleRate / (float) device.sampleRate();
 
-        for (int i = 0; i < data.length; i += 2) {
-          samples[i / 2] = (double) ((data[i] & 0xFF) | (data[i + 1] << 8)) / 32768.0;
+        double[] out = new double[channelScalar * (int) (resampleFactor * buffer.length / 2)];
+        microphone.read(buffer, 0, buffer.length);
+
+        for (int i = 0; i < buffer.length; i += 2) {
+          float sample = (float) ((buffer[i] & 0xFF) | (buffer[i + 1] << 8)) / 32768.0f;
+          if (device.channels() == 1) {
+            floatSrc[i] = sample;
+            floatSrc[i + 1] = sample;
+          } else {
+            floatSrc[i / 2] = sample;
+          }
+        }
+
+        r.process(resampleFactor, floatSrc, 0, floatSrc.length, false, floatOut, 0, out.length);
+        for (int i = 0; i < out.length; i++) {
+          out[i] = floatOut[i];
         }
 
         for (AudioInputListener listener : listeners) {
-          listener.transmit(samples);
+          listener.transmit(out);
         }
       }
       microphone.close();
@@ -234,5 +259,15 @@ public class JavaAudioEngine implements AudioEngine {
   @Override
   public boolean inputAvailable() {
     return devices().stream().anyMatch(Predicate.not(AudioDevice::output));
+  }
+
+  @Override
+  public boolean isListening() {
+    return microphone.isRunning();
+  }
+
+  @Override
+  public void setSampleRate(int sampleRate) {
+    this.sampleRate = sampleRate;
   }
 }

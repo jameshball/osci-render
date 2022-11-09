@@ -28,6 +28,8 @@ public class XtAudioEngine implements AudioEngine {
   // microphone
   private final List<AudioInputListener> listeners = new ArrayList<>();
   private AudioDevice inputDevice;
+  private boolean listening;
+  private int sampleRate;
 
   public XtAudioEngine() {}
 
@@ -262,9 +264,10 @@ public class XtAudioEngine implements AudioEngine {
         return devices;
       }
 
-      try (XtDeviceList inputs = service.openDeviceList(EnumSet.of(Enums.XtEnumFlags.INPUT))) {
-        devices.addAll(getDevices(service, inputs, false));
-      }
+// TO BE IMPLEMENTED AT A LATER DATE
+//      try (XtDeviceList inputs = service.openDeviceList(EnumSet.of(Enums.XtEnumFlags.INPUT))) {
+//        devices.addAll(getDevices(service, inputs, false));
+//      }
 
       try (XtDeviceList outputs = service.openDeviceList(EnumSet.of(Enums.XtEnumFlags.OUTPUT))) {
         devices.addAll(getDevices(service, outputs, true));
@@ -346,6 +349,7 @@ public class XtAudioEngine implements AudioEngine {
 
   @Override
   public void listen(AudioDevice device) {
+    listening = true;
     Structs.XtStreamParams streamParams;
     Structs.XtDeviceStreamParams deviceParams;
 
@@ -382,6 +386,7 @@ public class XtAudioEngine implements AudioEngine {
     }
 
     this.inputDevice = null;
+    listening = false;
   }
 
   private int readInput(XtStream stream, Structs.XtBuffer buffer, Object user) throws Exception {
@@ -406,6 +411,16 @@ public class XtAudioEngine implements AudioEngine {
   @Override
   public boolean inputAvailable() {
     return devices().stream().anyMatch(Predicate.not(AudioDevice::output));
+  }
+
+  @Override
+  public boolean isListening() {
+    return listening;
+  }
+
+  @Override
+  public void setSampleRate(int sampleRate) {
+    this.sampleRate = sampleRate;
   }
 
 

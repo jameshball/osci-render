@@ -207,6 +207,12 @@
             <artifactId>bcel</artifactId>
             <version>6.5.0</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/com.github.axet/TarsosDSP -->
+        <dependency>
+            <groupId>com.github.axet</groupId>
+            <artifactId>TarsosDSP</artifactId>
+            <version>2.4-1</version>
+        </dependency>
     </dependencies>
     <profiles>
         <profile>

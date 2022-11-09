@@ -190,7 +190,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
   @FXML
   private ListView<AudioDevice> outputDeviceListView;
   @FXML
+  private ListView<AudioDevice> inputDeviceListView;
+  @FXML
   private CustomMenuItem audioDeviceMenuItem;
+  @FXML
+  private CustomMenuItem inputDeviceMenuItem;
   @FXML
   private Slider brightnessSlider;
   @FXML
@@ -520,14 +524,21 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
 
       Platform.runLater(() -> {
         outputDeviceListView.setItems(FXCollections.observableList(outputDevices));
-        outputDeviceListView.getSelectionModel().select(defaultDevice);
+        inputDeviceListView.setItems(FXCollections.observableList(inputDevices));
+        outputDeviceListView.getSelectionModel().select(defaultOutputDevice);
+        inputDeviceListView.getSelectionModel().select(defaultInputDevice);
         outputDeviceListView.getSelectionModel().selectedItemProperty().addListener((options, oldDevice, newDevice) -> {
           if (newDevice != null) {
             switchOutputDevice(newDevice);
           }
         });
+        inputDeviceListView.getSelectionModel().selectedItemProperty().addListener((options, oldDevice, newDevice) -> {
+          if (newDevice != null) {
+            switchInputDevice(newDevice);
+          }
+        });
       });
-      switchOutputDevice(defaultDevice, false);
+      switchOutputDevice(defaultOutputDevice, false);
     }).start();
 
     audioSampleComboBox.setItems(FXCollections.observableList(List.of(AudioSample.UINT8, AudioSample.INT8, AudioSample.INT16, AudioSample.INT24, AudioSample.INT32)));
@@ -611,6 +622,15 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     generalController.updateLastVisitedDirectory(dir);
   }
 
+  private void switchInputDevice(AudioDevice device) {
+    try {
+      audioPlayer.resetInput();
+    } catch (Exception e) {
+      logger.log(Level.SEVERE, e.getMessage(), e);
+    }
+    new Thread(() -> audioPlayer.listen(device)).start();
+  }
+
   private void switchOutputDevice(AudioDevice device) {
     switchOutputDevice(device, true);
   }
@@ -624,7 +644,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         logger.log(Level.SEVERE, e.getMessage(), e);
       }
     }
-    audioPlayer.setDevice(device);
+    audioPlayer.setOutputDevice(device);
     audioPlayer.setBrightness(brightnessSlider.getValue());
     effectsController.setAudioDevice(device);
     sampleRate = device.sampleRate();
@@ -1531,10 +1551,10 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     producer = new FrameProducer<>(audioPlayer, frames);
     objController.setAudioProducer(producer);
 
-    if (defaultDevice == null) {
+    if (defaultOutputDevice == null) {
       throw new RuntimeException("No default audio device found!");
     }
-    sampleRate = defaultDevice.sampleRate();
+    sampleRate = defaultOutputDevice.sampleRate();
 
     objController.updateObjectRotateSpeed();
 
@@ -1544,7 +1564,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       audioPlayer.addListener(this);
       audioPlayer.addListener(audioPlayer);
       audioPlayer.inputConnected();
-      new Thread(() -> audioPlayer.listen(audioPlayer.getDefaultInputDevice())).start();
+      new Thread(() -> audioPlayer.listen(defaultInputDevice)).start();
     } else {
       subControllers().forEach(SubController::micNotAvailable);
       micSelected().forEach(prop -> {

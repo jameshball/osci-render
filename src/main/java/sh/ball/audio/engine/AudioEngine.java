@@ -27,4 +27,8 @@ public interface AudioEngine {
   void listen(AudioDevice device);
 
   boolean inputAvailable();
+
+  boolean isListening();
+
+  void setSampleRate(int sampleRate);
 }

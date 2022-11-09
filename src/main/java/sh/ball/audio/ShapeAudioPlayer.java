@@ -13,6 +13,7 @@ import sh.ball.audio.engine.AudioInputListener;
 import sh.ball.audio.engine.AudioSample;
 import sh.ball.audio.midi.MidiCommunicator;
 import sh.ball.audio.midi.MidiNote;
+import sh.ball.engine.Vector3;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
@@ -59,7 +60,8 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private final Queue<Listener> listeners = new ConcurrentLinkedQueue<>();
 
   private AudioEngine audioOutputEngine;
-  private final AudioEngine audioInputEngine;
+  private AudioEngine audioInputEngine;
+  private List<AudioInputListener> inputListeners = new ArrayList<>();
   private ByteArrayOutputStream outputStream;
   private boolean recording = false;
   private int framesRecorded = 0;
@@ -79,7 +81,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private boolean traceMinEnabled = false;
   private boolean traceMaxEnabled = false;
   private int octave = 0;
-  private int sampleRate;
+  private int sampleRate = 192000;
   private boolean flipX = false;
   private boolean flipY = false;
   private double brightness = 1.0;
@@ -166,16 +168,24 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     if (inputConnected) {
       if (micSamples == null) {
         try {
-          micSamples = micSampleQueue.take();
+          double[] newSamples = micSampleQueue.poll(1, TimeUnit.SECONDS);
+          inputConnected = newSamples != null;
+          if (newSamples != null) {
+            micSamples = newSamples;
+          }
         } catch (InterruptedException e) {
           logger.log(Level.SEVERE, "Failed to get mic samples", e);
         }
       }
 
       channels = new Vector2(micSamples[micSampleIndex++], micSamples[micSampleIndex++]);
-      if (micSampleIndex >= micSamples.length) {
+      if (micSampleIndex >= micSamples.length - 1) {
         try {
-          micSamples = micSampleQueue.take();
+          double[] newSamples = micSampleQueue.poll(1, TimeUnit.SECONDS);
+          inputConnected = newSamples != null;
+          if (newSamples != null) {
+            micSamples = newSamples;
+          }
         } catch (InterruptedException e) {
           logger.log(Level.SEVERE, "Failed to get mic samples", e);
         }
@@ -460,6 +470,19 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   @Override
+  public void resetInput() throws Exception {
+    audioInputEngine.stop();
+    while (isListening()) {
+      Thread.onSpinWait();
+    }
+    audioInputEngine = audioEngineBuilder.call();
+    audioInputEngine.setSampleRate(sampleRate);
+    for (AudioInputListener listener : inputListeners) {
+      audioInputEngine.addListener(listener);
+    }
+  }
+
+  @Override
   public void stop() {
     audioOutputEngine.stop();
   }
@@ -467,6 +490,11 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   @Override
   public boolean isPlaying() {
     return audioOutputEngine.isPlaying();
+  }
+
+  @Override
+  public boolean isListening() {
+    return audioInputEngine.isListening();
   }
 
   @Override
@@ -552,9 +580,11 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   @Override
-  public void setDevice(AudioDevice device) {
+  public void setOutputDevice(AudioDevice device) {
     this.device = device;
     this.sampleRate = device.sampleRate();
+    System.out.println("device: " + device);
+    audioInputEngine.setSampleRate(device.sampleRate());
     for (EffectTypePair pair : effects) {
       Effect effect = pair.effect();
       if (effect instanceof PhaseEffect phase) {
@@ -585,6 +615,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
   @Override
   public void addListener(AudioInputListener listener) {
+    inputListeners.add(listener);
     audioInputEngine.addListener(listener);
   }
 

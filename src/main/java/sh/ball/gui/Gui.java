@@ -38,7 +38,8 @@ public class Gui extends Application {
   public static final Logger logger = Logger.getLogger(Gui.class.getName());
 
   public static ShapeAudioPlayer audioPlayer;
-  public static AudioDevice defaultDevice;
+  public static AudioDevice defaultOutputDevice;
+  public static AudioDevice defaultInputDevice;
 
   private static CodeEditor editor;
   private static Stage editorStage;
@@ -46,7 +47,8 @@ public class Gui extends Application {
   static {
     try {
       audioPlayer = new ShapeAudioPlayer(ConglomerateAudioEngine::new, midiCommunicator);
-      defaultDevice = audioPlayer.getDefaultOutputDevice();
+      defaultOutputDevice = audioPlayer.getDefaultOutputDevice();
+      defaultInputDevice = audioPlayer.getDefaultInputDevice();
 
       if (PlatformUtil.isWindows()) {
         LOG_DIR = System.getenv("AppData");

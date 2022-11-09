@@ -17,6 +17,8 @@ public interface AudioPlayer<S> extends Runnable, MidiListener, AudioInputListen
 
   boolean isPlaying();
 
+  boolean isListening();
+
   void setOctave(int octave);
 
   void setBackingMidiVolume(double scale);
@@ -37,7 +39,7 @@ public interface AudioPlayer<S> extends Runnable, MidiListener, AudioInputListen
 
   void startRecord();
 
-  void setDevice(AudioDevice device);
+  void setOutputDevice(AudioDevice device);
 
   AudioDevice getDefaultOutputDevice();
 
@@ -56,4 +58,6 @@ public interface AudioPlayer<S> extends Runnable, MidiListener, AudioInputListen
   void setThreshold(double doubleValue);
 
   boolean inputAvailable();
+
+  void resetInput() throws Exception;
 }

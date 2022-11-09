@@ -19,7 +19,7 @@
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 
-<AnchorPane maxHeight="752.0" maxWidth="1105.0" minHeight="752.0" minWidth="1046.0" prefHeight="752.0" prefWidth="1096.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.MainController">
+<AnchorPane maxHeight="752.0" maxWidth="1105.0" minHeight="752.0" minWidth="1046.0" prefHeight="752.0" prefWidth="1096.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.MainController">
    <MenuBar prefHeight="27.0" prefWidth="1046.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
      <menus>
        <Menu mnemonicParsing="false" text="File">
@@ -44,12 +44,22 @@
        </Menu>
          <Menu fx:id="audioMenu" mnemonicParsing="false" text="Audio">
             <items>
-               <CustomMenuItem fx:id="audioDeviceMenuItem" hideOnClick="false" mnemonicParsing="false" text="Audio Device">
+               <CustomMenuItem fx:id="audioDeviceMenuItem" hideOnClick="false" mnemonicParsing="false" text="Audio Output Device">
                   <content>
                      <AnchorPane focusTraversable="true">
                         <children>
-                           <Label prefHeight="25.0" text="Audio Device" textFill="WHITE" />
+                           <Label prefHeight="25.0" text="Audio Output Device" textFill="WHITE" />
                            <ListView fx:id="outputDeviceListView" layoutY="25.0" prefHeight="200.0" prefWidth="400.0" />
+                        </children>
+                     </AnchorPane>
+                  </content>
+               </CustomMenuItem>
+               <CustomMenuItem fx:id="inputDeviceMenuItem" hideOnClick="false" mnemonicParsing="false" text="Audio Input Device">
+                  <content>
+                     <AnchorPane focusTraversable="true">
+                        <children>
+                           <Label prefHeight="25.0" text="Audio Input Device" textFill="WHITE" />
+                           <ListView fx:id="inputDeviceListView" layoutY="25.0" prefHeight="200.0" prefWidth="400.0" />
                         </children>
                      </AnchorPane>
                   </content>
