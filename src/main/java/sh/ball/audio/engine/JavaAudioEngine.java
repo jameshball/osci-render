@@ -219,8 +219,10 @@ public class JavaAudioEngine implements AudioEngine {
 
       byte[] buffer = new byte[bufferSize];
       int channelScalar = device.channels() == 1 ? 2 : 1;
-      float[] floatSrc = new float[channelScalar * buffer.length / 2];
-      float[] floatOut = new float[channelScalar * MAX_RESAMPLE_FACTOR * buffer.length / 2];
+      float[] floatSrcLeft = new float[channelScalar * buffer.length / 4];
+      float[] floatSrcRight = new float[channelScalar * buffer.length / 4];
+      float[] floatOutLeft = new float[channelScalar * MAX_RESAMPLE_FACTOR * buffer.length / 4];
+      float[] floatOutRight = new float[channelScalar * MAX_RESAMPLE_FACTOR * buffer.length / 4];
 
       microphone.start();
       while (!stopped) {
@@ -229,19 +231,25 @@ public class JavaAudioEngine implements AudioEngine {
         double[] out = new double[channelScalar * (int) (resampleFactor * buffer.length / 2)];
         microphone.read(buffer, 0, buffer.length);
 
-        for (int i = 0; i < buffer.length; i += 2) {
-          float sample = (float) ((buffer[i] & 0xFF) | (buffer[i + 1] << 8)) / 32768.0f;
+        for (int i = 0; i < buffer.length - 3; i += 4) {
+          float left = (float) ((buffer[i] & 0xFF) | (buffer[i + 1] << 8)) / 32768.0f;
+          float right = (float) ((buffer[i + 2] & 0xFF) | (buffer[i + 3] << 8)) / 32768.0f;
           if (device.channels() == 1) {
-            floatSrc[i] = sample;
-            floatSrc[i + 1] = sample;
+            floatSrcLeft[i / 2] = left;
+            floatSrcLeft[i / 2 + 1] = left;
+            floatSrcRight[i / 2] = right;
+            floatSrcRight[i / 2 + 1] = right;
           } else {
-            floatSrc[i / 2] = sample;
+            floatSrcLeft[i / 4] = left;
+            floatSrcRight[i / 4] = right;
           }
         }
 
-        r.process(resampleFactor, floatSrc, 0, floatSrc.length, false, floatOut, 0, out.length);
-        for (int i = 0; i < out.length; i++) {
-          out[i] = floatOut[i];
+        r.process(resampleFactor, floatSrcLeft, 0, floatSrcLeft.length, true, floatOutLeft, 0, out.length / 2);
+        r.process(resampleFactor, floatSrcRight, 0, floatSrcRight.length, true, floatOutRight, 0, out.length / 2);
+        for (int i = 0; i < out.length - 1; i += 2) {
+          out[i] = floatOutLeft[i / 2];
+          out[i + 1] = floatOutRight[i / 2];
         }
 
         for (AudioInputListener listener : listeners) {

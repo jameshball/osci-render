@@ -655,7 +655,7 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     if (analyser != null) {
       analyser.stop();
     }
-    analyser = new FrequencyAnalyser<>(audioPlayer, 2, sampleRate);
+    analyser = new FrequencyAnalyser<>(audioPlayer, sampleRate);
     startFrequencyAnalyser(analyser);
     effectsController.setFrequencyAnalyser(analyser);
     startAudioPlayerThread();

@@ -33,7 +33,7 @@ public class WobbleEffect extends PhaseEffect implements FrequencyListener, Sett
 
   @Override
   public void updateFrequency(double leftFrequency, double rightFrequency) {
-    lastFrequency = leftFrequency;
+    lastFrequency = leftFrequency + 1;
   }
 
   @Override

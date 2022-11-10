@@ -1,6 +1,8 @@
 package sh.ball.audio;
 
-import sh.ball.math.fft.FFT;
+import be.tarsos.dsp.pitch.DynamicWavelet;
+import be.tarsos.dsp.pitch.PitchDetectionResult;
+import be.tarsos.dsp.pitch.PitchDetector;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,19 +14,17 @@ public class FrequencyAnalyser<S> implements Runnable {
 
   private static final int DEFAULT_SAMPLE_RATE = 192000;
   // increase this for higher frequency resolution, but less frequent frequency calculation
-  private static final int DEFAULT_POWER_OF_TWO = 18;
+  private static final int DEFAULT_POWER_OF_TWO = 15;
 
   private final AudioPlayer<S> audioPlayer;
   private final List<FrequencyListener> listeners = new ArrayList<>();
-  private final int frameSize;
   private final int sampleRate;
   private final int powerOfTwo;
 
   private volatile boolean stopped;
 
-  public FrequencyAnalyser(AudioPlayer<S> audioPlayer, int frameSize, int sampleRate) {
+  public FrequencyAnalyser(AudioPlayer<S> audioPlayer, int sampleRate) {
     this.audioPlayer = audioPlayer;
-    this.frameSize = frameSize;
     this.sampleRate = sampleRate;
     this.powerOfTwo = (int) (DEFAULT_POWER_OF_TWO - Math.log(DEFAULT_SAMPLE_RATE / sampleRate) / Math.log(2));
   }
@@ -43,6 +43,9 @@ public class FrequencyAnalyser<S> implements Runnable {
   @Override
   public void run() {
     double[] buf = new double[2 << (powerOfTwo - 1)];
+    float[] leftSamples = new float[buf.length / 2];
+    float[] rightSamples = new float[buf.length / 2];
+    PitchDetector pitchDetector = new DynamicWavelet(sampleRate, buf.length / 2);
 
     while (!stopped) {
       try {
@@ -50,39 +53,15 @@ public class FrequencyAnalyser<S> implements Runnable {
       } catch (InterruptedException e) {
         logger.log(Level.SEVERE, e.getMessage(), e);
       }
-      double[] leftSamples = new double[buf.length / 2];
-      double[] rightSamples = new double[buf.length / 2];
       for (int i = 0; i < buf.length; i += 2) {
-        leftSamples[i / 2] = buf[i];
-        rightSamples[i / 2] = buf[i + 1];
+        leftSamples[i / 2] = (float) buf[i];
+        rightSamples[i / 2] = (float) buf[i + 1];
       }
 
-      FFT leftFft = new FFT(leftSamples, null, false, true);
-      FFT rightFft = new FFT(rightSamples, null, false, true);
+      PitchDetectionResult leftFrequency = pitchDetector.getPitch(leftSamples);
+      PitchDetectionResult rightFrequency = pitchDetector.getPitch(rightSamples);
 
-      double[] leftMags = leftFft.getMagnitudeSpectrum();
-      double[] rightMags = rightFft.getMagnitudeSpectrum();
-      double[] bins = leftFft.getBinLabels(sampleRate);
-
-      int maxLeftIndex = 0;
-      double maxLeft = Double.NEGATIVE_INFINITY;
-      int maxRightIndex = 0;
-      double maxRight = Double.NEGATIVE_INFINITY;
-      for (int i = 0; i < leftMags.length; i++) {
-        if (bins[i] < 20 || bins[i] > 20000) {
-          continue;
-        }
-        if (leftMags[i] > maxLeft) {
-          maxLeftIndex = i;
-          maxLeft = leftMags[i];
-        }
-        if (rightMags[i] > maxRight) {
-          maxRightIndex = i;
-          maxRight = rightMags[i];
-        }
-      }
-
-      notifyListeners(bins[maxLeftIndex], bins[maxRightIndex]);
+      notifyListeners(leftFrequency.getPitch(), rightFrequency.getPitch());
     }
   }
 
