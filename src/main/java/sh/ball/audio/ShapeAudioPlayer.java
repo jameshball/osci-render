@@ -583,7 +583,6 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   public void setOutputDevice(AudioDevice device) {
     this.device = device;
     this.sampleRate = device.sampleRate();
-    System.out.println("device: " + device);
     audioInputEngine.setSampleRate(device.sampleRate());
     for (EffectTypePair pair : effects) {
       Effect effect = pair.effect();
