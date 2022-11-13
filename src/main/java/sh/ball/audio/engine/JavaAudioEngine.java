@@ -150,7 +150,7 @@ public class JavaAudioEngine implements AudioEngine {
 
     for (Mixer.Info info : inputDeviceInfos) {
       Stream.of(192000, 96000, 48000, 44100).forEach(rate ->
-        Stream.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12).forEach(channels -> {
+        Stream.of(1, 2).forEach(channels -> {
           try {
             AudioFormat format = new AudioFormat((float) rate, BIT_DEPTH, channels, SIGNED_SAMPLE, BIG_ENDIAN);
             AudioSystem.getTargetDataLine(format, info);
@@ -228,7 +228,11 @@ public class JavaAudioEngine implements AudioEngine {
       while (!stopped) {
         float resampleFactor = (float) sampleRate / (float) device.sampleRate();
 
-        double[] out = new double[channelScalar * (int) (resampleFactor * buffer.length / 2)];
+        int outLength = channelScalar * (int) (resampleFactor * buffer.length / 2);
+        if (outLength % 2 != 0) {
+          outLength--;
+        }
+        double[] out = new double[outLength];
         microphone.read(buffer, 0, buffer.length);
 
         for (int i = 0; i < buffer.length - 3; i += 4) {
@@ -247,7 +251,7 @@ public class JavaAudioEngine implements AudioEngine {
 
         r.process(resampleFactor, floatSrcLeft, 0, floatSrcLeft.length, true, floatOutLeft, 0, out.length / 2);
         r.process(resampleFactor, floatSrcRight, 0, floatSrcRight.length, true, floatOutRight, 0, out.length / 2);
-        for (int i = 0; i < out.length - 1; i += 2) {
+        for (int i = 0; i < out.length; i += 2) {
           out[i] = floatOutLeft[i / 2];
           out[i + 1] = floatOutRight[i / 2];
         }
