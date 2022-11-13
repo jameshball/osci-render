@@ -56,7 +56,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
   private FrameSource<Vector2> sampleSource;
   private final List<EffectTypePair> effects = new CopyOnWriteArrayList<>();
-  private final Queue<Listener> listeners = new ConcurrentLinkedQueue<>();
+  private final List<Listener> listeners = new CopyOnWriteArrayList<>();
 
   private AudioEngine audioOutputEngine;
   private AudioEngine audioInputEngine;
@@ -313,13 +313,14 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
       try {
         keyOnLock.acquire();
 
-        int totalVolume = MidiNote.MAX_VELOCITY;
+        int totalVolume = 0;
 
         boolean resetRelease = false;
         boolean resetAttack = false;
 
         for (int i = keyOn.nextSetBit(0); i >= 0; i = keyOn.nextSetBit(i + 1)) {
           int noteVolume = keyActualVolumes[i];
+          totalVolume += noteVolume;
 
           if (lastRelease > releaseFrames) {
             resetRelease = true;

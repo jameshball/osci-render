@@ -69,7 +69,7 @@ public class JavaAudioEngine implements AudioEngine {
     int bufferSize = calculateBufferSize(device, frameSize, LATENCY_MS);
 
     byte[] buffer = new byte[bufferSize * 2];
-    short[] channels = new short[device.channels()];
+    int numChannels = device.channels();
 
     source.open(format, buffer.length);
 
@@ -77,27 +77,26 @@ public class JavaAudioEngine implements AudioEngine {
     this.stopped = false;
     while (!stopped) {
       int requiredSamples = bufferSize / frameSize;
+      short defaultSample = (short) (brightness * Short.MAX_VALUE);
 
-      if (requiredSamples * channels.length > buffer.length / 2) {
-        buffer = new byte[requiredSamples * channels.length * 2];
+      if (requiredSamples * numChannels > buffer.length / 2) {
+        buffer = new byte[requiredSamples * numChannels * 2];
       }
 
+      int bufferIndex = 0;
       for (int i = 0; i < requiredSamples; i++) {
         try {
-          Arrays.fill(channels, (short) (Short.MAX_VALUE * brightness));
           Vector2 vector = channelGenerator.call();
-          // converting doubles from Vector2 into shorts and then bytes so
-          // that the byte buffer supports them
-          if (channels.length > 0) {
-            channels[0] = (short) (vector.getX() * Short.MAX_VALUE);
-          }
-          if (channels.length > 1) {
-            channels[1] = (short) (vector.getY() * Short.MAX_VALUE);
-          }
 
-          for (int j = 0; j < channels.length; j++) {
-            buffer[i * channels.length * 2 + j * 2] = (byte) channels[j];
-            buffer[i * channels.length * 2 + j * 2 + 1] = (byte) (channels[j] >> 8);
+          for (int j = 0; j < numChannels; j++) {
+            short sample = defaultSample;
+            if (j == 0) {
+              sample = (short) (vector.x * Short.MAX_VALUE);
+            } else if (j == 1) {
+              sample = (short) (vector.y * Short.MAX_VALUE);
+            }
+            buffer[bufferIndex++] = (byte) sample;
+            buffer[bufferIndex++] = (byte) (sample >> 8);
           }
         } catch (Exception e) {
           logger.log(Level.SEVERE, e.getMessage(), e);
