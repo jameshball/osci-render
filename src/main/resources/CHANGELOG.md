@@ -1,3 +1,14 @@
+- 1.31.0
+  - Support audio input from microphone/sound card as an audio source
+    - Just click the microphone button next to where you choose a file to open
+    - This will replace the current audio source with the microphone
+    - You can choose which input device in the Audio settings, just like you would for an output device
+    - Different sample rates are supported and will be resampled if they do not match the output device
+    - Changing the input device also changes which input device is used for controlling effects with the microphone
+  - Minor performance improvements
+  - As always, please report any bugs you find on [GitHub](https://github.com/jameshball/osci-render/issues)!
+
+
 - 1.30.3
   - Dramatically improved MIDI performance! Should now be pretty resilient to anything you throw at it
   - Renamed decay to release in MIDI settings
