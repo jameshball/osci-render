@@ -71,7 +71,7 @@ public final class Vector2 extends Shape {
 
   @Override
   public Vector2 scale(double factor) {
-    return scale(new Vector2(factor));
+    return new Vector2(x * factor, y * factor);
   }
 
   @Override

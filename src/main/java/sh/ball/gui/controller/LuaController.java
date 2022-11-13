@@ -19,6 +19,7 @@ import static sh.ball.gui.Gui.audioPlayer;
 public class LuaController implements Initializable, SubController {
 
   private MainController mainController;
+  private boolean active = false;
 
   @FXML
   private EffectComponentGroup luaA;
@@ -61,7 +62,7 @@ public class LuaController implements Initializable, SubController {
   }
 
   private void updateLuaVariable(String id, double value) {
-    if (mainController != null) {
+    if (mainController != null && active) {
       mainController.setLuaVariable("slider_" + id.toLowerCase().charAt(3), value);
     }
   }
@@ -96,5 +97,9 @@ public class LuaController implements Initializable, SubController {
   @Override
   public void micNotAvailable() {
     effects().forEach(EffectComponentGroup::micNotAvailable);
+  }
+
+  public void setActive(boolean active) {
+    this.active = active;
   }
 }

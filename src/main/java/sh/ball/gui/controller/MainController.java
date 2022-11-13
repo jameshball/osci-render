@@ -770,9 +770,11 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       luaParser.setScriptFromInputStream(new ByteArrayInputStream(fileData));
       luaParser.parse();
       sampleParsers.add(luaParser);
+      luaController.setActive(true);
       Platform.runLater(() -> luaController.updateLuaVariables());
       frameSources.add(null);
     } else {
+      luaController.setActive(false);
       frameSources.add(ParserFactory.getParser(name, fileData, fontFamilyListView.getSelectionModel().getSelectedItem(), fontStyleComboBox.getValue()).parse());
       sampleParsers.add(null);
     }
