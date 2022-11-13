@@ -13,7 +13,6 @@ import sh.ball.audio.engine.AudioInputListener;
 import sh.ball.audio.engine.AudioSample;
 import sh.ball.audio.midi.MidiCommunicator;
 import sh.ball.audio.midi.MidiNote;
-import sh.ball.engine.Vector3;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
@@ -92,6 +91,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private double[] micSamples;
   private boolean lineInEnabled = false;
   private boolean inputConnected = false;
+  private Runnable inputDisconnected;
 
   private AudioDevice device;
 
@@ -162,33 +162,35 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
     }
   }
 
+  public void setInputDisconnected(Runnable inputDisconnected) {
+    this.inputDisconnected = inputDisconnected;
+  }
+
+  private void fetchMicSamples() {
+    try {
+      double[] newSamples = micSampleQueue.poll(1, TimeUnit.SECONDS);
+      inputConnected = newSamples != null;
+      if (inputConnected) {
+        micSamples = newSamples;
+      } else if (inputDisconnected != null) {
+        inputDisconnected.run();
+      }
+    } catch (InterruptedException e) {
+      logger.log(Level.SEVERE, "Failed to get mic samples", e);
+    }
+  }
+
   private Vector2 generateChannels() {
     Vector2 channels = new Vector2();
 
     if (inputConnected) {
       if (micSamples == null) {
-        try {
-          double[] newSamples = micSampleQueue.poll(1, TimeUnit.SECONDS);
-          inputConnected = newSamples != null;
-          if (newSamples != null) {
-            micSamples = newSamples;
-          }
-        } catch (InterruptedException e) {
-          logger.log(Level.SEVERE, "Failed to get mic samples", e);
-        }
+        fetchMicSamples();
       }
 
       channels = new Vector2(micSamples[micSampleIndex++], micSamples[micSampleIndex++]);
       if (micSampleIndex >= micSamples.length - 1) {
-        try {
-          double[] newSamples = micSampleQueue.poll(1, TimeUnit.SECONDS);
-          inputConnected = newSamples != null;
-          if (newSamples != null) {
-            micSamples = newSamples;
-          }
-        } catch (InterruptedException e) {
-          logger.log(Level.SEVERE, "Failed to get mic samples", e);
-        }
+        fetchMicSamples();
         micSampleIndex = 0;
       }
     }

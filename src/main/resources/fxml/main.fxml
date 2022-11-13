@@ -49,7 +49,7 @@
                      <AnchorPane focusTraversable="true">
                         <children>
                            <Label prefHeight="25.0" text="Audio Output Device" textFill="WHITE" />
-                           <ListView fx:id="outputDeviceListView" layoutY="25.0" prefHeight="200.0" prefWidth="400.0" />
+                           <ListView fx:id="outputDeviceListView" layoutY="25.0" prefHeight="150.0" prefWidth="400.0" />
                         </children>
                      </AnchorPane>
                   </content>
@@ -59,7 +59,11 @@
                      <AnchorPane focusTraversable="true">
                         <children>
                            <Label prefHeight="25.0" text="Audio Input Device" textFill="WHITE" />
-                           <ListView fx:id="inputDeviceListView" layoutY="25.0" prefHeight="200.0" prefWidth="400.0" />
+                           <ListView fx:id="inputDeviceListView" layoutY="25.0" prefHeight="150.0" prefWidth="400.0" >
+                               <placeholder>
+                                   <Label text="No input audio devices available." />
+                               </placeholder>
+                           </ListView>
                         </children>
                      </AnchorPane>
                   </content>

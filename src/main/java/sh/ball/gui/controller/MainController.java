@@ -1565,13 +1565,9 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       audioPlayer.addListener(audioPlayer);
       audioPlayer.inputConnected();
       new Thread(() -> audioPlayer.listen(defaultInputDevice)).start();
+      audioPlayer.setInputDisconnected(() -> Platform.runLater(this::setMicNotAvailable));
     } else {
-      subControllers().forEach(SubController::micNotAvailable);
-      micSelected().forEach(prop -> {
-        if (prop != null) {
-          prop.setValue(false);
-        }
-      });
+      setMicNotAvailable();
     }
 
     updateRecentFiles();
@@ -1586,6 +1582,17 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     webSocketServer.start();
     this.buffer = new byte[FRAME_SIZE * SOSCI_NUM_VERTICES * SOSCI_VERTEX_SIZE];
     new Thread(() -> sendAudioDataToWebSocket(webSocketServer)).start();
+  }
+
+  private void setMicNotAvailable() {
+    Platform.runLater(() -> {
+      subControllers().forEach(SubController::micNotAvailable);
+      micSelected().forEach(prop -> {
+        if (prop != null) {
+          prop.setValue(false);
+        }
+      });
+    });
   }
 
   public void setRecentFiles(Callable<List<String>> recentFiles) {
