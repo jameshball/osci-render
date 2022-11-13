@@ -23,9 +23,9 @@ public class TranslateEffect extends PhaseEffect implements SettableEffect {
   public Vector2 apply(int count, Vector2 vector) {
     if (ellipse) {
       double theta = nextTheta();
-      return vector.translate(translation.scale(new Vector2(Math.sin(theta), Math.cos(theta))).scale(scale));
+      return new Vector2(vector.x + translation.x * Math.sin(theta) * scale, vector.y + translation.y * Math.cos(theta) * scale);
     } else {
-      return vector.translate(translation.scale(scale));
+      return new Vector2(vector.x + translation.x * scale, vector.y + translation.y * scale);
     }
   }
 

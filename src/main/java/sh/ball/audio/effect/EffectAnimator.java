@@ -47,6 +47,15 @@ public class EffectAnimator extends PhaseEffect implements SettableEffect {
 
   @Override
   public Vector2 apply(int count, Vector2 vector) {
+    if (type == AnimationType.STATIC) {
+      if (justSetToStatic) {
+        actualValue = targetValue;
+        justSetToStatic = false;
+        effect.setValue(actualValue);
+      }
+      return effect.apply(count, vector);
+    }
+
     double minValue = min;
     double maxValue = max;
     double range = maxValue - minValue;
@@ -56,14 +65,6 @@ public class EffectAnimator extends PhaseEffect implements SettableEffect {
     double normalisedTargetValue = (targetValue - minValue) / range;
     double normalisedActualValue = (actualValue - minValue) / range;
     switch (type) {
-      case STATIC -> {
-        if (justSetToStatic) {
-          actualValue = targetValue;
-          justSetToStatic = false;
-          effect.setValue(actualValue);
-        }
-        return effect.apply(count, vector);
-      }
       case SEESAW -> {
         double scalar = 10 * Math.max(Math.min(normalisedActualValue, 1 - normalisedActualValue), 0.01);
         double change = range * scalar * SPEED_SCALE * normalisedTargetValue / sampleRate;

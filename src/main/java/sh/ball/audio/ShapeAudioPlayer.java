@@ -168,7 +168,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
 
   private void fetchMicSamples() {
     try {
-      double[] newSamples = micSampleQueue.poll(1, TimeUnit.SECONDS);
+      double[] newSamples = micSampleQueue.poll(10, TimeUnit.SECONDS);
       inputConnected = newSamples != null;
       if (inputConnected) {
         micSamples = newSamples;
@@ -252,17 +252,16 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   private void writeChannels(float leftChannel, float rightChannel) {
-    double[] channels = new double[device.channels()];
-    Arrays.fill(channels, brightness);
-
-    if (channels.length > 0) {
-      channels[0] = leftChannel;
-    }
-    if (channels.length > 1) {
-      channels[1] = rightChannel;
-    }
-
     if (recording) {
+      double[] channels = new double[device.channels()];
+      Arrays.fill(channels, brightness);
+
+      if (channels.length > 0) {
+        channels[0] = leftChannel;
+      }
+      if (channels.length > 1) {
+        channels[1] = rightChannel;
+      }
       AudioSample.writeAudioSample(audioSample, channels, outputStream::write);
     }
 
