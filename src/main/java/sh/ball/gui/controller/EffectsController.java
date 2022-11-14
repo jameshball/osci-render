@@ -44,6 +44,7 @@ public class EffectsController implements Initializable, SubController {
   private final PerspectiveEffect perspectiveEffect;
   private final TranslateEffect translateEffect;
   private final RotateEffect rotateEffect;
+  private DelayEffect delayEffect;
 
   private double scrollDelta = 0.05;
   private String script = DEFAULT_SCRIPT;
@@ -89,6 +90,10 @@ public class EffectsController implements Initializable, SubController {
   @FXML
   private EffectComponentGroup backingMidi;
   @FXML
+  private EffectComponentGroup delayEchoLength;
+  @FXML
+  private EffectComponentGroup delayDecay;
+  @FXML
   private TextField translationXTextField;
   @FXML
   private TextField translationYTextField;
@@ -116,6 +121,7 @@ public class EffectsController implements Initializable, SubController {
     this.perspectiveEffect = new PerspectiveEffect(executor);
     this.translateEffect = new TranslateEffect(DEFAULT_SAMPLE_RATE, 1, new Vector2());
     this.rotateEffect = new RotateEffect(DEFAULT_SAMPLE_RATE);
+    this.delayEffect = new DelayEffect(0.5, 0.5, DEFAULT_SAMPLE_RATE);
   }
 
   private <K, V> Map<K, V> mergeEffectMaps(Function<EffectComponentGroup, Map<K, V>> map) {
@@ -143,6 +149,8 @@ public class EffectsController implements Initializable, SubController {
       Platform.runLater(() ->
         List.of(rotateSpeed3D, rotateX, rotateY, rotateZ, zPos).forEach(ecg -> ecg.setInactive(!checked))
       );
+    } else if (type == EffectType.DELAY_DECAY) {
+      Platform.runLater(() -> delayEchoLength.setInactive(!checked));
     }
   }
 
@@ -150,6 +158,7 @@ public class EffectsController implements Initializable, SubController {
     wobbleEffect.setSampleRate(device.sampleRate());
     translateEffect.setSampleRate(device.sampleRate());
     rotateEffect.setSampleRate(device.sampleRate());
+    delayEffect.setSampleRate(device.sampleRate());
     Map<ComboBox<AnimationType>, EffectAnimator> comboAnimatorMap = getComboBoxAnimatorMap();
     for (EffectAnimator animator : comboAnimatorMap.values()) {
       animator.setSampleRate(device.sampleRate());
@@ -193,6 +202,8 @@ public class EffectsController implements Initializable, SubController {
     translationSpeed.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(translateEffect::setSpeed)));
     rotateSpeed.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, rotateEffect));
     backingMidi.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(audioPlayer::setBackingMidiVolume)));
+    delayDecay.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, delayEffect));
+    delayEchoLength.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect((value) -> delayEffect.setEchoLength(value))));
 
     effects().forEach(effect -> {
       effect.setEffectUpdater(this::updateEffect);
@@ -239,6 +250,7 @@ public class EffectsController implements Initializable, SubController {
     depthFunctionButton.setOnAction(e -> Gui.launchCodeEditor(script, "3D Perspective Effect Depth Function", "text/x-lua", this::updateDepthFunction));
 
     List.of(rotateSpeed3D, rotateX, rotateY, rotateZ, zPos).forEach(ecg -> ecg.setInactive(true));
+    delayEchoLength.setInactive(true);
 
     fixedAngleX.setOnMouseClicked(e -> {
       setFixedAngleX = !setFixedAngleX;
@@ -284,7 +296,9 @@ public class EffectsController implements Initializable, SubController {
       translationScale,
       translationSpeed,
       rotateSpeed,
-      backingMidi
+      backingMidi,
+      delayDecay,
+      delayEchoLength
     );
   }
 
