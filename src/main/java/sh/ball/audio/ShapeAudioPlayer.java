@@ -1,5 +1,6 @@
 package sh.ball.audio;
 
+import be.tarsos.dsp.effects.DelayEffect;
 import sh.ball.audio.effect.*;
 
 import java.io.*;

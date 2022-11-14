@@ -13,9 +13,9 @@
 <?import javafx.scene.shape.SVGPath?>
 <?import sh.ball.gui.components.EffectComponentGroup?>
 
-<ScrollPane fitToHeight="true" fitToWidth="true" hbarPolicy="NEVER" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.EffectsController">
+<ScrollPane fitToHeight="true" fitToWidth="true" hbarPolicy="NEVER" prefHeight="1168.0" prefWidth="605.0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.EffectsController">
    <content>
-      <FlowPane prefHeight="1094.0" prefWidth="603.0" prefWrapLength="100.0" rowValignment="BASELINE">
+      <FlowPane prefHeight="1094.0" prefWidth="605.0" prefWrapLength="100.0" rowValignment="BASELINE">
          <children>
             <VBox>
                <children>
@@ -135,6 +135,25 @@
                   </AnchorPane>
                    <EffectComponentGroup fx:id="traceMax" increment="0.005" label="traceMax" majorTickUnit="0.1" max="1.0" min="0.0" name="Trace max" type="TRACE_MAX" value="0.5" />
                    <EffectComponentGroup fx:id="traceMin" increment="0.005" label="traceMin" majorTickUnit="0.1" max="1.0" min="0.0" name="Trace min" type="TRACE_MIN" value="0.5" />
+               </children>
+            </VBox>
+            <VBox>
+               <children>
+                  <Label alignment="CENTER" prefWidth="601.0" text="Output" textAlignment="JUSTIFY">
+                     <padding>
+                        <Insets bottom="5.0" />
+                     </padding>
+                  </Label>
+                  <Separator prefWidth="200.0">
+                     <opaqueInsets>
+                        <Insets />
+                     </opaqueInsets>
+                     <padding>
+                        <Insets bottom="5.0" />
+                     </padding>
+                  </Separator>
+                  <EffectComponentGroup fx:id="delayDecay" increment="0.005" label="delayDecay" max="1.0" min="0.0" name="Echo Decay" type="DELAY_DECAY" value="0.5" />
+                  <EffectComponentGroup fx:id="delayEchoLength" alwaysEnabled="true" increment="0.01" label="delayEchoLength" majorTickUnit="0.25" max="2.0" min="0.0" name="Echo Length" type="DELAY_ECHO_LENGTH" value="0.5" />
                </children>
             </VBox>
          </children>
