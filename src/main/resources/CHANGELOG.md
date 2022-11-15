@@ -1,3 +1,11 @@
+- 1.32.0
+  - Added two new audio effects: Delay/Echo and Bulge
+  - Delay effect can be used to create an echo of the audio signal
+    - Controllable with both the echo length and the decay of the echo
+  - Bulge effect makes the image bulge outwards
+    - If you change the minimum slider value to something negative using the Slider settings, you can make the image bulge inwards
+
+
 - 1.31.0
   - Support audio input from microphone/sound card as an audio source
     - Just click the microphone button next to where you choose a file to open
