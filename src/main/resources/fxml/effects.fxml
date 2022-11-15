@@ -13,7 +13,7 @@
 <?import javafx.scene.shape.SVGPath?>
 <?import sh.ball.gui.components.EffectComponentGroup?>
 
-<ScrollPane fitToHeight="true" fitToWidth="true" hbarPolicy="NEVER" prefHeight="1168.0" prefWidth="605.0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.EffectsController">
+<ScrollPane fitToHeight="true" fitToWidth="true" hbarPolicy="NEVER" prefHeight="1214.0" prefWidth="605.0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.EffectsController">
    <content>
       <FlowPane prefHeight="1094.0" prefWidth="605.0" prefWrapLength="100.0" rowValignment="BASELINE">
          <children>
@@ -135,11 +135,12 @@
                   </AnchorPane>
                    <EffectComponentGroup fx:id="traceMax" increment="0.005" label="traceMax" majorTickUnit="0.1" max="1.0" min="0.0" name="Trace max" type="TRACE_MAX" value="0.5" />
                    <EffectComponentGroup fx:id="traceMin" increment="0.005" label="traceMin" majorTickUnit="0.1" max="1.0" min="0.0" name="Trace min" type="TRACE_MIN" value="0.5" />
+                  <EffectComponentGroup fx:id="bulge" increment="0.005" label="bulge" majorTickUnit="0.1" max="1.0" min="0.0" name="Bulge" type="BULGE" value="0.1" />
                </children>
             </VBox>
             <VBox>
                <children>
-                  <Label alignment="CENTER" prefWidth="601.0" text="Output" textAlignment="JUSTIFY">
+                  <Label alignment="CENTER" prefWidth="601.0" text="Delay" textAlignment="JUSTIFY">
                      <padding>
                         <Insets bottom="5.0" />
                      </padding>

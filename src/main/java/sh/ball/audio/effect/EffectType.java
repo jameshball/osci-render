@@ -31,7 +31,8 @@ public enum EffectType {
   LUA_D(-1),
   LUA_E(-1),
   DELAY_DECAY(101),
-  DELAY_ECHO_LENGTH(-1),;
+  DELAY_ECHO_LENGTH(-1),
+  BULGE(53);
 
   public final int precedence;
 
