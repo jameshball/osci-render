@@ -113,4 +113,8 @@ public final class Vector2 extends Shape {
       ", y=" + y +
       '}';
   }
+
+  public double magnitude() {
+    return Math.sqrt(x * x + y * y);
+  }
 }

@@ -23,7 +23,6 @@ import sh.ball.parser.lua.LuaExecutor;
 import sh.ball.shapes.Shape;
 import sh.ball.shapes.Vector2;
 
-import java.awt.*;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -93,6 +92,8 @@ public class EffectsController implements Initializable, SubController {
   private EffectComponentGroup delayEchoLength;
   @FXML
   private EffectComponentGroup delayDecay;
+  @FXML
+  private EffectComponentGroup bulge;
   @FXML
   private TextField translationXTextField;
   @FXML
@@ -204,6 +205,7 @@ public class EffectsController implements Initializable, SubController {
     backingMidi.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect(audioPlayer::setBackingMidiVolume)));
     delayDecay.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, delayEffect));
     delayEchoLength.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new ConsumerEffect((value) -> delayEffect.setEchoLength(value))));
+    bulge.setAnimator(new EffectAnimator(DEFAULT_SAMPLE_RATE, new BulgeEffect()));
 
     effects().forEach(effect -> {
       effect.setEffectUpdater(this::updateEffect);
@@ -298,7 +300,8 @@ public class EffectsController implements Initializable, SubController {
       rotateSpeed,
       backingMidi,
       delayDecay,
-      delayEchoLength
+      delayEchoLength,
+      bulge
     );
   }
 
