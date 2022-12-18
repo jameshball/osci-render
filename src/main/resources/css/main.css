@@ -412,3 +412,8 @@
     -fx-border-radius: 0;
     -fx-border-color: white;
 }
+
+.hyperlink {
+    -fx-text-fill: #00ff00;
+    -fx-border-color: transparent;
+}

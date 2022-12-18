@@ -1,14 +1,16 @@
 package sh.ball.gui.controller;
 
+import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Worker;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.scene.control.*;
 import javafx.scene.control.Button;
-import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
-import javafx.scene.control.ListView;
+import javafx.scene.layout.VBox;
 import javafx.scene.web.WebView;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -19,6 +21,7 @@ import org.w3c.dom.NodeList;
 import org.w3c.dom.events.EventTarget;
 import org.w3c.dom.html.HTMLAnchorElement;
 import sh.ball.gui.ExceptionBiConsumer;
+import sh.ball.gui.GitHubReleaseDetector;
 import sh.ball.gui.Gui;
 
 import java.awt.*;
@@ -29,6 +32,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.ResourceBundle;
 import java.util.function.Consumer;
 import java.util.logging.Level;
@@ -45,11 +49,13 @@ public class ProjectSelectController implements Initializable {
 
   private final Preferences userPreferences = Preferences.userNodeForPackage(getClass());
   private final ObservableList<String> recentFiles = FXCollections.observableArrayList();
+  private final GitHubReleaseDetector gitHubReleaseDetector = new GitHubReleaseDetector("jameshball", "osci-render");
   private ExceptionBiConsumer<String, Boolean> launchMainApplication;
   private Consumer<String> openBrowser;
 
   private Stage stage;
   private final FileChooser projectFileChooser = new FileChooser();
+  private final Hyperlink latestReleaseHyperlink = new Hyperlink();
 
   @FXML
   private ListView<String> recentFilesListView;
@@ -65,6 +71,8 @@ public class ProjectSelectController implements Initializable {
   private Button logButton;
   @FXML
   private Label versionLabel;
+  @FXML
+  private VBox projectVBox;
 
   @Override
   public void initialize(URL url, ResourceBundle resourceBundle) {
@@ -80,6 +88,18 @@ public class ProjectSelectController implements Initializable {
     projectFileChooser.getExtensionFilters().add(
       new FileChooser.ExtensionFilter("osci-render files", "*.osci")
     );
+
+    latestReleaseHyperlink.setOnAction(event -> openBrowser.accept("https://github.com/jameshball/osci-render/releases/latest"));
+    new Thread(() -> {
+      String latestRelease = gitHubReleaseDetector.getLatestRelease();
+      Platform.runLater(() -> {
+        String currentVersion = versionLabel.getText().replaceAll("^v", "");
+        if (!latestRelease.equals(currentVersion)) {
+          latestReleaseHyperlink.setText("v" + latestRelease + " is the latest version on GitHub!");
+          projectVBox.getChildren().add(projectVBox.getChildren().size() - 1, latestReleaseHyperlink);
+        }
+      });
+    }).start();
 
     openProjectButton.setOnAction(e -> {
       File file = projectFileChooser.showOpenDialog(stage);

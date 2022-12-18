@@ -1,3 +1,7 @@
+- 1.32.2
+  - Add message to project select screen if there is a new version available
+
+
 - 1.32.1
   - Allow projects to be openable from the project select screen, even if they haven't been opened before
 

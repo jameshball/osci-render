@@ -6,7 +6,7 @@
 
     <groupId>sh.ball</groupId>
     <artifactId>osci-render</artifactId>
-    <version>1.32.1</version>
+    <version>1.32.2</version>
 
     <name>osci-render</name>
 
@@ -212,6 +212,11 @@
             <groupId>com.github.axet</groupId>
             <artifactId>TarsosDSP</artifactId>
             <version>2.4-1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.json</groupId>
+            <artifactId>json</artifactId>
+            <version>20220320</version>
         </dependency>
     </dependencies>
     <profiles>
