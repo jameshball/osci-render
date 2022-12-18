@@ -10,6 +10,8 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.web.WebView;
+import javafx.stage.FileChooser;
+import javafx.stage.Stage;
 import netscape.javascript.JSObject;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
@@ -46,10 +48,15 @@ public class ProjectSelectController implements Initializable {
   private ExceptionBiConsumer<String, Boolean> launchMainApplication;
   private Consumer<String> openBrowser;
 
+  private Stage stage;
+  private final FileChooser projectFileChooser = new FileChooser();
+
   @FXML
   private ListView<String> recentFilesListView;
   @FXML
   private Button newProjectButton;
+  @FXML
+  private Button openProjectButton;
   @FXML
   private CheckBox startMutedCheckBox;
   @FXML
@@ -69,6 +76,21 @@ public class ProjectSelectController implements Initializable {
         break;
       }
     }
+
+    projectFileChooser.getExtensionFilters().add(
+      new FileChooser.ExtensionFilter("osci-render files", "*.osci")
+    );
+
+    openProjectButton.setOnAction(e -> {
+      File file = projectFileChooser.showOpenDialog(stage);
+      if (file != null) {
+        try {
+          launchMainApplication.accept(file.getAbsolutePath(), startMutedCheckBox.isSelected());
+        } catch (Exception ex) {
+          logger.log(Level.SEVERE, ex.getMessage(), ex);
+        }
+      }
+    });
 
     recentFilesListView.setItems(recentFiles);
     recentFilesListView.setOnMouseClicked(e -> {
@@ -191,5 +213,9 @@ public class ProjectSelectController implements Initializable {
 
   public String version() {
     return versionLabel.getText();
+  }
+
+  public void setStage(Stage stage) {
+    this.stage = stage;
   }
 }

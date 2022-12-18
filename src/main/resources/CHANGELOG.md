@@ -1,3 +1,7 @@
+- 1.32.1
+  - Allow projects to be openable from the project select screen, even if they haven't been opened before
+
+
 - 1.32.0
   - Added two new audio effects: Delay/Echo and Bulge
   - Delay effect can be used to create an echo of the audio signal
