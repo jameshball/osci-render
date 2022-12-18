@@ -90,6 +90,7 @@ public class Gui extends Application {
     FXMLLoader projectSelectLoader = new FXMLLoader(getClass().getResource("/fxml/projectSelect.fxml"));
     Parent projectSelectRoot = projectSelectLoader.load();
     ProjectSelectController projectSelectController = projectSelectLoader.getController();
+    projectSelectController.setStage(stage);
     projectSelectController.setOpenBrowser(url -> getHostServices().showDocument(url));
 
     stage.getIcons().add(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/icons/icon.png"))));

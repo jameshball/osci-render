@@ -13,7 +13,7 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.web.WebView?>
 
-<AnchorPane prefHeight="752.0" prefWidth="1096.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.ProjectSelectController">
+<AnchorPane prefHeight="752.0" prefWidth="1096.0" stylesheets="@../css/main.css" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sh.ball.gui.controller.ProjectSelectController">
    <AnchorPane layoutX="11.0" layoutY="12.0" prefHeight="727.0" prefWidth="1023.0" styleClass="darkPane" AnchorPane.bottomAnchor="12.0" AnchorPane.leftAnchor="12.0" AnchorPane.rightAnchor="12.0" AnchorPane.topAnchor="12.0">
       <children>
          <HBox alignment="TOP_CENTER" layoutX="-3.0" prefHeight="693.0" prefWidth="992.0" spacing="20.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="15.0" AnchorPane.rightAnchor="15.0" AnchorPane.topAnchor="0.0">
@@ -39,11 +39,16 @@
                            <Label text="No recent projects. Start a new project below." />
                         </placeholder>
                      </ListView>
-                     <Button fx:id="newProjectButton" mnemonicParsing="false" prefHeight="40.0" prefWidth="131.0" text="Start new project" />
+                     <HBox alignment="CENTER" prefHeight="41.0" prefWidth="582.0" spacing="20.0">
+                        <children>
+                           <Button fx:id="newProjectButton" mnemonicParsing="false" prefHeight="40.0" prefWidth="131.0" text="Start new project" />
+                           <Button fx:id="openProjectButton" mnemonicParsing="false" prefHeight="40.0" prefWidth="131.0" text="Open existing project" />
+                        </children>
+                     </HBox>
                      <CheckBox fx:id="startMutedCheckBox" mnemonicParsing="false" text="Start muted" />
                      <HBox alignment="CENTER" spacing="20.0">
                         <children>
-                           <Label fx:id="versionLabel" minWidth="42.0" prefHeight="18.0" prefWidth="42.0" text="v1.32.0" />
+                           <Label fx:id="versionLabel" minWidth="42.0" prefHeight="18.0" prefWidth="42.0" text="v1.32.1" />
                            <Label prefHeight="54.0" prefWidth="379.0" text="Email me at james@ball.sh or create an issue on GitHub for feature suggestions, issues, or opportunites I might be interested in!" textAlignment="CENTER" wrapText="true" />
                            <Button fx:id="logButton" minWidth="102.0" mnemonicParsing="false" prefWidth="102.0" text="Open log folder" />
                         </children>
