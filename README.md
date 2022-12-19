@@ -26,6 +26,12 @@ Send an email to [james@ball.sh](mailto:james@ball.sh) if you have any issues, f
 
 [youtube.com/watch?v=ZeP-0U8ebKU](https://www.youtube.com/watch?v=ZeP-0U8ebKU)
 
+#### Latest features
+
+[![Osci-Render: New Features and Improvements](https://img.youtube.com/vi/s7THNuvNrGg/0.jpg)](https://www.youtube.com/watch?v=s7THNuvNrGg)
+
+[youtube.com/watch?v=s7THNuvNrGg](https://www.youtube.com/watch?v=s7THNuvNrGg)
+
 ## Current Features
 
 - Render `.obj` files on an oscilloscope
