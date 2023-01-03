@@ -158,7 +158,9 @@ To uninstall, use Windows control panel, as you would expect.
   - Control-click the file, and choose Open from the shortcut menu
   - Click Open
 - Follow the steps in the installer
-- Open `osci-render` from the Launchpad
+- Open `osci-render` from Launchpad
+  - On Ventura (latest macOS), you will need to right-click and choose 'Open' to bypass the '"osci-render" is damaged and can't be opened' error. More details [here](https://iboysoft.com/news/app-is-damaged-and-cannot-be-opened.html).
+  - Again, this is because I haven't paid for a developer licence
 - Start rendering!
 
 ### Installing using .deb (Ubuntu)
