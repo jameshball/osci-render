@@ -135,7 +135,12 @@ public class ConglomerateAudioEngine implements AudioEngine {
 
   @Override
   public boolean inputAvailable() {
-    return javaEngine.inputAvailable() || xtEngine.inputAvailable();
+    boolean javaInputAvailable = javaEngine.inputAvailable();
+    if (MAC_OS) {
+      return javaInputAvailable;
+    } else {
+      return javaInputAvailable || xtEngine.inputAvailable();
+    }
   }
 
   @Override

@@ -1,3 +1,7 @@
+- 1.32.3
+  - Only check for XTAudio devices if not on macOS as it is not available on macOS
+
+
 - 1.32.2
   - Add message to project select screen if there is a new version available
 
