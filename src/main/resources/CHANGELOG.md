@@ -1,3 +1,7 @@
+- 1.33.1
+  - Fix check for a new version of osci-render in project select screen
+
+
 - 1.33.0
   - Overhaul how animations work in the interface for more precise and intuitive control over the animation speed
     - When the animation type changes, the range of the slider changes and changing the slider changes the frequency of the animation
