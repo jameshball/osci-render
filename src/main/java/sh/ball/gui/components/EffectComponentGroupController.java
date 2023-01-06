@@ -70,7 +70,11 @@ public class EffectComponentGroupController implements Initializable, SubControl
   @FXML
   public Slider slider;
   @FXML
+  public Slider animationSlider;
+  @FXML
   public Spinner<Double> spinner;
+  @FXML
+  public Spinner<Double> animationSpinner;
   @FXML
   public SVGPath midi;
   @FXML
@@ -138,7 +142,12 @@ public class EffectComponentGroupController implements Initializable, SubControl
     spinner.valueProperty().addListener((o, oldValue, newValue) -> slider.setValue(newValue));
     slider.valueProperty().addListener((o, oldValue, newValue) -> spinner.getValueFactory().setValue(newValue.doubleValue()));
 
-    List<AnimationType> animations = List.of(AnimationType.STATIC, AnimationType.SEESAW, AnimationType.LINEAR, AnimationType.FORWARD, AnimationType.REVERSE);
+    animationSpinner.valueProperty().addListener((o, oldValue, newValue) -> animationSlider.setValue(newValue));
+    animationSlider.valueProperty().addListener((o, oldValue, newValue) -> animationSpinner.getValueFactory().setValue(newValue.doubleValue()));
+
+    animationSpinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(0, 100, 1, 0.05));
+
+    List<AnimationType> animations = List.of(AnimationType.values());
 
     comboBox.setItems(FXCollections.observableList(animations));
     comboBox.setValue(AnimationType.STATIC);
@@ -180,9 +189,12 @@ public class EffectComponentGroupController implements Initializable, SubControl
       document.createTextNode(effectCheckBox.selectedProperty().getValue().toString())
     );
     Element animation = document.createElement("animation");
-    animation.appendChild(document.createTextNode(comboBox.getValue().toString()));
+    animation.appendChild(document.createTextNode(comboBox.getValue().getName()));
+    Element animationSpeed = document.createElement("animationSpeed");
+    animationSpeed.appendChild(document.createTextNode(Double.toString(animationSlider.getValue())));
     checkBox.appendChild(selected);
     checkBox.appendChild(animation);
+    checkBox.appendChild(animationSpeed);
     return List.of(checkBox);
   }
 
@@ -203,11 +215,23 @@ public class EffectComponentGroupController implements Initializable, SubControl
       selected = checkBox.getElementsByTagName("selected").item(0).getTextContent();
       if (checkBox.getElementsByTagName("animation").getLength() > 0) {
         String animation = checkBox.getElementsByTagName("animation").item(0).getTextContent();
-        comboBox.setValue(AnimationType.fromString(animation));
+        AnimationType type = AnimationType.fromString(animation);
+        comboBox.setValue(type);
+
+        if (checkBox.getElementsByTagName("animationSpeed").getLength() > 0) {
+          String animationSpeed = checkBox.getElementsByTagName("animationSpeed").item(0).getTextContent();
+          animationSlider.setValue(Double.parseDouble(animationSpeed));
+        } else if (type != AnimationType.STATIC) {
+          // backwards compatibility - must translate the old animation that uses the slider value,
+          // to the new animation that uses the animation slider value
+          double percentage = (slider.getValue() - slider.getMin()) / (slider.getMax() - slider.getMin());
+          animationSlider.setValue(percentage * 10);
+        }
       }
     } else {
       selected = checkBox.getTextContent();
       comboBox.setValue(AnimationType.STATIC);
+      animationSlider.setValue(1.0);
     }
     effectCheckBox.setSelected(Boolean.parseBoolean(selected) || model.isAlwaysEnabled());
   }
@@ -227,7 +251,9 @@ public class EffectComponentGroupController implements Initializable, SubControl
       this.animator.setValue(slider.getValue());
       updater.run(model.getType(), selected, this.animator);
       slider.setDisable(!selected);
+      animationSlider.setDisable(!selected);
       spinner.setDisable(!selected);
+      animationSpinner.setDisable(!selected);
     };
 
     effectCheckBox.selectedProperty().addListener(listener);
@@ -250,12 +276,23 @@ public class EffectComponentGroupController implements Initializable, SubControl
     slider.minProperty().addListener((e, old, min) -> this.animator.setMin(min.doubleValue()));
     slider.maxProperty().addListener((e, old, max) -> this.animator.setMax(max.doubleValue()));
     slider.valueProperty().addListener((e, old, value) -> this.animator.setValue(value.doubleValue()));
+    animationSlider.valueProperty().addListener((e, old, value) -> this.animator.setSpeed(value.doubleValue()));
     comboBox.valueProperty().addListener((options, old, animationType) -> {
       this.animator.setAnimation(animationType);
       if (animationType != AnimationType.STATIC) {
-        slider.setStyle("-thumb-color: #00ff00;");
+        animationSlider.setVisible(true);
+        slider.setVisible(false);
+        if (!model.isSpinnerHidden()) {
+          animationSpinner.setVisible(true);
+        }
+        spinner.setVisible(false);
       } else {
-        slider.setStyle("");
+        animationSlider.setVisible(false);
+        slider.setVisible(true);
+        animationSpinner.setVisible(false);
+        if (!model.isSpinnerHidden()) {
+          spinner.setVisible(true);
+        }
       }
     });
   }
@@ -284,7 +321,9 @@ public class EffectComponentGroupController implements Initializable, SubControl
 
   public void setInactive(boolean inactive) {
     slider.setDisable(inactive);
+    animationSlider.setDisable(inactive);
     spinner.setDisable(inactive);
+    animationSpinner.setDisable(inactive);
   }
 
   public void setValue(double value) {

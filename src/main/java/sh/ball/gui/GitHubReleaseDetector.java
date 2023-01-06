@@ -42,7 +42,7 @@ public class GitHubReleaseDetector {
       String latestRelease = null;
       for (int i = 0; i < releases.length(); i++) {
         JSONObject release = releases.getJSONObject(i);
-        String version = release.getString("tag_name").replaceAll("^v", "");
+        String version = release.getString("tag_name");
 
         // Compare versions and update the latestRelease variable if necessary
         if (compareVersions(version, latestRelease) > 0) {
@@ -58,12 +58,14 @@ public class GitHubReleaseDetector {
     return null;
   }
 
-  private static int compareVersions(String v1, String v2) {
+  public static int compareVersions(String v1, String v2) {
     if (v1 == null) {
       return -1;
     } else if (v2 == null) {
       return 1;
     }
+    v1 = v1.replaceAll("^v", "");
+    v2 = v2.replaceAll("^v", "");
     // Split the version strings on "." characters
     String[] v1Parts = v1.split("\\.");
     String[] v2Parts = v2.split("\\.");

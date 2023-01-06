@@ -129,6 +129,10 @@
     -fx-shape: "M460,530.874 1,265.87 460,0.866z";
 }
 
+.animationSlider > .thumb {
+    -thumb-color: #00ff00;
+}
+
 .thresholdSlider > .track {
     -fx-background-color: transparent;
 }

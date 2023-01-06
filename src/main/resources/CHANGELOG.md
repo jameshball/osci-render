@@ -1,3 +1,19 @@
+- 1.33.0
+  - Overhaul how animations work in the interface for more precise and intuitive control over the animation speed
+    - When the animation type changes, the range of the slider changes and changing the slider changes the frequency of the animation
+    - The value of the slider when there is no animation (Static) is saved and restored when the animation is removed
+    - Animation speeds vary from 0Hz to 100Hz
+    - You should not notice any difference in how animation is enabled or controlled, but the animation speed slider now goes much faster
+  - As before, to control the range of the animation, just change the range of the slider from the "Slider" menu
+  - Add new animation type: "Sine"
+  - Add new animation type: "Square"
+  - Rename "Linear" animation to "Triangle"
+  - Rename "Forward" animation to "Sawtooth"
+  - Rename "Reverse" animation to "Reverse Sawtooth"
+  - These new changes should be backwards compatible with projects in prior versions
+  - If you notice any issues or differences in projects loaded from older versions, please let me know!
+
+
 - 1.32.3
   - Only check for XTAudio devices if not on macOS as it is not available on macOS
 

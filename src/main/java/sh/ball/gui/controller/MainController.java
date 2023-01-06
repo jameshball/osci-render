@@ -55,6 +55,7 @@ import sh.ball.audio.midi.MidiListener;
 import sh.ball.audio.midi.MidiNote;
 import sh.ball.engine.ObjectServer;
 import sh.ball.engine.ObjectSet;
+import sh.ball.gui.GitHubReleaseDetector;
 import sh.ball.gui.Gui;
 import sh.ball.gui.components.EffectComponentGroup;
 import sh.ball.oscilloscope.ByteWebSocketServer;
@@ -1095,9 +1096,14 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
     }
   }
 
-  private void loadSliderValues(List<Slider> sliders, List<String> labels, Element root) {
+  private void loadSliderValues(List<Slider> sliders, List<String> labels, Element root, String version) {
     for (int i = 0; i < sliders.size(); i++) {
-      NodeList nodes = root.getElementsByTagName(labels.get(i));
+      String label = labels.get(i);
+      NodeList nodes = root.getElementsByTagName(label);
+
+      // backwards compatibility (PhaseEffect speed was doubled in v1.33.0)
+      boolean phaseEffectSpeedDoubled = (label.equals("translationSpeed") || label.equals("rotateSpeed")) && (version == null || GitHubReleaseDetector.compareVersions(version, "1.33.0") < 0);
+
       // backwards compatibility
       if (nodes.getLength() > 0) {
         Element sliderElement = (Element) nodes.item(0);
@@ -1110,13 +1116,24 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
           value = sliderElement.getElementsByTagName("value").item(0).getTextContent();
           String min = sliderElement.getElementsByTagName("min").item(0).getTextContent();
           String max = sliderElement.getElementsByTagName("max").item(0).getTextContent();
-          slider.setMin(Double.parseDouble(min));
-          slider.setMax(Double.parseDouble(max));
+          double minValue = Double.parseDouble(min);
+          double maxValue = Double.parseDouble(max);
+          if (phaseEffectSpeedDoubled) {
+            minValue /= 2;
+            maxValue /= 2;
+          }
+          slider.setMin(minValue);
+          slider.setMax(maxValue);
           updateSliderUnits(slider);
         }
 
-        slider.setValue(Double.parseDouble(value));
-        targetSliderValue[i] = Double.parseDouble(value);
+        double sliderValue = Double.parseDouble(value);
+        if (phaseEffectSpeedDoubled) {
+          sliderValue /= 2;
+        }
+
+        slider.setValue(sliderValue);
+        targetSliderValue[i] = sliderValue;
       }
     }
 
@@ -1310,8 +1327,12 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       generalController.disablePlayback();
 
       Element root = document.getDocumentElement();
+      String version = null;
+      if (root.getElementsByTagName("version").getLength() > 0) {
+        version = root.getElementsByTagName("version").item(0).getTextContent();
+      }
       Element slidersElement = (Element) root.getElementsByTagName("sliders").item(0);
-      loadSliderValues(sliders, labels, slidersElement);
+      loadSliderValues(sliders, labels, slidersElement, version);
 
       // doesn't exist on newer projects - backwards compatibility
       Element objectRotation = (Element) root.getElementsByTagName("objectRotation").item(0);

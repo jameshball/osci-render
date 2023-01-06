@@ -6,15 +6,12 @@ public class EffectAnimator extends PhaseEffect implements SettableEffect {
 
   public static final int DEFAULT_SAMPLE_RATE = 192000;
 
-  private static final double SPEED_SCALE = 20.0;
-
   private final SettableEffect effect;
 
   private AnimationType type = AnimationType.STATIC;
   private boolean justSetToStatic = true;
   private double targetValue = 0.5;
   private double actualValue = 0.5;
-  private boolean linearDirection = true;
   private double min;
   private double max;
 
@@ -31,7 +28,6 @@ public class EffectAnimator extends PhaseEffect implements SettableEffect {
 
   public void setAnimation(AnimationType type) {
     this.type = type;
-    this.linearDirection = true;
     if (type == AnimationType.STATIC) {
       justSetToStatic = true;
     }
@@ -58,48 +54,26 @@ public class EffectAnimator extends PhaseEffect implements SettableEffect {
 
     double minValue = min;
     double maxValue = max;
-    double range = maxValue - minValue;
-    if (range <= 0) {
-      return vector;
-    }
-    double normalisedTargetValue = (targetValue - minValue) / range;
-    double normalisedActualValue = (actualValue - minValue) / range;
+    double phase = nextTheta();
+    double percentage = phase / (2 * Math.PI);
     switch (type) {
       case SEESAW -> {
-        double scalar = 10 * Math.max(Math.min(normalisedActualValue, 1 - normalisedActualValue), 0.01);
-        double change = range * scalar * SPEED_SCALE * normalisedTargetValue / sampleRate;
-        if (actualValue + change > maxValue || actualValue - change < minValue) {
-          linearDirection = !linearDirection;
-        }
-        if (linearDirection) {
-          actualValue += change;
-        } else {
-          actualValue -= change;
-        }
+        // modified sigmoid function
+        actualValue = (percentage < 0.5) ? percentage * 2 : (1 - percentage) * 2;
+        actualValue = 1 / (1 + Math.exp(-16 * (actualValue - 0.5)));
+        actualValue = actualValue * (maxValue - minValue) + minValue;
+      }
+      case SINE -> {
+        actualValue = Math.sin(phase) * 0.5 + 0.5;
+        actualValue = actualValue * (maxValue - minValue) + minValue;
       }
       case LINEAR -> {
-        double change = range * SPEED_SCALE * normalisedTargetValue / sampleRate;
-        if (actualValue + change > maxValue || actualValue - change < minValue) {
-          linearDirection = !linearDirection;
-        }
-        if (linearDirection) {
-          actualValue += change;
-        } else {
-          actualValue -= change;
-        }
+        actualValue = (percentage < 0.5) ? percentage * 2 : (1 - percentage) * 2;
+        actualValue = actualValue * (maxValue - minValue) + minValue;
       }
-      case FORWARD -> {
-        actualValue += range * 0.5 * SPEED_SCALE * normalisedTargetValue / sampleRate;
-        if (actualValue > maxValue) {
-          actualValue = minValue;
-        }
-      }
-      case REVERSE -> {
-        actualValue -= range * 0.5 * SPEED_SCALE * normalisedTargetValue / sampleRate;
-        if (actualValue < minValue) {
-          actualValue = maxValue;
-        }
-      }
+      case SQUARE -> actualValue = (percentage < 0.5) ? maxValue : minValue;
+      case FORWARD -> actualValue = percentage * (maxValue - minValue) + minValue;
+      case REVERSE -> actualValue = (1 - percentage) * (maxValue - minValue) + minValue;
     }
     if (actualValue > maxValue) {
       actualValue = maxValue;
