@@ -93,8 +93,7 @@ public class ProjectSelectController implements Initializable {
     new Thread(() -> {
       String latestRelease = gitHubReleaseDetector.getLatestRelease();
       Platform.runLater(() -> {
-        String currentVersion = versionLabel.getText().replaceAll("^v", "");
-        if (!latestRelease.equals(currentVersion)) {
+        if (!latestRelease.equals(versionLabel.getText())) {
           latestReleaseHyperlink.setText(latestRelease + " is the latest version on GitHub!");
           projectVBox.getChildren().add(projectVBox.getChildren().size() - 1, latestReleaseHyperlink);
         }
