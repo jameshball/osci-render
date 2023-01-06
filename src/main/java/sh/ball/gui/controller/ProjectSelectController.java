@@ -95,7 +95,7 @@ public class ProjectSelectController implements Initializable {
       Platform.runLater(() -> {
         String currentVersion = versionLabel.getText().replaceAll("^v", "");
         if (!latestRelease.equals(currentVersion)) {
-          latestReleaseHyperlink.setText("v" + latestRelease + " is the latest version on GitHub!");
+          latestReleaseHyperlink.setText(latestRelease + " is the latest version on GitHub!");
           projectVBox.getChildren().add(projectVBox.getChildren().size() - 1, latestReleaseHyperlink);
         }
       });

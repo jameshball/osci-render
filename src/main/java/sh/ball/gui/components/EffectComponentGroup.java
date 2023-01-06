@@ -34,7 +34,6 @@ public class EffectComponentGroup extends HBox {
   private final DoubleProperty min = new SimpleDoubleProperty();
   private final DoubleProperty max = new SimpleDoubleProperty();
   private final BooleanProperty micSelected = new SimpleBooleanProperty(false);
-  private final BooleanProperty enabled = new SimpleBooleanProperty(false);
 
   public EffectComponentGroup() {
     EffectComponentGroupController temp;
@@ -67,8 +66,12 @@ public class EffectComponentGroup extends HBox {
   public synchronized void hideSpinner() {
     controller.spinner.setVisible(false);
     controller.spinner.setPrefWidth(0);
+    controller.animationSpinner.setVisible(false);
+    controller.animationSpinner.setPrefWidth(0);
     controller.label.setPrefWidth(90);
     controller.slider.setPrefWidth(170);
+    controller.animationSlider.setPrefWidth(170);
+    controller.animationSlider.setMajorTickUnit(20);
     HBox.setMargin(controller.midi, new Insets(11, 5, 0, -7));
   }
 
