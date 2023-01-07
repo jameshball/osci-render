@@ -1,3 +1,11 @@
+- 1.33.2
+  - Improved MIDI support
+    - CC channels that are reserved and commonly used (e.g. channel volume, pan, etc.) are now reserved and cannot be used for controlling slider values
+    - Added support for changing the channel's volume using CC values
+    - Added support for changing the pitch bend range via RPN messages
+  - Fix Wobble effect stutter and frequency
+
+
 - 1.33.1
   - Fix check for a new version of osci-render in project select screen
 

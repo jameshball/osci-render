@@ -35,6 +35,7 @@ public class MidiNote {
   public static final int REGISTERED_PARAMETER_MSB = 101;
   public static final int PITCH_BEND_RANGE_RPM_LSB = 0;
   public static final int PITCH_BEND_RANGE_RPM_MSB = 0;
+  public static final int RESET_ALL_CONTROLLERS = 121;
   public static final List<Integer> RESERVED_CC = List.of(
     BANK_SELECT_MSB,
     MODULATION_WHEEL_MSB,
