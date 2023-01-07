@@ -1011,6 +1011,8 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
         // don't allow reserved CCs to be mapped to sliders
       } else if (cc == MidiNote.ALL_NOTES_OFF || cc == MidiNote.ALL_SOUND_OFF) {
         audioPlayer.stopMidiNotes();
+      } else if (cc == MidiNote.RESET_ALL_CONTROLLERS) {
+        audioPlayer.resetMidi();
       } else if (cc < MidiNote.ALL_SOUND_OFF) {
         // if a user has selected a MIDI logo next to a slider, create a mapping
         // between the MIDI channel and the SVG MIDI logo
