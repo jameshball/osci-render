@@ -1007,41 +1007,45 @@ public class MainController implements Initializable, FrequencyListener, MidiLis
       int cc = message.getData1();
       int value = message.getData2();
 
-      // if a user has selected a MIDI logo next to a slider, create a mapping
-      // between the MIDI channel and the SVG MIDI logo
-      if (armedMidi != null) {
-        mapMidiCC(cc, armedMidi);
-        armedMidiPaint = null;
-        armedMidi = null;
-      }
-      // If there is a slider associated with the MIDI channel, update the value
-      // of it
-      if (cc <= MidiNote.MAX_CC && CCMap.containsKey(cc)) {
-        Platform.runLater(() -> {
-          Slider slider = midiButtonMap.get(CCMap.get(cc));
-          short closestToZero = channelClosestToZero.get(slider);
-          double sliderValue = getValueInSliderRange(slider, value / (float) MidiNote.MAX_VELOCITY);
-          // deadzone
-          if (value >= closestToZero - midiDeadzone && value <= closestToZero + midiDeadzone && sliderValue < 1) {
-            slider.setValue(0);
-          } else {
-            int leftDeadzone = Math.min(closestToZero, midiDeadzone);
-            int rightDeadzone = Math.min(MidiNote.MAX_VELOCITY - closestToZero, midiDeadzone);
-            int actualChannels = MidiNote.MAX_VELOCITY - (leftDeadzone + 1 + rightDeadzone);
-            int correctedValue;
-            if (value > closestToZero) {
-              correctedValue = value - midiDeadzone;
-            } else {
-              correctedValue = value + midiDeadzone;
-            }
-
-            double scale = MidiNote.MAX_VELOCITY / (double) actualChannels;
-            double zeroPoint = closestToZero / (double) MidiNote.MAX_VELOCITY;
-            slider.setValue(getValueInSliderRange(slider, scale * ((correctedValue / (double) MidiNote.MAX_VELOCITY) - zeroPoint) + zeroPoint));
-          }
-        });
-      } else if (cc == MidiNote.ALL_NOTES_OFF) {
+      if (MidiNote.RESERVED_CC.contains(cc)) {
+        // don't allow reserved CCs to be mapped to sliders
+      } else if (cc == MidiNote.ALL_NOTES_OFF || cc == MidiNote.ALL_SOUND_OFF) {
         audioPlayer.stopMidiNotes();
+      } else if (cc < MidiNote.ALL_SOUND_OFF) {
+        // if a user has selected a MIDI logo next to a slider, create a mapping
+        // between the MIDI channel and the SVG MIDI logo
+        if (armedMidi != null) {
+          mapMidiCC(cc, armedMidi);
+          armedMidiPaint = null;
+          armedMidi = null;
+        }
+        // If there is a slider associated with the MIDI channel, update the value
+        // of it
+        if (CCMap.containsKey(cc)) {
+          Platform.runLater(() -> {
+            Slider slider = midiButtonMap.get(CCMap.get(cc));
+            short closestToZero = channelClosestToZero.get(slider);
+            double sliderValue = getValueInSliderRange(slider, value / (float) MidiNote.MAX_VELOCITY);
+            // deadzone
+            if (value >= closestToZero - midiDeadzone && value <= closestToZero + midiDeadzone && sliderValue < 1) {
+              slider.setValue(0);
+            } else {
+              int leftDeadzone = Math.min(closestToZero, midiDeadzone);
+              int rightDeadzone = Math.min(MidiNote.MAX_VELOCITY - closestToZero, midiDeadzone);
+              int actualChannels = MidiNote.MAX_VELOCITY - (leftDeadzone + 1 + rightDeadzone);
+              int correctedValue;
+              if (value > closestToZero) {
+                correctedValue = value - midiDeadzone;
+              } else {
+                correctedValue = value + midiDeadzone;
+              }
+
+              double scale = MidiNote.MAX_VELOCITY / (double) actualChannels;
+              double zeroPoint = closestToZero / (double) MidiNote.MAX_VELOCITY;
+              slider.setValue(getValueInSliderRange(slider, scale * ((correctedValue / (double) MidiNote.MAX_VELOCITY) - zeroPoint) + zeroPoint));
+            }
+          });
+        }
       }
     } else if (command == ShortMessage.PROGRAM_CHANGE) {
       // We want to change the file that is currently playing
