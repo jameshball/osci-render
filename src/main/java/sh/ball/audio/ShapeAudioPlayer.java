@@ -52,6 +52,12 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   private int lastAttack = 0;
   private double attackSeconds = 0.1;
   private int attackFrames;
+  private final int[] volumes = new int[MidiNote.NUM_CHANNELS];
+  private final int[] pitchBendRangeSemis = new int[MidiNote.NUM_CHANNELS];
+  private final int[] pitchBendRangeCents = new int[MidiNote.NUM_CHANNELS];
+
+  private final int[] registeredParameterLSBs = new int[MidiNote.NUM_CHANNELS];
+  private final int[] registeredParameterMSBs = new int[MidiNote.NUM_CHANNELS];
 
   private final Callable<AudioEngine> audioEngineBuilder;
   private final BlockingQueue<List<Shape>> frameQueue = new ArrayBlockingQueue<>(BUFFER_SIZE);
@@ -113,6 +119,11 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   public void resetMidi() {
     Arrays.fill(keyTargetVolumes, (short) 0);
     Arrays.fill(keyActualVolumes, (short) 0);
+    Arrays.fill(pitchBendRangeSemis, MidiNote.PITCH_BEND_SEMITONES);
+    Arrays.fill(pitchBendRangeCents, 0);
+    Arrays.fill(registeredParameterLSBs, -1);
+    Arrays.fill(registeredParameterMSBs, -1);
+    Arrays.fill(volumes, 127);
     keyOn.clear();
     // Middle C is down by default
     keyTargetVolumes[60] = (short) MidiNote.MAX_VELOCITY;
@@ -307,7 +318,10 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
   }
 
   private Vector2 applyEffects(int frame, Vector2 vector) {
-    vector = vector.scale((double) keyActualVolumes[mainChannel * MidiNote.NUM_KEYS + baseNote.key()] / MidiNote.MAX_VELOCITY);
+    vector = vector.scale(
+      ((double) keyActualVolumes[mainChannel * MidiNote.NUM_KEYS + baseNote.key()] / MidiNote.MAX_VELOCITY)
+      * ((double) volumes[mainChannel] / MidiNote.MAX_VELOCITY)
+    );
     if (midiStarted) {
       Vector2 sineVector = new Vector2();
 
@@ -348,7 +362,7 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
             phase += 1;
 
             double theta = 2 * Math.PI * phase / sampleRate;
-            double frequency = MidiNote.KEY_TO_FREQUENCY[key];
+            double frequency = MidiNote.KEY_TO_FREQUENCY[key] * pitchBends[channel];
             double x = Math.sin(frequency * theta);
             double y = Math.cos(frequency * theta);
 
@@ -682,6 +696,8 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
       midiStarted = true;
     }
 
+    int channel = message.getChannel();
+
     if (command == ShortMessage.NOTE_ON || command == ShortMessage.NOTE_OFF) {
       MidiNote note = new MidiNote(message.getData1(), message.getChannel());
       int velocity = message.getData2();
@@ -708,12 +724,50 @@ public class ShapeAudioPlayer implements AudioPlayer<List<Shape>> {
       // get pitch bend in range -1 to 1
       double pitchBendFactor = (double) pitchBend / MidiNote.PITCH_BEND_MAX;
       pitchBendFactor = 2 * pitchBendFactor - 1;
-      pitchBendFactor *= MidiNote.PITCH_BEND_SEMITONES;
+      pitchBendFactor *= pitchBendRangeSemis[channel] + pitchBendRangeCents[channel] / 100.0;
       // 12 tone equal temperament
       pitchBendFactor /= 12;
       pitchBendFactor = Math.pow(2, pitchBendFactor);
 
       setPitchBendFactor(message.getChannel(), pitchBendFactor);
+    } else if (command == ShortMessage.CONTROL_CHANGE) {
+      int cc = message.getData1();
+      int value = message.getData2();
+
+      if (MidiNote.RESERVED_CC.contains(cc)) {
+        if (cc == MidiNote.VOLUME_MSB) {
+          volumes[channel] = value;
+        } else if (cc == MidiNote.REGISTERED_PARAMETER_LSB) {
+          if (value == 127) {
+            registeredParameterLSBs[channel] = -1;
+            registeredParameterMSBs[channel] = -1;
+          } else {
+            registeredParameterLSBs[channel] = value;
+          }
+        } else if (cc == MidiNote.REGISTERED_PARAMETER_MSB) {
+          if (value == 127) {
+            registeredParameterLSBs[channel] = -1;
+            registeredParameterMSBs[channel] = -1;
+          } else {
+            registeredParameterMSBs[channel] = value;
+          }
+        } else if (cc == MidiNote.DATA_ENTRY_MSB || cc == MidiNote.DATA_ENTRY_LSB) {
+          int lsb = registeredParameterLSBs[channel];
+          int msb = registeredParameterMSBs[channel];
+          if (lsb != -1 && msb != -1) {
+            if (lsb == MidiNote.PITCH_BEND_RANGE_RPM_LSB && msb == MidiNote.PITCH_BEND_RANGE_RPM_MSB) {
+              // pitch bend range
+              if (cc == MidiNote.DATA_ENTRY_MSB) {
+                pitchBendRangeSemis[channel] = value;
+              } else {
+                pitchBendRangeCents[channel] = value;
+                registeredParameterLSBs[channel] = -1;
+                registeredParameterMSBs[channel] = -1;
+              }
+            }
+          }
+        }
+      }
     }
   }
 

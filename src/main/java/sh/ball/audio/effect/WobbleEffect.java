@@ -9,13 +9,11 @@ import sh.ball.shapes.Vector2;
 public class WobbleEffect extends PhaseEffect implements FrequencyListener, SettableEffect {
 
   private static final double DEFAULT_VOLUME = 0.2;
-
-  private double frequency;
   private double lastFrequency;
   private double volume;
 
   public WobbleEffect(int sampleRate, double volume) {
-    super(sampleRate, 2);
+    super(sampleRate, 1);
     this.volume = Math.max(Math.min(volume, 1), 0);
   }
 
@@ -24,7 +22,7 @@ public class WobbleEffect extends PhaseEffect implements FrequencyListener, Sett
   }
 
   public void update() {
-    frequency = lastFrequency;
+    setSpeed(lastFrequency);
   }
 
   public void setVolume(double volume) {
@@ -39,7 +37,7 @@ public class WobbleEffect extends PhaseEffect implements FrequencyListener, Sett
   @Override
   public Vector2 apply(int count, Vector2 vector) {
     double theta = nextTheta();
-    double delta = volume * Math.sin(frequency * theta);
+    double delta = volume * Math.sin(theta);
     double x = vector.x + delta;
     double y = vector.y + delta;
 

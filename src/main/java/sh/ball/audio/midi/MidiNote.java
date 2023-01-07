@@ -1,5 +1,7 @@
 package sh.ball.audio.midi;
 
+import java.util.List;
+
 public class MidiNote {
 
   public static final int MAX_VELOCITY = 127;
@@ -7,11 +9,52 @@ public class MidiNote {
   public static final short MAX_CHANNEL = 15;
   public static final short NUM_CHANNELS = (short) (MAX_CHANNEL + 1);
   public static final short NUM_KEYS = 128;
-  public static final short ALL_NOTES_OFF = 0x7B;
+  public static final short ALL_SOUND_OFF = 120;
+  public static final short ALL_NOTES_OFF = 123;
   public static final double MIDDLE_C = 261.6255798;
   public static final int PITCH_BEND_DATA_LENGTH = 7;
   public static final int PITCH_BEND_MAX = 16383;
   public static final int PITCH_BEND_SEMITONES = 2;
+  public static final int BANK_SELECT_MSB = 0;
+  public static final int MODULATION_WHEEL_MSB = 1;
+  public static final int FOOT_PEDAL_MSB = 4;
+  public static final int DATA_ENTRY_MSB = 6;
+  public static final int VOLUME_MSB = 7;
+  public static final int PAN_MSB = 10;
+  public static final int EXPRESSION_MSB = 11;
+  public static final int BANK_SELECT_LSB = 32;
+  public static final int MODULATION_WHEEL_LSB = 33;
+  public static final int FOOT_PEDAL_LSB = 36;
+  public static final int DATA_ENTRY_LSB = 38;
+  public static final int VOLUME_LSB = 39;
+  public static final int PAN_LSB = 42;
+  public static final int EXPRESSION_LSB = 43;
+  public static final int NON_REGISTERED_PARAMETER_LSB = 98;
+  public static final int NON_REGISTERED_PARAMETER_MSB = 99;
+  public static final int REGISTERED_PARAMETER_LSB = 100;
+  public static final int REGISTERED_PARAMETER_MSB = 101;
+  public static final int PITCH_BEND_RANGE_RPM_LSB = 0;
+  public static final int PITCH_BEND_RANGE_RPM_MSB = 0;
+  public static final List<Integer> RESERVED_CC = List.of(
+    BANK_SELECT_MSB,
+    MODULATION_WHEEL_MSB,
+    FOOT_PEDAL_MSB,
+    DATA_ENTRY_MSB,
+    VOLUME_MSB,
+    PAN_MSB,
+    EXPRESSION_MSB,
+    BANK_SELECT_LSB,
+    MODULATION_WHEEL_LSB,
+    FOOT_PEDAL_LSB,
+    DATA_ENTRY_LSB,
+    VOLUME_LSB,
+    PAN_LSB,
+    EXPRESSION_LSB,
+    NON_REGISTERED_PARAMETER_LSB,
+    NON_REGISTERED_PARAMETER_MSB,
+    REGISTERED_PARAMETER_LSB,
+    REGISTERED_PARAMETER_MSB
+  );
 
   // Concert A Pitch is A4 and has the key number 69
   final static int KEY_A4 = 69;
