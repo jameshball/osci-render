@@ -2,7 +2,7 @@
   <img width="267" height="256" src="osci.png" />
 </p>
 
-Program for making music by drawing objects, text, and images on an oscilloscope using audio output.
+Synthesizer for making music by drawing objects, text, and images on an oscilloscope using audio output.
 
 This allows for 3D rendering of `.obj` files, `.svg` images, `.txt` files, and Blender scenes on Windows, macOS, and Linux.
 
