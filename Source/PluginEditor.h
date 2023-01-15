@@ -10,12 +10,14 @@
 
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
+#include "EffectComponentGroup.h"
+#include "EffectsComponent.h"
+#include "MainComponent.h"
 
 //==============================================================================
 /**
 */
-class OscirenderAudioProcessorEditor  : public juce::AudioProcessorEditor,
-	                                    public juce::Slider::Listener
+class OscirenderAudioProcessorEditor  : public juce::AudioProcessorEditor
 {
 public:
     OscirenderAudioProcessorEditor (OscirenderAudioProcessor&);
@@ -26,13 +28,10 @@ public:
     void resized() override;
 
 private:
-    void sliderValueChanged(juce::Slider* slider) override;
-
-    // This reference is provided as a quick way for your editor to
-    // access the processor object that created it.
     OscirenderAudioProcessor& audioProcessor;
-
-    juce::Slider midiVolume;
+    
+    MainComponent main;
+    EffectsComponent effects;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OscirenderAudioProcessorEditor)
 };

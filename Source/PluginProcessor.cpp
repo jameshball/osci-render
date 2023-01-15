@@ -8,6 +8,8 @@
 
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "parser/FileParser.h"
+#include "parser/FrameProducer.h"
 
 //==============================================================================
 OscirenderAudioProcessor::OscirenderAudioProcessor()
@@ -21,7 +23,8 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
                      #endif
                        )
 #endif
-{
+    , producer(std::make_unique<FrameProducer>(*this, parser)) {
+    producer->startThread();
 }
 
 OscirenderAudioProcessor::~OscirenderAudioProcessor()
@@ -93,8 +96,8 @@ void OscirenderAudioProcessor::changeProgramName (int index, const juce::String&
 //==============================================================================
 void OscirenderAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
+	currentSampleRate = sampleRate;
+    updateAngleDelta();
 }
 
 void OscirenderAudioProcessor::releaseResources()
@@ -129,6 +132,61 @@ bool OscirenderAudioProcessor::isBusesLayoutSupported (const BusesLayout& layout
 }
 #endif
 
+void OscirenderAudioProcessor::updateAngleDelta() {
+	auto cyclesPerSample = frequency / currentSampleRate;
+	thetaDelta = cyclesPerSample * 2.0 * juce::MathConstants<double>::pi;
+}
+
+void OscirenderAudioProcessor::addFrame(std::vector<std::unique_ptr<Shape>> frame) {
+    const auto scope = frameFifo.write(1);
+    
+	if (scope.blockSize1 > 0) {
+		frameBuffer[scope.startIndex1].clear();
+		for (auto& shape : frame) {
+			frameBuffer[scope.startIndex1].push_back(std::move(shape));
+		}
+	}
+    
+	if (scope.blockSize2 > 0) {
+		frameBuffer[scope.startIndex2].clear();
+		for (auto& shape : frame) {
+			frameBuffer[scope.startIndex2].push_back(std::move(shape));
+		}
+	}
+}
+
+void OscirenderAudioProcessor::updateFrame() {
+    currentShape = 0;
+    shapeDrawn = 0.0;
+    frameDrawn = 0.0;
+    
+	if (frameFifo.getNumReady() > 0) {
+        {
+            const auto scope = frameFifo.read(1);
+
+            if (scope.blockSize1 > 0) {
+				frame.clear();
+                for (auto& shape : frameBuffer[scope.startIndex1]) {
+                    frame.push_back(std::move(shape));
+                }
+            }
+
+            if (scope.blockSize2 > 0) {
+				frame.clear();
+				for (auto& shape : frameBuffer[scope.startIndex2]) {
+					frame.push_back(std::move(shape));
+				}
+            }
+        }
+        
+        frameLength = Shape::totalLength(frame);
+	}
+}
+
+void OscirenderAudioProcessor::updateLengthIncrement() {
+    lengthIncrement = std::max(frameLength / (currentSampleRate / frequency), MIN_LENGTH_INCREMENT);
+}
+
 void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
@@ -144,18 +202,54 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
-    // This is the place where you'd normally do the guts of your plugin's
-    // audio processing...
-    // Make sure to reset the state if your inner loop is processing
-    // the samples and the outer loop is handling the channels.
-    // Alternatively, you can process the samples with the channels
-    // interleaved by keeping the same state.
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
-    {
-        auto* channelData = buffer.getWritePointer (channel);
+    
+    auto* channelData = buffer.getArrayOfWritePointers();
+	auto numSamples = buffer.getNumSamples();
+    
+	for (auto sample = 0; sample < numSamples; ++sample) {
+        updateLengthIncrement();
 
-        // ..do something to the data...
-    }
+        double x = 0.0;
+        double y = 0.0;
+        double length = 0.0;
+
+        if (currentShape < frame.size()) {
+			
+            auto& shape = frame[currentShape];
+            length = shape->length();
+            double drawingProgress = length == 0.0 ? 1 : shapeDrawn / length;
+            Vector2 channels = shape->nextVector(drawingProgress);
+			x = channels.x;
+            y = channels.y;
+        }
+
+        if (totalNumOutputChannels >= 2) {
+			channelData[0][sample] = x;
+			channelData[1][sample] = y;
+		} else if (totalNumOutputChannels == 1) {
+            channelData[0][sample] = x;
+        }
+        
+        frameDrawn += lengthIncrement;
+		shapeDrawn += lengthIncrement;
+
+        // Need to skip all shapes that the lengthIncrement draws over.
+        // This is especially an issue when there are lots of small lines being
+        // drawn.
+		while (shapeDrawn > length) {
+			shapeDrawn -= length;
+			currentShape++;
+			if (currentShape >= frame.size()) {
+				currentShape = 0;
+                break;
+			}
+			length = frame[currentShape]->length();
+		}
+
+        if (frameDrawn > frameLength) {
+			updateFrame();
+		}
+	}
 
 	juce::MidiBuffer processedMidi;
     

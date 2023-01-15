@@ -9,6 +9,10 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "shape/Shape.h"
+#include "parser/FileParser.h"
+#include "parser/FrameProducer.h"
+#include "parser/FrameConsumer.h"
 
 //==============================================================================
 /**
@@ -17,6 +21,7 @@ class OscirenderAudioProcessor  : public juce::AudioProcessor
                             #if JucePlugin_Enable_ARA
                              , public juce::AudioProcessorARAExtension
                             #endif
+    , public FrameConsumer
 {
 public:
     //==============================================================================
@@ -57,8 +62,35 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
 
     float noteOnVel;
+	float frequency = 0.0f;
+
+    double currentSampleRate = 0.0;
+
+    FileParser parser;
+    std::unique_ptr<FrameProducer> producer;
+
+    void updateAngleDelta();
+	void addFrame(std::vector<std::unique_ptr<Shape>> frame) override;
 
 private:
+    double theta = 0.0;
+    double thetaDelta = 0.0;
+
+	juce::AbstractFifo frameFifo{ 10 };
+	std::vector<std::unique_ptr<Shape>> frameBuffer[10];
+
+	int currentShape = 0;
+	std::vector<std::unique_ptr<Shape>> frame;
+    double frameLength;
+	double shapeDrawn = 0.0;
+	double frameDrawn = 0.0;
+	double lengthIncrement = 0.0;
+
+	void updateFrame();
+    void updateLengthIncrement();
+
+    const double MIN_LENGTH_INCREMENT = 0.000001;
+
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OscirenderAudioProcessor)
 };
