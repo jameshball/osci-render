@@ -38,7 +38,7 @@ void Line::translate(double x, double y) {
 	y2 += y;
 }
 
-double Line::length() {
+double inline Line::length() {
 	if (len < 0) {
 		// Euclidean distance approximation based on octagonal boundary
 		double dx = std::abs(x2 - x1);

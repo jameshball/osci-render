@@ -14,6 +14,5 @@ public:
 	double length() override;
 
 	double x1, y1, x2, y2;
-	double len;
 	
 };

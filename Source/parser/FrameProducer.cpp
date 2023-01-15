@@ -8,7 +8,7 @@ FrameProducer::~FrameProducer() {
 }
 
 void FrameProducer::run() {
-	while (frameSource.isActive() && !threadShouldExit()) {
+	while (!threadShouldExit() && frameSource.isActive()) {
 		frameConsumer.addFrame(frameSource.next());
 	}
 }

@@ -80,7 +80,7 @@ private:
 	std::vector<std::unique_ptr<Shape>> frameBuffer[10];
 
 	int currentShape = 0;
-	std::vector<std::unique_ptr<Shape>> frame;
+    std::vector<std::unique_ptr<Shape>> frame;
     double frameLength;
 	double shapeDrawn = 0.0;
 	double frameDrawn = 0.0;

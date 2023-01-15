@@ -17,4 +17,6 @@ public:
 	static double totalLength(std::vector<std::unique_ptr<Shape>>&);
 
 	const double INVALID_LENGTH = -1.0;
+
+	double len = INVALID_LENGTH;
 };

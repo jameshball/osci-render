@@ -139,20 +139,20 @@ void OscirenderAudioProcessor::updateAngleDelta() {
 
 void OscirenderAudioProcessor::addFrame(std::vector<std::unique_ptr<Shape>> frame) {
     const auto scope = frameFifo.write(1);
-    
-	if (scope.blockSize1 > 0) {
-		frameBuffer[scope.startIndex1].clear();
-		for (auto& shape : frame) {
-			frameBuffer[scope.startIndex1].push_back(std::move(shape));
-		}
-	}
-    
-	if (scope.blockSize2 > 0) {
-		frameBuffer[scope.startIndex2].clear();
-		for (auto& shape : frame) {
-			frameBuffer[scope.startIndex2].push_back(std::move(shape));
-		}
-	}
+
+    if (scope.blockSize1 > 0) {
+        frameBuffer[scope.startIndex1].clear();
+        for (auto& shape : frame) {
+            frameBuffer[scope.startIndex1].push_back(std::move(shape));
+        }
+    }
+
+    if (scope.blockSize2 > 0) {
+        frameBuffer[scope.startIndex2].clear();
+        for (auto& shape : frame) {
+            frameBuffer[scope.startIndex2].push_back(std::move(shape));
+        }
+    }
 }
 
 void OscirenderAudioProcessor::updateFrame() {
@@ -165,21 +165,13 @@ void OscirenderAudioProcessor::updateFrame() {
             const auto scope = frameFifo.read(1);
 
             if (scope.blockSize1 > 0) {
-				frame.clear();
-                for (auto& shape : frameBuffer[scope.startIndex1]) {
-                    frame.push_back(std::move(shape));
-                }
+				frame.swap(frameBuffer[scope.startIndex1]);
+            } else if (scope.blockSize2 > 0) {
+                frame.swap(frameBuffer[scope.startIndex2]);
             }
 
-            if (scope.blockSize2 > 0) {
-				frame.clear();
-				for (auto& shape : frameBuffer[scope.startIndex2]) {
-					frame.push_back(std::move(shape));
-				}
-            }
+            frameLength = Shape::totalLength(frame);
         }
-        
-        frameLength = Shape::totalLength(frame);
 	}
 }
 
@@ -230,8 +222,10 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
             channelData[0][sample] = x;
         }
         
-        frameDrawn += lengthIncrement;
-		shapeDrawn += lengthIncrement;
+        // hard cap on how many times it can be over the length to
+        // prevent audio stuttering
+        frameDrawn += std::min(lengthIncrement, 20 * length);
+		shapeDrawn += std::min(lengthIncrement, 20 * length);
 
         // Need to skip all shapes that the lengthIncrement draws over.
         // This is especially an issue when there are lots of small lines being
@@ -243,7 +237,9 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 				currentShape = 0;
                 break;
 			}
-			length = frame[currentShape]->length();
+            // POTENTIAL TODO: Think of a way to make this more efficient when iterating
+            // this loop many times
+            length = frame[currentShape]->len;
 		}
 
         if (frameDrawn > frameLength) {

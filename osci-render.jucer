@@ -33,9 +33,12 @@
         <FILE id="hCrVUD" name="FrameSource.h" compile="0" resource="0" file="Source/parser/FrameSource.h"/>
       </GROUP>
       <GROUP id="{E6ED85A9-3843-825F-EF48-BCF81E38F8AD}" name="obj">
-        <FILE id="aUh7fp" name="LICENSE" compile="0" resource="1" file="Source/obj/LICENSE"/>
-        <FILE id="npNAJ1" name="obj.c" compile="1" resource="0" file="Source/obj/obj.c"/>
-        <FILE id="iVQVY6" name="obj.h" compile="0" resource="0" file="Source/obj/obj.h"/>
+        <FILE id="Tyz6WY" name="Camera.cpp" compile="1" resource="0" file="Source/obj/Camera.cpp"/>
+        <FILE id="ix12FT" name="Camera.h" compile="0" resource="0" file="Source/obj/Camera.h"/>
+        <FILE id="JJTNO9" name="Line3D.cpp" compile="1" resource="0" file="Source/obj/Line3D.cpp"/>
+        <FILE id="TMrur0" name="Line3D.h" compile="0" resource="0" file="Source/obj/Line3D.h"/>
+        <FILE id="YNsbe9" name="WorldObject.cpp" compile="1" resource="0" file="Source/obj/WorldObject.cpp"/>
+        <FILE id="SZBVI9" name="WorldObject.h" compile="0" resource="0" file="Source/obj/WorldObject.h"/>
       </GROUP>
       <FILE id="GKBQ8j" name="MainComponent.cpp" compile="1" resource="0"
             file="Source/MainComponent.cpp"/>

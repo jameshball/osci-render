@@ -16,15 +16,7 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p) : audioProcessor(p) {
 		chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
 			if (chooser.getURLResult().isLocalFile()) {
 				auto file = chooser.getResult();
-				if (file.getFileExtension() == ".obj") {
-					audioProcessor.parser.parse();
-				} else if (file.getFileExtension() == ".svg") {
-					
-				} else if (file.getFileExtension() == ".lua") {
-					
-				} else if (file.getFileExtension() == ".txt") {
-					
-				}
+				audioProcessor.parser.parse(file.getFileExtension(), file.createInputStream());
 			}
 		});
 	};

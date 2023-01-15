@@ -60,7 +60,7 @@ void CubicBezierCurve::translate(double x, double y) {
 }
 
 double CubicBezierCurve::length() {
-	if (len == INVALID_LENGTH) {
+	if (len < 0) {
 		// Euclidean distance approximation based on octagonal boundary
 		double dx = std::abs(x4 - x1);
 		double dy = std::abs(y4 - y1);
