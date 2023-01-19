@@ -43,7 +43,7 @@ pair< vector<int>, vector<double> > Dijkstra(const Graph & G, int origin, const 
 			if(permanent[v])
 				continue;
 
-			double c = cost.empty() ? 1.0 : pathCost[u] + cost[G.GetEdgeIndex(u,v)];
+			double c = pathCost[u] + (cost.empty() ? 1.0 : cost[G.GetEdgeIndex(u,v)]);
 
 			//v has not been discovered yet
 			if(father[v] == -1)

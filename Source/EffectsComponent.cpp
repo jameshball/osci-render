@@ -5,7 +5,7 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p) : audioProcessor
 
     addAndMakeVisible(frequency);
 
-    frequency.slider.setRange(40.0, 10000.0);
+    frequency.slider.setRange(0.0, 12000.0);
     frequency.slider.setSkewFactorFromMidPoint(500.0);
     frequency.slider.setTextValueSuffix("Hz");
     frequency.slider.setValue(440.0);

@@ -114,15 +114,21 @@ WorldObject::WorldObject(juce::InputStream& stream) {
     y /= vertices.size();
     z /= vertices.size();
 
+    for (auto& v : vertices) {
+        v.v[0] = (v.v[0] - x) / max;
+        v.v[1] = (v.v[1] - y) / max;
+        v.v[2] = (v.v[2] - z) / max;
+    }
+
     int prevVertex = -1;
     for (auto& vertex : path) {
         if (prevVertex != -1) {
-            double x1 = (vertices[prevVertex].v[0] - x) / max;
-            double y1 = (vertices[prevVertex].v[1] - y) / max;
-            double z1 = (vertices[prevVertex].v[2] - z) / max;
-            double x2 = (vertices[vertex].v[0] - x) / max;
-            double y2 = (vertices[vertex].v[1] - y) / max;
-            double z2 = (vertices[vertex].v[2] - z) / max;
+            double x1 = vertices[prevVertex].v[0];
+            double y1 = vertices[prevVertex].v[1];
+            double z1 = vertices[prevVertex].v[2];
+            double x2 = vertices[vertex].v[0];
+            double y2 = vertices[vertex].v[1];
+            double z2 = vertices[vertex].v[2];
 
             edges.push_back(Line3D(x1, y1, z1, x2, y2, z2));
         }

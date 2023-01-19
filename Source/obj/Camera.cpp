@@ -4,9 +4,9 @@
 
 Camera::Camera(double focalLength, double x, double y, double z) : focalLength(focalLength), x(x), y(y), z(z) {}
 
-std::vector<std::unique_ptr<Shape>> Camera::draw(WorldObject& object)
-{
+std::vector<std::unique_ptr<Shape>> Camera::draw(WorldObject& object) {
 	std::vector<std::unique_ptr<Shape>> shapes;
+	object.rotateY += 0.001;
 	for (auto& edge : object.edges) {
         Vector2 start = project(object.rotateX, object.rotateY, object.rotateZ, edge.x1, edge.y1, edge.z1);
         Vector2 end = project(object.rotateX, object.rotateY, object.rotateZ, edge.x2, edge.y2, edge.z2);
@@ -84,8 +84,8 @@ Vector2 Camera::project(double objRotateX, double objRotateY, double objRotateZ,
     double x3 = cosValue * x2 - sinValue * y2;
     double y3 = sinValue * x2 + cosValue * y2;
 
-    double start = x3 * focalLength / (z3 - z) + x;
-    double end = y3 * focalLength / (z3 - z) + y;
+    double start = x3 * focalLength / (z3 - this->z) + this->x;
+    double end = y3 * focalLength / (z3 - this->z) + this->y;
 
     return Vector2(start, end);
 }
