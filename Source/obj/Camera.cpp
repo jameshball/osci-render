@@ -41,10 +41,10 @@ std::vector<Vector2> Camera::sampleVerticesInRender(WorldObject& object) {
     double oldRotateZ = object.rotateZ;
 
     for (int i = 0; i < SAMPLE_RENDER_SAMPLES - 1; i++) {
-        for (size_t j = 0; j < std::min(VERTEX_SAMPLES, object.vertices.size()); j++) {
-            double x = object.vertices[j].v[0];
-            double y = object.vertices[j].v[1];
-            double z = object.vertices[j].v[2];
+        for (size_t j = 0; j < std::min(VERTEX_SAMPLES, object.numVertices); j++) {
+            double x = object.vs[j * 3];
+            double y = object.vs[j * 3 + 1];
+            double z = object.vs[j * 3 + 2];
             vertices.push_back(project(object.rotateX, object.rotateY, object.rotateZ, x, y, z));
         }
         object.rotateY += rotation;

@@ -15,7 +15,7 @@ private:
 	const double VERTEX_VALUE_THRESHOLD = 1.0;
 	const double CAMERA_MOVE_INCREMENT = -0.1;
 	const int SAMPLE_RENDER_SAMPLES = 50;
-	const size_t VERTEX_SAMPLES = 1000;
+	const int VERTEX_SAMPLES = 1000;
 	const int MAX_NUM_STEPS = 1000;
 
 	double focalLength;

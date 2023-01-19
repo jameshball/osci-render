@@ -51,6 +51,10 @@
         <FILE id="ix12FT" name="Camera.h" compile="0" resource="0" file="Source/obj/Camera.h"/>
         <FILE id="JJTNO9" name="Line3D.cpp" compile="1" resource="0" file="Source/obj/Line3D.cpp"/>
         <FILE id="TMrur0" name="Line3D.h" compile="0" resource="0" file="Source/obj/Line3D.h"/>
+        <FILE id="a4ILpa" name="tiny_obj_loader.cpp" compile="1" resource="0"
+              file="Source/obj/tiny_obj_loader.cpp"/>
+        <FILE id="YdfYbM" name="tiny_obj_loader.h" compile="0" resource="0"
+              file="Source/obj/tiny_obj_loader.h"/>
         <FILE id="YNsbe9" name="WorldObject.cpp" compile="1" resource="0" file="Source/obj/WorldObject.cpp"/>
         <FILE id="SZBVI9" name="WorldObject.h" compile="0" resource="0" file="Source/obj/WorldObject.h"/>
       </GROUP>
