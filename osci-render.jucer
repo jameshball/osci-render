@@ -7,6 +7,20 @@
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <GROUP id="{2A41BAF3-5E83-B018-5668-39D89ABFA00C}" name="chinese_postman">
+        <FILE id="LcDpwe" name="BinaryHeap.cpp" compile="1" resource="0" file="Source/chinese_postman/BinaryHeap.cpp"/>
+        <FILE id="UYdaXR" name="BinaryHeap.h" compile="0" resource="0" file="Source/chinese_postman/BinaryHeap.h"/>
+        <FILE id="UnjMQ4" name="ChinesePostman.h" compile="0" resource="0"
+              file="Source/chinese_postman/ChinesePostman.h"/>
+        <FILE id="ItJWxN" name="Dijkstra.h" compile="0" resource="0" file="Source/chinese_postman/Dijkstra.h"/>
+        <FILE id="PFBBHM" name="Example.cpp" compile="1" resource="0" file="Source/chinese_postman/Example.cpp"/>
+        <FILE id="r66okI" name="Globals.h" compile="0" resource="0" file="Source/chinese_postman/Globals.h"/>
+        <FILE id="GN3vkN" name="Graph.cpp" compile="1" resource="0" file="Source/chinese_postman/Graph.cpp"/>
+        <FILE id="tpPZBV" name="Graph.h" compile="0" resource="0" file="Source/chinese_postman/Graph.h"/>
+        <FILE id="rAjVkN" name="LICENSE" compile="0" resource="1" file="Source/chinese_postman/LICENSE"/>
+        <FILE id="hz1Tov" name="Matching.cpp" compile="1" resource="0" file="Source/chinese_postman/Matching.cpp"/>
+        <FILE id="CdKZCg" name="Matching.h" compile="0" resource="0" file="Source/chinese_postman/Matching.h"/>
+      </GROUP>
       <GROUP id="{92CEA658-C82C-9CEB-15EB-945EF6B6B5C8}" name="shape">
         <FILE id="G5fbub" name="Shape.cpp" compile="1" resource="0" file="Source/shape/Shape.cpp"/>
         <FILE id="Dbvew2" name="CubicBezierCurve.cpp" compile="1" resource="0"
