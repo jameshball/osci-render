@@ -56,8 +56,8 @@ public:
 	double rotateX = 0.0, rotateY = 0.0, rotateZ = 0.0;
     
     std::vector<Line3D> edges;
-private:
     std::vector<vertex> vertices;
+private:
     std::vector<vertex> texcoords;
     std::vector<vertex> normals;
     std::vector<vertex> parameters;

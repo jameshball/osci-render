@@ -1,5 +1,6 @@
 #include "Camera.h"
 #include "../shape/Line.h"
+#include <numbers>
 
 Camera::Camera(double focalLength, double x, double y, double z) : focalLength(focalLength), x(x), y(y), z(z) {}
 
@@ -7,49 +8,84 @@ std::vector<std::unique_ptr<Shape>> Camera::draw(WorldObject& object)
 {
 	std::vector<std::unique_ptr<Shape>> shapes;
 	for (auto& edge : object.edges) {
-        // rotate around x-axis
-        double cosValue = std::cos(object.rotateX);
-        double sinValue = std::sin(object.rotateX);
-        double y2 = cosValue * edge.y1 - sinValue * edge.z1;
-        double z2 = sinValue * edge.y1 + cosValue * edge.z1;
+        Vector2 start = project(object.rotateX, object.rotateY, object.rotateZ, edge.x1, edge.y1, edge.z1);
+        Vector2 end = project(object.rotateX, object.rotateY, object.rotateZ, edge.x2, edge.y2, edge.z2);
 
-        // rotate around y-axis
-        cosValue = std::cos(object.rotateY);
-        sinValue = std::sin(object.rotateY);
-        double x2 = cosValue * edge.x1 + sinValue * z2;
-        double z3 = -sinValue * edge.x1 + cosValue * z2;
-
-        // rotate around z-axis
-        cosValue = cos(object.rotateZ);
-        sinValue = sin(object.rotateZ);
-        double x3 = cosValue * x2 - sinValue * y2;
-        double y3 = sinValue * x2 + cosValue * y2;
-
-		double startX = x3 * focalLength / (z3 - z) + x;
-		double startY = y3 * focalLength / (z3 - z) + y;
-
-        // rotate around x-axis
-        cosValue = std::cos(object.rotateX);
-        sinValue = std::sin(object.rotateX);
-        y2 = cosValue * edge.y2 - sinValue * edge.z2;
-        z2 = sinValue * edge.y2 + cosValue * edge.z2;
-
-        // rotate around y-axis
-        cosValue = std::cos(object.rotateY);
-        sinValue = std::sin(object.rotateY);
-        x2 = cosValue * edge.x2 + sinValue * z2;
-        z3 = -sinValue * edge.x2 + cosValue * z2;
-
-        // rotate around z-axis
-        cosValue = cos(object.rotateZ);
-        sinValue = sin(object.rotateZ);
-        x3 = cosValue * x2 - sinValue * y2;
-        y3 = sinValue * x2 + cosValue * y2;
-
-        double endX = x3 * focalLength / (z3 - z) + x;
-        double endY = y3 * focalLength / (z3 - z) + y;
-
-		shapes.push_back(std::make_unique<Line>(startX, startY, endX, endY));
+		shapes.push_back(std::make_unique<Line>(start.x, start.y, end.x, end.y));
 	}
 	return shapes;
+}
+
+void Camera::findZPos(WorldObject& object) {
+    x = 0.0;
+    y = 0.0;
+    z = 0.0;
+
+    std::vector<Vector2> vertices;
+
+    int stepsMade = 0;
+    while (maxVertexValue(vertices) > VERTEX_VALUE_THRESHOLD && stepsMade < MAX_NUM_STEPS) {
+        z += CAMERA_MOVE_INCREMENT;
+        vertices = sampleVerticesInRender(object);
+        stepsMade++;
+    }
+}
+
+std::vector<Vector2> Camera::sampleVerticesInRender(WorldObject& object) {
+    double rotation = 2.0 * std::numbers::pi / SAMPLE_RENDER_SAMPLES;
+
+    std::vector<Vector2> vertices;
+    
+    double oldRotateX = object.rotateX;
+    double oldRotateY = object.rotateY;
+    double oldRotateZ = object.rotateZ;
+
+    for (int i = 0; i < SAMPLE_RENDER_SAMPLES - 1; i++) {
+        for (size_t j = 0; j < std::min(VERTEX_SAMPLES, object.vertices.size()); j++) {
+            double x = object.vertices[j].v[0];
+            double y = object.vertices[j].v[1];
+            double z = object.vertices[j].v[2];
+            vertices.push_back(project(object.rotateX, object.rotateY, object.rotateZ, x, y, z));
+        }
+        object.rotateY += rotation;
+        object.rotateZ += rotation;
+    }
+
+    return vertices;
+}
+
+double Camera::maxVertexValue(std::vector<Vector2>& vertices) {
+    if (vertices.empty()) {
+        return std::numeric_limits<double>::infinity();
+    }
+    double max = 0.0;
+    for (auto& vertex : vertices) {
+        max = std::max(max, std::max(std::abs(vertex.x), std::abs(vertex.y)));
+    }
+    return max;
+}
+
+Vector2 Camera::project(double objRotateX, double objRotateY, double objRotateZ, double x, double y, double z) {
+    // rotate around x-axis
+    double cosValue = std::cos(objRotateX);
+    double sinValue = std::sin(objRotateX);
+    double y2 = cosValue * y - sinValue * z;
+    double z2 = sinValue * y + cosValue * z;
+
+    // rotate around y-axis
+    cosValue = std::cos(objRotateY);
+    sinValue = std::sin(objRotateY);
+    double x2 = cosValue * x + sinValue * z2;
+    double z3 = -sinValue * x + cosValue * z2;
+
+    // rotate around z-axis
+    cosValue = cos(objRotateZ);
+    sinValue = sin(objRotateZ);
+    double x3 = cosValue * x2 - sinValue * y2;
+    double y3 = sinValue * x2 + cosValue * y2;
+
+    double start = x3 * focalLength / (z3 - z) + x;
+    double end = y3 * focalLength / (z3 - z) + y;
+
+    return Vector2(start, end);
 }
