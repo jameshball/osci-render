@@ -65,7 +65,7 @@ private:
 	list<int> free;//List of free blossom indices
 
 	vector<int> outer;//outer[v] gives the index of the outermost blossom that contains v, outer[v] = v if v is not contained in any blossom
-	vector< list<int> > deep;//deep[v] is a list of all the original vertices contained inside v, deep[v] = v if v is an original vertex
+	vector< vector<int> > deep;//deep[v] is a list of all the original vertices contained inside v, deep[v] = v if v is an original vertex
 	vector< list<int> > shallow;//shallow[v] is a list of the vertices immediately contained inside v, shallow[v] is empty is the default
 	vector<int> tip;//tip[v] is the tip of blossom v
 	vector<bool> active;//true if a blossom is being used

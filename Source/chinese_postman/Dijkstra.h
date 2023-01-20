@@ -36,9 +36,7 @@ pair< vector<int>, vector<double> > Dijkstra(const Graph & G, int origin, const 
 		permanent[u] = true;
 
 		//Update the heap with vertices adjacent to u
-		for(list<int>::const_iterator it = G.AdjList(u).begin(); it != G.AdjList(u).end(); it++)
-		{
-			int v = *it;
+		for (int v : G.AdjList(u)) {
 			
 			if(permanent[v])
 				continue;

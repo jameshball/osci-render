@@ -1,11 +1,10 @@
 #pragma once
 
-#include <JuceHeader.h>
 #include "Line3D.h"
 
 class WorldObject {
 public:
-	WorldObject(juce::InputStream&);
+	WorldObject(std::string);
     
 	double rotateX = 0.0, rotateY = 0.0, rotateZ = 0.0;
     

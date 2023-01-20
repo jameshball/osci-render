@@ -5,7 +5,7 @@ FileParser::FileParser() {}
 
 void FileParser::parse(juce::String extension, std::unique_ptr<juce::InputStream> stream) {
 	if (extension == ".obj") {
-		object = std::make_unique<WorldObject>(*stream);
+		object = std::make_unique<WorldObject>(stream->readEntireStreamAsString().toStdString());
 		camera = std::make_unique<Camera>(1.0, 0, 0, 0.0);
 		camera->findZPos(*object);
 	}

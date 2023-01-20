@@ -18,9 +18,7 @@ bool Connected(const Graph & G)
         visited[u] = true;
         n++;
         
-        for(list<int>::const_iterator it = G.AdjList(u).begin(); it != G.AdjList(u).end(); it++)
-		{
-			int v = *it;
+        for(int v : G.AdjList(u)) {
 		    L.push_back(v);
 		}
     }
@@ -41,7 +39,7 @@ pair< list<int>, double > ChinesePostman(const Graph& G, const vector<double>& c
 		throw "Error: Graph is not connected";
 
 	//Build adjacency lists using edges in the graph
-	vector< list<int> > A(G.GetNumVertices(), list<int>());
+	vector<vector<int>> A(G.GetNumVertices(), vector<int>());
 	for(int u = 0; u < G.GetNumVertices(); u++)
 	    A[u] = G.AdjList(u);
 
@@ -105,10 +103,7 @@ pair< list<int>, double > ChinesePostman(const Graph& G, const vector<double>& c
 	vector<int> traversed(G.GetNumEdges(), 0);
 	for(int u = 0; u < G.GetNumVertices(); u++)
 	{
-		for(list<int>::iterator it = A[u].begin(); it != A[u].end(); it++)
-		{
-			int v = *it;
-			
+		for(int v : A[u]) {
 			//we do this so that the edge is not counted twice
 			if(v < u) continue;
 

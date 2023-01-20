@@ -30,7 +30,7 @@ public:
 	void AddEdge(int u, int v);
 
 	//Returns the adjacency list of a vertex
-	const list<int> & AdjList(int v) const;
+	const vector<int>& AdjList(int v) const;
 
 	//Returns the graph's adjacency matrix
 	const vector< vector<bool> > & AdjMat() const;
@@ -44,11 +44,11 @@ private:
 	vector< vector<bool> > adjMat;
 
 	//Adjacency lists
-	vector< list<int> > adjList;
+	vector<vector<int> > adjList;
 
 	//Array of edges
-	vector< pair<int, int> > edges;
+	vector<pair<int, int> > edges;
 
 	//Indices of the edges
-	vector< vector<int> > edgeIndex;
+	vector<vector<int> > edgeIndex;
 };

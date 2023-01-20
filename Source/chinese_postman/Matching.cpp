@@ -1,4 +1,6 @@
 #include "Matching.h"
+#include <deque>
+#include <stack>
 
 Matching::Matching(const Graph & G):
 	G(G),
@@ -33,14 +35,10 @@ void Matching::Grow()
 
 		//w might be a blossom
 		//we have to explore all the connections from vertices inside the blossom to other vertices
-		for(list<int>::iterator it = deep[w].begin(); it != deep[w].end(); it++)
-		{
-			int u = *it;
+		for(int u : deep[w]) {
 
 			int cont = false;
-			for(list<int>::const_iterator jt = G.AdjList(u).begin(); jt != G.AdjList(u).end(); jt++)
-			{
-				int v = *jt;
+			for(int v : G.AdjList(u)) {
 
 				if(IsEdgeBlocked(u, v)) continue;
 
@@ -143,10 +141,7 @@ void Matching::Heuristic()
 		if(mate[outer[u]] == -1)
 		{
 			int min = -1;
-			for(list<int>::const_iterator it = G.AdjList(u).begin(); it != G.AdjList(u).end(); it++)
-			{
-				int v = *it;
-
+			for (int v : G.AdjList(u)) {
 				if(IsEdgeBlocked(u, v) or
 					(outer[u] == outer[v]) or
 					(mate[outer[v]] != -1) )
@@ -170,12 +165,10 @@ void Matching::DestroyBlossom(int t)
 	if((t < n) or
 		(blocked[t] and GREATER(dual[t], 0))) return;
 
-	for(list<int>::iterator it = shallow[t].begin(); it != shallow[t].end(); it++)
-	{
-		int s = *it;
+	for(int s : shallow[t]) {
 		outer[s] = s;
-		for(list<int>::iterator jt = deep[s].begin(); jt != deep[s].end(); jt++)
-			outer[*jt] = s;	
+		for(int d : deep[s])
+			outer[d] = s;	
 
 		DestroyBlossom(s);
 	}
@@ -186,82 +179,84 @@ void Matching::DestroyBlossom(int t)
 	mate[t] = -1;
 }
 
-void Matching::Expand(int u, bool expandBlocked = false)
+void Matching::Expand(int start, bool expandBlocked = false)
 {
-	int v = outer[mate[u]];
+	std::stack<int> Q;
+	Q.push(start);
 
-	int index = m;
-	int p = -1, q = -1;
-	//Find the regular edge {p,q} of minimum index connecting u and its mate
-	//We use the minimum index to grant that the two possible blossoms u and v will use the same edge for a mate
-	for(list<int>::iterator it = deep[u].begin(); it != deep[u].end(); it++)
-	{	
-		int di = *it;
-		for(list<int>::iterator jt = deep[v].begin(); jt != deep[v].end(); jt++)
-		{
-			int dj = *jt;
-			if(IsAdjacent(di, dj) and G.GetEdgeIndex(di, dj) < index)
-			{
-				index = G.GetEdgeIndex(di, dj);
-				p = di;
-				q = dj;
+	while (!Q.empty()) {
+		int u = Q.top();
+		Q.pop();
+		int v = outer[mate[u]];
+
+		int index = m;
+		int p = -1, q = -1;
+		//Find the regular edge {p,q} of minimum index connecting u and its mate
+		//We use the minimum index to grant that the two possible blossoms u and v will use the same edge for a mate
+		for (int di : deep[u]) {
+			for (int dj : deep[v]) {
+				if (IsAdjacent(di, dj) and G.GetEdgeIndex(di, dj) < index)
+				{
+					index = G.GetEdgeIndex(di, dj);
+					p = di;
+					q = dj;
+				}
 			}
 		}
-	}
-	
-	mate[u] = q;
-    mate[v] = p;
-	//If u is a regular vertex, we are done
-	if(u < n or (blocked[u] and not expandBlocked)) return;
 
-	bool found = false;
-	//Find the position t of the new tip of the blossom
-	for(list<int>::iterator it = shallow[u].begin(); it != shallow[u].end() and not found; )
-	{
-		int si = *it;
-		for(list<int>::iterator jt = deep[si].begin(); jt != deep[si].end() and not found; jt++)
+		mate[u] = q;
+		mate[v] = p;
+		//If u is a regular vertex, we are done
+		if (u < n or (blocked[u] and not expandBlocked)) continue;
+
+		bool found = false;
+		//Find the position t of the new tip of the blossom
+		for (list<int>::iterator it = shallow[u].begin(); it != shallow[u].end() and not found; )
 		{
-			if(*jt == p )
-				found = true;
+			int si = *it;
+			for (vector<int>::iterator jt = deep[si].begin(); jt != deep[si].end() and not found; jt++)
+			{
+				if (*jt == p)
+					found = true;
+			}
+			it++;
+			if (not found)
+			{
+				shallow[u].push_back(si);
+				shallow[u].pop_front();
+			}
 		}
+
+		list<int>::iterator it = shallow[u].begin();
+		//Adjust the mate of the tip
+		mate[*it] = mate[u];
 		it++;
-		if(not found)
+		//
+		//Now we go through the odd circuit adjusting the new mates
+		while (it != shallow[u].end())
 		{
-			shallow[u].push_back(si);
-			shallow[u].pop_front();
+			list<int>::iterator itnext = it;
+			itnext++;
+			mate[*it] = *itnext;
+			mate[*itnext] = *it;
+			itnext++;
+			it = itnext;
+		}
+
+		//We update the sets blossom, shallow, and outer since this blossom is being deactivated
+		for (int s : shallow[u]) {
+			outer[s] = s;
+			for (int d : deep[s])
+				outer[d] = s;
+		}
+		active[u] = false;
+		AddFreeBlossomIndex(u);
+
+		//Expand the vertices in the blossom
+		for (int s : shallow[u]) {
+			Q.push(s);
 		}
 	}
-	
-	list<int>::iterator it = shallow[u].begin();
-	//Adjust the mate of the tip
-	mate[*it] = mate[u];
-	it++;
-	//
-	//Now we go through the odd circuit adjusting the new mates
-	while(it != shallow[u].end())
-	{
-		list<int>::iterator itnext = it;
-		itnext++;
-		mate[*it] = *itnext;
-		mate[*itnext] = *it;
-		itnext++;
-		it = itnext;
-	}
-
-	//We update the sets blossom, shallow, and outer since this blossom is being deactivated
-	for(list<int>::iterator it = shallow[u].begin(); it != shallow[u].end(); it++)
-	{
-		int s = *it;
-		outer[s] = s;
-		for(list<int>::iterator jt = deep[s].begin(); jt != deep[s].end(); jt++)
-			outer[*jt] = s;	
-	}
-	active[u] = false;
-	AddFreeBlossomIndex(u);
-	
-	//Expand the vertices in the blossom
-	for(list<int>::iterator it = shallow[u].begin(); it != shallow[u].end(); it++)
-		Expand(*it, expandBlocked);
 
 }
 
@@ -396,14 +391,11 @@ int Matching::Blossom(int u, int v)
 	}
 
 	//Now we construct deep and update outer
-	for(list<int>::iterator it = shallow[t].begin(); it != shallow[t].end(); it++)
-	{
-		u_ = *it;
+	for(int u_ : shallow[t]) {
 		outer[u_] = t;
-		for(list<int>::iterator jt = deep[u_].begin(); jt != deep[u_].end(); jt++)
-		{
-			deep[t].push_back(*jt);
-			outer[*jt] = t;
+		for(int d : deep[u_]) {
+			deep[t].push_back(d);
+			outer[d] = t;
 		}
 	}
 
@@ -423,10 +415,16 @@ void Matching::UpdateDualCosts()
 	int inite1 = false, inite2 = false, inite3 = false;
 	for(int i = 0; i < m; i++)
 	{
-		int u = G.GetEdge(i).first,
-			v = G.GetEdge(i).second;
+		auto edge = G.GetEdge(i);
+		int u = edge.first,
+			v = edge.second;
 
-		if( (type[outer[u]] == EVEN and type[outer[v]] == UNLABELED) or (type[outer[v]] == EVEN and type[outer[u]] == UNLABELED) )
+		int outer_u = outer[u];
+		int outer_v = outer[v];
+		int type_u = type[outer_u];
+		int type_v = type[outer_v];
+
+		if( (type_u == EVEN and type_v == UNLABELED) or (type_v == EVEN and type_u == UNLABELED) )
 		{
 			if(!inite1 or GREATER(e1, slack[i]))
 			{
@@ -434,7 +432,7 @@ void Matching::UpdateDualCosts()
 				inite1 = true;
 			}
 		}
-		else if( (outer[u] != outer[v]) and type[outer[u]] == EVEN and type[outer[v]] == EVEN )
+		else if( (outer_u != outer_v) and type_u == EVEN and type_v == EVEN )
 		{
 			if(!inite2 or GREATER(e2, slack[i]))
 			{
@@ -477,18 +475,24 @@ void Matching::UpdateDualCosts()
 
 	for(int i = 0; i < m; i++)
 	{
-		int u = G.GetEdge(i).first,
-			v = G.GetEdge(i).second;
+		auto edge = G.GetEdge(i);
+		int u = edge.first,
+			v = edge.second;
 
-		if(outer[u] != outer[v])
+		int outer_u = outer[u];
+		int outer_v = outer[v];
+		int type_u = type[outer_u];
+		int type_v = type[outer_v];
+
+		if(outer_u != outer_v)
 		{	
-			if(type[outer[u]] == EVEN and type[outer[v]] == EVEN)
+			if(type_u == EVEN and type_v == EVEN)
 				slack[i] -= 2.0*e;
-			else if(type[outer[u]] == ODD and type[outer[v]] == ODD)
+			else if(type_u == ODD and type_v == ODD)
 				slack[i] += 2.0*e;
-			else if( (type[outer[v]] == UNLABELED and type[outer[u]] == EVEN) or (type[outer[u]] == UNLABELED and type[outer[v]] == EVEN) )
+			else if( (type_v == UNLABELED and type_u == EVEN) or (type_u == UNLABELED and type_v == EVEN) )
 				slack[i] -= e;
-			else if( (type[outer[v]] == UNLABELED and type[outer[u]] == ODD) or (type[outer[u]] == UNLABELED and type[outer[v]] == ODD) )
+			else if( (type_v == UNLABELED and type_u == ODD) or (type_u == UNLABELED and type_v == ODD) )
 				slack[i] += e;
 		}
 	}
