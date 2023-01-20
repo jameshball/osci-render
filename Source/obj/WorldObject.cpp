@@ -117,6 +117,7 @@ WorldObject::WorldObject(std::string obj_string) {
     // perform chinese postman on all connected sub-components of graph
     for (auto& connected_component : connected_components) {
         // TODO: make this parallel: https://stackoverflow.com/questions/36246300/parallel-loops-in-c
+		// TODO: check the number of edges in the subgraph to make sure it's not too large compared to java version
 
         //
         // get a mapping to graph vertices that doesn't skip over
