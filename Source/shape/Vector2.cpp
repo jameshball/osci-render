@@ -31,6 +31,11 @@ void Vector2::translate(double x, double y) {
 	this->y += y;
 }
 
+void Vector2::reflectRelativeToVector(double x, double y) {
+	this->x += 2.0 * (x - this->x);
+	this->y += 2.0 * (y - this->y);
+}
+
 double Vector2::length() {
 	return 0.0;
 }

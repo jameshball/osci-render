@@ -12,6 +12,7 @@ public:
 	void rotate(double theta);
 	void scale(double x, double y);
 	void translate(double x, double y);
+	void reflectRelativeToVector(double x, double y);
 	double length();
 
 	double x, y;
