@@ -48,3 +48,7 @@ double inline Line::length() {
 	}
 	return len;
 }
+
+std::unique_ptr<Shape> Line::clone() {
+	return std::make_unique<Line>(x1, y1, x2, y2);
+}

@@ -4,6 +4,7 @@
 #include "../shape/Shape.h"
 #include "../obj/WorldObject.h"
 #include "../obj/Camera.h"
+#include "../svg/SvgParser.h"
 
 class FileParser : public FrameSource {
 public:
@@ -20,4 +21,5 @@ private:
 
 	std::unique_ptr<WorldObject> object;
 	std::unique_ptr<Camera> camera;
+	std::unique_ptr<SvgParser> svg;
 };

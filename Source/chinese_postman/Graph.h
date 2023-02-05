@@ -24,8 +24,6 @@ public:
 	//Given the endpoints, returns the index
 	int GetEdgeIndex(int u, int v) const;
 
-	//Adds a new vertex to the graph
-	void AddVertex();
 	//Adds a new edge to the graph
 	void AddEdge(int u, int v);
 
@@ -33,7 +31,7 @@ public:
 	const vector<int>& AdjList(int v) const;
 
 	//Returns the graph's adjacency matrix
-	const vector< vector<bool> > & AdjMat() const;
+	const vector<bool>& AdjMat() const;
 private:
 	//Number of vertices
 	int n;
@@ -41,7 +39,7 @@ private:
 	int m;
 
 	//Adjacency matrix
-	vector< vector<bool> > adjMat;
+	vector<bool> adjMat;
 
 	//Adjacency lists
 	vector<vector<int> > adjList;

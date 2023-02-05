@@ -7,6 +7,11 @@
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <GROUP id="{022CB910-9A16-C4AE-4C3B-9CB57BE87FC2}" name="xml">
+        <FILE id="pW7WRh" name="pugiconfig.hpp" compile="0" resource="0" file="Source/xml/pugiconfig.hpp"/>
+        <FILE id="CnkgyF" name="pugixml.cpp" compile="1" resource="0" file="Source/xml/pugixml.cpp"/>
+        <FILE id="SrvH3B" name="pugixml.hpp" compile="0" resource="0" file="Source/xml/pugixml.hpp"/>
+      </GROUP>
       <GROUP id="{56A27063-1FE7-31C3-8263-98389240A8CB}" name="svg">
         <FILE id="FVWkba" name="ClosePath.cpp" compile="1" resource="0" file="Source/svg/ClosePath.cpp"/>
         <FILE id="pJz3ek" name="ClosePath.h" compile="0" resource="0" file="Source/svg/ClosePath.h"/>

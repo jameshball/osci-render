@@ -13,6 +13,7 @@ public:
 	virtual void scale(double x, double y) = 0;
 	virtual void translate(double x, double y) = 0;
 	virtual double length() = 0;
+	virtual std::unique_ptr<Shape> clone() = 0;
 
 	static double totalLength(std::vector<std::unique_ptr<Shape>>&);
 

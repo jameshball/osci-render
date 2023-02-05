@@ -3,7 +3,7 @@
 Graph::Graph(int n, const list< pair<int, int> > & edges):
 	n(n),
 	m(edges.size()),
-	adjMat(n, vector<bool>(n, false)),
+	adjMat(n * n),
 	adjList(n),
 	edges(),
 	edgeIndex(n, vector<int>(n, -1))
@@ -27,24 +27,11 @@ int Graph::GetEdgeIndex(int u, int v) const
 	return edgeIndex[u][v];
 }
 
-void Graph::AddVertex()
-{
-	for(int i = 0; i < n; i++)
-	{
-		adjMat[i].push_back(false);
-		edgeIndex[i].push_back(-1);
-	}
-	n++;
-	adjMat.push_back( vector<bool>(n, false) );
-	edgeIndex.push_back( vector<int>(n, -1) );
-	adjList.push_back( vector<int>() );
-}
-
 void Graph::AddEdge(int u, int v)
 {
-	if(adjMat[u][v]) return;
+	if(adjMat[u * n + v]) return;
 
-	adjMat[u][v] = adjMat[v][u] = true;
+	adjMat[u * n + v] = adjMat[v * n + u] = true;
 	adjList[u].push_back(v);
 	adjList[v].push_back(u);
 
@@ -60,7 +47,7 @@ const vector<int>& Graph::AdjList(int v) const
 	return adjList[v];
 }
 
-const vector< vector<bool> > & Graph::AdjMat() const
+const vector<bool> & Graph::AdjMat() const
 {
 	return adjMat;
 }

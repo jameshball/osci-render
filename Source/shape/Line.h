@@ -12,6 +12,7 @@ public:
 	void scale(double x, double y) override;
 	void translate(double x, double y) override;
 	double length() override;
+	std::unique_ptr<Shape> clone() override;
 
 	double x1, y1, x2, y2;
 	

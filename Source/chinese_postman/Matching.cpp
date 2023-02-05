@@ -100,7 +100,7 @@ void Matching::Grow()
 
 bool Matching::IsAdjacent(int u, int v)
 {
-	return (G.AdjMat()[u][v] and not IsEdgeBlocked(u, v));
+	return (G.AdjMat()[u * G.GetNumVertices() + v] and not IsEdgeBlocked(u, v));
 }
 
 bool Matching::IsEdgeBlocked(int u, int v)
