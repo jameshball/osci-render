@@ -19,7 +19,7 @@ public:
 private:
 	bool active = true;
 
-	std::unique_ptr<WorldObject> object;
-	std::unique_ptr<Camera> camera;
-	std::unique_ptr<SvgParser> svg;
+	std::shared_ptr<WorldObject> object;
+	std::shared_ptr<Camera> camera;
+	std::shared_ptr<SvgParser> svg;
 };

@@ -11,19 +11,23 @@ void FileParser::parse(juce::String extension, std::unique_ptr<juce::InputStream
 	svg = nullptr;
 	
 	if (extension == ".obj") {
-		object = std::make_unique<WorldObject>(stream->readEntireStreamAsString().toStdString());
-		camera = std::make_unique<Camera>(1.0, 0, 0, 0.0);
+		object = std::make_shared<WorldObject>(stream->readEntireStreamAsString().toStdString());
+		camera = std::make_shared<Camera>(1.0, 0, 0, 0.0);
 		camera->findZPos(*object);
 	} else if (extension == ".svg") {
-		svg = std::make_unique<SvgParser>(stream->readEntireStreamAsString());
+		svg = std::make_shared<SvgParser>(stream->readEntireStreamAsString());
 	}
 }
 
 std::vector<std::unique_ptr<Shape>> FileParser::next() {
-	if (object != nullptr && camera != nullptr) {
-		return camera->draw(*object);
-	} else if (svg != nullptr) {
-		return svg->draw();
+	auto tempObject = object;
+	auto tempCamera = camera;
+	auto tempSvg = svg;
+
+	if (tempObject != nullptr && tempCamera != nullptr) {
+		return tempCamera->draw(*tempObject);
+	} else if (tempSvg != nullptr) {
+		return tempSvg->draw();
 	}
 	auto tempShapes = std::vector<std::unique_ptr<Shape>>();
 	tempShapes.push_back(std::make_unique<Arc>(0, 0, 0.5, 0.5, std::numbers::pi / 4.0, 2 * std::numbers::pi));

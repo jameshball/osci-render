@@ -62,14 +62,12 @@ std::vector<std::unique_ptr<Shape>> CurveTo::parseCurveTo(SvgState& state, std::
                     controlPoint1 = state.currPoint;
                 } else {
                     controlPoint1 = state.prevCubicControlPoint.value();
-                    controlPoint1.reflectRelativeToVector(state.currPoint.x, state.currPoint.y);
                 }
             } else {
                 if (!state.prevQuadraticControlPoint.has_value()) {
                     controlPoint1 = state.currPoint;
                 } else {
                     controlPoint1 = state.prevQuadraticControlPoint.value();
-                    controlPoint1.reflectRelativeToVector(state.currPoint.x, state.currPoint.y);
                 }
             }
         } else {
@@ -77,15 +75,21 @@ std::vector<std::unique_ptr<Shape>> CurveTo::parseCurveTo(SvgState& state, std::
         }
 
         if (isCubic) {
-            controlPoint2 = Vector2(args[i + 2], args[i + 3]);
+            controlPoint2 = Vector2(args[i + expectedArgs - 4], args[i + expectedArgs - 3]);
         }
 
         Vector2 newPoint(args[i + expectedArgs - 2], args[i + expectedArgs - 1]);
 
         if (!isAbsolute) {
-			controlPoint1.translate(state.currPoint.x, state.currPoint.y);
+            if (!isSmooth) {
+                controlPoint1.translate(state.currPoint.x, state.currPoint.y);
+            }
             controlPoint2.translate(state.currPoint.x, state.currPoint.y);
             newPoint.translate(state.currPoint.x, state.currPoint.y);
+        }
+
+        if (isSmooth) {
+            controlPoint1.reflectRelativeToVector(state.currPoint.x, state.currPoint.y);
         }
 
         if (isCubic) {

@@ -12,11 +12,13 @@ SvgParser::SvgParser(juce::String svgFile) {
 	pugi::xml_parse_result result = doc.load_string(svgFile.toStdString().c_str());
 	
 	if (result) {
-		pugi::xml_node svg = doc.child("svg");
+		pugi::xml_node svg = doc.select_node("//svg").node();
+		pugi::xpath_node_set paths = svg.select_nodes("//path");
 
 		shapes = std::vector<std::unique_ptr<Shape>>();
-
-		for (pugi::xml_node path : svg.children("path")) {
+		
+		for (pugi::xpath_node xPath : paths) {
+			pugi::xml_node path = xPath.node();
 			for (pugi::xml_attribute attr : path.attributes()) {
 				if (std::strcmp(attr.name(), "d") == 0) {
 					auto path = parsePath(juce::String(attr.value()));
@@ -44,6 +46,7 @@ SvgParser::~SvgParser() {
 std::vector<std::unique_ptr<Shape>> SvgParser::draw() {
 	// clone with deep copy
 	std::vector<std::unique_ptr<Shape>> tempShapes = std::vector<std::unique_ptr<Shape>>();
+	
 	for (auto& shape : shapes) {
 		tempShapes.push_back(shape->clone());
 	}
