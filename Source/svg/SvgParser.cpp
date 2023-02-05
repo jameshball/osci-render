@@ -31,9 +31,9 @@ SvgParser::SvgParser(juce::String svgFile) {
 			double width = dimensions.first;
 			double height = dimensions.second;
 			
-			// normalise the svg
+			Shape::normalize(shapes, width, height);
 		} else {
-			// normalise the svg
+			Shape::normalize(shapes);
 		}
 	}
 }
@@ -55,9 +55,6 @@ std::vector<std::string> SvgParser::preProcessPath(std::string path) {
 	std::regex re2("-(?!e)");
 	std::regex re3("\\s+");
 	std::regex re4("(^\\s|\\s$)");
-	std::regex re5("[^mlhvcsqtazMLHVCSQTAZ\\-.\\d\\s]");
-	std::regex re6("[a-zA-Z.\\-]{2,}");
-	std::regex re7("^[a-zA-Z]");
 
 	path = std::regex_replace(path, re1, " ");
 	// reverse path and use a negative lookahead 
@@ -66,14 +63,6 @@ std::vector<std::string> SvgParser::preProcessPath(std::string path) {
 	std::reverse(path.begin(), path.end());
 	path = std::regex_replace(path, re3, " ");
 	path = std::regex_replace(path, re4, "");
-	
-	if (std::regex_search(path, re5)) {
-		throw std::invalid_argument("Illegal characters in SVG path.");
-	} else if (std::regex_search(path, re6)) {
-		throw std::invalid_argument("Multiple letters or delimiters found next to one another in SVG path.");
-	} else if (!std::regex_search(path, re7)) {
-		throw std::invalid_argument("Start of SVG path is not a letter.");
-	}
 
 	std::regex commands("(?=[mlhvcsqtazMLHVCSQTAZ])");
 	std::vector<std::string> commandsVector;
@@ -230,10 +219,10 @@ std::vector<std::unique_ptr<Shape>> SvgParser::parsePath(juce::String path) {
 
 			pathShapes.insert(pathShapes.end(), std::make_move_iterator(commandShapes.begin()), std::make_move_iterator(commandShapes.end()));
 
-			if (commandChar == 'c' || commandChar == 'C' || commandChar == 's' || commandChar == 'S') {
+			if (commandChar != 'c' && commandChar != 'C' && commandChar != 's' && commandChar != 'S') {
 				state.prevCubicControlPoint = std::nullopt;
 			}
-			if (commandChar == 'q' || commandChar == 'Q' || commandChar == 't' || commandChar == 'T') {
+			if (commandChar != 'q' && commandChar != 'Q' && commandChar != 't' && commandChar != 'T') {
 				state.prevQuadraticControlPoint = std::nullopt;
 			}
 		}

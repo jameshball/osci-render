@@ -1,5 +1,7 @@
 #include "FileParser.h"
 #include "../shape/Line.h"
+#include "../shape/Arc.h"
+#include <numbers>
 
 FileParser::FileParser() {}
 
@@ -24,7 +26,7 @@ std::vector<std::unique_ptr<Shape>> FileParser::next() {
 		return svg->draw();
 	}
 	auto tempShapes = std::vector<std::unique_ptr<Shape>>();
-	tempShapes.push_back(std::make_unique<Line>(0.0, 0.0, 1.0, 1.0));
+	tempShapes.push_back(std::make_unique<Arc>(0, 0, 0.5, 0.5, std::numbers::pi / 4.0, 2 * std::numbers::pi));
 	return tempShapes;
 }
 

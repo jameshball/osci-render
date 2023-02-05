@@ -73,3 +73,7 @@ double CubicBezierCurve::length() {
 std::unique_ptr<Shape> CubicBezierCurve::clone() {
 	return std::make_unique<CubicBezierCurve>(x1, y1, x2, y2, x3, y3, x4, y4);
 }
+
+std::string CubicBezierCurve::type() {
+	return std::string("CubicBezierCurve");
+}

@@ -45,6 +45,8 @@
         <FILE id="CdKZCg" name="Matching.h" compile="0" resource="0" file="Source/chinese_postman/Matching.h"/>
       </GROUP>
       <GROUP id="{92CEA658-C82C-9CEB-15EB-945EF6B6B5C8}" name="shape">
+        <FILE id="b9eg7J" name="Arc.cpp" compile="1" resource="0" file="Source/shape/Arc.cpp"/>
+        <FILE id="KIQgS0" name="Arc.h" compile="0" resource="0" file="Source/shape/Arc.h"/>
         <FILE id="G5fbub" name="Shape.cpp" compile="1" resource="0" file="Source/shape/Shape.cpp"/>
         <FILE id="Dbvew2" name="CubicBezierCurve.cpp" compile="1" resource="0"
               file="Source/shape/CubicBezierCurve.cpp"/>
