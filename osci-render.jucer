@@ -7,6 +7,10 @@
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <GROUP id="{E81B1D7B-B0F7-1967-B271-71B3F838720F}" name="txt">
+        <FILE id="vIYWRG" name="TextParser.cpp" compile="1" resource="0" file="Source/txt/TextParser.cpp"/>
+        <FILE id="LlefOK" name="TextParser.h" compile="0" resource="0" file="Source/txt/TextParser.h"/>
+      </GROUP>
       <GROUP id="{022CB910-9A16-C4AE-4C3B-9CB57BE87FC2}" name="xml">
         <FILE id="pW7WRh" name="pugiconfig.hpp" compile="0" resource="0" file="Source/xml/pugiconfig.hpp"/>
         <FILE id="CnkgyF" name="pugixml.cpp" compile="1" resource="0" file="Source/xml/pugixml.cpp"/>

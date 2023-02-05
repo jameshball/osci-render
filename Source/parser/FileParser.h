@@ -5,6 +5,7 @@
 #include "../obj/WorldObject.h"
 #include "../obj/Camera.h"
 #include "../svg/SvgParser.h"
+#include "../txt/TextParser.h"
 
 class FileParser : public FrameSource {
 public:
@@ -22,4 +23,5 @@ private:
 	std::shared_ptr<WorldObject> object;
 	std::shared_ptr<Camera> camera;
 	std::shared_ptr<SvgParser> svg;
+	std::shared_ptr<TextParser> text;
 };
