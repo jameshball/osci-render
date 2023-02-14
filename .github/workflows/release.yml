@@ -62,7 +62,7 @@ jobs:
         with:
           tag_name: v${{ env.VERSION }}
           files: |
-            target/lib/osci-render_${{ env.VERSION }}-1_amd64.deb
+            target/lib/osci-render_${{ env.VERSION }}_amd64.deb
             target/lib/osci-render-unix-${{ env.VERSION }}.jar
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
