@@ -13,6 +13,8 @@
 #include "parser/FileParser.h"
 #include "parser/FrameProducer.h"
 #include "parser/FrameConsumer.h"
+#include "audio/Effect.h"
+#include "audio/BitCrushEffect.h"
 
 //==============================================================================
 /**
@@ -65,6 +67,10 @@ public:
 	float frequency = 0.0f;
 
     double currentSampleRate = 0.0;
+
+	std::vector<std::reference_wrapper<Effect>> effects;
+
+    BitCrushEffect bitCrushEffect = BitCrushEffect();
 
     FileParser parser;
     std::unique_ptr<FrameProducer> producer;

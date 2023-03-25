@@ -22,9 +22,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor (OscirenderAudioP
     addAndMakeVisible(main);
 }
 
-OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor()
-{
-}
+OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {}
 
 //==============================================================================
 void OscirenderAudioProcessorEditor::paint (juce::Graphics& g)

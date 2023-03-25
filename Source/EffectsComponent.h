@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "audio/BitCrushEffect.h"
 #include "EffectComponentGroup.h"
 #include "PluginProcessor.h"
 

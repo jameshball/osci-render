@@ -1,4 +1,5 @@
 #include "EffectsComponent.h"
+#include "audio/BitCrushEffect.h"
 
 EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p) : audioProcessor(p) {
 	setText("Audio Effects");
@@ -19,6 +20,7 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p) : audioProcessor
 }
 
 EffectsComponent::~EffectsComponent() {
+    
 }
 
 void EffectsComponent::resized() {

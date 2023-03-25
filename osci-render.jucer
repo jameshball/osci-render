@@ -7,6 +7,14 @@
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
+        <FILE id="NWuowi" name="BitCrushEffect.cpp" compile="1" resource="0"
+              file="Source/audio/BitCrushEffect.cpp"/>
+        <FILE id="Bc8UeW" name="BitCrushEffect.h" compile="0" resource="0"
+              file="Source/audio/BitCrushEffect.h"/>
+        <FILE id="mP5lpY" name="Effect.cpp" compile="1" resource="0" file="Source/audio/Effect.cpp"/>
+        <FILE id="LKeNnY" name="Effect.h" compile="0" resource="0" file="Source/audio/Effect.h"/>
+      </GROUP>
       <GROUP id="{E81B1D7B-B0F7-1967-B271-71B3F838720F}" name="txt">
         <FILE id="vIYWRG" name="TextParser.cpp" compile="1" resource="0" file="Source/txt/TextParser.cpp"/>
         <FILE id="LlefOK" name="TextParser.h" compile="0" resource="0" file="Source/txt/TextParser.h"/>

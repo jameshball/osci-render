@@ -6,7 +6,6 @@ Camera::Camera(double focalLength, double x, double y, double z) : focalLength(f
 
 std::vector<std::unique_ptr<Shape>> Camera::draw(WorldObject& object) {
 	std::vector<std::unique_ptr<Shape>> shapes;
-	object.rotateY += 0.001;
 	for (auto& edge : object.edges) {
         Vector2 start = project(object.rotateX, object.rotateY, object.rotateZ, edge.x1, edge.y1, edge.z1);
         Vector2 end = project(object.rotateX, object.rotateY, object.rotateZ, edge.x2, edge.y2, edge.z2);

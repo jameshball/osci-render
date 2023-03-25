@@ -25,6 +25,8 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
 #endif
     , producer(std::make_unique<FrameProducer>(*this, parser)) {
     producer->startThread();
+    bitCrushEffect.value = 0.5;
+    effects.push_back(std::ref(bitCrushEffect));
 }
 
 OscirenderAudioProcessor::~OscirenderAudioProcessor()
@@ -200,7 +202,8 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     
 	for (auto sample = 0; sample < numSamples; ++sample) {
         updateLengthIncrement();
-
+        
+        Vector2 channels;
         double x = 0.0;
         double y = 0.0;
         double length = 0.0;
@@ -210,10 +213,15 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
             auto& shape = frame[currentShape];
             length = shape->length();
             double drawingProgress = length == 0.0 ? 1 : shapeDrawn / length;
-            Vector2 channels = shape->nextVector(drawingProgress);
-			x = channels.x;
-            y = channels.y;
+            channels = shape->nextVector(drawingProgress);
         }
+
+		for (auto effect : effects) {
+			channels = effect.get().apply(sample, channels);
+		}
+
+		x = channels.x;
+		y = channels.y;
 
         if (totalNumOutputChannels >= 2) {
 			channelData[0][sample] = x;

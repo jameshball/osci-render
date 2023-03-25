@@ -15,5 +15,6 @@ EffectComponentGroup::~EffectComponentGroup() {
 }
 
 void EffectComponentGroup::resized() {
-	slider.setBounds(0, 0, getWidth() - 100, 20);
+	auto sliderLeft = 100;
+	slider.setBounds(sliderLeft, 0, getWidth() - 200, 20);
 }
