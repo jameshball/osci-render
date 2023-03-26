@@ -39,3 +39,7 @@ void Vector2::reflectRelativeToVector(double x, double y) {
 double Vector2::length() {
 	return 0.0;
 }
+
+double Vector2::magnitude() {
+	return sqrt(x * x + y * y);
+}

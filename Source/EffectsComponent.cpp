@@ -1,7 +1,7 @@
 #include "EffectsComponent.h"
 #include "audio/BitCrushEffect.h"
 
-EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p) : audioProcessor(p) {
+EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p) : audioProcessor(p), listBoxModel(listBox, itemData) {
 	setText("Audio Effects");
 
     addAndMakeVisible(frequency);
@@ -17,6 +17,29 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p) : audioProcessor
             audioProcessor.updateAngleDelta();
         }
     };
+
+    auto effects = audioProcessor.allEffects;
+	for (int i = 0; i < effects.size(); i++) {
+		auto effect = effects[i];
+        effect->setValue(0.5);
+		audioProcessor.enableEffect(effect);
+	}
+
+    itemData.data.push_back(juce::String("Item 1"));
+    itemData.data.push_back(juce::String("Item 2"));
+    itemData.data.push_back(juce::String("Item 3"));
+
+    addBtn.setButtonText("Add Item...");
+    addBtn.onClick = [this]()
+    {
+        itemData.data.push_back(juce::String("Item " + juce::String(1 + itemData.getNumItems())));
+        listBox.updateContent();
+    };
+    addAndMakeVisible(addBtn);
+
+    listBox.setModel(&listBoxModel);
+    listBox.setRowHeight(40);
+    addAndMakeVisible(listBox);
 }
 
 EffectsComponent::~EffectsComponent() {
@@ -27,4 +50,11 @@ void EffectsComponent::resized() {
     auto xPadding = 10;
     auto yPadding = 20;
     frequency.setBounds(xPadding, yPadding, getWidth() - xPadding, 40);
+
+    auto area = getLocalBounds().reduced(20);
+    auto row = area.removeFromTop(24);
+    addBtn.setBounds(row.removeFromRight(100));
+
+    area.removeFromTop(6);
+    listBox.setBounds(area);
 }

@@ -7,11 +7,23 @@
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
+        <FILE id="poPVxL" name="DraggableListBox.cpp" compile="1" resource="0"
+              file="Source/components/DraggableListBox.cpp"/>
+        <FILE id="Y9NEGn" name="DraggableListBox.h" compile="0" resource="0"
+              file="Source/components/DraggableListBox.h"/>
+        <FILE id="M9ImIg" name="MyListComponent.cpp" compile="1" resource="0"
+              file="Source/components/MyListComponent.cpp"/>
+        <FILE id="goyxlC" name="MyListComponent.h" compile="0" resource="0"
+              file="Source/components/MyListComponent.h"/>
+      </GROUP>
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
         <FILE id="NWuowi" name="BitCrushEffect.cpp" compile="1" resource="0"
               file="Source/audio/BitCrushEffect.cpp"/>
         <FILE id="Bc8UeW" name="BitCrushEffect.h" compile="0" resource="0"
               file="Source/audio/BitCrushEffect.h"/>
+        <FILE id="ATOFA9" name="BulgeEffect.cpp" compile="1" resource="0" file="Source/audio/BulgeEffect.cpp"/>
+        <FILE id="lOXxYe" name="BulgeEffect.h" compile="0" resource="0" file="Source/audio/BulgeEffect.h"/>
         <FILE id="mP5lpY" name="Effect.cpp" compile="1" resource="0" file="Source/audio/Effect.cpp"/>
         <FILE id="LKeNnY" name="Effect.h" compile="0" resource="0" file="Source/audio/Effect.h"/>
       </GROUP>

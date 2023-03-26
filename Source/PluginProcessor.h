@@ -15,6 +15,7 @@
 #include "parser/FrameConsumer.h"
 #include "audio/Effect.h"
 #include "audio/BitCrushEffect.h"
+#include "audio/BulgeEffect.h"
 
 //==============================================================================
 /**
@@ -68,16 +69,18 @@ public:
 
     double currentSampleRate = 0.0;
 
-	std::vector<std::reference_wrapper<Effect>> effects;
+	std::vector<std::shared_ptr<Effect>> allEffects;
+	std::shared_ptr<std::vector<std::shared_ptr<Effect>>> enabledEffects = std::make_shared<std::vector<std::shared_ptr<Effect>>>();
 
     BitCrushEffect bitCrushEffect = BitCrushEffect();
+	BulgeEffect bulgeEffect = BulgeEffect();
 
     FileParser parser;
     std::unique_ptr<FrameProducer> producer;
 
     void updateAngleDelta();
-	void addFrame(std::vector<std::unique_ptr<Shape>> frame) override;
-
+    void addFrame(std::vector<std::unique_ptr<Shape>> frame) override;
+	void enableEffect(std::shared_ptr<Effect> effect);
 private:
     double theta = 0.0;
     double thetaDelta = 0.0;

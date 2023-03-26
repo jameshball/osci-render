@@ -25,8 +25,9 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
 #endif
     , producer(std::make_unique<FrameProducer>(*this, parser)) {
     producer->startThread();
-    bitCrushEffect.value = 0.5;
-    effects.push_back(std::ref(bitCrushEffect));
+
+	allEffects.push_back(std::make_shared<BitCrushEffect>());
+	allEffects.push_back(std::make_shared<BulgeEffect>());
 }
 
 OscirenderAudioProcessor::~OscirenderAudioProcessor()
@@ -157,6 +158,23 @@ void OscirenderAudioProcessor::addFrame(std::vector<std::unique_ptr<Shape>> fram
     }
 }
 
+void OscirenderAudioProcessor::enableEffect(std::shared_ptr<Effect> effect) {
+	// need to make a new vector because the old one is being iterated over in another thread
+	std::shared_ptr<std::vector<std::shared_ptr<Effect>>> newEffects = std::make_shared<std::vector<std::shared_ptr<Effect>>>();
+	for (auto& e : *enabledEffects) {
+		newEffects->push_back(e);
+	}
+	if (std::find(newEffects->begin(), newEffects->end(), effect) == newEffects->end()) {
+		// insert according to precedence (sorts from lowest to highest precedence)
+		auto it = newEffects->begin();
+		while (it != newEffects->end() && (*it)->getPrecedence() <= effect->getPrecedence()) {
+			it++;
+		}
+		newEffects->insert(it, effect);
+	}
+	enabledEffects = newEffects;
+}
+
 void OscirenderAudioProcessor::updateFrame() {
     currentShape = 0;
     shapeDrawn = 0.0;
@@ -215,9 +233,11 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
             double drawingProgress = length == 0.0 ? 1 : shapeDrawn / length;
             channels = shape->nextVector(drawingProgress);
         }
+        
+		auto enabledEffectsCopy = enabledEffects;
 
-		for (auto effect : effects) {
-			channels = effect.get().apply(sample, channels);
+		for (auto effect : *enabledEffectsCopy) {
+			channels = effect->apply(sample, channels);
 		}
 
 		x = channels.x;

@@ -14,6 +14,7 @@ public:
 	void translate(double x, double y);
 	void reflectRelativeToVector(double x, double y);
 	double length();
+	double magnitude();
 
 	double x, y;
 	
