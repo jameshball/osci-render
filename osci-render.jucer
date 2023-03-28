@@ -36,6 +36,9 @@
         <FILE id="PbbNqz" name="RotateEffect.cpp" compile="1" resource="0"
               file="Source/audio/RotateEffect.cpp"/>
         <FILE id="tUwNZV" name="RotateEffect.h" compile="0" resource="0" file="Source/audio/RotateEffect.h"/>
+        <FILE id="iUEfwT" name="SmoothEffect.cpp" compile="1" resource="0"
+              file="Source/audio/SmoothEffect.cpp"/>
+        <FILE id="Vwjht7" name="SmoothEffect.h" compile="0" resource="0" file="Source/audio/SmoothEffect.h"/>
         <FILE id="VBskjq" name="VectorCancellingEffect.cpp" compile="1" resource="0"
               file="Source/audio/VectorCancellingEffect.cpp"/>
         <FILE id="Be21D0" name="VectorCancellingEffect.h" compile="0" resource="0"

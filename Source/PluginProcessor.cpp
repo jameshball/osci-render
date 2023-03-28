@@ -13,6 +13,7 @@
 #include "audio/RotateEffect.h"
 #include "audio/VectorCancellingEffect.h"
 #include "audio/DistortEffect.h"
+#include "audio/SmoothEffect.h"
 
 //==============================================================================
 OscirenderAudioProcessor::OscirenderAudioProcessor()
@@ -35,6 +36,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     allEffects.push_back(std::make_shared<Effect>(std::make_unique<VectorCancellingEffect>(), "Vector cancelling", "vectorCancelling"));
     allEffects.push_back(std::make_shared<Effect>(std::make_unique<DistortEffect>(true), "Vertical shift", "verticalDistort"));
     allEffects.push_back(std::make_shared<Effect>(std::make_unique<DistortEffect>(false), "Horizontal shift", "horizontalDistort"));
+    allEffects.push_back(std::make_shared<Effect>(std::make_unique<SmoothEffect>(), "Smoothing", "smoothing"));
 }
 
 OscirenderAudioProcessor::~OscirenderAudioProcessor()
