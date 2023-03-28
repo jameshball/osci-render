@@ -81,6 +81,7 @@ public:
     void updateAngleDelta();
     void addFrame(std::vector<std::unique_ptr<Shape>> frame) override;
 	void enableEffect(std::shared_ptr<Effect> effect);
+    void updateEffectPrecedence();
 private:
     double theta = 0.0;
     double thetaDelta = 0.0;

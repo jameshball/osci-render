@@ -1,12 +1,16 @@
 #pragma once
 #include "DraggableListBox.h"
 #include <JuceHeader.h>
+#include "../PluginProcessor.h"
 #include "../audio/Effect.h"
 
 // Application-specific data container
 struct MyListBoxItemData : public DraggableListBoxItemData
 {
     std::vector<std::shared_ptr<Effect>> data;
+    OscirenderAudioProcessor& audioProcessor;
+
+	MyListBoxItemData(OscirenderAudioProcessor& p) : audioProcessor(p) {}
 
     int getNumItems() override {
         return data.size();
@@ -27,13 +31,19 @@ struct MyListBoxItemData : public DraggableListBoxItemData
     }
 
 	void moveBefore(int indexOfItemToMove, int indexOfItemToPlaceBefore) override {
-		auto temp = data[indexOfItemToMove];
+		auto effect = data[indexOfItemToMove];
 
         if (indexOfItemToMove < indexOfItemToPlaceBefore) {
             move(data, indexOfItemToMove, indexOfItemToPlaceBefore - 1);
         } else {
             move(data, indexOfItemToMove, indexOfItemToPlaceBefore);
         }
+        
+		for (int i = 0; i < data.size(); i++) {
+			data[i]->setPrecedence(i);
+		}
+
+        audioProcessor.updateEffectPrecedence();
 	}
 
     void moveAfter(int indexOfItemToMove, int indexOfItemToPlaceAfter) override {
@@ -44,6 +54,12 @@ struct MyListBoxItemData : public DraggableListBoxItemData
         } else {
             move(data, indexOfItemToMove, indexOfItemToPlaceAfter + 1);
         }
+        
+        for (int i = 0; i < data.size(); i++) {
+            data[i]->setPrecedence(i);
+        }
+
+        audioProcessor.updateEffectPrecedence();
     }
 
     template <typename t> void move(std::vector<t>& v, size_t oldIndex, size_t newIndex) {

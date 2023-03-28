@@ -173,14 +173,32 @@ void OscirenderAudioProcessor::enableEffect(std::shared_ptr<Effect> effect) {
 	for (auto& e : *enabledEffects) {
 		newEffects->push_back(e);
 	}
-	if (std::find(newEffects->begin(), newEffects->end(), effect) == newEffects->end()) {
-		// insert according to precedence (sorts from lowest to highest precedence)
-		auto it = newEffects->begin();
-		while (it != newEffects->end() && (*it)->getPrecedence() <= effect->getPrecedence()) {
+	// remove any existing effects with the same id
+	for (auto it = newEffects->begin(); it != newEffects->end();) {
+		if ((*it)->getId() == effect->getId()) {
+			it = newEffects->erase(it);
+		} else {
 			it++;
 		}
-		newEffects->insert(it, effect);
 	}
+	// insert according to precedence (sorts from lowest to highest precedence)
+	auto it = newEffects->begin();
+	while (it != newEffects->end() && (*it)->getPrecedence() <= effect->getPrecedence()) {
+		it++;
+	}
+	newEffects->insert(it, effect);
+	enabledEffects = newEffects;
+}
+
+void OscirenderAudioProcessor::updateEffectPrecedence() {
+	// need to make a new vector because the old one is being iterated over in another thread
+	std::shared_ptr<std::vector<std::shared_ptr<Effect>>> newEffects = std::make_shared<std::vector<std::shared_ptr<Effect>>>();
+	for (auto& e : *enabledEffects) {
+		newEffects->push_back(e);
+	}
+	std::sort(newEffects->begin(), newEffects->end(), [](std::shared_ptr<Effect> a, std::shared_ptr<Effect> b) {
+		return a->getPrecedence() < b->getPrecedence();
+    });
 	enabledEffects = newEffects;
 }
 

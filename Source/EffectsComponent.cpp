@@ -1,7 +1,7 @@
 #include "EffectsComponent.h"
 #include "audio/BitCrushEffect.h"
 
-EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p) : audioProcessor(p), listBoxModel(listBox, itemData) {
+EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p) : audioProcessor(p), itemData(p), listBoxModel(listBox, itemData) {
 	setText("Audio Effects");
 
     addAndMakeVisible(frequency);
