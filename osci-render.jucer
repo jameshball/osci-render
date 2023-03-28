@@ -26,6 +26,10 @@
         <FILE id="lOXxYe" name="BulgeEffect.h" compile="0" resource="0" file="Source/audio/BulgeEffect.h"/>
         <FILE id="mP5lpY" name="Effect.cpp" compile="1" resource="0" file="Source/audio/Effect.cpp"/>
         <FILE id="LKeNnY" name="Effect.h" compile="0" resource="0" file="Source/audio/Effect.h"/>
+        <FILE id="ca2VrC" name="EffectApplication.cpp" compile="1" resource="0"
+              file="Source/audio/EffectApplication.cpp"/>
+        <FILE id="MIYJ9y" name="EffectApplication.h" compile="0" resource="0"
+              file="Source/audio/EffectApplication.h"/>
       </GROUP>
       <GROUP id="{E81B1D7B-B0F7-1967-B271-71B3F838720F}" name="txt">
         <FILE id="vIYWRG" name="TextParser.cpp" compile="1" resource="0" file="Source/txt/TextParser.cpp"/>

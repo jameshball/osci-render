@@ -65,7 +65,7 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
 
     float noteOnVel;
-	float frequency = 0.0f;
+	float frequency = 440.0f;
 
     double currentSampleRate = 0.0;
 

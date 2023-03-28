@@ -26,8 +26,8 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     , producer(std::make_unique<FrameProducer>(*this, parser)) {
     producer->startThread();
 
-	allEffects.push_back(std::make_shared<BitCrushEffect>());
-	allEffects.push_back(std::make_shared<BulgeEffect>());
+	allEffects.push_back(std::make_shared<Effect>(std::make_unique<BitCrushEffect>(), "Bit Crush", "bitCrush"));
+	allEffects.push_back(std::make_shared<Effect>(std::make_unique<BulgeEffect>(), "Bulge", "bulge"));
 }
 
 OscirenderAudioProcessor::~OscirenderAudioProcessor()

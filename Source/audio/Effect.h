@@ -1,17 +1,26 @@
 #pragma once
 #include "../shape/Vector2.h"
 #include <JuceHeader.h>
+#include "EffectApplication.h"
 
 class Effect {
 public:
-	Effect();
+	Effect(std::unique_ptr<EffectApplication> effectApplication, juce::String name, juce::String id);
 
-	virtual Vector2 apply(int index, Vector2 input) = 0;
-	virtual double getValue() = 0;
-	virtual void setValue(double value) = 0;
-	virtual void setFrequency(double frequency) = 0;
-	virtual int getPrecedence() = 0;
-	virtual void setPrecedence(int precedence) = 0;
-	virtual juce::String getName() = 0;
-	virtual juce::String getId() = 0;
+	Vector2 apply(int index, Vector2 input);
+	double getValue();
+	void setValue(double value);
+	void setFrequency(double frequency);
+	int getPrecedence();
+	void setPrecedence(int precedence);
+	juce::String getName();
+	juce::String getId();
+private:
+	double value = 0.0;
+	double frequency = 1.0;
+	int precedence = -1;
+	juce::String name;
+	juce::String id;
+	
+	std::unique_ptr<EffectApplication> effectApplication;
 };

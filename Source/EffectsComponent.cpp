@@ -9,7 +9,7 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p) : audioProcessor
     frequency.slider.setRange(0.0, 12000.0);
     frequency.slider.setSkewFactorFromMidPoint(500.0);
     frequency.slider.setTextValueSuffix("Hz");
-    frequency.slider.setValue(440.0);
+    frequency.slider.setValue(audioProcessor.frequency, juce::dontSendNotification);
 
     frequency.slider.onValueChange = [this] {
         audioProcessor.frequency = frequency.slider.getValue();
@@ -21,7 +21,7 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p) : audioProcessor
     auto effects = audioProcessor.allEffects;
 	for (int i = 0; i < effects.size(); i++) {
 		auto effect = effects[i];
-        effect->setValue(0.5);
+        effect->setValue(effect->getValue());
 		audioProcessor.enableEffect(effect);
 		itemData.data.push_back(effect);
 	}
