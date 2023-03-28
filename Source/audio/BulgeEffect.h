@@ -7,5 +7,5 @@ public:
 	BulgeEffect();
 	~BulgeEffect();
 
-	Vector2 apply(int index, Vector2 input, double value) override;
+	Vector2 apply(int index, Vector2 input, double value, double frequency, double sampleRate) override;
 };

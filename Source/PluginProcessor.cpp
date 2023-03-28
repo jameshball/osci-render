@@ -10,6 +10,9 @@
 #include "PluginEditor.h"
 #include "parser/FileParser.h"
 #include "parser/FrameProducer.h"
+#include "audio/RotateEffect.h"
+#include "audio/VectorCancellingEffect.h"
+#include "audio/DistortEffect.h"
 
 //==============================================================================
 OscirenderAudioProcessor::OscirenderAudioProcessor()
@@ -28,6 +31,10 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
 
 	allEffects.push_back(std::make_shared<Effect>(std::make_unique<BitCrushEffect>(), "Bit Crush", "bitCrush"));
 	allEffects.push_back(std::make_shared<Effect>(std::make_unique<BulgeEffect>(), "Bulge", "bulge"));
+    allEffects.push_back(std::make_shared<Effect>(std::make_unique<RotateEffect>(), "2D Rotate Speed", "rotateSpeed"));
+    allEffects.push_back(std::make_shared<Effect>(std::make_unique<VectorCancellingEffect>(), "Vector cancelling", "vectorCancelling"));
+    allEffects.push_back(std::make_shared<Effect>(std::make_unique<DistortEffect>(true), "Vertical shift", "verticalDistort"));
+    allEffects.push_back(std::make_shared<Effect>(std::make_unique<DistortEffect>(false), "Horizontal shift", "horizontalDistort"));
 }
 
 OscirenderAudioProcessor::~OscirenderAudioProcessor()

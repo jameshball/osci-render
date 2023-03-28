@@ -5,7 +5,7 @@ Effect::Effect(std::unique_ptr<EffectApplication> effectApplication, juce::Strin
 }
 
 Vector2 Effect::apply(int index, Vector2 input) {
-	return effectApplication->apply(index, input, value);
+	return effectApplication->apply(index, input, value, frequency, sampleRate);
 }
 
 double Effect::getValue() {

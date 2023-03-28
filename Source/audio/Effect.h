@@ -19,6 +19,7 @@ private:
 	double value = 0.0;
 	double frequency = 1.0;
 	int precedence = -1;
+	int sampleRate = 192000;
 	juce::String name;
 	juce::String id;
 	
