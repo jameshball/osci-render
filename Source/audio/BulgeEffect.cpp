@@ -14,6 +14,10 @@ Vector2 BulgeEffect::apply(int index, Vector2 input) {
     return Vector2(rn * cos(theta), rn * sin(theta));
 }
 
+double BulgeEffect::getValue() {
+    return value;
+}
+
 void BulgeEffect::setValue(double value) {
 	this->value = value;
 }
@@ -28,4 +32,12 @@ int BulgeEffect::getPrecedence() {
 
 void BulgeEffect::setPrecedence(int precedence) {
     this->precedence = precedence;
+}
+
+juce::String BulgeEffect::getName() {
+    return juce::String("Bulge");
+}
+
+juce::String BulgeEffect::getId() {
+    return juce::String("bulge");
 }

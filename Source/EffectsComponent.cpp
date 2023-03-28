@@ -23,22 +23,19 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p) : audioProcessor
 		auto effect = effects[i];
         effect->setValue(0.5);
 		audioProcessor.enableEffect(effect);
+		itemData.data.push_back(effect);
 	}
 
-    itemData.data.push_back(juce::String("Item 1"));
-    itemData.data.push_back(juce::String("Item 2"));
-    itemData.data.push_back(juce::String("Item 3"));
-
-    addBtn.setButtonText("Add Item...");
+    /*addBtn.setButtonText("Add Item...");
     addBtn.onClick = [this]()
     {
         itemData.data.push_back(juce::String("Item " + juce::String(1 + itemData.getNumItems())));
         listBox.updateContent();
     };
-    addAndMakeVisible(addBtn);
+    addAndMakeVisible(addBtn);*/
 
     listBox.setModel(&listBoxModel);
-    listBox.setRowHeight(40);
+    listBox.setRowHeight(30);
     addAndMakeVisible(listBox);
 }
 
