@@ -28,6 +28,8 @@ struct MyListBoxItemData : public DraggableListBoxItemData
         g.fillAll(juce::Colours::lightgrey);
         g.setColour(juce::Colours::black);
         g.drawRect(bounds);
+		bounds.removeFromLeft(30);
+		g.drawText(data[rowNum]->getName(), bounds, juce::Justification::left);
     }
 
 	void moveBefore(int indexOfItemToMove, int indexOfItemToPlaceBefore) override {
@@ -73,6 +75,14 @@ struct MyListBoxItemData : public DraggableListBoxItemData
     void setValue(int itemIndex, double value) {
 		data[itemIndex]->setValue(value);
     }
+    
+    void setSelected(int itemIndex, bool selected) {
+        if (selected) {
+			audioProcessor.enableEffect(data[itemIndex]);
+        } else {
+			audioProcessor.disableEffect(data[itemIndex]);
+        }
+    }
 
 	juce::String getText(int itemIndex) {
 		return data[itemIndex]->getName();
@@ -81,6 +91,10 @@ struct MyListBoxItemData : public DraggableListBoxItemData
 	double getValue(int itemIndex) {
 		return data[itemIndex]->getValue();
 	}
+
+    juce::String getId(int itemIndex) {
+        return data[itemIndex]->getId();
+    }
 };
 
 // Custom list-item Component (which includes item-delete button)
@@ -97,8 +111,8 @@ protected:
     juce::Rectangle<int> dataArea;
     
     juce::Slider slider;
-    juce::Label label;
     juce::String id;
+    juce::ToggleButton selected;
 
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MyListComponent)

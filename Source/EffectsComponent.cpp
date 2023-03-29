@@ -22,7 +22,6 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p) : audioProcessor
 	for (int i = 0; i < effects.size(); i++) {
 		auto effect = effects[i];
         effect->setValue(effect->getValue());
-		audioProcessor.enableEffect(effect);
 		itemData.data.push_back(effect);
 	}
 

@@ -190,6 +190,23 @@ void OscirenderAudioProcessor::enableEffect(std::shared_ptr<Effect> effect) {
 	enabledEffects = newEffects;
 }
 
+void OscirenderAudioProcessor::disableEffect(std::shared_ptr<Effect> effect) {
+	// need to make a new vector because the old one is being iterated over in another thread
+	std::shared_ptr<std::vector<std::shared_ptr<Effect>>> newEffects = std::make_shared<std::vector<std::shared_ptr<Effect>>>();
+	for (auto& e : *enabledEffects) {
+		newEffects->push_back(e);
+	}
+	// remove any existing effects with the same id
+	for (auto it = newEffects->begin(); it != newEffects->end();) {
+		if ((*it)->getId() == effect->getId()) {
+			it = newEffects->erase(it);
+		} else {
+			it++;
+		}
+	}
+	enabledEffects = newEffects;
+}
+
 void OscirenderAudioProcessor::updateEffectPrecedence() {
 	// need to make a new vector because the old one is being iterated over in another thread
 	std::shared_ptr<std::vector<std::shared_ptr<Effect>>> newEffects = std::make_shared<std::vector<std::shared_ptr<Effect>>>();
