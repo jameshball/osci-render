@@ -23,7 +23,7 @@ pair<int, int> Graph::GetEdge(int e)
 }
 
 int Graph::GetEdgeIndex(int u, int v) {
-	return edgeIndex[pair<int, int>(u, v)];
+	return edgeIndex[u * n + v];
 }
 
 void Graph::AddEdge(int u, int v)
@@ -35,7 +35,7 @@ void Graph::AddEdge(int u, int v)
 	adjList[v].push_back(u);
 
 	edges.push_back(pair<int, int>(u, v));
-	edgeIndex[pair<int, int>(u, v)] = edgeIndex[pair<int, int>(v, u)] = m++;
+	edgeIndex[u * n + v] = edgeIndex[v * n + u] = m++;
 }
 
 const vector<int>& Graph::AdjList(int v)

@@ -2,6 +2,11 @@
 #include "../chinese_postman/ChinesePostman.h"
 #include "tiny_obj_loader.h"
 
+struct pair_hash {
+    inline std::size_t operator()(const std::pair<int, int>& v) const {
+        return v.first * 31 + v.second;
+    }
+};
 
 //
 // returns all vertex indices in all connected sub-components of the graph
@@ -38,6 +43,8 @@ std::vector<std::vector<int>> ConnectedComponents(Graph& G) {
 
 WorldObject::WorldObject(std::string obj_string) {
     tinyobj::ObjReaderConfig reader_config;
+    reader_config.triangulate = false;
+    reader_config.vertex_color = false;
     tinyobj::ObjReader reader;
 
     reader.ParseFromString(obj_string, "", reader_config);
@@ -85,16 +92,30 @@ WorldObject::WorldObject(std::string obj_string) {
         int face = 0;
         while (i < shape.mesh.indices.size()) {
             int prevVertex = -1;
+            int num_face_vertices = shape.mesh.num_face_vertices[face];
+            int firstVertex;
+            int lastVertex;
             // num_face_vertices stores the number of vertices per face, used to
             // iterate through mesh.indices and know when a face starts/ends
-			for (int j = 0; j < shape.mesh.num_face_vertices[face]; j++) {
-				int vertex = shape.mesh.indices[i].vertex_index;
+            for (int j = 0; j < num_face_vertices; j++) {
+                int vertex = shape.mesh.indices[i].vertex_index;
+                if (j == 0) {
+                    firstVertex = vertex;
+                }
+                if (j == num_face_vertices - 1) {
+                    lastVertex = vertex;
+                }
 				if (prevVertex != -1) {
-					edge_set.insert(std::make_pair(prevVertex, vertex));
+					int first = std::min(prevVertex, vertex);
+					int last = std::max(prevVertex, vertex);
+					edge_set.insert(std::make_pair(first, last));
 				}
 				prevVertex = vertex;
 				i++;
 			}
+            int first = std::min(firstVertex, lastVertex);
+            int last = std::max(firstVertex, lastVertex);
+            edge_set.insert(std::make_pair(first, last));
             face++;
         }
 	}

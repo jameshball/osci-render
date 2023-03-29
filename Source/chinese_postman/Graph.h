@@ -5,12 +5,6 @@
 #include <unordered_map>
 using namespace std;
 
-struct pair_hash {
-	inline std::size_t operator()(const std::pair<int, int>& v) const {
-		return v.first * 31 + v.second;
-	}
-};
-
 class Graph
 {
 public:
@@ -55,5 +49,5 @@ private:
 	vector<pair<int, int> > edges;
 
 	//Indices of the edges
-	unordered_map<pair<int, int>, int, pair_hash> edgeIndex;
+	unordered_map<int, int> edgeIndex;
 };
