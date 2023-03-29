@@ -20,6 +20,24 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor (OscirenderAudioP
 
     addAndMakeVisible(effects);
     addAndMakeVisible(main);
+
+	codeEditor = std::make_unique<juce::CodeEditorComponent>(codeDocument, &luaTokeniser);
+	addAndMakeVisible(*codeEditor);
+    
+    codeEditor->loadContent (R"LUA(
+    -- defines a factorial function
+    function fact (n)
+      if n == 0 then
+        return 1
+      else
+        return n * fact(n-1)
+      end
+    end
+    
+    print("enter a number:")
+    a = io.read("*number")        -- read a number
+    print(fact(a))
+)LUA");
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {}
@@ -37,4 +55,7 @@ void OscirenderAudioProcessorEditor::paint (juce::Graphics& g)
 void OscirenderAudioProcessorEditor::resized() {
     effects.setBounds(getWidth() / 2, 0, getWidth() / 2, getHeight());
 	main.setBounds(0, 0, getWidth() / 2, getHeight() / 2);
+    if (codeEditor != nullptr) {
+        codeEditor->setBounds(0, getHeight() / 2, getWidth() / 2, getHeight() / 2);
+    }
 }
