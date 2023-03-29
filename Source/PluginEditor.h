@@ -35,6 +35,7 @@ private:
     juce::CodeDocument codeDocument;
     juce::LuaTokeniser luaTokeniser;
 	std::unique_ptr<juce::CodeEditorComponent> codeEditor;
+	juce::ShapeButton collapseButton;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OscirenderAudioProcessorEditor)
 };
