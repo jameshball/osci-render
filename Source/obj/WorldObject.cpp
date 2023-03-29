@@ -2,17 +2,11 @@
 #include "../chinese_postman/ChinesePostman.h"
 #include "tiny_obj_loader.h"
 
-struct pair_hash {
-    inline std::size_t operator()(const std::pair<int, int>& v) const {
-        return v.first * 31 + v.second;
-    }
-};
-
 
 //
 // returns all vertex indices in all connected sub-components of the graph
 //
-std::vector<std::vector<int>> ConnectedComponents(const Graph& G) {
+std::vector<std::vector<int>> ConnectedComponents(Graph& G) {
     std::vector<std::vector<int>> components;
     std::vector<bool> visited(G.GetNumVertices(), false);
     std::list<int> L;

@@ -1,8 +1,9 @@
 #include "MainComponent.h"
 #include "parser/FileParser.h"
 #include "parser/FrameProducer.h"
+#include "PluginEditor.h"
 
-MainComponent::MainComponent(OscirenderAudioProcessor& p) : audioProcessor(p) {
+MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
 	setText("Main Settings");
 
     addAndMakeVisible(fileButton);
@@ -16,7 +17,7 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p) : audioProcessor(p) {
 		chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
 			if (chooser.getURLResult().isLocalFile()) {
 				auto file = chooser.getResult();
-				audioProcessor.parser.parse(file.getFileExtension(), file.createInputStream());
+				auto block = pluginEditor.addFile(file);
 			}
 		});
 	};

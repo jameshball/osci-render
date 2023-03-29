@@ -2,7 +2,7 @@
 #include "./Matching.h"
 #include "./Graph.h"
 
-bool Connected(const Graph & G)
+bool Connected(Graph & G)
 {
     vector<bool> visited(G.GetNumVertices(), false);
     list<int> L;
@@ -32,7 +32,7 @@ returns a pair containing a list and a double
 the list is the sequence of vertices in the solution
 the double is the solution cost
 */
-pair< list<int>, double > ChinesePostman(const Graph& G, const vector<double>& cost = vector<double>())
+pair< list<int>, double > ChinesePostman(Graph& G, vector<double>& cost)
 {
 	//Check if the graph if connected
 	if(not Connected(G))
@@ -53,7 +53,8 @@ pair< list<int>, double > ChinesePostman(const Graph& G, const vector<double>& c
 	if(not odd.empty())
 	{
 		//Create a graph with the odd degree vertices
-		Graph O(odd.size());
+		auto edges = list<pair<int, int>>();
+		Graph O(odd.size(), edges);
 		for(int u = 0; u < (int)odd.size(); u++)
 			for(int v = u+1; v < (int)odd.size(); v++)
 				O.AddEdge(u, v);

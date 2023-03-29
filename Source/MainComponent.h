@@ -6,16 +6,17 @@
 #include "parser/FileParser.h"
 #include "parser/FrameProducer.h"
 
-
+class OscirenderAudioProcessorEditor;
 class MainComponent : public juce::GroupComponent {
 public:
-	MainComponent(OscirenderAudioProcessor&);
+	MainComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
 	~MainComponent() override;
 
 	void resized() override;
 
 private:
 	OscirenderAudioProcessor& audioProcessor;
+	OscirenderAudioProcessorEditor& pluginEditor;
 
 	std::unique_ptr<juce::FileChooser> chooser;
 	juce::TextButton fileButton;

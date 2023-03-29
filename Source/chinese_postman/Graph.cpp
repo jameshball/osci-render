@@ -1,12 +1,12 @@
 #include "Graph.h"
 
-Graph::Graph(int n, const list< pair<int, int> > & edges):
+Graph::Graph(int n, list< pair<int, int> > & edges):
 	n(n),
 	m(edges.size()),
 	adjMat(n * n),
 	adjList(n),
 	edges(),
-	edgeIndex(n, vector<int>(n, -1))
+	edgeIndex()
 {
 	for(list< pair<int, int> >::const_iterator it = edges.begin(); it != edges.end(); it++)
 	{
@@ -17,14 +17,13 @@ Graph::Graph(int n, const list< pair<int, int> > & edges):
 	}
 }
 
-pair<int, int> Graph::GetEdge(int e) const
+pair<int, int> Graph::GetEdge(int e)
 {
 	return edges[e];
 }
 
-int Graph::GetEdgeIndex(int u, int v) const
-{
-	return edgeIndex[u][v];
+int Graph::GetEdgeIndex(int u, int v) {
+	return edgeIndex[pair<int, int>(u, v)];
 }
 
 void Graph::AddEdge(int u, int v)
@@ -36,10 +35,10 @@ void Graph::AddEdge(int u, int v)
 	adjList[v].push_back(u);
 
 	edges.push_back(pair<int, int>(u, v));
-	edgeIndex[u][v] = edgeIndex[v][u] = m++;
+	edgeIndex[pair<int, int>(u, v)] = edgeIndex[pair<int, int>(v, u)] = m++;
 }
 
-const vector<int>& Graph::AdjList(int v) const
+const vector<int>& Graph::AdjList(int v)
 {
 	if(v > n)
 		throw "Error: vertex does not exist";
@@ -47,7 +46,7 @@ const vector<int>& Graph::AdjList(int v) const
 	return adjList[v];
 }
 
-const vector<bool> & Graph::AdjMat() const
+const vector<bool> & Graph::AdjMat()
 {
 	return adjMat;
 }

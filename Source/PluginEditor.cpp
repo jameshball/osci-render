@@ -10,8 +10,8 @@
 #include "PluginEditor.h"
 
 //==============================================================================
-OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor (OscirenderAudioProcessor& p)
-	: AudioProcessorEditor(&p), audioProcessor(p), effects(p), main(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white)
+OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p)
+	: AudioProcessorEditor(&p), audioProcessor(p), effects(p), main(p, *this), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white)
 {
     // Make sure that before the constructor has finished, you've set the
     // editor's size to whatever you need it to be.
@@ -84,5 +84,29 @@ void OscirenderAudioProcessorEditor::resized() {
     }
 	effects.setBounds(area.removeFromRight(getWidth() / sections));
 	main.setBounds(area.removeFromTop(getHeight() / 2));
-    
+}
+
+std::shared_ptr<juce::MemoryBlock> OscirenderAudioProcessorEditor::addFile(juce::File file) {
+	fileBlocks.push_back(std::make_shared<juce::MemoryBlock>());
+	files.push_back(file);
+	file.createInputStream()->readIntoMemoryBlock(*fileBlocks.back());
+
+	openFile(fileBlocks.size() - 1);
+	
+	return fileBlocks.back();
+}
+
+void OscirenderAudioProcessorEditor::removeFile(int index) {
+    openFile(index - 1);
+    fileBlocks.erase(fileBlocks.begin() + index);
+    files.erase(files.begin() + index);
+}
+
+int OscirenderAudioProcessorEditor::numFiles() {
+    return fileBlocks.size();
+}
+
+void OscirenderAudioProcessorEditor::openFile(int index) {
+    audioProcessor.parser.parse(files[index].getFileExtension(), std::make_unique<juce::MemoryInputStream>(*fileBlocks[index], false));
+    codeEditor->loadContent(juce::MemoryInputStream(*fileBlocks[index], false).readEntireStreamAsString());
 }

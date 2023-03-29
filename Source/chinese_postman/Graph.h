@@ -2,36 +2,43 @@
 
 #include <list>
 #include <vector>
+#include <unordered_map>
 using namespace std;
+
+struct pair_hash {
+	inline std::size_t operator()(const std::pair<int, int>& v) const {
+		return v.first * 31 + v.second;
+	}
+};
 
 class Graph
 {
 public:
 	//n is the number of vertices
 	//edges is a list of pairs representing the edges (default = empty list)
-	Graph(int n, const list< pair<int, int> > & edges = list< pair<int, int> >());
+	Graph(int n, list< pair<int, int> > & edges);
 
 	//Default constructor creates an empty graph
 	Graph(): n(0), m(0) {};
 
 	//Returns the number of vertices
-	int GetNumVertices() const { return n; };
+	int GetNumVertices() { return n; };
 	//Returns the number of edges
-	int GetNumEdges() const { return m; };
+	int GetNumEdges() { return m; };
 
 	//Given the edge's index, returns its endpoints as a pair
-	pair<int, int> GetEdge(int e) const;
+	pair<int, int> GetEdge(int e);
 	//Given the endpoints, returns the index
-	int GetEdgeIndex(int u, int v) const;
+	int GetEdgeIndex(int u, int v);
 
 	//Adds a new edge to the graph
 	void AddEdge(int u, int v);
 
 	//Returns the adjacency list of a vertex
-	const vector<int>& AdjList(int v) const;
+	const vector<int>& AdjList(int v);
 
 	//Returns the graph's adjacency matrix
-	const vector<bool>& AdjMat() const;
+	const vector<bool>& AdjMat();
 private:
 	//Number of vertices
 	int n;
@@ -48,5 +55,5 @@ private:
 	vector<pair<int, int> > edges;
 
 	//Indices of the edges
-	vector<vector<int> > edgeIndex;
+	unordered_map<pair<int, int>, int, pair_hash> edgeIndex;
 };

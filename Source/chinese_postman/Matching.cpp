@@ -2,7 +2,7 @@
 #include <deque>
 #include <stack>
 
-Matching::Matching(const Graph & G):
+Matching::Matching(Graph & G):
 	G(G),
 	outer(2*G.GetNumVertices()),
 	deep(2*G.GetNumVertices()),
@@ -518,7 +518,7 @@ void Matching::UpdateDualCosts()
 	}	
 }
 
-pair< list<int>, double> Matching::SolveMinimumCostPerfectMatching(const vector<double> & cost)
+pair< list<int>, double> Matching::SolveMinimumCostPerfectMatching(vector<double> & cost)
 {
 	SolveMaximumMatching();
 	if(!perfect)

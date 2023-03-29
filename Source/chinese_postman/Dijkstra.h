@@ -10,7 +10,7 @@ using namespace std;
 //Returns a pair (vector<int>, vector<double>)
 //vector<double> gives the cost of the optimal path to each vertex
 //vector<int> gives the parent of each vertex in the tree of optimal paths
-pair< vector<int>, vector<double> > Dijkstra(const Graph & G, int origin, const vector<double> & cost)
+pair< vector<int>, vector<double> > Dijkstra(Graph & G, int origin, vector<double> & cost)
 {
 	BinaryHeap B;
 

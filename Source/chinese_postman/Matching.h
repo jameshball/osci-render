@@ -14,7 +14,7 @@ class Matching
 {
 public:
 	//Parametric constructor receives a graph instance
-	Matching(const Graph & G);
+	Matching(Graph & G);
 
 	//Solves the minimum cost perfect matching problem
 	//Receives the a vector whose position i has the cost of the edge with index i
@@ -22,7 +22,7 @@ public:
 	//Returns a pair
 	//the first element of the pair is a list of the indices of the edges in the matching
 	//the second is the cost of the matching
-	pair< list<int>, double > SolveMinimumCostPerfectMatching(const vector<double> & cost);
+	pair< list<int>, double > SolveMinimumCostPerfectMatching(vector<double> & cost);
 
 	//Solves the maximum cardinality matching problem
 	//Returns a list with the indices of the edges in the matching
@@ -60,7 +60,7 @@ private:
 	//Returns true if u and v are adjacent in G and not blocked
 	bool IsAdjacent(int u, int v);
 
-	const Graph & G;
+	Graph & G;
 
 	list<int> free;//List of free blossom indices
 

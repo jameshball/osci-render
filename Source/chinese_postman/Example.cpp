@@ -24,7 +24,8 @@ pair< Graph, vector<double> > ReadWeightedGraph(string filename)
 	int m;
 	ss >> m;
 
-	Graph G(n);
+	auto edges = list<pair<int, int>>();
+	Graph G(n, edges);
 	vector<double> cost(m);
 	for(int i = 0; i < m; i++)
 	{

@@ -27,6 +27,10 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
 
+	std::shared_ptr<juce::MemoryBlock> addFile(juce::File file);
+    void removeFile(int index);
+	int numFiles();
+    void openFile(int index);
 private:
     OscirenderAudioProcessor& audioProcessor;
     
@@ -36,6 +40,9 @@ private:
     juce::LuaTokeniser luaTokeniser;
 	std::unique_ptr<juce::CodeEditorComponent> codeEditor;
 	juce::ShapeButton collapseButton;
+
+    std::vector<std::shared_ptr<juce::MemoryBlock>> fileBlocks;
+    std::vector<juce::File> files;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OscirenderAudioProcessorEditor)
 };
