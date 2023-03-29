@@ -7,6 +7,74 @@
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <GROUP id="{75F6236A-68A5-85DA-EDAE-23D1621601DB}" name="lua">
+        <FILE id="X5i9iw" name="lapi.c" compile="1" resource="0" file="Source/lua/lapi.c"/>
+        <FILE id="J62WSE" name="lapi.h" compile="0" resource="0" file="Source/lua/lapi.h"/>
+        <FILE id="v4lA26" name="lauxlib.c" compile="1" resource="0" file="Source/lua/lauxlib.c"/>
+        <FILE id="z9SQPS" name="lauxlib.h" compile="0" resource="0" file="Source/lua/lauxlib.h"/>
+        <FILE id="dM1l5e" name="lbaselib.c" compile="1" resource="0" file="Source/lua/lbaselib.c"/>
+        <FILE id="tBA40u" name="lcode.c" compile="1" resource="0" file="Source/lua/lcode.c"/>
+        <FILE id="bTVMKk" name="lcode.h" compile="0" resource="0" file="Source/lua/lcode.h"/>
+        <FILE id="G9B5S7" name="lcorolib.c" compile="1" resource="0" file="Source/lua/lcorolib.c"/>
+        <FILE id="kuf6Vm" name="lctype.c" compile="1" resource="0" file="Source/lua/lctype.c"/>
+        <FILE id="pEomqC" name="lctype.h" compile="0" resource="0" file="Source/lua/lctype.h"/>
+        <FILE id="AFnTEZ" name="ldblib.c" compile="1" resource="0" file="Source/lua/ldblib.c"/>
+        <FILE id="fZzGsS" name="ldebug.c" compile="1" resource="0" file="Source/lua/ldebug.c"/>
+        <FILE id="WCJqvn" name="ldebug.h" compile="0" resource="0" file="Source/lua/ldebug.h"/>
+        <FILE id="h3gdqd" name="ldo.c" compile="1" resource="0" file="Source/lua/ldo.c"/>
+        <FILE id="Hm2KPw" name="ldo.h" compile="0" resource="0" file="Source/lua/ldo.h"/>
+        <FILE id="IkNvZU" name="ldump.c" compile="1" resource="0" file="Source/lua/ldump.c"/>
+        <FILE id="ZUfy0d" name="lfunc.c" compile="1" resource="0" file="Source/lua/lfunc.c"/>
+        <FILE id="xs8zsP" name="lfunc.h" compile="0" resource="0" file="Source/lua/lfunc.h"/>
+        <FILE id="UlRhKa" name="lgc.c" compile="1" resource="0" file="Source/lua/lgc.c"/>
+        <FILE id="wdds4b" name="lgc.h" compile="0" resource="0" file="Source/lua/lgc.h"/>
+        <FILE id="g1tClC" name="linit.c" compile="1" resource="0" file="Source/lua/linit.c"/>
+        <FILE id="WRQaO0" name="liolib.c" compile="1" resource="0" file="Source/lua/liolib.c"/>
+        <FILE id="NjFl9K" name="ljumptab.h" compile="0" resource="0" file="Source/lua/ljumptab.h"/>
+        <FILE id="HKwu63" name="llex.c" compile="1" resource="0" file="Source/lua/llex.c"/>
+        <FILE id="qno80g" name="llex.h" compile="0" resource="0" file="Source/lua/llex.h"/>
+        <FILE id="nCxKcr" name="llimits.h" compile="0" resource="0" file="Source/lua/llimits.h"/>
+        <FILE id="alHAga" name="lmathlib.c" compile="1" resource="0" file="Source/lua/lmathlib.c"/>
+        <FILE id="hR4qan" name="lmem.c" compile="1" resource="0" file="Source/lua/lmem.c"/>
+        <FILE id="iVly2Q" name="lmem.h" compile="0" resource="0" file="Source/lua/lmem.h"/>
+        <FILE id="QcbMMs" name="loadlib.c" compile="1" resource="0" file="Source/lua/loadlib.c"/>
+        <FILE id="ElmN8J" name="lobject.c" compile="1" resource="0" file="Source/lua/lobject.c"/>
+        <FILE id="tBIjln" name="lobject.h" compile="0" resource="0" file="Source/lua/lobject.h"/>
+        <FILE id="fsNwrE" name="lopcodes.c" compile="1" resource="0" file="Source/lua/lopcodes.c"/>
+        <FILE id="RXxRpC" name="lopcodes.h" compile="0" resource="0" file="Source/lua/lopcodes.h"/>
+        <FILE id="G8iVh8" name="lopnames.h" compile="0" resource="0" file="Source/lua/lopnames.h"/>
+        <FILE id="lxze1f" name="loslib.c" compile="1" resource="0" file="Source/lua/loslib.c"/>
+        <FILE id="OdIDpC" name="lparser.c" compile="1" resource="0" file="Source/lua/lparser.c"/>
+        <FILE id="LFujc2" name="lparser.h" compile="0" resource="0" file="Source/lua/lparser.h"/>
+        <FILE id="VMX9gs" name="lprefix.h" compile="0" resource="0" file="Source/lua/lprefix.h"/>
+        <FILE id="Q73kac" name="lstate.c" compile="1" resource="0" file="Source/lua/lstate.c"/>
+        <FILE id="xjSsJU" name="lstate.h" compile="0" resource="0" file="Source/lua/lstate.h"/>
+        <FILE id="ekuQ04" name="lstring.c" compile="1" resource="0" file="Source/lua/lstring.c"/>
+        <FILE id="WeslrA" name="lstring.h" compile="0" resource="0" file="Source/lua/lstring.h"/>
+        <FILE id="HPI8Uc" name="lstrlib.c" compile="1" resource="0" file="Source/lua/lstrlib.c"/>
+        <FILE id="wz0d28" name="ltable.c" compile="1" resource="0" file="Source/lua/ltable.c"/>
+        <FILE id="Xpxf4K" name="ltable.h" compile="0" resource="0" file="Source/lua/ltable.h"/>
+        <FILE id="MkO2LL" name="ltablib.c" compile="1" resource="0" file="Source/lua/ltablib.c"/>
+        <FILE id="ZhSuBu" name="ltests.c" compile="1" resource="0" file="Source/lua/ltests.c"/>
+        <FILE id="tc4tf4" name="ltests.h" compile="0" resource="0" file="Source/lua/ltests.h"/>
+        <FILE id="rvM9uj" name="ltm.c" compile="1" resource="0" file="Source/lua/ltm.c"/>
+        <FILE id="xZDYz2" name="ltm.h" compile="0" resource="0" file="Source/lua/ltm.h"/>
+        <FILE id="kj7TdT" name="lua.c" compile="1" resource="0" file="Source/lua/lua.c"/>
+        <FILE id="ogn72m" name="lua.h" compile="0" resource="0" file="Source/lua/lua.h"/>
+        <FILE id="x771Rj" name="luaconf.h" compile="0" resource="0" file="Source/lua/luaconf.h"/>
+        <FILE id="BlOdIr" name="luaimport.cpp" compile="1" resource="0" file="Source/lua/luaimport.cpp"/>
+        <FILE id="XUJtiC" name="luaimport.h" compile="0" resource="0" file="Source/lua/luaimport.h"/>
+        <FILE id="NeC0ti" name="lualib.h" compile="0" resource="0" file="Source/lua/lualib.h"/>
+        <FILE id="IKwQ2M" name="lundump.c" compile="1" resource="0" file="Source/lua/lundump.c"/>
+        <FILE id="tuKfAR" name="lundump.h" compile="0" resource="0" file="Source/lua/lundump.h"/>
+        <FILE id="qkRiRs" name="lutf8lib.c" compile="1" resource="0" file="Source/lua/lutf8lib.c"/>
+        <FILE id="F0nLNW" name="lvm.c" compile="1" resource="0" file="Source/lua/lvm.c"/>
+        <FILE id="ttKmto" name="lvm.h" compile="0" resource="0" file="Source/lua/lvm.h"/>
+        <FILE id="dy37RJ" name="lzio.c" compile="1" resource="0" file="Source/lua/lzio.c"/>
+        <FILE id="vYPcZP" name="lzio.h" compile="0" resource="0" file="Source/lua/lzio.h"/>
+        <FILE id="ktpcF1" name="onelua.c" compile="1" resource="0" file="Source/lua/onelua.c"/>
+        <FILE id="RykUkb" name="sol.hpp" compile="0" resource="0" file="Source/lua/sol.hpp"/>
+      </GROUP>
       <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
         <FILE id="poPVxL" name="DraggableListBox.cpp" compile="1" resource="0"
               file="Source/components/DraggableListBox.cpp"/>

@@ -14,6 +14,7 @@
 #include "audio/VectorCancellingEffect.h"
 #include "audio/DistortEffect.h"
 #include "audio/SmoothEffect.h"
+#include "lua/luaimport.h"
 
 //==============================================================================
 OscirenderAudioProcessor::OscirenderAudioProcessor()
@@ -37,6 +38,49 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     allEffects.push_back(std::make_shared<Effect>(std::make_unique<DistortEffect>(true), "Vertical shift", "verticalDistort"));
     allEffects.push_back(std::make_shared<Effect>(std::make_unique<DistortEffect>(false), "Horizontal shift", "horizontalDistort"));
     allEffects.push_back(std::make_shared<Effect>(std::make_unique<SmoothEffect>(), "Smoothing", "smoothing"));
+
+    // initialization
+    lua_State * L = luaL_newstate();
+    luaL_openlibs(L);
+
+    // execute script
+    const char* lua_script = "print('Hello World!')";
+    int load_stat = luaL_loadbuffer(L, lua_script, strlen(lua_script), lua_script);
+    lua_pcall(L, 0, 0, 0);
+
+    const char* lua_function_script = 
+        R"LUA(
+        function add(x, y)
+            return x + y
+        end
+    )LUA";
+
+    // execute script
+    load_stat = luaL_loadbuffer(L, lua_function_script, strlen(lua_function_script), lua_function_script);
+    lua_pcall(L, 0, 0, 0);
+
+    int a = 5;
+    int b = 6;
+    int sum;
+
+    // fetch the function
+    lua_getglobal(L, "add");
+
+    // pass two numbers to lua as arguemnt 1 and 2
+    lua_pushnumber(L, a);
+    lua_pushnumber(L, b);
+
+    // call the function with 2 arguments and receive 1 result
+    lua_call(L, 2, 1);
+
+    // read the restul from the top of the stack and cast to int
+    sum = (int)lua_tointeger(L, -1);
+    lua_pop(L, 1);
+
+    DBG("Result: " << sum);
+
+    // cleanup
+    lua_close(L);
 }
 
 OscirenderAudioProcessor::~OscirenderAudioProcessor()
@@ -240,7 +284,7 @@ void OscirenderAudioProcessor::updateFrame() {
 }
 
 void OscirenderAudioProcessor::updateLengthIncrement() {
-    lengthIncrement = std::max(frameLength / (currentSampleRate / frequency), MIN_LENGTH_INCREMENT);
+    lengthIncrement = max(frameLength / (currentSampleRate / frequency), MIN_LENGTH_INCREMENT);
 }
 
 void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
@@ -296,8 +340,8 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         
         // hard cap on how many times it can be over the length to
         // prevent audio stuttering
-        frameDrawn += std::min(lengthIncrement, 20 * length);
-		shapeDrawn += std::min(lengthIncrement, 20 * length);
+        frameDrawn += min(lengthIncrement, 20 * length);
+		shapeDrawn += min(lengthIncrement, 20 * length);
 
         // Need to skip all shapes that the lengthIncrement draws over.
         // This is especially an issue when there are lots of small lines being
