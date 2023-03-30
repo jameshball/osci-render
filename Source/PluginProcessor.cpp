@@ -28,7 +28,11 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
                      #endif
                        )
 #endif
-    , producer(std::make_unique<FrameProducer>(*this, parser)) {
+    {
+	parsers.push_back(std::make_unique<FileParser>());
+    files.emplace_back();
+	fileBlocks.emplace_back();
+    producer = std::make_unique<FrameProducer>(*this, parsers[0]);
     producer->startThread();
 
 	allEffects.push_back(std::make_shared<Effect>(std::make_unique<BitCrushEffect>(), "Bit Crush", "bitCrush"));
@@ -263,6 +267,46 @@ void OscirenderAudioProcessor::updateEffectPrecedence() {
 	enabledEffects = newEffects;
 }
 
+void OscirenderAudioProcessor::updateFileBlock(int index, std::shared_ptr<juce::MemoryBlock> block) {
+	fileBlocks[index] = block;
+	openFile(index);
+}
+
+void OscirenderAudioProcessor::addFile(juce::File file) {
+    fileBlocks.push_back(std::make_shared<juce::MemoryBlock>());
+    files.push_back(file);
+	parsers.push_back(std::make_unique<FileParser>());
+    file.createInputStream()->readIntoMemoryBlock(*fileBlocks.back());
+
+    openFile(fileBlocks.size() - 1);
+}
+
+void OscirenderAudioProcessor::removeFile(int index) {
+    openFile(index - 1);
+    parsers[index]->disable();
+    fileBlocks.erase(fileBlocks.begin() + index);
+    files.erase(files.begin() + index);
+	parsers.erase(parsers.begin() + index);
+}
+
+int OscirenderAudioProcessor::numFiles() {
+    return fileBlocks.size();
+}
+
+void OscirenderAudioProcessor::openFile(int index) {
+    currentFile = index;
+    parsers[index]->parse(files[index].getFileExtension(), std::make_unique<juce::MemoryInputStream>(*fileBlocks[index], false));
+    producer->setSource(parsers[index]);
+}
+
+int OscirenderAudioProcessor::getCurrentFile() {
+    return currentFile;
+}
+
+std::shared_ptr<juce::MemoryBlock> OscirenderAudioProcessor::getFileBlock(int index) {
+    return fileBlocks[index];
+}
+
 void OscirenderAudioProcessor::updateFrame() {
     currentShape = 0;
     shapeDrawn = 0.0;
@@ -315,7 +359,6 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         double length = 0.0;
 
         if (currentShape < frame.size()) {
-			
             auto& shape = frame[currentShape];
             length = shape->length();
             double drawingProgress = length == 0.0 ? 1 : shapeDrawn / length;
@@ -358,7 +401,7 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
             length = frame[currentShape]->len;
 		}
 
-        if (frameDrawn > frameLength) {
+        if (frameDrawn >= frameLength) {
 			updateFrame();
 		}
 	}

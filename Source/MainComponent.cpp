@@ -17,7 +17,8 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 		chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
 			if (chooser.getURLResult().isLocalFile()) {
 				auto file = chooser.getResult();
-				auto block = pluginEditor.addFile(file);
+				audioProcessor.addFile(file);
+				pluginEditor.updateCodeEditor();
 			}
 		});
 	};

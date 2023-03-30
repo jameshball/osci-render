@@ -6,12 +6,12 @@
 
 class FrameProducer : public juce::Thread {
 public:
-	FrameProducer(FrameConsumer&, FrameSource&);
+	FrameProducer(FrameConsumer&, std::shared_ptr<FrameSource>);
 	~FrameProducer() override;
 
 	void run() override;
-
+	void setSource(std::shared_ptr<FrameSource>);
 private:
 	FrameConsumer& frameConsumer;
-	FrameSource& frameSource;
+	std::shared_ptr<FrameSource> frameSource;
 };

@@ -39,6 +39,12 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     print(fact(a))
 )LUA");
 
+    // I need to disable accessibility otherwise it doesn't work! Appears to be a JUCE issue, very annoying!
+    codeEditor->setAccessible(false);
+
+	// listen for changes to the code editor
+	codeDocument.addListener(this);
+
     addAndMakeVisible(collapseButton);
 	collapseButton.onClick = [this] {
 		if (codeEditor->isVisible()) {
@@ -86,27 +92,16 @@ void OscirenderAudioProcessorEditor::resized() {
 	main.setBounds(area.removeFromTop(getHeight() / 2));
 }
 
-std::shared_ptr<juce::MemoryBlock> OscirenderAudioProcessorEditor::addFile(juce::File file) {
-	fileBlocks.push_back(std::make_shared<juce::MemoryBlock>());
-	files.push_back(file);
-	file.createInputStream()->readIntoMemoryBlock(*fileBlocks.back());
-
-	openFile(fileBlocks.size() - 1);
-	
-	return fileBlocks.back();
+void OscirenderAudioProcessorEditor::updateCodeEditor() {
+    codeEditor->loadContent(juce::MemoryInputStream(*audioProcessor.getFileBlock(audioProcessor.getCurrentFile()), false).readEntireStreamAsString());
+}
+    
+void OscirenderAudioProcessorEditor::codeDocumentTextInserted(const juce::String& newText, int insertIndex) {
+    juce::String file = codeDocument.getAllContent();
+    audioProcessor.updateFileBlock(audioProcessor.getCurrentFile(), std::make_shared<juce::MemoryBlock>(file.toRawUTF8(), file.getNumBytesAsUTF8() + 1));
 }
 
-void OscirenderAudioProcessorEditor::removeFile(int index) {
-    openFile(index - 1);
-    fileBlocks.erase(fileBlocks.begin() + index);
-    files.erase(files.begin() + index);
-}
-
-int OscirenderAudioProcessorEditor::numFiles() {
-    return fileBlocks.size();
-}
-
-void OscirenderAudioProcessorEditor::openFile(int index) {
-    audioProcessor.parser.parse(files[index].getFileExtension(), std::make_unique<juce::MemoryInputStream>(*fileBlocks[index], false));
-    codeEditor->loadContent(juce::MemoryInputStream(*fileBlocks[index], false).readEntireStreamAsString());
+void OscirenderAudioProcessorEditor::codeDocumentTextDeleted(int startIndex, int endIndex) {
+    juce::String file = codeDocument.getAllContent();
+    audioProcessor.updateFileBlock(audioProcessor.getCurrentFile(), std::make_shared<juce::MemoryBlock>(file.toRawUTF8(), file.getNumBytesAsUTF8() + 1));
 }

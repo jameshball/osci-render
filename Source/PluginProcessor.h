@@ -75,7 +75,11 @@ public:
     BitCrushEffect bitCrushEffect = BitCrushEffect();
 	BulgeEffect bulgeEffect = BulgeEffect();
 
-    FileParser parser;
+    std::vector<std::shared_ptr<FileParser>> parsers;
+    std::vector<std::shared_ptr<juce::MemoryBlock>> fileBlocks;
+    std::vector<juce::File> files;
+    int currentFile = -1;
+    
     std::unique_ptr<FrameProducer> producer;
 
     void updateAngleDelta();
@@ -83,6 +87,13 @@ public:
 	void enableEffect(std::shared_ptr<Effect> effect);
     void disableEffect(std::shared_ptr<Effect> effect);
     void updateEffectPrecedence();
+    void updateFileBlock(int index, std::shared_ptr<juce::MemoryBlock> block);
+    void addFile(juce::File file);
+    void removeFile(int index);
+    int numFiles();
+    void openFile(int index);
+    int getCurrentFile();
+	std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
 private:
     double theta = 0.0;
     double thetaDelta = 0.0;

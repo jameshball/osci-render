@@ -17,7 +17,7 @@
 //==============================================================================
 /**
 */
-class OscirenderAudioProcessorEditor  : public juce::AudioProcessorEditor
+class OscirenderAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::CodeDocument::Listener
 {
 public:
     OscirenderAudioProcessorEditor (OscirenderAudioProcessor&);
@@ -27,10 +27,7 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
 
-	std::shared_ptr<juce::MemoryBlock> addFile(juce::File file);
-    void removeFile(int index);
-	int numFiles();
-    void openFile(int index);
+    void updateCodeEditor();
 private:
     OscirenderAudioProcessor& audioProcessor;
     
@@ -41,8 +38,8 @@ private:
 	std::unique_ptr<juce::CodeEditorComponent> codeEditor;
 	juce::ShapeButton collapseButton;
 
-    std::vector<std::shared_ptr<juce::MemoryBlock>> fileBlocks;
-    std::vector<juce::File> files;
+	void codeDocumentTextInserted(const juce::String& newText, int insertIndex) override;
+	void codeDocumentTextDeleted(int startIndex, int endIndex) override;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OscirenderAudioProcessorEditor)
 };
