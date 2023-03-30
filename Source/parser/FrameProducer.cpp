@@ -9,11 +9,12 @@ FrameProducer::~FrameProducer() {
 
 void FrameProducer::run() {
 	while (!threadShouldExit() && frameSource->isActive()) {
-		frameConsumer.addFrame(frameSource->next());
+		frameConsumer.addFrame(frameSource->next(), sourceFileIndex);
 	}
 }
 
-void FrameProducer::setSource(std::shared_ptr<FrameSource> source) {
+void FrameProducer::setSource(std::shared_ptr<FrameSource> source, int fileIndex) {
 	// TODO: should make this atomic
 	frameSource = source;
+	sourceFileIndex = fileIndex;
 }

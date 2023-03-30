@@ -74,7 +74,7 @@ public:
 
     BitCrushEffect bitCrushEffect = BitCrushEffect();
 	BulgeEffect bulgeEffect = BulgeEffect();
-
+    
     std::vector<std::shared_ptr<FileParser>> parsers;
     std::vector<std::shared_ptr<juce::MemoryBlock>> fileBlocks;
     std::vector<juce::File> files;
@@ -83,7 +83,7 @@ public:
     std::unique_ptr<FrameProducer> producer;
 
     void updateAngleDelta();
-    void addFrame(std::vector<std::unique_ptr<Shape>> frame) override;
+    void addFrame(std::vector<std::unique_ptr<Shape>> frame, int fileIndex) override;
 	void enableEffect(std::shared_ptr<Effect> effect);
     void disableEffect(std::shared_ptr<Effect> effect);
     void updateEffectPrecedence();
@@ -92,7 +92,9 @@ public:
     void removeFile(int index);
     int numFiles();
     void openFile(int index);
-    int getCurrentFile();
+    void changeCurrentFile(int index);
+    int getCurrentFileIndex();
+	juce::File getCurrentFile();
 	std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
 private:
     double theta = 0.0;
@@ -100,13 +102,16 @@ private:
 
 	juce::AbstractFifo frameFifo{ 10 };
 	std::vector<std::unique_ptr<Shape>> frameBuffer[10];
+    int frameBufferIndices[10];
 
 	int currentShape = 0;
     std::vector<std::unique_ptr<Shape>> frame;
+    int currentBufferIndex = -1;
     double frameLength;
 	double shapeDrawn = 0.0;
 	double frameDrawn = 0.0;
 	double lengthIncrement = 0.0;
+    bool invalidateFrameBuffer = false;
 
 	void updateFrame();
     void updateLengthIncrement();

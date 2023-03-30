@@ -13,13 +13,16 @@ public:
 	~MainComponent() override;
 
 	void resized() override;
-
 private:
 	OscirenderAudioProcessor& audioProcessor;
 	OscirenderAudioProcessorEditor& pluginEditor;
 
 	std::unique_ptr<juce::FileChooser> chooser;
 	juce::TextButton fileButton;
+	juce::TextButton closeFileButton;
+	juce::Label fileLabel;
+
+	void updateFileLabel();
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };

@@ -10,8 +10,9 @@ public:
 	~FrameProducer() override;
 
 	void run() override;
-	void setSource(std::shared_ptr<FrameSource>);
+	void setSource(std::shared_ptr<FrameSource>, int fileIndex);
 private:
 	FrameConsumer& frameConsumer;
 	std::shared_ptr<FrameSource> frameSource;
+	int sourceFileIndex = 0;
 };

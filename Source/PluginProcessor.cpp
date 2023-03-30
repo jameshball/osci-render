@@ -29,10 +29,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
                        )
 #endif
     {
-	parsers.push_back(std::make_unique<FileParser>());
-    files.emplace_back();
-	fileBlocks.emplace_back();
-    producer = std::make_unique<FrameProducer>(*this, parsers[0]);
+    producer = std::make_unique<FrameProducer>(*this, std::make_shared<FileParser>());
     producer->startThread();
 
 	allEffects.push_back(std::make_shared<Effect>(std::make_unique<BitCrushEffect>(), "Bit Crush", "bitCrush"));
@@ -197,24 +194,6 @@ void OscirenderAudioProcessor::updateAngleDelta() {
 	thetaDelta = cyclesPerSample * 2.0 * juce::MathConstants<double>::pi;
 }
 
-void OscirenderAudioProcessor::addFrame(std::vector<std::unique_ptr<Shape>> frame) {
-    const auto scope = frameFifo.write(1);
-
-    if (scope.blockSize1 > 0) {
-        frameBuffer[scope.startIndex1].clear();
-        for (auto& shape : frame) {
-            frameBuffer[scope.startIndex1].push_back(std::move(shape));
-        }
-    }
-
-    if (scope.blockSize2 > 0) {
-        frameBuffer[scope.startIndex2].clear();
-        for (auto& shape : frame) {
-            frameBuffer[scope.startIndex2].push_back(std::move(shape));
-        }
-    }
-}
-
 void OscirenderAudioProcessor::enableEffect(std::shared_ptr<Effect> effect) {
 	// need to make a new vector because the old one is being iterated over in another thread
 	std::shared_ptr<std::vector<std::shared_ptr<Effect>>> newEffects = std::make_shared<std::vector<std::shared_ptr<Effect>>>();
@@ -282,8 +261,10 @@ void OscirenderAudioProcessor::addFile(juce::File file) {
 }
 
 void OscirenderAudioProcessor::removeFile(int index) {
-    openFile(index - 1);
-    parsers[index]->disable();
+	if (index < 0 || index >= fileBlocks.size()) {
+		return;
+	}
+    changeCurrentFile(index - 1);
     fileBlocks.erase(fileBlocks.begin() + index);
     files.erase(files.begin() + index);
 	parsers.erase(parsers.begin() + index);
@@ -294,17 +275,54 @@ int OscirenderAudioProcessor::numFiles() {
 }
 
 void OscirenderAudioProcessor::openFile(int index) {
-    currentFile = index;
+	if (index < 0 || index >= fileBlocks.size()) {
+		return;
+	}
     parsers[index]->parse(files[index].getFileExtension(), std::make_unique<juce::MemoryInputStream>(*fileBlocks[index], false));
-    producer->setSource(parsers[index]);
+    producer->setSource(parsers[index], index);
+    currentFile = index;
+	invalidateFrameBuffer = true;
 }
 
-int OscirenderAudioProcessor::getCurrentFile() {
+void OscirenderAudioProcessor::changeCurrentFile(int index) {
+	if (index < 0 || index >= fileBlocks.size()) {
+		return;
+	}
+	producer->setSource(parsers[index], index);
+    currentFile = index;
+	invalidateFrameBuffer = true;
+}
+
+int OscirenderAudioProcessor::getCurrentFileIndex() {
     return currentFile;
+}
+
+juce::File OscirenderAudioProcessor::getCurrentFile() {
+    return files[currentFile];
 }
 
 std::shared_ptr<juce::MemoryBlock> OscirenderAudioProcessor::getFileBlock(int index) {
     return fileBlocks[index];
+}
+
+void OscirenderAudioProcessor::addFrame(std::vector<std::unique_ptr<Shape>> frame, int fileIndex) {
+    const auto scope = frameFifo.write(1);
+
+    if (scope.blockSize1 > 0) {
+        frameBuffer[scope.startIndex1].clear();
+        for (auto& shape : frame) {
+            frameBuffer[scope.startIndex1].push_back(std::move(shape));
+        }
+        frameBufferIndices[scope.startIndex1] = fileIndex;
+    }
+
+    if (scope.blockSize2 > 0) {
+        frameBuffer[scope.startIndex2].clear();
+        for (auto& shape : frame) {
+            frameBuffer[scope.startIndex2].push_back(std::move(shape));
+        }
+        frameBufferIndices[scope.startIndex2] = fileIndex;
+    }
 }
 
 void OscirenderAudioProcessor::updateFrame() {
@@ -318,8 +336,10 @@ void OscirenderAudioProcessor::updateFrame() {
 
             if (scope.blockSize1 > 0) {
 				frame.swap(frameBuffer[scope.startIndex1]);
+                currentBufferIndex = frameBufferIndices[scope.startIndex1];
             } else if (scope.blockSize2 > 0) {
                 frame.swap(frameBuffer[scope.startIndex2]);
+                currentBufferIndex = frameBufferIndices[scope.startIndex2];
             }
 
             frameLength = Shape::totalLength(frame);
@@ -349,6 +369,17 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     
     auto* channelData = buffer.getArrayOfWritePointers();
 	auto numSamples = buffer.getNumSamples();
+
+    if (invalidateFrameBuffer) {
+        frameFifo.reset();
+        // keeps getting the next frame until the frame comes from the file that we want to render.
+        // this MIGHT be hacky and cause issues later down the line, but for now it works as a
+        // solution to get instant changing of current file when pressing j and k.
+        while (currentBufferIndex != currentFile) {
+            updateFrame();
+        }
+        invalidateFrameBuffer = false;
+    }
     
 	for (auto sample = 0; sample < numSamples; ++sample) {
         updateLengthIncrement();

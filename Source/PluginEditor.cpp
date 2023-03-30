@@ -54,6 +54,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
             collapseButton.setShape(path, false, true, true);
 		} else {
 			codeEditor->setVisible(true);
+            updateCodeEditor();
             juce::Path path;
             path.addTriangle(0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.5f);
             collapseButton.setShape(path, false, true, true);
@@ -93,15 +94,40 @@ void OscirenderAudioProcessorEditor::resized() {
 }
 
 void OscirenderAudioProcessorEditor::updateCodeEditor() {
-    codeEditor->loadContent(juce::MemoryInputStream(*audioProcessor.getFileBlock(audioProcessor.getCurrentFile()), false).readEntireStreamAsString());
+    if (codeEditor->isVisible() && audioProcessor.getCurrentFileIndex() != -1) {
+        codeEditor->loadContent(juce::MemoryInputStream(*audioProcessor.getFileBlock(audioProcessor.getCurrentFileIndex()), false).readEntireStreamAsString());
+    }
 }
     
 void OscirenderAudioProcessorEditor::codeDocumentTextInserted(const juce::String& newText, int insertIndex) {
     juce::String file = codeDocument.getAllContent();
-    audioProcessor.updateFileBlock(audioProcessor.getCurrentFile(), std::make_shared<juce::MemoryBlock>(file.toRawUTF8(), file.getNumBytesAsUTF8() + 1));
+    audioProcessor.updateFileBlock(audioProcessor.getCurrentFileIndex(), std::make_shared<juce::MemoryBlock>(file.toRawUTF8(), file.getNumBytesAsUTF8() + 1));
 }
 
 void OscirenderAudioProcessorEditor::codeDocumentTextDeleted(int startIndex, int endIndex) {
     juce::String file = codeDocument.getAllContent();
-    audioProcessor.updateFileBlock(audioProcessor.getCurrentFile(), std::make_shared<juce::MemoryBlock>(file.toRawUTF8(), file.getNumBytesAsUTF8() + 1));
+    audioProcessor.updateFileBlock(audioProcessor.getCurrentFileIndex(), std::make_shared<juce::MemoryBlock>(file.toRawUTF8(), file.getNumBytesAsUTF8() + 1));
+}
+
+bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
+    int numFiles = audioProcessor.numFiles();
+    int currentFile = audioProcessor.getCurrentFileIndex();
+    if (key.getTextCharacter() == 'j') {
+        currentFile++;
+        if (currentFile == numFiles) {
+            currentFile = 0;
+        }
+        audioProcessor.changeCurrentFile(currentFile);
+        updateCodeEditor();
+        return true;
+    } else if (key.getTextCharacter() == 'k') {
+        currentFile--;
+        if (currentFile < 0) {
+            currentFile = numFiles - 1;
+        }
+        audioProcessor.changeCurrentFile(currentFile);
+        updateCodeEditor();
+        return true;
+    }
+    return false;
 }

@@ -41,5 +41,7 @@ private:
 	void codeDocumentTextInserted(const juce::String& newText, int insertIndex) override;
 	void codeDocumentTextDeleted(int startIndex, int endIndex) override;
 
+    bool keyPressed(const juce::KeyPress& key) override;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OscirenderAudioProcessorEditor)
 };
