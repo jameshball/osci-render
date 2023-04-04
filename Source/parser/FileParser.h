@@ -6,13 +6,14 @@
 #include "../obj/Camera.h"
 #include "../svg/SvgParser.h"
 #include "../txt/TextParser.h"
+#include "../lua/LuaParser.h"
 
 class FileParser : public FrameSource {
 public:
 	FileParser();
 
 	void parse(juce::String extension, std::unique_ptr<juce::InputStream>) override;
-	std::vector<std::unique_ptr<Shape>> next() override;
+	std::vector<std::unique_ptr<Shape>> nextFrame() override;
 	bool isActive() override;
 	void disable() override;
 	void enable() override;
@@ -24,4 +25,5 @@ private:
 	std::shared_ptr<Camera> camera;
 	std::shared_ptr<SvgParser> svg;
 	std::shared_ptr<TextParser> text;
+	std::shared_ptr<LuaParser> lua;
 };

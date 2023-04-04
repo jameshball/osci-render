@@ -3,9 +3,9 @@
 #include "Shape.h"
 #include "Vector2.h"
 
-class Arc : public Shape {
+class CircleArc : public Shape {
 public:
-	Arc(double x, double y, double radiusX, double radiusY, double startAngle, double endAngle);
+	CircleArc(double x, double y, double radiusX, double radiusY, double startAngle, double endAngle);
 
 	Vector2 nextVector(double drawingProgress) override;
 	void rotate(double theta) override;

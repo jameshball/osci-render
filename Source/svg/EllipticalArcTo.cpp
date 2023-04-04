@@ -1,7 +1,7 @@
 #include "EllipticalArcTo.h"
 #include "../shape/Line.h"
 #include <numbers>
-#include "../shape/Arc.h"
+#include "../shape/CircleArc.h"
 
 std::vector<std::unique_ptr<Shape>> EllipticalArcTo::absolute(SvgState& state, std::vector<float>& args) {
 	return parseEllipticalArc(state, args, true);
@@ -113,7 +113,7 @@ void EllipticalArcTo::createArc(std::vector<std::unique_ptr<Shape>>& shapes, Vec
 	angleExtent = std::fmod(angleExtent, 2 * std::numbers::pi);
 	angleStart = std::fmod(angleStart, 2 * std::numbers::pi);
 
-	auto arc = std::make_unique<Arc>(cx, cy, rx, ry, angleStart, angleExtent);
+	auto arc = std::make_unique<CircleArc>(cx, cy, rx, ry, angleStart, angleExtent);
 	arc->translate(-cx, -cy);
 	arc->rotate(theta);
 	arc->translate(cx, cy);

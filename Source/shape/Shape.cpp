@@ -1,5 +1,6 @@
 #include "Shape.h"
 #include "Line.h"
+#include "Vector2.h"
 
 double Shape::totalLength(std::vector<std::unique_ptr<Shape>>& shapes) {
     double length = 0.0;

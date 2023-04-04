@@ -65,6 +65,8 @@
         <FILE id="BlOdIr" name="luaimport.cpp" compile="1" resource="0" file="Source/lua/luaimport.cpp"/>
         <FILE id="XUJtiC" name="luaimport.h" compile="0" resource="0" file="Source/lua/luaimport.h"/>
         <FILE id="NeC0ti" name="lualib.h" compile="0" resource="0" file="Source/lua/lualib.h"/>
+        <FILE id="ggEnCt" name="LuaParser.cpp" compile="1" resource="0" file="Source/lua/LuaParser.cpp"/>
+        <FILE id="BzW4g3" name="LuaParser.h" compile="0" resource="0" file="Source/lua/LuaParser.h"/>
         <FILE id="IKwQ2M" name="lundump.c" compile="1" resource="0" file="Source/lua/lundump.c"/>
         <FILE id="tuKfAR" name="lundump.h" compile="0" resource="0" file="Source/lua/lundump.h"/>
         <FILE id="qkRiRs" name="lutf8lib.c" compile="1" resource="0" file="Source/lua/lutf8lib.c"/>
@@ -73,7 +75,6 @@
         <FILE id="dy37RJ" name="lzio.c" compile="1" resource="0" file="Source/lua/lzio.c"/>
         <FILE id="vYPcZP" name="lzio.h" compile="0" resource="0" file="Source/lua/lzio.h"/>
         <FILE id="ktpcF1" name="onelua.c" compile="1" resource="0" file="Source/lua/onelua.c"/>
-        <FILE id="RykUkb" name="sol.hpp" compile="0" resource="0" file="Source/lua/sol.hpp"/>
       </GROUP>
       <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
         <FILE id="poPVxL" name="DraggableListBox.cpp" compile="1" resource="0"
@@ -154,8 +155,8 @@
         <FILE id="CdKZCg" name="Matching.h" compile="0" resource="0" file="Source/chinese_postman/Matching.h"/>
       </GROUP>
       <GROUP id="{92CEA658-C82C-9CEB-15EB-945EF6B6B5C8}" name="shape">
-        <FILE id="b9eg7J" name="Arc.cpp" compile="1" resource="0" file="Source/shape/Arc.cpp"/>
-        <FILE id="KIQgS0" name="Arc.h" compile="0" resource="0" file="Source/shape/Arc.h"/>
+        <FILE id="iglTFG" name="CircleArc.cpp" compile="1" resource="0" file="Source/shape/CircleArc.cpp"/>
+        <FILE id="T3S8Sg" name="CircleArc.h" compile="0" resource="0" file="Source/shape/CircleArc.h"/>
         <FILE id="G5fbub" name="Shape.cpp" compile="1" resource="0" file="Source/shape/Shape.cpp"/>
         <FILE id="Dbvew2" name="CubicBezierCurve.cpp" compile="1" resource="0"
               file="Source/shape/CubicBezierCurve.cpp"/>

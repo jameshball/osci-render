@@ -9,7 +9,7 @@ FrameProducer::~FrameProducer() {
 
 void FrameProducer::run() {
 	while (!threadShouldExit() && frameSource->isActive()) {
-		frameConsumer.addFrame(frameSource->next(), sourceFileIndex);
+		frameConsumer.addFrame(frameSource->nextFrame(), sourceFileIndex);
 	}
 }
 

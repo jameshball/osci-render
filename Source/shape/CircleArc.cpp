@@ -1,10 +1,10 @@
-#include "Arc.h"
+#include "CircleArc.h"
 #include <numbers>
 #include "Line.h"
 
-Arc::Arc(double x, double y, double radiusX, double radiusY, double startAngle, double endAngle) : x(x), y(y), radiusX(radiusX), radiusY(radiusY), startAngle(startAngle), endAngle(endAngle) {}
+CircleArc::CircleArc(double x, double y, double radiusX, double radiusY, double startAngle, double endAngle) : x(x), y(y), radiusX(radiusX), radiusY(radiusY), startAngle(startAngle), endAngle(endAngle) {}
 
-Vector2 Arc::nextVector(double drawingProgress) {
+Vector2 CircleArc::nextVector(double drawingProgress) {
 	// scale between start and end angle in the positive direction
 	double angle = startAngle + endAngle * drawingProgress;
 	return Vector2(
@@ -13,7 +13,7 @@ Vector2 Arc::nextVector(double drawingProgress) {
 	);
 }
 
-void Arc::rotate(double theta) {
+void CircleArc::rotate(double theta) {
 	double cosTheta = std::cos(theta);
 	double sinTheta = std::sin(theta);
 
@@ -41,19 +41,19 @@ void Arc::rotate(double theta) {
 	endAngle = newEndAngle;
 }
 
-void Arc::scale(double x, double y) {
+void CircleArc::scale(double x, double y) {
 	this->x *= x;
 	this->y *= y;
 	this->radiusX *= x;
 	this->radiusY *= y;
 }
 
-void Arc::translate(double x, double y) {
+void CircleArc::translate(double x, double y) {
 	this->x += x;
 	this->y += y;
 }
 
-double Arc::length() {
+double CircleArc::length() {
 	if (len < 0) {
 		len = 0;
 		double angle = startAngle;
@@ -67,10 +67,10 @@ double Arc::length() {
 	return len;
 }
 
-std::unique_ptr<Shape> Arc::clone() {
-	return std::make_unique<Arc>(x, y, radiusX, radiusY, startAngle, endAngle);
+std::unique_ptr<Shape> CircleArc::clone() {
+	return std::make_unique<CircleArc>(x, y, radiusX, radiusY, startAngle, endAngle);
 }
 
-std::string Arc::type() {
+std::string CircleArc::type() {
 	return std::string("Arc");
 }

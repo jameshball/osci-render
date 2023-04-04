@@ -4,9 +4,9 @@
 #include <cstdlib>
 #include <vector>
 #include <memory>
-#include "Vector2.h"
 #include <string>
 
+class Vector2;
 class Shape {
 public:
 	virtual Vector2 nextVector(double drawingProgress) = 0;

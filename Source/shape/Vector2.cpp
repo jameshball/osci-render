@@ -43,3 +43,17 @@ double Vector2::length() {
 double Vector2::magnitude() {
 	return sqrt(x * x + y * y);
 }
+
+std::unique_ptr<Shape> Vector2::clone() {
+	return std::unique_ptr<Shape>();
+}
+
+std::string Vector2::type() {
+	return std::string();
+}
+
+Vector2& Vector2::operator=(const Vector2& other) {
+	x = other.x;
+	y = other.y;
+	return *this;
+}
