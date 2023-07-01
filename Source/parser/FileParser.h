@@ -14,12 +14,15 @@ public:
 
 	void parse(juce::String extension, std::unique_ptr<juce::InputStream>) override;
 	std::vector<std::unique_ptr<Shape>> nextFrame() override;
+	Vector2 nextSample() override;
+	bool isSample() override;
 	bool isActive() override;
 	void disable() override;
 	void enable() override;
 
 private:
 	bool active = true;
+	bool sampleSource = false;
 
 	std::shared_ptr<WorldObject> object;
 	std::shared_ptr<Camera> camera;

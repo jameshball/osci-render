@@ -9,8 +9,10 @@ public:
 	LuaParser(juce::String script);
 	~LuaParser();
 
-	std::vector<std::unique_ptr<Shape>> draw();
+	Vector2 draw();
 private:
+	void parse();
+	int functionRef = -1;
 	long step = 1;
 	lua_State* L;
 	juce::String script;

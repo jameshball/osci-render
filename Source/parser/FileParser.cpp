@@ -23,6 +23,8 @@ void FileParser::parse(juce::String extension, std::unique_ptr<juce::InputStream
 	} else if (extension == ".lua") {
 		lua = std::make_shared<LuaParser>(stream->readEntireStreamAsString());
 	}
+
+	sampleSource = lua != nullptr;
 }
 
 std::vector<std::unique_ptr<Shape>> FileParser::nextFrame() {
@@ -30,7 +32,6 @@ std::vector<std::unique_ptr<Shape>> FileParser::nextFrame() {
 	auto tempCamera = camera;
 	auto tempSvg = svg;
 	auto tempText = text;
-	auto tempLua = lua;
 
 	if (tempObject != nullptr && tempCamera != nullptr) {
 		return tempCamera->draw(*tempObject);
@@ -38,12 +39,21 @@ std::vector<std::unique_ptr<Shape>> FileParser::nextFrame() {
 		return tempSvg->draw();
 	} else if (tempText != nullptr) {
 		return tempText->draw();
-	} else if (tempLua != nullptr) {
-		return tempLua->draw();
 	}
 	auto tempShapes = std::vector<std::unique_ptr<Shape>>();
 	tempShapes.push_back(std::make_unique<CircleArc>(0, 0, 0.5, 0.5, std::numbers::pi / 4.0, 2 * std::numbers::pi));
 	return tempShapes;
+}
+
+Vector2 FileParser::nextSample() {
+	auto tempLua = lua;
+	if (tempLua != nullptr) {
+		return tempLua->draw();
+	}
+}
+
+bool FileParser::isSample() {
+	return sampleSource;
 }
 
 bool FileParser::isActive() {

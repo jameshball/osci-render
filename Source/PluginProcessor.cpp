@@ -300,7 +300,9 @@ void OscirenderAudioProcessor::updateFrame() {
 
             frameLength = Shape::totalLength(frame);
         }
-	}
+    } else {
+        DBG("frame not ready!");
+    }
 }
 
 void OscirenderAudioProcessor::updateLengthIncrement() {
@@ -345,7 +347,11 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         double y = 0.0;
         double length = 0.0;
 
-        if (currentShape < frame.size()) {
+        bool renderingSample = currentFile >= 0 && parsers[currentFile]->isSample();
+
+        if (renderingSample) {
+            channels = parsers[currentFile]->nextSample();
+        } else if (currentShape < frame.size()) {
             auto& shape = frame[currentShape];
             length = shape->length();
             double drawingProgress = length == 0.0 ? 1 : shapeDrawn / length;
@@ -360,6 +366,7 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
 		x = channels.x;
 		y = channels.y;
+        
 
         if (totalNumOutputChannels >= 2) {
 			channelData[0][sample] = x;
@@ -368,29 +375,31 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
             channelData[0][sample] = x;
         }
         
-        // hard cap on how many times it can be over the length to
-        // prevent audio stuttering
-        frameDrawn += std::min(lengthIncrement, 20 * length);
-		shapeDrawn += std::min(lengthIncrement, 20 * length);
+        if (!renderingSample) {
+            // hard cap on how many times it can be over the length to
+            // prevent audio stuttering
+            frameDrawn += std::min(lengthIncrement, 20 * length);
+            shapeDrawn += std::min(lengthIncrement, 20 * length);
 
-        // Need to skip all shapes that the lengthIncrement draws over.
-        // This is especially an issue when there are lots of small lines being
-        // drawn.
-		while (shapeDrawn > length) {
-			shapeDrawn -= length;
-			currentShape++;
-			if (currentShape >= frame.size()) {
-				currentShape = 0;
-                break;
-			}
-            // POTENTIAL TODO: Think of a way to make this more efficient when iterating
-            // this loop many times
-            length = frame[currentShape]->len;
-		}
+            // Need to skip all shapes that the lengthIncrement draws over.
+            // This is especially an issue when there are lots of small lines being
+            // drawn.
+            while (shapeDrawn > length) {
+                shapeDrawn -= length;
+                currentShape++;
+                if (currentShape >= frame.size()) {
+                    currentShape = 0;
+                    break;
+                }
+                // POTENTIAL TODO: Think of a way to make this more efficient when iterating
+                // this loop many times
+                length = frame[currentShape]->len;
+            }
+        }
 
-        if (frameDrawn >= frameLength) {
-			updateFrame();
-		}
+        if (!renderingSample && frameDrawn >= frameLength) {
+            updateFrame();
+        }
 	}
 
 	juce::MidiBuffer processedMidi;
