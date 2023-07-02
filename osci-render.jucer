@@ -88,10 +88,14 @@
               file="Source/components/EffectComponent.cpp"/>
         <FILE id="u4UCwb" name="EffectComponent.h" compile="0" resource="0"
               file="Source/components/EffectComponent.h"/>
-        <FILE id="M9ImIg" name="MyListComponent.cpp" compile="1" resource="0"
-              file="Source/components/MyListComponent.cpp"/>
-        <FILE id="goyxlC" name="MyListComponent.h" compile="0" resource="0"
-              file="Source/components/MyListComponent.h"/>
+        <FILE id="JG4NCF" name="EffectsListComponent.cpp" compile="1" resource="0"
+              file="Source/components/EffectsListComponent.cpp"/>
+        <FILE id="dcLchL" name="EffectsListComponent.h" compile="0" resource="0"
+              file="Source/components/EffectsListComponent.h"/>
+        <FILE id="qIxm1z" name="LuaListComponent.cpp" compile="1" resource="0"
+              file="Source/components/LuaListComponent.cpp"/>
+        <FILE id="x0Syav" name="LuaListComponent.h" compile="0" resource="0"
+              file="Source/components/LuaListComponent.h"/>
       </GROUP>
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
         <FILE id="NWuowi" name="BitCrushEffect.cpp" compile="1" resource="0"

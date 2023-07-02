@@ -6,12 +6,12 @@
 #include "EffectComponent.h"
 
 // Application-specific data container
-struct MyListBoxItemData : public DraggableListBoxItemData
+struct AudioEffectListBoxItemData : public DraggableListBoxItemData
 {
     std::vector<std::shared_ptr<Effect>> data;
     OscirenderAudioProcessor& audioProcessor;
 
-	MyListBoxItemData(OscirenderAudioProcessor& p) : audioProcessor(p) {}
+    AudioEffectListBoxItemData(OscirenderAudioProcessor& p) : audioProcessor(p) {}
 
     int getNumItems() override {
         return data.size();
@@ -91,11 +91,11 @@ struct MyListBoxItemData : public DraggableListBoxItemData
 };
 
 // Custom list-item Component (which includes item-delete button)
-class MyListComponent : public DraggableListBoxItem
+class EffectsListComponent : public DraggableListBoxItem
 {
 public:
-    MyListComponent(DraggableListBox& lb, MyListBoxItemData& data, int rn, std::shared_ptr<EffectComponent> effectComponent);
-    ~MyListComponent();
+    EffectsListComponent(DraggableListBox& lb, AudioEffectListBoxItemData& data, int rn, std::shared_ptr<EffectComponent> effectComponent);
+    ~EffectsListComponent();
 
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -103,15 +103,15 @@ public:
 protected:
     std::shared_ptr<EffectComponent> effectComponent;
 private:
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MyListComponent)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EffectsListComponent)
 };
 
 // Customized DraggableListBoxModel overrides refreshComponentForRow() to ensure that every
-// list-item Component is a MyListComponent.
-class MyListBoxModel : public DraggableListBoxModel
+// list-item Component is a EffectsListComponent.
+class EffectsListBoxModel : public DraggableListBoxModel
 {
 public:
-    MyListBoxModel(DraggableListBox& lb, DraggableListBoxItemData& md)
+    EffectsListBoxModel(DraggableListBox& lb, DraggableListBoxItemData& md)
         : DraggableListBoxModel(lb, md) {}
 
     juce::Component* refreshComponentForRow(int, bool, juce::Component*) override;

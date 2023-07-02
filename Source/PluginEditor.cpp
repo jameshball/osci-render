@@ -11,7 +11,7 @@
 
 //==============================================================================
 OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p)
-	: AudioProcessorEditor(&p), audioProcessor(p), effects(p), main(p, *this), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white)
+	: AudioProcessorEditor(&p), audioProcessor(p), effects(p), main(p, *this), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white), lua(p, *this)
 {
     // Make sure that before the constructor has finished, you've set the
     // editor's size to whatever you need it to be.
@@ -20,6 +20,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 
     addAndMakeVisible(effects);
     addAndMakeVisible(main);
+    addAndMakeVisible(lua);
 
     addAndMakeVisible(collapseButton);
 	collapseButton.onClick = [this] {
@@ -74,6 +75,7 @@ void OscirenderAudioProcessorEditor::resized() {
 	}
 	effects.setBounds(area.removeFromRight(getWidth() / sections));
 	main.setBounds(area.removeFromTop(getHeight() / 2));
+    lua.setBounds(area);
 }
 
 void OscirenderAudioProcessorEditor::addCodeEditor(int index) {

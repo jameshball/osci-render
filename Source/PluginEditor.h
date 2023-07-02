@@ -12,6 +12,7 @@
 #include "PluginProcessor.h"
 #include "EffectsComponent.h"
 #include "MainComponent.h"
+#include "LuaComponent.h"
 
 //==============================================================================
 /**
@@ -33,6 +34,7 @@ private:
     OscirenderAudioProcessor& audioProcessor;
     
     MainComponent main;
+    LuaComponent lua;
     EffectsComponent effects;
     std::vector<std::shared_ptr<juce::CodeDocument>> codeDocuments;
     std::vector<std::shared_ptr<juce::CodeEditorComponent>> codeEditors;

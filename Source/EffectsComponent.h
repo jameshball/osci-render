@@ -4,7 +4,7 @@
 #include "audio/BitCrushEffect.h"
 #include "PluginProcessor.h"
 #include "components/DraggableListBox.h"
-#include "components/MyListComponent.h"
+#include "components/EffectsListComponent.h"
 
 class EffectsComponent : public juce::GroupComponent {
 public:
@@ -18,8 +18,8 @@ private:
 
 	// juce::TextButton addBtn;
 
-	MyListBoxItemData itemData;
-	MyListBoxModel listBoxModel;
+	AudioEffectListBoxItemData itemData;
+	EffectsListBoxModel listBoxModel;
 	DraggableListBox listBox;
 	
 	EffectComponent frequency = EffectComponent(0.0, 12000.0, 0.1, 400, "Frequency", "frequency");
