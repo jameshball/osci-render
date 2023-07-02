@@ -64,6 +64,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 	juce::Path path;
 	path.addTriangle(0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.5f);
 	collapseButton.setShape(path, false, true, true);
+    resized();
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {}
