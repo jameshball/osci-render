@@ -26,16 +26,19 @@ public:
     //==============================================================================
     void paint (juce::Graphics&) override;
     void resized() override;
-
+    
+    void addCodeEditor(int index);
+    void removeCodeEditor(int index);
     void updateCodeEditor();
 private:
     OscirenderAudioProcessor& audioProcessor;
     
     MainComponent main;
     EffectsComponent effects;
-    juce::CodeDocument codeDocument;
+    std::vector<std::shared_ptr<juce::CodeDocument>> codeDocuments;
+    std::vector<std::shared_ptr<juce::CodeEditorComponent>> codeEditors;
     juce::LuaTokeniser luaTokeniser;
-	std::unique_ptr<juce::CodeEditorComponent> codeEditor;
+    juce::XmlTokeniser xmlTokeniser;
 	juce::ShapeButton collapseButton;
 
 	void codeDocumentTextInserted(const juce::String& newText, int insertIndex) override;

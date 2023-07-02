@@ -20,6 +20,7 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 					audioProcessor.addFile(file);
 				}
 			}
+			pluginEditor.addCodeEditor(audioProcessor.getCurrentFileIndex());
 			pluginEditor.updateCodeEditor();
 			updateFileLabel();
 		});
@@ -29,6 +30,11 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 	closeFileButton.setButtonText("Close File");
 	
 	closeFileButton.onClick = [this] {
+		int index = audioProcessor.getCurrentFileIndex();
+		if (index == -1) {
+			return;
+		}
+		pluginEditor.removeCodeEditor(audioProcessor.getCurrentFileIndex());
 		audioProcessor.removeFile(audioProcessor.getCurrentFileIndex());
 		pluginEditor.updateCodeEditor();
 		updateFileLabel();

@@ -21,48 +21,27 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     addAndMakeVisible(effects);
     addAndMakeVisible(main);
 
-	codeEditor = std::make_unique<juce::CodeEditorComponent>(codeDocument, &luaTokeniser);
-	addAndMakeVisible(*codeEditor);
-    
-    codeEditor->loadContent (R"LUA(
-    -- defines a factorial function
-    function fact (n)
-      if n == 0 then
-        return 1
-      else
-        return n * fact(n-1)
-      end
-    end
-    
-    print("enter a number:")
-    a = io.read("*number")        -- read a number
-    print(fact(a))
-)LUA");
-
-    // I need to disable accessibility otherwise it doesn't work! Appears to be a JUCE issue, very annoying!
-    codeEditor->setAccessible(false);
-
-	// listen for changes to the code editor
-	codeDocument.addListener(this);
-
     addAndMakeVisible(collapseButton);
 	collapseButton.onClick = [this] {
-		if (codeEditor->isVisible()) {
-			codeEditor->setVisible(false);
-            juce::Path path;
-            path.addTriangle(0.0f, 0.5f, 1.0f, 1.0f, 1.0f, 0.0f);
-            collapseButton.setShape(path, false, true, true);
-		} else {
-			codeEditor->setVisible(true);
-            updateCodeEditor();
-            juce::Path path;
-            path.addTriangle(0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.5f);
-            collapseButton.setShape(path, false, true, true);
-		}
-        resized();
+        int index = audioProcessor.getCurrentFileIndex();
+        if (index != -1) {
+            if (codeEditors[index]->isVisible()) {
+                codeEditors[index]->setVisible(false);
+                juce::Path path;
+                path.addTriangle(0.0f, 0.5f, 1.0f, 1.0f, 1.0f, 0.0f);
+                collapseButton.setShape(path, false, true, true);
+            } else {
+                codeEditors[index]->setVisible(true);
+                updateCodeEditor();
+                juce::Path path;
+                path.addTriangle(0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.5f);
+                collapseButton.setShape(path, false, true, true);
+            }
+            resized();
+        }
 	};
 	juce::Path path;
-	path.addTriangle(0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.5f);
+    path.addTriangle(0.0f, 0.5f, 1.0f, 1.0f, 1.0f, 0.0f);
 	collapseButton.setShape(path, false, true, true);
     resized();
 }
@@ -81,54 +60,101 @@ void OscirenderAudioProcessorEditor::paint (juce::Graphics& g)
 void OscirenderAudioProcessorEditor::resized() {
     auto area = getLocalBounds();
     auto sections = 2;
-    if (codeEditor != nullptr) {
-		if (codeEditor->isVisible()) {
+    int index = audioProcessor.getCurrentFileIndex();
+    if (index != -1) {
+		if (codeEditors[index]->isVisible()) {
             sections++;
-            codeEditor->setBounds(area.removeFromRight(getWidth() / sections));
+            codeEditors[index]->setBounds(area.removeFromRight(getWidth() / sections));
 		} else {
-			codeEditor->setBounds(0, 0, 0, 0);
+            codeEditors[index]->setBounds(0, 0, 0, 0);
 		}
 		collapseButton.setBounds(area.removeFromRight(20));
-    }
+    } else {
+		collapseButton.setBounds(0, 0, 0, 0);
+	}
 	effects.setBounds(area.removeFromRight(getWidth() / sections));
 	main.setBounds(area.removeFromTop(getHeight() / 2));
 }
 
+void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
+    std::shared_ptr<juce::CodeDocument> codeDocument = std::make_shared<juce::CodeDocument>();
+    codeDocuments.insert(codeDocuments.begin() + index, codeDocument);
+    juce::String extension = audioProcessor.getFile(index).getFileExtension();
+    juce::CodeTokeniser* tokeniser = nullptr;
+    if (extension == ".lua") {
+        tokeniser = &luaTokeniser;
+    } else if (extension == ".svg") {
+        tokeniser = &xmlTokeniser;
+	}
+    std::shared_ptr<juce::CodeEditorComponent> editor = std::make_shared<juce::CodeEditorComponent>(*codeDocument, tokeniser);
+    // I need to disable accessibility otherwise it doesn't work! Appears to be a JUCE issue, very annoying!
+    editor->setAccessible(false);
+    // listen for changes to the code editor
+    codeDocument->addListener(this);
+    codeEditors.insert(codeEditors.begin() + index, editor);
+    addChildComponent(*editor);
+}
+
+void OscirenderAudioProcessorEditor::removeCodeEditor(int index) {
+    codeEditors.erase(codeEditors.begin() + index);
+    codeDocuments.erase(codeDocuments.begin() + index);
+}
+
 void OscirenderAudioProcessorEditor::updateCodeEditor() {
-    if (codeEditor->isVisible() && audioProcessor.getCurrentFileIndex() != -1) {
-        codeEditor->loadContent(juce::MemoryInputStream(*audioProcessor.getFileBlock(audioProcessor.getCurrentFileIndex()), false).readEntireStreamAsString());
+    // check if any code editors are visible
+    bool visible = false;
+    for (int i = 0; i < codeEditors.size(); i++) {
+        if (codeEditors[i]->isVisible()) {
+			visible = true;
+			break;
+		}
+	}
+    int index = audioProcessor.getCurrentFileIndex();
+    if (index != -1 && visible) {
+        for (int i = 0; i < codeEditors.size(); i++) {
+			codeEditors[i]->setVisible(false);
+		}
+        codeEditors[index]->setVisible(true);
+        codeEditors[index]->loadContent(juce::MemoryInputStream(*audioProcessor.getFileBlock(index), false).readEntireStreamAsString());
     }
+    resized();
 }
     
 void OscirenderAudioProcessorEditor::codeDocumentTextInserted(const juce::String& newText, int insertIndex) {
-    juce::String file = codeDocument.getAllContent();
-    audioProcessor.updateFileBlock(audioProcessor.getCurrentFileIndex(), std::make_shared<juce::MemoryBlock>(file.toRawUTF8(), file.getNumBytesAsUTF8() + 1));
+    int index = audioProcessor.getCurrentFileIndex();
+    juce::String file = codeDocuments[index]->getAllContent();
+    audioProcessor.updateFileBlock(index, std::make_shared<juce::MemoryBlock>(file.toRawUTF8(), file.getNumBytesAsUTF8() + 1));
 }
 
 void OscirenderAudioProcessorEditor::codeDocumentTextDeleted(int startIndex, int endIndex) {
-    juce::String file = codeDocument.getAllContent();
-    audioProcessor.updateFileBlock(audioProcessor.getCurrentFileIndex(), std::make_shared<juce::MemoryBlock>(file.toRawUTF8(), file.getNumBytesAsUTF8() + 1));
+    int index = audioProcessor.getCurrentFileIndex();
+    juce::String file = codeDocuments[index]->getAllContent();
+    audioProcessor.updateFileBlock(index, std::make_shared<juce::MemoryBlock>(file.toRawUTF8(), file.getNumBytesAsUTF8() + 1));
 }
 
 bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
     int numFiles = audioProcessor.numFiles();
     int currentFile = audioProcessor.getCurrentFileIndex();
+    bool updated = false;
     if (key.getTextCharacter() == 'j') {
         currentFile++;
         if (currentFile == numFiles) {
             currentFile = 0;
         }
-        audioProcessor.changeCurrentFile(currentFile);
-        updateCodeEditor();
-        return true;
+        updated = true;
     } else if (key.getTextCharacter() == 'k') {
         currentFile--;
         if (currentFile < 0) {
             currentFile = numFiles - 1;
         }
+        updated = true;
+    }
+
+    if (updated) {
         audioProcessor.changeCurrentFile(currentFile);
         updateCodeEditor();
-        return true;
+        main.updateFileLabel();
     }
-    return false;
+
+    return updated;
 }

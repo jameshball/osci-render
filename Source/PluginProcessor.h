@@ -95,6 +95,7 @@ public:
     void changeCurrentFile(int index);
     int getCurrentFileIndex();
 	juce::File getCurrentFile();
+    juce::File getFile(int index);
 	std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
 private:
     double theta = 0.0;
