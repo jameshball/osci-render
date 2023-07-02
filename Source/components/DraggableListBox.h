@@ -8,7 +8,6 @@ struct DraggableListBoxItemData
     virtual ~DraggableListBoxItemData() = 0;
     
     virtual int getNumItems() = 0;
-    virtual void paintContents(int, juce::Graphics&, juce::Rectangle<int>) = 0;
 
     virtual void moveBefore(int indexOfItemToMove, int indexOfItemToPlaceBefore) = 0;
     virtual void moveAfter(int indexOfItemToMove, int indexOfItemToPlaceAfter) = 0;

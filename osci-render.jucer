@@ -7,6 +7,9 @@
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <FILE id="X26RjJ" name="LuaComponent.cpp" compile="1" resource="0"
+            file="Source/LuaComponent.cpp"/>
+      <FILE id="g5xRHT" name="LuaComponent.h" compile="0" resource="0" file="Source/LuaComponent.h"/>
       <GROUP id="{75F6236A-68A5-85DA-EDAE-23D1621601DB}" name="lua">
         <FILE id="X5i9iw" name="lapi.c" compile="1" resource="0" file="Source/lua/lapi.c"/>
         <FILE id="J62WSE" name="lapi.h" compile="0" resource="0" file="Source/lua/lapi.h"/>
@@ -81,6 +84,10 @@
               file="Source/components/DraggableListBox.cpp"/>
         <FILE id="Y9NEGn" name="DraggableListBox.h" compile="0" resource="0"
               file="Source/components/DraggableListBox.h"/>
+        <FILE id="xLAEHK" name="EffectComponent.cpp" compile="1" resource="0"
+              file="Source/components/EffectComponent.cpp"/>
+        <FILE id="u4UCwb" name="EffectComponent.h" compile="0" resource="0"
+              file="Source/components/EffectComponent.h"/>
         <FILE id="M9ImIg" name="MyListComponent.cpp" compile="1" resource="0"
               file="Source/components/MyListComponent.cpp"/>
         <FILE id="goyxlC" name="MyListComponent.h" compile="0" resource="0"
@@ -196,10 +203,6 @@
       <FILE id="GKBQ8j" name="MainComponent.cpp" compile="1" resource="0"
             file="Source/MainComponent.cpp"/>
       <FILE id="RU8fGr" name="MainComponent.h" compile="0" resource="0" file="Source/MainComponent.h"/>
-      <FILE id="PBCW3H" name="EffectComponentGroup.cpp" compile="1" resource="0"
-            file="Source/EffectComponentGroup.cpp"/>
-      <FILE id="FXKqir" name="EffectComponentGroup.h" compile="0" resource="0"
-            file="Source/EffectComponentGroup.h"/>
       <FILE id="I44EdJ" name="EffectsComponent.cpp" compile="1" resource="0"
             file="Source/EffectsComponent.cpp"/>
       <FILE id="qxxNX3" name="EffectsComponent.h" compile="0" resource="0"

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "EffectComponentGroup.h"
 #include "PluginProcessor.h"
 #include "parser/FileParser.h"
 #include "parser/FrameProducer.h"

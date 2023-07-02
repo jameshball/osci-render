@@ -10,7 +10,6 @@
 
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
-#include "EffectComponentGroup.h"
 #include "EffectsComponent.h"
 #include "MainComponent.h"
 

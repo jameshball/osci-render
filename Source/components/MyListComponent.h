@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include "../PluginProcessor.h"
 #include "../audio/Effect.h"
+#include "EffectComponent.h"
 
 // Application-specific data container
 struct MyListBoxItemData : public DraggableListBoxItemData
@@ -22,14 +23,6 @@ struct MyListBoxItemData : public DraggableListBoxItemData
 
     void addItemAtEnd() override {
         // data.push_back(juce::String("Yahoo"));
-    }
-
-    void paintContents(int rowNum, juce::Graphics& g, juce::Rectangle<int> bounds) override {
-        g.fillAll(juce::Colours::lightgrey);
-        g.setColour(juce::Colours::black);
-        g.drawRect(bounds);
-		bounds.removeFromLeft(30);
-		g.drawText(data[rowNum]->getName(), bounds, juce::Justification::left);
     }
 
 	void moveBefore(int indexOfItemToMove, int indexOfItemToPlaceBefore) override {
@@ -101,19 +94,14 @@ struct MyListBoxItemData : public DraggableListBoxItemData
 class MyListComponent : public DraggableListBoxItem
 {
 public:
-    MyListComponent(DraggableListBox& lb, MyListBoxItemData& data, int rn);
+    MyListComponent(DraggableListBox& lb, MyListBoxItemData& data, int rn, std::shared_ptr<EffectComponent> effectComponent);
     ~MyListComponent();
 
-    void paint(juce::Graphics&) override;
+    void paint(juce::Graphics& g) override;
     void resized() override;
 
 protected:
-    juce::Rectangle<int> dataArea;
-    
-    juce::Slider slider;
-    juce::String id;
-    juce::ToggleButton selected;
-
+    std::shared_ptr<EffectComponent> effectComponent;
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MyListComponent)
 };
