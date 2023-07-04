@@ -6,6 +6,8 @@
 class Effect {
 public:
 	Effect(std::unique_ptr<EffectApplication> effectApplication, juce::String name, juce::String id);
+	Effect(juce::String name, juce::String id);
+	Effect(juce::String name, juce::String id, double value);
 
 	Vector2 apply(int index, Vector2 input);
 	double getValue();

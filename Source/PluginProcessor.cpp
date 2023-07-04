@@ -230,6 +230,9 @@ void OscirenderAudioProcessor::updateEffectPrecedence() {
 }
 
 void OscirenderAudioProcessor::updateFileBlock(int index, std::shared_ptr<juce::MemoryBlock> block) {
+    if (index < 0 || index >= fileBlocks.size()) {
+		return;
+	}
 	fileBlocks[index] = block;
 	openFile(index);
 }
@@ -387,10 +390,18 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         double y = 0.0;
         double length = 0.0;
 
-        bool renderingSample = currentFile >= 0 && parsers[currentFile]->isSample();
+
+        std::shared_ptr<FileParser> sampleParser;
+        {
+            juce::SpinLock::ScopedLockType lock(parsersLock);
+            if (currentFile >= 0 && parsers[currentFile]->isSample()) {
+                sampleParser = parsers[currentFile];
+            }
+        }
+        bool renderingSample = sampleParser != nullptr;
 
         if (renderingSample) {
-            channels = parsers[currentFile]->nextSample();
+            channels = sampleParser->nextSample();
         } else if (currentShape < frame.size()) {
             auto& shape = frame[currentShape];
             length = shape->length();

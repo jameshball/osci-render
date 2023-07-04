@@ -7,6 +7,9 @@
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <FILE id="RHHuXP" name="ObjComponent.cpp" compile="1" resource="0"
+            file="Source/ObjComponent.cpp"/>
+      <FILE id="mliVoS" name="ObjComponent.h" compile="0" resource="0" file="Source/ObjComponent.h"/>
       <FILE id="X26RjJ" name="LuaComponent.cpp" compile="1" resource="0"
             file="Source/LuaComponent.cpp"/>
       <FILE id="g5xRHT" name="LuaComponent.h" compile="0" resource="0" file="Source/LuaComponent.h"/>

@@ -12,6 +12,10 @@ EffectComponent::EffectComponent(double min, double max, double step, Effect& ef
     slider.setValue(effect.getValue(), juce::dontSendNotification);
 }
 
+EffectComponent::EffectComponent(double min, double max, double step, Effect& effect, bool hideCheckbox) : EffectComponent(min, max, step, effect) {
+	setHideCheckbox(hideCheckbox);
+}
+
 void EffectComponent::componentSetup() {
     addAndMakeVisible(slider);
     addAndMakeVisible(selected);

@@ -11,7 +11,7 @@
 
 //==============================================================================
 OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p)
-	: AudioProcessorEditor(&p), audioProcessor(p), effects(p), main(p, *this), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white), lua(p, *this)
+	: AudioProcessorEditor(&p), audioProcessor(p), effects(p), main(p, *this), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white), lua(p, *this), obj(p, *this)
 {
     // Make sure that before the constructor has finished, you've set the
     // editor's size to whatever you need it to be.
@@ -20,10 +20,12 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 
     addAndMakeVisible(effects);
     addAndMakeVisible(main);
-    addAndMakeVisible(lua);
+    addChildComponent(lua);
+    addChildComponent(obj);
 
     addAndMakeVisible(collapseButton);
 	collapseButton.onClick = [this] {
+        juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
         int index = audioProcessor.getCurrentFileIndex();
         if (index != -1) {
             if (codeEditors[index]->isVisible()) {
@@ -76,6 +78,7 @@ void OscirenderAudioProcessorEditor::resized() {
 	effects.setBounds(area.removeFromRight(getWidth() / sections));
 	main.setBounds(area.removeFromTop(getHeight() / 2));
     lua.setBounds(area);
+    obj.setBounds(area);
 }
 
 void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
@@ -102,6 +105,8 @@ void OscirenderAudioProcessorEditor::removeCodeEditor(int index) {
     codeDocuments.erase(codeDocuments.begin() + index);
 }
 
+
+// parsersLock must be locked before calling this function
 void OscirenderAudioProcessorEditor::updateCodeEditor() {
     // check if any code editors are visible
     bool visible = false;
@@ -114,27 +119,40 @@ void OscirenderAudioProcessorEditor::updateCodeEditor() {
     int index = audioProcessor.getCurrentFileIndex();
     if (index != -1 && visible) {
         for (int i = 0; i < codeEditors.size(); i++) {
-			codeEditors[i]->setVisible(false);
-		}
+            codeEditors[i]->setVisible(false);
+        }
         codeEditors[index]->setVisible(true);
         codeEditors[index]->loadContent(juce::MemoryInputStream(*audioProcessor.getFileBlock(index), false).readEntireStreamAsString());
     }
     resized();
 }
+
+void OscirenderAudioProcessorEditor::fileUpdated(juce::File file) {
+    lua.setVisible(false);
+    obj.setVisible(false);
+    if (file.getFileExtension() == ".lua") {
+        lua.setVisible(true);
+    } else if (file.getFileExtension() == ".obj") {
+		obj.setVisible(true);
+	}
+}
     
 void OscirenderAudioProcessorEditor::codeDocumentTextInserted(const juce::String& newText, int insertIndex) {
+    juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
     int index = audioProcessor.getCurrentFileIndex();
     juce::String file = codeDocuments[index]->getAllContent();
     audioProcessor.updateFileBlock(index, std::make_shared<juce::MemoryBlock>(file.toRawUTF8(), file.getNumBytesAsUTF8() + 1));
 }
 
 void OscirenderAudioProcessorEditor::codeDocumentTextDeleted(int startIndex, int endIndex) {
+    juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
     int index = audioProcessor.getCurrentFileIndex();
     juce::String file = codeDocuments[index]->getAllContent();
     audioProcessor.updateFileBlock(index, std::make_shared<juce::MemoryBlock>(file.toRawUTF8(), file.getNumBytesAsUTF8() + 1));
 }
 
 bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
+    juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
     int numFiles = audioProcessor.numFiles();
     int currentFile = audioProcessor.getCurrentFileIndex();
     bool updated = false;
@@ -154,6 +172,7 @@ bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
 
     if (updated) {
         audioProcessor.changeCurrentFile(currentFile);
+        fileUpdated(audioProcessor.getCurrentFile());
         updateCodeEditor();
         main.updateFileLabel();
     }

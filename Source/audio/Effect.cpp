@@ -4,7 +4,14 @@ Effect::Effect(std::unique_ptr<EffectApplication> effectApplication, juce::Strin
 	this->effectApplication = std::move(effectApplication);
 }
 
+Effect::Effect(juce::String name, juce::String id) : name(name), id(id) {}
+
+Effect::Effect(juce::String name, juce::String id, double value) : name(name), id(id), value(value) {}
+
 Vector2 Effect::apply(int index, Vector2 input) {
+	if (effectApplication == nullptr) {
+		return input;
+	}
 	return effectApplication->apply(index, input, value, frequency, sampleRate);
 }
 

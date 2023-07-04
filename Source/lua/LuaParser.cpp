@@ -40,19 +40,18 @@ Vector2 LuaParser::draw() {
 
     // this CANNOT run at the same time as setVariable
     if (updateVariables) {
-		bool expected = false;
-        if (accessingVariables.compare_exchange_strong(expected, true)) {
+        juce::SpinLock::ScopedTryLockType lock(variableLock);
+        if (lock.isLocked()) {
             for (int i = 0; i < variableNames.size(); i++) {
-				lua_pushnumber(L, variables[i]);
-				lua_setglobal(L, variableNames[i].toUTF8());
-                DBG("set " + variableNames[i] + " to " + juce::String(variables[i]));
-			}
+                lua_pushnumber(L, variables[i]);
+                lua_setglobal(L, variableNames[i].toUTF8());
+                DBG("set " << variableNames[i] << " to " << variables[i]);
+            }
             variableNames.clear();
             variables.clear();
-            accessingVariables = false;
-			updateVariables = false;
+            updateVariables = false;
 		}
-	}
+    }
     
 	lua_geti(L, LUA_REGISTRYINDEX, functionRef);
     
@@ -86,15 +85,9 @@ Vector2 LuaParser::draw() {
 
 // this CANNOT run at the same time as draw()
 // many threads can run this function
-bool LuaParser::setVariable(juce::String variableName, double value) {
-    bool expected = false;
-    // this is very unlikely to fail, and if it does, it's not a big deal
-    if (accessingVariables.compare_exchange_strong(expected, true)) {
-		variableNames.push_back(variableName);
-		variables.push_back(value);
-        accessingVariables = false;
-        updateVariables = true;
-        return true;
-    }
-    return false;
+void LuaParser::setVariable(juce::String variableName, double value) {
+    juce::SpinLock::ScopedLockType lock(variableLock);
+	variableNames.push_back(variableName);
+	variables.push_back(value);
+    updateVariables = true;
 }

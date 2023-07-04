@@ -8,6 +8,7 @@ class EffectComponent : public juce::Component {
 public:
     EffectComponent(double min, double max, double step, double value, juce::String name, juce::String id);
     EffectComponent(double min, double max, double step, Effect& effect);
+    EffectComponent(double min, double max, double step, Effect& effect, bool hideCheckbox);
     ~EffectComponent();
 
     void resized() override;

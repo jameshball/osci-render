@@ -72,10 +72,17 @@ public:
 
     std::vector<std::shared_ptr<Effect>> luaEffects;
     
+    Effect focalLength{"Focal length", "focalLength", 1};
+    Effect rotateX{"Rotate x", "rotateX", 0};
+    Effect rotateY{"Rotate y", "rotateY", 0};
+    Effect rotateZ{"Rotate z", "rotateZ", 0};
+    Effect rotateSpeed{"Rotate speed", "rotateSpeed", 0};
+    
+    juce::SpinLock parsersLock;
     std::vector<std::shared_ptr<FileParser>> parsers;
     std::vector<std::shared_ptr<juce::MemoryBlock>> fileBlocks;
     std::vector<juce::File> files;
-    int currentFile = -1;
+    std::atomic<int> currentFile = -1;
     
     std::unique_ptr<FrameProducer> producer;
 
@@ -90,7 +97,6 @@ public:
     void addFile(juce::File file);
     void removeFile(int index);
     int numFiles();
-    void openFile(int index);
     void changeCurrentFile(int index);
     int getCurrentFileIndex();
     std::shared_ptr<FileParser> getCurrentFileParser();
@@ -116,7 +122,7 @@ private:
 
 	void updateFrame();
     void updateLengthIncrement();
-    void syncLuaSliders();
+    void openFile(int index);
 
     const double MIN_LENGTH_INCREMENT = 0.000001;
 

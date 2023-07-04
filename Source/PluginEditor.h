@@ -13,6 +13,7 @@
 #include "EffectsComponent.h"
 #include "MainComponent.h"
 #include "LuaComponent.h"
+#include "ObjComponent.h"
 
 //==============================================================================
 /**
@@ -30,11 +31,13 @@ public:
     void addCodeEditor(int index);
     void removeCodeEditor(int index);
     void updateCodeEditor();
+    void fileUpdated(juce::File file);
 private:
     OscirenderAudioProcessor& audioProcessor;
     
     MainComponent main;
     LuaComponent lua;
+    ObjComponent obj;
     EffectsComponent effects;
     std::vector<std::shared_ptr<juce::CodeDocument>> codeDocuments;
     std::vector<std::shared_ptr<juce::CodeEditorComponent>> codeEditors;

@@ -10,7 +10,7 @@ public:
 	~LuaParser();
 
 	Vector2 draw();
-	bool setVariable(juce::String variableName, double value);
+	void setVariable(juce::String variableName, double value);
 
 private:
 	void parse();
@@ -20,7 +20,7 @@ private:
 	lua_State* L;
 	juce::String script;
 	std::atomic<bool> updateVariables = false;
-	std::atomic<bool> accessingVariables = false;
+	juce::SpinLock variableLock;
 	std::vector<juce::String> variableNames;
 	std::vector<double> variables;
 };
