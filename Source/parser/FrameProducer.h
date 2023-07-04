@@ -14,5 +14,5 @@ public:
 private:
 	FrameConsumer& frameConsumer;
 	std::shared_ptr<FrameSource> frameSource;
-	int sourceFileIndex = 0;
+	int sourceFileIndex = -1;
 };

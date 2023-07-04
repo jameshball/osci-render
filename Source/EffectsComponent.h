@@ -2,10 +2,9 @@
 
 #include <JuceHeader.h>
 #include "audio/BitCrushEffect.h"
-#include "EffectComponentGroup.h"
 #include "PluginProcessor.h"
 #include "components/DraggableListBox.h"
-#include "components/MyListComponent.h"
+#include "components/EffectsListComponent.h"
 
 class EffectsComponent : public juce::GroupComponent {
 public:
@@ -17,13 +16,13 @@ public:
 private:
 	OscirenderAudioProcessor& audioProcessor;
 
-	juce::TextButton addBtn;
+	// juce::TextButton addBtn;
 
-	MyListBoxItemData itemData;
-	MyListBoxModel listBoxModel;
+	AudioEffectListBoxItemData itemData;
+	EffectsListBoxModel listBoxModel;
 	DraggableListBox listBox;
 	
-	EffectComponentGroup frequency = EffectComponentGroup("frequency", "Frequency");
+	EffectComponent frequency = EffectComponent(0.0, 12000.0, 0.1, 400, "Frequency", "frequency");
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EffectsComponent)
 };

@@ -5,8 +5,8 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p) : audioProcessor
 	setText("Audio Effects");
 
     addAndMakeVisible(frequency);
+    frequency.setHideCheckbox(true);
 
-    frequency.slider.setRange(0.0, 12000.0);
     frequency.slider.setSkewFactorFromMidPoint(500.0);
     frequency.slider.setTextValueSuffix("Hz");
     frequency.slider.setValue(audioProcessor.frequency, juce::dontSendNotification);
@@ -43,13 +43,8 @@ EffectsComponent::~EffectsComponent() {
 }
 
 void EffectsComponent::resized() {
-    auto xPadding = 10;
-    auto yPadding = 20;
-    frequency.setBounds(xPadding, yPadding, getWidth() - xPadding, 40);
-
     auto area = getLocalBounds().reduced(20);
-    auto row = area.removeFromTop(24);
-    addBtn.setBounds(row.removeFromRight(100));
+    frequency.setBounds(area.removeFromTop(30));
 
     area.removeFromTop(6);
     listBox.setBounds(area);

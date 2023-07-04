@@ -14,8 +14,6 @@
 #include "parser/FrameProducer.h"
 #include "parser/FrameConsumer.h"
 #include "audio/Effect.h"
-#include "audio/BitCrushEffect.h"
-#include "audio/BulgeEffect.h"
 
 //==============================================================================
 /**
@@ -72,8 +70,7 @@ public:
 	std::vector<std::shared_ptr<Effect>> allEffects;
 	std::shared_ptr<std::vector<std::shared_ptr<Effect>>> enabledEffects = std::make_shared<std::vector<std::shared_ptr<Effect>>>();
 
-    BitCrushEffect bitCrushEffect = BitCrushEffect();
-	BulgeEffect bulgeEffect = BulgeEffect();
+    std::vector<std::shared_ptr<Effect>> luaEffects;
     
     std::vector<std::shared_ptr<FileParser>> parsers;
     std::vector<std::shared_ptr<juce::MemoryBlock>> fileBlocks;
@@ -82,6 +79,8 @@ public:
     
     std::unique_ptr<FrameProducer> producer;
 
+    void addLuaSlider();
+    void updateLuaValues();
     void updateAngleDelta();
     void addFrame(std::vector<std::unique_ptr<Shape>> frame, int fileIndex) override;
 	void enableEffect(std::shared_ptr<Effect> effect);
@@ -94,7 +93,9 @@ public:
     void openFile(int index);
     void changeCurrentFile(int index);
     int getCurrentFileIndex();
+    std::shared_ptr<FileParser> getCurrentFileParser();
 	juce::File getCurrentFile();
+    juce::File getFile(int index);
 	std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
 private:
     double theta = 0.0;
@@ -115,6 +116,7 @@ private:
 
 	void updateFrame();
     void updateLengthIncrement();
+    void syncLuaSliders();
 
     const double MIN_LENGTH_INCREMENT = 0.000001;
 

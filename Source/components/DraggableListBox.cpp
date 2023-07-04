@@ -4,8 +4,6 @@ DraggableListBoxItemData::~DraggableListBoxItemData() {};
 
 void DraggableListBoxItem::paint(juce::Graphics& g)
 {
-    modelData.paintContents(rowNum, g, getLocalBounds());
-
     if (insertAfter)
     {
         g.setColour(juce::Colours::red);

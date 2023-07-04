@@ -1,7 +1,6 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "EffectComponentGroup.h"
 #include "PluginProcessor.h"
 #include "parser/FileParser.h"
 #include "parser/FrameProducer.h"
@@ -13,6 +12,7 @@ public:
 	~MainComponent() override;
 
 	void resized() override;
+	void updateFileLabel();
 private:
 	OscirenderAudioProcessor& audioProcessor;
 	OscirenderAudioProcessorEditor& pluginEditor;
@@ -21,8 +21,6 @@ private:
 	juce::TextButton fileButton;
 	juce::TextButton closeFileButton;
 	juce::Label fileLabel;
-
-	void updateFileLabel();
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };

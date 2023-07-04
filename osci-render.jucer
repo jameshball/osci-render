@@ -7,6 +7,9 @@
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <FILE id="X26RjJ" name="LuaComponent.cpp" compile="1" resource="0"
+            file="Source/LuaComponent.cpp"/>
+      <FILE id="g5xRHT" name="LuaComponent.h" compile="0" resource="0" file="Source/LuaComponent.h"/>
       <GROUP id="{75F6236A-68A5-85DA-EDAE-23D1621601DB}" name="lua">
         <FILE id="X5i9iw" name="lapi.c" compile="1" resource="0" file="Source/lua/lapi.c"/>
         <FILE id="J62WSE" name="lapi.h" compile="0" resource="0" file="Source/lua/lapi.h"/>
@@ -81,10 +84,18 @@
               file="Source/components/DraggableListBox.cpp"/>
         <FILE id="Y9NEGn" name="DraggableListBox.h" compile="0" resource="0"
               file="Source/components/DraggableListBox.h"/>
-        <FILE id="M9ImIg" name="MyListComponent.cpp" compile="1" resource="0"
-              file="Source/components/MyListComponent.cpp"/>
-        <FILE id="goyxlC" name="MyListComponent.h" compile="0" resource="0"
-              file="Source/components/MyListComponent.h"/>
+        <FILE id="xLAEHK" name="EffectComponent.cpp" compile="1" resource="0"
+              file="Source/components/EffectComponent.cpp"/>
+        <FILE id="u4UCwb" name="EffectComponent.h" compile="0" resource="0"
+              file="Source/components/EffectComponent.h"/>
+        <FILE id="JG4NCF" name="EffectsListComponent.cpp" compile="1" resource="0"
+              file="Source/components/EffectsListComponent.cpp"/>
+        <FILE id="dcLchL" name="EffectsListComponent.h" compile="0" resource="0"
+              file="Source/components/EffectsListComponent.h"/>
+        <FILE id="qIxm1z" name="LuaListComponent.cpp" compile="1" resource="0"
+              file="Source/components/LuaListComponent.cpp"/>
+        <FILE id="x0Syav" name="LuaListComponent.h" compile="0" resource="0"
+              file="Source/components/LuaListComponent.h"/>
       </GROUP>
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
         <FILE id="NWuowi" name="BitCrushEffect.cpp" compile="1" resource="0"
@@ -102,6 +113,8 @@
               file="Source/audio/EffectApplication.cpp"/>
         <FILE id="MIYJ9y" name="EffectApplication.h" compile="0" resource="0"
               file="Source/audio/EffectApplication.h"/>
+        <FILE id="uhyh7T" name="LuaEffect.cpp" compile="1" resource="0" file="Source/audio/LuaEffect.cpp"/>
+        <FILE id="jqDcZq" name="LuaEffect.h" compile="0" resource="0" file="Source/audio/LuaEffect.h"/>
         <FILE id="PbbNqz" name="RotateEffect.cpp" compile="1" resource="0"
               file="Source/audio/RotateEffect.cpp"/>
         <FILE id="tUwNZV" name="RotateEffect.h" compile="0" resource="0" file="Source/audio/RotateEffect.h"/>
@@ -196,10 +209,6 @@
       <FILE id="GKBQ8j" name="MainComponent.cpp" compile="1" resource="0"
             file="Source/MainComponent.cpp"/>
       <FILE id="RU8fGr" name="MainComponent.h" compile="0" resource="0" file="Source/MainComponent.h"/>
-      <FILE id="PBCW3H" name="EffectComponentGroup.cpp" compile="1" resource="0"
-            file="Source/EffectComponentGroup.cpp"/>
-      <FILE id="FXKqir" name="EffectComponentGroup.h" compile="0" resource="0"
-            file="Source/EffectComponentGroup.h"/>
       <FILE id="I44EdJ" name="EffectsComponent.cpp" compile="1" resource="0"
             file="Source/EffectsComponent.cpp"/>
       <FILE id="qxxNX3" name="EffectsComponent.h" compile="0" resource="0"

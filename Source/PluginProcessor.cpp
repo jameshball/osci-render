@@ -14,6 +14,9 @@
 #include "audio/VectorCancellingEffect.h"
 #include "audio/DistortEffect.h"
 #include "audio/SmoothEffect.h"
+#include "audio/BitCrushEffect.h"
+#include "audio/BulgeEffect.h"
+#include "audio/LuaEffect.h"
 
 //==============================================================================
 OscirenderAudioProcessor::OscirenderAudioProcessor()
@@ -38,6 +41,10 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     allEffects.push_back(std::make_shared<Effect>(std::make_unique<DistortEffect>(true), "Vertical shift", "verticalDistort"));
     allEffects.push_back(std::make_shared<Effect>(std::make_unique<DistortEffect>(false), "Horizontal shift", "horizontalDistort"));
     allEffects.push_back(std::make_shared<Effect>(std::make_unique<SmoothEffect>(), "Smoothing", "smoothing"));
+
+    for (int i = 0; i < 5; i++) {
+        addLuaSlider();
+    }
 }
 
 OscirenderAudioProcessor::~OscirenderAudioProcessor()
@@ -145,6 +152,26 @@ bool OscirenderAudioProcessor::isBusesLayoutSupported (const BusesLayout& layout
 }
 #endif
 
+void OscirenderAudioProcessor::addLuaSlider() {
+    juce::String sliderName = "";
+
+    int sliderNum = luaEffects.size() + 1;
+    while (sliderNum > 0) {
+        int mod = (sliderNum - 1) % 26;
+        sliderName = (char)(mod + 'A') + sliderName;
+        sliderNum = (sliderNum - mod) / 26;
+    }
+
+    luaEffects.push_back(std::make_shared<Effect>(std::make_unique<LuaEffect>(sliderName, *this), "Lua " + sliderName, "lua" + sliderName));
+}
+
+void OscirenderAudioProcessor::updateLuaValues() {
+    Vector2 vector;
+    for (auto& effect : luaEffects) {
+        effect->apply(0, vector);
+	}
+}
+
 void OscirenderAudioProcessor::updateAngleDelta() {
 	auto cyclesPerSample = frequency / currentSampleRate;
 	thetaDelta = cyclesPerSample * 2.0 * juce::MathConstants<double>::pi;
@@ -238,9 +265,14 @@ void OscirenderAudioProcessor::openFile(int index) {
     producer->setSource(parsers[index], index);
     currentFile = index;
 	invalidateFrameBuffer = true;
+    updateLuaValues();
 }
 
 void OscirenderAudioProcessor::changeCurrentFile(int index) {
+    if (index == -1) {
+        currentFile = -1;
+        producer->setSource(std::make_shared<FileParser>(), -1);
+    }
 	if (index < 0 || index >= fileBlocks.size()) {
 		return;
 	}
@@ -253,8 +285,16 @@ int OscirenderAudioProcessor::getCurrentFileIndex() {
     return currentFile;
 }
 
+std::shared_ptr<FileParser> OscirenderAudioProcessor::getCurrentFileParser() {
+    return parsers[currentFile];
+}
+
 juce::File OscirenderAudioProcessor::getCurrentFile() {
     return files[currentFile];
+}
+
+juce::File OscirenderAudioProcessor::getFile(int index) {
+    return files[index];
 }
 
 std::shared_ptr<juce::MemoryBlock> OscirenderAudioProcessor::getFileBlock(int index) {
@@ -300,7 +340,9 @@ void OscirenderAudioProcessor::updateFrame() {
 
             frameLength = Shape::totalLength(frame);
         }
-	}
+    } else {
+        DBG("frame not ready!");
+    }
 }
 
 void OscirenderAudioProcessor::updateLengthIncrement() {
@@ -345,7 +387,11 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         double y = 0.0;
         double length = 0.0;
 
-        if (currentShape < frame.size()) {
+        bool renderingSample = currentFile >= 0 && parsers[currentFile]->isSample();
+
+        if (renderingSample) {
+            channels = parsers[currentFile]->nextSample();
+        } else if (currentShape < frame.size()) {
             auto& shape = frame[currentShape];
             length = shape->length();
             double drawingProgress = length == 0.0 ? 1 : shapeDrawn / length;
@@ -360,6 +406,7 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
 		x = channels.x;
 		y = channels.y;
+        
 
         if (totalNumOutputChannels >= 2) {
 			channelData[0][sample] = x;
@@ -368,29 +415,31 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
             channelData[0][sample] = x;
         }
         
-        // hard cap on how many times it can be over the length to
-        // prevent audio stuttering
-        frameDrawn += std::min(lengthIncrement, 20 * length);
-		shapeDrawn += std::min(lengthIncrement, 20 * length);
+        if (!renderingSample) {
+            // hard cap on how many times it can be over the length to
+            // prevent audio stuttering
+            frameDrawn += std::min(lengthIncrement, 20 * length);
+            shapeDrawn += std::min(lengthIncrement, 20 * length);
 
-        // Need to skip all shapes that the lengthIncrement draws over.
-        // This is especially an issue when there are lots of small lines being
-        // drawn.
-		while (shapeDrawn > length) {
-			shapeDrawn -= length;
-			currentShape++;
-			if (currentShape >= frame.size()) {
-				currentShape = 0;
-                break;
-			}
-            // POTENTIAL TODO: Think of a way to make this more efficient when iterating
-            // this loop many times
-            length = frame[currentShape]->len;
-		}
+            // Need to skip all shapes that the lengthIncrement draws over.
+            // This is especially an issue when there are lots of small lines being
+            // drawn.
+            while (shapeDrawn > length) {
+                shapeDrawn -= length;
+                currentShape++;
+                if (currentShape >= frame.size()) {
+                    currentShape = 0;
+                    break;
+                }
+                // POTENTIAL TODO: Think of a way to make this more efficient when iterating
+                // this loop many times
+                length = frame[currentShape]->len;
+            }
+        }
 
-        if (frameDrawn >= frameLength) {
-			updateFrame();
-		}
+        if (!renderingSample && frameDrawn >= frameLength) {
+            updateFrame();
+        }
 	}
 
 	juce::MidiBuffer processedMidi;
