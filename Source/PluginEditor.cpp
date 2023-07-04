@@ -136,16 +136,18 @@ void OscirenderAudioProcessorEditor::fileUpdated(juce::File file) {
 		obj.setVisible(true);
 	}
 }
-    
+
+// parsersLock must be locked before calling this function
 void OscirenderAudioProcessorEditor::codeDocumentTextInserted(const juce::String& newText, int insertIndex) {
-    juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
-    int index = audioProcessor.getCurrentFileIndex();
-    juce::String file = codeDocuments[index]->getAllContent();
-    audioProcessor.updateFileBlock(index, std::make_shared<juce::MemoryBlock>(file.toRawUTF8(), file.getNumBytesAsUTF8() + 1));
+    updateCodeDocument();
 }
 
+// parsersLock must be locked before calling this function
 void OscirenderAudioProcessorEditor::codeDocumentTextDeleted(int startIndex, int endIndex) {
-    juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+    updateCodeDocument();
+}
+
+void OscirenderAudioProcessorEditor::updateCodeDocument() {
     int index = audioProcessor.getCurrentFileIndex();
     juce::String file = codeDocuments[index]->getAllContent();
     audioProcessor.updateFileBlock(index, std::make_shared<juce::MemoryBlock>(file.toRawUTF8(), file.getNumBytesAsUTF8() + 1));

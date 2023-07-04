@@ -47,6 +47,7 @@ private:
 
 	void codeDocumentTextInserted(const juce::String& newText, int insertIndex) override;
 	void codeDocumentTextDeleted(int startIndex, int endIndex) override;
+    void updateCodeDocument();
 
     bool keyPressed(const juce::KeyPress& key) override;
 
