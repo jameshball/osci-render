@@ -1,17 +1,14 @@
 #include "LuaListComponent.h"
 
-LuaListComponent::LuaListComponent(int sliderNum) {
-	juce::String sliderName = "";
-
-	sliderNum++;
-	while (sliderNum > 0) {
-		int mod = (sliderNum - 1) % 26;
-		sliderName = (char)(mod + 'A') + sliderName;
-		sliderNum = (sliderNum - mod) / 26;
-	}
-	
-	effectComponent = std::make_shared<EffectComponent>(0.0, 1.0, 0.01, 0, "Lua " + sliderName, "lua" + sliderName);
+LuaListComponent::LuaListComponent(OscirenderAudioProcessor& p, Effect& effect) {
+	effectComponent = std::make_shared<EffectComponent>(0.0, 1.0, 0.01, effect);
 	effectComponent->setHideCheckbox(true);
+
+	effectComponent->slider.onValueChange = [this, &effect, &p] {
+		effect.setValue(effectComponent->slider.getValue());
+		effect.apply(0, Vector2());
+	};
+
 	addAndMakeVisible(*effectComponent);
 }
 
@@ -24,23 +21,23 @@ void LuaListComponent::resized() {
 void paintListBoxItem(int sliderNum, juce::Graphics& g, int width, int height, bool rowIsSelected) {}
 
 int LuaListBoxModel::getNumRows() {
-	return numSliders + 1;
+	return audioProcessor.luaEffects.size() + 1;
 }
 
 void LuaListBoxModel::paintListBoxItem(int rowNumber, juce::Graphics& g, int width, int height, bool rowIsSelected) {}
 
-juce::Component* LuaListBoxModel::refreshComponentForRow(int sliderNum, bool isRowSelected, juce::Component *existingComponentToUpdate) {
-	if (sliderNum < getNumRows() - 1) {
+juce::Component* LuaListBoxModel::refreshComponentForRow(int rowNum, bool isRowSelected, juce::Component *existingComponentToUpdate) {
+	if (rowNum < getNumRows() - 1) {
 		std::unique_ptr<LuaListComponent> item(dynamic_cast<LuaListComponent*>(existingComponentToUpdate));
-		if (juce::isPositiveAndBelow(sliderNum, getNumRows())) {
-			item = std::make_unique<LuaListComponent>(sliderNum);
+		if (juce::isPositiveAndBelow(rowNum, getNumRows())) {
+			item = std::make_unique<LuaListComponent>(audioProcessor, *audioProcessor.luaEffects[rowNum]);
 		}
 		return item.release();
 	} else {
 		std::unique_ptr<juce::TextButton> item(dynamic_cast<juce::TextButton*>(existingComponentToUpdate));
-		item = std::make_unique<juce::TextButton>("Add");
+		item = std::make_unique<juce::TextButton>("+");
 		item->onClick = [this]() {
-			numSliders++;
+			audioProcessor.addLuaSlider();
 			listBox.updateContent();
 		};
 		return item.release();

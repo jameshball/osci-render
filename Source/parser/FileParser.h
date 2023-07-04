@@ -20,6 +20,12 @@ public:
 	void disable() override;
 	void enable() override;
 
+	std::shared_ptr<WorldObject> getObject();
+	std::shared_ptr<Camera> getCamera();
+	std::shared_ptr<SvgParser> getSvg();
+	std::shared_ptr<TextParser> getText();
+	std::shared_ptr<LuaParser> getLua();
+
 private:
 	bool active = true;
 	bool sampleSource = false;

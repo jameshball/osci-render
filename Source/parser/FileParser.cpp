@@ -67,3 +67,23 @@ void FileParser::disable() {
 void FileParser::enable() {
 	active = true;
 }
+
+std::shared_ptr<WorldObject> FileParser::getObject() {
+	return object;
+}
+
+std::shared_ptr<Camera> FileParser::getCamera() {
+	return camera;
+}
+
+std::shared_ptr<SvgParser> FileParser::getSvg() {
+	return svg;
+}
+
+std::shared_ptr<TextParser> FileParser::getText() {
+	return text;
+}
+
+std::shared_ptr<LuaParser> FileParser::getLua() {
+	return lua;
+}

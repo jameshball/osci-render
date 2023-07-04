@@ -1,16 +1,27 @@
 #include "EffectComponent.h"
 
 EffectComponent::EffectComponent(double min, double max, double step, double value, juce::String name, juce::String id) : name(name), id(id) {
+    componentSetup();
+	slider.setRange(min, max, step);
+    slider.setValue(value, juce::dontSendNotification);
+}
+
+EffectComponent::EffectComponent(double min, double max, double step, Effect& effect) : name(effect.getName()), id(effect.getId()) {
+    componentSetup();
+    slider.setRange(min, max, step);
+    slider.setValue(effect.getValue(), juce::dontSendNotification);
+}
+
+void EffectComponent::componentSetup() {
     addAndMakeVisible(slider);
     addAndMakeVisible(selected);
 
     slider.setSliderStyle(juce::Slider::LinearHorizontal);
     slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 90, slider.getTextBoxHeight());
-	slider.setRange(min, max, step);
-    slider.setValue(value, juce::dontSendNotification);
 
-	selected.setToggleState(false, juce::dontSendNotification);
+    selected.setToggleState(false, juce::dontSendNotification);
 }
+
 
 EffectComponent::~EffectComponent() {}
 

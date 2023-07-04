@@ -113,6 +113,8 @@
               file="Source/audio/EffectApplication.cpp"/>
         <FILE id="MIYJ9y" name="EffectApplication.h" compile="0" resource="0"
               file="Source/audio/EffectApplication.h"/>
+        <FILE id="uhyh7T" name="LuaEffect.cpp" compile="1" resource="0" file="Source/audio/LuaEffect.cpp"/>
+        <FILE id="jqDcZq" name="LuaEffect.h" compile="0" resource="0" file="Source/audio/LuaEffect.h"/>
         <FILE id="PbbNqz" name="RotateEffect.cpp" compile="1" resource="0"
               file="Source/audio/RotateEffect.cpp"/>
         <FILE id="tUwNZV" name="RotateEffect.h" compile="0" resource="0" file="Source/audio/RotateEffect.h"/>

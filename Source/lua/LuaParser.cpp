@@ -27,6 +27,7 @@ void LuaParser::parse() {
     }
 }
 
+// only the audio thread runs this fuction
 Vector2 LuaParser::draw() {
 	Vector2 sample;
     
@@ -36,6 +37,22 @@ Vector2 LuaParser::draw() {
 	
     lua_pushnumber(L, step);
     lua_setglobal(L, "step");
+
+    // this CANNOT run at the same time as setVariable
+    if (updateVariables) {
+		bool expected = false;
+        if (accessingVariables.compare_exchange_strong(expected, true)) {
+            for (int i = 0; i < variableNames.size(); i++) {
+				lua_pushnumber(L, variables[i]);
+				lua_setglobal(L, variableNames[i].toUTF8());
+                DBG("set " + variableNames[i] + " to " + juce::String(variables[i]));
+			}
+            variableNames.clear();
+            variables.clear();
+            accessingVariables = false;
+			updateVariables = false;
+		}
+	}
     
 	lua_geti(L, LUA_REGISTRYINDEX, functionRef);
     
@@ -65,4 +82,19 @@ Vector2 LuaParser::draw() {
 	step++;
     
 	return sample;
+}
+
+// this CANNOT run at the same time as draw()
+// many threads can run this function
+bool LuaParser::setVariable(juce::String variableName, double value) {
+    bool expected = false;
+    // this is very unlikely to fail, and if it does, it's not a big deal
+    if (accessingVariables.compare_exchange_strong(expected, true)) {
+		variableNames.push_back(variableName);
+		variables.push_back(value);
+        accessingVariables = false;
+        updateVariables = true;
+        return true;
+    }
+    return false;
 }

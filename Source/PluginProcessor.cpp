@@ -14,6 +14,9 @@
 #include "audio/VectorCancellingEffect.h"
 #include "audio/DistortEffect.h"
 #include "audio/SmoothEffect.h"
+#include "audio/BitCrushEffect.h"
+#include "audio/BulgeEffect.h"
+#include "audio/LuaEffect.h"
 
 //==============================================================================
 OscirenderAudioProcessor::OscirenderAudioProcessor()
@@ -38,6 +41,10 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     allEffects.push_back(std::make_shared<Effect>(std::make_unique<DistortEffect>(true), "Vertical shift", "verticalDistort"));
     allEffects.push_back(std::make_shared<Effect>(std::make_unique<DistortEffect>(false), "Horizontal shift", "horizontalDistort"));
     allEffects.push_back(std::make_shared<Effect>(std::make_unique<SmoothEffect>(), "Smoothing", "smoothing"));
+
+    for (int i = 0; i < 5; i++) {
+        addLuaSlider();
+    }
 }
 
 OscirenderAudioProcessor::~OscirenderAudioProcessor()
@@ -145,6 +152,26 @@ bool OscirenderAudioProcessor::isBusesLayoutSupported (const BusesLayout& layout
 }
 #endif
 
+void OscirenderAudioProcessor::addLuaSlider() {
+    juce::String sliderName = "";
+
+    int sliderNum = luaEffects.size() + 1;
+    while (sliderNum > 0) {
+        int mod = (sliderNum - 1) % 26;
+        sliderName = (char)(mod + 'A') + sliderName;
+        sliderNum = (sliderNum - mod) / 26;
+    }
+
+    luaEffects.push_back(std::make_shared<Effect>(std::make_unique<LuaEffect>(sliderName, *this), "Lua " + sliderName, "lua" + sliderName));
+}
+
+void OscirenderAudioProcessor::updateLuaValues() {
+    Vector2 vector;
+    for (auto& effect : luaEffects) {
+        effect->apply(0, vector);
+	}
+}
+
 void OscirenderAudioProcessor::updateAngleDelta() {
 	auto cyclesPerSample = frequency / currentSampleRate;
 	thetaDelta = cyclesPerSample * 2.0 * juce::MathConstants<double>::pi;
@@ -238,6 +265,7 @@ void OscirenderAudioProcessor::openFile(int index) {
     producer->setSource(parsers[index], index);
     currentFile = index;
 	invalidateFrameBuffer = true;
+    updateLuaValues();
 }
 
 void OscirenderAudioProcessor::changeCurrentFile(int index) {
@@ -255,6 +283,10 @@ void OscirenderAudioProcessor::changeCurrentFile(int index) {
 
 int OscirenderAudioProcessor::getCurrentFileIndex() {
     return currentFile;
+}
+
+std::shared_ptr<FileParser> OscirenderAudioProcessor::getCurrentFileParser() {
+    return parsers[currentFile];
 }
 
 juce::File OscirenderAudioProcessor::getCurrentFile() {

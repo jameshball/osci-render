@@ -7,7 +7,7 @@
 class LuaListComponent : public juce::Component
 {
 public:
-    LuaListComponent(int sliderNum);
+    LuaListComponent(OscirenderAudioProcessor& p, Effect& effect);
     ~LuaListComponent();
 
     void resized() override;
@@ -21,7 +21,7 @@ private:
 class LuaListBoxModel : public juce::ListBoxModel
 {
 public:
-    LuaListBoxModel(juce::ListBox& lb) : listBox(lb) {}
+    LuaListBoxModel(juce::ListBox& lb, OscirenderAudioProcessor& p) : listBox(lb), audioProcessor(p) {}
 
     int getNumRows() override;
     void paintListBoxItem(int rowNumber, juce::Graphics& g, int width, int height, bool rowIsSelected) override;
@@ -30,4 +30,5 @@ public:
 private:
     int numSliders = 5;
     juce::ListBox& listBox;
+    OscirenderAudioProcessor& audioProcessor;
 };
