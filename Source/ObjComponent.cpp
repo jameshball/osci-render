@@ -103,9 +103,9 @@ ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 	fixedRotateY->onClick = onRotationChange;
 	fixedRotateZ->onClick = onRotationChange;
 
-	rotateX.addComponent(fixedRotateX);
-	rotateY.addComponent(fixedRotateY);
-	rotateZ.addComponent(fixedRotateZ);
+	rotateX.setComponent(fixedRotateX);
+	rotateY.setComponent(fixedRotateY);
+	rotateZ.setComponent(fixedRotateZ);
 
 	fixedRotateX->setToggleState(audioProcessor.fixedRotateX, juce::NotificationType::dontSendNotification);
 	fixedRotateY->setToggleState(audioProcessor.fixedRotateY, juce::NotificationType::dontSendNotification);
@@ -142,10 +142,6 @@ void ObjComponent::resized() {
 	rotateY.setBounds(area.removeFromTop(rowHeight));
 	rotateZ.setBounds(area.removeFromTop(rowHeight));
 	rotateSpeed.setBounds(area.removeFromTop(rowHeight));
-
-	// TODO this is a bit of a hack
-	focalLength.setRightPadding(25);
-	rotateSpeed.setRightPadding(25);
 
 	area.removeFromTop(10);
 	auto row = area.removeFromTop(rowHeight);
