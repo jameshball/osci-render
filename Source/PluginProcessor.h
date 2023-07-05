@@ -14,6 +14,7 @@
 #include "parser/FrameProducer.h"
 #include "parser/FrameConsumer.h"
 #include "audio/Effect.h"
+#include <numbers>
 
 //==============================================================================
 /**
@@ -71,12 +72,50 @@ public:
 	std::shared_ptr<std::vector<std::shared_ptr<Effect>>> enabledEffects = std::make_shared<std::vector<std::shared_ptr<Effect>>>();
 
     std::vector<std::shared_ptr<Effect>> luaEffects;
+
+    // TODO see if there is a way to move this code to .cpp
+    std::function<Vector2(int, Vector2, double, double, int)> onRotationChange = [this](int index, Vector2 input, double value, double frequency, double sampleRate) {
+        if (getCurrentFileIndex() != -1) {
+            auto obj = getCurrentFileParser()->getObject();
+            if (obj == nullptr) return input;
+            obj->setBaseRotation(
+                rotateX.getValue() * std::numbers::pi,
+                rotateY.getValue() * std::numbers::pi,
+                rotateZ.getValue() * std::numbers::pi
+            );
+        }
+        return input;
+    };
     
-    Effect focalLength{"Focal length", "focalLength", 1};
-    Effect rotateX{"Rotate x", "rotateX", 0};
-    Effect rotateY{"Rotate y", "rotateY", 0};
-    Effect rotateZ{"Rotate z", "rotateZ", 0};
-    Effect rotateSpeed{"Rotate speed", "rotateSpeed", 0};
+    Effect focalLength{
+        [this](int index, Vector2 input, double value, double frequency, double sampleRate) {
+            if (getCurrentFileIndex() != -1) {
+                auto camera = getCurrentFileParser()->getCamera();
+                if (camera == nullptr) return input;
+                camera->setFocalLength(value);
+            }
+            return input;
+		},
+        "Focal length",
+        "focalLength",
+        1
+    };
+    Effect rotateX{onRotationChange, "Rotate x", "rotateX", 1};
+    Effect rotateY{onRotationChange, "Rotate y", "rotateY", 1};
+    Effect rotateZ{onRotationChange, "Rotate z", "rotateZ", 0};
+    Effect rotateSpeed{
+        [this](int index, Vector2 input, double value, double frequency, double sampleRate) {
+            if (getCurrentFileIndex() != -1) {
+                auto obj = getCurrentFileParser()->getObject();
+                if (obj == nullptr) return input;
+                obj->setRotationSpeed(value);
+            }
+            return input;
+		},
+        "Rotate speed",
+        "rotateSpeed",
+        0
+    };
     
     juce::SpinLock parsersLock;
     std::vector<std::shared_ptr<FileParser>> parsers;
@@ -87,7 +126,6 @@ public:
     std::unique_ptr<FrameProducer> producer;
 
     void addLuaSlider();
-    void updateLuaValues();
     void updateAngleDelta();
     void addFrame(std::vector<std::unique_ptr<Shape>> frame, int fileIndex) override;
 	void enableEffect(std::shared_ptr<Effect> effect);
@@ -123,6 +161,8 @@ private:
 	void updateFrame();
     void updateLengthIncrement();
     void openFile(int index);
+    void updateLuaValues();
+    void updateObjValues();
 
     const double MIN_LENGTH_INCREMENT = 0.000001;
 

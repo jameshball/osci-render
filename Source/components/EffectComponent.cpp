@@ -12,8 +12,8 @@ EffectComponent::EffectComponent(double min, double max, double step, Effect& ef
     slider.setValue(effect.getValue(), juce::dontSendNotification);
 }
 
-EffectComponent::EffectComponent(double min, double max, double step, Effect& effect, bool hideCheckbox) : EffectComponent(min, max, step, effect) {
-	setHideCheckbox(hideCheckbox);
+EffectComponent::EffectComponent(double min, double max, double step, Effect& effect, bool checkboxVisible) : EffectComponent(min, max, step, effect) {
+	setCheckboxVisible(checkboxVisible);
 }
 
 void EffectComponent::componentSetup() {
@@ -34,11 +34,11 @@ void EffectComponent::resized() {
     auto bounds = getLocalBounds();
     bounds.removeFromRight(10);
     slider.setBounds(bounds.removeFromRight(sliderRight));
-    if (hideCheckbox) {
-        bounds.removeFromLeft(5);
-    } else {
+    if (checkboxVisible) {
         bounds.removeFromLeft(2);
         selected.setBounds(bounds.removeFromLeft(25));
+    } else {
+        bounds.removeFromLeft(5);
     }
     textBounds = bounds;
 }
@@ -51,6 +51,6 @@ void EffectComponent::paint(juce::Graphics& g) {
     g.drawText(name, textBounds, juce::Justification::left);
 }
 
-void EffectComponent::setHideCheckbox(bool hide) {
-    hideCheckbox = hide;
+void EffectComponent::setCheckboxVisible(bool visible) {
+    checkboxVisible = visible;
 }

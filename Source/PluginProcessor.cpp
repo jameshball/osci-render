@@ -166,10 +166,16 @@ void OscirenderAudioProcessor::addLuaSlider() {
 }
 
 void OscirenderAudioProcessor::updateLuaValues() {
-    Vector2 vector;
     for (auto& effect : luaEffects) {
-        effect->apply(0, vector);
+        effect->apply();
 	}
+}
+
+// parsersLock should be held when calling this
+void OscirenderAudioProcessor::updateObjValues() {
+    focalLength.apply();
+    rotateX.apply();
+    rotateSpeed.apply();
 }
 
 void OscirenderAudioProcessor::updateAngleDelta() {
@@ -269,6 +275,7 @@ void OscirenderAudioProcessor::openFile(int index) {
     currentFile = index;
 	invalidateFrameBuffer = true;
     updateLuaValues();
+    updateObjValues();
 }
 
 void OscirenderAudioProcessor::changeCurrentFile(int index) {
@@ -417,6 +424,10 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
 		x = channels.x;
 		y = channels.y;
+
+        // clip to -1.0 to 1.0
+        x = std::max(-1.0, std::min(1.0, x));
+        y = std::max(-1.0, std::min(1.0, y));
         
 
         if (totalNumOutputChannels >= 2) {

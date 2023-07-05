@@ -8,8 +8,10 @@ public:
 	Effect(std::unique_ptr<EffectApplication> effectApplication, juce::String name, juce::String id);
 	Effect(juce::String name, juce::String id);
 	Effect(juce::String name, juce::String id, double value);
+	Effect(std::function<Vector2(int, Vector2, double, double, int)> application, juce::String name, juce::String id, double value);
 
 	Vector2 apply(int index, Vector2 input);
+	void apply();
 	double getValue();
 	void setValue(double value);
 	void setFrequency(double frequency);
@@ -24,6 +26,7 @@ private:
 	int sampleRate = 192000;
 	juce::String name;
 	juce::String id;
+	std::function<Vector2(int, Vector2, double, double, int)> application;
 	
 	std::unique_ptr<EffectApplication> effectApplication;
 };

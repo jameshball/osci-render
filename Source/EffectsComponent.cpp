@@ -5,7 +5,7 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p) : audioProcessor
 	setText("Audio Effects");
 
     addAndMakeVisible(frequency);
-    frequency.setHideCheckbox(true);
+    frequency.setCheckboxVisible(false);
 
     frequency.slider.setSkewFactorFromMidPoint(500.0);
     frequency.slider.setTextValueSuffix("Hz");

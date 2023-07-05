@@ -8,11 +8,21 @@ Effect::Effect(juce::String name, juce::String id) : name(name), id(id) {}
 
 Effect::Effect(juce::String name, juce::String id, double value) : name(name), id(id), value(value) {}
 
+Effect::Effect(std::function<Vector2(int, Vector2, double, double, int)> application, juce::String name, juce::String id, double value) : Effect(name, id, value) {
+	this->application = application;
+};
+
 Vector2 Effect::apply(int index, Vector2 input) {
-	if (effectApplication == nullptr) {
-		return input;
+	if (application) {
+		return application(index, input, value, frequency, sampleRate);
+	} else if (effectApplication != nullptr) {
+		return effectApplication->apply(index, input, value, frequency, sampleRate);
 	}
-	return effectApplication->apply(index, input, value, frequency, sampleRate);
+	return input;
+}
+
+void Effect::apply() {
+	apply(0, Vector2());
 }
 
 double Effect::getValue() {

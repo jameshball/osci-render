@@ -8,13 +8,13 @@ class EffectComponent : public juce::Component {
 public:
     EffectComponent(double min, double max, double step, double value, juce::String name, juce::String id);
     EffectComponent(double min, double max, double step, Effect& effect);
-    EffectComponent(double min, double max, double step, Effect& effect, bool hideCheckbox);
+    EffectComponent(double min, double max, double step, Effect& effect, bool checkboxVisible);
     ~EffectComponent();
 
     void resized() override;
     void paint(juce::Graphics& g) override;
 
-    void setHideCheckbox(bool hide);
+    void setCheckboxVisible(bool visible);
 
     juce::Slider slider;
     juce::String id;
@@ -23,7 +23,7 @@ public:
 
 private:
     void componentSetup();
-    bool hideCheckbox = false;
+    bool checkboxVisible = false;
     juce::Rectangle<int> textBounds;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EffectComponent)

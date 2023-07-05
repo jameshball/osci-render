@@ -11,6 +11,7 @@ public:
 
 	std::vector<std::unique_ptr<Shape>> draw(WorldObject& object);
 	void findZPos(WorldObject& object);
+	void setFocalLength(double focalLength);
 private:
 	const double VERTEX_VALUE_THRESHOLD = 1.0;
 	const double CAMERA_MOVE_INCREMENT = -0.1;
@@ -18,7 +19,7 @@ private:
 	const int VERTEX_SAMPLES = 1000;
 	const int MAX_NUM_STEPS = 1000;
 
-	double focalLength;
+	std::atomic<double> focalLength;
 	double x, y, z;
 
 	std::vector<Vector2> sampleVerticesInRender(WorldObject& object);
