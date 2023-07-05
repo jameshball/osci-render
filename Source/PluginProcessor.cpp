@@ -238,9 +238,19 @@ void OscirenderAudioProcessor::updateFileBlock(int index, std::shared_ptr<juce::
 // parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessor::addFile(juce::File file) {
     fileBlocks.push_back(std::make_shared<juce::MemoryBlock>());
-    files.push_back(file);
+    fileNames.push_back(file.getFileName());
 	parsers.push_back(std::make_unique<FileParser>());
     file.createInputStream()->readIntoMemoryBlock(*fileBlocks.back());
+
+    openFile(fileBlocks.size() - 1);
+}
+
+// parsersLock AND effectsLock must be locked before calling this function
+void OscirenderAudioProcessor::addFile(juce::String fileName, const char* data, const int size) {
+    fileBlocks.push_back(std::make_shared<juce::MemoryBlock>());
+    fileNames.push_back(fileName);
+    parsers.push_back(std::make_unique<FileParser>());
+    fileBlocks.back()->append(data, size);
 
     openFile(fileBlocks.size() - 1);
 }
@@ -252,7 +262,7 @@ void OscirenderAudioProcessor::removeFile(int index) {
 	}
     changeCurrentFile(index - 1);
     fileBlocks.erase(fileBlocks.begin() + index);
-    files.erase(files.begin() + index);
+    fileNames.erase(fileNames.begin() + index);
 	parsers.erase(parsers.begin() + index);
 }
 
@@ -267,7 +277,7 @@ void OscirenderAudioProcessor::openFile(int index) {
 	if (index < 0 || index >= fileBlocks.size()) {
 		return;
 	}
-    parsers[index]->parse(files[index].getFileExtension(), std::make_unique<juce::MemoryInputStream>(*fileBlocks[index], false));
+    parsers[index]->parse(fileNames[index].fromLastOccurrenceOf(".", true, false), std::make_unique<juce::MemoryInputStream>(*fileBlocks[index], false));
     changeCurrentFile(index);
 }
 
@@ -297,12 +307,16 @@ std::shared_ptr<FileParser> OscirenderAudioProcessor::getCurrentFileParser() {
     return parsers[currentFile];
 }
 
-juce::File OscirenderAudioProcessor::getCurrentFile() {
-    return files[currentFile];
+juce::String OscirenderAudioProcessor::getCurrentFileName() {
+    if (currentFile == -1) {
+		return "";
+    } else {
+        return fileNames[currentFile];
+    }
 }
 
-juce::File OscirenderAudioProcessor::getFile(int index) {
-    return files[index];
+juce::String OscirenderAudioProcessor::getFileName(int index) {
+    return fileNames[index];
 }
 
 std::shared_ptr<juce::MemoryBlock> OscirenderAudioProcessor::getFileBlock(int index) {

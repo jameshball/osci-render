@@ -22,5 +22,9 @@ private:
 	juce::TextButton closeFileButton;
 	juce::Label fileLabel;
 
+	juce::TextEditor fileName;
+	juce::ComboBox fileType;
+	juce::TextButton createFile{"Create File"};
+
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };
