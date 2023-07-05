@@ -6,6 +6,7 @@ Camera::Camera(double focalLength, double x, double y, double z) : focalLength(f
 
 std::vector<std::unique_ptr<Shape>> Camera::draw(WorldObject& object) {
 	std::vector<std::unique_ptr<Shape>> shapes;
+    object.nextFrame();
 	for (auto& edge : object.edges) {
         Vector2 start = project(object.rotateX, object.rotateY, object.rotateZ, edge.x1, edge.y1, edge.z1);
         Vector2 end = project(object.rotateX, object.rotateY, object.rotateZ, edge.x2, edge.y2, edge.z2);
@@ -30,14 +31,14 @@ void Camera::findZPos(WorldObject& object) {
     }
 }
 
+void Camera::setFocalLength(double focalLength) {
+    this->focalLength = focalLength;
+}
+
 std::vector<Vector2> Camera::sampleVerticesInRender(WorldObject& object) {
     double rotation = 2.0 * std::numbers::pi / SAMPLE_RENDER_SAMPLES;
 
     std::vector<Vector2> vertices;
-    
-    double oldRotateX = object.rotateX;
-    double oldRotateY = object.rotateY;
-    double oldRotateZ = object.rotateZ;
 
     for (int i = 0; i < SAMPLE_RENDER_SAMPLES - 1; i++) {
         for (size_t j = 0; j < std::min(VERTEX_SAMPLES, object.numVertices); j++) {

@@ -11,19 +11,16 @@
 
 //==============================================================================
 OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p)
-	: AudioProcessorEditor(&p), audioProcessor(p), effects(p), main(p, *this), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white), lua(p, *this)
+	: AudioProcessorEditor(&p), audioProcessor(p), effects(p), main(p, *this), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white), lua(p, *this), obj(p, *this)
 {
-    // Make sure that before the constructor has finished, you've set the
-    // editor's size to whatever you need it to be.
-    setSize(1100, 750);
-	setResizable(true, true);
-
     addAndMakeVisible(effects);
     addAndMakeVisible(main);
-    addAndMakeVisible(lua);
+    addChildComponent(lua);
+    addChildComponent(obj);
 
     addAndMakeVisible(collapseButton);
 	collapseButton.onClick = [this] {
+        juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
         int index = audioProcessor.getCurrentFileIndex();
         if (index != -1) {
             if (codeEditors[index]->isVisible()) {
@@ -44,7 +41,21 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 	juce::Path path;
     path.addTriangle(0.0f, 0.5f, 1.0f, 1.0f, 1.0f, 0.0f);
 	collapseButton.setShape(path, false, true, true);
-    resized();
+
+    juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+    for (int i = 0; i < audioProcessor.numFiles(); i++) {
+        addCodeEditor(i);
+    }
+    updateCodeEditor();
+
+    std::unique_ptr<juce::File> file;
+    if (audioProcessor.getCurrentFileIndex() != -1) {
+        file = std::make_unique<juce::File>(audioProcessor.getCurrentFile());
+    }
+    fileUpdated(std::move(file));
+
+    setSize(1100, 750);
+    setResizable(true, true);
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {}
@@ -76,6 +87,7 @@ void OscirenderAudioProcessorEditor::resized() {
 	effects.setBounds(area.removeFromRight(getWidth() / sections));
 	main.setBounds(area.removeFromTop(getHeight() / 2));
     lua.setBounds(area);
+    obj.setBounds(area);
 }
 
 void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
@@ -102,6 +114,8 @@ void OscirenderAudioProcessorEditor::removeCodeEditor(int index) {
     codeDocuments.erase(codeDocuments.begin() + index);
 }
 
+
+// parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessorEditor::updateCodeEditor() {
     // check if any code editors are visible
     bool visible = false;
@@ -114,49 +128,80 @@ void OscirenderAudioProcessorEditor::updateCodeEditor() {
     int index = audioProcessor.getCurrentFileIndex();
     if (index != -1 && visible) {
         for (int i = 0; i < codeEditors.size(); i++) {
-			codeEditors[i]->setVisible(false);
-		}
+            codeEditors[i]->setVisible(false);
+        }
         codeEditors[index]->setVisible(true);
         codeEditors[index]->loadContent(juce::MemoryInputStream(*audioProcessor.getFileBlock(index), false).readEntireStreamAsString());
     }
     resized();
 }
-    
-void OscirenderAudioProcessorEditor::codeDocumentTextInserted(const juce::String& newText, int insertIndex) {
-    int index = audioProcessor.getCurrentFileIndex();
-    juce::String file = codeDocuments[index]->getAllContent();
-    audioProcessor.updateFileBlock(index, std::make_shared<juce::MemoryBlock>(file.toRawUTF8(), file.getNumBytesAsUTF8() + 1));
+
+// parsersLock MUST be locked before calling this function
+void OscirenderAudioProcessorEditor::fileUpdated(std::unique_ptr<juce::File> file) {
+    lua.setVisible(false);
+    obj.setVisible(false);
+    if (file == nullptr) {
+		return;
+	} else if (file->getFileExtension() == ".lua") {
+        lua.setVisible(true);
+    } else if (file->getFileExtension() == ".obj") {
+		obj.setVisible(true);
+	}
+    main.updateFileLabel();
 }
 
+// parsersLock AND effectsLock must be locked before calling this function
+void OscirenderAudioProcessorEditor::codeDocumentTextInserted(const juce::String& newText, int insertIndex) {
+    updateCodeDocument();
+}
+
+// parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessorEditor::codeDocumentTextDeleted(int startIndex, int endIndex) {
+    updateCodeDocument();
+}
+
+void OscirenderAudioProcessorEditor::updateCodeDocument() {
     int index = audioProcessor.getCurrentFileIndex();
     juce::String file = codeDocuments[index]->getAllContent();
     audioProcessor.updateFileBlock(index, std::make_shared<juce::MemoryBlock>(file.toRawUTF8(), file.getNumBytesAsUTF8() + 1));
 }
 
 bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
+    juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
+    juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
+
     int numFiles = audioProcessor.numFiles();
     int currentFile = audioProcessor.getCurrentFileIndex();
-    bool updated = false;
+    bool changedFile = false;
+    bool consumeKey = true;
     if (key.getTextCharacter() == 'j') {
-        currentFile++;
-        if (currentFile == numFiles) {
-            currentFile = 0;
+        if (numFiles > 1) {
+            currentFile++;
+            if (currentFile == numFiles) {
+                currentFile = 0;
+            }
+            changedFile = true;
         }
-        updated = true;
     } else if (key.getTextCharacter() == 'k') {
-        currentFile--;
-        if (currentFile < 0) {
-            currentFile = numFiles - 1;
-        }
-        updated = true;
-    }
+        if (numFiles > 1) {
+			currentFile--;
+            if (currentFile < 0) {
+				currentFile = numFiles - 1;
+			}
+			changedFile = true;
+		}
+    } else if (key.isKeyCode(juce::KeyPress::escapeKey)) {
+        obj.disableMouseRotation();
+    } else {
+		consumeKey = false;
+	}
 
-    if (updated) {
+    if (changedFile) {
         audioProcessor.changeCurrentFile(currentFile);
+        fileUpdated(std::make_unique<juce::File>(audioProcessor.getCurrentFile()));
         updateCodeEditor();
         main.updateFileLabel();
     }
 
-    return updated;
+    return consumeKey;
 }

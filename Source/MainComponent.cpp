@@ -14,6 +14,7 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 		auto flags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectMultipleItems;
 
 		chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
+			juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
 			for (auto& url : chooser.getURLResults()) {
 				if (url.isLocalFile()) {
 					auto file = url.getLocalFile();
@@ -22,7 +23,7 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 			}
 			pluginEditor.addCodeEditor(audioProcessor.getCurrentFileIndex());
 			pluginEditor.updateCodeEditor();
-			updateFileLabel();
+			pluginEditor.fileUpdated(std::make_unique<juce::File>(audioProcessor.getCurrentFile()));
 		});
 	};
 
@@ -30,6 +31,7 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 	closeFileButton.setButtonText("Close File");
 	
 	closeFileButton.onClick = [this] {
+		juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
 		int index = audioProcessor.getCurrentFileIndex();
 		if (index == -1) {
 			return;
@@ -37,7 +39,11 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 		pluginEditor.removeCodeEditor(audioProcessor.getCurrentFileIndex());
 		audioProcessor.removeFile(audioProcessor.getCurrentFileIndex());
 		pluginEditor.updateCodeEditor();
-		updateFileLabel();
+		std::unique_ptr<juce::File> file;
+		if (audioProcessor.getCurrentFileIndex() != -1) {
+			file = std::make_unique<juce::File>(audioProcessor.getCurrentFile());
+		}
+		pluginEditor.fileUpdated(std::move(file));
 	};
 
 	addAndMakeVisible(fileLabel);

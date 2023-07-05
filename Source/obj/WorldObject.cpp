@@ -206,3 +206,45 @@ WorldObject::WorldObject(std::string obj_string) {
         }
     }
 }
+
+void WorldObject::setBaseRotation(double x, double y, double z) {
+    baseRotateX = x;
+	baseRotateY = y;
+	baseRotateZ = z;
+}
+
+void WorldObject::setCurrentRotationX(double x) {
+    currentRotateX = x;
+}
+
+void WorldObject::setCurrentRotationY(double y) {
+	currentRotateY = y;
+}
+
+void WorldObject::setCurrentRotationZ(double z) {
+	currentRotateZ = z;
+}
+
+void WorldObject::setRotationSpeed(double rotateSpeed) {
+    this->rotateSpeed = linearSpeedToActualSpeed(rotateSpeed);
+}
+
+// called whenever a new frame is drawn, so that the object can update its
+// rotation
+void WorldObject::nextFrame() {
+    currentRotateX += baseRotateX * rotateSpeed;
+    currentRotateY += baseRotateY * rotateSpeed;
+    currentRotateZ += baseRotateZ * rotateSpeed;
+    rotateX = baseRotateX + currentRotateX;
+    rotateY = baseRotateY + currentRotateY;
+    rotateZ = baseRotateZ + currentRotateZ;
+}
+
+// this just makes the range of the speed more useful
+double WorldObject::linearSpeedToActualSpeed(double rotateSpeed) {
+    double actualSpeed = (std::exp(3 * std::min(10.0, std::abs(rotateSpeed))) - 1) / 50000;
+    if (rotateSpeed < 0) {
+		actualSpeed *= -1;
+	}
+    return actualSpeed;
+}

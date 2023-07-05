@@ -14,6 +14,7 @@
 #include "parser/FrameProducer.h"
 #include "parser/FrameConsumer.h"
 #include "audio/Effect.h"
+#include <numbers>
 
 //==============================================================================
 /**
@@ -67,20 +68,106 @@ public:
 
     double currentSampleRate = 0.0;
 
+    juce::SpinLock effectsLock;
 	std::vector<std::shared_ptr<Effect>> allEffects;
-	std::shared_ptr<std::vector<std::shared_ptr<Effect>>> enabledEffects = std::make_shared<std::vector<std::shared_ptr<Effect>>>();
-
+	std::vector<std::shared_ptr<Effect>> enabledEffects;
     std::vector<std::shared_ptr<Effect>> luaEffects;
+
+    // TODO see if there is a way to move this code to .cpp
+    std::function<Vector2(int, Vector2, double, double, int)> onRotationChange = [this](int index, Vector2 input, double value, double frequency, double sampleRate) {
+        if (getCurrentFileIndex() != -1) {
+            auto obj = getCurrentFileParser()->getObject();
+            if (obj == nullptr) return input;
+            obj->setBaseRotation(
+                rotateX.getValue() * std::numbers::pi,
+                rotateY.getValue() * std::numbers::pi,
+                rotateZ.getValue() * std::numbers::pi
+            );
+        }
+        return input;
+    };
     
+    Effect focalLength{
+        [this](int index, Vector2 input, double value, double frequency, double sampleRate) {
+            if (getCurrentFileIndex() != -1) {
+                auto camera = getCurrentFileParser()->getCamera();
+                if (camera == nullptr) return input;
+                camera->setFocalLength(value);
+            }
+            return input;
+		},
+        "Focal length",
+        "focalLength",
+        1
+    };
+    Effect rotateX{onRotationChange, "Rotate x", "rotateX", 1};
+    Effect rotateY{onRotationChange, "Rotate y", "rotateY", 1};
+    Effect rotateZ{onRotationChange, "Rotate z", "rotateZ", 0};
+    Effect currentRotateX{
+        [this](int index, Vector2 input, double value, double frequency, double sampleRate) {
+            if (getCurrentFileIndex() != -1) {
+                auto obj = getCurrentFileParser()->getObject();
+                if (obj == nullptr) return input;
+                obj->setCurrentRotationX(value * std::numbers::pi);
+            }
+            return input;
+        },
+        "Current Rotate x",
+        "currentRotateX",
+        0
+    };
+    Effect currentRotateY{
+        [this](int index, Vector2 input, double value, double frequency, double sampleRate) {
+            if (getCurrentFileIndex() != -1) {
+                auto obj = getCurrentFileParser()->getObject();
+                if (obj == nullptr) return input;
+                obj->setCurrentRotationY(value * std::numbers::pi);
+            }
+            return input;
+        },
+        "Current Rotate y",
+        "currentRotateY",
+        0
+    };
+    Effect currentRotateZ{
+        [this](int index, Vector2 input, double value, double frequency, double sampleRate) {
+            if (getCurrentFileIndex() != -1) {
+                auto obj = getCurrentFileParser()->getObject();
+                if (obj == nullptr) return input;
+                obj->setCurrentRotationZ(value * std::numbers::pi);
+            }
+            return input;
+    },
+        "Current Rotate z",
+        "currentRotateZ",
+        0
+    };
+    Effect rotateSpeed{
+        [this](int index, Vector2 input, double value, double frequency, double sampleRate) {
+            if (getCurrentFileIndex() != -1) {
+                auto obj = getCurrentFileParser()->getObject();
+                if (obj == nullptr) return input;
+                obj->setRotationSpeed(value);
+            }
+            return input;
+		},
+        "Rotate speed",
+        "rotateSpeed",
+        0
+    };
+    std::atomic<bool> fixedRotateX = false;
+    std::atomic<bool> fixedRotateY = false;
+    std::atomic<bool> fixedRotateZ = false;
+    
+    juce::SpinLock parsersLock;
     std::vector<std::shared_ptr<FileParser>> parsers;
     std::vector<std::shared_ptr<juce::MemoryBlock>> fileBlocks;
     std::vector<juce::File> files;
-    int currentFile = -1;
+    std::atomic<int> currentFile = -1;
     
     std::unique_ptr<FrameProducer> producer;
 
     void addLuaSlider();
-    void updateLuaValues();
     void updateAngleDelta();
     void addFrame(std::vector<std::unique_ptr<Shape>> frame, int fileIndex) override;
 	void enableEffect(std::shared_ptr<Effect> effect);
@@ -90,7 +177,6 @@ public:
     void addFile(juce::File file);
     void removeFile(int index);
     int numFiles();
-    void openFile(int index);
     void changeCurrentFile(int index);
     int getCurrentFileIndex();
     std::shared_ptr<FileParser> getCurrentFileParser();
@@ -116,7 +202,9 @@ private:
 
 	void updateFrame();
     void updateLengthIncrement();
-    void syncLuaSliders();
+    void openFile(int index);
+    void updateLuaValues();
+    void updateObjValues();
 
     const double MIN_LENGTH_INCREMENT = 0.000001;
 

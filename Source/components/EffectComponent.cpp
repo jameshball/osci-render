@@ -12,6 +12,10 @@ EffectComponent::EffectComponent(double min, double max, double step, Effect& ef
     slider.setValue(effect.getValue(), juce::dontSendNotification);
 }
 
+EffectComponent::EffectComponent(double min, double max, double step, Effect& effect, bool checkboxVisible) : EffectComponent(min, max, step, effect) {
+	setCheckboxVisible(checkboxVisible);
+}
+
 void EffectComponent::componentSetup() {
     addAndMakeVisible(slider);
     addAndMakeVisible(selected);
@@ -29,12 +33,17 @@ void EffectComponent::resized() {
     auto sliderRight = getWidth() - 140;
     auto bounds = getLocalBounds();
     bounds.removeFromRight(10);
+    auto componentBounds = bounds.removeFromRight(25);
+    if (component != nullptr) {
+		component->setBounds(componentBounds);
+	}
+
     slider.setBounds(bounds.removeFromRight(sliderRight));
-    if (hideCheckbox) {
-        bounds.removeFromLeft(5);
-    } else {
+    if (checkboxVisible) {
         bounds.removeFromLeft(2);
         selected.setBounds(bounds.removeFromLeft(25));
+    } else {
+        bounds.removeFromLeft(5);
     }
     textBounds = bounds;
 }
@@ -47,6 +56,11 @@ void EffectComponent::paint(juce::Graphics& g) {
     g.drawText(name, textBounds, juce::Justification::left);
 }
 
-void EffectComponent::setHideCheckbox(bool hide) {
-    hideCheckbox = hide;
+void EffectComponent::setComponent(std::shared_ptr<juce::Component> component) {
+	this->component = component;
+    addAndMakeVisible(component.get());
+}
+
+void EffectComponent::setCheckboxVisible(bool visible) {
+    checkboxVisible = visible;
 }

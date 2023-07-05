@@ -17,15 +17,19 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
         return data.size();
     }
 
+    // CURRENTLY NOT USED
     void deleteItem(int indexOfItemToDelete) override {
-		data.erase(data.begin() + indexOfItemToDelete);
+		// data.erase(data.begin() + indexOfItemToDelete);
     }
 
+    // CURRENTLY NOT USED
     void addItemAtEnd() override {
         // data.push_back(juce::String("Yahoo"));
     }
 
 	void moveBefore(int indexOfItemToMove, int indexOfItemToPlaceBefore) override {
+        juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+
 		auto effect = data[indexOfItemToMove];
 
         if (indexOfItemToMove < indexOfItemToPlaceBefore) {
@@ -42,6 +46,8 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
 	}
 
     void moveAfter(int indexOfItemToMove, int indexOfItemToPlaceAfter) override {
+        juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+
         auto temp = data[indexOfItemToMove];
         
         if (indexOfItemToMove <= indexOfItemToPlaceAfter) {
@@ -112,7 +118,11 @@ class EffectsListBoxModel : public DraggableListBoxModel
 {
 public:
     EffectsListBoxModel(DraggableListBox& lb, DraggableListBoxItemData& md)
-        : DraggableListBoxModel(lb, md) {}
+        : DraggableListBoxModel(lb, md) {
+        OscirenderAudioProcessor& audioProcessor = ((AudioEffectListBoxItemData&)md).audioProcessor;
+        juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+        audioProcessor.updateEffectPrecedence();
+    }
 
     juce::Component* refreshComponentForRow(int, bool, juce::Component*) override;
 };
