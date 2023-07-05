@@ -63,10 +63,24 @@ ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 	addAndMakeVisible(mouseRotate);
 
 	resetRotation.onClick = [this] {
+		fixedRotateX->setToggleState(false, juce::NotificationType::dontSendNotification);
+		fixedRotateY->setToggleState(false, juce::NotificationType::dontSendNotification);
+		fixedRotateZ->setToggleState(false, juce::NotificationType::dontSendNotification);
+
 		rotateX.slider.setValue(0);
 		rotateY.slider.setValue(0);
 		rotateZ.slider.setValue(0);
+		rotateSpeed.slider.setValue(0);
+		
 		mouseRotate.setToggleState(false, juce::NotificationType::dontSendNotification);
+
+		juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+		audioProcessor.currentRotateX.setValue(0);
+		audioProcessor.currentRotateY.setValue(0);
+		audioProcessor.currentRotateZ.setValue(0);
+		audioProcessor.currentRotateX.apply();
+		audioProcessor.currentRotateY.apply();
+		audioProcessor.currentRotateZ.apply();
 	};
 
 	auto doc = juce::XmlDocument::parse(BinaryData::fixed_rotate_svg);
@@ -128,6 +142,10 @@ void ObjComponent::resized() {
 	rotateY.setBounds(area.removeFromTop(rowHeight));
 	rotateZ.setBounds(area.removeFromTop(rowHeight));
 	rotateSpeed.setBounds(area.removeFromTop(rowHeight));
+
+	// TODO this is a bit of a hack
+	focalLength.setRightPadding(25);
+	rotateSpeed.setRightPadding(25);
 
 	area.removeFromTop(10);
 	auto row = area.removeFromTop(rowHeight);
