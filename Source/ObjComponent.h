@@ -12,7 +12,7 @@ public:
 
     void resized() override;
     void mouseMove(const juce::MouseEvent& event) override;
-    bool keyPressed(const juce::KeyPress& key) override;
+    void disableMouseRotation();
 private:
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& pluginEditor;

@@ -67,12 +67,8 @@ void ObjComponent::mouseMove(const juce::MouseEvent& e) {
 	}
 }
 
-// listen for when escape is pressed to disable mouse rotation
-bool ObjComponent::keyPressed(const juce::KeyPress& key) {
-	if (key == juce::KeyPress::escapeKey) {
-		mouseRotate.setToggleState(false, juce::NotificationType::dontSendNotification);
-	}
-	return true;
+void ObjComponent::disableMouseRotation() {
+	mouseRotate.setToggleState(false, juce::NotificationType::dontSendNotification);
 }
 
 void ObjComponent::resized() {
@@ -89,5 +85,4 @@ void ObjComponent::resized() {
 	resetRotation.setBounds(row.removeFromLeft(120));
 	row.removeFromLeft(20);
 	mouseRotate.setBounds(row);
-
 }

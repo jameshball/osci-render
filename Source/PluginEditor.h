@@ -31,7 +31,7 @@ public:
     void addCodeEditor(int index);
     void removeCodeEditor(int index);
     void updateCodeEditor();
-    void fileUpdated(juce::File file);
+    void fileUpdated(std::unique_ptr<juce::File> file);
 private:
     OscirenderAudioProcessor& audioProcessor;
     

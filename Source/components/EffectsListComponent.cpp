@@ -8,16 +8,22 @@ EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectList
         ((AudioEffectListBoxItemData&)modelData).setValue(rowNum, this->effectComponent->slider.getValue());
 	};
 
-    // check if effect is in audioProcessor enabled effects
 	bool isSelected = false;
-	for (auto effect : *data.audioProcessor.enabledEffects) {
-		if (effect->getId() == data.getId(rn)) {
-			isSelected = true;
-			break;
+
+	{
+		juce::SpinLock::ScopedLockType lock(data.audioProcessor.effectsLock);
+		// check if effect is in audioProcessor enabled effects
+		for (auto effect : *data.audioProcessor.enabledEffects) {
+			if (effect->getId() == data.getId(rn)) {
+				isSelected = true;
+				break;
+			}
 		}
 	}
 	effectComponent->selected.setToggleState(isSelected, juce::dontSendNotification);
 	effectComponent->selected.onClick = [this] {
+		auto data = (AudioEffectListBoxItemData&)modelData;
+		juce::SpinLock::ScopedLockType lock(data.audioProcessor.effectsLock);
 		((AudioEffectListBoxItemData&)modelData).setSelected(rowNum, this->effectComponent->selected.getToggleState());
 	};
 }

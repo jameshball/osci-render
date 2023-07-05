@@ -106,7 +106,7 @@ void OscirenderAudioProcessorEditor::removeCodeEditor(int index) {
 }
 
 
-// parsersLock must be locked before calling this function
+// parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessorEditor::updateCodeEditor() {
     // check if any code editors are visible
     bool visible = false;
@@ -127,22 +127,24 @@ void OscirenderAudioProcessorEditor::updateCodeEditor() {
     resized();
 }
 
-void OscirenderAudioProcessorEditor::fileUpdated(juce::File file) {
+void OscirenderAudioProcessorEditor::fileUpdated(std::unique_ptr<juce::File> file) {
     lua.setVisible(false);
     obj.setVisible(false);
-    if (file.getFileExtension() == ".lua") {
+    if (file == nullptr) {
+		return;
+	} else if (file->getFileExtension() == ".lua") {
         lua.setVisible(true);
-    } else if (file.getFileExtension() == ".obj") {
+    } else if (file->getFileExtension() == ".obj") {
 		obj.setVisible(true);
 	}
 }
 
-// parsersLock must be locked before calling this function
+// parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessorEditor::codeDocumentTextInserted(const juce::String& newText, int insertIndex) {
     updateCodeDocument();
 }
 
-// parsersLock must be locked before calling this function
+// parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessorEditor::codeDocumentTextDeleted(int startIndex, int endIndex) {
     updateCodeDocument();
 }
@@ -154,30 +156,41 @@ void OscirenderAudioProcessorEditor::updateCodeDocument() {
 }
 
 bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
-    juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+    juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
+    juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
+
     int numFiles = audioProcessor.numFiles();
     int currentFile = audioProcessor.getCurrentFileIndex();
-    bool updated = false;
+    bool changedFile = false;
+    bool consumeKey = true;
     if (key.getTextCharacter() == 'j') {
-        currentFile++;
-        if (currentFile == numFiles) {
-            currentFile = 0;
+        if (numFiles > 1) {
+            currentFile++;
+            if (currentFile == numFiles) {
+                currentFile = 0;
+            }
+            changedFile = true;
         }
-        updated = true;
     } else if (key.getTextCharacter() == 'k') {
-        currentFile--;
-        if (currentFile < 0) {
-            currentFile = numFiles - 1;
-        }
-        updated = true;
-    }
+        if (numFiles > 1) {
+			currentFile--;
+            if (currentFile < 0) {
+				currentFile = numFiles - 1;
+			}
+			changedFile = true;
+		}
+    } else if (key.isKeyCode(juce::KeyPress::escapeKey)) {
+        obj.disableMouseRotation();
+    } else {
+		consumeKey = false;
+	}
 
-    if (updated) {
+    if (changedFile) {
         audioProcessor.changeCurrentFile(currentFile);
-        fileUpdated(audioProcessor.getCurrentFile());
+        fileUpdated(std::make_unique<juce::File>(audioProcessor.getCurrentFile()));
         updateCodeEditor();
         main.updateFileLabel();
     }
 
-    return updated;
+    return consumeKey;
 }

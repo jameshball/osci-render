@@ -68,9 +68,9 @@ public:
 
     double currentSampleRate = 0.0;
 
+    juce::SpinLock effectsLock;
 	std::vector<std::shared_ptr<Effect>> allEffects;
 	std::shared_ptr<std::vector<std::shared_ptr<Effect>>> enabledEffects = std::make_shared<std::vector<std::shared_ptr<Effect>>>();
-
     std::vector<std::shared_ptr<Effect>> luaEffects;
 
     // TODO see if there is a way to move this code to .cpp

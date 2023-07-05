@@ -33,9 +33,11 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     {
     producer = std::make_unique<FrameProducer>(*this, std::make_shared<FileParser>());
     producer->startThread();
+    
+    juce::SpinLock::ScopedLockType lock(effectsLock);
 
-	allEffects.push_back(std::make_shared<Effect>(std::make_unique<BitCrushEffect>(), "Bit Crush", "bitCrush"));
-	allEffects.push_back(std::make_shared<Effect>(std::make_unique<BulgeEffect>(), "Bulge", "bulge"));
+    allEffects.push_back(std::make_shared<Effect>(std::make_unique<BitCrushEffect>(), "Bit Crush", "bitCrush"));
+    allEffects.push_back(std::make_shared<Effect>(std::make_unique<BulgeEffect>(), "Bulge", "bulge"));
     allEffects.push_back(std::make_shared<Effect>(std::make_unique<RotateEffect>(), "2D Rotate Speed", "rotateSpeed"));
     allEffects.push_back(std::make_shared<Effect>(std::make_unique<VectorCancellingEffect>(), "Vector cancelling", "vectorCancelling"));
     allEffects.push_back(std::make_shared<Effect>(std::make_unique<DistortEffect>(true), "Vertical shift", "verticalDistort"));
@@ -152,6 +154,7 @@ bool OscirenderAudioProcessor::isBusesLayoutSupported (const BusesLayout& layout
 }
 #endif
 
+// effectsLock should be held when calling this
 void OscirenderAudioProcessor::addLuaSlider() {
     juce::String sliderName = "";
 
@@ -165,6 +168,7 @@ void OscirenderAudioProcessor::addLuaSlider() {
     luaEffects.push_back(std::make_shared<Effect>(std::make_unique<LuaEffect>(sliderName, *this), "Lua " + sliderName, "lua" + sliderName));
 }
 
+// effectsLock should be held when calling this
 void OscirenderAudioProcessor::updateLuaValues() {
     for (auto& effect : luaEffects) {
         effect->apply();
@@ -183,58 +187,44 @@ void OscirenderAudioProcessor::updateAngleDelta() {
 	thetaDelta = cyclesPerSample * 2.0 * juce::MathConstants<double>::pi;
 }
 
+// effectsLock MUST be held when calling this
 void OscirenderAudioProcessor::enableEffect(std::shared_ptr<Effect> effect) {
-	// need to make a new vector because the old one is being iterated over in another thread
-	std::shared_ptr<std::vector<std::shared_ptr<Effect>>> newEffects = std::make_shared<std::vector<std::shared_ptr<Effect>>>();
-	for (auto& e : *enabledEffects) {
-		newEffects->push_back(e);
-	}
 	// remove any existing effects with the same id
-	for (auto it = newEffects->begin(); it != newEffects->end();) {
+	for (auto it = enabledEffects->begin(); it != enabledEffects->end();) {
 		if ((*it)->getId() == effect->getId()) {
-			it = newEffects->erase(it);
+			it = enabledEffects->erase(it);
 		} else {
 			it++;
 		}
 	}
 	// insert according to precedence (sorts from lowest to highest precedence)
-	auto it = newEffects->begin();
-	while (it != newEffects->end() && (*it)->getPrecedence() <= effect->getPrecedence()) {
+	auto it = enabledEffects->begin();
+	while (it != enabledEffects->end() && (*it)->getPrecedence() <= effect->getPrecedence()) {
 		it++;
 	}
-	newEffects->insert(it, effect);
-	enabledEffects = newEffects;
+    enabledEffects->insert(it, effect);
 }
 
+// effectsLock MUST be held when calling this
 void OscirenderAudioProcessor::disableEffect(std::shared_ptr<Effect> effect) {
-	// need to make a new vector because the old one is being iterated over in another thread
-	std::shared_ptr<std::vector<std::shared_ptr<Effect>>> newEffects = std::make_shared<std::vector<std::shared_ptr<Effect>>>();
-	for (auto& e : *enabledEffects) {
-		newEffects->push_back(e);
-	}
 	// remove any existing effects with the same id
-	for (auto it = newEffects->begin(); it != newEffects->end();) {
+	for (auto it = enabledEffects->begin(); it != enabledEffects->end();) {
 		if ((*it)->getId() == effect->getId()) {
-			it = newEffects->erase(it);
+			it = enabledEffects->erase(it);
 		} else {
 			it++;
 		}
 	}
-	enabledEffects = newEffects;
 }
 
+// effectsLock MUST be held when calling this
 void OscirenderAudioProcessor::updateEffectPrecedence() {
-	// need to make a new vector because the old one is being iterated over in another thread
-	std::shared_ptr<std::vector<std::shared_ptr<Effect>>> newEffects = std::make_shared<std::vector<std::shared_ptr<Effect>>>();
-	for (auto& e : *enabledEffects) {
-		newEffects->push_back(e);
-	}
-	std::sort(newEffects->begin(), newEffects->end(), [](std::shared_ptr<Effect> a, std::shared_ptr<Effect> b) {
+	std::sort(enabledEffects->begin(), enabledEffects->end(), [](std::shared_ptr<Effect> a, std::shared_ptr<Effect> b) {
 		return a->getPrecedence() < b->getPrecedence();
     });
-	enabledEffects = newEffects;
 }
 
+// parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessor::updateFileBlock(int index, std::shared_ptr<juce::MemoryBlock> block) {
     if (index < 0 || index >= fileBlocks.size()) {
 		return;
@@ -243,6 +233,7 @@ void OscirenderAudioProcessor::updateFileBlock(int index, std::shared_ptr<juce::
 	openFile(index);
 }
 
+// parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessor::addFile(juce::File file) {
     fileBlocks.push_back(std::make_shared<juce::MemoryBlock>());
     files.push_back(file);
@@ -252,6 +243,7 @@ void OscirenderAudioProcessor::addFile(juce::File file) {
     openFile(fileBlocks.size() - 1);
 }
 
+// parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessor::removeFile(int index) {
 	if (index < 0 || index >= fileBlocks.size()) {
 		return;
@@ -266,18 +258,20 @@ int OscirenderAudioProcessor::numFiles() {
     return fileBlocks.size();
 }
 
+// used for opening NEW files. Should be the default way of opening files as
+// it will reparse any existing files, so it is safer.
+// parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessor::openFile(int index) {
 	if (index < 0 || index >= fileBlocks.size()) {
 		return;
 	}
     parsers[index]->parse(files[index].getFileExtension(), std::make_unique<juce::MemoryInputStream>(*fileBlocks[index], false));
-    producer->setSource(parsers[index], index);
-    currentFile = index;
-	invalidateFrameBuffer = true;
-    updateLuaValues();
-    updateObjValues();
+    changeCurrentFile(index);
 }
 
+// used ONLY for changing the current file to an EXISTING file.
+// much faster than openFile(int index) because it doesn't reparse any files.
+// parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessor::changeCurrentFile(int index) {
     if (index == -1) {
         currentFile = -1;
@@ -289,6 +283,8 @@ void OscirenderAudioProcessor::changeCurrentFile(int index) {
 	producer->setSource(parsers[index], index);
     currentFile = index;
 	invalidateFrameBuffer = true;
+    updateLuaValues();
+    updateObjValues();
 }
 
 int OscirenderAudioProcessor::getCurrentFileIndex() {
@@ -415,12 +411,13 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
             double drawingProgress = length == 0.0 ? 1 : shapeDrawn / length;
             channels = shape->nextVector(drawingProgress);
         }
-        
-		auto enabledEffectsCopy = enabledEffects;
 
-		for (auto effect : *enabledEffectsCopy) {
-			channels = effect->apply(sample, channels);
-		}
+        {
+            juce::SpinLock::ScopedLockType lock(effectsLock);
+            for (auto effect : *enabledEffects) {
+                channels = effect->apply(sample, channels);
+            }
+        }
 
 		x = channels.x;
 		y = channels.y;

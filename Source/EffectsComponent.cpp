@@ -18,12 +18,14 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p) : audioProcessor
         }
     };
 
-    auto effects = audioProcessor.allEffects;
-	for (int i = 0; i < effects.size(); i++) {
-		auto effect = effects[i];
-        effect->setValue(effect->getValue());
-		itemData.data.push_back(effect);
-	}
+    {
+        juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+        for (int i = 0; i < audioProcessor.allEffects.size(); i++) {
+            auto effect = audioProcessor.allEffects[i];
+            effect->setValue(effect->getValue());
+            itemData.data.push_back(effect);
+        }
+    }
 
     /*addBtn.setButtonText("Add Item...");
     addBtn.onClick = [this]()
