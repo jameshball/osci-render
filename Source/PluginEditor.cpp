@@ -46,13 +46,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     for (int i = 0; i < audioProcessor.numFiles(); i++) {
         addCodeEditor(i);
     }
-    updateCodeEditor();
-
-    std::unique_ptr<juce::File> file;
-    if (audioProcessor.getCurrentFileIndex() != -1) {
-        file = std::make_unique<juce::File>(audioProcessor.getCurrentFile());
-    }
-    fileUpdated(std::move(file));
+    fileUpdated(audioProcessor.getCurrentFileName());
 
     setSize(1100, 750);
     setResizable(true, true);
@@ -93,7 +87,7 @@ void OscirenderAudioProcessorEditor::resized() {
 void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
     std::shared_ptr<juce::CodeDocument> codeDocument = std::make_shared<juce::CodeDocument>();
     codeDocuments.insert(codeDocuments.begin() + index, codeDocument);
-    juce::String extension = audioProcessor.getFile(index).getFileExtension();
+    juce::String extension = audioProcessor.getFileName(index).fromLastOccurrenceOf(".", true, false);
     juce::CodeTokeniser* tokeniser = nullptr;
     if (extension == ".lua") {
         tokeniser = &luaTokeniser;
@@ -137,17 +131,19 @@ void OscirenderAudioProcessorEditor::updateCodeEditor() {
 }
 
 // parsersLock MUST be locked before calling this function
-void OscirenderAudioProcessorEditor::fileUpdated(std::unique_ptr<juce::File> file) {
+void OscirenderAudioProcessorEditor::fileUpdated(juce::String fileName) {
+    juce::String extension = fileName.fromLastOccurrenceOf(".", true, false);
     lua.setVisible(false);
     obj.setVisible(false);
-    if (file == nullptr) {
-		return;
-	} else if (file->getFileExtension() == ".lua") {
+    if (fileName.isEmpty()) {
+        // do nothing
+    } else if (extension == ".lua") {
         lua.setVisible(true);
-    } else if (file->getFileExtension() == ".obj") {
+    } else if (extension == ".obj") {
 		obj.setVisible(true);
 	}
     main.updateFileLabel();
+    updateCodeEditor();
 }
 
 // parsersLock AND effectsLock must be locked before calling this function
@@ -198,9 +194,7 @@ bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
 
     if (changedFile) {
         audioProcessor.changeCurrentFile(currentFile);
-        fileUpdated(std::make_unique<juce::File>(audioProcessor.getCurrentFile()));
-        updateCodeEditor();
-        main.updateFileLabel();
+        fileUpdated(audioProcessor.getCurrentFileName());
     }
 
     return consumeKey;

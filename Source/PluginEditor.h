@@ -30,8 +30,7 @@ public:
     
     void addCodeEditor(int index);
     void removeCodeEditor(int index);
-    void updateCodeEditor();
-    void fileUpdated(std::unique_ptr<juce::File> file);
+    void fileUpdated(juce::String fileName);
 private:
     OscirenderAudioProcessor& audioProcessor;
     
@@ -48,6 +47,7 @@ private:
 	void codeDocumentTextInserted(const juce::String& newText, int insertIndex) override;
 	void codeDocumentTextDeleted(int startIndex, int endIndex) override;
     void updateCodeDocument();
+    void updateCodeEditor();
 
     bool keyPressed(const juce::KeyPress& key) override;
 

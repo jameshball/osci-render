@@ -162,7 +162,7 @@ public:
     juce::SpinLock parsersLock;
     std::vector<std::shared_ptr<FileParser>> parsers;
     std::vector<std::shared_ptr<juce::MemoryBlock>> fileBlocks;
-    std::vector<juce::File> files;
+    std::vector<juce::String> fileNames;
     std::atomic<int> currentFile = -1;
     
     std::unique_ptr<FrameProducer> producer;
@@ -175,13 +175,14 @@ public:
     void updateEffectPrecedence();
     void updateFileBlock(int index, std::shared_ptr<juce::MemoryBlock> block);
     void addFile(juce::File file);
+    void addFile(juce::String fileName, const char* data, const int size);
     void removeFile(int index);
     int numFiles();
     void changeCurrentFile(int index);
     int getCurrentFileIndex();
     std::shared_ptr<FileParser> getCurrentFileParser();
-	juce::File getCurrentFile();
-    juce::File getFile(int index);
+	juce::String getCurrentFileName();
+    juce::String getFileName(int index);
 	std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
 private:
     double theta = 0.0;

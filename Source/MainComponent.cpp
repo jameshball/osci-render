@@ -22,8 +22,7 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 				}
 			}
 			pluginEditor.addCodeEditor(audioProcessor.getCurrentFileIndex());
-			pluginEditor.updateCodeEditor();
-			pluginEditor.fileUpdated(std::make_unique<juce::File>(audioProcessor.getCurrentFile()));
+			pluginEditor.fileUpdated(audioProcessor.getCurrentFileName());
 		});
 	};
 
@@ -38,16 +37,46 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 		}
 		pluginEditor.removeCodeEditor(audioProcessor.getCurrentFileIndex());
 		audioProcessor.removeFile(audioProcessor.getCurrentFileIndex());
-		pluginEditor.updateCodeEditor();
-		std::unique_ptr<juce::File> file;
-		if (audioProcessor.getCurrentFileIndex() != -1) {
-			file = std::make_unique<juce::File>(audioProcessor.getCurrentFile());
-		}
-		pluginEditor.fileUpdated(std::move(file));
+		pluginEditor.fileUpdated(audioProcessor.getCurrentFileName());
 	};
 
 	addAndMakeVisible(fileLabel);
 	updateFileLabel();
+
+	
+	addAndMakeVisible(fileName);
+	fileType.addItem(".lua", 1);
+	fileType.addItem(".svg", 2);
+	fileType.addItem(".obj", 3);
+	fileType.addItem(".txt", 4);
+	fileType.setSelectedId(1);
+	addAndMakeVisible(fileType);
+	addAndMakeVisible(createFile);
+
+	createFile.onClick = [this] {
+		juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+		auto fileNameText = fileName.getText();
+		auto fileTypeText = fileType.getText();
+		auto fileName = fileNameText + fileTypeText;
+		if (fileTypeText == ".lua") {
+			audioProcessor.addFile(fileNameText + fileTypeText, BinaryData::demo_lua, BinaryData::demo_luaSize);
+		} else if (fileTypeText == ".svg") {
+			audioProcessor.addFile(fileNameText + fileTypeText, BinaryData::demo_svg, BinaryData::demo_svgSize);
+		} else if (fileTypeText == ".obj") {
+			audioProcessor.addFile(fileNameText + fileTypeText, BinaryData::cube_obj, BinaryData::cube_objSize);
+		} else if (fileTypeText == ".txt") {
+			audioProcessor.addFile(fileNameText + fileTypeText, BinaryData::helloworld_txt, BinaryData::helloworld_txtSize);
+		} else {
+			return;
+		}
+
+		pluginEditor.addCodeEditor(audioProcessor.getCurrentFileIndex());
+		pluginEditor.fileUpdated(fileName);
+	};
+
+	fileName.onReturnKey = [this] {
+		createFile.triggerClick();
+	};
 }
 
 MainComponent::~MainComponent() {
@@ -59,16 +88,28 @@ void MainComponent::updateFileLabel() {
 		return;
 	}
 	
-	fileLabel.setText(audioProcessor.getCurrentFile().getFileName(), juce::dontSendNotification);
+	fileLabel.setText(audioProcessor.getCurrentFileName(), juce::dontSendNotification);
 }
 
 void MainComponent::resized() {
-	auto baseYPadding = 10;
-	auto xPadding = 10;
-	auto yPadding = 10;
+	auto bounds = getLocalBounds().reduced(20);
 	auto buttonWidth = 120;
-	auto buttonHeight = 40;
-    fileButton.setBounds(xPadding, baseYPadding + yPadding, buttonWidth, buttonHeight);
-	closeFileButton.setBounds(xPadding, baseYPadding + yPadding + buttonHeight + yPadding, buttonWidth, buttonHeight);
-	fileLabel.setBounds(xPadding + buttonWidth + xPadding, baseYPadding + yPadding, getWidth() - xPadding - buttonWidth - xPadding, buttonHeight);
+	auto buttonHeight = 30;
+	auto padding = 10;
+	auto rowPadding = 10;
+	
+	auto row = bounds.removeFromTop(buttonHeight);
+    fileButton.setBounds(row.removeFromLeft(buttonWidth));
+	row.removeFromLeft(rowPadding);
+	fileLabel.setBounds(row);
+	bounds.removeFromTop(padding);
+	closeFileButton.setBounds(bounds.removeFromTop(buttonHeight).removeFromLeft(buttonWidth));
+
+	bounds.removeFromTop(padding);
+	row = bounds.removeFromTop(buttonHeight);
+	fileName.setBounds(row.removeFromLeft(buttonWidth));
+	row.removeFromLeft(rowPadding);
+	fileType.setBounds(row.removeFromLeft(buttonWidth / 2));
+	row.removeFromLeft(rowPadding);
+	createFile.setBounds(row.removeFromLeft(buttonWidth));
 }
