@@ -7,6 +7,9 @@ public:
 	WorldObject(std::string);
     
     void setBaseRotation(double x, double y, double z);
+    void setCurrentRotationX(double x);
+    void setCurrentRotationY(double y);
+    void setCurrentRotationZ(double z);
     void setRotationSpeed(double rotateSpeed);
     void nextFrame();
 

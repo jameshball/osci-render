@@ -213,6 +213,18 @@ void WorldObject::setBaseRotation(double x, double y, double z) {
 	baseRotateZ = z;
 }
 
+void WorldObject::setCurrentRotationX(double x) {
+    currentRotateX = x;
+}
+
+void WorldObject::setCurrentRotationY(double y) {
+	currentRotateY = y;
+}
+
+void WorldObject::setCurrentRotationZ(double z) {
+	currentRotateZ = z;
+}
+
 void WorldObject::setRotationSpeed(double rotateSpeed) {
     this->rotateSpeed = linearSpeedToActualSpeed(rotateSpeed);
 }

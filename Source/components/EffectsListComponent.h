@@ -118,7 +118,11 @@ class EffectsListBoxModel : public DraggableListBoxModel
 {
 public:
     EffectsListBoxModel(DraggableListBox& lb, DraggableListBoxItemData& md)
-        : DraggableListBoxModel(lb, md) {}
+        : DraggableListBoxModel(lb, md) {
+        OscirenderAudioProcessor& audioProcessor = ((AudioEffectListBoxItemData&)md).audioProcessor;
+        juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+        audioProcessor.updateEffectPrecedence();
+    }
 
     juce::Component* refreshComponentForRow(int, bool, juce::Component*) override;
 };

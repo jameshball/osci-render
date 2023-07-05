@@ -33,6 +33,11 @@ void EffectComponent::resized() {
     auto sliderRight = getWidth() - 140;
     auto bounds = getLocalBounds();
     bounds.removeFromRight(10);
+
+    for (auto& component : components) {
+		component->setBounds(bounds.removeFromRight(25));
+	}
+
     slider.setBounds(bounds.removeFromRight(sliderRight));
     if (checkboxVisible) {
         bounds.removeFromLeft(2);
@@ -49,6 +54,11 @@ void EffectComponent::paint(juce::Graphics& g) {
     auto bounds = getLocalBounds();
     g.drawRect(bounds);
     g.drawText(name, textBounds, juce::Justification::left);
+}
+
+void EffectComponent::addComponent(std::shared_ptr<juce::Component> component) {
+	components.push_back(component);
+    addAndMakeVisible(component.get());
 }
 
 void EffectComponent::setCheckboxVisible(bool visible) {

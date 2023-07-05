@@ -1,6 +1,7 @@
 #include "ObjComponent.h"
 #include "PluginEditor.h"
 #include <numbers>
+#include "Util.h"
 
 ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
 	setText("3D .obj File Settings");
@@ -21,11 +22,31 @@ ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 
 	auto onRotationChange = [this]() {
 		juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
-		audioProcessor.rotateX.setValue(rotateX.slider.getValue());
-		audioProcessor.rotateY.setValue(rotateY.slider.getValue());
-		audioProcessor.rotateZ.setValue(rotateZ.slider.getValue());
+		double x = fixedRotateX->getToggleState() ? 0 : rotateX.slider.getValue();
+		double y = fixedRotateY->getToggleState() ? 0 : rotateY.slider.getValue();
+		double z = fixedRotateZ->getToggleState() ? 0 : rotateZ.slider.getValue();
+		audioProcessor.rotateX.setValue(x);
+		audioProcessor.rotateY.setValue(y);
+		audioProcessor.rotateZ.setValue(z);
 		// all the rotate apply functions are the same
 		audioProcessor.rotateX.apply();
+
+		if (fixedRotateX->getToggleState()) {
+			audioProcessor.currentRotateX.setValue(rotateX.slider.getValue());
+			audioProcessor.currentRotateX.apply();
+		}
+		if (fixedRotateY->getToggleState()) {
+			audioProcessor.currentRotateY.setValue(rotateY.slider.getValue());
+			audioProcessor.currentRotateY.apply();
+		}
+		if (fixedRotateZ->getToggleState()) {
+			audioProcessor.currentRotateZ.setValue(rotateZ.slider.getValue());
+			audioProcessor.currentRotateZ.apply();
+		}
+
+		audioProcessor.fixedRotateX = fixedRotateX->getToggleState();
+		audioProcessor.fixedRotateY = fixedRotateY->getToggleState();
+		audioProcessor.fixedRotateZ = fixedRotateZ->getToggleState();
 	};
 
 	rotateX.slider.onValueChange = onRotationChange;
@@ -47,6 +68,34 @@ ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 		rotateZ.slider.setValue(0);
 		mouseRotate.setToggleState(false, juce::NotificationType::dontSendNotification);
 	};
+
+	auto doc = juce::XmlDocument::parse(BinaryData::fixed_rotate_svg);
+	Util::changeSvgColour(doc.get(), "white");
+	fixedRotateWhite = juce::Drawable::createFromSVG(*doc);
+	Util::changeSvgColour(doc.get(), "red");
+	DBG(doc->toString());
+	fixedRotateRed = juce::Drawable::createFromSVG(*doc);
+
+	// TODO: any way of removing this duplication?
+	getLookAndFeel().setColour(juce::DrawableButton::backgroundOnColourId, juce::Colours::transparentWhite);
+	fixedRotateX->setClickingTogglesState(true);
+	fixedRotateY->setClickingTogglesState(true);
+	fixedRotateZ->setClickingTogglesState(true);
+	fixedRotateX->setImages(fixedRotateWhite.get(), nullptr, nullptr, nullptr, fixedRotateRed.get());
+	fixedRotateY->setImages(fixedRotateWhite.get(), nullptr, nullptr, nullptr, fixedRotateRed.get());
+	fixedRotateZ->setImages(fixedRotateWhite.get(), nullptr, nullptr, nullptr, fixedRotateRed.get());
+
+	fixedRotateX->onClick = onRotationChange;
+	fixedRotateY->onClick = onRotationChange;
+	fixedRotateZ->onClick = onRotationChange;
+
+	rotateX.addComponent(fixedRotateX);
+	rotateY.addComponent(fixedRotateY);
+	rotateZ.addComponent(fixedRotateZ);
+
+	fixedRotateX->setToggleState(audioProcessor.fixedRotateX, juce::NotificationType::dontSendNotification);
+	fixedRotateY->setToggleState(audioProcessor.fixedRotateY, juce::NotificationType::dontSendNotification);
+	fixedRotateZ->setToggleState(audioProcessor.fixedRotateZ, juce::NotificationType::dontSendNotification);
 }
 
 ObjComponent::~ObjComponent() {

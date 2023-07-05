@@ -24,7 +24,6 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 			pluginEditor.addCodeEditor(audioProcessor.getCurrentFileIndex());
 			pluginEditor.updateCodeEditor();
 			pluginEditor.fileUpdated(std::make_unique<juce::File>(audioProcessor.getCurrentFile()));
-			updateFileLabel();
 		});
 	};
 
@@ -45,7 +44,6 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 			file = std::make_unique<juce::File>(audioProcessor.getCurrentFile());
 		}
 		pluginEditor.fileUpdated(std::move(file));
-		updateFileLabel();
 	};
 
 	addAndMakeVisible(fileLabel);

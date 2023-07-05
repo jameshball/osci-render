@@ -70,7 +70,7 @@ public:
 
     juce::SpinLock effectsLock;
 	std::vector<std::shared_ptr<Effect>> allEffects;
-	std::shared_ptr<std::vector<std::shared_ptr<Effect>>> enabledEffects = std::make_shared<std::vector<std::shared_ptr<Effect>>>();
+	std::vector<std::shared_ptr<Effect>> enabledEffects;
     std::vector<std::shared_ptr<Effect>> luaEffects;
 
     // TODO see if there is a way to move this code to .cpp
@@ -103,6 +103,45 @@ public:
     Effect rotateX{onRotationChange, "Rotate x", "rotateX", 1};
     Effect rotateY{onRotationChange, "Rotate y", "rotateY", 1};
     Effect rotateZ{onRotationChange, "Rotate z", "rotateZ", 0};
+    Effect currentRotateX{
+        [this](int index, Vector2 input, double value, double frequency, double sampleRate) {
+            if (getCurrentFileIndex() != -1) {
+                auto obj = getCurrentFileParser()->getObject();
+                if (obj == nullptr) return input;
+                obj->setCurrentRotationX(value * std::numbers::pi);
+            }
+            return input;
+        },
+        "Current Rotate x",
+        "currentRotateX",
+        0
+    };
+    Effect currentRotateY{
+        [this](int index, Vector2 input, double value, double frequency, double sampleRate) {
+            if (getCurrentFileIndex() != -1) {
+                auto obj = getCurrentFileParser()->getObject();
+                if (obj == nullptr) return input;
+                obj->setCurrentRotationY(value * std::numbers::pi);
+            }
+            return input;
+        },
+        "Current Rotate y",
+        "currentRotateY",
+        0
+    };
+    Effect currentRotateZ{
+        [this](int index, Vector2 input, double value, double frequency, double sampleRate) {
+            if (getCurrentFileIndex() != -1) {
+                auto obj = getCurrentFileParser()->getObject();
+                if (obj == nullptr) return input;
+                obj->setCurrentRotationZ(value * std::numbers::pi);
+            }
+            return input;
+    },
+        "Current Rotate z",
+        "currentRotateZ",
+        0
+    };
     Effect rotateSpeed{
         [this](int index, Vector2 input, double value, double frequency, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
@@ -116,6 +155,9 @@ public:
         "rotateSpeed",
         0
     };
+    std::atomic<bool> fixedRotateX = false;
+    std::atomic<bool> fixedRotateY = false;
+    std::atomic<bool> fixedRotateZ = false;
     
     juce::SpinLock parsersLock;
     std::vector<std::shared_ptr<FileParser>> parsers;

@@ -13,11 +13,6 @@
 OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p)
 	: AudioProcessorEditor(&p), audioProcessor(p), effects(p), main(p, *this), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white), lua(p, *this), obj(p, *this)
 {
-    // Make sure that before the constructor has finished, you've set the
-    // editor's size to whatever you need it to be.
-    setSize(1100, 750);
-	setResizable(true, true);
-
     addAndMakeVisible(effects);
     addAndMakeVisible(main);
     addChildComponent(lua);
@@ -46,7 +41,21 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 	juce::Path path;
     path.addTriangle(0.0f, 0.5f, 1.0f, 1.0f, 1.0f, 0.0f);
 	collapseButton.setShape(path, false, true, true);
-    resized();
+
+    juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+    for (int i = 0; i < audioProcessor.numFiles(); i++) {
+        addCodeEditor(i);
+    }
+    updateCodeEditor();
+
+    std::unique_ptr<juce::File> file;
+    if (audioProcessor.getCurrentFileIndex() != -1) {
+        file = std::make_unique<juce::File>(audioProcessor.getCurrentFile());
+    }
+    fileUpdated(std::move(file));
+
+    setSize(1100, 750);
+    setResizable(true, true);
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {}
@@ -127,6 +136,7 @@ void OscirenderAudioProcessorEditor::updateCodeEditor() {
     resized();
 }
 
+// parsersLock MUST be locked before calling this function
 void OscirenderAudioProcessorEditor::fileUpdated(std::unique_ptr<juce::File> file) {
     lua.setVisible(false);
     obj.setVisible(false);
@@ -137,6 +147,7 @@ void OscirenderAudioProcessorEditor::fileUpdated(std::unique_ptr<juce::File> fil
     } else if (file->getFileExtension() == ".obj") {
 		obj.setVisible(true);
 	}
+    main.updateFileLabel();
 }
 
 // parsersLock AND effectsLock must be locked before calling this function

@@ -15,6 +15,7 @@ public:
     void paint(juce::Graphics& g) override;
 
     void setCheckboxVisible(bool visible);
+    void addComponent(std::shared_ptr<juce::Component> component);
 
     juce::Slider slider;
     juce::String id;
@@ -25,6 +26,7 @@ private:
     void componentSetup();
     bool checkboxVisible = true;
     juce::Rectangle<int> textBounds;
+    std::vector<std::shared_ptr<juce::Component>> components;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EffectComponent)
 };

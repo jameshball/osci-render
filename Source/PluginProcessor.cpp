@@ -190,27 +190,27 @@ void OscirenderAudioProcessor::updateAngleDelta() {
 // effectsLock MUST be held when calling this
 void OscirenderAudioProcessor::enableEffect(std::shared_ptr<Effect> effect) {
 	// remove any existing effects with the same id
-	for (auto it = enabledEffects->begin(); it != enabledEffects->end();) {
+	for (auto it = enabledEffects.begin(); it != enabledEffects.end();) {
 		if ((*it)->getId() == effect->getId()) {
-			it = enabledEffects->erase(it);
+			it = enabledEffects.erase(it);
 		} else {
 			it++;
 		}
 	}
 	// insert according to precedence (sorts from lowest to highest precedence)
-	auto it = enabledEffects->begin();
-	while (it != enabledEffects->end() && (*it)->getPrecedence() <= effect->getPrecedence()) {
+	auto it = enabledEffects.begin();
+	while (it != enabledEffects.end() && (*it)->getPrecedence() <= effect->getPrecedence()) {
 		it++;
 	}
-    enabledEffects->insert(it, effect);
+    enabledEffects.insert(it, effect);
 }
 
 // effectsLock MUST be held when calling this
 void OscirenderAudioProcessor::disableEffect(std::shared_ptr<Effect> effect) {
 	// remove any existing effects with the same id
-	for (auto it = enabledEffects->begin(); it != enabledEffects->end();) {
+	for (auto it = enabledEffects.begin(); it != enabledEffects.end();) {
 		if ((*it)->getId() == effect->getId()) {
-			it = enabledEffects->erase(it);
+			it = enabledEffects.erase(it);
 		} else {
 			it++;
 		}
@@ -219,9 +219,11 @@ void OscirenderAudioProcessor::disableEffect(std::shared_ptr<Effect> effect) {
 
 // effectsLock MUST be held when calling this
 void OscirenderAudioProcessor::updateEffectPrecedence() {
-	std::sort(enabledEffects->begin(), enabledEffects->end(), [](std::shared_ptr<Effect> a, std::shared_ptr<Effect> b) {
-		return a->getPrecedence() < b->getPrecedence();
-    });
+    auto sortFunc = [](std::shared_ptr<Effect> a, std::shared_ptr<Effect> b) {
+        return a->getPrecedence() < b->getPrecedence();
+    };
+	std::sort(enabledEffects.begin(), enabledEffects.end(), sortFunc);
+    std::sort(allEffects.begin(), allEffects.end(), sortFunc);
 }
 
 // parsersLock AND effectsLock must be locked before calling this function
@@ -414,7 +416,7 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
         {
             juce::SpinLock::ScopedLockType lock(effectsLock);
-            for (auto effect : *enabledEffects) {
+            for (auto& effect : enabledEffects) {
                 channels = effect->apply(sample, channels);
             }
         }

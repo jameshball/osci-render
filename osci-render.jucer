@@ -6,7 +6,25 @@
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include">
   <MAINGROUP id="j5Ge2T" name="osci-render">
+    <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
+      <GROUP id="{C2609827-4F4A-1ADA-8BA1-A40C1D92649C}" name="lua">
+        <FILE id="xANsA8" name="demo.lua" compile="0" resource="1" file="Resources/lua/demo.lua"/>
+      </GROUP>
+      <GROUP id="{D084D1B2-6804-34C3-C831-231A00F4103A}" name="models">
+        <FILE id="LbviBq" name="cube.obj" compile="0" resource="1" file="Resources/models/cube.obj"/>
+      </GROUP>
+      <GROUP id="{82BCD6F1-A8BF-F30B-5587-81EE70168883}" name="svg">
+        <FILE id="IqXIZW" name="demo.svg" compile="0" resource="1" file="Resources/svg/demo.svg"/>
+        <FILE id="YwkQpy" name="fixed_rotate.svg" compile="0" resource="1"
+              file="Resources/svg/fixed_rotate.svg"/>
+      </GROUP>
+      <GROUP id="{F8A3D32C-4187-9A2F-5D78-040259957E9B}" name="text">
+        <FILE id="N9Q6Zg" name="greek.txt" compile="0" resource="1" file="Resources/text/greek.txt"/>
+        <FILE id="OABuJy" name="helloworld.txt" compile="0" resource="1" file="Resources/text/helloworld.txt"/>
+      </GROUP>
+    </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <FILE id="JceyXh" name="Util.h" compile="0" resource="0" file="Source/Util.h"/>
       <FILE id="RHHuXP" name="ObjComponent.cpp" compile="1" resource="0"
             file="Source/ObjComponent.cpp"/>
       <FILE id="mliVoS" name="ObjComponent.h" compile="0" resource="0" file="Source/ObjComponent.h"/>

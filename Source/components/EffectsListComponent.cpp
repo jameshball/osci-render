@@ -13,7 +13,7 @@ EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectList
 	{
 		juce::SpinLock::ScopedLockType lock(data.audioProcessor.effectsLock);
 		// check if effect is in audioProcessor enabled effects
-		for (auto effect : *data.audioProcessor.enabledEffects) {
+		for (auto effect : data.audioProcessor.enabledEffects) {
 			if (effect->getId() == data.getId(rn)) {
 				isSelected = true;
 				break;
