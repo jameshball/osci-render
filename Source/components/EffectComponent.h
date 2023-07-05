@@ -23,7 +23,7 @@ public:
 
 private:
     void componentSetup();
-    bool checkboxVisible = false;
+    bool checkboxVisible = true;
     juce::Rectangle<int> textBounds;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EffectComponent)

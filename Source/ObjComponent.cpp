@@ -5,6 +5,8 @@
 ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
 	setText("3D .obj File Settings");
 
+	juce::Desktop::getInstance().addGlobalMouseListener(this);
+
 	addAndMakeVisible(focalLength);
 	addAndMakeVisible(rotateX);
 	addAndMakeVisible(rotateY);
@@ -35,14 +37,57 @@ ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 		audioProcessor.rotateSpeed.setValue(rotateSpeed.slider.getValue());
 		audioProcessor.rotateSpeed.apply();
 	};
+
+	addAndMakeVisible(resetRotation);
+	addAndMakeVisible(mouseRotate);
+
+	resetRotation.onClick = [this] {
+		rotateX.slider.setValue(0);
+		rotateY.slider.setValue(0);
+		rotateZ.slider.setValue(0);
+		mouseRotate.setToggleState(false, juce::NotificationType::dontSendNotification);
+	};
+}
+
+ObjComponent::~ObjComponent() {
+	juce::Desktop::getInstance().removeGlobalMouseListener(this);
+}
+
+// listen for mouse movement and rotate the object if mouseRotate is enabled
+void ObjComponent::mouseMove(const juce::MouseEvent& e) {
+	if (mouseRotate.getToggleState()) {
+		auto globalEvent = e.getEventRelativeTo(&pluginEditor);
+		auto width = pluginEditor.getWidth();
+		auto height = pluginEditor.getHeight();
+		auto x = globalEvent.position.getX();
+		auto y = globalEvent.position.getY();
+
+		rotateX.slider.setValue(2 * x / width - 1);
+		rotateY.slider.setValue(1 - 2 * y / height);
+	}
+}
+
+// listen for when escape is pressed to disable mouse rotation
+bool ObjComponent::keyPressed(const juce::KeyPress& key) {
+	if (key == juce::KeyPress::escapeKey) {
+		mouseRotate.setToggleState(false, juce::NotificationType::dontSendNotification);
+	}
+	return true;
 }
 
 void ObjComponent::resized() {
 	auto area = getLocalBounds().reduced(20);
-	double sliderHeight = 30;
-	focalLength.setBounds(area.removeFromTop(sliderHeight));
-	rotateX.setBounds(area.removeFromTop(sliderHeight));
-	rotateY.setBounds(area.removeFromTop(sliderHeight));
-	rotateZ.setBounds(area.removeFromTop(sliderHeight));
-	rotateSpeed.setBounds(area.removeFromTop(sliderHeight));
+	double rowHeight = 30;
+	focalLength.setBounds(area.removeFromTop(rowHeight));
+	rotateX.setBounds(area.removeFromTop(rowHeight));
+	rotateY.setBounds(area.removeFromTop(rowHeight));
+	rotateZ.setBounds(area.removeFromTop(rowHeight));
+	rotateSpeed.setBounds(area.removeFromTop(rowHeight));
+
+	area.removeFromTop(10);
+	auto row = area.removeFromTop(rowHeight);
+	resetRotation.setBounds(row.removeFromLeft(120));
+	row.removeFromLeft(20);
+	mouseRotate.setBounds(row);
+
 }
