@@ -30,9 +30,8 @@ void EffectComponent::componentSetup() {
 EffectComponent::~EffectComponent() {}
 
 void EffectComponent::resized() {
-    auto sliderRight = getWidth() - 140;
+    auto sliderRight = getWidth() - 160;
     auto bounds = getLocalBounds();
-    bounds.removeFromRight(10);
     auto componentBounds = bounds.removeFromRight(25);
     if (component != nullptr) {
 		component->setBounds(componentBounds);
