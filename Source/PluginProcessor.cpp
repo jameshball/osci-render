@@ -43,6 +43,8 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     allEffects.push_back(std::make_shared<Effect>(std::make_unique<DistortEffect>(true), "Vertical shift", "verticalDistort"));
     allEffects.push_back(std::make_shared<Effect>(std::make_unique<DistortEffect>(false), "Horizontal shift", "horizontalDistort"));
     allEffects.push_back(std::make_shared<Effect>(std::make_unique<SmoothEffect>(), "Smoothing", "smoothing"));
+    allEffects.push_back(traceMax);
+    allEffects.push_back(traceMin);
 
     for (int i = 0; i < 5; i++) {
         addLuaSlider();
@@ -368,7 +370,10 @@ void OscirenderAudioProcessor::updateFrame() {
 }
 
 void OscirenderAudioProcessor::updateLengthIncrement() {
-    lengthIncrement = std::max(frameLength / (currentSampleRate / frequency), MIN_LENGTH_INCREMENT);
+    double traceMaxValue = traceMaxEnabled ? actualTraceMax : 1.0;
+    double traceMinValue = traceMinEnabled ? actualTraceMin : 0.0;
+    double proportionalLength = (traceMaxValue - traceMinValue) * frameLength;
+    lengthIncrement = std::max(proportionalLength / (currentSampleRate / frequency), MIN_LENGTH_INCREMENT);
 }
 
 void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
@@ -403,11 +408,13 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     
 	for (auto sample = 0; sample < numSamples; ++sample) {
         updateLengthIncrement();
+
+        traceMaxEnabled = false;
+        traceMinEnabled = false;
         
         Vector2 channels;
         double x = 0.0;
         double y = 0.0;
-        double length = 0.0;
 
 
         std::shared_ptr<FileParser> sampleParser;
@@ -423,7 +430,7 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
             channels = sampleParser->nextSample();
         } else if (currentShape < frame.size()) {
             auto& shape = frame[currentShape];
-            length = shape->length();
+            double length = shape->length();
             double drawingProgress = length == 0.0 ? 1 : shapeDrawn / length;
             channels = shape->nextVector(drawingProgress);
         }
@@ -449,31 +456,23 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 		} else if (totalNumOutputChannels == 1) {
             channelData[0][sample] = x;
         }
+
+        actualTraceMax = std::max(actualTraceMin + MIN_TRACE, std::min(traceMax->getValue(), 1.0));
+        actualTraceMin = std::max(MIN_TRACE, std::min(traceMin->getValue(), actualTraceMax - MIN_TRACE));
         
         if (!renderingSample) {
-            // hard cap on how many times it can be over the length to
-            // prevent audio stuttering
-            frameDrawn += std::min(lengthIncrement, 20 * length);
-            shapeDrawn += std::min(lengthIncrement, 20 * length);
-
-            // Need to skip all shapes that the lengthIncrement draws over.
-            // This is especially an issue when there are lots of small lines being
-            // drawn.
-            while (shapeDrawn > length) {
-                shapeDrawn -= length;
-                currentShape++;
-                if (currentShape >= frame.size()) {
-                    currentShape = 0;
-                    break;
-                }
-                // POTENTIAL TODO: Think of a way to make this more efficient when iterating
-                // this loop many times
-                length = frame[currentShape]->len;
-            }
+            incrementShapeDrawing();
         }
+        
+        double drawnFrameLength = traceMaxEnabled ? actualTraceMax * frameLength : frameLength;
 
-        if (!renderingSample && frameDrawn >= frameLength) {
+        if (!renderingSample && frameDrawn >= drawnFrameLength) {
             updateFrame();
+            if (traceMinEnabled) {
+                while (frameDrawn < actualTraceMin * frameLength) {
+                    incrementShapeDrawing();
+                }
+            }
         }
 	}
 
@@ -489,6 +488,29 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         processedMidi.addEvent(message, time);
     }
 	midiMessages.swapWith(processedMidi);
+}
+
+void OscirenderAudioProcessor::incrementShapeDrawing() {
+    double length = currentShape < frame.size() ? frame[currentShape]->len : 0.0;
+    // hard cap on how many times it can be over the length to
+    // prevent audio stuttering
+    frameDrawn += std::min(lengthIncrement, 20 * length);
+    shapeDrawn += std::min(lengthIncrement, 20 * length);
+
+    // Need to skip all shapes that the lengthIncrement draws over.
+    // This is especially an issue when there are lots of small lines being
+    // drawn.
+    while (shapeDrawn > length) {
+        shapeDrawn -= length;
+        currentShape++;
+        if (currentShape >= frame.size()) {
+            currentShape = 0;
+            break;
+        }
+        // POTENTIAL TODO: Think of a way to make this more efficient when iterating
+        // this loop many times
+        length = frame[currentShape]->len;
+    }
 }
 
 //==============================================================================

@@ -201,8 +201,33 @@ private:
 	double lengthIncrement = 0.0;
     bool invalidateFrameBuffer = false;
 
+    std::shared_ptr<Effect> traceMax = std::make_shared<Effect>(
+        [this](int index, Vector2 input, double value, double frequency, double sampleRate) {
+            traceMaxEnabled = true;
+            return input;
+        },
+        "Trace max",
+        "traceMax",
+        1
+    );
+    std::shared_ptr<Effect> traceMin = std::make_shared<Effect>(
+        [this](int index, Vector2 input, double value, double frequency, double sampleRate) {
+            traceMinEnabled = true;
+            return input;
+        },
+        "Trace min",
+        "traceMin",
+        0
+    );
+    const double MIN_TRACE = 0.005;
+    double actualTraceMax = traceMax->getValue();
+    double actualTraceMin = traceMin->getValue();
+    bool traceMaxEnabled = false;
+    bool traceMinEnabled = false;
+
 	void updateFrame();
     void updateLengthIncrement();
+    void incrementShapeDrawing();
     void openFile(int index);
     void updateLuaValues();
     void updateObjValues();
