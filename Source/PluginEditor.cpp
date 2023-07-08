@@ -42,6 +42,9 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     path.addTriangle(0.0f, 0.5f, 1.0f, 1.0f, 1.0f, 0.0f);
 	collapseButton.setShape(path, false, true, true);
 
+    audioProcessor.audioProducer.registerConsumer(audioConsumer);
+    dummyConsumer.startThread();
+
     juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
     for (int i = 0; i < audioProcessor.numFiles(); i++) {
         addCodeEditor(i);
@@ -52,7 +55,10 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     setResizable(true, true);
 }
 
-OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {}
+OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
+    audioProcessor.audioProducer.unregisterConsumer(audioConsumer);
+    dummyConsumer.stopThread(1000);
+}
 
 //==============================================================================
 void OscirenderAudioProcessorEditor::paint (juce::Graphics& g)

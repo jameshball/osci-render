@@ -15,6 +15,7 @@
 #include "parser/FrameConsumer.h"
 #include "audio/Effect.h"
 #include <numbers>
+#include "concurrency/BufferProducer.h"
 
 //==============================================================================
 /**
@@ -166,6 +167,8 @@ public:
     std::atomic<int> currentFile = -1;
     
     std::unique_ptr<FrameProducer> producer;
+
+    BufferProducer audioProducer;
 
     void addLuaSlider();
     void updateAngleDelta();

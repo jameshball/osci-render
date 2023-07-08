@@ -44,6 +44,9 @@ private:
     juce::XmlTokeniser xmlTokeniser;
 	juce::ShapeButton collapseButton;
 
+    std::shared_ptr<BufferConsumer> audioConsumer = std::make_shared<BufferConsumer>(50000);
+    DummyConsumer dummyConsumer{audioConsumer};
+
 	void codeDocumentTextInserted(const juce::String& newText, int insertIndex) override;
 	void codeDocumentTextDeleted(int startIndex, int endIndex) override;
     void updateCodeDocument();

@@ -118,8 +118,7 @@ void OscirenderAudioProcessor::changeProgramName (int index, const juce::String&
 }
 
 //==============================================================================
-void OscirenderAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
-{
+void OscirenderAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock) {
 	currentSampleRate = sampleRate;
     updateAngleDelta();
 }
@@ -449,13 +448,14 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         x = std::max(-1.0, std::min(1.0, x));
         y = std::max(-1.0, std::min(1.0, y));
         
-
         if (totalNumOutputChannels >= 2) {
 			channelData[0][sample] = x;
 			channelData[1][sample] = y;
 		} else if (totalNumOutputChannels == 1) {
             channelData[0][sample] = x;
         }
+
+        audioProducer.write(x, y);
 
         actualTraceMax = std::max(actualTraceMin + MIN_TRACE, std::min(traceMax->getValue(), 1.0));
         actualTraceMin = std::max(MIN_TRACE, std::min(traceMin->getValue(), actualTraceMax - MIN_TRACE));

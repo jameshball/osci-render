@@ -24,6 +24,12 @@
       </GROUP>
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <GROUP id="{9F5970A9-8094-E7F3-7AC1-812AE5589B9F}" name="concurrency">
+        <FILE id="WQ2W15" name="BufferConsumer.h" compile="0" resource="0"
+              file="Source/concurrency/BufferConsumer.h"/>
+        <FILE id="yWTiQQ" name="BufferProducer.h" compile="0" resource="0"
+              file="Source/concurrency/BufferProducer.h"/>
+      </GROUP>
       <FILE id="JceyXh" name="Util.h" compile="0" resource="0" file="Source/Util.h"/>
       <FILE id="RHHuXP" name="ObjComponent.cpp" compile="1" resource="0"
             file="Source/ObjComponent.cpp"/>
