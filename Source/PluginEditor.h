@@ -1,11 +1,3 @@
-/*
-  ==============================================================================
-
-    This file contains the basic framework code for a JUCE plugin editor.
-
-  ==============================================================================
-*/
-
 #pragma once
 
 #include <JuceHeader.h>
@@ -15,16 +7,12 @@
 #include "LuaComponent.h"
 #include "ObjComponent.h"
 
-//==============================================================================
-/**
-*/
-class OscirenderAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::CodeDocument::Listener
-{
+
+class OscirenderAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::CodeDocument::Listener {
 public:
     OscirenderAudioProcessorEditor (OscirenderAudioProcessor&);
     ~OscirenderAudioProcessorEditor() override;
 
-    //==============================================================================
     void paint (juce::Graphics&) override;
     void resized() override;
     
@@ -43,9 +31,6 @@ private:
     juce::LuaTokeniser luaTokeniser;
     juce::XmlTokeniser xmlTokeniser;
 	juce::ShapeButton collapseButton;
-
-    std::shared_ptr<BufferConsumer> audioConsumer = std::make_shared<BufferConsumer>(50000);
-    DummyConsumer dummyConsumer{audioConsumer};
 
 	void codeDocumentTextInserted(const juce::String& newText, int insertIndex) override;
 	void codeDocumentTextDeleted(int startIndex, int endIndex) override;

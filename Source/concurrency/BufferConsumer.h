@@ -17,10 +17,9 @@
 //
 class BufferConsumer {
 public:
-    // bufferSize MUST be a multiple of 2.
     BufferConsumer(int bufferSize) {
-        firstBuffer->resize(bufferSize, 0.0);
-        secondBuffer->resize(bufferSize, 0.0);
+        firstBuffer->resize(2 * bufferSize, 0.0);
+        secondBuffer->resize(2 * bufferSize, 0.0);
     }
 
     ~BufferConsumer() {}

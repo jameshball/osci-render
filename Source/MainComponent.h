@@ -4,6 +4,7 @@
 #include "PluginProcessor.h"
 #include "parser/FileParser.h"
 #include "parser/FrameProducer.h"
+#include "components/VisualiserComponent.h"
 
 class OscirenderAudioProcessorEditor;
 class MainComponent : public juce::GroupComponent {
@@ -25,6 +26,10 @@ private:
 	juce::TextEditor fileName;
 	juce::ComboBox fileType;
 	juce::TextButton createFile{"Create File"};
+
+	VisualiserComponent visualiser{2, audioProcessor};
+	std::shared_ptr<BufferConsumer> consumer = std::make_shared<BufferConsumer>(2048);
+	VisualiserProcessor visualiserProcessor{consumer, visualiser};
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };
