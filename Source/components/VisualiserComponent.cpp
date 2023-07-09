@@ -2,6 +2,7 @@
 
 VisualiserComponent::VisualiserComponent(int numChannels, OscirenderAudioProcessor& p) : numChannels(numChannels), backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), audioProcessor(p) {
     setOpaque(true);
+    startTimerHz(60);
 }
 
 VisualiserComponent::~VisualiserComponent() {}
@@ -33,6 +34,10 @@ void VisualiserComponent::paint(juce::Graphics& g) {
     for (int i = 0; i < numChannels; ++i) {
         paintChannel(g, r.removeFromTop(channelHeight), i);
     }
+}
+
+void VisualiserComponent::timerCallback() {
+    repaint();
 }
 
 void VisualiserComponent::paintChannel(juce::Graphics& g, juce::Rectangle<float> area, int channel) {

@@ -4,7 +4,7 @@
 #include "../concurrency/BufferConsumer.h"
 #include "../PluginProcessor.h"
 
-class VisualiserComponent : public juce::Component {
+class VisualiserComponent : public juce::Component, public juce::Timer {
 public:
     VisualiserComponent(int numChannels, OscirenderAudioProcessor& p);
     ~VisualiserComponent() override;
@@ -14,6 +14,7 @@ public:
     void paintChannel(juce::Graphics&, juce::Rectangle<float> bounds, int channel);
 	void paintXY(juce::Graphics&, juce::Rectangle<float> bounds);
     void paint(juce::Graphics&) override;
+	void timerCallback() override;
 
 private:
 	juce::SpinLock lock;
@@ -26,7 +27,7 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserComponent)
 };
 
-class VisualiserProcessor : public juce::AsyncUpdater, public juce::Thread {
+class VisualiserProcessor : public juce::Thread {
 public:
 	VisualiserProcessor(std::shared_ptr<BufferConsumer> consumer, VisualiserComponent& visualiser) : juce::Thread("VisualiserProcessor"), consumer(consumer), visualiser(visualiser) {}
 	~VisualiserProcessor() override {}
@@ -37,12 +38,7 @@ public:
 
 			visualiser.setBuffer(*buffer);
 			consumer->finishedProcessing();
-			triggerAsyncUpdate();
 		}
-	}
-
-	void handleAsyncUpdate() override {
-		visualiser.repaint();
 	}
 
 private:
