@@ -77,9 +77,18 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 	fileName.onReturnKey = [this] {
 		createFile.triggerClick();
 	};
+
+	addAndMakeVisible(visualiser);
+	audioProcessor.audioProducer.registerConsumer(consumer);
+	visualiserProcessor.startThread();
+
+	addAndMakeVisible(frequencyLabel);
+	pitchDetector.startThread();
 }
 
 MainComponent::~MainComponent() {
+	audioProcessor.audioProducer.unregisterConsumer(consumer);
+    visualiserProcessor.stopThread(1000);
 }
 
 void MainComponent::updateFileLabel() {
@@ -112,4 +121,10 @@ void MainComponent::resized() {
 	fileType.setBounds(row.removeFromLeft(buttonWidth / 2));
 	row.removeFromLeft(rowPadding);
 	createFile.setBounds(row.removeFromLeft(buttonWidth));
+
+	bounds.removeFromTop(padding);
+	frequencyLabel.setBounds(bounds.removeFromTop(20));
+
+	bounds.removeFromTop(padding);
+	visualiser.setBounds(bounds);
 }

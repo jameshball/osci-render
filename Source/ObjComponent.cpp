@@ -87,7 +87,6 @@ ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 	Util::changeSvgColour(doc.get(), "white");
 	fixedRotateWhite = juce::Drawable::createFromSVG(*doc);
 	Util::changeSvgColour(doc.get(), "red");
-	DBG(doc->toString());
 	fixedRotateRed = juce::Drawable::createFromSVG(*doc);
 
 	// TODO: any way of removing this duplication?

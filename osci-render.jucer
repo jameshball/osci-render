@@ -24,6 +24,12 @@
       </GROUP>
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <GROUP id="{9F5970A9-8094-E7F3-7AC1-812AE5589B9F}" name="concurrency">
+        <FILE id="WQ2W15" name="BufferConsumer.h" compile="0" resource="0"
+              file="Source/concurrency/BufferConsumer.h"/>
+        <FILE id="yWTiQQ" name="BufferProducer.h" compile="0" resource="0"
+              file="Source/concurrency/BufferProducer.h"/>
+      </GROUP>
       <FILE id="JceyXh" name="Util.h" compile="0" resource="0" file="Source/Util.h"/>
       <FILE id="RHHuXP" name="ObjComponent.cpp" compile="1" resource="0"
             file="Source/ObjComponent.cpp"/>
@@ -117,6 +123,10 @@
               file="Source/components/LuaListComponent.cpp"/>
         <FILE id="x0Syav" name="LuaListComponent.h" compile="0" resource="0"
               file="Source/components/LuaListComponent.h"/>
+        <FILE id="y3UiR0" name="VisualiserComponent.cpp" compile="1" resource="0"
+              file="Source/components/VisualiserComponent.cpp"/>
+        <FILE id="ZueyNl" name="VisualiserComponent.h" compile="0" resource="0"
+              file="Source/components/VisualiserComponent.h"/>
       </GROUP>
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
         <FILE id="NWuowi" name="BitCrushEffect.cpp" compile="1" resource="0"
@@ -136,6 +146,9 @@
               file="Source/audio/EffectApplication.h"/>
         <FILE id="uhyh7T" name="LuaEffect.cpp" compile="1" resource="0" file="Source/audio/LuaEffect.cpp"/>
         <FILE id="jqDcZq" name="LuaEffect.h" compile="0" resource="0" file="Source/audio/LuaEffect.h"/>
+        <FILE id="t2bsR8" name="PitchDetector.cpp" compile="1" resource="0"
+              file="Source/audio/PitchDetector.cpp"/>
+        <FILE id="rQC2gX" name="PitchDetector.h" compile="0" resource="0" file="Source/audio/PitchDetector.h"/>
         <FILE id="PbbNqz" name="RotateEffect.cpp" compile="1" resource="0"
               file="Source/audio/RotateEffect.cpp"/>
         <FILE id="tUwNZV" name="RotateEffect.h" compile="0" resource="0" file="Source/audio/RotateEffect.h"/>
@@ -264,6 +277,7 @@
         <MODULEPATH id="juce_gui_basics" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_gui_extra" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/VisualStudio2022">
@@ -285,6 +299,7 @@
         <MODULEPATH id="juce_gui_basics" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_gui_extra" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
       </MODULEPATHS>
     </VS2022>
     <XCODE_MAC targetFolder="Builds/MacOSX">
@@ -306,6 +321,7 @@
         <MODULEPATH id="juce_gui_basics" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_gui_extra" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
   </EXPORTFORMATS>
@@ -319,6 +335,7 @@
     <MODULE id="juce_audio_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_dsp" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_events" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_graphics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>

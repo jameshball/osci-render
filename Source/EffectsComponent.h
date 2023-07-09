@@ -6,6 +6,7 @@
 #include "components/DraggableListBox.h"
 #include "components/EffectsListComponent.h"
 
+class OscirenderAudioProcessorEditor;
 class EffectsComponent : public juce::GroupComponent {
 public:
 	EffectsComponent(OscirenderAudioProcessor&);
