@@ -16,6 +16,7 @@
 #include "audio/Effect.h"
 #include <numbers>
 #include "concurrency/BufferProducer.h"
+#include "audio/AudioWebSocketServer.h"
 
 //==============================================================================
 /**
@@ -228,6 +229,8 @@ private:
     double actualTraceMin = traceMin->getValue();
     bool traceMaxEnabled = false;
     bool traceMinEnabled = false;
+
+    AudioWebSocketServer softwareOscilloscopeServer{audioProducer};
 
 	void updateFrame();
     void updateLengthIncrement();

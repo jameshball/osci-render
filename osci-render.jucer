@@ -26,6 +26,165 @@
       </GROUP>
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <GROUP id="{D0D95F57-3D9D-46D9-C126-25C3C7459AC5}" name="ixwebsocket">
+        <FILE id="pPOkoj" name="IXBase64.h" compile="0" resource="0" file="Source/ixwebsocket/IXBase64.h"/>
+        <FILE id="qVI3x2" name="IXBench.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXBench.cpp"/>
+        <FILE id="syb80Q" name="IXBench.h" compile="0" resource="0" file="Source/ixwebsocket/IXBench.h"/>
+        <FILE id="RpJzkB" name="IXCancellationRequest.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXCancellationRequest.cpp"/>
+        <FILE id="kdXAKI" name="IXCancellationRequest.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXCancellationRequest.h"/>
+        <FILE id="aamZdO" name="IXConnectionState.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXConnectionState.cpp"/>
+        <FILE id="BtXbWW" name="IXConnectionState.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXConnectionState.h"/>
+        <FILE id="RxeRZi" name="IXDNSLookup.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXDNSLookup.cpp"/>
+        <FILE id="Fz6v9l" name="IXDNSLookup.h" compile="0" resource="0" file="Source/ixwebsocket/IXDNSLookup.h"/>
+        <FILE id="Fhe5e2" name="IXExponentialBackoff.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXExponentialBackoff.cpp"/>
+        <FILE id="IaNSzp" name="IXExponentialBackoff.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXExponentialBackoff.h"/>
+        <FILE id="h7oBry" name="IXGetFreePort.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXGetFreePort.cpp"/>
+        <FILE id="Q6cGBn" name="IXGetFreePort.h" compile="0" resource="0" file="Source/ixwebsocket/IXGetFreePort.h"/>
+        <FILE id="pSqWe3" name="IXGzipCodec.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXGzipCodec.cpp"/>
+        <FILE id="t0Zcs0" name="IXGzipCodec.h" compile="0" resource="0" file="Source/ixwebsocket/IXGzipCodec.h"/>
+        <FILE id="ddCdsp" name="IXHttp.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXHttp.cpp"/>
+        <FILE id="WkOHup" name="IXHttp.h" compile="0" resource="0" file="Source/ixwebsocket/IXHttp.h"/>
+        <FILE id="aHrUkJ" name="IXHttpClient.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXHttpClient.cpp"/>
+        <FILE id="O3ifPl" name="IXHttpClient.h" compile="0" resource="0" file="Source/ixwebsocket/IXHttpClient.h"/>
+        <FILE id="eFGxxE" name="IXHttpServer.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXHttpServer.cpp"/>
+        <FILE id="IaxJJ6" name="IXHttpServer.h" compile="0" resource="0" file="Source/ixwebsocket/IXHttpServer.h"/>
+        <FILE id="o7gWn7" name="IXNetSystem.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXNetSystem.cpp"/>
+        <FILE id="R5LFhQ" name="IXNetSystem.h" compile="0" resource="0" file="Source/ixwebsocket/IXNetSystem.h"/>
+        <FILE id="zi85pc" name="IXProgressCallback.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXProgressCallback.h"/>
+        <FILE id="pa8Kbj" name="IXSelectInterrupt.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXSelectInterrupt.cpp"/>
+        <FILE id="VZuUWe" name="IXSelectInterrupt.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXSelectInterrupt.h"/>
+        <FILE id="j84Mkc" name="IXSelectInterruptEvent.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXSelectInterruptEvent.cpp"/>
+        <FILE id="RUBIuY" name="IXSelectInterruptEvent.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXSelectInterruptEvent.h"/>
+        <FILE id="HXwmGn" name="IXSelectInterruptFactory.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXSelectInterruptFactory.cpp"/>
+        <FILE id="J7G90T" name="IXSelectInterruptFactory.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXSelectInterruptFactory.h"/>
+        <FILE id="DjhB8v" name="IXSelectInterruptPipe.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXSelectInterruptPipe.cpp"/>
+        <FILE id="cOe5ug" name="IXSelectInterruptPipe.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXSelectInterruptPipe.h"/>
+        <FILE id="iYEr5X" name="IXSetThreadName.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXSetThreadName.cpp"/>
+        <FILE id="lV9mJB" name="IXSetThreadName.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXSetThreadName.h"/>
+        <FILE id="Z3cko8" name="IXSocket.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXSocket.cpp"/>
+        <FILE id="K89iuz" name="IXSocket.h" compile="0" resource="0" file="Source/ixwebsocket/IXSocket.h"/>
+        <FILE id="UW4XZp" name="IXSocketAppleSSL.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXSocketAppleSSL.cpp"/>
+        <FILE id="goEr40" name="IXSocketAppleSSL.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXSocketAppleSSL.h"/>
+        <FILE id="ZG0dAO" name="IXSocketConnect.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXSocketConnect.cpp"/>
+        <FILE id="H8btLh" name="IXSocketConnect.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXSocketConnect.h"/>
+        <FILE id="Q8y3eR" name="IXSocketFactory.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXSocketFactory.cpp"/>
+        <FILE id="DgZ0NJ" name="IXSocketFactory.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXSocketFactory.h"/>
+        <FILE id="vA7xBJ" name="IXSocketMbedTLS.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXSocketMbedTLS.cpp"/>
+        <FILE id="NBsVY7" name="IXSocketMbedTLS.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXSocketMbedTLS.h"/>
+        <FILE id="vffym1" name="IXSocketOpenSSL.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXSocketOpenSSL.cpp"/>
+        <FILE id="rq1L43" name="IXSocketOpenSSL.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXSocketOpenSSL.h"/>
+        <FILE id="DP4x6I" name="IXSocketServer.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXSocketServer.cpp"/>
+        <FILE id="U62vhR" name="IXSocketServer.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXSocketServer.h"/>
+        <FILE id="DK2PKa" name="IXSocketTLSOptions.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXSocketTLSOptions.cpp"/>
+        <FILE id="R2ahd8" name="IXSocketTLSOptions.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXSocketTLSOptions.h"/>
+        <FILE id="IrGHMo" name="IXStrCaseCompare.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXStrCaseCompare.cpp"/>
+        <FILE id="fmXfd5" name="IXStrCaseCompare.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXStrCaseCompare.h"/>
+        <FILE id="vrPgrU" name="IXUdpSocket.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXUdpSocket.cpp"/>
+        <FILE id="C4kXEa" name="IXUdpSocket.h" compile="0" resource="0" file="Source/ixwebsocket/IXUdpSocket.h"/>
+        <FILE id="ljkhdF" name="IXUniquePtr.h" compile="0" resource="0" file="Source/ixwebsocket/IXUniquePtr.h"/>
+        <FILE id="q3UHD4" name="IXUrlParser.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXUrlParser.cpp"/>
+        <FILE id="JbS05r" name="IXUrlParser.h" compile="0" resource="0" file="Source/ixwebsocket/IXUrlParser.h"/>
+        <FILE id="gCWgUe" name="IXUserAgent.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXUserAgent.cpp"/>
+        <FILE id="ZXs1Pm" name="IXUserAgent.h" compile="0" resource="0" file="Source/ixwebsocket/IXUserAgent.h"/>
+        <FILE id="GQ7boW" name="IXUtf8Validator.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXUtf8Validator.h"/>
+        <FILE id="rnALh0" name="IXUuid.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXUuid.cpp"/>
+        <FILE id="WcfqnP" name="IXUuid.h" compile="0" resource="0" file="Source/ixwebsocket/IXUuid.h"/>
+        <FILE id="P6VcmE" name="IXWebSocket.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXWebSocket.cpp"/>
+        <FILE id="sf7P1K" name="IXWebSocket.h" compile="0" resource="0" file="Source/ixwebsocket/IXWebSocket.h"/>
+        <FILE id="npib4p" name="IXWebSocketCloseConstants.cpp" compile="1"
+              resource="0" file="Source/ixwebsocket/IXWebSocketCloseConstants.cpp"/>
+        <FILE id="vsumjK" name="IXWebSocketCloseConstants.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXWebSocketCloseConstants.h"/>
+        <FILE id="T9bjry" name="IXWebSocketCloseInfo.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXWebSocketCloseInfo.h"/>
+        <FILE id="LQoyiX" name="IXWebSocketErrorInfo.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXWebSocketErrorInfo.h"/>
+        <FILE id="eL17m7" name="IXWebSocketHandshake.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXWebSocketHandshake.cpp"/>
+        <FILE id="ArSjWc" name="IXWebSocketHandshake.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXWebSocketHandshake.h"/>
+        <FILE id="EI9MD8" name="IXWebSocketHandshakeKeyGen.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXWebSocketHandshakeKeyGen.h"/>
+        <FILE id="jE9vTw" name="IXWebSocketHttpHeaders.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXWebSocketHttpHeaders.cpp"/>
+        <FILE id="h6BRFe" name="IXWebSocketHttpHeaders.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXWebSocketHttpHeaders.h"/>
+        <FILE id="LBmQUe" name="IXWebSocketInitResult.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXWebSocketInitResult.h"/>
+        <FILE id="FJf0OS" name="IXWebSocketMessage.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXWebSocketMessage.h"/>
+        <FILE id="Zibknu" name="IXWebSocketMessageType.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXWebSocketMessageType.h"/>
+        <FILE id="NkmVRB" name="IXWebSocketOpenInfo.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXWebSocketOpenInfo.h"/>
+        <FILE id="ulTERZ" name="IXWebSocketPerMessageDeflate.cpp" compile="1"
+              resource="0" file="Source/ixwebsocket/IXWebSocketPerMessageDeflate.cpp"/>
+        <FILE id="k27DKW" name="IXWebSocketPerMessageDeflate.h" compile="0"
+              resource="0" file="Source/ixwebsocket/IXWebSocketPerMessageDeflate.h"/>
+        <FILE id="M8scBP" name="IXWebSocketPerMessageDeflateCodec.cpp" compile="1"
+              resource="0" file="Source/ixwebsocket/IXWebSocketPerMessageDeflateCodec.cpp"/>
+        <FILE id="tBlaUn" name="IXWebSocketPerMessageDeflateCodec.h" compile="0"
+              resource="0" file="Source/ixwebsocket/IXWebSocketPerMessageDeflateCodec.h"/>
+        <FILE id="rKyoIb" name="IXWebSocketPerMessageDeflateOptions.cpp" compile="1"
+              resource="0" file="Source/ixwebsocket/IXWebSocketPerMessageDeflateOptions.cpp"/>
+        <FILE id="Ge5VH2" name="IXWebSocketPerMessageDeflateOptions.h" compile="0"
+              resource="0" file="Source/ixwebsocket/IXWebSocketPerMessageDeflateOptions.h"/>
+        <FILE id="A8DdNw" name="IXWebSocketProxyServer.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXWebSocketProxyServer.cpp"/>
+        <FILE id="sUAP23" name="IXWebSocketProxyServer.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXWebSocketProxyServer.h"/>
+        <FILE id="tYUG47" name="IXWebSocketSendData.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXWebSocketSendData.h"/>
+        <FILE id="ndmbFI" name="IXWebSocketSendInfo.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXWebSocketSendInfo.h"/>
+        <FILE id="IsH7aV" name="IXWebSocketServer.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXWebSocketServer.cpp"/>
+        <FILE id="m5MS1R" name="IXWebSocketServer.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXWebSocketServer.h"/>
+        <FILE id="nb98Ow" name="IXWebSocketTransport.cpp" compile="1" resource="0"
+              file="Source/ixwebsocket/IXWebSocketTransport.cpp"/>
+        <FILE id="fFHF70" name="IXWebSocketTransport.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXWebSocketTransport.h"/>
+        <FILE id="eAqAle" name="IXWebSocketVersion.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXWebSocketVersion.h"/>
+      </GROUP>
       <GROUP id="{9F5970A9-8094-E7F3-7AC1-812AE5589B9F}" name="concurrency">
         <FILE id="WQ2W15" name="BufferConsumer.h" compile="0" resource="0"
               file="Source/concurrency/BufferConsumer.h"/>
@@ -135,6 +294,10 @@
               file="Source/components/VolumeComponent.h"/>
       </GROUP>
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
+        <FILE id="WDV6eI" name="AudioWebSocketServer.cpp" compile="1" resource="0"
+              file="Source/audio/AudioWebSocketServer.cpp"/>
+        <FILE id="RD41Jd" name="AudioWebSocketServer.h" compile="0" resource="0"
+              file="Source/audio/AudioWebSocketServer.h"/>
         <FILE id="NWuowi" name="BitCrushEffect.cpp" compile="1" resource="0"
               file="Source/audio/BitCrushEffect.cpp"/>
         <FILE id="Bc8UeW" name="BitCrushEffect.h" compile="0" resource="0"

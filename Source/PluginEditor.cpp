@@ -59,7 +59,7 @@ void OscirenderAudioProcessorEditor::resized() {
     auto area = getLocalBounds();
     area.removeFromLeft(3);
     auto volumeArea = area.removeFromLeft(30);
-    volume.setBounds(volumeArea.withSizeKeepingCentre(volumeArea.getWidth(), std::min(volumeArea.getHeight(), 300)));
+    volume.setBounds(volumeArea.withSizeKeepingCentre(volumeArea.getWidth(), juce::jmin(volumeArea.getHeight(), 300)));
     area.removeFromLeft(3);
     auto sections = 2;
     int index = audioProcessor.getCurrentFileIndex();
