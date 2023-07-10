@@ -372,7 +372,7 @@ void OscirenderAudioProcessor::updateLengthIncrement() {
     double traceMaxValue = traceMaxEnabled ? actualTraceMax : 1.0;
     double traceMinValue = traceMinEnabled ? actualTraceMin : 0.0;
     double proportionalLength = (traceMaxValue - traceMinValue) * frameLength;
-    lengthIncrement = std::max(proportionalLength / (currentSampleRate / frequency), MIN_LENGTH_INCREMENT);
+    lengthIncrement = juce::jmax(proportionalLength / (currentSampleRate / frequency), MIN_LENGTH_INCREMENT);
 }
 
 void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
@@ -448,8 +448,8 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         y *= volume;
 
         // clip
-        x = std::max(-threshold, std::min(threshold.load(), x));
-        y = std::max(-threshold, std::min(threshold.load(), y));
+        x = juce::jmax(-threshold, juce::jmin(threshold.load(), x));
+        y = juce::jmax(-threshold, juce::jmin(threshold.load(), y));
         
         if (totalNumOutputChannels >= 2) {
 			channelData[0][sample] = x;
@@ -460,8 +460,8 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
         audioProducer.write(x, y);
 
-        actualTraceMax = std::max(actualTraceMin + MIN_TRACE, std::min(traceMax->getValue(), 1.0));
-        actualTraceMin = std::max(MIN_TRACE, std::min(traceMin->getValue(), actualTraceMax - MIN_TRACE));
+        actualTraceMax = juce::jmax(actualTraceMin + MIN_TRACE, juce::jmin(traceMax->getValue(), 1.0));
+        actualTraceMin = juce::jmax(MIN_TRACE, juce::jmin(traceMin->getValue(), actualTraceMax - MIN_TRACE));
         
         if (!renderingSample) {
             incrementShapeDrawing();
@@ -484,8 +484,8 @@ void OscirenderAudioProcessor::incrementShapeDrawing() {
     double length = currentShape < frame.size() ? frame[currentShape]->len : 0.0;
     // hard cap on how many times it can be over the length to
     // prevent audio stuttering
-    frameDrawn += std::min(lengthIncrement, 20 * length);
-    shapeDrawn += std::min(lengthIncrement, 20 * length);
+    frameDrawn += juce::jmin(lengthIncrement, 20 * length);
+    shapeDrawn += juce::jmin(lengthIncrement, 20 * length);
 
     // Need to skip all shapes that the lengthIncrement draws over.
     // This is especially an issue when there are lots of small lines being
