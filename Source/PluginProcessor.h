@@ -64,10 +64,11 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
-    float noteOnVel;
-	float frequency = 440.0f;
+	std::atomic<float> frequency = 440.0f;
+    std::atomic<double> volume = 1.0;
+    std::atomic<double> threshold = 1.0;
 
-    double currentSampleRate = 0.0;
+    std::atomic<double> currentSampleRate = 0.0;
 
     juce::SpinLock effectsLock;
 	std::vector<std::shared_ptr<Effect>> allEffects;

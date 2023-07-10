@@ -11,7 +11,10 @@ VolumeComponent::VolumeComponent(OscirenderAudioProcessor& p) : audioProcessor(p
     volumeSlider.setColour(juce::Slider::ColourIds::backgroundColourId, juce::Colours::transparentWhite);
     volumeSlider.setColour(juce::Slider::ColourIds::trackColourId, juce::Colours::transparentWhite);
     volumeSlider.setOpaque(false);
-    volumeSlider.setRange(0, 1, 0.001);
+    volumeSlider.setRange(0, 2, 0.001);
+    volumeSlider.setValue(1);
+    volumeSlider.setLookAndFeel(&thumbRadiusLookAndFeel);
+    volumeSlider.setColour(juce::Slider::ColourIds::thumbColourId, juce::Colours::black);
 
     addAndMakeVisible(thresholdSlider);
     thresholdSlider.setSliderStyle(juce::Slider::SliderStyle::LinearVertical);
@@ -20,6 +23,17 @@ VolumeComponent::VolumeComponent(OscirenderAudioProcessor& p) : audioProcessor(p
     thresholdSlider.setColour(juce::Slider::ColourIds::trackColourId, juce::Colours::transparentWhite);
     thresholdSlider.setOpaque(false);
     thresholdSlider.setRange(0, 1, 0.001);
+    thresholdSlider.setValue(1);
+    thresholdSlider.setLookAndFeel(&thresholdLookAndFeel);
+    thresholdSlider.setColour(juce::Slider::ColourIds::thumbColourId, juce::Colours::black);
+
+    volumeSlider.onValueChange = [this]() {
+        audioProcessor.volume = volumeSlider.getValue();
+    };
+
+    thresholdSlider.onValueChange = [this]() {
+        audioProcessor.threshold = thresholdSlider.getValue();
+    };
 }
 
 VolumeComponent::~VolumeComponent() {
@@ -30,6 +44,8 @@ VolumeComponent::~VolumeComponent() {
 void VolumeComponent::paint(juce::Graphics& g) {
     auto r = getLocalBounds().toFloat();
     r.removeFromRight(r.getWidth() / 2);
+    r.removeFromTop(volumeSlider.getLookAndFeel().getSliderThumbRadius(volumeSlider));
+    r.removeFromBottom(volumeSlider.getLookAndFeel().getSliderThumbRadius(volumeSlider));
 
     g.setColour(juce::Colours::white);
     g.fillRect(r);
@@ -43,17 +59,19 @@ void VolumeComponent::paint(juce::Graphics& g) {
     auto leftRegion = leftRect;
     auto rightRegion = rightRect;
 
-    g.setGradientFill(juce::ColourGradient(juce::Colours::green, 0, leftRect.getBottom(), juce::Colours::red, 0, leftRect.getY(), false));
+    g.setGradientFill(juce::ColourGradient(juce::Colour(0xff00ff00), 0, leftRect.getBottom(), juce::Colours::red, 0, leftRect.getY(), false));
     g.fillRect(leftRect.removeFromBottom(leftVolumeHeight));
 
-    g.setGradientFill(juce::ColourGradient(juce::Colours::green, 0, rightRect.getBottom(), juce::Colours::red, 0, rightRect.getY(), false));
+    g.setGradientFill(juce::ColourGradient(juce::Colour(0xff00ff00), 0, rightRect.getBottom(), juce::Colours::red, 0, rightRect.getY(), false));
     g.fillRect(rightRect.removeFromBottom(rightVolumeHeight));
 
-    // draw average volume as new rectangles on each channel 10 pixels tall
-    g.setColour(juce::Colours::black);
-    g.fillRect(leftRegion.getX(), leftRegion.getBottom() - (avgLeftVolume * channelHeight), leftRegion.getWidth(), 5.0f);
-    g.fillRect(rightRegion.getX(), rightRegion.getBottom() - (avgRightVolume * channelHeight), rightRegion.getWidth(), 5.0f);
+    auto barWidth = 5.0f;
 
+    g.setColour(juce::Colours::black);
+    g.fillRect(leftRegion.getX(), leftRegion.getBottom() - (avgLeftVolume * channelHeight) - barWidth / 2, leftRegion.getWidth(), barWidth);
+    g.fillRect(rightRegion.getX(), rightRegion.getBottom() - (avgRightVolume * channelHeight) - barWidth / 2, rightRegion.getWidth(), barWidth);
+
+    g.fillRect(leftRegion.getX(), rightRegion.getBottom() - (thresholdSlider.getValue() * channelHeight) - barWidth / 2, leftRegion.getWidth() + rightRegion.getWidth(), barWidth);
 }
 
 void VolumeComponent::timerCallback() {

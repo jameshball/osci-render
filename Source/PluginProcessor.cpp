@@ -444,9 +444,12 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 		x = channels.x;
 		y = channels.y;
 
-        // clip to -1.0 to 1.0
-        x = std::max(-1.0, std::min(1.0, x));
-        y = std::max(-1.0, std::min(1.0, y));
+        x *= volume;
+        y *= volume;
+
+        // clip
+        x = std::max(-threshold, std::min(threshold.load(), x));
+        y = std::max(-threshold, std::min(threshold.load(), y));
         
         if (totalNumOutputChannels >= 2) {
 			channelData[0][sample] = x;
@@ -475,19 +478,6 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
             }
         }
 	}
-
-	juce::MidiBuffer processedMidi;
-    
-    for (const auto metadata : midiMessages) {
-        auto message = metadata.getMessage();
-        const auto time = metadata.samplePosition;
-        
-        if (message.isNoteOn()) {
-            message = juce::MidiMessage::noteOn(message.getChannel(), message.getNoteNumber(), (juce::uint8)noteOnVel);
-        }
-        processedMidi.addEvent(message, time);
-    }
-	midiMessages.swapWith(processedMidi);
 }
 
 void OscirenderAudioProcessor::incrementShapeDrawing() {
