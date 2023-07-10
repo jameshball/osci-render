@@ -1,22 +1,14 @@
-/*
-  ==============================================================================
-
-    This file contains the basic framework code for a JUCE plugin editor.
-
-  ==============================================================================
-*/
-
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-//==============================================================================
 OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p)
-	: AudioProcessorEditor(&p), audioProcessor(p), effects(p), main(p, *this), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white), lua(p, *this), obj(p, *this)
+	: AudioProcessorEditor(&p), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white)
 {
     addAndMakeVisible(effects);
     addAndMakeVisible(main);
     addChildComponent(lua);
     addChildComponent(obj);
+    addAndMakeVisible(volume);
 
     addAndMakeVisible(collapseButton);
 	collapseButton.onClick = [this] {
@@ -54,8 +46,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {}
 
-//==============================================================================
-void OscirenderAudioProcessorEditor::paint (juce::Graphics& g)
+void OscirenderAudioProcessorEditor::paint(juce::Graphics& g)
 {
     g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
 
@@ -65,6 +56,7 @@ void OscirenderAudioProcessorEditor::paint (juce::Graphics& g)
 
 void OscirenderAudioProcessorEditor::resized() {
     auto area = getLocalBounds();
+    volume.setBounds(area.removeFromLeft(50));
     auto sections = 2;
     int index = audioProcessor.getCurrentFileIndex();
     if (index != -1) {

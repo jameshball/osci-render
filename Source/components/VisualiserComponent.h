@@ -4,7 +4,7 @@
 #include "../concurrency/BufferConsumer.h"
 #include "../PluginProcessor.h"
 
-class VisualiserComponent : public juce::Component, public juce::Timer {
+class VisualiserComponent : public juce::Component, public juce::Timer, public juce::Thread {
 public:
     VisualiserComponent(int numChannels, OscirenderAudioProcessor& p);
     ~VisualiserComponent() override;
@@ -15,6 +15,7 @@ public:
 	void paintXY(juce::Graphics&, juce::Rectangle<float> bounds);
     void paint(juce::Graphics&) override;
 	void timerCallback() override;
+	void run() override;
 
 private:
 	juce::SpinLock lock;
@@ -22,26 +23,8 @@ private:
     int numChannels = 2;
     juce::Colour backgroundColour, waveformColour;
 	OscirenderAudioProcessor& audioProcessor;
+	std::shared_ptr<BufferConsumer> consumer = std::make_shared<BufferConsumer>(2048);
 	int precision = 2;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserComponent)
-};
-
-class VisualiserProcessor : public juce::Thread {
-public:
-	VisualiserProcessor(std::shared_ptr<BufferConsumer> consumer, VisualiserComponent& visualiser) : juce::Thread("VisualiserProcessor"), consumer(consumer), visualiser(visualiser) {}
-	~VisualiserProcessor() override {}
-
-	void run() override {
-		while (!threadShouldExit()) {
-			auto buffer = consumer->startProcessing();
-
-			visualiser.setBuffer(*buffer);
-			consumer->finishedProcessing();
-		}
-	}
-
-private:
-	std::shared_ptr<BufferConsumer> consumer;
-	VisualiserComponent& visualiser;
 };

@@ -79,17 +79,10 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 	};
 
 	addAndMakeVisible(visualiser);
-	audioProcessor.audioProducer.registerConsumer(consumer);
-	visualiserProcessor.startThread();
-
 	addAndMakeVisible(frequencyLabel);
-	pitchDetector.startThread();
 }
 
-MainComponent::~MainComponent() {
-	audioProcessor.audioProducer.unregisterConsumer(consumer);
-    visualiserProcessor.stopThread(1000);
-}
+MainComponent::~MainComponent() {}
 
 void MainComponent::updateFileLabel() {
 	if (audioProcessor.getCurrentFileIndex() == -1) {

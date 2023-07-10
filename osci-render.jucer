@@ -127,6 +127,10 @@
               file="Source/components/VisualiserComponent.cpp"/>
         <FILE id="ZueyNl" name="VisualiserComponent.h" compile="0" resource="0"
               file="Source/components/VisualiserComponent.h"/>
+        <FILE id="s8EVcE" name="VolumeComponent.cpp" compile="1" resource="0"
+              file="Source/components/VolumeComponent.cpp"/>
+        <FILE id="MWkfTv" name="VolumeComponent.h" compile="0" resource="0"
+              file="Source/components/VolumeComponent.h"/>
       </GROUP>
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
         <FILE id="NWuowi" name="BitCrushEffect.cpp" compile="1" resource="0"

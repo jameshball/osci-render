@@ -29,8 +29,6 @@ private:
 	juce::TextButton createFile{"Create File"};
 
 	VisualiserComponent visualiser{2, audioProcessor};
-	std::shared_ptr<BufferConsumer> consumer = std::make_shared<BufferConsumer>(2048);
-	VisualiserProcessor visualiserProcessor{consumer, visualiser};
 
 	juce::Label frequencyLabel;
 	PitchDetector pitchDetector{
