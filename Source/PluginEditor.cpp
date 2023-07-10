@@ -1,22 +1,14 @@
-/*
-  ==============================================================================
-
-    This file contains the basic framework code for a JUCE plugin editor.
-
-  ==============================================================================
-*/
-
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-//==============================================================================
 OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p)
-	: AudioProcessorEditor(&p), audioProcessor(p), effects(p), main(p, *this), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white), lua(p, *this), obj(p, *this)
+	: AudioProcessorEditor(&p), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white)
 {
     addAndMakeVisible(effects);
     addAndMakeVisible(main);
     addChildComponent(lua);
     addChildComponent(obj);
+    addAndMakeVisible(volume);
 
     addAndMakeVisible(collapseButton);
 	collapseButton.onClick = [this] {
@@ -50,12 +42,12 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 
     setSize(1100, 750);
     setResizable(true, true);
+    setResizeLimits(500, 400, 999999, 999999);
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {}
 
-//==============================================================================
-void OscirenderAudioProcessorEditor::paint (juce::Graphics& g)
+void OscirenderAudioProcessorEditor::paint(juce::Graphics& g)
 {
     g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
 
@@ -65,6 +57,10 @@ void OscirenderAudioProcessorEditor::paint (juce::Graphics& g)
 
 void OscirenderAudioProcessorEditor::resized() {
     auto area = getLocalBounds();
+    area.removeFromLeft(3);
+    auto volumeArea = area.removeFromLeft(30);
+    volume.setBounds(volumeArea.withSizeKeepingCentre(volumeArea.getWidth(), std::min(volumeArea.getHeight(), 300)));
+    area.removeFromLeft(3);
     auto sections = 2;
     int index = audioProcessor.getCurrentFileIndex();
     if (index != -1) {

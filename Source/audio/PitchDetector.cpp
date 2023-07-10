@@ -1,7 +1,9 @@
 #include "PitchDetector.h"
 #include "PitchDetector.h"
 
-PitchDetector::PitchDetector(OscirenderAudioProcessor& p, std::function<void(float)> frequencyCallback) : juce::Thread("PitchDetector"), audioProcessor(p), frequencyCallback(frequencyCallback) {}
+PitchDetector::PitchDetector(OscirenderAudioProcessor& p, std::function<void(float)> frequencyCallback) : juce::Thread("PitchDetector"), audioProcessor(p), frequencyCallback(frequencyCallback) {
+    startThread();
+}
 
 PitchDetector::~PitchDetector() {
     audioProcessor.audioProducer.unregisterConsumer(consumer);

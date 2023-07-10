@@ -6,14 +6,15 @@
 #include "MainComponent.h"
 #include "LuaComponent.h"
 #include "ObjComponent.h"
+#include "components/VolumeComponent.h"
 
 
 class OscirenderAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::CodeDocument::Listener {
 public:
-    OscirenderAudioProcessorEditor (OscirenderAudioProcessor&);
+    OscirenderAudioProcessorEditor(OscirenderAudioProcessor&);
     ~OscirenderAudioProcessorEditor() override;
 
-    void paint (juce::Graphics&) override;
+    void paint(juce::Graphics&) override;
     void resized() override;
     
     void addCodeEditor(int index);
@@ -22,10 +23,11 @@ public:
 private:
     OscirenderAudioProcessor& audioProcessor;
     
-    MainComponent main;
-    LuaComponent lua;
-    ObjComponent obj;
-    EffectsComponent effects;
+    MainComponent main{audioProcessor, *this};
+    LuaComponent lua{audioProcessor, *this};
+    ObjComponent obj{audioProcessor, *this};
+    EffectsComponent effects{audioProcessor};
+    VolumeComponent volume{audioProcessor};
     std::vector<std::shared_ptr<juce::CodeDocument>> codeDocuments;
     std::vector<std::shared_ptr<juce::CodeEditorComponent>> codeEditors;
     juce::LuaTokeniser luaTokeniser;

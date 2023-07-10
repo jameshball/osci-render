@@ -1,11 +1,15 @@
 #include "VisualiserComponent.h"
 
-VisualiserComponent::VisualiserComponent(int numChannels, OscirenderAudioProcessor& p) : numChannels(numChannels), backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), audioProcessor(p) {
+VisualiserComponent::VisualiserComponent(int numChannels, OscirenderAudioProcessor& p) : numChannels(numChannels), backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), audioProcessor(p), juce::Thread("VisualiserComponent") {
     setOpaque(true);
     startTimerHz(60);
+    startThread();
 }
 
-VisualiserComponent::~VisualiserComponent() {}
+VisualiserComponent::~VisualiserComponent() {
+    audioProcessor.audioProducer.unregisterConsumer(consumer);
+    stopThread(1000);
+}
 
 void VisualiserComponent::setBuffer(std::vector<float>& newBuffer) {
     juce::SpinLock::ScopedLockType scope(lock);
@@ -38,6 +42,16 @@ void VisualiserComponent::paint(juce::Graphics& g) {
 
 void VisualiserComponent::timerCallback() {
     repaint();
+}
+
+void VisualiserComponent::run() {
+    audioProcessor.audioProducer.registerConsumer(consumer);
+
+    while (!threadShouldExit()) {
+        auto buffer = consumer->startProcessing();
+        setBuffer(*buffer);
+        consumer->finishedProcessing();
+    }
 }
 
 void VisualiserComponent::paintChannel(juce::Graphics& g, juce::Rectangle<float> area, int channel) {
