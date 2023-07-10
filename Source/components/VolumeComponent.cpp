@@ -34,6 +34,14 @@ VolumeComponent::VolumeComponent(OscirenderAudioProcessor& p) : audioProcessor(p
     thresholdSlider.onValueChange = [this]() {
         audioProcessor.threshold = thresholdSlider.getValue();
     };
+
+    auto doc = juce::XmlDocument::parse(BinaryData::volume_svg);
+    volumeIcon = juce::Drawable::createFromSVG(*doc);
+    doc = juce::XmlDocument::parse(BinaryData::threshold_svg);
+    thresholdIcon = juce::Drawable::createFromSVG(*doc);
+
+    addAndMakeVisible(*volumeIcon);
+    addAndMakeVisible(*thresholdIcon);
 }
 
 VolumeComponent::~VolumeComponent() {
@@ -43,6 +51,7 @@ VolumeComponent::~VolumeComponent() {
 
 void VolumeComponent::paint(juce::Graphics& g) {
     auto r = getLocalBounds().toFloat();
+    r.removeFromTop(20);
     r.removeFromRight(r.getWidth() / 2);
     r.removeFromTop(volumeSlider.getLookAndFeel().getSliderThumbRadius(volumeSlider));
     r.removeFromBottom(volumeSlider.getLookAndFeel().getSliderThumbRadius(volumeSlider));
@@ -108,6 +117,9 @@ void VolumeComponent::run() {
 void VolumeComponent::resized() {
     auto r = getLocalBounds();
 
+    auto iconRow = r.removeFromTop(20).toFloat();
+    volumeIcon->setTransformToFit(iconRow.removeFromLeft(iconRow.getWidth() / 2).reduced(1), juce::RectanglePlacement::centred);
+    thresholdIcon->setTransformToFit(iconRow.reduced(2), juce::RectanglePlacement::centred);
     volumeSlider.setBounds(r.removeFromLeft(r.getWidth() / 2));
     thresholdSlider.setBounds(r);
 }

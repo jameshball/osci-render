@@ -82,5 +82,8 @@ private:
     ThresholdLookAndFeel thresholdLookAndFeel{20};
 	juce::Slider thresholdSlider;
 
+    std::unique_ptr<juce::Drawable> volumeIcon;
+    std::unique_ptr<juce::Drawable> thresholdIcon;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VolumeComponent)
 };
