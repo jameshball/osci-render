@@ -4,9 +4,13 @@ EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectList
 	auto details = effect->getDetails();
 	for (int i = 0; i < details.size(); i++) {
 		std::shared_ptr<EffectComponent> effectComponent = std::make_shared<EffectComponent>(0, 1, 0.01, details[i], i == 0);
+		// using weak_ptr to avoid circular reference and memory leak
+		std::weak_ptr<EffectComponent> weakEffectComponent = effectComponent;
 		effectComponent->slider.setValue(details[i].value, juce::dontSendNotification);
-		effectComponent->slider.onValueChange = [this, i, effectComponent] {
-			this->effect->setValue(i, effectComponent->slider.getValue());
+		effectComponent->slider.onValueChange = [this, i, weakEffectComponent] {
+			if (auto effectComponent = weakEffectComponent.lock()) {
+				this->effect->setValue(i, effectComponent->slider.getValue());
+			}
 		};
 
 		if (i == 0) {
@@ -23,12 +27,14 @@ EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectList
 				}
 			}
 			effectComponent->selected.setToggleState(isSelected, juce::dontSendNotification);
-			effectComponent->selected.onClick = [this, effectComponent] {
-				auto data = (AudioEffectListBoxItemData&)modelData;
-				juce::SpinLock::ScopedLockType lock(data.audioProcessor.effectsLock);
-				data.setSelected(rowNum, effectComponent->selected.getToggleState());
+			effectComponent->selected.onClick = [this, weakEffectComponent] {
+				if (auto effectComponent = weakEffectComponent.lock()) {
+					auto data = (AudioEffectListBoxItemData&)modelData;
+					juce::SpinLock::ScopedLockType lock(data.audioProcessor.effectsLock);
+					data.setSelected(rowNum, effectComponent->selected.getToggleState());
+				}
 			};
-        }
+		}
 
 		listModel.addComponent(effectComponent);
 	}
