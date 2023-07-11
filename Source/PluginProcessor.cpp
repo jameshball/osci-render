@@ -31,8 +31,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
                        )
 #endif
     {
-    producer = std::make_unique<FrameProducer>(*this, std::make_shared<FileParser>());
-    producer->startThread();
+    producer.startThread();
     
     juce::SpinLock::ScopedLockType lock(effectsLock);
 
@@ -295,12 +294,12 @@ void OscirenderAudioProcessor::openFile(int index) {
 void OscirenderAudioProcessor::changeCurrentFile(int index) {
     if (index == -1) {
         currentFile = -1;
-        producer->setSource(std::make_shared<FileParser>(), -1);
+        producer.setSource(std::make_shared<FileParser>(), -1);
     }
 	if (index < 0 || index >= fileBlocks.size()) {
 		return;
 	}
-	producer->setSource(parsers[index], index);
+	producer.setSource(parsers[index], index);
     currentFile = index;
 	invalidateFrameBuffer = true;
     updateLuaValues();
@@ -370,8 +369,6 @@ void OscirenderAudioProcessor::updateFrame() {
 
             frameLength = Shape::totalLength(frame);
         }
-    } else {
-        DBG("frame not ready!");
     }
 }
 

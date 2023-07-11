@@ -171,7 +171,7 @@ public:
     std::vector<juce::String> fileNames;
     std::atomic<int> currentFile = -1;
     
-    std::unique_ptr<FrameProducer> producer;
+    FrameProducer producer = FrameProducer(*this, std::make_shared<FileParser>());
 
     BufferProducer audioProducer;
 

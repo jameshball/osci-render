@@ -3,7 +3,7 @@
 EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectListBoxItemData& data, int rn, std::shared_ptr<Effect> effect) : DraggableListBoxItem(lb, data, rn), effect(effect) {
 	auto details = effect->getDetails();
 	for (int i = 0; i < details.size(); i++) {
-		std::shared_ptr<EffectComponent> effectComponent = std::make_shared<EffectComponent>(0, 1, 0.01, details[i], i == 0);
+		std::shared_ptr<EffectComponent> effectComponent = std::make_shared<EffectComponent>(0, 1, 0.001, details[i], i == 0);
 		// using weak_ptr to avoid circular reference and memory leak
 		std::weak_ptr<EffectComponent> weakEffectComponent = effectComponent;
 		effectComponent->slider.setValue(details[i].value, juce::dontSendNotification);
@@ -48,21 +48,29 @@ EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectList
 EffectsListComponent::~EffectsListComponent() {}
 
 void EffectsListComponent::paint(juce::Graphics& g) {
-	DraggableListBoxItem::paint(g);
 	auto bounds = getLocalBounds();
+	g.fillAll(juce::Colours::darkgrey);
+	g.setColour(juce::Colours::white);
 	bounds.removeFromLeft(20);
 	// draw drag and drop handle using circles
-	g.setColour(juce::Colours::white);
 	double size = 4;
 	double leftPad = 4;
 	double spacing = 7;
-	double topPad = 7;
-	g.fillEllipse(leftPad, topPad, size, size);
-	g.fillEllipse(leftPad, topPad + spacing, size, size);
-	g.fillEllipse(leftPad, topPad + 2 * spacing, size, size);
-	g.fillEllipse(leftPad + spacing, topPad, size, size);
-	g.fillEllipse(leftPad + spacing, topPad + spacing, size, size);
-	g.fillEllipse(leftPad + spacing, topPad + 2 * spacing, size, size);
+	double topPad = 6;
+	double y = bounds.getHeight() / 2 - 15;
+	g.fillEllipse(leftPad, y + topPad, size, size);
+	g.fillEllipse(leftPad, y + topPad + spacing, size, size);
+	g.fillEllipse(leftPad, y + topPad + 2 * spacing, size, size);
+	g.fillEllipse(leftPad + spacing, y + topPad, size, size);
+	g.fillEllipse(leftPad + spacing, y + topPad + spacing, size, size);
+	g.fillEllipse(leftPad + spacing, y + topPad + 2 * spacing, size, size);
+	DraggableListBoxItem::paint(g);
+}
+
+void EffectsListComponent::paintOverChildren(juce::Graphics& g) {
+	auto bounds = getLocalBounds();
+	g.setColour(juce::Colours::white);
+	g.drawRect(bounds);
 }
 
 void EffectsListComponent::resized() {

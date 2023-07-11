@@ -12,6 +12,7 @@ public:
 	void run() override;
 	void setSource(std::shared_ptr<FrameSource>, int fileIndex);
 private:
+	juce::SpinLock lock;
 	FrameConsumer& frameConsumer;
 	std::shared_ptr<FrameSource> frameSource;
 	int sourceFileIndex = -1;

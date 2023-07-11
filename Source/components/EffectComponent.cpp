@@ -54,10 +54,8 @@ void EffectComponent::resized() {
 }
 
 void EffectComponent::paint(juce::Graphics& g) {
-    g.fillAll(juce::Colours::lightgrey);
-    g.setColour(juce::Colours::black);
-    auto bounds = getLocalBounds();
-    g.drawRect(bounds);
+    g.fillAll(juce::Colours::black);
+    g.setColour(juce::Colours::white);
     g.drawText(name, textBounds, juce::Justification::left);
 }
 
