@@ -7,6 +7,8 @@
 class EffectComponent : public juce::Component {
 public:
     EffectComponent(double min, double max, double step, double value, juce::String name, juce::String id);
+    EffectComponent(double min, double max, double step, EffectDetails details);
+    EffectComponent(double min, double max, double step, EffectDetails details, bool checkboxVisible);
     EffectComponent(double min, double max, double step, Effect& effect);
     EffectComponent(double min, double max, double step, Effect& effect, bool checkboxVisible);
     ~EffectComponent();

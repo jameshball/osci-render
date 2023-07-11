@@ -4,6 +4,7 @@
 #include "../PluginProcessor.h"
 #include "../audio/Effect.h"
 #include "EffectComponent.h"
+#include "ComponentList.h"
 
 // Application-specific data container
 struct AudioEffectListBoxItemData : public DraggableListBoxItemData
@@ -71,10 +72,6 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
         }
     }
     
-    void setValue(int itemIndex, double value) {
-		data[itemIndex]->setValue(value);
-    }
-    
     void setSelected(int itemIndex, bool selected) {
         if (selected) {
 			audioProcessor.enableEffect(data[itemIndex]);
@@ -83,16 +80,8 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
         }
     }
 
-	juce::String getText(int itemIndex) {
-		return data[itemIndex]->getName();
-	}
-
-	double getValue(int itemIndex) {
-		return data[itemIndex]->getValue();
-	}
-
-    juce::String getId(int itemIndex) {
-        return data[itemIndex]->getId();
+    std::shared_ptr<Effect> getEffect(int itemIndex) {
+        return data[itemIndex];
     }
 };
 
@@ -100,14 +89,16 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
 class EffectsListComponent : public DraggableListBoxItem
 {
 public:
-    EffectsListComponent(DraggableListBox& lb, AudioEffectListBoxItemData& data, int rn, std::shared_ptr<EffectComponent> effectComponent);
+    EffectsListComponent(DraggableListBox& lb, AudioEffectListBoxItemData& data, int rn, std::shared_ptr<Effect> effect);
     ~EffectsListComponent();
 
     void paint(juce::Graphics& g) override;
     void resized() override;
 
 protected:
-    std::shared_ptr<EffectComponent> effectComponent;
+    std::shared_ptr<Effect> effect;
+    ComponentListModel listModel;
+    juce::ListBox list;
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EffectsListComponent)
 };
@@ -123,6 +114,9 @@ public:
         juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
         audioProcessor.updateEffectPrecedence();
     }
+
+    int getRowHeight(int row) override;
+    bool hasVariableHeightRows() const override;
 
     juce::Component* refreshComponentForRow(int, bool, juce::Component*) override;
 };

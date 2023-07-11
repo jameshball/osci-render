@@ -6,14 +6,20 @@ EffectComponent::EffectComponent(double min, double max, double step, double val
     slider.setValue(value, juce::dontSendNotification);
 }
 
-EffectComponent::EffectComponent(double min, double max, double step, Effect& effect) : name(effect.getName()), id(effect.getId()) {
+EffectComponent::EffectComponent(double min, double max, double step, EffectDetails details) : name(details.name), id(details.id) {
     componentSetup();
     slider.setRange(min, max, step);
-    slider.setValue(effect.getValue(), juce::dontSendNotification);
+    slider.setValue(details.value, juce::dontSendNotification);
 }
 
-EffectComponent::EffectComponent(double min, double max, double step, Effect& effect, bool checkboxVisible) : EffectComponent(min, max, step, effect) {
+EffectComponent::EffectComponent(double min, double max, double step, EffectDetails details, bool checkboxVisible) : EffectComponent(min, max, step, details) {
 	setCheckboxVisible(checkboxVisible);
+}
+
+EffectComponent::EffectComponent(double min, double max, double step, Effect& effect) : EffectComponent(min, max, step, effect.getDetails()[0]) {}
+
+EffectComponent::EffectComponent(double min, double max, double step, Effect& effect, bool checkboxVisible) : EffectComponent(min, max, step, effect) {
+    setCheckboxVisible(checkboxVisible);
 }
 
 void EffectComponent::componentSetup() {

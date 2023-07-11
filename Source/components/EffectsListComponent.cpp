@@ -1,31 +1,42 @@
 #include "EffectsListComponent.h"
 
-EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectListBoxItemData& data, int rn, std::shared_ptr<EffectComponent> effectComponent) : DraggableListBoxItem(lb, data, rn), effectComponent(effectComponent) {
-	addAndMakeVisible(*effectComponent);
+EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectListBoxItemData& data, int rn, std::shared_ptr<Effect> effect) : DraggableListBoxItem(lb, data, rn), effect(effect) {
+	auto details = effect->getDetails();
+	for (int i = 0; i < details.size(); i++) {
+		std::shared_ptr<EffectComponent> effectComponent = std::make_shared<EffectComponent>(0, 1, 0.01, details[i], i == 0);
+		effectComponent->slider.setValue(details[i].value, juce::dontSendNotification);
+		effectComponent->slider.onValueChange = [this, i, effectComponent] {
+			this->effect->setValue(i, effectComponent->slider.getValue());
+		};
 
-	effectComponent->slider.setValue(data.getValue(rn), juce::dontSendNotification);
-	effectComponent->slider.onValueChange = [this] {
-        ((AudioEffectListBoxItemData&)modelData).setValue(rowNum, this->effectComponent->slider.getValue());
-	};
+		if (i == 0) {
+			bool isSelected = false;
 
-	bool isSelected = false;
-
-	{
-		juce::SpinLock::ScopedLockType lock(data.audioProcessor.effectsLock);
-		// check if effect is in audioProcessor enabled effects
-		for (auto effect : data.audioProcessor.enabledEffects) {
-			if (effect->getId() == data.getId(rn)) {
-				isSelected = true;
-				break;
+			{
+				juce::SpinLock::ScopedLockType lock(data.audioProcessor.effectsLock);
+				// check if effect is in audioProcessor enabled effects
+				for (auto processorEffect : data.audioProcessor.enabledEffects) {
+					if (processorEffect->getId() == effect->getId()) {
+						isSelected = true;
+						break;
+					}
+				}
 			}
-		}
+			effectComponent->selected.setToggleState(isSelected, juce::dontSendNotification);
+			effectComponent->selected.onClick = [this, effectComponent] {
+				auto data = (AudioEffectListBoxItemData&)modelData;
+				juce::SpinLock::ScopedLockType lock(data.audioProcessor.effectsLock);
+				data.setSelected(rowNum, effectComponent->selected.getToggleState());
+			};
+        }
+
+		listModel.addComponent(effectComponent);
 	}
-	effectComponent->selected.setToggleState(isSelected, juce::dontSendNotification);
-	effectComponent->selected.onClick = [this] {
-		auto data = (AudioEffectListBoxItemData&)modelData;
-		juce::SpinLock::ScopedLockType lock(data.audioProcessor.effectsLock);
-		((AudioEffectListBoxItemData&)modelData).setSelected(rowNum, this->effectComponent->selected.getToggleState());
-	};
+
+	list.setModel(&listModel);
+	list.setRowHeight(30);
+	list.updateContent();
+	addAndMakeVisible(list);
 }
 
 EffectsListComponent::~EffectsListComponent() {}
@@ -51,15 +62,23 @@ void EffectsListComponent::paint(juce::Graphics& g) {
 void EffectsListComponent::resized() {
 	auto area = getLocalBounds();
 	area.removeFromLeft(20);
-	effectComponent->setBounds(area);
+	list.setBounds(area);
+}
+
+int EffectsListBoxModel::getRowHeight(int row) {
+	auto data = (AudioEffectListBoxItemData&)modelData;
+	return data.getEffect(row)->getDetails().size() * 30;
+}
+
+bool EffectsListBoxModel::hasVariableHeightRows() const {
+	return true;
 }
 
 juce::Component* EffectsListBoxModel::refreshComponentForRow(int rowNumber, bool isRowSelected, juce::Component *existingComponentToUpdate) {
     std::unique_ptr<EffectsListComponent> item(dynamic_cast<EffectsListComponent*>(existingComponentToUpdate));
     if (juce::isPositiveAndBelow(rowNumber, modelData.getNumItems())) {
 		auto data = (AudioEffectListBoxItemData&)modelData;
-		std::shared_ptr<EffectComponent> effectComponent = std::make_shared<EffectComponent>(0, 1, 0.01, 0, data.getText(rowNumber), data.getId(rowNumber));
-        item = std::make_unique<EffectsListComponent>(listBox, (AudioEffectListBoxItemData&)modelData, rowNumber, effectComponent);
+        item = std::make_unique<EffectsListComponent>(listBox, (AudioEffectListBoxItemData&)modelData, rowNumber, data.getEffect(rowNumber));
     }
     return item.release();
 }

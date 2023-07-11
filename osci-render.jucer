@@ -79,6 +79,9 @@
         <FILE id="CdKZCg" name="Matching.h" compile="0" resource="0" file="Source/chinese_postman/Matching.h"/>
       </GROUP>
       <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
+        <FILE id="kUinTt" name="ComponentList.cpp" compile="1" resource="0"
+              file="Source/components/ComponentList.cpp"/>
+        <FILE id="HGTPEW" name="ComponentList.h" compile="0" resource="0" file="Source/components/ComponentList.h"/>
         <FILE id="poPVxL" name="DraggableListBox.cpp" compile="1" resource="0"
               file="Source/components/DraggableListBox.cpp"/>
         <FILE id="Y9NEGn" name="DraggableListBox.h" compile="0" resource="0"
@@ -99,6 +102,8 @@
               file="Source/components/VisualiserComponent.cpp"/>
         <FILE id="ZueyNl" name="VisualiserComponent.h" compile="0" resource="0"
               file="Source/components/VisualiserComponent.h"/>
+        <FILE id="icFMpl" name="VListBox.cpp" compile="1" resource="0" file="Source/components/VListBox.cpp"/>
+        <FILE id="mvp8je" name="VListBox.h" compile="0" resource="0" file="Source/components/VListBox.h"/>
         <FILE id="s8EVcE" name="VolumeComponent.cpp" compile="1" resource="0"
               file="Source/components/VolumeComponent.cpp"/>
         <FILE id="MWkfTv" name="VolumeComponent.h" compile="0" resource="0"
