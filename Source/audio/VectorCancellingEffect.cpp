@@ -4,7 +4,8 @@ VectorCancellingEffect::VectorCancellingEffect() {}
 
 VectorCancellingEffect::~VectorCancellingEffect() {}
 
-Vector2 VectorCancellingEffect::apply(int index, Vector2 input, double value, double frequency, double sampleRate) {
+Vector2 VectorCancellingEffect::apply(int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) {
+    double value = details[0].value;
     if (value < 0.001) {
 		return input;
     }

@@ -26,6 +26,94 @@
       </GROUP>
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
+        <FILE id="WDV6eI" name="AudioWebSocketServer.cpp" compile="1" resource="0"
+              file="Source/audio/AudioWebSocketServer.cpp"/>
+        <FILE id="RD41Jd" name="AudioWebSocketServer.h" compile="0" resource="0"
+              file="Source/audio/AudioWebSocketServer.h"/>
+        <FILE id="NWuowi" name="BitCrushEffect.cpp" compile="1" resource="0"
+              file="Source/audio/BitCrushEffect.cpp"/>
+        <FILE id="Bc8UeW" name="BitCrushEffect.h" compile="0" resource="0"
+              file="Source/audio/BitCrushEffect.h"/>
+        <FILE id="ATOFA9" name="BulgeEffect.cpp" compile="1" resource="0" file="Source/audio/BulgeEffect.cpp"/>
+        <FILE id="lOXxYe" name="BulgeEffect.h" compile="0" resource="0" file="Source/audio/BulgeEffect.h"/>
+        <FILE id="e6SZox" name="DelayEffect.cpp" compile="1" resource="0" file="Source/audio/DelayEffect.cpp"/>
+        <FILE id="kpI9pv" name="DelayEffect.h" compile="0" resource="0" file="Source/audio/DelayEffect.h"/>
+        <FILE id="DiIoN4" name="DistortEffect.cpp" compile="1" resource="0"
+              file="Source/audio/DistortEffect.cpp"/>
+        <FILE id="ux2dO2" name="DistortEffect.h" compile="0" resource="0" file="Source/audio/DistortEffect.h"/>
+        <FILE id="mP5lpY" name="Effect.cpp" compile="1" resource="0" file="Source/audio/Effect.cpp"/>
+        <FILE id="LKeNnY" name="Effect.h" compile="0" resource="0" file="Source/audio/Effect.h"/>
+        <FILE id="ca2VrC" name="EffectApplication.cpp" compile="1" resource="0"
+              file="Source/audio/EffectApplication.cpp"/>
+        <FILE id="MIYJ9y" name="EffectApplication.h" compile="0" resource="0"
+              file="Source/audio/EffectApplication.h"/>
+        <FILE id="uhyh7T" name="LuaEffect.cpp" compile="1" resource="0" file="Source/audio/LuaEffect.cpp"/>
+        <FILE id="jqDcZq" name="LuaEffect.h" compile="0" resource="0" file="Source/audio/LuaEffect.h"/>
+        <FILE id="t2bsR8" name="PitchDetector.cpp" compile="1" resource="0"
+              file="Source/audio/PitchDetector.cpp"/>
+        <FILE id="rQC2gX" name="PitchDetector.h" compile="0" resource="0" file="Source/audio/PitchDetector.h"/>
+        <FILE id="PbbNqz" name="RotateEffect.cpp" compile="1" resource="0"
+              file="Source/audio/RotateEffect.cpp"/>
+        <FILE id="tUwNZV" name="RotateEffect.h" compile="0" resource="0" file="Source/audio/RotateEffect.h"/>
+        <FILE id="iUEfwT" name="SmoothEffect.cpp" compile="1" resource="0"
+              file="Source/audio/SmoothEffect.cpp"/>
+        <FILE id="Vwjht7" name="SmoothEffect.h" compile="0" resource="0" file="Source/audio/SmoothEffect.h"/>
+        <FILE id="VBskjq" name="VectorCancellingEffect.cpp" compile="1" resource="0"
+              file="Source/audio/VectorCancellingEffect.cpp"/>
+        <FILE id="Be21D0" name="VectorCancellingEffect.h" compile="0" resource="0"
+              file="Source/audio/VectorCancellingEffect.h"/>
+      </GROUP>
+      <GROUP id="{2A41BAF3-5E83-B018-5668-39D89ABFA00C}" name="chinese_postman">
+        <FILE id="LcDpwe" name="BinaryHeap.cpp" compile="1" resource="0" file="Source/chinese_postman/BinaryHeap.cpp"/>
+        <FILE id="UYdaXR" name="BinaryHeap.h" compile="0" resource="0" file="Source/chinese_postman/BinaryHeap.h"/>
+        <FILE id="UnjMQ4" name="ChinesePostman.h" compile="0" resource="0"
+              file="Source/chinese_postman/ChinesePostman.h"/>
+        <FILE id="ItJWxN" name="Dijkstra.h" compile="0" resource="0" file="Source/chinese_postman/Dijkstra.h"/>
+        <FILE id="PFBBHM" name="Example.cpp" compile="1" resource="0" file="Source/chinese_postman/Example.cpp"/>
+        <FILE id="r66okI" name="Globals.h" compile="0" resource="0" file="Source/chinese_postman/Globals.h"/>
+        <FILE id="GN3vkN" name="Graph.cpp" compile="1" resource="0" file="Source/chinese_postman/Graph.cpp"/>
+        <FILE id="tpPZBV" name="Graph.h" compile="0" resource="0" file="Source/chinese_postman/Graph.h"/>
+        <FILE id="rAjVkN" name="LICENSE" compile="0" resource="1" file="Source/chinese_postman/LICENSE"/>
+        <FILE id="hz1Tov" name="Matching.cpp" compile="1" resource="0" file="Source/chinese_postman/Matching.cpp"/>
+        <FILE id="CdKZCg" name="Matching.h" compile="0" resource="0" file="Source/chinese_postman/Matching.h"/>
+      </GROUP>
+      <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
+        <FILE id="poPVxL" name="DraggableListBox.cpp" compile="1" resource="0"
+              file="Source/components/DraggableListBox.cpp"/>
+        <FILE id="Y9NEGn" name="DraggableListBox.h" compile="0" resource="0"
+              file="Source/components/DraggableListBox.h"/>
+        <FILE id="xLAEHK" name="EffectComponent.cpp" compile="1" resource="0"
+              file="Source/components/EffectComponent.cpp"/>
+        <FILE id="u4UCwb" name="EffectComponent.h" compile="0" resource="0"
+              file="Source/components/EffectComponent.h"/>
+        <FILE id="JG4NCF" name="EffectsListComponent.cpp" compile="1" resource="0"
+              file="Source/components/EffectsListComponent.cpp"/>
+        <FILE id="dcLchL" name="EffectsListComponent.h" compile="0" resource="0"
+              file="Source/components/EffectsListComponent.h"/>
+        <FILE id="qIxm1z" name="LuaListComponent.cpp" compile="1" resource="0"
+              file="Source/components/LuaListComponent.cpp"/>
+        <FILE id="x0Syav" name="LuaListComponent.h" compile="0" resource="0"
+              file="Source/components/LuaListComponent.h"/>
+        <FILE id="y3UiR0" name="VisualiserComponent.cpp" compile="1" resource="0"
+              file="Source/components/VisualiserComponent.cpp"/>
+        <FILE id="ZueyNl" name="VisualiserComponent.h" compile="0" resource="0"
+              file="Source/components/VisualiserComponent.h"/>
+        <FILE id="s8EVcE" name="VolumeComponent.cpp" compile="1" resource="0"
+              file="Source/components/VolumeComponent.cpp"/>
+        <FILE id="MWkfTv" name="VolumeComponent.h" compile="0" resource="0"
+              file="Source/components/VolumeComponent.h"/>
+      </GROUP>
+      <GROUP id="{9F5970A9-8094-E7F3-7AC1-812AE5589B9F}" name="concurrency">
+        <FILE id="WQ2W15" name="BufferConsumer.h" compile="0" resource="0"
+              file="Source/concurrency/BufferConsumer.h"/>
+        <FILE id="yWTiQQ" name="BufferProducer.h" compile="0" resource="0"
+              file="Source/concurrency/BufferProducer.h"/>
+      </GROUP>
+      <FILE id="I44EdJ" name="EffectsComponent.cpp" compile="1" resource="0"
+            file="Source/EffectsComponent.cpp"/>
+      <FILE id="qxxNX3" name="EffectsComponent.h" compile="0" resource="0"
+            file="Source/EffectsComponent.h"/>
       <GROUP id="{D0D95F57-3D9D-46D9-C126-25C3C7459AC5}" name="ixwebsocket">
         <FILE id="pPOkoj" name="IXBase64.h" compile="0" resource="0" file="Source/ixwebsocket/IXBase64.h"/>
         <FILE id="qVI3x2" name="IXBench.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXBench.cpp"/>
@@ -185,19 +273,6 @@
         <FILE id="eAqAle" name="IXWebSocketVersion.h" compile="0" resource="0"
               file="Source/ixwebsocket/IXWebSocketVersion.h"/>
       </GROUP>
-      <GROUP id="{9F5970A9-8094-E7F3-7AC1-812AE5589B9F}" name="concurrency">
-        <FILE id="WQ2W15" name="BufferConsumer.h" compile="0" resource="0"
-              file="Source/concurrency/BufferConsumer.h"/>
-        <FILE id="yWTiQQ" name="BufferProducer.h" compile="0" resource="0"
-              file="Source/concurrency/BufferProducer.h"/>
-      </GROUP>
-      <FILE id="JceyXh" name="Util.h" compile="0" resource="0" file="Source/Util.h"/>
-      <FILE id="RHHuXP" name="ObjComponent.cpp" compile="1" resource="0"
-            file="Source/ObjComponent.cpp"/>
-      <FILE id="mliVoS" name="ObjComponent.h" compile="0" resource="0" file="Source/ObjComponent.h"/>
-      <FILE id="X26RjJ" name="LuaComponent.cpp" compile="1" resource="0"
-            file="Source/LuaComponent.cpp"/>
-      <FILE id="g5xRHT" name="LuaComponent.h" compile="0" resource="0" file="Source/LuaComponent.h"/>
       <GROUP id="{75F6236A-68A5-85DA-EDAE-23D1621601DB}" name="lua">
         <FILE id="X5i9iw" name="lapi.c" compile="1" resource="0" file="Source/lua/lapi.c"/>
         <FILE id="J62WSE" name="lapi.h" compile="0" resource="0" file="Source/lua/lapi.h"/>
@@ -267,76 +342,60 @@
         <FILE id="vYPcZP" name="lzio.h" compile="0" resource="0" file="Source/lua/lzio.h"/>
         <FILE id="ktpcF1" name="onelua.c" compile="1" resource="0" file="Source/lua/onelua.c"/>
       </GROUP>
-      <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
-        <FILE id="poPVxL" name="DraggableListBox.cpp" compile="1" resource="0"
-              file="Source/components/DraggableListBox.cpp"/>
-        <FILE id="Y9NEGn" name="DraggableListBox.h" compile="0" resource="0"
-              file="Source/components/DraggableListBox.h"/>
-        <FILE id="xLAEHK" name="EffectComponent.cpp" compile="1" resource="0"
-              file="Source/components/EffectComponent.cpp"/>
-        <FILE id="u4UCwb" name="EffectComponent.h" compile="0" resource="0"
-              file="Source/components/EffectComponent.h"/>
-        <FILE id="JG4NCF" name="EffectsListComponent.cpp" compile="1" resource="0"
-              file="Source/components/EffectsListComponent.cpp"/>
-        <FILE id="dcLchL" name="EffectsListComponent.h" compile="0" resource="0"
-              file="Source/components/EffectsListComponent.h"/>
-        <FILE id="qIxm1z" name="LuaListComponent.cpp" compile="1" resource="0"
-              file="Source/components/LuaListComponent.cpp"/>
-        <FILE id="x0Syav" name="LuaListComponent.h" compile="0" resource="0"
-              file="Source/components/LuaListComponent.h"/>
-        <FILE id="y3UiR0" name="VisualiserComponent.cpp" compile="1" resource="0"
-              file="Source/components/VisualiserComponent.cpp"/>
-        <FILE id="ZueyNl" name="VisualiserComponent.h" compile="0" resource="0"
-              file="Source/components/VisualiserComponent.h"/>
-        <FILE id="s8EVcE" name="VolumeComponent.cpp" compile="1" resource="0"
-              file="Source/components/VolumeComponent.cpp"/>
-        <FILE id="MWkfTv" name="VolumeComponent.h" compile="0" resource="0"
-              file="Source/components/VolumeComponent.h"/>
+      <FILE id="X26RjJ" name="LuaComponent.cpp" compile="1" resource="0"
+            file="Source/LuaComponent.cpp"/>
+      <FILE id="g5xRHT" name="LuaComponent.h" compile="0" resource="0" file="Source/LuaComponent.h"/>
+      <FILE id="GKBQ8j" name="MainComponent.cpp" compile="1" resource="0"
+            file="Source/MainComponent.cpp"/>
+      <FILE id="RU8fGr" name="MainComponent.h" compile="0" resource="0" file="Source/MainComponent.h"/>
+      <GROUP id="{E6ED85A9-3843-825F-EF48-BCF81E38F8AD}" name="obj">
+        <FILE id="Tyz6WY" name="Camera.cpp" compile="1" resource="0" file="Source/obj/Camera.cpp"/>
+        <FILE id="ix12FT" name="Camera.h" compile="0" resource="0" file="Source/obj/Camera.h"/>
+        <FILE id="JJTNO9" name="Line3D.cpp" compile="1" resource="0" file="Source/obj/Line3D.cpp"/>
+        <FILE id="TMrur0" name="Line3D.h" compile="0" resource="0" file="Source/obj/Line3D.h"/>
+        <FILE id="a4ILpa" name="tiny_obj_loader.cpp" compile="1" resource="0"
+              file="Source/obj/tiny_obj_loader.cpp"/>
+        <FILE id="YdfYbM" name="tiny_obj_loader.h" compile="0" resource="0"
+              file="Source/obj/tiny_obj_loader.h"/>
+        <FILE id="YNsbe9" name="WorldObject.cpp" compile="1" resource="0" file="Source/obj/WorldObject.cpp"/>
+        <FILE id="SZBVI9" name="WorldObject.h" compile="0" resource="0" file="Source/obj/WorldObject.h"/>
       </GROUP>
-      <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
-        <FILE id="WDV6eI" name="AudioWebSocketServer.cpp" compile="1" resource="0"
-              file="Source/audio/AudioWebSocketServer.cpp"/>
-        <FILE id="RD41Jd" name="AudioWebSocketServer.h" compile="0" resource="0"
-              file="Source/audio/AudioWebSocketServer.h"/>
-        <FILE id="NWuowi" name="BitCrushEffect.cpp" compile="1" resource="0"
-              file="Source/audio/BitCrushEffect.cpp"/>
-        <FILE id="Bc8UeW" name="BitCrushEffect.h" compile="0" resource="0"
-              file="Source/audio/BitCrushEffect.h"/>
-        <FILE id="ATOFA9" name="BulgeEffect.cpp" compile="1" resource="0" file="Source/audio/BulgeEffect.cpp"/>
-        <FILE id="lOXxYe" name="BulgeEffect.h" compile="0" resource="0" file="Source/audio/BulgeEffect.h"/>
-        <FILE id="DiIoN4" name="DistortEffect.cpp" compile="1" resource="0"
-              file="Source/audio/DistortEffect.cpp"/>
-        <FILE id="ux2dO2" name="DistortEffect.h" compile="0" resource="0" file="Source/audio/DistortEffect.h"/>
-        <FILE id="mP5lpY" name="Effect.cpp" compile="1" resource="0" file="Source/audio/Effect.cpp"/>
-        <FILE id="LKeNnY" name="Effect.h" compile="0" resource="0" file="Source/audio/Effect.h"/>
-        <FILE id="ca2VrC" name="EffectApplication.cpp" compile="1" resource="0"
-              file="Source/audio/EffectApplication.cpp"/>
-        <FILE id="MIYJ9y" name="EffectApplication.h" compile="0" resource="0"
-              file="Source/audio/EffectApplication.h"/>
-        <FILE id="uhyh7T" name="LuaEffect.cpp" compile="1" resource="0" file="Source/audio/LuaEffect.cpp"/>
-        <FILE id="jqDcZq" name="LuaEffect.h" compile="0" resource="0" file="Source/audio/LuaEffect.h"/>
-        <FILE id="t2bsR8" name="PitchDetector.cpp" compile="1" resource="0"
-              file="Source/audio/PitchDetector.cpp"/>
-        <FILE id="rQC2gX" name="PitchDetector.h" compile="0" resource="0" file="Source/audio/PitchDetector.h"/>
-        <FILE id="PbbNqz" name="RotateEffect.cpp" compile="1" resource="0"
-              file="Source/audio/RotateEffect.cpp"/>
-        <FILE id="tUwNZV" name="RotateEffect.h" compile="0" resource="0" file="Source/audio/RotateEffect.h"/>
-        <FILE id="iUEfwT" name="SmoothEffect.cpp" compile="1" resource="0"
-              file="Source/audio/SmoothEffect.cpp"/>
-        <FILE id="Vwjht7" name="SmoothEffect.h" compile="0" resource="0" file="Source/audio/SmoothEffect.h"/>
-        <FILE id="VBskjq" name="VectorCancellingEffect.cpp" compile="1" resource="0"
-              file="Source/audio/VectorCancellingEffect.cpp"/>
-        <FILE id="Be21D0" name="VectorCancellingEffect.h" compile="0" resource="0"
-              file="Source/audio/VectorCancellingEffect.h"/>
+      <FILE id="RHHuXP" name="ObjComponent.cpp" compile="1" resource="0"
+            file="Source/ObjComponent.cpp"/>
+      <FILE id="mliVoS" name="ObjComponent.h" compile="0" resource="0" file="Source/ObjComponent.h"/>
+      <GROUP id="{2AE40B10-2C85-6401-644A-D5F36BCC5BC1}" name="parser">
+        <FILE id="q22Fiw" name="FileParser.cpp" compile="1" resource="0" file="Source/parser/FileParser.cpp"/>
+        <FILE id="HWSJK8" name="FileParser.h" compile="0" resource="0" file="Source/parser/FileParser.h"/>
+        <FILE id="Yevl42" name="FrameConsumer.h" compile="0" resource="0" file="Source/parser/FrameConsumer.h"/>
+        <FILE id="Z3mAYx" name="FrameProducer.cpp" compile="1" resource="0"
+              file="Source/parser/FrameProducer.cpp"/>
+        <FILE id="JEcNPP" name="FrameProducer.h" compile="0" resource="0" file="Source/parser/FrameProducer.h"/>
+        <FILE id="hCrVUD" name="FrameSource.h" compile="0" resource="0" file="Source/parser/FrameSource.h"/>
       </GROUP>
-      <GROUP id="{E81B1D7B-B0F7-1967-B271-71B3F838720F}" name="txt">
-        <FILE id="vIYWRG" name="TextParser.cpp" compile="1" resource="0" file="Source/txt/TextParser.cpp"/>
-        <FILE id="LlefOK" name="TextParser.h" compile="0" resource="0" file="Source/txt/TextParser.h"/>
-      </GROUP>
-      <GROUP id="{022CB910-9A16-C4AE-4C3B-9CB57BE87FC2}" name="xml">
-        <FILE id="pW7WRh" name="pugiconfig.hpp" compile="0" resource="0" file="Source/xml/pugiconfig.hpp"/>
-        <FILE id="CnkgyF" name="pugixml.cpp" compile="1" resource="0" file="Source/xml/pugixml.cpp"/>
-        <FILE id="SrvH3B" name="pugixml.hpp" compile="0" resource="0" file="Source/xml/pugixml.hpp"/>
+      <FILE id="GF4uFx" name="PluginEditor.cpp" compile="1" resource="0"
+            file="Source/PluginEditor.cpp"/>
+      <FILE id="iySMgE" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
+      <FILE id="N4YgAT" name="PluginProcessor.cpp" compile="1" resource="0"
+            file="Source/PluginProcessor.cpp"/>
+      <FILE id="G4mTsK" name="PluginProcessor.h" compile="0" resource="0"
+            file="Source/PluginProcessor.h"/>
+      <GROUP id="{92CEA658-C82C-9CEB-15EB-945EF6B6B5C8}" name="shape">
+        <FILE id="iglTFG" name="CircleArc.cpp" compile="1" resource="0" file="Source/shape/CircleArc.cpp"/>
+        <FILE id="T3S8Sg" name="CircleArc.h" compile="0" resource="0" file="Source/shape/CircleArc.h"/>
+        <FILE id="G5fbub" name="Shape.cpp" compile="1" resource="0" file="Source/shape/Shape.cpp"/>
+        <FILE id="Dbvew2" name="CubicBezierCurve.cpp" compile="1" resource="0"
+              file="Source/shape/CubicBezierCurve.cpp"/>
+        <FILE id="pMyu9y" name="CubicBezierCurve.h" compile="0" resource="0"
+              file="Source/shape/CubicBezierCurve.h"/>
+        <FILE id="bGS2Fh" name="QuadraticBezierCurve.cpp" compile="1" resource="0"
+              file="Source/shape/QuadraticBezierCurve.cpp"/>
+        <FILE id="kdWF0N" name="QuadraticBezierCurve.h" compile="0" resource="0"
+              file="Source/shape/QuadraticBezierCurve.h"/>
+        <FILE id="W19EPg" name="Line.cpp" compile="1" resource="0" file="Source/shape/Line.cpp"/>
+        <FILE id="i1A2s1" name="Line.h" compile="0" resource="0" file="Source/shape/Line.h"/>
+        <FILE id="nUpro8" name="Vector2.cpp" compile="1" resource="0" file="Source/shape/Vector2.cpp"/>
+        <FILE id="X6A0jk" name="Vector2.h" compile="0" resource="0" file="Source/shape/Vector2.h"/>
+        <FILE id="NmptSY" name="Shape.h" compile="0" resource="0" file="Source/shape/Shape.h"/>
       </GROUP>
       <GROUP id="{56A27063-1FE7-31C3-8263-98389240A8CB}" name="svg">
         <FILE id="FVWkba" name="ClosePath.cpp" compile="1" resource="0" file="Source/svg/ClosePath.cpp"/>
@@ -356,73 +415,16 @@
         <FILE id="OvloZU" name="SvgState.cpp" compile="1" resource="0" file="Source/svg/SvgState.cpp"/>
         <FILE id="GCBO9x" name="SvgState.h" compile="0" resource="0" file="Source/svg/SvgState.h"/>
       </GROUP>
-      <GROUP id="{2A41BAF3-5E83-B018-5668-39D89ABFA00C}" name="chinese_postman">
-        <FILE id="LcDpwe" name="BinaryHeap.cpp" compile="1" resource="0" file="Source/chinese_postman/BinaryHeap.cpp"/>
-        <FILE id="UYdaXR" name="BinaryHeap.h" compile="0" resource="0" file="Source/chinese_postman/BinaryHeap.h"/>
-        <FILE id="UnjMQ4" name="ChinesePostman.h" compile="0" resource="0"
-              file="Source/chinese_postman/ChinesePostman.h"/>
-        <FILE id="ItJWxN" name="Dijkstra.h" compile="0" resource="0" file="Source/chinese_postman/Dijkstra.h"/>
-        <FILE id="PFBBHM" name="Example.cpp" compile="1" resource="0" file="Source/chinese_postman/Example.cpp"/>
-        <FILE id="r66okI" name="Globals.h" compile="0" resource="0" file="Source/chinese_postman/Globals.h"/>
-        <FILE id="GN3vkN" name="Graph.cpp" compile="1" resource="0" file="Source/chinese_postman/Graph.cpp"/>
-        <FILE id="tpPZBV" name="Graph.h" compile="0" resource="0" file="Source/chinese_postman/Graph.h"/>
-        <FILE id="rAjVkN" name="LICENSE" compile="0" resource="1" file="Source/chinese_postman/LICENSE"/>
-        <FILE id="hz1Tov" name="Matching.cpp" compile="1" resource="0" file="Source/chinese_postman/Matching.cpp"/>
-        <FILE id="CdKZCg" name="Matching.h" compile="0" resource="0" file="Source/chinese_postman/Matching.h"/>
+      <GROUP id="{E81B1D7B-B0F7-1967-B271-71B3F838720F}" name="txt">
+        <FILE id="vIYWRG" name="TextParser.cpp" compile="1" resource="0" file="Source/txt/TextParser.cpp"/>
+        <FILE id="LlefOK" name="TextParser.h" compile="0" resource="0" file="Source/txt/TextParser.h"/>
       </GROUP>
-      <GROUP id="{92CEA658-C82C-9CEB-15EB-945EF6B6B5C8}" name="shape">
-        <FILE id="iglTFG" name="CircleArc.cpp" compile="1" resource="0" file="Source/shape/CircleArc.cpp"/>
-        <FILE id="T3S8Sg" name="CircleArc.h" compile="0" resource="0" file="Source/shape/CircleArc.h"/>
-        <FILE id="G5fbub" name="Shape.cpp" compile="1" resource="0" file="Source/shape/Shape.cpp"/>
-        <FILE id="Dbvew2" name="CubicBezierCurve.cpp" compile="1" resource="0"
-              file="Source/shape/CubicBezierCurve.cpp"/>
-        <FILE id="pMyu9y" name="CubicBezierCurve.h" compile="0" resource="0"
-              file="Source/shape/CubicBezierCurve.h"/>
-        <FILE id="bGS2Fh" name="QuadraticBezierCurve.cpp" compile="1" resource="0"
-              file="Source/shape/QuadraticBezierCurve.cpp"/>
-        <FILE id="kdWF0N" name="QuadraticBezierCurve.h" compile="0" resource="0"
-              file="Source/shape/QuadraticBezierCurve.h"/>
-        <FILE id="W19EPg" name="Line.cpp" compile="1" resource="0" file="Source/shape/Line.cpp"/>
-        <FILE id="i1A2s1" name="Line.h" compile="0" resource="0" file="Source/shape/Line.h"/>
-        <FILE id="nUpro8" name="Vector2.cpp" compile="1" resource="0" file="Source/shape/Vector2.cpp"/>
-        <FILE id="X6A0jk" name="Vector2.h" compile="0" resource="0" file="Source/shape/Vector2.h"/>
-        <FILE id="NmptSY" name="Shape.h" compile="0" resource="0" file="Source/shape/Shape.h"/>
+      <FILE id="JceyXh" name="Util.h" compile="0" resource="0" file="Source/Util.h"/>
+      <GROUP id="{022CB910-9A16-C4AE-4C3B-9CB57BE87FC2}" name="xml">
+        <FILE id="pW7WRh" name="pugiconfig.hpp" compile="0" resource="0" file="Source/xml/pugiconfig.hpp"/>
+        <FILE id="CnkgyF" name="pugixml.cpp" compile="1" resource="0" file="Source/xml/pugixml.cpp"/>
+        <FILE id="SrvH3B" name="pugixml.hpp" compile="0" resource="0" file="Source/xml/pugixml.hpp"/>
       </GROUP>
-      <GROUP id="{2AE40B10-2C85-6401-644A-D5F36BCC5BC1}" name="parser">
-        <FILE id="q22Fiw" name="FileParser.cpp" compile="1" resource="0" file="Source/parser/FileParser.cpp"/>
-        <FILE id="HWSJK8" name="FileParser.h" compile="0" resource="0" file="Source/parser/FileParser.h"/>
-        <FILE id="Yevl42" name="FrameConsumer.h" compile="0" resource="0" file="Source/parser/FrameConsumer.h"/>
-        <FILE id="Z3mAYx" name="FrameProducer.cpp" compile="1" resource="0"
-              file="Source/parser/FrameProducer.cpp"/>
-        <FILE id="JEcNPP" name="FrameProducer.h" compile="0" resource="0" file="Source/parser/FrameProducer.h"/>
-        <FILE id="hCrVUD" name="FrameSource.h" compile="0" resource="0" file="Source/parser/FrameSource.h"/>
-      </GROUP>
-      <GROUP id="{E6ED85A9-3843-825F-EF48-BCF81E38F8AD}" name="obj">
-        <FILE id="Tyz6WY" name="Camera.cpp" compile="1" resource="0" file="Source/obj/Camera.cpp"/>
-        <FILE id="ix12FT" name="Camera.h" compile="0" resource="0" file="Source/obj/Camera.h"/>
-        <FILE id="JJTNO9" name="Line3D.cpp" compile="1" resource="0" file="Source/obj/Line3D.cpp"/>
-        <FILE id="TMrur0" name="Line3D.h" compile="0" resource="0" file="Source/obj/Line3D.h"/>
-        <FILE id="a4ILpa" name="tiny_obj_loader.cpp" compile="1" resource="0"
-              file="Source/obj/tiny_obj_loader.cpp"/>
-        <FILE id="YdfYbM" name="tiny_obj_loader.h" compile="0" resource="0"
-              file="Source/obj/tiny_obj_loader.h"/>
-        <FILE id="YNsbe9" name="WorldObject.cpp" compile="1" resource="0" file="Source/obj/WorldObject.cpp"/>
-        <FILE id="SZBVI9" name="WorldObject.h" compile="0" resource="0" file="Source/obj/WorldObject.h"/>
-      </GROUP>
-      <FILE id="GKBQ8j" name="MainComponent.cpp" compile="1" resource="0"
-            file="Source/MainComponent.cpp"/>
-      <FILE id="RU8fGr" name="MainComponent.h" compile="0" resource="0" file="Source/MainComponent.h"/>
-      <FILE id="I44EdJ" name="EffectsComponent.cpp" compile="1" resource="0"
-            file="Source/EffectsComponent.cpp"/>
-      <FILE id="qxxNX3" name="EffectsComponent.h" compile="0" resource="0"
-            file="Source/EffectsComponent.h"/>
-      <FILE id="N4YgAT" name="PluginProcessor.cpp" compile="1" resource="0"
-            file="Source/PluginProcessor.cpp"/>
-      <FILE id="G4mTsK" name="PluginProcessor.h" compile="0" resource="0"
-            file="Source/PluginProcessor.h"/>
-      <FILE id="GF4uFx" name="PluginEditor.cpp" compile="1" resource="0"
-            file="Source/PluginEditor.cpp"/>
-      <FILE id="iySMgE" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
     </GROUP>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"/>

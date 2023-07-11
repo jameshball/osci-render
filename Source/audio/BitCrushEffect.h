@@ -7,5 +7,5 @@ public:
 	BitCrushEffect();
 	~BitCrushEffect();
 
-	Vector2 apply(int index, Vector2 input, double value, double frequency, double sampleRate) override;
+	Vector2 apply(int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) override;
 };

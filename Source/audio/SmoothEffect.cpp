@@ -6,7 +6,8 @@ SmoothEffect::SmoothEffect() {
 
 SmoothEffect::~SmoothEffect() {}
 
-Vector2 SmoothEffect::apply(int index, Vector2 input, double value, double frequency, double sampleRate) {
+Vector2 SmoothEffect::apply(int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) {
+    double value = details[0].value;
     int newWindowSize = (int)(256 * value);
 	windowSize = std::max(1, std::min(MAX_WINDOW_SIZE, newWindowSize));
 	
