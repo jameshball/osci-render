@@ -30,6 +30,8 @@ private:
 	bool active = true;
 	bool sampleSource = false;
 
+	juce::SpinLock lock;
+
 	std::shared_ptr<WorldObject> object;
 	std::shared_ptr<Camera> camera;
 	std::shared_ptr<SvgParser> svg;

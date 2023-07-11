@@ -5,28 +5,32 @@
 
 class Effect {
 public:
-	Effect(std::unique_ptr<EffectApplication> effectApplication, juce::String name, juce::String id);
-	Effect(juce::String name, juce::String id);
+	Effect(std::shared_ptr<EffectApplication> effectApplication, std::vector<EffectDetails> details);
+	Effect(std::function<Vector2(int, Vector2, std::vector<EffectDetails>, double, int)> application, std::vector<EffectDetails> details);
+	Effect(std::shared_ptr<EffectApplication> effectApplication, juce::String name, juce::String id);
 	Effect(juce::String name, juce::String id, double value);
-	Effect(std::function<Vector2(int, Vector2, double, double, int)> application, juce::String name, juce::String id, double value);
+	Effect(juce::String name, juce::String id);
+	Effect(std::function<Vector2(int, Vector2, std::vector<EffectDetails>, double, int)> application, juce::String name, juce::String id, double value);
 
 	Vector2 apply(int index, Vector2 input);
 	void apply();
+	double getValue(int index);
 	double getValue();
+	std::vector<EffectDetails> getDetails();
+	void setValue(int index, double value);
 	void setValue(double value);
 	void setFrequency(double frequency);
 	int getPrecedence();
 	void setPrecedence(int precedence);
-	juce::String getName();
 	juce::String getId();
+	juce::String getName();
+
 private:
-	double value = 0.0;
+	std::vector<EffectDetails> details;
 	double frequency = 1.0;
 	int precedence = -1;
 	int sampleRate = 192000;
-	juce::String name;
-	juce::String id;
-	std::function<Vector2(int, Vector2, double, double, int)> application;
+	std::function<Vector2(int, Vector2, std::vector<EffectDetails>, double, int)> application;
 	
-	std::unique_ptr<EffectApplication> effectApplication;
+	std::shared_ptr<EffectApplication> effectApplication;
 };

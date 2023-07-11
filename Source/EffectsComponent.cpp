@@ -37,7 +37,6 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p) : audioProcessor
     addAndMakeVisible(addBtn);*/
 
     listBox.setModel(&listBoxModel);
-    listBox.setRowHeight(30);
     addAndMakeVisible(listBox);
 }
 

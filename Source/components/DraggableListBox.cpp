@@ -6,13 +6,13 @@ void DraggableListBoxItem::paint(juce::Graphics& g)
 {
     if (insertAfter)
     {
-        g.setColour(juce::Colours::red);
-        g.fillRect(0, getHeight() - 3, getWidth(), 3);
+        g.setColour(juce::Colour(0xff00ff00));
+        g.fillRect(0, getHeight() - 4, getWidth(), 4);
     }
     else if (insertBefore)
     {
-        g.setColour(juce::Colours::red);
-        g.fillRect(0, 0, getWidth(), 3);
+        g.setColour(juce::Colour(0xff00ff00));
+        g.fillRect(0, 0, getWidth(), 4);
     }
 }
 

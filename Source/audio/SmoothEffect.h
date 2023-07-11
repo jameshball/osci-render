@@ -7,10 +7,8 @@ public:
 	SmoothEffect();
 	~SmoothEffect();
 
-	Vector2 apply(int index, Vector2 input, double value, double frequency, double sampleRate) override;
+	Vector2 apply(int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) override;
 private:
-	const int MAX_WINDOW_SIZE = 2048;
-	std::vector<Vector2> window;
-	int windowSize = 1;
-	int head = 0;
+	double leftAvg = 0;
+	double rightAvg = 0;
 };

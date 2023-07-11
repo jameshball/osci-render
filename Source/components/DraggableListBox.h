@@ -1,5 +1,6 @@
 #pragma once
 #include "JuceHeader.h"
+#include "VListBox.h"
 
 // Your item-data container must inherit from this, and override at least the first
 // four member functions.
@@ -19,7 +20,7 @@ struct DraggableListBoxItemData
 
 // DraggableListBox is basically just a ListBox, that inherits from DragAndDropContainer.
 // Declare your list box using this type.
-class DraggableListBox : public juce::ListBox, public juce::DragAndDropContainer
+class DraggableListBox : public juce::jc::ListBox, public juce::DragAndDropContainer
 {
 };
 
@@ -58,7 +59,7 @@ protected:
     bool insertBefore = false;
 };
 
-class DraggableListBoxModel : public juce::ListBoxModel
+class DraggableListBoxModel : public juce::jc::ListBoxModel
 {
 public:
     DraggableListBoxModel(DraggableListBox& lb, DraggableListBoxItemData& md)

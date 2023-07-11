@@ -31,18 +31,24 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
                        )
 #endif
     {
-    producer = std::make_unique<FrameProducer>(*this, std::make_shared<FileParser>());
-    producer->startThread();
+    producer.startThread();
     
     juce::SpinLock::ScopedLockType lock(effectsLock);
 
-    allEffects.push_back(std::make_shared<Effect>(std::make_unique<BitCrushEffect>(), "Bit Crush", "bitCrush"));
-    allEffects.push_back(std::make_shared<Effect>(std::make_unique<BulgeEffect>(), "Bulge", "bulge"));
-    allEffects.push_back(std::make_shared<Effect>(std::make_unique<RotateEffect>(), "2D Rotate Speed", "rotateSpeed"));
-    allEffects.push_back(std::make_shared<Effect>(std::make_unique<VectorCancellingEffect>(), "Vector cancelling", "vectorCancelling"));
-    allEffects.push_back(std::make_shared<Effect>(std::make_unique<DistortEffect>(true), "Vertical shift", "verticalDistort"));
-    allEffects.push_back(std::make_shared<Effect>(std::make_unique<DistortEffect>(false), "Horizontal shift", "horizontalDistort"));
-    allEffects.push_back(std::make_shared<Effect>(std::make_unique<SmoothEffect>(), "Smoothing", "smoothing"));
+    allEffects.push_back(std::make_shared<Effect>(std::make_shared<BitCrushEffect>(), "Bit Crush", "bitCrush"));
+    allEffects.push_back(std::make_shared<Effect>(std::make_shared<BulgeEffect>(), "Bulge", "bulge"));
+    allEffects.push_back(std::make_shared<Effect>(std::make_shared<RotateEffect>(), "2D Rotate Speed", "rotateSpeed"));
+    allEffects.push_back(std::make_shared<Effect>(std::make_shared<VectorCancellingEffect>(), "Vector cancelling", "vectorCancelling"));
+    allEffects.push_back(std::make_shared<Effect>(std::make_shared<DistortEffect>(true), "Vertical shift", "verticalDistort"));
+    allEffects.push_back(std::make_shared<Effect>(std::make_shared<DistortEffect>(false), "Horizontal shift", "horizontalDistort"));
+    allEffects.push_back(std::make_shared<Effect>(std::make_shared<SmoothEffect>(), "Smoothing", "smoothing"));
+    allEffects.push_back(std::make_shared<Effect>(
+        delayEffect,
+        std::vector<EffectDetails>{
+            EffectDetails{ "Delay Decay", "delayDecay", 0 },
+            EffectDetails{ "Delay Length", "delayEchoLength", 0.5 }
+        }
+    ));
     allEffects.push_back(traceMax);
     allEffects.push_back(traceMin);
 
@@ -166,7 +172,7 @@ void OscirenderAudioProcessor::addLuaSlider() {
         sliderNum = (sliderNum - mod) / 26;
     }
 
-    luaEffects.push_back(std::make_shared<Effect>(std::make_unique<LuaEffect>(sliderName, *this), "Lua " + sliderName, "lua" + sliderName));
+    luaEffects.push_back(std::make_shared<Effect>(std::make_shared<LuaEffect>(sliderName, *this), "Lua " + sliderName, "lua" + sliderName));
 }
 
 // effectsLock should be held when calling this
@@ -288,12 +294,12 @@ void OscirenderAudioProcessor::openFile(int index) {
 void OscirenderAudioProcessor::changeCurrentFile(int index) {
     if (index == -1) {
         currentFile = -1;
-        producer->setSource(std::make_shared<FileParser>(), -1);
+        producer.setSource(std::make_shared<FileParser>(), -1);
     }
 	if (index < 0 || index >= fileBlocks.size()) {
 		return;
 	}
-	producer->setSource(parsers[index], index);
+	producer.setSource(parsers[index], index);
     currentFile = index;
 	invalidateFrameBuffer = true;
     updateLuaValues();
@@ -363,8 +369,6 @@ void OscirenderAudioProcessor::updateFrame() {
 
             frameLength = Shape::totalLength(frame);
         }
-    } else {
-        DBG("frame not ready!");
     }
 }
 

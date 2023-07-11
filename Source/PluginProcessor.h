@@ -17,6 +17,7 @@
 #include <numbers>
 #include "concurrency/BufferProducer.h"
 #include "audio/AudioWebSocketServer.h"
+#include "audio/DelayEffect.h"
 
 //==============================================================================
 /**
@@ -77,7 +78,7 @@ public:
     std::vector<std::shared_ptr<Effect>> luaEffects;
 
     // TODO see if there is a way to move this code to .cpp
-    std::function<Vector2(int, Vector2, double, double, int)> onRotationChange = [this](int index, Vector2 input, double value, double frequency, double sampleRate) {
+    std::function<Vector2(int, Vector2, std::vector<EffectDetails>, double, int)> onRotationChange = [this](int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) {
         if (getCurrentFileIndex() != -1) {
             auto obj = getCurrentFileParser()->getObject();
             if (obj == nullptr) return input;
@@ -91,11 +92,11 @@ public:
     };
     
     Effect focalLength{
-        [this](int index, Vector2 input, double value, double frequency, double sampleRate) {
+        [this](int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
                 auto camera = getCurrentFileParser()->getCamera();
                 if (camera == nullptr) return input;
-                camera->setFocalLength(value);
+                camera->setFocalLength(details[0].value);
             }
             return input;
 		},
@@ -107,11 +108,11 @@ public:
     Effect rotateY{onRotationChange, "Rotate y", "rotateY", 1};
     Effect rotateZ{onRotationChange, "Rotate z", "rotateZ", 0};
     Effect currentRotateX{
-        [this](int index, Vector2 input, double value, double frequency, double sampleRate) {
+        [this](int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
                 auto obj = getCurrentFileParser()->getObject();
                 if (obj == nullptr) return input;
-                obj->setCurrentRotationX(value * std::numbers::pi);
+                obj->setCurrentRotationX(details[0].value * std::numbers::pi);
             }
             return input;
         },
@@ -120,11 +121,11 @@ public:
         0
     };
     Effect currentRotateY{
-        [this](int index, Vector2 input, double value, double frequency, double sampleRate) {
+        [this](int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
                 auto obj = getCurrentFileParser()->getObject();
                 if (obj == nullptr) return input;
-                obj->setCurrentRotationY(value * std::numbers::pi);
+                obj->setCurrentRotationY(details[0].value * std::numbers::pi);
             }
             return input;
         },
@@ -133,24 +134,24 @@ public:
         0
     };
     Effect currentRotateZ{
-        [this](int index, Vector2 input, double value, double frequency, double sampleRate) {
+        [this](int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
                 auto obj = getCurrentFileParser()->getObject();
                 if (obj == nullptr) return input;
-                obj->setCurrentRotationZ(value * std::numbers::pi);
+                obj->setCurrentRotationZ(details[0].value * std::numbers::pi);
             }
             return input;
-    },
+        },
         "Current Rotate z",
         "currentRotateZ",
         0
     };
     Effect rotateSpeed{
-        [this](int index, Vector2 input, double value, double frequency, double sampleRate) {
+        [this](int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
                 auto obj = getCurrentFileParser()->getObject();
                 if (obj == nullptr) return input;
-                obj->setRotationSpeed(value);
+                obj->setRotationSpeed(details[0].value);
             }
             return input;
 		},
@@ -161,6 +162,8 @@ public:
     std::atomic<bool> fixedRotateX = false;
     std::atomic<bool> fixedRotateY = false;
     std::atomic<bool> fixedRotateZ = false;
+
+    std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
     
     juce::SpinLock parsersLock;
     std::vector<std::shared_ptr<FileParser>> parsers;
@@ -168,7 +171,7 @@ public:
     std::vector<juce::String> fileNames;
     std::atomic<int> currentFile = -1;
     
-    std::unique_ptr<FrameProducer> producer;
+    FrameProducer producer = FrameProducer(*this, std::make_shared<FileParser>());
 
     BufferProducer audioProducer;
 
@@ -207,7 +210,7 @@ private:
     bool invalidateFrameBuffer = false;
 
     std::shared_ptr<Effect> traceMax = std::make_shared<Effect>(
-        [this](int index, Vector2 input, double value, double frequency, double sampleRate) {
+        [this](int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) {
             traceMaxEnabled = true;
             return input;
         },
@@ -216,7 +219,7 @@ private:
         1
     );
     std::shared_ptr<Effect> traceMin = std::make_shared<Effect>(
-        [this](int index, Vector2 input, double value, double frequency, double sampleRate) {
+        [this](int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) {
             traceMinEnabled = true;
             return input;
         },

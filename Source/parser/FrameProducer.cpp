@@ -8,13 +8,16 @@ FrameProducer::~FrameProducer() {
 }
 
 void FrameProducer::run() {
-	while (!threadShouldExit() && frameSource->isActive()) {
+	while (!threadShouldExit()) {
+		// this lock is needed so that frameSource isn't deleted whilst nextFrame() is being called
+		juce::SpinLock::ScopedLockType scope(lock);
 		frameConsumer.addFrame(frameSource->nextFrame(), sourceFileIndex);
 	}
 }
 
 void FrameProducer::setSource(std::shared_ptr<FrameSource> source, int fileIndex) {
-	// TODO: should make this atomic
+	juce::SpinLock::ScopedLockType scope(lock);
+	frameSource->disable();
 	frameSource = source;
 	sourceFileIndex = fileIndex;
 }
