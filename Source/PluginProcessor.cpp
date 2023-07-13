@@ -42,6 +42,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     allEffects.push_back(std::make_shared<Effect>(std::make_shared<DistortEffect>(true), "Vertical shift", "verticalDistort"));
     allEffects.push_back(std::make_shared<Effect>(std::make_shared<DistortEffect>(false), "Horizontal shift", "horizontalDistort"));
     allEffects.push_back(std::make_shared<Effect>(std::make_shared<SmoothEffect>(), "Smoothing", "smoothing"));
+    allEffects.push_back(std::make_shared<Effect>(wobbleEffect, "Wobble", "wobble"));
     allEffects.push_back(std::make_shared<Effect>(
         delayEffect,
         std::vector<EffectDetails>{
@@ -57,18 +58,13 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     }
 }
 
-OscirenderAudioProcessor::~OscirenderAudioProcessor()
-{
-}
+OscirenderAudioProcessor::~OscirenderAudioProcessor() {}
 
-//==============================================================================
-const juce::String OscirenderAudioProcessor::getName() const
-{
+const juce::String OscirenderAudioProcessor::getName() const {
     return JucePlugin_Name;
 }
 
-bool OscirenderAudioProcessor::acceptsMidi() const
-{
+bool OscirenderAudioProcessor::acceptsMidi() const {
    #if JucePlugin_WantsMidiInput
     return true;
    #else
@@ -76,8 +72,7 @@ bool OscirenderAudioProcessor::acceptsMidi() const
    #endif
 }
 
-bool OscirenderAudioProcessor::producesMidi() const
-{
+bool OscirenderAudioProcessor::producesMidi() const {
    #if JucePlugin_ProducesMidiOutput
     return true;
    #else
@@ -85,8 +80,7 @@ bool OscirenderAudioProcessor::producesMidi() const
    #endif
 }
 
-bool OscirenderAudioProcessor::isMidiEffect() const
-{
+bool OscirenderAudioProcessor::isMidiEffect() const {
    #if JucePlugin_IsMidiEffect
     return true;
    #else
@@ -94,43 +88,35 @@ bool OscirenderAudioProcessor::isMidiEffect() const
    #endif
 }
 
-double OscirenderAudioProcessor::getTailLengthSeconds() const
-{
+double OscirenderAudioProcessor::getTailLengthSeconds() const {
     return 0.0;
 }
 
-int OscirenderAudioProcessor::getNumPrograms()
-{
+int OscirenderAudioProcessor::getNumPrograms() {
     return 1;   // NB: some hosts don't cope very well if you tell them there are 0 programs,
                 // so this should be at least 1, even if you're not really implementing programs.
 }
 
-int OscirenderAudioProcessor::getCurrentProgram()
-{
+int OscirenderAudioProcessor::getCurrentProgram() {
     return 0;
 }
 
-void OscirenderAudioProcessor::setCurrentProgram (int index)
-{
+void OscirenderAudioProcessor::setCurrentProgram(int index) {
 }
 
-const juce::String OscirenderAudioProcessor::getProgramName (int index)
-{
+const juce::String OscirenderAudioProcessor::getProgramName(int index) {
     return {};
 }
 
-void OscirenderAudioProcessor::changeProgramName (int index, const juce::String& newName)
-{
-}
+void OscirenderAudioProcessor::changeProgramName(int index, const juce::String& newName) {}
 
-//==============================================================================
-void OscirenderAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock) {
+void OscirenderAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
 	currentSampleRate = sampleRate;
+    pitchDetector.setSampleRate(sampleRate);
     updateAngleDelta();
 }
 
-void OscirenderAudioProcessor::releaseResources()
-{
+void OscirenderAudioProcessor::releaseResources() {
     // When playback stops, you can use this as an opportunity to free up any
     // spare memory, etc.
 }

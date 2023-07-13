@@ -80,9 +80,19 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 
 	addAndMakeVisible(visualiser);
 	addAndMakeVisible(frequencyLabel);
+
+	callbackIndex = audioProcessor.pitchDetector.addCallback(
+		[this](float frequency) {
+			// round to nearest integer
+			int roundedFrequency = static_cast<int>(frequency + 0.5f);
+			frequencyLabel.setText(juce::String(roundedFrequency) + "Hz", juce::dontSendNotification);
+		}
+	);
 }
 
-MainComponent::~MainComponent() {}
+MainComponent::~MainComponent() {
+	audioProcessor.pitchDetector.removeCallback(callbackIndex);
+}
 
 void MainComponent::updateFileLabel() {
 	if (audioProcessor.getCurrentFileIndex() == -1) {

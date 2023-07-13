@@ -2,7 +2,7 @@
 
 Effect::Effect(std::shared_ptr<EffectApplication> effectApplication, std::vector<EffectDetails> details) : effectApplication(effectApplication), details(details) {}
 
-Effect::Effect(std::function<Vector2(int, Vector2, std::vector<EffectDetails>, double, int)> application, std::vector<EffectDetails> details) : application(application), details(details) {}
+Effect::Effect(std::function<Vector2(int, Vector2, std::vector<EffectDetails>, double)> application, std::vector<EffectDetails> details) : application(application), details(details) {}
 
 Effect::Effect(std::shared_ptr<EffectApplication> effectApplication, juce::String name, juce::String id) {
 	this->effectApplication = effectApplication;
@@ -17,16 +17,16 @@ Effect::Effect(juce::String name, juce::String id) {
 	details = std::vector<EffectDetails>(1, EffectDetails{name, id, 0.0});
 }
 
-Effect::Effect(std::function<Vector2(int, Vector2, std::vector<EffectDetails> values, double, int)> application, juce::String name, juce::String id, double value) {
+Effect::Effect(std::function<Vector2(int, Vector2, std::vector<EffectDetails> values, double)> application, juce::String name, juce::String id, double value) {
 	details = std::vector<EffectDetails>(1, EffectDetails{name, id, value});
 	this->application = application;
 };
 
 Vector2 Effect::apply(int index, Vector2 input) {
 	if (application) {
-		return application(index, input, details, frequency, sampleRate);
+		return application(index, input, details, sampleRate);
 	} else if (effectApplication != nullptr) {
-		return effectApplication->apply(index, input, details, frequency, sampleRate);
+		return effectApplication->apply(index, input, details, sampleRate);
 	}
 	return input;
 }
@@ -53,10 +53,6 @@ void Effect::setValue(int index, double value) {
 
 void Effect::setValue(double value) {
 	setValue(0, value);
-}
-
-void Effect::setFrequency(double frequency) {
-	this->frequency = frequency;
 }
 
 int Effect::getPrecedence() {

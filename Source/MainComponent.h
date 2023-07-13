@@ -31,15 +31,7 @@ private:
 	VisualiserComponent visualiser{2, audioProcessor};
 
 	juce::Label frequencyLabel;
-	PitchDetector pitchDetector{
-		audioProcessor,
-		[this](float frequency) {
-			// round to nearest integer
-			int roundedFrequency = static_cast<int>(frequency + 0.5f);
-			frequencyLabel.setText(juce::String(roundedFrequency) + "Hz", juce::dontSendNotification);
-
-        }
-	};
+	int callbackIndex = -1;
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };
