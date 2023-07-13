@@ -4,7 +4,7 @@ BulgeEffect::BulgeEffect() {}
 
 BulgeEffect::~BulgeEffect() {}
 
-Vector2 BulgeEffect::apply(int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) {
+Vector2 BulgeEffect::apply(int index, Vector2 input, std::vector<EffectDetails> details, double sampleRate) {
     double value = details[0].value;
     double translatedBulge = -value + 1;
 

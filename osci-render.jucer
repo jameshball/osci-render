@@ -63,6 +63,9 @@
               file="Source/audio/VectorCancellingEffect.cpp"/>
         <FILE id="Be21D0" name="VectorCancellingEffect.h" compile="0" resource="0"
               file="Source/audio/VectorCancellingEffect.h"/>
+        <FILE id="emm2Cy" name="WobbleEffect.cpp" compile="1" resource="0"
+              file="Source/audio/WobbleEffect.cpp"/>
+        <FILE id="sgdTlo" name="WobbleEffect.h" compile="0" resource="0" file="Source/audio/WobbleEffect.h"/>
       </GROUP>
       <GROUP id="{2A41BAF3-5E83-B018-5668-39D89ABFA00C}" name="chinese_postman">
         <FILE id="LcDpwe" name="BinaryHeap.cpp" compile="1" resource="0" file="Source/chinese_postman/BinaryHeap.cpp"/>

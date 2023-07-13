@@ -7,7 +7,7 @@ public:
 	DelayEffect();
 	~DelayEffect();
 
-	Vector2 apply(int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) override;
+	Vector2 apply(int index, Vector2 input, std::vector<EffectDetails> details, double sampleRate) override;
 
 private:
 	const static int MAX_DELAY = 192000 * 10;

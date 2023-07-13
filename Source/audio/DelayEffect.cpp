@@ -4,7 +4,7 @@ DelayEffect::DelayEffect() {}
 
 DelayEffect::~DelayEffect() {}
 
-Vector2 DelayEffect::apply(int index, Vector2 vector, std::vector<EffectDetails> details, double frequency, double sampleRate) {
+Vector2 DelayEffect::apply(int index, Vector2 vector, std::vector<EffectDetails> details, double sampleRate) {
     double decay = details[0].value;
     double decayLength = details[1].value;
 	int delayBufferLength = (int)(sampleRate * decayLength);

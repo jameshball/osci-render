@@ -8,7 +8,7 @@ class LuaEffect : public EffectApplication {
 public:
 	LuaEffect(juce::String name, OscirenderAudioProcessor& p) : audioProcessor(p), name(name) {};
 
-	Vector2 apply(int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) override;
+	Vector2 apply(int index, Vector2 input, std::vector<EffectDetails> details, double sampleRate) override;
 private:
 	OscirenderAudioProcessor& audioProcessor;
 	juce::String name;

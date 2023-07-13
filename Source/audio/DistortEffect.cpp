@@ -4,7 +4,7 @@ DistortEffect::DistortEffect(bool vertical) : vertical(vertical) {}
 
 DistortEffect::~DistortEffect() {}
 
-Vector2 DistortEffect::apply(int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) {
+Vector2 DistortEffect::apply(int index, Vector2 input, std::vector<EffectDetails> details, double sampleRate) {
 	double value = details[0].value;
 	int vertical = (int)this->vertical;
 	if (index % 2 == 0) {

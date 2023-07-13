@@ -12,7 +12,7 @@ class EffectApplication {
 public:
 	EffectApplication() {};
 
-	virtual Vector2 apply(int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) = 0;
+	virtual Vector2 apply(int index, Vector2 input, std::vector<EffectDetails> details, double sampleRate) = 0;
 	
 	void resetPhase();
 	double nextPhase(double frequency, double sampleRate);

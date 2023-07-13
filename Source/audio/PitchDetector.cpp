@@ -1,17 +1,17 @@
 #include "PitchDetector.h"
 #include "PitchDetector.h"
 
-PitchDetector::PitchDetector(OscirenderAudioProcessor& p, std::function<void(float)> frequencyCallback) : juce::Thread("PitchDetector"), audioProcessor(p), frequencyCallback(frequencyCallback) {
+PitchDetector::PitchDetector(BufferProducer& producer) : juce::Thread("PitchDetector"), producer(producer) {
     startThread();
 }
 
 PitchDetector::~PitchDetector() {
-    audioProcessor.audioProducer.unregisterConsumer(consumer);
+    producer.unregisterConsumer(consumer);
     stopThread(1000);
 }
 
 void PitchDetector::run() {
-    audioProcessor.audioProducer.registerConsumer(consumer);
+    producer.registerConsumer(consumer);
 
 	while (!threadShouldExit()) {
 		auto buffer = consumer->startProcessing();
@@ -44,10 +44,28 @@ void PitchDetector::run() {
 }
 
 void PitchDetector::handleAsyncUpdate() {
-    frequencyCallback(frequency);
+    juce::SpinLock::ScopedLockType scope(lock);
+    for (auto& callback : callbacks) {
+        callback(frequency);
+    }
+}
+
+int PitchDetector::addCallback(std::function<void(float)> callback) {
+    juce::SpinLock::ScopedLockType scope(lock);
+    callbacks.push_back(callback);
+    return callbacks.size() - 1;
+}
+
+void PitchDetector::removeCallback(int index) {
+    juce::SpinLock::ScopedLockType scope(lock);
+    callbacks.erase(callbacks.begin() + index);
+}
+
+void PitchDetector::setSampleRate(float sampleRate) {
+    this->sampleRate = sampleRate;
 }
 
 float PitchDetector::frequencyFromIndex(int index) {
-    auto binWidth = audioProcessor.currentSampleRate / fftSize;
+    auto binWidth = sampleRate / fftSize;
     return index * binWidth;
 }

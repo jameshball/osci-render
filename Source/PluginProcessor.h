@@ -18,6 +18,8 @@
 #include "concurrency/BufferProducer.h"
 #include "audio/AudioWebSocketServer.h"
 #include "audio/DelayEffect.h"
+#include "audio/PitchDetector.h"
+#include "audio/WobbleEffect.h"
 
 //==============================================================================
 /**
@@ -78,7 +80,7 @@ public:
     std::vector<std::shared_ptr<Effect>> luaEffects;
 
     // TODO see if there is a way to move this code to .cpp
-    std::function<Vector2(int, Vector2, std::vector<EffectDetails>, double, int)> onRotationChange = [this](int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) {
+    std::function<Vector2(int, Vector2, std::vector<EffectDetails>, double)> onRotationChange = [this](int index, Vector2 input, std::vector<EffectDetails> details, double sampleRate) {
         if (getCurrentFileIndex() != -1) {
             auto obj = getCurrentFileParser()->getObject();
             if (obj == nullptr) return input;
@@ -92,7 +94,7 @@ public:
     };
     
     Effect focalLength{
-        [this](int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) {
+        [this](int index, Vector2 input, std::vector<EffectDetails> details, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
                 auto camera = getCurrentFileParser()->getCamera();
                 if (camera == nullptr) return input;
@@ -108,7 +110,7 @@ public:
     Effect rotateY{onRotationChange, "Rotate y", "rotateY", 1};
     Effect rotateZ{onRotationChange, "Rotate z", "rotateZ", 0};
     Effect currentRotateX{
-        [this](int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) {
+        [this](int index, Vector2 input, std::vector<EffectDetails> details, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
                 auto obj = getCurrentFileParser()->getObject();
                 if (obj == nullptr) return input;
@@ -121,7 +123,7 @@ public:
         0
     };
     Effect currentRotateY{
-        [this](int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) {
+        [this](int index, Vector2 input, std::vector<EffectDetails> details, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
                 auto obj = getCurrentFileParser()->getObject();
                 if (obj == nullptr) return input;
@@ -134,7 +136,7 @@ public:
         0
     };
     Effect currentRotateZ{
-        [this](int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) {
+        [this](int index, Vector2 input, std::vector<EffectDetails> details, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
                 auto obj = getCurrentFileParser()->getObject();
                 if (obj == nullptr) return input;
@@ -147,7 +149,7 @@ public:
         0
     };
     Effect rotateSpeed{
-        [this](int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) {
+        [this](int index, Vector2 input, std::vector<EffectDetails> details, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
                 auto obj = getCurrentFileParser()->getObject();
                 if (obj == nullptr) return input;
@@ -174,6 +176,9 @@ public:
     FrameProducer producer = FrameProducer(*this, std::make_shared<FileParser>());
 
     BufferProducer audioProducer;
+
+    PitchDetector pitchDetector{audioProducer};
+    std::shared_ptr<WobbleEffect> wobbleEffect = std::make_shared<WobbleEffect>(pitchDetector);
 
     void addLuaSlider();
     void updateAngleDelta();
@@ -210,7 +215,7 @@ private:
     bool invalidateFrameBuffer = false;
 
     std::shared_ptr<Effect> traceMax = std::make_shared<Effect>(
-        [this](int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) {
+        [this](int index, Vector2 input, std::vector<EffectDetails> details, double sampleRate) {
             traceMaxEnabled = true;
             return input;
         },
@@ -219,7 +224,7 @@ private:
         1
     );
     std::shared_ptr<Effect> traceMin = std::make_shared<Effect>(
-        [this](int index, Vector2 input, std::vector<EffectDetails> details, double frequency, double sampleRate) {
+        [this](int index, Vector2 input, std::vector<EffectDetails> details, double sampleRate) {
             traceMinEnabled = true;
             return input;
         },
