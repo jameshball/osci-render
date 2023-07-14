@@ -35,23 +35,32 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     
     juce::SpinLock::ScopedLockType lock(effectsLock);
 
-    allEffects.push_back(std::make_shared<Effect>(std::make_shared<BitCrushEffect>(), "Bit Crush", "bitCrush"));
-    allEffects.push_back(std::make_shared<Effect>(std::make_shared<BulgeEffect>(), "Bulge", "bulge"));
-    allEffects.push_back(std::make_shared<Effect>(std::make_shared<RotateEffect>(), "2D Rotate Speed", "rotateSpeed"));
-    allEffects.push_back(std::make_shared<Effect>(std::make_shared<VectorCancellingEffect>(), "Vector cancelling", "vectorCancelling"));
-    allEffects.push_back(std::make_shared<Effect>(std::make_shared<DistortEffect>(true), "Vertical shift", "verticalDistort"));
-    allEffects.push_back(std::make_shared<Effect>(std::make_shared<DistortEffect>(false), "Horizontal shift", "horizontalDistort"));
-    allEffects.push_back(std::make_shared<Effect>(std::make_shared<SmoothEffect>(), "Smoothing", "smoothing"));
-    allEffects.push_back(std::make_shared<Effect>(wobbleEffect, "Wobble", "wobble"));
+    allEffects.push_back(std::make_shared<Effect>(std::make_shared<BitCrushEffect>(), "Bit Crush", "bitCrush", true));
+    allEffects.push_back(std::make_shared<Effect>(std::make_shared<BulgeEffect>(), "Bulge", "bulge", true));
+    allEffects.push_back(std::make_shared<Effect>(std::make_shared<RotateEffect>(), "2D Rotate Speed", "rotateSpeed", true));
+    allEffects.push_back(std::make_shared<Effect>(std::make_shared<VectorCancellingEffect>(), "Vector cancelling", "vectorCancelling", true));
+    allEffects.push_back(std::make_shared<Effect>(std::make_shared<DistortEffect>(true), "Vertical shift", "verticalDistort", true));
+    allEffects.push_back(std::make_shared<Effect>(std::make_shared<DistortEffect>(false), "Horizontal shift", "horizontalDistort", true));
+    allEffects.push_back(std::make_shared<Effect>(std::make_shared<SmoothEffect>(), "Smoothing", "smoothing", true));
+    allEffects.push_back(std::make_shared<Effect>(wobbleEffect, "Wobble", "wobble", true));
     allEffects.push_back(std::make_shared<Effect>(
         delayEffect,
         std::vector<EffectDetails>{
             EffectDetails{ "Delay Decay", "delayDecay", 0 },
             EffectDetails{ "Delay Length", "delayEchoLength", 0.5 }
-        }
+        }, true
     ));
     allEffects.push_back(traceMax);
     allEffects.push_back(traceMin);
+
+    permanentEffects.push_back(frequencyEffect);
+    permanentEffects.push_back(volumeEffect);
+    permanentEffects.push_back(thresholdEffect);
+    permanentEffects.push_back(rotateSpeed);
+    permanentEffects.push_back(rotateX);
+    permanentEffects.push_back(rotateY);
+    permanentEffects.push_back(rotateZ);
+    permanentEffects.push_back(focalLength);
 
     for (int i = 0; i < 5; i++) {
         addLuaSlider();
@@ -113,7 +122,6 @@ void OscirenderAudioProcessor::changeProgramName(int index, const juce::String& 
 void OscirenderAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
 	currentSampleRate = sampleRate;
     pitchDetector.setSampleRate(sampleRate);
-    updateAngleDelta();
 }
 
 void OscirenderAudioProcessor::releaseResources() {
@@ -158,7 +166,7 @@ void OscirenderAudioProcessor::addLuaSlider() {
         sliderNum = (sliderNum - mod) / 26;
     }
 
-    luaEffects.push_back(std::make_shared<Effect>(std::make_shared<LuaEffect>(sliderName, *this), "Lua " + sliderName, "lua" + sliderName));
+    luaEffects.push_back(std::make_shared<Effect>(std::make_shared<LuaEffect>(sliderName, *this), "Lua " + sliderName, "lua" + sliderName, false));
 }
 
 // effectsLock should be held when calling this
@@ -170,14 +178,11 @@ void OscirenderAudioProcessor::updateLuaValues() {
 
 // parsersLock should be held when calling this
 void OscirenderAudioProcessor::updateObjValues() {
-    focalLength.apply();
-    rotateX.apply();
-    rotateSpeed.apply();
-}
-
-void OscirenderAudioProcessor::updateAngleDelta() {
-	auto cyclesPerSample = frequency / currentSampleRate;
-	thetaDelta = cyclesPerSample * 2.0 * juce::MathConstants<double>::pi;
+    focalLength->apply();
+    rotateX->apply();
+    rotateY->apply();
+    rotateZ->apply();
+    rotateSpeed->apply();
 }
 
 // effectsLock MUST be held when calling this
@@ -365,7 +370,7 @@ void OscirenderAudioProcessor::updateLengthIncrement() {
     lengthIncrement = juce::jmax(proportionalLength / (currentSampleRate / frequency), MIN_LENGTH_INCREMENT);
 }
 
-void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
+void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels  = getTotalNumInputChannels();
@@ -429,6 +434,9 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
             for (auto& effect : enabledEffects) {
                 channels = effect->apply(sample, channels);
             }
+            for (auto& effect : permanentEffects) {
+                channels = effect->apply(sample, channels);
+            }
         }
 
 		x = channels.x;
@@ -450,8 +458,8 @@ void OscirenderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
         audioProducer.write(x, y);
 
-        actualTraceMax = juce::jmax(actualTraceMin + MIN_TRACE, juce::jmin(traceMax->getValue(), 1.0));
-        actualTraceMin = juce::jmax(MIN_TRACE, juce::jmin(traceMin->getValue(), actualTraceMax - MIN_TRACE));
+        actualTraceMax = juce::jmax(actualTraceMin + MIN_TRACE, juce::jmin(traceMaxValue, 1.0));
+        actualTraceMin = juce::jmax(MIN_TRACE, juce::jmin(traceMinValue, actualTraceMax - MIN_TRACE));
         
         if (!renderingSample) {
             incrementShapeDrawing();

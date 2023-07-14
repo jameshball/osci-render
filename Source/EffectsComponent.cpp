@@ -10,13 +10,10 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p) : audioProcessor
 
     frequency.slider.setSkewFactorFromMidPoint(500.0);
     frequency.slider.setTextValueSuffix("Hz");
-    frequency.slider.setValue(audioProcessor.frequency, juce::dontSendNotification);
+    frequency.slider.setValue(audioProcessor.frequencyEffect->getValue(), juce::dontSendNotification);
 
     frequency.slider.onValueChange = [this] {
-        audioProcessor.frequency = frequency.slider.getValue();
-        if (audioProcessor.currentSampleRate > 0.0) {
-            audioProcessor.updateAngleDelta();
-        }
+        audioProcessor.frequencyEffect->setValue(frequency.slider.getValue());
     };
 
     {

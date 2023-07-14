@@ -1,32 +1,44 @@
 #include "Effect.h"
 
-Effect::Effect(std::shared_ptr<EffectApplication> effectApplication, std::vector<EffectDetails> details) : effectApplication(effectApplication), details(details) {}
+Effect::Effect(std::shared_ptr<EffectApplication> effectApplication, std::vector<EffectDetails> details, bool smoothValueChange) : effectApplication(effectApplication), details(details), smoothValueChange(smoothValueChange) {
+	smoothValues = std::vector<double>(details.size(), 0.0);
+}
 
-Effect::Effect(std::function<Vector2(int, Vector2, std::vector<EffectDetails>, double)> application, std::vector<EffectDetails> details) : application(application), details(details) {}
+Effect::Effect(std::function<Vector2(int, Vector2, const std::vector<double>&, double)> application, std::vector<EffectDetails> details, bool smoothValueChange) : application(application), details(details), smoothValueChange(smoothValueChange) {
+	smoothValues = std::vector<double>(details.size(), 0.0);
+}
 
-Effect::Effect(std::shared_ptr<EffectApplication> effectApplication, juce::String name, juce::String id) {
+Effect::Effect(std::shared_ptr<EffectApplication> effectApplication, juce::String name, juce::String id, bool smoothValueChange) : smoothValueChange(smoothValueChange) {
 	this->effectApplication = effectApplication;
     details = std::vector<EffectDetails>(1, EffectDetails{name, id, 0.0});
+	smoothValues = std::vector<double>(details.size(), 0.0);
 }
 
-Effect::Effect(juce::String name, juce::String id, double value) {
+Effect::Effect(juce::String name, juce::String id, double value, bool smoothValueChange) : smoothValueChange(smoothValueChange) {
 	details = std::vector<EffectDetails>(1, EffectDetails{name, id, value});
+	smoothValues = std::vector<double>(details.size(), 0.0);
 }
 
-Effect::Effect(juce::String name, juce::String id) {
+Effect::Effect(juce::String name, juce::String id, bool smoothValueChange) : smoothValueChange(smoothValueChange) {
 	details = std::vector<EffectDetails>(1, EffectDetails{name, id, 0.0});
+	smoothValues = std::vector<double>(details.size(), 0.0);
 }
 
-Effect::Effect(std::function<Vector2(int, Vector2, std::vector<EffectDetails> values, double)> application, juce::String name, juce::String id, double value) {
+Effect::Effect(std::function<Vector2(int, Vector2, const std::vector<double>& values, double)> application, juce::String name, juce::String id, double value, bool smoothValueChange) : smoothValueChange(smoothValueChange) {
 	details = std::vector<EffectDetails>(1, EffectDetails{name, id, value});
+	smoothValues = std::vector<double>(details.size(), 0.0);
 	this->application = application;
 };
 
 Vector2 Effect::apply(int index, Vector2 input) {
+	double weight = smoothValueChange ? 0.0005 : 1.0;
+	for (int i = 0; i < details.size(); i++) {
+        smoothValues[i] = (1.0 - weight) * smoothValues[i] + weight * details[i].value;
+    }
 	if (application) {
-		return application(index, input, details, sampleRate);
+		return application(index, input, smoothValues, sampleRate);
 	} else if (effectApplication != nullptr) {
-		return effectApplication->apply(index, input, details, sampleRate);
+		return effectApplication->apply(index, input, smoothValues, sampleRate);
 	}
 	return input;
 }

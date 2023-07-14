@@ -207,10 +207,16 @@ WorldObject::WorldObject(std::string obj_string) {
     }
 }
 
-void WorldObject::setBaseRotation(double x, double y, double z) {
+void WorldObject::setBaseRotationX(double x) {
     baseRotateX = x;
-	baseRotateY = y;
-	baseRotateZ = z;
+}
+
+void WorldObject::setBaseRotationY(double y) {
+    baseRotateY = y;
+}
+
+void WorldObject::setBaseRotationZ(double z) {
+    baseRotateZ = z;
 }
 
 void WorldObject::setCurrentRotationX(double x) {

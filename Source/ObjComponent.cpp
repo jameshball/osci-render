@@ -16,8 +16,8 @@ ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 
 	focalLength.slider.onValueChange = [this] {
 		juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
-		audioProcessor.focalLength.setValue(focalLength.slider.getValue());
-		audioProcessor.focalLength.apply();
+		audioProcessor.focalLength->setValue(focalLength.slider.getValue());
+		audioProcessor.focalLength->apply();
 	};
 
 	auto onRotationChange = [this]() {
@@ -25,23 +25,21 @@ ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 		double x = fixedRotateX->getToggleState() ? 0 : rotateX.slider.getValue();
 		double y = fixedRotateY->getToggleState() ? 0 : rotateY.slider.getValue();
 		double z = fixedRotateZ->getToggleState() ? 0 : rotateZ.slider.getValue();
-		audioProcessor.rotateX.setValue(x);
-		audioProcessor.rotateY.setValue(y);
-		audioProcessor.rotateZ.setValue(z);
-		// all the rotate apply functions are the same
-		audioProcessor.rotateX.apply();
+		audioProcessor.rotateX->setValue(x);
+		audioProcessor.rotateY->setValue(y);
+		audioProcessor.rotateZ->setValue(z);
 
 		if (fixedRotateX->getToggleState()) {
-			audioProcessor.currentRotateX.setValue(rotateX.slider.getValue());
-			audioProcessor.currentRotateX.apply();
+			audioProcessor.currentRotateX->setValue(rotateX.slider.getValue());
+			audioProcessor.currentRotateX->apply();
 		}
 		if (fixedRotateY->getToggleState()) {
-			audioProcessor.currentRotateY.setValue(rotateY.slider.getValue());
-			audioProcessor.currentRotateY.apply();
+			audioProcessor.currentRotateY->setValue(rotateY.slider.getValue());
+			audioProcessor.currentRotateY->apply();
 		}
 		if (fixedRotateZ->getToggleState()) {
-			audioProcessor.currentRotateZ.setValue(rotateZ.slider.getValue());
-			audioProcessor.currentRotateZ.apply();
+			audioProcessor.currentRotateZ->setValue(rotateZ.slider.getValue());
+			audioProcessor.currentRotateZ->apply();
 		}
 
 		audioProcessor.fixedRotateX = fixedRotateX->getToggleState();
@@ -55,8 +53,8 @@ ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 
 	rotateSpeed.slider.onValueChange = [this] {
 		juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
-		audioProcessor.rotateSpeed.setValue(rotateSpeed.slider.getValue());
-		audioProcessor.rotateSpeed.apply();
+		audioProcessor.rotateSpeed->setValue(rotateSpeed.slider.getValue());
+		audioProcessor.rotateSpeed->apply();
 	};
 
 	addAndMakeVisible(resetRotation);
@@ -75,12 +73,12 @@ ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 		mouseRotate.setToggleState(false, juce::NotificationType::dontSendNotification);
 
 		juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
-		audioProcessor.currentRotateX.setValue(0);
-		audioProcessor.currentRotateY.setValue(0);
-		audioProcessor.currentRotateZ.setValue(0);
-		audioProcessor.currentRotateX.apply();
-		audioProcessor.currentRotateY.apply();
-		audioProcessor.currentRotateZ.apply();
+		audioProcessor.currentRotateX->setValue(0);
+		audioProcessor.currentRotateY->setValue(0);
+		audioProcessor.currentRotateZ->setValue(0);
+		audioProcessor.currentRotateX->apply();
+		audioProcessor.currentRotateY->apply();
+		audioProcessor.currentRotateZ->apply();
 	};
 
 	auto doc = juce::XmlDocument::parse(BinaryData::fixed_rotate_svg);

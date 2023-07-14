@@ -4,11 +4,11 @@ WobbleEffect::WobbleEffect(PitchDetector& pitchDetector) : pitchDetector(pitchDe
 
 WobbleEffect::~WobbleEffect() {}
 
-Vector2 WobbleEffect::apply(int index, Vector2 input, std::vector<EffectDetails> details, double sampleRate) {
+Vector2 WobbleEffect::apply(int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
     // TODO: this doesn't consider sample rate
     smoothedFrequency = smoothedFrequency * 0.99995 + pitchDetector.frequency * 0.00005;
     double theta = nextPhase(smoothedFrequency, sampleRate);
-    double delta = details[0].value * std::sin(theta);
+    double delta = values[0] * std::sin(theta);
     double x = input.x + delta;
     double y = input.y + delta;
 
