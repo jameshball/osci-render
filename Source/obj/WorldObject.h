@@ -6,7 +6,9 @@ class WorldObject {
 public:
 	WorldObject(std::string);
     
-    void setBaseRotation(double x, double y, double z);
+    void setBaseRotationX(double x);
+    void setBaseRotationY(double y);
+    void setBaseRotationZ(double z);
     void setCurrentRotationX(double x);
     void setCurrentRotationY(double y);
     void setCurrentRotationZ(double z);

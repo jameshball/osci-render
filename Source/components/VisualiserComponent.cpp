@@ -33,10 +33,12 @@ void VisualiserComponent::paint(juce::Graphics& g) {
 
     g.setColour(waveformColour);
     juce::SpinLock::ScopedLockType scope(lock);
-    paintXY(g, r.removeFromRight(r.getHeight()));
+    if (buffer.size() > 0) {
+        paintXY(g, r.removeFromRight(r.getHeight()));
 
-    for (int i = 0; i < numChannels; ++i) {
-        paintChannel(g, r.removeFromTop(channelHeight), i);
+        for (int i = 0; i < numChannels; ++i) {
+            paintChannel(g, r.removeFromTop(channelHeight), i);
+        }
     }
 }
 

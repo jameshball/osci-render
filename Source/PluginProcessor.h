@@ -68,10 +68,6 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
-	std::atomic<float> frequency = 440.0f;
-    std::atomic<double> volume = 1.0;
-    std::atomic<double> threshold = 1.0;
-
     std::atomic<double> currentSampleRate = 0.0;
 
     juce::SpinLock effectsLock;
@@ -79,88 +75,107 @@ public:
 	std::vector<std::shared_ptr<Effect>> enabledEffects;
     std::vector<std::shared_ptr<Effect>> luaEffects;
 
-    // TODO see if there is a way to move this code to .cpp
-    std::function<Vector2(int, Vector2, std::vector<EffectDetails>, double)> onRotationChange = [this](int index, Vector2 input, std::vector<EffectDetails> details, double sampleRate) {
-        if (getCurrentFileIndex() != -1) {
-            auto obj = getCurrentFileParser()->getObject();
-            if (obj == nullptr) return input;
-            obj->setBaseRotation(
-                rotateX.getValue() * std::numbers::pi,
-                rotateY.getValue() * std::numbers::pi,
-                rotateZ.getValue() * std::numbers::pi
-            );
-        }
-        return input;
-    };
+    std::shared_ptr<Effect> frequencyEffect = std::make_shared<Effect>(
+        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+            frequency = values[0];
+            return input;
+        }, "Frequency", "frequency", 440
+    );
+
+    std::shared_ptr<Effect> volumeEffect = std::make_shared<Effect>(
+        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+            volume = values[0];
+            return input;
+        }, "Volume", "volume", 1
+    );
+
+    std::shared_ptr<Effect> thresholdEffect = std::make_shared<Effect>(
+        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+            threshold = values[0];
+            return input;
+        }, "Threshold", "threshold", 3
+    );
     
-    Effect focalLength{
-        [this](int index, Vector2 input, std::vector<EffectDetails> details, double sampleRate) {
+    std::shared_ptr<Effect> focalLength = std::make_shared<Effect>(
+        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
                 auto camera = getCurrentFileParser()->getCamera();
                 if (camera == nullptr) return input;
-                camera->setFocalLength(details[0].value);
+                camera->setFocalLength(values[0]);
             }
             return input;
-		},
-        "Focal length",
-        "focalLength",
-        1
-    };
-    Effect rotateX{onRotationChange, "Rotate x", "rotateX", 1};
-    Effect rotateY{onRotationChange, "Rotate y", "rotateY", 1};
-    Effect rotateZ{onRotationChange, "Rotate z", "rotateZ", 0};
-    Effect currentRotateX{
-        [this](int index, Vector2 input, std::vector<EffectDetails> details, double sampleRate) {
+		}, "Focal length", "focalLength", 1
+    );
+    std::shared_ptr<Effect> rotateX = std::make_shared<Effect>(
+        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
                 auto obj = getCurrentFileParser()->getObject();
                 if (obj == nullptr) return input;
-                obj->setCurrentRotationX(details[0].value * std::numbers::pi);
+                obj->setBaseRotationX(values[0] * std::numbers::pi);
             }
             return input;
-        },
-        "Current Rotate x",
-        "currentRotateX",
-        0
-    };
-    Effect currentRotateY{
-        [this](int index, Vector2 input, std::vector<EffectDetails> details, double sampleRate) {
+        }, "Rotate x", "rotateX", 1
+    );
+    std::shared_ptr<Effect> rotateY = std::make_shared<Effect>(
+        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
                 auto obj = getCurrentFileParser()->getObject();
                 if (obj == nullptr) return input;
-                obj->setCurrentRotationY(details[0].value * std::numbers::pi);
+                obj->setBaseRotationY(values[0] * std::numbers::pi);
             }
             return input;
-        },
-        "Current Rotate y",
-        "currentRotateY",
-        0
-    };
-    Effect currentRotateZ{
-        [this](int index, Vector2 input, std::vector<EffectDetails> details, double sampleRate) {
+        }, "Rotate y", "rotateY", 1
+    );
+    std::shared_ptr<Effect> rotateZ = std::make_shared<Effect>(
+        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
                 auto obj = getCurrentFileParser()->getObject();
                 if (obj == nullptr) return input;
-                obj->setCurrentRotationZ(details[0].value * std::numbers::pi);
+                obj->setBaseRotationZ(values[0] * std::numbers::pi);
             }
             return input;
-        },
-        "Current Rotate z",
-        "currentRotateZ",
-        0
-    };
-    Effect rotateSpeed{
-        [this](int index, Vector2 input, std::vector<EffectDetails> details, double sampleRate) {
+        }, "Rotate z", "rotateZ", 0
+    );
+    std::shared_ptr<Effect> currentRotateX = std::make_shared<Effect>(
+        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
                 auto obj = getCurrentFileParser()->getObject();
                 if (obj == nullptr) return input;
-                obj->setRotationSpeed(details[0].value);
+                obj->setCurrentRotationX(values[0] * std::numbers::pi);
             }
             return input;
-		},
-        "Rotate speed",
-        "rotateSpeed",
-        0
-    };
+        }, "Current Rotate x", "currentRotateX", 0, false
+    );
+    std::shared_ptr<Effect> currentRotateY = std::make_shared<Effect>(
+        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+            if (getCurrentFileIndex() != -1) {
+                auto obj = getCurrentFileParser()->getObject();
+                if (obj == nullptr) return input;
+                obj->setCurrentRotationY(values[0] * std::numbers::pi);
+            }
+            return input;
+        }, "Current Rotate y", "currentRotateY", 0, false
+    );
+    std::shared_ptr<Effect> currentRotateZ = std::make_shared<Effect>(
+        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+            if (getCurrentFileIndex() != -1) {
+                auto obj = getCurrentFileParser()->getObject();
+                if (obj == nullptr) return input;
+                obj->setCurrentRotationZ(values[0] * std::numbers::pi);
+            }
+            return input;
+        }, "Current Rotate z", "currentRotateZ", 0, false
+    );
+    std::shared_ptr<Effect> rotateSpeed = std::make_shared<Effect>(
+        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+            if (getCurrentFileIndex() != -1) {
+                auto obj = getCurrentFileParser()->getObject();
+                if (obj == nullptr) return input;
+                obj->setRotationSpeed(values[0]);
+            }
+            return input;
+		}, "Rotate speed", "rotateSpeed", 0
+    );
     std::atomic<bool> fixedRotateX = false;
     std::atomic<bool> fixedRotateY = false;
     std::atomic<bool> fixedRotateZ = false;
@@ -181,7 +196,6 @@ public:
     std::shared_ptr<WobbleEffect> wobbleEffect = std::make_shared<WobbleEffect>(pitchDetector);
 
     void addLuaSlider();
-    void updateAngleDelta();
     void addFrame(std::vector<std::unique_ptr<Shape>> frame, int fileIndex) override;
 	void enableEffect(std::shared_ptr<Effect> effect);
     void disableEffect(std::shared_ptr<Effect> effect);
@@ -198,8 +212,9 @@ public:
     juce::String getFileName(int index);
 	std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
 private:
-    double theta = 0.0;
-    double thetaDelta = 0.0;
+    std::atomic<float> frequency = 440.0f;
+    std::atomic<double> volume = 1.0;
+    std::atomic<double> threshold = 1.0;
 
 	juce::AbstractFifo frameFifo{ 10 };
 	std::vector<std::unique_ptr<Shape>> frameBuffer[10];
@@ -214,27 +229,27 @@ private:
 	double lengthIncrement = 0.0;
     bool invalidateFrameBuffer = false;
 
+    std::vector<std::shared_ptr<Effect>> permanentEffects;
+
     std::shared_ptr<Effect> traceMax = std::make_shared<Effect>(
-        [this](int index, Vector2 input, std::vector<EffectDetails> details, double sampleRate) {
+        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+            traceMaxValue = values[0];
             traceMaxEnabled = true;
             return input;
-        },
-        "Trace max",
-        "traceMax",
-        1
+        }, "Trace max", "traceMax", 1, true
     );
     std::shared_ptr<Effect> traceMin = std::make_shared<Effect>(
-        [this](int index, Vector2 input, std::vector<EffectDetails> details, double sampleRate) {
+        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+            traceMinValue = values[0];
             traceMinEnabled = true;
             return input;
-        },
-        "Trace min",
-        "traceMin",
-        0
+        }, "Trace min", "traceMin", 0, true
     );
     const double MIN_TRACE = 0.005;
-    double actualTraceMax = traceMax->getValue();
-    double actualTraceMin = traceMin->getValue();
+    double traceMaxValue = traceMax->getValue();
+    double traceMinValue = traceMin->getValue();
+    double actualTraceMax = traceMaxValue;
+    double actualTraceMin = traceMinValue;
     bool traceMaxEnabled = false;
     bool traceMinEnabled = false;
 

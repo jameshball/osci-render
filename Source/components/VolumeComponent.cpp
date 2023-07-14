@@ -28,11 +28,11 @@ VolumeComponent::VolumeComponent(OscirenderAudioProcessor& p) : audioProcessor(p
     thresholdSlider.setColour(juce::Slider::ColourIds::thumbColourId, juce::Colours::black);
 
     volumeSlider.onValueChange = [this]() {
-        audioProcessor.volume = volumeSlider.getValue();
+        audioProcessor.volumeEffect->setValue(volumeSlider.getValue());
     };
 
     thresholdSlider.onValueChange = [this]() {
-        audioProcessor.threshold = thresholdSlider.getValue();
+        audioProcessor.thresholdEffect->setValue(thresholdSlider.getValue());
     };
 
     auto doc = juce::XmlDocument::parse(BinaryData::volume_svg);
