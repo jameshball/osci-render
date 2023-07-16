@@ -6,11 +6,10 @@
 
 class EffectComponent : public juce::Component {
 public:
-    EffectComponent(double min, double max, double step, double value, juce::String name, juce::String id);
-    EffectComponent(double min, double max, double step, EffectDetails details);
-    EffectComponent(double min, double max, double step, EffectDetails details, bool checkboxVisible);
-    EffectComponent(double min, double max, double step, Effect& effect);
-    EffectComponent(double min, double max, double step, Effect& effect, bool checkboxVisible);
+    EffectComponent(EffectDetails details);
+    EffectComponent(EffectDetails details, bool checkboxVisible);
+    EffectComponent(Effect& effect);
+    EffectComponent(Effect& effect, bool checkboxVisible);
     ~EffectComponent();
 
     void resized() override;
@@ -20,8 +19,7 @@ public:
     void setComponent(std::shared_ptr<juce::Component> component);
 
     juce::Slider slider;
-    juce::String id;
-    juce::String name;
+    EffectDetails details;
     juce::ToggleButton selected;
 
 private:

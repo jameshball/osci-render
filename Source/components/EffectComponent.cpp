@@ -1,24 +1,18 @@
 #include "EffectComponent.h"
 
-EffectComponent::EffectComponent(double min, double max, double step, double value, juce::String name, juce::String id) : name(name), id(id) {
+EffectComponent::EffectComponent(EffectDetails details) : details(details) {
     componentSetup();
-	slider.setRange(min, max, step);
-    slider.setValue(value, juce::dontSendNotification);
-}
-
-EffectComponent::EffectComponent(double min, double max, double step, EffectDetails details) : name(details.name), id(details.id) {
-    componentSetup();
-    slider.setRange(min, max, step);
+    slider.setRange(details.min, details.max, details.step);
     slider.setValue(details.value, juce::dontSendNotification);
 }
 
-EffectComponent::EffectComponent(double min, double max, double step, EffectDetails details, bool checkboxVisible) : EffectComponent(min, max, step, details) {
+EffectComponent::EffectComponent(EffectDetails details, bool checkboxVisible) : EffectComponent(details) {
 	setCheckboxVisible(checkboxVisible);
 }
 
-EffectComponent::EffectComponent(double min, double max, double step, Effect& effect) : EffectComponent(min, max, step, effect.getDetails()[0]) {}
+EffectComponent::EffectComponent(Effect& effect) : EffectComponent(effect.getDetails()[0]) {}
 
-EffectComponent::EffectComponent(double min, double max, double step, Effect& effect, bool checkboxVisible) : EffectComponent(min, max, step, effect) {
+EffectComponent::EffectComponent(Effect& effect, bool checkboxVisible) : EffectComponent(effect) {
     setCheckboxVisible(checkboxVisible);
 }
 
@@ -56,7 +50,7 @@ void EffectComponent::resized() {
 void EffectComponent::paint(juce::Graphics& g) {
     g.fillAll(juce::Colours::black);
     g.setColour(juce::Colours::white);
-    g.drawText(name, textBounds, juce::Justification::left);
+    g.drawText(details.name, textBounds, juce::Justification::left);
 }
 
 void EffectComponent::setComponent(std::shared_ptr<juce::Component> component) {

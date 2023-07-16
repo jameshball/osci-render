@@ -5,7 +5,11 @@
 struct EffectDetails {
 	juce::String name;
 	juce::String id;
-	double value;
+	double value = 0.0;
+	double min = 0.0;
+	double max = 1.0;
+	double step = 0.001;
+	bool smoothValueChange = true;
 };
 
 class EffectApplication {

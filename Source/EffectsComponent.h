@@ -23,7 +23,7 @@ private:
 	EffectsListBoxModel listBoxModel;
 	DraggableListBox listBox;
 	
-	EffectComponent frequency = EffectComponent(0.0, 12000.0, 0.1, *audioProcessor.frequencyEffect, false);
+	EffectComponent frequency = EffectComponent(*audioProcessor.frequencyEffect, false);
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EffectsComponent)
 };
