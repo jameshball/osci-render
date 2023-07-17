@@ -2,26 +2,27 @@
 #include <JuceHeader.h>
 #include "../PluginProcessor.h"
 #include "../audio/Effect.h"
+#include "LabelledTextBox.h"
 
 
 class EffectComponent : public juce::Component {
 public:
-    EffectComponent(double min, double max, double step, double value, juce::String name, juce::String id);
-    EffectComponent(double min, double max, double step, EffectDetails details);
-    EffectComponent(double min, double max, double step, EffectDetails details, bool checkboxVisible);
-    EffectComponent(double min, double max, double step, Effect& effect);
-    EffectComponent(double min, double max, double step, Effect& effect, bool checkboxVisible);
+    EffectComponent(Effect& effect, int index);
+    EffectComponent(Effect& effect, int index, bool checkboxVisible);
+    EffectComponent(Effect& effect);
+    EffectComponent(Effect& effect, bool checkboxVisible);
     ~EffectComponent();
 
     void resized() override;
     void paint(juce::Graphics& g) override;
+    void mouseDown(const juce::MouseEvent& event) override;
 
     void setCheckboxVisible(bool visible);
     void setComponent(std::shared_ptr<juce::Component> component);
 
     juce::Slider slider;
-    juce::String id;
-    juce::String name;
+    Effect& effect;
+    int index;
     juce::ToggleButton selected;
 
 private:
@@ -29,6 +30,10 @@ private:
     bool checkboxVisible = true;
     juce::Rectangle<int> textBounds;
     std::shared_ptr<juce::Component> component;
+
+    juce::Label popupLabel;
+    LabelledTextBox min{"Min"};
+    LabelledTextBox max{"Max"};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EffectComponent)
 };

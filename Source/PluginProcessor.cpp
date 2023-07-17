@@ -35,20 +35,41 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     
     juce::SpinLock::ScopedLockType lock(effectsLock);
 
-    allEffects.push_back(std::make_shared<Effect>(std::make_shared<BitCrushEffect>(), "Bit Crush", "bitCrush", true));
-    allEffects.push_back(std::make_shared<Effect>(std::make_shared<BulgeEffect>(), "Bulge", "bulge", true));
-    allEffects.push_back(std::make_shared<Effect>(std::make_shared<RotateEffect>(), "2D Rotate Speed", "rotateSpeed", true));
-    allEffects.push_back(std::make_shared<Effect>(std::make_shared<VectorCancellingEffect>(), "Vector cancelling", "vectorCancelling", true));
-    allEffects.push_back(std::make_shared<Effect>(std::make_shared<DistortEffect>(true), "Vertical shift", "verticalDistort", true));
-    allEffects.push_back(std::make_shared<Effect>(std::make_shared<DistortEffect>(false), "Horizontal shift", "horizontalDistort", true));
-    allEffects.push_back(std::make_shared<Effect>(std::make_shared<SmoothEffect>(), "Smoothing", "smoothing", true));
-    allEffects.push_back(std::make_shared<Effect>(wobbleEffect, "Wobble", "wobble", true));
+    allEffects.push_back(std::make_shared<Effect>(
+        std::make_shared<BitCrushEffect>(),
+        std::vector<EffectDetails>(1, { "Bit Crush", "bitCrush", 0.0, 0.0, 1.0, 0.001, true })
+    ));
+    allEffects.push_back(std::make_shared<Effect>(
+        std::make_shared<BulgeEffect>(),
+        std::vector<EffectDetails>(1, { "Bulge", "bulge", 0.0, 0.0, 1.0, 0.001, true })
+    ));
+    allEffects.push_back(std::make_shared<Effect>(
+        std::make_shared<RotateEffect>(),
+        std::vector<EffectDetails>(1, { "2D Rotate Speed", "rotateSpeed", 0.0, 0.0, 1.0, 0.001, true })
+    ));
+    allEffects.push_back(std::make_shared<Effect>(
+        std::make_shared<VectorCancellingEffect>(),
+        std::vector<EffectDetails>(1, { "Vector cancelling", "vectorCancelling", 0.0, 0.0, 1.0, 0.001, true })
+    ));
+    allEffects.push_back(std::make_shared<Effect>(
+        std::make_shared<DistortEffect>(true),
+        std::vector<EffectDetails>(1, { "Vertical shift", "verticalDistort", 0.0, 0.0, 1.0, 0.001, true })
+    ));
+    allEffects.push_back(std::make_shared<Effect>(
+        std::make_shared<DistortEffect>(false),
+        std::vector<EffectDetails>(1, { "Horizontal shift", "horizontalDistort", 0.0, 0.0, 1.0, 0.001, true })
+    ));
+    allEffects.push_back(std::make_shared<Effect>(
+        std::make_shared<SmoothEffect>(),
+        std::vector<EffectDetails>(1, { "Smoothing", "smoothing", 0.0, 0.0, 1.0, 0.001, true })
+    ));
+    allEffects.push_back(std::make_shared<Effect>(
+        wobbleEffect,
+        std::vector<EffectDetails>(1, { "Wobble", "wobble", 0.0, 0.0, 1.0, 0.001, true })
+    ));
     allEffects.push_back(std::make_shared<Effect>(
         delayEffect,
-        std::vector<EffectDetails>{
-            EffectDetails{ "Delay Decay", "delayDecay", 0 },
-            EffectDetails{ "Delay Length", "delayEchoLength", 0.5 }
-        }, true
+        std::vector<EffectDetails>{{ "Delay Decay", "delayDecay", 0.0, 0.0, 1.0, 0.001, true }, { "Delay Length", "delayEchoLength", 0.5, 0.0, 1.0, 0.001, true }}
     ));
     allEffects.push_back(traceMax);
     allEffects.push_back(traceMin);
@@ -166,7 +187,10 @@ void OscirenderAudioProcessor::addLuaSlider() {
         sliderNum = (sliderNum - mod) / 26;
     }
 
-    luaEffects.push_back(std::make_shared<Effect>(std::make_shared<LuaEffect>(sliderName, *this), "Lua " + sliderName, "lua" + sliderName, false));
+    luaEffects.push_back(std::make_shared<Effect>(
+        std::make_shared<LuaEffect>(sliderName, *this),
+        std::vector<EffectDetails>(1, { "Lua " + sliderName, "lua" + sliderName, 0.0, 0.0, 1.0, 0.001, false })
+    ));
 }
 
 // effectsLock should be held when calling this
