@@ -14,7 +14,6 @@ public:
 	void apply();
 	double getValue(int index);
 	double getValue();
-	std::vector<EffectDetails> getDetails();
 	void setValue(int index, double value);
 	void setValue(double value);
 	int getPrecedence();
@@ -22,8 +21,10 @@ public:
 	juce::String getId();
 	juce::String getName();
 
-private:
 	std::vector<EffectDetails> details;
+
+private:
+	
 	std::vector<double> smoothValues;
 	double frequency = 1.0;
 	int precedence = -1;

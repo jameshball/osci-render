@@ -97,10 +97,13 @@
               file="Source/components/EffectsListComponent.cpp"/>
         <FILE id="dcLchL" name="EffectsListComponent.h" compile="0" resource="0"
               file="Source/components/EffectsListComponent.h"/>
+        <FILE id="L9DIT2" name="LabelledTextBox.h" compile="0" resource="0"
+              file="Source/components/LabelledTextBox.h"/>
         <FILE id="qIxm1z" name="LuaListComponent.cpp" compile="1" resource="0"
               file="Source/components/LuaListComponent.cpp"/>
         <FILE id="x0Syav" name="LuaListComponent.h" compile="0" resource="0"
               file="Source/components/LuaListComponent.h"/>
+        <FILE id="QQzSwh" name="SliderTextBox.h" compile="0" resource="0" file="Source/components/SliderTextBox.h"/>
         <FILE id="y3UiR0" name="VisualiserComponent.cpp" compile="1" resource="0"
               file="Source/components/VisualiserComponent.cpp"/>
         <FILE id="ZueyNl" name="VisualiserComponent.h" compile="0" resource="0"

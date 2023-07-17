@@ -37,10 +37,6 @@ double Effect::getValue() {
 	return getValue(0);
 }
 
-std::vector<EffectDetails> Effect::getDetails() {
-	return details;
-}
-
 void Effect::setValue(int index, double value) {
 	details[index].value = value;
 }
