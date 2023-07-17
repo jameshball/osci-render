@@ -32,12 +32,24 @@ void EffectComponent::componentSetup() {
     max.textBox.setValue(details.max, juce::dontSendNotification);
 
     min.textBox.onValueChange = [this]() {
-        effect.details[index].min = min.textBox.getValue();
+        double minValue = min.textBox.getValue();
+        double maxValue = max.textBox.getValue();
+        if (minValue >= maxValue) {
+            minValue = maxValue - effect.details[index].step;
+            min.textBox.setValue(minValue, juce::dontSendNotification);
+        }
+        effect.details[index].min = minValue;
         slider.setRange(effect.details[index].min, effect.details[index].max, effect.details[index].step);
     };
 
     max.textBox.onValueChange = [this]() {
-        effect.details[index].max = max.textBox.getValue();
+        double minValue = min.textBox.getValue();
+        double maxValue = max.textBox.getValue();
+        if (maxValue <= minValue) {
+            maxValue = minValue + effect.details[index].step;
+            max.textBox.setValue(maxValue, juce::dontSendNotification);
+        }
+        effect.details[index].max = maxValue;
         slider.setRange(effect.details[index].min, effect.details[index].max, effect.details[index].step);
     };
 
@@ -74,15 +86,15 @@ void EffectComponent::paint(juce::Graphics& g) {
 }
 
 void EffectComponent::mouseDown(const juce::MouseEvent& event) {
-    juce::PopupMenu menu;
+    if (event.mods.isPopupMenu()) {
+        juce::PopupMenu menu;
 
-    menu.addCustomItem(1, popupLabel, 200, 30, false);
-    menu.addCustomItem(2, min, 160, 40, false);
-    menu.addCustomItem(3, max, 160, 40, false);
+        menu.addCustomItem(1, popupLabel, 200, 30, false);
+        menu.addCustomItem(2, min, 160, 40, false);
+        menu.addCustomItem(3, max, 160, 40, false);
 
-    menu.showMenuAsync(juce::PopupMenu::Options(), [this](int result) {
-        
-    });
+        menu.showMenuAsync(juce::PopupMenu::Options(), [this](int result) {});
+    }
 }
 
 void EffectComponent::setComponent(std::shared_ptr<juce::Component> component) {
