@@ -5,10 +5,10 @@
 
 class Effect {
 public:
-	Effect(std::shared_ptr<EffectApplication> effectApplication, std::vector<EffectDetails> details);
-	Effect(std::shared_ptr<EffectApplication> effectApplication, EffectDetails details);
-	Effect(std::function<Vector2(int, Vector2, const std::vector<double>&, double)> application, std::vector<EffectDetails> details);
-	Effect(std::function<Vector2(int, Vector2, const std::vector<double>&, double)> application, EffectDetails details);
+	Effect(std::shared_ptr<EffectApplication> effectApplication, std::vector<EffectParameter> parameters);
+	Effect(std::shared_ptr<EffectApplication> effectApplication, EffectParameter parameter);
+	Effect(std::function<Vector2(int, Vector2, const std::vector<double>&, double)> application, std::vector<EffectParameter> parameters);
+	Effect(std::function<Vector2(int, Vector2, const std::vector<double>&, double)> application, EffectParameter parameter);
 
 	Vector2 apply(int index, Vector2 input);
 	void apply();
@@ -21,7 +21,7 @@ public:
 	juce::String getId();
 	juce::String getName();
 
-	std::vector<EffectDetails> details;
+	std::vector<EffectParameter> parameters;
 
 private:
 	
