@@ -18,42 +18,42 @@ void EffectComponent::componentSetup() {
     addAndMakeVisible(slider);
     addAndMakeVisible(selected);
 
-    EffectDetails details = effect.details[index];
+    EffectParameter& parameter = effect.parameters[index];
 
-    slider.setRange(details.min, details.max, details.step);
-    slider.setValue(details.value, juce::dontSendNotification);
+    slider.setRange(parameter.min, parameter.max, parameter.step);
+    slider.setValue(parameter.getValueUnnormalised(), juce::dontSendNotification);
 
     slider.setSliderStyle(juce::Slider::LinearHorizontal);
     slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 90, slider.getTextBoxHeight());
 
     selected.setToggleState(false, juce::dontSendNotification);
 
-    min.textBox.setValue(details.min, juce::dontSendNotification);
-    max.textBox.setValue(details.max, juce::dontSendNotification);
+    min.textBox.setValue(parameter.min, juce::dontSendNotification);
+    max.textBox.setValue(parameter.max, juce::dontSendNotification);
 
     min.textBox.onValueChange = [this]() {
         double minValue = min.textBox.getValue();
         double maxValue = max.textBox.getValue();
         if (minValue >= maxValue) {
-            minValue = maxValue - effect.details[index].step;
+            minValue = maxValue - effect.parameters[index].step;
             min.textBox.setValue(minValue, juce::dontSendNotification);
         }
-        effect.details[index].min = minValue;
-        slider.setRange(effect.details[index].min, effect.details[index].max, effect.details[index].step);
+        effect.parameters[index].min = minValue;
+        slider.setRange(effect.parameters[index].min, effect.parameters[index].max, effect.parameters[index].step);
     };
 
     max.textBox.onValueChange = [this]() {
         double minValue = min.textBox.getValue();
         double maxValue = max.textBox.getValue();
         if (maxValue <= minValue) {
-            maxValue = minValue + effect.details[index].step;
+            maxValue = minValue + effect.parameters[index].step;
             max.textBox.setValue(maxValue, juce::dontSendNotification);
         }
-        effect.details[index].max = maxValue;
-        slider.setRange(effect.details[index].min, effect.details[index].max, effect.details[index].step);
+        effect.parameters[index].max = maxValue;
+        slider.setRange(effect.parameters[index].min, effect.parameters[index].max, effect.parameters[index].step);
     };
 
-    popupLabel.setText(details.name + " Settings", juce::dontSendNotification);
+    popupLabel.setText(parameter.name + " Settings", juce::dontSendNotification);
     popupLabel.setJustificationType(juce::Justification::centred);
     popupLabel.setFont(juce::Font(14.0f, juce::Font::bold));
 }
@@ -82,7 +82,7 @@ void EffectComponent::resized() {
 void EffectComponent::paint(juce::Graphics& g) {
     g.fillAll(juce::Colours::black);
     g.setColour(juce::Colours::white);
-    g.drawText(effect.details[index].name, textBounds, juce::Justification::left);
+    g.drawText(effect.parameters[index].name, textBounds, juce::Justification::left);
 }
 
 void EffectComponent::mouseDown(const juce::MouseEvent& event) {

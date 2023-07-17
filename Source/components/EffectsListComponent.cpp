@@ -1,12 +1,12 @@
 #include "EffectsListComponent.h"
 
 EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectListBoxItemData& data, int rn, std::shared_ptr<Effect> effect) : DraggableListBoxItem(lb, data, rn), effect(effect) {
-	auto details = effect->details;
-	for (int i = 0; i < details.size(); i++) {
+	auto parameters = effect->parameters;
+	for (int i = 0; i < parameters.size(); i++) {
 		std::shared_ptr<EffectComponent> effectComponent = std::make_shared<EffectComponent>(*effect, i, i == 0);
 		// using weak_ptr to avoid circular reference and memory leak
 		std::weak_ptr<EffectComponent> weakEffectComponent = effectComponent;
-		effectComponent->slider.setValue(details[i].value, juce::dontSendNotification);
+		effectComponent->slider.setValue(parameters[i].getValueUnnormalised(), juce::dontSendNotification);
 		effectComponent->slider.onValueChange = [this, i, weakEffectComponent] {
 			if (auto effectComponent = weakEffectComponent.lock()) {
 				this->effect->setValue(i, effectComponent->slider.getValue());
@@ -81,7 +81,7 @@ void EffectsListComponent::resized() {
 
 int EffectsListBoxModel::getRowHeight(int row) {
 	auto data = (AudioEffectListBoxItemData&)modelData;
-	return data.getEffect(row)->details.size() * 30;
+	return data.getEffect(row)->parameters.size() * 30;
 }
 
 bool EffectsListBoxModel::hasVariableHeightRows() const {

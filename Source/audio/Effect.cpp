@@ -1,21 +1,21 @@
 #include "Effect.h"
 
-Effect::Effect(std::shared_ptr<EffectApplication> effectApplication, std::vector<EffectDetails> details) : effectApplication(effectApplication), details(details) {
-	smoothValues = std::vector<double>(details.size(), 0.0);
+Effect::Effect(std::shared_ptr<EffectApplication> effectApplication, std::vector<EffectParameter> parameters) : effectApplication(effectApplication), parameters(parameters) {
+	smoothValues = std::vector<double>(parameters.size(), 0.0);
 }
 
-Effect::Effect(std::shared_ptr<EffectApplication> effectApplication, EffectDetails details) : Effect(effectApplication, std::vector<EffectDetails>{details}) {}
+Effect::Effect(std::shared_ptr<EffectApplication> effectApplication, EffectParameter parameter) : Effect(effectApplication, std::vector<EffectParameter>{parameter}) {}
 
-Effect::Effect(std::function<Vector2(int, Vector2, const std::vector<double>&, double)> application, std::vector<EffectDetails> details) : application(application), details(details) {
-	smoothValues = std::vector<double>(details.size(), 0.0);
+Effect::Effect(std::function<Vector2(int, Vector2, const std::vector<double>&, double)> application, std::vector<EffectParameter> parameters) : application(application), parameters(parameters) {
+	smoothValues = std::vector<double>(parameters.size(), 0.0);
 }
 
-Effect::Effect(std::function<Vector2(int, Vector2, const std::vector<double>&, double)> application, EffectDetails details) : Effect(application, std::vector<EffectDetails>{details}) {}
+Effect::Effect(std::function<Vector2(int, Vector2, const std::vector<double>&, double)> application, EffectParameter parameter) : Effect(application, std::vector<EffectParameter>{parameter}) {}
 
 Vector2 Effect::apply(int index, Vector2 input) {
-	for (int i = 0; i < details.size(); i++) {
-		double weight = details[i].smoothValueChange ? 0.0005 : 1.0;
-        smoothValues[i] = (1.0 - weight) * smoothValues[i] + weight * details[i].value;
+	for (int i = 0; i < parameters.size(); i++) {
+		double weight = parameters[i].smoothValueChange ? 0.0005 : 1.0;
+        smoothValues[i] = (1.0 - weight) * smoothValues[i] + weight * parameters[i].getValueUnnormalised();
     }
 	if (application) {
 		return application(index, input, smoothValues, sampleRate);
@@ -30,7 +30,7 @@ void Effect::apply() {
 }
 
 double Effect::getValue(int index) {
-	return details[index].value;
+	return parameters[index].getValueUnnormalised();
 }
 
 double Effect::getValue() {
@@ -38,7 +38,7 @@ double Effect::getValue() {
 }
 
 void Effect::setValue(int index, double value) {
-	details[index].value = value;
+	parameters[index].setUnnormalisedValueNotifyingHost(value);
 }
 
 void Effect::setValue(double value) {
@@ -54,9 +54,9 @@ void Effect::setPrecedence(int precedence) {
 }
 
 juce::String Effect::getId() {
-	return details[0].id;
+	return parameters[0].id;
 }
 
 juce::String Effect::getName() {
-    return details[0].name;
+    return parameters[0].name;
 }
