@@ -6,7 +6,7 @@ EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectList
 		std::shared_ptr<EffectComponent> effectComponent = std::make_shared<EffectComponent>(*effect, i, i == 0);
 		// using weak_ptr to avoid circular reference and memory leak
 		std::weak_ptr<EffectComponent> weakEffectComponent = effectComponent;
-		effectComponent->slider.setValue(parameters[i].value, juce::dontSendNotification);
+		effectComponent->slider.setValue(parameters[i].getValueUnnormalised(), juce::dontSendNotification);
 		effectComponent->slider.onValueChange = [this, i, weakEffectComponent] {
 			if (auto effectComponent = weakEffectComponent.lock()) {
 				this->effect->setValue(i, effectComponent->slider.getValue());

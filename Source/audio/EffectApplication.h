@@ -6,14 +6,13 @@ class EffectParameter : public juce::AudioProcessorParameter {
 public:
 	juce::String name;
 	juce::String id;
-	// value is not necessarily in the range [min, max] so effect applications may need to clip to a valid range
-	std::atomic<double> value = 0.0;
-	std::atomic<double> min = 0.0;
-	std::atomic<double> max = 1.0;
-	std::atomic<double> step = 0.001;
+	
+	std::atomic<float> min = 0.0;
+	std::atomic<float> max = 1.0;
+	std::atomic<float> step = 0.001;
 	std::atomic<bool> smoothValueChange = true;
 
-	EffectParameter(juce::String name, juce::String id, double value, double min, double max, double step = 0.001, bool smoothValueChange = true) : name(name), id(id), value(value), min(min), max(max), step(step), smoothValueChange(smoothValueChange) {}
+	EffectParameter(juce::String name, juce::String id, float value, float min, float max, float step = 0.001, bool smoothValueChange = true) : name(name), id(id), value(value), min(min), max(max), step(step), smoothValueChange(smoothValueChange) {}
 
 	// COPY CONSTRUCTOR SHOULD ONLY BE USED BEFORE
 	// THE OBJECT IS USED IN MULTIPLE THREADS
@@ -34,13 +33,42 @@ public:
 	juce::String getLabel() const override {
         return juce::String();
     }
+	
+	// returns value in range [0, 1]
+	float getNormalisedValue(float value) const {
+		// clip value to valid range
+        auto min = this->min.load();
+        auto max = this->max.load();
+		value = juce::jlimit(min, max, value);
+		// normalize value to range [0, 1]
+        return (value - min) / (max - min);
+    }
+
+	float getUnnormalisedValue(float value) const {
+        value = juce::jlimit(0.0f, 1.0f, value);
+		auto min = this->min.load();
+		auto max = this->max.load();
+		return min + value * (max - min);
+    }
 
 	float getValue() const override {
-		return value.load();
+		return getNormalisedValue(value.load());
 	}
 
+	float getValueUnnormalised() const {
+        return value.load();
+    }
+
 	void setValue(float newValue) override {
-        value.store(newValue);
+		value = getUnnormalisedValue(newValue);
+    }
+
+	void setValueUnnormalised(float newValue) {
+        value = newValue;
+    }
+
+	void setUnnormalisedValueNotifyingHost(float newValue) {
+        setValueNotifyingHost(getNormalisedValue(newValue));
     }
 
 	float getDefaultValue() const override {
@@ -64,12 +92,12 @@ public:
     }
 
 	juce::String getText(float value, int maximumStringLength) const override {
-		auto string = juce::String(value, 3);
+		auto string = juce::String(getUnnormalisedValue(value), 3);
 		return string.substring(0, maximumStringLength);
 	}
 
 	float getValueForText(const juce::String& text) const override {
-        return text.getFloatValue();
+        return getNormalisedValue(text.getFloatValue());
     }
 
 	bool isAutomatable() const override {
@@ -83,6 +111,10 @@ public:
 	juce::AudioProcessorParameter::Category getCategory() const override {
         return juce::AudioProcessorParameter::genericParameter;
     }
+
+private:
+	// value is not necessarily in the range [min, max] so effect applications may need to clip to a valid range
+	std::atomic<float> value = 0.0;
 };
 
 class EffectApplication {

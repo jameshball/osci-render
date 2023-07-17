@@ -18,10 +18,10 @@ void EffectComponent::componentSetup() {
     addAndMakeVisible(slider);
     addAndMakeVisible(selected);
 
-    EffectParameter parameter = effect.parameters[index];
+    EffectParameter& parameter = effect.parameters[index];
 
     slider.setRange(parameter.min, parameter.max, parameter.step);
-    slider.setValue(parameter.value, juce::dontSendNotification);
+    slider.setValue(parameter.getValueUnnormalised(), juce::dontSendNotification);
 
     slider.setSliderStyle(juce::Slider::LinearHorizontal);
     slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 90, slider.getTextBoxHeight());

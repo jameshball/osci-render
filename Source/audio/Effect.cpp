@@ -15,7 +15,7 @@ Effect::Effect(std::function<Vector2(int, Vector2, const std::vector<double>&, d
 Vector2 Effect::apply(int index, Vector2 input) {
 	for (int i = 0; i < parameters.size(); i++) {
 		double weight = parameters[i].smoothValueChange ? 0.0005 : 1.0;
-        smoothValues[i] = (1.0 - weight) * smoothValues[i] + weight * parameters[i].value;
+        smoothValues[i] = (1.0 - weight) * smoothValues[i] + weight * parameters[i].getValueUnnormalised();
     }
 	if (application) {
 		return application(index, input, smoothValues, sampleRate);
@@ -30,7 +30,7 @@ void Effect::apply() {
 }
 
 double Effect::getValue(int index) {
-	return parameters[index].value;
+	return parameters[index].getValueUnnormalised();
 }
 
 double Effect::getValue() {
@@ -38,7 +38,7 @@ double Effect::getValue() {
 }
 
 void Effect::setValue(int index, double value) {
-	parameters[index].value = value;
+	parameters[index].setUnnormalisedValueNotifyingHost(value);
 }
 
 void Effect::setValue(double value) {

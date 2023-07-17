@@ -86,6 +86,16 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     for (int i = 0; i < 5; i++) {
         addLuaSlider();
     }
+
+    auto effects = allEffects;
+    effects.insert(effects.end(), permanentEffects.begin(), permanentEffects.end());
+    effects.insert(effects.end(), luaEffects.begin(), luaEffects.end());
+
+    for (auto effect : effects) {
+        for (auto& parameter : effect->parameters) {
+            addParameter(&parameter);
+        }
+    }
 }
 
 OscirenderAudioProcessor::~OscirenderAudioProcessor() {}
