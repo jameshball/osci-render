@@ -14,18 +14,6 @@ public:
 
 	EffectParameter(juce::String name, juce::String id, float value, float min, float max, float step = 0.001, bool smoothValueChange = true) : name(name), id(id), value(value), min(min), max(max), step(step), smoothValueChange(smoothValueChange) {}
 
-	// COPY CONSTRUCTOR SHOULD ONLY BE USED BEFORE
-	// THE OBJECT IS USED IN MULTIPLE THREADS
-	EffectParameter(const EffectParameter& other) {
-        name = other.name;
-        id = other.id;
-        value.store(other.value.load());
-		min.store(other.min.load());
-		max.store(other.max.load());
-		step.store(other.step.load());
-		smoothValueChange.store(other.smoothValueChange.load());
-    }
-
 	juce::String getName(int maximumStringLength) const override {
 		return name.substring(0, maximumStringLength);
 	}

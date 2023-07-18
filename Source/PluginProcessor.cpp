@@ -38,46 +38,47 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
 
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<BitCrushEffect>(),
-        std::vector<EffectParameter>(1, { "Bit Crush", "bitCrush", 0.0, 0.0, 1.0 })
+        new EffectParameter("Bit Crush", "bitCrush", 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<BulgeEffect>(),
-        std::vector<EffectParameter>(1, { "Bulge", "bulge", 0.0, 0.0, 1.0 })
+        new EffectParameter("Bulge", "bulge", 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<RotateEffect>(),
-        std::vector<EffectParameter>(1, { "2D Rotate Speed", "rotateSpeed", 0.0, 0.0, 1.0 })
+        new EffectParameter("2D Rotate Speed", "rotateSpeed", 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<VectorCancellingEffect>(),
-        std::vector<EffectParameter>(1, { "Vector cancelling", "vectorCancelling", 0.0, 0.0, 1.0 })
+        new EffectParameter("Vector cancelling", "vectorCancelling", 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<DistortEffect>(true),
-        std::vector<EffectParameter>(1, { "Vertical shift", "verticalDistort", 0.0, 0.0, 1.0 })
+        new EffectParameter("Vertical shift", "verticalDistort", 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<DistortEffect>(false),
-        std::vector<EffectParameter>(1, { "Horizontal shift", "horizontalDistort", 0.0, 0.0, 1.0 })
+        new EffectParameter("Horizontal shift", "horizontalDistort", 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<SmoothEffect>(),
-        std::vector<EffectParameter>(1, { "Smoothing", "smoothing", 0.0, 0.0, 1.0 })
+        new EffectParameter("Smoothing", "smoothing", 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         wobbleEffect,
-        std::vector<EffectParameter>(1, { "Wobble", "wobble", 0.0, 0.0, 1.0 })
+        new EffectParameter("Wobble", "wobble", 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         delayEffect,
-        std::vector<EffectParameter>{{ "Delay Decay", "delayDecay", 0.0, 0.0, 1.0 }, { "Delay Length", "delayEchoLength", 0.5, 0.0, 1.0 }}
+        std::vector<EffectParameter*>{new EffectParameter("Delay Decay", "delayDecay", 0.0, 0.0, 1.0), new EffectParameter("Delay Length", "delayEchoLength", 0.5, 0.0, 1.0)}
     ));
     toggleableEffects.push_back(traceMax);
     toggleableEffects.push_back(traceMin);
 
     for (auto& effect : toggleableEffects) {
-        addParameter(&effect->enabled);
-        effect->enabled.setValueNotifyingHost(false);
+        effect->markEnableable(false);
+        addParameter(effect->enabled);
+        effect->enabled->setValueNotifyingHost(false);
     }
 
     permanentEffects.push_back(frequencyEffect);
@@ -98,13 +99,23 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     effects.insert(effects.end(), luaEffects.begin(), luaEffects.end());
 
     for (auto effect : effects) {
-        for (auto& parameter : effect->parameters) {
-            addParameter(&parameter);
+        for (auto parameter : effect->parameters) {
+            addParameter(parameter);
+        }
+    }
+
+    hiddenEffects.push_back(currentRotateX);
+    hiddenEffects.push_back(currentRotateY);
+    hiddenEffects.push_back(currentRotateZ);
+}
+
+OscirenderAudioProcessor::~OscirenderAudioProcessor() {
+    for (auto effect : hiddenEffects) {
+        for (auto parameter : effect->parameters) {
+            delete parameter;
         }
     }
 }
-
-OscirenderAudioProcessor::~OscirenderAudioProcessor() {}
 
 const juce::String OscirenderAudioProcessor::getName() const {
     return JucePlugin_Name;
@@ -205,7 +216,7 @@ void OscirenderAudioProcessor::addLuaSlider() {
 
     luaEffects.push_back(std::make_shared<Effect>(
         std::make_shared<LuaEffect>(sliderName, *this),
-        std::vector<EffectParameter>(1, { "Lua " + sliderName, "lua" + sliderName, 0.0, 0.0, 1.0, 0.001, false })
+        new EffectParameter("Lua " + sliderName, "lua" + sliderName, 0.0, 0.0, 1.0, 0.001, false)
     ));
 }
 
@@ -441,7 +452,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         {
             juce::SpinLock::ScopedLockType lock(effectsLock);
             for (auto& effect : toggleableEffects) {
-                if (effect->enabled.getValue()) {
+                if (effect->enabled->getValue()) {
                     channels = effect->apply(sample, channels);
                 }
             }
