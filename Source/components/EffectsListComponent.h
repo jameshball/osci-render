@@ -74,9 +74,9 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
     
     void setSelected(int itemIndex, bool selected) {
         if (selected) {
-			audioProcessor.enableEffect(data[itemIndex]);
+            data[itemIndex]->enabled.setValueNotifyingHost(true);
         } else {
-			audioProcessor.disableEffect(data[itemIndex]);
+            data[itemIndex]->enabled.setValueNotifyingHost(false);
         }
     }
 

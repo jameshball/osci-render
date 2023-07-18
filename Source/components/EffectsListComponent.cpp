@@ -14,18 +14,7 @@ EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectList
 		};
 
 		if (i == 0) {
-			bool isSelected = false;
-
-			{
-				juce::SpinLock::ScopedLockType lock(data.audioProcessor.effectsLock);
-				// check if effect is in audioProcessor enabled effects
-				for (auto processorEffect : data.audioProcessor.enabledEffects) {
-					if (processorEffect->getId() == effect->getId()) {
-						isSelected = true;
-						break;
-					}
-				}
-			}
+			bool isSelected = effect->enabled.getValue();
 			effectComponent->selected.setToggleState(isSelected, juce::dontSendNotification);
 			effectComponent->selected.onClick = [this, weakEffectComponent] {
 				if (auto effectComponent = weakEffectComponent.lock()) {

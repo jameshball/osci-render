@@ -2,6 +2,9 @@
 #include "../shape/Vector2.h"
 #include <JuceHeader.h>
 #include "EffectApplication.h"
+#include "EffectParameter.h"
+#include "BooleanParameter.h"
+
 
 class Effect {
 public:
@@ -22,6 +25,7 @@ public:
 	juce::String getName();
 
 	std::vector<EffectParameter> parameters;
+	BooleanParameter enabled;
 
 private:
 	

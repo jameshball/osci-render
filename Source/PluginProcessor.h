@@ -71,8 +71,7 @@ public:
     std::atomic<double> currentSampleRate = 0.0;
 
     juce::SpinLock effectsLock;
-	std::vector<std::shared_ptr<Effect>> allEffects;
-	std::vector<std::shared_ptr<Effect>> enabledEffects;
+	std::vector<std::shared_ptr<Effect>> toggleableEffects;
     std::vector<std::shared_ptr<Effect>> luaEffects;
 
     std::shared_ptr<Effect> frequencyEffect = std::make_shared<Effect>(
@@ -197,8 +196,6 @@ public:
 
     void addLuaSlider();
     void addFrame(std::vector<std::unique_ptr<Shape>> frame, int fileIndex) override;
-	void enableEffect(std::shared_ptr<Effect> effect);
-    void disableEffect(std::shared_ptr<Effect> effect);
     void updateEffectPrecedence();
     void updateFileBlock(int index, std::shared_ptr<juce::MemoryBlock> block);
     void addFile(juce::File file);

@@ -17,6 +17,7 @@
 #include "audio/BitCrushEffect.h"
 #include "audio/BulgeEffect.h"
 #include "audio/LuaEffect.h"
+#include "audio/EffectParameter.h"
 
 //==============================================================================
 OscirenderAudioProcessor::OscirenderAudioProcessor()
@@ -35,44 +36,49 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     
     juce::SpinLock::ScopedLockType lock(effectsLock);
 
-    allEffects.push_back(std::make_shared<Effect>(
+    toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<BitCrushEffect>(),
         std::vector<EffectParameter>(1, { "Bit Crush", "bitCrush", 0.0, 0.0, 1.0 })
     ));
-    allEffects.push_back(std::make_shared<Effect>(
+    toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<BulgeEffect>(),
         std::vector<EffectParameter>(1, { "Bulge", "bulge", 0.0, 0.0, 1.0 })
     ));
-    allEffects.push_back(std::make_shared<Effect>(
+    toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<RotateEffect>(),
         std::vector<EffectParameter>(1, { "2D Rotate Speed", "rotateSpeed", 0.0, 0.0, 1.0 })
     ));
-    allEffects.push_back(std::make_shared<Effect>(
+    toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<VectorCancellingEffect>(),
         std::vector<EffectParameter>(1, { "Vector cancelling", "vectorCancelling", 0.0, 0.0, 1.0 })
     ));
-    allEffects.push_back(std::make_shared<Effect>(
+    toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<DistortEffect>(true),
         std::vector<EffectParameter>(1, { "Vertical shift", "verticalDistort", 0.0, 0.0, 1.0 })
     ));
-    allEffects.push_back(std::make_shared<Effect>(
+    toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<DistortEffect>(false),
         std::vector<EffectParameter>(1, { "Horizontal shift", "horizontalDistort", 0.0, 0.0, 1.0 })
     ));
-    allEffects.push_back(std::make_shared<Effect>(
+    toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<SmoothEffect>(),
         std::vector<EffectParameter>(1, { "Smoothing", "smoothing", 0.0, 0.0, 1.0 })
     ));
-    allEffects.push_back(std::make_shared<Effect>(
+    toggleableEffects.push_back(std::make_shared<Effect>(
         wobbleEffect,
         std::vector<EffectParameter>(1, { "Wobble", "wobble", 0.0, 0.0, 1.0 })
     ));
-    allEffects.push_back(std::make_shared<Effect>(
+    toggleableEffects.push_back(std::make_shared<Effect>(
         delayEffect,
         std::vector<EffectParameter>{{ "Delay Decay", "delayDecay", 0.0, 0.0, 1.0 }, { "Delay Length", "delayEchoLength", 0.5, 0.0, 1.0 }}
     ));
-    allEffects.push_back(traceMax);
-    allEffects.push_back(traceMin);
+    toggleableEffects.push_back(traceMax);
+    toggleableEffects.push_back(traceMin);
+
+    for (auto& effect : toggleableEffects) {
+        addParameter(&effect->enabled);
+        effect->enabled.setValueNotifyingHost(false);
+    }
 
     permanentEffects.push_back(frequencyEffect);
     permanentEffects.push_back(volumeEffect);
@@ -87,7 +93,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         addLuaSlider();
     }
 
-    auto effects = allEffects;
+    auto effects = toggleableEffects;
     effects.insert(effects.end(), permanentEffects.begin(), permanentEffects.end());
     effects.insert(effects.end(), luaEffects.begin(), luaEffects.end());
 
@@ -220,42 +226,11 @@ void OscirenderAudioProcessor::updateObjValues() {
 }
 
 // effectsLock MUST be held when calling this
-void OscirenderAudioProcessor::enableEffect(std::shared_ptr<Effect> effect) {
-	// remove any existing effects with the same id
-	for (auto it = enabledEffects.begin(); it != enabledEffects.end();) {
-		if ((*it)->getId() == effect->getId()) {
-			it = enabledEffects.erase(it);
-		} else {
-			it++;
-		}
-	}
-	// insert according to precedence (sorts from lowest to highest precedence)
-	auto it = enabledEffects.begin();
-	while (it != enabledEffects.end() && (*it)->getPrecedence() <= effect->getPrecedence()) {
-		it++;
-	}
-    enabledEffects.insert(it, effect);
-}
-
-// effectsLock MUST be held when calling this
-void OscirenderAudioProcessor::disableEffect(std::shared_ptr<Effect> effect) {
-	// remove any existing effects with the same id
-	for (auto it = enabledEffects.begin(); it != enabledEffects.end();) {
-		if ((*it)->getId() == effect->getId()) {
-			it = enabledEffects.erase(it);
-		} else {
-			it++;
-		}
-	}
-}
-
-// effectsLock MUST be held when calling this
 void OscirenderAudioProcessor::updateEffectPrecedence() {
     auto sortFunc = [](std::shared_ptr<Effect> a, std::shared_ptr<Effect> b) {
         return a->getPrecedence() < b->getPrecedence();
     };
-	std::sort(enabledEffects.begin(), enabledEffects.end(), sortFunc);
-    std::sort(allEffects.begin(), allEffects.end(), sortFunc);
+    std::sort(toggleableEffects.begin(), toggleableEffects.end(), sortFunc);
 }
 
 // parsersLock AND effectsLock must be locked before calling this function
@@ -465,8 +440,10 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
         {
             juce::SpinLock::ScopedLockType lock(effectsLock);
-            for (auto& effect : enabledEffects) {
-                channels = effect->apply(sample, channels);
+            for (auto& effect : toggleableEffects) {
+                if (effect->enabled.getValue()) {
+                    channels = effect->apply(sample, channels);
+                }
             }
             for (auto& effect : permanentEffects) {
                 channels = effect->apply(sample, channels);
