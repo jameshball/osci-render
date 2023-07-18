@@ -53,6 +53,18 @@ void Effect::setPrecedence(int precedence) {
 	this->precedence = precedence;
 }
 
+void Effect::addListener(int index, juce::AudioProcessorParameter::Listener* listener) {
+	juce::SpinLock::ScopedLockType lock(listenerLock);
+	parameters[index].addListener(listener);
+	enabled.addListener(listener);
+}
+
+void Effect::removeListener(int index, juce::AudioProcessorParameter::Listener* listener) {
+    juce::SpinLock::ScopedLockType lock(listenerLock);
+    parameters[index].removeListener(listener);
+    enabled.removeListener(listener);
+}
+
 juce::String Effect::getId() {
 	return parameters[0].id;
 }

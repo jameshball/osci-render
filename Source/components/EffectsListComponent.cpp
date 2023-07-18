@@ -14,8 +14,6 @@ EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectList
 		};
 
 		if (i == 0) {
-			bool isSelected = effect->enabled.getValue();
-			effectComponent->selected.setToggleState(isSelected, juce::dontSendNotification);
 			effectComponent->selected.onClick = [this, weakEffectComponent] {
 				if (auto effectComponent = weakEffectComponent.lock()) {
 					auto data = (AudioEffectListBoxItemData&)modelData;

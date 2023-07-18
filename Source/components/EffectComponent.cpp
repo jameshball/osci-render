@@ -1,7 +1,10 @@
 #include "EffectComponent.h"
 
 EffectComponent::EffectComponent(Effect& effect, int index) : effect(effect), index(index) {
-    componentSetup();
+    addAndMakeVisible(slider);
+    addAndMakeVisible(selected);
+    effect.addListener(index, this);
+    setupComponent();
 }
 
 EffectComponent::EffectComponent(Effect& effect, int index, bool checkboxVisible) : EffectComponent(effect, index) {
@@ -14,10 +17,7 @@ EffectComponent::EffectComponent(Effect& effect, bool checkboxVisible) : EffectC
     setCheckboxVisible(checkboxVisible);
 }
 
-void EffectComponent::componentSetup() {
-    addAndMakeVisible(slider);
-    addAndMakeVisible(selected);
-
+void EffectComponent::setupComponent() {
     EffectParameter& parameter = effect.parameters[index];
 
     slider.setRange(parameter.min, parameter.max, parameter.step);
@@ -26,7 +26,7 @@ void EffectComponent::componentSetup() {
     slider.setSliderStyle(juce::Slider::LinearHorizontal);
     slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 90, slider.getTextBoxHeight());
 
-    selected.setToggleState(false, juce::dontSendNotification);
+    selected.setToggleState(effect.enabled.getValue(), juce::dontSendNotification);
 
     min.textBox.setValue(parameter.min, juce::dontSendNotification);
     max.textBox.setValue(parameter.max, juce::dontSendNotification);
@@ -59,7 +59,9 @@ void EffectComponent::componentSetup() {
 }
 
 
-EffectComponent::~EffectComponent() {}
+EffectComponent::~EffectComponent() {
+    effect.removeListener(index, this);
+}
 
 void EffectComponent::resized() {
     auto sliderRight = getWidth() - 160;
@@ -95,6 +97,16 @@ void EffectComponent::mouseDown(const juce::MouseEvent& event) {
 
         menu.showMenuAsync(juce::PopupMenu::Options(), [this](int result) {});
     }
+}
+
+void EffectComponent::parameterValueChanged(int parameterIndex, float newValue) {
+    triggerAsyncUpdate();
+}
+
+void EffectComponent::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
+
+void EffectComponent::handleAsyncUpdate() {
+    setupComponent();
 }
 
 void EffectComponent::setComponent(std::shared_ptr<juce::Component> component) {

@@ -11,8 +11,9 @@ VolumeComponent::VolumeComponent(OscirenderAudioProcessor& p) : audioProcessor(p
     volumeSlider.setColour(juce::Slider::ColourIds::backgroundColourId, juce::Colours::transparentWhite);
     volumeSlider.setColour(juce::Slider::ColourIds::trackColourId, juce::Colours::transparentWhite);
     volumeSlider.setOpaque(false);
-    volumeSlider.setRange(0, 2, 0.001);
-    volumeSlider.setValue(1);
+    auto& volumeParam = audioProcessor.volumeEffect->parameters[0];
+    volumeSlider.setRange(volumeParam.min, volumeParam.max, volumeParam.step);
+    volumeSlider.setValue(volumeParam.getValueUnnormalised());
     volumeSlider.setLookAndFeel(&thumbRadiusLookAndFeel);
     volumeSlider.setColour(juce::Slider::ColourIds::thumbColourId, juce::Colours::black);
 
@@ -22,8 +23,9 @@ VolumeComponent::VolumeComponent(OscirenderAudioProcessor& p) : audioProcessor(p
     thresholdSlider.setColour(juce::Slider::ColourIds::backgroundColourId, juce::Colours::transparentWhite);
     thresholdSlider.setColour(juce::Slider::ColourIds::trackColourId, juce::Colours::transparentWhite);
     thresholdSlider.setOpaque(false);
-    thresholdSlider.setRange(0, 1, 0.001);
-    thresholdSlider.setValue(1);
+    auto& thresholdParam = audioProcessor.thresholdEffect->parameters[0];
+    thresholdSlider.setRange(thresholdParam.min, thresholdParam.max, thresholdParam.step);
+    thresholdSlider.setValue(thresholdParam.getValueUnnormalised());
     thresholdSlider.setLookAndFeel(&thresholdLookAndFeel);
     thresholdSlider.setColour(juce::Slider::ColourIds::thumbColourId, juce::Colours::black);
 
@@ -85,6 +87,8 @@ void VolumeComponent::paint(juce::Graphics& g) {
 
 void VolumeComponent::timerCallback() {
     repaint();
+    volumeSlider.setValue(audioProcessor.volumeEffect->getValue(), juce::NotificationType::dontSendNotification);
+    thresholdSlider.setValue(audioProcessor.thresholdEffect->getValue(), juce::NotificationType::dontSendNotification);
 }
 
 void VolumeComponent::run() {

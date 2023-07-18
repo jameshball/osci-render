@@ -5,7 +5,7 @@
 #include "LabelledTextBox.h"
 
 
-class EffectComponent : public juce::Component {
+class EffectComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater {
 public:
     EffectComponent(Effect& effect, int index);
     EffectComponent(Effect& effect, int index, bool checkboxVisible);
@@ -16,6 +16,9 @@ public:
     void resized() override;
     void paint(juce::Graphics& g) override;
     void mouseDown(const juce::MouseEvent& event) override;
+    void parameterValueChanged(int parameterIndex, float newValue) override;
+    void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
+    void handleAsyncUpdate() override;
 
     void setCheckboxVisible(bool visible);
     void setComponent(std::shared_ptr<juce::Component> component);
@@ -26,7 +29,7 @@ public:
     juce::ToggleButton selected;
 
 private:
-    void componentSetup();
+    void setupComponent();
     bool checkboxVisible = true;
     juce::Rectangle<int> textBounds;
     std::shared_ptr<juce::Component> component;

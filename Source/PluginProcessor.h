@@ -92,7 +92,7 @@ public:
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             threshold = values[0];
             return input;
-        }, std::vector<EffectParameter>(1, { "Threshold", "threshold", 3.0, 0.0, 3.0 })
+        }, std::vector<EffectParameter>(1, { "Threshold", "threshold", 1.0, 0.0, 1.0 })
     );
     
     std::shared_ptr<Effect> focalLength = std::make_shared<Effect>(

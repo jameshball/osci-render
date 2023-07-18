@@ -21,6 +21,8 @@ public:
 	void setValue(double value);
 	int getPrecedence();
 	void setPrecedence(int precedence);
+	void addListener(int index, juce::AudioProcessorParameter::Listener* listener);
+	void removeListener(int index, juce::AudioProcessorParameter::Listener* listener);
 	juce::String getId();
 	juce::String getName();
 
@@ -29,6 +31,7 @@ public:
 
 private:
 	
+	juce::SpinLock listenerLock;
 	std::vector<double> smoothValues;
 	double frequency = 1.0;
 	int precedence = -1;
