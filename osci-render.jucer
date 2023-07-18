@@ -35,6 +35,8 @@
               file="Source/audio/BitCrushEffect.cpp"/>
         <FILE id="Bc8UeW" name="BitCrushEffect.h" compile="0" resource="0"
               file="Source/audio/BitCrushEffect.h"/>
+        <FILE id="S5ChqG" name="BooleanParameter.h" compile="0" resource="0"
+              file="Source/audio/BooleanParameter.h"/>
         <FILE id="ATOFA9" name="BulgeEffect.cpp" compile="1" resource="0" file="Source/audio/BulgeEffect.cpp"/>
         <FILE id="lOXxYe" name="BulgeEffect.h" compile="0" resource="0" file="Source/audio/BulgeEffect.h"/>
         <FILE id="e6SZox" name="DelayEffect.cpp" compile="1" resource="0" file="Source/audio/DelayEffect.cpp"/>
@@ -48,6 +50,8 @@
               file="Source/audio/EffectApplication.cpp"/>
         <FILE id="MIYJ9y" name="EffectApplication.h" compile="0" resource="0"
               file="Source/audio/EffectApplication.h"/>
+        <FILE id="aE0RtD" name="EffectParameter.h" compile="0" resource="0"
+              file="Source/audio/EffectParameter.h"/>
         <FILE id="uhyh7T" name="LuaEffect.cpp" compile="1" resource="0" file="Source/audio/LuaEffect.cpp"/>
         <FILE id="jqDcZq" name="LuaEffect.h" compile="0" resource="0" file="Source/audio/LuaEffect.h"/>
         <FILE id="t2bsR8" name="PitchDetector.cpp" compile="1" resource="0"

@@ -18,8 +18,8 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p) : audioProcessor
 
     {
         juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-        for (int i = 0; i < audioProcessor.allEffects.size(); i++) {
-            auto effect = audioProcessor.allEffects[i];
+        for (int i = 0; i < audioProcessor.toggleableEffects.size(); i++) {
+            auto effect = audioProcessor.toggleableEffects[i];
             effect->setValue(effect->getValue());
             itemData.data.push_back(effect);
         }

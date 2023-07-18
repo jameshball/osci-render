@@ -71,29 +71,28 @@ public:
     std::atomic<double> currentSampleRate = 0.0;
 
     juce::SpinLock effectsLock;
-	std::vector<std::shared_ptr<Effect>> allEffects;
-	std::vector<std::shared_ptr<Effect>> enabledEffects;
+	std::vector<std::shared_ptr<Effect>> toggleableEffects;
     std::vector<std::shared_ptr<Effect>> luaEffects;
 
     std::shared_ptr<Effect> frequencyEffect = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             frequency = values[0];
             return input;
-        }, std::vector<EffectParameter>(1, { "Frequency", "frequency", 440.0, 0.0, 12000.0, 0.1 })
+        }, new EffectParameter("Frequency", "frequency", 440.0, 0.0, 12000.0, 0.1)
     );
 
     std::shared_ptr<Effect> volumeEffect = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             volume = values[0];
             return input;
-        }, std::vector<EffectParameter>(1, { "Volume", "volume", 1.0, 0.0, 3.0 })
+        }, new EffectParameter("Volume", "volume", 1.0, 0.0, 3.0)
     );
 
     std::shared_ptr<Effect> thresholdEffect = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             threshold = values[0];
             return input;
-        }, std::vector<EffectParameter>(1, { "Threshold", "threshold", 3.0, 0.0, 3.0 })
+        }, new EffectParameter("Threshold", "threshold", 1.0, 0.0, 1.0)
     );
     
     std::shared_ptr<Effect> focalLength = std::make_shared<Effect>(
@@ -104,7 +103,7 @@ public:
                 camera->setFocalLength(values[0]);
             }
             return input;
-		}, std::vector<EffectParameter>(1, { "Focal length", "focalLength", 1.0, 0.0, 2.0 })
+		}, new EffectParameter("Focal length", "focalLength", 1.0, 0.0, 2.0)
     );
     std::shared_ptr<Effect> rotateX = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
@@ -114,7 +113,7 @@ public:
                 obj->setBaseRotationX(values[0] * std::numbers::pi);
             }
             return input;
-        }, std::vector<EffectParameter>(1, { "Rotate x", "rotateX", 1.0, -1.0, 1.0 })
+        }, new EffectParameter("Rotate x", "rotateX", 1.0, -1.0, 1.0)
     );
     std::shared_ptr<Effect> rotateY = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
@@ -124,7 +123,7 @@ public:
                 obj->setBaseRotationY(values[0] * std::numbers::pi);
             }
             return input;
-        }, std::vector<EffectParameter>(1, { "Rotate y", "rotateY", 1.0, -1.0, 1.0 })
+        }, new EffectParameter("Rotate y", "rotateY", 1.0, -1.0, 1.0)
     );
     std::shared_ptr<Effect> rotateZ = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
@@ -134,7 +133,7 @@ public:
                 obj->setBaseRotationZ(values[0] * std::numbers::pi);
             }
             return input;
-        }, std::vector<EffectParameter>(1, { "Rotate z", "rotateZ", 0.0, -1.0, 1.0 })
+        }, new EffectParameter("Rotate z", "rotateZ", 0.0, -1.0, 1.0)
     );
     std::shared_ptr<Effect> currentRotateX = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
@@ -144,7 +143,7 @@ public:
                 obj->setCurrentRotationX(values[0] * std::numbers::pi);
             }
             return input;
-        }, std::vector<EffectParameter>(1, { "Current Rotate x", "currentRotateX", 0.0, 0.0, 1.0, 0.001, false })
+        }, new EffectParameter("Current Rotate x", "currentRotateX", 0.0, 0.0, 1.0, 0.001, false)
     );
     std::shared_ptr<Effect> currentRotateY = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
@@ -154,7 +153,7 @@ public:
                 obj->setCurrentRotationY(values[0] * std::numbers::pi);
             }
             return input;
-        }, std::vector<EffectParameter>(1, { "Current Rotate y", "currentRotateY", 0.0, 0.0, 1.0, 0.001, false })
+        }, new EffectParameter("Current Rotate y", "currentRotateY", 0.0, 0.0, 1.0, 0.001, false)
     );
     std::shared_ptr<Effect> currentRotateZ = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
@@ -164,7 +163,7 @@ public:
                 obj->setCurrentRotationZ(values[0] * std::numbers::pi);
             }
             return input;
-        }, std::vector<EffectParameter>(1, { "Current Rotate z", "currentRotateZ", 0.0, 0.0, 1.0, 0.001, false })
+        }, new EffectParameter("Current Rotate z", "currentRotateZ", 0.0, 0.0, 1.0, 0.001, false)
     );
     std::shared_ptr<Effect> rotateSpeed = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
@@ -174,7 +173,7 @@ public:
                 obj->setRotationSpeed(values[0]);
             }
             return input;
-		}, std::vector<EffectParameter>(1, { "Rotate speed", "rotateSpeed", 0.0, -1.0, 1.0 })
+		}, new EffectParameter("Rotate speed", "rotateSpeed", 0.0, -1.0, 1.0)
     );
     std::atomic<bool> fixedRotateX = false;
     std::atomic<bool> fixedRotateY = false;
@@ -197,8 +196,6 @@ public:
 
     void addLuaSlider();
     void addFrame(std::vector<std::unique_ptr<Shape>> frame, int fileIndex) override;
-	void enableEffect(std::shared_ptr<Effect> effect);
-    void disableEffect(std::shared_ptr<Effect> effect);
     void updateEffectPrecedence();
     void updateFileBlock(int index, std::shared_ptr<juce::MemoryBlock> block);
     void addFile(juce::File file);
@@ -230,20 +227,23 @@ private:
     bool invalidateFrameBuffer = false;
 
     std::vector<std::shared_ptr<Effect>> permanentEffects;
+    // any effects that are not added as a plugin parameter must be deleted manually
+    // as JUCE will not delete them upon destruction of the AudioProcessor
+    std::vector<std::shared_ptr<Effect>> hiddenEffects;
 
     std::shared_ptr<Effect> traceMax = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             traceMaxValue = values[0];
             traceMaxEnabled = true;
             return input;
-        }, std::vector<EffectParameter>(1, { "Trace max", "traceMax", 1.0, 0.0, 1.0 })
+        }, new EffectParameter("Trace max", "traceMax", 1.0, 0.0, 1.0)
     );
     std::shared_ptr<Effect> traceMin = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             traceMinValue = values[0];
             traceMinEnabled = true;
             return input;
-        }, std::vector<EffectParameter>(1, { "Trace min", "traceMin", 0.0, 0.0, 1.0 })
+        }, new EffectParameter("Trace min", "traceMin", 0.0, 0.0, 1.0)
     );
     const double MIN_TRACE = 0.005;
     double traceMaxValue = traceMax->getValue();

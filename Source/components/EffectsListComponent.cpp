@@ -6,7 +6,7 @@ EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectList
 		std::shared_ptr<EffectComponent> effectComponent = std::make_shared<EffectComponent>(*effect, i, i == 0);
 		// using weak_ptr to avoid circular reference and memory leak
 		std::weak_ptr<EffectComponent> weakEffectComponent = effectComponent;
-		effectComponent->slider.setValue(parameters[i].getValueUnnormalised(), juce::dontSendNotification);
+		effectComponent->slider.setValue(parameters[i]->getValueUnnormalised(), juce::dontSendNotification);
 		effectComponent->slider.onValueChange = [this, i, weakEffectComponent] {
 			if (auto effectComponent = weakEffectComponent.lock()) {
 				this->effect->setValue(i, effectComponent->slider.getValue());
@@ -14,19 +14,6 @@ EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectList
 		};
 
 		if (i == 0) {
-			bool isSelected = false;
-
-			{
-				juce::SpinLock::ScopedLockType lock(data.audioProcessor.effectsLock);
-				// check if effect is in audioProcessor enabled effects
-				for (auto processorEffect : data.audioProcessor.enabledEffects) {
-					if (processorEffect->getId() == effect->getId()) {
-						isSelected = true;
-						break;
-					}
-				}
-			}
-			effectComponent->selected.setToggleState(isSelected, juce::dontSendNotification);
 			effectComponent->selected.onClick = [this, weakEffectComponent] {
 				if (auto effectComponent = weakEffectComponent.lock()) {
 					auto data = (AudioEffectListBoxItemData&)modelData;
