@@ -129,5 +129,6 @@ void MainComponent::resized() {
 	frequencyLabel.setBounds(bounds.removeFromTop(20));
 
 	bounds.removeFromTop(padding);
-	visualiser.setBounds(bounds);
+	auto minDim = juce::jmin(bounds.getWidth(), bounds.getHeight());
+	visualiser.setBounds(bounds.withSizeKeepingCentre(minDim, minDim));
 }

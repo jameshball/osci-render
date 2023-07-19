@@ -45,7 +45,6 @@ Vector2 LuaParser::draw() {
             for (int i = 0; i < variableNames.size(); i++) {
                 lua_pushnumber(L, variables[i]);
                 lua_setglobal(L, variableNames[i].toUTF8());
-                DBG("set " << variableNames[i] << " to " << variables[i]);
             }
             variableNames.clear();
             variables.clear();

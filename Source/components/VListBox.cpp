@@ -259,7 +259,6 @@ public:
                 if (auto* rowComp = getComponentForRow (row))
                 {
                     rowComp->setBounds (0, owner.getPositionForRow (row), w, owner.getRowHeight (row));
-                    DBG (String (i) + " " + rowComp->getBounds().toString());
                     rowComp->update (row, owner.isRowSelected (row));
                 }
             }

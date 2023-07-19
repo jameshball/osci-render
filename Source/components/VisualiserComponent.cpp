@@ -29,16 +29,12 @@ void VisualiserComponent::paint(juce::Graphics& g) {
     g.fillAll(backgroundColour);
 
     auto r = getLocalBounds().toFloat();
-    auto channelHeight = r.getHeight() / (float)numChannels;
+    auto minDim = juce::jmin(r.getWidth(), r.getHeight());
 
-    g.setColour(waveformColour);
     juce::SpinLock::ScopedLockType scope(lock);
     if (buffer.size() > 0) {
-        paintXY(g, r.removeFromRight(r.getHeight()));
-
-        for (int i = 0; i < numChannels; ++i) {
-            paintChannel(g, r.removeFromTop(channelHeight), i);
-        }
+        g.setColour(waveformColour);
+        paintXY(g, r.withSizeKeepingCentre(minDim, minDim));
     }
 }
 
@@ -77,17 +73,19 @@ void VisualiserComponent::paintChannel(juce::Graphics& g, juce::Rectangle<float>
 }
 
 void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area) {
-    juce::Path path;
-
-    path.startNewSubPath(buffer[0], buffer[1]);
+    auto transform = juce::AffineTransform::fromTargetPoints(-1.0f, -1.0f, area.getX(), area.getBottom(), 1.0f, 1.0f, area.getRight(), area.getY(), 1.0f, -1.0f, area.getRight(), area.getBottom());
+    std::vector<juce::Line<float>> lines;
 
     for (int i = 2; i < buffer.size(); i += 2) {
-        path.lineTo(buffer[i + 0], buffer[i + 1]);
+        lines.emplace_back(buffer[i - 2], buffer[i - 1], buffer[i], buffer[i + 1]);
     }
 
-    // apply affine transform to path to fit in area
-    auto transform = juce::AffineTransform::fromTargetPoints(-1.0f, -1.0f, area.getX(), area.getBottom(), 1.0f, 1.0f, area.getRight(), area.getY(), 1.0f, -1.0f, area.getRight(), area.getBottom());
-    path.applyTransform(transform);
-
-    g.strokePath(path, juce::PathStrokeType(1.0f));
+    for (auto& line : lines) {
+        line.applyTransform(transform);
+        float lengthScale = 1.0f / (line.getLength() + 1.0f);
+        double strength = 10;
+        lengthScale = std::log(strength * lengthScale + 1) / std::log(strength + 1);
+        g.setColour(waveformColour.withAlpha(lengthScale));
+        g.drawLine(line, 1.0f);
+    }
 }

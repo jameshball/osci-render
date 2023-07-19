@@ -23,8 +23,8 @@ private:
     int numChannels = 2;
     juce::Colour backgroundColour, waveformColour;
 	OscirenderAudioProcessor& audioProcessor;
-	std::shared_ptr<BufferConsumer> consumer = std::make_shared<BufferConsumer>(2048);
-	int precision = 2;
+	std::shared_ptr<BufferConsumer> consumer = std::make_shared<BufferConsumer>(4096);
+    int precision = 4;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserComponent)
 };
