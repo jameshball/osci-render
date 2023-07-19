@@ -105,12 +105,21 @@ public:
             return input;
 		}, new EffectParameter("Focal length", "focalLength", 1.0, 0.0, 2.0)
     );
+
+    std::atomic<bool> fixedRotateX = false;
+    std::atomic<bool> fixedRotateY = false;
+    std::atomic<bool> fixedRotateZ = false;
     std::shared_ptr<Effect> rotateX = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
                 auto obj = getCurrentFileParser()->getObject();
                 if (obj == nullptr) return input;
-                obj->setBaseRotationX(values[0] * std::numbers::pi);
+                auto rotation = values[0] * std::numbers::pi;
+                if (fixedRotateX) {
+                    obj->setCurrentRotationX(rotation);
+                } else {
+                    obj->setBaseRotationX(rotation);
+                }
             }
             return input;
         }, new EffectParameter("Rotate x", "rotateX", 1.0, -1.0, 1.0)
@@ -120,7 +129,12 @@ public:
             if (getCurrentFileIndex() != -1) {
                 auto obj = getCurrentFileParser()->getObject();
                 if (obj == nullptr) return input;
-                obj->setBaseRotationY(values[0] * std::numbers::pi);
+                auto rotation = values[0] * std::numbers::pi;
+                if (fixedRotateY) {
+                    obj->setCurrentRotationY(rotation);
+                } else {
+                    obj->setBaseRotationY(rotation);
+                }
             }
             return input;
         }, new EffectParameter("Rotate y", "rotateY", 1.0, -1.0, 1.0)
@@ -130,40 +144,15 @@ public:
             if (getCurrentFileIndex() != -1) {
                 auto obj = getCurrentFileParser()->getObject();
                 if (obj == nullptr) return input;
-                obj->setBaseRotationZ(values[0] * std::numbers::pi);
+                auto rotation = values[0] * std::numbers::pi;
+                if (fixedRotateZ) {
+                    obj->setCurrentRotationZ(rotation);
+                } else {
+                    obj->setBaseRotationZ(rotation);
+                }
             }
             return input;
         }, new EffectParameter("Rotate z", "rotateZ", 0.0, -1.0, 1.0)
-    );
-    std::shared_ptr<Effect> currentRotateX = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
-            if (getCurrentFileIndex() != -1) {
-                auto obj = getCurrentFileParser()->getObject();
-                if (obj == nullptr) return input;
-                obj->setCurrentRotationX(values[0] * std::numbers::pi);
-            }
-            return input;
-        }, new EffectParameter("Current Rotate x", "currentRotateX", 0.0, 0.0, 1.0, 0.001, false)
-    );
-    std::shared_ptr<Effect> currentRotateY = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
-            if (getCurrentFileIndex() != -1) {
-                auto obj = getCurrentFileParser()->getObject();
-                if (obj == nullptr) return input;
-                obj->setCurrentRotationY(values[0] * std::numbers::pi);
-            }
-            return input;
-        }, new EffectParameter("Current Rotate y", "currentRotateY", 0.0, 0.0, 1.0, 0.001, false)
-    );
-    std::shared_ptr<Effect> currentRotateZ = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
-            if (getCurrentFileIndex() != -1) {
-                auto obj = getCurrentFileParser()->getObject();
-                if (obj == nullptr) return input;
-                obj->setCurrentRotationZ(values[0] * std::numbers::pi);
-            }
-            return input;
-        }, new EffectParameter("Current Rotate z", "currentRotateZ", 0.0, 0.0, 1.0, 0.001, false)
     );
     std::shared_ptr<Effect> rotateSpeed = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
@@ -175,9 +164,6 @@ public:
             return input;
 		}, new EffectParameter("Rotate speed", "rotateSpeed", 0.0, -1.0, 1.0)
     );
-    std::atomic<bool> fixedRotateX = false;
-    std::atomic<bool> fixedRotateY = false;
-    std::atomic<bool> fixedRotateZ = false;
 
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
     
@@ -227,9 +213,6 @@ private:
     bool invalidateFrameBuffer = false;
 
     std::vector<std::shared_ptr<Effect>> permanentEffects;
-    // any effects that are not added as a plugin parameter must be deleted manually
-    // as JUCE will not delete them upon destruction of the AudioProcessor
-    std::vector<std::shared_ptr<Effect>> hiddenEffects;
 
     std::shared_ptr<Effect> traceMax = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {

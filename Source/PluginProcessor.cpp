@@ -50,15 +50,22 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<VectorCancellingEffect>(),
-        new EffectParameter("Vector cancelling", "vectorCancelling", 0.0, 0.0, 1.0)
-    ));
-    toggleableEffects.push_back(std::make_shared<Effect>(
-        std::make_shared<DistortEffect>(true),
-        new EffectParameter("Vertical shift", "verticalDistort", 0.0, 0.0, 1.0)
+        new EffectParameter("Vector Cancelling", "vectorCancelling", 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<DistortEffect>(false),
-        new EffectParameter("Horizontal shift", "horizontalDistort", 0.0, 0.0, 1.0)
+        new EffectParameter("Horizontal Distort", "horizontalDistort", 0.0, 0.0, 1.0)
+    ));
+    toggleableEffects.push_back(std::make_shared<Effect>(
+        std::make_shared<DistortEffect>(true),
+        new EffectParameter("Vertical Distort", "verticalDistort", 0.0, 0.0, 1.0)
+    ));
+    toggleableEffects.push_back(std::make_shared<Effect>(
+        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+            input.x += values[0];
+            input.y += values[1];
+            return input;
+        }, std::vector<EffectParameter*>{new EffectParameter("Translate x", "translateX", 0.0, -1.0, 1.0), new EffectParameter("Translate y", "translateY", 0.0, -1.0, 1.0)}
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<SmoothEffect>(),
@@ -103,19 +110,9 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
             addParameter(parameter);
         }
     }
-
-    hiddenEffects.push_back(currentRotateX);
-    hiddenEffects.push_back(currentRotateY);
-    hiddenEffects.push_back(currentRotateZ);
 }
 
-OscirenderAudioProcessor::~OscirenderAudioProcessor() {
-    for (auto effect : hiddenEffects) {
-        for (auto parameter : effect->parameters) {
-            delete parameter;
-        }
-    }
-}
+OscirenderAudioProcessor::~OscirenderAudioProcessor() {}
 
 const juce::String OscirenderAudioProcessor::getName() const {
     return JucePlugin_Name;

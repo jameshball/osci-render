@@ -22,25 +22,9 @@ ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 
 	auto onRotationChange = [this]() {
 		juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
-		double x = fixedRotateX->getToggleState() ? 0 : rotateX.slider.getValue();
-		double y = fixedRotateY->getToggleState() ? 0 : rotateY.slider.getValue();
-		double z = fixedRotateZ->getToggleState() ? 0 : rotateZ.slider.getValue();
-		audioProcessor.rotateX->setValue(x);
-		audioProcessor.rotateY->setValue(y);
-		audioProcessor.rotateZ->setValue(z);
-
-		if (fixedRotateX->getToggleState()) {
-			audioProcessor.currentRotateX->setValue(rotateX.slider.getValue());
-			audioProcessor.currentRotateX->apply();
-		}
-		if (fixedRotateY->getToggleState()) {
-			audioProcessor.currentRotateY->setValue(rotateY.slider.getValue());
-			audioProcessor.currentRotateY->apply();
-		}
-		if (fixedRotateZ->getToggleState()) {
-			audioProcessor.currentRotateZ->setValue(rotateZ.slider.getValue());
-			audioProcessor.currentRotateZ->apply();
-		}
+		audioProcessor.rotateX->setValue(rotateX.slider.getValue());
+		audioProcessor.rotateY->setValue(rotateY.slider.getValue());
+		audioProcessor.rotateZ->setValue(rotateZ.slider.getValue());
 
 		audioProcessor.fixedRotateX = fixedRotateX->getToggleState();
 		audioProcessor.fixedRotateY = fixedRotateY->getToggleState();
@@ -73,12 +57,14 @@ ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 		mouseRotate.setToggleState(false, juce::NotificationType::dontSendNotification);
 
 		juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
-		audioProcessor.currentRotateX->setValue(0);
-		audioProcessor.currentRotateY->setValue(0);
-		audioProcessor.currentRotateZ->setValue(0);
-		audioProcessor.currentRotateX->apply();
-		audioProcessor.currentRotateY->apply();
-		audioProcessor.currentRotateZ->apply();
+		if (audioProcessor.getCurrentFileIndex() != -1) {
+			auto obj = audioProcessor.getCurrentFileParser()->getObject();
+			if (obj != nullptr) {
+				obj->setCurrentRotationX(0);
+				obj->setCurrentRotationY(0);
+				obj->setCurrentRotationZ(0);
+			}
+		}
 	};
 
 	auto doc = juce::XmlDocument::parse(BinaryData::fixed_rotate_svg);
