@@ -106,8 +106,11 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     effects.insert(effects.end(), luaEffects.begin(), luaEffects.end());
 
     for (auto effect : effects) {
-        for (auto parameter : effect->parameters) {
-            addParameter(parameter);
+        for (auto effectParameter : effect->parameters) {
+            auto parameters = effectParameter->getParameters();
+            for (auto parameter : parameters) {
+                addParameter(parameter);
+            }
         }
     }
 }

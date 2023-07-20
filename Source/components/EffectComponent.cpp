@@ -42,11 +42,11 @@ void EffectComponent::setupComponent() {
     bool enabled = effect.enabled == nullptr || effect.enabled->getValue();
     selected.setToggleState(enabled, juce::dontSendNotification);
 
-    lfo.setSelectedId(static_cast<int>(parameter->lfoType.load()), juce::dontSendNotification);
+    lfo.setSelectedId(parameter->lfo->getValueUnnormalised(), juce::dontSendNotification);
 
     lfo.onChange = [this]() {
         if (lfo.getSelectedId() != 0) {
-            effect.parameters[index]->lfoType = static_cast<LfoType>(lfo.getSelectedId());
+            effect.parameters[index]->lfo->setUnnormalisedValueNotifyingHost(lfo.getSelectedId());
         }
     };
 

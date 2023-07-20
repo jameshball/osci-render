@@ -55,16 +55,20 @@ void Effect::setPrecedence(int precedence) {
 
 void Effect::addListener(int index, juce::AudioProcessorParameter::Listener* listener) {
 	parameters[index]->addListener(listener);
+	parameters[index]->lfo->addListener(listener);
+	parameters[index]->lfoRate->addListener(listener);
 	if (enabled != nullptr) {
 		enabled->addListener(listener);
 	}
 }
 
 void Effect::removeListener(int index, juce::AudioProcessorParameter::Listener* listener) {
-    parameters[index]->removeListener(listener);
 	if (enabled != nullptr) {
 		enabled->removeListener(listener);
 	}
+	parameters[index]->lfoRate->removeListener(listener);
+	parameters[index]->lfo->removeListener(listener);
+    parameters[index]->removeListener(listener);
 }
 
 void Effect::markEnableable(bool enable) {
