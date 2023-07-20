@@ -217,10 +217,60 @@ enum class LfoType : int {
 	Noise = 8
 };
 
+class LfoTypeParameter : public IntParameter {
+public:
+	LfoTypeParameter(juce::String name, juce::String id, int value) : IntParameter(name, id, value, 1, 8) {}
+
+	juce::String getText(float value, int maximumStringLength) const override {
+		switch ((LfoType)(int)getUnnormalisedValue(value)) {
+            case LfoType::Static:
+                return "Static";
+            case LfoType::Sine:
+                return "Sine";
+            case LfoType::Square:
+                return "Square";
+            case LfoType::Seesaw:
+                return "Seesaw";
+            case LfoType::Triangle:
+                return "Triangle";
+            case LfoType::Sawtooth:
+                return "Sawtooth";
+            case LfoType::ReverseSawtooth:
+                return "Reverse Sawtooth";
+            case LfoType::Noise:
+                return "Noise";
+            default:
+                return "Unknown";
+        }
+	}
+
+	float getValueForText(const juce::String& text) const override {
+		if (text == "Static") {
+            return (int)LfoType::Static;
+		} else if (text == "Sine") {
+            return (int)LfoType::Sine;
+		} else if (text == "Square") {
+            return (int)LfoType::Square;
+		} else if (text == "Seesaw") {
+            return (int)LfoType::Seesaw;
+		} else if (text == "Triangle") {
+            return (int)LfoType::Triangle;
+		} else if (text == "Sawtooth") {
+            return (int)LfoType::Sawtooth;
+		} else if (text == "Reverse Sawtooth") {
+            return (int)LfoType::ReverseSawtooth;
+		} else if (text == "Noise") {
+            return (int)LfoType::Noise;
+		} else {
+            return (int)LfoType::Static;
+        }
+	}
+};
+
 class EffectParameter : public FloatParameter {
 public:
 	std::atomic<bool> smoothValueChange = true;
-	IntParameter* lfo = new IntParameter(name + " LFO", id + "Lfo", 1, 1, 8);
+	LfoTypeParameter* lfo = new LfoTypeParameter(name + " LFO", id + "Lfo", 1);
 	FloatParameter* lfoRate = new FloatParameter(name + " LFO Rate", id + "LfoRate", 1.0f, 0.0f, 100.0f, 0.1f, "Hz");
 	std::atomic<float> phase = 0.0f;
 

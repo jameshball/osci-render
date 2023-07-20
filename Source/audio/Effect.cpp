@@ -31,30 +31,36 @@ void Effect::animateValues() {
 		float phase = nextPhase(parameter);
 		float percentage = phase / (2 * std::numbers::pi);
 
-		switch ((int) parameter->lfo->getValueUnnormalised()) {
-			case static_cast<int>(LfoType::Sine):
+		switch ((LfoType)(int) parameter->lfo->getValueUnnormalised()) {
+			case LfoType::Sine:
 				actualValues[i] = std::sin(phase) * 0.5 + 0.5;
 				actualValues[i] = actualValues[i] * (maxValue - minValue) + minValue;
                 break;
-			case static_cast<int>(LfoType::Square):
+			case LfoType::Square:
 				actualValues[i] = (percentage < 0.5) ? maxValue : minValue;
 				break;
-			case static_cast<int>(LfoType::Seesaw):
+			case LfoType::Seesaw:
 				// modified sigmoid function
 				actualValues[i] = (percentage < 0.5) ? percentage * 2 : (1 - percentage) * 2;
 				actualValues[i] = 1 / (1 + std::exp(-16 * (actualValues[i] - 0.5)));
 				actualValues[i] = actualValues[i] * (maxValue - minValue) + minValue;
 				break;
-			case static_cast<int>(LfoType::Triangle):
+			case LfoType::Triangle:
 				actualValues[i] = (percentage < 0.5) ? percentage * 2 : (1 - percentage) * 2;
 				actualValues[i] = actualValues[i] * (maxValue - minValue) + minValue;
 				break;
-			case static_cast<int>(LfoType::Sawtooth):
+			case LfoType::Sawtooth:
 				actualValues[i] = percentage * (maxValue - minValue) + minValue;
 				break;
-			case static_cast<int>(LfoType::ReverseSawtooth):
+			case LfoType::ReverseSawtooth:
 				actualValues[i] = (1 - percentage) * (maxValue - minValue) + minValue;
 				break;
+			case LfoType::Noise:
+			{
+				float noise = (float)rand() / RAND_MAX;
+				actualValues[i] = noise * (maxValue - minValue) + minValue;
+				break;
+			}
 			default:
 				double weight = parameter->smoothValueChange ? 0.0005 : 1.0;
 				actualValues[i] = (1.0 - weight) * actualValues[i] + weight * parameter->getValueUnnormalised();
