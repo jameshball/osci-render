@@ -2,6 +2,17 @@
 #include "../shape/Vector2.h"
 #include <JuceHeader.h>
 
+enum class LfoType : int {
+	Static = 1,
+    Sine = 2,
+    Square = 3,
+	Seesaw = 4,
+    Triangle = 5,
+    Sawtooth = 6,
+    ReverseSawtooth = 7,
+    Noise = 8
+};
+
 class EffectParameter : public juce::AudioProcessorParameter {
 public:
 	juce::String name;
@@ -11,6 +22,7 @@ public:
 	std::atomic<float> max = 1.0;
 	std::atomic<float> step = 0.001;
 	std::atomic<bool> smoothValueChange = true;
+	std::atomic<LfoType> lfoType = LfoType::Static;
 
 	EffectParameter(juce::String name, juce::String id, float value, float min, float max, float step = 0.001, bool smoothValueChange = true) : name(name), id(id), value(value), min(min), max(max), step(step), smoothValueChange(smoothValueChange) {}
 

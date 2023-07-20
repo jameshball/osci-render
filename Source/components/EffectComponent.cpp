@@ -3,6 +3,19 @@
 EffectComponent::EffectComponent(Effect& effect, int index) : effect(effect), index(index) {
     addAndMakeVisible(slider);
     addAndMakeVisible(selected);
+    addAndMakeVisible(lfo);
+
+    lfo.addItem("Static", static_cast<int>(LfoType::Static));
+    lfo.addItem("Sine", static_cast<int>(LfoType::Sine));
+    lfo.addItem("Square", static_cast<int>(LfoType::Square));
+    lfo.addItem("Seesaw", static_cast<int>(LfoType::Seesaw));
+    lfo.addItem("Triangle", static_cast<int>(LfoType::Triangle));
+    lfo.addItem("Sawtooth", static_cast<int>(LfoType::Sawtooth));
+    lfo.addItem("Reverse Sawtooth", static_cast<int>(LfoType::ReverseSawtooth));
+    lfo.addItem("Noise", static_cast<int>(LfoType::Noise));
+
+    lfo.setLookAndFeel(&lfoLookAndFeel);
+
     effect.addListener(index, this);
     setupComponent();
 }
@@ -24,10 +37,18 @@ void EffectComponent::setupComponent() {
     slider.setValue(parameter->getValueUnnormalised(), juce::dontSendNotification);
 
     slider.setSliderStyle(juce::Slider::LinearHorizontal);
-    slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 90, slider.getTextBoxHeight());
+    slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 70, slider.getTextBoxHeight());
 
     bool enabled = effect.enabled == nullptr || effect.enabled->getValue();
     selected.setToggleState(enabled, juce::dontSendNotification);
+
+    lfo.setSelectedId(static_cast<int>(parameter->lfoType.load()), juce::dontSendNotification);
+
+    lfo.onChange = [this]() {
+        if (lfo.getSelectedId() != 0) {
+            effect.parameters[index]->lfoType = static_cast<LfoType>(lfo.getSelectedId());
+        }
+    };
 
     min.textBox.setValue(parameter->min, juce::dontSendNotification);
     max.textBox.setValue(parameter->max, juce::dontSendNotification);
@@ -65,21 +86,24 @@ EffectComponent::~EffectComponent() {
 }
 
 void EffectComponent::resized() {
-    auto sliderRight = getWidth() - 160;
     auto bounds = getLocalBounds();
     auto componentBounds = bounds.removeFromRight(25);
     if (component != nullptr) {
 		component->setBounds(componentBounds);
 	}
 
-    slider.setBounds(bounds.removeFromRight(sliderRight));
+    lfo.setBounds(bounds.removeFromRight(100).reduced(5));
+
+    auto checkboxLabel = bounds.removeFromLeft(110);
+
     if (checkboxVisible) {
-        bounds.removeFromLeft(2);
-        selected.setBounds(bounds.removeFromLeft(25));
+        checkboxLabel.removeFromLeft(2);
+        selected.setBounds(checkboxLabel.removeFromLeft(25));
     } else {
-        bounds.removeFromLeft(5);
+        checkboxLabel.removeFromLeft(5);
     }
-    textBounds = bounds;
+    textBounds = checkboxLabel;
+    slider.setBounds(bounds);
 }
 
 void EffectComponent::paint(juce::Graphics& g) {

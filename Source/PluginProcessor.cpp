@@ -46,26 +46,26 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<RotateEffect>(),
-        new EffectParameter("2D Rotate Speed", "rotateSpeed", 0.0, 0.0, 1.0)
+        new EffectParameter("2D Rotate", "rotateSpeed", 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<VectorCancellingEffect>(),
-        new EffectParameter("Vector Cancelling", "vectorCancelling", 0.0, 0.0, 1.0)
+        new EffectParameter("Vector Cancel", "vectorCancelling", 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<DistortEffect>(false),
-        new EffectParameter("Horizontal Distort", "horizontalDistort", 0.0, 0.0, 1.0)
+        new EffectParameter("X Distort", "horizontalDistort", 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<DistortEffect>(true),
-        new EffectParameter("Vertical Distort", "verticalDistort", 0.0, 0.0, 1.0)
+        new EffectParameter("Y Distort", "verticalDistort", 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             input.x += values[0];
             input.y += values[1];
             return input;
-        }, std::vector<EffectParameter*>{new EffectParameter("Translate x", "translateX", 0.0, -1.0, 1.0), new EffectParameter("Translate y", "translateY", 0.0, -1.0, 1.0)}
+        }, std::vector<EffectParameter*>{new EffectParameter("Translate X", "translateX", 0.0, -1.0, 1.0), new EffectParameter("Translate Y", "translateY", 0.0, -1.0, 1.0)}
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<SmoothEffect>(),

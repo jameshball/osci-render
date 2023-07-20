@@ -122,7 +122,7 @@ public:
                 }
             }
             return input;
-        }, new EffectParameter("Rotate x", "rotateX", 1.0, -1.0, 1.0)
+        }, new EffectParameter("Rotate X", "rotateX", 1.0, -1.0, 1.0)
     );
     std::shared_ptr<Effect> rotateY = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
@@ -137,7 +137,7 @@ public:
                 }
             }
             return input;
-        }, new EffectParameter("Rotate y", "rotateY", 1.0, -1.0, 1.0)
+        }, new EffectParameter("Rotate Y", "rotateY", 1.0, -1.0, 1.0)
     );
     std::shared_ptr<Effect> rotateZ = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
@@ -152,7 +152,7 @@ public:
                 }
             }
             return input;
-        }, new EffectParameter("Rotate z", "rotateZ", 0.0, -1.0, 1.0)
+        }, new EffectParameter("Rotate Z", "rotateZ", 0.0, -1.0, 1.0)
     );
     std::shared_ptr<Effect> rotateSpeed = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
@@ -162,7 +162,7 @@ public:
                 obj->setRotationSpeed(values[0]);
             }
             return input;
-		}, new EffectParameter("Rotate speed", "rotateSpeed", 0.0, -1.0, 1.0)
+		}, new EffectParameter("Rotate Speed", "rotateSpeed", 0.0, -1.0, 1.0)
     );
 
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
