@@ -222,6 +222,7 @@ public:
 	std::atomic<bool> smoothValueChange = true;
 	IntParameter* lfo = new IntParameter(name + " LFO", id + "Lfo", 1, 1, 8);
 	FloatParameter* lfoRate = new FloatParameter(name + " LFO Rate", id + "LfoRate", 1.0f, 0.0f, 100.0f, 0.1f, "Hz");
+	std::atomic<float> phase = 0.0f;
 
 	std::vector<juce::AudioProcessorParameter*> getParameters() {
         return { this, lfo, lfoRate };
