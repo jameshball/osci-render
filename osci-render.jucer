@@ -54,6 +54,10 @@
               file="Source/audio/EffectParameter.h"/>
         <FILE id="uhyh7T" name="LuaEffect.cpp" compile="1" resource="0" file="Source/audio/LuaEffect.cpp"/>
         <FILE id="jqDcZq" name="LuaEffect.h" compile="0" resource="0" file="Source/audio/LuaEffect.h"/>
+        <FILE id="QBWW9w" name="PerspectiveEffect.cpp" compile="1" resource="0"
+              file="Source/audio/PerspectiveEffect.cpp"/>
+        <FILE id="h0dMim" name="PerspectiveEffect.h" compile="0" resource="0"
+              file="Source/audio/PerspectiveEffect.h"/>
         <FILE id="t2bsR8" name="PitchDetector.cpp" compile="1" resource="0"
               file="Source/audio/PitchDetector.cpp"/>
         <FILE id="rQC2gX" name="PitchDetector.h" compile="0" resource="0" file="Source/audio/PitchDetector.h"/>

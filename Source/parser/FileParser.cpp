@@ -48,7 +48,11 @@ Vector2 FileParser::nextSample() {
 	juce::SpinLock::ScopedLockType scope(lock);
 
 	if (lua != nullptr) {
-		return lua->draw();
+		auto values = lua->run();
+		if (values.size() < 2) {
+            return Vector2();
+        }
+		return Vector2(values[0], values[1]);
 	}
 }
 

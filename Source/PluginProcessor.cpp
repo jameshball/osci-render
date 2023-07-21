@@ -79,6 +79,17 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         delayEffect,
         std::vector<EffectParameter*>{new EffectParameter("Delay Decay", "delayDecay", 0.0, 0.0, 1.0), new EffectParameter("Delay Length", "delayEchoLength", 0.5, 0.0, 1.0)}
     ));
+    toggleableEffects.push_back(std::make_shared<Effect>(
+        perspectiveEffect,
+        std::vector<EffectParameter*>{
+            new EffectParameter("3D Perspective", "depthScale", 0.0, 0.0, 1.0),
+            new EffectParameter("3D Depth (z)", "zPos", 0.1, 0.0, 1.0),
+            new EffectParameter("3D Rotate Speed", "rotateSpeed3D", 0.0, -1.0, 1.0),
+            new EffectParameter("Rotate X", "rotateX", 1.0, -1.0, 1.0),
+            new EffectParameter("Rotate Y", "rotateY", 1.0, -1.0, 1.0),
+            new EffectParameter("Rotate Z", "rotateZ", 0.0, -1.0, 1.0),
+        }
+    ));
     toggleableEffects.push_back(traceMax);
     toggleableEffects.push_back(traceMin);
 
