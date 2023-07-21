@@ -51,6 +51,7 @@ public:
     void setComponent(std::shared_ptr<juce::Component> component);
 
     juce::Slider slider;
+    juce::Slider lfoSlider;
     Effect& effect;
     int index;
     juce::ToggleButton selected;

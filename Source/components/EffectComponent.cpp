@@ -2,6 +2,7 @@
 
 EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, int index) : effect(effect), index(index), audioProcessor(p) {
     addAndMakeVisible(slider);
+    addAndMakeVisible(lfoSlider);
     addAndMakeVisible(selected);
     addAndMakeVisible(lfo);
 
@@ -49,7 +50,35 @@ void EffectComponent::setupComponent() {
         lfo.onChange = [this]() {
             if (lfo.getSelectedId() != 0) {
                 effect.parameters[index]->lfo->setUnnormalisedValueNotifyingHost(lfo.getSelectedId());
+
+                if (lfo.getSelectedId() == static_cast<int>(LfoType::Static)) {
+                    lfoSlider.setVisible(false);
+                    slider.setVisible(true);
+                } else {
+                    lfoSlider.setVisible(true);
+                    slider.setVisible(false);
+                }
             }
+        };
+
+        lfoSlider.setRange(parameter->lfoRate->min, parameter->lfoRate->max, parameter->lfoRate->step);
+        lfoSlider.setValue(parameter->lfoRate->getValueUnnormalised(), juce::dontSendNotification);
+
+        if (lfo.getSelectedId() == static_cast<int>(LfoType::Static)) {
+            lfoSlider.setVisible(false);
+            slider.setVisible(true);
+        } else {
+            lfoSlider.setVisible(true);
+            slider.setVisible(false);
+        }
+
+        lfoSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+        lfoSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 70, lfoSlider.getTextBoxHeight());
+        lfoSlider.setTextValueSuffix("Hz");
+        lfoSlider.setColour(juce::Slider::thumbColourId, juce::Colour(0xff00ff00));
+
+        lfoSlider.onValueChange = [this]() {
+            effect.parameters[index]->lfoRate->setUnnormalisedValueNotifyingHost(lfoSlider.getValue());
         };
     }
     
@@ -109,6 +138,7 @@ void EffectComponent::resized() {
     }
     textBounds = checkboxLabel;
     slider.setBounds(bounds);
+    lfoSlider.setBounds(bounds);
 }
 
 void EffectComponent::paint(juce::Graphics& g) {

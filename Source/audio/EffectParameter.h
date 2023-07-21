@@ -107,7 +107,7 @@ public:
 	std::atomic<int> min = 0;
 	std::atomic<int> max = 10;
 
-	IntParameter(juce::String name, juce::String id, int value, int min, int max) : AudioProcessorParameterWithID(name, id), value(value), min(min), max(max) {}
+	IntParameter(juce::String name, juce::String id, int value, int min, int max) : AudioProcessorParameterWithID(id, name), value(value), min(min), max(max) {}
 
 	juce::String getName(int maximumStringLength) const override {
 		return name.substring(0, maximumStringLength);
