@@ -15,6 +15,16 @@ Vector2 PerspectiveEffect::apply(int index, Vector2 input, const std::vector<dou
 	currentRotateY += baseRotateY * rotateSpeed;
 	currentRotateZ += baseRotateZ * rotateSpeed;
 
+	if (currentRotateX > std::numbers::pi * 50) {
+        currentRotateX -= std::numbers::pi * 50;
+    }
+	if (currentRotateY > std::numbers::pi * 50) {
+        currentRotateY -= std::numbers::pi * 50;
+    }
+	if (currentRotateZ > std::numbers::pi * 50) {
+        currentRotateZ -= std::numbers::pi * 50;
+    }
+
 	auto x = input.x;
 	auto y = input.y;
 	auto z = 0.0;

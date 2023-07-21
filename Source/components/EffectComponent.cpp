@@ -2,7 +2,7 @@
 
 EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, int index) : effect(effect), index(index), audioProcessor(p) {
     addAndMakeVisible(slider);
-    addAndMakeVisible(lfoSlider);
+    addChildComponent(lfoSlider);
     addAndMakeVisible(selected);
     addAndMakeVisible(lfo);
 

@@ -61,25 +61,6 @@ function rotate(point, rotate_x, rotate_y, rotate_z)
 end
 
 num_points = 16
--- 3D cube draw path
-points = {
-  {x=-1.0, y=-1.0, z=1.0},
-  {x=1.0, y=-1.0, z=1.0},
-  {x=1.0, y=-1.0, z=-1.0},
-  {x=-1.0, y=-1.0, z=-1.0},
-  {x=1.0, y=-1.0, z=-1.0},
-  {x=1.0, y=1.0, z=-1.0},
-  {x=-1.0, y=1.0, z=-1.0},
-  {x=-1.0, y=-1.0, z=-1.0},
-  {x=-1.0, y=-1.0, z=1.0},
-  {x=1.0, y=-1.0, z=1.0},
-  {x=1.0, y=1.0, z=1.0},
-  {x=-1.0, y=1.0, z=1.0},
-  {x=1.0, y=1.0, z=1.0},
-  {x=1.0, y=1.0, z=-1.0},
-  {x=-1.0, y=1.0, z=-1.0},
-  {x=-1.0, y=1.0, z=1.0}
-}
 
 -- Percentage of the image that has currently been drawn.
 -- The 'or' syntax sets 'drawing_progress' to 0 initially, or the
@@ -104,6 +85,25 @@ end
 -- prev_start ~= start_index == true whenever a new line has started
 if prev_start ~= start_index then
   rotate_speed = slider_d * step / 50000
+  -- 3D cube draw path
+  points = {
+    {x=-1.0, y=-1.0, z=1.0},
+    {x=1.0, y=-1.0, z=1.0},
+    {x=1.0, y=-1.0, z=-1.0},
+    {x=-1.0, y=-1.0, z=-1.0},
+    {x=1.0, y=-1.0, z=-1.0},
+    {x=1.0, y=1.0, z=-1.0},
+    {x=-1.0, y=1.0, z=-1.0},
+    {x=-1.0, y=-1.0, z=-1.0},
+    {x=-1.0, y=-1.0, z=1.0},
+    {x=1.0, y=-1.0, z=1.0},
+    {x=1.0, y=1.0, z=1.0},
+    {x=-1.0, y=1.0, z=1.0},
+    {x=1.0, y=1.0, z=1.0},
+    {x=1.0, y=1.0, z=-1.0},
+    {x=-1.0, y=1.0, z=-1.0},
+    {x=-1.0, y=1.0, z=1.0}
+  }
   -- rotate and project the start and end points
   proj_start = project(rotate(points[start_index], rotate_speed, rotate_speed, 0))
   proj_end = project(rotate(points[end_index], rotate_speed, rotate_speed, 0))
