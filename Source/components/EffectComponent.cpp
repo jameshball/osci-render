@@ -1,6 +1,6 @@
 #include "EffectComponent.h"
 
-EffectComponent::EffectComponent(Effect& effect, int index) : effect(effect), index(index) {
+EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, int index) : effect(effect), index(index), audioProcessor(p) {
     addAndMakeVisible(slider);
     addAndMakeVisible(selected);
     addAndMakeVisible(lfo);
@@ -20,13 +20,13 @@ EffectComponent::EffectComponent(Effect& effect, int index) : effect(effect), in
     setupComponent();
 }
 
-EffectComponent::EffectComponent(Effect& effect, int index, bool checkboxVisible) : EffectComponent(effect, index) {
+EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, int index, bool checkboxVisible) : EffectComponent(p, effect, index) {
     setCheckboxVisible(checkboxVisible);
 }
 
-EffectComponent::EffectComponent(Effect& effect) : EffectComponent(effect, 0) {}
+EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect) : EffectComponent(p, effect, 0) {}
 
-EffectComponent::EffectComponent(Effect& effect, bool checkboxVisible) : EffectComponent(effect) {
+EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, bool checkboxVisible) : EffectComponent(p, effect) {
     setCheckboxVisible(checkboxVisible);
 }
 
@@ -42,14 +42,17 @@ void EffectComponent::setupComponent() {
     bool enabled = effect.enabled == nullptr || effect.enabled->getValue();
     selected.setToggleState(enabled, juce::dontSendNotification);
 
-    lfo.setSelectedId(parameter->lfo->getValueUnnormalised(), juce::dontSendNotification);
+    lfoEnabled = parameter->lfo != nullptr && parameter->lfoRate != nullptr;
+    if (lfoEnabled) {
+        lfo.setSelectedId(parameter->lfo->getValueUnnormalised(), juce::dontSendNotification);
 
-    lfo.onChange = [this]() {
-        if (lfo.getSelectedId() != 0) {
-            effect.parameters[index]->lfo->setUnnormalisedValueNotifyingHost(lfo.getSelectedId());
-        }
-    };
-
+        lfo.onChange = [this]() {
+            if (lfo.getSelectedId() != 0) {
+                effect.parameters[index]->lfo->setUnnormalisedValueNotifyingHost(lfo.getSelectedId());
+            }
+        };
+    }
+    
     min.textBox.setValue(parameter->min, juce::dontSendNotification);
     max.textBox.setValue(parameter->max, juce::dontSendNotification);
 
@@ -92,7 +95,9 @@ void EffectComponent::resized() {
 		component->setBounds(componentBounds);
 	}
 
-    lfo.setBounds(bounds.removeFromRight(100).reduced(5));
+    if (lfoEnabled) {
+        lfo.setBounds(bounds.removeFromRight(100).reduced(5));
+    }
 
     auto checkboxLabel = bounds.removeFromLeft(110);
 
@@ -132,6 +137,11 @@ void EffectComponent::parameterGestureChanged(int parameterIndex, bool gestureIs
 
 void EffectComponent::handleAsyncUpdate() {
     setupComponent();
+    juce::SpinLock::ScopedLockType lock1(audioProcessor.parsersLock);
+    juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
+    if (effect.getId().contains("lua")) {
+        effect.apply();
+    }
 }
 
 void EffectComponent::setComponent(std::shared_ptr<juce::Component> component) {

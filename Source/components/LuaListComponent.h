@@ -28,7 +28,7 @@ public:
     juce::Component* refreshComponentForRow(int sliderNum, bool isRowSelected, juce::Component *existingComponentToUpdate) override;
 
 private:
-    int numSliders = 5;
+    int numSliders = 26;
     juce::ListBox& listBox;
     OscirenderAudioProcessor& audioProcessor;
 };

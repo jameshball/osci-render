@@ -34,10 +34,10 @@ class SmallComboBoxArrow : public juce::LookAndFeel_V4 {
 
 class EffectComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater {
 public:
-    EffectComponent(Effect& effect, int index);
-    EffectComponent(Effect& effect, int index, bool checkboxVisible);
-    EffectComponent(Effect& effect);
-    EffectComponent(Effect& effect, bool checkboxVisible);
+    EffectComponent(OscirenderAudioProcessor& p, Effect& effect, int index);
+    EffectComponent(OscirenderAudioProcessor& p, Effect& effect, int index, bool checkboxVisible);
+    EffectComponent(OscirenderAudioProcessor& p, Effect& effect);
+    EffectComponent(OscirenderAudioProcessor& p, Effect& effect, bool checkboxVisible);
     ~EffectComponent();
 
     void resized() override;
@@ -60,8 +60,10 @@ public:
 private:
     void setupComponent();
     bool checkboxVisible = true;
+    bool lfoEnabled = true;
     juce::Rectangle<int> textBounds;
     std::shared_ptr<juce::Component> component;
+    OscirenderAudioProcessor& audioProcessor;
 
     juce::Label popupLabel;
     LabelledTextBox min{"Min"};

@@ -28,10 +28,11 @@ void Effect::animateValues() {
 		auto parameter = parameters[i];
 		float minValue = parameter->min;
 		float maxValue = parameter->max;
-		float phase = nextPhase(parameter);
+		float phase = parameter->lfo != nullptr ? nextPhase(parameter) : 0.0;
 		float percentage = phase / (2 * std::numbers::pi);
+		LfoType type = parameter->lfo != nullptr ? (LfoType)(int)parameter->lfo->getValueUnnormalised() : LfoType::Static;
 
-		switch ((LfoType)(int) parameter->lfo->getValueUnnormalised()) {
+		switch (type) {
 			case LfoType::Sine:
 				actualValues[i] = std::sin(phase) * 0.5 + 0.5;
 				actualValues[i] = actualValues[i] * (maxValue - minValue) + minValue;
@@ -56,11 +57,8 @@ void Effect::animateValues() {
 				actualValues[i] = (1 - percentage) * (maxValue - minValue) + minValue;
 				break;
 			case LfoType::Noise:
-			{
-				float noise = (float)rand() / RAND_MAX;
-				actualValues[i] = noise * (maxValue - minValue) + minValue;
+				actualValues[i] = ((float)rand() / RAND_MAX) * (maxValue - minValue) + minValue;
 				break;
-			}
 			default:
 				double weight = parameter->smoothValueChange ? 0.0005 : 1.0;
 				actualValues[i] = (1.0 - weight) * actualValues[i] + weight * parameter->getValueUnnormalised();
@@ -110,8 +108,12 @@ void Effect::setPrecedence(int precedence) {
 
 void Effect::addListener(int index, juce::AudioProcessorParameter::Listener* listener) {
 	parameters[index]->addListener(listener);
-	parameters[index]->lfo->addListener(listener);
-	parameters[index]->lfoRate->addListener(listener);
+	if (parameters[index]->lfo != nullptr) {
+		parameters[index]->lfo->addListener(listener);
+	}
+	if (parameters[index]->lfoRate != nullptr) {
+		parameters[index]->lfoRate->addListener(listener);
+	}
 	if (enabled != nullptr) {
 		enabled->addListener(listener);
 	}
@@ -121,8 +123,12 @@ void Effect::removeListener(int index, juce::AudioProcessorParameter::Listener* 
 	if (enabled != nullptr) {
 		enabled->removeListener(listener);
 	}
-	parameters[index]->lfoRate->removeListener(listener);
-	parameters[index]->lfo->removeListener(listener);
+	if (parameters[index]->lfoRate != nullptr) {
+		parameters[index]->lfoRate->removeListener(listener);
+	}
+	if (parameters[index]->lfo != nullptr) {
+		parameters[index]->lfo->removeListener(listener);
+	}
     parameters[index]->removeListener(listener);
 }
 
@@ -135,7 +141,7 @@ void Effect::markEnableable(bool enable) {
 }
 
 juce::String Effect::getId() {
-	return parameters[0]->id;
+	return parameters[0]->paramID;
 }
 
 juce::String Effect::getName() {

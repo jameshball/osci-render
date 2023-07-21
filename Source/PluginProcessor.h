@@ -162,7 +162,7 @@ public:
                 obj->setRotationSpeed(values[0]);
             }
             return input;
-		}, new EffectParameter("Rotate Speed", "rotateSpeed", 0.0, -1.0, 1.0)
+		}, new EffectParameter("Rotate Speed", "rotateSpeed3D", 0.0, -1.0, 1.0)
     );
 
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();

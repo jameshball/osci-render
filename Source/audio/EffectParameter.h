@@ -2,16 +2,13 @@
 #include "../shape/Vector2.h"
 #include <JuceHeader.h>
 
-class FloatParameter : public juce::AudioProcessorParameter {
+class FloatParameter : public juce::AudioProcessorParameterWithID {
 public:
-	juce::String name;
-	juce::String id;
-
 	std::atomic<float> min = 0.0;
 	std::atomic<float> max = 1.0;
 	std::atomic<float> step = 0.001;
 
-	FloatParameter(juce::String name, juce::String id, float value, float min, float max, float step = 0.001, juce::String label = "") : name(name), id(id), value(value), min(min), max(max), step(step), label(label) {}
+	FloatParameter(juce::String name, juce::String id, float value, float min, float max, float step = 0.001, juce::String label = "") : juce::AudioProcessorParameterWithID(id, name), value(value), min(min), max(max), step(step), label(label) {}
 
 	juce::String getName(int maximumStringLength) const override {
 		return name.substring(0, maximumStringLength);
@@ -105,15 +102,12 @@ private:
 	juce::String label;
 };
 
-class IntParameter : public juce::AudioProcessorParameter {
+class IntParameter : public juce::AudioProcessorParameterWithID {
 public:
-	juce::String name;
-	juce::String id;
-
 	std::atomic<int> min = 0;
 	std::atomic<int> max = 10;
 
-	IntParameter(juce::String name, juce::String id, int value, int min, int max) : name(name), id(id), value(value), min(min), max(max) {}
+	IntParameter(juce::String name, juce::String id, int value, int min, int max) : AudioProcessorParameterWithID(name, id), value(value), min(min), max(max) {}
 
 	juce::String getName(int maximumStringLength) const override {
 		return name.substring(0, maximumStringLength);
@@ -270,13 +264,28 @@ public:
 class EffectParameter : public FloatParameter {
 public:
 	std::atomic<bool> smoothValueChange = true;
-	LfoTypeParameter* lfo = new LfoTypeParameter(name + " LFO", id + "Lfo", 1);
-	FloatParameter* lfoRate = new FloatParameter(name + " LFO Rate", id + "LfoRate", 1.0f, 0.0f, 100.0f, 0.1f, "Hz");
+	LfoTypeParameter* lfo = new LfoTypeParameter(name + " LFO", paramID + "Lfo", 1);
+	FloatParameter* lfoRate = new FloatParameter(name + " LFO Rate", paramID + "LfoRate", 1.0f, 0.0f, 100.0f, 0.1f, "Hz");
 	std::atomic<float> phase = 0.0f;
 
 	std::vector<juce::AudioProcessorParameter*> getParameters() {
-        return { this, lfo, lfoRate };
+		std::vector<juce::AudioProcessorParameter*> parameters;
+		parameters.push_back(this);
+		if (lfo != nullptr) {
+			parameters.push_back(lfo);
+		}
+		if (lfoRate != nullptr) {
+			parameters.push_back(lfoRate);
+		}
+		return parameters;
     }
+
+	void disableLfo() {
+		delete lfo;
+		delete lfoRate;
+		lfo = nullptr;
+		lfoRate = nullptr;
+	}
 
 	EffectParameter(juce::String name, juce::String id, float value, float min, float max, float step = 0.001, bool smoothValueChange = true) : FloatParameter(name, id, value, min, max, step), smoothValueChange(smoothValueChange) {}
 };

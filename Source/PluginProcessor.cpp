@@ -97,7 +97,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     permanentEffects.push_back(rotateZ);
     permanentEffects.push_back(focalLength);
 
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 26; i++) {
         addLuaSlider();
     }
 
@@ -218,6 +218,9 @@ void OscirenderAudioProcessor::addLuaSlider() {
         std::make_shared<LuaEffect>(sliderName, *this),
         new EffectParameter("Lua " + sliderName, "lua" + sliderName, 0.0, 0.0, 1.0, 0.001, false)
     ));
+
+    auto& effect = luaEffects.back();
+    effect->parameters[0]->disableLfo();
 }
 
 // effectsLock should be held when calling this
