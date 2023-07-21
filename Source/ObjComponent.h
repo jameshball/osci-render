@@ -17,11 +17,11 @@ private:
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& pluginEditor;
 
-    EffectComponent focalLength{*audioProcessor.focalLength, false};
-    EffectComponent rotateX{*audioProcessor.rotateX, false};
-    EffectComponent rotateY{*audioProcessor.rotateY, false};
-    EffectComponent rotateZ{*audioProcessor.rotateZ, false};
-    EffectComponent rotateSpeed{*audioProcessor.rotateSpeed, false};
+    EffectComponent focalLength{audioProcessor, *audioProcessor.focalLength, false};
+    EffectComponent rotateX{audioProcessor, *audioProcessor.rotateX, false};
+    EffectComponent rotateY{audioProcessor, *audioProcessor.rotateY, false};
+    EffectComponent rotateZ{audioProcessor, *audioProcessor.rotateZ, false};
+    EffectComponent rotateSpeed{audioProcessor, *audioProcessor.rotateSpeed, false};
 
     juce::TextButton resetRotation{"Reset Rotation"};
     juce::ToggleButton mouseRotate{"Rotate with Mouse (Esc to disable)"};

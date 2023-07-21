@@ -42,7 +42,7 @@ public:
     }
 
 	bool isDiscrete() const override {
-        return false;
+        return true;
     }
 
 	bool isBoolean() const override {

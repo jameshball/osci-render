@@ -1,19 +1,33 @@
 #include "EffectComponent.h"
 
-EffectComponent::EffectComponent(Effect& effect, int index) : effect(effect), index(index) {
+EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, int index) : effect(effect), index(index), audioProcessor(p) {
     addAndMakeVisible(slider);
+    addAndMakeVisible(lfoSlider);
     addAndMakeVisible(selected);
+    addAndMakeVisible(lfo);
+
+    lfo.addItem("Static", static_cast<int>(LfoType::Static));
+    lfo.addItem("Sine", static_cast<int>(LfoType::Sine));
+    lfo.addItem("Square", static_cast<int>(LfoType::Square));
+    lfo.addItem("Seesaw", static_cast<int>(LfoType::Seesaw));
+    lfo.addItem("Triangle", static_cast<int>(LfoType::Triangle));
+    lfo.addItem("Sawtooth", static_cast<int>(LfoType::Sawtooth));
+    lfo.addItem("Reverse Sawtooth", static_cast<int>(LfoType::ReverseSawtooth));
+    lfo.addItem("Noise", static_cast<int>(LfoType::Noise));
+
+    lfo.setLookAndFeel(&lfoLookAndFeel);
+
     effect.addListener(index, this);
     setupComponent();
 }
 
-EffectComponent::EffectComponent(Effect& effect, int index, bool checkboxVisible) : EffectComponent(effect, index) {
+EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, int index, bool checkboxVisible) : EffectComponent(p, effect, index) {
     setCheckboxVisible(checkboxVisible);
 }
 
-EffectComponent::EffectComponent(Effect& effect) : EffectComponent(effect, 0) {}
+EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect) : EffectComponent(p, effect, 0) {}
 
-EffectComponent::EffectComponent(Effect& effect, bool checkboxVisible) : EffectComponent(effect) {
+EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, bool checkboxVisible) : EffectComponent(p, effect) {
     setCheckboxVisible(checkboxVisible);
 }
 
@@ -24,11 +38,50 @@ void EffectComponent::setupComponent() {
     slider.setValue(parameter->getValueUnnormalised(), juce::dontSendNotification);
 
     slider.setSliderStyle(juce::Slider::LinearHorizontal);
-    slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 90, slider.getTextBoxHeight());
+    slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 70, slider.getTextBoxHeight());
 
     bool enabled = effect.enabled == nullptr || effect.enabled->getValue();
     selected.setToggleState(enabled, juce::dontSendNotification);
 
+    lfoEnabled = parameter->lfo != nullptr && parameter->lfoRate != nullptr;
+    if (lfoEnabled) {
+        lfo.setSelectedId(parameter->lfo->getValueUnnormalised(), juce::dontSendNotification);
+
+        lfo.onChange = [this]() {
+            if (lfo.getSelectedId() != 0) {
+                effect.parameters[index]->lfo->setUnnormalisedValueNotifyingHost(lfo.getSelectedId());
+
+                if (lfo.getSelectedId() == static_cast<int>(LfoType::Static)) {
+                    lfoSlider.setVisible(false);
+                    slider.setVisible(true);
+                } else {
+                    lfoSlider.setVisible(true);
+                    slider.setVisible(false);
+                }
+            }
+        };
+
+        lfoSlider.setRange(parameter->lfoRate->min, parameter->lfoRate->max, parameter->lfoRate->step);
+        lfoSlider.setValue(parameter->lfoRate->getValueUnnormalised(), juce::dontSendNotification);
+
+        if (lfo.getSelectedId() == static_cast<int>(LfoType::Static)) {
+            lfoSlider.setVisible(false);
+            slider.setVisible(true);
+        } else {
+            lfoSlider.setVisible(true);
+            slider.setVisible(false);
+        }
+
+        lfoSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+        lfoSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 70, lfoSlider.getTextBoxHeight());
+        lfoSlider.setTextValueSuffix("Hz");
+        lfoSlider.setColour(juce::Slider::thumbColourId, juce::Colour(0xff00ff00));
+
+        lfoSlider.onValueChange = [this]() {
+            effect.parameters[index]->lfoRate->setUnnormalisedValueNotifyingHost(lfoSlider.getValue());
+        };
+    }
+    
     min.textBox.setValue(parameter->min, juce::dontSendNotification);
     max.textBox.setValue(parameter->max, juce::dontSendNotification);
 
@@ -65,21 +118,27 @@ EffectComponent::~EffectComponent() {
 }
 
 void EffectComponent::resized() {
-    auto sliderRight = getWidth() - 160;
     auto bounds = getLocalBounds();
     auto componentBounds = bounds.removeFromRight(25);
     if (component != nullptr) {
 		component->setBounds(componentBounds);
 	}
 
-    slider.setBounds(bounds.removeFromRight(sliderRight));
-    if (checkboxVisible) {
-        bounds.removeFromLeft(2);
-        selected.setBounds(bounds.removeFromLeft(25));
-    } else {
-        bounds.removeFromLeft(5);
+    if (lfoEnabled) {
+        lfo.setBounds(bounds.removeFromRight(100).reduced(5));
     }
-    textBounds = bounds;
+
+    auto checkboxLabel = bounds.removeFromLeft(110);
+
+    if (checkboxVisible) {
+        checkboxLabel.removeFromLeft(2);
+        selected.setBounds(checkboxLabel.removeFromLeft(25));
+    } else {
+        checkboxLabel.removeFromLeft(5);
+    }
+    textBounds = checkboxLabel;
+    slider.setBounds(bounds);
+    lfoSlider.setBounds(bounds);
 }
 
 void EffectComponent::paint(juce::Graphics& g) {
@@ -108,6 +167,11 @@ void EffectComponent::parameterGestureChanged(int parameterIndex, bool gestureIs
 
 void EffectComponent::handleAsyncUpdate() {
     setupComponent();
+    juce::SpinLock::ScopedLockType lock1(audioProcessor.parsersLock);
+    juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
+    if (effect.getId().contains("lua")) {
+        effect.apply();
+    }
 }
 
 void EffectComponent::setComponent(std::shared_ptr<juce::Component> component) {

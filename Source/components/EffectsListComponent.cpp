@@ -3,7 +3,7 @@
 EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectListBoxItemData& data, int rn, std::shared_ptr<Effect> effect) : DraggableListBoxItem(lb, data, rn), effect(effect) {
 	auto parameters = effect->parameters;
 	for (int i = 0; i < parameters.size(); i++) {
-		std::shared_ptr<EffectComponent> effectComponent = std::make_shared<EffectComponent>(*effect, i, i == 0);
+		std::shared_ptr<EffectComponent> effectComponent = std::make_shared<EffectComponent>(data.audioProcessor, *effect, i, i == 0);
 		// using weak_ptr to avoid circular reference and memory leak
 		std::weak_ptr<EffectComponent> weakEffectComponent = effectComponent;
 		effectComponent->slider.setValue(parameters[i]->getValueUnnormalised(), juce::dontSendNotification);

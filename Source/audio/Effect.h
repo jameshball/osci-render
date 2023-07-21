@@ -14,6 +14,7 @@ public:
 	Effect(std::function<Vector2(int, Vector2, const std::vector<double>&, double)> application, EffectParameter* parameter);
 
 	Vector2 apply(int index, Vector2 input);
+	
 	void apply();
 	double getValue(int index);
 	double getValue();
@@ -33,11 +34,13 @@ public:
 private:
 	
 	juce::SpinLock listenerLock;
-	std::vector<double> smoothValues;
-	double frequency = 1.0;
+	std::vector<double> actualValues;
 	int precedence = -1;
 	int sampleRate = 192000;
 	std::function<Vector2(int, Vector2, const std::vector<double>&, double)> application;
 	
 	std::shared_ptr<EffectApplication> effectApplication;
+
+	void animateValues();
+	float nextPhase(EffectParameter* parameter);
 };

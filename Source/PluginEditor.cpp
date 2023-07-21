@@ -74,10 +74,15 @@ void OscirenderAudioProcessorEditor::resized() {
     } else {
 		collapseButton.setBounds(0, 0, 0, 0);
 	}
-	effects.setBounds(area.removeFromRight(getWidth() / sections));
-	main.setBounds(area.removeFromTop(getHeight() / 2));
-    lua.setBounds(area);
-    obj.setBounds(area);
+    auto effectsSection = area.removeFromRight(1.2 * getWidth() / sections);
+    main.setBounds(area);
+    if (lua.isVisible() || obj.isVisible()) {
+        auto altEffectsSection = effectsSection.removeFromBottom(juce::jmin(effectsSection.getHeight() / 2, 300));
+        lua.setBounds(altEffectsSection);
+        obj.setBounds(altEffectsSection);
+    }
+	effects.setBounds(effectsSection);
+    
 }
 
 void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
