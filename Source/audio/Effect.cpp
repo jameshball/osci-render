@@ -28,9 +28,10 @@ void Effect::animateValues() {
 		auto parameter = parameters[i];
 		float minValue = parameter->min;
 		float maxValue = parameter->max;
-		float phase = parameter->lfo != nullptr ? nextPhase(parameter) : 0.0;
+		bool lfoEnabled = parameter->lfo != nullptr && parameter->lfo->getValueUnnormalised() != (int)LfoType::Static;
+		float phase = lfoEnabled ? nextPhase(parameter) : 0.0;
 		float percentage = phase / (2 * std::numbers::pi);
-		LfoType type = parameter->lfo != nullptr ? (LfoType)(int)parameter->lfo->getValueUnnormalised() : LfoType::Static;
+		LfoType type = lfoEnabled ? (LfoType)(int)parameter->lfo->getValueUnnormalised() : LfoType::Static;
 
 		switch (type) {
 			case LfoType::Sine:

@@ -27,7 +27,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
                 path.addTriangle(0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.5f);
                 collapseButton.setShape(path, false, true, true);
             }
-            resized();
+            triggerAsyncUpdate();
         }
 	};
 	juce::Path path;
@@ -128,7 +128,7 @@ void OscirenderAudioProcessorEditor::updateCodeEditor() {
         codeEditors[index]->setVisible(true);
         codeEditors[index]->loadContent(juce::MemoryInputStream(*audioProcessor.getFileBlock(index), false).readEntireStreamAsString());
     }
-    resized();
+    triggerAsyncUpdate();
 }
 
 // parsersLock MUST be locked before calling this function
@@ -145,6 +145,10 @@ void OscirenderAudioProcessorEditor::fileUpdated(juce::String fileName) {
 	}
     main.updateFileLabel();
     updateCodeEditor();
+}
+
+void OscirenderAudioProcessorEditor::handleAsyncUpdate() {
+    resized();
 }
 
 // parsersLock AND effectsLock must be locked before calling this function

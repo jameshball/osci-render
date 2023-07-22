@@ -12,7 +12,7 @@ VisualiserComponent::~VisualiserComponent() {
 }
 
 void VisualiserComponent::setBuffer(std::vector<float>& newBuffer) {
-    juce::SpinLock::ScopedLockType scope(lock);
+    juce::CriticalSection::ScopedLockType scope(lock);
     buffer.clear();
     for (int i = 0; i < newBuffer.size(); i += precision * numChannels) {
         buffer.push_back(newBuffer[i]);
@@ -31,7 +31,7 @@ void VisualiserComponent::paint(juce::Graphics& g) {
     auto r = getLocalBounds().toFloat();
     auto minDim = juce::jmin(r.getWidth(), r.getHeight());
 
-    juce::SpinLock::ScopedLockType scope(lock);
+    juce::CriticalSection::ScopedLockType scope(lock);
     if (buffer.size() > 0) {
         g.setColour(waveformColour);
         paintXY(g, r.withSizeKeepingCentre(minDim, minDim));

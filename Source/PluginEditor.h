@@ -9,7 +9,7 @@
 #include "components/VolumeComponent.h"
 
 
-class OscirenderAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::CodeDocument::Listener {
+class OscirenderAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater {
 public:
     OscirenderAudioProcessorEditor(OscirenderAudioProcessor&);
     ~OscirenderAudioProcessorEditor() override;
@@ -20,6 +20,7 @@ public:
     void addCodeEditor(int index);
     void removeCodeEditor(int index);
     void fileUpdated(juce::String fileName);
+    void handleAsyncUpdate() override;
 private:
     OscirenderAudioProcessor& audioProcessor;
     

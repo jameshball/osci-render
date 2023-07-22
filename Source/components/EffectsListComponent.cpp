@@ -87,6 +87,13 @@ std::shared_ptr<juce::Component> EffectsListComponent::createComponent(EffectPar
 			toggle->setBoolValueNotifyingHost(!toggle->getBoolValue());
         };
 		return button;
+	} else if (parameter->paramID == "depthScale") {
+		std::shared_ptr<SvgButton> button = std::make_shared<SvgButton>(parameter->name, BinaryData::pencil_svg, "white");
+		button->setEdgeIndent(5);
+		button->onClick = [this] {
+			
+		};
+		return button;
 	}
 	return nullptr;
 }

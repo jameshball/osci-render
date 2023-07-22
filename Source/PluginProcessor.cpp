@@ -471,7 +471,8 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         }
 
         {
-            juce::SpinLock::ScopedLockType lock(effectsLock);
+            juce::SpinLock::ScopedLockType lock1(parsersLock);
+            juce::SpinLock::ScopedLockType lock2(effectsLock);
             for (auto& effect : toggleableEffects) {
                 if (effect->enabled->getValue()) {
                     channels = effect->apply(sample, channels);
@@ -512,6 +513,11 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
         if (!renderingSample && frameDrawn >= drawnFrameLength) {
             updateFrame();
+            // TODO: updateFrame already iterates over all the shapes,
+            // so we can improve performance by calculating frameDrawn
+            // and shapeDrawn directly. frameDrawn is simply actualTraceMin * frameLength
+            // but shapeDrawn is the amount of the current shape that has been drawn so
+            // we need to iterate over all the shapes to calculate it.
             if (traceMinEnabled) {
                 while (frameDrawn < actualTraceMin * frameLength) {
                     incrementShapeDrawing();
@@ -521,12 +527,14 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 	}
 }
 
+// TODO this is the slowest part of the program - any way to improve this would help!
 void OscirenderAudioProcessor::incrementShapeDrawing() {
     double length = currentShape < frame.size() ? frame[currentShape]->len : 0.0;
     // hard cap on how many times it can be over the length to
     // prevent audio stuttering
-    frameDrawn += juce::jmin(lengthIncrement, 20 * length);
-    shapeDrawn += juce::jmin(lengthIncrement, 20 * length);
+    auto increment = juce::jmin(lengthIncrement, 20 * length);
+    frameDrawn += increment;
+    shapeDrawn += increment;
 
     // Need to skip all shapes that the lengthIncrement draws over.
     // This is especially an issue when there are lots of small lines being

@@ -17,6 +17,7 @@
         <FILE id="IqXIZW" name="demo.svg" compile="0" resource="1" file="Resources/svg/demo.svg"/>
         <FILE id="YwkQpy" name="fixed_rotate.svg" compile="0" resource="1"
               file="Resources/svg/fixed_rotate.svg"/>
+        <FILE id="D2AI1b" name="pencil.svg" compile="0" resource="1" file="Resources/svg/pencil.svg"/>
         <FILE id="rXjNlx" name="threshold.svg" compile="0" resource="1" file="Resources/svg/threshold.svg"/>
         <FILE id="qC6QiP" name="volume.svg" compile="0" resource="1" file="Resources/svg/volume.svg"/>
       </GROUP>
