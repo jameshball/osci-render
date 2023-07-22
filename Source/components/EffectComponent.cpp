@@ -128,7 +128,7 @@ void EffectComponent::resized() {
         lfo.setBounds(bounds.removeFromRight(100).reduced(5));
     }
 
-    auto checkboxLabel = bounds.removeFromLeft(110);
+    auto checkboxLabel = bounds.removeFromLeft(120);
 
     if (checkboxVisible) {
         checkboxLabel.removeFromLeft(2);
