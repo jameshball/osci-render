@@ -37,7 +37,7 @@ You can track the most up-to-date progress [here](https://github.com/users/james
 - Support for .txt
 - Support for .svg
 - Support for .lua
-- Most audio effects implemented
+- All audio effects implemented
 - Audio effects are reorderable
 - Infinite Lua sliders can be added for more control
 - Text editor for the current file
@@ -55,6 +55,4 @@ You can track the most up-to-date progress [here](https://github.com/users/james
 - Project select screen
 - Blender integration
 - MIDI support
-- 3D perspective effect
-- Translation effect
 - Improved algorithm for finding the best path to render 3D object
