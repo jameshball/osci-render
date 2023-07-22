@@ -46,6 +46,9 @@ Vector2 PerspectiveEffect::apply(int index, Vector2 input, const std::vector<dou
 	auto z = 0.0;
 
 	{
+		// TODO: Instead of evaluating the script every time, we could evaluate it
+		// once at the start for all values of x and y and then interpolate between
+		// the results.
 		juce::SpinLock::ScopedLockType lock(codeLock);
 		if (!defaultScript) {
 			parser->setVariable("x", x);
