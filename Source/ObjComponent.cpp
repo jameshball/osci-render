@@ -1,7 +1,6 @@
 #include "ObjComponent.h"
 #include "PluginEditor.h"
 #include <numbers>
-#include "Util.h"
 
 ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
 	setText("3D .obj File Settings");
@@ -66,21 +65,6 @@ ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 			}
 		}
 	};
-
-	auto doc = juce::XmlDocument::parse(BinaryData::fixed_rotate_svg);
-	Util::changeSvgColour(doc.get(), "white");
-	fixedRotateWhite = juce::Drawable::createFromSVG(*doc);
-	Util::changeSvgColour(doc.get(), "red");
-	fixedRotateRed = juce::Drawable::createFromSVG(*doc);
-
-	// TODO: any way of removing this duplication?
-	getLookAndFeel().setColour(juce::DrawableButton::backgroundOnColourId, juce::Colours::transparentWhite);
-	fixedRotateX->setClickingTogglesState(true);
-	fixedRotateY->setClickingTogglesState(true);
-	fixedRotateZ->setClickingTogglesState(true);
-	fixedRotateX->setImages(fixedRotateWhite.get(), nullptr, nullptr, nullptr, fixedRotateRed.get());
-	fixedRotateY->setImages(fixedRotateWhite.get(), nullptr, nullptr, nullptr, fixedRotateRed.get());
-	fixedRotateZ->setImages(fixedRotateWhite.get(), nullptr, nullptr, nullptr, fixedRotateRed.get());
 
 	fixedRotateX->onClick = onRotationChange;
 	fixedRotateY->onClick = onRotationChange;
