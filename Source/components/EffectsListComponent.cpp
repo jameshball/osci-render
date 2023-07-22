@@ -1,7 +1,8 @@
 #include "EffectsListComponent.h"
 #include "SvgButton.h"
+#include "../PluginEditor.h"
 
-EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectListBoxItemData& data, int rn, Effect& effect) : DraggableListBoxItem(lb, data, rn), effect(effect), audioProcessor(data.audioProcessor) {
+EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectListBoxItemData& data, int rn, Effect& effect) : DraggableListBoxItem(lb, data, rn), effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
 	auto parameters = effect.parameters;
 	for (int i = 0; i < parameters.size(); i++) {
 		std::shared_ptr<EffectComponent> effectComponent = std::make_shared<EffectComponent>(audioProcessor, effect, i, i == 0);
@@ -88,10 +89,14 @@ std::shared_ptr<juce::Component> EffectsListComponent::createComponent(EffectPar
         };
 		return button;
 	} else if (parameter->paramID == "depthScale") {
-		std::shared_ptr<SvgButton> button = std::make_shared<SvgButton>(parameter->name, BinaryData::pencil_svg, "white");
+		std::shared_ptr<SvgButton> button = std::make_shared<SvgButton>(parameter->name, BinaryData::pencil_svg, "white", "red");
+		std::weak_ptr<SvgButton> weakButton = button;
 		button->setEdgeIndent(5);
-		button->onClick = [this] {
-			
+		button->setToggleState(editor.editingPerspective, juce::dontSendNotification);
+		button->onClick = [this, weakButton] {
+			if (auto button = weakButton.lock()) {
+                editor.editPerspectiveFunction(button->getToggleState());
+            }
 		};
 		return button;
 	}

@@ -45,16 +45,19 @@ Vector2 PerspectiveEffect::apply(int index, Vector2 input, const std::vector<dou
 	auto y = input.y;
 	auto z = 0.0;
 
-	if (!defaultScript) {
-		parser.setVariable("x", x);
-		parser.setVariable("y", y);
-		parser.setVariable("z", z);
+	{
+		juce::SpinLock::ScopedLockType lock(codeLock);
+		if (!defaultScript) {
+			parser->setVariable("x", x);
+			parser->setVariable("y", y);
+			parser->setVariable("z", z);
 
-		auto result = parser.run();
-		if (result.size() >= 3) {
-			x = result[0];
-			y = result[1];
-			z = result[2];
+			auto result = parser->run();
+			if (result.size() >= 3) {
+				x = result[0];
+				y = result[1];
+				z = result[2];
+			}
 		}
 	}
 
@@ -86,4 +89,16 @@ Vector2 PerspectiveEffect::apply(int index, Vector2 input, const std::vector<dou
 		(1 - effectScale) * input.x + effectScale * (x3 * focalLength / (z3 - depth)),
 		(1 - effectScale) * input.y + effectScale * (y3 * focalLength / (z3 - depth))
 	);
+}
+
+void PerspectiveEffect::updateCode(const juce::String& newCode) {
+	juce::SpinLock::ScopedLockType lock(codeLock);
+	defaultScript = newCode == DEFAULT_SCRIPT;
+    code = newCode;
+	parser = std::make_unique<LuaParser>(code);
+}
+
+juce::String PerspectiveEffect::getCode() {
+	juce::SpinLock::ScopedLockType lock(codeLock);
+    return code;
 }

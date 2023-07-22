@@ -7,12 +7,14 @@
 #include "ComponentList.h"
 
 // Application-specific data container
+class OscirenderAudioProcessorEditor;
 struct AudioEffectListBoxItemData : public DraggableListBoxItemData
 {
     std::vector<std::shared_ptr<Effect>> data;
     OscirenderAudioProcessor& audioProcessor;
+    OscirenderAudioProcessorEditor& editor;
 
-    AudioEffectListBoxItemData(OscirenderAudioProcessor& p) : audioProcessor(p) {}
+    AudioEffectListBoxItemData(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), editor(editor) {}
 
     int getNumItems() override {
         return data.size();
@@ -102,6 +104,7 @@ protected:
     juce::ListBox list;
 private:
     OscirenderAudioProcessor& audioProcessor;
+    OscirenderAudioProcessorEditor& editor;
 
     std::shared_ptr<juce::Component> createComponent(EffectParameter* parameter);
 

@@ -21,19 +21,25 @@ public:
     void removeCodeEditor(int index);
     void fileUpdated(juce::String fileName);
     void handleAsyncUpdate() override;
+
+    void editPerspectiveFunction(bool enabled);
+
+    std::atomic<bool> editingPerspective = false;
 private:
     OscirenderAudioProcessor& audioProcessor;
     
     MainComponent main{audioProcessor, *this};
     LuaComponent lua{audioProcessor, *this};
     ObjComponent obj{audioProcessor, *this};
-    EffectsComponent effects{audioProcessor};
+    EffectsComponent effects{audioProcessor, *this};
     VolumeComponent volume{audioProcessor};
     std::vector<std::shared_ptr<juce::CodeDocument>> codeDocuments;
     std::vector<std::shared_ptr<juce::CodeEditorComponent>> codeEditors;
     juce::LuaTokeniser luaTokeniser;
     juce::XmlTokeniser xmlTokeniser;
 	juce::ShapeButton collapseButton;
+    std::shared_ptr<juce::CodeDocument> perspectiveCodeDocument = std::make_shared<juce::CodeDocument>();
+    std::shared_ptr<juce::CodeEditorComponent> perspectiveCodeEditor = std::make_shared<juce::CodeEditorComponent>(*perspectiveCodeDocument, &luaTokeniser);
 
 	void codeDocumentTextInserted(const juce::String& newText, int insertIndex) override;
 	void codeDocumentTextDeleted(int startIndex, int endIndex) override;
