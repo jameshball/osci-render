@@ -107,16 +107,16 @@ public:
 		}, new EffectParameter("Focal length", "focalLength", 1.0, 0.0, 2.0)
     );
 
-    std::atomic<bool> fixedRotateX = false;
-    std::atomic<bool> fixedRotateY = false;
-    std::atomic<bool> fixedRotateZ = false;
+    BooleanParameter* fixedRotateX = new BooleanParameter("Object Fixed Rotate X", "objFixedRotateX", false);
+    BooleanParameter* fixedRotateY = new BooleanParameter("Object Fixed Rotate Y", "objFixedRotateY", false);
+    BooleanParameter* fixedRotateZ = new BooleanParameter("Object Fixed Rotate Z", "objFixedRotateZ", false);
     std::shared_ptr<Effect> rotateX = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
                 auto obj = getCurrentFileParser()->getObject();
                 if (obj == nullptr) return input;
                 auto rotation = values[0] * std::numbers::pi;
-                if (fixedRotateX) {
+                if (fixedRotateX->getBoolValue()) {
                     obj->setCurrentRotationX(rotation);
                 } else {
                     obj->setBaseRotationX(rotation);
@@ -131,7 +131,7 @@ public:
                 auto obj = getCurrentFileParser()->getObject();
                 if (obj == nullptr) return input;
                 auto rotation = values[0] * std::numbers::pi;
-                if (fixedRotateY) {
+                if (fixedRotateY->getBoolValue()) {
                     obj->setCurrentRotationY(rotation);
                 } else {
                     obj->setBaseRotationY(rotation);
@@ -146,7 +146,7 @@ public:
                 auto obj = getCurrentFileParser()->getObject();
                 if (obj == nullptr) return input;
                 auto rotation = values[0] * std::numbers::pi;
-                if (fixedRotateZ) {
+                if (fixedRotateZ->getBoolValue()) {
                     obj->setCurrentRotationZ(rotation);
                 } else {
                     obj->setBaseRotationZ(rotation);

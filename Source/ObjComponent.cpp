@@ -25,9 +25,9 @@ ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 		audioProcessor.rotateY->setValue(rotateY.slider.getValue());
 		audioProcessor.rotateZ->setValue(rotateZ.slider.getValue());
 
-		audioProcessor.fixedRotateX = fixedRotateX->getToggleState();
-		audioProcessor.fixedRotateY = fixedRotateY->getToggleState();
-		audioProcessor.fixedRotateZ = fixedRotateZ->getToggleState();
+		audioProcessor.fixedRotateX->setBoolValueNotifyingHost(fixedRotateX->getToggleState());
+		audioProcessor.fixedRotateY->setBoolValueNotifyingHost(fixedRotateY->getToggleState());
+		audioProcessor.fixedRotateZ->setBoolValueNotifyingHost(fixedRotateZ->getToggleState());
 	};
 
 	rotateX.slider.onValueChange = onRotationChange;
@@ -73,10 +73,6 @@ ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 	rotateX.setComponent(fixedRotateX);
 	rotateY.setComponent(fixedRotateY);
 	rotateZ.setComponent(fixedRotateZ);
-
-	fixedRotateX->setToggleState(audioProcessor.fixedRotateX, juce::NotificationType::dontSendNotification);
-	fixedRotateY->setToggleState(audioProcessor.fixedRotateY, juce::NotificationType::dontSendNotification);
-	fixedRotateZ->setToggleState(audioProcessor.fixedRotateZ, juce::NotificationType::dontSendNotification);
 }
 
 ObjComponent::~ObjComponent() {

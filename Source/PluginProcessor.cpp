@@ -124,6 +124,13 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
             }
         }
     }
+
+    addParameter(fixedRotateX);
+    addParameter(fixedRotateY);
+    addParameter(fixedRotateZ);
+    addParameter(perspectiveEffect->fixedRotateX);
+    addParameter(perspectiveEffect->fixedRotateY);
+    addParameter(perspectiveEffect->fixedRotateZ);
 }
 
 OscirenderAudioProcessor::~OscirenderAudioProcessor() {}

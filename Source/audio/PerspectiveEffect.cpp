@@ -7,37 +7,55 @@ Vector2 PerspectiveEffect::apply(int index, Vector2 input, const std::vector<dou
 	auto effectScale = values[0];
 	auto depth = 1.0 + (values[1] - 0.1) * 3;
 	auto rotateSpeed = linearSpeedToActualSpeed(values[2]);
-	auto baseRotateX = values[3] * std::numbers::pi;
-	auto baseRotateY = values[4] * std::numbers::pi;
-	auto baseRotateZ = values[5] * std::numbers::pi;
+	double baseRotateX, baseRotateY, baseRotateZ;
+	if (fixedRotateX->getBoolValue()) {
+		baseRotateX = 0;
+		currentRotateX = values[3] * std::numbers::pi;
+	} else {
+        baseRotateX = values[3] * std::numbers::pi;
+    }
+	if (fixedRotateY->getBoolValue()) {
+		baseRotateY = 0;
+        currentRotateY = values[4] * std::numbers::pi;
+	} else {
+        baseRotateY = values[4] * std::numbers::pi;
+	}
+	if (fixedRotateZ->getBoolValue()) {
+        baseRotateZ = 0;
+        currentRotateZ = values[5] * std::numbers::pi;
+	} else {
+        baseRotateZ = values[5] * std::numbers::pi;
+    }
 
 	currentRotateX += baseRotateX * rotateSpeed;
 	currentRotateY += baseRotateY * rotateSpeed;
 	currentRotateZ += baseRotateZ * rotateSpeed;
 
-	if (currentRotateX > std::numbers::pi * 50) {
-        currentRotateX -= std::numbers::pi * 50;
+	if (currentRotateX > std::numbers::pi * 8) {
+        currentRotateX -= std::numbers::pi * 8;
     }
-	if (currentRotateY > std::numbers::pi * 50) {
-        currentRotateY -= std::numbers::pi * 50;
+	if (currentRotateY > std::numbers::pi * 8) {
+        currentRotateY -= std::numbers::pi * 8;
     }
-	if (currentRotateZ > std::numbers::pi * 50) {
-        currentRotateZ -= std::numbers::pi * 50;
+	if (currentRotateZ > std::numbers::pi * 8) {
+        currentRotateZ -= std::numbers::pi * 8;
     }
 
 	auto x = input.x;
 	auto y = input.y;
 	auto z = 0.0;
 
-	parser.setVariable("x", x);
-	parser.setVariable("y", y);
-	parser.setVariable("z", z);
+	if (!defaultScript) {
+		parser.setVariable("x", x);
+		parser.setVariable("y", y);
+		parser.setVariable("z", z);
 
-	auto result = parser.run();
-	if (result.size() >= 3) {
-		x = result[0];
-		y = result[1];
-		z = result[2];
+		auto result = parser.run();
+		if (result.size() >= 3) {
+			x = result[0];
+			y = result[1];
+			z = result[2];
+		}
 	}
 
 	auto rotateX = baseRotateX + currentRotateX;

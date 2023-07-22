@@ -86,6 +86,6 @@ void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area
         double strength = 10;
         lengthScale = std::log(strength * lengthScale + 1) / std::log(strength + 1);
         g.setColour(waveformColour.withAlpha(lengthScale));
-        g.drawLine(line, 2.0f);
+        g.drawLine(line, area.getWidth() / 150.0f);
     }
 }
