@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 #include "components/EffectComponent.h"
+#include "components/SvgButton.h"
 
 class OscirenderAudioProcessorEditor;
 class ObjComponent : public juce::GroupComponent, public juce::MouseListener {
@@ -26,11 +27,9 @@ private:
     juce::TextButton resetRotation{"Reset Rotation"};
     juce::ToggleButton mouseRotate{"Rotate with Mouse (Esc to disable)"};
 
-    std::unique_ptr<juce::Drawable> fixedRotateWhite;
-    std::unique_ptr<juce::Drawable> fixedRotateRed;
-    std::shared_ptr<juce::DrawableButton> fixedRotateX = std::make_shared<juce::DrawableButton>("fixedRotateX", juce::DrawableButton::ButtonStyle::ImageFitted);
-    std::shared_ptr<juce::DrawableButton> fixedRotateY = std::make_shared<juce::DrawableButton>("fixedRotateY", juce::DrawableButton::ButtonStyle::ImageFitted);
-    std::shared_ptr<juce::DrawableButton> fixedRotateZ = std::make_shared<juce::DrawableButton>("fixedRotateZ", juce::DrawableButton::ButtonStyle::ImageFitted);
+    std::shared_ptr<SvgButton> fixedRotateX = std::make_shared<SvgButton>("fixedRotateX", juce::String(BinaryData::fixed_rotate_svg), "white", "red", audioProcessor.fixedRotateX);
+    std::shared_ptr<SvgButton> fixedRotateY = std::make_shared<SvgButton>("fixedRotateY", juce::String(BinaryData::fixed_rotate_svg), "white", "red", audioProcessor.fixedRotateY);
+    std::shared_ptr<SvgButton> fixedRotateZ = std::make_shared<SvgButton>("fixedRotateZ", juce::String(BinaryData::fixed_rotate_svg), "white", "red", audioProcessor.fixedRotateZ);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ObjComponent)
 };

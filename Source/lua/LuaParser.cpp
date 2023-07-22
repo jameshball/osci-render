@@ -28,11 +28,11 @@ void LuaParser::parse() {
 }
 
 // only the audio thread runs this fuction
-Vector2 LuaParser::draw() {
-	Vector2 sample;
+std::vector<float> LuaParser::run() {
+    std::vector<float> values;
     
 	if (functionRef == -1) {
-		return sample;
+		return values;
 	}
 	
     lua_pushnumber(L, step);
@@ -60,29 +60,25 @@ Vector2 LuaParser::draw() {
         DBG(error);
 		functionRef = -1;
     } else if (lua_istable(L, -1)) {
-        // get the first element of the table
-        lua_pushinteger(L, 1);
-        lua_gettable(L, -2);
-        float x = lua_tonumber(L, -1);
-        lua_pop(L, 1);
+        auto length = lua_rawlen(L, -1);
 
-        // get the second element of the table
-        lua_pushinteger(L, 2);
-        lua_gettable(L, -2);
-        float y = lua_tonumber(L, -1);
-        lua_pop(L, 1);
-
-        sample = Vector2(x, y);
+        for (int i = 1; i <= length; i++) {
+            lua_pushinteger(L, i);
+            lua_gettable(L, -2);
+            float value = lua_tonumber(L, -1);
+            lua_pop(L, 1);
+            values.push_back(value);
+        }
     }
 
     lua_pop(L, 1);
 
 	step++;
     
-	return sample;
+	return values;
 }
 
-// this CANNOT run at the same time as draw()
+// this CANNOT run at the same time as run()
 // many threads can run this function
 void LuaParser::setVariable(juce::String variableName, double value) {
     juce::SpinLock::ScopedLockType lock(variableLock);

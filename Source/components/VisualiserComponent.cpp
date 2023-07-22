@@ -12,7 +12,7 @@ VisualiserComponent::~VisualiserComponent() {
 }
 
 void VisualiserComponent::setBuffer(std::vector<float>& newBuffer) {
-    juce::SpinLock::ScopedLockType scope(lock);
+    juce::CriticalSection::ScopedLockType scope(lock);
     buffer.clear();
     for (int i = 0; i < newBuffer.size(); i += precision * numChannels) {
         buffer.push_back(newBuffer[i]);
@@ -31,7 +31,7 @@ void VisualiserComponent::paint(juce::Graphics& g) {
     auto r = getLocalBounds().toFloat();
     auto minDim = juce::jmin(r.getWidth(), r.getHeight());
 
-    juce::SpinLock::ScopedLockType scope(lock);
+    juce::CriticalSection::ScopedLockType scope(lock);
     if (buffer.size() > 0) {
         g.setColour(waveformColour);
         paintXY(g, r.withSizeKeepingCentre(minDim, minDim));
@@ -86,6 +86,6 @@ void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area
         double strength = 10;
         lengthScale = std::log(strength * lengthScale + 1) / std::log(strength + 1);
         g.setColour(waveformColour.withAlpha(lengthScale));
-        g.drawLine(line, 2.0f);
+        g.drawLine(line, area.getWidth() / 150.0f);
     }
 }

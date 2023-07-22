@@ -15,14 +15,18 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 
 		chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
 			juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+			bool fileAdded = false;
 			for (auto& url : chooser.getURLResults()) {
 				if (url.isLocalFile()) {
 					auto file = url.getLocalFile();
 					audioProcessor.addFile(file);
+					fileAdded = true;
 				}
 			}
-			pluginEditor.addCodeEditor(audioProcessor.getCurrentFileIndex());
-			pluginEditor.fileUpdated(audioProcessor.getCurrentFileName());
+			if (fileAdded) {
+				pluginEditor.addCodeEditor(audioProcessor.getCurrentFileIndex());
+				pluginEditor.fileUpdated(audioProcessor.getCurrentFileName());
+			}
 		});
 	};
 

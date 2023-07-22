@@ -89,8 +89,8 @@ public:
 
     std::shared_ptr<std::vector<float>> firstBuffer = std::make_shared<std::vector<float>>();
     std::shared_ptr<std::vector<float>> secondBuffer = std::make_shared<std::vector<float>>();
-    std::shared_ptr<juce::SpinLock> firstBufferLock = std::make_shared<juce::SpinLock>();
-    std::shared_ptr<juce::SpinLock> secondBufferLock = std::make_shared<juce::SpinLock>();
+    std::shared_ptr<juce::CriticalSection> firstBufferLock = std::make_shared<juce::CriticalSection>();
+    std::shared_ptr<juce::CriticalSection> secondBufferLock = std::make_shared<juce::CriticalSection>();
 private:
     // Indirectly used by the producer to signal whether it holds the lock on the buffer.
     // This is accurate if the global producer lock is held as the buffer lock is acquired

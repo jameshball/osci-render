@@ -79,6 +79,17 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         delayEffect,
         std::vector<EffectParameter*>{new EffectParameter("Delay Decay", "delayDecay", 0.0, 0.0, 1.0), new EffectParameter("Delay Length", "delayEchoLength", 0.5, 0.0, 1.0)}
     ));
+    toggleableEffects.push_back(std::make_shared<Effect>(
+        perspectiveEffect,
+        std::vector<EffectParameter*>{
+            new EffectParameter("3D Perspective", "depthScale", 0.0, 0.0, 1.0),
+            new EffectParameter("3D Depth (z)", "zPos", 0.1, 0.0, 1.0),
+            new EffectParameter("3D Rotate Speed", "rotateSpeed3D", 0.0, -1.0, 1.0),
+            new EffectParameter("Rotate X", "rotateX", 1.0, -1.0, 1.0),
+            new EffectParameter("Rotate Y", "rotateY", 1.0, -1.0, 1.0),
+            new EffectParameter("Rotate Z", "rotateZ", 0.0, -1.0, 1.0),
+        }
+    ));
     toggleableEffects.push_back(traceMax);
     toggleableEffects.push_back(traceMin);
 
@@ -113,6 +124,13 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
             }
         }
     }
+
+    addParameter(fixedRotateX);
+    addParameter(fixedRotateY);
+    addParameter(fixedRotateZ);
+    addParameter(perspectiveEffect->fixedRotateX);
+    addParameter(perspectiveEffect->fixedRotateY);
+    addParameter(perspectiveEffect->fixedRotateZ);
 }
 
 OscirenderAudioProcessor::~OscirenderAudioProcessor() {}
@@ -453,7 +471,8 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         }
 
         {
-            juce::SpinLock::ScopedLockType lock(effectsLock);
+            juce::SpinLock::ScopedLockType lock1(parsersLock);
+            juce::SpinLock::ScopedLockType lock2(effectsLock);
             for (auto& effect : toggleableEffects) {
                 if (effect->enabled->getValue()) {
                     channels = effect->apply(sample, channels);
@@ -494,6 +513,11 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
         if (!renderingSample && frameDrawn >= drawnFrameLength) {
             updateFrame();
+            // TODO: updateFrame already iterates over all the shapes,
+            // so we can improve performance by calculating frameDrawn
+            // and shapeDrawn directly. frameDrawn is simply actualTraceMin * frameLength
+            // but shapeDrawn is the amount of the current shape that has been drawn so
+            // we need to iterate over all the shapes to calculate it.
             if (traceMinEnabled) {
                 while (frameDrawn < actualTraceMin * frameLength) {
                     incrementShapeDrawing();
@@ -503,12 +527,14 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 	}
 }
 
+// TODO this is the slowest part of the program - any way to improve this would help!
 void OscirenderAudioProcessor::incrementShapeDrawing() {
     double length = currentShape < frame.size() ? frame[currentShape]->len : 0.0;
     // hard cap on how many times it can be over the length to
     // prevent audio stuttering
-    frameDrawn += juce::jmin(lengthIncrement, 20 * length);
-    shapeDrawn += juce::jmin(lengthIncrement, 20 * length);
+    auto increment = juce::jmin(lengthIncrement, 20 * length);
+    frameDrawn += increment;
+    shapeDrawn += increment;
 
     // Need to skip all shapes that the lengthIncrement draws over.
     // This is especially an issue when there are lots of small lines being

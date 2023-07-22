@@ -7,12 +7,14 @@
 #include "ComponentList.h"
 
 // Application-specific data container
+class OscirenderAudioProcessorEditor;
 struct AudioEffectListBoxItemData : public DraggableListBoxItemData
 {
     std::vector<std::shared_ptr<Effect>> data;
     OscirenderAudioProcessor& audioProcessor;
+    OscirenderAudioProcessorEditor& editor;
 
-    AudioEffectListBoxItemData(OscirenderAudioProcessor& p) : audioProcessor(p) {}
+    AudioEffectListBoxItemData(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), editor(editor) {}
 
     int getNumItems() override {
         return data.size();
@@ -89,7 +91,7 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
 class EffectsListComponent : public DraggableListBoxItem
 {
 public:
-    EffectsListComponent(DraggableListBox& lb, AudioEffectListBoxItemData& data, int rn, std::shared_ptr<Effect> effect);
+    EffectsListComponent(DraggableListBox& lb, AudioEffectListBoxItemData& data, int rn, Effect& effect);
     ~EffectsListComponent();
 
     void paint(juce::Graphics& g) override;
@@ -97,10 +99,15 @@ public:
     void resized() override;
 
 protected:
-    std::shared_ptr<Effect> effect;
+    Effect& effect;
     ComponentListModel listModel;
     juce::ListBox list;
 private:
+    OscirenderAudioProcessor& audioProcessor;
+    OscirenderAudioProcessorEditor& editor;
+
+    std::shared_ptr<juce::Component> createComponent(EffectParameter* parameter);
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EffectsListComponent)
 };
 

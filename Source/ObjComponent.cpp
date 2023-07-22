@@ -1,7 +1,6 @@
 #include "ObjComponent.h"
 #include "PluginEditor.h"
 #include <numbers>
-#include "Util.h"
 
 ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
 	setText("3D .obj File Settings");
@@ -26,9 +25,9 @@ ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 		audioProcessor.rotateY->setValue(rotateY.slider.getValue());
 		audioProcessor.rotateZ->setValue(rotateZ.slider.getValue());
 
-		audioProcessor.fixedRotateX = fixedRotateX->getToggleState();
-		audioProcessor.fixedRotateY = fixedRotateY->getToggleState();
-		audioProcessor.fixedRotateZ = fixedRotateZ->getToggleState();
+		audioProcessor.fixedRotateX->setBoolValueNotifyingHost(fixedRotateX->getToggleState());
+		audioProcessor.fixedRotateY->setBoolValueNotifyingHost(fixedRotateY->getToggleState());
+		audioProcessor.fixedRotateZ->setBoolValueNotifyingHost(fixedRotateZ->getToggleState());
 	};
 
 	rotateX.slider.onValueChange = onRotationChange;
@@ -67,21 +66,6 @@ ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 		}
 	};
 
-	auto doc = juce::XmlDocument::parse(BinaryData::fixed_rotate_svg);
-	Util::changeSvgColour(doc.get(), "white");
-	fixedRotateWhite = juce::Drawable::createFromSVG(*doc);
-	Util::changeSvgColour(doc.get(), "red");
-	fixedRotateRed = juce::Drawable::createFromSVG(*doc);
-
-	// TODO: any way of removing this duplication?
-	getLookAndFeel().setColour(juce::DrawableButton::backgroundOnColourId, juce::Colours::transparentWhite);
-	fixedRotateX->setClickingTogglesState(true);
-	fixedRotateY->setClickingTogglesState(true);
-	fixedRotateZ->setClickingTogglesState(true);
-	fixedRotateX->setImages(fixedRotateWhite.get(), nullptr, nullptr, nullptr, fixedRotateRed.get());
-	fixedRotateY->setImages(fixedRotateWhite.get(), nullptr, nullptr, nullptr, fixedRotateRed.get());
-	fixedRotateZ->setImages(fixedRotateWhite.get(), nullptr, nullptr, nullptr, fixedRotateRed.get());
-
 	fixedRotateX->onClick = onRotationChange;
 	fixedRotateY->onClick = onRotationChange;
 	fixedRotateZ->onClick = onRotationChange;
@@ -89,10 +73,6 @@ ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 	rotateX.setComponent(fixedRotateX);
 	rotateY.setComponent(fixedRotateY);
 	rotateZ.setComponent(fixedRotateZ);
-
-	fixedRotateX->setToggleState(audioProcessor.fixedRotateX, juce::NotificationType::dontSendNotification);
-	fixedRotateY->setToggleState(audioProcessor.fixedRotateY, juce::NotificationType::dontSendNotification);
-	fixedRotateZ->setToggleState(audioProcessor.fixedRotateZ, juce::NotificationType::dontSendNotification);
 }
 
 ObjComponent::~ObjComponent() {

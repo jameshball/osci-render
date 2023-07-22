@@ -9,7 +9,7 @@
 class OscirenderAudioProcessorEditor;
 class EffectsComponent : public juce::GroupComponent {
 public:
-	EffectsComponent(OscirenderAudioProcessor&);
+	EffectsComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
 	~EffectsComponent() override;
 
 	void resized() override;

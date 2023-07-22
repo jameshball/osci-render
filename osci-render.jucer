@@ -17,6 +17,7 @@
         <FILE id="IqXIZW" name="demo.svg" compile="0" resource="1" file="Resources/svg/demo.svg"/>
         <FILE id="YwkQpy" name="fixed_rotate.svg" compile="0" resource="1"
               file="Resources/svg/fixed_rotate.svg"/>
+        <FILE id="D2AI1b" name="pencil.svg" compile="0" resource="1" file="Resources/svg/pencil.svg"/>
         <FILE id="rXjNlx" name="threshold.svg" compile="0" resource="1" file="Resources/svg/threshold.svg"/>
         <FILE id="qC6QiP" name="volume.svg" compile="0" resource="1" file="Resources/svg/volume.svg"/>
       </GROUP>
@@ -54,6 +55,10 @@
               file="Source/audio/EffectParameter.h"/>
         <FILE id="uhyh7T" name="LuaEffect.cpp" compile="1" resource="0" file="Source/audio/LuaEffect.cpp"/>
         <FILE id="jqDcZq" name="LuaEffect.h" compile="0" resource="0" file="Source/audio/LuaEffect.h"/>
+        <FILE id="QBWW9w" name="PerspectiveEffect.cpp" compile="1" resource="0"
+              file="Source/audio/PerspectiveEffect.cpp"/>
+        <FILE id="h0dMim" name="PerspectiveEffect.h" compile="0" resource="0"
+              file="Source/audio/PerspectiveEffect.h"/>
         <FILE id="t2bsR8" name="PitchDetector.cpp" compile="1" resource="0"
               file="Source/audio/PitchDetector.cpp"/>
         <FILE id="rQC2gX" name="PitchDetector.h" compile="0" resource="0" file="Source/audio/PitchDetector.h"/>
@@ -108,6 +113,7 @@
         <FILE id="x0Syav" name="LuaListComponent.h" compile="0" resource="0"
               file="Source/components/LuaListComponent.h"/>
         <FILE id="QQzSwh" name="SliderTextBox.h" compile="0" resource="0" file="Source/components/SliderTextBox.h"/>
+        <FILE id="QrDKRZ" name="SvgButton.h" compile="0" resource="0" file="Source/components/SvgButton.h"/>
         <FILE id="y3UiR0" name="VisualiserComponent.cpp" compile="1" resource="0"
               file="Source/components/VisualiserComponent.cpp"/>
         <FILE id="ZueyNl" name="VisualiserComponent.h" compile="0" resource="0"
@@ -434,7 +440,6 @@
         <FILE id="vIYWRG" name="TextParser.cpp" compile="1" resource="0" file="Source/txt/TextParser.cpp"/>
         <FILE id="LlefOK" name="TextParser.h" compile="0" resource="0" file="Source/txt/TextParser.h"/>
       </GROUP>
-      <FILE id="JceyXh" name="Util.h" compile="0" resource="0" file="Source/Util.h"/>
       <GROUP id="{022CB910-9A16-C4AE-4C3B-9CB57BE87FC2}" name="xml">
         <FILE id="pW7WRh" name="pugiconfig.hpp" compile="0" resource="0" file="Source/xml/pugiconfig.hpp"/>
         <FILE id="CnkgyF" name="pugixml.cpp" compile="1" resource="0" file="Source/xml/pugixml.cpp"/>

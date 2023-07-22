@@ -1,5 +1,4 @@
 #pragma once
-#include "../shape/Vector2.h"
 #include <JuceHeader.h>
 #include "../shape/Shape.h"
 
@@ -9,7 +8,7 @@ public:
 	LuaParser(juce::String script);
 	~LuaParser();
 
-	Vector2 draw();
+	std::vector<float> run();
 	void setVariable(juce::String variableName, double value);
 
 private:

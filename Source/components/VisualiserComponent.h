@@ -18,7 +18,7 @@ public:
 	void run() override;
 
 private:
-	juce::SpinLock lock;
+	juce::CriticalSection lock;
     std::vector<float> buffer;
     int numChannels = 2;
     juce::Colour backgroundColour, waveformColour;

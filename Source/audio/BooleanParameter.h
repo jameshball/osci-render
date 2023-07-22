@@ -29,8 +29,20 @@ public:
 		return value.load();
 	}
 
+	bool getBoolValue() const {
+        return value.load();
+    }
+
 	void setValue(float newValue) override {
 		value.store(newValue >= 0.5f);
+    }
+
+	void setBoolValue(bool newValue) {
+		value.store(newValue);
+	}
+
+	void setBoolValueNotifyingHost(bool newValue) {
+        setValueNotifyingHost(newValue ? 1.0f : 0.0f);
     }
 
 	float getDefaultValue() const override {

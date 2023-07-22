@@ -2,7 +2,7 @@
 
 EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, int index) : effect(effect), index(index), audioProcessor(p) {
     addAndMakeVisible(slider);
-    addAndMakeVisible(lfoSlider);
+    addChildComponent(lfoSlider);
     addAndMakeVisible(selected);
     addAndMakeVisible(lfo);
 
@@ -128,7 +128,7 @@ void EffectComponent::resized() {
         lfo.setBounds(bounds.removeFromRight(100).reduced(5));
     }
 
-    auto checkboxLabel = bounds.removeFromLeft(110);
+    auto checkboxLabel = bounds.removeFromLeft(120);
 
     if (checkboxVisible) {
         checkboxLabel.removeFromLeft(2);
