@@ -74,13 +74,13 @@ void EffectsListComponent::resized() {
 }
 
 std::shared_ptr<juce::Component> EffectsListComponent::createComponent(EffectParameter* parameter) {
-	if (parameter->paramID == "rotateX" || parameter->paramID == "rotateY" || parameter->paramID == "rotateZ") {
+	if (parameter->paramID == "perspectiveRotateX" || parameter->paramID == "perspectiveRotateY" || parameter->paramID == "perspectiveRotateZ") {
 		BooleanParameter* toggle;
-		if (parameter->paramID == "rotateX") {
+		if (parameter->paramID == "perspectiveRotateX") {
             toggle = audioProcessor.perspectiveEffect->fixedRotateX;
-		} else if (parameter->paramID == "rotateY") {
+		} else if (parameter->paramID == "perspectiveRotateY") {
             toggle = audioProcessor.perspectiveEffect->fixedRotateY;
-		} else if (parameter->paramID == "rotateZ") {
+		} else if (parameter->paramID == "perspectiveRotateZ") {
             toggle = audioProcessor.perspectiveEffect->fixedRotateZ;
         }
 		std::shared_ptr<SvgButton> button = std::make_shared<SvgButton>(parameter->name, BinaryData::fixed_rotate_svg, "white", "red", toggle);
@@ -88,7 +88,7 @@ std::shared_ptr<juce::Component> EffectsListComponent::createComponent(EffectPar
 			toggle->setBoolValueNotifyingHost(!toggle->getBoolValue());
         };
 		return button;
-	} else if (parameter->paramID == "depthScale") {
+	} else if (parameter->paramID == "perspectiveStrength") {
 		std::shared_ptr<SvgButton> button = std::make_shared<SvgButton>(parameter->name, BinaryData::pencil_svg, "white", "red");
 		std::weak_ptr<SvgButton> weakButton = button;
 		button->setEdgeIndent(5);

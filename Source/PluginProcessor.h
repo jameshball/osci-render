@@ -174,6 +174,8 @@ public:
     std::vector<std::shared_ptr<juce::MemoryBlock>> fileBlocks;
     std::vector<juce::String> fileNames;
     std::atomic<int> currentFile = -1;
+
+    juce::ChangeBroadcaster broadcaster;
     
     FrameProducer producer = FrameProducer(*this, std::make_shared<FileParser>());
 
@@ -188,6 +190,7 @@ public:
     void updateFileBlock(int index, std::shared_ptr<juce::MemoryBlock> block);
     void addFile(juce::File file);
     void addFile(juce::String fileName, const char* data, const int size);
+    void addFile(juce::String fileName, std::shared_ptr<juce::MemoryBlock> data);
     void removeFile(int index);
     int numFiles();
     void changeCurrentFile(int index);
@@ -214,6 +217,7 @@ private:
 	double lengthIncrement = 0.0;
     bool invalidateFrameBuffer = false;
 
+    std::vector<BooleanParameter*> booleanParameters;
     std::vector<std::shared_ptr<Effect>> allEffects;
     std::vector<std::shared_ptr<Effect>> permanentEffects;
 
@@ -247,6 +251,8 @@ private:
     void openFile(int index);
     void updateLuaValues();
     void updateObjValues();
+    std::shared_ptr<Effect> getEffect(juce::String id);
+    BooleanParameter* getBooleanParameter(juce::String id);
 
     const double MIN_LENGTH_INCREMENT = 0.000001;
 

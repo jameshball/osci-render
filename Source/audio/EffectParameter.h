@@ -104,6 +104,22 @@ public:
 		xml->setAttribute("step", step.load());
 	}
 
+	// opt to not change any values if not found
+	void load(juce::XmlElement* xml) {
+        if (xml->hasAttribute("value")) {
+            value = xml->getDoubleAttribute("value");
+        }
+        if (xml->hasAttribute("min")) {
+            min = xml->getDoubleAttribute("min");
+        }
+        if (xml->hasAttribute("max")) {
+            max = xml->getDoubleAttribute("max");
+        }
+        if (xml->hasAttribute("step")) {
+            step = xml->getDoubleAttribute("step");
+        }
+    }
+
 private:
 	// value is not necessarily in the range [min, max] so effect applications may need to clip to a valid range
 	std::atomic<float> value = 0.0;
@@ -247,29 +263,35 @@ public:
 	}
 
 	float getValueForText(const juce::String& text) const override {
+		int unnormalisedValue;
 		if (text == "Static") {
-            return (int)LfoType::Static;
+			unnormalisedValue = (int)LfoType::Static;
 		} else if (text == "Sine") {
-            return (int)LfoType::Sine;
+			unnormalisedValue = (int)LfoType::Sine;
 		} else if (text == "Square") {
-            return (int)LfoType::Square;
+			unnormalisedValue = (int)LfoType::Square;
 		} else if (text == "Seesaw") {
-            return (int)LfoType::Seesaw;
+			unnormalisedValue = (int)LfoType::Seesaw;
 		} else if (text == "Triangle") {
-            return (int)LfoType::Triangle;
+			unnormalisedValue = (int)LfoType::Triangle;
 		} else if (text == "Sawtooth") {
-            return (int)LfoType::Sawtooth;
+			unnormalisedValue = (int)LfoType::Sawtooth;
 		} else if (text == "Reverse Sawtooth") {
-            return (int)LfoType::ReverseSawtooth;
+			unnormalisedValue = (int)LfoType::ReverseSawtooth;
 		} else if (text == "Noise") {
-            return (int)LfoType::Noise;
+			unnormalisedValue = (int)LfoType::Noise;
 		} else {
-            return (int)LfoType::Static;
+			unnormalisedValue = (int)LfoType::Static;
         }
+		return getNormalisedValue(unnormalisedValue);
 	}
 
 	void save(juce::XmlElement* xml) {
         xml->setAttribute("lfo", getText(getValue(), 100));
+    }
+
+	void load(juce::XmlElement* xml) {
+        setValueNotifyingHost(getValueForText(xml->getStringAttribute("lfo")));
     }
 };
 
@@ -307,6 +329,16 @@ public:
 			lfo->save(lfoXml);
 			lfoRate->save(lfoXml);
 		}
+    }
+
+	void load(juce::XmlElement* xml) {
+        FloatParameter::load(xml);
+
+        auto lfoXml = xml->getChildByName("lfo");
+        if (lfoXml != nullptr) {
+            lfo->load(lfoXml);
+            lfoRate->load(lfoXml);
+        }
     }
 
 	EffectParameter(juce::String name, juce::String id, float value, float min, float max, float step = 0.001, bool smoothValueChange = true) : FloatParameter(name, id, value, min, max, step), smoothValueChange(smoothValueChange) {}

@@ -125,12 +125,16 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         }
     }
 
-    addParameter(fixedRotateX);
-    addParameter(fixedRotateY);
-    addParameter(fixedRotateZ);
-    addParameter(perspectiveEffect->fixedRotateX);
-    addParameter(perspectiveEffect->fixedRotateY);
-    addParameter(perspectiveEffect->fixedRotateZ);
+    booleanParameters.push_back(fixedRotateX);
+    booleanParameters.push_back(fixedRotateY);
+    booleanParameters.push_back(fixedRotateZ);
+    booleanParameters.push_back(perspectiveEffect->fixedRotateX);
+    booleanParameters.push_back(perspectiveEffect->fixedRotateY);
+    booleanParameters.push_back(perspectiveEffect->fixedRotateZ);
+
+    for (auto parameter : booleanParameters) {
+        addParameter(parameter);
+    }
 }
 
 OscirenderAudioProcessor::~OscirenderAudioProcessor() {}
@@ -257,6 +261,26 @@ void OscirenderAudioProcessor::updateObjValues() {
     rotateSpeed->apply();
 }
 
+// effectsLock should be held when calling this
+std::shared_ptr<Effect> OscirenderAudioProcessor::getEffect(juce::String id) {
+    for (auto& effect : allEffects) {
+        if (effect->getId() == id) {
+            return effect;
+        }
+    }
+    return nullptr;
+}
+
+// effectsLock should be held when calling this
+BooleanParameter* OscirenderAudioProcessor::getBooleanParameter(juce::String id) {
+    for (auto& parameter : booleanParameters) {
+        if (parameter->paramID == id) {
+            return parameter;
+        }
+    }
+    return nullptr;
+}
+
 // effectsLock MUST be held when calling this
 void OscirenderAudioProcessor::updateEffectPrecedence() {
     auto sortFunc = [](std::shared_ptr<Effect> a, std::shared_ptr<Effect> b) {
@@ -295,14 +319,27 @@ void OscirenderAudioProcessor::addFile(juce::String fileName, const char* data, 
 }
 
 // parsersLock AND effectsLock must be locked before calling this function
+void OscirenderAudioProcessor::addFile(juce::String fileName, std::shared_ptr<juce::MemoryBlock> data) {
+    fileBlocks.push_back(data);
+    fileNames.push_back(fileName);
+    parsers.push_back(std::make_unique<FileParser>());
+
+    openFile(fileBlocks.size() - 1);
+}
+
+// parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessor::removeFile(int index) {
 	if (index < 0 || index >= fileBlocks.size()) {
 		return;
 	}
-    changeCurrentFile(index - 1);
     fileBlocks.erase(fileBlocks.begin() + index);
     fileNames.erase(fileNames.begin() + index);
-	parsers.erase(parsers.begin() + index);
+    parsers.erase(parsers.begin() + index);
+    auto newFileIndex = index;
+    if (newFileIndex >= fileBlocks.size()) {
+        newFileIndex = fileBlocks.size() - 1;
+    }
+    changeCurrentFile(newFileIndex);
 }
 
 int OscirenderAudioProcessor::numFiles() {
@@ -572,6 +609,13 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
     for (auto effect : allEffects) {
         effect->save(effectsXml->createNewChildElement("effect"));
     }
+
+    auto booleanParametersXml = xml->createNewChildElement("booleanParameters");
+    for (auto parameter : booleanParameters) {
+        auto parameterXml = booleanParametersXml->createNewChildElement("parameter");
+        parameter->save(parameterXml);
+    }
+
     auto perspectiveFunction = xml->createNewChildElement("perspectiveFunction");
     perspectiveFunction->addTextElement(juce::Base64::toBase64(perspectiveEffect->getCode()));
     auto filesXml = xml->createNewChildElement("files");
@@ -588,8 +632,58 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
 }
 
 void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
-    // You should use this method to restore your parameters from this memory block,
-    // whose contents will have been created by the getStateInformation() call.
+    juce::SpinLock::ScopedLockType lock1(parsersLock);
+    juce::SpinLock::ScopedLockType lock2(effectsLock);
+
+    std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data, sizeInBytes));
+
+    if (xml.get() != nullptr && xml->hasTagName("project")) {
+        auto effectsXml = xml->getChildByName("effects");
+        if (effectsXml != nullptr) {
+            for (auto effectXml : effectsXml->getChildIterator()) {
+                auto effect = getEffect(effectXml->getStringAttribute("id"));
+                if (effect != nullptr) {
+                    effect->load(effectXml);
+                }
+            }
+        }
+        updateEffectPrecedence();
+
+        auto booleanParametersXml = xml->getChildByName("booleanParameters");
+        if (booleanParametersXml != nullptr) {
+            for (auto parameterXml : booleanParametersXml->getChildIterator()) {
+                auto parameter = getBooleanParameter(parameterXml->getStringAttribute("id"));
+                if (parameter != nullptr) {
+                    parameter->load(parameterXml);
+                }
+            }
+        }
+
+        auto perspectiveFunction = xml->getChildByName("perspectiveFunction");
+        if (perspectiveFunction != nullptr) {
+            auto stream = juce::MemoryOutputStream();
+            juce::Base64::convertFromBase64(stream, perspectiveFunction->getAllSubText());
+            perspectiveEffect->updateCode(stream.toString());
+        }
+        // close all files
+        auto numFiles = fileBlocks.size();
+        for (int i = 0; i < numFiles; i++) {
+            removeFile(0);
+        }
+
+        auto filesXml = xml->getChildByName("files");
+        if (filesXml != nullptr) {
+            for (auto fileXml : filesXml->getChildIterator()) {
+                auto fileName = fileXml->getStringAttribute("name");
+                auto stream = juce::MemoryOutputStream();
+                juce::Base64::convertFromBase64(stream, fileXml->getAllSubText());
+                auto fileBlock = std::make_shared<juce::MemoryBlock>(stream.getData(), stream.getDataSize());
+                addFile(fileName, fileBlock);
+            }
+        }
+        changeCurrentFile(xml->getIntAttribute("currentFile", -1));
+        broadcaster.sendChangeMessage();
+    }
 }
 
 //==============================================================================
