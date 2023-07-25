@@ -113,6 +113,10 @@
               file="Source/components/LuaListComponent.cpp"/>
         <FILE id="x0Syav" name="LuaListComponent.h" compile="0" resource="0"
               file="Source/components/LuaListComponent.h"/>
+        <FILE id="CfBFAE" name="MainMenuBarModel.cpp" compile="1" resource="0"
+              file="Source/components/MainMenuBarModel.cpp"/>
+        <FILE id="ubDcnO" name="MainMenuBarModel.h" compile="0" resource="0"
+              file="Source/components/MainMenuBarModel.h"/>
         <FILE id="QQzSwh" name="SliderTextBox.h" compile="0" resource="0" file="Source/components/SliderTextBox.h"/>
         <FILE id="QrDKRZ" name="SvgButton.h" compile="0" resource="0" file="Source/components/SvgButton.h"/>
         <FILE id="y3UiR0" name="VisualiserComponent.cpp" compile="1" resource="0"

@@ -627,7 +627,6 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
         fileXml->addTextElement(juce::Base64::toBase64(fileString));
     }
     xml->setAttribute("currentFile", currentFile);
-    DBG(xml->toString());
     copyXmlToBinary(*xml, destData);
 }
 

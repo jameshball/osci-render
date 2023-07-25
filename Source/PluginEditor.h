@@ -7,6 +7,7 @@
 #include "LuaComponent.h"
 #include "ObjComponent.h"
 #include "components/VolumeComponent.h"
+#include "components/MainMenuBarModel.h"
 
 
 class OscirenderAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater {
@@ -24,6 +25,12 @@ public:
 
     void editPerspectiveFunction(bool enabled);
 
+    void newProject();
+    void openProject();
+    void saveProject();
+    void saveProjectAs();
+    void updateTitle();
+
     std::atomic<bool> editingPerspective = false;
 private:
     OscirenderAudioProcessor& audioProcessor;
@@ -40,6 +47,10 @@ private:
 	juce::ShapeButton collapseButton;
     std::shared_ptr<juce::CodeDocument> perspectiveCodeDocument = std::make_shared<juce::CodeDocument>();
     std::shared_ptr<juce::CodeEditorComponent> perspectiveCodeEditor = std::make_shared<juce::CodeEditorComponent>(*perspectiveCodeDocument, &luaTokeniser);
+
+    std::unique_ptr<juce::FileChooser> chooser;
+    MainMenuBarModel menuBarModel{*this};
+    juce::MenuBarComponent menuBar;
 
 	void codeDocumentTextInserted(const juce::String& newText, int insertIndex) override;
 	void codeDocumentTextDeleted(int startIndex, int endIndex) override;

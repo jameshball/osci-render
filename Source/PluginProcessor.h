@@ -184,6 +184,10 @@ public:
     PitchDetector pitchDetector{audioProducer};
     std::shared_ptr<WobbleEffect> wobbleEffect = std::make_shared<WobbleEffect>(pitchDetector);
 
+    // shouldn't be accessed by audio thread, but needs to persist when GUI is closed
+    // so should only be accessed by message thread
+    juce::String currentProjectFile;
+
     void addLuaSlider();
     void addFrame(std::vector<std::unique_ptr<Shape>> frame, int fileIndex) override;
     void updateEffectPrecedence();

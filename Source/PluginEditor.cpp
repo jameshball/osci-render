@@ -10,6 +10,9 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     addChildComponent(obj);
     addAndMakeVisible(volume);
 
+    menuBar.setModel(&menuBarModel);
+    addAndMakeVisible(menuBar);
+
     addAndMakeVisible(collapseButton);
 	collapseButton.onClick = [this] {
         juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
@@ -45,8 +48,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {}
 
-void OscirenderAudioProcessorEditor::paint(juce::Graphics& g)
-{
+void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
     g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
 
     g.setColour(juce::Colours::white);
@@ -55,6 +57,8 @@ void OscirenderAudioProcessorEditor::paint(juce::Graphics& g)
 
 void OscirenderAudioProcessorEditor::resized() {
     auto area = getLocalBounds();
+    menuBar.setBounds(area.removeFromTop(25));
+    area.removeFromTop(2);
     area.removeFromLeft(3);
     auto volumeArea = area.removeFromLeft(30);
     volume.setBounds(volumeArea.withSizeKeepingCentre(volumeArea.getWidth(), juce::jmin(volumeArea.getHeight(), 300)));
@@ -216,39 +220,108 @@ void OscirenderAudioProcessorEditor::updateCodeDocument() {
 }
 
 bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
-    juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
-    juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
+    bool consumeKey1 = true;
+    {
+        juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
+        juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
 
-    int numFiles = audioProcessor.numFiles();
-    int currentFile = audioProcessor.getCurrentFileIndex();
-    bool changedFile = false;
-    bool consumeKey = true;
-    if (key.getTextCharacter() == 'j') {
-        if (numFiles > 1) {
-            currentFile++;
-            if (currentFile == numFiles) {
-                currentFile = 0;
+        int numFiles = audioProcessor.numFiles();
+        int currentFile = audioProcessor.getCurrentFileIndex();
+        bool changedFile = false;
+
+        if (key.getTextCharacter() == 'j') {
+            if (numFiles > 1) {
+                currentFile++;
+                if (currentFile == numFiles) {
+                    currentFile = 0;
+                }
+                changedFile = true;
             }
-            changedFile = true;
+        } else if (key.getTextCharacter() == 'k') {
+            if (numFiles > 1) {
+                currentFile--;
+                if (currentFile < 0) {
+                    currentFile = numFiles - 1;
+                }
+                changedFile = true;
+            }
+        } else {
+            consumeKey1 = false;
         }
-    } else if (key.getTextCharacter() == 'k') {
-        if (numFiles > 1) {
-			currentFile--;
-            if (currentFile < 0) {
-				currentFile = numFiles - 1;
-			}
-			changedFile = true;
-		}
-    } else if (key.isKeyCode(juce::KeyPress::escapeKey)) {
+
+        if (changedFile) {
+            audioProcessor.changeCurrentFile(currentFile);
+            fileUpdated(audioProcessor.getCurrentFileName());
+        }
+    }
+    
+    bool consumeKey2 = true;
+    if (key.isKeyCode(juce::KeyPress::escapeKey)) {
         obj.disableMouseRotation();
+    } else if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'S') {
+        saveProjectAs();
+    } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'S') {
+        saveProject();
+    } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'O') {
+        openProject();
     } else {
-		consumeKey = false;
+        consumeKey2 = false;
 	}
 
-    if (changedFile) {
-        audioProcessor.changeCurrentFile(currentFile);
-        fileUpdated(audioProcessor.getCurrentFileName());
-    }
+    return consumeKey1 || consumeKey2;
+}
 
-    return consumeKey;
+void OscirenderAudioProcessorEditor::newProject() {
+    // TODO: open a default project
+}
+
+void OscirenderAudioProcessorEditor::openProject() {
+    chooser = std::make_unique<juce::FileChooser>("Load osci-render Project", juce::File::getSpecialLocation(juce::File::userHomeDirectory), "*.osci");
+    auto flags = juce::FileBrowserComponent::openMode;
+
+    chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
+        auto file = chooser.getResult();
+        if (file != juce::File()) {
+            auto data = juce::MemoryBlock();
+            if (file.loadFileAsData(data)) {
+                audioProcessor.setStateInformation(data.getData(), data.getSize());
+            }
+            audioProcessor.currentProjectFile = file.getFullPathName();
+            updateTitle();
+        }
+    });
+}
+
+void OscirenderAudioProcessorEditor::saveProject() {
+    if (audioProcessor.currentProjectFile.isEmpty()) {
+        saveProjectAs();
+    } else {
+        auto data = juce::MemoryBlock();
+        audioProcessor.getStateInformation(data);
+        auto file = juce::File(audioProcessor.currentProjectFile);
+        file.create();
+        file.replaceWithData(data.getData(), data.getSize());
+        updateTitle();
+    }
+}
+
+void OscirenderAudioProcessorEditor::saveProjectAs() {
+    chooser = std::make_unique<juce::FileChooser>("Save osci-render Project", juce::File::getSpecialLocation(juce::File::userHomeDirectory), "*.osci");
+    auto flags = juce::FileBrowserComponent::saveMode;
+
+    chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
+        auto file = chooser.getResult();
+        if (file != juce::File()) {
+            audioProcessor.currentProjectFile = file.getFullPathName();
+            saveProject();
+        }
+    });
+}
+
+void OscirenderAudioProcessorEditor::updateTitle() {
+    juce::String title = "osci-render";
+    if (!audioProcessor.currentProjectFile.isEmpty()) {
+        title += " - " + audioProcessor.currentProjectFile;
+    }
+    getTopLevelComponent()->setName(title);
 }
