@@ -148,3 +148,12 @@ juce::String Effect::getId() {
 juce::String Effect::getName() {
     return parameters[0]->name;
 }
+
+void Effect::save(juce::XmlElement* xml) {
+	if (enabled != nullptr) {
+		xml->setAttribute("enabled", enabled->getBoolValue());
+	}
+	for (auto parameter : parameters) {
+		parameter->save(xml->createNewChildElement("parameter"));
+	}
+}

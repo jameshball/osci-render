@@ -33,8 +33,8 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
 #endif
     {
     producer.startThread();
-    
-    juce::SpinLock::ScopedLockType lock(effectsLock);
+
+    // locking isn't necessary here because we are in the constructor
 
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<BitCrushEffect>(),
@@ -46,19 +46,19 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<RotateEffect>(),
-        new EffectParameter("2D Rotate", "rotateSpeed", 0.0, 0.0, 1.0)
+        new EffectParameter("2D Rotate", "2DRotateSpeed", 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<VectorCancellingEffect>(),
-        new EffectParameter("Vector Cancel", "vectorCancelling", 0.0, 0.0, 1.0)
+        new EffectParameter("Vector Cancelling", "vectorCancelling", 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<DistortEffect>(false),
-        new EffectParameter("X Distort", "horizontalDistort", 0.0, 0.0, 1.0)
+        new EffectParameter("Distort X", "distortX", 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<DistortEffect>(true),
-        new EffectParameter("Y Distort", "verticalDistort", 0.0, 0.0, 1.0)
+        new EffectParameter("Distort Y", "distortY", 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
@@ -77,17 +77,17 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         delayEffect,
-        std::vector<EffectParameter*>{new EffectParameter("Delay Decay", "delayDecay", 0.0, 0.0, 1.0), new EffectParameter("Delay Length", "delayEchoLength", 0.5, 0.0, 1.0)}
+        std::vector<EffectParameter*>{new EffectParameter("Delay Decay", "delayDecay", 0.0, 0.0, 1.0), new EffectParameter("Delay Length", "delayLength", 0.5, 0.0, 1.0)}
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         perspectiveEffect,
         std::vector<EffectParameter*>{
-            new EffectParameter("3D Perspective", "depthScale", 0.0, 0.0, 1.0),
-            new EffectParameter("3D Depth (z)", "zPos", 0.1, 0.0, 1.0),
-            new EffectParameter("3D Rotate Speed", "rotateSpeed3D", 0.0, -1.0, 1.0),
-            new EffectParameter("Rotate X", "rotateX", 1.0, -1.0, 1.0),
-            new EffectParameter("Rotate Y", "rotateY", 1.0, -1.0, 1.0),
-            new EffectParameter("Rotate Z", "rotateZ", 0.0, -1.0, 1.0),
+            new EffectParameter("3D Perspective", "perspectiveStrength", 0.0, 0.0, 1.0),
+            new EffectParameter("Depth (z)", "perspectiveZPos", 0.1, 0.0, 1.0),
+            new EffectParameter("Rotate Speed", "perspectiveRotateSpeed", 0.0, -1.0, 1.0),
+            new EffectParameter("Rotate X", "perspectiveRotateX", 1.0, -1.0, 1.0),
+            new EffectParameter("Rotate Y", "perspectiveRotateY", 1.0, -1.0, 1.0),
+            new EffectParameter("Rotate Z", "perspectiveRotateZ", 0.0, -1.0, 1.0),
         }
     ));
     toggleableEffects.push_back(traceMax);
@@ -112,11 +112,11 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         addLuaSlider();
     }
 
-    auto effects = toggleableEffects;
-    effects.insert(effects.end(), permanentEffects.begin(), permanentEffects.end());
-    effects.insert(effects.end(), luaEffects.begin(), luaEffects.end());
+    allEffects = toggleableEffects;
+    allEffects.insert(allEffects.end(), permanentEffects.begin(), permanentEffects.end());
+    allEffects.insert(allEffects.end(), luaEffects.begin(), luaEffects.end());
 
-    for (auto effect : effects) {
+    for (auto effect : allEffects) {
         for (auto effectParameter : effect->parameters) {
             auto parameters = effectParameter->getParameters();
             for (auto parameter : parameters) {
@@ -553,26 +553,41 @@ void OscirenderAudioProcessor::incrementShapeDrawing() {
 }
 
 //==============================================================================
-bool OscirenderAudioProcessor::hasEditor() const
-{
+bool OscirenderAudioProcessor::hasEditor() const {
     return true; // (change this to false if you choose to not supply an editor)
 }
 
-juce::AudioProcessorEditor* OscirenderAudioProcessor::createEditor()
-{
+juce::AudioProcessorEditor* OscirenderAudioProcessor::createEditor() {
     return new OscirenderAudioProcessorEditor (*this);
 }
 
 //==============================================================================
-void OscirenderAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
-{
-    // You should use this method to store your parameters in the memory block.
-    // You could do that either as raw data, or use the XML or ValueTree classes
-    // as intermediaries to make it easy to save and load complex data.
+void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
+    juce::SpinLock::ScopedLockType lock1(parsersLock);
+    juce::SpinLock::ScopedLockType lock2(effectsLock);
+
+    std::unique_ptr<juce::XmlElement> xml = std::make_unique<juce::XmlElement>("project");
+    xml->setAttribute("version", ProjectInfo::versionString);
+    auto effectsXml = xml->createNewChildElement("effects");
+    for (auto effect : allEffects) {
+        effect->save(effectsXml->createNewChildElement("effect"));
+    }
+    auto perspectiveFunction = xml->createNewChildElement("perspectiveFunction");
+    perspectiveFunction->addTextElement(juce::Base64::toBase64(perspectiveEffect->getCode()));
+    auto filesXml = xml->createNewChildElement("files");
+    
+    for (int i = 0; i < fileBlocks.size(); i++) {
+        auto fileXml = filesXml->createNewChildElement("file");
+        fileXml->setAttribute("name", fileNames[i]);
+        auto fileString = juce::MemoryInputStream(*fileBlocks[i], false).readEntireStreamAsString();
+        fileXml->addTextElement(juce::Base64::toBase64(fileString));
+    }
+    xml->setAttribute("currentFile", currentFile);
+    DBG(xml->toString());
+    copyXmlToBinary(*xml, destData);
 }
 
-void OscirenderAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
-{
+void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
     // You should use this method to restore your parameters from this memory block,
     // whose contents will have been created by the getStateInformation() call.
 }

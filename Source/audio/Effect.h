@@ -27,6 +27,7 @@ public:
 	void markEnableable(bool enabled);
 	juce::String getId();
 	juce::String getName();
+	void save(juce::XmlElement* xml);
 
 	std::vector<EffectParameter*> parameters;
 	BooleanParameter* enabled;

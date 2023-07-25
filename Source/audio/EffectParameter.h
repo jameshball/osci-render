@@ -96,6 +96,14 @@ public:
 		return juce::AudioProcessorParameter::genericParameter;
 	}
 
+	void save(juce::XmlElement* xml) {
+		xml->setAttribute("id", paramID);
+		xml->setAttribute("value", value.load());
+		xml->setAttribute("min", min.load());
+		xml->setAttribute("max", max.load());
+		xml->setAttribute("step", step.load());
+	}
+
 private:
 	// value is not necessarily in the range [min, max] so effect applications may need to clip to a valid range
 	std::atomic<float> value = 0.0;
@@ -259,6 +267,10 @@ public:
             return (int)LfoType::Static;
         }
 	}
+
+	void save(juce::XmlElement* xml) {
+        xml->setAttribute("lfo", getText(getValue(), 100));
+    }
 };
 
 class EffectParameter : public FloatParameter {
@@ -286,6 +298,16 @@ public:
 		lfo = nullptr;
 		lfoRate = nullptr;
 	}
+
+	void save(juce::XmlElement* xml) {
+		FloatParameter::save(xml);
+
+		if (lfo != nullptr && lfoRate != nullptr) {
+			auto lfoXml = xml->createNewChildElement("lfo");
+			lfo->save(lfoXml);
+			lfoRate->save(lfoXml);
+		}
+    }
 
 	EffectParameter(juce::String name, juce::String id, float value, float min, float max, float step = 0.001, bool smoothValueChange = true) : FloatParameter(name, id, value, min, max, step), smoothValueChange(smoothValueChange) {}
 };

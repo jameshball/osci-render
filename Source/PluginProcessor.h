@@ -104,7 +104,7 @@ public:
                 camera->setFocalLength(values[0]);
             }
             return input;
-		}, new EffectParameter("Focal length", "focalLength", 1.0, 0.0, 2.0)
+		}, new EffectParameter("Focal length", "objFocalLength", 1.0, 0.0, 2.0)
     );
 
     BooleanParameter* fixedRotateX = new BooleanParameter("Object Fixed Rotate X", "objFixedRotateX", false);
@@ -214,6 +214,7 @@ private:
 	double lengthIncrement = 0.0;
     bool invalidateFrameBuffer = false;
 
+    std::vector<std::shared_ptr<Effect>> allEffects;
     std::vector<std::shared_ptr<Effect>> permanentEffects;
 
     std::shared_ptr<Effect> traceMax = std::make_shared<Effect>(
