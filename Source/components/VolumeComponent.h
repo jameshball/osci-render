@@ -3,8 +3,9 @@
 #include <JuceHeader.h>
 #include "../concurrency/BufferConsumer.h"
 #include "../PluginProcessor.h"
+#include "../LookAndFeel.h"
 
-class ThumbRadiusLookAndFeel : public juce::LookAndFeel_V4 {
+class ThumbRadiusLookAndFeel : public OscirenderLookAndFeel {
 public:
     ThumbRadiusLookAndFeel(int thumbRadius) : thumbRadius(thumbRadius) {}
 
@@ -26,7 +27,7 @@ public:
         float ky = sliderPos;
 
         auto outlineThickness = slider.isEnabled() ? 0.8f : 0.3f;
-        auto sliderRadius = (float) (getSliderThumbRadius(slider) - 2);
+        auto sliderRadius = (float) getSliderThumbRadius(slider);
         auto diameter = sliderRadius * 2.0f;
         auto halfThickness = outlineThickness * 0.5f;
 
@@ -49,7 +50,7 @@ public:
         g.setColour(knobColour);
         g.fillPath(p);
 
-        g.setColour(knobColour.brighter());
+        g.setColour(slider.findColour(sliderThumbOutlineColourId));
         g.strokePath(p, juce::PathStrokeType(outlineThickness));
     }
 
@@ -79,7 +80,7 @@ private:
 	
     ThumbRadiusLookAndFeel thumbRadiusLookAndFeel{20};
     juce::Slider volumeSlider;
-    ThresholdLookAndFeel thresholdLookAndFeel{20};
+    ThresholdLookAndFeel thresholdLookAndFeel{7};
 	juce::Slider thresholdSlider;
 
     std::unique_ptr<juce::Drawable> volumeIcon;

@@ -39,7 +39,7 @@ EffectsComponent::~EffectsComponent() {
 }
 
 void EffectsComponent::resized() {
-    auto area = getLocalBounds().reduced(20);
+    auto area = getLocalBounds().withTrimmedTop(20).reduced(20);
     frequency.setBounds(area.removeFromTop(30));
 
     area.removeFromTop(6);

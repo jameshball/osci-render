@@ -108,7 +108,7 @@ void MainComponent::updateFileLabel() {
 }
 
 void MainComponent::resized() {
-	auto bounds = getLocalBounds().reduced(20);
+	auto bounds = getLocalBounds().withTrimmedTop(20).reduced(20);
 	auto buttonWidth = 120;
 	auto buttonHeight = 30;
 	auto padding = 10;
@@ -135,4 +135,12 @@ void MainComponent::resized() {
 	bounds.removeFromTop(padding);
 	auto minDim = juce::jmin(bounds.getWidth(), bounds.getHeight());
 	visualiser.setBounds(bounds.withSizeKeepingCentre(minDim, minDim));
+}
+
+void MainComponent::paint(juce::Graphics& g) {
+	juce::GroupComponent::paint(g);
+
+	// add drop shadow to the visualiser
+	auto dc = juce::DropShadow(juce::Colours::black, 30, juce::Point<int>(0, 0));
+	dc.drawForRectangle(g, visualiser.getBounds());
 }

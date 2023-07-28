@@ -27,6 +27,7 @@ void VisualiserComponent::setColours(juce::Colour bk, juce::Colour fg) {
 
 void VisualiserComponent::paint(juce::Graphics& g) {
     g.fillAll(backgroundColour);
+    g.drawRect(getLocalBounds(), 1);
 
     auto r = getLocalBounds().toFloat();
     auto minDim = juce::jmin(r.getWidth(), r.getHeight());

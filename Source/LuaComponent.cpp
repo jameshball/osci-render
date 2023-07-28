@@ -13,6 +13,6 @@ LuaComponent::~LuaComponent() {
 }
 
 void LuaComponent::resized() {
-	auto area = getLocalBounds().reduced(20);
+	auto area = getLocalBounds().withTrimmedTop(20).reduced(20);
 	sliders.setBounds(area);
 }

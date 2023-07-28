@@ -42,12 +42,24 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
         audioProcessor.broadcaster.addChangeListener(this);
     }
 
+    if (audioProcessor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
+        if (juce::TopLevelWindow::getNumTopLevelWindows() == 1) {
+            juce::TopLevelWindow* w = juce::TopLevelWindow::getTopLevelWindow(0);
+            w->setColour(juce::ResizableWindow::backgroundColourId, Colours::veryDark);
+        }
+    }
+
+    juce::Desktop::getInstance().setDefaultLookAndFeel(&lookAndFeel);
+    setLookAndFeel(&lookAndFeel);
+
     setSize(1100, 750);
     setResizable(true, true);
     setResizeLimits(500, 400, 999999, 999999);
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
+    setLookAndFeel(nullptr);
+    juce::Desktop::getInstance().setDefaultLookAndFeel(nullptr);
     juce::MessageManagerLock lock;
     audioProcessor.broadcaster.removeChangeListener(this);
 }
@@ -66,6 +78,16 @@ void OscirenderAudioProcessorEditor::initialiseCodeEditors() {
 
 void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
     g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
+
+    juce::DropShadow ds(juce::Colours::black, 10, juce::Point<int>(0, 0));
+    ds.drawForRectangle(g, main.getBounds());
+    ds.drawForRectangle(g, effects.getBounds());
+    if (lua.isVisible()) {
+        ds.drawForRectangle(g, lua.getBounds());
+    }
+    if (obj.isVisible()) {
+        ds.drawForRectangle(g, obj.getBounds());
+    }
 
     g.setColour(juce::Colours::white);
     g.setFont(15.0f);
@@ -110,13 +132,15 @@ void OscirenderAudioProcessorEditor::resized() {
     }
     
     auto effectsSection = area.removeFromRight(1.2 * getWidth() / sections);
-    main.setBounds(area);
+    main.setBounds(area.reduced(5));
     if (lua.isVisible() || obj.isVisible()) {
         auto altEffectsSection = effectsSection.removeFromBottom(juce::jmin(effectsSection.getHeight() / 2, 300));
-        lua.setBounds(altEffectsSection);
-        obj.setBounds(altEffectsSection);
+        lua.setBounds(altEffectsSection.reduced(5));
+        obj.setBounds(altEffectsSection.reduced(5));
     }
-	effects.setBounds(effectsSection);
+	effects.setBounds(effectsSection.reduced(5));
+
+    repaint();
 }
 
 void OscirenderAudioProcessorEditor::addCodeEditor(int index) {

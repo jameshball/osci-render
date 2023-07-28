@@ -125,5 +125,6 @@ void VolumeComponent::resized() {
     volumeIcon->setTransformToFit(iconRow.removeFromLeft(iconRow.getWidth() / 2).reduced(1), juce::RectanglePlacement::centred);
     thresholdIcon->setTransformToFit(iconRow.reduced(2), juce::RectanglePlacement::centred);
     volumeSlider.setBounds(r.removeFromLeft(r.getWidth() / 2));
-    thresholdSlider.setBounds(r);
+    auto radius = volumeSlider.getLookAndFeel().getSliderThumbRadius(volumeSlider);
+    thresholdSlider.setBounds(r.reduced(0, radius / 2));
 }

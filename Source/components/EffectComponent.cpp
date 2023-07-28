@@ -1,4 +1,5 @@
 #include "EffectComponent.h"
+#include "../LookAndFeel.h"
 
 EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, int index) : effect(effect), index(index), audioProcessor(p) {
     addAndMakeVisible(slider);
@@ -14,8 +15,6 @@ EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, in
     lfo.addItem("Sawtooth", static_cast<int>(LfoType::Sawtooth));
     lfo.addItem("Reverse Sawtooth", static_cast<int>(LfoType::ReverseSawtooth));
     lfo.addItem("Noise", static_cast<int>(LfoType::Noise));
-
-    lfo.setLookAndFeel(&lfoLookAndFeel);
 
     effect.addListener(index, this);
     setupComponent();
@@ -75,7 +74,7 @@ void EffectComponent::setupComponent() {
         lfoSlider.setSliderStyle(juce::Slider::LinearHorizontal);
         lfoSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 70, lfoSlider.getTextBoxHeight());
         lfoSlider.setTextValueSuffix("Hz");
-        lfoSlider.setColour(juce::Slider::thumbColourId, juce::Colour(0xff00ff00));
+        lfoSlider.setColour(sliderThumbOutlineColourId, juce::Colour(0xff00ff00));
 
         lfoSlider.onValueChange = [this]() {
             effect.parameters[index]->lfoRate->setUnnormalisedValueNotifyingHost(lfoSlider.getValue());
@@ -142,7 +141,7 @@ void EffectComponent::resized() {
 }
 
 void EffectComponent::paint(juce::Graphics& g) {
-    g.fillAll(juce::Colours::black);
+    g.fillAll(findColour(effectComponentBackgroundColourId));
     g.setColour(juce::Colours::white);
     g.drawText(effect.parameters[index]->name, textBounds, juce::Justification::left);
 }
