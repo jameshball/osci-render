@@ -32,11 +32,9 @@ class OscirenderAudioProcessor  : public juce::AudioProcessor
     , public FrameConsumer
 {
 public:
-    //==============================================================================
     OscirenderAudioProcessor();
     ~OscirenderAudioProcessor() override;
 
-    //==============================================================================
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
 
@@ -46,28 +44,22 @@ public:
 
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
-    //==============================================================================
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override;
 
-    //==============================================================================
     const juce::String getName() const override;
 
     bool acceptsMidi() const override;
     bool producesMidi() const override;
     bool isMidiEffect() const override;
     double getTailLengthSeconds() const override;
-
-    //==============================================================================
     int getNumPrograms() override;
     int getCurrentProgram() override;
-    void setCurrentProgram (int index) override;
-    const juce::String getProgramName (int index) override;
-    void changeProgramName (int index, const juce::String& newName) override;
-
-    //==============================================================================
-    void getStateInformation (juce::MemoryBlock& destData) override;
-    void setStateInformation (const void* data, int sizeInBytes) override;
+    void setCurrentProgram(int index) override;
+    const juce::String getProgramName(int index) override;
+    void changeProgramName(int index, const juce::String& newName) override;
+    void getStateInformation(juce::MemoryBlock& destData) override;
+    void setStateInformation(const void* data, int sizeInBytes) override;
 
     std::atomic<double> currentSampleRate = 0.0;
 
@@ -257,6 +249,10 @@ private:
     void updateObjValues();
     std::shared_ptr<Effect> getEffect(juce::String id);
     BooleanParameter* getBooleanParameter(juce::String id);
+    void openLegacyProject(const juce::XmlElement* xml);
+    std::pair<std::shared_ptr<Effect>, EffectParameter*> effectFromLegacyId(const juce::String& id, bool updatePrecedence = false);
+    LfoType lfoTypeFromLegacyAnimationType(const juce::String& type);
+    double valueFromLegacy(double value, const juce::String& id);
 
     const double MIN_LENGTH_INCREMENT = 0.000001;
 

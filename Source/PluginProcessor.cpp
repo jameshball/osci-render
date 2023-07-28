@@ -93,10 +93,12 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     toggleableEffects.push_back(traceMax);
     toggleableEffects.push_back(traceMin);
 
-    for (auto& effect : toggleableEffects) {
+    for (int i = 0; i < toggleableEffects.size(); i++) {
+        auto effect = toggleableEffects[i];
         effect->markEnableable(false);
         addParameter(effect->enabled);
         effect->enabled->setValueNotifyingHost(false);
+        effect->setPrecedence(i);
     }
 
     permanentEffects.push_back(frequencyEffect);
@@ -631,12 +633,27 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
 }
 
 void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
-    juce::SpinLock::ScopedLockType lock1(parsersLock);
-    juce::SpinLock::ScopedLockType lock2(effectsLock);
+    std::unique_ptr<juce::XmlElement> xml;
 
-    std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data, sizeInBytes));
+    const uint32_t magicXmlNumber = 0x21324356;
+    if (sizeInBytes > 8 && juce::ByteOrder::littleEndianInt(data) == magicXmlNumber) {
+        // this is a binary xml format
+        xml = getXmlFromBinary(data, sizeInBytes);
+    } else {
+        // this is a text xml format
+        xml = juce::XmlDocument::parse(juce::String((const char*)data, sizeInBytes));
+    }
 
     if (xml.get() != nullptr && xml->hasTagName("project")) {
+        auto versionXml = xml->getChildByName("version");
+        if (versionXml != nullptr && versionXml->getAllSubText().startsWith("v1.")) {
+            openLegacyProject(xml.get());
+            return;
+        }
+
+        juce::SpinLock::ScopedLockType lock1(parsersLock);
+        juce::SpinLock::ScopedLockType lock2(effectsLock);
+
         auto effectsXml = xml->getChildByName("effects");
         if (effectsXml != nullptr) {
             for (auto effectXml : effectsXml->getChildIterator()) {

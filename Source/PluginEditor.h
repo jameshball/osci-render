@@ -10,7 +10,7 @@
 #include "components/MainMenuBarModel.h"
 
 
-class OscirenderAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater {
+class OscirenderAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener {
 public:
     OscirenderAudioProcessorEditor(OscirenderAudioProcessor&);
     ~OscirenderAudioProcessorEditor() override;
@@ -18,10 +18,12 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
     
+    void initialiseCodeEditors();
     void addCodeEditor(int index);
     void removeCodeEditor(int index);
     void fileUpdated(juce::String fileName);
     void handleAsyncUpdate() override;
+    void changeListenerCallback(juce::ChangeBroadcaster* source) override;
 
     void editPerspectiveFunction(bool enabled);
 

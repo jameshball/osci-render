@@ -299,6 +299,8 @@
         <FILE id="eAqAle" name="IXWebSocketVersion.h" compile="0" resource="0"
               file="Source/ixwebsocket/IXWebSocketVersion.h"/>
       </GROUP>
+      <FILE id="uyOdTl" name="LegacyProject.cpp" compile="1" resource="0"
+            file="Source/LegacyProject.cpp"/>
       <GROUP id="{75F6236A-68A5-85DA-EDAE-23D1621601DB}" name="lua">
         <FILE id="X5i9iw" name="lapi.c" compile="1" resource="0" file="Source/lua/lapi.c"/>
         <FILE id="J62WSE" name="lapi.h" compile="0" resource="0" file="Source/lua/lapi.h"/>

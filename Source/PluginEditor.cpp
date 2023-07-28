@@ -34,11 +34,12 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 
     {
         juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
-        addCodeEditor(-1);
-        for (int i = 0; i < audioProcessor.numFiles(); i++) {
-            addCodeEditor(i);
-        }
-        fileUpdated(audioProcessor.getCurrentFileName());
+        initialiseCodeEditors();
+    }
+
+    {
+        juce::MessageManagerLock lock;
+        audioProcessor.broadcaster.addChangeListener(this);
     }
 
     setSize(1100, 750);
@@ -46,7 +47,22 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     setResizeLimits(500, 400, 999999, 999999);
 }
 
-OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {}
+OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
+    juce::MessageManagerLock lock;
+    audioProcessor.broadcaster.removeChangeListener(this);
+}
+
+// parsersLock must be held
+void OscirenderAudioProcessorEditor::initialiseCodeEditors() {
+    codeDocuments.clear();
+    codeEditors.clear();
+    // -1 is the perspective function
+    addCodeEditor(-1);
+    for (int i = 0; i < audioProcessor.numFiles(); i++) {
+        addCodeEditor(i);
+    }
+    fileUpdated(audioProcessor.getCurrentFileName());
+}
 
 void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
     g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
@@ -101,7 +117,6 @@ void OscirenderAudioProcessorEditor::resized() {
         obj.setBounds(altEffectsSection);
     }
 	effects.setBounds(effectsSection);
-    
 }
 
 void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
@@ -185,6 +200,11 @@ void OscirenderAudioProcessorEditor::fileUpdated(juce::String fileName) {
 
 void OscirenderAudioProcessorEditor::handleAsyncUpdate() {
     resized();
+}
+
+void OscirenderAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcaster* source) {
+    juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+    initialiseCodeEditors();
 }
 
 void OscirenderAudioProcessorEditor::editPerspectiveFunction(bool enable) {
