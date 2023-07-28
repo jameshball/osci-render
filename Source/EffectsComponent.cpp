@@ -16,15 +16,6 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
         audioProcessor.frequencyEffect->setValue(frequency.slider.getValue());
     };
 
-    {
-        juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-        for (int i = 0; i < audioProcessor.toggleableEffects.size(); i++) {
-            auto effect = audioProcessor.toggleableEffects[i];
-            effect->setValue(effect->getValue());
-            itemData.data.push_back(effect);
-        }
-    }
-
     /*addBtn.setButtonText("Add Item...");
     addBtn.onClick = [this]()
     {
@@ -33,12 +24,18 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
     };
     addAndMakeVisible(addBtn);*/
 
+    {
+        juce::MessageManagerLock lock;
+        audioProcessor.broadcaster.addChangeListener(this);
+    }
+
     listBox.setModel(&listBoxModel);
     addAndMakeVisible(listBox);
 }
 
 EffectsComponent::~EffectsComponent() {
-    
+    juce::MessageManagerLock lock;
+    audioProcessor.broadcaster.removeChangeListener(this);
 }
 
 void EffectsComponent::resized() {
@@ -47,4 +44,9 @@ void EffectsComponent::resized() {
 
     area.removeFromTop(6);
     listBox.setBounds(area);
+}
+
+void EffectsComponent::changeListenerCallback(juce::ChangeBroadcaster* source) {
+    itemData.resetData();
+    listBox.updateContent();
 }

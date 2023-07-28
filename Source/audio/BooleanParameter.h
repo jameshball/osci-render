@@ -2,20 +2,9 @@
 #include "../shape/Vector2.h"
 #include <JuceHeader.h>
 
-class BooleanParameter : public juce::AudioProcessorParameter {
+class BooleanParameter : public juce::AudioProcessorParameterWithID {
 public:
-	juce::String name;
-	juce::String id;
-
-	BooleanParameter(juce::String name, juce::String id, bool value) : name(name), id(id), value(value) {}
-
-	// COPY CONSTRUCTOR SHOULD ONLY BE USED BEFORE
-	// THE OBJECT IS USED IN MULTIPLE THREADS
-	BooleanParameter(const BooleanParameter& other) {
-        name = other.name;
-        id = other.id;
-        value.store(other.value.load());
-    }
+	BooleanParameter(juce::String name, juce::String id, bool value) : AudioProcessorParameterWithID(id, name), value(value) {}
 
 	juce::String getName(int maximumStringLength) const override {
 		return name.substring(0, maximumStringLength);
@@ -84,6 +73,15 @@ public:
 
 	juce::AudioProcessorParameter::Category getCategory() const override {
         return juce::AudioProcessorParameter::genericParameter;
+    }
+
+	void save(juce::XmlElement* xml) {
+		xml->setAttribute("id", paramID);
+		xml->setAttribute("value", value.load());
+    }
+
+	void load(juce::XmlElement* xml) {
+		setBoolValueNotifyingHost(xml->getBoolAttribute("value", getDefaultValue()));
     }
 
 private:

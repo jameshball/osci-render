@@ -148,3 +148,42 @@ juce::String Effect::getId() {
 juce::String Effect::getName() {
     return parameters[0]->name;
 }
+
+void Effect::save(juce::XmlElement* xml) {
+	if (enabled != nullptr) {
+		auto enabledXml = xml->createNewChildElement("enabled");
+		enabled->save(enabledXml);
+	}
+	xml->setAttribute("id", getId());
+	xml->setAttribute("precedence", precedence);
+	for (auto parameter : parameters) {
+		parameter->save(xml->createNewChildElement("parameter"));
+	}
+}
+
+void Effect::load(juce::XmlElement* xml) {
+	if (enabled != nullptr) {
+		auto enabledXml = xml->getChildByName("enabled");
+        if (enabledXml != nullptr) {
+            enabled->load(enabledXml);
+        }
+	}
+    if (xml->hasAttribute("precedence")) {
+        setPrecedence(xml->getIntAttribute("precedence"));
+    }
+    for (auto parameterXml : xml->getChildIterator()) {
+        auto parameter = getParameter(parameterXml->getStringAttribute("id"));
+        if (parameter != nullptr) {
+            parameter->load(parameterXml);
+        }
+    }
+}
+
+EffectParameter* Effect::getParameter(juce::String id) {
+	for (auto parameter : parameters) {
+        if (parameter->paramID == id) {
+            return parameter;
+        }
+    }
+    return nullptr;
+}

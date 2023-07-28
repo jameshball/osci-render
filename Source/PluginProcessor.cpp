@@ -33,8 +33,8 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
 #endif
     {
     producer.startThread();
-    
-    juce::SpinLock::ScopedLockType lock(effectsLock);
+
+    // locking isn't necessary here because we are in the constructor
 
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<BitCrushEffect>(),
@@ -46,19 +46,19 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<RotateEffect>(),
-        new EffectParameter("2D Rotate", "rotateSpeed", 0.0, 0.0, 1.0)
+        new EffectParameter("2D Rotate", "2DRotateSpeed", 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<VectorCancellingEffect>(),
-        new EffectParameter("Vector Cancel", "vectorCancelling", 0.0, 0.0, 1.0)
+        new EffectParameter("Vector Cancelling", "vectorCancelling", 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<DistortEffect>(false),
-        new EffectParameter("X Distort", "horizontalDistort", 0.0, 0.0, 1.0)
+        new EffectParameter("Distort X", "distortX", 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<DistortEffect>(true),
-        new EffectParameter("Y Distort", "verticalDistort", 0.0, 0.0, 1.0)
+        new EffectParameter("Distort Y", "distortY", 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
@@ -77,26 +77,28 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         delayEffect,
-        std::vector<EffectParameter*>{new EffectParameter("Delay Decay", "delayDecay", 0.0, 0.0, 1.0), new EffectParameter("Delay Length", "delayEchoLength", 0.5, 0.0, 1.0)}
+        std::vector<EffectParameter*>{new EffectParameter("Delay Decay", "delayDecay", 0.0, 0.0, 1.0), new EffectParameter("Delay Length", "delayLength", 0.5, 0.0, 1.0)}
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         perspectiveEffect,
         std::vector<EffectParameter*>{
-            new EffectParameter("3D Perspective", "depthScale", 0.0, 0.0, 1.0),
-            new EffectParameter("3D Depth (z)", "zPos", 0.1, 0.0, 1.0),
-            new EffectParameter("3D Rotate Speed", "rotateSpeed3D", 0.0, -1.0, 1.0),
-            new EffectParameter("Rotate X", "rotateX", 1.0, -1.0, 1.0),
-            new EffectParameter("Rotate Y", "rotateY", 1.0, -1.0, 1.0),
-            new EffectParameter("Rotate Z", "rotateZ", 0.0, -1.0, 1.0),
+            new EffectParameter("3D Perspective", "perspectiveStrength", 0.0, 0.0, 1.0),
+            new EffectParameter("Depth (z)", "perspectiveZPos", 0.1, 0.0, 1.0),
+            new EffectParameter("Rotate Speed", "perspectiveRotateSpeed", 0.0, -1.0, 1.0),
+            new EffectParameter("Rotate X", "perspectiveRotateX", 1.0, -1.0, 1.0),
+            new EffectParameter("Rotate Y", "perspectiveRotateY", 1.0, -1.0, 1.0),
+            new EffectParameter("Rotate Z", "perspectiveRotateZ", 0.0, -1.0, 1.0),
         }
     ));
     toggleableEffects.push_back(traceMax);
     toggleableEffects.push_back(traceMin);
 
-    for (auto& effect : toggleableEffects) {
+    for (int i = 0; i < toggleableEffects.size(); i++) {
+        auto effect = toggleableEffects[i];
         effect->markEnableable(false);
         addParameter(effect->enabled);
         effect->enabled->setValueNotifyingHost(false);
+        effect->setPrecedence(i);
     }
 
     permanentEffects.push_back(frequencyEffect);
@@ -112,11 +114,11 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         addLuaSlider();
     }
 
-    auto effects = toggleableEffects;
-    effects.insert(effects.end(), permanentEffects.begin(), permanentEffects.end());
-    effects.insert(effects.end(), luaEffects.begin(), luaEffects.end());
+    allEffects = toggleableEffects;
+    allEffects.insert(allEffects.end(), permanentEffects.begin(), permanentEffects.end());
+    allEffects.insert(allEffects.end(), luaEffects.begin(), luaEffects.end());
 
-    for (auto effect : effects) {
+    for (auto effect : allEffects) {
         for (auto effectParameter : effect->parameters) {
             auto parameters = effectParameter->getParameters();
             for (auto parameter : parameters) {
@@ -125,12 +127,16 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         }
     }
 
-    addParameter(fixedRotateX);
-    addParameter(fixedRotateY);
-    addParameter(fixedRotateZ);
-    addParameter(perspectiveEffect->fixedRotateX);
-    addParameter(perspectiveEffect->fixedRotateY);
-    addParameter(perspectiveEffect->fixedRotateZ);
+    booleanParameters.push_back(fixedRotateX);
+    booleanParameters.push_back(fixedRotateY);
+    booleanParameters.push_back(fixedRotateZ);
+    booleanParameters.push_back(perspectiveEffect->fixedRotateX);
+    booleanParameters.push_back(perspectiveEffect->fixedRotateY);
+    booleanParameters.push_back(perspectiveEffect->fixedRotateZ);
+
+    for (auto parameter : booleanParameters) {
+        addParameter(parameter);
+    }
 }
 
 OscirenderAudioProcessor::~OscirenderAudioProcessor() {}
@@ -257,6 +263,26 @@ void OscirenderAudioProcessor::updateObjValues() {
     rotateSpeed->apply();
 }
 
+// effectsLock should be held when calling this
+std::shared_ptr<Effect> OscirenderAudioProcessor::getEffect(juce::String id) {
+    for (auto& effect : allEffects) {
+        if (effect->getId() == id) {
+            return effect;
+        }
+    }
+    return nullptr;
+}
+
+// effectsLock should be held when calling this
+BooleanParameter* OscirenderAudioProcessor::getBooleanParameter(juce::String id) {
+    for (auto& parameter : booleanParameters) {
+        if (parameter->paramID == id) {
+            return parameter;
+        }
+    }
+    return nullptr;
+}
+
 // effectsLock MUST be held when calling this
 void OscirenderAudioProcessor::updateEffectPrecedence() {
     auto sortFunc = [](std::shared_ptr<Effect> a, std::shared_ptr<Effect> b) {
@@ -295,14 +321,27 @@ void OscirenderAudioProcessor::addFile(juce::String fileName, const char* data, 
 }
 
 // parsersLock AND effectsLock must be locked before calling this function
+void OscirenderAudioProcessor::addFile(juce::String fileName, std::shared_ptr<juce::MemoryBlock> data) {
+    fileBlocks.push_back(data);
+    fileNames.push_back(fileName);
+    parsers.push_back(std::make_unique<FileParser>());
+
+    openFile(fileBlocks.size() - 1);
+}
+
+// parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessor::removeFile(int index) {
 	if (index < 0 || index >= fileBlocks.size()) {
 		return;
 	}
-    changeCurrentFile(index - 1);
     fileBlocks.erase(fileBlocks.begin() + index);
     fileNames.erase(fileNames.begin() + index);
-	parsers.erase(parsers.begin() + index);
+    parsers.erase(parsers.begin() + index);
+    auto newFileIndex = index;
+    if (newFileIndex >= fileBlocks.size()) {
+        newFileIndex = fileBlocks.size() - 1;
+    }
+    changeCurrentFile(newFileIndex);
 }
 
 int OscirenderAudioProcessor::numFiles() {
@@ -553,28 +592,114 @@ void OscirenderAudioProcessor::incrementShapeDrawing() {
 }
 
 //==============================================================================
-bool OscirenderAudioProcessor::hasEditor() const
-{
+bool OscirenderAudioProcessor::hasEditor() const {
     return true; // (change this to false if you choose to not supply an editor)
 }
 
-juce::AudioProcessorEditor* OscirenderAudioProcessor::createEditor()
-{
+juce::AudioProcessorEditor* OscirenderAudioProcessor::createEditor() {
     return new OscirenderAudioProcessorEditor (*this);
 }
 
 //==============================================================================
-void OscirenderAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
-{
-    // You should use this method to store your parameters in the memory block.
-    // You could do that either as raw data, or use the XML or ValueTree classes
-    // as intermediaries to make it easy to save and load complex data.
+void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
+    juce::SpinLock::ScopedLockType lock1(parsersLock);
+    juce::SpinLock::ScopedLockType lock2(effectsLock);
+
+    std::unique_ptr<juce::XmlElement> xml = std::make_unique<juce::XmlElement>("project");
+    xml->setAttribute("version", ProjectInfo::versionString);
+    auto effectsXml = xml->createNewChildElement("effects");
+    for (auto effect : allEffects) {
+        effect->save(effectsXml->createNewChildElement("effect"));
+    }
+
+    auto booleanParametersXml = xml->createNewChildElement("booleanParameters");
+    for (auto parameter : booleanParameters) {
+        auto parameterXml = booleanParametersXml->createNewChildElement("parameter");
+        parameter->save(parameterXml);
+    }
+
+    auto perspectiveFunction = xml->createNewChildElement("perspectiveFunction");
+    perspectiveFunction->addTextElement(juce::Base64::toBase64(perspectiveEffect->getCode()));
+    auto filesXml = xml->createNewChildElement("files");
+    
+    for (int i = 0; i < fileBlocks.size(); i++) {
+        auto fileXml = filesXml->createNewChildElement("file");
+        fileXml->setAttribute("name", fileNames[i]);
+        auto fileString = juce::MemoryInputStream(*fileBlocks[i], false).readEntireStreamAsString();
+        fileXml->addTextElement(juce::Base64::toBase64(fileString));
+    }
+    xml->setAttribute("currentFile", currentFile);
+    copyXmlToBinary(*xml, destData);
 }
 
-void OscirenderAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
-{
-    // You should use this method to restore your parameters from this memory block,
-    // whose contents will have been created by the getStateInformation() call.
+void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
+    std::unique_ptr<juce::XmlElement> xml;
+
+    const uint32_t magicXmlNumber = 0x21324356;
+    if (sizeInBytes > 8 && juce::ByteOrder::littleEndianInt(data) == magicXmlNumber) {
+        // this is a binary xml format
+        xml = getXmlFromBinary(data, sizeInBytes);
+    } else {
+        // this is a text xml format
+        xml = juce::XmlDocument::parse(juce::String((const char*)data, sizeInBytes));
+    }
+
+    if (xml.get() != nullptr && xml->hasTagName("project")) {
+        auto versionXml = xml->getChildByName("version");
+        if (versionXml != nullptr && versionXml->getAllSubText().startsWith("v1.")) {
+            openLegacyProject(xml.get());
+            return;
+        }
+
+        juce::SpinLock::ScopedLockType lock1(parsersLock);
+        juce::SpinLock::ScopedLockType lock2(effectsLock);
+
+        auto effectsXml = xml->getChildByName("effects");
+        if (effectsXml != nullptr) {
+            for (auto effectXml : effectsXml->getChildIterator()) {
+                auto effect = getEffect(effectXml->getStringAttribute("id"));
+                if (effect != nullptr) {
+                    effect->load(effectXml);
+                }
+            }
+        }
+        updateEffectPrecedence();
+
+        auto booleanParametersXml = xml->getChildByName("booleanParameters");
+        if (booleanParametersXml != nullptr) {
+            for (auto parameterXml : booleanParametersXml->getChildIterator()) {
+                auto parameter = getBooleanParameter(parameterXml->getStringAttribute("id"));
+                if (parameter != nullptr) {
+                    parameter->load(parameterXml);
+                }
+            }
+        }
+
+        auto perspectiveFunction = xml->getChildByName("perspectiveFunction");
+        if (perspectiveFunction != nullptr) {
+            auto stream = juce::MemoryOutputStream();
+            juce::Base64::convertFromBase64(stream, perspectiveFunction->getAllSubText());
+            perspectiveEffect->updateCode(stream.toString());
+        }
+        // close all files
+        auto numFiles = fileBlocks.size();
+        for (int i = 0; i < numFiles; i++) {
+            removeFile(0);
+        }
+
+        auto filesXml = xml->getChildByName("files");
+        if (filesXml != nullptr) {
+            for (auto fileXml : filesXml->getChildIterator()) {
+                auto fileName = fileXml->getStringAttribute("name");
+                auto stream = juce::MemoryOutputStream();
+                juce::Base64::convertFromBase64(stream, fileXml->getAllSubText());
+                auto fileBlock = std::make_shared<juce::MemoryBlock>(stream.getData(), stream.getDataSize());
+                addFile(fileName, fileBlock);
+            }
+        }
+        changeCurrentFile(xml->getIntAttribute("currentFile", -1));
+        broadcaster.sendChangeMessage();
+    }
 }
 
 //==============================================================================

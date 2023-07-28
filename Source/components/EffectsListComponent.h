@@ -14,7 +14,19 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& editor;
 
-    AudioEffectListBoxItemData(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), editor(editor) {}
+    AudioEffectListBoxItemData(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), editor(editor) {
+        resetData();
+    }
+
+    void resetData() {
+        juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+        data.clear();
+        for (int i = 0; i < audioProcessor.toggleableEffects.size(); i++) {
+            auto effect = audioProcessor.toggleableEffects[i];
+            effect->setValue(effect->getValue());
+            data.push_back(effect);
+        }
+    }
 
     int getNumItems() override {
         return data.size();

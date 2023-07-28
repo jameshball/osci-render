@@ -7,12 +7,13 @@
 #include "components/EffectsListComponent.h"
 
 class OscirenderAudioProcessorEditor;
-class EffectsComponent : public juce::GroupComponent {
+class EffectsComponent : public juce::GroupComponent, public juce::ChangeListener {
 public:
 	EffectsComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
 	~EffectsComponent() override;
 
 	void resized() override;
+	void changeListenerCallback(juce::ChangeBroadcaster* source) override;
 
 private:
 	OscirenderAudioProcessor& audioProcessor;

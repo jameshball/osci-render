@@ -32,11 +32,9 @@ class OscirenderAudioProcessor  : public juce::AudioProcessor
     , public FrameConsumer
 {
 public:
-    //==============================================================================
     OscirenderAudioProcessor();
     ~OscirenderAudioProcessor() override;
 
-    //==============================================================================
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
 
@@ -46,28 +44,22 @@ public:
 
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
-    //==============================================================================
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override;
 
-    //==============================================================================
     const juce::String getName() const override;
 
     bool acceptsMidi() const override;
     bool producesMidi() const override;
     bool isMidiEffect() const override;
     double getTailLengthSeconds() const override;
-
-    //==============================================================================
     int getNumPrograms() override;
     int getCurrentProgram() override;
-    void setCurrentProgram (int index) override;
-    const juce::String getProgramName (int index) override;
-    void changeProgramName (int index, const juce::String& newName) override;
-
-    //==============================================================================
-    void getStateInformation (juce::MemoryBlock& destData) override;
-    void setStateInformation (const void* data, int sizeInBytes) override;
+    void setCurrentProgram(int index) override;
+    const juce::String getProgramName(int index) override;
+    void changeProgramName(int index, const juce::String& newName) override;
+    void getStateInformation(juce::MemoryBlock& destData) override;
+    void setStateInformation(const void* data, int sizeInBytes) override;
 
     std::atomic<double> currentSampleRate = 0.0;
 
@@ -104,7 +96,7 @@ public:
                 camera->setFocalLength(values[0]);
             }
             return input;
-		}, new EffectParameter("Focal length", "focalLength", 1.0, 0.0, 2.0)
+		}, new EffectParameter("Focal length", "objFocalLength", 1.0, 0.0, 2.0)
     );
 
     BooleanParameter* fixedRotateX = new BooleanParameter("Object Fixed Rotate X", "objFixedRotateX", false);
@@ -174,6 +166,8 @@ public:
     std::vector<std::shared_ptr<juce::MemoryBlock>> fileBlocks;
     std::vector<juce::String> fileNames;
     std::atomic<int> currentFile = -1;
+
+    juce::ChangeBroadcaster broadcaster;
     
     FrameProducer producer = FrameProducer(*this, std::make_shared<FileParser>());
 
@@ -182,12 +176,17 @@ public:
     PitchDetector pitchDetector{audioProducer};
     std::shared_ptr<WobbleEffect> wobbleEffect = std::make_shared<WobbleEffect>(pitchDetector);
 
+    // shouldn't be accessed by audio thread, but needs to persist when GUI is closed
+    // so should only be accessed by message thread
+    juce::String currentProjectFile;
+
     void addLuaSlider();
     void addFrame(std::vector<std::unique_ptr<Shape>> frame, int fileIndex) override;
     void updateEffectPrecedence();
     void updateFileBlock(int index, std::shared_ptr<juce::MemoryBlock> block);
     void addFile(juce::File file);
     void addFile(juce::String fileName, const char* data, const int size);
+    void addFile(juce::String fileName, std::shared_ptr<juce::MemoryBlock> data);
     void removeFile(int index);
     int numFiles();
     void changeCurrentFile(int index);
@@ -214,6 +213,8 @@ private:
 	double lengthIncrement = 0.0;
     bool invalidateFrameBuffer = false;
 
+    std::vector<BooleanParameter*> booleanParameters;
+    std::vector<std::shared_ptr<Effect>> allEffects;
     std::vector<std::shared_ptr<Effect>> permanentEffects;
 
     std::shared_ptr<Effect> traceMax = std::make_shared<Effect>(
@@ -246,6 +247,12 @@ private:
     void openFile(int index);
     void updateLuaValues();
     void updateObjValues();
+    std::shared_ptr<Effect> getEffect(juce::String id);
+    BooleanParameter* getBooleanParameter(juce::String id);
+    void openLegacyProject(const juce::XmlElement* xml);
+    std::pair<std::shared_ptr<Effect>, EffectParameter*> effectFromLegacyId(const juce::String& id, bool updatePrecedence = false);
+    LfoType lfoTypeFromLegacyAnimationType(const juce::String& type);
+    double valueFromLegacy(double value, const juce::String& id);
 
     const double MIN_LENGTH_INCREMENT = 0.000001;
 
