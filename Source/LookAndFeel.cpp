@@ -26,6 +26,11 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     setColour(juce::ScrollBar::backgroundColourId, Colours::veryDark);
     setColour(effectComponentBackgroundColourId, juce::Colours::transparentBlack);
     setColour(effectComponentHandleColourId, Colours::veryDark);
+    setColour(juce::CodeEditorComponent::backgroundColourId, Colours::darker);
+    setColour(juce::CodeEditorComponent::defaultTextColourId, juce::Colours::white);
+    setColour(juce::CodeEditorComponent::lineNumberBackgroundId, Colours::veryDark);
+    setColour(juce::CodeEditorComponent::lineNumberTextId, juce::Colours::white);
+
     getCurrentColourScheme().setUIColour(ColourScheme::widgetBackground, Colours::veryDark);
 }
 
