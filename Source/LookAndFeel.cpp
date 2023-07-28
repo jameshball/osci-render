@@ -152,3 +152,10 @@ void OscirenderLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button
     g.setColour(button.findColour(juce::ComboBox::outlineColourId));
     g.drawRect(bounds, 1.0f);
 }
+
+void OscirenderLookAndFeel::drawMenuBarBackground(juce::Graphics& g, int width, int height, bool, juce::MenuBarComponent& menuBar) {
+    juce::Rectangle<int> r(width, height);
+
+    g.setColour(menuBar.findColour(juce::TextButton::buttonColourId));
+    g.fillRect(r);
+}

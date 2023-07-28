@@ -41,6 +41,7 @@ public:
         const juce::Colour& backgroundColour,
         bool shouldDrawButtonAsHighlighted,
         bool shouldDrawButtonAsDown) override;
+    void drawMenuBarBackground(juce::Graphics& g, int width, int height, bool, juce::MenuBarComponent& menuBar) override;
 
     
 };
