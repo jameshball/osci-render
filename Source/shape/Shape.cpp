@@ -97,9 +97,12 @@ Vector2 Shape::maxVector(std::vector<std::unique_ptr<Shape>>& shapes) {
 }
 
 void Shape::removeOutOfBounds(std::vector<std::unique_ptr<Shape>>& shapes) {
+    std::vector<int> toRemove;
+
     for (int i = 0; i < shapes.size(); i++) {
 		Vector2 start = shapes[i]->nextVector(0);
 		Vector2 end = shapes[i]->nextVector(1);
+        bool keep = false;
 
         if ((start.x < 1 && start.x > -1) || (start.y < 1 && start.y > -1)) {
             if ((end.x < 1 && end.x > -1) || (end.y < 1 && end.y > -1)) {
@@ -108,7 +111,16 @@ void Shape::removeOutOfBounds(std::vector<std::unique_ptr<Shape>>& shapes) {
                     Vector2 newEnd(std::min(std::max(end.x, -1.0), 1.0), std::min(std::max(end.y, -1.0), 1.0));
 					shapes[i] = std::make_unique<Line>(newStart.x, newStart.y, newEnd.x, newEnd.y);
                 }
+                keep = true;
             }
         }
+
+        if (!keep) {
+            toRemove.push_back(i);
+        }
+    }
+
+    for (int i = toRemove.size() - 1; i >= 0; i--) {
+        shapes.erase(shapes.begin() + toRemove[i]);
     }
 }

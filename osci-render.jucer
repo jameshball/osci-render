@@ -428,31 +428,12 @@
         <FILE id="NmptSY" name="Shape.h" compile="0" resource="0" file="Source/shape/Shape.h"/>
       </GROUP>
       <GROUP id="{56A27063-1FE7-31C3-8263-98389240A8CB}" name="svg">
-        <FILE id="FVWkba" name="ClosePath.cpp" compile="1" resource="0" file="Source/svg/ClosePath.cpp"/>
-        <FILE id="pJz3ek" name="ClosePath.h" compile="0" resource="0" file="Source/svg/ClosePath.h"/>
-        <FILE id="PS8Qfk" name="CurveTo.cpp" compile="1" resource="0" file="Source/svg/CurveTo.cpp"/>
-        <FILE id="Sjh7ne" name="CurveTo.h" compile="0" resource="0" file="Source/svg/CurveTo.h"/>
-        <FILE id="DQJJdr" name="EllipticalArcTo.cpp" compile="1" resource="0"
-              file="Source/svg/EllipticalArcTo.cpp"/>
-        <FILE id="iVMpEw" name="EllipticalArcTo.h" compile="0" resource="0"
-              file="Source/svg/EllipticalArcTo.h"/>
-        <FILE id="DSmqNL" name="LineTo.cpp" compile="1" resource="0" file="Source/svg/LineTo.cpp"/>
-        <FILE id="fjo7Oy" name="LineTo.h" compile="0" resource="0" file="Source/svg/LineTo.h"/>
-        <FILE id="c2y2ap" name="MoveTo.cpp" compile="1" resource="0" file="Source/svg/MoveTo.cpp"/>
-        <FILE id="SfIJEj" name="MoveTo.h" compile="0" resource="0" file="Source/svg/MoveTo.h"/>
         <FILE id="cTec1H" name="SvgParser.cpp" compile="1" resource="0" file="Source/svg/SvgParser.cpp"/>
         <FILE id="gvkrDH" name="SvgParser.h" compile="0" resource="0" file="Source/svg/SvgParser.h"/>
-        <FILE id="OvloZU" name="SvgState.cpp" compile="1" resource="0" file="Source/svg/SvgState.cpp"/>
-        <FILE id="GCBO9x" name="SvgState.h" compile="0" resource="0" file="Source/svg/SvgState.h"/>
       </GROUP>
       <GROUP id="{E81B1D7B-B0F7-1967-B271-71B3F838720F}" name="txt">
         <FILE id="vIYWRG" name="TextParser.cpp" compile="1" resource="0" file="Source/txt/TextParser.cpp"/>
         <FILE id="LlefOK" name="TextParser.h" compile="0" resource="0" file="Source/txt/TextParser.h"/>
-      </GROUP>
-      <GROUP id="{022CB910-9A16-C4AE-4C3B-9CB57BE87FC2}" name="xml">
-        <FILE id="pW7WRh" name="pugiconfig.hpp" compile="0" resource="0" file="Source/xml/pugiconfig.hpp"/>
-        <FILE id="CnkgyF" name="pugixml.cpp" compile="1" resource="0" file="Source/xml/pugixml.cpp"/>
-        <FILE id="SrvH3B" name="pugixml.hpp" compile="0" resource="0" file="Source/xml/pugixml.hpp"/>
       </GROUP>
     </GROUP>
   </MAINGROUP>
