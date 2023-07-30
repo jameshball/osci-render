@@ -597,7 +597,8 @@ bool OscirenderAudioProcessor::hasEditor() const {
 }
 
 juce::AudioProcessorEditor* OscirenderAudioProcessor::createEditor() {
-    return new OscirenderAudioProcessorEditor (*this);
+    auto editor = new OscirenderAudioProcessorEditor(*this);
+    return editor;
 }
 
 //==============================================================================

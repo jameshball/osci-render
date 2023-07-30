@@ -43,7 +43,7 @@ EffectsListComponent::~EffectsListComponent() {}
 
 void EffectsListComponent::paint(juce::Graphics& g) {
 	auto bounds = getLocalBounds();
-	g.fillAll(juce::Colours::darkgrey);
+	g.fillAll(findColour(effectComponentHandleColourId));
 	g.setColour(juce::Colours::white);
 	bounds.removeFromLeft(20);
 	// draw drag and drop handle using circles

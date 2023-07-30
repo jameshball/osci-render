@@ -8,6 +8,7 @@
 #include "ObjComponent.h"
 #include "components/VolumeComponent.h"
 #include "components/MainMenuBarModel.h"
+#include "LookAndFeel.h"
 
 
 class OscirenderAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener {
@@ -34,6 +35,8 @@ public:
     void updateTitle();
 
     std::atomic<bool> editingPerspective = false;
+
+    OscirenderLookAndFeel lookAndFeel;
 private:
     OscirenderAudioProcessor& audioProcessor;
     

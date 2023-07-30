@@ -98,7 +98,7 @@ void ObjComponent::disableMouseRotation() {
 }
 
 void ObjComponent::resized() {
-	auto area = getLocalBounds().reduced(20);
+	auto area = getLocalBounds().withTrimmedTop(20).reduced(20);
 	double rowHeight = 30;
 	focalLength.setBounds(area.removeFromTop(rowHeight));
 	rotateX.setBounds(area.removeFromTop(rowHeight));
