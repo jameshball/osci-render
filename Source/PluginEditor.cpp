@@ -8,6 +8,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     addAndMakeVisible(main);
     addChildComponent(lua);
     addChildComponent(obj);
+    addChildComponent(txt);
     addAndMakeVisible(volume);
 
     menuBar.setModel(&menuBarModel);
@@ -68,8 +69,8 @@ OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
 
 // parsersLock must be held
 void OscirenderAudioProcessorEditor::initialiseCodeEditors() {
-    codeDocuments.clear();
     codeEditors.clear();
+    codeDocuments.clear();
     // -1 is the perspective function
     addCodeEditor(-1);
     for (int i = 0; i < audioProcessor.numFiles(); i++) {
@@ -135,10 +136,11 @@ void OscirenderAudioProcessorEditor::resized() {
     
     auto effectsSection = area.removeFromRight(1.2 * getWidth() / sections);
     main.setBounds(area.reduced(5));
-    if (lua.isVisible() || obj.isVisible()) {
-        auto altEffectsSection = effectsSection.removeFromBottom(juce::jmin(effectsSection.getHeight() / 2, 300));
+    if (lua.isVisible() || obj.isVisible() || txt.isVisible()) {
+        auto altEffectsSection = effectsSection.removeFromBottom(juce::jmin(effectsSection.getHeight() / 2, txt.isVisible() ? 150 : 300));
         lua.setBounds(altEffectsSection.reduced(5));
         obj.setBounds(altEffectsSection.reduced(5));
+        txt.setBounds(altEffectsSection.reduced(5));
     }
 	effects.setBounds(effectsSection.reduced(5));
 
@@ -214,13 +216,16 @@ void OscirenderAudioProcessorEditor::fileUpdated(juce::String fileName) {
     juce::String extension = fileName.fromLastOccurrenceOf(".", true, false);
     lua.setVisible(false);
     obj.setVisible(false);
+    txt.setVisible(false);
     if (fileName.isEmpty()) {
         // do nothing
     } else if (extension == ".lua") {
         lua.setVisible(true);
     } else if (extension == ".obj") {
 		obj.setVisible(true);
-	}
+    } else if (extension == ".txt") {
+        txt.setVisible(true);
+    }
     main.updateFileLabel();
     updateCodeEditor();
 }
@@ -232,6 +237,7 @@ void OscirenderAudioProcessorEditor::handleAsyncUpdate() {
 void OscirenderAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcaster* source) {
     juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
     initialiseCodeEditors();
+    txt.update();
 }
 
 void OscirenderAudioProcessorEditor::editPerspectiveFunction(bool enable) {

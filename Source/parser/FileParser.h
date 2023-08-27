@@ -8,17 +8,17 @@
 #include "../txt/TextParser.h"
 #include "../lua/LuaParser.h"
 
-class FileParser : public FrameSource {
+class FileParser {
 public:
 	FileParser();
 
-	void parse(juce::String extension, std::unique_ptr<juce::InputStream>) override;
-	std::vector<std::unique_ptr<Shape>> nextFrame() override;
-	Vector2 nextSample() override;
-	bool isSample() override;
-	bool isActive() override;
-	void disable() override;
-	void enable() override;
+	void parse(juce::String extension, std::unique_ptr<juce::InputStream>, juce::Font);
+	std::vector<std::unique_ptr<Shape>> nextFrame();
+	Vector2 nextSample();
+	bool isSample();
+	bool isActive();
+	void disable();
+	void enable();
 
 	std::shared_ptr<WorldObject> getObject();
 	std::shared_ptr<Camera> getCamera();

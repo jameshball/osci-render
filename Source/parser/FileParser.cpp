@@ -5,7 +5,7 @@
 
 FileParser::FileParser() {}
 
-void FileParser::parse(juce::String extension, std::unique_ptr<juce::InputStream> stream) {
+void FileParser::parse(juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font font) {
 	juce::SpinLock::ScopedLockType scope(lock);
 
 	object = nullptr;
@@ -21,7 +21,7 @@ void FileParser::parse(juce::String extension, std::unique_ptr<juce::InputStream
 	} else if (extension == ".svg") {
 		svg = std::make_shared<SvgParser>(stream->readEntireStreamAsString());
 	} else if (extension == ".txt") {
-		text = std::make_shared<TextParser>(stream->readEntireStreamAsString(), juce::Font(1.0f));
+		text = std::make_shared<TextParser>(stream->readEntireStreamAsString(), font);
 	} else if (extension == ".lua") {
 		lua = std::make_shared<LuaParser>(stream->readEntireStreamAsString());
 	}

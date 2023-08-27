@@ -180,6 +180,9 @@ public:
     // so should only be accessed by message thread
     juce::String currentProjectFile;
 
+    juce::SpinLock fontLock;
+    juce::Font font = juce::Font(juce::Font::getDefaultSansSerifFontName(), 1.0f, juce::Font::plain);
+
     void addLuaSlider();
     void addFrame(std::vector<std::unique_ptr<Shape>> frame, int fileIndex) override;
     void updateEffectPrecedence();
@@ -190,6 +193,7 @@ public:
     void removeFile(int index);
     int numFiles();
     void changeCurrentFile(int index);
+    void openFile(int index);
     int getCurrentFileIndex();
     std::shared_ptr<FileParser> getCurrentFileParser();
 	juce::String getCurrentFileName();
@@ -244,7 +248,6 @@ private:
 	void updateFrame();
     void updateLengthIncrement();
     void incrementShapeDrawing();
-    void openFile(int index);
     void updateLuaValues();
     void updateObjValues();
     std::shared_ptr<Effect> getEffect(juce::String id);
