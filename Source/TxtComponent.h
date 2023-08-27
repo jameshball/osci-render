@@ -9,6 +9,7 @@ public:
     TxtComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
 
     void resized() override;
+    void update();
 private:
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& pluginEditor;

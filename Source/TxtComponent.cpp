@@ -12,17 +12,7 @@ TxtComponent::TxtComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
         font.addItem(installedFonts[i], i + 1);
     }
 
-	{
-		juce::SpinLock::ScopedLockType lock(audioProcessor.fontLock);
-		juce::String defaultFont = audioProcessor.font.getTypefaceName();
-		int index = installedFonts.indexOf(defaultFont);
-		if (index == -1) {
-			index = 0;
-		}
-		font.setSelectedItemIndex(index);
-		bold.setToggleState(audioProcessor.font.isBold(), juce::dontSendNotification);
-		italic.setToggleState(audioProcessor.font.isItalic(), juce::dontSendNotification);
-	}
+	update();
 
 	auto updateFont = [this]() {
 		juce::SpinLock::ScopedLockType lock1(audioProcessor.parsersLock);
@@ -48,4 +38,16 @@ void TxtComponent::resized() {
 	font.setBounds(area.removeFromTop(rowHeight));
 	bold.setBounds(area.removeFromTop(rowHeight));
 	italic.setBounds(area.removeFromTop(rowHeight));
+}
+
+void TxtComponent::update() {
+	juce::SpinLock::ScopedLockType lock(audioProcessor.fontLock);
+    juce::String defaultFont = audioProcessor.font.getTypefaceName();
+    int index = installedFonts.indexOf(defaultFont);
+	if (index == -1) {
+        index = 0;
+    }
+    font.setSelectedItemIndex(index);
+    bold.setToggleState(audioProcessor.font.isBold(), juce::dontSendNotification);
+    italic.setToggleState(audioProcessor.font.isItalic(), juce::dontSendNotification);
 }

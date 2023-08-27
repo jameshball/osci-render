@@ -124,6 +124,18 @@ void OscirenderAudioProcessor::openLegacyProject(const juce::XmlElement* xml) {
             juce::Base64::convertFromBase64(stream, perspectiveFunction->getAllSubText());
             perspectiveEffect->updateCode(stream.toString());
         }
+
+        auto fontFamilyXml = xml->getChildByName("fontFamily");
+        if (fontFamilyXml != nullptr) {
+            font.setTypefaceName(fontFamilyXml->getAllSubText());
+        }
+        auto fontStyleXml = xml->getChildByName("fontStyle");
+        if (fontStyleXml != nullptr) {
+            int style = fontStyleXml->getAllSubText().getIntValue();
+            font.setBold(style == 1);
+            font.setItalic(style == 2);
+        }
+
         // close all files
         auto numFiles = fileBlocks.size();
         for (int i = 0; i < numFiles; i++) {

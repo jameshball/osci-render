@@ -622,6 +622,12 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
 
     auto perspectiveFunction = xml->createNewChildElement("perspectiveFunction");
     perspectiveFunction->addTextElement(juce::Base64::toBase64(perspectiveEffect->getCode()));
+
+    auto fontXml = xml->createNewChildElement("font");
+    fontXml->setAttribute("family", font.getTypefaceName());
+    fontXml->setAttribute("bold", font.isBold());
+    fontXml->setAttribute("italic", font.isItalic());
+
     auto filesXml = xml->createNewChildElement("files");
     
     for (int i = 0; i < fileBlocks.size(); i++) {
@@ -631,6 +637,7 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
         fileXml->addTextElement(juce::Base64::toBase64(fileString));
     }
     xml->setAttribute("currentFile", currentFile);
+
     copyXmlToBinary(*xml, destData);
 }
 
@@ -683,6 +690,16 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
             juce::Base64::convertFromBase64(stream, perspectiveFunction->getAllSubText());
             perspectiveEffect->updateCode(stream.toString());
         }
+
+        auto fontXml = xml->getChildByName("font");
+        if (fontXml != nullptr) {
+            auto family = fontXml->getStringAttribute("family");
+            auto bold = fontXml->getBoolAttribute("bold");
+            auto italic = fontXml->getBoolAttribute("italic");
+            juce::SpinLock::ScopedLockType lock(fontLock);
+            font = juce::Font(family, 1.0, (bold ? juce::Font::bold : 0) | (italic ? juce::Font::italic : 0));
+        }
+
         // close all files
         auto numFiles = fileBlocks.size();
         for (int i = 0; i < numFiles; i++) {

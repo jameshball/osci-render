@@ -69,8 +69,8 @@ OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
 
 // parsersLock must be held
 void OscirenderAudioProcessorEditor::initialiseCodeEditors() {
-    codeDocuments.clear();
     codeEditors.clear();
+    codeDocuments.clear();
     // -1 is the perspective function
     addCodeEditor(-1);
     for (int i = 0; i < audioProcessor.numFiles(); i++) {
@@ -237,6 +237,7 @@ void OscirenderAudioProcessorEditor::handleAsyncUpdate() {
 void OscirenderAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcaster* source) {
     juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
     initialiseCodeEditors();
+    txt.update();
 }
 
 void OscirenderAudioProcessorEditor::editPerspectiveFunction(bool enable) {
