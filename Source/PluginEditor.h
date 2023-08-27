@@ -47,6 +47,7 @@ private:
     VolumeComponent volume{audioProcessor};
     std::vector<std::shared_ptr<juce::CodeDocument>> codeDocuments;
     std::vector<std::shared_ptr<juce::CodeEditorComponent>> codeEditors;
+    juce::CodeEditorComponent::ColourScheme colourScheme;
     juce::LuaTokeniser luaTokeniser;
     juce::XmlTokeniser xmlTokeniser;
 	juce::ShapeButton collapseButton;

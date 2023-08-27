@@ -27,9 +27,12 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     setColour(effectComponentBackgroundColourId, juce::Colours::transparentBlack);
     setColour(effectComponentHandleColourId, Colours::veryDark);
     setColour(juce::CodeEditorComponent::backgroundColourId, Colours::darker);
-    setColour(juce::CodeEditorComponent::defaultTextColourId, juce::Colours::white);
+    setColour(juce::CodeEditorComponent::defaultTextColourId, Dracula::foreground);
     setColour(juce::CodeEditorComponent::lineNumberBackgroundId, Colours::veryDark);
-    setColour(juce::CodeEditorComponent::lineNumberTextId, juce::Colours::white);
+    setColour(juce::CodeEditorComponent::lineNumberTextId, Dracula::foreground);
+    setColour(juce::CodeEditorComponent::highlightColourId, Colours::grey);
+    setColour(juce::CaretComponent::caretColourId, Dracula::foreground);
+    setColour(juce::TextEditor::highlightColourId, Colours::grey);
 
     getCurrentColourScheme().setUIColour(ColourScheme::widgetBackground, Colours::veryDark);
 }
@@ -163,4 +166,28 @@ void OscirenderLookAndFeel::drawMenuBarBackground(juce::Graphics& g, int width, 
 
     g.setColour(menuBar.findColour(juce::TextButton::buttonColourId));
     g.fillRect(r);
+}
+
+juce::CodeEditorComponent::ColourScheme OscirenderLookAndFeel::getDefaultColourScheme() {
+    juce::CodeEditorComponent::ColourScheme cs;
+
+    static const juce::CodeEditorComponent::ColourScheme::TokenType types[] = {
+        {"Error", juce::Colour(Dracula::red)},
+        {"Comment", juce::Colour(Dracula::comment)},
+        {"Keyword", juce::Colour(Dracula::pink)},
+        {"Operator", juce::Colour(Dracula::foreground)},
+        {"Identifier", juce::Colour(Dracula::foreground)},
+        {"Integer", juce::Colour(Dracula::purple)},
+        {"Float", juce::Colour(Dracula::purple)},
+        {"String", juce::Colour(Dracula::yellow)},
+        {"Bracket", juce::Colour(Dracula::foreground)},
+        {"Punctuation", juce::Colour(Dracula::pink)},
+        {"Preprocessor Text", juce::Colour(Dracula::comment)}
+    };
+
+    for (auto& t : types) {
+        cs.set(t.name, juce::Colour(t.colour));
+    }
+
+    return cs;
 }

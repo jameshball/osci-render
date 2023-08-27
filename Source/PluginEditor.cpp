@@ -32,6 +32,8 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     path.addTriangle(0.0f, 0.5f, 1.0f, 1.0f, 1.0f, 0.0f);
 	collapseButton.setShape(path, false, true, true);
 
+    colourScheme = lookAndFeel.getDefaultColourScheme();
+
     {
         juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
         initialiseCodeEditors();
@@ -171,6 +173,7 @@ void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
     editor->setAccessible(false);
     // listen for changes to the code editor
     codeDocument->addListener(this);
+    editor->setColourScheme(colourScheme);
 }
 
 void OscirenderAudioProcessorEditor::removeCodeEditor(int index) {
