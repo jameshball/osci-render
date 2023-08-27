@@ -6,6 +6,7 @@
 #include "MainComponent.h"
 #include "LuaComponent.h"
 #include "ObjComponent.h"
+#include "TxtComponent.h"
 #include "components/VolumeComponent.h"
 #include "components/MainMenuBarModel.h"
 #include "LookAndFeel.h"
@@ -43,6 +44,7 @@ private:
     MainComponent main{audioProcessor, *this};
     LuaComponent lua{audioProcessor, *this};
     ObjComponent obj{audioProcessor, *this};
+    TxtComponent txt{audioProcessor, *this};
     EffectsComponent effects{audioProcessor, *this};
     VolumeComponent volume{audioProcessor};
     std::vector<std::shared_ptr<juce::CodeDocument>> codeDocuments;

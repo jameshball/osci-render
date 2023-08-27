@@ -1,6 +1,6 @@
 #include "FrameProducer.h"
 
-FrameProducer::FrameProducer(FrameConsumer& fc, std::shared_ptr<FrameSource> fs) : frameConsumer(fc), frameSource(fs), juce::Thread("producer", 0) {}
+FrameProducer::FrameProducer(FrameConsumer& fc, std::shared_ptr<FileParser> fs) : frameConsumer(fc), frameSource(fs), juce::Thread("producer", 0) {}
 
 FrameProducer::~FrameProducer() {
 	frameSource->disable();
@@ -15,7 +15,7 @@ void FrameProducer::run() {
 	}
 }
 
-void FrameProducer::setSource(std::shared_ptr<FrameSource> source, int fileIndex) {
+void FrameProducer::setSource(std::shared_ptr<FileParser> source, int fileIndex) {
 	juce::SpinLock::ScopedLockType scope(lock);
 	frameSource->disable();
 	frameSource = source;

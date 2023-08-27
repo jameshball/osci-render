@@ -435,6 +435,9 @@
         <FILE id="vIYWRG" name="TextParser.cpp" compile="1" resource="0" file="Source/txt/TextParser.cpp"/>
         <FILE id="LlefOK" name="TextParser.h" compile="0" resource="0" file="Source/txt/TextParser.h"/>
       </GROUP>
+      <FILE id="UxZu4n" name="TxtComponent.cpp" compile="1" resource="0"
+            file="Source/TxtComponent.cpp"/>
+      <FILE id="kxPbsL" name="TxtComponent.h" compile="0" resource="0" file="Source/TxtComponent.h"/>
     </GROUP>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"/>

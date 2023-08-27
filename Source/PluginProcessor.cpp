@@ -355,7 +355,8 @@ void OscirenderAudioProcessor::openFile(int index) {
 	if (index < 0 || index >= fileBlocks.size()) {
 		return;
 	}
-    parsers[index]->parse(fileNames[index].fromLastOccurrenceOf(".", true, false), std::make_unique<juce::MemoryInputStream>(*fileBlocks[index], false));
+    juce::SpinLock::ScopedLockType lock(fontLock);
+    parsers[index]->parse(fileNames[index].fromLastOccurrenceOf(".", true, false), std::make_unique<juce::MemoryInputStream>(*fileBlocks[index], false), font);
     changeCurrentFile(index);
 }
 
