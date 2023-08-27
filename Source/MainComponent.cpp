@@ -83,6 +83,13 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 	};
 
 	addAndMakeVisible(visualiser);
+	addAndMakeVisible(openOscilloscope);
+
+	openOscilloscope.onClick = [this] {
+		// TODO: Log if this fails
+		juce::URL("https://james.ball.sh/oscilloscope").launchInDefaultBrowser();
+    };
+
 	addAndMakeVisible(frequencyLabel);
 
 	callbackIndex = audioProcessor.pitchDetector.addCallback(
@@ -133,6 +140,8 @@ void MainComponent::resized() {
 	frequencyLabel.setBounds(bounds.removeFromTop(20));
 
 	bounds.removeFromTop(padding);
+	openOscilloscope.setBounds(bounds.removeFromBottom(buttonHeight).withSizeKeepingCentre(160, buttonHeight));
+	bounds.removeFromBottom(padding);
 	auto minDim = juce::jmin(bounds.getWidth(), bounds.getHeight());
 	visualiser.setBounds(bounds.withSizeKeepingCentre(minDim, minDim));
 }

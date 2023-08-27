@@ -30,6 +30,7 @@ private:
 	juce::TextButton createFile{"Create File"};
 
 	VisualiserComponent visualiser{2, audioProcessor};
+	juce::TextButton openOscilloscope{"Open Oscilloscope"};
 
 	juce::Label frequencyLabel;
 	int callbackIndex = -1;
