@@ -10,10 +10,9 @@
 
 #include <JuceHeader.h>
 #include "shape/Shape.h"
-#include "parser/FileParser.h"
-#include "parser/FrameProducer.h"
-#include "parser/FrameConsumer.h"
 #include "audio/Effect.h"
+#include "audio/ShapeSound.h"
+#include "audio/ShapeVoice.h"
 #include <numbers>
 #include "concurrency/BufferProducer.h"
 #include "audio/AudioWebSocketServer.h"
@@ -29,7 +28,6 @@ class OscirenderAudioProcessor  : public juce::AudioProcessor
                             #if JucePlugin_Enable_ARA
                              , public juce::AudioProcessorARAExtension
                             #endif
-    , public FrameConsumer
 {
 public:
     OscirenderAudioProcessor();
@@ -158,18 +156,28 @@ public:
 		}, new EffectParameter("Rotate Speed", "objRotateSpeed", 0.0, -1.0, 1.0)
     );
 
+    std::shared_ptr<Effect> traceMax = std::make_shared<Effect>(
+        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+            return input;
+        }, new EffectParameter("Trace max", "traceMax", 1.0, 0.0, 1.0)
+    );
+    std::shared_ptr<Effect> traceMin = std::make_shared<Effect>(
+        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+            return input;
+        }, new EffectParameter("Trace min", "traceMin", 0.0, 0.0, 1.0)
+    );
+
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
     std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>();
     
     juce::SpinLock parsersLock;
     std::vector<std::shared_ptr<FileParser>> parsers;
+    std::vector<ShapeSound::Ptr> sounds;
     std::vector<std::shared_ptr<juce::MemoryBlock>> fileBlocks;
     std::vector<juce::String> fileNames;
     std::atomic<int> currentFile = -1;
 
     juce::ChangeBroadcaster broadcaster;
-    
-    FrameProducer producer = FrameProducer(*this, std::make_shared<FileParser>());
 
     BufferProducer audioProducer;
 
@@ -184,7 +192,6 @@ public:
     juce::Font font = juce::Font(juce::Font::getDefaultSansSerifFontName(), 1.0f, juce::Font::plain);
 
     void addLuaSlider();
-    void addFrame(std::vector<std::unique_ptr<Shape>> frame, int fileIndex) override;
     void updateEffectPrecedence();
     void updateFileBlock(int index, std::shared_ptr<juce::MemoryBlock> block);
     void addFile(juce::File file);
@@ -204,50 +211,14 @@ private:
     std::atomic<double> volume = 1.0;
     std::atomic<double> threshold = 1.0;
 
-	juce::AbstractFifo frameFifo{ 10 };
-	std::vector<std::unique_ptr<Shape>> frameBuffer[10];
-    int frameBufferIndices[10];
-
-	int currentShape = 0;
-    std::vector<std::unique_ptr<Shape>> frame;
-    int currentBufferIndex = -1;
-    double frameLength;
-	double shapeDrawn = 0.0;
-	double frameDrawn = 0.0;
-	double lengthIncrement = 0.0;
-    bool invalidateFrameBuffer = false;
-
     std::vector<BooleanParameter*> booleanParameters;
     std::vector<std::shared_ptr<Effect>> allEffects;
     std::vector<std::shared_ptr<Effect>> permanentEffects;
 
-    std::shared_ptr<Effect> traceMax = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
-            traceMaxValue = values[0];
-            traceMaxEnabled = true;
-            return input;
-        }, new EffectParameter("Trace max", "traceMax", 1.0, 0.0, 1.0)
-    );
-    std::shared_ptr<Effect> traceMin = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
-            traceMinValue = values[0];
-            traceMinEnabled = true;
-            return input;
-        }, new EffectParameter("Trace min", "traceMin", 0.0, 0.0, 1.0)
-    );
-    const double MIN_TRACE = 0.005;
-    double traceMaxValue = traceMax->getValue();
-    double traceMinValue = traceMin->getValue();
-    double actualTraceMax = traceMaxValue;
-    double actualTraceMin = traceMinValue;
-    bool traceMaxEnabled = false;
-    bool traceMinEnabled = false;
+    juce::Synthesiser synth;
 
     AudioWebSocketServer softwareOscilloscopeServer{audioProducer};
 
-	void updateFrame();
-    void updateLengthIncrement();
-    void incrementShapeDrawing();
     void updateLuaValues();
     void updateObjValues();
     std::shared_ptr<Effect> getEffect(juce::String id);

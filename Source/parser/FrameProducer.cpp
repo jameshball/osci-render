@@ -9,15 +9,7 @@ FrameProducer::~FrameProducer() {
 
 void FrameProducer::run() {
 	while (!threadShouldExit()) {
-		// this lock is needed so that frameSource isn't deleted whilst nextFrame() is being called
-		juce::SpinLock::ScopedLockType scope(lock);
-		frameConsumer.addFrame(frameSource->nextFrame(), sourceFileIndex);
+		auto frame = frameSource->nextFrame();
+		frameConsumer.addFrame(frame);
 	}
-}
-
-void FrameProducer::setSource(std::shared_ptr<FileParser> source, int fileIndex) {
-	juce::SpinLock::ScopedLockType scope(lock);
-	frameSource->disable();
-	frameSource = source;
-	sourceFileIndex = fileIndex;
 }

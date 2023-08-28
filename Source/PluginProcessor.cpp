@@ -32,8 +32,6 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
                        )
 #endif
     {
-    producer.startThread();
-
     // locking isn't necessary here because we are in the constructor
 
     toggleableEffects.push_back(std::make_shared<Effect>(
@@ -137,6 +135,10 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     for (auto parameter : booleanParameters) {
         addParameter(parameter);
     }
+
+    for (int i = 0; i < 4; i++) {
+        synth.addVoice(new ShapeVoice(*this));
+    }
 }
 
 OscirenderAudioProcessor::~OscirenderAudioProcessor() {}
@@ -194,6 +196,7 @@ void OscirenderAudioProcessor::changeProgramName(int index, const juce::String& 
 void OscirenderAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
 	currentSampleRate = sampleRate;
     pitchDetector.setSampleRate(sampleRate);
+    synth.setCurrentPlaybackSampleRate(sampleRate);
 }
 
 void OscirenderAudioProcessor::releaseResources() {
@@ -304,7 +307,8 @@ void OscirenderAudioProcessor::updateFileBlock(int index, std::shared_ptr<juce::
 void OscirenderAudioProcessor::addFile(juce::File file) {
     fileBlocks.push_back(std::make_shared<juce::MemoryBlock>());
     fileNames.push_back(file.getFileName());
-	parsers.push_back(std::make_unique<FileParser>());
+	parsers.push_back(std::make_shared<FileParser>());
+    sounds.push_back(new ShapeSound(parsers.back()));
     file.createInputStream()->readIntoMemoryBlock(*fileBlocks.back());
 
     openFile(fileBlocks.size() - 1);
@@ -314,7 +318,8 @@ void OscirenderAudioProcessor::addFile(juce::File file) {
 void OscirenderAudioProcessor::addFile(juce::String fileName, const char* data, const int size) {
     fileBlocks.push_back(std::make_shared<juce::MemoryBlock>());
     fileNames.push_back(fileName);
-    parsers.push_back(std::make_unique<FileParser>());
+    parsers.push_back(std::make_shared<FileParser>());
+    sounds.push_back(new ShapeSound(parsers.back()));
     fileBlocks.back()->append(data, size);
 
     openFile(fileBlocks.size() - 1);
@@ -324,7 +329,8 @@ void OscirenderAudioProcessor::addFile(juce::String fileName, const char* data, 
 void OscirenderAudioProcessor::addFile(juce::String fileName, std::shared_ptr<juce::MemoryBlock> data) {
     fileBlocks.push_back(data);
     fileNames.push_back(fileName);
-    parsers.push_back(std::make_unique<FileParser>());
+    parsers.push_back(std::make_shared<FileParser>());
+    sounds.push_back(new ShapeSound(parsers.back()));
 
     openFile(fileBlocks.size() - 1);
 }
@@ -337,6 +343,7 @@ void OscirenderAudioProcessor::removeFile(int index) {
     fileBlocks.erase(fileBlocks.begin() + index);
     fileNames.erase(fileNames.begin() + index);
     parsers.erase(parsers.begin() + index);
+    sounds.erase(sounds.begin() + index);
     auto newFileIndex = index;
     if (newFileIndex >= fileBlocks.size()) {
         newFileIndex = fileBlocks.size() - 1;
@@ -363,17 +370,18 @@ void OscirenderAudioProcessor::openFile(int index) {
 // used ONLY for changing the current file to an EXISTING file.
 // much faster than openFile(int index) because it doesn't reparse any files.
 // parsersLock AND effectsLock must be locked before calling this function
+
+// TODO: This should change whatever the ShapeSound is to the new index
 void OscirenderAudioProcessor::changeCurrentFile(int index) {
+    synth.clearSounds();
     if (index == -1) {
         currentFile = -1;
-        producer.setSource(std::make_shared<FileParser>(), -1);
     }
 	if (index < 0 || index >= fileBlocks.size()) {
 		return;
 	}
-	producer.setSource(parsers[index], index);
+	synth.addSound(sounds[index]);
     currentFile = index;
-	invalidateFrameBuffer = true;
     updateLuaValues();
     updateObjValues();
 }
@@ -402,113 +410,19 @@ std::shared_ptr<juce::MemoryBlock> OscirenderAudioProcessor::getFileBlock(int in
     return fileBlocks[index];
 }
 
-void OscirenderAudioProcessor::addFrame(std::vector<std::unique_ptr<Shape>> frame, int fileIndex) {
-    const auto scope = frameFifo.write(1);
-
-    if (scope.blockSize1 > 0) {
-        frameBuffer[scope.startIndex1].clear();
-        for (auto& shape : frame) {
-            frameBuffer[scope.startIndex1].push_back(std::move(shape));
-        }
-        frameBufferIndices[scope.startIndex1] = fileIndex;
-    }
-
-    if (scope.blockSize2 > 0) {
-        frameBuffer[scope.startIndex2].clear();
-        for (auto& shape : frame) {
-            frameBuffer[scope.startIndex2].push_back(std::move(shape));
-        }
-        frameBufferIndices[scope.startIndex2] = fileIndex;
-    }
-}
-
-void OscirenderAudioProcessor::updateFrame() {
-    currentShape = 0;
-    shapeDrawn = 0.0;
-    frameDrawn = 0.0;
-    
-	if (frameFifo.getNumReady() > 0) {
-        {
-            const auto scope = frameFifo.read(1);
-
-            if (scope.blockSize1 > 0) {
-				frame.swap(frameBuffer[scope.startIndex1]);
-                currentBufferIndex = frameBufferIndices[scope.startIndex1];
-            } else if (scope.blockSize2 > 0) {
-                frame.swap(frameBuffer[scope.startIndex2]);
-                currentBufferIndex = frameBufferIndices[scope.startIndex2];
-            }
-
-            frameLength = Shape::totalLength(frame);
-        }
-    }
-}
-
-void OscirenderAudioProcessor::updateLengthIncrement() {
-    double traceMaxValue = traceMaxEnabled ? actualTraceMax : 1.0;
-    double traceMinValue = traceMinEnabled ? actualTraceMin : 0.0;
-    double proportionalLength = (traceMaxValue - traceMinValue) * frameLength;
-    lengthIncrement = juce::jmax(proportionalLength / (currentSampleRate / frequency), MIN_LENGTH_INCREMENT);
-}
-
-void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
-{
+void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    // In case we have more outputs than inputs, this code clears any output
-    // channels that didn't contain input data, (because these aren't
-    // guaranteed to be empty - they may contain garbage).
-    // This is here to avoid people getting screaming feedback
-    // when they first compile a plugin, but obviously you don't need to keep
-    // this code if your algorithm always overwrites all the output channels.
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
-
+    buffer.clear();
+    synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
+    midiMessages.clear();
     
     auto* channelData = buffer.getArrayOfWritePointers();
-	auto numSamples = buffer.getNumSamples();
-
-    if (invalidateFrameBuffer) {
-        frameFifo.reset();
-        // keeps getting the next frame until the frame comes from the file that we want to render.
-        // this MIGHT be hacky and cause issues later down the line, but for now it works as a
-        // solution to get instant changing of current file when pressing j and k.
-        while (currentBufferIndex != currentFile) {
-            updateFrame();
-        }
-        invalidateFrameBuffer = false;
-    }
     
-	for (auto sample = 0; sample < numSamples; ++sample) {
-        updateLengthIncrement();
-
-        traceMaxEnabled = false;
-        traceMinEnabled = false;
-        
-        Vector2 channels;
-        double x = 0.0;
-        double y = 0.0;
-
-
-        std::shared_ptr<FileParser> sampleParser;
-        {
-            juce::SpinLock::ScopedLockType lock(parsersLock);
-            if (currentFile >= 0 && parsers[currentFile]->isSample()) {
-                sampleParser = parsers[currentFile];
-            }
-        }
-        bool renderingSample = sampleParser != nullptr;
-
-        if (renderingSample) {
-            channels = sampleParser->nextSample();
-        } else if (currentShape < frame.size()) {
-            auto& shape = frame[currentShape];
-            double length = shape->length();
-            double drawingProgress = length == 0.0 ? 1 : shapeDrawn / length;
-            channels = shape->nextVector(drawingProgress);
-        }
+	for (auto sample = 0; sample < buffer.getNumSamples(); ++sample) {
+        Vector2 channels = {buffer.getSample(0, sample), buffer.getSample(1, sample)};
 
         {
             juce::SpinLock::ScopedLockType lock1(parsersLock);
@@ -523,8 +437,8 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             }
         }
 
-		x = channels.x;
-		y = channels.y;
+		double x = channels.x;
+		double y = channels.y;
 
         x *= volume;
         y *= volume;
@@ -541,55 +455,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         }
 
         audioProducer.write(x, y);
-
-        actualTraceMax = juce::jmax(actualTraceMin + MIN_TRACE, juce::jmin(traceMaxValue, 1.0));
-        actualTraceMin = juce::jmax(MIN_TRACE, juce::jmin(traceMinValue, actualTraceMax - MIN_TRACE));
-        
-        if (!renderingSample) {
-            incrementShapeDrawing();
-        }
-        
-        double drawnFrameLength = traceMaxEnabled ? actualTraceMax * frameLength : frameLength;
-
-        if (!renderingSample && frameDrawn >= drawnFrameLength) {
-            updateFrame();
-            // TODO: updateFrame already iterates over all the shapes,
-            // so we can improve performance by calculating frameDrawn
-            // and shapeDrawn directly. frameDrawn is simply actualTraceMin * frameLength
-            // but shapeDrawn is the amount of the current shape that has been drawn so
-            // we need to iterate over all the shapes to calculate it.
-            if (traceMinEnabled) {
-                while (frameDrawn < actualTraceMin * frameLength) {
-                    incrementShapeDrawing();
-                }
-            }
-        }
 	}
-}
-
-// TODO this is the slowest part of the program - any way to improve this would help!
-void OscirenderAudioProcessor::incrementShapeDrawing() {
-    double length = currentShape < frame.size() ? frame[currentShape]->len : 0.0;
-    // hard cap on how many times it can be over the length to
-    // prevent audio stuttering
-    auto increment = juce::jmin(lengthIncrement, 20 * length);
-    frameDrawn += increment;
-    shapeDrawn += increment;
-
-    // Need to skip all shapes that the lengthIncrement draws over.
-    // This is especially an issue when there are lots of small lines being
-    // drawn.
-    while (shapeDrawn > length) {
-        shapeDrawn -= length;
-        currentShape++;
-        if (currentShape >= frame.size()) {
-            currentShape = 0;
-            break;
-        }
-        // POTENTIAL TODO: Think of a way to make this more efficient when iterating
-        // this loop many times
-        length = frame[currentShape]->len;
-    }
 }
 
 //==============================================================================
