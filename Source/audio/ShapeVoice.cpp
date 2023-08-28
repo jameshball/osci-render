@@ -15,8 +15,10 @@ void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesiser
 
     if (shapeSound != nullptr) {
         this->sound = shapeSound;
-        while (frame.empty()) {
+        int tries = 0;
+        while (frame.empty() && tries < 20) {
             frameLength = shapeSound->updateFrame(frame);
+            tries++;
         }
         tailOff = 0.0;
         frequency = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber);
