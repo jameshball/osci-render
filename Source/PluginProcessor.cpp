@@ -540,7 +540,14 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             channelData[0][sample] = x;
         }
 
-        audioProducer.write(x, y);
+        {
+            juce::SpinLock::ScopedLockType scope(consumerLock);
+            for (auto consumer : consumers) {
+                consumer->write(x);
+                consumer->write(y);
+                consumer->notifyIfFull();
+            }
+        }
 
         actualTraceMax = juce::jmax(actualTraceMin + MIN_TRACE, juce::jmin(traceMaxValue, 1.0));
         actualTraceMin = juce::jmax(MIN_TRACE, juce::jmin(traceMinValue, actualTraceMax - MIN_TRACE));
@@ -720,6 +727,21 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         broadcaster.sendChangeMessage();
     }
 }
+
+
+void OscirenderAudioProcessor::read(std::vector<float>& buffer) {
+    std::shared_ptr<BufferConsumer> consumer = std::make_shared<BufferConsumer>(buffer);
+    {
+        juce::SpinLock::ScopedLockType scope(consumerLock);
+        consumers.push_back(consumer);
+    }
+    consumer->waitUntilFull();
+    {
+        juce::SpinLock::ScopedLockType scope(consumerLock);
+        consumers.erase(std::remove(consumers.begin(), consumers.end(), consumer), consumers.end());
+    }
+}
+
 
 //==============================================================================
 // This creates new instances of the plugin..

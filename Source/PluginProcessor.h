@@ -13,9 +13,9 @@
 #include "parser/FileParser.h"
 #include "parser/FrameProducer.h"
 #include "parser/FrameConsumer.h"
+#include "concurrency/BufferConsumer.h"
 #include "audio/Effect.h"
 #include <numbers>
-#include "concurrency/BufferProducer.h"
 #include "audio/AudioWebSocketServer.h"
 #include "audio/DelayEffect.h"
 #include "audio/PitchDetector.h"
@@ -60,6 +60,7 @@ public:
     void changeProgramName(int index, const juce::String& newName) override;
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
+    void read(std::vector<float>& buffer);
     
     int VERSION_HINT = 1;
 
@@ -173,9 +174,7 @@ public:
     
     FrameProducer producer = FrameProducer(*this, std::make_shared<FileParser>());
 
-    BufferProducer audioProducer;
-
-    PitchDetector pitchDetector{audioProducer};
+    PitchDetector pitchDetector{*this};
     std::shared_ptr<WobbleEffect> wobbleEffect = std::make_shared<WobbleEffect>(pitchDetector);
 
     // shouldn't be accessed by audio thread, but needs to persist when GUI is closed
@@ -244,8 +243,11 @@ private:
     double actualTraceMin = traceMinValue;
     bool traceMaxEnabled = false;
     bool traceMinEnabled = false;
+    
+    juce::SpinLock consumerLock;
+    std::vector<std::shared_ptr<BufferConsumer>> consumers;
 
-    AudioWebSocketServer softwareOscilloscopeServer{audioProducer};
+    AudioWebSocketServer softwareOscilloscopeServer{*this};
 
 	void updateFrame();
     void updateLengthIncrement();

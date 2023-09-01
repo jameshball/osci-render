@@ -1,12 +1,10 @@
 #pragma once
 #include <JuceHeader.h>
-#include "../concurrency/BufferConsumer.h"
-#include "../concurrency/BufferProducer.h"
 
-
+class OscirenderAudioProcessor;
 class PitchDetector : public juce::Thread, public juce::AsyncUpdater {
 public:
-	PitchDetector(BufferProducer& producer);
+	PitchDetector(OscirenderAudioProcessor& audioProcessor);
 	~PitchDetector();
 
     void run() override;
@@ -21,10 +19,10 @@ private:
 	static constexpr int fftOrder = 15;
 	static constexpr int fftSize = 1 << fftOrder;
 
-    std::shared_ptr<BufferConsumer> consumer = std::make_shared<BufferConsumer>(fftSize);
+    std::vector<float> buffer = std::vector<float>(2 * fftSize);
     juce::dsp::FFT forwardFFT{fftOrder};
     std::array<float, fftSize * 2> fftData;
-    BufferProducer& producer;
+    OscirenderAudioProcessor& audioProcessor;
     std::vector<std::function<void(float)>> callbacks;
     juce::SpinLock lock;
     float sampleRate = 192000.0f;

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "../concurrency/BufferConsumer.h"
 #include "../PluginProcessor.h"
 #include "../LookAndFeel.h"
 
@@ -71,7 +70,7 @@ public:
 
 private:
 	OscirenderAudioProcessor& audioProcessor;
-	std::shared_ptr<BufferConsumer> consumer = std::make_shared<BufferConsumer>(1 << 11);
+	std::vector<float> buffer = std::vector<float>(2 * 1 << 11);
 
 	std::atomic<float> leftVolume = 0;
 	std::atomic<float> rightVolume = 0;

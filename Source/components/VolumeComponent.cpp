@@ -47,7 +47,6 @@ VolumeComponent::VolumeComponent(OscirenderAudioProcessor& p) : audioProcessor(p
 }
 
 VolumeComponent::~VolumeComponent() {
-    audioProcessor.audioProducer.unregisterConsumer(consumer);
     stopThread(1000);
 }
 
@@ -92,29 +91,25 @@ void VolumeComponent::timerCallback() {
 }
 
 void VolumeComponent::run() {
-    audioProcessor.audioProducer.registerConsumer(consumer);
-
     while (!threadShouldExit()) {
-        auto buffer = consumer->startProcessing();
+        audioProcessor.read(buffer);
 
         float leftVolume = 0;
         float rightVolume = 0;
 
-        for (int i = 0; i < buffer->size(); i += 2) {
-            leftVolume += buffer->at(i) * buffer->at(i);
-            rightVolume += buffer->at(i + 1) * buffer->at(i + 1);
+        for (int i = 0; i < buffer.size(); i += 2) {
+            leftVolume += buffer[i] * buffer[i];
+            rightVolume += buffer[i + 1] * buffer[i + 1];
         }
         // RMS
-        leftVolume = std::sqrt(leftVolume / (buffer->size() / 2));
-        rightVolume = std::sqrt(rightVolume / (buffer->size() / 2));
+        leftVolume = std::sqrt(leftVolume / (buffer.size() / 2));
+        rightVolume = std::sqrt(rightVolume / (buffer.size() / 2));
 
         this->leftVolume = leftVolume;
         this->rightVolume = rightVolume;
 
         avgLeftVolume = (avgLeftVolume * 0.95) + (leftVolume * 0.05);
         avgRightVolume = (avgRightVolume * 0.95) + (rightVolume * 0.05);
-
-        consumer->finishedProcessing();
     }
 }
 

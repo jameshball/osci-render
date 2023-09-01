@@ -1,6 +1,7 @@
 #include "AudioWebSocketServer.h"
+#include "../PluginProcessor.h"
 
-AudioWebSocketServer::AudioWebSocketServer(BufferProducer& producer) : juce::Thread("AudioWebSocketServer"), producer(producer) {
+AudioWebSocketServer::AudioWebSocketServer(OscirenderAudioProcessor& audioProcessor) : juce::Thread("AudioWebSocketServer"), audioProcessor(audioProcessor) {
     server.setOnClientMessageCallback([](std::shared_ptr<ix::ConnectionState> connectionState, ix::WebSocket & webSocket, const ix::WebSocketMessagePtr & msg) {
         // The ConnectionState object contains information about the connection,
         // at this point only the client ip address and the port.
@@ -40,18 +41,15 @@ AudioWebSocketServer::AudioWebSocketServer(BufferProducer& producer) : juce::Thr
 AudioWebSocketServer::~AudioWebSocketServer() {
     server.stop();
     ix::uninitNetSystem();
-    producer.unregisterConsumer(consumer);
     stopThread(1000);
 }
 
 void AudioWebSocketServer::run() {
-    producer.registerConsumer(consumer);
-
     while (!threadShouldExit()) {
-        auto floatBuffer = consumer->startProcessing();
+        audioProcessor.read(floatBuffer);
 
-        for (int i = 0; i < floatBuffer->size(); i++) {
-            short sample = floatBuffer->at(i) * 32767;
+        for (int i = 0; i < floatBuffer.size(); i++) {
+            short sample = floatBuffer[i] * 32767;
             char b0 = sample & 0xff;
             char b1 = (sample >> 8) & 0xff;
             buffer[2 * i] = b0;
@@ -62,8 +60,6 @@ void AudioWebSocketServer::run() {
             ix::IXWebSocketSendData data{buffer, sizeof(buffer)};
             client->sendBinary(data);
         }
-        
-        consumer->finishedProcessing();
     }
     
 }

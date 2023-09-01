@@ -133,8 +133,6 @@
       <GROUP id="{9F5970A9-8094-E7F3-7AC1-812AE5589B9F}" name="concurrency">
         <FILE id="WQ2W15" name="BufferConsumer.h" compile="0" resource="0"
               file="Source/concurrency/BufferConsumer.h"/>
-        <FILE id="yWTiQQ" name="BufferProducer.h" compile="0" resource="0"
-              file="Source/concurrency/BufferProducer.h"/>
       </GROUP>
       <FILE id="I44EdJ" name="EffectsComponent.cpp" compile="1" resource="0"
             file="Source/EffectsComponent.cpp"/>
