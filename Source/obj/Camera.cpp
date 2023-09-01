@@ -47,8 +47,8 @@ std::vector<Vector2> Camera::sampleVerticesInRender(WorldObject& object) {
             double z = object.vs[j * 3 + 2];
             vertices.push_back(project(object.rotateX, object.rotateY, object.rotateZ, x, y, z));
         }
-        object.rotateY += rotation;
-        object.rotateZ += rotation;
+        object.rotateY = object.rotateY + rotation;
+        object.rotateZ = object.rotateY + rotation;
     }
 
     return vertices;

@@ -238,9 +238,9 @@ void WorldObject::setRotationSpeed(double rotateSpeed) {
 // called whenever a new frame is drawn, so that the object can update its
 // rotation
 void WorldObject::nextFrame() {
-    currentRotateX += baseRotateX * rotateSpeed;
-    currentRotateY += baseRotateY * rotateSpeed;
-    currentRotateZ += baseRotateZ * rotateSpeed;
+    currentRotateX = currentRotateX + baseRotateX * rotateSpeed;
+    currentRotateY = currentRotateY + baseRotateY * rotateSpeed;
+    currentRotateZ = currentRotateZ + baseRotateZ * rotateSpeed;
     rotateX = baseRotateX + currentRotateX;
     rotateY = baseRotateY + currentRotateY;
     rotateZ = baseRotateZ + currentRotateZ;

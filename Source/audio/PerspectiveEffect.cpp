@@ -1,7 +1,11 @@
 #include "PerspectiveEffect.h"
 #include <numbers>
 
-PerspectiveEffect::PerspectiveEffect() {}
+PerspectiveEffect::PerspectiveEffect(int versionHint) : versionHint(versionHint) {
+    fixedRotateX = new BooleanParameter("Perspective Fixed Rotate X", "perspectiveFixedRotateX", versionHint, false);
+    fixedRotateY = new BooleanParameter("Perspective Fixed Rotate Y", "perspectiveFixedRotateY", versionHint, false);
+    fixedRotateZ = new BooleanParameter("Perspective Fixed Rotate Z", "perspectiveFixedRotateZ", versionHint, false);
+}
 
 Vector2 PerspectiveEffect::apply(int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
 	auto effectScale = values[0];

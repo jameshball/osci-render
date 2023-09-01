@@ -6,7 +6,7 @@
 #include "components/SvgButton.h"
 
 class OscirenderAudioProcessorEditor;
-class ObjComponent : public juce::GroupComponent, public juce::MouseListener {
+class ObjComponent : public juce::GroupComponent {
 public:
     ObjComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
     ~ObjComponent();

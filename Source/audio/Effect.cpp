@@ -70,10 +70,10 @@ void Effect::animateValues() {
 
 // should only be the audio thread calling this, but either way it's not a big deal
 float Effect::nextPhase(EffectParameter* parameter) {
-	parameter->phase += parameter->lfoRate->getValueUnnormalised() / sampleRate;
+	parameter->phase = parameter->phase + parameter->lfoRate->getValueUnnormalised() / sampleRate;
 
 	if (parameter->phase > 1) {
-		parameter->phase -= 1;
+		parameter->phase = parameter->phase - 1;
 	}
 
 	return parameter->phase * 2 * std::numbers::pi;
@@ -137,7 +137,7 @@ void Effect::markEnableable(bool enable) {
 	if (enabled != nullptr) {
         enabled->setValue(enable);
 	} else {
-		enabled = new BooleanParameter(getName() + " Enabled", getId() + "Enabled", enable);
+		enabled = new BooleanParameter(getName() + " Enabled", getId() + "Enabled", parameters[0]->getVersionHint(), enable);
 	}
 }
 

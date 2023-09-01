@@ -60,6 +60,8 @@ public:
     void changeProgramName(int index, const juce::String& newName) override;
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
+    
+    int VERSION_HINT = 1;
 
     std::atomic<double> currentSampleRate = 0.0;
 
@@ -71,21 +73,21 @@ public:
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             frequency = values[0];
             return input;
-        }, new EffectParameter("Frequency", "frequency", 440.0, 0.0, 12000.0, 0.1)
+        }, new EffectParameter("Frequency", "frequency", VERSION_HINT, 440.0, 0.0, 12000.0, 0.1)
     );
 
     std::shared_ptr<Effect> volumeEffect = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             volume = values[0];
             return input;
-        }, new EffectParameter("Volume", "volume", 1.0, 0.0, 3.0)
+        }, new EffectParameter("Volume", "volume", VERSION_HINT, 1.0, 0.0, 3.0)
     );
 
     std::shared_ptr<Effect> thresholdEffect = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             threshold = values[0];
             return input;
-        }, new EffectParameter("Threshold", "threshold", 1.0, 0.0, 1.0)
+        }, new EffectParameter("Threshold", "threshold", VERSION_HINT, 1.0, 0.0, 1.0)
     );
     
     std::shared_ptr<Effect> focalLength = std::make_shared<Effect>(
@@ -96,12 +98,12 @@ public:
                 camera->setFocalLength(values[0]);
             }
             return input;
-		}, new EffectParameter("Focal length", "objFocalLength", 1.0, 0.0, 2.0)
+		}, new EffectParameter("Focal length", "objFocalLength", VERSION_HINT, 1.0, 0.0, 2.0)
     );
 
-    BooleanParameter* fixedRotateX = new BooleanParameter("Object Fixed Rotate X", "objFixedRotateX", false);
-    BooleanParameter* fixedRotateY = new BooleanParameter("Object Fixed Rotate Y", "objFixedRotateY", false);
-    BooleanParameter* fixedRotateZ = new BooleanParameter("Object Fixed Rotate Z", "objFixedRotateZ", false);
+    BooleanParameter* fixedRotateX = new BooleanParameter("Object Fixed Rotate X", "objFixedRotateX", VERSION_HINT, false);
+    BooleanParameter* fixedRotateY = new BooleanParameter("Object Fixed Rotate Y", "objFixedRotateY", VERSION_HINT, false);
+    BooleanParameter* fixedRotateZ = new BooleanParameter("Object Fixed Rotate Z", "objFixedRotateZ", VERSION_HINT, false);
     std::shared_ptr<Effect> rotateX = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
@@ -115,7 +117,7 @@ public:
                 }
             }
             return input;
-        }, new EffectParameter("Rotate X", "objRotateX", 1.0, -1.0, 1.0)
+        }, new EffectParameter("Rotate X", "objRotateX", VERSION_HINT, 1.0, -1.0, 1.0)
     );
     std::shared_ptr<Effect> rotateY = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
@@ -130,7 +132,7 @@ public:
                 }
             }
             return input;
-        }, new EffectParameter("Rotate Y", "objRotateY", 1.0, -1.0, 1.0)
+        }, new EffectParameter("Rotate Y", "objRotateY", VERSION_HINT, 1.0, -1.0, 1.0)
     );
     std::shared_ptr<Effect> rotateZ = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
@@ -145,7 +147,7 @@ public:
                 }
             }
             return input;
-        }, new EffectParameter("Rotate Z", "objRotateZ", 0.0, -1.0, 1.0)
+        }, new EffectParameter("Rotate Z", "objRotateZ", VERSION_HINT, 0.0, -1.0, 1.0)
     );
     std::shared_ptr<Effect> rotateSpeed = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
@@ -155,11 +157,11 @@ public:
                 obj->setRotationSpeed(values[0]);
             }
             return input;
-		}, new EffectParameter("Rotate Speed", "objRotateSpeed", 0.0, -1.0, 1.0)
+		}, new EffectParameter("Rotate Speed", "objRotateSpeed", VERSION_HINT, 0.0, -1.0, 1.0)
     );
 
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
-    std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>();
+    std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>(VERSION_HINT);
     
     juce::SpinLock parsersLock;
     std::vector<std::shared_ptr<FileParser>> parsers;
@@ -226,14 +228,14 @@ private:
             traceMaxValue = values[0];
             traceMaxEnabled = true;
             return input;
-        }, new EffectParameter("Trace max", "traceMax", 1.0, 0.0, 1.0)
+        }, new EffectParameter("Trace max", "traceMax", VERSION_HINT, 1.0, 0.0, 1.0)
     );
     std::shared_ptr<Effect> traceMin = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             traceMinValue = values[0];
             traceMinEnabled = true;
             return input;
-        }, new EffectParameter("Trace min", "traceMin", 0.0, 0.0, 1.0)
+        }, new EffectParameter("Trace min", "traceMin", VERSION_HINT, 0.0, 0.0, 1.0)
     );
     const double MIN_TRACE = 0.005;
     double traceMaxValue = traceMax->getValue();
