@@ -2,11 +2,8 @@
 
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
-#include "EffectsComponent.h"
-#include "MainComponent.h"
-#include "LuaComponent.h"
-#include "ObjComponent.h"
-#include "TxtComponent.h"
+#include "SettingsComponent.h"
+#include "MidiComponent.h"
 #include "components/VolumeComponent.h"
 #include "components/MainMenuBarModel.h"
 #include "LookAndFeel.h"
@@ -41,11 +38,9 @@ public:
 private:
     OscirenderAudioProcessor& audioProcessor;
     
-    MainComponent main{audioProcessor, *this};
-    LuaComponent lua{audioProcessor, *this};
-    ObjComponent obj{audioProcessor, *this};
-    TxtComponent txt{audioProcessor, *this};
-    EffectsComponent effects{audioProcessor, *this};
+    juce::TabbedComponent tabs{juce::TabbedButtonBar::TabsAtTop};
+    MidiComponent midi{audioProcessor, *this};
+    SettingsComponent settings{audioProcessor, *this};
     VolumeComponent volume{audioProcessor};
     std::vector<std::shared_ptr<juce::CodeDocument>> codeDocuments;
     std::vector<std::shared_ptr<juce::CodeEditorComponent>> codeEditors;

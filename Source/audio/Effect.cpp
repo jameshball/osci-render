@@ -91,6 +91,16 @@ double Effect::getValue() {
 	return getValue(0);
 }
 
+// Not thread safe! Should only be called from the audio thread
+double Effect::getActualValue(int index) {
+    return actualValues[index];
+}
+
+// Not thread safe! Should only be called from the audio thread
+double Effect::getActualValue() {
+	return actualValues[0];
+}
+
 void Effect::setValue(int index, double value) {
 	parameters[index]->setUnnormalisedValueNotifyingHost(value);
 }

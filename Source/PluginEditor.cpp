@@ -4,11 +4,11 @@
 OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p)
 	: AudioProcessorEditor(&p), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white)
 {
-    addAndMakeVisible(effects);
-    addAndMakeVisible(main);
-    addChildComponent(lua);
-    addChildComponent(obj);
-    addChildComponent(txt);
+    addAndMakeVisible(tabs);
+    tabs.addTab("Main", juce::Colours::white, &settings, false);
+    tabs.addTab("MIDI", juce::Colours::white, &midi, false);
+    tabs.setTabBackgroundColour(0, juce::Colours::white);
+    tabs.setTabBackgroundColour(1, juce::Colours::white);
     addAndMakeVisible(volume);
 
     menuBar.setModel(&menuBarModel);
@@ -82,16 +82,6 @@ void OscirenderAudioProcessorEditor::initialiseCodeEditors() {
 void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
     g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
 
-    juce::DropShadow ds(juce::Colours::black, 10, juce::Point<int>(0, 0));
-    ds.drawForRectangle(g, main.getBounds());
-    ds.drawForRectangle(g, effects.getBounds());
-    if (lua.isVisible()) {
-        ds.drawForRectangle(g, lua.getBounds());
-    }
-    if (obj.isVisible()) {
-        ds.drawForRectangle(g, obj.getBounds());
-    }
-
     g.setColour(juce::Colours::white);
     g.setFont(15.0f);
 }
@@ -134,15 +124,8 @@ void OscirenderAudioProcessorEditor::resized() {
         collapseButton.setShape(path, false, true, true);
     }
     
-    auto effectsSection = area.removeFromRight(1.2 * getWidth() / sections);
-    main.setBounds(area.reduced(5));
-    if (lua.isVisible() || obj.isVisible() || txt.isVisible()) {
-        auto altEffectsSection = effectsSection.removeFromBottom(juce::jmin(effectsSection.getHeight() / 2, txt.isVisible() ? 150 : 300));
-        lua.setBounds(altEffectsSection.reduced(5));
-        obj.setBounds(altEffectsSection.reduced(5));
-        txt.setBounds(altEffectsSection.reduced(5));
-    }
-	effects.setBounds(effectsSection.reduced(5));
+    settings.sections = sections;
+    tabs.setBounds(area);
 
     repaint();
 }
@@ -213,20 +196,7 @@ void OscirenderAudioProcessorEditor::updateCodeEditor() {
 
 // parsersLock MUST be locked before calling this function
 void OscirenderAudioProcessorEditor::fileUpdated(juce::String fileName) {
-    juce::String extension = fileName.fromLastOccurrenceOf(".", true, false);
-    lua.setVisible(false);
-    obj.setVisible(false);
-    txt.setVisible(false);
-    if (fileName.isEmpty()) {
-        // do nothing
-    } else if (extension == ".lua") {
-        lua.setVisible(true);
-    } else if (extension == ".obj") {
-		obj.setVisible(true);
-    } else if (extension == ".txt") {
-        txt.setVisible(true);
-    }
-    main.updateFileLabel();
+    settings.fileUpdated(fileName);
     updateCodeEditor();
 }
 
@@ -237,7 +207,7 @@ void OscirenderAudioProcessorEditor::handleAsyncUpdate() {
 void OscirenderAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcaster* source) {
     juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
     initialiseCodeEditors();
-    txt.update();
+    settings.update();
 }
 
 void OscirenderAudioProcessorEditor::editPerspectiveFunction(bool enable) {
@@ -310,7 +280,7 @@ bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
     
     bool consumeKey2 = true;
     if (key.isKeyCode(juce::KeyPress::escapeKey)) {
-        obj.disableMouseRotation();
+        settings.disableMouseRotation();
     } else if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'S') {
         saveProjectAs();
     } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'S') {

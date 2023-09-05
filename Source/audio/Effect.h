@@ -18,6 +18,8 @@ public:
 	void apply();
 	double getValue(int index);
 	double getValue();
+	double getActualValue(int index);
+	double getActualValue();
 	void setValue(int index, double value);
 	void setValue(double value);
 	int getPrecedence();
