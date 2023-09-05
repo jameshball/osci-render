@@ -47,6 +47,7 @@ VolumeComponent::VolumeComponent(OscirenderAudioProcessor& p) : audioProcessor(p
 }
 
 VolumeComponent::~VolumeComponent() {
+    audioProcessor.consumerStop(consumer);
     stopThread(1000);
 }
 
@@ -92,7 +93,8 @@ void VolumeComponent::timerCallback() {
 
 void VolumeComponent::run() {
     while (!threadShouldExit()) {
-        audioProcessor.read(buffer);
+        consumer = audioProcessor.consumerRegister(buffer);
+        audioProcessor.consumerRead(consumer);
 
         float leftVolume = 0;
         float rightVolume = 0;

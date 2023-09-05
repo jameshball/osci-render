@@ -54,6 +54,12 @@ public:
             sema.release();
         }
     }
+    
+    // to be used when the audio thread is being destroyed to
+    // make sure that everything waiting on it stops waiting.
+    void forceNotify() {
+        sema.release();
+    }
 
     void write(double d) {
         if (offset < buffer.size()) {

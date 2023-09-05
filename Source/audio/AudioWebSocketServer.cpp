@@ -41,12 +41,14 @@ AudioWebSocketServer::AudioWebSocketServer(OscirenderAudioProcessor& audioProces
 AudioWebSocketServer::~AudioWebSocketServer() {
     server.stop();
     ix::uninitNetSystem();
+    audioProcessor.consumerStop(consumer);
     stopThread(1000);
 }
 
 void AudioWebSocketServer::run() {
     while (!threadShouldExit()) {
-        audioProcessor.read(floatBuffer);
+        consumer = audioProcessor.consumerRegister(floatBuffer);
+        audioProcessor.consumerRead(consumer);
 
         for (int i = 0; i < floatBuffer.size(); i++) {
             short sample = floatBuffer[i] * 32767;

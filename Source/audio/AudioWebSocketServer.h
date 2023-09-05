@@ -1,6 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 #include "../ixwebsocket/IXWebSocketServer.h"
+#include "../concurrency/BufferConsumer.h"
 
 class OscirenderAudioProcessor;
 class AudioWebSocketServer : juce::Thread {
@@ -15,4 +16,6 @@ private:
     OscirenderAudioProcessor& audioProcessor;
 	std::vector<float> floatBuffer = std::vector<float>(2 * 4096);
 	char buffer[4096 * 2 * 2];
+    
+    std::shared_ptr<BufferConsumer> consumer;
 };

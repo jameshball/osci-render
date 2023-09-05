@@ -58,7 +58,9 @@ public:
     void changeProgramName(int index, const juce::String& newName) override;
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
-    void read(std::vector<float>& buffer);
+    std::shared_ptr<BufferConsumer> consumerRegister(std::vector<float>& buffer);
+    void consumerStop(std::shared_ptr<BufferConsumer> consumer);
+    void consumerRead(std::shared_ptr<BufferConsumer> consumer);
     
     int VERSION_HINT = 1;
 
@@ -216,6 +218,7 @@ private:
     std::vector<std::shared_ptr<Effect>> allEffects;
     std::vector<std::shared_ptr<Effect>> permanentEffects;
 
+    bool playedNote = false;
     juce::Synthesiser synth;
     
     juce::SpinLock consumerLock;

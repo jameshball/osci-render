@@ -1,5 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
+#include "../concurrency/BufferConsumer.h"
 
 class OscirenderAudioProcessor;
 class PitchDetector : public juce::Thread, public juce::AsyncUpdater {
@@ -19,6 +20,7 @@ private:
 	static constexpr int fftOrder = 15;
 	static constexpr int fftSize = 1 << fftOrder;
 
+    std::shared_ptr<BufferConsumer> consumer;
     std::vector<float> buffer = std::vector<float>(2 * fftSize);
     juce::dsp::FFT forwardFFT{fftOrder};
     std::array<float, fftSize * 2> fftData;

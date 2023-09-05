@@ -416,8 +416,14 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
     buffer.clear();
-    synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
     midiMessages.clear();
+    // TODO: Make this less hacky and more permanent
+    if (!playedNote) {
+        playedNote = true;
+        midiMessages.addEvent(juce::MidiMessage::noteOn(1, 60, 1.0f), 0);
+    }
+    synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
+    
     
     auto* channelData = buffer.getArrayOfWritePointers();
     
@@ -594,17 +600,24 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
     }
 }
 
-
-void OscirenderAudioProcessor::read(std::vector<float>& buffer) {
+std::shared_ptr<BufferConsumer> OscirenderAudioProcessor::consumerRegister(std::vector<float>& buffer) {
     std::shared_ptr<BufferConsumer> consumer = std::make_shared<BufferConsumer>(buffer);
-    {
-        juce::SpinLock::ScopedLockType scope(consumerLock);
-        consumers.push_back(consumer);
-    }
+    juce::SpinLock::ScopedLockType scope(consumerLock);
+    consumers.push_back(consumer);
+    
+    return consumer;
+}
+
+void OscirenderAudioProcessor::consumerRead(std::shared_ptr<BufferConsumer> consumer) {
     consumer->waitUntilFull();
-    {
+    juce::SpinLock::ScopedLockType scope(consumerLock);
+    consumers.erase(std::remove(consumers.begin(), consumers.end(), consumer), consumers.end());
+}
+
+void OscirenderAudioProcessor::consumerStop(std::shared_ptr<BufferConsumer> consumer) {
+    if (consumer != nullptr) {
         juce::SpinLock::ScopedLockType scope(consumerLock);
-        consumers.erase(std::remove(consumers.begin(), consumers.end(), consumer), consumers.end());
+        consumer->forceNotify();
     }
 }
 

@@ -6,12 +6,14 @@ PitchDetector::PitchDetector(OscirenderAudioProcessor& audioProcessor) : juce::T
 }
 
 PitchDetector::~PitchDetector() {
+    audioProcessor.consumerStop(consumer);
     stopThread(1000);
 }
 
 void PitchDetector::run() {
 	while (!threadShouldExit()) {
-        audioProcessor.read(buffer);
+        consumer = audioProcessor.consumerRegister(buffer);
+        audioProcessor.consumerRead(consumer);
 
         // buffer is for 2 channels, so we need to only use one
         for (int i = 0; i < fftSize; i++) {

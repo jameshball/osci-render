@@ -25,6 +25,8 @@ private:
 	OscirenderAudioProcessor& audioProcessor;
     std::vector<float> tempBuffer = std::vector<float>(2 * 4096);
     int precision = 4;
+    
+    std::shared_ptr<BufferConsumer> consumer;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserComponent)
 };
