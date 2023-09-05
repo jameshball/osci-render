@@ -218,7 +218,7 @@ private:
     std::vector<std::shared_ptr<Effect>> allEffects;
     std::vector<std::shared_ptr<Effect>> permanentEffects;
 
-    bool playedNote = false;
+    ShapeSound::Ptr defaultSound = new ShapeSound(std::make_shared<FileParser>());
     juce::Synthesiser synth;
     
     juce::SpinLock consumerLock;

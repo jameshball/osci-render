@@ -139,6 +139,8 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     for (int i = 0; i < 4; i++) {
         synth.addVoice(new ShapeVoice(*this));
     }
+        
+    synth.addSound(defaultSound);
 }
 
 OscirenderAudioProcessor::~OscirenderAudioProcessor() {}
@@ -373,13 +375,13 @@ void OscirenderAudioProcessor::openFile(int index) {
 
 // TODO: This should change whatever the ShapeSound is to the new index
 void OscirenderAudioProcessor::changeCurrentFile(int index) {
-    synth.clearSounds();
     if (index == -1) {
         currentFile = -1;
     }
 	if (index < 0 || index >= fileBlocks.size()) {
 		return;
 	}
+    synth.clearSounds();
 	synth.addSound(sounds[index]);
     currentFile = index;
     updateLuaValues();
@@ -416,14 +418,8 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
     buffer.clear();
-    midiMessages.clear();
-    // TODO: Make this less hacky and more permanent
-    if (!playedNote) {
-        playedNote = true;
-        midiMessages.addEvent(juce::MidiMessage::noteOn(1, 60, 1.0f), 0);
-    }
     synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
-    
+    midiMessages.clear();
     
     auto* channelData = buffer.getArrayOfWritePointers();
     
