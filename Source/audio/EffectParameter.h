@@ -8,7 +8,11 @@ public:
 	std::atomic<float> max = 0.0;
 	std::atomic<float> step = 0.0;
 
-    FloatParameter(juce::String name, juce::String id, int versionHint, float value, float min, float max, float step = 0.69, juce::String label = "") : juce::AudioProcessorParameterWithID(juce::ParameterID(id, versionHint), name), min(min), max(max), step(step), value(value), label(label) {}
+    FloatParameter(juce::String name, juce::String id, int versionHint, float value, float min, float max, float step = 0.69, juce::String label = "") : juce::AudioProcessorParameterWithID(juce::ParameterID(id, versionHint), name), step(step), value(value), label(label) {
+		// need to initialise here because of naming conflicts on Windows
+		this->min = min;
+		this->max = max;
+	}
 
 	juce::String getName(int maximumStringLength) const override {
 		return name.substring(0, maximumStringLength);
@@ -131,7 +135,11 @@ public:
 	std::atomic<int> min = 0;
 	std::atomic<int> max = 10;
 
-    IntParameter(juce::String name, juce::String id, int versionHint, int value, int min, int max) : AudioProcessorParameterWithID(juce::ParameterID(id, versionHint), name), min(min), max(max), value(value) {}
+    IntParameter(juce::String name, juce::String id, int versionHint, int value, int min, int max) : AudioProcessorParameterWithID(juce::ParameterID(id, versionHint), name), value(value) {
+		// need to initialise here because of naming conflicts on Windows
+		this->min = min;
+		this->max = max;
+	}
 
 	juce::String getName(int maximumStringLength) const override {
 		return name.substring(0, maximumStringLength);
