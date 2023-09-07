@@ -9,6 +9,7 @@ public:
 
 	bool canPlaySound(juce::SynthesiserSound* sound) override;
 	void startNote(int midiNoteNumber, float velocity, juce::SynthesiserSound* sound, int currentPitchWheelPosition) override;
+    void updateSound(juce::SynthesiserSound* sound);
 	void renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int startSample, int numSamples) override;
 	void stopNote(float velocity, bool allowTailOff) override;
 	void pitchWheelMoved(int newPitchWheelValue) override;
@@ -22,7 +23,7 @@ private:
 
 	OscirenderAudioProcessor& audioProcessor;
 	std::vector<std::unique_ptr<Shape>> frame;
-	ShapeSound* sound = nullptr;
+	std::atomic<ShapeSound*> sound = nullptr;
 	double actualTraceMin;
 	double actualTraceMax;
 
@@ -32,6 +33,7 @@ private:
 	double frameDrawn = 0.0;
 	double lengthIncrement = 0.0;
 
+    bool currentlyPlaying = false;
 	double tailOff = 0.0;
 	double frequency = 1.0;
 };

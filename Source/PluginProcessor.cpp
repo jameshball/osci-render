@@ -131,6 +131,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     booleanParameters.push_back(perspectiveEffect->fixedRotateX);
     booleanParameters.push_back(perspectiveEffect->fixedRotateY);
     booleanParameters.push_back(perspectiveEffect->fixedRotateZ);
+    booleanParameters.push_back(midiEnabled);
 
     for (auto parameter : booleanParameters) {
         addParameter(parameter);
@@ -372,20 +373,27 @@ void OscirenderAudioProcessor::openFile(int index) {
 // used ONLY for changing the current file to an EXISTING file.
 // much faster than openFile(int index) because it doesn't reparse any files.
 // parsersLock AND effectsLock must be locked before calling this function
-
-// TODO: This should change whatever the ShapeSound is to the new index
 void OscirenderAudioProcessor::changeCurrentFile(int index) {
     if (index == -1) {
         currentFile = -1;
+        changeSound(defaultSound);
     }
 	if (index < 0 || index >= fileBlocks.size()) {
 		return;
 	}
-    synth.clearSounds();
-	synth.addSound(sounds[index]);
+    changeSound(sounds[index]);
     currentFile = index;
     updateLuaValues();
     updateObjValues();
+}
+
+void OscirenderAudioProcessor::changeSound(ShapeSound::Ptr sound) {
+    synth.clearSounds();
+    synth.addSound(sound);
+    for (int i = 0; i < synth.getNumVoices(); i++) {
+        auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
+        voice->updateSound(sound.get());
+    }
 }
 
 int OscirenderAudioProcessor::getCurrentFileIndex() {
@@ -418,7 +426,30 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
     buffer.clear();
-    synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
+    bool usingMidi = midiEnabled->getBoolValue();
+    if (!usingMidi) {
+        midiMessages.clear();
+    }
+    
+    // if midi enabled has changed state
+    if (prevMidiEnabled != usingMidi) {
+        for (int i = 1; i <= 16; i++) {
+            midiMessages.addEvent(juce::MidiMessage::allNotesOff(i), i);
+        }
+    }
+    
+    // if midi has just been disabled
+    if (prevMidiEnabled && !usingMidi) {
+        midiMessages.addEvent(juce::MidiMessage::noteOn(1, 60, 1.0f), 17);
+    }
+    
+    prevMidiEnabled = usingMidi;
+    
+    {
+        juce::SpinLock::ScopedLockType lock1(parsersLock);
+        juce::SpinLock::ScopedLockType lock2(effectsLock);
+        synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
+    }
     midiMessages.clear();
     
     auto* channelData = buffer.getArrayOfWritePointers();

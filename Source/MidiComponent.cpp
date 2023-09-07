@@ -4,6 +4,10 @@
 MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
     addAndMakeVisible(midiToggle);
     addAndMakeVisible(keyboard);
+    
+    midiToggle.onClick = [this]() {
+        audioProcessor.midiEnabled->setBoolValueNotifyingHost(midiToggle.getToggleState());
+    };
 }
 
 

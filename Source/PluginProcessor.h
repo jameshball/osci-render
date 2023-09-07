@@ -61,6 +61,7 @@ public:
     std::shared_ptr<BufferConsumer> consumerRegister(std::vector<float>& buffer);
     void consumerStop(std::shared_ptr<BufferConsumer> consumer);
     void consumerRead(std::shared_ptr<BufferConsumer> consumer);
+    void setMidiEnabled(bool enabled);
     
     int VERSION_HINT = 1;
 
@@ -175,6 +176,9 @@ public:
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
     std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>(VERSION_HINT);
     
+    BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false);
+    std::atomic<float> frequency = 440.0f;
+    
     juce::SpinLock parsersLock;
     std::vector<std::shared_ptr<FileParser>> parsers;
     std::vector<ShapeSound::Ptr> sounds;
@@ -184,6 +188,11 @@ public:
 
     juce::ChangeBroadcaster broadcaster;
 
+private:
+    juce::SpinLock consumerLock;
+    std::vector<std::shared_ptr<BufferConsumer>> consumers;
+public:
+    
     PitchDetector pitchDetector{*this};
     std::shared_ptr<WobbleEffect> wobbleEffect = std::make_shared<WobbleEffect>(pitchDetector);
 
@@ -210,9 +219,10 @@ public:
     juce::String getFileName(int index);
 	std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
 private:
-    std::atomic<float> frequency = 440.0f;
     std::atomic<double> volume = 1.0;
     std::atomic<double> threshold = 1.0;
+    
+    bool prevMidiEnabled = !midiEnabled->getBoolValue();
 
     std::vector<BooleanParameter*> booleanParameters;
     std::vector<std::shared_ptr<Effect>> allEffects;
@@ -220,9 +230,6 @@ private:
 
     ShapeSound::Ptr defaultSound = new ShapeSound(std::make_shared<FileParser>());
     juce::Synthesiser synth;
-    
-    juce::SpinLock consumerLock;
-    std::vector<std::shared_ptr<BufferConsumer>> consumers;
 
     AudioWebSocketServer softwareOscilloscopeServer{*this};
 
@@ -234,6 +241,7 @@ private:
     std::pair<std::shared_ptr<Effect>, EffectParameter*> effectFromLegacyId(const juce::String& id, bool updatePrecedence = false);
     LfoType lfoTypeFromLegacyAnimationType(const juce::String& type);
     double valueFromLegacy(double value, const juce::String& id);
+    void changeSound(ShapeSound::Ptr sound);
 
     const double MIN_LENGTH_INCREMENT = 0.000001;
 

@@ -56,6 +56,7 @@ void CircleArc::translate(double x, double y) {
 double CircleArc::length() {
 	if (len < 0) {
 		len = 0;
+        // TODO: Replace this, it's stupid. Do a real approximation.
         int segments = 5;
 		for (int i = 0; i < segments; i++) {
 			Vector2 v1 = nextVector(i / (double) segments);
