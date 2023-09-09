@@ -300,7 +300,8 @@ void OscirenderAudioProcessorEditor::newProject() {
 
 void OscirenderAudioProcessorEditor::openProject() {
     chooser = std::make_unique<juce::FileChooser>("Load osci-render Project", juce::File::getSpecialLocation(juce::File::userHomeDirectory), "*.osci");
-    auto flags = juce::FileBrowserComponent::openMode;
+    auto flags = juce::FileBrowserComponent::openMode |
+        juce::FileBrowserComponent::canSelectFiles;
 
     chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
         auto file = chooser.getResult();
