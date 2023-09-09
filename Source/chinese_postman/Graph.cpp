@@ -12,8 +12,10 @@ Graph::Graph(int n, list< pair<int, int> > & edges):
 	{
 		int u = (*it).first;
 		int v = (*it).second;
-
-		AddEdge(u, v);
+        
+        if (v < n && u < n) {
+            AddEdge(u, v);
+        }
 	}
 }
 

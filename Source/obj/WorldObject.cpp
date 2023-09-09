@@ -1,6 +1,7 @@
 #include "WorldObject.h"
 #include "../chinese_postman/ChinesePostman.h"
 #include "tiny_obj_loader.h"
+#include "../MathUtil.h"
 
 struct pair_hash {
     inline std::size_t operator()(const std::pair<int, int>& v) const {
@@ -238,9 +239,9 @@ void WorldObject::setRotationSpeed(double rotateSpeed) {
 // called whenever a new frame is drawn, so that the object can update its
 // rotation
 void WorldObject::nextFrame() {
-    currentRotateX = currentRotateX + baseRotateX * rotateSpeed;
-    currentRotateY = currentRotateY + baseRotateY * rotateSpeed;
-    currentRotateZ = currentRotateZ + baseRotateZ * rotateSpeed;
+    currentRotateX = MathUtil::wrapAngle(currentRotateX + baseRotateX * rotateSpeed);
+    currentRotateY = MathUtil::wrapAngle(currentRotateY + baseRotateY * rotateSpeed);
+    currentRotateZ = MathUtil::wrapAngle(currentRotateZ + baseRotateZ * rotateSpeed);
     rotateX = baseRotateX + currentRotateX;
     rotateY = baseRotateY + currentRotateY;
     rotateZ = baseRotateZ + currentRotateZ;

@@ -380,6 +380,7 @@
       <FILE id="GKBQ8j" name="MainComponent.cpp" compile="1" resource="0"
             file="Source/MainComponent.cpp"/>
       <FILE id="RU8fGr" name="MainComponent.h" compile="0" resource="0" file="Source/MainComponent.h"/>
+      <FILE id="cFVaxu" name="MathUtil.h" compile="0" resource="0" file="Source/MathUtil.h"/>
       <FILE id="eB92KJ" name="MidiComponent.cpp" compile="1" resource="0"
             file="Source/MidiComponent.cpp"/>
       <FILE id="GJqoJa" name="MidiComponent.h" compile="0" resource="0" file="Source/MidiComponent.h"/>

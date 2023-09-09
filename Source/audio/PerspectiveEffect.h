@@ -28,7 +28,11 @@ private:
     
     int versionHint;
 
-	float linearSpeedToActualSpeed(float rotateSpeed) {
-		return (std::exp(3 * juce::jmin(10.0f, std::abs(rotateSpeed))) - 1) / 50000.0;
-	}
+    double linearSpeedToActualSpeed(double rotateSpeed) {
+        double actualSpeed = (std::exp(3 * std::min(10.0, std::abs(rotateSpeed))) - 1) / 50000;
+        if (rotateSpeed < 0) {
+            actualSpeed *= -1;
+        }
+        return actualSpeed;
+    }
 };
