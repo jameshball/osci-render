@@ -3,10 +3,12 @@
 #include "../parser/FileParser.h"
 #include "../parser/FrameProducer.h"
 #include "../parser/FrameConsumer.h"
+#include "../concurrency/BlockingQueue.h"
 
 class ShapeSound : public juce::SynthesiserSound, public FrameConsumer {
 public:
 	ShapeSound(std::shared_ptr<FileParser> parser);
+	~ShapeSound() override;
 
 	bool appliesToNote(int note) override;
 	bool appliesToChannel(int channel) override;
@@ -19,8 +21,7 @@ public:
 
 private:
 	
-	juce::AbstractFifo frameFifo{ 10 };
-	std::vector<std::unique_ptr<Shape>> frameBuffer[10];
+	BlockingQueue frames{10};
 	std::unique_ptr<FrameProducer> producer;
 	double frameLength = 0.0;
 };

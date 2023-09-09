@@ -2,10 +2,7 @@
 
 FrameProducer::FrameProducer(FrameConsumer& fc, std::shared_ptr<FileParser> fs) : frameConsumer(fc), frameSource(fs), juce::Thread("producer", 0) {}
 
-FrameProducer::~FrameProducer() {
-	frameSource->disable();
-	stopThread(-1);
-}
+FrameProducer::~FrameProducer() {}
 
 void FrameProducer::run() {
 	while (!threadShouldExit()) {

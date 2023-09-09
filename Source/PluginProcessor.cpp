@@ -444,8 +444,11 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     }
     
     prevMidiEnabled = usingMidi;
+
+    const double EPSILON = 0.00001;
     
-    {
+    
+    if (volume > EPSILON) {
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
         synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
@@ -460,9 +463,11 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         {
             juce::SpinLock::ScopedLockType lock1(parsersLock);
             juce::SpinLock::ScopedLockType lock2(effectsLock);
-            for (auto& effect : toggleableEffects) {
-                if (effect->enabled->getValue()) {
-                    channels = effect->apply(sample, channels);
+            if (volume > EPSILON) {
+                for (auto& effect : toggleableEffects) {
+                    if (effect->enabled->getValue()) {
+                        channels = effect->apply(sample, channels);
+                    }
                 }
             }
             for (auto& effect : permanentEffects) {
