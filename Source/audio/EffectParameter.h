@@ -5,10 +5,14 @@
 class FloatParameter : public juce::AudioProcessorParameterWithID {
 public:
 	std::atomic<float> min = 0.0;
-	std::atomic<float> max = 1.0;
-	std::atomic<float> step = 0.001;
+	std::atomic<float> max = 0.0;
+	std::atomic<float> step = 0.0;
 
-	FloatParameter(juce::String name, juce::String id, float value, float min, float max, float step = 0.001, juce::String label = "") : juce::AudioProcessorParameterWithID(id, name), value(value), min(min), max(max), step(step), label(label) {}
+    FloatParameter(juce::String name, juce::String id, int versionHint, float value, float min, float max, float step = 0.69, juce::String label = "") : juce::AudioProcessorParameterWithID(juce::ParameterID(id, versionHint), name), step(step), value(value), label(label) {
+		// need to initialise here because of naming conflicts on Windows
+		this->min = min;
+		this->max = max;
+	}
 
 	juce::String getName(int maximumStringLength) const override {
 		return name.substring(0, maximumStringLength);
@@ -131,7 +135,11 @@ public:
 	std::atomic<int> min = 0;
 	std::atomic<int> max = 10;
 
-	IntParameter(juce::String name, juce::String id, int value, int min, int max) : AudioProcessorParameterWithID(id, name), value(value), min(min), max(max) {}
+    IntParameter(juce::String name, juce::String id, int versionHint, int value, int min, int max) : AudioProcessorParameterWithID(juce::ParameterID(id, versionHint), name), value(value) {
+		// need to initialise here because of naming conflicts on Windows
+		this->min = min;
+		this->max = max;
+	}
 
 	juce::String getName(int maximumStringLength) const override {
 		return name.substring(0, maximumStringLength);
@@ -237,7 +245,7 @@ enum class LfoType : int {
 
 class LfoTypeParameter : public IntParameter {
 public:
-	LfoTypeParameter(juce::String name, juce::String id, int value) : IntParameter(name, id, value, 1, 8) {}
+	LfoTypeParameter(juce::String name, juce::String id, int versionHint, int value) : IntParameter(name, id, versionHint, value, 1, 8) {}
 
 	juce::String getText(float value, int maximumStringLength) const override {
 		switch ((LfoType)(int)getUnnormalisedValue(value)) {
@@ -298,8 +306,8 @@ public:
 class EffectParameter : public FloatParameter {
 public:
 	std::atomic<bool> smoothValueChange = true;
-	LfoTypeParameter* lfo = new LfoTypeParameter(name + " LFO", paramID + "Lfo", 1);
-	FloatParameter* lfoRate = new FloatParameter(name + " LFO Rate", paramID + "LfoRate", 1.0f, 0.0f, 100.0f, 0.1f, "Hz");
+	LfoTypeParameter* lfo = new LfoTypeParameter(name + " LFO", paramID + "Lfo", getVersionHint(), 1);
+	FloatParameter* lfoRate = new FloatParameter(name + " LFO Rate", paramID + "LfoRate", getVersionHint(), 1.0f, 0.0f, 100.0f, 0.1f, "Hz");
 	std::atomic<float> phase = 0.0f;
 
 	std::vector<juce::AudioProcessorParameter*> getParameters() {
@@ -341,5 +349,5 @@ public:
         }
     }
 
-	EffectParameter(juce::String name, juce::String id, float value, float min, float max, float step = 0.001, bool smoothValueChange = true) : FloatParameter(name, id, value, min, max, step), smoothValueChange(smoothValueChange) {}
+	EffectParameter(juce::String name, juce::String id, int versionHint, float value, float min, float max, float step = 0.01, bool smoothValueChange = true) : FloatParameter(name, id, versionHint, value, min, max, step), smoothValueChange(smoothValueChange) {}
 };

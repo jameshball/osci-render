@@ -1,9 +1,9 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "../concurrency/BufferConsumer.h"
 #include "../PluginProcessor.h"
 #include "../LookAndFeel.h"
+#include "../concurrency/BufferConsumer.h"
 
 class ThumbRadiusLookAndFeel : public OscirenderLookAndFeel {
 public:
@@ -71,7 +71,7 @@ public:
 
 private:
 	OscirenderAudioProcessor& audioProcessor;
-	std::shared_ptr<BufferConsumer> consumer = std::make_shared<BufferConsumer>(1 << 11);
+	std::vector<float> buffer = std::vector<float>(2 * 1 << 11);
 
 	std::atomic<float> leftVolume = 0;
 	std::atomic<float> rightVolume = 0;
@@ -85,6 +85,8 @@ private:
 
     std::unique_ptr<juce::Drawable> volumeIcon;
     std::unique_ptr<juce::Drawable> thresholdIcon;
+    
+    std::shared_ptr<BufferConsumer> consumer;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VolumeComponent)
 };

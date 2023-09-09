@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT id="HH2E72" name="osci-render" projectType="audioplug" useAppConfig="0"
-              addUsingNamespaceToJuceHeader="0" displaySplashScreen="0" jucerFormatVersion="1"
+              addUsingNamespaceToJuceHeader="0" displaySplashScreen="1" jucerFormatVersion="1"
               pluginCharacteristicsValue="pluginProducesMidiOut,pluginWantsMidiIn"
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
@@ -66,6 +66,10 @@
         <FILE id="PbbNqz" name="RotateEffect.cpp" compile="1" resource="0"
               file="Source/audio/RotateEffect.cpp"/>
         <FILE id="tUwNZV" name="RotateEffect.h" compile="0" resource="0" file="Source/audio/RotateEffect.h"/>
+        <FILE id="dBaZAV" name="ShapeSound.cpp" compile="1" resource="0" file="Source/audio/ShapeSound.cpp"/>
+        <FILE id="VKBirB" name="ShapeSound.h" compile="0" resource="0" file="Source/audio/ShapeSound.h"/>
+        <FILE id="UcPZ09" name="ShapeVoice.cpp" compile="1" resource="0" file="Source/audio/ShapeVoice.cpp"/>
+        <FILE id="WId4vx" name="ShapeVoice.h" compile="0" resource="0" file="Source/audio/ShapeVoice.h"/>
         <FILE id="iUEfwT" name="SmoothEffect.cpp" compile="1" resource="0"
               file="Source/audio/SmoothEffect.cpp"/>
         <FILE id="Vwjht7" name="SmoothEffect.h" compile="0" resource="0" file="Source/audio/SmoothEffect.h"/>
@@ -133,8 +137,6 @@
       <GROUP id="{9F5970A9-8094-E7F3-7AC1-812AE5589B9F}" name="concurrency">
         <FILE id="WQ2W15" name="BufferConsumer.h" compile="0" resource="0"
               file="Source/concurrency/BufferConsumer.h"/>
-        <FILE id="yWTiQQ" name="BufferProducer.h" compile="0" resource="0"
-              file="Source/concurrency/BufferProducer.h"/>
       </GROUP>
       <FILE id="I44EdJ" name="EffectsComponent.cpp" compile="1" resource="0"
             file="Source/EffectsComponent.cpp"/>
@@ -378,6 +380,10 @@
       <FILE id="GKBQ8j" name="MainComponent.cpp" compile="1" resource="0"
             file="Source/MainComponent.cpp"/>
       <FILE id="RU8fGr" name="MainComponent.h" compile="0" resource="0" file="Source/MainComponent.h"/>
+      <FILE id="cFVaxu" name="MathUtil.h" compile="0" resource="0" file="Source/MathUtil.h"/>
+      <FILE id="eB92KJ" name="MidiComponent.cpp" compile="1" resource="0"
+            file="Source/MidiComponent.cpp"/>
+      <FILE id="GJqoJa" name="MidiComponent.h" compile="0" resource="0" file="Source/MidiComponent.h"/>
       <GROUP id="{E6ED85A9-3843-825F-EF48-BCF81E38F8AD}" name="obj">
         <FILE id="Tyz6WY" name="Camera.cpp" compile="1" resource="0" file="Source/obj/Camera.cpp"/>
         <FILE id="ix12FT" name="Camera.h" compile="0" resource="0" file="Source/obj/Camera.h"/>
@@ -409,6 +415,10 @@
             file="Source/PluginProcessor.cpp"/>
       <FILE id="G4mTsK" name="PluginProcessor.h" compile="0" resource="0"
             file="Source/PluginProcessor.h"/>
+      <FILE id="x57ccs" name="SettingsComponent.cpp" compile="1" resource="0"
+            file="Source/SettingsComponent.cpp"/>
+      <FILE id="Vlmozi" name="SettingsComponent.h" compile="0" resource="0"
+            file="Source/SettingsComponent.h"/>
       <GROUP id="{92CEA658-C82C-9CEB-15EB-945EF6B6B5C8}" name="shape">
         <FILE id="iglTFG" name="CircleArc.cpp" compile="1" resource="0" file="Source/shape/CircleArc.cpp"/>
         <FILE id="T3S8Sg" name="CircleArc.h" compile="0" resource="0" file="Source/shape/CircleArc.h"/>

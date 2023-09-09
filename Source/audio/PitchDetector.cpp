@@ -1,24 +1,23 @@
 #include "PitchDetector.h"
-#include "PitchDetector.h"
+#include "../PluginProcessor.h"
 
-PitchDetector::PitchDetector(BufferProducer& producer) : juce::Thread("PitchDetector"), producer(producer) {
+PitchDetector::PitchDetector(OscirenderAudioProcessor& audioProcessor) : juce::Thread("PitchDetector"), audioProcessor(audioProcessor) {
     startThread();
 }
 
 PitchDetector::~PitchDetector() {
-    producer.unregisterConsumer(consumer);
+    audioProcessor.consumerStop(consumer);
     stopThread(1000);
 }
 
 void PitchDetector::run() {
-    producer.registerConsumer(consumer);
-
 	while (!threadShouldExit()) {
-		auto buffer = consumer->startProcessing();
+        consumer = audioProcessor.consumerRegister(buffer);
+        audioProcessor.consumerRead(consumer);
 
         // buffer is for 2 channels, so we need to only use one
         for (int i = 0; i < fftSize; i++) {
-            fftData[i] = buffer->at(2 * i);
+            fftData[i] = buffer[2 * i];
         }
 
         forwardFFT.performFrequencyOnlyForwardTransform(fftData.data());
@@ -37,8 +36,6 @@ void PitchDetector::run() {
         }
 
         frequency = frequencyFromIndex(maxIndex);
-
-		consumer->finishedProcessing();
         triggerAsyncUpdate();
 	}
 }

@@ -45,7 +45,7 @@ double Vector2::magnitude() {
 }
 
 std::unique_ptr<Shape> Vector2::clone() {
-	return std::unique_ptr<Shape>();
+	return std::make_unique<Vector2>(x, y);
 }
 
 std::string Vector2::type() {

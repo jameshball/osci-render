@@ -2,8 +2,6 @@
 
 BitCrushEffect::BitCrushEffect() {}
 
-BitCrushEffect::~BitCrushEffect() {}
-
 // algorithm from https://www.kvraudio.com/forum/viewtopic.php?t=163880
 Vector2 BitCrushEffect::apply(int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
 	double value = values[0];

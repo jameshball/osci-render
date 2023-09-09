@@ -4,7 +4,7 @@
 
 class BooleanParameter : public juce::AudioProcessorParameterWithID {
 public:
-	BooleanParameter(juce::String name, juce::String id, bool value) : AudioProcessorParameterWithID(id, name), value(value) {}
+    BooleanParameter(juce::String name, juce::String id, int versionHint, bool value) : AudioProcessorParameterWithID(juce::ParameterID(id, versionHint), name), value(value) {}
 
 	juce::String getName(int maximumStringLength) const override {
 		return name.substring(0, maximumStringLength);

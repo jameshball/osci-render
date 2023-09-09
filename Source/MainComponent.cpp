@@ -11,7 +11,8 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
     
 	fileButton.onClick = [this] {
 		chooser = std::make_unique<juce::FileChooser>("Open", juce::File::getSpecialLocation(juce::File::userHomeDirectory), "*.obj;*.svg;*.lua;*.txt");
-		auto flags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectMultipleItems;
+		auto flags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectMultipleItems |
+            juce::FileBrowserComponent::canSelectFiles;
 
 		chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
 			juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);

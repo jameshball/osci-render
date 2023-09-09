@@ -7,7 +7,7 @@ VisualiserComponent::VisualiserComponent(int numChannels, OscirenderAudioProcess
 }
 
 VisualiserComponent::~VisualiserComponent() {
-    audioProcessor.audioProducer.unregisterConsumer(consumer);
+    audioProcessor.consumerStop(consumer);
     stopThread(1000);
 }
 
@@ -44,12 +44,10 @@ void VisualiserComponent::timerCallback() {
 }
 
 void VisualiserComponent::run() {
-    audioProcessor.audioProducer.registerConsumer(consumer);
-
     while (!threadShouldExit()) {
-        auto buffer = consumer->startProcessing();
-        setBuffer(*buffer);
-        consumer->finishedProcessing();
+        consumer = audioProcessor.consumerRegister(tempBuffer);
+        audioProcessor.consumerRead(consumer);
+        setBuffer(tempBuffer);
     }
 }
 

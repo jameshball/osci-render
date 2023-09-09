@@ -1,7 +1,12 @@
 #include "PerspectiveEffect.h"
 #include <numbers>
+#include "../MathUtil.h"
 
-PerspectiveEffect::PerspectiveEffect() {}
+PerspectiveEffect::PerspectiveEffect(int versionHint) : versionHint(versionHint) {
+    fixedRotateX = new BooleanParameter("Perspective Fixed Rotate X", "perspectiveFixedRotateX", versionHint, false);
+    fixedRotateY = new BooleanParameter("Perspective Fixed Rotate Y", "perspectiveFixedRotateY", versionHint, false);
+    fixedRotateZ = new BooleanParameter("Perspective Fixed Rotate Z", "perspectiveFixedRotateZ", versionHint, false);
+}
 
 Vector2 PerspectiveEffect::apply(int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
 	auto effectScale = values[0];
@@ -27,19 +32,9 @@ Vector2 PerspectiveEffect::apply(int index, Vector2 input, const std::vector<dou
         baseRotateZ = values[5] * std::numbers::pi;
     }
 
-	currentRotateX += baseRotateX * rotateSpeed;
-	currentRotateY += baseRotateY * rotateSpeed;
-	currentRotateZ += baseRotateZ * rotateSpeed;
-
-	if (currentRotateX > std::numbers::pi * 8) {
-        currentRotateX -= std::numbers::pi * 8;
-    }
-	if (currentRotateY > std::numbers::pi * 8) {
-        currentRotateY -= std::numbers::pi * 8;
-    }
-	if (currentRotateZ > std::numbers::pi * 8) {
-        currentRotateZ -= std::numbers::pi * 8;
-    }
+	currentRotateX = MathUtil::wrapAngle(currentRotateX + baseRotateX * rotateSpeed);
+	currentRotateY = MathUtil::wrapAngle(currentRotateY + baseRotateY * rotateSpeed);
+	currentRotateZ = MathUtil::wrapAngle(currentRotateZ + baseRotateZ * rotateSpeed);
 
 	auto x = input.x;
 	auto y = input.y;

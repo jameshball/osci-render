@@ -10,12 +10,11 @@
 
 #include <JuceHeader.h>
 #include "shape/Shape.h"
-#include "parser/FileParser.h"
-#include "parser/FrameProducer.h"
-#include "parser/FrameConsumer.h"
+#include "concurrency/BufferConsumer.h"
 #include "audio/Effect.h"
+#include "audio/ShapeSound.h"
+#include "audio/ShapeVoice.h"
 #include <numbers>
-#include "concurrency/BufferProducer.h"
 #include "audio/AudioWebSocketServer.h"
 #include "audio/DelayEffect.h"
 #include "audio/PitchDetector.h"
@@ -29,7 +28,6 @@ class OscirenderAudioProcessor  : public juce::AudioProcessor
                             #if JucePlugin_Enable_ARA
                              , public juce::AudioProcessorARAExtension
                             #endif
-    , public FrameConsumer
 {
 public:
     OscirenderAudioProcessor();
@@ -60,6 +58,12 @@ public:
     void changeProgramName(int index, const juce::String& newName) override;
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
+    std::shared_ptr<BufferConsumer> consumerRegister(std::vector<float>& buffer);
+    void consumerStop(std::shared_ptr<BufferConsumer> consumer);
+    void consumerRead(std::shared_ptr<BufferConsumer> consumer);
+    void setMidiEnabled(bool enabled);
+    
+    int VERSION_HINT = 1;
 
     std::atomic<double> currentSampleRate = 0.0;
 
@@ -71,21 +75,21 @@ public:
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             frequency = values[0];
             return input;
-        }, new EffectParameter("Frequency", "frequency", 440.0, 0.0, 12000.0, 0.1)
+        }, new EffectParameter("Frequency", "frequency", VERSION_HINT, 440.0, 0.0, 12000.0, 0.1)
     );
 
     std::shared_ptr<Effect> volumeEffect = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             volume = values[0];
             return input;
-        }, new EffectParameter("Volume", "volume", 1.0, 0.0, 3.0)
+        }, new EffectParameter("Volume", "volume", VERSION_HINT, 1.0, 0.0, 3.0)
     );
 
     std::shared_ptr<Effect> thresholdEffect = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             threshold = values[0];
             return input;
-        }, new EffectParameter("Threshold", "threshold", 1.0, 0.0, 1.0)
+        }, new EffectParameter("Threshold", "threshold", VERSION_HINT, 1.0, 0.0, 1.0)
     );
     
     std::shared_ptr<Effect> focalLength = std::make_shared<Effect>(
@@ -96,12 +100,12 @@ public:
                 camera->setFocalLength(values[0]);
             }
             return input;
-		}, new EffectParameter("Focal length", "objFocalLength", 1.0, 0.0, 2.0)
+		}, new EffectParameter("Focal length", "objFocalLength", VERSION_HINT, 1.0, 0.0, 2.0)
     );
 
-    BooleanParameter* fixedRotateX = new BooleanParameter("Object Fixed Rotate X", "objFixedRotateX", false);
-    BooleanParameter* fixedRotateY = new BooleanParameter("Object Fixed Rotate Y", "objFixedRotateY", false);
-    BooleanParameter* fixedRotateZ = new BooleanParameter("Object Fixed Rotate Z", "objFixedRotateZ", false);
+    BooleanParameter* fixedRotateX = new BooleanParameter("Object Fixed Rotate X", "objFixedRotateX", VERSION_HINT, false);
+    BooleanParameter* fixedRotateY = new BooleanParameter("Object Fixed Rotate Y", "objFixedRotateY", VERSION_HINT, false);
+    BooleanParameter* fixedRotateZ = new BooleanParameter("Object Fixed Rotate Z", "objFixedRotateZ", VERSION_HINT, false);
     std::shared_ptr<Effect> rotateX = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
@@ -115,7 +119,7 @@ public:
                 }
             }
             return input;
-        }, new EffectParameter("Rotate X", "objRotateX", 1.0, -1.0, 1.0)
+        }, new EffectParameter("Rotate X", "objRotateX", VERSION_HINT, 1.0, -1.0, 1.0)
     );
     std::shared_ptr<Effect> rotateY = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
@@ -130,7 +134,7 @@ public:
                 }
             }
             return input;
-        }, new EffectParameter("Rotate Y", "objRotateY", 1.0, -1.0, 1.0)
+        }, new EffectParameter("Rotate Y", "objRotateY", VERSION_HINT, 1.0, -1.0, 1.0)
     );
     std::shared_ptr<Effect> rotateZ = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
@@ -145,7 +149,7 @@ public:
                 }
             }
             return input;
-        }, new EffectParameter("Rotate Z", "objRotateZ", 0.0, -1.0, 1.0)
+        }, new EffectParameter("Rotate Z", "objRotateZ", VERSION_HINT, 0.0, -1.0, 1.0)
     );
     std::shared_ptr<Effect> rotateSpeed = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
@@ -155,25 +159,41 @@ public:
                 obj->setRotationSpeed(values[0]);
             }
             return input;
-		}, new EffectParameter("Rotate Speed", "objRotateSpeed", 0.0, -1.0, 1.0)
+		}, new EffectParameter("Rotate Speed", "objRotateSpeed", VERSION_HINT, 0.0, -1.0, 1.0)
+    );
+
+    std::shared_ptr<Effect> traceMax = std::make_shared<Effect>(
+        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+            return input;
+        }, new EffectParameter("Trace max", "traceMax", VERSION_HINT, 1.0, 0.0, 1.0)
+    );
+    std::shared_ptr<Effect> traceMin = std::make_shared<Effect>(
+        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+            return input;
+        }, new EffectParameter("Trace min", "traceMin", VERSION_HINT, 0.0, 0.0, 1.0)
     );
 
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
-    std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>();
+    std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>(VERSION_HINT);
+    
+    BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false);
+    std::atomic<float> frequency = 440.0f;
     
     juce::SpinLock parsersLock;
     std::vector<std::shared_ptr<FileParser>> parsers;
+    std::vector<ShapeSound::Ptr> sounds;
     std::vector<std::shared_ptr<juce::MemoryBlock>> fileBlocks;
     std::vector<juce::String> fileNames;
     std::atomic<int> currentFile = -1;
 
     juce::ChangeBroadcaster broadcaster;
+
+private:
+    juce::SpinLock consumerLock;
+    std::vector<std::shared_ptr<BufferConsumer>> consumers;
+public:
     
-    FrameProducer producer = FrameProducer(*this, std::make_shared<FileParser>());
-
-    BufferProducer audioProducer;
-
-    PitchDetector pitchDetector{audioProducer};
+    PitchDetector pitchDetector{*this};
     std::shared_ptr<WobbleEffect> wobbleEffect = std::make_shared<WobbleEffect>(pitchDetector);
 
     // shouldn't be accessed by audio thread, but needs to persist when GUI is closed
@@ -184,7 +204,6 @@ public:
     juce::Font font = juce::Font(juce::Font::getDefaultSansSerifFontName(), 1.0f, juce::Font::plain);
 
     void addLuaSlider();
-    void addFrame(std::vector<std::unique_ptr<Shape>> frame, int fileIndex) override;
     void updateEffectPrecedence();
     void updateFileBlock(int index, std::shared_ptr<juce::MemoryBlock> block);
     void addFile(juce::File file);
@@ -200,54 +219,20 @@ public:
     juce::String getFileName(int index);
 	std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
 private:
-    std::atomic<float> frequency = 440.0f;
     std::atomic<double> volume = 1.0;
     std::atomic<double> threshold = 1.0;
-
-	juce::AbstractFifo frameFifo{ 10 };
-	std::vector<std::unique_ptr<Shape>> frameBuffer[10];
-    int frameBufferIndices[10];
-
-	int currentShape = 0;
-    std::vector<std::unique_ptr<Shape>> frame;
-    int currentBufferIndex = -1;
-    double frameLength;
-	double shapeDrawn = 0.0;
-	double frameDrawn = 0.0;
-	double lengthIncrement = 0.0;
-    bool invalidateFrameBuffer = false;
+    
+    bool prevMidiEnabled = !midiEnabled->getBoolValue();
 
     std::vector<BooleanParameter*> booleanParameters;
     std::vector<std::shared_ptr<Effect>> allEffects;
     std::vector<std::shared_ptr<Effect>> permanentEffects;
 
-    std::shared_ptr<Effect> traceMax = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
-            traceMaxValue = values[0];
-            traceMaxEnabled = true;
-            return input;
-        }, new EffectParameter("Trace max", "traceMax", 1.0, 0.0, 1.0)
-    );
-    std::shared_ptr<Effect> traceMin = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
-            traceMinValue = values[0];
-            traceMinEnabled = true;
-            return input;
-        }, new EffectParameter("Trace min", "traceMin", 0.0, 0.0, 1.0)
-    );
-    const double MIN_TRACE = 0.005;
-    double traceMaxValue = traceMax->getValue();
-    double traceMinValue = traceMin->getValue();
-    double actualTraceMax = traceMaxValue;
-    double actualTraceMin = traceMinValue;
-    bool traceMaxEnabled = false;
-    bool traceMinEnabled = false;
+    ShapeSound::Ptr defaultSound = new ShapeSound(std::make_shared<FileParser>());
+    juce::Synthesiser synth;
 
-    AudioWebSocketServer softwareOscilloscopeServer{audioProducer};
+    AudioWebSocketServer softwareOscilloscopeServer{*this};
 
-	void updateFrame();
-    void updateLengthIncrement();
-    void incrementShapeDrawing();
     void updateLuaValues();
     void updateObjValues();
     std::shared_ptr<Effect> getEffect(juce::String id);
@@ -256,6 +241,7 @@ private:
     std::pair<std::shared_ptr<Effect>, EffectParameter*> effectFromLegacyId(const juce::String& id, bool updatePrecedence = false);
     LfoType lfoTypeFromLegacyAnimationType(const juce::String& type);
     double valueFromLegacy(double value, const juce::String& id);
+    void changeSound(ShapeSound::Ptr sound);
 
     const double MIN_LENGTH_INCREMENT = 0.000001;
 

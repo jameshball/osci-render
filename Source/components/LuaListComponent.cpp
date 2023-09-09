@@ -27,7 +27,8 @@ int LuaListBoxModel::getNumRows() {
 void LuaListBoxModel::paintListBoxItem(int rowNumber, juce::Graphics& g, int width, int height, bool rowIsSelected) {}
 
 juce::Component* LuaListBoxModel::refreshComponentForRow(int rowNum, bool isRowSelected, juce::Component *existingComponentToUpdate) {
-	juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+    // TODO: We should REALLY be locking here but it causes a deadlock :( works fine without.....
+	// juce::SpinLock::ScopedLockType lock1(audioProcessor.effectsLock);
 	std::unique_ptr<LuaListComponent> item(dynamic_cast<LuaListComponent*>(existingComponentToUpdate));
 	if (juce::isPositiveAndBelow(rowNum, getNumRows())) {
 		item = std::make_unique<LuaListComponent>(audioProcessor, *audioProcessor.luaEffects[rowNum]);

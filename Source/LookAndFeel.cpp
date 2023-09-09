@@ -33,6 +33,11 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     setColour(juce::CodeEditorComponent::highlightColourId, Colours::grey);
     setColour(juce::CaretComponent::caretColourId, Dracula::foreground);
     setColour(juce::TextEditor::highlightColourId, Colours::grey);
+    setColour(juce::TabbedButtonBar::tabOutlineColourId, Colours::veryDark);
+    setColour(juce::TabbedButtonBar::frontOutlineColourId, Colours::veryDark);
+    setColour(juce::TabbedButtonBar::tabTextColourId, juce::Colours::black);
+    setColour(juce::TabbedButtonBar::frontTextColourId, juce::Colours::black);
+    setColour(juce::TabbedComponent::outlineColourId, Colours::veryDark);
 
     getCurrentColourScheme().setUIColour(ColourScheme::widgetBackground, Colours::veryDark);
 }

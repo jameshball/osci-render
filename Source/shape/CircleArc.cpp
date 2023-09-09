@@ -56,11 +56,11 @@ void CircleArc::translate(double x, double y) {
 double CircleArc::length() {
 	if (len < 0) {
 		len = 0;
-		double angle = startAngle;
-		double step = (endAngle - startAngle) / 500;
-		for (int i = 0; i < 500; i++) {
-			Vector2 v1 = nextVector(i / 500.0);
-			Vector2 v2 = nextVector((i + 1) / 500.0);
+        // TODO: Replace this, it's stupid. Do a real approximation.
+        int segments = 5;
+		for (int i = 0; i < segments; i++) {
+			Vector2 v1 = nextVector(i / (double) segments);
+			Vector2 v2 = nextVector((i + 1) / (double) segments);
 			len += Line(v1.x, v1.y, v2.x, v2.y).length();
 		}
 	}

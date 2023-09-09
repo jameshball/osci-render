@@ -5,17 +5,26 @@
 
 SvgParser::SvgParser(juce::String svgFile) {
 	auto doc = juce::XmlDocument::parse(svgFile);
-	std::unique_ptr<juce::Drawable> svg = juce::Drawable::createFromSVG(*doc);
-	juce::DrawableComposite* composite = dynamic_cast<juce::DrawableComposite*>(svg.get());
-	auto contentArea = composite->getContentArea();
-	auto path = svg->getOutlineAsPath();
-	// apply transform to path to get the content area in the bounds -1 to 1
-	path.applyTransform(juce::AffineTransform::translation(-contentArea.getX(), -contentArea.getY()));
-	path.applyTransform(juce::AffineTransform::scale(2 / contentArea.getWidth(), 2 / contentArea.getHeight()));
-	path.applyTransform(juce::AffineTransform::translation(-1, -1));
+    if (doc != nullptr) {
+        std::unique_ptr<juce::Drawable> svg = juce::Drawable::createFromSVG(*doc);
+        juce::DrawableComposite* composite = dynamic_cast<juce::DrawableComposite*>(svg.get());
+        if (composite != nullptr) {
+            auto contentArea = composite->getContentArea();
+            auto path = svg->getOutlineAsPath();
+            // apply transform to path to get the content area in the bounds -1 to 1
+            path.applyTransform(juce::AffineTransform::translation(-contentArea.getX(), -contentArea.getY()));
+            path.applyTransform(juce::AffineTransform::scale(2 / contentArea.getWidth(), 2 / contentArea.getHeight()));
+            path.applyTransform(juce::AffineTransform::translation(-1, -1));
 
-	pathToShapes(path, shapes);
-	Shape::removeOutOfBounds(shapes);
+            pathToShapes(path, shapes);
+            Shape::removeOutOfBounds(shapes);
+            return;
+        }
+    }
+    
+    // draw an X to indicate an error.
+    shapes.push_back(std::make_unique<Line>(-0.5, -0.5, 0.5, 0.5));
+    shapes.push_back(std::make_unique<Line>(-0.5, 0.5, 0.5, -0.5));
 }
 
 SvgParser::~SvgParser() {}
