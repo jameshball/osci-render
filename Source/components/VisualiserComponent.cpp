@@ -32,10 +32,23 @@ void VisualiserComponent::paint(juce::Graphics& g) {
     auto r = getLocalBounds().toFloat();
     auto minDim = juce::jmin(r.getWidth(), r.getHeight());
 
-    juce::CriticalSection::ScopedLockType scope(lock);
-    if (buffer.size() > 0) {
-        g.setColour(waveformColour);
-        paintXY(g, r.withSizeKeepingCentre(minDim, minDim));
+    {
+        juce::CriticalSection::ScopedLockType scope(lock);
+        if (buffer.size() > 0) {
+            g.setColour(waveformColour);
+            paintXY(g, r.withSizeKeepingCentre(minDim, minDim));
+        }
+    }
+
+    if (!active) {
+        // add translucent layer
+        g.setColour(juce::Colours::black.withAlpha(0.5f));
+        g.fillRect(getLocalBounds());
+
+        // add text
+        g.setColour(juce::Colours::white);
+        g.setFont(14.0f);
+        g.drawFittedText("Paused", getLocalBounds(), juce::Justification::centred, 1);
     }
 }
 
@@ -48,6 +61,23 @@ void VisualiserComponent::run() {
         consumer = audioProcessor.consumerRegister(tempBuffer);
         audioProcessor.consumerRead(consumer);
         setBuffer(tempBuffer);
+    }
+}
+
+void VisualiserComponent::mouseDown(const juce::MouseEvent& event) {
+    if (event.mods.isLeftButtonDown()) {
+        active = !active;
+        if (active) {
+            startTimerHz(60);
+            startThread();
+        } else {
+            audioProcessor.consumerStop(consumer);
+            stopTimer();
+            stopThread(1000);
+        }
+        repaint();
+    } else if (event.mods.isRightButtonDown()) {
+        // TODO: add menu to control colours and precision
     }
 }
 

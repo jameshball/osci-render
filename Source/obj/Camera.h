@@ -24,5 +24,5 @@ private:
 
 	std::vector<Vector2> sampleVerticesInRender(WorldObject& object);
 	double maxVertexValue(std::vector<Vector2>& vertices);
-	Vector2 project(double objRotateX, double objRotateY, double objRotateZ, double x, double y, double z);
+	Vector2 project(double x, double y, double z);
 };

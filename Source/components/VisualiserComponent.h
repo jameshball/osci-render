@@ -4,7 +4,7 @@
 #include "../concurrency/BufferConsumer.h"
 #include "../PluginProcessor.h"
 
-class VisualiserComponent : public juce::Component, public juce::Timer, public juce::Thread {
+class VisualiserComponent : public juce::Component, public juce::Timer, public juce::Thread, public juce::MouseListener {
 public:
     VisualiserComponent(int numChannels, OscirenderAudioProcessor& p);
     ~VisualiserComponent() override;
@@ -16,6 +16,7 @@ public:
     void paint(juce::Graphics&) override;
 	void timerCallback() override;
 	void run() override;
+    void mouseDown(const juce::MouseEvent& event) override;
 
 private:
 	juce::CriticalSection lock;
@@ -25,6 +26,8 @@ private:
 	OscirenderAudioProcessor& audioProcessor;
     std::vector<float> tempBuffer = std::vector<float>(2 * 4096);
     int precision = 4;
+
+    std::atomic<bool> active = true;
     
     std::shared_ptr<BufferConsumer> consumer;
 
