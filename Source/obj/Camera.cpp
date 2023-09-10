@@ -10,8 +10,21 @@ std::vector<std::unique_ptr<Shape>> Camera::draw(WorldObject& object) {
 	for (auto edge : object.edges) {
         edge.rotate(object.rotateX, object.rotateY, object.rotateZ);
         // very crude frustum culling
-        if (edge.z1 < z || edge.z2 < z) {
+        double minZ = z + 0.1;
+        if (edge.z1 < minZ && edge.z2 < minZ) {
             continue;
+        }
+        if (edge.z1 < minZ) {
+            double ratio = (minZ - edge.z1) / (edge.z2 - edge.z1);
+            edge.x1 = edge.x1 + (edge.x2 - edge.x1) * ratio;
+            edge.y1 = edge.y1 + (edge.y2 - edge.y1) * ratio;
+            edge.z1 = minZ;
+        }
+        if (edge.z2 < minZ) {
+            double ratio = (minZ - edge.z2) / (edge.z1 - edge.z2);
+            edge.x2 = edge.x2 + (edge.x1 - edge.x2) * ratio;
+            edge.y2 = edge.y2 + (edge.y1 - edge.y2) * ratio;
+            edge.z2 = minZ;
         }
 
         Vector2 start = project(edge.x1, edge.y1, edge.z1);
