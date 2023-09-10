@@ -649,6 +649,7 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         }
         changeCurrentFile(xml->getIntAttribute("currentFile", -1));
         broadcaster.sendChangeMessage();
+        prevMidiEnabled = !midiEnabled->getBoolValue();
     }
 }
 
