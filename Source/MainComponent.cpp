@@ -107,12 +107,13 @@ MainComponent::~MainComponent() {
 }
 
 void MainComponent::updateFileLabel() {
-	if (audioProcessor.getCurrentFileIndex() == -1) {
+	if (audioProcessor.objectServerRendering) {
+		fileLabel.setText("Rendering from Blender", juce::dontSendNotification);
+	} else if (audioProcessor.getCurrentFileIndex() == -1) {
 		fileLabel.setText("No file open", juce::dontSendNotification);
-		return;
+	} else {
+		fileLabel.setText(audioProcessor.getCurrentFileName(), juce::dontSendNotification);
 	}
-	
-	fileLabel.setText(audioProcessor.getCurrentFileName(), juce::dontSendNotification);
 }
 
 void MainComponent::resized() {

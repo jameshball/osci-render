@@ -388,11 +388,13 @@ void OscirenderAudioProcessor::changeCurrentFile(int index) {
 }
 
 void OscirenderAudioProcessor::changeSound(ShapeSound::Ptr sound) {
-    synth.clearSounds();
-    synth.addSound(sound);
-    for (int i = 0; i < synth.getNumVoices(); i++) {
-        auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
-        voice->updateSound(sound.get());
+    if (!objectServerRendering || sound == objectServerSound) {
+        synth.clearSounds();
+        synth.addSound(sound);
+        for (int i = 0; i < synth.getNumVoices(); i++) {
+            auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
+            voice->updateSound(sound.get());
+        }
     }
 }
 
@@ -405,7 +407,7 @@ std::shared_ptr<FileParser> OscirenderAudioProcessor::getCurrentFileParser() {
 }
 
 juce::String OscirenderAudioProcessor::getCurrentFileName() {
-    if (currentFile == -1) {
+    if (objectServerRendering || currentFile == -1) {
 		return "";
     } else {
         return fileNames[currentFile];
@@ -418,6 +420,24 @@ juce::String OscirenderAudioProcessor::getFileName(int index) {
 
 std::shared_ptr<juce::MemoryBlock> OscirenderAudioProcessor::getFileBlock(int index) {
     return fileBlocks[index];
+}
+
+void OscirenderAudioProcessor::setObjectServerRendering(bool enabled) {
+    {
+        juce::SpinLock::ScopedLockType lock1(parsersLock);
+
+        objectServerRendering = enabled;
+        if (enabled) {
+            changeSound(objectServerSound);
+        } else {
+            changeCurrentFile(currentFile);
+        }
+    }
+
+    {
+        juce::MessageManagerLock lock;
+        fileChangeBroadcaster.sendChangeMessage();
+    }
 }
 
 void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {

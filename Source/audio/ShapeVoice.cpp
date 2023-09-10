@@ -88,10 +88,11 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         bool renderingSample = true;
 
         if (sound.load() != nullptr) {
-            renderingSample = sound.load()->parser->isSample();
+            auto parser = sound.load()->parser;
+            renderingSample = parser != nullptr && parser->isSample();
 
             if (renderingSample) {
-                channels = sound.load()->parser->nextSample();
+                channels = parser->nextSample();
             } else if (currentShape < frame.size()) {
                 auto& shape = frame[currentShape];
                 double length = shape->length();

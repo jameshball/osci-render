@@ -8,6 +8,7 @@
 class ShapeSound : public juce::SynthesiserSound, public FrameConsumer {
 public:
 	ShapeSound(std::shared_ptr<FileParser> parser);
+	ShapeSound();
 	~ShapeSound() override;
 
 	bool appliesToNote(int note) override;
