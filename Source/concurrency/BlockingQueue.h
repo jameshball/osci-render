@@ -35,7 +35,7 @@ public:
         {
             std::unique_lock<std::mutex> lk(mutex);
             not_full.wait(lk, [this]() { return size < content.size() || killed; });
-            content[head] = std::move(item);
+            content[(head + size) % content.size()] = std::move(item);
             size++;
         }
         not_empty.notify_one();
@@ -47,7 +47,7 @@ public:
             if (size == content.size()) {
                 return false;
             }
-            content[head] = std::move(item);
+            content[(head + size) % content.size()] = std::move(item);
             size++;
         }
         not_empty.notify_one();

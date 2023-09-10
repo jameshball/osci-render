@@ -7,8 +7,15 @@ Camera::Camera(double focalLength, double x, double y, double z) : focalLength(f
 std::vector<std::unique_ptr<Shape>> Camera::draw(WorldObject& object) {
 	std::vector<std::unique_ptr<Shape>> shapes;
     object.nextFrame();
+    Line3D* prevLine = nullptr;
+    Vector2 prevVertex;
 	for (auto& edge : object.edges) {
-        Vector2 start = project(object.rotateX, object.rotateY, object.rotateZ, edge.x1, edge.y1, edge.z1);
+        Vector2 start;
+        if (prevLine != nullptr && prevLine->x2 == edge.x1 && prevLine->y2 == edge.y1 && prevLine->z2 == edge.z1) {
+            start = prevVertex;
+        } else {
+            start = project(object.rotateX, object.rotateY, object.rotateZ, edge.x1, edge.y1, edge.z1);
+        }
         Vector2 end = project(object.rotateX, object.rotateY, object.rotateZ, edge.x2, edge.y2, edge.z2);
 
 		shapes.push_back(std::make_unique<Line>(start.x, start.y, end.x, end.y));
