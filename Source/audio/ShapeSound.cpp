@@ -26,8 +26,12 @@ bool ShapeSound::appliesToChannel(int channel) {
     return true;
 }
 
-void ShapeSound::addFrame(std::vector<std::unique_ptr<Shape>>& frame) {
-    frames.push(std::move(frame));
+void ShapeSound::addFrame(std::vector<std::unique_ptr<Shape>>& frame, bool force) {
+    if (force) {
+        frames.push(std::move(frame));
+    } else {
+        frames.try_push(std::move(frame));
+    }
 }
 
 double ShapeSound::updateFrame(std::vector<std::unique_ptr<Shape>>& frame) {
