@@ -62,7 +62,6 @@ public:
     std::shared_ptr<BufferConsumer> consumerRegister(std::vector<float>& buffer);
     void consumerStop(std::shared_ptr<BufferConsumer> consumer);
     void consumerRead(std::shared_ptr<BufferConsumer> consumer);
-    void setMidiEnabled(bool enabled);
     
     int VERSION_HINT = 1;
 
