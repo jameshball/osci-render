@@ -47,7 +47,7 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
     lua.setVisible(false);
     obj.setVisible(false);
     txt.setVisible(false);
-    if (fileName.isEmpty()) {
+    if (fileName.isEmpty() || audioProcessor.objectServerRendering) {
         // do nothing
     } else if (extension == ".lua") {
         lua.setVisible(true);

@@ -42,6 +42,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 
     {
         juce::MessageManagerLock lock;
+        audioProcessor.fileChangeBroadcaster.addChangeListener(this);
         audioProcessor.broadcaster.addChangeListener(this);
     }
 
@@ -65,6 +66,7 @@ OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
     juce::Desktop::getInstance().setDefaultLookAndFeel(nullptr);
     juce::MessageManagerLock lock;
     audioProcessor.broadcaster.removeChangeListener(this);
+    audioProcessor.fileChangeBroadcaster.removeChangeListener(this);
 }
 
 // parsersLock must be held
@@ -206,8 +208,13 @@ void OscirenderAudioProcessorEditor::handleAsyncUpdate() {
 
 void OscirenderAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcaster* source) {
     juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
-    initialiseCodeEditors();
-    settings.update();
+    if (source == &audioProcessor.broadcaster) {
+        initialiseCodeEditors();
+        settings.update();
+    } else if (source == &audioProcessor.fileChangeBroadcaster) {
+        // triggered when the audioProcessor changes the current file (e.g. to Blender)
+        settings.fileUpdated(audioProcessor.getCurrentFileName());
+    }
 }
 
 void OscirenderAudioProcessorEditor::editPerspectiveFunction(bool enable) {

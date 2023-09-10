@@ -20,6 +20,7 @@
 #include "audio/PitchDetector.h"
 #include "audio/WobbleEffect.h"
 #include "audio/PerspectiveEffect.h"
+#include "obj/ObjectServer.h"
 
 //==============================================================================
 /**
@@ -187,6 +188,8 @@ public:
     std::atomic<int> currentFile = -1;
 
     juce::ChangeBroadcaster broadcaster;
+    std::atomic<bool> objectServerRendering = false;
+    juce::ChangeBroadcaster fileChangeBroadcaster;
 
 private:
     juce::SpinLock consumerLock;
@@ -203,6 +206,8 @@ public:
     juce::SpinLock fontLock;
     juce::Font font = juce::Font(juce::Font::getDefaultSansSerifFontName(), 1.0f, juce::Font::plain);
 
+    ShapeSound::Ptr objectServerSound = new ShapeSound();
+
     void addLuaSlider();
     void updateEffectPrecedence();
     void updateFileBlock(int index, std::shared_ptr<juce::MemoryBlock> block);
@@ -218,6 +223,7 @@ public:
 	juce::String getCurrentFileName();
     juce::String getFileName(int index);
 	std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
+    void setObjectServerRendering(bool enabled);
 private:
     std::atomic<double> volume = 1.0;
     std::atomic<double> threshold = 1.0;
@@ -232,6 +238,7 @@ private:
     juce::Synthesiser synth;
 
     AudioWebSocketServer softwareOscilloscopeServer{*this};
+    ObjectServer objectServer{*this};
 
     void updateLuaValues();
     void updateObjValues();

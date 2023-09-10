@@ -9,9 +9,13 @@ ShapeSound::ShapeSound(std::shared_ptr<FileParser> parser) : parser(parser) {
     producer->startThread();
 }
 
+ShapeSound::ShapeSound() {}
+
 ShapeSound::~ShapeSound() {
     frames.kill();
-    producer->stopThread(1000);
+    if (producer != nullptr) {
+        producer->stopThread(1000);
+    }
 }
 
 bool ShapeSound::appliesToNote(int note) {
