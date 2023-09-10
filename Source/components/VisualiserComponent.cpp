@@ -65,16 +65,20 @@ void VisualiserComponent::run() {
 }
 
 void VisualiserComponent::mouseDown(const juce::MouseEvent& event) {
-    active = !active;
-    if (active) {
-        startTimerHz(60);
-        startThread();
-    } else {
-        audioProcessor.consumerStop(consumer);
-        stopTimer();
-        stopThread(1000);
+    if (event.mods.isLeftButtonDown()) {
+        active = !active;
+        if (active) {
+            startTimerHz(60);
+            startThread();
+        } else {
+            audioProcessor.consumerStop(consumer);
+            stopTimer();
+            stopThread(1000);
+        }
+        repaint();
+    } else if (event.mods.isRightButtonDown()) {
+        // TODO: add menu to control colours and precision
     }
-    repaint();
 }
 
 void VisualiserComponent::paintChannel(juce::Graphics& g, juce::Rectangle<float> area, int channel) {

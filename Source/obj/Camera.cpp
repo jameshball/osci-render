@@ -7,16 +7,15 @@ Camera::Camera(double focalLength, double x, double y, double z) : focalLength(f
 std::vector<std::unique_ptr<Shape>> Camera::draw(WorldObject& object) {
 	std::vector<std::unique_ptr<Shape>> shapes;
     object.nextFrame();
-    Line3D* prevLine = nullptr;
-    Vector2 prevVertex;
-	for (auto& edge : object.edges) {
-        Vector2 start;
-        if (prevLine != nullptr && prevLine->x2 == edge.x1 && prevLine->y2 == edge.y1 && prevLine->z2 == edge.z1) {
-            start = prevVertex;
-        } else {
-            start = project(object.rotateX, object.rotateY, object.rotateZ, edge.x1, edge.y1, edge.z1);
+	for (auto edge : object.edges) {
+        edge.rotate(object.rotateX, object.rotateY, object.rotateZ);
+        // very crude frustum culling
+        if (edge.z1 < z || edge.z2 < z) {
+            continue;
         }
-        Vector2 end = project(object.rotateX, object.rotateY, object.rotateZ, edge.x2, edge.y2, edge.z2);
+
+        Vector2 start = project(edge.x1, edge.y1, edge.z1);
+        Vector2 end = project(edge.x2, edge.y2, edge.z2);
 
 		shapes.push_back(std::make_unique<Line>(start.x, start.y, end.x, end.y));
 	}
@@ -49,10 +48,9 @@ std::vector<Vector2> Camera::sampleVerticesInRender(WorldObject& object) {
 
     for (int i = 0; i < SAMPLE_RENDER_SAMPLES - 1; i++) {
         for (size_t j = 0; j < std::min(VERTEX_SAMPLES, object.numVertices); j++) {
-            double x = object.vs[j * 3];
-            double y = object.vs[j * 3 + 1];
-            double z = object.vs[j * 3 + 2];
-            vertices.push_back(project(object.rotateX, object.rotateY, object.rotateZ, x, y, z));
+            Vector3D vertex{object.vs[j * 3], object.vs[j * 3 + 1], object.vs[j * 3 + 2]};
+            vertex.rotate(object.rotateX, object.rotateY, object.rotateZ);
+            vertices.push_back(project(vertex.x, vertex.y, vertex.z));
         }
         object.rotateY = object.rotateY + rotation;
         object.rotateZ = object.rotateY + rotation;
@@ -72,27 +70,9 @@ double Camera::maxVertexValue(std::vector<Vector2>& vertices) {
     return max;
 }
 
-Vector2 Camera::project(double objRotateX, double objRotateY, double objRotateZ, double x, double y, double z) {
-    // rotate around x-axis
-    double cosValue = std::cos(objRotateX);
-    double sinValue = std::sin(objRotateX);
-    double y2 = cosValue * y - sinValue * z;
-    double z2 = sinValue * y + cosValue * z;
-
-    // rotate around y-axis
-    cosValue = std::cos(objRotateY);
-    sinValue = std::sin(objRotateY);
-    double x2 = cosValue * x + sinValue * z2;
-    double z3 = -sinValue * x + cosValue * z2;
-
-    // rotate around z-axis
-    cosValue = cos(objRotateZ);
-    sinValue = sin(objRotateZ);
-    double x3 = cosValue * x2 - sinValue * y2;
-    double y3 = sinValue * x2 + cosValue * y2;
-
-    double start = x3 * focalLength / (z3 - this->z) + this->x;
-    double end = y3 * focalLength / (z3 - this->z) + this->y;
+Vector2 Camera::project(double x, double y, double z) {
+    double start = x * focalLength / (z - this->z) + this->x;
+    double end = y * focalLength / (z - this->z) + this->y;
 
     return Vector2(start, end);
 }
