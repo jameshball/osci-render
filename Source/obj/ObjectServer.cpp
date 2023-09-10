@@ -22,7 +22,7 @@ void ObjectServer::run() {
                 if (connection != nullptr) {
                     audioProcessor.setObjectServerRendering(true);
 
-                    while (!threadShouldExit()) {
+                    while (!threadShouldExit() && connection->isConnected()) {
                         if (connection->waitUntilReady(true, 200) == 1) {
                             int i = 0;
 
@@ -177,7 +177,7 @@ void ObjectServer::run() {
                                 }
                             }
 
-                            audioProcessor.objectServerSound->addFrame(frame);
+                            audioProcessor.objectServerSound->addFrame(frame, false);
                         }
                     }
                 }

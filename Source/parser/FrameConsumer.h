@@ -6,5 +6,5 @@
 
 class FrameConsumer {
 public:
-	virtual void addFrame(std::vector<std::unique_ptr<Shape>>& frame) = 0;
+	virtual void addFrame(std::vector<std::unique_ptr<Shape>>& frame, bool force = true) = 0;
 };

@@ -177,7 +177,7 @@ public:
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
     std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>(VERSION_HINT);
     
-    BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false);
+    BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, !juce::JUCEApplicationBase::isStandaloneApp());
     std::atomic<float> frequency = 440.0f;
     
     juce::SpinLock parsersLock;

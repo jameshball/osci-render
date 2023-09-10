@@ -135,7 +135,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         double drawnFrameLength = traceMaxEnabled ? actualTraceMax * frameLength : frameLength;
 
         if (!renderingSample && frameDrawn >= drawnFrameLength) {
-            if (sound.load() != nullptr) {
+            if (sound.load() != nullptr && currentlyPlaying) {
                 frameLength = sound.load()->updateFrame(frame);
             }
             // TODO: updateFrame already iterates over all the shapes,
