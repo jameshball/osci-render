@@ -381,10 +381,10 @@ void OscirenderAudioProcessor::changeCurrentFile(int index) {
 	if (index < 0 || index >= fileBlocks.size()) {
 		return;
 	}
-    changeSound(sounds[index]);
     currentFile = index;
     updateLuaValues();
     updateObjValues();
+    changeSound(sounds[index]);
 }
 
 void OscirenderAudioProcessor::changeSound(ShapeSound::Ptr sound) {

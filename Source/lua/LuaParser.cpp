@@ -5,6 +5,7 @@
 LuaParser::LuaParser(juce::String script) {
     // initialization
     L = luaL_newstate();
+    lua_atpanic(L, panic);
     luaL_openlibs(L);
 
     this->script = script;
@@ -54,24 +55,30 @@ std::vector<float> LuaParser::run() {
     
 	lua_geti(L, LUA_REGISTRYINDEX, functionRef);
     
-    const int ret = lua_pcall(L, 0, LUA_MULTRET, 0);
-    if (ret != 0) {
-        const char* error = lua_tostring(L, -1);
-        DBG(error);
-		functionRef = -1;
-    } else if (lua_istable(L, -1)) {
-        auto length = lua_rawlen(L, -1);
+    if (lua_isfunction(L, -1)) {
+        const int ret = lua_pcall(L, 0, LUA_MULTRET, 0);
+        if (ret != 0) {
+            const char* error = lua_tostring(L, -1);
+            DBG(error);
+            functionRef = -1;
+        } else if (lua_istable(L, -1)) {
+            auto length = lua_rawlen(L, -1);
 
-        for (int i = 1; i <= length; i++) {
-            lua_pushinteger(L, i);
-            lua_gettable(L, -2);
-            float value = lua_tonumber(L, -1);
-            lua_pop(L, 1);
-            values.push_back(value);
+            for (int i = 1; i <= length; i++) {
+                lua_pushinteger(L, i);
+                lua_gettable(L, -2);
+                float value = lua_tonumber(L, -1);
+                lua_pop(L, 1);
+                values.push_back(value);
+            }
         }
+    } else {
+        DBG("functionRef is not a function");
+        functionRef = -1;
     }
 
-    lua_pop(L, 1);
+    // clear stack
+    lua_settop(L, 0);
 
 	step++;
     
@@ -85,4 +92,12 @@ void LuaParser::setVariable(juce::String variableName, double value) {
 	variableNames.push_back(variableName);
 	variables.push_back(value);
     updateVariables = true;
+}
+
+
+int LuaParser::panic(lua_State *L) {
+    const char *msg = lua_tostring(L, -1);
+    if (msg == NULL) msg = "error object is not a string";
+    DBG("PANIC: unprotected error in call to Lua API (%s)\n" << msg);
+    return 0;  /* return to Lua to abort */
 }

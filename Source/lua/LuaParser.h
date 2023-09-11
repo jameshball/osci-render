@@ -14,6 +14,8 @@ public:
 private:
 	void parse();
 
+	static int panic(lua_State* L);
+
 	int functionRef = -1;
 	long step = 1;
 	lua_State* L;
