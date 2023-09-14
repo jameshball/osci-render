@@ -37,4 +37,6 @@ private:
 	std::shared_ptr<SvgParser> svg;
 	std::shared_ptr<TextParser> text;
 	std::shared_ptr<LuaParser> lua;
+
+	juce::String fallbackLuaScript = "return { 0.0, 0.0 }";
 };

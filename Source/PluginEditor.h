@@ -55,6 +55,8 @@ private:
     MainMenuBarModel menuBarModel{*this};
     juce::MenuBarComponent menuBar;
 
+    std::atomic<bool> updatingDocumentsWithParserLock = false;
+
 	void codeDocumentTextInserted(const juce::String& newText, int insertIndex) override;
 	void codeDocumentTextDeleted(int startIndex, int endIndex) override;
     void updateCodeDocument();

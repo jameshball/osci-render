@@ -187,11 +187,17 @@ void OscirenderAudioProcessorEditor::updateCodeEditor() {
             codeEditors[i]->setVisible(false);
         }
         codeEditors[index]->setVisible(true);
+        // used so that codeDocumentTextInserted and codeDocumentTextDeleted know whether the parserLock
+        // is held by the message thread or not. We hold the lock in this function, but not when the
+        // code document is updated by the user editing text. Since both functions are called by the
+        // message thread, this is safe.
+        updatingDocumentsWithParserLock = true;
         if (index == 0) {
             codeEditors[index]->loadContent(audioProcessor.perspectiveEffect->getCode());
         } else {
             codeEditors[index]->loadContent(juce::MemoryInputStream(*audioProcessor.getFileBlock(originalIndex), false).readEntireStreamAsString());
         }
+        updatingDocumentsWithParserLock = false;
     }
     triggerAsyncUpdate();
 }
@@ -227,12 +233,22 @@ void OscirenderAudioProcessorEditor::editPerspectiveFunction(bool enable) {
 
 // parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessorEditor::codeDocumentTextInserted(const juce::String& newText, int insertIndex) {
-    updateCodeDocument();
+    if (updatingDocumentsWithParserLock) {
+        updateCodeDocument();
+    } else {
+        juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
+        updateCodeDocument();
+    }
 }
 
 // parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessorEditor::codeDocumentTextDeleted(int startIndex, int endIndex) {
-    updateCodeDocument();
+    if (updatingDocumentsWithParserLock) {
+        updateCodeDocument();
+    } else {
+        juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
+        updateCodeDocument();
+    }
 }
 
 // parsersLock AND effectsLock must be locked before calling this function
