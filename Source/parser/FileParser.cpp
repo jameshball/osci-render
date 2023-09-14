@@ -8,6 +8,10 @@ FileParser::FileParser() {}
 void FileParser::parse(juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font font) {
 	juce::SpinLock::ScopedLockType scope(lock);
 
+	if (extension == ".lua" && lua != nullptr && lua->isFunctionValid()) {
+		fallbackLuaScript = lua->getScript();
+	}
+
 	object = nullptr;
 	camera = nullptr;
 	svg = nullptr;
@@ -23,7 +27,7 @@ void FileParser::parse(juce::String extension, std::unique_ptr<juce::InputStream
 	} else if (extension == ".txt") {
 		text = std::make_shared<TextParser>(stream->readEntireStreamAsString(), font);
 	} else if (extension == ".lua") {
-		lua = std::make_shared<LuaParser>(stream->readEntireStreamAsString());
+		lua = std::make_shared<LuaParser>(stream->readEntireStreamAsString(), fallbackLuaScript);
 	}
 
 	sampleSource = lua != nullptr;

@@ -2,18 +2,27 @@
 #include "luaimport.h"
 
 
-LuaParser::LuaParser(juce::String script) {
-    // initialization
+LuaParser::LuaParser(juce::String script, juce::String fallbackScript) : fallbackScript(fallbackScript) {
+    reset(script);
+}
+
+LuaParser::~LuaParser() {
+    lua_close(L);
+}
+
+void LuaParser::reset(juce::String script) {
+    functionRef = -1;
+
+    if (L != nullptr) {
+        lua_close(L);
+    }
+    
     L = luaL_newstate();
     lua_atpanic(L, panic);
     luaL_openlibs(L);
 
     this->script = script;
-	parse();
-}
-
-LuaParser::~LuaParser() {
-    lua_close(L);
+    parse();
 }
 
 void LuaParser::parse() {
@@ -23,6 +32,9 @@ void LuaParser::parse() {
         DBG(error);
         lua_pop(L, 1);
         functionRef = -1;
+        if (script != fallbackScript) {
+            reset(fallbackScript);
+        }
     } else {
         functionRef = luaL_ref(L, LUA_REGISTRYINDEX);
     }
@@ -31,10 +43,6 @@ void LuaParser::parse() {
 // only the audio thread runs this fuction
 std::vector<float> LuaParser::run() {
     std::vector<float> values;
-    
-	if (functionRef == -1) {
-		return values;
-	}
 	
     lua_pushnumber(L, step);
     lua_setglobal(L, "step");
@@ -61,6 +69,9 @@ std::vector<float> LuaParser::run() {
             const char* error = lua_tostring(L, -1);
             DBG(error);
             functionRef = -1;
+            if (script != fallbackScript) {
+                reset(fallbackScript);
+            }
         } else if (lua_istable(L, -1)) {
             auto length = lua_rawlen(L, -1);
 
@@ -73,8 +84,10 @@ std::vector<float> LuaParser::run() {
             }
         }
     } else {
-        DBG("functionRef is not a function");
         functionRef = -1;
+        if (script != fallbackScript) {
+            reset(fallbackScript);
+        }
     }
 
     // clear stack
@@ -92,6 +105,14 @@ void LuaParser::setVariable(juce::String variableName, double value) {
 	variableNames.push_back(variableName);
 	variables.push_back(value);
     updateVariables = true;
+}
+
+bool LuaParser::isFunctionValid() {
+    return functionRef != -1;
+}
+
+juce::String LuaParser::getScript() {
+    return script;
 }
 
 
