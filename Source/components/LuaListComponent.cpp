@@ -6,7 +6,6 @@ LuaListComponent::LuaListComponent(OscirenderAudioProcessor& p, Effect& effect) 
 
 	effectComponent->slider.onValueChange = [this, &effect, &p] {
 		effect.setValue(effectComponent->slider.getValue());
-		effect.apply(0, Vector2());
 	};
 
 	addAndMakeVisible(*effectComponent);
