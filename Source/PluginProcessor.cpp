@@ -112,6 +112,10 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         addLuaSlider();
     }
 
+    for (auto& effect : luaEffects) {
+        effect->addListener(0, this);
+    }
+
     allEffects = toggleableEffects;
     allEffects.insert(allEffects.end(), permanentEffects.begin(), permanentEffects.end());
     allEffects.insert(allEffects.end(), luaEffects.begin(), luaEffects.end());
@@ -144,7 +148,11 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     synth.addSound(defaultSound);
 }
 
-OscirenderAudioProcessor::~OscirenderAudioProcessor() {}
+OscirenderAudioProcessor::~OscirenderAudioProcessor() {
+    for (auto& effect : luaEffects) {
+        effect->removeListener(0, this);
+    }
+}
 
 const juce::String OscirenderAudioProcessor::getName() const {
     return JucePlugin_Name;
@@ -673,6 +681,18 @@ void OscirenderAudioProcessor::consumerStop(std::shared_ptr<BufferConsumer> cons
         consumer->forceNotify();
     }
 }
+
+void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float newValue) {
+    // call apply on lua effects
+    for (auto& effect : luaEffects) {
+        if (parameterIndex == effect->parameters[0]->getParameterIndex()) {
+            effect->apply();
+            return;
+        }
+    }
+}
+
+void OscirenderAudioProcessor::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
 
 
 //==============================================================================

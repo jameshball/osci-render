@@ -25,7 +25,7 @@
 //==============================================================================
 /**
 */
-class OscirenderAudioProcessor  : public juce::AudioProcessor
+class OscirenderAudioProcessor  : public juce::AudioProcessor, juce::AudioProcessorParameter::Listener
                             #if JucePlugin_Enable_ARA
                              , public juce::AudioProcessorARAExtension
                             #endif
@@ -62,6 +62,8 @@ public:
     std::shared_ptr<BufferConsumer> consumerRegister(std::vector<float>& buffer);
     void consumerStop(std::shared_ptr<BufferConsumer> consumer);
     void consumerRead(std::shared_ptr<BufferConsumer> consumer);
+    void parameterValueChanged(int parameterIndex, float newValue) override;
+    void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     
     int VERSION_HINT = 1;
 
