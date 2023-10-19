@@ -100,6 +100,8 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 			frequencyLabel.setText(juce::String(roundedFrequency) + "Hz", juce::dontSendNotification);
 		}
 	);
+
+	addAndMakeVisible(envelope);
 }
 
 MainComponent::~MainComponent() {
@@ -144,6 +146,7 @@ void MainComponent::resized() {
 	bounds.removeFromTop(padding);
 	openOscilloscope.setBounds(bounds.removeFromBottom(buttonHeight).withSizeKeepingCentre(160, buttonHeight));
 	bounds.removeFromBottom(padding);
+	envelope.setBounds(bounds.removeFromTop(200));
 	auto minDim = juce::jmin(bounds.getWidth(), bounds.getHeight());
 	visualiser.setBounds(bounds.withSizeKeepingCentre(minDim, minDim));
 }

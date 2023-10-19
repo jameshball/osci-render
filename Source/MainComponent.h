@@ -6,6 +6,7 @@
 #include "parser/FrameProducer.h"
 #include "components/VisualiserComponent.h"
 #include "audio/PitchDetector.h"
+#include "UGen/ugen_JuceEnvelopeComponent.h"
 
 class OscirenderAudioProcessorEditor;
 class MainComponent : public juce::GroupComponent {
@@ -31,6 +32,8 @@ private:
 
 	VisualiserComponent visualiser{2, audioProcessor};
 	juce::TextButton openOscilloscope{"Open Oscilloscope"};
+
+	EnvelopeContainerComponent envelope;
 
 	juce::Label frequencyLabel;
 	int callbackIndex = -1;
