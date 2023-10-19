@@ -10,16 +10,20 @@ public:
 
 	Vector2 apply(int index, Vector2 input, const std::vector<double>& values, double sampleRate) override;
 	void updateCode(const juce::String& newCode);
+	void setVariable(juce::String variableName, double value);
+
 	juce::String getCode();
 
 	BooleanParameter* fixedRotateX;
 	BooleanParameter* fixedRotateY;
 	BooleanParameter* fixedRotateZ;
+
 private:
 	const juce::String DEFAULT_SCRIPT = "return { x, y, z }";
 	juce::String code = DEFAULT_SCRIPT;
-	juce::SpinLock codeLock;
 	std::unique_ptr<LuaParser> parser = std::make_unique<LuaParser>(code);
+	juce::SpinLock codeLock;
+
 	bool defaultScript = true;
 
 	float currentRotateX = 0;

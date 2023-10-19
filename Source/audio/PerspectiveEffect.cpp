@@ -93,6 +93,13 @@ void PerspectiveEffect::updateCode(const juce::String& newCode) {
 	parser = std::make_unique<LuaParser>(code);
 }
 
+void PerspectiveEffect::setVariable(juce::String variableName, double value) {
+	juce::SpinLock::ScopedLockType lock(codeLock);
+	if (!defaultScript) {
+        parser->setVariable(variableName, value);
+    }
+}
+
 juce::String PerspectiveEffect::getCode() {
 	juce::SpinLock::ScopedLockType lock(codeLock);
     return code;
