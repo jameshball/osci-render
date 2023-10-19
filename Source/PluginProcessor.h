@@ -21,6 +21,7 @@
 #include "audio/WobbleEffect.h"
 #include "audio/PerspectiveEffect.h"
 #include "obj/ObjectServer.h"
+#include "UGen/Env.h"
 
 //==============================================================================
 /**
@@ -191,6 +192,8 @@ public:
     juce::ChangeBroadcaster broadcaster;
     std::atomic<bool> objectServerRendering = false;
     juce::ChangeBroadcaster fileChangeBroadcaster;
+
+    Env adsrEnv = Env::adsr(0.1, 0.1, 0.1, 0.1, 0.1);
 
 private:
     juce::SpinLock consumerLock;

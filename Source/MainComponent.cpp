@@ -102,6 +102,7 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 	);
 
 	addAndMakeVisible(envelope);
+	envelope.setEnv(audioProcessor.adsrEnv);
 }
 
 MainComponent::~MainComponent() {

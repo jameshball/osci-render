@@ -257,18 +257,18 @@ void EnvelopeHandleComponent::mouseDown(const juce::MouseEvent& e)
         return; // dont send drag msg
 		
 	} 
-	else if(e.mods.isCtrlDown())
-	{
-		if(getParentComponent()->getAllowNodeEditing())
-		{
-			ignoreDrag = true;
-			
-			if(PopupComponent::getActivePopups() < 1)
-			{
-				EnvelopeNodePopup::create(this, getScreenX()+e.x, getScreenY()+e.y);
-			}
-		}
-	}
+	//else if(e.mods.isCtrlDown())
+	//{
+	//	if(getParentComponent()->getAllowNodeEditing())
+	//	{
+	//		ignoreDrag = true;
+	//		
+	//		if(PopupComponent::getActivePopups() < 1)
+	//		{
+	//			EnvelopeNodePopup::create(this, getScreenX()+e.x, getScreenY()+e.y);
+	//		}
+	//	}
+	//}
 	else 
 	{
 		
@@ -299,20 +299,7 @@ void EnvelopeHandleComponent::mouseDrag(const juce::MouseEvent& e)
 {
 	if(ignoreDrag == true) return;
 	
-	if(e.mods.isAltDown()) {
-
-		int moveX = e.x-offsetX;
-		int moveY = offsetY-e.y;
-		
-		offsetTimeAndValue(moveX * FINETUNE, moveY * FINETUNE, FINETUNE);
-		ignoreDrag = true;
-		setMousePositionToThisHandle();
-		ignoreDrag = false;
-		
-	} else {
-				
-		dragger.dragComponent(this, e, &resizeLimits);
-	}
+	dragger.dragComponent(this, e, &resizeLimits);
 	
 	updateLegend();
 	getParentComponent()->repaint();
@@ -548,6 +535,7 @@ EnvelopeComponent::EnvelopeComponent()
 	gridDisplayMode(GridNone),
 	gridQuantiseMode(GridNone),
 	draggingHandle(0),
+	adjustingHandle(nullptr),
 	curvePoints(64),
 	releaseNode(-1),
 	loopNode(-1),
@@ -635,6 +623,18 @@ void EnvelopeComponent::recalculateHandles()
 	{
 		handles.getUnchecked(i)->recalculatePosition();
 	}
+}
+
+EnvelopeHandleComponent* EnvelopeComponent::findHandle(double time) {
+	EnvelopeHandleComponent* handle = nullptr;
+
+	for (int i = 0; i < handles.size(); i++) {
+		handle = handles.getUnchecked(i);
+		if (handle->getTime() > time)
+			break;
+	}
+
+	return handle;
 }
 
 void EnvelopeComponent::setGrid(const GridMode display, const GridMode quantise, const double domainQ, const double valueQ)
@@ -836,47 +836,42 @@ void EnvelopeComponent::mouseDown(const juce::MouseEvent& e)
 		// not needed ?
 				
 	}
-	else if(e.mods.isCtrlDown())
-	{
-		if(getAllowCurveEditing())
-		{
-			float timeAtClick = convertPixelsToDomain(e.x);
-			
-			int i;
-			EnvelopeHandleComponent* handle = 0;
-			
-			for(i = 0; i < handles.size(); i++) {
-				handle = handles.getUnchecked(i);
-				if(handle->getTime() > timeAtClick)
-					break;
-			}
-			
-			if(PopupComponent::getActivePopups() < 1)
-			{
-				EnvelopeHandleComponent* prev = handle->getPreviousHandle();
-				
-				if(!prev)
-				{
-					EnvelopeCurvePopup::create(handle, getScreenX()+e.x, getScreenY()+e.y);
-				}
-				else
-				{
-					EnvelopeCurvePopup::create(handle, 
-											   (handle->getScreenX() + prev->getScreenX())/2, 
-						juce::jmax(handle->getScreenY(), prev->getScreenY())+10);
-				}
-			}
-		}
-	}
-	else 
-	{
-		draggingHandle = addHandle(e.x,e.y, EnvCurve::Linear);
-		
-		if(draggingHandle != 0) {
-			setMouseCursor(juce::MouseCursor::NoCursor);
-			draggingHandle->mouseDown(e.getEventRelativeTo(draggingHandle));
-			draggingHandle->updateLegend();
-		}
+	//else if(e.mods.isCtrlDown())
+	//{
+	//	if(getAllowCurveEditing())
+	//	{
+	//		float timeAtClick = convertPixelsToDomain(e.x);
+	//		
+	//		EnvelopeHandleComponent* handle = findHandle(timeAtClick);
+	//		
+	//		if(PopupComponent::getActivePopups() < 1)
+	//		{
+	//			EnvelopeHandleComponent* prev = handle->getPreviousHandle();
+	//			
+	//			if(!prev)
+	//			{
+	//				EnvelopeCurvePopup::create(handle, getScreenX()+e.x, getScreenY()+e.y);
+	//			}
+	//			else
+	//			{
+	//				EnvelopeCurvePopup::create(handle, 
+	//										   (handle->getScreenX() + prev->getScreenX())/2, 
+	//					juce::jmax(handle->getScreenY(), prev->getScreenY())+10);
+	//			}
+	//		}
+	//	}
+	//}
+	else if (e.mods.isAltDown()) {
+		adjustingHandle = findHandle(convertPixelsToDomain(e.x));
+		prevCurveValue = adjustingHandle->getCurve().getCurve();
+	} else {
+		//draggingHandle = addHandle(e.x,e.y, EnvCurve::Numerical);
+		//
+		//if(draggingHandle != 0) {
+		//	setMouseCursor(juce::MouseCursor::NoCursor);
+		//	draggingHandle->mouseDown(e.getEventRelativeTo(draggingHandle));
+		//	draggingHandle->updateLegend();
+		//}
 	}
 }
 
@@ -885,9 +880,27 @@ void EnvelopeComponent::mouseDrag(const juce::MouseEvent& e)
 #ifdef MYDEBUG
 	printf("MyEnvelopeComponent::mouseDrag(%d, %d)\n", e.x, e.y);
 #endif
-		
-	if(draggingHandle != 0)
+	
+	if (e.mods.isAltDown() && adjustingHandle != nullptr) {
+		EnvCurve curve = adjustingHandle->getCurve();
+		EnvelopeHandleComponent* prevHandle = adjustingHandle->getPreviousHandle();
+		// get distance as proportion of height
+		double originalValue = e.getDistanceFromDragStartY() / (double) getHeight();
+		double value = originalValue * 5;
+		value = value * value;
+		if (originalValue < 0) {
+            value = -value;
+        }
+		// make the value change the prevValue rather than overwriting it
+		if (prevHandle != nullptr && prevHandle->getValue() > adjustingHandle->getValue()) {
+			value = -value;
+        }
+		value = juce::jmin(prevCurveValue + value, 50.0);
+		curve.setCurve(value);
+		adjustingHandle->setCurve(curve);
+	} else if (draggingHandle != 0) {
 		draggingHandle->mouseDrag(e.getEventRelativeTo(draggingHandle));
+	}
 }
 
 void EnvelopeComponent::mouseUp(const juce::MouseEvent& e)
@@ -895,6 +908,10 @@ void EnvelopeComponent::mouseUp(const juce::MouseEvent& e)
 #ifdef MYDEBUG
 	printf("MyEnvelopeComponent::mouseUp\n");
 #endif
+
+	if (adjustingHandle != nullptr) {
+		adjustingHandle = nullptr;
+    }
 	
 	if(draggingHandle != 0) 
 	{

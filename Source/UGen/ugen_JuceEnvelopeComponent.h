@@ -240,6 +240,7 @@ public:
 	
 private:
 	void recalculateHandles();
+	EnvelopeHandleComponent* findHandle(double time);
 	
 	juce::SortedSet <void*> listeners;
 	juce::Array<EnvelopeHandleComponent*> handles;
@@ -249,11 +250,13 @@ private:
 	double valueGrid, domainGrid;
 	GridMode gridDisplayMode, gridQuantiseMode;
 	EnvelopeHandleComponent* draggingHandle;
+	EnvelopeHandleComponent* adjustingHandle;
+	double prevCurveValue = 0.0;
 	int curvePoints;
 	int releaseNode, loopNode;
 	
-	bool allowCurveEditing:1;
-	bool allowNodeEditing:1;
+	bool allowCurveEditing = false;
+	bool allowNodeEditing = false;
 	
 	juce::Colour colours[NumEnvColours];
 };
