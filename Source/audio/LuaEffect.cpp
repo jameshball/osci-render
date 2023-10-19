@@ -10,5 +10,8 @@ Vector2 LuaEffect::apply(int index, Vector2 input, const std::vector<double>& va
 	if (parser != nullptr) {
 		parser->setVariable("slider_" + name.toLowerCase(), values[0]);
 	}
+	
+	audioProcessor.perspectiveEffect->setVariable("slider_" + name.toLowerCase(), values[0]);
+
 	return input;
 }

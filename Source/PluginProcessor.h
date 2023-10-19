@@ -225,6 +225,7 @@ public:
     juce::String getFileName(int index);
 	std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
     void setObjectServerRendering(bool enabled);
+    void updateLuaValues();
 private:
     std::atomic<double> volume = 1.0;
     std::atomic<double> threshold = 1.0;
@@ -241,7 +242,6 @@ private:
     AudioWebSocketServer softwareOscilloscopeServer{*this};
     ObjectServer objectServer{*this};
 
-    void updateLuaValues();
     void updateObjValues();
     std::shared_ptr<Effect> getEffect(juce::String id);
     BooleanParameter* getBooleanParameter(juce::String id);

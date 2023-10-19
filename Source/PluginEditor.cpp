@@ -256,6 +256,7 @@ void OscirenderAudioProcessorEditor::updateCodeDocument() {
     if (editingPerspective) {
         juce::String file = codeDocuments[0]->getAllContent();
         audioProcessor.perspectiveEffect->updateCode(file);
+        audioProcessor.updateLuaValues();
     } else {
         int originalIndex = audioProcessor.getCurrentFileIndex();
         int index = audioProcessor.getCurrentFileIndex();
