@@ -109,12 +109,27 @@ void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area
         lines.emplace_back(buffer[i - 2], buffer[i - 1], buffer[i], buffer[i + 1]);
     }
 
+    double strength = 15;
+    double strengthLast = 5;
+    double widthDivisor = 130;
+    double widthDivisorLast = 130;
+    juce::Colour waveColor = waveformColour;
+    juce::Colour waveColorLast = waveColor;
+
+    for (auto& line : prevLines) {
+        line.applyTransform(transform);
+        float lengthScale = (line.getLength() + 0.001);
+        float lengthScaleLog = std::log(strengthLast * (1.f / lengthScale) + 1) / std::log(strengthLast + 1);
+        g.setColour(waveColorLast.withAlpha(std::max(0.f, std::min(lengthScaleLog, 1.f))));
+        g.drawLine(line, area.getWidth() * (lengthScaleLog * 0.3 + 0.7) / widthDivisorLast);
+    }
+    prevLines = lines;
+
     for (auto& line : lines) {
         line.applyTransform(transform);
-        float lengthScale = 1.0f / (line.getLength() + 1.0f);
-        double strength = 10;
-        lengthScale = std::log(strength * lengthScale + 1) / std::log(strength + 1);
-        g.setColour(waveformColour.withAlpha(lengthScale));
-        g.drawLine(line, area.getWidth() / 150.0f);
+        float lengthScale = (line.getLength() + 0.001);
+        float lengthScaleLog = std::log(strength * (1 / lengthScale) + 1) / std::log(strength + 1);
+        g.setColour(waveColor.withAlpha(std::max(0.f, std::min(lengthScaleLog, 1.f))).withSaturation(std::pow(lengthScale, 2)));
+        g.drawLine(line, area.getWidth() * (lengthScaleLog * 0.3 + 0.7) / widthDivisor);
     }
 }
