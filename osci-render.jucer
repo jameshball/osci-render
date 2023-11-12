@@ -500,7 +500,8 @@
         <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
       </MODULEPATHS>
     </VS2022>
-    <XCODE_MAC targetFolder="Builds/MacOSX">
+    <XCODE_MAC targetFolder="Builds/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak"
+               extraDefs="JUCE_SILENCE_XCODE_15_LINKER_WARNING=1">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="osci-render"/>
