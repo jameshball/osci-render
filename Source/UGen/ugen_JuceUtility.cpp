@@ -35,8 +35,6 @@
  ==============================================================================
  */
 
-#include "../core/ugen_StandardHeader.h"
-
 #include "ugen_JuceUtility.h"
 
 PopupComponent::PopupComponent(const int max) 
