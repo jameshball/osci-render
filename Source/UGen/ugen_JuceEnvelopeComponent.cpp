@@ -814,14 +814,31 @@ void EnvelopeComponent::resized()
 
 void EnvelopeComponent::mouseEnter(const juce::MouseEvent& e) 
 {
-	(void)e;
-	setMouseCursor(juce::MouseCursor::NormalCursor);
+	EnvelopeHandleComponent* handle = findHandle(convertPixelsToDomain(e.x));
+	EnvelopeHandleComponent* prevHandle = handle->getPreviousHandle();
+
+	auto handleBounds = handle->getBoundsInParent();
+	auto prevHandleBounds = prevHandle->getBoundsInParent();
+	
+	auto minX = juce::jmin(handleBounds.getX(), prevHandleBounds.getX());
+	auto maxX = juce::jmax(handleBounds.getRight(), prevHandleBounds.getRight());
+	auto minY = juce::jmin(handleBounds.getY(), prevHandleBounds.getY());
+	auto maxY = juce::jmax(handleBounds.getBottom(), prevHandleBounds.getBottom());
+
+	auto rect = juce::Rectangle<int>(minX, minY, maxX - minX, maxY - minY);
+
+	if (rect.contains(e.getPosition())) {
+		adjustable = true;
+        setMouseCursor(juce::MouseCursor::UpDownResizeCursor);
+    } else {
+		adjustable = false;
+        setMouseCursor(juce::MouseCursor::NormalCursor);
+    }
 }
 
 void EnvelopeComponent::mouseMove(const juce::MouseEvent& e) 
 {
-	(void)e;
-	setMouseCursor(juce::MouseCursor::NormalCursor);
+	mouseEnter(e);
 }
 
 void EnvelopeComponent::mouseDown(const juce::MouseEvent& e)
@@ -830,48 +847,9 @@ void EnvelopeComponent::mouseDown(const juce::MouseEvent& e)
 	printf("MyEnvelopeComponent::mouseDown(%d, %d)\n", e.x, e.y);
 #endif
 	
-	if(e.mods.isShiftDown()) 
-	{
-		
-		// not needed ?
-				
-	}
-	//else if(e.mods.isCtrlDown())
-	//{
-	//	if(getAllowCurveEditing())
-	//	{
-	//		float timeAtClick = convertPixelsToDomain(e.x);
-	//		
-	//		EnvelopeHandleComponent* handle = findHandle(timeAtClick);
-	//		
-	//		if(PopupComponent::getActivePopups() < 1)
-	//		{
-	//			EnvelopeHandleComponent* prev = handle->getPreviousHandle();
-	//			
-	//			if(!prev)
-	//			{
-	//				EnvelopeCurvePopup::create(handle, getScreenX()+e.x, getScreenY()+e.y);
-	//			}
-	//			else
-	//			{
-	//				EnvelopeCurvePopup::create(handle, 
-	//										   (handle->getScreenX() + prev->getScreenX())/2, 
-	//					juce::jmax(handle->getScreenY(), prev->getScreenY())+10);
-	//			}
-	//		}
-	//	}
-	//}
-	else if (e.mods.isAltDown()) {
+	if (adjustable) {
 		adjustingHandle = findHandle(convertPixelsToDomain(e.x));
 		prevCurveValue = adjustingHandle->getCurve().getCurve();
-	} else {
-		//draggingHandle = addHandle(e.x,e.y, EnvCurve::Numerical);
-		//
-		//if(draggingHandle != 0) {
-		//	setMouseCursor(juce::MouseCursor::NoCursor);
-		//	draggingHandle->mouseDown(e.getEventRelativeTo(draggingHandle));
-		//	draggingHandle->updateLegend();
-		//}
 	}
 }
 
@@ -881,7 +859,7 @@ void EnvelopeComponent::mouseDrag(const juce::MouseEvent& e)
 	printf("MyEnvelopeComponent::mouseDrag(%d, %d)\n", e.x, e.y);
 #endif
 	
-	if (e.mods.isAltDown() && adjustingHandle != nullptr) {
+	if (adjustable && adjustingHandle != nullptr) {
 		EnvCurve curve = adjustingHandle->getCurve();
 		EnvelopeHandleComponent* prevHandle = adjustingHandle->getPreviousHandle();
 		// get distance as proportion of height
@@ -898,7 +876,7 @@ void EnvelopeComponent::mouseDrag(const juce::MouseEvent& e)
 		value = juce::jmin(prevCurveValue + value, 50.0);
 		curve.setCurve(value);
 		adjustingHandle->setCurve(curve);
-	} else if (draggingHandle != 0) {
+	} else if (draggingHandle != nullptr) {
 		draggingHandle->mouseDrag(e.getEventRelativeTo(draggingHandle));
 	}
 }
@@ -909,9 +887,7 @@ void EnvelopeComponent::mouseUp(const juce::MouseEvent& e)
 	printf("MyEnvelopeComponent::mouseUp\n");
 #endif
 
-	if (adjustingHandle != nullptr) {
-		adjustingHandle = nullptr;
-    }
+	adjustingHandle = nullptr;
 	
 	if(draggingHandle != 0) 
 	{

@@ -251,6 +251,7 @@ private:
 	GridMode gridDisplayMode, gridQuantiseMode;
 	EnvelopeHandleComponent* draggingHandle;
 	EnvelopeHandleComponent* adjustingHandle;
+	bool adjustable = false;
 	double prevCurveValue = 0.0;
 	int curvePoints;
 	int releaseNode, loopNode;
