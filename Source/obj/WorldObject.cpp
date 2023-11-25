@@ -42,7 +42,7 @@ std::vector<std::vector<int>> ConnectedComponents(Graph& G) {
     return components;
 }
 
-WorldObject::WorldObject(std::string obj_string) {
+WorldObject::WorldObject(const std::string& obj_string) {
     tinyobj::ObjReaderConfig reader_config;
     reader_config.triangulate = false;
     reader_config.vertex_color = false;

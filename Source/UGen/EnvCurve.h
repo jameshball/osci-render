@@ -112,7 +112,7 @@ public:
 	/// @{
 
 	EnvCurveList(EnvCurve const& i00) throw();
-	EnvCurveList(std::vector<EnvCurve>) throw();
+	EnvCurveList(const std::vector<EnvCurve>&) throw();
 
 	EnvCurveList(EnvCurve::CurveType type, const int size = 1) throw();
 	EnvCurveList(const double curve, const int size = 1) throw();

@@ -8,9 +8,9 @@
 
 class Effect {
 public:
-	Effect(std::shared_ptr<EffectApplication> effectApplication, std::vector<EffectParameter*> parameters);
+	Effect(std::shared_ptr<EffectApplication> effectApplication, const std::vector<EffectParameter*>& parameters);
 	Effect(std::shared_ptr<EffectApplication> effectApplication, EffectParameter* parameter);
-	Effect(std::function<Vector2(int, Vector2, const std::vector<double>&, double)> application, std::vector<EffectParameter*> parameters);
+	Effect(std::function<Vector2(int, Vector2, const std::vector<double>&, double)> application, const std::vector<EffectParameter*>& parameters);
 	Effect(std::function<Vector2(int, Vector2, const std::vector<double>&, double)> application, EffectParameter* parameter);
 
 	Vector2 apply(int index, Vector2 input);

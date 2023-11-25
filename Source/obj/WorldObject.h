@@ -4,7 +4,7 @@
 
 class WorldObject {
 public:
-	WorldObject(std::string);
+	WorldObject(const std::string&);
     
     void setBaseRotationX(double x);
     void setBaseRotationY(double y);

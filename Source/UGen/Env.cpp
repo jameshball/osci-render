@@ -39,8 +39,9 @@ http://www.audiosynth.com
 
 #include "Env.h"
 
-Env::Env(std::vector<double> levels, 
-	std::vector<double> times, 
+Env::Env(
+	const std::vector<double>& levels, 
+	const std::vector<double>& times, 
 	EnvCurveList const& curves, 
 	const int releaseNode, 
 	const int loopNode) throw()

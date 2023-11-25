@@ -41,9 +41,7 @@ EnvCurveList::EnvCurveList(EnvCurve const& i00) throw() {
 	data.push_back(i00);
 }
 
-EnvCurveList::EnvCurveList(std::vector<EnvCurve> curves) throw() {
-	data = curves;
-}
+EnvCurveList::EnvCurveList(const std::vector<EnvCurve>& curves) throw() : data(curves) {}
 
 EnvCurveList::EnvCurveList(EnvCurve::CurveType type, const int size) throw(){
 	for(int i = 0; i < size; i++)
