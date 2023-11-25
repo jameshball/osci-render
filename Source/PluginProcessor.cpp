@@ -141,10 +141,14 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         addParameter(parameter);
     }
 
-    addParameter(attack);
-    addParameter(decay);
-    addParameter(sustain);
-    addParameter(release);
+    addParameter(attackTime);
+    addParameter(attackLevel);
+    addParameter(attackShape);
+    addParameter(decayTime);
+    addParameter(decayShape);
+    addParameter(sustainLevel);
+    addParameter(releaseTime);
+    addParameter(releaseShape);
 
     for (int i = 0; i < 4; i++) {
         synth.addVoice(new ShapeVoice(*this));
@@ -699,6 +703,12 @@ void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float n
 
 void OscirenderAudioProcessor::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
 
+void updateIfApproxEqual(FloatParameter* parameter, float newValue) {
+    if (std::abs(parameter->getValueUnnormalised() - newValue) > 0.0001) {
+        parameter->setUnnormalisedValueNotifyingHost(newValue);
+    }
+}
+
 void OscirenderAudioProcessor::envelopeChanged(EnvelopeComponent* changedEnvelope) {
     Env env = changedEnvelope->getEnv();
     std::vector<double> levels = env.getLevels();
@@ -707,27 +717,14 @@ void OscirenderAudioProcessor::envelopeChanged(EnvelopeComponent* changedEnvelop
 
     if (levels.size() == 4 && times.size() == 3 && curves.size() == 3) {
         this->adsrEnv = env;
-        if (attack->getValueUnnormalised() != times[0]) {
-            attack->setUnnormalisedValueNotifyingHost(times[0]);
-        }
-        if (decay->getValueUnnormalised() != times[1]) {
-            decay->setUnnormalisedValueNotifyingHost(times[1]);
-        }
-        if (sustain->getValueUnnormalised() != levels[2]) {
-            sustain->setUnnormalisedValueNotifyingHost(levels[2]);
-        }
-        if (release->getValueUnnormalised() != times[2]) {
-            release->setUnnormalisedValueNotifyingHost(times[2]);
-        }
-        if (attackShape->getValueUnnormalised() != curves[0].getCurve()) {
-            attackShape->setUnnormalisedValueNotifyingHost(curves[0].getCurve());
-        }
-        if (decayShape->getValueUnnormalised() != curves[1].getCurve()) {
-            decayShape->setUnnormalisedValueNotifyingHost(curves[1].getCurve());
-        }
-        if (releaseShape->getValueUnnormalised() != curves[2].getCurve()) {
-            releaseShape->setUnnormalisedValueNotifyingHost(curves[2].getCurve());
-        }
+        updateIfApproxEqual(attackTime, times[0]);
+        updateIfApproxEqual(attackLevel, levels[1]);
+        updateIfApproxEqual(attackShape, curves[0].getCurve());
+        updateIfApproxEqual(decayTime, times[1]);
+        updateIfApproxEqual(sustainLevel, levels[2]);
+        updateIfApproxEqual(decayShape, curves[1].getCurve());
+        updateIfApproxEqual(releaseTime, times[2]);
+        updateIfApproxEqual(releaseShape, curves[2].getCurve());
         DBG("adsr changed");
     }
 }

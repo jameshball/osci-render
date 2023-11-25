@@ -470,7 +470,6 @@ void EnvelopeHandleComponent::setTimeAndValue(double timeToSet, double valueToSe
 	dontUpdateTimeAndValue = oldDontUpdateTimeAndValue;
 	
 	getParentComponent()->repaint();
-	getParentComponent()->sendChangeMessage();
 }
 
 void EnvelopeHandleComponent::offsetTimeAndValue(double offsetTime, double offsetValue, double quantise)
@@ -493,7 +492,7 @@ double EnvelopeHandleComponent::constrainDomain(double domainToConstrain) const
 	if(previousHandle != 0) left += FINETUNE;
 	if(nextHandle != 0) right -= FINETUNE;
 		
-	return juce::jlimit(left, right, shouldLockTime ? time : domainToConstrain);
+	return juce::jlimit(juce::jmin(left, right), juce::jmax(left, right), shouldLockTime ? time : domainToConstrain);
 }
 
 double EnvelopeHandleComponent::constrainValue(double valueToConstrain) const
@@ -1274,8 +1273,9 @@ void EnvelopeComponent::setEnv(Env const& env)
 		for (int i = 0; i < handles.size(); i++) {
 			EnvelopeHandleComponent* handle = handles.getUnchecked(i);
             handle->setTimeAndValue(time, (double)levels[i], 0.0);
-            handle->setCurve(curves[i]);
-			quantiseHandle(handle);
+			if (i > 0) {
+				handle->curve = curves[i - 1];
+			}
 			if (i < times.size()) {
 				time += times[i];
 			}

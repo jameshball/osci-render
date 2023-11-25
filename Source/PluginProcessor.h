@@ -195,20 +195,20 @@ public:
     std::atomic<bool> objectServerRendering = false;
     juce::ChangeBroadcaster fileChangeBroadcaster;
 
-    FloatParameter* attack = new FloatParameter("Attack", "attack", VERSION_HINT, 0.1, 0.0, 1.0);
+    FloatParameter* attackTime = new FloatParameter("Attack Time", "attackTime", VERSION_HINT, 0.05, 0.0, 1.0);
     FloatParameter* attackLevel = new FloatParameter("Attack Level", "attackLevel", VERSION_HINT, 1.0, 0.0, 1.0);
-    FloatParameter* decay = new FloatParameter("Decay", "decay", VERSION_HINT, 0.1, 0.0, 1.0);
-    FloatParameter* sustain = new FloatParameter("Sustain", "sustain", VERSION_HINT, 0.1, 0.0, 1.0);
-    FloatParameter* release = new FloatParameter("Release", "release", VERSION_HINT, 0.1, 0.0, 1.0);
-    FloatParameter* attackShape = new FloatParameter("Attack Shape", "attackShape", VERSION_HINT, 0.0, 0.0, 1.0);
-    FloatParameter* decayShape = new FloatParameter("Decay Shape", "decayShape", VERSION_HINT, 0.0, 0.0, 1.0);
-    FloatParameter* releaseShape = new FloatParameter("Release Shape", "releaseShape", VERSION_HINT, 0.0, 0.0, 1.0);
+    FloatParameter* decayTime = new FloatParameter("Decay Time", "decayTime", VERSION_HINT, 0.05, 0.0, 1.0);
+    FloatParameter* sustainLevel = new FloatParameter("Sustain Level", "sustainLevel", VERSION_HINT, 0.8, 0.0, 1.0);
+    FloatParameter* releaseTime = new FloatParameter("Release Time", "releaseTime", VERSION_HINT, 0.2, 0.0, 1.0);
+    FloatParameter* attackShape = new FloatParameter("Attack Shape", "attackShape", VERSION_HINT, 5, -50, 50);
+    FloatParameter* decayShape = new FloatParameter("Decay Shape", "decayShape", VERSION_HINT, -20, -50, 50);
+    FloatParameter* releaseShape = new FloatParameter("Release Shape", "releaseShape", VERSION_HINT, 5,-50, 50);
 
     Env adsrEnv = Env::adsr(
-        attack->getValueUnnormalised(),
-        decay->getValueUnnormalised(),
-        sustain->getValueUnnormalised(),
-        release->getValueUnnormalised(),
+        attackTime->getValueUnnormalised(),
+        decayTime->getValueUnnormalised(),
+        sustainLevel->getValueUnnormalised(),
+        releaseTime->getValueUnnormalised(),
         1.0,
         std::vector<EnvCurve>{ attackShape->getValueUnnormalised(), decayShape->getValueUnnormalised(), releaseShape->getValueUnnormalised() }
     );
