@@ -215,6 +215,9 @@ public:
 	bool getAllowCurveEditing() const;
 	void setAllowNodeEditing(const bool flag);
 	bool getAllowNodeEditing() const;
+	void setAdsrMode(const bool adsrMode);
+	bool getAdsrMode() const;
+
 	
 	double convertPixelsToDomain(int pixelsX, int pixelsXMax = -1) const;
 	double convertPixelsToValue(int pixelsY, int pixelsYMax = -1) const;
@@ -258,6 +261,7 @@ private:
 	
 	bool allowCurveEditing = false;
 	bool allowNodeEditing = false;
+	bool adsrMode = false;
 	
 	juce::Colour colours[NumEnvColours];
 };
@@ -345,6 +349,7 @@ public:
 	bool getAllowCurveEditing() const			{ return envelope->getAllowCurveEditing();	}
 	void setAllowNodeEditing(const bool flag)	{ envelope->setAllowNodeEditing(flag);		}
 	bool getAllowNodeEditing() const			{ return envelope->getAllowNodeEditing();	}
+	void setAdsrMode(const bool adsrMode)		{ envelope->setAdsrMode(adsrMode);			}
 
 	
 private:

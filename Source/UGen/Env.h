@@ -84,6 +84,7 @@ public:
 
 	Env(Env const& copy) throw();
 	Env& operator= (Env const& other) throw();
+	bool operator== (const Env& other) const throw();
 
 	~Env() throw();
 
@@ -133,14 +134,14 @@ public:
 	@param sustainLevel	The level of the sustain portion as a ratio of the peak level.
 	@param releaseTime		The duration of the release portion.
 	@param level			The peak level of the envelope.
-	@param curve			The curvature of the envelope.
+	@param curves			The curves of the envelope.
 	@return				The Env envelope specification. */	
 	static Env adsr(const double attackTime = 0.01, 
 		const double decayTime = 0.3, 
 		const double sustainLevel = 0.5, 
 		const double releaseTime = 1.0, 
 		const double level = 1.0, 
-		EnvCurve const& curve = -4.0) throw();
+		EnvCurveList const& curves = -4.0) throw();
 
 	/**  Creates a new envelope specification which is shaped like traditional analog attack-sustain-release (asr) envelopes.
 	@param attackTime		The duration of the attack portion.

@@ -141,6 +141,11 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         addParameter(parameter);
     }
 
+    addParameter(attack);
+    addParameter(decay);
+    addParameter(sustain);
+    addParameter(release);
+
     for (int i = 0; i < 4; i++) {
         synth.addVoice(new ShapeVoice(*this));
     }
@@ -693,6 +698,39 @@ void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float n
 }
 
 void OscirenderAudioProcessor::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
+
+void OscirenderAudioProcessor::envelopeChanged(EnvelopeComponent* changedEnvelope) {
+    Env env = changedEnvelope->getEnv();
+    std::vector<double> levels = env.getLevels();
+    std::vector<double> times = env.getTimes();
+    EnvCurveList curves = env.getCurves();
+
+    if (levels.size() == 4 && times.size() == 3 && curves.size() == 3) {
+        this->adsrEnv = env;
+        if (attack->getValueUnnormalised() != times[0]) {
+            attack->setUnnormalisedValueNotifyingHost(times[0]);
+        }
+        if (decay->getValueUnnormalised() != times[1]) {
+            decay->setUnnormalisedValueNotifyingHost(times[1]);
+        }
+        if (sustain->getValueUnnormalised() != levels[2]) {
+            sustain->setUnnormalisedValueNotifyingHost(levels[2]);
+        }
+        if (release->getValueUnnormalised() != times[2]) {
+            release->setUnnormalisedValueNotifyingHost(times[2]);
+        }
+        if (attackShape->getValueUnnormalised() != curves[0].getCurve()) {
+            attackShape->setUnnormalisedValueNotifyingHost(curves[0].getCurve());
+        }
+        if (decayShape->getValueUnnormalised() != curves[1].getCurve()) {
+            decayShape->setUnnormalisedValueNotifyingHost(curves[1].getCurve());
+        }
+        if (releaseShape->getValueUnnormalised() != curves[2].getCurve()) {
+            releaseShape->setUnnormalisedValueNotifyingHost(curves[2].getCurve());
+        }
+        DBG("adsr changed");
+    }
+}
 
 
 //==============================================================================

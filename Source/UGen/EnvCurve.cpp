@@ -69,6 +69,10 @@ EnvCurveList& EnvCurveList::operator= (EnvCurveList const& other) throw()
 	return *this;
 }
 
+bool EnvCurveList::operator==(EnvCurveList const& other) const throw() {
+	return data == other.data;
+}
+
 EnvCurve& EnvCurveList::operator[] (const int index) throw() {
 	return data[index % size()];
 }

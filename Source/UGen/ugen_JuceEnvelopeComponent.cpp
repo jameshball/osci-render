@@ -107,19 +107,31 @@ EnvelopeComponent* EnvelopeHandleComponent::getParentComponent() const
 
 void EnvelopeHandleComponent::updateTimeAndValue()
 {
+	bool envChanged = false;
+
     if (shouldLockTime)
     {
         setTopLeftPosition(getParentComponent()->convertDomainToPixels(time),
                            getY());
     }
-    else time = getParentComponent()->convertPixelsToDomain(getX());
+	else {
+		envChanged = true;
+		time = getParentComponent()->convertPixelsToDomain(getX());
+	}
     
     if (shouldLockValue)
     {
         setTopLeftPosition(getX(),
                            getParentComponent()->convertValueToPixels(value));
     }
-    else value = getParentComponent()->convertPixelsToValue(getY());
+	else {
+		envChanged = true;
+		value = getParentComponent()->convertPixelsToValue(getY());
+	}
+
+	if (envChanged == true) {
+        ((EnvelopeComponent*)getParentComponent())->sendChangeMessage();
+    }
 	
 #ifdef MYDEBUG
 	printf("MyEnvelopeHandleComponent::updateTimeAndValue(%f, %f)\n", time, value);
@@ -303,7 +315,6 @@ void EnvelopeHandleComponent::mouseDrag(const juce::MouseEvent& e)
 	
 	updateLegend();
 	getParentComponent()->repaint();
-	getParentComponent()->sendChangeMessage();
 	
 	if(lastX == getX() && lastY == getY()) {	
 		setMousePositionToThisHandle();
@@ -1045,6 +1056,14 @@ EnvelopeHandleComponent* EnvelopeComponent::addHandle(double newDomain, double n
 		handle->setTimeAndValue(newDomain, newValue, 0.0);	
 		handle->setCurve(curve);
 		handles.insert(i, handle);
+		if (adsrMode) {
+			if (i == 0) {
+				handle->lockTime(0);
+			}
+			if (i == 0 || i == 3) {
+				handle->lockValue(0);
+			}
+		}
 	//	sendChangeMessage();
 		return handle;
 	}
@@ -1165,6 +1184,14 @@ bool EnvelopeComponent::getAllowNodeEditing() const
 	return allowNodeEditing;
 }
 
+void EnvelopeComponent::setAdsrMode(const bool adsrMode) {
+	this->adsrMode = adsrMode;
+}
+
+bool EnvelopeComponent::getAdsrMode() const {
+    return adsrMode;
+}
+
 void EnvelopeComponent::setReleaseNode(EnvelopeHandleComponent* thisHandle)
 {
 	setReleaseNode(handles.indexOf(thisHandle));
@@ -1237,24 +1264,42 @@ Env EnvelopeComponent::getEnv() const
 
 void EnvelopeComponent::setEnv(Env const& env)
 {
-    clear();
-    
-    double time = 0.0;
-	
-	std::vector<double> levels = env.getLevels();
-	std::vector<double> times = env.getTimes();
-	const EnvCurveList& curves = env.getCurves();
-	
-	EnvelopeHandleComponent* handle = addHandle(time, (double)levels[0], EnvCurve::Linear);
-	quantiseHandle(handle);
+	if (env.getLevels().size() == handles.size()) {
+		double time = 0.0;
 
-	for(int i = 0; i < times.size(); i++)
-	{
-		time += times[i];
-		handle = addHandle(time, (double)levels[i+1], curves[i]);
+		std::vector<double> levels = env.getLevels();
+		std::vector<double> times = env.getTimes();
+		const EnvCurveList& curves = env.getCurves();
+
+		for (int i = 0; i < handles.size(); i++) {
+			EnvelopeHandleComponent* handle = handles.getUnchecked(i);
+            handle->setTimeAndValue(time, (double)levels[i], 0.0);
+            handle->setCurve(curves[i]);
+			quantiseHandle(handle);
+			if (i < times.size()) {
+				time += times[i];
+			}
+		}
+	} else {
+		clear();
+
+		double time = 0.0;
+
+		std::vector<double> levels = env.getLevels();
+		std::vector<double> times = env.getTimes();
+		const EnvCurveList& curves = env.getCurves();
+
+		EnvelopeHandleComponent* handle = addHandle(time, (double)levels[0], EnvCurve::Linear);
 		quantiseHandle(handle);
+
+		for(int i = 0; i < times.size(); i++)
+		{
+			time += times[i];
+			handle = addHandle(time, (double)levels[i+1], curves[i]);
+			quantiseHandle(handle);
+		}
 	}
-	
+
 	releaseNode = env.getReleaseNode();
 	loopNode = env.getLoopNode();
 }

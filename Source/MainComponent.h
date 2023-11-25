@@ -33,8 +33,6 @@ private:
 	VisualiserComponent visualiser{2, audioProcessor};
 	juce::TextButton openOscilloscope{"Open Oscilloscope"};
 
-	EnvelopeContainerComponent envelope;
-
 	juce::Label frequencyLabel;
 	int callbackIndex = -1;
 

@@ -121,6 +121,7 @@ public:
 
 	EnvCurveList(EnvCurveList const& copy) throw();
 	EnvCurveList& operator= (EnvCurveList const& other) throw();
+	bool operator== (EnvCurveList const& other) const throw();
 
 
 	/// @} <!-- end Construction and destruction ------------------------------------------- -->

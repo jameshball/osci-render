@@ -52,6 +52,48 @@ Env::Env(std::vector<double> levels,
 {
 }
 
+Env& Env::operator=(Env const& other) throw() {
+	if (this != &other) {
+        levels_ = other.levels_;
+        times_ = other.times_;
+        curves_ = other.curves_;
+        releaseNode_ = other.releaseNode_;
+        loopNode_ = other.loopNode_;
+    }
+    return *this;
+}
+
+bool Env::operator==(const Env& other) const throw() {
+	// approximate comparison
+	bool levelsEqual = true;
+	for (int i = 0; i < levels_.size(); i++) {
+        if (std::abs(levels_[i] - other.levels_[i]) > 0.001) {
+            levelsEqual = false;
+            break;
+        }
+    }
+
+	// approximate comparison
+	bool timesEqual = true;
+	for (int i = 0; i < times_.size(); i++) {
+        if (std::abs(times_[i] - other.times_[i]) > 0.001) {
+            timesEqual = false;
+            break;
+        }
+    }
+
+	// approximate comparison
+	bool curvesEqual = true;
+	for (int i = 0; i < curves_.size(); i++) {
+        if (std::abs(curves_[i].getCurve() - other.curves_[i].getCurve()) > 0.001) {
+            curvesEqual = false;
+            break;
+        }
+    }
+
+	return levelsEqual && timesEqual && curvesEqual;
+}
+
 Env::~Env() throw() {}
 
 double Env::duration() const throw() {
@@ -272,11 +314,11 @@ Env Env::adsr(const double attackTime,
 	const double sustainLevel, 
 	const double releaseTime,
 	const double level, 
-	EnvCurve const& curve) throw()
+	EnvCurveList const& curves) throw()
 {
 	return Env({ 0.0, level, (level * sustainLevel), 0.0 },
 		{ attackTime, decayTime, releaseTime },
-		curve, 2);
+		curves, 2);
 }
 
 Env Env::asr(const double attackTime, 
