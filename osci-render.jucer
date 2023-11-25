@@ -452,6 +452,20 @@
       <FILE id="UxZu4n" name="TxtComponent.cpp" compile="1" resource="0"
             file="Source/TxtComponent.cpp"/>
       <FILE id="kxPbsL" name="TxtComponent.h" compile="0" resource="0" file="Source/TxtComponent.h"/>
+      <GROUP id="{0C40BD3D-FDE8-D3CD-E1AB-14CA04799E4A}" name="UGen">
+        <FILE id="zfNA3c" name="Env.cpp" compile="1" resource="0" file="Source/UGen/Env.cpp"/>
+        <FILE id="DHCLp1" name="Env.h" compile="0" resource="0" file="Source/UGen/Env.h"/>
+        <FILE id="K4CI4M" name="EnvCurve.cpp" compile="1" resource="0" file="Source/UGen/EnvCurve.cpp"/>
+        <FILE id="w3bgas" name="EnvCurve.h" compile="0" resource="0" file="Source/UGen/EnvCurve.h"/>
+        <FILE id="aBbEWE" name="ugen_JuceEnvelopeComponent.cpp" compile="1"
+              resource="0" file="Source/UGen/ugen_JuceEnvelopeComponent.cpp"/>
+        <FILE id="ayzzMJ" name="ugen_JuceEnvelopeComponent.h" compile="0" resource="0"
+              file="Source/UGen/ugen_JuceEnvelopeComponent.h"/>
+        <FILE id="eOA8hh" name="ugen_JuceUtility.cpp" compile="1" resource="0"
+              file="Source/UGen/ugen_JuceUtility.cpp"/>
+        <FILE id="mC1tUv" name="ugen_JuceUtility.h" compile="0" resource="0"
+              file="Source/UGen/ugen_JuceUtility.h"/>
+      </GROUP>
     </GROUP>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"/>

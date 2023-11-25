@@ -1,6 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 #include "ShapeSound.h"
+#include "../UGen/Env.h"
 
 class OscirenderAudioProcessor;
 class ShapeVoice : public juce::SynthesiserVoice {
@@ -34,6 +35,11 @@ private:
 	double lengthIncrement = 0.0;
 
     bool currentlyPlaying = false;
-	double tailOff = 0.0;
 	double frequency = 1.0;
+
+	Env adsr;
+	double time = 0.0;
+	double releaseTime = 0.0;
+	double endTime = 99999999;
+	bool waitingForRelease = false;
 };

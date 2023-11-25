@@ -21,11 +21,13 @@
 #include "audio/WobbleEffect.h"
 #include "audio/PerspectiveEffect.h"
 #include "obj/ObjectServer.h"
+#include "UGen/Env.h"
+#include "UGen/ugen_JuceEnvelopeComponent.h"
 
 //==============================================================================
 /**
 */
-class OscirenderAudioProcessor  : public juce::AudioProcessor, juce::AudioProcessorParameter::Listener
+class OscirenderAudioProcessor  : public juce::AudioProcessor, juce::AudioProcessorParameter::Listener, public EnvelopeComponentListener
                             #if JucePlugin_Enable_ARA
                              , public juce::AudioProcessorARAExtension
                             #endif
@@ -64,6 +66,7 @@ public:
     void consumerRead(std::shared_ptr<BufferConsumer> consumer);
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
+    void envelopeChanged(EnvelopeComponent* changedEnvelope) override;
     
     int VERSION_HINT = 1;
 
@@ -191,6 +194,24 @@ public:
     juce::ChangeBroadcaster broadcaster;
     std::atomic<bool> objectServerRendering = false;
     juce::ChangeBroadcaster fileChangeBroadcaster;
+
+    FloatParameter* attackTime = new FloatParameter("Attack Time", "attackTime", VERSION_HINT, 0.05, 0.0, 1.0);
+    FloatParameter* attackLevel = new FloatParameter("Attack Level", "attackLevel", VERSION_HINT, 1.0, 0.0, 1.0);
+    FloatParameter* decayTime = new FloatParameter("Decay Time", "decayTime", VERSION_HINT, 0.05, 0.0, 1.0);
+    FloatParameter* sustainLevel = new FloatParameter("Sustain Level", "sustainLevel", VERSION_HINT, 0.8, 0.0, 1.0);
+    FloatParameter* releaseTime = new FloatParameter("Release Time", "releaseTime", VERSION_HINT, 0.2, 0.0, 1.0);
+    FloatParameter* attackShape = new FloatParameter("Attack Shape", "attackShape", VERSION_HINT, 5, -50, 50);
+    FloatParameter* decayShape = new FloatParameter("Decay Shape", "decayShape", VERSION_HINT, -20, -50, 50);
+    FloatParameter* releaseShape = new FloatParameter("Release Shape", "releaseShape", VERSION_HINT, 5,-50, 50);
+
+    Env adsrEnv = Env::adsr(
+        attackTime->getValueUnnormalised(),
+        decayTime->getValueUnnormalised(),
+        sustainLevel->getValueUnnormalised(),
+        releaseTime->getValueUnnormalised(),
+        1.0,
+        std::vector<EnvCurve>{ attackShape->getValueUnnormalised(), decayShape->getValueUnnormalised(), releaseShape->getValueUnnormalised() }
+    );
 
 private:
     juce::SpinLock consumerLock;

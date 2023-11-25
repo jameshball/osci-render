@@ -21,7 +21,18 @@ void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesiser
             frameLength = shapeSound->updateFrame(frame);
             tries++;
         }
-        tailOff = 0.0;
+        adsr = audioProcessor.adsrEnv;
+        time = 0.0;
+        releaseTime = 0.0;
+        endTime = 0.0;
+        waitingForRelease = true;
+        std::vector<double> times = adsr.getTimes();
+        for (int i = 0; i < times.size(); i++) {
+            if (i < adsr.getReleaseNode()) {
+                releaseTime += times[i];
+            }
+            endTime += times[i];
+        }
         if (audioProcessor.midiEnabled->getBoolValue()) {
             frequency = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber);
         }
@@ -104,17 +115,17 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         x = channels.x;
         y = channels.y;
 
-        if (tailOff > 0.0) {
-            tailOff *= 0.99999;
+        time += 1.0 / audioProcessor.currentSampleRate;
 
-            if (tailOff < 0.005) {
-                clearCurrentNote();
-                sound = nullptr;
-                break;
-            }
+        if (waitingForRelease) {
+            time = juce::jmin(time, releaseTime);
+        } else if (time >= endTime) {
+            clearCurrentNote();
+            sound = nullptr;
+            break;
         }
 
-        double gain = tailOff == 0.0 ? 1.0 : tailOff;
+        double gain = audioProcessor.midiEnabled->getBoolValue() ? adsr.lookup(time) : 1.0;
 
         if (numChannels >= 2) {
             outputBuffer.addSample(0, sample, x * gain);
@@ -154,11 +165,8 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
 
 void ShapeVoice::stopNote(float velocity, bool allowTailOff) {
     currentlyPlaying = false;
-    if (allowTailOff) {
-        if (tailOff == 0.0) {
-            tailOff = 1.0;
-        }
-    } else {
+    waitingForRelease = false;
+    if (!allowTailOff) {
         clearCurrentNote();
         sound = nullptr;
     }
