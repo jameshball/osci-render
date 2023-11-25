@@ -40,6 +40,7 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     setColour(juce::TabbedComponent::outlineColourId, Colours::veryDark);
 
     getCurrentColourScheme().setUIColour(ColourScheme::widgetBackground, Colours::veryDark);
+    getCurrentColourScheme().setUIColour(ColourScheme::UIColour::defaultFill, Colours::accentColor);
 }
 
 void OscirenderLookAndFeel::drawComboBox(juce::Graphics& g, int width, int height, bool, int, int, int, int, juce::ComboBox& box) {

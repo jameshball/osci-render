@@ -18,7 +18,6 @@ public:
 	void update();
 	void disableMouseRotation();
 
-	int sections = 2;
 private:
 	OscirenderAudioProcessor& audioProcessor;
 	OscirenderAudioProcessorEditor& pluginEditor;
@@ -28,6 +27,11 @@ private:
 	ObjComponent obj{audioProcessor, pluginEditor};
 	TxtComponent txt{audioProcessor, pluginEditor};
 	EffectsComponent effects{audioProcessor, pluginEditor};
+
+	juce::StretchableLayoutManager columnLayout;
+	juce::StretchableLayoutResizerBar columnResizerBar{&columnLayout, 1, true};
+	juce::StretchableLayoutManager rowLayout;
+	juce::StretchableLayoutResizerBar rowResizerBar{&rowLayout, 1, false};
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SettingsComponent)
 };

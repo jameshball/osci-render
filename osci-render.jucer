@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT id="HH2E72" name="osci-render" projectType="audioplug" useAppConfig="0"
-              addUsingNamespaceToJuceHeader="0" displaySplashScreen="1" jucerFormatVersion="1"
+              addUsingNamespaceToJuceHeader="0" displaySplashScreen="0" jucerFormatVersion="1"
               pluginCharacteristicsValue="pluginProducesMidiOut,pluginWantsMidiIn"
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"

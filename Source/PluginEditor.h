@@ -55,6 +55,9 @@ private:
     MainMenuBarModel menuBarModel{*this};
     juce::MenuBarComponent menuBar;
 
+    juce::StretchableLayoutManager layout;
+    juce::StretchableLayoutResizerBar resizerBar{&layout, 1, true};
+
     std::atomic<bool> updatingDocumentsWithParserLock = false;
 
 	void codeDocumentTextInserted(const juce::String& newText, int insertIndex) override;
