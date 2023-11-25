@@ -221,9 +221,10 @@ float Env::lookup(float time) const throw()
 	float level0 = levels_[stageIndex-1];
 	float level1 = levels_[stageIndex];
 
-	EnvCurve curve = getCurves()[stageIndex-1];
-	EnvCurve::CurveType type = curve.getType();
-	float curveValue = curve.getCurve();
+	int curveIndex = (stageIndex - 1) % curves_.size();
+
+	EnvCurve::CurveType type = curves_.data[curveIndex].getType();
+	float curveValue = curves_.data[curveIndex].getCurve();
 
 	if((lastTime - stageTime)==0.f)
 	{

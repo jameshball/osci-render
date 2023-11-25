@@ -140,7 +140,6 @@ public:
 
 	/// @} <!-- end Array access and manipulation ----------------------------------------------- -->
 
-private:
 	static EnvCurve empty;
 	std::vector<EnvCurve> data;
 };

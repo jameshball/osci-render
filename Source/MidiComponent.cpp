@@ -62,6 +62,11 @@ void MidiComponent::handleAsyncUpdate() {
         2
     );
 
+    {
+        juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+        audioProcessor.adsrEnv = newEnv;
+    }
+
     envelope.setEnv(newEnv);
 }
 

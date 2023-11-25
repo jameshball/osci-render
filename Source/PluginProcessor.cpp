@@ -716,7 +716,10 @@ void OscirenderAudioProcessor::envelopeChanged(EnvelopeComponent* changedEnvelop
     EnvCurveList curves = env.getCurves();
 
     if (levels.size() == 4 && times.size() == 3 && curves.size() == 3) {
-        this->adsrEnv = env;
+        {
+            juce::SpinLock::ScopedLockType lock(effectsLock);
+            this->adsrEnv = env;
+        }
         updateIfApproxEqual(attackTime, times[0]);
         updateIfApproxEqual(attackLevel, levels[1]);
         updateIfApproxEqual(attackShape, curves[0].getCurve());
