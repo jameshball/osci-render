@@ -214,12 +214,12 @@ void Matching::Expand(int start, bool expandBlocked = false)
 		for (list<int>::iterator it = shallow[u].begin(); it != shallow[u].end() and not found; )
 		{
 			int si = *it;
-			for (vector<int>::iterator jt = deep[si].begin(); jt != deep[si].end() and not found; jt++)
+			for (vector<int>::iterator jt = deep[si].begin(); jt != deep[si].end() and not found; ++jt)
 			{
 				if (*jt == p)
 					found = true;
 			}
-			it++;
+			++it;
 			if (not found)
 			{
 				shallow[u].push_back(si);
@@ -230,16 +230,16 @@ void Matching::Expand(int start, bool expandBlocked = false)
 		list<int>::iterator it = shallow[u].begin();
 		//Adjust the mate of the tip
 		mate[*it] = mate[u];
-		it++;
+		++it;
 		//
 		//Now we go through the odd circuit adjusting the new mates
 		while (it != shallow[u].end())
 		{
 			list<int>::iterator itnext = it;
-			itnext++;
+			++itnext;
 			mate[*it] = *itnext;
 			mate[*itnext] = *it;
-			itnext++;
+			++itnext;
 			it = itnext;
 		}
 
@@ -378,7 +378,7 @@ int Matching::Blossom(int u, int v)
 
 	shallow[t].clear();
 	deep[t].clear();
-	for(list<int>::iterator it = circuit.begin(); it != circuit.end(); it++)
+	for(list<int>::iterator it = circuit.begin(); it != circuit.end(); ++it)
 	{
 		shallow[t].push_back(*it);
 	}
@@ -547,15 +547,8 @@ pair< list<int>, double> Matching::SolveMinimumCostPerfectMatching(vector<double
 	list<int> matching = RetrieveMatching();
 
 	double obj = 0;
-	for(list<int>::iterator it = matching.begin(); it != matching.end(); it++)
+	for(list<int>::iterator it = matching.begin(); it != matching.end(); ++it)
 		obj += cost[*it];
-	
-	double dualObj = 0;
-	for(int i = 0; i < 2*n; i++)
-	{
-		if(i < n) dualObj += dual[i];
-		else if(blocked[i]) dualObj += dual[i];	
-	}
 	
 	return pair< list<int>, double >(matching, obj);
 }

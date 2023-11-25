@@ -69,8 +69,8 @@ public:
 	/**
 	Creates an Env with supplied specification.
 	*/
-	Env(std::vector<double> levels = { 0.0, 1.0, 0.0 },		/**<	A Buffer of levels. e.g. B(0.0, 1.0, 1.0, 0.0) you can also use the macro LL - List Levels. */
-		std::vector<double> times = { 1.0, 1.0 },				/**<	A Buffer of times. e.g., B(0.1, 0.8, 0.1) would have a total duration of 1sec. Macro LT - List Times can be used.
+	Env(const std::vector<double>& levels = { 0.0, 1.0, 0.0 },		/**<	A Buffer of levels. e.g. B(0.0, 1.0, 1.0, 0.0) you can also use the macro LL - List Levels. */
+		const std::vector<double>& times = { 1.0, 1.0 },				/**<	A Buffer of times. e.g., B(0.1, 0.8, 0.1) would have a total duration of 1sec. Macro LT - List Times can be used.
 		There should be one fewer time than level. */
 		EnvCurveList const& curves = EnvCurve(EnvCurve::Linear),	/**<	The shape of each segment. An EnvCurveList, with upto 
 		the same number of elements as the times Buffer. 
