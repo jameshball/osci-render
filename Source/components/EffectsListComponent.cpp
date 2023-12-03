@@ -21,9 +21,12 @@ EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectList
 					auto data = (AudioEffectListBoxItemData&)modelData;
 					juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
 					data.setSelected(rowNum, effectComponent->selected.getToggleState());
+                    effectComponent->updateEnabled();
 				}
 			};
-		}
+        }
+        
+        effectComponent->setSubParameter(i != 0);
 
 		auto component = createComponent(parameters[i]);
 		if (component != nullptr) {
@@ -34,7 +37,7 @@ EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectList
 	}
 
 	list.setModel(&listModel);
-	list.setRowHeight(30);
+	list.setRowHeight(ROW_HEIGHT);
 	list.updateContent();
 	addAndMakeVisible(list);
 }
@@ -43,9 +46,10 @@ EffectsListComponent::~EffectsListComponent() {}
 
 void EffectsListComponent::paint(juce::Graphics& g) {
 	auto bounds = getLocalBounds();
-	g.fillAll(findColour(effectComponentHandleColourId));
+    g.setColour(findColour(effectComponentHandleColourId));
+    bounds.removeFromBottom(2);
+	g.fillRect(bounds);
 	g.setColour(juce::Colours::white);
-	bounds.removeFromLeft(20);
 	// draw drag and drop handle using circles
 	double size = 4;
 	double leftPad = 4;
@@ -59,12 +63,6 @@ void EffectsListComponent::paint(juce::Graphics& g) {
 	g.fillEllipse(leftPad + spacing, y + topPad + spacing, size, size);
 	g.fillEllipse(leftPad + spacing, y + topPad + 2 * spacing, size, size);
 	DraggableListBoxItem::paint(g);
-}
-
-void EffectsListComponent::paintOverChildren(juce::Graphics& g) {
-	auto bounds = getLocalBounds();
-	g.setColour(juce::Colours::white);
-	g.drawRect(bounds);
 }
 
 void EffectsListComponent::resized() {
@@ -105,7 +103,7 @@ std::shared_ptr<juce::Component> EffectsListComponent::createComponent(EffectPar
 
 int EffectsListBoxModel::getRowHeight(int row) {
 	auto data = (AudioEffectListBoxItemData&)modelData;
-	return data.getEffect(row)->parameters.size() * 30;
+	return data.getEffect(row)->parameters.size() * EffectsListComponent::ROW_HEIGHT + 2;
 }
 
 bool EffectsListBoxModel::hasVariableHeightRows() const {

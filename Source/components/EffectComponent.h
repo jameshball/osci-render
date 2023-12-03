@@ -18,8 +18,10 @@ public:
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void handleAsyncUpdate() override;
+    void updateEnabled();
 
     void setCheckboxVisible(bool visible);
+    void setSubParameter(bool subParameter);
     void setComponent(std::shared_ptr<juce::Component> component);
 
     juce::Slider slider;
@@ -32,6 +34,7 @@ public:
 private:
     void setupComponent();
     bool checkboxVisible = true;
+    bool subParameter = false;
     bool lfoEnabled = true;
     juce::Rectangle<int> textBounds;
     std::shared_ptr<juce::Component> component;

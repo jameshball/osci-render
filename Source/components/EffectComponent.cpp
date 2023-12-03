@@ -41,6 +41,7 @@ void EffectComponent::setupComponent() {
 
     bool enabled = effect.enabled == nullptr || effect.enabled->getValue();
     selected.setToggleState(enabled, juce::dontSendNotification);
+    updateEnabled();
 
     lfoEnabled = parameter->lfo != nullptr && parameter->lfoRate != nullptr;
     if (lfoEnabled) {
@@ -129,9 +130,12 @@ void EffectComponent::resized() {
 
     auto checkboxLabel = bounds.removeFromLeft(120);
 
-    if (checkboxVisible) {
+    if (checkboxVisible || subParameter) {
         checkboxLabel.removeFromLeft(2);
-        selected.setBounds(checkboxLabel.removeFromLeft(25));
+        auto checkboxBounds = checkboxLabel.removeFromLeft(25);
+        if (checkboxVisible) {
+            selected.setBounds(checkboxBounds);
+        }
     } else {
         checkboxLabel.removeFromLeft(5);
     }
@@ -144,6 +148,10 @@ void EffectComponent::paint(juce::Graphics& g) {
     g.fillAll(findColour(effectComponentBackgroundColourId));
     g.setColour(juce::Colours::white);
     g.drawText(effect.parameters[index]->name, textBounds, juce::Justification::left);
+    if (!selected.getToggleState()) {
+        g.setColour(juce::Colours::black.withAlpha(0.5f));
+        g.fillAll();
+    }
 }
 
 void EffectComponent::mouseDown(const juce::MouseEvent& event) {
@@ -180,4 +188,16 @@ void EffectComponent::setComponent(std::shared_ptr<juce::Component> component) {
 
 void EffectComponent::setCheckboxVisible(bool visible) {
     checkboxVisible = visible;
+}
+
+void EffectComponent::setSubParameter(bool subParameter) {
+    this->subParameter = subParameter;
+}
+
+void EffectComponent::updateEnabled() {
+    bool enabled = selected.getToggleState();
+    slider.setEnabled(enabled);
+    lfoSlider.setEnabled(enabled);
+    lfo.setEnabled(enabled);
+    repaint();
 }

@@ -107,8 +107,9 @@ public:
     ~EffectsListComponent();
 
     void paint(juce::Graphics& g) override;
-    void paintOverChildren(juce::Graphics& g) override;
     void resized() override;
+    
+    static const int ROW_HEIGHT = 30;
 
 protected:
     Effect& effect;
