@@ -148,6 +148,9 @@ void EffectComponent::paint(juce::Graphics& g) {
     g.fillAll(findColour(effectComponentBackgroundColourId));
     g.setColour(juce::Colours::white);
     g.drawText(effect.parameters[index]->name, textBounds, juce::Justification::left);
+}
+
+void EffectComponent::paintOverChildren(juce::Graphics &g) {
     if (!selected.getToggleState()) {
         g.setColour(juce::Colours::black.withAlpha(0.5f));
         g.fillAll();
@@ -195,9 +198,5 @@ void EffectComponent::setSubParameter(bool subParameter) {
 }
 
 void EffectComponent::updateEnabled() {
-    bool enabled = selected.getToggleState();
-    slider.setEnabled(enabled);
-    lfoSlider.setEnabled(enabled);
-    lfo.setEnabled(enabled);
     repaint();
 }

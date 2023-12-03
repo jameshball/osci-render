@@ -11,10 +11,10 @@ enum ColourIds {
 };
 
 namespace Colours {
-    const juce::Colour dark{0xff424242};
-    const juce::Colour darker{0xff212121};
-    const juce::Colour veryDark{0xff111111};
-    const juce::Colour grey{0xff555555};
+    const juce::Colour dark{0xff555555};
+    const juce::Colour darker{0xff333333};
+    const juce::Colour veryDark{0xff000000};
+    const juce::Colour grey{0xff666666};
     const juce::Colour accentColor{0xff00cc00};
 }
 
