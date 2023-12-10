@@ -11,11 +11,11 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     addChildComponent(txt);
 
     columnLayout.setItemLayout(0, -0.1, -0.9, -0.4);
-    columnLayout.setItemLayout(1, 5, 5, 5);
+    columnLayout.setItemLayout(1, 7, 7, 7);
     columnLayout.setItemLayout(2, -0.1, -0.9, -0.6);
 
     rowLayout.setItemLayout(0, -0.1, -1.0, -0.63);
-    rowLayout.setItemLayout(1, 5, 5, 5);
+    rowLayout.setItemLayout(1, 7, 7, 7);
     rowLayout.setItemLayout(2, -0.1, -0.9, -0.37);
 }
 

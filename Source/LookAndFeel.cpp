@@ -35,9 +35,10 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     setColour(juce::TextEditor::highlightColourId, Colours::grey);
     setColour(juce::TabbedButtonBar::tabOutlineColourId, Colours::veryDark);
     setColour(juce::TabbedButtonBar::frontOutlineColourId, Colours::veryDark);
-    setColour(juce::TabbedButtonBar::tabTextColourId, juce::Colours::black);
-    setColour(juce::TabbedButtonBar::frontTextColourId, juce::Colours::black);
+    setColour(juce::TabbedButtonBar::tabTextColourId, juce::Colours::white);
+    setColour(juce::TabbedButtonBar::frontTextColourId, juce::Colours::white);
     setColour(juce::TabbedComponent::outlineColourId, Colours::veryDark);
+    setColour(tabbedComponentBackgroundColourId, Colours::veryDark);
 
     getCurrentColourScheme().setUIColour(ColourScheme::widgetBackground, Colours::veryDark);
     getCurrentColourScheme().setUIColour(ColourScheme::UIColour::defaultFill, Colours::accentColor);
