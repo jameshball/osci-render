@@ -49,8 +49,8 @@ void OscirenderLookAndFeel::drawComboBox(juce::Graphics& g, int width, int heigh
     g.setColour(box.findColour(juce::ComboBox::backgroundColourId));
     g.fillRect(boxBounds.toFloat());
 
-    g.setColour(box.findColour(juce::ComboBox::outlineColourId));
-    g.drawRect(boxBounds.toFloat().reduced(0.5f, 0.5f), 1.0f);
+    g.setColour(box.findColour(juce::ComboBox::outlineColourId).withAlpha(box.isEnabled() ? 1.0f : 0.5f));
+    g.drawRect(boxBounds.toFloat(), 1.0f);
 
     juce::Rectangle<int> arrowZone{width - 15, 0, 10, height};
     juce::Path path;
@@ -59,7 +59,7 @@ void OscirenderLookAndFeel::drawComboBox(juce::Graphics& g, int width, int heigh
     path.lineTo((float)arrowZone.getRight(), (float)arrowZone.getCentreY() - 3.0f);
     path.closeSubPath();
 
-    g.setColour(box.findColour(juce::ComboBox::arrowColourId));
+    g.setColour(box.findColour(juce::ComboBox::arrowColourId).withAlpha(box.isEnabled() ? 1.0f : 0.5f));
     g.fillPath(path);
 }
 
@@ -147,7 +147,7 @@ void OscirenderLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, in
 
     auto thumbWidth = getSliderThumbRadius(slider);
 
-    g.setColour(slider.findColour(sliderThumbOutlineColourId));
+    g.setColour(slider.findColour(sliderThumbOutlineColourId).withAlpha(slider.isEnabled() ? 1.0f : 0.5f));
     g.drawEllipse(juce::Rectangle<float>(static_cast<float>(thumbWidth), static_cast<float>(thumbWidth)).withCentre(point), 1.0f);
 }
 

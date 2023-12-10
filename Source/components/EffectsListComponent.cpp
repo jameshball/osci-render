@@ -41,7 +41,9 @@ EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectList
 	addAndMakeVisible(selected);
 }
 
-EffectsListComponent::~EffectsListComponent() {}
+EffectsListComponent::~EffectsListComponent() {
+    list.setLookAndFeel(nullptr);
+}
 
 void EffectsListComponent::paint(juce::Graphics& g) {
 	auto bounds = getLocalBounds();
