@@ -7,35 +7,26 @@
 class EffectComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater {
 public:
     EffectComponent(OscirenderAudioProcessor& p, Effect& effect, int index);
-    EffectComponent(OscirenderAudioProcessor& p, Effect& effect, int index, bool checkboxVisible);
     EffectComponent(OscirenderAudioProcessor& p, Effect& effect);
-    EffectComponent(OscirenderAudioProcessor& p, Effect& effect, bool checkboxVisible);
     ~EffectComponent();
 
     void resized() override;
     void paint(juce::Graphics& g) override;
-    void paintOverChildren(juce::Graphics& g) override;
     void mouseDown(const juce::MouseEvent& event) override;
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void handleAsyncUpdate() override;
-    void updateEnabled();
 
-    void setCheckboxVisible(bool visible);
-    void setSubParameter(bool subParameter);
     void setComponent(std::shared_ptr<juce::Component> component);
 
     juce::Slider slider;
     juce::Slider lfoSlider;
     Effect& effect;
     int index;
-    juce::ToggleButton selected;
     juce::ComboBox lfo;
 
 private:
     void setupComponent();
-    bool checkboxVisible = true;
-    bool subParameter = false;
     bool lfoEnabled = true;
     juce::Rectangle<int> textBounds;
     std::shared_ptr<juce::Component> component;

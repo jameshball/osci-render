@@ -2,7 +2,6 @@
 
 LuaListComponent::LuaListComponent(OscirenderAudioProcessor& p, Effect& effect) {
 	effectComponent = std::make_shared<EffectComponent>(p, effect);
-	effectComponent->setCheckboxVisible(false);
 
 	effectComponent->slider.onValueChange = [this, &effect, &p] {
 		effect.setValue(effectComponent->slider.getValue());

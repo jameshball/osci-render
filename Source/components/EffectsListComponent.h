@@ -107,6 +107,7 @@ public:
     ~EffectsListComponent();
 
     void paint(juce::Graphics& g) override;
+    void paintOverChildren(juce::Graphics& g) override;
     void resized() override;
     
     static const int ROW_HEIGHT = 30;
@@ -115,6 +116,7 @@ protected:
     Effect& effect;
     ComponentListModel listModel;
     juce::ListBox list;
+    juce::ToggleButton selected;
 private:
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& editor;
