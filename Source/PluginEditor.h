@@ -58,6 +58,8 @@ private:
     juce::StretchableLayoutManager layout;
     juce::StretchableLayoutResizerBar resizerBar{&layout, 1, true};
 
+    juce::TooltipWindow tooltipWindow{this};
+
     std::atomic<bool> updatingDocumentsWithParserLock = false;
 
 	void codeDocumentTextInserted(const juce::String& newText, int insertIndex) override;

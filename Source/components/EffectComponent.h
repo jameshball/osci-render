@@ -4,7 +4,7 @@
 #include "../audio/Effect.h"
 #include "LabelledTextBox.h"
 
-class EffectComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater {
+class EffectComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater, public juce::SettableTooltipClient {
 public:
     EffectComponent(OscirenderAudioProcessor& p, Effect& effect, int index);
     EffectComponent(OscirenderAudioProcessor& p, Effect& effect);

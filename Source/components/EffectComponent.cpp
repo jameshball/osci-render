@@ -15,6 +15,8 @@ EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, in
     lfo.addItem("Reverse Sawtooth", static_cast<int>(LfoType::ReverseSawtooth));
     lfo.addItem("Noise", static_cast<int>(LfoType::Noise));
 
+    setTooltip(effect.getDescription());
+
     effect.addListener(index, this);
     setupComponent();
 }
