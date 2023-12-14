@@ -45,6 +45,10 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 		pluginEditor.fileUpdated(audioProcessor.getCurrentFileName());
 	};
 
+	addAndMakeVisible(inputEnabled);
+	inputEnabled.onClick = [this] {
+		audioProcessor.inputEnabled->setBoolValueNotifyingHost(!audioProcessor.inputEnabled->getBoolValue());
+	};
 	addAndMakeVisible(fileLabel);
 	updateFileLabel();
 
@@ -125,6 +129,8 @@ void MainComponent::resized() {
 	
 	auto row = bounds.removeFromTop(buttonHeight);
     fileButton.setBounds(row.removeFromLeft(buttonWidth));
+	row.removeFromLeft(rowPadding);
+	inputEnabled.setBounds(row.removeFromLeft(20));
 	row.removeFromLeft(rowPadding);
 	fileLabel.setBounds(row);
 	bounds.removeFromTop(padding);

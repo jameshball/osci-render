@@ -14,6 +14,7 @@
 #include "audio/Effect.h"
 #include "audio/ShapeSound.h"
 #include "audio/ShapeVoice.h"
+#include "audio/PublicSynthesiser.h"
 #include <numbers>
 #include "audio/AudioWebSocketServer.h"
 #include "audio/DelayEffect.h"
@@ -192,6 +193,7 @@ public:
     std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>(VERSION_HINT);
     
     BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, !juce::JUCEApplicationBase::isStandaloneApp());
+    BooleanParameter* inputEnabled = new BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false);
     std::atomic<float> frequency = 440.0f;
     
     juce::SpinLock parsersLock;
@@ -268,7 +270,7 @@ private:
     std::vector<std::shared_ptr<Effect>> permanentEffects;
 
     ShapeSound::Ptr defaultSound = new ShapeSound(std::make_shared<FileParser>());
-    juce::Synthesiser synth;
+    PublicSynthesiser synth;
 
     AudioWebSocketServer softwareOscilloscopeServer{*this};
     ObjectServer objectServer{*this};

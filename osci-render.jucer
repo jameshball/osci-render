@@ -18,6 +18,7 @@
         <FILE id="IqXIZW" name="demo.svg" compile="0" resource="1" file="Resources/svg/demo.svg"/>
         <FILE id="YwkQpy" name="fixed_rotate.svg" compile="0" resource="1"
               file="Resources/svg/fixed_rotate.svg"/>
+        <FILE id="PxYKbt" name="microphone.svg" compile="0" resource="1" file="Resources/svg/microphone.svg"/>
         <FILE id="pSc1mq" name="osci.svg" compile="0" resource="1" file="Resources/svg/osci.svg"/>
         <FILE id="D2AI1b" name="pencil.svg" compile="0" resource="1" file="Resources/svg/pencil.svg"/>
         <FILE id="rXjNlx" name="threshold.svg" compile="0" resource="1" file="Resources/svg/threshold.svg"/>
@@ -64,6 +65,8 @@
         <FILE id="t2bsR8" name="PitchDetector.cpp" compile="1" resource="0"
               file="Source/audio/PitchDetector.cpp"/>
         <FILE id="rQC2gX" name="PitchDetector.h" compile="0" resource="0" file="Source/audio/PitchDetector.h"/>
+        <FILE id="t5g8pf" name="PublicSynthesiser.h" compile="0" resource="0"
+              file="Source/audio/PublicSynthesiser.h"/>
         <FILE id="PbbNqz" name="RotateEffect.cpp" compile="1" resource="0"
               file="Source/audio/RotateEffect.cpp"/>
         <FILE id="tUwNZV" name="RotateEffect.h" compile="0" resource="0" file="Source/audio/RotateEffect.h"/>

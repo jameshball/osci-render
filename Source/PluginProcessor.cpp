@@ -147,6 +147,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     booleanParameters.push_back(perspectiveEffect->fixedRotateY);
     booleanParameters.push_back(perspectiveEffect->fixedRotateZ);
     booleanParameters.push_back(midiEnabled);
+    booleanParameters.push_back(inputEnabled);
 
     for (auto parameter : booleanParameters) {
         addParameter(parameter);
@@ -474,7 +475,13 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    buffer.clear();
+    // clear output channels
+    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i) {
+        buffer.clear(i, 0, buffer.getNumSamples());
+    }
+
+    bool usingInput = inputEnabled->getBoolValue();
+
     bool usingMidi = midiEnabled->getBoolValue();
     if (!usingMidi) {
         midiMessages.clear();
@@ -495,13 +502,26 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     prevMidiEnabled = usingMidi;
 
     const double EPSILON = 0.00001;
-    
-    
-    if (volume > EPSILON) {
-        juce::SpinLock::ScopedLockType lock1(parsersLock);
-        juce::SpinLock::ScopedLockType lock2(effectsLock);
-        synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
+
+    if (usingInput && totalNumInputChannels >= 2) {
+        // handle all midi messages
+        auto midiIterator = midiMessages.cbegin();
+        std::for_each(midiIterator,
+            midiMessages.cend(),
+            [&] (const juce::MidiMessageMetadata& meta) { synth.publicHandleMidiEvent(meta.getMessage()); }
+        );
+    } else {
+        for (auto i = 0; i < totalNumInputChannels; ++i) {
+            buffer.clear(i, 0, buffer.getNumSamples());
+        }
+        if (volume > EPSILON) {
+            juce::SpinLock::ScopedLockType lock1(parsersLock);
+            juce::SpinLock::ScopedLockType lock2(effectsLock);
+            synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
+        }
     }
+
+    
     midiMessages.clear();
     
     auto* channelData = buffer.getArrayOfWritePointers();

@@ -7,6 +7,7 @@
 #include "components/VisualiserComponent.h"
 #include "audio/PitchDetector.h"
 #include "UGen/ugen_JuceEnvelopeComponent.h"
+#include "components/SvgButton.h"
 
 class OscirenderAudioProcessorEditor;
 class MainComponent : public juce::GroupComponent {
@@ -24,6 +25,7 @@ private:
 	std::unique_ptr<juce::FileChooser> chooser;
 	juce::TextButton fileButton;
 	juce::TextButton closeFileButton;
+	SvgButton inputEnabled{"inputEnabled", juce::String(BinaryData::microphone_svg), "white", "red", audioProcessor.inputEnabled};
 	juce::Label fileLabel;
 
 	juce::TextEditor fileName;
