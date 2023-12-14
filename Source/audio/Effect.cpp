@@ -1,21 +1,23 @@
 #include "Effect.h"
 #include <numbers>
 
-Effect::Effect(std::shared_ptr<EffectApplication> effectApplication, const std::vector<EffectParameter*>& parameters) :
+Effect::Effect(std::shared_ptr<EffectApplication> effectApplication, const std::vector<EffectParameter*>& parameters, juce::String description) :
 	effectApplication(effectApplication),
 	parameters(parameters),
 	enabled(nullptr),
-	actualValues(std::vector<double>(parameters.size(), 0.0)) {}
+	actualValues(std::vector<double>(parameters.size(), 0.0)),
+	description(description) {}
 
-Effect::Effect(std::shared_ptr<EffectApplication> effectApplication, EffectParameter* parameter) : Effect(effectApplication, std::vector<EffectParameter*>{parameter}) {}
+Effect::Effect(std::shared_ptr<EffectApplication> effectApplication, EffectParameter* parameter, juce::String description) : Effect(effectApplication, std::vector<EffectParameter*>{parameter}, description) {}
 
-Effect::Effect(std::function<Vector2(int, Vector2, const std::vector<double>&, double)> application, const std::vector<EffectParameter*>& parameters) :
+Effect::Effect(std::function<Vector2(int, Vector2, const std::vector<double>&, double)> application, const std::vector<EffectParameter*>& parameters, juce::String description) :
 	application(application),
 	parameters(parameters),
 	enabled(nullptr),
-	actualValues(std::vector<double>(parameters.size(), 0.0)) {}
+	actualValues(std::vector<double>(parameters.size(), 0.0)),
+	description(description) {}
 
-Effect::Effect(std::function<Vector2(int, Vector2, const std::vector<double>&, double)> application, EffectParameter* parameter) : Effect(application, std::vector<EffectParameter*>{parameter}) {}
+Effect::Effect(std::function<Vector2(int, Vector2, const std::vector<double>&, double)> application, EffectParameter* parameter, juce::String description) : Effect(application, std::vector<EffectParameter*>{parameter}, description) {}
 
 Vector2 Effect::apply(int index, Vector2 input) {
 	animateValues();
@@ -200,4 +202,8 @@ EffectParameter* Effect::getParameter(juce::String id) {
         }
     }
     return nullptr;
+}
+
+juce::String Effect::getDescription() {
+	return description;
 }

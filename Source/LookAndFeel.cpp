@@ -35,11 +35,13 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     setColour(juce::TextEditor::highlightColourId, Colours::grey);
     setColour(juce::TabbedButtonBar::tabOutlineColourId, Colours::veryDark);
     setColour(juce::TabbedButtonBar::frontOutlineColourId, Colours::veryDark);
-    setColour(juce::TabbedButtonBar::tabTextColourId, juce::Colours::black);
-    setColour(juce::TabbedButtonBar::frontTextColourId, juce::Colours::black);
+    setColour(juce::TabbedButtonBar::tabTextColourId, juce::Colours::white);
+    setColour(juce::TabbedButtonBar::frontTextColourId, juce::Colours::white);
     setColour(juce::TabbedComponent::outlineColourId, Colours::veryDark);
+    setColour(tabbedComponentBackgroundColourId, Colours::veryDark);
 
     getCurrentColourScheme().setUIColour(ColourScheme::widgetBackground, Colours::veryDark);
+    getCurrentColourScheme().setUIColour(ColourScheme::UIColour::defaultFill, Colours::accentColor);
 }
 
 void OscirenderLookAndFeel::drawComboBox(juce::Graphics& g, int width, int height, bool, int, int, int, int, juce::ComboBox& box) {
@@ -48,8 +50,8 @@ void OscirenderLookAndFeel::drawComboBox(juce::Graphics& g, int width, int heigh
     g.setColour(box.findColour(juce::ComboBox::backgroundColourId));
     g.fillRect(boxBounds.toFloat());
 
-    g.setColour(box.findColour(juce::ComboBox::outlineColourId));
-    g.drawRect(boxBounds.toFloat().reduced(0.5f, 0.5f), 1.0f);
+    g.setColour(box.findColour(juce::ComboBox::outlineColourId).withAlpha(box.isEnabled() ? 1.0f : 0.5f));
+    g.drawRect(boxBounds.toFloat(), 1.0f);
 
     juce::Rectangle<int> arrowZone{width - 15, 0, 10, height};
     juce::Path path;
@@ -58,7 +60,7 @@ void OscirenderLookAndFeel::drawComboBox(juce::Graphics& g, int width, int heigh
     path.lineTo((float)arrowZone.getRight(), (float)arrowZone.getCentreY() - 3.0f);
     path.closeSubPath();
 
-    g.setColour(box.findColour(juce::ComboBox::arrowColourId).withAlpha((box.isEnabled() ? 0.9f : 0.2f)));
+    g.setColour(box.findColour(juce::ComboBox::arrowColourId).withAlpha(box.isEnabled() ? 1.0f : 0.5f));
     g.fillPath(path);
 }
 
@@ -138,7 +140,7 @@ void OscirenderLookAndFeel::drawGroupComponentOutline(juce::Graphics& g, int wid
 
 void OscirenderLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, int width, int height, float sliderPos, float minSliderPos, float maxSliderPos, const juce::Slider::SliderStyle style, juce::Slider& slider) {
     juce::LookAndFeel_V4::drawLinearSlider(g, x, y, width, height, sliderPos, minSliderPos, maxSliderPos, style, slider);
-
+    
     auto kx = slider.isHorizontal() ? sliderPos : ((float)x + (float)width * 0.5f);
     auto ky = slider.isHorizontal() ? ((float)y + (float)height * 0.5f) : sliderPos;
 
@@ -146,7 +148,7 @@ void OscirenderLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, in
 
     auto thumbWidth = getSliderThumbRadius(slider);
 
-    g.setColour(slider.findColour(sliderThumbOutlineColourId));
+    g.setColour(slider.findColour(sliderThumbOutlineColourId).withAlpha(slider.isEnabled() ? 1.0f : 0.5f));
     g.drawEllipse(juce::Rectangle<float>(static_cast<float>(thumbWidth), static_cast<float>(thumbWidth)).withCentre(point), 1.0f);
 }
 

@@ -4,11 +4,12 @@
 OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p)
 	: AudioProcessorEditor(&p), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white)
 {
+    juce::Desktop::getInstance().setDefaultLookAndFeel(&lookAndFeel);
+    setLookAndFeel(&lookAndFeel);
+
     addAndMakeVisible(tabs);
-    tabs.addTab("Main", juce::Colours::white, &settings, false);
-    tabs.addTab("MIDI", juce::Colours::white, &midi, false);
-    tabs.setTabBackgroundColour(0, juce::Colours::white);
-    tabs.setTabBackgroundColour(1, juce::Colours::white);
+    tabs.addTab("Main", getLookAndFeel().findColour(tabbedComponentBackgroundColourId), &settings, false);
+    tabs.addTab("MIDI", getLookAndFeel().findColour(tabbedComponentBackgroundColourId), &midi, false);
     addAndMakeVisible(volume);
 
     menuBar.setModel(&menuBarModel);
@@ -53,12 +54,15 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
         }
     }
 
-    juce::Desktop::getInstance().setDefaultLookAndFeel(&lookAndFeel);
-    setLookAndFeel(&lookAndFeel);
-
     setSize(1100, 750);
     setResizable(true, true);
     setResizeLimits(500, 400, 999999, 999999);
+
+    layout.setItemLayout(0, -0.3, -1.0, -0.7);
+    layout.setItemLayout(1, 7, 7, 7);
+    layout.setItemLayout(2, -0.1, -1.0, -0.3);
+
+    addAndMakeVisible(resizerBar);
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
@@ -96,21 +100,31 @@ void OscirenderAudioProcessorEditor::resized() {
     auto volumeArea = area.removeFromLeft(30);
     volume.setBounds(volumeArea.withSizeKeepingCentre(volumeArea.getWidth(), juce::jmin(volumeArea.getHeight(), 300)));
     area.removeFromLeft(3);
-    auto sections = 2;
     bool editorVisible = false;
+
+    juce::Component dummy;
+
     {
         juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+
         int originalIndex = audioProcessor.getCurrentFileIndex();
         int index = editingPerspective ? 0 : audioProcessor.getCurrentFileIndex() + 1;
         if (originalIndex != -1 || editingPerspective) {
             if (codeEditors[index]->isVisible()) {
-                sections++;
                 editorVisible = true;
-                codeEditors[index]->setBounds(area.removeFromRight(getWidth() / sections));
+
+                juce::Component* columns[] = { &dummy, &resizerBar, codeEditors[index].get() };
+
+                layout.layOutComponents(columns, 3, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
+                auto dummyBounds = dummy.getBounds();
+                collapseButton.setBounds(dummyBounds.removeFromRight(20));
+
+                area = dummyBounds;
+                
             } else {
                 codeEditors[index]->setBounds(0, 0, 0, 0);
+                collapseButton.setBounds(area.removeFromRight(20));
             }
-            collapseButton.setBounds(area.removeFromRight(20));
         } else {
             collapseButton.setBounds(0, 0, 0, 0);
         }
@@ -126,7 +140,6 @@ void OscirenderAudioProcessorEditor::resized() {
         collapseButton.setShape(path, false, true, true);
     }
     
-    settings.sections = sections;
     tabs.setBounds(area);
 
     repaint();

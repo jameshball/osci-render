@@ -4,42 +4,52 @@
 SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
     addAndMakeVisible(effects);
     addAndMakeVisible(main);
+    addAndMakeVisible(columnResizerBar);
+    addAndMakeVisible(rowResizerBar);
     addChildComponent(lua);
     addChildComponent(obj);
     addChildComponent(txt);
+
+    columnLayout.setItemLayout(0, -0.1, -0.9, -0.4);
+    columnLayout.setItemLayout(1, 7, 7, 7);
+    columnLayout.setItemLayout(2, -0.1, -0.9, -0.6);
+
+    rowLayout.setItemLayout(0, -0.1, -1.0, -0.63);
+    rowLayout.setItemLayout(1, 7, 7, 7);
+    rowLayout.setItemLayout(2, -0.1, -0.9, -0.37);
 }
 
 
 void SettingsComponent::resized() {
     auto area = getLocalBounds();
-    auto effectsSection = area.removeFromRight(1.2 * pluginEditor.getWidth() / sections);
     area.removeFromLeft(5);
-    area.removeFromRight(3);
+    area.removeFromRight(5);
     area.removeFromTop(5);
     area.removeFromBottom(5);
 
-    main.setBounds(area);
-    if (lua.isVisible() || obj.isVisible() || txt.isVisible()) {
-        int height = txt.isVisible() ? 150 : 300;
-        auto altEffectsSection = effectsSection.removeFromBottom(juce::jmin(effectsSection.getHeight() / 2, height));
-        altEffectsSection.removeFromTop(3);
-        altEffectsSection.removeFromLeft(2);
-        altEffectsSection.removeFromRight(5);
-        altEffectsSection.removeFromBottom(5);
+    juce::Component dummy;
 
-        lua.setBounds(altEffectsSection);
-        obj.setBounds(altEffectsSection);
-        txt.setBounds(altEffectsSection);
+    juce::Component* columns[] = { &main, &columnResizerBar, &dummy };
+    columnLayout.layOutComponents(columns, 3, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
 
-        effectsSection.removeFromBottom(2);
-    } else {
-        effectsSection.removeFromBottom(5);
+    juce::Component* effectSettings = nullptr;
+
+    if (lua.isVisible()) {
+        effectSettings = &lua;
+    } else if (obj.isVisible()) {
+        effectSettings = &obj;
+    } else if (txt.isVisible()) {
+        effectSettings = &txt;
     }
 
-    effectsSection.removeFromLeft(2);
-    effectsSection.removeFromRight(5);
-    effectsSection.removeFromTop(5);
-    effects.setBounds(effectsSection);
+    juce::Component* rows[] = { &effects, &rowResizerBar, effectSettings };
+
+    // use the dummy component to work out the bounds of the rows
+    if (effectSettings != nullptr) {
+        rowLayout.layOutComponents(rows, 3, dummy.getX(), dummy.getY(), dummy.getWidth(), dummy.getHeight(), true, true);
+    } else {
+        effects.setBounds(dummy.getBounds());
+    }
 }
 
 void SettingsComponent::fileUpdated(juce::String fileName) {

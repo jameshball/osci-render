@@ -4,7 +4,6 @@
 EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, int index) : effect(effect), index(index), audioProcessor(p) {
     addAndMakeVisible(slider);
     addChildComponent(lfoSlider);
-    addAndMakeVisible(selected);
     addAndMakeVisible(lfo);
 
     lfo.addItem("Static", static_cast<int>(LfoType::Static));
@@ -16,19 +15,14 @@ EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, in
     lfo.addItem("Reverse Sawtooth", static_cast<int>(LfoType::ReverseSawtooth));
     lfo.addItem("Noise", static_cast<int>(LfoType::Noise));
 
+    // temporarily disabling tooltips
+    // setTooltip(effect.getDescription());
+
     effect.addListener(index, this);
     setupComponent();
 }
 
-EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, int index, bool checkboxVisible) : EffectComponent(p, effect, index) {
-    setCheckboxVisible(checkboxVisible);
-}
-
 EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect) : EffectComponent(p, effect, 0) {}
-
-EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, bool checkboxVisible) : EffectComponent(p, effect) {
-    setCheckboxVisible(checkboxVisible);
-}
 
 void EffectComponent::setupComponent() {
     EffectParameter* parameter = effect.parameters[index];
@@ -38,9 +32,6 @@ void EffectComponent::setupComponent() {
 
     slider.setSliderStyle(juce::Slider::LinearHorizontal);
     slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 70, slider.getTextBoxHeight());
-
-    bool enabled = effect.enabled == nullptr || effect.enabled->getValue();
-    selected.setToggleState(enabled, juce::dontSendNotification);
 
     lfoEnabled = parameter->lfo != nullptr && parameter->lfoRate != nullptr;
     if (lfoEnabled) {
@@ -127,15 +118,8 @@ void EffectComponent::resized() {
         lfo.setBounds(bounds.removeFromRight(100).reduced(5));
     }
 
-    auto checkboxLabel = bounds.removeFromLeft(120);
-
-    if (checkboxVisible) {
-        checkboxLabel.removeFromLeft(2);
-        selected.setBounds(checkboxLabel.removeFromLeft(25));
-    } else {
-        checkboxLabel.removeFromLeft(5);
-    }
-    textBounds = checkboxLabel;
+    textBounds = bounds.removeFromLeft(120);
+    textBounds.removeFromLeft(5);
     slider.setBounds(bounds);
     lfoSlider.setBounds(bounds);
 }
@@ -176,8 +160,4 @@ void EffectComponent::handleAsyncUpdate() {
 void EffectComponent::setComponent(std::shared_ptr<juce::Component> component) {
 	this->component = component;
     addAndMakeVisible(component.get());
-}
-
-void EffectComponent::setCheckboxVisible(bool visible) {
-    checkboxVisible = visible;
 }

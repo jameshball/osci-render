@@ -8,6 +8,7 @@ enum ColourIds {
     effectComponentBackgroundColourId,
     effectComponentHandleColourId,
     sliderThumbOutlineColourId,
+    tabbedComponentBackgroundColourId,
 };
 
 namespace Colours {
