@@ -36,56 +36,62 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
 
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<BitCrushEffect>(),
-        new EffectParameter("Bit Crush", "description", "bitCrush", VERSION_HINT, 0.0, 0.0, 1.0)
+        new EffectParameter("Bit Crush", "Limits the resolution of points drawn to the screen, making the image look pixelated, and making the audio sound more 'digital' and distorted.", "bitCrush", VERSION_HINT, 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<BulgeEffect>(),
-        new EffectParameter("Bulge", "description", "bulge", VERSION_HINT, 0.0, 0.0, 1.0)
+        new EffectParameter("Bulge", "Applies a bulge that makes the centre of the image larger, and squishes the edges of the image. This applies a distortion to the audio.", "bulge", VERSION_HINT, 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<RotateEffect>(),
-        new EffectParameter("2D Rotate", "description", "2DRotateSpeed", VERSION_HINT, 0.0, 0.0, 1.0)
+        new EffectParameter("2D Rotate", "Rotates the image, and pans the audio.", "2DRotateSpeed", VERSION_HINT, 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<VectorCancellingEffect>(),
-        new EffectParameter("Vector Cancelling", "description", "vectorCancelling", VERSION_HINT, 0.0, 0.0, 1.0)
+        new EffectParameter("Vector Cancelling", "Inverts the audio and image every few samples to 'cancel out' the audio, making the audio quiet, and distorting the image.", "vectorCancelling", VERSION_HINT, 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<DistortEffect>(false),
-        new EffectParameter("Distort X", "description", "distortX", VERSION_HINT, 0.0, 0.0, 1.0)
+        new EffectParameter("Distort X", "Distorts the image in the horizontal direction by jittering the audio sample being drawn.", "distortX", VERSION_HINT, 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<DistortEffect>(true),
-        new EffectParameter("Distort Y", "description", "distortY", VERSION_HINT, 0.0, 0.0, 1.0)
+        new EffectParameter("Distort Y", "Distorts the image in the vertical direction by jittering the audio sample being drawn.", "distortY", VERSION_HINT, 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             input.x += values[0];
             input.y += values[1];
             return input;
-        }, std::vector<EffectParameter*>{new EffectParameter("Translate X", "description", "translateX", VERSION_HINT, 0.0, -1.0, 1.0), new EffectParameter("Translate Y", "description", "translateY", VERSION_HINT, 0.0, -1.0, 1.0)}
+        }, std::vector<EffectParameter*>{
+            new EffectParameter("Translate X", "Moves the image horizontally.", "translateX", VERSION_HINT, 0.0, -1.0, 1.0),
+            new EffectParameter("Translate Y", "Moves the image vertically.", "translateY", VERSION_HINT, 0.0, -1.0, 1.0)
+        }
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<SmoothEffect>(),
-        new EffectParameter("Smoothing", "description", "smoothing", VERSION_HINT, 0.0, 0.0, 1.0)
+        new EffectParameter("Smoothing", "This works as a low-pass frequency filter that removes high frequencies, making the image look smoother, and audio sound less harsh.", "smoothing", VERSION_HINT, 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         wobbleEffect,
-        new EffectParameter("Wobble", "description", "wobble", VERSION_HINT, 0.0, 0.0, 1.0)
+        new EffectParameter("Wobble", "Adds a sine wave of the prominent frequency in the audio currently playing. The sine wave's frequency is slightly offset to create a subtle 'wobble' in the image. Increasing the slider increases the strength of the wobble.", "wobble", VERSION_HINT, 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         delayEffect,
-        std::vector<EffectParameter*>{new EffectParameter("Delay Decay", "description", "delayDecay", VERSION_HINT, 0.0, 0.0, 1.0), new EffectParameter("Delay Length", "description", "delayLength", VERSION_HINT, 0.5, 0.0, 1.0)}
+        std::vector<EffectParameter*>{
+            new EffectParameter("Delay Decay", "Adds repetitions, delays, or echos to the audio. This slider controls the volume of the echo.", "delayDecay", VERSION_HINT, 0.0, 0.0, 1.0),
+            new EffectParameter("Delay Length", "Controls the time in seconds between echos.", "delayLength", VERSION_HINT, 0.5, 0.0, 1.0)
+        }
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         perspectiveEffect,
         std::vector<EffectParameter*>{
-            new EffectParameter("3D Perspective", "description", "perspectiveStrength", VERSION_HINT, 0.0, 0.0, 1.0),
-            new EffectParameter("Depth (z)", "description", "perspectiveZPos", VERSION_HINT, 0.1, 0.0, 1.0),
-            new EffectParameter("Rotate Speed", "description", "perspectiveRotateSpeed", VERSION_HINT, 0.0, -1.0, 1.0),
-            new EffectParameter("Rotate X", "description", "perspectiveRotateX", VERSION_HINT, 1.0, -1.0, 1.0),
-            new EffectParameter("Rotate Y", "description", "perspectiveRotateY", VERSION_HINT, 1.0, -1.0, 1.0),
-            new EffectParameter("Rotate Z", "description", "perspectiveRotateZ", VERSION_HINT, 0.0, -1.0, 1.0),
+            new EffectParameter("3D Perspective", "Controls the strength of the 3D perspective effect which treats the image as a 3D object that can be rotated.", "perspectiveStrength", VERSION_HINT, 0.0, 0.0, 1.0),
+            new EffectParameter("Depth (z)", "Controls how far away the 3D object is drawn away from the camera (the Z position).", "perspectiveZPos", VERSION_HINT, 0.1, 0.0, 1.0),
+            new EffectParameter("Rotate Speed", "Controls how fast the 3D object rotates in the direction determined by the rotation sliders below.", "perspectiveRotateSpeed", VERSION_HINT, 0.0, -1.0, 1.0),
+            new EffectParameter("Rotate X", "Controls the rotation of the object in the X axis.", "perspectiveRotateX", VERSION_HINT, 1.0, -1.0, 1.0),
+            new EffectParameter("Rotate Y", "Controls the rotation of the object in the Y axis.", "perspectiveRotateY", VERSION_HINT, 1.0, -1.0, 1.0),
+            new EffectParameter("Rotate Z", "Controls the rotation of the object in the Z axis.", "perspectiveRotateZ", VERSION_HINT, 0.0, -1.0, 1.0),
         }
     ));
     toggleableEffects.push_back(traceMax);
@@ -264,7 +270,12 @@ void OscirenderAudioProcessor::addLuaSlider() {
 
     luaEffects.push_back(std::make_shared<Effect>(
         std::make_shared<LuaEffect>(sliderName, *this),
-        new EffectParameter("Lua " + sliderName, "description", "lua" + sliderName, VERSION_HINT, 0.0, 0.0, 1.0, 0.001, false)
+        new EffectParameter(
+            "Lua Slider " + sliderName,
+            "Controls the value of the Lua variable called slider_" + sliderName + ".",
+            "lua" + sliderName,
+            VERSION_HINT, 0.0, 0.0, 1.0, 0.001, false
+        )
     ));
 
     auto& effect = luaEffects.back();

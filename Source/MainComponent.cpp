@@ -83,6 +83,9 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 		pluginEditor.fileUpdated(fileName);
 	};
 
+	fileName.setFont(juce::Font(16.0f, juce::Font::plain));
+	fileName.setText("filename");
+
 	fileName.onReturnKey = [this] {
 		createFile.triggerClick();
 	};

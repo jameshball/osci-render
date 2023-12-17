@@ -73,6 +73,11 @@ ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 	rotateX.setComponent(fixedRotateX);
 	rotateY.setComponent(fixedRotateY);
 	rotateZ.setComponent(fixedRotateZ);
+
+	juce::String tooltip = "Toggles whether the rotation around this axis is fixed, or changes according to the rotation speed.";
+	fixedRotateX->setTooltip(tooltip);
+	fixedRotateY->setTooltip(tooltip);
+	fixedRotateZ->setTooltip(tooltip);
 }
 
 ObjComponent::~ObjComponent() {

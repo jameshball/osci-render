@@ -86,14 +86,19 @@ void EffectsListComponent::resized() {
 std::shared_ptr<juce::Component> EffectsListComponent::createComponent(EffectParameter* parameter) {
 	if (parameter->paramID == "perspectiveRotateX" || parameter->paramID == "perspectiveRotateY" || parameter->paramID == "perspectiveRotateZ") {
 		BooleanParameter* toggle;
+		juce::String axis;
 		if (parameter->paramID == "perspectiveRotateX") {
             toggle = audioProcessor.perspectiveEffect->fixedRotateX;
+			axis = "X";
 		} else if (parameter->paramID == "perspectiveRotateY") {
             toggle = audioProcessor.perspectiveEffect->fixedRotateY;
+			axis = "Y";
 		} else if (parameter->paramID == "perspectiveRotateZ") {
             toggle = audioProcessor.perspectiveEffect->fixedRotateZ;
+			axis = "Z";
         }
 		std::shared_ptr<SvgButton> button = std::make_shared<SvgButton>(parameter->name, BinaryData::fixed_rotate_svg, "white", "red", toggle);
+		button->setTooltip("Toggles whether the rotation around the " + axis + " axis is fixed, or changes according to the rotation speed.");
 		button->onClick = [this, toggle] {
 			toggle->setBoolValueNotifyingHost(!toggle->getBoolValue());
         };
@@ -103,6 +108,7 @@ std::shared_ptr<juce::Component> EffectsListComponent::createComponent(EffectPar
 		std::weak_ptr<SvgButton> weakButton = button;
 		button->setEdgeIndent(5);
 		button->setToggleState(editor.editingPerspective, juce::dontSendNotification);
+		button->setTooltip("Toggles whether the text editor is editing the currently open file, or the Lua 3D perspective function.");
 		button->onClick = [this, weakButton] {
 			if (auto button = weakButton.lock()) {
                 editor.editPerspectiveFunction(button->getToggleState());
