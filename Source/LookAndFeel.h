@@ -34,6 +34,37 @@ namespace Dracula {
     const juce::Colour yellow{0xfff1fa8c};
 }
 
+namespace LookAndFeelHelpers
+{
+    static juce::Colour createBaseColour (juce::Colour buttonColour,
+        bool hasKeyboardFocus,
+        bool shouldDrawButtonAsHighlighted,
+        bool shouldDrawButtonAsDown) noexcept
+    {
+        const float sat = hasKeyboardFocus ? 1.3f : 0.9f;
+        const juce::Colour baseColour (buttonColour.withMultipliedSaturation (sat));
+
+        if (shouldDrawButtonAsDown)        return baseColour.contrasting (0.2f);
+        if (shouldDrawButtonAsHighlighted) return baseColour.contrasting (0.1f);
+
+        return baseColour;
+    }
+
+    static juce::TextLayout layoutTooltipText (const juce::String& text, juce::Colour colour) noexcept
+    {
+        const float tooltipFontSize = 13.0f;
+        const int maxToolTipWidth = 400;
+
+        juce::AttributedString s;
+        s.setJustification (juce::Justification::centred);
+        s.append (text, juce::Font (tooltipFontSize, juce::Font::bold), colour);
+
+        juce::TextLayout tl;
+        tl.createLayoutWithBalancedLineLengths (s, (float) maxToolTipWidth);
+        return tl;
+    }
+}
+
 class OscirenderLookAndFeel : public juce::LookAndFeel_V4 {
 public:
     OscirenderLookAndFeel();
@@ -58,6 +89,6 @@ public:
         bool shouldDrawButtonAsHighlighted,
         bool shouldDrawButtonAsDown) override;
     void drawMenuBarBackground(juce::Graphics& g, int width, int height, bool, juce::MenuBarComponent& menuBar) override;
-
     juce::CodeEditorComponent::ColourScheme getDefaultColourScheme();
+    void drawTooltip(juce::Graphics& g, const juce::String& text, int width, int height) override;
 };

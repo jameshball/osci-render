@@ -58,7 +58,7 @@ private:
     juce::StretchableLayoutManager layout;
     juce::StretchableLayoutResizerBar resizerBar{&layout, 1, true};
 
-    juce::TooltipWindow tooltipWindow{this};
+    juce::TooltipWindow tooltipWindow{this, 0};
 
     std::atomic<bool> updatingDocumentsWithParserLock = false;
 

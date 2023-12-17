@@ -36,68 +36,57 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
 
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<BitCrushEffect>(),
-        new EffectParameter("Bit Crush", "bitCrush", VERSION_HINT, 0.0, 0.0, 1.0),
-        "bitCrush"
+        new EffectParameter("Bit Crush", "description", "bitCrush", VERSION_HINT, 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<BulgeEffect>(),
-        new EffectParameter("Bulge", "bulge", VERSION_HINT, 0.0, 0.0, 1.0),
-        "bulge"
+        new EffectParameter("Bulge", "description", "bulge", VERSION_HINT, 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<RotateEffect>(),
-        new EffectParameter("2D Rotate", "2DRotateSpeed", VERSION_HINT, 0.0, 0.0, 1.0),
-        "2DRotate"
+        new EffectParameter("2D Rotate", "description", "2DRotateSpeed", VERSION_HINT, 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<VectorCancellingEffect>(),
-        new EffectParameter("Vector Cancelling", "vectorCancelling", VERSION_HINT, 0.0, 0.0, 1.0),
-        "vectorCancelling"
+        new EffectParameter("Vector Cancelling", "description", "vectorCancelling", VERSION_HINT, 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<DistortEffect>(false),
-        new EffectParameter("Distort X", "distortX", VERSION_HINT, 0.0, 0.0, 1.0),
-        "distortX"
+        new EffectParameter("Distort X", "description", "distortX", VERSION_HINT, 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<DistortEffect>(true),
-        new EffectParameter("Distort Y", "distortY", VERSION_HINT, 0.0, 0.0, 1.0),
-        "distortY"
+        new EffectParameter("Distort Y", "description", "distortY", VERSION_HINT, 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             input.x += values[0];
             input.y += values[1];
             return input;
-        }, std::vector<EffectParameter*>{new EffectParameter("Translate X", "translateX", VERSION_HINT, 0.0, -1.0, 1.0), new EffectParameter("Translate Y", "translateY", VERSION_HINT, 0.0, -1.0, 1.0)},
-        "translate"
+        }, std::vector<EffectParameter*>{new EffectParameter("Translate X", "description", "translateX", VERSION_HINT, 0.0, -1.0, 1.0), new EffectParameter("Translate Y", "description", "translateY", VERSION_HINT, 0.0, -1.0, 1.0)}
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<SmoothEffect>(),
-        new EffectParameter("Smoothing", "smoothing", VERSION_HINT, 0.0, 0.0, 1.0),
-        "smoothing"
+        new EffectParameter("Smoothing", "description", "smoothing", VERSION_HINT, 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         wobbleEffect,
-        new EffectParameter("Wobble", "wobble", VERSION_HINT, 0.0, 0.0, 1.0),
-        "wobble"
+        new EffectParameter("Wobble", "description", "wobble", VERSION_HINT, 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         delayEffect,
-        std::vector<EffectParameter*>{new EffectParameter("Delay Decay", "delayDecay", VERSION_HINT, 0.0, 0.0, 1.0), new EffectParameter("Delay Length", "delayLength", VERSION_HINT, 0.5, 0.0, 1.0)},
-        "delay"
+        std::vector<EffectParameter*>{new EffectParameter("Delay Decay", "description", "delayDecay", VERSION_HINT, 0.0, 0.0, 1.0), new EffectParameter("Delay Length", "description", "delayLength", VERSION_HINT, 0.5, 0.0, 1.0)}
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         perspectiveEffect,
         std::vector<EffectParameter*>{
-            new EffectParameter("3D Perspective", "perspectiveStrength", VERSION_HINT, 0.0, 0.0, 1.0),
-            new EffectParameter("Depth (z)", "perspectiveZPos", VERSION_HINT, 0.1, 0.0, 1.0),
-            new EffectParameter("Rotate Speed", "perspectiveRotateSpeed", VERSION_HINT, 0.0, -1.0, 1.0),
-            new EffectParameter("Rotate X", "perspectiveRotateX", VERSION_HINT, 1.0, -1.0, 1.0),
-            new EffectParameter("Rotate Y", "perspectiveRotateY", VERSION_HINT, 1.0, -1.0, 1.0),
-            new EffectParameter("Rotate Z", "perspectiveRotateZ", VERSION_HINT, 0.0, -1.0, 1.0),
-        },
-        "perspective"
+            new EffectParameter("3D Perspective", "description", "perspectiveStrength", VERSION_HINT, 0.0, 0.0, 1.0),
+            new EffectParameter("Depth (z)", "description", "perspectiveZPos", VERSION_HINT, 0.1, 0.0, 1.0),
+            new EffectParameter("Rotate Speed", "description", "perspectiveRotateSpeed", VERSION_HINT, 0.0, -1.0, 1.0),
+            new EffectParameter("Rotate X", "description", "perspectiveRotateX", VERSION_HINT, 1.0, -1.0, 1.0),
+            new EffectParameter("Rotate Y", "description", "perspectiveRotateY", VERSION_HINT, 1.0, -1.0, 1.0),
+            new EffectParameter("Rotate Z", "description", "perspectiveRotateZ", VERSION_HINT, 0.0, -1.0, 1.0),
+        }
     ));
     toggleableEffects.push_back(traceMax);
     toggleableEffects.push_back(traceMin);
@@ -275,8 +264,7 @@ void OscirenderAudioProcessor::addLuaSlider() {
 
     luaEffects.push_back(std::make_shared<Effect>(
         std::make_shared<LuaEffect>(sliderName, *this),
-        new EffectParameter("Lua " + sliderName, "lua" + sliderName, VERSION_HINT, 0.0, 0.0, 1.0, 0.001, false),
-        "lua" + sliderName
+        new EffectParameter("Lua " + sliderName, "description", "lua" + sliderName, VERSION_HINT, 0.0, 0.0, 1.0, 0.001, false)
     ));
 
     auto& effect = luaEffects.back();

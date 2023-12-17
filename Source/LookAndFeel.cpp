@@ -39,6 +39,8 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     setColour(juce::TabbedButtonBar::frontTextColourId, juce::Colours::white);
     setColour(juce::TabbedComponent::outlineColourId, Colours::veryDark);
     setColour(tabbedComponentBackgroundColourId, Colours::veryDark);
+    setColour(juce::TooltipWindow::backgroundColourId, Colours::veryDark);
+    setColour(juce::TooltipWindow::outlineColourId, juce::Colours::white);
 
     getCurrentColourScheme().setUIColour(ColourScheme::widgetBackground, Colours::veryDark);
     getCurrentColourScheme().setUIColour(ColourScheme::UIColour::defaultFill, Colours::accentColor);
@@ -173,6 +175,20 @@ void OscirenderLookAndFeel::drawMenuBarBackground(juce::Graphics& g, int width, 
 
     g.setColour(menuBar.findColour(juce::TextButton::buttonColourId));
     g.fillRect(r);
+}
+
+void OscirenderLookAndFeel::drawTooltip(juce::Graphics& g, const juce::String& text, int width, int height) {
+    juce::Rectangle<int> bounds (width, height);
+    auto cornerSize = 5.0f;
+
+    g.setColour(findColour(juce::TooltipWindow::backgroundColourId));
+    g.fillRect(bounds.toFloat());
+
+    g.setColour(findColour(juce::TooltipWindow::outlineColourId));
+    g.drawRect(bounds.toFloat().reduced(0.5f, 0.5f), 1.0f);
+
+    LookAndFeelHelpers::layoutTooltipText (text, findColour (juce::TooltipWindow::textColourId))
+        .draw (g, { static_cast<float> (width), static_cast<float> (height) });
 }
 
 juce::CodeEditorComponent::ColourScheme OscirenderLookAndFeel::getDefaultColourScheme() {

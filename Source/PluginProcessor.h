@@ -81,24 +81,36 @@ public:
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             frequency = values[0];
             return input;
-        }, new EffectParameter("Frequency", "frequency", VERSION_HINT, 440.0, 0.0, 12000.0, 0.1),
-        "Controls how many times per second the image is drawn, thereby controlling the pitch of the sound. Lower frequencies result in more-accurately drawn images, but more flickering, and vice versa."
+        }, new EffectParameter(
+            "Frequency",
+            "Controls how many times per second the image is drawn, thereby controlling the pitch of the sound. Lower frequencies result in more-accurately drawn images, but more flickering, and vice versa.",
+            "frequency",
+            VERSION_HINT, 440.0, 0.0, 12000.0, 0.1
+        )
     );
 
     std::shared_ptr<Effect> volumeEffect = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             volume = values[0];
             return input;
-        }, new EffectParameter("Volume", "volume", VERSION_HINT, 1.0, 0.0, 3.0),
-        "Controls the volume of the sound. Works by scaling the image and sound by a factor."
+        }, new EffectParameter(
+            "Volume",
+            "Controls the volume of the sound. Works by scaling the image and sound by a factor.",
+            "volume",
+            VERSION_HINT, 1.0, 0.0, 3.0
+        )
     );
 
     std::shared_ptr<Effect> thresholdEffect = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             threshold = values[0];
             return input;
-        }, new EffectParameter("Threshold", "threshold", VERSION_HINT, 1.0, 0.0, 1.0),
-        "Clips the sound and image to a maximum value. Applying a harsher threshold results in a more distorted sound."
+        }, new EffectParameter(
+            "Threshold",
+            "Clips the sound and image to a maximum value. Applying a harsher threshold results in a more distorted sound.",
+            "threshold",
+            VERSION_HINT, 1.0, 0.0, 1.0
+        )
     );
     
     std::shared_ptr<Effect> focalLength = std::make_shared<Effect>(
@@ -109,8 +121,12 @@ public:
                 camera->setFocalLength(values[0]);
             }
             return input;
-		}, new EffectParameter("Focal length", "objFocalLength", VERSION_HINT, 1.0, 0.0, 2.0),
-        "Controls the focal length of the camera being used to render the 3D object. A lower focal length results in a wider field of view, distorting the image, and making the image smaller."
+		}, new EffectParameter(
+            "Focal length",
+            "Controls the focal length of the camera being used to render the 3D object. A lower focal length results in a wider field of view, distorting the image, and making the image smaller.",
+            "objFocalLength",
+            VERSION_HINT, 1.0, 0.0, 2.0
+        )
     );
 
     BooleanParameter* fixedRotateX = new BooleanParameter("Object Fixed Rotate X", "objFixedRotateX", VERSION_HINT, false);
@@ -129,8 +145,12 @@ public:
                 }
             }
             return input;
-        }, new EffectParameter("Object Rotate X", "objRotateX", VERSION_HINT, 1.0, -1.0, 1.0),
-        "Controls the rotation of the 3D object around the X axis. When Object Fixed Rotate X is enabled, the object is unaffected by the rotation speed, and remains in a fixed position."
+        }, new EffectParameter(
+            "Object Rotate X",
+            "Controls the rotation of the 3D object around the X axis. When Object Fixed Rotate X is enabled, the object is unaffected by the rotation speed, and remains in a fixed position.",
+            "objRotateX",
+            VERSION_HINT, 1.0, -1.0, 1.0
+        )
     );
     std::shared_ptr<Effect> rotateY = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
@@ -145,8 +165,12 @@ public:
                 }
             }
             return input;
-        }, new EffectParameter("Object Rotate Y", "objRotateY", VERSION_HINT, 1.0, -1.0, 1.0),
-        "Controls the rotation of the 3D object around the Y axis. When Object Fixed Rotate Y is enabled, the object is unaffected by the rotation speed, and remains in a fixed position."
+        }, new EffectParameter(
+            "Object Rotate Y",
+            "Controls the rotation of the 3D object around the Y axis. When Object Fixed Rotate Y is enabled, the object is unaffected by the rotation speed, and remains in a fixed position.",
+            "objRotateY",
+            VERSION_HINT, 1.0, -1.0, 1.0
+        )
     );
     std::shared_ptr<Effect> rotateZ = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
@@ -161,8 +185,12 @@ public:
                 }
             }
             return input;
-        }, new EffectParameter("Object Rotate Z", "objRotateZ", VERSION_HINT, 0.0, -1.0, 1.0),
-        "Controls the rotation of the 3D object around the Z axis. When Object Fixed Rotate Z is enabled, the object is unaffected by the rotation speed, and remains in a fixed position."
+        }, new EffectParameter(
+            "Object Rotate Z",
+            "Controls the rotation of the 3D object around the Z axis. When Object Fixed Rotate Z is enabled, the object is unaffected by the rotation speed, and remains in a fixed position.",
+            "objRotateZ",
+            VERSION_HINT, 0.0, -1.0, 1.0
+        )
     );
     std::shared_ptr<Effect> rotateSpeed = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
@@ -172,21 +200,33 @@ public:
                 obj->setRotationSpeed(values[0]);
             }
             return input;
-		}, new EffectParameter("Rotate Speed", "objRotateSpeed", VERSION_HINT, 0.0, -1.0, 1.0),
-       "Controls the speed at which the 3D object rotates. A negative value results in the object rotating in the opposite direction. The rotate speed is scaled by the different Object Rotate Axis values to rotate the object."
+		}, new EffectParameter(
+            "Rotate Speed",
+            "Controls the speed at which the 3D object rotates. A negative value results in the object rotating in the opposite direction. The rotate speed is scaled by the different Object Rotate Axis values to rotate the object.",
+            "objRotateSpeed",
+            VERSION_HINT, 0.0, -1.0, 1.0
+        )
     );
 
     std::shared_ptr<Effect> traceMax = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             return input;
-        }, new EffectParameter("Trace max", "traceMax", VERSION_HINT, 1.0, 0.0, 1.0),
-        "Defines the maximum proportion of the image that is drawn before skipping to the next frame. This has the effect of 'tracing' out the image from a single dot when animated. By default, we draw until the end of the frame, so this value is 1.0."
+        }, new EffectParameter(
+            "Trace max",
+            "Defines the maximum proportion of the image that is drawn before skipping to the next frame. This has the effect of 'tracing' out the image from a single dot when animated. By default, we draw until the end of the frame, so this value is 1.0.",
+            "traceMax",
+            VERSION_HINT, 1.0, 0.0, 1.0
+        )
     );
     std::shared_ptr<Effect> traceMin = std::make_shared<Effect>(
         [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
             return input;
-        }, new EffectParameter("Trace min", "traceMin", VERSION_HINT, 0.0, 0.0, 1.0),
-        "Defines the proportion of the image that drawing starts from. This has the effect of 'tracing' out the image from a single dot when animated. By default, we start drawing from the beginning of the frame, so this value is 0.0."
+        }, new EffectParameter(
+            "Trace min",
+            "Defines the proportion of the image that drawing starts from. This has the effect of 'tracing' out the image from a single dot when animated. By default, we start drawing from the beginning of the frame, so this value is 0.0.",
+            "traceMin",
+            VERSION_HINT, 0.0, 0.0, 1.0
+        )
     );
 
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();

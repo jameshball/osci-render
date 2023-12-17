@@ -5,6 +5,9 @@ EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, in
     addAndMakeVisible(slider);
     addChildComponent(lfoSlider);
     addAndMakeVisible(lfo);
+    addAndMakeVisible(label);
+
+    label.setFont(juce::Font(13.0f));
 
     lfo.addItem("Static", static_cast<int>(LfoType::Static));
     lfo.addItem("Sine", static_cast<int>(LfoType::Sine));
@@ -15,9 +18,6 @@ EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, in
     lfo.addItem("Reverse Sawtooth", static_cast<int>(LfoType::ReverseSawtooth));
     lfo.addItem("Noise", static_cast<int>(LfoType::Noise));
 
-    // temporarily disabling tooltips
-    // setTooltip(effect.getDescription());
-
     effect.addListener(index, this);
     setupComponent();
 }
@@ -26,6 +26,9 @@ EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect) : 
 
 void EffectComponent::setupComponent() {
     EffectParameter* parameter = effect.parameters[index];
+
+    label.setTooltip(parameter->description);
+    label.setText(parameter->name, juce::dontSendNotification);
 
     slider.setRange(parameter->min, parameter->max, parameter->step);
     slider.setValue(parameter->getValueUnnormalised(), juce::dontSendNotification);
@@ -118,16 +121,14 @@ void EffectComponent::resized() {
         lfo.setBounds(bounds.removeFromRight(100).reduced(5));
     }
 
-    textBounds = bounds.removeFromLeft(120);
-    textBounds.removeFromLeft(5);
+    bounds.removeFromLeft(5);
+    label.setBounds(bounds.removeFromLeft(120));
     slider.setBounds(bounds);
     lfoSlider.setBounds(bounds);
 }
 
 void EffectComponent::paint(juce::Graphics& g) {
     g.fillAll(findColour(effectComponentBackgroundColourId));
-    g.setColour(juce::Colours::white);
-    g.drawText(effect.parameters[index]->name, textBounds, juce::Justification::left);
 }
 
 void EffectComponent::mouseDown(const juce::MouseEvent& event) {
