@@ -46,7 +46,7 @@
 #include "EnvCurve.h"
 
 
-#define HANDLESIZE 7
+#define HANDLESIZE 11
 #define FINETUNE 0.001
 
 //#define MYDEBUG 1 // get rid of this later
@@ -121,6 +121,7 @@ public:
 private:
 	bool dontUpdateTimeAndValue;
 	void recalculatePosition();
+	void recalculateShouldDraw();
 	
 	juce::ComponentDragger dragger;
 	int lastX, lastY;
@@ -128,7 +129,7 @@ private:
 	EnvelopeHandleComponentConstrainer resizeLimits;
 	
 	double time, value;
-    bool shouldLockTime, shouldLockValue;
+    bool shouldLockTime, shouldLockValue, shouldDraw;
 	EnvCurve curve;
 	bool ignoreDrag;
 };
@@ -241,13 +242,14 @@ public:
 		Node = COLOUR_OFFSET,
 		ReleaseNode = COLOUR_OFFSET + 1,
 		LoopNode = COLOUR_OFFSET + 2,
-		Line = COLOUR_OFFSET + 3,
-		LoopLine = COLOUR_OFFSET + 4,
-		Background = COLOUR_OFFSET + 5,
-		GridLine = COLOUR_OFFSET + 6,
-		LegendText = COLOUR_OFFSET + 7,
-		LegendBackground = COLOUR_OFFSET + 8,
-		NumEnvColours = 9,
+		NodeOutline = COLOUR_OFFSET + 3,
+		Line = COLOUR_OFFSET + 4,
+		LoopLine = COLOUR_OFFSET + 5,
+		Background = COLOUR_OFFSET + 6,
+		GridLine = COLOUR_OFFSET + 7,
+		LegendText = COLOUR_OFFSET + 8,
+		LegendBackground = COLOUR_OFFSET + 9,
+		NumEnvColours = 10,
 	};
 	
 	enum MoveMode { MoveClip, MoveSlide, NumMoveModes };

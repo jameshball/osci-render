@@ -13,6 +13,7 @@
  UGEN++ can be redistributed and/or modified under the terms of the
  GNU General Public License, as published by the Free Software Foundation;
  either version 2 of the License, or (at your option) any later version.
+ either version 2 of the License, or (at your option) any later version.
  
  UGEN++ is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -88,15 +89,19 @@ void EnvelopeHandleComponentConstrainer::setAdjacentHandleLimits(int setLeftLimi
 }
 
 EnvelopeHandleComponent::EnvelopeHandleComponent()
-	:	dontUpdateTimeAndValue(false),
-		lastX(-1),
-		lastY(-1),
-		resizeLimits(this),
-        shouldLockTime(false),
-        shouldLockValue(false),
-		ignoreDrag(false)
+	: dontUpdateTimeAndValue(false),
+	lastX(-1),
+	lastY(-1),
+	resizeLimits(this),
+	shouldLockTime(false),
+	shouldLockValue(false),
+	shouldDraw(!shouldLockTime || !shouldLockValue),
+	ignoreDrag(false)
 {
-	setMouseCursor(juce::MouseCursor::CrosshairCursor);
+
+	if (shouldDraw) {
+		setMouseCursor(juce::MouseCursor::CrosshairCursor);
+	}
 	resetOffsets();
 }
 
@@ -191,28 +196,32 @@ void EnvelopeHandleComponent::updateLegend()
 
 void EnvelopeHandleComponent::paint(juce::Graphics& g)
 {
-	EnvelopeComponent *env = getParentComponent();
-	juce::Colour handleColour;
-	
-	if(env == 0)
-	{
-		handleColour = juce::Colour(0xFF69B4FF);
+	if (shouldDraw) {
+		EnvelopeComponent *env = getParentComponent();
+		juce::Colour handleColour;
+
+		if(env == 0)
+		{
+			handleColour = juce::Colour(0xFF69B4FF);
+		}
+		else if(env->isReleaseNode(this))
+		{
+			handleColour = findColour(EnvelopeComponent::ReleaseNode);
+		}
+		else if(env->isLoopNode(this))
+		{
+			handleColour = findColour(EnvelopeComponent::LoopNode);
+		}
+		else
+		{
+			handleColour = findColour(EnvelopeComponent::Node);
+		}
+
+		g.setColour(handleColour);
+		g.fillEllipse(1, 1, getWidth() - 2, getHeight() - 2);
+		g.setColour(findColour(EnvelopeComponent::NodeOutline));
+		g.drawEllipse(1, 1, getWidth() - 2, getHeight() - 2, 1.0f);
 	}
-	else if(env->isReleaseNode(this))
-	{
-		handleColour = findColour(EnvelopeComponent::ReleaseNode);
-	}
-	else if(env->isLoopNode(this))
-	{
-		handleColour = findColour(EnvelopeComponent::LoopNode);
-	}
-	else
-	{
-		handleColour = findColour(EnvelopeComponent::Node);
-	}
-	
-	g.setColour(handleColour);
-	g.fillRect(1, 1, getWidth()-2, getHeight()-2);
 }
 
 void EnvelopeHandleComponent::moved()
@@ -236,8 +245,12 @@ void EnvelopeHandleComponent::mouseEnter(const juce::MouseEvent& e)
 	printf("MyEnvelopeHandleComponent::mouseEnter\n");
 #endif
 	
-	setMouseCursor(juce::MouseCursor::CrosshairCursor);	
-	updateLegend();
+	if (shouldDraw) {
+		setMouseCursor(juce::MouseCursor::CrosshairCursor);
+		updateLegend();
+	} else {
+        setMouseCursor(juce::MouseCursor::NormalCursor);
+    }
 }
 
 void EnvelopeHandleComponent::mouseExit(const juce::MouseEvent& e)
@@ -256,60 +269,62 @@ void EnvelopeHandleComponent::mouseDown(const juce::MouseEvent& e)
 	printf("MyEnvelopeHandleComponent::mouseDown (%d, %d)\n", e.x, e.y);
 #endif
 	
-	setMouseCursor(juce::MouseCursor::NoCursor);
-	
-	if(e.mods.isShiftDown()) {
-		
-        if(!shouldLockTime && !shouldLockValue)
-        {
-            getParentComponent()->setLegendTextToDefault();
-            removeThisHandle();
+	if (shouldDraw) {
+		setMouseCursor(juce::MouseCursor::NoCursor);
+
+		if(e.mods.isShiftDown()) {
+
+			if(!shouldLockTime && !shouldLockValue)
+			{
+				getParentComponent()->setLegendTextToDefault();
+				removeThisHandle();
+			}
+
+			return; // dont send drag msg
+
+		} 
+		//else if(e.mods.isCtrlDown())
+		//{
+		//	if(getParentComponent()->getAllowNodeEditing())
+		//	{
+		//		ignoreDrag = true;
+		//		
+		//		if(PopupComponent::getActivePopups() < 1)
+		//		{
+		//			EnvelopeNodePopup::create(this, getScreenX()+e.x, getScreenY()+e.y);
+		//		}
+		//	}
+		//}
+		else 
+		{
+
+			offsetX = e.x;
+			offsetY = e.y;
+
+			resizeLimits.setMinimumOnscreenAmounts(HANDLESIZE,HANDLESIZE,HANDLESIZE,HANDLESIZE);
+
+			EnvelopeHandleComponent* previousHandle = getPreviousHandle();
+			EnvelopeHandleComponent* nextHandle = getNextHandle();
+
+			int leftLimit = previousHandle == 0 ? 0 : previousHandle->getX()+2;
+			int rightLimit = nextHandle == 0 ? getParentWidth()-HANDLESIZE : nextHandle->getX()-2;
+			//		int leftLimit = previousHandle == 0 ? 0 : previousHandle->getX();
+			//		int rightLimit = nextHandle == 0 ? getParentWidth()-HANDLESIZE : nextHandle->getX();
+
+
+			resizeLimits.setAdjacentHandleLimits(leftLimit, rightLimit);
+
+			dragger.startDraggingComponent(this, e);//&resizeLimits);
+
 		}
-        
-        return; // dont send drag msg
-		
-	} 
-	//else if(e.mods.isCtrlDown())
-	//{
-	//	if(getParentComponent()->getAllowNodeEditing())
-	//	{
-	//		ignoreDrag = true;
-	//		
-	//		if(PopupComponent::getActivePopups() < 1)
-	//		{
-	//			EnvelopeNodePopup::create(this, getScreenX()+e.x, getScreenY()+e.y);
-	//		}
-	//	}
-	//}
-	else 
-	{
-		
-		offsetX = e.x;
-		offsetY = e.y;
-		
-		resizeLimits.setMinimumOnscreenAmounts(HANDLESIZE,HANDLESIZE,HANDLESIZE,HANDLESIZE);
-		
-		EnvelopeHandleComponent* previousHandle = getPreviousHandle();
-		EnvelopeHandleComponent* nextHandle = getNextHandle();
-		
-		int leftLimit = previousHandle == 0 ? 0 : previousHandle->getX()+2;
-		int rightLimit = nextHandle == 0 ? getParentWidth()-HANDLESIZE : nextHandle->getX()-2;
-//		int leftLimit = previousHandle == 0 ? 0 : previousHandle->getX();
-//		int rightLimit = nextHandle == 0 ? getParentWidth()-HANDLESIZE : nextHandle->getX();
 
-		
-		resizeLimits.setAdjacentHandleLimits(leftLimit, rightLimit);
-
-		dragger.startDraggingComponent(this, e);//&resizeLimits);
-	
+		getParentComponent()->sendStartDrag();
 	}
-    
-    getParentComponent()->sendStartDrag();
 }
 
 void EnvelopeHandleComponent::mouseDrag(const juce::MouseEvent& e)
 {
-	if(ignoreDrag == true) return;
+	if(ignoreDrag || !shouldDraw) return;
 	
 	dragger.dragComponent(this, e, &resizeLimits);
 	
@@ -350,7 +365,11 @@ void EnvelopeHandleComponent::mouseUp(const juce::MouseEvent& e)
 	printf("MyEnvelopeHandleComponent::mouseUp\n");
 #endif
 	
-	if(ignoreDrag == true)
+	if (!shouldDraw) {
+		goto exit;
+    }
+
+	if(ignoreDrag)
 	{
 		ignoreDrag = false;
 		goto exit;
@@ -504,22 +523,26 @@ void EnvelopeHandleComponent::lockTime(double timeToLock)
 {
     setTime(timeToLock);
     shouldLockTime = true;
+	recalculateShouldDraw();
 }
 
 void EnvelopeHandleComponent::lockValue(double valueToLock)
 {
     setValue(valueToLock);
     shouldLockValue = true;
+	recalculateShouldDraw();
 }
 
 void EnvelopeHandleComponent::unlockTime()
 {
     shouldLockTime = false;
+	recalculateShouldDraw();
 }
 
 void EnvelopeHandleComponent::unlockValue()
 {
     shouldLockValue = false;
+	recalculateShouldDraw();
 }
 
 void EnvelopeHandleComponent::recalculatePosition()
@@ -530,6 +553,10 @@ void EnvelopeHandleComponent::recalculatePosition()
 					   getParentComponent()->convertValueToPixels(value));
 	dontUpdateTimeAndValue = oldDontUpdateTimeAndValue;
 	getParentComponent()->repaint();
+}
+
+void EnvelopeHandleComponent::recalculateShouldDraw() {
+	shouldDraw = !shouldLockTime || !shouldLockValue;
 }
 
 
@@ -710,7 +737,7 @@ void EnvelopeComponent::paint(juce::Graphics& g)
 		}
 		
 		g.setColour(findColour(Line));
-		g.strokePath (path, juce::PathStrokeType(1.0f));
+		g.strokePath (path, juce::PathStrokeType(2.0f));
 		
 		if((loopNode >= 0) && (releaseNode >= 0) && (releaseNode > loopNode))
 		{			

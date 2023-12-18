@@ -54,9 +54,10 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     setColour(juce::CodeEditorComponent::highlightColourId, Colours::grey);
 
     // envelope
-    setColour(EnvelopeComponent::Node, Colours::accentColor);
-    setColour(EnvelopeComponent::ReleaseNode, Colours::accentColor);
-    setColour(EnvelopeComponent::LoopNode, Colours::accentColor);
+    setColour(EnvelopeComponent::Node, Colours::veryDark);
+    setColour(EnvelopeComponent::ReleaseNode, Colours::veryDark);
+    setColour(EnvelopeComponent::LoopNode, Colours::veryDark);
+    setColour(EnvelopeComponent::NodeOutline, juce::Colours::white);
     setColour(EnvelopeComponent::Line, juce::Colours::white);
     setColour(EnvelopeComponent::LoopLine, juce::Colours::white);
     setColour(EnvelopeComponent::Background, Colours::veryDark);
