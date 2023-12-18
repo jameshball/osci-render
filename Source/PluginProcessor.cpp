@@ -479,6 +479,9 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         buffer.clear(i, 0, buffer.getNumSamples());
     }
 
+    // merge keyboard state and midi messages
+    keyboardState.processNextMidiBuffer(midiMessages, 0, buffer.getNumSamples(), true);
+
     bool usingInput = inputEnabled->getBoolValue();
 
     bool usingMidi = midiEnabled->getBoolValue();

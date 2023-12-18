@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "UGen/ugen_JuceEnvelopeComponent.h"
 
 enum ColourIds {
     groupComponentBackgroundColourId,
@@ -8,11 +9,10 @@ enum ColourIds {
     effectComponentBackgroundColourId,
     effectComponentHandleColourId,
     sliderThumbOutlineColourId,
-    tabbedComponentBackgroundColourId,
 };
 
 namespace Colours {
-    const juce::Colour dark{0xff424242};
+    const juce::Colour dark{0xff353535};
     const juce::Colour darker{0xff212121};
     const juce::Colour veryDark{0xff111111};
     const juce::Colour grey{0xff555555};

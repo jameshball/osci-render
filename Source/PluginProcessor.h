@@ -232,7 +232,7 @@ public:
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
     std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>(VERSION_HINT);
     
-    BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, !juce::JUCEApplicationBase::isStandaloneApp());
+    BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false);
     BooleanParameter* inputEnabled = new BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false);
     std::atomic<float> frequency = 440.0f;
     
@@ -247,14 +247,14 @@ public:
     std::atomic<bool> objectServerRendering = false;
     juce::ChangeBroadcaster fileChangeBroadcaster;
 
-    FloatParameter* attackTime = new FloatParameter("Attack Time", "attackTime", VERSION_HINT, 0.05, 0.0, 1.0);
+    FloatParameter* attackTime = new FloatParameter("Attack Time", "attackTime", VERSION_HINT, 0.005, 0.0, 1.0);
     FloatParameter* attackLevel = new FloatParameter("Attack Level", "attackLevel", VERSION_HINT, 1.0, 0.0, 1.0);
-    FloatParameter* decayTime = new FloatParameter("Decay Time", "decayTime", VERSION_HINT, 0.05, 0.0, 1.0);
-    FloatParameter* sustainLevel = new FloatParameter("Sustain Level", "sustainLevel", VERSION_HINT, 0.8, 0.0, 1.0);
-    FloatParameter* releaseTime = new FloatParameter("Release Time", "releaseTime", VERSION_HINT, 0.2, 0.0, 1.0);
+    FloatParameter* decayTime = new FloatParameter("Decay Time", "decayTime", VERSION_HINT, 0.095, 0.0, 1.0);
+    FloatParameter* sustainLevel = new FloatParameter("Sustain Level", "sustainLevel", VERSION_HINT, 0.6, 0.0, 1.0);
+    FloatParameter* releaseTime = new FloatParameter("Release Time", "releaseTime", VERSION_HINT, 0.4, 0.0, 1.0);
     FloatParameter* attackShape = new FloatParameter("Attack Shape", "attackShape", VERSION_HINT, 5, -50, 50);
     FloatParameter* decayShape = new FloatParameter("Decay Shape", "decayShape", VERSION_HINT, -20, -50, 50);
-    FloatParameter* releaseShape = new FloatParameter("Release Shape", "releaseShape", VERSION_HINT, 5,-50, 50);
+    FloatParameter* releaseShape = new FloatParameter("Release Shape", "releaseShape", VERSION_HINT, -5,-50, 50);
 
     Env adsrEnv = Env::adsr(
         attackTime->getValueUnnormalised(),
@@ -264,6 +264,8 @@ public:
         1.0,
         std::vector<EnvCurve>{ attackShape->getValueUnnormalised(), decayShape->getValueUnnormalised(), releaseShape->getValueUnnormalised() }
     );
+
+    juce::MidiKeyboardState keyboardState;
 
 private:
     juce::SpinLock consumerLock;

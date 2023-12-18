@@ -38,8 +38,6 @@ public:
 private:
     OscirenderAudioProcessor& audioProcessor;
     
-    juce::TabbedComponent tabs{juce::TabbedButtonBar::TabsAtTop};
-    MidiComponent midi{audioProcessor, *this};
     SettingsComponent settings{audioProcessor, *this};
     VolumeComponent volume{audioProcessor};
     std::vector<std::shared_ptr<juce::CodeDocument>> codeDocuments;

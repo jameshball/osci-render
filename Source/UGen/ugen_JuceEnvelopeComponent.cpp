@@ -200,15 +200,15 @@ void EnvelopeHandleComponent::paint(juce::Graphics& g)
 	}
 	else if(env->isReleaseNode(this))
 	{
-		handleColour = env->getEnvColour(EnvelopeComponent::ReleaseNode);
+		handleColour = findColour(EnvelopeComponent::ReleaseNode);
 	}
 	else if(env->isLoopNode(this))
 	{
-		handleColour = env->getEnvColour(EnvelopeComponent::LoopNode);
+		handleColour = findColour(EnvelopeComponent::LoopNode);
 	}
 	else
 	{
-		handleColour = env->getEnvColour(EnvelopeComponent::Node);
+		handleColour = findColour(EnvelopeComponent::Node);
 	}
 	
 	g.setColour(handleColour);
@@ -554,16 +554,6 @@ EnvelopeComponent::EnvelopeComponent()
 {
 	setMouseCursor(juce::MouseCursor::NormalCursor);
 	setBounds(0, 0, 200, 200); // non-zero size to start with
-		
-	colours[Node]				= juce::Colour(0xFF69B4FF);
-	colours[ReleaseNode]		= juce::Colour(0xFFB469FF);
-	colours[LoopNode]			= juce::Colour(0xFF69FFB4);
-	colours[Line]				= juce::Colour(0xFFFFFFFF);
-	colours[LoopLine]			= juce::Colour(0xFFB469FF);
-	colours[Background]			= juce::Colour(0xFF555555);
-	colours[GridLine]			= juce::Colour(0xFF888888);
-	colours[LegendText]			= juce::Colour(0xFF000000);
-	colours[LegendBackground]	= juce::Colour(0xFF696969);
 }
 
 EnvelopeComponent::~EnvelopeComponent()
@@ -719,7 +709,7 @@ void EnvelopeComponent::paint(juce::Graphics& g)
 			time = nextTime;
 		}
 		
-		g.setColour(colours[Line]);
+		g.setColour(findColour(Line));
 		g.strokePath (path, juce::PathStrokeType(1.0f));
 		
 		if((loopNode >= 0) && (releaseNode >= 0) && (releaseNode > loopNode))
@@ -730,7 +720,7 @@ void EnvelopeComponent::paint(juce::Graphics& g)
 			if((releaseHandle != 0) && (loopHandle != 0))
 			{
 				// draw a horizontal line from release
-				g.setColour(colours[LoopLine]);
+				g.setColour(findColour(LoopLine));
 				
 				const float loopY = (loopHandle->getY() + loopHandle->getBottom()) * 0.5f;
 				const float releaseY = (releaseHandle->getY() + releaseHandle->getBottom()) * 0.5f;
@@ -748,7 +738,7 @@ void EnvelopeComponent::paint(juce::Graphics& g)
 						   0.5f);
 				
 				if(loopY == releaseY)
-					g.setColour(colours[LoopNode]);
+					g.setColour(findColour(LoopNode));
 				
 //				g.drawArrow(loopX + arrowLength, releaseY, 
 //							loopX, releaseY, 
@@ -770,10 +760,10 @@ inline double round(double a, double b) throw()
 
 void EnvelopeComponent::paintBackground(juce::Graphics& g)
 {
-	g.setColour(colours[Background]);
+	g.setColour(findColour(Background));
 	g.fillRect(0, 0, getWidth(), getHeight());
 	
-	g.setColour(colours[GridLine]);
+	g.setColour(findColour(GridLine));
 	
 	if((gridDisplayMode & GridValue) && (valueGrid > 0.0))
 	{
@@ -1389,28 +1379,6 @@ double EnvelopeComponent::constrainValue(double valueToConstrain) const
 //		return value;
 //}
 
-void EnvelopeComponent::setEnvColour(const EnvColours which, juce::Colour colour) throw()
-{
-	if((which >= 0) && (which < NumEnvColours))
-	{
-		//lock();
-		colours[which] = colour;
-		//unlock();
-		
-		//updateGUI();
-		getParentComponent()->repaint();
-		repaint();
-	}
-}
-
-const juce::Colour EnvelopeComponent::getEnvColour(const EnvColours which) const throw()
-{
-	if ((which < 0) || (which >= NumEnvColours))
-		return juce::Colour();
-	else
-		return colours[which];	
-}
-
 EnvelopeLegendComponent::EnvelopeLegendComponent(juce::String _defaultText)
 :	defaultText(_defaultText)
 {
@@ -1440,12 +1408,12 @@ void EnvelopeLegendComponent::resized()
 void EnvelopeLegendComponent::paint(juce::Graphics& g)
 {
 	EnvelopeComponent *env = getEnvelopeComponent();
-	juce::Colour backColour = env ? env->getEnvColour(EnvelopeComponent::LegendBackground) : juce::Colour(0xFF696969);
+	juce::Colour backColour = findColour(EnvelopeComponent::LegendBackground);
 	
 	g.setColour(backColour);
 	g.fillRect(0, 0, getWidth(), getHeight());
 	
-	juce::Colour textColour = env ? env->getEnvColour(EnvelopeComponent::LegendText) : juce::Colour(0xFF0000);
+	juce::Colour textColour = findColour(EnvelopeComponent::LegendText);
 	text->setColour(juce::Label::textColourId, textColour);
 }
 

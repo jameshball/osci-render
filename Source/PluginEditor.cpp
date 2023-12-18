@@ -6,10 +6,6 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 {
     juce::Desktop::getInstance().setDefaultLookAndFeel(&lookAndFeel);
     setLookAndFeel(&lookAndFeel);
-
-    addAndMakeVisible(tabs);
-    tabs.addTab("Main", getLookAndFeel().findColour(tabbedComponentBackgroundColourId), &settings, false);
-    tabs.addTab("MIDI", getLookAndFeel().findColour(tabbedComponentBackgroundColourId), &midi, false);
     addAndMakeVisible(volume);
 
     menuBar.setModel(&menuBarModel);
@@ -33,6 +29,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 	juce::Path path;
     path.addTriangle(0.0f, 0.5f, 1.0f, 1.0f, 1.0f, 0.0f);
 	collapseButton.setShape(path, false, true, true);
+    collapseButton.setMouseCursor(juce::MouseCursor::PointingHandCursor);
 
     colourScheme = lookAndFeel.getDefaultColourScheme();
 
@@ -62,6 +59,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     layout.setItemLayout(1, 7, 7, 7);
     layout.setItemLayout(2, -0.1, -1.0, -0.3);
 
+    addAndMakeVisible(settings);
     addAndMakeVisible(resizerBar);
 }
 
@@ -115,6 +113,8 @@ void OscirenderAudioProcessorEditor::resized() {
 
                 juce::Component* columns[] = { &dummy, &resizerBar, codeEditors[index].get() };
 
+                DBG("area: " << area.toString());
+                 
                 layout.layOutComponents(columns, 3, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
                 auto dummyBounds = dummy.getBounds();
                 collapseButton.setBounds(dummyBounds.removeFromRight(20));
@@ -123,6 +123,7 @@ void OscirenderAudioProcessorEditor::resized() {
                 
             } else {
                 codeEditors[index]->setBounds(0, 0, 0, 0);
+                resizerBar.setBounds(0, 0, 0, 0);
                 collapseButton.setBounds(area.removeFromRight(20));
             }
         } else {
@@ -139,9 +140,8 @@ void OscirenderAudioProcessorEditor::resized() {
         path.addTriangle(0.0f, 0.5f, 1.0f, 1.0f, 1.0f, 0.0f);
         collapseButton.setShape(path, false, true, true);
     }
-    
-    tabs.setBounds(area);
 
+    settings.setBounds(area);
     repaint();
 }
 

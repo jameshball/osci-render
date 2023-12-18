@@ -2,6 +2,8 @@
 #include "PluginEditor.h"
 
 MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
+    setText("MIDI Settings");
+
     addAndMakeVisible(midiToggle);
     addAndMakeVisible(keyboard);
 
@@ -15,6 +17,7 @@ MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
     envelope.setAdsrMode(true);
     envelope.setEnv(audioProcessor.adsrEnv);
     envelope.addListener(&audioProcessor);
+    envelope.setGrid(EnvelopeComponent::GridBoth, EnvelopeComponent::GridNone, 0.1, 0.25);
 
     audioProcessor.attackTime->addListener(this);
     audioProcessor.attackLevel->addListener(this);
@@ -45,7 +48,6 @@ void MidiComponent::parameterValueChanged(int parameterIndex, float newValue) {
 void MidiComponent::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
 
 void MidiComponent::handleAsyncUpdate() {
-    DBG("MidiComponent::handleAsyncUpdate");
     Env newEnv = Env(
         { 
             0.0,
@@ -71,14 +73,13 @@ void MidiComponent::handleAsyncUpdate() {
 }
 
 void MidiComponent::resized() {
-    auto area = getLocalBounds().reduced(5);
-    midiToggle.setBounds(area.removeFromTop(50));
-    envelope.setBounds(area.removeFromTop(200));
-    keyboard.setBounds(area.removeFromBottom(100));
+    auto area = getLocalBounds().withTrimmedTop(20).reduced(20);
+    midiToggle.setBounds(area.removeFromTop(30));
+    area.removeFromTop(5);
+    keyboard.setBounds(area.removeFromBottom(50));
+    envelope.setBounds(area);
 }
 
 void MidiComponent::paint(juce::Graphics& g) {
-    auto rect = getLocalBounds().reduced(5);
-    g.setColour(getLookAndFeel().findColour(groupComponentBackgroundColourId));
-    g.fillRect(rect);
+    juce::GroupComponent::paint(g);
 }
