@@ -100,7 +100,7 @@ EnvelopeHandleComponent::EnvelopeHandleComponent()
 {
 
 	if (shouldDraw) {
-		setMouseCursor(juce::MouseCursor::CrosshairCursor);
+		setMouseCursor(juce::MouseCursor::DraggingHandCursor);
 	}
 	resetOffsets();
 }
@@ -154,42 +154,56 @@ void EnvelopeHandleComponent::updateLegend()
 	
 	int width = getParentWidth();
 	int places;
-	
-	if(width >= 165) {
-		
-		if(env && env->isLoopNode(this))
-			text << "(Loop) ";
-		else if(env && env->isReleaseNode(this))
-			text << "(Release) ";
-		else
-			text << "Point ";
-		
+
+	if (width >= 115) {
 		places = 3;
-	}
-	else if(width >= 140) {
-		text << "Point ";
-		places = 3;
-	} else if(width >= 115) {
-		text << "Pt ";
-		places = 3;
-	} else if(width >= 100) {
-		text << "Pt ";
+	} else if (width >= 100) {
 		places = 2;
-	} else if(width >= 85) {
-		text << "Pt ";
-		places = 1;
-	} else if(width >= 65) {
-		text << "P ";
-		places = 1;
 	} else {
 		places = 1;
 	}
 	
-	text << (getHandleIndex())
-		 << ": "
-		 << juce::String(legend->mapTime(time), places) << legend->getTimeUnits()
-		 << ", "
-		 << juce::String(legend->mapValue(value), places) << legend->getValueUnits();
+	if (env->getAdsrMode()) {
+		int index = env->getHandleIndex(this);
+		Env envelope = env->getEnv();
+		
+		double envTime = envelope.getTimes()[index - 1];
+
+		if (index == 1) {
+			text = "Attack time (s): " + juce::String(legend->mapTime(envTime), places);
+			text << ", Attack level: " << juce::String(legend->mapValue(value), places);
+		} else if (index == 2) {
+			text = "Decay time (s): " + juce::String(legend->mapTime(envTime), places);
+			text << ", Sustain level: " << juce::String(legend->mapValue(value), places);
+		} else {
+			text = "Release time (s): " + juce::String(legend->mapTime(envTime), places);
+		}
+	} else {
+		if (width >= 165) {
+			if (env && env->isLoopNode(this))
+				text << "(Loop) ";
+			else if (env && env->isReleaseNode(this))
+				text << "(Release) ";
+			else
+				text << "Point ";
+		} else if (width >= 140) {
+			text << "Point ";
+		} else if (width >= 115) {
+			text << "Pt ";
+		} else if (width >= 100) {
+			text << "Pt ";
+		} else if (width >= 85) {
+			text << "Pt ";
+		} else if (width >= 65) {
+			text << "P ";
+		}
+
+		text << (getHandleIndex())
+			<< ": "
+			<< juce::String(legend->mapTime(time), places) << legend->getTimeUnits()
+			<< ", "
+			<< juce::String(legend->mapValue(value), places) << legend->getValueUnits();
+	}
 	
 	getParentComponent()->setLegendText(text);
 }
@@ -246,7 +260,7 @@ void EnvelopeHandleComponent::mouseEnter(const juce::MouseEvent& e)
 #endif
 	
 	if (shouldDraw) {
-		setMouseCursor(juce::MouseCursor::CrosshairCursor);
+		setMouseCursor(juce::MouseCursor::DraggingHandCursor);
 		updateLegend();
 	} else {
         setMouseCursor(juce::MouseCursor::NormalCursor);
@@ -380,7 +394,7 @@ void EnvelopeHandleComponent::mouseUp(const juce::MouseEvent& e)
 		env->quantiseHandle(this);
 //	}
 	
-	setMouseCursor(juce::MouseCursor::CrosshairCursor);
+	setMouseCursor(juce::MouseCursor::DraggingHandCursor);
 	setMousePositionToThisHandle();
 	
 	offsetX = 0;
@@ -921,7 +935,7 @@ void EnvelopeComponent::mouseUp(const juce::MouseEvent& e)
 		if(e.mods.isCtrlDown() == false)
 			quantiseHandle(draggingHandle);
 		
-		setMouseCursor(juce::MouseCursor::CrosshairCursor);
+		setMouseCursor(juce::MouseCursor::DraggingHandCursor);
 		draggingHandle->setMousePositionToThisHandle();
 		draggingHandle->resetOffsets();
 		draggingHandle = 0;
