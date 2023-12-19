@@ -13,6 +13,7 @@
  UGEN++ can be redistributed and/or modified under the terms of the
  GNU General Public License, as published by the Free Software Foundation;
  either version 2 of the License, or (at your option) any later version.
+ either version 2 of the License, or (at your option) any later version.
  
  UGEN++ is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -88,15 +89,19 @@ void EnvelopeHandleComponentConstrainer::setAdjacentHandleLimits(int setLeftLimi
 }
 
 EnvelopeHandleComponent::EnvelopeHandleComponent()
-	:	dontUpdateTimeAndValue(false),
-		lastX(-1),
-		lastY(-1),
-		resizeLimits(this),
-        shouldLockTime(false),
-        shouldLockValue(false),
-		ignoreDrag(false)
+	: dontUpdateTimeAndValue(false),
+	lastX(-1),
+	lastY(-1),
+	resizeLimits(this),
+	shouldLockTime(false),
+	shouldLockValue(false),
+	shouldDraw(!shouldLockTime || !shouldLockValue),
+	ignoreDrag(false)
 {
-	setMouseCursor(juce::MouseCursor::CrosshairCursor);
+
+	if (shouldDraw) {
+		setMouseCursor(juce::MouseCursor::DraggingHandCursor);
+	}
 	resetOffsets();
 }
 
@@ -149,70 +154,88 @@ void EnvelopeHandleComponent::updateLegend()
 	
 	int width = getParentWidth();
 	int places;
-	
-	if(width >= 165) {
-		
-		if(env && env->isLoopNode(this))
-			text << "(Loop) ";
-		else if(env && env->isReleaseNode(this))
-			text << "(Release) ";
-		else
-			text << "Point ";
-		
+
+	if (width >= 115) {
 		places = 3;
-	}
-	else if(width >= 140) {
-		text << "Point ";
-		places = 3;
-	} else if(width >= 115) {
-		text << "Pt ";
-		places = 3;
-	} else if(width >= 100) {
-		text << "Pt ";
+	} else if (width >= 100) {
 		places = 2;
-	} else if(width >= 85) {
-		text << "Pt ";
-		places = 1;
-	} else if(width >= 65) {
-		text << "P ";
-		places = 1;
 	} else {
 		places = 1;
 	}
 	
-	text << (getHandleIndex())
-		 << ": "
-		 << juce::String(legend->mapTime(time), places) << legend->getTimeUnits()
-		 << ", "
-		 << juce::String(legend->mapValue(value), places) << legend->getValueUnits();
+	if (env->getAdsrMode()) {
+		int index = env->getHandleIndex(this);
+		Env envelope = env->getEnv();
+		
+		double envTime = envelope.getTimes()[index - 1];
+
+		if (index == 1) {
+			text = "Attack time (s): " + juce::String(legend->mapTime(envTime), places);
+			text << ", Attack level: " << juce::String(legend->mapValue(value), places);
+		} else if (index == 2) {
+			text = "Decay time (s): " + juce::String(legend->mapTime(envTime), places);
+			text << ", Sustain level: " << juce::String(legend->mapValue(value), places);
+		} else {
+			text = "Release time (s): " + juce::String(legend->mapTime(envTime), places);
+		}
+	} else {
+		if (width >= 165) {
+			if (env && env->isLoopNode(this))
+				text << "(Loop) ";
+			else if (env && env->isReleaseNode(this))
+				text << "(Release) ";
+			else
+				text << "Point ";
+		} else if (width >= 140) {
+			text << "Point ";
+		} else if (width >= 115) {
+			text << "Pt ";
+		} else if (width >= 100) {
+			text << "Pt ";
+		} else if (width >= 85) {
+			text << "Pt ";
+		} else if (width >= 65) {
+			text << "P ";
+		}
+
+		text << (getHandleIndex())
+			<< ": "
+			<< juce::String(legend->mapTime(time), places) << legend->getTimeUnits()
+			<< ", "
+			<< juce::String(legend->mapValue(value), places) << legend->getValueUnits();
+	}
 	
 	getParentComponent()->setLegendText(text);
 }
 
 void EnvelopeHandleComponent::paint(juce::Graphics& g)
 {
-	EnvelopeComponent *env = getParentComponent();
-	juce::Colour handleColour;
-	
-	if(env == 0)
-	{
-		handleColour = juce::Colour(0xFF69B4FF);
+	if (shouldDraw) {
+		EnvelopeComponent *env = getParentComponent();
+		juce::Colour handleColour;
+
+		if(env == 0)
+		{
+			handleColour = juce::Colour(0xFF69B4FF);
+		}
+		else if(env->isReleaseNode(this))
+		{
+			handleColour = findColour(EnvelopeComponent::ReleaseNode);
+		}
+		else if(env->isLoopNode(this))
+		{
+			handleColour = findColour(EnvelopeComponent::LoopNode);
+		}
+		else
+		{
+			handleColour = findColour(EnvelopeComponent::Node);
+		}
+
+		g.setColour(handleColour);
+		g.fillEllipse(1, 1, getWidth() - 2, getHeight() - 2);
+		g.setColour(findColour(EnvelopeComponent::NodeOutline));
+		g.drawEllipse(1, 1, getWidth() - 2, getHeight() - 2, 1.0f);
 	}
-	else if(env->isReleaseNode(this))
-	{
-		handleColour = env->getEnvColour(EnvelopeComponent::ReleaseNode);
-	}
-	else if(env->isLoopNode(this))
-	{
-		handleColour = env->getEnvColour(EnvelopeComponent::LoopNode);
-	}
-	else
-	{
-		handleColour = env->getEnvColour(EnvelopeComponent::Node);
-	}
-	
-	g.setColour(handleColour);
-	g.fillRect(1, 1, getWidth()-2, getHeight()-2);
 }
 
 void EnvelopeHandleComponent::moved()
@@ -236,8 +259,12 @@ void EnvelopeHandleComponent::mouseEnter(const juce::MouseEvent& e)
 	printf("MyEnvelopeHandleComponent::mouseEnter\n");
 #endif
 	
-	setMouseCursor(juce::MouseCursor::CrosshairCursor);	
-	updateLegend();
+	if (shouldDraw) {
+		setMouseCursor(juce::MouseCursor::DraggingHandCursor);
+		updateLegend();
+	} else {
+        setMouseCursor(juce::MouseCursor::NormalCursor);
+    }
 }
 
 void EnvelopeHandleComponent::mouseExit(const juce::MouseEvent& e)
@@ -256,60 +283,62 @@ void EnvelopeHandleComponent::mouseDown(const juce::MouseEvent& e)
 	printf("MyEnvelopeHandleComponent::mouseDown (%d, %d)\n", e.x, e.y);
 #endif
 	
-	setMouseCursor(juce::MouseCursor::NoCursor);
-	
-	if(e.mods.isShiftDown()) {
-		
-        if(!shouldLockTime && !shouldLockValue)
-        {
-            getParentComponent()->setLegendTextToDefault();
-            removeThisHandle();
+	if (shouldDraw) {
+		setMouseCursor(juce::MouseCursor::NoCursor);
+
+		if(e.mods.isShiftDown()) {
+
+			if(!shouldLockTime && !shouldLockValue)
+			{
+				getParentComponent()->setLegendTextToDefault();
+				removeThisHandle();
+			}
+
+			return; // dont send drag msg
+
+		} 
+		//else if(e.mods.isCtrlDown())
+		//{
+		//	if(getParentComponent()->getAllowNodeEditing())
+		//	{
+		//		ignoreDrag = true;
+		//		
+		//		if(PopupComponent::getActivePopups() < 1)
+		//		{
+		//			EnvelopeNodePopup::create(this, getScreenX()+e.x, getScreenY()+e.y);
+		//		}
+		//	}
+		//}
+		else 
+		{
+
+			offsetX = e.x;
+			offsetY = e.y;
+
+			resizeLimits.setMinimumOnscreenAmounts(HANDLESIZE,HANDLESIZE,HANDLESIZE,HANDLESIZE);
+
+			EnvelopeHandleComponent* previousHandle = getPreviousHandle();
+			EnvelopeHandleComponent* nextHandle = getNextHandle();
+
+			int leftLimit = previousHandle == 0 ? 0 : previousHandle->getX()+2;
+			int rightLimit = nextHandle == 0 ? getParentWidth()-HANDLESIZE : nextHandle->getX()-2;
+			//		int leftLimit = previousHandle == 0 ? 0 : previousHandle->getX();
+			//		int rightLimit = nextHandle == 0 ? getParentWidth()-HANDLESIZE : nextHandle->getX();
+
+
+			resizeLimits.setAdjacentHandleLimits(leftLimit, rightLimit);
+
+			dragger.startDraggingComponent(this, e);//&resizeLimits);
+
 		}
-        
-        return; // dont send drag msg
-		
-	} 
-	//else if(e.mods.isCtrlDown())
-	//{
-	//	if(getParentComponent()->getAllowNodeEditing())
-	//	{
-	//		ignoreDrag = true;
-	//		
-	//		if(PopupComponent::getActivePopups() < 1)
-	//		{
-	//			EnvelopeNodePopup::create(this, getScreenX()+e.x, getScreenY()+e.y);
-	//		}
-	//	}
-	//}
-	else 
-	{
-		
-		offsetX = e.x;
-		offsetY = e.y;
-		
-		resizeLimits.setMinimumOnscreenAmounts(HANDLESIZE,HANDLESIZE,HANDLESIZE,HANDLESIZE);
-		
-		EnvelopeHandleComponent* previousHandle = getPreviousHandle();
-		EnvelopeHandleComponent* nextHandle = getNextHandle();
-		
-		int leftLimit = previousHandle == 0 ? 0 : previousHandle->getX()+2;
-		int rightLimit = nextHandle == 0 ? getParentWidth()-HANDLESIZE : nextHandle->getX()-2;
-//		int leftLimit = previousHandle == 0 ? 0 : previousHandle->getX();
-//		int rightLimit = nextHandle == 0 ? getParentWidth()-HANDLESIZE : nextHandle->getX();
 
-		
-		resizeLimits.setAdjacentHandleLimits(leftLimit, rightLimit);
-
-		dragger.startDraggingComponent(this, e);//&resizeLimits);
-	
+		getParentComponent()->sendStartDrag();
 	}
-    
-    getParentComponent()->sendStartDrag();
 }
 
 void EnvelopeHandleComponent::mouseDrag(const juce::MouseEvent& e)
 {
-	if(ignoreDrag == true) return;
+	if(ignoreDrag || !shouldDraw) return;
 	
 	dragger.dragComponent(this, e, &resizeLimits);
 	
@@ -350,7 +379,11 @@ void EnvelopeHandleComponent::mouseUp(const juce::MouseEvent& e)
 	printf("MyEnvelopeHandleComponent::mouseUp\n");
 #endif
 	
-	if(ignoreDrag == true)
+	if (!shouldDraw) {
+		goto exit;
+    }
+
+	if(ignoreDrag)
 	{
 		ignoreDrag = false;
 		goto exit;
@@ -361,7 +394,7 @@ void EnvelopeHandleComponent::mouseUp(const juce::MouseEvent& e)
 		env->quantiseHandle(this);
 //	}
 	
-	setMouseCursor(juce::MouseCursor::CrosshairCursor);
+	setMouseCursor(juce::MouseCursor::DraggingHandCursor);
 	setMousePositionToThisHandle();
 	
 	offsetX = 0;
@@ -504,22 +537,26 @@ void EnvelopeHandleComponent::lockTime(double timeToLock)
 {
     setTime(timeToLock);
     shouldLockTime = true;
+	recalculateShouldDraw();
 }
 
 void EnvelopeHandleComponent::lockValue(double valueToLock)
 {
     setValue(valueToLock);
     shouldLockValue = true;
+	recalculateShouldDraw();
 }
 
 void EnvelopeHandleComponent::unlockTime()
 {
     shouldLockTime = false;
+	recalculateShouldDraw();
 }
 
 void EnvelopeHandleComponent::unlockValue()
 {
     shouldLockValue = false;
+	recalculateShouldDraw();
 }
 
 void EnvelopeHandleComponent::recalculatePosition()
@@ -530,6 +567,10 @@ void EnvelopeHandleComponent::recalculatePosition()
 					   getParentComponent()->convertValueToPixels(value));
 	dontUpdateTimeAndValue = oldDontUpdateTimeAndValue;
 	getParentComponent()->repaint();
+}
+
+void EnvelopeHandleComponent::recalculateShouldDraw() {
+	shouldDraw = !shouldLockTime || !shouldLockValue;
 }
 
 
@@ -554,16 +595,6 @@ EnvelopeComponent::EnvelopeComponent()
 {
 	setMouseCursor(juce::MouseCursor::NormalCursor);
 	setBounds(0, 0, 200, 200); // non-zero size to start with
-		
-	colours[Node]				= juce::Colour(0xFF69B4FF);
-	colours[ReleaseNode]		= juce::Colour(0xFFB469FF);
-	colours[LoopNode]			= juce::Colour(0xFF69FFB4);
-	colours[Line]				= juce::Colour(0xFFFFFFFF);
-	colours[LoopLine]			= juce::Colour(0xFFB469FF);
-	colours[Background]			= juce::Colour(0xFF555555);
-	colours[GridLine]			= juce::Colour(0xFF888888);
-	colours[LegendText]			= juce::Colour(0xFF000000);
-	colours[LegendBackground]	= juce::Colour(0xFF696969);
 }
 
 EnvelopeComponent::~EnvelopeComponent()
@@ -719,8 +750,8 @@ void EnvelopeComponent::paint(juce::Graphics& g)
 			time = nextTime;
 		}
 		
-		g.setColour(colours[Line]);
-		g.strokePath (path, juce::PathStrokeType(1.0f));
+		g.setColour(findColour(Line));
+		g.strokePath (path, juce::PathStrokeType(2.0f));
 		
 		if((loopNode >= 0) && (releaseNode >= 0) && (releaseNode > loopNode))
 		{			
@@ -730,7 +761,7 @@ void EnvelopeComponent::paint(juce::Graphics& g)
 			if((releaseHandle != 0) && (loopHandle != 0))
 			{
 				// draw a horizontal line from release
-				g.setColour(colours[LoopLine]);
+				g.setColour(findColour(LoopLine));
 				
 				const float loopY = (loopHandle->getY() + loopHandle->getBottom()) * 0.5f;
 				const float releaseY = (releaseHandle->getY() + releaseHandle->getBottom()) * 0.5f;
@@ -748,7 +779,7 @@ void EnvelopeComponent::paint(juce::Graphics& g)
 						   0.5f);
 				
 				if(loopY == releaseY)
-					g.setColour(colours[LoopNode]);
+					g.setColour(findColour(LoopNode));
 				
 //				g.drawArrow(loopX + arrowLength, releaseY, 
 //							loopX, releaseY, 
@@ -770,10 +801,10 @@ inline double round(double a, double b) throw()
 
 void EnvelopeComponent::paintBackground(juce::Graphics& g)
 {
-	g.setColour(colours[Background]);
+	g.setColour(findColour(Background));
 	g.fillRect(0, 0, getWidth(), getHeight());
 	
-	g.setColour(colours[GridLine]);
+	g.setColour(findColour(GridLine));
 	
 	if((gridDisplayMode & GridValue) && (valueGrid > 0.0))
 	{
@@ -904,7 +935,7 @@ void EnvelopeComponent::mouseUp(const juce::MouseEvent& e)
 		if(e.mods.isCtrlDown() == false)
 			quantiseHandle(draggingHandle);
 		
-		setMouseCursor(juce::MouseCursor::CrosshairCursor);
+		setMouseCursor(juce::MouseCursor::DraggingHandCursor);
 		draggingHandle->setMousePositionToThisHandle();
 		draggingHandle->resetOffsets();
 		draggingHandle = 0;
@@ -1389,28 +1420,6 @@ double EnvelopeComponent::constrainValue(double valueToConstrain) const
 //		return value;
 //}
 
-void EnvelopeComponent::setEnvColour(const EnvColours which, juce::Colour colour) throw()
-{
-	if((which >= 0) && (which < NumEnvColours))
-	{
-		//lock();
-		colours[which] = colour;
-		//unlock();
-		
-		//updateGUI();
-		getParentComponent()->repaint();
-		repaint();
-	}
-}
-
-const juce::Colour EnvelopeComponent::getEnvColour(const EnvColours which) const throw()
-{
-	if ((which < 0) || (which >= NumEnvColours))
-		return juce::Colour();
-	else
-		return colours[which];	
-}
-
 EnvelopeLegendComponent::EnvelopeLegendComponent(juce::String _defaultText)
 :	defaultText(_defaultText)
 {
@@ -1440,12 +1449,12 @@ void EnvelopeLegendComponent::resized()
 void EnvelopeLegendComponent::paint(juce::Graphics& g)
 {
 	EnvelopeComponent *env = getEnvelopeComponent();
-	juce::Colour backColour = env ? env->getEnvColour(EnvelopeComponent::LegendBackground) : juce::Colour(0xFF696969);
+	juce::Colour backColour = findColour(EnvelopeComponent::LegendBackground);
 	
 	g.setColour(backColour);
 	g.fillRect(0, 0, getWidth(), getHeight());
 	
-	juce::Colour textColour = env ? env->getEnvColour(EnvelopeComponent::LegendText) : juce::Colour(0xFF0000);
+	juce::Colour textColour = findColour(EnvelopeComponent::LegendText);
 	text->setColour(juce::Label::textColourId, textColour);
 }
 

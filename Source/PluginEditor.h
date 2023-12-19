@@ -38,8 +38,6 @@ public:
 private:
     OscirenderAudioProcessor& audioProcessor;
     
-    juce::TabbedComponent tabs{juce::TabbedButtonBar::TabsAtTop};
-    MidiComponent midi{audioProcessor, *this};
     SettingsComponent settings{audioProcessor, *this};
     VolumeComponent volume{audioProcessor};
     std::vector<std::shared_ptr<juce::CodeDocument>> codeDocuments;
@@ -58,7 +56,7 @@ private:
     juce::StretchableLayoutManager layout;
     juce::StretchableLayoutResizerBar resizerBar{&layout, 1, true};
 
-    juce::TooltipWindow tooltipWindow{this};
+    juce::TooltipWindow tooltipWindow{this, 0};
 
     std::atomic<bool> updatingDocumentsWithParserLock = false;
 

@@ -28,11 +28,11 @@ public:
 private:
     void setupComponent();
     bool lfoEnabled = true;
-    juce::Rectangle<int> textBounds;
     std::shared_ptr<juce::Component> component;
     OscirenderAudioProcessor& audioProcessor;
 
     juce::Label popupLabel;
+    juce::Label label;
     LabelledTextBox min{"Min"};
     LabelledTextBox max{"Max"};
 

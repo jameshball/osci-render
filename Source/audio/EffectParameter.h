@@ -309,6 +309,7 @@ public:
 	LfoTypeParameter* lfo = new LfoTypeParameter(name + " LFO", paramID + "Lfo", getVersionHint(), 1);
 	FloatParameter* lfoRate = new FloatParameter(name + " LFO Rate", paramID + "LfoRate", getVersionHint(), 1.0f, 0.0f, 100.0f, 0.1f, "Hz");
 	std::atomic<float> phase = 0.0f;
+	juce::String description;
 
 	std::vector<juce::AudioProcessorParameter*> getParameters() {
 		std::vector<juce::AudioProcessorParameter*> parameters;
@@ -349,5 +350,5 @@ public:
         }
     }
 
-	EffectParameter(juce::String name, juce::String id, int versionHint, float value, float min, float max, float step = 0.01, bool smoothValueChange = true) : FloatParameter(name, id, versionHint, value, min, max, step), smoothValueChange(smoothValueChange) {}
+	EffectParameter(juce::String name, juce::String description, juce::String id, int versionHint, float value, float min, float max, float step = 0.01, bool smoothValueChange = true) : FloatParameter(name, id, versionHint, value, min, max, step), smoothValueChange(smoothValueChange), description(description) {}
 };

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "UGen/ugen_JuceEnvelopeComponent.h"
 
 enum ColourIds {
     groupComponentBackgroundColourId,
@@ -8,11 +9,10 @@ enum ColourIds {
     effectComponentBackgroundColourId,
     effectComponentHandleColourId,
     sliderThumbOutlineColourId,
-    tabbedComponentBackgroundColourId,
 };
 
 namespace Colours {
-    const juce::Colour dark{0xff424242};
+    const juce::Colour dark{0xff353535};
     const juce::Colour darker{0xff212121};
     const juce::Colour veryDark{0xff111111};
     const juce::Colour grey{0xff555555};
@@ -32,6 +32,37 @@ namespace Dracula {
     const juce::Colour purple{0xffbd93f9};
     const juce::Colour red{0xffff5555};
     const juce::Colour yellow{0xfff1fa8c};
+}
+
+namespace LookAndFeelHelpers
+{
+    static juce::Colour createBaseColour (juce::Colour buttonColour,
+        bool hasKeyboardFocus,
+        bool shouldDrawButtonAsHighlighted,
+        bool shouldDrawButtonAsDown) noexcept
+    {
+        const float sat = hasKeyboardFocus ? 1.3f : 0.9f;
+        const juce::Colour baseColour (buttonColour.withMultipliedSaturation (sat));
+
+        if (shouldDrawButtonAsDown)        return baseColour.contrasting (0.2f);
+        if (shouldDrawButtonAsHighlighted) return baseColour.contrasting (0.1f);
+
+        return baseColour;
+    }
+
+    static juce::TextLayout layoutTooltipText (const juce::String& text, juce::Colour colour) noexcept
+    {
+        const float tooltipFontSize = 13.0f;
+        const int maxToolTipWidth = 400;
+
+        juce::AttributedString s;
+        s.setJustification (juce::Justification::centred);
+        s.append (text, juce::Font (tooltipFontSize, juce::Font::bold), colour);
+
+        juce::TextLayout tl;
+        tl.createLayoutWithBalancedLineLengths (s, (float) maxToolTipWidth);
+        return tl;
+    }
 }
 
 class OscirenderLookAndFeel : public juce::LookAndFeel_V4 {
@@ -58,6 +89,6 @@ public:
         bool shouldDrawButtonAsHighlighted,
         bool shouldDrawButtonAsDown) override;
     void drawMenuBarBackground(juce::Graphics& g, int width, int height, bool, juce::MenuBarComponent& menuBar) override;
-
     juce::CodeEditorComponent::ColourScheme getDefaultColourScheme();
+    void drawTooltip(juce::Graphics& g, const juce::String& text, int width, int height) override;
 };

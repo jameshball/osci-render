@@ -46,7 +46,7 @@
 #include "EnvCurve.h"
 
 
-#define HANDLESIZE 7
+#define HANDLESIZE 11
 #define FINETUNE 0.001
 
 //#define MYDEBUG 1 // get rid of this later
@@ -121,6 +121,7 @@ public:
 private:
 	bool dontUpdateTimeAndValue;
 	void recalculatePosition();
+	void recalculateShouldDraw();
 	
 	juce::ComponentDragger dragger;
 	int lastX, lastY;
@@ -128,7 +129,7 @@ private:
 	EnvelopeHandleComponentConstrainer resizeLimits;
 	
 	double time, value;
-    bool shouldLockTime, shouldLockValue;
+    bool shouldLockTime, shouldLockValue, shouldDraw;
 	EnvCurve curve;
 	bool ignoreDrag;
 };
@@ -235,9 +236,21 @@ public:
 //	double quantiseDomain(double value);
 //	double quantiseValue(double value);
 	
-	enum EnvColours { Node, ReleaseNode, LoopNode, Line, LoopLine, Background, GridLine, LegendText, LegendBackground, NumEnvColours };
-	void setEnvColour(const EnvColours which, juce::Colour colour) throw();
-	const juce::Colour getEnvColour(const EnvColours which) const throw();
+	const static int COLOUR_OFFSET = 0x6082100;
+
+	enum EnvColours {
+		Node = COLOUR_OFFSET,
+		ReleaseNode = COLOUR_OFFSET + 1,
+		LoopNode = COLOUR_OFFSET + 2,
+		NodeOutline = COLOUR_OFFSET + 3,
+		Line = COLOUR_OFFSET + 4,
+		LoopLine = COLOUR_OFFSET + 5,
+		Background = COLOUR_OFFSET + 6,
+		GridLine = COLOUR_OFFSET + 7,
+		LegendText = COLOUR_OFFSET + 8,
+		LegendBackground = COLOUR_OFFSET + 9,
+		NumEnvColours = 10,
+	};
 	
 	enum MoveMode { MoveClip, MoveSlide, NumMoveModes };
 	
@@ -262,8 +275,6 @@ private:
 	bool allowCurveEditing = false;
 	bool allowNodeEditing = false;
 	bool adsrMode = false;
-	
-	juce::Colour colours[NumEnvColours];
 };
 
 class EnvelopeLegendComponent : public juce::Component
@@ -311,16 +322,7 @@ public:
 	Env getEnv() const { return getEnvelopeComponent()->getEnv(); }
 	void setEnv(Env const& env) { return getEnvelopeComponent()->setEnv(env); }
 	float lookup(const float time) const { return getEnvelopeComponent()->lookup(time); }
-	
-	void setEnvColour(const EnvelopeComponent::EnvColours which, juce::Colour const& colour) throw()
-	{
-		envelope->setEnvColour(which, colour);
-	}
-	
-	const juce::Colour getEnvColour(const EnvelopeComponent::EnvColours which) const throw()
-	{
-		return envelope->getEnvColour(which);
-	}
+
 	
 	void setDomainRange(const double min, const double max)		{ envelope->setDomainRange(min, max);	}
 	void setDomainRange(const double max)						{ setDomainRange(0.0, max);				}

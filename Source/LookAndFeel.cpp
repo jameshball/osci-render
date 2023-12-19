@@ -1,6 +1,7 @@
 #include "LookAndFeel.h"
 
 OscirenderLookAndFeel::OscirenderLookAndFeel() {
+    // slider
     setColour(juce::Slider::thumbColourId, Colours::veryDark);
     setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::white);
     setColour(juce::Slider::textBoxBackgroundColourId, Colours::veryDark);
@@ -8,38 +9,72 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     setColour(juce::Slider::trackColourId, juce::Colours::grey);
     setColour(juce::Slider::backgroundColourId, Colours::dark);
     setColour(sliderThumbOutlineColourId, juce::Colours::white);
+
+    // buttons
     setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::white);
-    setColour(juce::ResizableWindow::backgroundColourId, Colours::dark);
+    setColour(juce::TextButton::buttonColourId, Colours::veryDark);
+
+    // windows & menus
+    setColour(juce::ResizableWindow::backgroundColourId, Colours::grey);
     setColour(groupComponentBackgroundColourId, Colours::darker);
     setColour(groupComponentHeaderColourId, Colours::veryDark);
     setColour(juce::PopupMenu::backgroundColourId, Colours::veryDark);
     setColour(juce::PopupMenu::highlightedBackgroundColourId, Colours::darker);
+    setColour(juce::TooltipWindow::backgroundColourId, Colours::veryDark);
+    setColour(juce::TooltipWindow::outlineColourId, juce::Colours::white);
+
+    // combo box
     setColour(juce::ComboBox::backgroundColourId, Colours::veryDark);
     setColour(juce::ComboBox::outlineColourId, juce::Colours::white);
     setColour(juce::ComboBox::arrowColourId, juce::Colours::white);
-    setColour(juce::TextButton::buttonColourId, Colours::veryDark);
+    
+    // text box
     setColour(juce::TextEditor::backgroundColourId, Colours::veryDark);
     setColour(juce::TextEditor::outlineColourId, juce::Colours::white);
+    setColour(juce::CaretComponent::caretColourId, Dracula::foreground);
+    setColour(juce::TextEditor::highlightColourId, Colours::grey);
+
+    // list box
     setColour(juce::ListBox::backgroundColourId, Colours::darker);
+
+    // scroll bar
     setColour(juce::ScrollBar::thumbColourId, juce::Colours::white);
     setColour(juce::ScrollBar::trackColourId, Colours::veryDark);
     setColour(juce::ScrollBar::backgroundColourId, Colours::veryDark);
+
+    // custom components
     setColour(effectComponentBackgroundColourId, juce::Colours::transparentBlack);
     setColour(effectComponentHandleColourId, Colours::veryDark);
+
+    // code editor
     setColour(juce::CodeEditorComponent::backgroundColourId, Colours::darker);
     setColour(juce::CodeEditorComponent::defaultTextColourId, Dracula::foreground);
     setColour(juce::CodeEditorComponent::lineNumberBackgroundId, Colours::veryDark);
     setColour(juce::CodeEditorComponent::lineNumberTextId, Dracula::foreground);
     setColour(juce::CodeEditorComponent::highlightColourId, Colours::grey);
-    setColour(juce::CaretComponent::caretColourId, Dracula::foreground);
-    setColour(juce::TextEditor::highlightColourId, Colours::grey);
-    setColour(juce::TabbedButtonBar::tabOutlineColourId, Colours::veryDark);
-    setColour(juce::TabbedButtonBar::frontOutlineColourId, Colours::veryDark);
-    setColour(juce::TabbedButtonBar::tabTextColourId, juce::Colours::white);
-    setColour(juce::TabbedButtonBar::frontTextColourId, juce::Colours::white);
-    setColour(juce::TabbedComponent::outlineColourId, Colours::veryDark);
-    setColour(tabbedComponentBackgroundColourId, Colours::veryDark);
 
+    // envelope
+    setColour(EnvelopeComponent::Node, Colours::veryDark);
+    setColour(EnvelopeComponent::ReleaseNode, Colours::veryDark);
+    setColour(EnvelopeComponent::LoopNode, Colours::veryDark);
+    setColour(EnvelopeComponent::NodeOutline, juce::Colours::white);
+    setColour(EnvelopeComponent::Line, juce::Colours::white);
+    setColour(EnvelopeComponent::LoopLine, juce::Colours::white);
+    setColour(EnvelopeComponent::Background, Colours::veryDark);
+    setColour(EnvelopeComponent::GridLine, Colours::dark);
+    setColour(EnvelopeComponent::LegendText, juce::Colours::white);
+    setColour(EnvelopeComponent::LegendBackground, Colours::veryDark);
+
+    // midi keyboard
+    setColour(juce::MidiKeyboardComponent::blackNoteColourId, Colours::veryDark);
+    setColour(juce::MidiKeyboardComponent::whiteNoteColourId, juce::Colours::white);
+    setColour(juce::MidiKeyboardComponent::mouseOverKeyOverlayColourId, Colours::accentColor.withAlpha(0.3f));
+    setColour(juce::MidiKeyboardComponent::keyDownOverlayColourId, Colours::accentColor.withAlpha(0.7f));
+    setColour(juce::MidiKeyboardComponent::shadowColourId, juce::Colours::transparentBlack);
+    setColour(juce::MidiKeyboardComponent::upDownButtonBackgroundColourId, Colours::veryDark);
+    setColour(juce::MidiKeyboardComponent::upDownButtonArrowColourId, juce::Colours::white);
+
+    // UI colours
     getCurrentColourScheme().setUIColour(ColourScheme::widgetBackground, Colours::veryDark);
     getCurrentColourScheme().setUIColour(ColourScheme::UIColour::defaultFill, Colours::accentColor);
 }
@@ -173,6 +208,20 @@ void OscirenderLookAndFeel::drawMenuBarBackground(juce::Graphics& g, int width, 
 
     g.setColour(menuBar.findColour(juce::TextButton::buttonColourId));
     g.fillRect(r);
+}
+
+void OscirenderLookAndFeel::drawTooltip(juce::Graphics& g, const juce::String& text, int width, int height) {
+    juce::Rectangle<int> bounds (width, height);
+    auto cornerSize = 5.0f;
+
+    g.setColour(findColour(juce::TooltipWindow::backgroundColourId));
+    g.fillRect(bounds.toFloat());
+
+    g.setColour(findColour(juce::TooltipWindow::outlineColourId));
+    g.drawRect(bounds.toFloat().reduced(0.5f, 0.5f), 1.0f);
+
+    LookAndFeelHelpers::layoutTooltipText (text, findColour (juce::TooltipWindow::textColourId))
+        .draw (g, { static_cast<float> (width), static_cast<float> (height) });
 }
 
 juce::CodeEditorComponent::ColourScheme OscirenderLookAndFeel::getDefaultColourScheme() {

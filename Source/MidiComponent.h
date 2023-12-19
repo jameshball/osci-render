@@ -4,7 +4,7 @@
 #include "PluginProcessor.h"
 
 class OscirenderAudioProcessorEditor;
-class MidiComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater {
+class MidiComponent : public juce::GroupComponent, public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater {
 public:
 	MidiComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
 	~MidiComponent() override;
@@ -20,8 +20,7 @@ private:
 	OscirenderAudioProcessorEditor& pluginEditor;
 
 	juce::ToggleButton midiToggle{"Enable MIDI"};
-	juce::MidiKeyboardState keyboardState;
-	juce::MidiKeyboardComponent keyboard{keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard};
+	juce::MidiKeyboardComponent keyboard{audioProcessor.keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard};
 
 	EnvelopeContainerComponent envelope;
 
