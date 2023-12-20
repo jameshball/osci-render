@@ -1,7 +1,6 @@
 #include "LuaParser.h"
 #include "luaimport.h"
 
-
 LuaParser::LuaParser(juce::String fileName, juce::String script, std::function<void(int, juce::String, juce::String)> errorCallback, juce::String fallbackScript) : fallbackScript(fallbackScript), errorCallback(errorCallback), fileName(fileName) {
     reset(script);
 }

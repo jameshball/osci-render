@@ -608,6 +608,12 @@ bool OscirenderAudioProcessor::hasEditor() const {
 
 juce::AudioProcessorEditor* OscirenderAudioProcessor::createEditor() {
     auto editor = new OscirenderAudioProcessorEditor(*this);
+    if (wrapperType == wrapperType_Standalone) {
+        if (juce::TopLevelWindow::getNumTopLevelWindows() == 1) {
+            juce::TopLevelWindow* w = juce::TopLevelWindow::getTopLevelWindow(0);
+            w->setUsingNativeTitleBar(true);
+        }
+    }
     return editor;
 }
 

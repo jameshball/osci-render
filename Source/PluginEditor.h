@@ -32,6 +32,7 @@ public:
     void saveProject();
     void saveProjectAs();
     void updateTitle();
+    void openAudioSettings();
 
     std::atomic<bool> editingPerspective = false;
 
@@ -60,6 +61,8 @@ private:
     juce::TooltipWindow tooltipWindow{this, 0};
 
     std::atomic<bool> updatingDocumentsWithParserLock = false;
+
+    bool usingNativeMenuBar = false;
 
 	void codeDocumentTextInserted(const juce::String& newText, int insertIndex) override;
 	void codeDocumentTextDeleted(int startIndex, int endIndex) override;

@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
 
 OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p)
 	: AudioProcessorEditor(&p), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white)
@@ -8,8 +9,16 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     setLookAndFeel(&lookAndFeel);
     addAndMakeVisible(volume);
 
-    menuBar.setModel(&menuBarModel);
-    addAndMakeVisible(menuBar);
+#if JUCE_MAC
+    if (audioProcessor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
+        usingNativeMenuBar = true;
+    }
+#endif
+
+    if (!usingNativeMenuBar) {
+        menuBar.setModel(&menuBarModel);
+        addAndMakeVisible(menuBar);
+    }
 
     addAndMakeVisible(collapseButton);
 	collapseButton.onClick = [this] {
@@ -92,7 +101,10 @@ void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
 
 void OscirenderAudioProcessorEditor::resized() {
     auto area = getLocalBounds();
-    menuBar.setBounds(area.removeFromTop(25));
+    if (!usingNativeMenuBar) {
+        menuBar.setBounds(area.removeFromTop(25));
+    }
+    
     area.removeFromTop(2);
     area.removeFromLeft(3);
     auto volumeArea = area.removeFromLeft(30);
@@ -383,4 +395,9 @@ void OscirenderAudioProcessorEditor::updateTitle() {
         title += " - " + audioProcessor.currentProjectFile;
     }
     getTopLevelComponent()->setName(title);
+}
+
+void OscirenderAudioProcessorEditor::openAudioSettings() {
+    juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
+    standalone->showAudioSettingsDialog();
 }
