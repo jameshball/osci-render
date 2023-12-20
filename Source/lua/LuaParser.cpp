@@ -2,7 +2,7 @@
 #include "luaimport.h"
 
 
-LuaParser::LuaParser(juce::String script, juce::String fallbackScript) : fallbackScript(fallbackScript) {
+LuaParser::LuaParser(juce::String script, std::function<void(int, juce::String)> errorCallback, juce::String fallbackScript) : fallbackScript(fallbackScript), errorCallback(errorCallback) {
     reset(script);
 }
 
@@ -25,16 +25,36 @@ void LuaParser::reset(juce::String script) {
     parse();
 }
 
+void LuaParser::reportError(const char* errorChars) {
+    std::string error = errorChars;
+    std::regex nilRegex = std::regex(R"(attempt to.*nil value.*'slider_\w')");
+    // ignore nil errors about global variables, these are likely caused by other errors
+    if (std::regex_search(error, nilRegex)) {
+        return;
+    }
+
+    error = std::regex_replace(error, std::regex(R"(^\[string ".*"\]:)"), "");
+    // extract line number from start of error message
+    std::regex lineRegex(R"((\d+): )");
+    std::smatch lineMatch;
+    std::regex_search(error, lineMatch, lineRegex);
+
+    if (lineMatch.size() > 1) {
+        int line = std::stoi(lineMatch[1]);
+        // remove line number from error message
+        error = std::regex_replace(error, lineRegex, "");
+        errorCallback(line, error);
+    }
+}
+
 void LuaParser::parse() {
     const int ret = luaL_loadstring(L, script.toUTF8());
     if (ret != 0) {
         const char* error = lua_tostring(L, -1);
-
-		std::string newError = std::regex_replace(error, std::regex(R"(^\[string ".*"\]:)"), "");
-        
-        DBG(newError);
+        reportError(error);
         lua_pop(L, 1);
         functionRef = -1;
+        usingFallbackScript = true;
         if (script != fallbackScript) {
             reset(fallbackScript);
         }
@@ -68,10 +88,11 @@ std::vector<float> LuaParser::run() {
     
     if (lua_isfunction(L, -1)) {
         const int ret = lua_pcall(L, 0, LUA_MULTRET, 0);
-        if (ret != 0) {
+        if (ret != LUA_OK) {
             const char* error = lua_tostring(L, -1);
-            DBG(error);
+            reportError(error);
             functionRef = -1;
+            usingFallbackScript = true;
             if (script != fallbackScript) {
                 reset(fallbackScript);
             }
@@ -88,9 +109,15 @@ std::vector<float> LuaParser::run() {
         }
     } else {
         functionRef = -1;
+        usingFallbackScript = true;
         if (script != fallbackScript) {
             reset(fallbackScript);
         }
+    }
+
+    if (functionRef != -1 && !usingFallbackScript) {
+        // report no error
+        errorCallback(-1, "");
     }
 
     // clear stack
@@ -117,7 +144,6 @@ bool LuaParser::isFunctionValid() {
 juce::String LuaParser::getScript() {
     return script;
 }
-
 
 int LuaParser::panic(lua_State *L) {
     const char *msg = lua_tostring(L, -1);

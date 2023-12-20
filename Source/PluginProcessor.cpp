@@ -289,6 +289,16 @@ void OscirenderAudioProcessor::updateLuaValues() {
 	}
 }
 
+void OscirenderAudioProcessor::addErrorListener(ErrorListener* listener) {
+    juce::SpinLock::ScopedLockType lock(errorListenersLock);
+    errorListeners.push_back(listener);
+}
+
+void OscirenderAudioProcessor::removeErrorListener(ErrorListener* listener) {
+    juce::SpinLock::ScopedLockType lock(errorListenersLock);
+    errorListeners.erase(std::remove(errorListeners.begin(), errorListeners.end(), listener), errorListeners.end());
+}
+
 // parsersLock should be held when calling this
 void OscirenderAudioProcessor::updateObjValues() {
     focalLength->apply();
@@ -339,7 +349,7 @@ void OscirenderAudioProcessor::updateFileBlock(int index, std::shared_ptr<juce::
 void OscirenderAudioProcessor::addFile(juce::File file) {
     fileBlocks.push_back(std::make_shared<juce::MemoryBlock>());
     fileNames.push_back(file.getFileName());
-	parsers.push_back(std::make_shared<FileParser>());
+	parsers.push_back(std::make_shared<FileParser>(errorCallback));
     sounds.push_back(new ShapeSound(parsers.back()));
     file.createInputStream()->readIntoMemoryBlock(*fileBlocks.back());
 
@@ -350,7 +360,7 @@ void OscirenderAudioProcessor::addFile(juce::File file) {
 void OscirenderAudioProcessor::addFile(juce::String fileName, const char* data, const int size) {
     fileBlocks.push_back(std::make_shared<juce::MemoryBlock>());
     fileNames.push_back(fileName);
-    parsers.push_back(std::make_shared<FileParser>());
+    parsers.push_back(std::make_shared<FileParser>(errorCallback));
     sounds.push_back(new ShapeSound(parsers.back()));
     fileBlocks.back()->append(data, size);
 
@@ -361,7 +371,7 @@ void OscirenderAudioProcessor::addFile(juce::String fileName, const char* data, 
 void OscirenderAudioProcessor::addFile(juce::String fileName, std::shared_ptr<juce::MemoryBlock> data) {
     fileBlocks.push_back(data);
     fileNames.push_back(fileName);
-    parsers.push_back(std::make_shared<FileParser>());
+    parsers.push_back(std::make_shared<FileParser>(errorCallback));
     sounds.push_back(new ShapeSound(parsers.back()));
 
     openFile(fileBlocks.size() - 1);
@@ -424,6 +434,13 @@ void OscirenderAudioProcessor::changeSound(ShapeSound::Ptr sound) {
             auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
             voice->updateSound(sound.get());
         }
+    }
+}
+
+void OscirenderAudioProcessor::notifyErrorListeners(int lineNumber, juce::String error) {
+    juce::SpinLock::ScopedLockType lock(errorListenersLock);
+    for (auto listener : errorListeners) {
+        listener->onError(lineNumber, error);
     }
 }
 

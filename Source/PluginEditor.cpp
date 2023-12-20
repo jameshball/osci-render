@@ -149,7 +149,7 @@ void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
     int originalIndex = index;
     index++;
     std::shared_ptr<juce::CodeDocument> codeDocument;
-    std::shared_ptr<juce::CodeEditorComponent> editor;
+    std::shared_ptr<ErrorCodeEditorComponent> editor;
 
     if (index == 0) {
         codeDocument = perspectiveCodeDocument;
@@ -163,7 +163,7 @@ void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
         } else if (extension == ".svg") {
             tokeniser = &xmlTokeniser;
         }
-        editor = std::make_shared<juce::CodeEditorComponent>(*codeDocument, tokeniser);
+        editor = std::make_shared<ErrorCodeEditorComponent>(*codeDocument, tokeniser, audioProcessor);
     }
     
     codeDocuments.insert(codeDocuments.begin() + index, codeDocument);

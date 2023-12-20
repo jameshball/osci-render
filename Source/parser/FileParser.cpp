@@ -3,7 +3,7 @@
 #include "../shape/CircleArc.h"
 #include <numbers>
 
-FileParser::FileParser() {}
+FileParser::FileParser(std::function<void(int, juce::String)> errorCallback) : errorCallback(errorCallback) {}
 
 void FileParser::parse(juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font font) {
 	juce::SpinLock::ScopedLockType scope(lock);
@@ -27,7 +27,7 @@ void FileParser::parse(juce::String extension, std::unique_ptr<juce::InputStream
 	} else if (extension == ".txt") {
 		text = std::make_shared<TextParser>(stream->readEntireStreamAsString(), font);
 	} else if (extension == ".lua") {
-		lua = std::make_shared<LuaParser>(stream->readEntireStreamAsString(), fallbackLuaScript);
+		lua = std::make_shared<LuaParser>(stream->readEntireStreamAsString(), errorCallback, fallbackLuaScript);
 	}
 
 	sampleSource = lua != nullptr;

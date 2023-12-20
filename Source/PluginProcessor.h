@@ -230,7 +230,8 @@ public:
     );
 
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
-    std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>(VERSION_HINT);
+    std::function<void(int, juce::String)> errorCallback = [this](int lineNum, juce::String error) { notifyErrorListeners(lineNum, error); };
+    std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>(VERSION_HINT, errorCallback);
     
     BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false);
     BooleanParameter* inputEnabled = new BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false);
@@ -301,6 +302,9 @@ public:
 	std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
     void setObjectServerRendering(bool enabled);
     void updateLuaValues();
+    void addErrorListener(ErrorListener* listener);
+    void removeErrorListener(ErrorListener* listener);
+    void notifyErrorListeners(int lineNumber, juce::String error);
 private:
     std::atomic<double> volume = 1.0;
     std::atomic<double> threshold = 1.0;
@@ -310,6 +314,9 @@ private:
     std::vector<BooleanParameter*> booleanParameters;
     std::vector<std::shared_ptr<Effect>> allEffects;
     std::vector<std::shared_ptr<Effect>> permanentEffects;
+
+    juce::SpinLock errorListenersLock;
+    std::vector<ErrorListener*> errorListeners;
 
     ShapeSound::Ptr defaultSound = new ShapeSound(std::make_shared<FileParser>());
     PublicSynthesiser synth;
