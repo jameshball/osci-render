@@ -33,9 +33,12 @@ void LuaParser::reportError(const char* errorChars) {
         return;
     }
 
+    // remove any newlines from error message
+    error = std::regex_replace(error, std::regex(R"(\n|\r)"), "");
+    // remove script content from error message
     error = std::regex_replace(error, std::regex(R"(^\[string ".*"\]:)"), "");
     // extract line number from start of error message
-    std::regex lineRegex(R"((\d+): )");
+    std::regex lineRegex(R"(^(\d+): )");
     std::smatch lineMatch;
     std::regex_search(error, lineMatch, lineRegex);
 

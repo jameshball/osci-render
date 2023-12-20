@@ -3,7 +3,7 @@
 #include "../lua/LuaParser.h"
 #include "../PluginProcessor.h"
 
-class ErrorCodeEditorComponent : public juce::CodeEditorComponent, public ErrorListener {
+class ErrorCodeEditorComponent : public juce::CodeEditorComponent, public ErrorListener, public juce::AsyncUpdater {
  public:
     ErrorCodeEditorComponent(juce::CodeDocument& document, juce::CodeTokeniser* codeTokeniser, OscirenderAudioProcessor& p, juce::String fileName) : juce::CodeEditorComponent(document, codeTokeniser), audioProcessor(p), document(document), fileName(fileName) {
         audioProcessor.addErrorListener(this);
@@ -73,7 +73,7 @@ class ErrorCodeEditorComponent : public juce::CodeEditorComponent, public ErrorL
         juce::CodeEditorComponent::mouseMove(event);
         if (errorLine != -1) {
             errorLineHovered = getErrorLineBounds().contains(event.getPosition());
-            repaint(getErrorRepaintBounds());
+            repaint();
         }
     }
 
@@ -84,20 +84,18 @@ class ErrorCodeEditorComponent : public juce::CodeEditorComponent, public ErrorL
         return juce::Rectangle<int>(gutterWidth, getLineHeight() * (errorLine - 1 - firstVisibleLine), getWidth() - gutterWidth, getLineHeight());
     }
 
-    juce::Rectangle<int> getErrorRepaintBounds() {
-        auto lineBounds = getErrorLineBounds();
-        return juce::Rectangle<int>(lineBounds.getX(), lineBounds.getY(), lineBounds.getWidth(), lineBounds.getHeight() * 2);
-    }
-
-    bool keyPressed(const juce::KeyPress& key) override {
+    void handleAsyncUpdate() override {
         repaint();
-        return juce::CodeEditorComponent::keyPressed(key);
     }
 
 private:
     void onError(int lineNumber, juce::String error) override {
+        int oldErrorLine = errorLine;
         errorLine = lineNumber;
         errorText = error;
+        if (errorLine != -1 || errorLine != oldErrorLine) {
+            triggerAsyncUpdate();
+        }
     }
 
     juce::String getFileName() override {
