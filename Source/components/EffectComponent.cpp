@@ -29,6 +29,7 @@ void EffectComponent::setupComponent() {
 
     label.setTooltip(parameter->description);
     label.setText(parameter->name, juce::dontSendNotification);
+    label.setInterceptsMouseClicks(false, false);
 
     slider.setRange(parameter->min, parameter->max, parameter->step);
     slider.setValue(parameter->getValueUnnormalised(), juce::dontSendNotification);
