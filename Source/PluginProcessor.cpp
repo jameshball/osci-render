@@ -350,7 +350,7 @@ void OscirenderAudioProcessor::addFile(juce::File file) {
     fileBlocks.push_back(std::make_shared<juce::MemoryBlock>());
     fileNames.push_back(file.getFileName());
     fileIds.push_back(currentFileId++);
-	parsers.push_back(std::make_shared<FileParser>(errorCallback, variableCallback));
+	parsers.push_back(std::make_shared<FileParser>(errorCallback));
     sounds.push_back(new ShapeSound(parsers.back()));
     file.createInputStream()->readIntoMemoryBlock(*fileBlocks.back());
 
@@ -362,7 +362,7 @@ void OscirenderAudioProcessor::addFile(juce::String fileName, const char* data, 
     fileBlocks.push_back(std::make_shared<juce::MemoryBlock>());
     fileNames.push_back(fileName);
     fileIds.push_back(currentFileId++);
-    parsers.push_back(std::make_shared<FileParser>(errorCallback, variableCallback));
+    parsers.push_back(std::make_shared<FileParser>(errorCallback));
     sounds.push_back(new ShapeSound(parsers.back()));
     fileBlocks.back()->append(data, size);
 
@@ -374,7 +374,7 @@ void OscirenderAudioProcessor::addFile(juce::String fileName, std::shared_ptr<ju
     fileBlocks.push_back(data);
     fileNames.push_back(fileName);
     fileIds.push_back(currentFileId++);
-    parsers.push_back(std::make_shared<FileParser>(errorCallback, variableCallback));
+    parsers.push_back(std::make_shared<FileParser>(errorCallback));
     sounds.push_back(new ShapeSound(parsers.back()));
 
     openFile(fileBlocks.size() - 1);

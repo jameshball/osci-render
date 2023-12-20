@@ -11,34 +11,29 @@ public:
 };
 
 struct LuaVariables {
-	int sampleRate;
+	double sampleRate;
 	double frequency;
 };
 
 struct lua_State;
 class LuaParser {
 public:
-	LuaParser(juce::String fileName, juce::String script, std::function<void(int, juce::String, juce::String)> errorCallback, std::function<LuaVariables()> variableCallback, juce::String fallbackScript = "return { 0.0, 0.0 }");
-	~LuaParser();
+	LuaParser(juce::String fileName, juce::String script, std::function<void(int, juce::String, juce::String)> errorCallback, juce::String fallbackScript = "return { 0.0, 0.0 }");
 
-	std::vector<float> run();
+	std::vector<float> run(lua_State*& L, const LuaVariables vars, long& step, double& phase);
 	void setVariable(juce::String variableName, double value);
 	bool isFunctionValid();
 	juce::String getScript();
 	void resetErrors();
+	void close(lua_State*& L);
 
 private:
-	void reset(juce::String script);
+	void reset(lua_State*& L, juce::String script);
 	void reportError(const char* error);
-	void parse();
-
-	static int panic(lua_State* L);
+	void parse(lua_State*& L);
 
 	int functionRef = -1;
 	bool usingFallbackScript = false;
-	long step = 1;
-	double phase = 0.0;
-	lua_State* L = nullptr;
 	juce::String script;
 	juce::String fallbackScript;
 	std::atomic<bool> updateVariables = false;
@@ -46,6 +41,6 @@ private:
 	std::vector<juce::String> variableNames;
 	std::vector<double> variables;
 	std::function<void(int, juce::String, juce::String)> errorCallback;
-	std::function<LuaVariables()> variableCallback;
 	juce::String fileName;
+	std::vector<lua_State*> seenStates;
 };

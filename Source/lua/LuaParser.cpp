@@ -1,15 +1,9 @@
 #include "LuaParser.h"
 #include "luaimport.h"
 
-LuaParser::LuaParser(juce::String fileName, juce::String script, std::function<void(int, juce::String, juce::String)> errorCallback, std::function<LuaVariables()> variableCallback, juce::String fallbackScript) : fallbackScript(fallbackScript), errorCallback(errorCallback), variableCallback(variableCallback), fileName(fileName) {
-    reset(script);
-}
+LuaParser::LuaParser(juce::String fileName, juce::String script, std::function<void(int, juce::String, juce::String)> errorCallback, juce::String fallbackScript) : script(script), fallbackScript(fallbackScript), errorCallback(errorCallback), fileName(fileName) {}
 
-LuaParser::~LuaParser() {
-    lua_close(L);
-}
-
-void LuaParser::reset(juce::String script) {
+void LuaParser::reset(lua_State*& L, juce::String script) {
     functionRef = -1;
 
     if (L != nullptr) {
@@ -17,11 +11,9 @@ void LuaParser::reset(juce::String script) {
     }
     
     L = luaL_newstate();
-    lua_atpanic(L, panic);
     luaL_openlibs(L);
-
     this->script = script;
-    parse();
+    parse(L);
 }
 
 void LuaParser::reportError(const char* errorChars) {
@@ -49,7 +41,7 @@ void LuaParser::reportError(const char* errorChars) {
     }
 }
 
-void LuaParser::parse() {
+void LuaParser::parse(lua_State*& L) {
     const int ret = luaL_loadstring(L, script.toUTF8());
     if (ret != 0) {
         const char* error = lua_tostring(L, -1);
@@ -58,7 +50,7 @@ void LuaParser::parse() {
         functionRef = -1;
         usingFallbackScript = true;
         if (script != fallbackScript) {
-            reset(fallbackScript);
+            reset(L, fallbackScript);
         }
     } else {
         functionRef = luaL_ref(L, LUA_REGISTRYINDEX);
@@ -66,13 +58,17 @@ void LuaParser::parse() {
 }
 
 // only the audio thread runs this fuction
-std::vector<float> LuaParser::run() {
+std::vector<float> LuaParser::run(lua_State*& L, const LuaVariables vars, long& step, double& phase) {
+    // if we haven't seen this state before, reset it
+    if (std::find(seenStates.begin(), seenStates.end(), L) == seenStates.end()) {
+        reset(L, script);
+        seenStates.push_back(L);
+    }
+
     std::vector<float> values;
 	
     lua_pushnumber(L, step);
     lua_setglobal(L, "step");
-
-    auto vars = variableCallback();
 
     lua_pushnumber(L, vars.sampleRate);
     lua_setglobal(L, "sample_rate");
@@ -84,18 +80,13 @@ std::vector<float> LuaParser::run() {
     lua_setglobal(L, "phase");
 
     // this CANNOT run at the same time as setVariable
-    if (updateVariables) {
-        juce::SpinLock::ScopedTryLockType lock(variableLock);
-        if (lock.isLocked()) {
-            for (int i = 0; i < variableNames.size(); i++) {
-                lua_pushnumber(L, variables[i]);
-                lua_setglobal(L, variableNames[i].toUTF8());
-            }
-            variableNames.clear();
-            variables.clear();
-            updateVariables = false;
-		}
-    }
+    juce::SpinLock::ScopedTryLockType lock(variableLock);
+    if (lock.isLocked()) {
+        for (int i = 0; i < variableNames.size(); i++) {
+            lua_pushnumber(L, variables[i]);
+            lua_setglobal(L, variableNames[i].toUTF8());
+        }
+	}
     
 	lua_geti(L, LUA_REGISTRYINDEX, functionRef);
     
@@ -107,7 +98,7 @@ std::vector<float> LuaParser::run() {
             functionRef = -1;
             usingFallbackScript = true;
             if (script != fallbackScript) {
-                reset(fallbackScript);
+                reset(L, fallbackScript);
             }
         } else if (lua_istable(L, -1)) {
             auto length = lua_rawlen(L, -1);
@@ -124,7 +115,7 @@ std::vector<float> LuaParser::run() {
         functionRef = -1;
         usingFallbackScript = true;
         if (script != fallbackScript) {
-            reset(fallbackScript);
+            reset(L, fallbackScript);
         }
     }
 
@@ -148,9 +139,23 @@ std::vector<float> LuaParser::run() {
 // many threads can run this function
 void LuaParser::setVariable(juce::String variableName, double value) {
     juce::SpinLock::ScopedLockType lock(variableLock);
-	variableNames.push_back(variableName);
-	variables.push_back(value);
-    updateVariables = true;
+    // find variable index
+    int index = -1;
+    for (int i = 0; i < variableNames.size(); i++) {
+        if (variableNames[i] == variableName) {
+            index = i;
+            break;
+        }
+    }
+	
+    if (index == -1) {
+        // add new variable
+        variableNames.push_back(variableName);
+        variables.push_back(value);
+    } else {
+        // update existing variable
+        variables[index] = value;
+    }
 }
 
 bool LuaParser::isFunctionValid() {
@@ -165,9 +170,8 @@ void LuaParser::resetErrors() {
     errorCallback(-1, fileName, "");
 }
 
-int LuaParser::panic(lua_State *L) {
-    const char *msg = lua_tostring(L, -1);
-    if (msg == NULL) msg = "error object is not a string";
-    DBG("PANIC: unprotected error in call to Lua API (%s)\n" << msg);
-    return 0;  /* return to Lua to abort */
+void LuaParser::close(lua_State*& L) {
+    if (L != nullptr) {
+        lua_close(L);
+    }
 }

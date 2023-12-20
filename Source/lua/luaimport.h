@@ -1,3 +1,6 @@
+#ifndef LUAIMPORT_H
+#define LUAIMPORT_H
+
 extern "C" {
 	#include "lapi.c"
 	#include "lauxlib.c"
@@ -33,3 +36,5 @@ extern "C" {
 	#include "lvm.c"
 	#include "lzio.c"
 }
+
+#endif

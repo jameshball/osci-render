@@ -103,7 +103,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             renderingSample = parser != nullptr && parser->isSample();
 
             if (renderingSample) {
-                channels = parser->nextSample();
+                channels = parser->nextSample(L, LuaVariables{ audioProcessor.currentSampleRate, frequency }, step, phase);
             } else if (currentShape < frame.size()) {
                 auto& shape = frame[currentShape];
                 double length = shape->length();

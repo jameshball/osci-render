@@ -10,11 +10,12 @@
 
 class FileParser {
 public:
-	FileParser(std::function<void(int, juce::String, juce::String)> errorCallback = nullptr, std::function<LuaVariables()> variableCallback = nullptr);
+	FileParser(std::function<void(int, juce::String, juce::String)> errorCallback = nullptr);
 
 	void parse(juce::String fileName, juce::String extension, std::unique_ptr<juce::InputStream>, juce::Font);
 	std::vector<std::unique_ptr<Shape>> nextFrame();
-	Vector2 nextSample();
+	Vector2 nextSample(lua_State*& L, const LuaVariables vars, long& step, double& phase);
+	void closeLua(lua_State*& L);
 	bool isSample();
 	bool isActive();
 	void disable();
@@ -41,5 +42,4 @@ private:
 	juce::String fallbackLuaScript = "return { 0.0, 0.0 }";
 
 	std::function<void(int, juce::String, juce::String)> errorCallback;
-	std::function<LuaVariables()> variableCallback;
 };

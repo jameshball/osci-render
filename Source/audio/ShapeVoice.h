@@ -37,6 +37,10 @@ private:
     bool currentlyPlaying = false;
 	double frequency = 1.0;
 
+	lua_State* L = nullptr;
+	long step = 1;
+	double phase = 0;
+
 	Env adsr;
 	double time = 0.0;
 	double releaseTime = 0.0;

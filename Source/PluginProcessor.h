@@ -231,10 +231,7 @@ public:
 
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
     std::function<void(int, juce::String, juce::String)> errorCallback = [this](int lineNum, juce::String fileName, juce::String error) { notifyErrorListeners(lineNum, fileName, error); };
-    std::function<LuaVariables()> variableCallback = [this]() {
-        return LuaVariables{ (int) currentSampleRate.load(), frequency.load()};
-    };
-    std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>(VERSION_HINT, errorCallback, variableCallback);
+    std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>(VERSION_HINT, errorCallback);
     
     BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false);
     BooleanParameter* inputEnabled = new BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false);

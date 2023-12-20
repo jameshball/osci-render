@@ -3,7 +3,7 @@
 #include "../shape/CircleArc.h"
 #include <numbers>
 
-FileParser::FileParser(std::function<void(int, juce::String, juce::String)> errorCallback, std::function<LuaVariables()> variableCallback) : errorCallback(errorCallback), variableCallback(variableCallback) {}
+FileParser::FileParser(std::function<void(int, juce::String, juce::String)> errorCallback) : errorCallback(errorCallback) {}
 
 void FileParser::parse(juce::String fileName, juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font font) {
 	juce::SpinLock::ScopedLockType scope(lock);
@@ -27,7 +27,7 @@ void FileParser::parse(juce::String fileName, juce::String extension, std::uniqu
 	} else if (extension == ".txt") {
 		text = std::make_shared<TextParser>(stream->readEntireStreamAsString(), font);
 	} else if (extension == ".lua") {
-		lua = std::make_shared<LuaParser>(fileName, stream->readEntireStreamAsString(), errorCallback, variableCallback, fallbackLuaScript);
+		lua = std::make_shared<LuaParser>(fileName, stream->readEntireStreamAsString(), errorCallback, fallbackLuaScript);
 	}
 
 	sampleSource = lua != nullptr;
@@ -48,16 +48,22 @@ std::vector<std::unique_ptr<Shape>> FileParser::nextFrame() {
 	return tempShapes;
 }
 
-Vector2 FileParser::nextSample() {
+Vector2 FileParser::nextSample(lua_State*& L, const LuaVariables vars, long& step, double& phase) {
 	juce::SpinLock::ScopedLockType scope(lock);
 
 	if (lua != nullptr) {
-		auto values = lua->run();
+		auto values = lua->run(L, vars, step, phase);
 		if (values.size() < 2) {
             return Vector2();
         }
 		return Vector2(values[0], values[1]);
 	}
+}
+
+void FileParser::closeLua(lua_State*& L) {
+	if (lua != nullptr) {
+		lua->close(L);
+    }
 }
 
 bool FileParser::isSample() {
