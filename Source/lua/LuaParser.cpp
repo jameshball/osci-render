@@ -1,7 +1,7 @@
 #include "LuaParser.h"
 #include "luaimport.h"
 
-LuaParser::LuaParser(juce::String fileName, juce::String script, std::function<void(int, juce::String, juce::String)> errorCallback, juce::String fallbackScript) : fallbackScript(fallbackScript), errorCallback(errorCallback), fileName(fileName) {
+LuaParser::LuaParser(juce::String fileName, juce::String script, std::function<void(int, juce::String, juce::String)> errorCallback, std::function<LuaVariables()> variableCallback, juce::String fallbackScript) : fallbackScript(fallbackScript), errorCallback(errorCallback), variableCallback(variableCallback), fileName(fileName) {
     reset(script);
 }
 
@@ -72,6 +72,17 @@ std::vector<float> LuaParser::run() {
     lua_pushnumber(L, step);
     lua_setglobal(L, "step");
 
+    auto vars = variableCallback();
+
+    lua_pushnumber(L, vars.sampleRate);
+    lua_setglobal(L, "sample_rate");
+
+    lua_pushnumber(L, vars.frequency);
+    lua_setglobal(L, "frequency");
+
+    lua_pushnumber(L, phase);
+    lua_setglobal(L, "phase");
+
     // this CANNOT run at the same time as setVariable
     if (updateVariables) {
         juce::SpinLock::ScopedTryLockType lock(variableLock);
@@ -125,6 +136,10 @@ std::vector<float> LuaParser::run() {
     lua_settop(L, 0);
 
 	step++;
+    phase += 2 * std::numbers::pi * vars.frequency / vars.sampleRate;
+    if (phase > 2 * std::numbers::pi) {
+        phase -= 2 * std::numbers::pi;
+    }
     
 	return values;
 }

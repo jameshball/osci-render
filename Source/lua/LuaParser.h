@@ -1,6 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 #include <regex>
+#include <numbers>
 #include "../shape/Shape.h"
 
 class ErrorListener {
@@ -9,10 +10,15 @@ public:
 	virtual juce::String getFileName() = 0;
 };
 
+struct LuaVariables {
+	int sampleRate;
+	double frequency;
+};
+
 struct lua_State;
 class LuaParser {
 public:
-	LuaParser(juce::String fileName, juce::String script, std::function<void(int, juce::String, juce::String)> errorCallback, juce::String fallbackScript = "return { 0.0, 0.0 }");
+	LuaParser(juce::String fileName, juce::String script, std::function<void(int, juce::String, juce::String)> errorCallback, std::function<LuaVariables()> variableCallback, juce::String fallbackScript = "return { 0.0, 0.0 }");
 	~LuaParser();
 
 	std::vector<float> run();
@@ -31,6 +37,7 @@ private:
 	int functionRef = -1;
 	bool usingFallbackScript = false;
 	long step = 1;
+	double phase = 0.0;
 	lua_State* L = nullptr;
 	juce::String script;
 	juce::String fallbackScript;
@@ -39,5 +46,6 @@ private:
 	std::vector<juce::String> variableNames;
 	std::vector<double> variables;
 	std::function<void(int, juce::String, juce::String)> errorCallback;
+	std::function<LuaVariables()> variableCallback;
 	juce::String fileName;
 };
