@@ -161,7 +161,7 @@ void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
         } else if (extension == ".svg") {
             tokeniser = &xmlTokeniser;
         }
-        editor = std::make_shared<ErrorCodeEditorComponent>(*codeDocument, tokeniser, audioProcessor, audioProcessor.getFileName(originalIndex));
+        editor = std::make_shared<ErrorCodeEditorComponent>(*codeDocument, tokeniser, audioProcessor, audioProcessor.getFileId(originalIndex));
     }
     
     codeDocuments.insert(codeDocuments.begin() + index, codeDocument);

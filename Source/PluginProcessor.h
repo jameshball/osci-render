@@ -242,6 +242,8 @@ public:
     std::vector<ShapeSound::Ptr> sounds;
     std::vector<std::shared_ptr<juce::MemoryBlock>> fileBlocks;
     std::vector<juce::String> fileNames;
+    int currentFileId = 0;
+    std::vector<int> fileIds;
     std::atomic<int> currentFile = -1;
 
     juce::ChangeBroadcaster broadcaster;
@@ -299,6 +301,7 @@ public:
     std::shared_ptr<FileParser> getCurrentFileParser();
 	juce::String getCurrentFileName();
     juce::String getFileName(int index);
+    juce::String getFileId(int index);
 	std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
     void setObjectServerRendering(bool enabled);
     void updateLuaValues();

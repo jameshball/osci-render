@@ -349,6 +349,7 @@ void OscirenderAudioProcessor::updateFileBlock(int index, std::shared_ptr<juce::
 void OscirenderAudioProcessor::addFile(juce::File file) {
     fileBlocks.push_back(std::make_shared<juce::MemoryBlock>());
     fileNames.push_back(file.getFileName());
+    fileIds.push_back(currentFileId++);
 	parsers.push_back(std::make_shared<FileParser>(errorCallback));
     sounds.push_back(new ShapeSound(parsers.back()));
     file.createInputStream()->readIntoMemoryBlock(*fileBlocks.back());
@@ -360,6 +361,7 @@ void OscirenderAudioProcessor::addFile(juce::File file) {
 void OscirenderAudioProcessor::addFile(juce::String fileName, const char* data, const int size) {
     fileBlocks.push_back(std::make_shared<juce::MemoryBlock>());
     fileNames.push_back(fileName);
+    fileIds.push_back(currentFileId++);
     parsers.push_back(std::make_shared<FileParser>(errorCallback));
     sounds.push_back(new ShapeSound(parsers.back()));
     fileBlocks.back()->append(data, size);
@@ -371,6 +373,7 @@ void OscirenderAudioProcessor::addFile(juce::String fileName, const char* data, 
 void OscirenderAudioProcessor::addFile(juce::String fileName, std::shared_ptr<juce::MemoryBlock> data) {
     fileBlocks.push_back(data);
     fileNames.push_back(fileName);
+    fileIds.push_back(currentFileId++);
     parsers.push_back(std::make_shared<FileParser>(errorCallback));
     sounds.push_back(new ShapeSound(parsers.back()));
 
@@ -384,6 +387,7 @@ void OscirenderAudioProcessor::removeFile(int index) {
 	}
     fileBlocks.erase(fileBlocks.begin() + index);
     fileNames.erase(fileNames.begin() + index);
+    fileIds.erase(fileIds.begin() + index);
     parsers.erase(parsers.begin() + index);
     sounds.erase(sounds.begin() + index);
     auto newFileIndex = index;
@@ -405,7 +409,7 @@ void OscirenderAudioProcessor::openFile(int index) {
 		return;
 	}
     juce::SpinLock::ScopedLockType lock(fontLock);
-    parsers[index]->parse(fileNames[index], fileNames[index].fromLastOccurrenceOf(".", true, false), std::make_unique<juce::MemoryInputStream>(*fileBlocks[index], false), font);
+    parsers[index]->parse(juce::String(fileIds[index]), fileNames[index].fromLastOccurrenceOf(".", true, false), std::make_unique<juce::MemoryInputStream>(*fileBlocks[index], false), font);
     changeCurrentFile(index);
 }
 
@@ -464,6 +468,10 @@ juce::String OscirenderAudioProcessor::getCurrentFileName() {
 
 juce::String OscirenderAudioProcessor::getFileName(int index) {
     return fileNames[index];
+}
+
+juce::String OscirenderAudioProcessor::getFileId(int index) {
+    return juce::String(fileIds[index]);
 }
 
 std::shared_ptr<juce::MemoryBlock> OscirenderAudioProcessor::getFileBlock(int index) {
