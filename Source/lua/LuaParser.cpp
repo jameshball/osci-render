@@ -29,7 +29,10 @@ void LuaParser::parse() {
     const int ret = luaL_loadstring(L, script.toUTF8());
     if (ret != 0) {
         const char* error = lua_tostring(L, -1);
-        DBG(error);
+
+		std::string newError = std::regex_replace(error, std::regex(R"(^\[string ".*"\]:)"), "");
+        
+        DBG(newError);
         lua_pop(L, 1);
         functionRef = -1;
         if (script != fallbackScript) {

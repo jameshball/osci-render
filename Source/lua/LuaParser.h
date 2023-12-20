@@ -1,5 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
+#include <regex>
 #include "../shape/Shape.h"
 
 struct lua_State;
@@ -15,6 +16,7 @@ public:
 
 private:
 	void reset(juce::String script);
+	static int handleLuaError(lua_State* L);
 	void parse();
 
 	static int panic(lua_State* L);
