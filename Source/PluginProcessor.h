@@ -230,7 +230,7 @@ public:
     );
 
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
-    std::function<void(int, juce::String)> errorCallback = [this](int lineNum, juce::String error) { notifyErrorListeners(lineNum, error); };
+    std::function<void(int, juce::String, juce::String)> errorCallback = [this](int lineNum, juce::String fileName, juce::String error) { notifyErrorListeners(lineNum, fileName, error); };
     std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>(VERSION_HINT, errorCallback);
     
     BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false);
@@ -304,7 +304,7 @@ public:
     void updateLuaValues();
     void addErrorListener(ErrorListener* listener);
     void removeErrorListener(ErrorListener* listener);
-    void notifyErrorListeners(int lineNumber, juce::String error);
+    void notifyErrorListeners(int lineNumber, juce::String fileName, juce::String error);
 private:
     std::atomic<double> volume = 1.0;
     std::atomic<double> threshold = 1.0;

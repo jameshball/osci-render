@@ -3,9 +3,9 @@
 #include "../shape/CircleArc.h"
 #include <numbers>
 
-FileParser::FileParser(std::function<void(int, juce::String)> errorCallback) : errorCallback(errorCallback) {}
+FileParser::FileParser(std::function<void(int, juce::String, juce::String)> errorCallback) : errorCallback(errorCallback) {}
 
-void FileParser::parse(juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font font) {
+void FileParser::parse(juce::String fileName, juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font font) {
 	juce::SpinLock::ScopedLockType scope(lock);
 
 	if (extension == ".lua" && lua != nullptr && lua->isFunctionValid()) {
@@ -27,7 +27,7 @@ void FileParser::parse(juce::String extension, std::unique_ptr<juce::InputStream
 	} else if (extension == ".txt") {
 		text = std::make_shared<TextParser>(stream->readEntireStreamAsString(), font);
 	} else if (extension == ".lua") {
-		lua = std::make_shared<LuaParser>(stream->readEntireStreamAsString(), errorCallback, fallbackLuaScript);
+		lua = std::make_shared<LuaParser>(fileName, stream->readEntireStreamAsString(), errorCallback, fallbackLuaScript);
 	}
 
 	sampleSource = lua != nullptr;

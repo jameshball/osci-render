@@ -405,7 +405,7 @@ void OscirenderAudioProcessor::openFile(int index) {
 		return;
 	}
     juce::SpinLock::ScopedLockType lock(fontLock);
-    parsers[index]->parse(fileNames[index].fromLastOccurrenceOf(".", true, false), std::make_unique<juce::MemoryInputStream>(*fileBlocks[index], false), font);
+    parsers[index]->parse(fileNames[index], fileNames[index].fromLastOccurrenceOf(".", true, false), std::make_unique<juce::MemoryInputStream>(*fileBlocks[index], false), font);
     changeCurrentFile(index);
 }
 
@@ -437,10 +437,12 @@ void OscirenderAudioProcessor::changeSound(ShapeSound::Ptr sound) {
     }
 }
 
-void OscirenderAudioProcessor::notifyErrorListeners(int lineNumber, juce::String error) {
+void OscirenderAudioProcessor::notifyErrorListeners(int lineNumber, juce::String fileName, juce::String error) {
     juce::SpinLock::ScopedLockType lock(errorListenersLock);
     for (auto listener : errorListeners) {
-        listener->onError(lineNumber, error);
+        if (listener->getFileName() == fileName) {
+            listener->onError(lineNumber, error);
+        }
     }
 }
 
@@ -779,7 +781,6 @@ void OscirenderAudioProcessor::envelopeChanged(EnvelopeComponent* changedEnvelop
         updateIfApproxEqual(decayShape, curves[1].getCurve());
         updateIfApproxEqual(releaseTime, times[2]);
         updateIfApproxEqual(releaseShape, curves[2].getCurve());
-        DBG("adsr changed");
     }
 }
 

@@ -48,7 +48,7 @@ private:
     juce::XmlTokeniser xmlTokeniser;
 	juce::ShapeButton collapseButton;
     std::shared_ptr<juce::CodeDocument> perspectiveCodeDocument = std::make_shared<juce::CodeDocument>();
-    std::shared_ptr<ErrorCodeEditorComponent> perspectiveCodeEditor = std::make_shared<ErrorCodeEditorComponent>(*perspectiveCodeDocument, &luaTokeniser, audioProcessor);
+    std::shared_ptr<ErrorCodeEditorComponent> perspectiveCodeEditor = std::make_shared<ErrorCodeEditorComponent>(*perspectiveCodeDocument, &luaTokeniser, audioProcessor, "perspectiveEffect");
 
     std::unique_ptr<juce::FileChooser> chooser;
     MainMenuBarModel menuBarModel{*this};

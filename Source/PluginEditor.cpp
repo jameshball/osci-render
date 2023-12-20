@@ -112,8 +112,6 @@ void OscirenderAudioProcessorEditor::resized() {
                 editorVisible = true;
 
                 juce::Component* columns[] = { &dummy, &resizerBar, codeEditors[index].get() };
-
-                DBG("area: " << area.toString());
                  
                 layout.layOutComponents(columns, 3, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
                 auto dummyBounds = dummy.getBounds();
@@ -163,7 +161,7 @@ void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
         } else if (extension == ".svg") {
             tokeniser = &xmlTokeniser;
         }
-        editor = std::make_shared<ErrorCodeEditorComponent>(*codeDocument, tokeniser, audioProcessor);
+        editor = std::make_shared<ErrorCodeEditorComponent>(*codeDocument, tokeniser, audioProcessor, audioProcessor.getFileName(originalIndex));
     }
     
     codeDocuments.insert(codeDocuments.begin() + index, codeDocument);

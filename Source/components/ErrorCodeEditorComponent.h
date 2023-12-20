@@ -5,7 +5,7 @@
 
 class ErrorCodeEditorComponent : public juce::CodeEditorComponent, public ErrorListener {
  public:
-    ErrorCodeEditorComponent(juce::CodeDocument& document, juce::CodeTokeniser* codeTokeniser, OscirenderAudioProcessor& p) : juce::CodeEditorComponent(document, codeTokeniser), audioProcessor(p), document(document) {
+    ErrorCodeEditorComponent(juce::CodeDocument& document, juce::CodeTokeniser* codeTokeniser, OscirenderAudioProcessor& p, juce::String fileName) : juce::CodeEditorComponent(document, codeTokeniser), audioProcessor(p), document(document), fileName(fileName) {
         audioProcessor.addErrorListener(this);
     }
 
@@ -41,11 +41,14 @@ class ErrorCodeEditorComponent : public juce::CodeEditorComponent, public ErrorL
             double start = getCharWidth() * leadingWhitespace;
             double width = getCharWidth() * line.length() - getCharWidth();
 
-            path.startNewSubPath(lineBounds.getX() + start + xOffset, lineBounds.getY() + lineBounds.getHeight() + yOffset);
+            double squiggleMax = lineBounds.getY() + lineBounds.getHeight() - squiggleHeight + yOffset;
+            double squiggleMin = lineBounds.getY() + lineBounds.getHeight() + yOffset;
+
+            path.startNewSubPath(lineBounds.getX() + start + xOffset, squiggleMax);
 
             for (double i = start; i < width - xOffset; i += 2 * lineIncrement) {
-                path.lineTo(lineBounds.getX() + i + xOffset, lineBounds.getY() + lineBounds.getHeight() - squiggleHeight + yOffset);
-                path.lineTo(lineBounds.getX() + i + lineIncrement + xOffset, lineBounds.getY() + lineBounds.getHeight() + yOffset);
+                path.lineTo(lineBounds.getX() + i + xOffset, squiggleMax);
+                path.lineTo(lineBounds.getX() + i + lineIncrement + xOffset, squiggleMin);
             }
             g.strokePath(path, juce::PathStrokeType(1.0f));
 
@@ -97,7 +100,12 @@ private:
         errorText = error;
     }
 
+    juce::String getFileName() override {
+        return fileName;
+    }
+
     juce::CodeDocument& document;
+    juce::String fileName;
     int errorLine = -1;
     juce::String errorText;
     bool errorLineHovered = false;

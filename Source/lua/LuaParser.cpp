@@ -2,7 +2,7 @@
 #include "luaimport.h"
 
 
-LuaParser::LuaParser(juce::String script, std::function<void(int, juce::String)> errorCallback, juce::String fallbackScript) : fallbackScript(fallbackScript), errorCallback(errorCallback) {
+LuaParser::LuaParser(juce::String fileName, juce::String script, std::function<void(int, juce::String, juce::String)> errorCallback, juce::String fallbackScript) : fallbackScript(fallbackScript), errorCallback(errorCallback), fileName(fileName) {
     reset(script);
 }
 
@@ -43,7 +43,7 @@ void LuaParser::reportError(const char* errorChars) {
         int line = std::stoi(lineMatch[1]);
         // remove line number from error message
         error = std::regex_replace(error, lineRegex, "");
-        errorCallback(line, error);
+        errorCallback(line, fileName, error);
     }
 }
 
@@ -116,8 +116,7 @@ std::vector<float> LuaParser::run() {
     }
 
     if (functionRef != -1 && !usingFallbackScript) {
-        // report no error
-        errorCallback(-1, "");
+        resetErrors();
     }
 
     // clear stack
@@ -143,6 +142,10 @@ bool LuaParser::isFunctionValid() {
 
 juce::String LuaParser::getScript() {
     return script;
+}
+
+void LuaParser::resetErrors() {
+    errorCallback(-1, fileName, "");
 }
 
 int LuaParser::panic(lua_State *L) {
