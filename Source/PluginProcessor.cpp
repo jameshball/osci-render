@@ -289,6 +289,16 @@ void OscirenderAudioProcessor::updateLuaValues() {
 	}
 }
 
+void OscirenderAudioProcessor::addErrorListener(ErrorListener* listener) {
+    juce::SpinLock::ScopedLockType lock(errorListenersLock);
+    errorListeners.push_back(listener);
+}
+
+void OscirenderAudioProcessor::removeErrorListener(ErrorListener* listener) {
+    juce::SpinLock::ScopedLockType lock(errorListenersLock);
+    errorListeners.erase(std::remove(errorListeners.begin(), errorListeners.end(), listener), errorListeners.end());
+}
+
 // parsersLock should be held when calling this
 void OscirenderAudioProcessor::updateObjValues() {
     focalLength->apply();
@@ -339,7 +349,8 @@ void OscirenderAudioProcessor::updateFileBlock(int index, std::shared_ptr<juce::
 void OscirenderAudioProcessor::addFile(juce::File file) {
     fileBlocks.push_back(std::make_shared<juce::MemoryBlock>());
     fileNames.push_back(file.getFileName());
-	parsers.push_back(std::make_shared<FileParser>());
+    fileIds.push_back(currentFileId++);
+	parsers.push_back(std::make_shared<FileParser>(errorCallback));
     sounds.push_back(new ShapeSound(parsers.back()));
     file.createInputStream()->readIntoMemoryBlock(*fileBlocks.back());
 
@@ -350,7 +361,8 @@ void OscirenderAudioProcessor::addFile(juce::File file) {
 void OscirenderAudioProcessor::addFile(juce::String fileName, const char* data, const int size) {
     fileBlocks.push_back(std::make_shared<juce::MemoryBlock>());
     fileNames.push_back(fileName);
-    parsers.push_back(std::make_shared<FileParser>());
+    fileIds.push_back(currentFileId++);
+    parsers.push_back(std::make_shared<FileParser>(errorCallback));
     sounds.push_back(new ShapeSound(parsers.back()));
     fileBlocks.back()->append(data, size);
 
@@ -361,7 +373,8 @@ void OscirenderAudioProcessor::addFile(juce::String fileName, const char* data, 
 void OscirenderAudioProcessor::addFile(juce::String fileName, std::shared_ptr<juce::MemoryBlock> data) {
     fileBlocks.push_back(data);
     fileNames.push_back(fileName);
-    parsers.push_back(std::make_shared<FileParser>());
+    fileIds.push_back(currentFileId++);
+    parsers.push_back(std::make_shared<FileParser>(errorCallback));
     sounds.push_back(new ShapeSound(parsers.back()));
 
     openFile(fileBlocks.size() - 1);
@@ -374,6 +387,7 @@ void OscirenderAudioProcessor::removeFile(int index) {
 	}
     fileBlocks.erase(fileBlocks.begin() + index);
     fileNames.erase(fileNames.begin() + index);
+    fileIds.erase(fileIds.begin() + index);
     parsers.erase(parsers.begin() + index);
     sounds.erase(sounds.begin() + index);
     auto newFileIndex = index;
@@ -395,7 +409,7 @@ void OscirenderAudioProcessor::openFile(int index) {
 		return;
 	}
     juce::SpinLock::ScopedLockType lock(fontLock);
-    parsers[index]->parse(fileNames[index].fromLastOccurrenceOf(".", true, false), std::make_unique<juce::MemoryInputStream>(*fileBlocks[index], false), font);
+    parsers[index]->parse(juce::String(fileIds[index]), fileNames[index].fromLastOccurrenceOf(".", true, false), std::make_unique<juce::MemoryInputStream>(*fileBlocks[index], false), font);
     changeCurrentFile(index);
 }
 
@@ -427,6 +441,15 @@ void OscirenderAudioProcessor::changeSound(ShapeSound::Ptr sound) {
     }
 }
 
+void OscirenderAudioProcessor::notifyErrorListeners(int lineNumber, juce::String fileName, juce::String error) {
+    juce::SpinLock::ScopedLockType lock(errorListenersLock);
+    for (auto listener : errorListeners) {
+        if (listener->getFileName() == fileName) {
+            listener->onError(lineNumber, error);
+        }
+    }
+}
+
 int OscirenderAudioProcessor::getCurrentFileIndex() {
     return currentFile;
 }
@@ -445,6 +468,10 @@ juce::String OscirenderAudioProcessor::getCurrentFileName() {
 
 juce::String OscirenderAudioProcessor::getFileName(int index) {
     return fileNames[index];
+}
+
+juce::String OscirenderAudioProcessor::getFileId(int index) {
+    return juce::String(fileIds[index]);
 }
 
 std::shared_ptr<juce::MemoryBlock> OscirenderAudioProcessor::getFileBlock(int index) {
@@ -762,7 +789,6 @@ void OscirenderAudioProcessor::envelopeChanged(EnvelopeComponent* changedEnvelop
         updateIfApproxEqual(decayShape, curves[1].getCurve());
         updateIfApproxEqual(releaseTime, times[2]);
         updateIfApproxEqual(releaseShape, curves[2].getCurve());
-        DBG("adsr changed");
     }
 }
 

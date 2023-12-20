@@ -230,7 +230,8 @@ public:
     );
 
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
-    std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>(VERSION_HINT);
+    std::function<void(int, juce::String, juce::String)> errorCallback = [this](int lineNum, juce::String fileName, juce::String error) { notifyErrorListeners(lineNum, fileName, error); };
+    std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>(VERSION_HINT, errorCallback);
     
     BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false);
     BooleanParameter* inputEnabled = new BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false);
@@ -241,6 +242,8 @@ public:
     std::vector<ShapeSound::Ptr> sounds;
     std::vector<std::shared_ptr<juce::MemoryBlock>> fileBlocks;
     std::vector<juce::String> fileNames;
+    int currentFileId = 0;
+    std::vector<int> fileIds;
     std::atomic<int> currentFile = -1;
 
     juce::ChangeBroadcaster broadcaster;
@@ -298,9 +301,13 @@ public:
     std::shared_ptr<FileParser> getCurrentFileParser();
 	juce::String getCurrentFileName();
     juce::String getFileName(int index);
+    juce::String getFileId(int index);
 	std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
     void setObjectServerRendering(bool enabled);
     void updateLuaValues();
+    void addErrorListener(ErrorListener* listener);
+    void removeErrorListener(ErrorListener* listener);
+    void notifyErrorListeners(int lineNumber, juce::String fileName, juce::String error);
 private:
     std::atomic<double> volume = 1.0;
     std::atomic<double> threshold = 1.0;
@@ -310,6 +317,9 @@ private:
     std::vector<BooleanParameter*> booleanParameters;
     std::vector<std::shared_ptr<Effect>> allEffects;
     std::vector<std::shared_ptr<Effect>> permanentEffects;
+
+    juce::SpinLock errorListenersLock;
+    std::vector<ErrorListener*> errorListeners;
 
     ShapeSound::Ptr defaultSound = new ShapeSound(std::make_shared<FileParser>());
     PublicSynthesiser synth;

@@ -6,7 +6,10 @@
 
 class PerspectiveEffect : public EffectApplication {
 public:
-	PerspectiveEffect(int versionHint);
+	PerspectiveEffect(int versionHint, std::function<void(int, juce::String, juce::String)> errorCallback);
+
+	// arbitrary UUID
+	static const juce::String FILE_NAME;
 
 	Vector2 apply(int index, Vector2 input, const std::vector<double>& values, double sampleRate) override;
 	void updateCode(const juce::String& newCode);
@@ -21,7 +24,8 @@ public:
 private:
 	const juce::String DEFAULT_SCRIPT = "return { x, y, z }";
 	juce::String code = DEFAULT_SCRIPT;
-	std::unique_ptr<LuaParser> parser = std::make_unique<LuaParser>(code);
+	std::function<void(int, juce::String, juce::String)> errorCallback;
+	std::unique_ptr<LuaParser> parser = std::make_unique<LuaParser>(FILE_NAME, code, errorCallback);
 	juce::SpinLock codeLock;
 
 	bool defaultScript = true;

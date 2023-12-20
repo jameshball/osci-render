@@ -2,7 +2,9 @@
 #include <numbers>
 #include "../MathUtil.h"
 
-PerspectiveEffect::PerspectiveEffect(int versionHint) : versionHint(versionHint) {
+const juce::String PerspectiveEffect::FILE_NAME = "6a3580b0-c5fc-4b28-a33e-e26a487f052f";
+
+PerspectiveEffect::PerspectiveEffect(int versionHint, std::function<void(int, juce::String, juce::String)> errorCallback) : versionHint(versionHint), errorCallback(errorCallback) {
     fixedRotateX = new BooleanParameter("Perspective Fixed Rotate X", "perspectiveFixedRotateX", versionHint, false);
     fixedRotateY = new BooleanParameter("Perspective Fixed Rotate Y", "perspectiveFixedRotateY", versionHint, false);
     fixedRotateZ = new BooleanParameter("Perspective Fixed Rotate Z", "perspectiveFixedRotateZ", versionHint, false);
@@ -53,6 +55,8 @@ Vector2 PerspectiveEffect::apply(int index, Vector2 input, const std::vector<dou
 				y = result[1];
 				z = result[2];
 			}
+		} else {
+			parser->resetErrors();
 		}
 	}
 
@@ -90,7 +94,7 @@ void PerspectiveEffect::updateCode(const juce::String& newCode) {
 	juce::SpinLock::ScopedLockType lock(codeLock);
 	defaultScript = newCode == DEFAULT_SCRIPT;
     code = newCode;
-	parser = std::make_unique<LuaParser>(code);
+	parser = std::make_unique<LuaParser>(FILE_NAME, code, errorCallback);
 }
 
 void PerspectiveEffect::setVariable(juce::String variableName, double value) {

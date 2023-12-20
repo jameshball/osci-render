@@ -7,6 +7,7 @@
 #include "components/VolumeComponent.h"
 #include "components/MainMenuBarModel.h"
 #include "LookAndFeel.h"
+#include "components/ErrorCodeEditorComponent.h"
 
 
 class OscirenderAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener {
@@ -41,13 +42,13 @@ private:
     SettingsComponent settings{audioProcessor, *this};
     VolumeComponent volume{audioProcessor};
     std::vector<std::shared_ptr<juce::CodeDocument>> codeDocuments;
-    std::vector<std::shared_ptr<juce::CodeEditorComponent>> codeEditors;
+    std::vector<std::shared_ptr<ErrorCodeEditorComponent>> codeEditors;
     juce::CodeEditorComponent::ColourScheme colourScheme;
     juce::LuaTokeniser luaTokeniser;
     juce::XmlTokeniser xmlTokeniser;
 	juce::ShapeButton collapseButton;
     std::shared_ptr<juce::CodeDocument> perspectiveCodeDocument = std::make_shared<juce::CodeDocument>();
-    std::shared_ptr<juce::CodeEditorComponent> perspectiveCodeEditor = std::make_shared<juce::CodeEditorComponent>(*perspectiveCodeDocument, &luaTokeniser);
+    std::shared_ptr<ErrorCodeEditorComponent> perspectiveCodeEditor = std::make_shared<ErrorCodeEditorComponent>(*perspectiveCodeDocument, &luaTokeniser, audioProcessor, PerspectiveEffect::FILE_NAME);
 
     std::unique_ptr<juce::FileChooser> chooser;
     MainMenuBarModel menuBarModel{*this};

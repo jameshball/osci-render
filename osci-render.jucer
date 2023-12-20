@@ -115,6 +115,8 @@
               file="Source/components/EffectsListComponent.cpp"/>
         <FILE id="dcLchL" name="EffectsListComponent.h" compile="0" resource="0"
               file="Source/components/EffectsListComponent.h"/>
+        <FILE id="aEprcE" name="ErrorCodeEditorComponent.h" compile="0" resource="0"
+              file="Source/components/ErrorCodeEditorComponent.h"/>
         <FILE id="L9DIT2" name="LabelledTextBox.h" compile="0" resource="0"
               file="Source/components/LabelledTextBox.h"/>
         <FILE id="qIxm1z" name="LuaListComponent.cpp" compile="1" resource="0"
