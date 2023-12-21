@@ -36,6 +36,7 @@ private:
 
     bool currentlyPlaying = false;
 	double frequency = 1.0;
+    double velocity = 1.0;
 
 	lua_State* L = nullptr;
 	long step = 1;

@@ -33,6 +33,7 @@ public:
     void saveProjectAs();
     void updateTitle();
     void openAudioSettings();
+    void resetToDefault();
 
     std::atomic<bool> editingPerspective = false;
 

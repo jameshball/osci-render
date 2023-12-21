@@ -5,6 +5,7 @@
 #include <JuceHeader.h>
 #include "../concurrency/BufferConsumer.h"
 #include "../PluginProcessor.h"
+#include "LabelledTextBox.h"
 
 class VisualiserComponent : public juce::Component, public juce::Timer, public juce::Thread, public juce::MouseListener {
 public:
@@ -21,18 +22,27 @@ public:
     void mouseDown(const juce::MouseEvent& event) override;
 
 private:
+    const double BUFFER_LENGTH_SECS = 0.02;
+    const double DEFAULT_SAMPLE_RATE = 192000.0;
+    
 	juce::CriticalSection lock;
     std::vector<float> buffer;
     std::vector<juce::Line<float>> prevLines;
     int numChannels = 2;
     juce::Colour backgroundColour, waveformColour;
 	OscirenderAudioProcessor& audioProcessor;
-    std::vector<float> tempBuffer = std::vector<float>(2 * 4096);
+    int sampleRate = DEFAULT_SAMPLE_RATE;
+    LabelledTextBox roughness{"Roughness", 1, 8, 1};
+    LabelledTextBox intensity{"Intensity", 0, 1, 0.01};
+    
+    std::vector<float> tempBuffer;
     int precision = 4;
 
     std::atomic<bool> active = true;
     
     std::shared_ptr<BufferConsumer> consumer;
+    
+    void resetBuffer();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserComponent)
 };

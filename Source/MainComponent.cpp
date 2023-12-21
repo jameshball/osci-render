@@ -151,8 +151,7 @@ void MainComponent::resized() {
 	frequencyLabel.setBounds(bounds.removeFromTop(20));
 
 	bounds.removeFromTop(padding);
-	openOscilloscope.setBounds(bounds.removeFromBottom(buttonHeight).withSizeKeepingCentre(160, buttonHeight));
-	bounds.removeFromBottom(padding);
+	// openOscilloscope.setBounds(bounds.removeFromBottom(buttonHeight).withSizeKeepingCentre(160, buttonHeight));
 	auto minDim = juce::jmin(bounds.getWidth(), bounds.getHeight());
 	visualiser.setBounds(bounds.withSizeKeepingCentre(minDim, minDim));
 }

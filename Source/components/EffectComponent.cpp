@@ -27,7 +27,7 @@ EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect) : 
 void EffectComponent::setupComponent() {
     EffectParameter* parameter = effect.parameters[index];
 
-    label.setTooltip(parameter->description);
+    setTooltip(parameter->description);
     label.setText(parameter->name, juce::dontSendNotification);
     label.setInterceptsMouseClicks(false, false);
 

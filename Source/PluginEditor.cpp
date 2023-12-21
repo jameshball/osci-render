@@ -5,13 +5,13 @@
 OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p)
 	: AudioProcessorEditor(&p), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white)
 {
-    juce::Desktop::getInstance().setDefaultLookAndFeel(&lookAndFeel);
     setLookAndFeel(&lookAndFeel);
     addAndMakeVisible(volume);
 
 #if JUCE_MAC
     if (audioProcessor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
         usingNativeMenuBar = true;
+        menuBarModel.setMacMainMenu(&menuBarModel);
     }
 #endif
 
@@ -78,6 +78,12 @@ OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
     juce::MessageManagerLock lock;
     audioProcessor.broadcaster.removeChangeListener(this);
     audioProcessor.fileChangeBroadcaster.removeChangeListener(this);
+    
+#if JUCE_MAC
+    if (usingNativeMenuBar) {
+        menuBarModel.setMacMainMenu(nullptr);
+    }
+#endif
 }
 
 // parsersLock must be held
@@ -95,8 +101,21 @@ void OscirenderAudioProcessorEditor::initialiseCodeEditors() {
 void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
     g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
 
-    g.setColour(juce::Colours::white);
-    g.setFont(15.0f);
+    if (!usingNativeMenuBar) {
+        // add drop shadow to the menu bar
+        auto ds = juce::DropShadow(juce::Colours::black, 5, juce::Point<int>(0, 0));
+        ds.drawForRectangle(g, menuBar.getBounds());
+    }
+
+    // draw drop shadow around code editor if visible
+    juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+
+    int originalIndex = audioProcessor.getCurrentFileIndex();
+    int index = editingPerspective ? 0 : audioProcessor.getCurrentFileIndex() + 1;
+    if ((originalIndex != -1 || editingPerspective) && codeEditors[index]->isVisible()) {
+        auto ds = juce::DropShadow(juce::Colours::black, 5, juce::Point<int>(0, 0));
+        ds.drawForRectangle(g, codeEditors[index]->getBounds());
+    }
 }
 
 void OscirenderAudioProcessorEditor::resized() {
@@ -125,7 +144,9 @@ void OscirenderAudioProcessorEditor::resized() {
 
                 juce::Component* columns[] = { &dummy, &resizerBar, codeEditors[index].get() };
                  
-                layout.layOutComponents(columns, 3, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
+                // offsetting the y position by -1 and the height by +1 is a hack to fix a bug where the code editor
+                // doesn't draw up to the edges of the menu bar above.
+                layout.layOutComponents(columns, 3, area.getX(), area.getY() - 1, area.getWidth(), area.getHeight() + 1, false, true);
                 auto dummyBounds = dummy.getBounds();
                 collapseButton.setBounds(dummyBounds.removeFromRight(20));
 
@@ -240,6 +261,8 @@ void OscirenderAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcas
     if (source == &audioProcessor.broadcaster) {
         initialiseCodeEditors();
         settings.update();
+        resized();
+        repaint();
     } else if (source == &audioProcessor.fileChangeBroadcaster) {
         // triggered when the audioProcessor changes the current file (e.g. to Blender)
         settings.fileUpdated(audioProcessor.getCurrentFileName());
@@ -400,4 +423,11 @@ void OscirenderAudioProcessorEditor::updateTitle() {
 void OscirenderAudioProcessorEditor::openAudioSettings() {
     juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
     standalone->showAudioSettingsDialog();
+}
+
+void OscirenderAudioProcessorEditor::resetToDefault() {
+    juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
+    if (window != nullptr) {
+        window->resetToDefaultState();
+    }
 }

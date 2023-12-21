@@ -11,6 +11,7 @@ bool ShapeVoice::canPlaySound(juce::SynthesiserSound* sound) {
 }
 
 void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::SynthesiserSound* sound, int currentPitchWheelPosition) {
+    this->velocity = velocity;
     auto* shapeSound = dynamic_cast<ShapeSound*>(sound);
 
     currentlyPlaying = true;
@@ -89,7 +90,6 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         double traceMax = traceMaxEnabled ? actualTraceMax : 1.0;
         double traceMin = traceMinEnabled ? actualTraceMin : 0.0;
         double proportionalLength = (traceMax - traceMin) * frameLength;
-        // double frequency = audioProcessor.frequencyEffect->getActualValue();
         lengthIncrement = juce::jmax(proportionalLength / (audioProcessor.currentSampleRate / frequency), MIN_LENGTH_INCREMENT);
 
         Vector2 channels;
@@ -126,6 +126,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         }
 
         double gain = audioProcessor.midiEnabled->getBoolValue() ? adsr.lookup(time) : 1.0;
+        gain *= velocity;
 
         if (numChannels >= 2) {
             outputBuffer.addSample(0, sample, x * gain);

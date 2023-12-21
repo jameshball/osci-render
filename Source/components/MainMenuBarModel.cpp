@@ -2,7 +2,11 @@
 #include "../PluginEditor.h"
 
 juce::StringArray MainMenuBarModel::getMenuBarNames() {
-    return juce::StringArray("File", "Options");
+    if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
+        return juce::StringArray("File", "Audio");
+    } else {
+        return juce::StringArray("File");
+    }
 }
 
 juce::PopupMenu MainMenuBarModel::getMenuForIndex(int topLevelMenuIndex, const juce::String& menuName) {
@@ -12,8 +16,11 @@ juce::PopupMenu MainMenuBarModel::getMenuForIndex(int topLevelMenuIndex, const j
         menu.addItem(1, "Open");
         menu.addItem(2, "Save");
         menu.addItem(3, "Save As");
+        if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
+            menu.addItem(4, "Create New Project");
+        }
     } else if (topLevelMenuIndex == 1) {
-        menu.addItem(1, "Audio Settings");
+        menu.addItem(1, "Settings");
     }
 
     return menu;
@@ -31,6 +38,9 @@ void MainMenuBarModel::menuItemSelected(int menuItemID, int topLevelMenuIndex) {
                     break;
                 case 3:
                     editor.saveProjectAs();
+                    break;
+                case 4:
+                    editor.resetToDefault();
                     break;
                 default:
                     break;

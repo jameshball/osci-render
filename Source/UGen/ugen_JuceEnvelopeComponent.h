@@ -249,7 +249,8 @@ public:
 		GridLine = COLOUR_OFFSET + 7,
 		LegendText = COLOUR_OFFSET + 8,
 		LegendBackground = COLOUR_OFFSET + 9,
-		NumEnvColours = 10,
+		LineBackground = COLOUR_OFFSET + 10,
+		NumEnvColours = 11,
 	};
 	
 	enum MoveMode { MoveClip, MoveSlide, NumMoveModes };

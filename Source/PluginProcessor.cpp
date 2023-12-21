@@ -148,18 +148,30 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         addParameter(parameter);
     }
 
-    addParameter(attackTime);
-    addParameter(attackLevel);
-    addParameter(attackShape);
-    addParameter(decayTime);
-    addParameter(decayShape);
-    addParameter(sustainLevel);
-    addParameter(releaseTime);
-    addParameter(releaseShape);
+    floatParameters.push_back(attackTime);
+    floatParameters.push_back(attackLevel);
+    floatParameters.push_back(attackShape);
+    floatParameters.push_back(decayTime);
+    floatParameters.push_back(decayShape);
+    floatParameters.push_back(sustainLevel);
+    floatParameters.push_back(releaseTime);
+    floatParameters.push_back(releaseShape);
 
-    for (int i = 0; i < 4; i++) {
+    for (auto parameter : floatParameters) {
+        addParameter(parameter);
+    }
+
+    for (int i = 0; i < voices->getValueUnnormalised(); i++) {
         synth.addVoice(new ShapeVoice(*this));
     }
+
+    intParameters.push_back(voices);
+
+    for (auto parameter : intParameters) {
+        addParameter(parameter);
+    }
+
+    voices->addListener(this);
         
     synth.addSound(defaultSound);
 }
@@ -168,6 +180,7 @@ OscirenderAudioProcessor::~OscirenderAudioProcessor() {
     for (auto& effect : luaEffects) {
         effect->removeListener(0, this);
     }
+    voices->removeListener(this);
 }
 
 const juce::String OscirenderAudioProcessor::getName() const {
@@ -224,6 +237,11 @@ void OscirenderAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
 	currentSampleRate = sampleRate;
     pitchDetector.setSampleRate(sampleRate);
     synth.setCurrentPlaybackSampleRate(sampleRate);
+    retriggerMidi = true;
+    
+    for (auto& effect : allEffects) {
+        effect->updateSampleRate(currentSampleRate);
+    }
 }
 
 void OscirenderAudioProcessor::releaseResources() {
@@ -272,7 +290,7 @@ void OscirenderAudioProcessor::addLuaSlider() {
         std::make_shared<LuaEffect>(sliderName, *this),
         new EffectParameter(
             "Lua Slider " + sliderName,
-            "Controls the value of the Lua variable called slider_" + sliderName + ".",
+            "Controls the value of the Lua variable called slider_" + sliderName.toLowerCase() + ".",
             "lua" + sliderName,
             VERSION_HINT, 0.0, 0.0, 1.0, 0.001, false
         )
@@ -321,6 +339,26 @@ std::shared_ptr<Effect> OscirenderAudioProcessor::getEffect(juce::String id) {
 // effectsLock should be held when calling this
 BooleanParameter* OscirenderAudioProcessor::getBooleanParameter(juce::String id) {
     for (auto& parameter : booleanParameters) {
+        if (parameter->paramID == id) {
+            return parameter;
+        }
+    }
+    return nullptr;
+}
+
+// effectsLock should be held when calling this
+FloatParameter* OscirenderAudioProcessor::getFloatParameter(juce::String id) {
+    for (auto& parameter : floatParameters) {
+        if (parameter->paramID == id) {
+            return parameter;
+        }
+    }
+    return nullptr;
+}
+
+// effectsLock should be held when calling this
+IntParameter* OscirenderAudioProcessor::getIntParameter(juce::String id) {
+    for (auto& parameter : intParameters) {
         if (parameter->paramID == id) {
             return parameter;
         }
@@ -523,9 +561,10 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         }
     }
     
-    // if midi has just been disabled
-    if (prevMidiEnabled && !usingMidi) {
+    // if midi has just been disabled or we need to retrigger
+    if (!usingMidi && (retriggerMidi || prevMidiEnabled)) {
         midiMessages.addEvent(juce::MidiMessage::noteOn(1, 60, 1.0f), 17);
+        retriggerMidi = false;
     }
     
     prevMidiEnabled = usingMidi;
@@ -543,11 +582,9 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         for (auto i = 0; i < totalNumInputChannels; ++i) {
             buffer.clear(i, 0, buffer.getNumSamples());
         }
-        if (volume > EPSILON) {
-            juce::SpinLock::ScopedLockType lock1(parsersLock);
-            juce::SpinLock::ScopedLockType lock2(effectsLock);
-            synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
-        }
+        juce::SpinLock::ScopedLockType lock1(parsersLock);
+        juce::SpinLock::ScopedLockType lock2(effectsLock);
+        synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
     }
 
     
@@ -635,6 +672,18 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
         parameter->save(parameterXml);
     }
 
+    auto floatParametersXml = xml->createNewChildElement("floatParameters");
+    for (auto parameter : floatParameters) {
+        auto parameterXml = floatParametersXml->createNewChildElement("parameter");
+        parameter->save(parameterXml);
+    }
+
+    auto intParametersXml = xml->createNewChildElement("intParameters");
+    for (auto parameter : intParameters) {
+        auto parameterXml = intParametersXml->createNewChildElement("parameter");
+        parameter->save(parameterXml);
+    }
+
     auto perspectiveFunction = xml->createNewChildElement("perspectiveFunction");
     perspectiveFunction->addTextElement(juce::Base64::toBase64(perspectiveEffect->getCode()));
 
@@ -693,6 +742,26 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         if (booleanParametersXml != nullptr) {
             for (auto parameterXml : booleanParametersXml->getChildIterator()) {
                 auto parameter = getBooleanParameter(parameterXml->getStringAttribute("id"));
+                if (parameter != nullptr) {
+                    parameter->load(parameterXml);
+                }
+            }
+        }
+
+        auto floatParametersXml = xml->getChildByName("floatParameters");
+        if (floatParametersXml != nullptr) {
+            for (auto parameterXml : floatParametersXml->getChildIterator()) {
+                auto parameter = getFloatParameter(parameterXml->getStringAttribute("id"));
+                if (parameter != nullptr) {
+                    parameter->load(parameterXml);
+                }
+            }
+        }
+
+        auto intParametersXml = xml->getChildByName("intParameters");
+        if (intParametersXml != nullptr) {
+            for (auto parameterXml : intParametersXml->getChildIterator()) {
+                auto parameter = getIntParameter(parameterXml->getStringAttribute("id"));
                 if (parameter != nullptr) {
                     parameter->load(parameterXml);
                 }
@@ -764,6 +833,22 @@ void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float n
         if (parameterIndex == effect->parameters[0]->getParameterIndex()) {
             effect->apply();
             return;
+        }
+    }
+
+    if (parameterIndex == voices->getParameterIndex()) {
+        int numVoices = voices->getValueUnnormalised();
+        // if the number of voices has changed, update the synth without clearing all the voices
+        if (numVoices != synth.getNumVoices()) {
+            if (numVoices > synth.getNumVoices()) {
+                for (int i = synth.getNumVoices(); i < numVoices; i++) {
+                    synth.addVoice(new ShapeVoice(*this));
+                }
+            } else {
+                for (int i = synth.getNumVoices() - 1; i >= numVoices; i--) {
+                    synth.removeVoice(i);
+                }
+            }
         }
     }
 }

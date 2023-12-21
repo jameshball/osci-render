@@ -227,6 +227,26 @@ public:
 		return juce::AudioProcessorParameter::genericParameter;
 	}
 
+	void save(juce::XmlElement* xml) {
+        xml->setAttribute("id", paramID);
+        xml->setAttribute("value", value.load());
+        xml->setAttribute("min", min.load());
+        xml->setAttribute("max", max.load());
+    }
+
+	// opt to not change any values if not found
+	void load(juce::XmlElement* xml) {
+		if (xml->hasAttribute("value")) {
+            value = xml->getIntAttribute("value");
+        }
+		if (xml->hasAttribute("min")) {
+            min = xml->getIntAttribute("min");
+        }
+		if (xml->hasAttribute("max")) {
+            max = xml->getIntAttribute("max");
+        }
+    }
+
 private:
 	// value is not necessarily in the range [min, max] so effect applications may need to clip to a valid range
 	std::atomic<int> value = 0;

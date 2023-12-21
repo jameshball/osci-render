@@ -20,6 +20,8 @@ private:
 	OscirenderAudioProcessorEditor& pluginEditor;
 
 	juce::ToggleButton midiToggle{"Enable MIDI"};
+	juce::Slider voicesSlider;
+	juce::Label voicesLabel;
 	juce::MidiKeyboardComponent keyboard{audioProcessor.keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard};
 
 	EnvelopeContainerComponent envelope;

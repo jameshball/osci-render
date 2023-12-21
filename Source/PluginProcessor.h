@@ -270,6 +270,8 @@ public:
 
     juce::MidiKeyboardState keyboardState;
 
+    IntParameter* voices = new IntParameter("Voices", "voices", VERSION_HINT, 4, 1, 16);
+
 private:
     juce::SpinLock consumerLock;
     std::vector<std::shared_ptr<BufferConsumer>> consumers;
@@ -315,6 +317,8 @@ private:
     bool prevMidiEnabled = !midiEnabled->getBoolValue();
 
     std::vector<BooleanParameter*> booleanParameters;
+    std::vector<FloatParameter*> floatParameters;
+    std::vector<IntParameter*> intParameters;
     std::vector<std::shared_ptr<Effect>> allEffects;
     std::vector<std::shared_ptr<Effect>> permanentEffects;
 
@@ -323,6 +327,7 @@ private:
 
     ShapeSound::Ptr defaultSound = new ShapeSound(std::make_shared<FileParser>());
     PublicSynthesiser synth;
+    bool retriggerMidi = true;
 
     AudioWebSocketServer softwareOscilloscopeServer{*this};
     ObjectServer objectServer{*this};
@@ -330,6 +335,8 @@ private:
     void updateObjValues();
     std::shared_ptr<Effect> getEffect(juce::String id);
     BooleanParameter* getBooleanParameter(juce::String id);
+    FloatParameter* getFloatParameter(juce::String id);
+    IntParameter* getIntParameter(juce::String id);
     void openLegacyProject(const juce::XmlElement* xml);
     std::pair<std::shared_ptr<Effect>, EffectParameter*> effectFromLegacyId(const juce::String& id, bool updatePrecedence = false);
     LfoType lfoTypeFromLegacyAnimationType(const juce::String& type);

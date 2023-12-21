@@ -22,6 +22,7 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     setColour(juce::PopupMenu::highlightedBackgroundColourId, Colours::darker);
     setColour(juce::TooltipWindow::backgroundColourId, Colours::veryDark);
     setColour(juce::TooltipWindow::outlineColourId, juce::Colours::white);
+    setColour(juce::TextButton::buttonOnColourId, Colours::darker);
 
     // combo box
     setColour(juce::ComboBox::backgroundColourId, Colours::veryDark);
@@ -64,6 +65,7 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     setColour(EnvelopeComponent::GridLine, Colours::dark);
     setColour(EnvelopeComponent::LegendText, juce::Colours::white);
     setColour(EnvelopeComponent::LegendBackground, Colours::veryDark);
+    setColour(EnvelopeComponent::LineBackground, juce::Colours::white);
 
     // midi keyboard
     setColour(juce::MidiKeyboardComponent::blackNoteColourId, Colours::veryDark);
@@ -77,6 +79,9 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     // UI colours
     getCurrentColourScheme().setUIColour(ColourScheme::widgetBackground, Colours::veryDark);
     getCurrentColourScheme().setUIColour(ColourScheme::UIColour::defaultFill, Colours::accentColor);
+
+    // I have to do this, otherwise components are initialised before the look and feel is set
+    juce::LookAndFeel::setDefaultLookAndFeel(this);
 }
 
 void OscirenderLookAndFeel::drawComboBox(juce::Graphics& g, int width, int height, bool, int, int, int, int, juce::ComboBox& box) {

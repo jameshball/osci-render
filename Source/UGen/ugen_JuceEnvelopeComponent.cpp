@@ -752,6 +752,14 @@ void EnvelopeComponent::paint(juce::Graphics& g)
 		
 		g.setColour(findColour(Line));
 		g.strokePath (path, juce::PathStrokeType(2.0f));
+
+		path.lineTo(handle->getRight(), getHeight());
+		path.lineTo(0, getHeight());
+
+		// gradient fill the path
+		juce::ColourGradient gradient(findColour(LoopLine), 0, 0, juce::Colours::transparentWhite, 0, getHeight(), false);
+		g.setGradientFill(gradient);
+		g.fillPath(path);
 		
 		if((loopNode >= 0) && (releaseNode >= 0) && (releaseNode > loopNode))
 		{			
@@ -857,6 +865,12 @@ void EnvelopeComponent::mouseEnter(const juce::MouseEvent& e)
 {
 	EnvelopeHandleComponent* handle = findHandle(convertPixelsToDomain(e.x));
 	EnvelopeHandleComponent* prevHandle = handle->getPreviousHandle();
+
+	if (handle == nullptr || prevHandle == nullptr) {
+        adjustable = false;
+        setMouseCursor(juce::MouseCursor::NormalCursor);
+        return;
+    }
 
 	auto handleBounds = handle->getBoundsInParent();
 	auto prevHandleBounds = prevHandle->getBoundsInParent();
