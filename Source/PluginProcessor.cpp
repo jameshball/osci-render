@@ -578,11 +578,9 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         for (auto i = 0; i < totalNumInputChannels; ++i) {
             buffer.clear(i, 0, buffer.getNumSamples());
         }
-        if (volume > EPSILON) {
-            juce::SpinLock::ScopedLockType lock1(parsersLock);
-            juce::SpinLock::ScopedLockType lock2(effectsLock);
-            synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
-        }
+        juce::SpinLock::ScopedLockType lock1(parsersLock);
+        juce::SpinLock::ScopedLockType lock2(effectsLock);
+        synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
     }
 
     

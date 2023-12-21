@@ -123,7 +123,7 @@ void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area
     }
 
     double strength = 15;
-    double widthDivisor = 130;
+    double widthDivisor = 160;
     double lengthIntensityScale = 700;
     juce::Colour waveColor = waveformColour;
 
