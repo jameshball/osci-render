@@ -11,6 +11,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 #if JUCE_MAC
     if (audioProcessor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
         usingNativeMenuBar = true;
+        menuBarModel.setMacMainMenu(&menuBarModel);
     }
 #endif
 
@@ -77,6 +78,12 @@ OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
     juce::MessageManagerLock lock;
     audioProcessor.broadcaster.removeChangeListener(this);
     audioProcessor.fileChangeBroadcaster.removeChangeListener(this);
+    
+#if JUCE_MAC
+    if (usingNativeMenuBar) {
+        menuBarModel.setMacMainMenu(nullptr);
+    }
+#endif
 }
 
 // parsersLock must be held

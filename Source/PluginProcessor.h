@@ -327,6 +327,7 @@ private:
 
     ShapeSound::Ptr defaultSound = new ShapeSound(std::make_shared<FileParser>());
     PublicSynthesiser synth;
+    bool retriggerMidi = true;
 
     AudioWebSocketServer softwareOscilloscopeServer{*this};
     ObjectServer objectServer{*this};

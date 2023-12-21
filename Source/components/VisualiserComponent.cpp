@@ -2,6 +2,7 @@
 
 VisualiserComponent::VisualiserComponent(int numChannels, OscirenderAudioProcessor& p) : numChannels(numChannels), backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), audioProcessor(p), juce::Thread("VisualiserComponent") {
     setOpaque(true);
+    resetBuffer();
     startTimerHz(60);
     startThread();
 }
@@ -58,6 +59,10 @@ void VisualiserComponent::timerCallback() {
 
 void VisualiserComponent::run() {
     while (!threadShouldExit()) {
+        if (sampleRate != (int) audioProcessor.currentSampleRate) {
+            resetBuffer();
+        }
+        
         consumer = audioProcessor.consumerRegister(tempBuffer);
         audioProcessor.consumerRead(consumer);
         setBuffer(tempBuffer);
@@ -110,26 +115,20 @@ void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area
     }
 
     double strength = 15;
-    double strengthLast = 5;
     double widthDivisor = 130;
-    double widthDivisorLast = 130;
     juce::Colour waveColor = waveformColour;
-    juce::Colour waveColorLast = waveColor;
-
-    for (auto& line : prevLines) {
-        line.applyTransform(transform);
-        float lengthScale = (line.getLength() + 0.001);
-        float lengthScaleLog = std::log(strengthLast * (1.f / lengthScale) + 1) / std::log(strengthLast + 1);
-        g.setColour(waveColorLast.withAlpha(std::max(0.f, std::min(lengthScaleLog, 1.f))));
-        g.drawLine(line, area.getWidth() * (lengthScaleLog * 0.3 + 0.7) / widthDivisorLast);
-    }
-    prevLines = lines;
 
     for (auto& line : lines) {
         line.applyTransform(transform);
-        float lengthScale = (line.getLength() + 0.001);
+        float normalisedLength = line.getLength() * (sampleRate / DEFAULT_SAMPLE_RATE);
+        float lengthScale = (normalisedLength + 0.001);
         float lengthScaleLog = std::log(strength * (1 / lengthScale) + 1) / std::log(strength + 1);
         g.setColour(waveColor.withAlpha(std::max(0.f, std::min(lengthScaleLog, 1.f))).withSaturation(std::pow(lengthScale, 2)));
         g.drawLine(line, area.getWidth() * (lengthScaleLog * 0.3 + 0.7) / widthDivisor);
     }
+}
+
+void VisualiserComponent::resetBuffer() {
+    sampleRate = (int) audioProcessor.currentSampleRate;
+    tempBuffer = std::vector<float>(2 * sampleRate * BUFFER_LENGTH_SECS);
 }

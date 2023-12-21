@@ -237,6 +237,7 @@ void OscirenderAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
 	currentSampleRate = sampleRate;
     pitchDetector.setSampleRate(sampleRate);
     synth.setCurrentPlaybackSampleRate(sampleRate);
+    retriggerMidi = true;
 }
 
 void OscirenderAudioProcessor::releaseResources() {
@@ -556,9 +557,10 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         }
     }
     
-    // if midi has just been disabled
-    if (prevMidiEnabled && !usingMidi) {
+    // if midi has just been disabled or we need to retrigger
+    if (!usingMidi && (retriggerMidi || prevMidiEnabled)) {
         midiMessages.addEvent(juce::MidiMessage::noteOn(1, 60, 1.0f), 17);
+        retriggerMidi = false;
     }
     
     prevMidiEnabled = usingMidi;
