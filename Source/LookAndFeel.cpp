@@ -64,6 +64,7 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     setColour(EnvelopeComponent::GridLine, Colours::dark);
     setColour(EnvelopeComponent::LegendText, juce::Colours::white);
     setColour(EnvelopeComponent::LegendBackground, Colours::veryDark);
+    setColour(EnvelopeComponent::LineBackground, juce::Colours::white);
 
     // midi keyboard
     setColour(juce::MidiKeyboardComponent::blackNoteColourId, Colours::veryDark);
