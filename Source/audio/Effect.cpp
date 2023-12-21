@@ -201,3 +201,7 @@ EffectParameter* Effect::getParameter(juce::String id) {
     }
     return nullptr;
 }
+
+void Effect::updateSampleRate(int sampleRate) {
+    this->sampleRate = sampleRate;
+}

@@ -238,6 +238,10 @@ void OscirenderAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
     pitchDetector.setSampleRate(sampleRate);
     synth.setCurrentPlaybackSampleRate(sampleRate);
     retriggerMidi = true;
+    
+    for (auto& effect : allEffects) {
+        effect->updateSampleRate(currentSampleRate);
+    }
 }
 
 void OscirenderAudioProcessor::releaseResources() {
@@ -286,7 +290,7 @@ void OscirenderAudioProcessor::addLuaSlider() {
         std::make_shared<LuaEffect>(sliderName, *this),
         new EffectParameter(
             "Lua Slider " + sliderName,
-            "Controls the value of the Lua variable called slider_" + sliderName + ".",
+            "Controls the value of the Lua variable called slider_" + sliderName.toLowerCase() + ".",
             "lua" + sliderName,
             VERSION_HINT, 0.0, 0.0, 1.0, 0.001, false
         )

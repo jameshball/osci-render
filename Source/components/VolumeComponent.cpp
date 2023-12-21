@@ -1,6 +1,8 @@
 #include "VolumeComponent.h"
 
 VolumeComponent::VolumeComponent(OscirenderAudioProcessor& p) : audioProcessor(p), juce::Thread("VolumeComponent") {
+    resetBuffer();
+    
     setOpaque(false);
     startTimerHz(60);
     startThread();
@@ -93,6 +95,10 @@ void VolumeComponent::timerCallback() {
 
 void VolumeComponent::run() {
     while (!threadShouldExit()) {
+        if (sampleRate != (int) audioProcessor.currentSampleRate) {
+            resetBuffer();
+        }
+        
         consumer = audioProcessor.consumerRegister(buffer);
         audioProcessor.consumerRead(consumer);
 
@@ -124,4 +130,9 @@ void VolumeComponent::resized() {
     volumeSlider.setBounds(r.removeFromLeft(r.getWidth() / 2));
     auto radius = volumeSlider.getLookAndFeel().getSliderThumbRadius(volumeSlider);
     thresholdSlider.setBounds(r.reduced(0, radius / 2));
+}
+
+void VolumeComponent::resetBuffer() {
+    sampleRate = (int) audioProcessor.currentSampleRate;
+    buffer = std::vector<float>(2 * BUFFER_DURATION_SECS * sampleRate);
 }

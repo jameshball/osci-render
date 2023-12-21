@@ -32,6 +32,7 @@ public:
 	void save(juce::XmlElement* xml);
 	void load(juce::XmlElement* xml);
 	EffectParameter* getParameter(juce::String id);
+    void updateSampleRate(int sampleRate);
 
 	std::vector<EffectParameter*> parameters;
 	BooleanParameter* enabled;

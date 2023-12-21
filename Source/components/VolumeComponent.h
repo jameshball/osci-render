@@ -71,7 +71,12 @@ public:
 
 private:
 	OscirenderAudioProcessor& audioProcessor;
-	std::vector<float> buffer = std::vector<float>(2 * 1 << 11);
+    
+    const int DEFAULT_SAMPLE_RATE = 192000;
+    const double BUFFER_DURATION_SECS = 0.02;
+    
+    int sampleRate = DEFAULT_SAMPLE_RATE;
+	std::vector<float> buffer;
 
 	std::atomic<float> leftVolume = 0;
 	std::atomic<float> rightVolume = 0;
@@ -87,6 +92,8 @@ private:
     std::unique_ptr<juce::Drawable> thresholdIcon;
     
     std::shared_ptr<BufferConsumer> consumer;
+    
+    void resetBuffer();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VolumeComponent)
 };
