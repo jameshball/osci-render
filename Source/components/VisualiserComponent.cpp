@@ -128,13 +128,19 @@ void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area
     juce::Colour waveColor = waveformColour;
 
     for (auto& line : lines) {
+        double thickness = area.getWidth() / widthDivisor;
         float normalisedLength = line.getLength() * (sampleRate / DEFAULT_SAMPLE_RATE) / roughness.textBox.getValue();
         line.applyTransform(transform);
         double beamIntensity = intensity.textBox.getValue();
         double lengthScale = (lengthIntensityScale * 0.5 + lengthIntensityScale * (1 - beamIntensity)) * (normalisedLength + 0.001);
         double lengthScaleLog = std::log(strength * (1 / lengthScale) + 1) / std::log(strength + 1);
         g.setColour(waveColor.withAlpha((float) std::max(0.0, std::min(lengthScaleLog * beamIntensity, 1.0))).withSaturation(lengthScale / 4));
-        g.drawLine(line, area.getWidth() / widthDivisor);
+        
+        if (normalisedLength < 0.00001) {
+            g.fillEllipse(line.getStartX(), line.getStartY(), thickness, thickness);
+        } else {
+            g.drawLine(line, thickness);
+        }
     }
 }
 
