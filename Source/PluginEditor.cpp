@@ -240,6 +240,8 @@ void OscirenderAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcas
     if (source == &audioProcessor.broadcaster) {
         initialiseCodeEditors();
         settings.update();
+        resized();
+        repaint();
     } else if (source == &audioProcessor.fileChangeBroadcaster) {
         // triggered when the audioProcessor changes the current file (e.g. to Blender)
         settings.fileUpdated(audioProcessor.getCurrentFileName());
@@ -400,4 +402,11 @@ void OscirenderAudioProcessorEditor::updateTitle() {
 void OscirenderAudioProcessorEditor::openAudioSettings() {
     juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
     standalone->showAudioSettingsDialog();
+}
+
+void OscirenderAudioProcessorEditor::resetToDefault() {
+    juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
+    if (window != nullptr) {
+        window->resetToDefaultState();
+    }
 }

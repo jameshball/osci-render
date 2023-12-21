@@ -46,6 +46,8 @@ MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
     audioProcessor.sustainLevel->addListener(this);
     audioProcessor.releaseTime->addListener(this);
     audioProcessor.releaseShape->addListener(this);
+
+    handleAsyncUpdate();
 }
 
 MidiComponent::~MidiComponent() {

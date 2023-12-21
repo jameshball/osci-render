@@ -317,6 +317,8 @@ private:
     bool prevMidiEnabled = !midiEnabled->getBoolValue();
 
     std::vector<BooleanParameter*> booleanParameters;
+    std::vector<FloatParameter*> floatParameters;
+    std::vector<IntParameter*> intParameters;
     std::vector<std::shared_ptr<Effect>> allEffects;
     std::vector<std::shared_ptr<Effect>> permanentEffects;
 
@@ -332,6 +334,8 @@ private:
     void updateObjValues();
     std::shared_ptr<Effect> getEffect(juce::String id);
     BooleanParameter* getBooleanParameter(juce::String id);
+    FloatParameter* getFloatParameter(juce::String id);
+    IntParameter* getIntParameter(juce::String id);
     void openLegacyProject(const juce::XmlElement* xml);
     std::pair<std::shared_ptr<Effect>, EffectParameter*> effectFromLegacyId(const juce::String& id, bool updatePrecedence = false);
     LfoType lfoTypeFromLegacyAnimationType(const juce::String& type);

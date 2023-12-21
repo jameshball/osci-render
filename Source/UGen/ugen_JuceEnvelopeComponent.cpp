@@ -858,6 +858,12 @@ void EnvelopeComponent::mouseEnter(const juce::MouseEvent& e)
 	EnvelopeHandleComponent* handle = findHandle(convertPixelsToDomain(e.x));
 	EnvelopeHandleComponent* prevHandle = handle->getPreviousHandle();
 
+	if (handle == nullptr || prevHandle == nullptr) {
+        adjustable = false;
+        setMouseCursor(juce::MouseCursor::NormalCursor);
+        return;
+    }
+
 	auto handleBounds = handle->getBoundsInParent();
 	auto prevHandleBounds = prevHandle->getBoundsInParent();
 	
