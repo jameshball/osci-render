@@ -3,7 +3,7 @@
 
 juce::StringArray MainMenuBarModel::getMenuBarNames() {
     if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-        return juce::StringArray("File", "Options");
+        return juce::StringArray("File", "Audio");
     } else {
         return juce::StringArray("File");
     }
@@ -20,7 +20,7 @@ juce::PopupMenu MainMenuBarModel::getMenuForIndex(int topLevelMenuIndex, const j
             menu.addItem(4, "Create New Project");
         }
     } else if (topLevelMenuIndex == 1) {
-        menu.addItem(1, "Audio Settings");
+        menu.addItem(1, "Settings");
     }
 
     return menu;

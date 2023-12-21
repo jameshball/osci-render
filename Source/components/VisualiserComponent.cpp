@@ -5,6 +5,9 @@ VisualiserComponent::VisualiserComponent(int numChannels, OscirenderAudioProcess
     resetBuffer();
     startTimerHz(60);
     startThread();
+    
+    roughness.textBox.setValue(4);
+    intensity.textBox.setValue(0.75);
 }
 
 VisualiserComponent::~VisualiserComponent() {
@@ -15,7 +18,7 @@ VisualiserComponent::~VisualiserComponent() {
 void VisualiserComponent::setBuffer(std::vector<float>& newBuffer) {
     juce::CriticalSection::ScopedLockType scope(lock);
     buffer.clear();
-    for (int i = 0; i < newBuffer.size(); i += precision * numChannels) {
+    for (int i = 0; i < newBuffer.size(); i += (int) roughness.textBox.getValue() * numChannels) {
         buffer.push_back(newBuffer[i]);
         buffer.push_back(newBuffer[i + 1]);
     }
@@ -81,8 +84,13 @@ void VisualiserComponent::mouseDown(const juce::MouseEvent& event) {
             stopThread(1000);
         }
         repaint();
-    } else if (event.mods.isRightButtonDown()) {
-        // TODO: add menu to control colours and precision
+    } else if (event.mods.isPopupMenu()) {
+        juce::PopupMenu menu;
+
+        menu.addCustomItem(1, roughness, 160, 40, false);
+        menu.addCustomItem(1, intensity, 160, 40, false);
+
+        menu.showMenuAsync(juce::PopupMenu::Options(), [this](int result) {});
     }
 }
 
@@ -116,15 +124,17 @@ void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area
 
     double strength = 15;
     double widthDivisor = 130;
+    double lengthIntensityScale = 700;
     juce::Colour waveColor = waveformColour;
 
     for (auto& line : lines) {
+        float normalisedLength = line.getLength() * (sampleRate / DEFAULT_SAMPLE_RATE) / roughness.textBox.getValue();
         line.applyTransform(transform);
-        float normalisedLength = line.getLength() * (sampleRate / DEFAULT_SAMPLE_RATE);
-        float lengthScale = (normalisedLength + 0.001);
-        float lengthScaleLog = std::log(strength * (1 / lengthScale) + 1) / std::log(strength + 1);
-        g.setColour(waveColor.withAlpha(std::max(0.f, std::min(lengthScaleLog, 1.f))).withSaturation(std::pow(lengthScale, 2)));
-        g.drawLine(line, area.getWidth() * (lengthScaleLog * 0.3 + 0.7) / widthDivisor);
+        double beamIntensity = intensity.textBox.getValue();
+        double lengthScale = (lengthIntensityScale * 0.5 + lengthIntensityScale * (1 - beamIntensity)) * (normalisedLength + 0.001);
+        double lengthScaleLog = std::log(strength * (1 / lengthScale) + 1) / std::log(strength + 1);
+        g.setColour(waveColor.withAlpha((float) std::max(0.0, std::min(lengthScaleLog * beamIntensity, 1.0))).withSaturation(lengthScale / 4));
+        g.drawLine(line, area.getWidth() / widthDivisor);
     }
 }
 

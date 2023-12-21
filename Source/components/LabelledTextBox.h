@@ -4,7 +4,7 @@
 
 class LabelledTextBox : public juce::Component {
  public:
-     LabelledTextBox(juce::String text) {
+     LabelledTextBox(juce::String text, double min = -999999, double max = 999999, double step = 0.01) : textBox(min, max, step) {
         addAndMakeVisible(label);
         addAndMakeVisible(textBox);
         label.setText(text, juce::dontSendNotification);

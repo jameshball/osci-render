@@ -5,6 +5,7 @@
 #include <JuceHeader.h>
 #include "../concurrency/BufferConsumer.h"
 #include "../PluginProcessor.h"
+#include "LabelledTextBox.h"
 
 class VisualiserComponent : public juce::Component, public juce::Timer, public juce::Thread, public juce::MouseListener {
 public:
@@ -31,6 +32,8 @@ private:
     juce::Colour backgroundColour, waveformColour;
 	OscirenderAudioProcessor& audioProcessor;
     int sampleRate = DEFAULT_SAMPLE_RATE;
+    LabelledTextBox roughness{"Roughness", 1, 8, 1};
+    LabelledTextBox intensity{"Intensity", 0, 1, 0.01};
     
     std::vector<float> tempBuffer;
     int precision = 4;
