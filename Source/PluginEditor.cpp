@@ -5,7 +5,6 @@
 OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p)
 	: AudioProcessorEditor(&p), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white)
 {
-    juce::Desktop::getInstance().setDefaultLookAndFeel(&lookAndFeel);
     setLookAndFeel(&lookAndFeel);
     addAndMakeVisible(volume);
 
