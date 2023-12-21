@@ -43,4 +43,5 @@ private:
 	std::function<void(int, juce::String, juce::String)> errorCallback;
 	juce::String fileName;
 	std::vector<lua_State*> seenStates;
+	std::vector<bool> staleStates;
 };

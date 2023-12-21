@@ -58,10 +58,12 @@ double CircleArc::length() {
 		len = 0;
         // TODO: Replace this, it's stupid. Do a real approximation.
         int segments = 5;
+		Vector2 start;
+		Vector2 end = nextVector(0);
 		for (int i = 0; i < segments; i++) {
-			Vector2 v1 = nextVector(i / (double) segments);
-			Vector2 v2 = nextVector((i + 1) / (double) segments);
-			len += Line(v1.x, v1.y, v2.x, v2.y).length();
+			start = end;
+			end = nextVector((i + 1) / (double) segments);
+			len += Line::length(start.x, start.y, end.x, end.y);
 		}
 	}
 	return len;

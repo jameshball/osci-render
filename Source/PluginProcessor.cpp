@@ -157,9 +157,12 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     addParameter(releaseTime);
     addParameter(releaseShape);
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < voices->getValueUnnormalised(); i++) {
         synth.addVoice(new ShapeVoice(*this));
     }
+
+    addParameter(voices);
+    voices->addListener(this);
         
     synth.addSound(defaultSound);
 }
@@ -168,6 +171,7 @@ OscirenderAudioProcessor::~OscirenderAudioProcessor() {
     for (auto& effect : luaEffects) {
         effect->removeListener(0, this);
     }
+    voices->removeListener(this);
 }
 
 const juce::String OscirenderAudioProcessor::getName() const {
@@ -764,6 +768,22 @@ void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float n
         if (parameterIndex == effect->parameters[0]->getParameterIndex()) {
             effect->apply();
             return;
+        }
+    }
+
+    if (parameterIndex == voices->getParameterIndex()) {
+        int numVoices = voices->getValueUnnormalised();
+        // if the number of voices has changed, update the synth without clearing all the voices
+        if (numVoices != synth.getNumVoices()) {
+            if (numVoices > synth.getNumVoices()) {
+                for (int i = synth.getNumVoices(); i < numVoices; i++) {
+                    synth.addVoice(new ShapeVoice(*this));
+                }
+            } else {
+                for (int i = synth.getNumVoices() - 1; i >= numVoices; i--) {
+                    synth.removeVoice(i);
+                }
+            }
         }
     }
 }

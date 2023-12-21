@@ -59,10 +59,14 @@ void LuaParser::parse(lua_State*& L) {
 
 // only the audio thread runs this fuction
 std::vector<float> LuaParser::run(lua_State*& L, const LuaVariables vars, long& step, double& phase) {
+    juce::SpinLock::ScopedLockType lock(variableLock);
+
     // if we haven't seen this state before, reset it
-    if (std::find(seenStates.begin(), seenStates.end(), L) == seenStates.end()) {
+    int stateIndex = std::find(seenStates.begin(), seenStates.end(), L) - seenStates.begin();
+    if (stateIndex == seenStates.size()) {
         reset(L, script);
         seenStates.push_back(L);
+        staleStates.push_back(true);
     }
 
     std::vector<float> values;
@@ -79,14 +83,14 @@ std::vector<float> LuaParser::run(lua_State*& L, const LuaVariables vars, long& 
     lua_pushnumber(L, phase);
     lua_setglobal(L, "phase");
 
-    // this CANNOT run at the same time as setVariable
-    juce::SpinLock::ScopedTryLockType lock(variableLock);
-    if (lock.isLocked()) {
+    if (staleStates[stateIndex]) {
+        // update variables
         for (int i = 0; i < variableNames.size(); i++) {
             lua_pushnumber(L, variables[i]);
             lua_setglobal(L, variableNames[i].toUTF8());
         }
-	}
+        staleStates[stateIndex] = false;
+    }
     
 	lua_geti(L, LUA_REGISTRYINDEX, functionRef);
     
@@ -147,14 +151,25 @@ void LuaParser::setVariable(juce::String variableName, double value) {
             break;
         }
     }
+
+    bool changed = false;
 	
     if (index == -1) {
         // add new variable
         variableNames.push_back(variableName);
         variables.push_back(value);
+        changed = true;
     } else {
         // update existing variable
+        changed = variables[index] != value;
         variables[index] = value;
+    }
+
+    if (changed) {
+        // mark all states as stale
+        for (int i = 0; i < staleStates.size(); i++) {
+            staleStates[i] = true;
+        }
     }
 }
 

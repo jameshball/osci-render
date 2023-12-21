@@ -270,6 +270,8 @@ public:
 
     juce::MidiKeyboardState keyboardState;
 
+    IntParameter* voices = new IntParameter("Voices", "voices", VERSION_HINT, 4, 1, 16);
+
 private:
     juce::SpinLock consumerLock;
     std::vector<std::shared_ptr<BufferConsumer>> consumers;

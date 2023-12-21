@@ -2,7 +2,11 @@
 #include "../PluginEditor.h"
 
 juce::StringArray MainMenuBarModel::getMenuBarNames() {
-    return juce::StringArray("File", "Options");
+    if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
+        return juce::StringArray("File", "Options");
+    } else {
+        return juce::StringArray("File");
+    }
 }
 
 juce::PopupMenu MainMenuBarModel::getMenuForIndex(int topLevelMenuIndex, const juce::String& menuName) {
