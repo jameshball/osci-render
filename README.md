@@ -12,6 +12,8 @@ Send an email to [james@ball.sh](mailto:james@ball.sh) if you have any issues, f
 
 ## See it in action
 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/eb04bb80dd0e40839418861f170db9b5)](https://app.codacy.com/gh/jameshball/osci-render?utm_source=github.com&utm_medium=referral&utm_content=jameshball/osci-render&utm_campaign=Badge_Grade)
+
 ### Rendering an animated Blender scene
 
 ![image](images/blender.gif)
