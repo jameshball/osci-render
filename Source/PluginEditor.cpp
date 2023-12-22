@@ -112,7 +112,7 @@ void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
 
     int originalIndex = audioProcessor.getCurrentFileIndex();
     int index = editingPerspective ? 0 : audioProcessor.getCurrentFileIndex() + 1;
-    if ((originalIndex != -1 || editingPerspective) && codeEditors[index]->isVisible()) {
+    if ((originalIndex != -1 || editingPerspective) && index < codeEditors.size() && codeEditors[index]->isVisible()) {
         auto ds = juce::DropShadow(juce::Colours::black, 5, juce::Point<int>(0, 0));
         ds.drawForRectangle(g, codeEditors[index]->getBounds());
     }
@@ -257,13 +257,17 @@ void OscirenderAudioProcessorEditor::handleAsyncUpdate() {
 }
 
 void OscirenderAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcaster* source) {
-    juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+    
     if (source == &audioProcessor.broadcaster) {
-        initialiseCodeEditors();
-        settings.update();
+        {
+            juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+            initialiseCodeEditors();
+            settings.update();
+        }
         resized();
         repaint();
     } else if (source == &audioProcessor.fileChangeBroadcaster) {
+        juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
         // triggered when the audioProcessor changes the current file (e.g. to Blender)
         settings.fileUpdated(audioProcessor.getCurrentFileName());
     }
