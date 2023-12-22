@@ -47,7 +47,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
         initialiseCodeEditors();
     }
 
-    {
+    {   
         juce::MessageManagerLock lock;
         audioProcessor.fileChangeBroadcaster.addChangeListener(this);
         audioProcessor.broadcaster.addChangeListener(this);

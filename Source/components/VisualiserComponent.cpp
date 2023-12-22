@@ -7,7 +7,7 @@ VisualiserComponent::VisualiserComponent(int numChannels, OscirenderAudioProcess
     startThread();
     
     roughness.textBox.setValue(4);
-    intensity.textBox.setValue(0.75);
+    intensity.textBox.setValue(1.0);
 }
 
 VisualiserComponent::~VisualiserComponent() {
