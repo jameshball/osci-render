@@ -1,10 +1,12 @@
-<img width="100%" src="images/osci-wide-tagline.png" />
+<a href="https://osci-render.com"><img width="100%" src="images/osci-wide-tagline.png" /></a>
 
 Open-source synthesizer for making music by drawing objects, text, and images on an oscilloscope using audio. Allows for 3D rendering of `.obj` files, `.svg` images, `.txt` files, and Blender scenes on Windows and macOS.
 
 Everything is controllable from a Digital Audio Workstation (DAW), allowing for parameter automation and MIDI control. If you prefer to use osci-render as a standalone application, you can do that too!
 
 Osci-render is a fully programmable synthesiser, allowing for custom visuals, sounds, and audio effects to be scripted using Lua, and interacted with using your DAW.
+
+Get the latest version [here](https://osci-render.com)!
 
 Send an email to [james@ball.sh](mailto:james@ball.sh) if you have any issues, feedback, feature requests, or anything else!
 
