@@ -56,7 +56,12 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     if (audioProcessor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
         if (juce::TopLevelWindow::getNumTopLevelWindows() == 1) {
             juce::TopLevelWindow* w = juce::TopLevelWindow::getTopLevelWindow(0);
-            w->setColour(juce::ResizableWindow::backgroundColourId, Colours::veryDark);
+            juce::DocumentWindow* dw = dynamic_cast<juce::DocumentWindow*>(w);
+            if (dw != nullptr) {
+                dw->setColour(juce::ResizableWindow::backgroundColourId, Colours::veryDark);
+                dw->setTitleBarButtonsRequired(juce::DocumentWindow::allButtons, false);
+                dw->setUsingNativeTitleBar(true);
+            }
         }
     }
 
