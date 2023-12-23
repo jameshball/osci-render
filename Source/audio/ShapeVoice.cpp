@@ -43,11 +43,8 @@ void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesiser
 // TODO this is the slowest part of the program - any way to improve this would help!
 void ShapeVoice::incrementShapeDrawing() {
     double length = currentShape < frame.size() ? frame[currentShape]->len : 0.0;
-    // hard cap on how many times it can be over the length to
-    // prevent audio stuttering
-    auto increment = juce::jmin(lengthIncrement, 20 * length);
-    frameDrawn += increment;
-    shapeDrawn += increment;
+    frameDrawn += lengthIncrement;
+    shapeDrawn += lengthIncrement;
 
     // Need to skip all shapes that the lengthIncrement draws over.
     // This is especially an issue when there are lots of small lines being
