@@ -12,6 +12,11 @@ Get the latest version [here](https://osci-render.com)!
 
 Send an email to [james@ball.sh](mailto:james@ball.sh) if you have any issues, feedback, feature requests, or anything else!
 
+<div align="center">
+  <a href="https://www.youtube.com/watch?v=qQIYtuoDx3w"><img src="https://img.youtube.com/vi/qQIYtuoDx3w/0.jpg" alt="Announcing osci-render 2.0 - an audio plugin for oscilloscope music"></a>
+  <a href="https://www.youtube.com/watch?v=qQIYtuoDx3w"><p>Announcing osci-render 2.0 - an audio plugin for oscilloscope music</p></a>
+</div>
+
 ## See it in action
 
 ### Rendering an animated Blender scene
