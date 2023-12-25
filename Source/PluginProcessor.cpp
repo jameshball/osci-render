@@ -593,7 +593,12 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     auto* channelData = buffer.getArrayOfWritePointers();
     
 	for (auto sample = 0; sample < buffer.getNumSamples(); ++sample) {
-        Vector2 channels = {buffer.getSample(0, sample), buffer.getSample(1, sample)};
+        Vector2 channels;
+        if (totalNumOutputChannels >= 2) {
+            channels = {buffer.getSample(0, sample), buffer.getSample(1, sample)};
+        } else if (totalNumOutputChannels == 1) {
+            channels = {buffer.getSample(0, sample), buffer.getSample(0, sample)};
+        }
 
         {
             juce::SpinLock::ScopedLockType lock1(parsersLock);
