@@ -2,7 +2,7 @@
 
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/2a3cfe583d8c49fc8aa8e496bd79133b)](https://app.codacy.com/gh/jameshball/osci-render/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 
-Open-source synthesizer for making music by drawing objects, text, and images on an oscilloscope using audio. Allows for 3D rendering of `.obj` files, `.svg` images, `.txt` files, and Blender scenes on Windows and macOS.
+Open-source synthesizer for making music by drawing objects, text, and images on an oscilloscope using audio. Allows for 3D rendering of `.obj` files, `.svg` images, `.txt` files, and Blender scenes on Windows, macOS, and Linux.
 
 Everything is controllable from a Digital Audio Workstation (DAW), allowing for parameter automation and MIDI control. If you prefer to use osci-render as a standalone application, you can do that too!
 
@@ -76,7 +76,7 @@ After you've purchased, you'll be sent an email with a download link. Here you c
 
 ### Standalone Application
 
-Run the `osci-render.exe` file on Windows, or the `osci-render.app` file on macOS. You may need to allow the application to run if you get a warning.
+Run the `osci-render.exe` file on Windows, the `osci-render.app` file on macOS, or `osci-render` executable on Linux. You may need to allow the application to run if you get a warning.
 
 Details on how to bypass security warnings or 'app is damaged' warnings on macOS can be found [here](https://support.apple.com/en-us/HT202491).
 
