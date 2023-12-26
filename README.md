@@ -133,6 +133,32 @@ Make sure your MIDI device is enabled by clicking Audio > Settings from the top 
 
 <img width="450px" src="images/audio-settings.png">
 
+## Building
+
+### Windows
+
+TODO
+
+### macOS
+
+TODO
+
+### Linux
+
+- Clone osci-render
+- Install required packages
+  - `sudo apt update`
+  - `sudo apt install libasound2-dev libjack-jackd2-dev ladspa-sdk libcurl4-openssl-dev libfreetype6-dev libx11-dev libxcomposite-dev libxcursor-dev libxcursor-dev libxext-dev libxinerama-dev libxrandr-dev libxrender-dev libwebkit2gtk-4.0-dev libglu1-mesa-dev mesa-common-dev g++ make`
+- Download JUCE from here https://juce.com/download/
+- Unzip the file
+- Run `Projucer` from where you unzipped: `./JUCE/Projucer`
+- Open `osci-render.jucer` in Projucer
+- Go to File > Save Project to create a Makefile
+- Go to the `LinuxMakefile` folder: `cd osci-render/Builds/LinuxMakefile`
+- Build the project: `make CONFIG=Release` for release, or `make CONFIG=Debug` for testing
+- Go to the build folder: `cd build`
+- Run `osci-render` executable, or use the VST3 file
+
 ## Contact
 
 James H Ball, [james@ball.sh](mailto:james@ball.sh)
