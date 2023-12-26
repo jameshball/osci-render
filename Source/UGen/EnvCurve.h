@@ -133,8 +133,8 @@ public:
 	const EnvCurve& operator[] (const int index) const throw();
 
 	inline int size() const throw()									{ return data.size();		}
-	inline const std::vector<EnvCurve> const getData() throw()					{ return data;		}
-	inline const std::vector<EnvCurve> const getData() const throw()			{ return data;		}
+	inline const std::vector<EnvCurve> getData() throw()					{ return data;		}
+	inline const std::vector<EnvCurve> getData() const throw()			{ return data;		}
 
 	EnvCurveList blend(EnvCurveList const& other, float fraction) const throw();
 
