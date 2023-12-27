@@ -65,6 +65,10 @@ private:
 
     bool usingNativeMenuBar = false;
 
+#if !JUCE_MAC
+    juce::OpenGLContext openGlContext;
+#endif
+
 	void codeDocumentTextInserted(const juce::String& newText, int insertIndex) override;
 	void codeDocumentTextDeleted(int startIndex, int endIndex) override;
     void updateCodeDocument();
