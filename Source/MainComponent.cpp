@@ -90,7 +90,30 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 		createFile.triggerClick();
 	};
 
-	addAndMakeVisible(visualiser);
+	if (!pluginEditor.visualiserFullScreen) {
+		addAndMakeVisible(pluginEditor.visualiser);
+	}
+	pluginEditor.visualiser.setFullScreenCallback([this](FullScreenMode mode) {
+		if (mode == FullScreenMode::TOGGLE) {
+            pluginEditor.visualiserFullScreen = !pluginEditor.visualiserFullScreen;
+		} else if (mode == FullScreenMode::FULL_SCREEN) {
+            pluginEditor.visualiserFullScreen = true;
+		} else if (mode == FullScreenMode::MAIN_COMPONENT) {
+            pluginEditor.visualiserFullScreen = false;
+        }
+
+		if (pluginEditor.visualiserFullScreen) {
+			removeChildComponent(&pluginEditor.visualiser);
+			pluginEditor.addAndMakeVisible(pluginEditor.visualiser);
+		} else {
+			pluginEditor.removeChildComponent(&pluginEditor.visualiser);
+			addAndMakeVisible(pluginEditor.visualiser);
+		}
+		pluginEditor.resized();
+		pluginEditor.repaint();
+		resized();
+		repaint();
+    });
 	addAndMakeVisible(openOscilloscope);
 
 	openOscilloscope.onClick = [this] {
@@ -151,15 +174,18 @@ void MainComponent::resized() {
 	frequencyLabel.setBounds(bounds.removeFromTop(20));
 
 	bounds.removeFromTop(padding);
-	// openOscilloscope.setBounds(bounds.removeFromBottom(buttonHeight).withSizeKeepingCentre(160, buttonHeight));
-	auto minDim = juce::jmin(bounds.getWidth(), bounds.getHeight());
-	visualiser.setBounds(bounds.withSizeKeepingCentre(minDim, minDim));
+	if (!pluginEditor.visualiserFullScreen) {
+		auto minDim = juce::jmin(bounds.getWidth(), bounds.getHeight());
+		pluginEditor.visualiser.setBounds(bounds.withSizeKeepingCentre(minDim, minDim));
+	}
 }
 
 void MainComponent::paint(juce::Graphics& g) {
 	juce::GroupComponent::paint(g);
 
-	// add drop shadow to the visualiser
-	auto dc = juce::DropShadow(juce::Colours::black, 30, juce::Point<int>(0, 0));
-	dc.drawForRectangle(g, visualiser.getBounds());
+	if (!pluginEditor.visualiserFullScreen) {
+		// add drop shadow to the visualiser
+		auto dc = juce::DropShadow(juce::Colours::black, 30, juce::Point<int>(0, 0));
+		dc.drawForRectangle(g, pluginEditor.visualiser.getBounds());
+	}
 }

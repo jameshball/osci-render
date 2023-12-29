@@ -32,7 +32,6 @@ private:
 	juce::ComboBox fileType;
 	juce::TextButton createFile{"Create File"};
 
-	VisualiserComponent visualiser{2, audioProcessor};
 	juce::TextButton openOscilloscope{"Open Oscilloscope"};
 
 	juce::Label frequencyLabel;

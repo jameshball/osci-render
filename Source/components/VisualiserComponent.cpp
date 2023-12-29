@@ -8,11 +8,25 @@ VisualiserComponent::VisualiserComponent(int numChannels, OscirenderAudioProcess
     
     roughness.textBox.setValue(4);
     intensity.textBox.setValue(1.0);
+
+    setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    setWantsKeyboardFocus(true);
 }
 
 VisualiserComponent::~VisualiserComponent() {
     audioProcessor.consumerStop(consumer);
     stopThread(1000);
+}
+
+void VisualiserComponent::setFullScreenCallback(std::function<void(FullScreenMode)> callback) {
+    fullScreenCallback = callback;
+}
+
+void VisualiserComponent::mouseDoubleClick(const juce::MouseEvent& event) {
+    if (fullScreenCallback) {
+        fullScreenCallback(FullScreenMode::TOGGLE);
+    }
+    grabKeyboardFocus();
 }
 
 void VisualiserComponent::setBuffer(std::vector<float>& newBuffer) {
@@ -92,6 +106,17 @@ void VisualiserComponent::mouseDown(const juce::MouseEvent& event) {
 
         menu.showMenuAsync(juce::PopupMenu::Options(), [this](int result) {});
     }
+}
+
+bool VisualiserComponent::keyPressed(const juce::KeyPress& key) {
+    if (key.isKeyCode(juce::KeyPress::escapeKey)) {
+        if (fullScreenCallback) {
+            fullScreenCallback(FullScreenMode::MAIN_COMPONENT);
+        }
+        return true;
+    }
+
+    return false;
 }
 
 void VisualiserComponent::paintChannel(juce::Graphics& g, juce::Rectangle<float> area, int channel) {
