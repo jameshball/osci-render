@@ -35,14 +35,19 @@ public:
     void openAudioSettings();
     void resetToDefault();
 
-    std::atomic<bool> editingPerspective = false;
-
-    OscirenderLookAndFeel lookAndFeel;
 private:
     OscirenderAudioProcessor& audioProcessor;
-    
+public:
+
+    OscirenderLookAndFeel lookAndFeel;
+
+    std::atomic<bool> editingPerspective = false;
+
+    VisualiserComponent visualiser{2, audioProcessor};
+    std::atomic<bool> visualiserFullScreen = false;
     SettingsComponent settings{audioProcessor, *this};
     VolumeComponent volume{audioProcessor};
+
     std::vector<std::shared_ptr<juce::CodeDocument>> codeDocuments;
     std::vector<std::shared_ptr<ErrorCodeEditorComponent>> codeEditors;
     juce::CodeEditorComponent::ColourScheme colourScheme;

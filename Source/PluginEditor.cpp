@@ -80,6 +80,10 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 
     addAndMakeVisible(settings);
     addAndMakeVisible(resizerBar);
+
+    if (visualiserFullScreen) {
+        addAndMakeVisible(visualiser);
+    }
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
@@ -130,6 +134,12 @@ void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
 
 void OscirenderAudioProcessorEditor::resized() {
     auto area = getLocalBounds();
+
+    if (visualiserFullScreen) {
+        visualiser.setBounds(area);
+        return;
+    }
+
     if (!usingNativeMenuBar) {
         menuBar.setBounds(area.removeFromTop(25));
     }
@@ -327,7 +337,7 @@ void OscirenderAudioProcessorEditor::updateCodeDocument() {
 }
 
 bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
-    bool consumeKey1 = true;
+    bool consumeKey = false;
     {
         juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
         juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
@@ -344,6 +354,7 @@ bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
                 }
                 changedFile = true;
             }
+            consumeKey = true;
         } else if (key.getTextCharacter() == 'k') {
             if (numFiles > 1) {
                 currentFile--;
@@ -352,8 +363,7 @@ bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
                 }
                 changedFile = true;
             }
-        } else {
-            consumeKey1 = false;
+            consumeKey = true;
         }
 
         if (changedFile) {
@@ -362,7 +372,6 @@ bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
         }
     }
     
-    bool consumeKey2 = true;
     if (key.isKeyCode(juce::KeyPress::escapeKey)) {
         settings.disableMouseRotation();
     } else if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'S') {
@@ -371,11 +380,9 @@ bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
         saveProject();
     } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'O') {
         openProject();
-    } else {
-        consumeKey2 = false;
-	}
+    }
 
-    return consumeKey1 || consumeKey2;
+    return consumeKey;
 }
 
 void OscirenderAudioProcessorEditor::newProject() {

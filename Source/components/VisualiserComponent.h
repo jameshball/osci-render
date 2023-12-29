@@ -7,11 +7,19 @@
 #include "../PluginProcessor.h"
 #include "LabelledTextBox.h"
 
+enum class FullScreenMode {
+    TOGGLE,
+    FULL_SCREEN,
+    MAIN_COMPONENT,
+};
+
 class VisualiserComponent : public juce::Component, public juce::Timer, public juce::Thread, public juce::MouseListener {
 public:
     VisualiserComponent(int numChannels, OscirenderAudioProcessor& p);
     ~VisualiserComponent() override;
 
+    void setFullScreenCallback(std::function<void(FullScreenMode)> callback);
+    void mouseDoubleClick(const juce::MouseEvent& event) override;
     void setBuffer(std::vector<float>& buffer);
     void setColours(juce::Colour backgroundColour, juce::Colour waveformColour);
     void paintChannel(juce::Graphics&, juce::Rectangle<float> bounds, int channel);
@@ -20,6 +28,8 @@ public:
 	void timerCallback() override;
 	void run() override;
     void mouseDown(const juce::MouseEvent& event) override;
+    bool keyPressed(const juce::KeyPress& key) override;
+
 
 private:
     const double BUFFER_LENGTH_SECS = 0.02;
@@ -41,6 +51,8 @@ private:
     std::atomic<bool> active = true;
     
     std::shared_ptr<BufferConsumer> consumer;
+
+    std::function<void(FullScreenMode)> fullScreenCallback;
     
     void resetBuffer();
 
