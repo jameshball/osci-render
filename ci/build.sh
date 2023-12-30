@@ -30,7 +30,7 @@ elif [ "$OS" = "mac" ]; then
   PROJUCER_OS="osx"
 fi
 
-curl -s -S "https://api.juce.com/api/v1/download/juce/latest/$PROJUCER_OS" -o Projucer.zip
+curl -s -S -L "https://api.juce.com/api/v1/download/juce/latest/$PROJUCER_OS" -o Projucer.zip
 unzip Projucer.zip
 
 # Resave jucer file
