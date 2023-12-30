@@ -35,16 +35,16 @@ unzip Projucer.zip
 
 # Resave jucer file
 if [ "$OS" = "mac" ]; then
-  "$ROOT/ci/bin/JUCE/Projucer.app/Contents/MacOS/Projucer" --resave "$ROOT/plugin/$PLUGIN.jucer"
+  "$ROOT/ci/bin/JUCE/Projucer.app/Contents/MacOS/Projucer" --resave "$ROOT/$PLUGIN.jucer"
 elif [ "$OS" = "linux" ]; then
-  "$ROOT/ci/bin/JUCE/Projucer" --resave "$ROOT/plugin/$PLUGIN.jucer"
+  "$ROOT/ci/bin/JUCE/Projucer" --resave "$ROOT/$PLUGIN.jucer"
 else
-  "$ROOT/ci/bin/JUCE/Projucer.exe" --resave "$ROOT/plugin/$PLUGIN.jucer"
+  "$ROOT/ci/bin/JUCE/Projucer.exe" --resave "$ROOT/$PLUGIN.jucer"
 fi
 
 # Build mac version
 if [ "$OS" = "mac" ]; then
-  cd "$ROOT/plugin/Builds/MacOSX"
+  cd "$ROOT/Builds/MacOSX"
   xcodebuild -configuration Release || exit 1
 
   cp -R ~/Library/Audio/Plug-Ins/VST3/$PLUGIN.vst3 "$ROOT/ci/bin"
@@ -58,7 +58,7 @@ fi
 
 # Build linux version
 if [ "$OS" = "linux" ]; then
-  cd "$ROOT/plugin/Builds/LinuxMakefile"
+  cd "$ROOT/Builds/LinuxMakefile"
   make CONFIG=Release
 
   cp -r ./build/$PLUGIN.vst3 "$ROOT/ci/bin"
@@ -78,13 +78,13 @@ if [ "$OS" = "win" ]; then
   MSBUILD_EXE=$("$VS_WHERE" -latest -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\MSBuild.exe")
   echo $MSBUILD_EXE
 
-  cd "$ROOT/plugin/Builds/VisualStudio2022"
+  cd "$ROOT/Builds/VisualStudio2022"
   "$MSBUILD_EXE" "$PLUGIN.sln" "//p:VisualStudioVersion=16.0" "//m" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64"
 
   cd "$ROOT/ci/bin"
   mkdir -p VST3
 
-  cp "$ROOT/plugin/Builds/VisualStudio2022/x64/Release/VST3/${PLUGIN}.vst3" ${PLUGIN}.vst3
+  cp "$ROOT/Builds/VisualStudio2022/x64/Release/VST3/${PLUGIN}.vst3" ${PLUGIN}.vst3
 
   7z a ${PLUGIN}_Win.zip ${PLUGIN}.vst3
   cp ${PLUGIN}_Win.zip "$ROOT/bin"
