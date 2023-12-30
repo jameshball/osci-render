@@ -60,6 +60,8 @@ if [ "$OS" = "mac" ]; then
   cp -R ~/Library/Audio/Plug-Ins/Components/$PLUGIN.component "$ROOT/ci/bin"
 
   cd "$ROOT/ci/bin"
+
+  ls
   
   zip -r ${PLUGIN}.vst3.zip $PLUGIN.vst3
   zip -r ${PLUGIN}.app.zip $PLUGIN.component
@@ -91,14 +93,11 @@ if [ "$OS" = "win" ]; then
   cd "$ROOT/Builds/VisualStudio2022"
   "$MSBUILD_EXE" "$PLUGIN.sln" "//p:VisualStudioVersion=16.0" "//m" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64"
   echo "Build done"
-  ls
+
   cd "$ROOT/ci/bin"
-  mkdir -p VST3
 
   echo "Copy VST3"
-  cp "$ROOT/Builds/VisualStudio2022/x64/Release/VST3/${PLUGIN}.vst3" ${PLUGIN}.vst3
-
-  echo "Zipping"
-  7z a ${PLUGIN}_Win.zip ${PLUGIN}.vst3
-  cp ${PLUGIN}_Win.zip "$ROOT/bin"
+  ls "$ROOT/Builds/VisualStudio2022/x64/Release/"
+  ls "$ROOT/Builds/VisualStudio2022/x64/Release/VST3/"
+  cp "$ROOT/Builds/VisualStudio2022/x64/Release/VST3/$PLUGIN.vst3" "$ROOT/bin"
 fi
