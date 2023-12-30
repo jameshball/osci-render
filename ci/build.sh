@@ -55,13 +55,16 @@ if [ "$OS" = "mac" ]; then
   cd "$ROOT/Builds/MacOSX"
   xcodebuild -configuration Release || exit 1
 
+  cp "$ROOT/Builds/MacOSX/Release/$PLUGIN.app" "$ROOT/ci/bin"
   cp -R ~/Library/Audio/Plug-Ins/VST3/$PLUGIN.vst3 "$ROOT/ci/bin"
   cp -R ~/Library/Audio/Plug-Ins/Components/$PLUGIN.component "$ROOT/ci/bin"
 
   cd "$ROOT/ci/bin"
   
-  zip -r ${PLUGIN}_Mac.zip $PLUGIN.vst3 $PLUGIN.component
-  cp ${PLUGIN}_Mac.zip "$ROOT/bin"
+  zip -r ${PLUGIN}.vst3.zip $PLUGIN.vst3
+  zip -r ${PLUGIN}.app.zip $PLUGIN.component
+  zip -r ${PLUGIN}.component.zip $PLUGIN.app
+  cp ${PLUGIN}*.zip "$ROOT/bin"
 fi
 
 # Build linux version
@@ -69,14 +72,13 @@ if [ "$OS" = "linux" ]; then
   cd "$ROOT/Builds/LinuxMakefile"
   make CONFIG=Release
 
-  cp -r ./build/$PLUGIN.vst3 "$ROOT/ci/bin"
+  cp -r ./build/$PLUGIN.vst3 ./build/$PLUGIN "$ROOT/ci/bin"
 
   cd "$ROOT/ci/bin"
 
-  # Upload
-  cd "$ROOT/ci/bin"
-  zip -r ${PLUGIN}_Linux.zip $PLUGIN.vst3
-  cp ${PLUGIN}_Linux.zip "$ROOT/bin"
+  zip -r ${PLUGIN}-vst3.zip $PLUGIN.vst3
+  zip -r ${PLUGIN}.zip $PLUGIN
+  cp ${PLUGIN}*.zip "$ROOT/bin"
 fi
 
 # Build Win version
@@ -88,12 +90,15 @@ if [ "$OS" = "win" ]; then
 
   cd "$ROOT/Builds/VisualStudio2022"
   "$MSBUILD_EXE" "$PLUGIN.sln" "//p:VisualStudioVersion=16.0" "//m" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64"
-
+  echo "Build done"
+  ls
   cd "$ROOT/ci/bin"
   mkdir -p VST3
 
+  echo "Copy VST3"
   cp "$ROOT/Builds/VisualStudio2022/x64/Release/VST3/${PLUGIN}.vst3" ${PLUGIN}.vst3
 
+  echo "Zipping"
   7z a ${PLUGIN}_Win.zip ${PLUGIN}.vst3
   cp ${PLUGIN}_Win.zip "$ROOT/bin"
 fi
