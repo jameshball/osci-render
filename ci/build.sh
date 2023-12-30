@@ -55,7 +55,6 @@ if [ "$OS" = "mac" ]; then
   cd "$ROOT/Builds/MacOSX"
   xcodebuild -configuration Release || exit 1
 
-  ls "$ROOT/Builds/MacOSX/Release"
   ls "$ROOT/Builds/MacOSX"
 
   cp "$ROOT/Builds/MacOSX/Release/$PLUGIN.app" "$ROOT/ci/bin"
@@ -100,5 +99,8 @@ if [ "$OS" = "win" ]; then
   echo "Copy VST3"
   ls "$ROOT/Builds/VisualStudio2022/x64/Release/"
   ls "$ROOT/Builds/VisualStudio2022/x64/Release/VST3/"
-  cp "$ROOT/Builds/VisualStudio2022/x64/Release/VST3/$PLUGIN.vst3" "$ROOT/bin"
+
+  stat "$ROOT/Builds/VisualStudio2022/x64/Release/VST3/$PLUGIN.vst3"
+
+  cp -r "$ROOT/Builds/VisualStudio2022/x64/Release/VST3/$PLUGIN.vst3" "$ROOT/bin"
 fi
