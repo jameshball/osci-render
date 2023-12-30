@@ -21,11 +21,6 @@ cd "$ROOT/ci"
 rm -Rf bin
 mkdir bin
 
-# Get the hash
-cd "$ROOT/modules/juce"
-HASH=`git rev-parse HEAD`
-echo "Hash: $HASH"
-
 # Get the Projucer
 cd "$ROOT/ci/bin"
 PROJUCER_OS=$OS
