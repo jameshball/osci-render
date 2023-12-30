@@ -55,9 +55,10 @@ if [ "$OS" = "mac" ]; then
   cd "$ROOT/Builds/MacOSX"
   xcodebuild -configuration Release || exit 1
 
-  ls "$ROOT/Builds/MacOSX"
+  ls "$ROOT/Builds/MacOSX/build"
+  ls "$ROOT/Builds/MacOSX/build/Release"
 
-  cp "$ROOT/Builds/MacOSX/Release/$PLUGIN.app" "$ROOT/ci/bin"
+  cp "$ROOT/Builds/MacOSX/build/Release/$PLUGIN.app" "$ROOT/ci/bin"
   cp -R ~/Library/Audio/Plug-Ins/VST3/$PLUGIN.vst3 "$ROOT/ci/bin"
   cp -R ~/Library/Audio/Plug-Ins/Components/$PLUGIN.component "$ROOT/ci/bin"
 
@@ -102,5 +103,5 @@ if [ "$OS" = "win" ]; then
 
   stat "$ROOT/Builds/VisualStudio2022/x64/Release/VST3/$PLUGIN.vst3"
 
-  cp -r "$ROOT/Builds/VisualStudio2022/x64/Release/VST3/$PLUGIN.vst3" "$ROOT/bin"
+  cp -r "$ROOT/Builds/VisualStudio2022/x64/Release/VST3/$PLUGIN.vst3/Contents/x86_64-win/$PLUGIN.vst3" "$ROOT/bin"
 fi
