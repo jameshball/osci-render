@@ -55,13 +55,14 @@ if [ "$OS" = "mac" ]; then
   cd "$ROOT/Builds/MacOSX"
   xcodebuild -configuration Release || exit 1
 
+  ls "$ROOT/Builds/MacOSX/Release"
+  ls "$ROOT/Builds/MacOSX"
+
   cp "$ROOT/Builds/MacOSX/Release/$PLUGIN.app" "$ROOT/ci/bin"
   cp -R ~/Library/Audio/Plug-Ins/VST3/$PLUGIN.vst3 "$ROOT/ci/bin"
   cp -R ~/Library/Audio/Plug-Ins/Components/$PLUGIN.component "$ROOT/ci/bin"
 
   cd "$ROOT/ci/bin"
-
-  ls
   
   zip -r ${PLUGIN}.vst3.zip $PLUGIN.vst3
   zip -r ${PLUGIN}.app.zip $PLUGIN.component
