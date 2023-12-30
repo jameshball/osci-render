@@ -1,0 +1,28 @@
+name: Build macOS
+on:
+  push:
+    branches:
+      - release
+jobs:
+  build:
+    name: Build macOS
+    runs-on: macos-latest
+    steps:
+      - name: Fix up git URLs
+        run: echo -e '[url "https://github.com/"]\n  insteadOf = "git@github.com:"' >> ~/.gitconfig
+        shell: bash
+      - uses: actions/checkout@v1
+        with:
+          token: ${{ secrets.ACCESS_TOKEN }}
+          submodules: true
+      - name: "Run script"
+        run: |
+          export OS="mac"
+          ./ci/build.sh
+        shell: bash
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: Binaries
+          path: bin
+          retention-days: 1
