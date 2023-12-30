@@ -33,14 +33,22 @@ fi
 curl -s -S -L "https://api.juce.com/api/v1/download/juce/latest/$PROJUCER_OS" -o Projucer.zip
 unzip Projucer.zip
 
-# Resave jucer file
+# Set Projucer path based on OS
 if [ "$OS" = "mac" ]; then
-  "$ROOT/ci/bin/JUCE/Projucer.app/Contents/MacOS/Projucer" --resave "$ROOT/$PLUGIN.jucer"
+  PROJUCER_PATH="$ROOT/ci/bin/JUCE/Projucer.app/Contents/MacOS/Projucer"
 elif [ "$OS" = "linux" ]; then
-  "$ROOT/ci/bin/JUCE/Projucer" --resave "$ROOT/$PLUGIN.jucer"
+  PROJUCER_PATH="$ROOT/ci/bin/JUCE/Projucer"
 else
-  "$ROOT/ci/bin/JUCE/Projucer.exe" --resave "$ROOT/$PLUGIN.jucer"
+  PROJUCER_PATH="$ROOT/ci/bin/JUCE/Projucer.exe"
 fi
+
+# Set global path
+GLOBAL_PATH_COMMAND="$PROJUCER_PATH --set-global-search-path $PROJUCER_OS 'defaultJuceModulePath' '$ROOT/ci/bin/JUCE/modules'"
+eval "$GLOBAL_PATH_COMMAND"
+
+# Resave jucer file
+RESAVE_COMMAND="$PROJUCER_PATH --resave '$ROOT/$PLUGIN.jucer'"
+eval "$RESAVE_COMMAND"
 
 # Build mac version
 if [ "$OS" = "mac" ]; then
