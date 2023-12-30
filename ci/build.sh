@@ -61,9 +61,9 @@ if [ "$OS" = "mac" ]; then
 
   cd "$ROOT/ci/bin"
   
-  zip -r ${PLUGIN}.vst3.zip $PLUGIN.vst3
-  zip -r ${PLUGIN}.component.zip $PLUGIN.component
-  zip -r ${PLUGIN}.app.zip $PLUGIN.app
+  zip -r ${PLUGIN}-mac.vst3.zip $PLUGIN.vst3
+  zip -r ${PLUGIN}-mac.component.zip $PLUGIN.component
+  zip -r ${PLUGIN}-mac.app.zip $PLUGIN.app
   cp ${PLUGIN}*.zip "$ROOT/bin"
 fi
 
@@ -76,8 +76,8 @@ if [ "$OS" = "linux" ]; then
 
   cd "$ROOT/ci/bin"
 
-  zip -r ${PLUGIN}-vst3.zip $PLUGIN.vst3
-  zip -r ${PLUGIN}.zip $PLUGIN
+  zip -r ${PLUGIN}-linux-vst3.zip $PLUGIN.vst3
+  zip -r ${PLUGIN}-linux.zip $PLUGIN
   cp ${PLUGIN}*.zip "$ROOT/bin"
 fi
 
