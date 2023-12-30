@@ -55,18 +55,15 @@ if [ "$OS" = "mac" ]; then
   cd "$ROOT/Builds/MacOSX"
   xcodebuild -configuration Release || exit 1
 
-  ls "$ROOT/Builds/MacOSX/build"
-  ls "$ROOT/Builds/MacOSX/build/Release"
-
-  cp "$ROOT/Builds/MacOSX/build/Release/$PLUGIN.app" "$ROOT/ci/bin"
+  cp -R "$ROOT/Builds/MacOSX/build/Release/$PLUGIN.app" "$ROOT/ci/bin"
   cp -R ~/Library/Audio/Plug-Ins/VST3/$PLUGIN.vst3 "$ROOT/ci/bin"
   cp -R ~/Library/Audio/Plug-Ins/Components/$PLUGIN.component "$ROOT/ci/bin"
 
   cd "$ROOT/ci/bin"
   
   zip -r ${PLUGIN}.vst3.zip $PLUGIN.vst3
-  zip -r ${PLUGIN}.app.zip $PLUGIN.component
-  zip -r ${PLUGIN}.component.zip $PLUGIN.app
+  zip -r ${PLUGIN}.component.zip $PLUGIN.component
+  zip -r ${PLUGIN}.app.zip $PLUGIN.app
   cp ${PLUGIN}*.zip "$ROOT/bin"
 fi
 
@@ -93,15 +90,6 @@ if [ "$OS" = "win" ]; then
 
   cd "$ROOT/Builds/VisualStudio2022"
   "$MSBUILD_EXE" "$PLUGIN.sln" "//p:VisualStudioVersion=16.0" "//m" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64"
-  echo "Build done"
-
   cd "$ROOT/ci/bin"
-
-  echo "Copy VST3"
-  ls "$ROOT/Builds/VisualStudio2022/x64/Release/"
-  ls "$ROOT/Builds/VisualStudio2022/x64/Release/VST3/"
-
-  stat "$ROOT/Builds/VisualStudio2022/x64/Release/VST3/$PLUGIN.vst3"
-
   cp -r "$ROOT/Builds/VisualStudio2022/x64/Release/VST3/$PLUGIN.vst3/Contents/x86_64-win/$PLUGIN.vst3" "$ROOT/bin"
 fi
