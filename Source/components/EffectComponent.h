@@ -35,10 +35,11 @@ private:
 
     void setupComponent();
     bool lfoEnabled = true;
+    bool sidechainEnabled = true;
     std::shared_ptr<juce::Component> component;
     OscirenderAudioProcessor& audioProcessor;
 
-    SvgButton sidechainButton{ effect.parameters[index]->name, BinaryData::microphone_svg, "white", "red", effect.parameters[index]->sidechain };
+    std::unique_ptr<SvgButton> sidechainButton;
 
     juce::Label popupLabel;
     juce::Label label;

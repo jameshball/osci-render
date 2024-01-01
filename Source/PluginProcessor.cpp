@@ -299,6 +299,7 @@ void OscirenderAudioProcessor::addLuaSlider() {
 
     auto& effect = luaEffects.back();
     effect->parameters[0]->disableLfo();
+    effect->parameters[0]->disableSidechain();
 }
 
 // effectsLock should be held when calling this
@@ -540,11 +541,6 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    // clear output channels
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i) {
-        buffer.clear(i, 0, buffer.getNumSamples());
-    }
-
     // merge keyboard state and midi messages
     keyboardState.processNextMidiBuffer(midiMessages, 0, buffer.getNumSamples(), true);
 
@@ -572,24 +568,9 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
     const double EPSILON = 0.00001;
 
-    // update currentVolume by iterating over input channel samples
-    for (auto sample = 0; sample < buffer.getNumSamples(); ++sample) {
-        auto left = 0.0;
-        auto right = 0.0;
-        if (totalNumInputChannels >= 2) {
-            left = buffer.getSample(0, sample);
-            right = buffer.getSample(1, sample);
-        } else if (totalNumInputChannels == 1) {
-            left = buffer.getSample(0, sample);
-            right = buffer.getSample(0, sample);
-        }
-
-        // update volume using a moving average
-        int oldestBufferIndex = (volumeBufferIndex + 1) % volumeBuffer.size();
-        currentVolume -= volumeBuffer[oldestBufferIndex] / volumeBuffer.size();
-        volumeBufferIndex = oldestBufferIndex;
-        volumeBuffer[volumeBufferIndex] = std::sqrt(left * left + right * right);
-        currentVolume += volumeBuffer[volumeBufferIndex] / volumeBuffer.size();
+    juce::AudioBuffer<float> inputBuffer = juce::AudioBuffer<float>(totalNumInputChannels, buffer.getNumSamples());
+    for (auto channel = 0; channel < totalNumInputChannels; channel++) {
+        inputBuffer.copyFrom(channel, 0, buffer, channel, 0, buffer.getNumSamples());
     }
 
     if (usingInput && totalNumInputChannels >= 2) {
@@ -600,9 +581,8 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             [&] (const juce::MidiMessageMetadata& meta) { synth.publicHandleMidiEvent(meta.getMessage()); }
         );
     } else {
-        for (auto i = 0; i < totalNumInputChannels; ++i) {
-            buffer.clear(i, 0, buffer.getNumSamples());
-        }
+        // only clear buffer if we aren't using input, since we keep the input audio.
+        buffer.clear();
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
         synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
@@ -613,6 +593,24 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     auto* channelData = buffer.getArrayOfWritePointers();
     
 	for (auto sample = 0; sample < buffer.getNumSamples(); ++sample) {
+        auto left = 0.0;
+        auto right = 0.0;
+        if (totalNumInputChannels >= 2) {
+            left = inputBuffer.getSample(0, sample);
+            right = inputBuffer.getSample(1, sample);
+        } else if (totalNumInputChannels == 1) {
+            left = inputBuffer.getSample(0, sample);
+            right = inputBuffer.getSample(0, sample);
+        }
+
+        // update volume using a moving average
+        int oldestBufferIndex = (volumeBufferIndex + 1) % volumeBuffer.size();
+        squaredVolume -= volumeBuffer[oldestBufferIndex] / volumeBuffer.size();
+        volumeBufferIndex = oldestBufferIndex;
+        volumeBuffer[volumeBufferIndex] = (left * left + right * right) / 2;
+        squaredVolume += volumeBuffer[volumeBufferIndex] / volumeBuffer.size();
+        currentVolume = std::sqrt(squaredVolume);
+
         Vector2 channels;
         if (totalNumOutputChannels >= 2) {
             channels = {buffer.getSample(0, sample), buffer.getSample(1, sample)};

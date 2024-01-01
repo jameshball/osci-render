@@ -336,6 +336,7 @@ private:
 
     std::vector<double> volumeBuffer;
     int volumeBufferIndex = 0;
+    double squaredVolume = 0;
     double currentVolume = 0;
 
     void updateObjValues();

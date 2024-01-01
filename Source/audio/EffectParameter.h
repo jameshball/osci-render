@@ -342,7 +342,9 @@ public:
 		if (lfoRate != nullptr) {
 			parameters.push_back(lfoRate);
 		}
-        parameters.push_back(sidechain);
+		if (sidechain != nullptr) {
+			parameters.push_back(sidechain);
+		}
 		return parameters;
     }
 
@@ -353,6 +355,11 @@ public:
 		lfoRate = nullptr;
 	}
 
+	void disableSidechain() {
+        delete sidechain;
+        sidechain = nullptr;
+    }
+
 	void save(juce::XmlElement* xml) {
 		FloatParameter::save(xml);
 
@@ -362,8 +369,10 @@ public:
 			lfoRate->save(lfoXml);
 		}
 
-		auto sidechainXml = xml->createNewChildElement("sidechain");
-		sidechain->save(sidechainXml);
+		if (sidechain != nullptr) {
+			auto sidechainXml = xml->createNewChildElement("sidechain");
+			sidechain->save(sidechainXml);
+		}
     }
 
 	void load(juce::XmlElement* xml) {
@@ -380,11 +389,13 @@ public:
 			}
 		}
 
-		auto sidechainXml = xml->getChildByName("sidechain");
-		if (sidechainXml != nullptr) {
-			sidechain->load(sidechainXml);
-		} else {
-			sidechain->setBoolValueNotifyingHost(false);
+		if (sidechain != nullptr) {
+			auto sidechainXml = xml->getChildByName("sidechain");
+			if (sidechainXml != nullptr) {
+				sidechain->load(sidechainXml);
+			} else {
+				sidechain->setBoolValueNotifyingHost(false);
+			}
 		}
     }
 
