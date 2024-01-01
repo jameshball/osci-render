@@ -332,6 +332,12 @@ private:
     AudioWebSocketServer softwareOscilloscopeServer{*this};
     ObjectServer objectServer{*this};
 
+    const double VOLUME_BUFFER_SECONDS = 0.1;
+
+    std::vector<double> volumeBuffer;
+    int volumeBufferIndex = 0;
+    double currentVolume = 0;
+
     void updateObjValues();
     std::shared_ptr<Effect> getEffect(juce::String id);
     BooleanParameter* getBooleanParameter(juce::String id);

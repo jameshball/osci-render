@@ -9,16 +9,16 @@ Effect::Effect(std::shared_ptr<EffectApplication> effectApplication, const std::
 
 Effect::Effect(std::shared_ptr<EffectApplication> effectApplication, EffectParameter* parameter) : Effect(effectApplication, std::vector<EffectParameter*>{parameter}) {}
 
-Effect::Effect(std::function<Vector2(int, Vector2, const std::vector<double>&, double)> application, const std::vector<EffectParameter*>& parameters) :
+Effect::Effect(EffectApplicationType application, const std::vector<EffectParameter*>& parameters) :
 	application(application),
 	parameters(parameters),
 	enabled(nullptr),
 	actualValues(std::vector<double>(parameters.size(), 0.0)) {}
 
-Effect::Effect(std::function<Vector2(int, Vector2, const std::vector<double>&, double)> application, EffectParameter* parameter) : Effect(application, std::vector<EffectParameter*>{parameter}) {}
+Effect::Effect(EffectApplicationType application, EffectParameter* parameter) : Effect(application, std::vector<EffectParameter*>{parameter}) {}
 
-Vector2 Effect::apply(int index, Vector2 input) {
-	animateValues();
+Vector2 Effect::apply(int index, Vector2 input, double volume) {
+	animateValues(volume);
 	if (application) {
 		return application(index, input, actualValues, sampleRate);
 	} else if (effectApplication != nullptr) {
@@ -27,7 +27,7 @@ Vector2 Effect::apply(int index, Vector2 input) {
 	return input;
 }
 
-void Effect::animateValues() {
+void Effect::animateValues(double volume) {
 	for (int i = 0; i < parameters.size(); i++) {
 		auto parameter = parameters[i];
 		float minValue = parameter->min;
@@ -66,7 +66,13 @@ void Effect::animateValues() {
 				break;
 			default:
 				double weight = parameter->smoothValueChange ? 0.0005 : 1.0;
-				actualValues[i] = (1.0 - weight) * actualValues[i] + weight * parameter->getValueUnnormalised();
+				double newValue;
+				if (parameter->sidechain->getBoolValue()) {
+					newValue = volume * (maxValue - minValue) + minValue;
+				} else {
+                    newValue = parameter->getValueUnnormalised();
+                }
+				actualValues[i] = (1.0 - weight) * actualValues[i] + weight * newValue;
 				break;
 		}
 	}
@@ -132,9 +138,11 @@ void Effect::addListener(int index, juce::AudioProcessorParameter::Listener* lis
 	if (enabled != nullptr) {
 		enabled->addListener(listener);
 	}
+	parameters[index]->sidechain->addListener(listener);
 }
 
 void Effect::removeListener(int index, juce::AudioProcessorParameter::Listener* listener) {
+	parameters[index]->sidechain->removeListener(listener);
 	if (enabled != nullptr) {
 		enabled->removeListener(listener);
 	}

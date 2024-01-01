@@ -6,6 +6,17 @@ EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, in
     addChildComponent(lfoSlider);
     addAndMakeVisible(lfo);
     addAndMakeVisible(label);
+    addAndMakeVisible(sidechainButton);
+
+    slider.setSliderStyle(juce::Slider::LinearHorizontal);
+    slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, TEXT_BOX_WIDTH, slider.getTextBoxHeight());
+
+    lfoSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    lfoSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, TEXT_BOX_WIDTH, lfoSlider.getTextBoxHeight());
+    lfoSlider.setTextValueSuffix("Hz");
+    lfoSlider.setColour(sliderThumbOutlineColourId, juce::Colour(0xff00ff00));
+
+    sidechainButton.setTooltip("When enabled, the volume of the input audio controls the value of the slider, acting like a sidechain effect.");
 
     label.setFont(juce::Font(13.0f));
 
@@ -33,9 +44,6 @@ void EffectComponent::setupComponent() {
 
     slider.setRange(parameter->min, parameter->max, parameter->step);
     slider.setValue(parameter->getValueUnnormalised(), juce::dontSendNotification);
-
-    slider.setSliderStyle(juce::Slider::LinearHorizontal);
-    slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 70, slider.getTextBoxHeight());
 
     lfoEnabled = parameter->lfo != nullptr && parameter->lfoRate != nullptr;
     if (lfoEnabled) {
@@ -65,11 +73,6 @@ void EffectComponent::setupComponent() {
             lfoSlider.setVisible(true);
             slider.setVisible(false);
         }
-
-        lfoSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-        lfoSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 70, lfoSlider.getTextBoxHeight());
-        lfoSlider.setTextValueSuffix("Hz");
-        lfoSlider.setColour(sliderThumbOutlineColourId, juce::Colour(0xff00ff00));
 
         lfoSlider.onValueChange = [this]() {
             effect.parameters[index]->lfoRate->setUnnormalisedValueNotifyingHost(lfoSlider.getValue());
@@ -104,6 +107,20 @@ void EffectComponent::setupComponent() {
     popupLabel.setText(parameter->name + " Settings", juce::dontSendNotification);
     popupLabel.setJustificationType(juce::Justification::centred);
     popupLabel.setFont(juce::Font(14.0f, juce::Font::bold));
+
+    sidechainButton.onClick = [this] {
+        effect.parameters[index]->sidechain->setBoolValueNotifyingHost(!effect.parameters[index]->sidechain->getBoolValue());
+    };
+
+    if (effect.parameters[index]->sidechain->getBoolValue()) {
+        slider.setEnabled(false);
+        slider.setColour(sliderThumbOutlineColourId, juce::Colour(0xffff0000));
+        slider.setTooltip("Sidechain effect applied - click the microphone icon to disable this.");
+    } else {
+        slider.setEnabled(true);
+        slider.setColour(sliderThumbOutlineColourId, findColour(sliderThumbOutlineColourId));
+        slider.setTooltip("");
+    }
 }
 
 
@@ -118,12 +135,20 @@ void EffectComponent::resized() {
 		component->setBounds(componentBounds);
 	}
 
+    sidechainButton.setBounds(bounds.removeFromRight(20));
+
+    bool drawingSmall = bounds.getWidth() < 3 * TEXT_WIDTH;
+
     if (lfoEnabled) {
-        lfo.setBounds(bounds.removeFromRight(100).reduced(5));
+        lfo.setBounds(bounds.removeFromRight(drawingSmall ? 70 : 100).reduced(5));
     }
 
     bounds.removeFromLeft(5);
-    label.setBounds(bounds.removeFromLeft(120));
+
+    label.setBounds(bounds.removeFromLeft(drawingSmall ? SMALL_TEXT_WIDTH : TEXT_WIDTH));
+    slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, drawingSmall ? SMALL_TEXT_BOX_WIDTH : TEXT_BOX_WIDTH, slider.getTextBoxHeight());
+    lfoSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, drawingSmall ? SMALL_TEXT_BOX_WIDTH : TEXT_BOX_WIDTH, lfoSlider.getTextBoxHeight());
+
     slider.setBounds(bounds);
     lfoSlider.setBounds(bounds);
 }
