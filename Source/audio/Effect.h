@@ -5,15 +5,16 @@
 #include "EffectParameter.h"
 #include "BooleanParameter.h"
 
+typedef std::function<Vector2(int index, Vector2 input, const std::vector<double>& values, double sampleRate)> EffectApplicationType;
 
 class Effect {
 public:
 	Effect(std::shared_ptr<EffectApplication> effectApplication, const std::vector<EffectParameter*>& parameters);
 	Effect(std::shared_ptr<EffectApplication> effectApplication, EffectParameter* parameter);
-	Effect(std::function<Vector2(int, Vector2, const std::vector<double>&, double)> application, const std::vector<EffectParameter*>& parameters);
-	Effect(std::function<Vector2(int, Vector2, const std::vector<double>&, double)> application, EffectParameter* parameter);
+	Effect(EffectApplicationType application, const std::vector<EffectParameter*>& parameters);
+	Effect(EffectApplicationType application, EffectParameter* parameter);
 
-	Vector2 apply(int index, Vector2 input);
+	Vector2 apply(int index, Vector2 input, double volume = 0.0);
 	
 	void apply();
 	double getValue(int index);
@@ -43,10 +44,10 @@ private:
 	std::vector<double> actualValues;
 	int precedence = -1;
 	int sampleRate = 192000;
-	std::function<Vector2(int, Vector2, const std::vector<double>&, double)> application;
+	EffectApplicationType application;
 	
 	std::shared_ptr<EffectApplication> effectApplication;
 
-	void animateValues();
+	void animateValues(double volume);
 	float nextPhase(EffectParameter* parameter);
 };

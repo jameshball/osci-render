@@ -1,6 +1,7 @@
 #pragma once
 #include "../shape/Vector2.h"
 #include <JuceHeader.h>
+#include "BooleanParameter.h"
 
 class FloatParameter : public juce::AudioProcessorParameterWithID {
 public:
@@ -328,6 +329,7 @@ public:
 	std::atomic<bool> smoothValueChange = true;
 	LfoTypeParameter* lfo = new LfoTypeParameter(name + " LFO", paramID + "Lfo", getVersionHint(), 1);
 	FloatParameter* lfoRate = new FloatParameter(name + " LFO Rate", paramID + "LfoRate", getVersionHint(), 1.0f, 0.0f, 100.0f, 0.1f, "Hz");
+	BooleanParameter* sidechain = new BooleanParameter(name + " Sidechain Enabled", paramID + "Sidechain", getVersionHint(), false);
 	std::atomic<float> phase = 0.0f;
 	juce::String description;
 
@@ -340,6 +342,7 @@ public:
 		if (lfoRate != nullptr) {
 			parameters.push_back(lfoRate);
 		}
+        parameters.push_back(sidechain);
 		return parameters;
     }
 
@@ -358,16 +361,31 @@ public:
 			lfo->save(lfoXml);
 			lfoRate->save(lfoXml);
 		}
+
+		auto sidechainXml = xml->createNewChildElement("sidechain");
+		sidechain->save(sidechainXml);
     }
 
 	void load(juce::XmlElement* xml) {
         FloatParameter::load(xml);
 
-        auto lfoXml = xml->getChildByName("lfo");
-        if (lfoXml != nullptr) {
-            lfo->load(lfoXml);
-            lfoRate->load(lfoXml);
-        }
+		if (lfo != nullptr && lfoRate != nullptr) {
+			auto lfoXml = xml->getChildByName("lfo");
+			if (lfoXml != nullptr) {
+				lfo->load(lfoXml);
+				lfoRate->load(lfoXml);
+			} else {
+				lfo->setValueNotifyingHost(lfo->getValueForText("Static"));
+				lfoRate->setUnnormalisedValueNotifyingHost(1.0f);
+			}
+		}
+
+		auto sidechainXml = xml->getChildByName("sidechain");
+		if (sidechainXml != nullptr) {
+			sidechain->load(sidechainXml);
+		} else {
+			sidechain->setBoolValueNotifyingHost(false);
+		}
     }
 
 	EffectParameter(juce::String name, juce::String description, juce::String id, int versionHint, float value, float min, float max, float step = 0.01, bool smoothValueChange = true) : FloatParameter(name, id, versionHint, value, min, max, step), smoothValueChange(smoothValueChange), description(description) {}

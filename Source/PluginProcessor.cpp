@@ -235,6 +235,7 @@ void OscirenderAudioProcessor::changeProgramName(int index, const juce::String& 
 
 void OscirenderAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
 	currentSampleRate = sampleRate;
+    volumeBuffer = std::vector<double>(VOLUME_BUFFER_SECONDS * sampleRate, 0);
     pitchDetector.setSampleRate(sampleRate);
     synth.setCurrentPlaybackSampleRate(sampleRate);
     retriggerMidi = true;
@@ -571,6 +572,26 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
     const double EPSILON = 0.00001;
 
+    // update currentVolume by iterating over input channel samples
+    for (auto sample = 0; sample < buffer.getNumSamples(); ++sample) {
+        auto left = 0.0;
+        auto right = 0.0;
+        if (totalNumInputChannels >= 2) {
+            left = buffer.getSample(0, sample);
+            right = buffer.getSample(1, sample);
+        } else if (totalNumInputChannels == 1) {
+            left = buffer.getSample(0, sample);
+            right = buffer.getSample(0, sample);
+        }
+
+        // update volume using a moving average
+        int oldestBufferIndex = (volumeBufferIndex + 1) % volumeBuffer.size();
+        currentVolume -= volumeBuffer[oldestBufferIndex] / volumeBuffer.size();
+        volumeBufferIndex = oldestBufferIndex;
+        volumeBuffer[volumeBufferIndex] = std::sqrt(left * left + right * right);
+        currentVolume += volumeBuffer[volumeBufferIndex] / volumeBuffer.size();
+    }
+
     if (usingInput && totalNumInputChannels >= 2) {
         // handle all midi messages
         auto midiIterator = midiMessages.cbegin();
@@ -586,7 +607,6 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         juce::SpinLock::ScopedLockType lock2(effectsLock);
         synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
     }
-
     
     midiMessages.clear();
     
@@ -606,12 +626,12 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             if (volume > EPSILON) {
                 for (auto& effect : toggleableEffects) {
                     if (effect->enabled->getValue()) {
-                        channels = effect->apply(sample, channels);
+                        channels = effect->apply(sample, channels, currentVolume);
                     }
                 }
             }
             for (auto& effect : permanentEffects) {
-                channels = effect->apply(sample, channels);
+                channels = effect->apply(sample, channels, currentVolume);
             }
         }
 
