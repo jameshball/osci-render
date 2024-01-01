@@ -111,7 +111,7 @@ public:
 	// opt to not change any values if not found
 	void load(juce::XmlElement* xml) {
         if (xml->hasAttribute("value")) {
-            value = xml->getDoubleAttribute("value");
+			setUnnormalisedValueNotifyingHost(xml->getDoubleAttribute("value"));
         }
         if (xml->hasAttribute("min")) {
             min = xml->getDoubleAttribute("min");
@@ -237,7 +237,7 @@ public:
 	// opt to not change any values if not found
 	void load(juce::XmlElement* xml) {
 		if (xml->hasAttribute("value")) {
-            value = xml->getIntAttribute("value");
+            setUnnormalisedValueNotifyingHost(xml->getIntAttribute("value"));
         }
 		if (xml->hasAttribute("min")) {
             min = xml->getIntAttribute("min");
