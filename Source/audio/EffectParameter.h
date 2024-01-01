@@ -111,9 +111,6 @@ public:
 
 	// opt to not change any values if not found
 	void load(juce::XmlElement* xml) {
-        if (xml->hasAttribute("value")) {
-			setUnnormalisedValueNotifyingHost(xml->getDoubleAttribute("value"));
-        }
         if (xml->hasAttribute("min")) {
             min = xml->getDoubleAttribute("min");
         }
@@ -123,6 +120,9 @@ public:
         if (xml->hasAttribute("step")) {
             step = xml->getDoubleAttribute("step");
         }
+		if (xml->hasAttribute("value")) {
+			setUnnormalisedValueNotifyingHost(xml->getDoubleAttribute("value"));
+		}
     }
 
 private:
@@ -237,15 +237,15 @@ public:
 
 	// opt to not change any values if not found
 	void load(juce::XmlElement* xml) {
-		if (xml->hasAttribute("value")) {
-            setUnnormalisedValueNotifyingHost(xml->getIntAttribute("value"));
-        }
 		if (xml->hasAttribute("min")) {
             min = xml->getIntAttribute("min");
         }
 		if (xml->hasAttribute("max")) {
             max = xml->getIntAttribute("max");
         }
+		if (xml->hasAttribute("value")) {
+			setUnnormalisedValueNotifyingHost(xml->getIntAttribute("value"));
+		}
     }
 
 private:
