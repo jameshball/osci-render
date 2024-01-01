@@ -15,7 +15,7 @@ EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectList
 				this->effect.setValue(i, effectComponent->slider.getValue());
 			}
 		};
-
+		
 		list.setEnabled(selected.getToggleState());
 		selected.onClick = [this, weakEffectComponent] {
 			if (auto effectComponent = weakEffectComponent.lock()) {
@@ -68,7 +68,7 @@ void EffectsListComponent::paint(juce::Graphics& g) {
 
 void EffectsListComponent::paintOverChildren(juce::Graphics& g) {
 	if (!selected.getToggleState()) {
-        g.setColour(juce::Colours::black.withAlpha(0.5f));
+        g.setColour(juce::Colours::black.withAlpha(0.3f));
 		auto bounds = list.getBounds();
 		bounds.removeFromBottom(2);
 		g.fillRect(bounds);
