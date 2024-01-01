@@ -610,6 +610,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         volumeBuffer[volumeBufferIndex] = (left * left + right * right) / 2;
         squaredVolume += volumeBuffer[volumeBufferIndex] / volumeBuffer.size();
         currentVolume = std::sqrt(squaredVolume);
+        currentVolume = juce::jlimit(0.0, 1.0, currentVolume);
 
         Vector2 channels;
         if (totalNumOutputChannels >= 2) {
