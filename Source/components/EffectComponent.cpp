@@ -6,7 +6,13 @@ EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, in
     addChildComponent(lfoSlider);
     addAndMakeVisible(lfo);
     addAndMakeVisible(label);
-    addAndMakeVisible(sidechainButton);
+
+    sidechainEnabled = effect.parameters[0]->sidechain != nullptr;
+    if (sidechainEnabled) {
+        sidechainButton = std::make_unique<SvgButton>(effect.parameters[0]->name, BinaryData::microphone_svg, "white", "red", effect.parameters[0]->sidechain);
+        sidechainButton->setTooltip("When enabled, the volume of the input audio controls the value of the slider, acting like a sidechain effect.");
+        addAndMakeVisible(*sidechainButton);
+    }
 
     slider.setSliderStyle(juce::Slider::LinearHorizontal);
     slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, TEXT_BOX_WIDTH, slider.getTextBoxHeight());
@@ -15,8 +21,6 @@ EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, in
     lfoSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, TEXT_BOX_WIDTH, lfoSlider.getTextBoxHeight());
     lfoSlider.setTextValueSuffix("Hz");
     lfoSlider.setColour(sliderThumbOutlineColourId, juce::Colour(0xff00ff00));
-
-    sidechainButton.setTooltip("When enabled, the volume of the input audio controls the value of the slider, acting like a sidechain effect.");
 
     label.setFont(juce::Font(13.0f));
 
@@ -108,11 +112,14 @@ void EffectComponent::setupComponent() {
     popupLabel.setJustificationType(juce::Justification::centred);
     popupLabel.setFont(juce::Font(14.0f, juce::Font::bold));
 
-    sidechainButton.onClick = [this] {
-        effect.parameters[index]->sidechain->setBoolValueNotifyingHost(!effect.parameters[index]->sidechain->getBoolValue());
-    };
+    if (sidechainEnabled) {
+        sidechainButton->onClick = [this] {
+            effect.parameters[index]->sidechain->setBoolValueNotifyingHost(!effect.parameters[index]->sidechain->getBoolValue());
+        };
+    }
+    
 
-    if (effect.parameters[index]->sidechain->getBoolValue()) {
+    if (sidechainEnabled && effect.parameters[index]->sidechain->getBoolValue()) {
         slider.setEnabled(false);
         slider.setColour(sliderThumbOutlineColourId, juce::Colour(0xffff0000));
         slider.setTooltip("Sidechain effect applied - click the microphone icon to disable this.");
@@ -135,7 +142,9 @@ void EffectComponent::resized() {
 		component->setBounds(componentBounds);
 	}
 
-    sidechainButton.setBounds(bounds.removeFromRight(20));
+    if (sidechainEnabled) {
+        sidechainButton->setBounds(bounds.removeFromRight(20));
+    }
 
     bool drawingSmall = bounds.getWidth() < 3 * TEXT_WIDTH;
 

@@ -67,7 +67,7 @@ void Effect::animateValues(double volume) {
 			default:
 				double weight = parameter->smoothValueChange ? 0.0005 : 1.0;
 				double newValue;
-				if (parameter->sidechain->getBoolValue()) {
+				if (parameter->sidechain != nullptr && parameter->sidechain->getBoolValue()) {
 					newValue = volume * (maxValue - minValue) + minValue;
 				} else {
                     newValue = parameter->getValueUnnormalised();
@@ -138,11 +138,15 @@ void Effect::addListener(int index, juce::AudioProcessorParameter::Listener* lis
 	if (enabled != nullptr) {
 		enabled->addListener(listener);
 	}
-	parameters[index]->sidechain->addListener(listener);
+	if (parameters[index]->sidechain != nullptr) {
+        parameters[index]->sidechain->addListener(listener);
+    }
 }
 
 void Effect::removeListener(int index, juce::AudioProcessorParameter::Listener* listener) {
-	parameters[index]->sidechain->removeListener(listener);
+	if (parameters[index]->sidechain != nullptr) {
+        parameters[index]->sidechain->removeListener(listener);
+    }
 	if (enabled != nullptr) {
 		enabled->removeListener(listener);
 	}
