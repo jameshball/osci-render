@@ -78,22 +78,22 @@ void ObjectServer::run() {
 
                             auto objects = *json.getProperty("objects", juce::Array<juce::var>()).getArray();
                             std::vector<std::vector<double>> allMatrices;
-                            std::vector<std::vector<std::vector<Vector3D>>> allVertices;
+                            std::vector<std::vector<std::vector<Point>>> allVertices;
 
                             double focalLength = json.getProperty("focalLength", 1);
 
                             for (int i = 0; i < objects.size(); i++) {
                                 auto verticesArray = *objects[i].getProperty("vertices", juce::Array<juce::var>()).getArray();
-                                std::vector<std::vector<Vector3D>> vertices;
+                                std::vector<std::vector<Point>> vertices;
 
                                 for (auto& vertexArrayVar : verticesArray) {
-                                    vertices.push_back(std::vector<Vector3D>());
+                                    vertices.push_back(std::vector<Point>());
                                     auto& vertexArray = *vertexArrayVar.getArray();
                                     for (auto& vertex : vertexArray) {
                                         double x = vertex.getProperty("x", 0);
                                         double y = vertex.getProperty("y", 0);
                                         double z = vertex.getProperty("z", 0);
-                                        vertices[vertices.size() - 1].push_back(Vector3D(x, y, z));
+                                        vertices[vertices.size() - 1].push_back(Point(x, y, z));
                                     }
                                 }
                                 auto matrix = *objects[i].getProperty("matrix", juce::Array<juce::var>()).getArray();
@@ -103,7 +103,7 @@ void ObjectServer::run() {
                                     allMatrices[i].push_back(value);
                                 }
 
-                                std::vector<std::vector<Vector3D>> reorderedVertices;
+                                std::vector<std::vector<Point>> reorderedVertices;
 
                                 if (vertices.size() > 0 && matrix.size() == 16) {
                                     std::vector<bool> visited = std::vector<bool>(vertices.size(), false);
@@ -136,7 +136,7 @@ void ObjectServer::run() {
                                     }
 
                                     for (int i = 0; i < vertices.size(); i++) {
-                                        std::vector<Vector3D> reorderedVertex;
+                                        std::vector<Point> reorderedVertex;
                                         int index = order[i];
                                         for (int j = 0; j < vertices[index].size(); j++) {
                                             reorderedVertex.push_back(vertices[index][j]);

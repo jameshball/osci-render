@@ -13,34 +13,6 @@ Point CircleArc::nextVector(double drawingProgress) {
 	);
 }
 
-void CircleArc::rotate(double theta) {
-	double cosTheta = std::cos(theta);
-	double sinTheta = std::sin(theta);
-
-	double newX = x * cosTheta - y * sinTheta;
-	double newY = x * sinTheta + y * cosTheta;
-	double newWidth = radiusX * cosTheta - radiusY * sinTheta;
-	double newHeight = radiusX * sinTheta + radiusY * cosTheta;
-
-	x = newX;
-	y = newY;
-	radiusX = newWidth;
-	radiusY = newHeight;
-	
-	double newStartAngle = startAngle + theta;
-	double newEndAngle = endAngle + theta;
-	
-	if (newStartAngle > 2 * std::numbers::pi) {
-		newStartAngle -= 2 * std::numbers::pi;
-	}
-	if (newEndAngle > 2 * std::numbers::pi) {
-		newEndAngle -= 2 * std::numbers::pi;
-	}
-	
-	startAngle = newStartAngle;
-	endAngle = newEndAngle;
-}
-
 void CircleArc::scale(double x, double y) {
 	this->x *= x;
 	this->y *= y;

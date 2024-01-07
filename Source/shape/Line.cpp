@@ -1,27 +1,15 @@
 #include "Line.h"
 
-Line::Line(double x1, double y1, double x2, double y2) : x1(x1), y1(y1), x2(x2), y2(y2) {}
+Line::Line(double x1, double y1, double x2, double y2) : x1(x1), y1(y1), z1(0), x2(x2), y2(y2), z2(0) {}
+
+Line::Line(double x1, double y1, double z1, double x2, double y2, double z2) : x1(x1), y1(y1), z1(z1), x2(x2), y2(y2), z2(z2) {}
 
 Point Line::nextVector(double drawingProgress) {
 	return Point(
 		x1 + (x2 - x1) * drawingProgress,
-		y1 + (y2 - y1) * drawingProgress
+		y1 + (y2 - y1) * drawingProgress,
+		z1 + (z2 - z1) * drawingProgress
 	);
-}
-
-void Line::rotate(double theta) {
-	double cosTheta = std::cos(theta);
-	double sinTheta = std::sin(theta);
-
-	double newX1 = x1 * cosTheta - y1 * sinTheta;
-	double newY1 = x1 * sinTheta + y1 * cosTheta;
-	double newX2 = x2 * cosTheta - y2 * sinTheta;
-	double newY2 = x2 * sinTheta + y2 * cosTheta;
-
-	x1 = newX1;
-	y1 = newY1;
-	x2 = newX2;
-	y2 = newY2;
 }
 
 void Line::scale(double x, double y) {

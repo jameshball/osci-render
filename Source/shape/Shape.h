@@ -10,7 +10,6 @@ class Point;
 class Shape {
 public:
 	virtual Point nextVector(double drawingProgress) = 0;
-	virtual void rotate(double theta) = 0;
 	virtual void scale(double x, double y) = 0;
 	virtual void translate(double x, double y) = 0;
 	virtual double length() = 0;

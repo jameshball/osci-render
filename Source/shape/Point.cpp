@@ -12,15 +12,24 @@ Point Point::nextVector(double drawingProgress){
 	return Point(x, y, z);
 }
 
-void Point::rotate(double theta) {
-    double cosTheta = std::cos(theta);
-    double sinTheta = std::sin(theta);
-    
-    double newX = x * cosTheta - y * sinTheta;
-    double newY = x * sinTheta + y * cosTheta;
+void Point::rotate(double rotateX, double rotateY, double rotateZ) {
+    // rotate around x-axis
+    double cosValue = std::cos(rotateX);
+    double sinValue = std::sin(rotateX);
+    double y2 = cosValue * y - sinValue * z;
+    double z2 = sinValue * y + cosValue * z;
 
-	x = newX;
-	y = newY;
+    // rotate around y-axis
+    cosValue = std::cos(rotateY);
+    sinValue = std::sin(rotateY);
+    double x2 = cosValue * x + sinValue * z2;
+    z = -sinValue * x + cosValue * z2;
+
+    // rotate around z-axis
+    cosValue = cos(rotateZ);
+    sinValue = sin(rotateZ);
+    x = cosValue * x2 - sinValue * y2;
+    y = sinValue * x2 + cosValue * y2;
 }
 
 void Point::scale(double x, double y) {

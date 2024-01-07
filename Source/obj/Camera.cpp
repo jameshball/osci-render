@@ -27,10 +27,10 @@ std::vector<std::unique_ptr<Shape>> Camera::draw(WorldObject& object) {
             edge.z2 = minZ;
         }
 
-        Point start = project(edge.x1, edge.y1, edge.z1);
-        Point end = project(edge.x2, edge.y2, edge.z2);
+        Point start = Point(edge.x1, edge.y1, edge.z1);
+        Point end = Point(edge.x2, edge.y2, edge.z2);
 
-		shapes.push_back(std::make_unique<Line>(start.x, start.y, end.x, end.y));
+		shapes.push_back(std::make_unique<Line>(start.x, start.y, start.z, end.x, end.y, end.z));
 	}
 	return shapes;
 }
@@ -61,7 +61,7 @@ std::vector<Point> Camera::sampleVerticesInRender(WorldObject& object) {
 
     for (int i = 0; i < SAMPLE_RENDER_SAMPLES - 1; i++) {
         for (size_t j = 0; j < std::min(VERTEX_SAMPLES, object.numVertices); j++) {
-            Vector3D vertex{object.vs[j * 3], object.vs[j * 3 + 1], object.vs[j * 3 + 2]};
+            Point vertex{object.vs[j * 3], object.vs[j * 3 + 1], object.vs[j * 3 + 2]};
             vertex.rotate(object.rotateX, object.rotateY, object.rotateZ);
             vertices.push_back(project(vertex.x, vertex.y, vertex.z));
         }

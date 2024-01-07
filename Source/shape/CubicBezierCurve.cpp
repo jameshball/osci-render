@@ -14,29 +14,6 @@ Point CubicBezierCurve::nextVector(double t) {
 	return Point(x, y);
 }
 
-void CubicBezierCurve::rotate(double theta) {
-	double cosTheta = std::cos(theta);
-	double sinTheta = std::sin(theta);
-
-	double newX1 = x1 * cosTheta - y1 * sinTheta;
-	double newY1 = x1 * sinTheta + y1 * cosTheta;
-	double newX2 = x2 * cosTheta - y2 * sinTheta;
-	double newY2 = x2 * sinTheta + y2 * cosTheta;
-	double newX3 = x3 * cosTheta - y3 * sinTheta;
-	double newY3 = x3 * sinTheta + y3 * cosTheta;
-	double newX4 = x4 * cosTheta - y4 * sinTheta;
-	double newY4 = x4 * sinTheta + y4 * cosTheta;
-
-	x1 = newX1;
-	y1 = newY1;
-	x2 = newX2;
-	y2 = newY2;
-	x3 = newX3;
-	y3 = newY3;
-	x4 = newX4;
-	y4 = newY4;
-}
-
 void CubicBezierCurve::scale(double x, double y) {
 	x1 *= x;
 	y1 *= y;
