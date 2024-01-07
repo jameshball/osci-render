@@ -14,8 +14,8 @@ void Shape::normalize(std::vector<std::unique_ptr<Shape>>& shapes, double width,
     double maxDim = std::max(width, height);
     
 	for (auto& shape : shapes) {
-		shape->scale(2.0 / maxDim, -2.0 / maxDim);
-		shape->translate(-1.0, 1.0);
+        shape->scale(2.0 / maxDim, -2.0 / maxDim, 2.0 / maxDim);
+		shape->translate(-1.0, 1.0, 0.0);
 	}
 
 	removeOutOfBounds(shapes);
@@ -27,14 +27,14 @@ void Shape::normalize(std::vector<std::unique_ptr<Shape>>& shapes) {
 	double maxDim = std::max(oldHeight, oldWidth);
 
 	for (auto& shape : shapes) {
-		shape->scale(2.0 / maxDim, -2.0 / maxDim);
+		shape->scale(2.0 / maxDim, -2.0 / maxDim, 2.0 / maxDim);
 	}
 
 	Point max = maxVector(shapes);
 	double newHeight = height(shapes);
 
 	for (auto& shape : shapes) {
-		shape->translate(-1.0, -max.y + newHeight / 2.0);
+		shape->translate(-1.0, -max.y + newHeight / 2.0, 0.0);
 	}
 }
 

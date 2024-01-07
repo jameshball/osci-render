@@ -10,8 +10,8 @@ class Point;
 class Shape {
 public:
 	virtual Point nextVector(double drawingProgress) = 0;
-	virtual void scale(double x, double y) = 0;
-	virtual void translate(double x, double y) = 0;
+	virtual void scale(double x, double y, double z) = 0;
+	virtual void translate(double x, double y, double z) = 0;
 	virtual double length() = 0;
 	virtual std::unique_ptr<Shape> clone() = 0;
 	virtual std::string type() = 0;

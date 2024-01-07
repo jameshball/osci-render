@@ -19,6 +19,7 @@ public:
     void handleAsyncUpdate() override;
 
     void setComponent(std::shared_ptr<juce::Component> component);
+    void setSliderOnValueChange();
 
     juce::Slider slider;
     juce::Slider lfoSlider;

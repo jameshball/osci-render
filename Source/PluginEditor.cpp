@@ -29,8 +29,8 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 	collapseButton.onClick = [this] {
         juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
         int originalIndex = audioProcessor.getCurrentFileIndex();
-        int index = editingPerspective ? 0 : audioProcessor.getCurrentFileIndex() + 1;
-        if (originalIndex != -1 || editingPerspective) {
+        int index = editingCustomFunction ? 0 : audioProcessor.getCurrentFileIndex() + 1;
+        if (originalIndex != -1 || editingCustomFunction) {
             if (codeEditors[index]->isVisible()) {
                 codeEditors[index]->setVisible(false);
             } else {
@@ -125,8 +125,8 @@ void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
     juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
 
     int originalIndex = audioProcessor.getCurrentFileIndex();
-    int index = editingPerspective ? 0 : audioProcessor.getCurrentFileIndex() + 1;
-    if ((originalIndex != -1 || editingPerspective) && index < codeEditors.size() && codeEditors[index]->isVisible()) {
+    int index = editingCustomFunction ? 0 : audioProcessor.getCurrentFileIndex() + 1;
+    if ((originalIndex != -1 || editingCustomFunction) && index < codeEditors.size() && codeEditors[index]->isVisible()) {
         auto ds = juce::DropShadow(juce::Colours::black, 5, juce::Point<int>(0, 0));
         ds.drawForRectangle(g, codeEditors[index]->getBounds());
     }
@@ -157,8 +157,8 @@ void OscirenderAudioProcessorEditor::resized() {
         juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
 
         int originalIndex = audioProcessor.getCurrentFileIndex();
-        int index = editingPerspective ? 0 : audioProcessor.getCurrentFileIndex() + 1;
-        if (originalIndex != -1 || editingPerspective) {
+        int index = editingCustomFunction ? 0 : audioProcessor.getCurrentFileIndex() + 1;
+        if (originalIndex != -1 || editingCustomFunction) {
             if (codeEditors[index]->isVisible()) {
                 editorVisible = true;
 
@@ -203,8 +203,8 @@ void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
     std::shared_ptr<ErrorCodeEditorComponent> editor;
 
     if (index == 0) {
-        codeDocument = perspectiveCodeDocument;
-        editor = perspectiveCodeEditor;
+        codeDocument = customFunctionCodeDocument;
+        editor = customFunctionCodeEditor;
     } else {
         codeDocument = std::make_shared<juce::CodeDocument>();
         juce::String extension = audioProcessor.getFileName(originalIndex).fromLastOccurrenceOf(".", true, false);
@@ -245,8 +245,8 @@ void OscirenderAudioProcessorEditor::updateCodeEditor() {
         }
     }
     int originalIndex = audioProcessor.getCurrentFileIndex();
-    int index = editingPerspective ? 0 : audioProcessor.getCurrentFileIndex() + 1;
-    if ((originalIndex != -1 || editingPerspective) && visible) {
+    int index = editingCustomFunction ? 0 : audioProcessor.getCurrentFileIndex() + 1;
+    if ((originalIndex != -1 || editingCustomFunction) && visible) {
         for (int i = 0; i < codeEditors.size(); i++) {
             codeEditors[i]->setVisible(false);
         }
@@ -257,7 +257,7 @@ void OscirenderAudioProcessorEditor::updateCodeEditor() {
         // message thread, this is safe.
         updatingDocumentsWithParserLock = true;
         if (index == 0) {
-            codeEditors[index]->loadContent(audioProcessor.perspectiveEffect->getCode());
+            codeEditors[index]->loadContent(audioProcessor.customEffect->getCode());
         } else {
             codeEditors[index]->loadContent(juce::MemoryInputStream(*audioProcessor.getFileBlock(originalIndex), false).readEntireStreamAsString());
         }
@@ -293,8 +293,8 @@ void OscirenderAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcas
     }
 }
 
-void OscirenderAudioProcessorEditor::editPerspectiveFunction(bool enable) {
-    editingPerspective = enable;
+void OscirenderAudioProcessorEditor::editCustomFunction(bool enable) {
+    editingCustomFunction = enable;
     juce::SpinLock::ScopedLockType lock1(audioProcessor.parsersLock);
     juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
     codeEditors[0]->setVisible(enable);
@@ -323,9 +323,9 @@ void OscirenderAudioProcessorEditor::codeDocumentTextDeleted(int startIndex, int
 
 // parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessorEditor::updateCodeDocument() {
-    if (editingPerspective) {
+    if (editingCustomFunction) {
         juce::String file = codeDocuments[0]->getAllContent();
-        audioProcessor.perspectiveEffect->updateCode(file);
+        audioProcessor.customEffect->updateCode(file);
         audioProcessor.updateLuaValues();
     } else {
         int originalIndex = audioProcessor.getCurrentFileIndex();

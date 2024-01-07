@@ -103,15 +103,15 @@ std::shared_ptr<juce::Component> EffectsListComponent::createComponent(EffectPar
 			toggle->setBoolValueNotifyingHost(!toggle->getBoolValue());
         };
 		return button;
-	} else if (parameter->paramID == "perspectiveStrength") {
+	} else if (parameter->paramID == "customEffectStrength") {
 		std::shared_ptr<SvgButton> button = std::make_shared<SvgButton>(parameter->name, BinaryData::pencil_svg, "white", "red");
 		std::weak_ptr<SvgButton> weakButton = button;
 		button->setEdgeIndent(5);
-		button->setToggleState(editor.editingPerspective, juce::dontSendNotification);
+		button->setToggleState(editor.editingCustomFunction, juce::dontSendNotification);
 		button->setTooltip("Toggles whether the text editor is editing the currently open file, or the Lua 3D perspective function.");
 		button->onClick = [this, weakButton] {
 			if (auto button = weakButton.lock()) {
-                editor.editPerspectiveFunction(button->getToggleState());
+                editor.editCustomFunction(button->getToggleState());
             }
 		};
 		return button;

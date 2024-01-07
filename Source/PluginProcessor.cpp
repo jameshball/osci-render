@@ -10,7 +10,6 @@
 #include "PluginEditor.h"
 #include "parser/FileParser.h"
 #include "parser/FrameProducer.h"
-#include "audio/RotateEffect.h"
 #include "audio/VectorCancellingEffect.h"
 #include "audio/DistortEffect.h"
 #include "audio/SmoothEffect.h"
@@ -41,10 +40,6 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<BulgeEffect>(),
         new EffectParameter("Bulge", "Applies a bulge that makes the centre of the image larger, and squishes the edges of the image. This applies a distortion to the audio.", "bulge", VERSION_HINT, 0.0, 0.0, 1.0)
-    ));
-    toggleableEffects.push_back(std::make_shared<Effect>(
-        std::make_shared<RotateEffect>(),
-        new EffectParameter("2D Rotate", "Rotates the image, and pans the audio.", "2DRotateSpeed", VERSION_HINT, 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<VectorCancellingEffect>(),
@@ -84,15 +79,8 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         }
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
-        perspectiveEffect,
-        std::vector<EffectParameter*>{
-            new EffectParameter("3D Perspective", "Controls the strength of the 3D perspective effect which treats the image as a 3D object that can be rotated.", "perspectiveStrength", VERSION_HINT, 0.0, 0.0, 1.0),
-            new EffectParameter("Depth (z)", "Controls how far away the 3D object is drawn away from the camera (the Z position).", "perspectiveZPos", VERSION_HINT, 0.1, 0.0, 1.0),
-            new EffectParameter("Rotate Speed", "Controls how fast the 3D object rotates in the direction determined by the rotation sliders below.", "perspectiveRotateSpeed", VERSION_HINT, 0.0, -1.0, 1.0),
-            new EffectParameter("Rotate X", "Controls the rotation of the object in the X axis.", "perspectiveRotateX", VERSION_HINT, 1.0, -1.0, 1.0),
-            new EffectParameter("Rotate Y", "Controls the rotation of the object in the Y axis.", "perspectiveRotateY", VERSION_HINT, 1.0, -1.0, 1.0),
-            new EffectParameter("Rotate Z", "Controls the rotation of the object in the Z axis.", "perspectiveRotateZ", VERSION_HINT, 0.0, -1.0, 1.0),
-        }
+        customEffect,
+        new EffectParameter("Effect Strength", "Controls the strength of the custom effect applied.", "customEffectStrength", VERSION_HINT, 1.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(traceMax);
     toggleableEffects.push_back(traceMin);
@@ -105,14 +93,10 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         effect->setPrecedence(i);
     }
 
+    permanentEffects.push_back(perspective);
     permanentEffects.push_back(frequencyEffect);
     permanentEffects.push_back(volumeEffect);
     permanentEffects.push_back(thresholdEffect);
-    permanentEffects.push_back(rotateSpeed);
-    permanentEffects.push_back(rotateX);
-    permanentEffects.push_back(rotateY);
-    permanentEffects.push_back(rotateZ);
-    permanentEffects.push_back(focalLength);
 
     for (int i = 0; i < 26; i++) {
         addLuaSlider();
@@ -135,9 +119,6 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         }
     }
 
-    booleanParameters.push_back(fixedRotateX);
-    booleanParameters.push_back(fixedRotateY);
-    booleanParameters.push_back(fixedRotateZ);
     booleanParameters.push_back(perspectiveEffect->fixedRotateX);
     booleanParameters.push_back(perspectiveEffect->fixedRotateY);
     booleanParameters.push_back(perspectiveEffect->fixedRotateZ);
@@ -319,15 +300,6 @@ void OscirenderAudioProcessor::removeErrorListener(ErrorListener* listener) {
     errorListeners.erase(std::remove(errorListeners.begin(), errorListeners.end(), listener), errorListeners.end());
 }
 
-// parsersLock should be held when calling this
-void OscirenderAudioProcessor::updateObjValues() {
-    focalLength->apply();
-    rotateX->apply();
-    rotateY->apply();
-    rotateZ->apply();
-    rotateSpeed->apply();
-}
-
 // effectsLock should be held when calling this
 std::shared_ptr<Effect> OscirenderAudioProcessor::getEffect(juce::String id) {
     for (auto& effect : allEffects) {
@@ -466,7 +438,6 @@ void OscirenderAudioProcessor::changeCurrentFile(int index) {
 	}
     currentFile = index;
     updateLuaValues();
-    updateObjValues();
     changeSound(sounds[index]);
 }
 
@@ -573,7 +544,14 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         inputBuffer.copyFrom(channel, 0, buffer, channel, 0, buffer.getNumSamples());
     }
 
+    juce::AudioBuffer<float> outputBuffer3d = juce::AudioBuffer<float>(3, buffer.getNumSamples());
+    outputBuffer3d.clear();
+
     if (usingInput && totalNumInputChannels >= 2) {
+        for (auto channel = 0; channel < juce::jmin(2, totalNumInputChannels); channel++) {
+            outputBuffer3d.copyFrom(channel, 0, inputBuffer, channel, 0, buffer.getNumSamples());
+        }
+
         // handle all midi messages
         auto midiIterator = midiMessages.cbegin();
         std::for_each(midiIterator,
@@ -581,11 +559,9 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             [&] (const juce::MidiMessageMetadata& meta) { synth.publicHandleMidiEvent(meta.getMessage()); }
         );
     } else {
-        // only clear buffer if we aren't using input, since we keep the input audio.
-        buffer.clear();
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
-        synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
+        synth.renderNextBlock(outputBuffer3d, midiMessages, 0, buffer.getNumSamples());
     }
     
     midiMessages.clear();
@@ -612,12 +588,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         currentVolume = std::sqrt(squaredVolume);
         currentVolume = juce::jlimit(0.0, 1.0, currentVolume);
 
-        Point channels;
-        if (totalNumOutputChannels >= 2) {
-            channels = {buffer.getSample(0, sample), buffer.getSample(1, sample)};
-        } else if (totalNumOutputChannels == 1) {
-            channels = {buffer.getSample(0, sample), buffer.getSample(0, sample)};
-        }
+        Point channels = { outputBuffer3d.getSample(0, sample), outputBuffer3d.getSample(1, sample), outputBuffer3d.getSample(2, sample) };
 
         {
             juce::SpinLock::ScopedLockType lock1(parsersLock);
@@ -702,8 +673,8 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
         parameter->save(parameterXml);
     }
 
-    auto perspectiveFunction = xml->createNewChildElement("perspectiveFunction");
-    perspectiveFunction->addTextElement(juce::Base64::toBase64(perspectiveEffect->getCode()));
+    auto customFunction = xml->createNewChildElement("customFunction");
+    customFunction->addTextElement(juce::Base64::toBase64(customEffect->getCode()));
 
     auto fontXml = xml->createNewChildElement("font");
     fontXml->setAttribute("family", font.getTypefaceName());
@@ -786,11 +757,14 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
             }
         }
 
-        auto perspectiveFunction = xml->getChildByName("perspectiveFunction");
-        if (perspectiveFunction != nullptr) {
+        auto customFunction = xml->getChildByName("customFunction");
+        if (customFunction == nullptr) {
+            customFunction = xml->getChildByName("perspectiveFunction");
+        }
+        if (customFunction != nullptr) {
             auto stream = juce::MemoryOutputStream();
-            juce::Base64::convertFromBase64(stream, perspectiveFunction->getAllSubText());
-            perspectiveEffect->updateCode(stream.toString());
+            juce::Base64::convertFromBase64(stream, customFunction->getAllSubText());
+            customEffect->updateCode(stream.toString());
         }
 
         auto fontXml = xml->getChildByName("font");

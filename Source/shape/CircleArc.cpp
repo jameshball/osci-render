@@ -13,14 +13,14 @@ Point CircleArc::nextVector(double drawingProgress) {
 	);
 }
 
-void CircleArc::scale(double x, double y) {
+void CircleArc::scale(double x, double y, double z) {
 	this->x *= x;
 	this->y *= y;
 	this->radiusX *= x;
 	this->radiusY *= y;
 }
 
-void CircleArc::translate(double x, double y) {
+void CircleArc::translate(double x, double y, double z) {
 	this->x += x;
 	this->y += y;
 }
@@ -35,7 +35,7 @@ double CircleArc::length() {
 		for (int i = 0; i < segments; i++) {
 			start = end;
 			end = nextVector((i + 1) / (double) segments);
-			len += Line::length(start.x, start.y, end.x, end.y);
+			len += Line::length(start.x, start.y, start.z, end.x, end.y, end.z);
 		}
 	}
 	return len;

@@ -12,41 +12,37 @@ Point Line::nextVector(double drawingProgress) {
 	);
 }
 
-void Line::scale(double x, double y) {
+void Line::scale(double x, double y, double z) {
 	x1 *= x;
 	y1 *= y;
+	z1 *= z;
 	x2 *= x;
 	y2 *= y;
+	z2 *= z;
 }
 
-void Line::translate(double x, double y) {
+void Line::translate(double x, double y, double z) {
 	x1 += x;
 	y1 += y;
+	z1 += z;
 	x2 += x;
 	y2 += y;
+	z2 += z;
 }
 
-double Line::length(double x1, double y1, double x2, double y2) {
-	// Euclidean distance approximation based on octagonal boundary
-	double dx = std::abs(x2 - x1);
-	double dy = std::abs(y2 - y1);
-
-	return 0.41 * std::min(dx, dy) + 0.941246 * std::max(dx, dy);
+double Line::length(double x1, double y1, double z1, double x2, double y2, double z2) {
+	return sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2) + pow(z2 - z1, 2));
 }
 
 double inline Line::length() {
 	if (len < 0) {
-		// Euclidean distance approximation based on octagonal boundary
-		double dx = std::abs(x2 - x1);
-		double dy = std::abs(y2 - y1);
-
-		len = 0.41 * std::min(dx, dy) + 0.941246 * std::max(dx, dy);
+		len = length(x1, y1, z1, x2, y2, z2);
 	}
 	return len;
 }
 
 std::unique_ptr<Shape> Line::clone() {
-	return std::make_unique<Line>(x1, y1, x2, y2);
+	return std::make_unique<Line>(x1, y1, z1, x2, y2, z2);
 }
 
 std::string Line::type() {

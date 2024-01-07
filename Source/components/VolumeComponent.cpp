@@ -113,6 +113,11 @@ void VolumeComponent::run() {
         leftVolume = std::sqrt(leftVolume / (buffer.size() / 2));
         rightVolume = std::sqrt(rightVolume / (buffer.size() / 2));
 
+        if (std::isnan(leftVolume) || std::isnan(rightVolume)) {
+            leftVolume = 0;
+            rightVolume = 0;
+        }
+
         this->leftVolume = leftVolume;
         this->rightVolume = rightVolume;
 

@@ -3,72 +3,42 @@
 #include <numbers>
 
 ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
-	setText("3D .obj File Settings");
+	setText("3D Settings");
 
 	juce::Desktop::getInstance().addGlobalMouseListener(this);
 
+	addAndMakeVisible(perspective);
 	addAndMakeVisible(focalLength);
+	addAndMakeVisible(distance);
+	addAndMakeVisible(rotateSpeed);
 	addAndMakeVisible(rotateX);
 	addAndMakeVisible(rotateY);
 	addAndMakeVisible(rotateZ);
-	addAndMakeVisible(rotateSpeed);
-
-	focalLength.slider.onValueChange = [this] {
-		juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
-		audioProcessor.focalLength->setValue(focalLength.slider.getValue());
-		audioProcessor.focalLength->apply();
-	};
-
-	auto onRotationChange = [this]() {
-		juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
-		audioProcessor.rotateX->setValue(rotateX.slider.getValue());
-		audioProcessor.rotateY->setValue(rotateY.slider.getValue());
-		audioProcessor.rotateZ->setValue(rotateZ.slider.getValue());
-
-		audioProcessor.fixedRotateX->setBoolValueNotifyingHost(fixedRotateX->getToggleState());
-		audioProcessor.fixedRotateY->setBoolValueNotifyingHost(fixedRotateY->getToggleState());
-		audioProcessor.fixedRotateZ->setBoolValueNotifyingHost(fixedRotateZ->getToggleState());
-	};
-
-	rotateX.slider.onValueChange = onRotationChange;
-	rotateY.slider.onValueChange = onRotationChange;
-	rotateZ.slider.onValueChange = onRotationChange;
-
-	rotateSpeed.slider.onValueChange = [this] {
-		juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
-		audioProcessor.rotateSpeed->setValue(rotateSpeed.slider.getValue());
-		audioProcessor.rotateSpeed->apply();
-	};
-
 	addAndMakeVisible(resetRotation);
 	addAndMakeVisible(mouseRotate);
+
+	perspective.setSliderOnValueChange();
+	focalLength.setSliderOnValueChange();
+	distance.setSliderOnValueChange();
+	rotateSpeed.setSliderOnValueChange();
+	rotateX.setSliderOnValueChange();
+	rotateY.setSliderOnValueChange();
+	rotateZ.setSliderOnValueChange();
 
 	resetRotation.onClick = [this] {
 		fixedRotateX->setToggleState(false, juce::NotificationType::dontSendNotification);
 		fixedRotateY->setToggleState(false, juce::NotificationType::dontSendNotification);
 		fixedRotateZ->setToggleState(false, juce::NotificationType::dontSendNotification);
 
-		rotateX.slider.setValue(0);
-		rotateY.slider.setValue(0);
-		rotateZ.slider.setValue(0);
-		rotateSpeed.slider.setValue(0);
+		audioProcessor.perspective->getParameter("perspectiveRotateX")->setUnnormalisedValueNotifyingHost(0);
+		audioProcessor.perspective->getParameter("perspectiveRotateY")->setUnnormalisedValueNotifyingHost(0);
+		audioProcessor.perspective->getParameter("perspectiveRotateZ")->setUnnormalisedValueNotifyingHost(0);
+		audioProcessor.perspective->getParameter("perspectiveRotateSpeed")->setUnnormalisedValueNotifyingHost(0);
+
+		audioProcessor.perspectiveEffect->resetRotation();
 		
 		mouseRotate.setToggleState(false, juce::NotificationType::dontSendNotification);
-
-		juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
-		if (audioProcessor.getCurrentFileIndex() != -1) {
-			auto obj = audioProcessor.getCurrentFileParser()->getObject();
-			if (obj != nullptr) {
-				obj->setCurrentRotationX(0);
-				obj->setCurrentRotationY(0);
-				obj->setCurrentRotationZ(0);
-			}
-		}
 	};
-
-	fixedRotateX->onClick = onRotationChange;
-	fixedRotateY->onClick = onRotationChange;
-	fixedRotateZ->onClick = onRotationChange;
 
 	rotateX.setComponent(fixedRotateX);
 	rotateY.setComponent(fixedRotateY);
@@ -93,8 +63,8 @@ void ObjComponent::mouseMove(const juce::MouseEvent& e) {
 		auto x = globalEvent.position.getX();
 		auto y = globalEvent.position.getY();
 
-		rotateX.slider.setValue(2 * x / width - 1);
-		rotateY.slider.setValue(1 - 2 * y / height);
+		audioProcessor.perspective->getParameter("perspectiveRotateX")->setUnnormalisedValueNotifyingHost(2 * x / width - 1);
+		audioProcessor.perspective->getParameter("perspectiveRotateY")->setUnnormalisedValueNotifyingHost(1 - 2 * y / height);
 	}
 }
 
@@ -105,7 +75,9 @@ void ObjComponent::disableMouseRotation() {
 void ObjComponent::resized() {
 	auto area = getLocalBounds().withTrimmedTop(20).reduced(20);
 	double rowHeight = 30;
+	perspective.setBounds(area.removeFromTop(rowHeight));
 	focalLength.setBounds(area.removeFromTop(rowHeight));
+	distance.setBounds(area.removeFromTop(rowHeight));
 	rotateX.setBounds(area.removeFromTop(rowHeight));
 	rotateY.setBounds(area.removeFromTop(rowHeight));
 	rotateZ.setBounds(area.removeFromTop(rowHeight));

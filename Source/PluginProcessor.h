@@ -24,6 +24,7 @@
 #include "obj/ObjectServer.h"
 #include "UGen/Env.h"
 #include "UGen/ugen_JuceEnvelopeComponent.h"
+#include "audio/CustomEffect.h"
 
 //==============================================================================
 /**
@@ -69,7 +70,7 @@ public:
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void envelopeChanged(EnvelopeComponent* changedEnvelope) override;
     
-    int VERSION_HINT = 1;
+    int VERSION_HINT = 2;
 
     std::atomic<double> currentSampleRate = 0.0;
 
@@ -113,101 +114,6 @@ public:
         )
     );
     
-    std::shared_ptr<Effect> focalLength = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
-            if (getCurrentFileIndex() != -1) {
-                auto camera = getCurrentFileParser()->getCamera();
-                if (camera == nullptr) return input;
-                camera->setFocalLength(values[0]);
-            }
-            return input;
-		}, new EffectParameter(
-            "Focal length",
-            "Controls the focal length of the camera being used to render the 3D object. A lower focal length results in a wider field of view, distorting the image, and making the image smaller.",
-            "objFocalLength",
-            VERSION_HINT, 1.0, 0.0, 2.0
-        )
-    );
-
-    BooleanParameter* fixedRotateX = new BooleanParameter("Object Fixed Rotate X", "objFixedRotateX", VERSION_HINT, false);
-    BooleanParameter* fixedRotateY = new BooleanParameter("Object Fixed Rotate Y", "objFixedRotateY", VERSION_HINT, false);
-    BooleanParameter* fixedRotateZ = new BooleanParameter("Object Fixed Rotate Z", "objFixedRotateZ", VERSION_HINT, false);
-    std::shared_ptr<Effect> rotateX = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
-            if (getCurrentFileIndex() != -1) {
-                auto obj = getCurrentFileParser()->getObject();
-                if (obj == nullptr) return input;
-                auto rotation = values[0] * std::numbers::pi;
-                if (fixedRotateX->getBoolValue()) {
-                    obj->setCurrentRotationX(rotation);
-                } else {
-                    obj->setBaseRotationX(rotation);
-                }
-            }
-            return input;
-        }, new EffectParameter(
-            "Object Rotate X",
-            "Controls the rotation of the 3D object around the X axis. When Object Fixed Rotate X is enabled, the object is unaffected by the rotation speed, and remains in a fixed position.",
-            "objRotateX",
-            VERSION_HINT, 1.0, -1.0, 1.0
-        )
-    );
-    std::shared_ptr<Effect> rotateY = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
-            if (getCurrentFileIndex() != -1) {
-                auto obj = getCurrentFileParser()->getObject();
-                if (obj == nullptr) return input;
-                auto rotation = values[0] * std::numbers::pi;
-                if (fixedRotateY->getBoolValue()) {
-                    obj->setCurrentRotationY(rotation);
-                } else {
-                    obj->setBaseRotationY(rotation);
-                }
-            }
-            return input;
-        }, new EffectParameter(
-            "Object Rotate Y",
-            "Controls the rotation of the 3D object around the Y axis. When Object Fixed Rotate Y is enabled, the object is unaffected by the rotation speed, and remains in a fixed position.",
-            "objRotateY",
-            VERSION_HINT, 1.0, -1.0, 1.0
-        )
-    );
-    std::shared_ptr<Effect> rotateZ = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
-            if (getCurrentFileIndex() != -1) {
-                auto obj = getCurrentFileParser()->getObject();
-                if (obj == nullptr) return input;
-                auto rotation = values[0] * std::numbers::pi;
-                if (fixedRotateZ->getBoolValue()) {
-                    obj->setCurrentRotationZ(rotation);
-                } else {
-                    obj->setBaseRotationZ(rotation);
-                }
-            }
-            return input;
-        }, new EffectParameter(
-            "Object Rotate Z",
-            "Controls the rotation of the 3D object around the Z axis. When Object Fixed Rotate Z is enabled, the object is unaffected by the rotation speed, and remains in a fixed position.",
-            "objRotateZ",
-            VERSION_HINT, 0.0, -1.0, 1.0
-        )
-    );
-    std::shared_ptr<Effect> rotateSpeed = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
-            if (getCurrentFileIndex() != -1) {
-                auto obj = getCurrentFileParser()->getObject();
-                if (obj == nullptr) return input;
-                obj->setRotationSpeed(values[0]);
-            }
-            return input;
-		}, new EffectParameter(
-            "Rotate Speed",
-            "Controls the speed at which the 3D object rotates. A negative value results in the object rotating in the opposite direction. The rotate speed is scaled by the different Object Rotate Axis values to rotate the object.",
-            "objRotateSpeed",
-            VERSION_HINT, 0.0, -1.0, 1.0
-        )
-    );
-
     std::shared_ptr<Effect> traceMax = std::make_shared<Effect>(
         [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
             return input;
@@ -230,8 +136,23 @@ public:
     );
 
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
+
     std::function<void(int, juce::String, juce::String)> errorCallback = [this](int lineNum, juce::String fileName, juce::String error) { notifyErrorListeners(lineNum, fileName, error); };
-    std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>(VERSION_HINT, errorCallback);
+    std::shared_ptr<CustomEffect> customEffect = std::make_shared<CustomEffect>(errorCallback);
+    
+    std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>(VERSION_HINT);
+    std::shared_ptr<Effect> perspective = std::make_shared<Effect>(
+        perspectiveEffect,
+        std::vector<EffectParameter*>{
+            new EffectParameter("3D Perspective", "Controls the strength of the 3D perspective projection.", "perspectiveStrength", VERSION_HINT, 1.0, 0.0, 1.0),
+            new EffectParameter("Focal Length", "Controls the focal length of the 3D perspective effect. A higher focal length makes the image look more flat, and a lower focal length makes the image look more 3D.", "perspectiveFocalLength", VERSION_HINT, 1.0, 0.1, 10.0),
+            new EffectParameter("Distance (z)", "Controls how far away the 3D object is drawn away from the camera (the Z position).", "perspectiveZPos", VERSION_HINT, 0.1, 0.0, 1.0),
+            new EffectParameter("Rotate Speed", "Controls how fast the 3D object rotates in the direction determined by the rotation sliders below.", "perspectiveRotateSpeed", VERSION_HINT, 0.0, -1.0, 1.0),
+            new EffectParameter("Rotate X", "Controls the rotation of the object in the X axis.", "perspectiveRotateX", VERSION_HINT, 1.0, -1.0, 1.0),
+            new EffectParameter("Rotate Y", "Controls the rotation of the object in the Y axis.", "perspectiveRotateY", VERSION_HINT, 1.0, -1.0, 1.0),
+            new EffectParameter("Rotate Z", "Controls the rotation of the object in the Z axis.", "perspectiveRotateZ", VERSION_HINT, 0.0, -1.0, 1.0),
+        }
+    );
     
     BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false);
     BooleanParameter* inputEnabled = new BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false);
@@ -339,7 +260,6 @@ private:
     double squaredVolume = 0;
     double currentVolume = 0;
 
-    void updateObjValues();
     std::shared_ptr<Effect> getEffect(juce::String id);
     BooleanParameter* getBooleanParameter(juce::String id);
     FloatParameter* getFloatParameter(juce::String id);

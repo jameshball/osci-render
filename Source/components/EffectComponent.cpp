@@ -197,3 +197,9 @@ void EffectComponent::setComponent(std::shared_ptr<juce::Component> component) {
 	this->component = component;
     addAndMakeVisible(component.get());
 }
+
+void EffectComponent::setSliderOnValueChange() {
+    slider.onValueChange = [this] {
+        effect.setValue(index, slider.getValue());
+    };
+}

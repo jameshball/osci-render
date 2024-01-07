@@ -2,6 +2,7 @@
 #include "../chinese_postman/ChinesePostman.h"
 #include "tiny_obj_loader.h"
 #include "../MathUtil.h"
+#include <unordered_set>
 
 struct pair_hash {
     inline std::size_t operator()(const std::pair<int, int>& v) const {
@@ -201,57 +202,18 @@ WorldObject::WorldObject(const std::string& obj_string) {
                 double y2 = vs[vertex * 3 + 1];
                 double z2 = vs[vertex * 3 + 2];
 
-                edges.push_back(Line3D(x1, y1, z1, x2, y2, z2));
+                edges.push_back(Line(x1, y1, z1, x2, y2, z2));
             }
             prevVertex = vertex;
         }
     }
 }
 
-void WorldObject::setBaseRotationX(double x) {
-    baseRotateX = x;
-}
+std::vector<std::unique_ptr<Shape>> WorldObject::draw() {
+    std::vector<std::unique_ptr<Shape>> shapes;
 
-void WorldObject::setBaseRotationY(double y) {
-    baseRotateY = y;
-}
-
-void WorldObject::setBaseRotationZ(double z) {
-    baseRotateZ = z;
-}
-
-void WorldObject::setCurrentRotationX(double x) {
-    currentRotateX = x;
-}
-
-void WorldObject::setCurrentRotationY(double y) {
-	currentRotateY = y;
-}
-
-void WorldObject::setCurrentRotationZ(double z) {
-	currentRotateZ = z;
-}
-
-void WorldObject::setRotationSpeed(double rotateSpeed) {
-    this->rotateSpeed = linearSpeedToActualSpeed(rotateSpeed);
-}
-
-// called whenever a new frame is drawn, so that the object can update its
-// rotation
-void WorldObject::nextFrame() {
-    currentRotateX = MathUtil::wrapAngle(currentRotateX + baseRotateX * rotateSpeed);
-    currentRotateY = MathUtil::wrapAngle(currentRotateY + baseRotateY * rotateSpeed);
-    currentRotateZ = MathUtil::wrapAngle(currentRotateZ + baseRotateZ * rotateSpeed);
-    rotateX = baseRotateX + currentRotateX;
-    rotateY = baseRotateY + currentRotateY;
-    rotateZ = baseRotateZ + currentRotateZ;
-}
-
-// this just makes the range of the speed more useful
-double WorldObject::linearSpeedToActualSpeed(double rotateSpeed) {
-    double actualSpeed = (std::exp(3 * std::min(10.0, std::abs(rotateSpeed))) - 1) / 50000;
-    if (rotateSpeed < 0) {
-		actualSpeed *= -1;
-	}
-    return actualSpeed;
+    for (auto& edge : edges) {
+        shapes.push_back(edge.clone());
+    }
+    return shapes;
 }

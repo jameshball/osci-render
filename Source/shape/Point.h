@@ -12,9 +12,8 @@ public:
 	Point();
 
 	Point nextVector(double drawingProgress) override;
-	void scale(double x, double y) override;
-	void translate(double x, double y) override;
-	void reflectRelativeToVector(double x, double y);
+	void scale(double x, double y, double z) override;
+	void translate(double x, double y, double z) override;
 	double length() override;
 	double magnitude();
 	std::unique_ptr<Shape> clone() override;

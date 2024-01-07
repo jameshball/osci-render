@@ -25,7 +25,8 @@ Point DelayEffect::apply(int index, Point vector, const std::vector<double>& val
     Point echo = delayBuffer[position];
     vector = Point(
         vector.x + echo.x * decay,
-        vector.y + echo.y * decay
+        vector.y + echo.y * decay,
+        vector.z + echo.z * decay
     );
 
     delayBuffer[head] = vector;

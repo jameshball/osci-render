@@ -9,9 +9,9 @@ public:
 	Line(double x1, double y1, double z1, double x2, double y2, double z2);
 
 	Point nextVector(double drawingProgress) override;
-	void scale(double x, double y) override;
-	void translate(double x, double y) override;
-	static double length(double x1, double y1, double x2, double y2);
+	void scale(double x, double y, double z) override;
+	void translate(double x, double y, double z) override;
+	static double length(double x1, double y1, double z1, double x2, double y2, double z2);
 	double length() override;
 	std::unique_ptr<Shape> clone() override;
 	std::string type() override;

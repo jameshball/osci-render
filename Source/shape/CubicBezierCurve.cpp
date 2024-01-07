@@ -14,7 +14,7 @@ Point CubicBezierCurve::nextVector(double t) {
 	return Point(x, y);
 }
 
-void CubicBezierCurve::scale(double x, double y) {
+void CubicBezierCurve::scale(double x, double y, double z) {
 	x1 *= x;
 	y1 *= y;
 	x2 *= x;
@@ -25,7 +25,7 @@ void CubicBezierCurve::scale(double x, double y) {
 	y4 *= y;
 }
 
-void CubicBezierCurve::translate(double x, double y) {
+void CubicBezierCurve::translate(double x, double y, double z) {
 	x1 += x;
 	y1 += y;
 	x2 += x;

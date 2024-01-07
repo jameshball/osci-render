@@ -25,7 +25,7 @@ public:
     void handleAsyncUpdate() override;
     void changeListenerCallback(juce::ChangeBroadcaster* source) override;
 
-    void editPerspectiveFunction(bool enabled);
+    void editCustomFunction(bool enabled);
 
     void newProject();
     void openProject();
@@ -41,7 +41,7 @@ public:
 
     OscirenderLookAndFeel lookAndFeel;
 
-    std::atomic<bool> editingPerspective = false;
+    std::atomic<bool> editingCustomFunction = false;
 
     VisualiserComponent visualiser{2, audioProcessor};
     std::atomic<bool> visualiserFullScreen = false;
@@ -54,8 +54,8 @@ public:
     juce::LuaTokeniser luaTokeniser;
     juce::XmlTokeniser xmlTokeniser;
 	juce::ShapeButton collapseButton;
-    std::shared_ptr<juce::CodeDocument> perspectiveCodeDocument = std::make_shared<juce::CodeDocument>();
-    std::shared_ptr<ErrorCodeEditorComponent> perspectiveCodeEditor = std::make_shared<ErrorCodeEditorComponent>(*perspectiveCodeDocument, &luaTokeniser, audioProcessor, PerspectiveEffect::FILE_NAME);
+    std::shared_ptr<juce::CodeDocument> customFunctionCodeDocument = std::make_shared<juce::CodeDocument>();
+    std::shared_ptr<ErrorCodeEditorComponent> customFunctionCodeEditor = std::make_shared<ErrorCodeEditorComponent>(*customFunctionCodeDocument, &luaTokeniser, audioProcessor, CustomEffect::FILE_NAME);
 
     std::unique_ptr<juce::FileChooser> chooser;
     MainMenuBarModel menuBarModel{*this};

@@ -17,7 +17,7 @@ Point VectorCancellingEffect::apply(int index, Point input, const std::vector<do
     if (index >= nextInvert) {
         nextInvert += frequency;
     } else {
-        input.scale(-1, -1);
+        input.scale(-1, -1, 1);
     }
     return input;
 }

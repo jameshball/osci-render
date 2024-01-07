@@ -32,19 +32,16 @@ void Point::rotate(double rotateX, double rotateY, double rotateZ) {
     y = sinValue * x2 + cosValue * y2;
 }
 
-void Point::scale(double x, double y) {
+void Point::scale(double x, double y, double z) {
 	this->x *= x;
 	this->y *= y;
+    this->z *= z;
 }
 
-void Point::translate(double x, double y) {
+void Point::translate(double x, double y, double z) {
 	this->x += x;
 	this->y += y;
-}
-
-void Point::reflectRelativeToVector(double x, double y) {
-	this->x += 2.0 * (x - this->x);
-	this->y += 2.0 * (y - this->y);
+    this->z += z;
 }
 
 double Point::length() {
@@ -52,7 +49,7 @@ double Point::length() {
 }
 
 double Point::magnitude() {
-	return sqrt(x * x + y * y + z * z);
+	return sqrt(x * x * x + y * y * y + z * z * z);
 }
 
 std::unique_ptr<Shape> Point::clone() {

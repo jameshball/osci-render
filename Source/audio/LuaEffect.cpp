@@ -11,7 +11,7 @@ Point LuaEffect::apply(int index, Point input, const std::vector<double>& values
 		parser->setVariable("slider_" + name.toLowerCase(), values[0]);
 	}
 	
-	audioProcessor.perspectiveEffect->setVariable("slider_" + name.toLowerCase(), values[0]);
+	audioProcessor.customEffect->setVariable("slider_" + name.toLowerCase(), values[0]);
 
 	return input;
 }

@@ -92,6 +92,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         Point channels;
         double x = 0.0;
         double y = 0.0;
+        double z = 0.0;
 
         bool renderingSample = true;
 
@@ -111,6 +112,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
 
         x = channels.x;
         y = channels.y;
+        z = channels.z;
 
         time += 1.0 / audioProcessor.currentSampleRate;
 
@@ -125,7 +127,11 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         double gain = audioProcessor.midiEnabled->getBoolValue() ? adsr.lookup(time) : 1.0;
         gain *= velocity;
 
-        if (numChannels >= 2) {
+        if (numChannels >= 3) {
+            outputBuffer.addSample(0, sample, x * gain);
+            outputBuffer.addSample(1, sample, y * gain);
+            outputBuffer.addSample(2, sample, z * gain);
+        } else if (numChannels == 2) {
             outputBuffer.addSample(0, sample, x * gain);
             outputBuffer.addSample(1, sample, y * gain);
         } else if (numChannels == 1) {
