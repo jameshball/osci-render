@@ -74,7 +74,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     juce::ScopedNoDenormals noDenormals;
 
     int numChannels = outputBuffer.getNumChannels();
-    
+
     if (!audioProcessor.midiEnabled->getBoolValue()) {
         frequency = audioProcessor.frequency;
     }
@@ -134,7 +134,9 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
 
         double traceMinValue = audioProcessor.traceMin->getActualValue();
         double traceMaxValue = audioProcessor.traceMax->getActualValue();
-        actualTraceMax = juce::jmax(actualTraceMin + MIN_TRACE, juce::jmin(traceMaxValue, 1.0));
+        traceMaxValue = traceMaxEnabled ? traceMaxValue : 1.0;
+        traceMinValue = traceMinEnabled ? traceMinValue : 0.0;
+        actualTraceMax = juce::jmax(actualTraceMin, juce::jmin(traceMaxValue, 1.0));
         actualTraceMin = juce::jmax(MIN_TRACE, juce::jmin(traceMinValue, actualTraceMax - MIN_TRACE));
 
         if (!renderingSample) {
@@ -147,6 +149,10 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             if (sound.load() != nullptr && currentlyPlaying) {
                 frameLength = sound.load()->updateFrame(frame);
             }
+            frameDrawn = 0.0;
+            shapeDrawn = 0.0;
+            currentShape = 0;
+
             // TODO: updateFrame already iterates over all the shapes,
             // so we can improve performance by calculating frameDrawn
             // and shapeDrawn directly. frameDrawn is simply actualTraceMin * frameLength
