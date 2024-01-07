@@ -78,7 +78,7 @@ public:
     std::vector<std::shared_ptr<Effect>> luaEffects;
 
     std::shared_ptr<Effect> frequencyEffect = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
             frequency = values[0];
             return input;
         }, new EffectParameter(
@@ -90,7 +90,7 @@ public:
     );
 
     std::shared_ptr<Effect> volumeEffect = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
             volume = values[0];
             return input;
         }, new EffectParameter(
@@ -102,7 +102,7 @@ public:
     );
 
     std::shared_ptr<Effect> thresholdEffect = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
             threshold = values[0];
             return input;
         }, new EffectParameter(
@@ -114,7 +114,7 @@ public:
     );
     
     std::shared_ptr<Effect> focalLength = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
                 auto camera = getCurrentFileParser()->getCamera();
                 if (camera == nullptr) return input;
@@ -133,7 +133,7 @@ public:
     BooleanParameter* fixedRotateY = new BooleanParameter("Object Fixed Rotate Y", "objFixedRotateY", VERSION_HINT, false);
     BooleanParameter* fixedRotateZ = new BooleanParameter("Object Fixed Rotate Z", "objFixedRotateZ", VERSION_HINT, false);
     std::shared_ptr<Effect> rotateX = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
                 auto obj = getCurrentFileParser()->getObject();
                 if (obj == nullptr) return input;
@@ -153,7 +153,7 @@ public:
         )
     );
     std::shared_ptr<Effect> rotateY = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
                 auto obj = getCurrentFileParser()->getObject();
                 if (obj == nullptr) return input;
@@ -173,7 +173,7 @@ public:
         )
     );
     std::shared_ptr<Effect> rotateZ = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
                 auto obj = getCurrentFileParser()->getObject();
                 if (obj == nullptr) return input;
@@ -193,7 +193,7 @@ public:
         )
     );
     std::shared_ptr<Effect> rotateSpeed = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
             if (getCurrentFileIndex() != -1) {
                 auto obj = getCurrentFileParser()->getObject();
                 if (obj == nullptr) return input;
@@ -209,7 +209,7 @@ public:
     );
 
     std::shared_ptr<Effect> traceMax = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
             return input;
         }, new EffectParameter(
             "Trace max",
@@ -219,7 +219,7 @@ public:
         )
     );
     std::shared_ptr<Effect> traceMin = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
             return input;
         }, new EffectParameter(
             "Trace min",

@@ -27,8 +27,8 @@ std::vector<std::unique_ptr<Shape>> Camera::draw(WorldObject& object) {
             edge.z2 = minZ;
         }
 
-        Vector2 start = project(edge.x1, edge.y1, edge.z1);
-        Vector2 end = project(edge.x2, edge.y2, edge.z2);
+        Point start = project(edge.x1, edge.y1, edge.z1);
+        Point end = project(edge.x2, edge.y2, edge.z2);
 
 		shapes.push_back(std::make_unique<Line>(start.x, start.y, end.x, end.y));
 	}
@@ -40,7 +40,7 @@ void Camera::findZPos(WorldObject& object) {
     y = 0.0;
     z = 0.0;
 
-    std::vector<Vector2> vertices;
+    std::vector<Point> vertices;
 
     int stepsMade = 0;
     while (maxVertexValue(vertices) > VERTEX_VALUE_THRESHOLD && stepsMade < MAX_NUM_STEPS) {
@@ -54,10 +54,10 @@ void Camera::setFocalLength(double focalLength) {
     this->focalLength = focalLength;
 }
 
-std::vector<Vector2> Camera::sampleVerticesInRender(WorldObject& object) {
+std::vector<Point> Camera::sampleVerticesInRender(WorldObject& object) {
     double rotation = 2.0 * std::numbers::pi / SAMPLE_RENDER_SAMPLES;
 
-    std::vector<Vector2> vertices;
+    std::vector<Point> vertices;
 
     for (int i = 0; i < SAMPLE_RENDER_SAMPLES - 1; i++) {
         for (size_t j = 0; j < std::min(VERTEX_SAMPLES, object.numVertices); j++) {
@@ -72,7 +72,7 @@ std::vector<Vector2> Camera::sampleVerticesInRender(WorldObject& object) {
     return vertices;
 }
 
-double Camera::maxVertexValue(std::vector<Vector2>& vertices) {
+double Camera::maxVertexValue(std::vector<Point>& vertices) {
     if (vertices.empty()) {
         return std::numeric_limits<double>::infinity();
     }
@@ -83,9 +83,9 @@ double Camera::maxVertexValue(std::vector<Vector2>& vertices) {
     return max;
 }
 
-Vector2 Camera::project(double x, double y, double z) {
+Point Camera::project(double x, double y, double z) {
     double start = x * focalLength / (z - this->z) + this->x;
     double end = y * focalLength / (z - this->z) + this->y;
 
-    return Vector2(start, end);
+    return Point(start, end);
 }

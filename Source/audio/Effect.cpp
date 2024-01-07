@@ -17,7 +17,7 @@ Effect::Effect(EffectApplicationType application, const std::vector<EffectParame
 
 Effect::Effect(EffectApplicationType application, EffectParameter* parameter) : Effect(application, std::vector<EffectParameter*>{parameter}) {}
 
-Vector2 Effect::apply(int index, Vector2 input, double volume) {
+Point Effect::apply(int index, Point input, double volume) {
 	animateValues(volume);
 	if (application) {
 		return application(index, input, actualValues, sampleRate);
@@ -90,7 +90,7 @@ float Effect::nextPhase(EffectParameter* parameter) {
 }
 
 void Effect::apply() {
-	apply(0, Vector2());
+	apply(0, Point());
 }
 
 double Effect::getValue(int index) {

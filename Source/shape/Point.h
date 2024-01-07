@@ -4,13 +4,14 @@
 #include <cmath>
 #include <string>
 
-class Vector2 : public Shape {
+class Point : public Shape {
 public:
-	Vector2(double x, double y);
-	Vector2(double val);
-	Vector2();
+	Point(double x, double y, double z);
+	Point(double x, double y);
+	Point(double val);
+	Point();
 
-	Vector2 nextVector(double drawingProgress) override;
+	Point nextVector(double drawingProgress) override;
 	void rotate(double theta) override;
 	void scale(double x, double y) override;
 	void translate(double x, double y) override;
@@ -21,8 +22,8 @@ public:
 	std::string type() override;
 
 	// copy assignment operator
-	Vector2& operator=(const Vector2& other);
+	Point& operator=(const Point& other);
 
-	double x, y;
+	double x, y, z;
 	
 };

@@ -2,8 +2,8 @@
 
 Line::Line(double x1, double y1, double x2, double y2) : x1(x1), y1(y1), x2(x2), y2(y2) {}
 
-Vector2 Line::nextVector(double drawingProgress) {
-	return Vector2(
+Point Line::nextVector(double drawingProgress) {
+	return Point(
 		x1 + (x2 - x1) * drawingProgress,
 		y1 + (y2 - y1) * drawingProgress
 	);

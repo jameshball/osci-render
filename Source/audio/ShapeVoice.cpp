@@ -89,7 +89,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         double proportionalLength = (traceMax - traceMin) * frameLength;
         lengthIncrement = juce::jmax(proportionalLength / (audioProcessor.currentSampleRate / frequency), MIN_LENGTH_INCREMENT);
 
-        Vector2 channels;
+        Point channels;
         double x = 0.0;
         double y = 0.0;
 

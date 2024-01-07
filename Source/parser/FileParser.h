@@ -14,7 +14,7 @@ public:
 
 	void parse(juce::String fileName, juce::String extension, std::unique_ptr<juce::InputStream>, juce::Font);
 	std::vector<std::unique_ptr<Shape>> nextFrame();
-	Vector2 nextSample(lua_State*& L, const LuaVariables vars, long& step, double& phase);
+	Point nextSample(lua_State*& L, const LuaVariables vars, long& step, double& phase);
 	void closeLua(lua_State*& L);
 	bool isSample();
 	bool isActive();

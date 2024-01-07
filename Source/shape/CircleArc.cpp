@@ -4,10 +4,10 @@
 
 CircleArc::CircleArc(double x, double y, double radiusX, double radiusY, double startAngle, double endAngle) : x(x), y(y), radiusX(radiusX), radiusY(radiusY), startAngle(startAngle), endAngle(endAngle) {}
 
-Vector2 CircleArc::nextVector(double drawingProgress) {
+Point CircleArc::nextVector(double drawingProgress) {
 	// scale between start and end angle in the positive direction
 	double angle = startAngle + endAngle * drawingProgress;
-	return Vector2(
+	return Point(
 		x + radiusX * std::cos(angle),
 		y + radiusY * std::sin(angle)
 	);
@@ -58,8 +58,8 @@ double CircleArc::length() {
 		len = 0;
         // TODO: Replace this, it's stupid. Do a real approximation.
         int segments = 5;
-		Vector2 start;
-		Vector2 end = nextVector(0);
+		Point start;
+		Point end = nextVector(0);
 		for (int i = 0; i < segments; i++) {
 			start = end;
 			end = nextVector((i + 1) / (double) segments);

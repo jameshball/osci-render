@@ -444,8 +444,8 @@
               file="Source/shape/QuadraticBezierCurve.h"/>
         <FILE id="W19EPg" name="Line.cpp" compile="1" resource="0" file="Source/shape/Line.cpp"/>
         <FILE id="i1A2s1" name="Line.h" compile="0" resource="0" file="Source/shape/Line.h"/>
-        <FILE id="nUpro8" name="Vector2.cpp" compile="1" resource="0" file="Source/shape/Vector2.cpp"/>
-        <FILE id="X6A0jk" name="Vector2.h" compile="0" resource="0" file="Source/shape/Vector2.h"/>
+        <FILE id="nUpro8" name="Point.cpp" compile="1" resource="0" file="Source/shape/Point.cpp"/>
+        <FILE id="X6A0jk" name="Point.h" compile="0" resource="0" file="Source/shape/Point.h"/>
         <FILE id="NmptSY" name="Shape.h" compile="0" resource="0" file="Source/shape/Shape.h"/>
       </GROUP>
       <GROUP id="{56A27063-1FE7-31C3-8263-98389240A8CB}" name="svg">

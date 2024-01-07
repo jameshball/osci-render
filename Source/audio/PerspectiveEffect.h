@@ -1,6 +1,6 @@
 #pragma once
 #include "EffectApplication.h"
-#include "../shape/Vector2.h"
+#include "../shape/Point.h"
 #include "../audio/Effect.h"
 #include "../lua/LuaParser.h"
 
@@ -12,7 +12,7 @@ public:
 	// arbitrary UUID
 	static const juce::String FILE_NAME;
 
-	Vector2 apply(int index, Vector2 input, const std::vector<double>& values, double sampleRate) override;
+	Point apply(int index, Point input, const std::vector<double>& values, double sampleRate) override;
 	void updateCode(const juce::String& newCode);
 	void setVariable(juce::String variableName, double value);
 

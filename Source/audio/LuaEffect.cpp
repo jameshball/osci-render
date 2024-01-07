@@ -1,7 +1,7 @@
 #include "LuaEffect.h"
 #include "../lua/LuaParser.h"
 
-Vector2 LuaEffect::apply(int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+Point LuaEffect::apply(int index, Point input, const std::vector<double>& values, double sampleRate) {
 	int fileIndex = audioProcessor.getCurrentFileIndex();
 	if (fileIndex == -1) {
 		return input;

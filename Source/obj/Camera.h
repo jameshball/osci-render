@@ -3,7 +3,7 @@
 #include <memory>
 #include "WorldObject.h"
 #include "../shape/Shape.h"
-#include "../shape/Vector2.h"
+#include "../shape/Point.h"
 
 class Camera {
 public:
@@ -22,7 +22,7 @@ private:
 	std::atomic<double> focalLength;
 	double x, y, z;
 
-	std::vector<Vector2> sampleVerticesInRender(WorldObject& object);
-	double maxVertexValue(std::vector<Vector2>& vertices);
-	Vector2 project(double x, double y, double z);
+	std::vector<Point> sampleVerticesInRender(WorldObject& object);
+	double maxVertexValue(std::vector<Point>& vertices);
+	Point project(double x, double y, double z);
 };

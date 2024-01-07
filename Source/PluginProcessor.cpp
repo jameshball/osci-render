@@ -59,7 +59,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         new EffectParameter("Distort Y", "Distorts the image in the vertical direction by jittering the audio sample being drawn.", "distortY", VERSION_HINT, 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
             input.x += values[0];
             input.y += values[1];
             return input;
@@ -612,7 +612,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         currentVolume = std::sqrt(squaredVolume);
         currentVolume = juce::jlimit(0.0, 1.0, currentVolume);
 
-        Vector2 channels;
+        Point channels;
         if (totalNumOutputChannels >= 2) {
             channels = {buffer.getSample(0, sample), buffer.getSample(1, sample)};
         } else if (totalNumOutputChannels == 1) {

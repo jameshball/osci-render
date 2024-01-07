@@ -14,7 +14,7 @@ PerspectiveEffect::~PerspectiveEffect() {
 	parser->close(L);
 }
 
-Vector2 PerspectiveEffect::apply(int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+Point PerspectiveEffect::apply(int index, Point input, const std::vector<double>& values, double sampleRate) {
 	auto effectScale = values[0];
 	auto depth = 1.0 + (values[1] - 0.1) * 3;
 	auto rotateSpeed = linearSpeedToActualSpeed(values[2]);
@@ -88,7 +88,7 @@ Vector2 PerspectiveEffect::apply(int index, Vector2 input, const std::vector<dou
 
 	// perspective projection
 	auto focalLength = 1.0;
-	return Vector2(
+	return Point(
 		(1 - effectScale) * input.x + effectScale * (x3 * focalLength / (z3 - depth)),
 		(1 - effectScale) * input.y + effectScale * (y3 * focalLength / (z3 - depth))
 	);
