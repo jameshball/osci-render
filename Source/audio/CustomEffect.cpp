@@ -12,7 +12,6 @@ CustomEffect::~CustomEffect() {
 
 Point CustomEffect::apply(int index, Point input, const std::vector<double>& values, double sampleRate) {
 	auto effectScale = values[0];
-	auto depth = 1.0 + (values[1] - 0.1) * 3;
 
 	auto x = input.x;
 	auto y = input.y;

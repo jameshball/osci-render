@@ -1,8 +1,8 @@
-#include "ObjComponent.h"
+#include "PerspectiveComponent.h"
 #include "PluginEditor.h"
 #include <numbers>
 
-ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
+PerspectiveComponent::PerspectiveComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
 	setText("3D Settings");
 
 	juce::Desktop::getInstance().addGlobalMouseListener(this);
@@ -50,12 +50,12 @@ ObjComponent::ObjComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 	fixedRotateZ->setTooltip(tooltip);
 }
 
-ObjComponent::~ObjComponent() {
+PerspectiveComponent::~PerspectiveComponent() {
 	juce::Desktop::getInstance().removeGlobalMouseListener(this);
 }
 
 // listen for mouse movement and rotate the object if mouseRotate is enabled
-void ObjComponent::mouseMove(const juce::MouseEvent& e) {
+void PerspectiveComponent::mouseMove(const juce::MouseEvent& e) {
 	if (mouseRotate.getToggleState()) {
 		auto globalEvent = e.getEventRelativeTo(&pluginEditor);
 		auto width = pluginEditor.getWidth();
@@ -68,11 +68,11 @@ void ObjComponent::mouseMove(const juce::MouseEvent& e) {
 	}
 }
 
-void ObjComponent::disableMouseRotation() {
+void PerspectiveComponent::disableMouseRotation() {
 	mouseRotate.setToggleState(false, juce::NotificationType::dontSendNotification);
 }
 
-void ObjComponent::resized() {
+void PerspectiveComponent::resized() {
 	auto area = getLocalBounds().withTrimmedTop(20).reduced(20);
 	double rowHeight = 30;
 	perspective.setBounds(area.removeFromTop(rowHeight));

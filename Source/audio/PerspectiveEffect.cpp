@@ -12,7 +12,7 @@ PerspectiveEffect::~PerspectiveEffect() {}
 
 Point PerspectiveEffect::apply(int index, Point input, const std::vector<double>& values, double sampleRate) {
 	auto effectScale = values[0];
-	auto focalLength = values[1];
+	auto focalLength = juce::jmax(values[1], 0.001);
 	auto depth = 1.0 + (values[2] - 0.1) * 3;
 	auto rotateSpeed = linearSpeedToActualSpeed(values[3]);
 	double baseRotateX, baseRotateY, baseRotateZ;

@@ -403,9 +403,10 @@
         <FILE id="YNsbe9" name="WorldObject.cpp" compile="1" resource="0" file="Source/obj/WorldObject.cpp"/>
         <FILE id="SZBVI9" name="WorldObject.h" compile="0" resource="0" file="Source/obj/WorldObject.h"/>
       </GROUP>
-      <FILE id="RHHuXP" name="ObjComponent.cpp" compile="1" resource="0"
-            file="Source/ObjComponent.cpp"/>
-      <FILE id="mliVoS" name="ObjComponent.h" compile="0" resource="0" file="Source/ObjComponent.h"/>
+      <FILE id="RHHuXP" name="PerspectiveComponent.cpp" compile="1" resource="0"
+            file="Source/PerspectiveComponent.cpp"/>
+      <FILE id="mliVoS" name="PerspectiveComponent.h" compile="0" resource="0"
+            file="Source/PerspectiveComponent.h"/>
       <GROUP id="{2AE40B10-2C85-6401-644A-D5F36BCC5BC1}" name="parser">
         <FILE id="q22Fiw" name="FileParser.cpp" compile="1" resource="0" file="Source/parser/FileParser.cpp"/>
         <FILE id="HWSJK8" name="FileParser.h" compile="0" resource="0" file="Source/parser/FileParser.h"/>

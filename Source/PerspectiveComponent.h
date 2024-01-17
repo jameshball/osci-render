@@ -6,10 +6,10 @@
 #include "components/SvgButton.h"
 
 class OscirenderAudioProcessorEditor;
-class ObjComponent : public juce::GroupComponent {
+class PerspectiveComponent : public juce::GroupComponent {
 public:
-    ObjComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
-    ~ObjComponent();
+    PerspectiveComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
+    ~PerspectiveComponent();
 
     void resized() override;
     void mouseMove(const juce::MouseEvent& event) override;
@@ -33,5 +33,5 @@ private:
     std::shared_ptr<SvgButton> fixedRotateY = std::make_shared<SvgButton>("fixedRotateY", juce::String(BinaryData::fixed_rotate_svg), "white", "red", audioProcessor.perspectiveEffect->fixedRotateY);
     std::shared_ptr<SvgButton> fixedRotateZ = std::make_shared<SvgButton>("fixedRotateZ", juce::String(BinaryData::fixed_rotate_svg), "white", "red", audioProcessor.perspectiveEffect->fixedRotateZ);
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ObjComponent)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PerspectiveComponent)
 };
