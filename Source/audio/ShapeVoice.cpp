@@ -12,6 +12,7 @@ bool ShapeVoice::canPlaySound(juce::SynthesiserSound* sound) {
 
 void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::SynthesiserSound* sound, int currentPitchWheelPosition) {
     this->velocity = velocity;
+    pitchWheelMoved(currentPitchWheelPosition);
     auto* shapeSound = dynamic_cast<ShapeSound*>(sound);
 
     currentlyPlaying = true;
@@ -74,9 +75,11 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     juce::ScopedNoDenormals noDenormals;
 
     int numChannels = outputBuffer.getNumChannels();
+
+    float actualFrequency = frequency * pitchWheelAdjustment;
     
     if (!audioProcessor.midiEnabled->getBoolValue()) {
-        frequency = audioProcessor.frequency;
+        actualFrequency = audioProcessor.frequency;
     }
 
     for (auto sample = startSample; sample < startSample + numSamples; ++sample) {
@@ -87,7 +90,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         double traceMax = traceMaxEnabled ? actualTraceMax : 1.0;
         double traceMin = traceMinEnabled ? actualTraceMin : 0.0;
         double proportionalLength = (traceMax - traceMin) * frameLength;
-        lengthIncrement = juce::jmax(proportionalLength / (audioProcessor.currentSampleRate / frequency), MIN_LENGTH_INCREMENT);
+        lengthIncrement = juce::jmax(proportionalLength / (audioProcessor.currentSampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
 
         Vector2 channels;
         double x = 0.0;
@@ -100,7 +103,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             renderingSample = parser != nullptr && parser->isSample();
 
             if (renderingSample) {
-                channels = parser->nextSample(L, LuaVariables{ audioProcessor.currentSampleRate, frequency }, step, phase);
+                channels = parser->nextSample(L, LuaVariables{ audioProcessor.currentSampleRate, actualFrequency }, step, phase);
             } else if (currentShape < frame.size()) {
                 auto& shape = frame[currentShape];
                 double length = shape->length();
@@ -117,8 +120,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         if (waitingForRelease) {
             time = juce::jmin(time, releaseTime);
         } else if (time >= endTime) {
-            clearCurrentNote();
-            sound = nullptr;
+            noteStopped();
             break;
         }
 
@@ -165,11 +167,17 @@ void ShapeVoice::stopNote(float velocity, bool allowTailOff) {
     currentlyPlaying = false;
     waitingForRelease = false;
     if (!allowTailOff) {
-        clearCurrentNote();
-        sound = nullptr;
+        noteStopped();
     }
 }
 
-void ShapeVoice::pitchWheelMoved(int newPitchWheelValue) {}
+void ShapeVoice::noteStopped() {
+    clearCurrentNote();
+    sound = nullptr;
+}
+
+void ShapeVoice::pitchWheelMoved(int newPitchWheelValue) {
+    pitchWheelAdjustment = 1.0 + (newPitchWheelValue - 8192.0) / 65536.0;
+}
 
 void ShapeVoice::controllerMoved(int controllerNumber, int newControllerValue) {}

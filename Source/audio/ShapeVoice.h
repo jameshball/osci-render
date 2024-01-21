@@ -16,6 +16,7 @@ public:
 	void pitchWheelMoved(int newPitchWheelValue) override;
 	void controllerMoved(int controllerNumber, int newControllerValue) override;
 
+
 	void incrementShapeDrawing();
 
 private:
@@ -37,6 +38,7 @@ private:
     bool currentlyPlaying = false;
 	double frequency = 1.0;
     double velocity = 1.0;
+	double pitchWheelAdjustment = 1.0;
 
 	lua_State* L = nullptr;
 	long step = 1;
@@ -47,4 +49,6 @@ private:
 	double releaseTime = 0.0;
 	double endTime = 99999999;
 	bool waitingForRelease = false;
+
+	void noteStopped();
 };
