@@ -108,7 +108,7 @@ std::shared_ptr<juce::Component> EffectsListComponent::createComponent(EffectPar
 		std::weak_ptr<SvgButton> weakButton = button;
 		button->setEdgeIndent(5);
 		button->setToggleState(editor.editingCustomFunction, juce::dontSendNotification);
-		button->setTooltip("Toggles whether the text editor is editing the currently open file, or the Lua 3D perspective function.");
+		button->setTooltip("Toggles whether the text editor is editing the currently open file, or the custom Lua effect.");
 		button->onClick = [this, weakButton] {
 			if (auto button = weakButton.lock()) {
                 editor.editCustomFunction(button->getToggleState());

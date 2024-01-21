@@ -2,7 +2,7 @@
 #include "PluginEditor.h"
 
 TxtComponent::TxtComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
-	setText(".txt File Settings");
+	setText("Text Settings");
 
 	addAndMakeVisible(font);
 	addAndMakeVisible(bold);

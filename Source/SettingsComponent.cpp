@@ -133,11 +133,10 @@ void SettingsComponent::paint(juce::Graphics& g) {
     dc.drawForRectangle(g, main.getBounds());
     dc.drawForRectangle(g, effects.getBounds());
     dc.drawForRectangle(g, midi.getBounds());
+    dc.drawForRectangle(g, perspective.getBounds());
 
     if (lua.isVisible()) {
         dc.drawForRectangle(g, lua.getBounds());
-    } else if (perspective.isVisible()) {
-        dc.drawForRectangle(g, perspective.getBounds());
     } else if (txt.isVisible()) {
         dc.drawForRectangle(g, txt.getBounds());
     }

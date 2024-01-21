@@ -80,7 +80,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         customEffect,
-        new EffectParameter("Effect Strength", "Controls the strength of the custom effect applied.", "customEffectStrength", VERSION_HINT, 1.0, 0.0, 1.0)
+        new EffectParameter("Lua Effect", "Controls the strength of the custom Lua effect applied. You can write your own custom effect using Lua by pressing the edit button on the right.", "customEffectStrength", VERSION_HINT, 1.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(traceMax);
     toggleableEffects.push_back(traceMin);
