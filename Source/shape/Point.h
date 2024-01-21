@@ -20,9 +20,16 @@ public:
 	std::string type() override;
 
 	void rotate(double rotateX, double rotateY, double rotateZ);
+	void normalize();
+	double innerProduct(Point& other);
 
 	// copy assignment operator
 	Point& operator=(const Point& other);
+	Point operator+(const Point& other);
+	Point operator-(const Point& other);
+	Point operator-();
+	Point operator*(const Point& other);
+	Point operator*(double scalar);
 
 	double x, y, z;
 	

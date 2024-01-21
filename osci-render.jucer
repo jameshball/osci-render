@@ -393,6 +393,8 @@
             file="Source/MidiComponent.cpp"/>
       <FILE id="GJqoJa" name="MidiComponent.h" compile="0" resource="0" file="Source/MidiComponent.h"/>
       <GROUP id="{E6ED85A9-3843-825F-EF48-BCF81E38F8AD}" name="obj">
+        <FILE id="T6iC8q" name="Frustum.cpp" compile="1" resource="0" file="Source/obj/Frustum.cpp"/>
+        <FILE id="ky5ZfA" name="Frustum.h" compile="0" resource="0" file="Source/obj/Frustum.h"/>
         <FILE id="Yfpzzn" name="ObjectServer.cpp" compile="1" resource="0"
               file="Source/obj/ObjectServer.cpp"/>
         <FILE id="CqYgqM" name="ObjectServer.h" compile="0" resource="0" file="Source/obj/ObjectServer.h"/>

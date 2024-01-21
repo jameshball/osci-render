@@ -32,6 +32,17 @@ void Point::rotate(double rotateX, double rotateY, double rotateZ) {
     y = sinValue * x2 + cosValue * y2;
 }
 
+void Point::normalize() {
+    double mag = magnitude();
+    x /= mag;
+    y /= mag;
+    z /= mag;
+}
+
+double Point::innerProduct(Point& other) {
+    return x * other.x + y * other.y + z * other.z;
+}
+
 void Point::scale(double x, double y, double z) {
 	this->x *= x;
 	this->y *= y;
@@ -49,7 +60,7 @@ double Point::length() {
 }
 
 double Point::magnitude() {
-	return sqrt(x * x * x + y * y * y + z * z * z);
+	return sqrt(x * x + y * y + z * z);
 }
 
 std::unique_ptr<Shape> Point::clone() {
@@ -65,4 +76,24 @@ Point& Point::operator=(const Point& other) {
 	y = other.y;
 	z = other.z;
 	return *this;
+}
+
+Point Point::operator+(const Point& other) {
+    return Point(x + other.x, y + other.y, z + other.z);
+}
+
+Point Point::operator-(const Point& other) {
+    return Point(x - other.x, y - other.y, z - other.z);
+}
+
+Point Point::operator-() {
+    return Point(-x, -y, -z);
+}
+
+Point Point::operator*(const Point& other) {
+    return Point(x * other.x, y * other.y, z * other.z);
+}
+
+Point Point::operator*(double scalar) {
+    return Point(x * scalar, y * scalar, z * scalar);
 }

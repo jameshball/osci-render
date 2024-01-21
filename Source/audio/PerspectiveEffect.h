@@ -3,6 +3,7 @@
 #include "../shape/Point.h"
 #include "../audio/Effect.h"
 #include "../lua/LuaParser.h"
+#include "../obj/Frustum.h"
 
 class PerspectiveEffect : public EffectApplication {
 public:

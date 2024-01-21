@@ -65,9 +65,14 @@ Point PerspectiveEffect::apply(int index, Point input, const std::vector<double>
 	double x3 = cosValue * x2 - sinValue * y2;
 	double y3 = sinValue * x2 + cosValue * y2;
 
+	Point p = Point(x3, y3, z3);
+
+	Frustum frustum = Frustum(focalLength, 1.0, 0.1, 1000);
+	frustum.clipToFrustum(p);
+
 	return Point(
-		(1 - effectScale) * input.x + effectScale * (x3 * focalLength / (z3 - depth)),
-		(1 - effectScale) * input.y + effectScale * (y3 * focalLength / (z3 - depth)),
+		(1 - effectScale) * input.x + effectScale * (p.x * focalLength / p.z),
+		(1 - effectScale) * input.y + effectScale * (p.y * focalLength / p.z),
 		0
 	);
 }
