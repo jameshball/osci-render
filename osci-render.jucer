@@ -5,7 +5,7 @@
               pluginCharacteristicsValue="pluginProducesMidiOut,pluginWantsMidiIn"
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
-              version="2.0.5" companyName="James H Ball" companyWebsite="https://osci-render.com"
+              version="2.0.6" companyName="James H Ball" companyWebsite="https://osci-render.com"
               companyEmail="james@ball.sh">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
