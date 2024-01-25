@@ -130,6 +130,8 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 			frequencyLabel.setText(juce::String(roundedFrequency) + "Hz", juce::dontSendNotification);
 		}
 	);
+
+	addAndMakeVisible(recorder);
 }
 
 MainComponent::~MainComponent() {
@@ -152,6 +154,9 @@ void MainComponent::resized() {
 	auto buttonHeight = 30;
 	auto padding = 10;
 	auto rowPadding = 10;
+
+	recorder.setBounds(bounds.removeFromBottom(30));
+	bounds.removeFromBottom(padding);
 	
 	auto row = bounds.removeFromTop(buttonHeight);
     fileButton.setBounds(row.removeFromLeft(buttonWidth));
