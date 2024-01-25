@@ -101,6 +101,8 @@
         <FILE id="CdKZCg" name="Matching.h" compile="0" resource="0" file="Source/chinese_postman/Matching.h"/>
       </GROUP>
       <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
+        <FILE id="M7wyTt" name="AudioRecordingComponent.h" compile="0" resource="0"
+              file="Source/components/AudioRecordingComponent.h"/>
         <FILE id="kUinTt" name="ComponentList.cpp" compile="1" resource="0"
               file="Source/components/ComponentList.cpp"/>
         <FILE id="HGTPEW" name="ComponentList.h" compile="0" resource="0" file="Source/components/ComponentList.h"/>
