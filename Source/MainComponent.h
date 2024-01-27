@@ -26,7 +26,7 @@ private:
 	std::unique_ptr<juce::FileChooser> chooser;
 	juce::TextButton fileButton;
 	juce::TextButton closeFileButton;
-	SvgButton inputEnabled{"inputEnabled", juce::String(BinaryData::microphone_svg), "white", "red", audioProcessor.inputEnabled};
+	SvgButton inputEnabled{"inputEnabled", juce::String(BinaryData::microphone_svg), juce::Colours::white, juce::Colours::red, audioProcessor.inputEnabled};
 	juce::Label fileLabel;
 
 	juce::TextEditor fileName;

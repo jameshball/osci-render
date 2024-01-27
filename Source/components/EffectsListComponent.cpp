@@ -97,14 +97,14 @@ std::shared_ptr<juce::Component> EffectsListComponent::createComponent(EffectPar
             toggle = audioProcessor.perspectiveEffect->fixedRotateZ;
 			axis = "Z";
         }
-		std::shared_ptr<SvgButton> button = std::make_shared<SvgButton>(parameter->name, BinaryData::fixed_rotate_svg, "white", "red", toggle);
+		std::shared_ptr<SvgButton> button = std::make_shared<SvgButton>(parameter->name, BinaryData::fixed_rotate_svg, juce::Colours::white, juce::Colours::red, toggle);
 		button->setTooltip("Toggles whether the rotation around the " + axis + " axis is fixed, or changes according to the rotation speed.");
 		button->onClick = [this, toggle] {
 			toggle->setBoolValueNotifyingHost(!toggle->getBoolValue());
         };
 		return button;
 	} else if (parameter->paramID == "perspectiveStrength") {
-		std::shared_ptr<SvgButton> button = std::make_shared<SvgButton>(parameter->name, BinaryData::pencil_svg, "white", "red");
+		std::shared_ptr<SvgButton> button = std::make_shared<SvgButton>(parameter->name, BinaryData::pencil_svg, juce::Colours::white, juce::Colours::red);
 		std::weak_ptr<SvgButton> weakButton = button;
 		button->setEdgeIndent(5);
 		button->setToggleState(editor.editingPerspective, juce::dontSendNotification);

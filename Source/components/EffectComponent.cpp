@@ -9,7 +9,7 @@ EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, in
 
     sidechainEnabled = effect.parameters[0]->sidechain != nullptr;
     if (sidechainEnabled) {
-        sidechainButton = std::make_unique<SvgButton>(effect.parameters[0]->name, BinaryData::microphone_svg, "white", "red", effect.parameters[0]->sidechain);
+        sidechainButton = std::make_unique<SvgButton>(effect.parameters[0]->name, BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red, effect.parameters[0]->sidechain);
         sidechainButton->setTooltip("When enabled, the volume of the input audio controls the value of the slider, acting like a sidechain effect.");
         addAndMakeVisible(*sidechainButton);
     }

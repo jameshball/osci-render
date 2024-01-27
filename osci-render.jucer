@@ -22,7 +22,9 @@
         <FILE id="PxYKbt" name="microphone.svg" compile="0" resource="1" file="Resources/svg/microphone.svg"/>
         <FILE id="pSc1mq" name="osci.svg" compile="0" resource="1" file="Resources/svg/osci.svg"/>
         <FILE id="D2AI1b" name="pencil.svg" compile="0" resource="1" file="Resources/svg/pencil.svg"/>
+        <FILE id="n79IAy" name="record.svg" compile="0" resource="1" file="Resources/svg/record.svg"/>
         <FILE id="rXjNlx" name="threshold.svg" compile="0" resource="1" file="Resources/svg/threshold.svg"/>
+        <FILE id="rFYmV8" name="timer.svg" compile="0" resource="1" file="Resources/svg/timer.svg"/>
         <FILE id="qC6QiP" name="volume.svg" compile="0" resource="1" file="Resources/svg/volume.svg"/>
       </GROUP>
       <GROUP id="{F8A3D32C-4187-9A2F-5D78-040259957E9B}" name="text">
@@ -106,6 +108,7 @@
         <FILE id="kUinTt" name="ComponentList.cpp" compile="1" resource="0"
               file="Source/components/ComponentList.cpp"/>
         <FILE id="HGTPEW" name="ComponentList.h" compile="0" resource="0" file="Source/components/ComponentList.h"/>
+        <FILE id="IvySRY" name="DoubleTextBox.h" compile="0" resource="0" file="Source/components/DoubleTextBox.h"/>
         <FILE id="poPVxL" name="DraggableListBox.cpp" compile="1" resource="0"
               file="Source/components/DraggableListBox.cpp"/>
         <FILE id="Y9NEGn" name="DraggableListBox.h" compile="0" resource="0"
