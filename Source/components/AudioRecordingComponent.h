@@ -47,6 +47,7 @@
 *******************************************************************************/
 
 #pragma once
+#include "DoubleTextBox.h"
 
 //==============================================================================
 class AudioRecorder final : public juce::Thread {
@@ -115,6 +116,12 @@ public:
         while (!threadShouldExit()) {
             consumer = audioProcessor.consumerRegister(buffer);
             audioProcessor.consumerRead(consumer);
+
+			if (nextSampleNum >= recordingLength * audioProcessor.currentSampleRate) {
+                stop();
+				stopCallback();
+                continue;
+			}
             
             const juce::ScopedLock sl(writerLock);
 			int numSamples = buffer.size() / 2;
@@ -135,6 +142,12 @@ public:
         }
     }
 
+    void setRecordLength(double recordLength) {
+		recordingLength = recordLength;
+    }
+
+    std::function<void()> stopCallback;
+
 private:
     OscirenderAudioProcessor& audioProcessor;
     
@@ -144,6 +157,8 @@ private:
     juce::int64 nextSampleNum = 0;
     std::vector<float> buffer = std::vector<float>(2 << 12);
     std::shared_ptr<BufferConsumer> consumer;
+
+    double recordingLength = 99999999999.0;
 
     juce::CriticalSection writerLock;
     std::atomic<juce::AudioFormatWriter::ThreadedWriter*> activeWriter { nullptr };
@@ -177,10 +192,7 @@ public:
                 : juce::jmax(30.0, thumbnail.getTotalLength());
 
             auto thumbArea = getLocalBounds();
-            thumbnail.drawChannels(g, thumbArea.reduced(2), 0.0, endTime, 2.0f);
-        } else {
-            g.setFont(14.0f);
-            g.drawFittedText("(No file recorded)", getLocalBounds(), juce::Justification::centred, 2);
+            thumbnail.drawChannels(g, thumbArea.reduced(2), 0.0, endTime, 1.0f);
         }
     }
 
@@ -204,12 +216,35 @@ class AudioRecordingComponent final : public juce::Component {
 public:
 	AudioRecordingComponent(OscirenderAudioProcessor& p) : audioProcessor(p) {
         addAndMakeVisible(recordButton);
+		addAndMakeVisible(timedRecord);
+		addAndMakeVisible(recordLength);
+
+		recordButton.setTooltip("Start recording audio to a WAV file. Press again to stop and save the recording.");
+		timedRecord.setTooltip("Record for a set amount of time. When enabled, the recording will automatically stop once the time is reached.");
+        
+        recordLength.setValue(1);
 
         recordButton.onClick = [this] {
-            if (recorder.isRecording())
-                stopRecording();
-            else
-                startRecording();
+            if (recordButton.getToggleState()) {
+				startRecording();
+			} else {
+				stopRecording();
+            }
+        };
+
+		timedRecord.onClick = [this] {
+			if (timedRecord.getToggleState()) {
+				addAndMakeVisible(recordLength);
+			} else {
+				removeChildComponent(&recordLength);
+			}
+            resized();
+		};
+
+		recorder.stopCallback = [this] {
+			juce::MessageManager::callAsync([this] {
+				recordButton.setToggleState(false, juce::sendNotification);
+			});
         };
 
         addAndMakeVisible(recordingThumbnail);
@@ -217,9 +252,16 @@ public:
     }
 
     void resized() override {
+		double iconSize = 25;
+        
         auto area = getLocalBounds();
-        recordButton.setBounds(area.removeFromLeft(80));
+        recordButton.setBounds(area.removeFromLeft(iconSize).withSizeKeepingCentre(iconSize, iconSize));
         area.removeFromLeft(5);
+		timedRecord.setBounds(area.removeFromLeft(iconSize).withSizeKeepingCentre(iconSize, iconSize));
+        if (timedRecord.getToggleState()) {
+            recordLength.setBounds(area.removeFromLeft(80).withSizeKeepingCentre(60, 25));
+        }
+		area.removeFromLeft(5);
         recordingThumbnail.setBounds(area);
     }
 
@@ -229,16 +271,22 @@ private:
     RecordingThumbnail recordingThumbnail;
     AudioRecorder recorder{ audioProcessor, recordingThumbnail.getAudioThumbnail() };
 
-    juce::TextButton recordButton{ "Record" };
+    SvgButton recordButton{ "record", BinaryData::record_svg, juce::Colours::white, juce::Colours::red };
     juce::File lastRecording;
     juce::FileChooser chooser { "Output file...", juce::File::getCurrentWorkingDirectory().getChildFile("recording.wav"), "*.wav" };
+	SvgButton timedRecord{ "timedRecord", BinaryData::timer_svg, juce::Colours::white, juce::Colours::red };
+	DoubleTextBox recordLength{ 0, 60 * 60 * 24 };
 
     void startRecording() {
         auto parentDir = juce::File::getSpecialLocation(juce::File::tempDirectory);
 
         lastRecording = parentDir.getNonexistentChildFile("osci-render-recording", ".wav");
+        if (timedRecord.getToggleState()) {
+            recorder.setRecordLength(recordLength.getValue());
+		} else {
+			recorder.setRecordLength(99999999999.0);
+		}
         recorder.startRecording(lastRecording);
-        recordButton.setButtonText("Stop");
 
         recordButton.setColour(juce::TextButton::buttonColourId, juce::Colours::red);
         recordButton.setColour(juce::TextButton::textColourOnId, juce::Colours::black);
@@ -246,8 +294,6 @@ private:
 
     void stopRecording() {
         recorder.stop();
-
-        recordButton.setButtonText("Record");
 
         recordButton.setColour(juce::TextButton::buttonColourId, findColour(juce::TextButton::buttonColourId));
         recordButton.setColour(juce::TextButton::textColourOnId, findColour(juce::TextButton::textColourOnId));
