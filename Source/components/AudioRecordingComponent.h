@@ -49,25 +49,25 @@
 #pragma once
 
 //==============================================================================
-/** A simple class that acts as an AudioIODeviceCallback and writes the
-    incoming audio data to a WAV file.
-*/
-class AudioRecorder final : public juce::AudioIODeviceCallback {
+class AudioRecorder final : public juce::Thread {
 public:
-    AudioRecorder(juce::AudioThumbnail& thumbnailToUpdate)
-        : thumbnail(thumbnailToUpdate) {
+    AudioRecorder(OscirenderAudioProcessor& p, juce::AudioThumbnail& thumbnailToUpdate)
+        : audioProcessor(p), thumbnail(thumbnailToUpdate), juce::Thread("Audio Recorder") {
         backgroundThread.startThread();
+        startThread();
     }
 
     ~AudioRecorder() override {
         stop();
+		audioProcessor.consumerStop(consumer);
+		stopThread(1000);
     }
 
     //==============================================================================
     void startRecording(const juce::File& file) {
         stop();
 
-        if (sampleRate > 0) {
+        if (audioProcessor.currentSampleRate > 0) {
             // Create an OutputStream to write to our destination file...
             file.deleteFile();
 
@@ -75,7 +75,7 @@ public:
                 // Now create a WAV writer object that writes to our output stream...
                 juce::WavAudioFormat wavFormat;
 
-                if (auto writer = wavFormat.createWriterFor(fileStream.get(), sampleRate, 2, 32, {}, 0)) {
+                if (auto writer = wavFormat.createWriterFor(fileStream.get(), audioProcessor.currentSampleRate, 2, 32, {}, 0)) {
                     fileStream.release(); // (passes responsibility for deleting the stream to the writer object that is now using it)
 
                     // Now we'll create one of these helper objects which will act as a FIFO buffer, and will
@@ -111,43 +111,39 @@ public:
         return activeWriter.load() != nullptr;
     }
 
-    //==============================================================================
-    void audioDeviceAboutToStart(juce::AudioIODevice* device) override {
-        sampleRate = device->getCurrentSampleRate();
-    }
+    void run() override {
+        while (!threadShouldExit()) {
+            consumer = audioProcessor.consumerRegister(buffer);
+            audioProcessor.consumerRead(consumer);
+            
+            const juce::ScopedLock sl(writerLock);
+			int numSamples = buffer.size() / 2;
 
-    void audioDeviceStopped() override {
-        sampleRate = 0;
-    }
+			// convert 1D buffer to juce::AudioBuffer
+			juce::AudioBuffer<float> audioBuffer(2, numSamples);
+			for (int i = 0; i < numSamples; i++) {
+				audioBuffer.setSample(0, i, buffer[i * 2]);
+				audioBuffer.setSample(1, i, buffer[i * 2 + 1]);
+			}
+            
 
-    void audioDeviceIOCallbackWithContext(const float* const* inputChannelData, int numInputChannels,
-        float* const* outputChannelData, int numOutputChannels,
-        int numSamples, const juce::AudioIODeviceCallbackContext& context) override {
-        juce::ignoreUnused(context);
-
-        const juce::ScopedLock sl(writerLock);
-
-        if (activeWriter.load() != nullptr && numInputChannels >= thumbnail.getNumChannels()) {
-            activeWriter.load()->write(inputChannelData, numSamples);
-
-            // Create an AudioBuffer to wrap our incoming data, note that this does no allocations or copies, it simply references our input data
-            juce::AudioBuffer<float> buffer(const_cast<float**> (inputChannelData), thumbnail.getNumChannels(), numSamples);
-            thumbnail.addBlock(nextSampleNum, buffer, 0, numSamples);
-            nextSampleNum += numSamples;
+            if (activeWriter.load() != nullptr) {
+                activeWriter.load()->write(audioBuffer.getArrayOfReadPointers(), numSamples);
+                thumbnail.addBlock(nextSampleNum, audioBuffer, 0, numSamples);
+                nextSampleNum += numSamples;
+            }
         }
-
-        // We need to clear the output buffers, in case they're full of junk..
-        for (int i = 0; i < numOutputChannels; ++i)
-            if (outputChannelData[i] != nullptr)
-                juce::FloatVectorOperations::clear(outputChannelData[i], numSamples);
     }
 
 private:
+    OscirenderAudioProcessor& audioProcessor;
+    
     juce::AudioThumbnail& thumbnail;
     juce::TimeSliceThread backgroundThread { "Audio Recorder Thread" }; // the thread that will write our audio data to disk
     std::unique_ptr<juce::AudioFormatWriter::ThreadedWriter> threadedWriter; // the FIFO used to buffer the incoming data
-    double sampleRate = 0.0;
     juce::int64 nextSampleNum = 0;
+    std::vector<float> buffer = std::vector<float>(2 << 12);
+    std::shared_ptr<BufferConsumer> consumer;
 
     juce::CriticalSection writerLock;
     std::atomic<juce::AudioFormatWriter::ThreadedWriter*> activeWriter { nullptr };
@@ -206,7 +202,7 @@ private:
 //==============================================================================
 class AudioRecordingComponent final : public juce::Component {
 public:
-    AudioRecordingComponent() {
+	AudioRecordingComponent(OscirenderAudioProcessor& p) : audioProcessor(p) {
         addAndMakeVisible(recordButton);
 
         recordButton.onClick = [this] {
@@ -218,19 +214,6 @@ public:
 
         addAndMakeVisible(recordingThumbnail);
         recordingThumbnail.setDisplayFullThumbnail(true);
-
-
-        juce::RuntimePermissions::request(juce::RuntimePermissions::recordAudio,
-            [this](bool granted) {
-                int numInputChannels = granted ? 2 : 0;
-                audioDeviceManager.initialise(numInputChannels, 2, nullptr, true, {}, nullptr);
-            });
-
-        audioDeviceManager.addAudioCallback(&recorder);
-    }
-
-    ~AudioRecordingComponent() override {
-        audioDeviceManager.removeAudioCallback(&recorder);
     }
 
     void resized() override {
@@ -241,27 +224,16 @@ public:
     }
 
 private:
-    juce::AudioDeviceManager audioDeviceManager;
+	OscirenderAudioProcessor& audioProcessor;
 
     RecordingThumbnail recordingThumbnail;
-    AudioRecorder recorder{ recordingThumbnail.getAudioThumbnail() };
+    AudioRecorder recorder{ audioProcessor, recordingThumbnail.getAudioThumbnail() };
 
     juce::TextButton recordButton{ "Record" };
     juce::File lastRecording;
     juce::FileChooser chooser { "Output file...", juce::File::getCurrentWorkingDirectory().getChildFile("recording.wav"), "*.wav" };
 
     void startRecording() {
-        if (!juce::RuntimePermissions::isGranted(juce::RuntimePermissions::writeExternalStorage)) {
-            SafePointer<AudioRecordingComponent> safeThis(this);
-
-            juce::RuntimePermissions::request(juce::RuntimePermissions::writeExternalStorage,
-                [safeThis](bool granted) mutable {
-                    if (granted)
-                        safeThis->startRecording();
-        });
-            return;
-    }
-
         auto parentDir = juce::File::getSpecialLocation(juce::File::tempDirectory);
 
         lastRecording = parentDir.getNonexistentChildFile("osci-render-recording", ".wav");
