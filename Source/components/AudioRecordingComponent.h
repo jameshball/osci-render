@@ -302,9 +302,13 @@ private:
             | juce::FileBrowserComponent::canSelectFiles
             | juce::FileBrowserComponent::warnAboutOverwriting,
             [this](const juce::FileChooser& c) {
-                if (juce::FileInputStream inputStream(lastRecording); inputStream.openedOk())
-                    if (const auto outputStream = makeOutputStream(c.getURLResult()))
+                if (juce::FileInputStream inputStream(lastRecording); inputStream.openedOk()) {
+                    if (const auto outputStream = c.getURLResult().getLocalFile().createOutputStream()) {
+                        outputStream->setPosition(0);
+                        outputStream->truncate();
                         outputStream->writeFromInputStream(inputStream, -1);
+                    }
+                }
 
                 lastRecording.deleteFile();
             });
