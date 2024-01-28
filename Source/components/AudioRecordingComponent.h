@@ -50,18 +50,17 @@
 #include "DoubleTextBox.h"
 
 //==============================================================================
-class AudioRecorder final : public juce::Thread {
+class AudioRecorder final {
 public:
     AudioRecorder(OscirenderAudioProcessor& p, juce::AudioThumbnail& thumbnailToUpdate)
-        : audioProcessor(p), thumbnail(thumbnailToUpdate), juce::Thread("Audio Recorder") {
+        : audioProcessor(p), thumbnail(thumbnailToUpdate) {
         backgroundThread.startThread();
-        startThread();
+        audioProcessor.setAudioThreadCallback([this](const juce::AudioBuffer<float>& buffer) { audioThreadCallback(buffer); });
     }
 
-    ~AudioRecorder() override {
+    ~AudioRecorder() {
+        audioProcessor.setAudioThreadCallback(nullptr);
         stop();
-		audioProcessor.consumerStop(consumer);
-		stopThread(1000);
     }
 
     //==============================================================================
@@ -112,33 +111,20 @@ public:
         return activeWriter.load() != nullptr;
     }
 
-    void run() override {
-        while (!threadShouldExit()) {
-            consumer = audioProcessor.consumerRegister(buffer);
-            audioProcessor.consumerRead(consumer);
-
-			if (nextSampleNum >= recordingLength * audioProcessor.currentSampleRate) {
-                stop();
-				stopCallback();
-                continue;
-			}
+    void audioThreadCallback(const juce::AudioBuffer<float>& buffer) {
+		if (nextSampleNum >= recordingLength * audioProcessor.currentSampleRate) {
+            stop();
+			stopCallback();
+            return;
+		}
             
-            const juce::ScopedLock sl(writerLock);
-			int numSamples = buffer.size() / 2;
+        const juce::ScopedLock sl(writerLock);
+        int numSamples = buffer.getNumSamples();
 
-			// convert 1D buffer to juce::AudioBuffer
-			juce::AudioBuffer<float> audioBuffer(2, numSamples);
-			for (int i = 0; i < numSamples; i++) {
-				audioBuffer.setSample(0, i, buffer[i * 2]);
-				audioBuffer.setSample(1, i, buffer[i * 2 + 1]);
-			}
-            
-
-            if (activeWriter.load() != nullptr) {
-                activeWriter.load()->write(audioBuffer.getArrayOfReadPointers(), numSamples);
-                thumbnail.addBlock(nextSampleNum, audioBuffer, 0, numSamples);
-                nextSampleNum += numSamples;
-            }
+        if (activeWriter.load() != nullptr) {
+            activeWriter.load()->write(buffer.getArrayOfReadPointers(), numSamples);
+            thumbnail.addBlock(nextSampleNum, buffer, 0, numSamples);
+            nextSampleNum += numSamples;
         }
     }
 
@@ -155,8 +141,6 @@ private:
     juce::TimeSliceThread backgroundThread { "Audio Recorder Thread" }; // the thread that will write our audio data to disk
     std::unique_ptr<juce::AudioFormatWriter::ThreadedWriter> threadedWriter; // the FIFO used to buffer the incoming data
     juce::int64 nextSampleNum = 0;
-    std::vector<float> buffer = std::vector<float>(2 << 12);
-    std::shared_ptr<BufferConsumer> consumer;
 
     double recordingLength = 99999999999.0;
 
@@ -220,7 +204,7 @@ public:
 		addAndMakeVisible(recordLength);
 
 		recordButton.setTooltip("Start recording audio to a WAV file. Press again to stop and save the recording.");
-		timedRecord.setTooltip("Record for a set amount of time. When enabled, the recording will automatically stop once the time is reached.");
+		timedRecord.setTooltip("Record for a set amount of time in seconds. When enabled, the recording will automatically stop once the time is reached.");
         
         recordLength.setValue(1);
 
