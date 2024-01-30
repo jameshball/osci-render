@@ -76,7 +76,7 @@ private:
     const double BUFFER_DURATION_SECS = 0.02;
     
     int sampleRate = DEFAULT_SAMPLE_RATE;
-	std::vector<float> buffer;
+	std::vector<float> buffer = std::vector<float>(BUFFER_DURATION_SECS * DEFAULT_SAMPLE_RATE);
 
 	std::atomic<float> leftVolume = 0;
 	std::atomic<float> rightVolume = 0;

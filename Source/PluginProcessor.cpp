@@ -168,6 +168,11 @@ const juce::String OscirenderAudioProcessor::getName() const {
     return JucePlugin_Name;
 }
 
+void OscirenderAudioProcessor::setAudioThreadCallback(std::function<void(const juce::AudioBuffer<float>&)> callback) {
+    juce::SpinLock::ScopedLockType lock(audioThreadCallbackLock);
+    audioThreadCallback = callback;
+}
+
 bool OscirenderAudioProcessor::acceptsMidi() const {
    #if JucePlugin_WantsMidiInput
     return true;
@@ -631,6 +636,10 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             }
         }
 	}
+
+    // used for any callback that must guarantee all audio is recieved (e.g. when recording to a file)
+    juce::SpinLock::ScopedLockType lock(audioThreadCallbackLock);
+    audioThreadCallback(buffer);
 }
 
 //==============================================================================

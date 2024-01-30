@@ -52,6 +52,8 @@ public:
 
     const juce::String getName() const override;
 
+    void setAudioThreadCallback(std::function<void(const juce::AudioBuffer<float>&)> callback);
+
     bool acceptsMidi() const override;
     bool producesMidi() const override;
     bool isMidiEffect() const override;
@@ -236,6 +238,9 @@ private:
     std::atomic<double> threshold = 1.0;
     
     bool prevMidiEnabled = !midiEnabled->getBoolValue();
+
+    juce::SpinLock audioThreadCallbackLock;
+    std::function<void(const juce::AudioBuffer<float>&)> audioThreadCallback;
 
     std::vector<BooleanParameter*> booleanParameters;
     std::vector<FloatParameter*> floatParameters;

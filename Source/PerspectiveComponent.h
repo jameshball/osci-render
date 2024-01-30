@@ -28,10 +28,10 @@ private:
 
     juce::TextButton resetRotation{"Reset Rotation"};
     juce::ToggleButton mouseRotate{"Rotate with Mouse (Esc to disable)"};
-
-    std::shared_ptr<SvgButton> fixedRotateX = std::make_shared<SvgButton>("fixedRotateX", juce::String(BinaryData::fixed_rotate_svg), "white", "red", audioProcessor.perspectiveEffect->fixedRotateX);
-    std::shared_ptr<SvgButton> fixedRotateY = std::make_shared<SvgButton>("fixedRotateY", juce::String(BinaryData::fixed_rotate_svg), "white", "red", audioProcessor.perspectiveEffect->fixedRotateY);
-    std::shared_ptr<SvgButton> fixedRotateZ = std::make_shared<SvgButton>("fixedRotateZ", juce::String(BinaryData::fixed_rotate_svg), "white", "red", audioProcessor.perspectiveEffect->fixedRotateZ);
+    
+    std::shared_ptr<SvgButton> fixedRotateX = std::make_shared<SvgButton>("fixedRotateX", juce::String(BinaryData::fixed_rotate_svg), juce::Colours::white, juce::Colours::red, audioProcessor.perspectiveEffect->fixedRotateX);
+    std::shared_ptr<SvgButton> fixedRotateY = std::make_shared<SvgButton>("fixedRotateY", juce::String(BinaryData::fixed_rotate_svg), juce::Colours::white, juce::Colours::red, audioProcessor.perspectiveEffect->fixedRotateY);
+    std::shared_ptr<SvgButton> fixedRotateZ = std::make_shared<SvgButton>("fixedRotateZ", juce::String(BinaryData::fixed_rotate_svg), juce::Colours::white, juce::Colours::red, audioProcessor.perspectiveEffect->fixedRotateZ);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PerspectiveComponent)
 };

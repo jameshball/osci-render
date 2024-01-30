@@ -8,6 +8,7 @@
 #include "audio/PitchDetector.h"
 #include "UGen/ugen_JuceEnvelopeComponent.h"
 #include "components/SvgButton.h"
+#include "components/AudioRecordingComponent.h"
 
 class OscirenderAudioProcessorEditor;
 class MainComponent : public juce::GroupComponent {
@@ -25,7 +26,7 @@ private:
 	std::unique_ptr<juce::FileChooser> chooser;
 	juce::TextButton fileButton;
 	juce::TextButton closeFileButton;
-	SvgButton inputEnabled{"inputEnabled", juce::String(BinaryData::microphone_svg), "white", "red", audioProcessor.inputEnabled};
+	SvgButton inputEnabled{"inputEnabled", juce::String(BinaryData::microphone_svg), juce::Colours::white, juce::Colours::red, audioProcessor.inputEnabled};
 	juce::Label fileLabel;
 
 	juce::TextEditor fileName;
@@ -36,6 +37,8 @@ private:
 
 	juce::Label frequencyLabel;
 	int callbackIndex = -1;
+
+	AudioRecordingComponent recorder{audioProcessor};
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };

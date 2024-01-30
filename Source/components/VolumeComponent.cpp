@@ -98,6 +98,10 @@ void VolumeComponent::run() {
         if (sampleRate != (int) audioProcessor.currentSampleRate) {
             resetBuffer();
         }
+
+        if (buffer.size() == 0) {
+            continue;
+        }
         
         consumer = audioProcessor.consumerRegister(buffer);
         audioProcessor.consumerRead(consumer);
