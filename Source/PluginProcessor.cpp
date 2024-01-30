@@ -668,7 +668,9 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
     // used for any callback that must guarantee all audio is recieved (e.g. when recording to a file)
     juce::SpinLock::ScopedLockType lock(audioThreadCallbackLock);
-    audioThreadCallback(buffer);
+    if (audioThreadCallback != nullptr) {
+        audioThreadCallback(buffer);
+    }
 }
 
 //==============================================================================
