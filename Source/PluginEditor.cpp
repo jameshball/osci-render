@@ -58,7 +58,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
         audioProcessor.broadcaster.addChangeListener(this);
     }
 
-    if (audioProcessor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
+    if (juce::JUCEApplicationBase::isStandaloneApp()) {
         if (juce::TopLevelWindow::getNumTopLevelWindows() == 1) {
             juce::TopLevelWindow* w = juce::TopLevelWindow::getTopLevelWindow(0);
             juce::DocumentWindow* dw = dynamic_cast<juce::DocumentWindow*>(w);
@@ -67,6 +67,11 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
                 dw->setTitleBarButtonsRequired(juce::DocumentWindow::allButtons, false);
                 dw->setUsingNativeTitleBar(true);
             }
+        }
+
+        juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
+        if (standalone != nullptr) {
+            standalone->getMuteInputValue().setValue(false);
         }
     }
 
