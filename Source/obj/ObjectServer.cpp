@@ -38,9 +38,11 @@ void ObjectServer::run() {
                                 std::memcpy(message.get() + i, buffer, bytesRead);
                                 i += bytesRead;
 
-                                if (message[i] == '\n') {
-                                    message[i] = '\0';
-                                    break;
+                                for (int j = i - bytesRead; j < i; j++) {
+                                    if (message[j] == '\n') {
+                                        message[j] = '\0';
+                                        break;
+                                    }
                                 }
                             }
 
