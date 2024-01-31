@@ -22,6 +22,7 @@ private:
 	juce::ToggleButton midiToggle{"Enable MIDI"};
 	juce::Slider voicesSlider;
 	juce::Label voicesLabel;
+	juce::TextButton midiSettingsButton{"Audio/MIDI Settings..."};
 	juce::MidiKeyboardComponent keyboard{audioProcessor.keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard};
 
 	EnvelopeContainerComponent envelope;
