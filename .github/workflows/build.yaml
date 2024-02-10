@@ -19,7 +19,7 @@ jobs:
       - name: "Run script"
         run: |
           export OS="linux"
-          ./ci/setup-env.sh
+          source ./ci/setup-env.sh
           ./ci/test.sh
           ./ci/build.sh
         shell: bash
@@ -43,7 +43,7 @@ jobs:
       - name: "Run script"
         run: |
           export OS="mac"
-          ./ci/setup-env.sh
+          source ./ci/setup-env.sh
           ./ci/test.sh
           ./ci/build.sh
         shell: bash
@@ -67,7 +67,7 @@ jobs:
       - name: "Run script"
         run: |
           export OS="win"
-          ./ci/setup-env.sh
+          source ./ci/setup-env.sh
           ./ci/test.sh
           ./ci/build.sh
         shell: bash
