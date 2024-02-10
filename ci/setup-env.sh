@@ -1,5 +1,7 @@
 #!/bin/bash -e
 
+ls -R
+
 # linux specific stiff
 if [ $OS = "linux" ]; then
   sudo apt-get update
@@ -7,9 +9,7 @@ if [ $OS = "linux" ]; then
 fi
 
 ROOT=$(pwd)
-cd "$ROOT"
 echo "$ROOT"
-ls .
 rm -Rf bin
 mkdir bin
 

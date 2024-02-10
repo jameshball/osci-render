@@ -17,7 +17,7 @@ fi
 
 # Build linux version
 if [ "$OS" = "linux" ]; then
-  cd "$ROOT/Builds/LinuxMakefile"
+  cd "$ROOT/Builds/Test/LinuxMakefile"
   make CONFIG=Release
 
   cd build
@@ -32,7 +32,7 @@ if [ "$OS" = "win" ]; then
   MSBUILD_EXE=$("$VS_WHERE" -latest -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\MSBuild.exe")
   echo $MSBUILD_EXE
 
-  cd "$ROOT/Builds/VisualStudio2022"
+  cd "$ROOT/Builds/Test/VisualStudio2022"
   "$MSBUILD_EXE" "$PLUGIN.sln" "//p:VisualStudioVersion=16.0" "//m" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64"
   
   cd "x64/Release/Standalone Plugin"
