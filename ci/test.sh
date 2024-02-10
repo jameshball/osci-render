@@ -39,3 +39,5 @@ if [ "$OS" = "win" ]; then
   # Run the test using the .exe file
   ./$PLUGIN.exe
 fi
+
+cd "$ROOT"

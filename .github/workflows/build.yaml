@@ -20,8 +20,8 @@ jobs:
         run: |
           export OS="linux"
           source ./ci/setup-env.sh
-          ./ci/test.sh
-          ./ci/build.sh
+          source ./ci/test.sh
+          source ./ci/build.sh
         shell: bash
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
@@ -44,8 +44,8 @@ jobs:
         run: |
           export OS="mac"
           source ./ci/setup-env.sh
-          ./ci/test.sh
-          ./ci/build.sh
+          source ./ci/test.sh
+          source ./ci/build.sh
         shell: bash
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
@@ -68,8 +68,8 @@ jobs:
         run: |
           export OS="win"
           source ./ci/setup-env.sh
-          ./ci/test.sh
-          ./ci/build.sh
+          source ./ci/test.sh
+          source ./ci/build.sh
         shell: bash
       - name: Upload Artifact
         uses: actions/upload-artifact@v3

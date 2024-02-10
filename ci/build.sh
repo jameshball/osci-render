@@ -50,3 +50,5 @@ if [ "$OS" = "win" ]; then
   cp "$ROOT/Builds/VisualStudio2022/x64/Release/Standalone Plugin/$PLUGIN.exe" "$ROOT/bin"
   cp -r "$ROOT/Builds/VisualStudio2022/x64/Release/VST3/$PLUGIN.vst3/Contents/x86_64-win/$PLUGIN.vst3" "$ROOT/bin"
 fi
+
+cd "$ROOT"
