@@ -44,3 +44,5 @@ fi
 # Set global path
 GLOBAL_PATH_COMMAND="$PROJUCER_PATH --set-global-search-path $PROJUCER_OS 'defaultJuceModulePath' '$ROOT/ci/bin/JUCE/modules'"
 eval "$GLOBAL_PATH_COMMAND"
+
+cd "$ROOT"
