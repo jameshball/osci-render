@@ -42,7 +42,7 @@ if [ "$OS" = "win" ]; then
   echo "Running the test"
   ls
   # Run the test using the .exe file
-  ./"$PLUGIN.exe"
+  ./osci-render-test.exe
 fi
 
 cd "$ROOT"
