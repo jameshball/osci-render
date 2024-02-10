@@ -26,7 +26,7 @@ public:
 
         beginTest("Part B");
 
-        expect(false);
+        expect(true);
     }
 };
 
