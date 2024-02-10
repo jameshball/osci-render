@@ -11,8 +11,9 @@ if [ "$OS" = "mac" ]; then
   cd "$ROOT/Builds/Test/MacOSX"
   xcodebuild -configuration Release || exit 1
   cd "build/Release"
-  # Run the test using the .app file
-  open -a "$PLUGIN.app"
+  find .
+  # Run the test
+  ./"$PLUGIN"
 fi
 
 # Build linux version
@@ -35,9 +36,9 @@ if [ "$OS" = "win" ]; then
   cd "$ROOT/Builds/Test/VisualStudio2022"
   "$MSBUILD_EXE" "$PLUGIN.sln" "//p:VisualStudioVersion=16.0" "//m" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64"
   
-  cd "x64/Release/Standalone Plugin"
+  cd "x64/Release/ConsoleApp"
   # Run the test using the .exe file
-  ./$PLUGIN.exe
+  ./"$PLUGIN.exe"
 fi
 
 cd "$ROOT"
