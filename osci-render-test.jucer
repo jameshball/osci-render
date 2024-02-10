@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<JUCERPROJECT id="Dt5Xh7" name="osci-render-test" projectType="consoleapp"
+              useAppConfig="0" addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1">
+  <MAINGROUP id="ztPpnM" name="osci-render-test">
+    <GROUP id="{4373FA2A-1E20-AAA6-40E0-740C13D88B75}" name="Source">
+      <FILE id="IsmItc" name="TestMain.cpp" compile="1" resource="0" file="../Source/TestMain.cpp"/>
+      <GROUP id="{9D1E8A66-A99C-4333-3CF8-A86432FE09A7}" name="obj">
+        <FILE id="ItrCVG" name="Frustum.cpp" compile="1" resource="0" file="../Source/obj/Frustum.cpp"/>
+        <FILE id="xr4U2j" name="Frustum.h" compile="0" resource="0" file="../Source/obj/Frustum.h"/>
+      </GROUP>
+      <GROUP id="{71CDF579-70BE-4BE4-D061-E5A079751C8E}" name="shape">
+        <FILE id="Cpe50B" name="CircleArc.cpp" compile="1" resource="0" file="../Source/shape/CircleArc.cpp"/>
+        <FILE id="EAvBdQ" name="CircleArc.h" compile="0" resource="0" file="../Source/shape/CircleArc.h"/>
+        <FILE id="tBJOz5" name="CubicBezierCurve.cpp" compile="1" resource="0"
+              file="../Source/shape/CubicBezierCurve.cpp"/>
+        <FILE id="kqPZkY" name="CubicBezierCurve.h" compile="0" resource="0"
+              file="../Source/shape/CubicBezierCurve.h"/>
+        <FILE id="H9cnS9" name="Line.cpp" compile="1" resource="0" file="../Source/shape/Line.cpp"/>
+        <FILE id="rAHuMy" name="Line.h" compile="0" resource="0" file="../Source/shape/Line.h"/>
+        <FILE id="eoabzV" name="Point.cpp" compile="1" resource="0" file="../Source/shape/Point.cpp"/>
+        <FILE id="PLnC15" name="Point.h" compile="0" resource="0" file="../Source/shape/Point.h"/>
+        <FILE id="jWzgJJ" name="QuadraticBezierCurve.cpp" compile="1" resource="0"
+              file="../Source/shape/QuadraticBezierCurve.cpp"/>
+        <FILE id="bM4cRL" name="QuadraticBezierCurve.h" compile="0" resource="0"
+              file="../Source/shape/QuadraticBezierCurve.h"/>
+        <FILE id="etDjNu" name="Shape.cpp" compile="1" resource="0" file="../Source/shape/Shape.cpp"/>
+        <FILE id="UZ3kKQ" name="Shape.h" compile="0" resource="0" file="../Source/shape/Shape.h"/>
+      </GROUP>
+    </GROUP>
+  </MAINGROUP>
+  <MODULES>
+    <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_events" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+  </MODULES>
+  <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1"/>
+  <EXPORTFORMATS>
+    <LINUX_MAKE targetFolder="Builds/Test/LinuxMakefile">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render-test"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render-test"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
+      </MODULEPATHS>
+    </LINUX_MAKE>
+    <VS2022 targetFolder="Builds/Test/VisualStudio2022">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render-test"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render-test"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
+      </MODULEPATHS>
+    </VS2022>
+    <XCODE_MAC targetFolder="Builds/Test/MacOSX">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render-test"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render-test"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
+      </MODULEPATHS>
+    </XCODE_MAC>
+  </EXPORTFORMATS>
+</JUCERPROJECT>
