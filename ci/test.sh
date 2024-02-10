@@ -12,6 +12,7 @@ if [ "$OS" = "mac" ]; then
   xcodebuild -configuration Release || exit 1
   cd "build/Release"
   find .
+  echo "Running the test"
   # Run the test
   ./"$PLUGIN"
 fi
@@ -22,6 +23,7 @@ if [ "$OS" = "linux" ]; then
   make CONFIG=Release
 
   cd build
+  echo "Running the test"
   # Run the test using the binary
   xvfb-run -a -s "-screen 0 1280x720x24" ./$PLUGIN
 fi
@@ -37,6 +39,8 @@ if [ "$OS" = "win" ]; then
   "$MSBUILD_EXE" "$PLUGIN.sln" "//p:VisualStudioVersion=16.0" "//m" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64"
   
   cd "x64/Release/ConsoleApp"
+  echo "Running the test"
+  ls
   # Run the test using the .exe file
   ./"$PLUGIN.exe"
 fi
