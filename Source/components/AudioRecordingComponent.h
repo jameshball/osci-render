@@ -287,10 +287,13 @@ private:
             | juce::FileBrowserComponent::warnAboutOverwriting,
             [this](const juce::FileChooser& c) {
                 if (juce::FileInputStream inputStream(lastRecording); inputStream.openedOk()) {
-                    if (const auto outputStream = c.getURLResult().getLocalFile().createOutputStream()) {
-                        outputStream->setPosition(0);
-                        outputStream->truncate();
-                        outputStream->writeFromInputStream(inputStream, -1);
+                    juce::URL url = c.getURLResult();
+                    if (url.isLocalFile()) {
+                        if (const auto outputStream = url.getLocalFile().createOutputStream()) {
+                            outputStream->setPosition(0);
+                            outputStream->truncate();
+                            outputStream->writeFromInputStream(inputStream, -1);
+                        }
                     }
                 }
 

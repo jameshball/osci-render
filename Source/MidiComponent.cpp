@@ -38,6 +38,13 @@ MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
     envelope.addListener(&audioProcessor);
     envelope.setGrid(EnvelopeComponent::GridBoth, EnvelopeComponent::GridNone, 0.1, 0.25);
 
+    if (juce::JUCEApplicationBase::isStandaloneApp()) {
+        addAndMakeVisible(midiSettingsButton);
+        midiSettingsButton.onClick = [this]() {
+            pluginEditor.openAudioSettings();
+        };
+    }
+
     audioProcessor.attackTime->addListener(this);
     audioProcessor.attackLevel->addListener(this);
     audioProcessor.attackShape->addListener(this);
@@ -105,6 +112,9 @@ void MidiComponent::resized() {
     midiToggle.setBounds(topRow.removeFromLeft(120));
     topRow.removeFromLeft(80);
     voicesSlider.setBounds(topRow.removeFromLeft(250));
+    if (midiSettingsButton.isVisible()) {
+        midiSettingsButton.setBounds(topRow.removeFromRight(160));
+    }
     area.removeFromTop(5);
     keyboard.setBounds(area.removeFromBottom(50));
     envelope.setBounds(area);
