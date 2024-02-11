@@ -58,11 +58,20 @@ WorldObject::WorldObject(const std::string& obj_string) {
     // normalising object vertices
     //
     double x = 0.0, y = 0.0, z = 0.0;
-    double max = 0.0;
     for (int i = 0; i < numVertices; i++) {
         x += vs[i * 3];
         y += vs[i * 3 + 1];
         z += vs[i * 3 + 2];
+    }
+    x /= numVertices;
+    y /= numVertices;
+    z /= numVertices;
+
+    double max = 0.0;
+    for (int i = 0; i < numVertices; i++) {
+        vs[i * 3] = vs[i * 3] - x;
+        vs[i * 3 + 1] = vs[i * 3 + 1] - y;
+        vs[i * 3 + 2] = vs[i * 3 + 2] - z;
         if (std::abs(vs[i * 3]) > max) {
             max = std::abs(vs[i * 3]);
         }
@@ -73,14 +82,12 @@ WorldObject::WorldObject(const std::string& obj_string) {
             max = std::abs(vs[i * 3 + 2]);
         }
     }
-    x /= numVertices;
-    y /= numVertices;
-    z /= numVertices;
 
-    for (int i = 0; i < numVertices; i++) {
-        vs[i * 3] = (vs[i * 3] - x) / max;
-        vs[i * 3 + 1] = (vs[i * 3 + 1] - y) / max;
-        vs[i * 3 + 2] = (vs[i * 3 + 2] - z) / max;
+    // scaling down so that it's slightly smaller
+    max = 1.75 * max;
+
+    for (int i = 0; i < vs.size(); i++) {
+        vs[i] /= max;
     }
 
     //
