@@ -2,27 +2,23 @@
 
 #pragma once
 
-#include <JuceHeader.h>
-#include "../shape/Point.h"
+#include "../mathter/Matrix.hpp"
+#include <cmath>
+
+using Vec3 = mathter::Vector<float, 3, false>;
 
 class Frustum {
 public:
-	float ratio, nearDistance, farDistance, width, height, tang;
+	float ratio, nearDistance, farDistance, width, height, tang, focalLength;
 
-	Point origin = Point(0, 0, -1);
-
-	Point X = Point(1, 0, 0);
-	Point Y = Point(0, 1, 0);
-	Point Z = Point(0, 0, 1);
-
-	Frustum(float fov, float ratio, float nearDistance, float farDistance) {
-        setCameraInternals(fov, ratio, nearDistance, farDistance);
+	Frustum(float focalLength, float ratio, float nearDistance, float farDistance) {
+        setCameraInternals(focalLength, ratio, nearDistance, farDistance);
     }
 	~Frustum() {};
 
-	void setCameraOrigin(Point& p) {
-        origin = p;
+	void setCameraInternals(float focalLength, float ratio, float nearD, float farD);
+	void clipToFrustum(Vec3 &p);
+	float getFocalLength() {
+        return focalLength;
     }
-	void setCameraInternals(float fov, float ratio, float nearD, float farD);
-	void clipToFrustum(Point &p);
 };

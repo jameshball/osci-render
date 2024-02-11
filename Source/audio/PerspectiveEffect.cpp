@@ -1,6 +1,7 @@
 #include "PerspectiveEffect.h"
 #include <numbers>
 #include "../MathUtil.h"
+#include "../obj/Camera.h"
 
 PerspectiveEffect::PerspectiveEffect(int versionHint) {
     fixedRotateX = new BooleanParameter("Perspective Fixed Rotate X", "perspectiveFixedRotateX", versionHint, false);
@@ -13,7 +14,7 @@ PerspectiveEffect::~PerspectiveEffect() {}
 Point PerspectiveEffect::apply(int index, Point input, const std::vector<double>& values, double sampleRate) {
 	auto effectScale = values[0];
 	auto focalLength = juce::jmax(values[1], 0.001);
-	auto depth = 1.0 + (values[2] - 0.1) * 3;
+	auto depth = values[2];
 	auto rotateSpeed = linearSpeedToActualSpeed(values[3]);
 	double baseRotateX, baseRotateY, baseRotateZ;
 	if (fixedRotateX->getBoolValue()) {
@@ -67,17 +68,16 @@ Point PerspectiveEffect::apply(int index, Point input, const std::vector<double>
 
 	Point p = Point(x3, y3, z3);
 
-	Frustum frustum = Frustum(focalLength, 1.0, 0.1, 1000);
-	Point origin = Point(0, 0, -focalLength - depth);
-	frustum.setCameraOrigin(origin);
-	frustum.clipToFrustum(p);
+	Vec3 origin = Vec3(0, 0, -focalLength - depth);
+	camera.setPosition(origin);
+	camera.setFocalLength(focalLength);
+	Vec3 vec = Vec3(p.x, p.y, p.z);
 
-	// need to convert point from world space to camera space before projecting
-	p = p - origin;
+	Vec3 projected = camera.project(vec);
 
 	return Point(
-		(1 - effectScale) * input.x + effectScale * (p.x * focalLength / p.z),
-		(1 - effectScale) * input.y + effectScale * (p.y * focalLength / p.z),
+		(1 - effectScale) * input.x + effectScale * projected.x,
+		(1 - effectScale) * input.y + effectScale * projected.y,
 		0
 	);
 }

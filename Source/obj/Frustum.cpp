@@ -4,6 +4,7 @@
 
 void Frustum::setCameraInternals(float focalLength, float ratio, float nearDistance, float farDistance) {
 	// store the information
+	this->focalLength = focalLength;
 	this->ratio = ratio;
 	this->nearDistance = nearDistance;
 	this->farDistance = farDistance;
@@ -15,31 +16,22 @@ void Frustum::setCameraInternals(float focalLength, float ratio, float nearDista
 	width = height * ratio;
 }
 
-void Frustum::clipToFrustum(Point &p) {
+void Frustum::clipToFrustum(Vec3 &p) {
 	float pcz, pcx, pcy, aux;
 
-	// compute vector from camera position to p
-	Point v = p - origin;
-
 	// compute and test the Z coordinate
-	Point negZ = -Z;
-	pcz = v.innerProduct(Z);
-	pcz = juce::jlimit(nearDistance, farDistance, pcz);
+	pcz = p.z;
+	pcz = pcz < nearDistance ? nearDistance : (pcz > farDistance ? farDistance : pcz);
 
 	// compute and test the Y coordinate
-	pcy = v.innerProduct(Y);
+	pcy = p.y;
 	aux = std::abs(pcz * tang);
-	pcy = juce::jlimit(-aux, aux, pcy);
+	pcy = pcy < -aux ? -aux : (pcy > aux ? aux : pcy);
 
 	// compute and test the X coordinate
-	pcx = v.innerProduct(X);
+	pcx = p.x;
 	aux = aux * ratio;
-	pcx = juce::jlimit(-aux, aux, pcx);
+	pcx = pcx < -aux ? -aux : (pcx > aux ? aux : pcx);
 
-	// calculate the clipped point using the referential coordinates
-	Point x = X * pcx;
-	Point y = Y * pcy;
-	Point z = Z * pcz;
-
-	p = x + y + z + origin;
+	p = Vec3(pcx, pcy, pcz);
 }

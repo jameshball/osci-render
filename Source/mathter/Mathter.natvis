@@ -1,0 +1,58 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+//L=============================================================================
+//L This software is distributed under the MIT license.
+//L Copyright 2021 Péter Kardos
+//L=============================================================================
+-->
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  
+  <Type Name="mathter::Vector&lt;*&gt;">
+    <DisplayString Condition="$T2==1">[{x}]</DisplayString>
+    <DisplayString Condition="$T2==2">[{x}, {y}]</DisplayString>
+    <DisplayString Condition="$T2==3">[{x}, {y}, {z}]</DisplayString>
+    <DisplayString Condition="$T2==4">[{data[0]}, {y}, {z}, {w}]</DisplayString>
+    <DisplayString Condition="$T2==5">[{data[0]}, {data[1]}, {data[2]}, {data[3]}, {data[4]}]</DisplayString>
+    <DisplayString Condition="$T2&gt;5">dim={$T2}  [{data[0]}, {data[0]}, ..., {data[$T2-1]}]</DisplayString>
+    <Expand>
+      <Item Name="[dimension]" ExcludeView="simple">$T2</Item>
+      <ArrayItems>
+        <Size>$T2</Size>
+        <ValuePointer>($T1*)this</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  
+  <Type Name="mathter::Matrix&lt;*&gt;">
+    <DisplayString>{{rows={$T2}, columns={$T3}}}</DisplayString>
+    <Expand>
+      <Item Name="[rows]" ExcludeView="simple">$T2</Item>
+      <Item Name="[columns]" ExcludeView="simple">$T3</Item>
+      <ArrayItems Condition="$T5==0">
+        <Size>$T2</Size>
+        <ValuePointer>stripes._Elems</ValuePointer>
+      </ArrayItems>
+      <ArrayItems Condition="$T5==1">
+        <Size>$T3</Size>
+        <ValuePointer>stripes._Elems</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  
+    <Type Name="mathter::Quaternion&lt;*&gt;">
+    <DisplayString>[{w} + {i} i + {j} j + {k} k]</DisplayString>
+  </Type>
+
+  <Type Name="mathter::Hyperplane&lt;*&gt;">
+    <DisplayString Condition="$T2==3">{normal.x} x + {normal.y} y + {normal.z} z = {scalar}</DisplayString>
+    <DisplayString Condition="$T2==2">{normal.x} x + {normal.y} y = {scalar}</DisplayString>
+    <Expand>
+      <Item Name="[normal]">normal</Item>
+      <Item Name="[scalar]">scalar</Item>
+    </Expand>
+  </Type> 
+  
+  <Type Name="mathter::Line&lt;*&gt;">
+    <DisplayString>[v] = {base} + {direction} t</DisplayString>
+  </Type>
+</AutoVisualizer>

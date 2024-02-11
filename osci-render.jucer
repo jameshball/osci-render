@@ -6,7 +6,7 @@
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
               version="2.0.8" companyName="James H Ball" companyWebsite="https://osci-render.com"
-              companyEmail="james@ball.sh">
+              companyEmail="james@ball.sh" defines="NOMINMAX=1">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
       <GROUP id="{C2609827-4F4A-1ADA-8BA1-A40C1D92649C}" name="lua">
@@ -33,6 +33,98 @@
       </GROUP>
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <GROUP id="{50F56072-D264-AC8C-EAC9-A073059CDE27}" name="mathter">
+        <GROUP id="{60CE44FE-26F8-4CE0-3BFF-5475F8E0BD75}" name="Common">
+          <FILE id="XY4AlJ" name="Approx.hpp" compile="0" resource="0" file="Source/mathter/Common/Approx.hpp"/>
+          <FILE id="LeuGwE" name="Definitions.hpp" compile="0" resource="0" file="Source/mathter/Common/Definitions.hpp"/>
+          <FILE id="HcUnQp" name="DeterministicInitializer.hpp" compile="0" resource="0"
+                file="Source/mathter/Common/DeterministicInitializer.hpp"/>
+          <FILE id="qvzdH7" name="MathUtil.hpp" compile="0" resource="0" file="Source/mathter/Common/MathUtil.hpp"/>
+          <FILE id="wy5V3L" name="Range.hpp" compile="0" resource="0" file="Source/mathter/Common/Range.hpp"/>
+          <FILE id="hsfx9V" name="Traits.hpp" compile="0" resource="0" file="Source/mathter/Common/Traits.hpp"/>
+        </GROUP>
+        <GROUP id="{AA5719C4-2684-8629-96C2-ACCCC846741E}" name="Decompositions">
+          <FILE id="mqUNTZ" name="DecomposeLU.hpp" compile="0" resource="0" file="Source/mathter/Decompositions/DecomposeLU.hpp"/>
+          <FILE id="bajVyN" name="DecomposeQR.hpp" compile="0" resource="0" file="Source/mathter/Decompositions/DecomposeQR.hpp"/>
+          <FILE id="LVojfW" name="DecomposeSVD.hpp" compile="0" resource="0"
+                file="Source/mathter/Decompositions/DecomposeSVD.hpp"/>
+        </GROUP>
+        <GROUP id="{5223A16D-BBB0-7277-2DA2-5F83E36AF6D7}" name="Matrix">
+          <FILE id="NiMdHn" name="MatrixArithmetic.hpp" compile="0" resource="0"
+                file="Source/mathter/Matrix/MatrixArithmetic.hpp"/>
+          <FILE id="OG3XE0" name="MatrixCast.hpp" compile="0" resource="0" file="Source/mathter/Matrix/MatrixCast.hpp"/>
+          <FILE id="hzHEZU" name="MatrixCompare.hpp" compile="0" resource="0"
+                file="Source/mathter/Matrix/MatrixCompare.hpp"/>
+          <FILE id="TKewDV" name="MatrixFunction.hpp" compile="0" resource="0"
+                file="Source/mathter/Matrix/MatrixFunction.hpp"/>
+          <FILE id="az9Zbs" name="MatrixImpl.hpp" compile="0" resource="0" file="Source/mathter/Matrix/MatrixImpl.hpp"/>
+          <FILE id="ZApObW" name="MatrixVectorArithmetic.hpp" compile="0" resource="0"
+                file="Source/mathter/Matrix/MatrixVectorArithmetic.hpp"/>
+        </GROUP>
+        <GROUP id="{9ED17B79-C8AF-B25C-1B0D-01C8A868E93B}" name="Quaternion">
+          <FILE id="Pg5bBV" name="QuaternionArithmetic.hpp" compile="0" resource="0"
+                file="Source/mathter/Quaternion/QuaternionArithmetic.hpp"/>
+          <FILE id="Q40Fdf" name="QuaternionCompare.hpp" compile="0" resource="0"
+                file="Source/mathter/Quaternion/QuaternionCompare.hpp"/>
+          <FILE id="lnp7Lb" name="QuaternionFunction.hpp" compile="0" resource="0"
+                file="Source/mathter/Quaternion/QuaternionFunction.hpp"/>
+          <FILE id="qDNOvo" name="QuaternionImpl.hpp" compile="0" resource="0"
+                file="Source/mathter/Quaternion/QuaternionImpl.hpp"/>
+          <FILE id="eXgZ46" name="QuaternionLiterals.hpp" compile="0" resource="0"
+                file="Source/mathter/Quaternion/QuaternionLiterals.hpp"/>
+          <FILE id="oMB7Jr" name="QuaternionVectorArithmetic.hpp" compile="0"
+                resource="0" file="Source/mathter/Quaternion/QuaternionVectorArithmetic.hpp"/>
+        </GROUP>
+        <GROUP id="{D82CFD72-F5BE-1024-94AB-5C2503423E4D}" name="Swizzle">
+          <FILE id="CeOGVV" name="Swizzle_1.inc.hpp" compile="0" resource="0"
+                file="Source/mathter/Swizzle/Swizzle_1.inc.hpp"/>
+          <FILE id="jwhhIz" name="Swizzle_2.inc.hpp" compile="0" resource="0"
+                file="Source/mathter/Swizzle/Swizzle_2.inc.hpp"/>
+          <FILE id="fPNnzc" name="Swizzle_3.inc.hpp" compile="0" resource="0"
+                file="Source/mathter/Swizzle/Swizzle_3.inc.hpp"/>
+          <FILE id="gU43mt" name="Swizzle_4.inc.hpp" compile="0" resource="0"
+                file="Source/mathter/Swizzle/Swizzle_4.inc.hpp"/>
+        </GROUP>
+        <GROUP id="{2F08F8FD-A6D7-6DE3-CAD4-564E35A9F0B9}" name="Transforms">
+          <FILE id="pltHW9" name="IdentityBuilder.hpp" compile="0" resource="0"
+                file="Source/mathter/Transforms/IdentityBuilder.hpp"/>
+          <FILE id="g2kgGu" name="OrthographicBuilder.hpp" compile="0" resource="0"
+                file="Source/mathter/Transforms/OrthographicBuilder.hpp"/>
+          <FILE id="DBDXmX" name="PerspectiveBuilder.hpp" compile="0" resource="0"
+                file="Source/mathter/Transforms/PerspectiveBuilder.hpp"/>
+          <FILE id="Gj9MnE" name="Rotation2DBuilder.hpp" compile="0" resource="0"
+                file="Source/mathter/Transforms/Rotation2DBuilder.hpp"/>
+          <FILE id="Hq0ZLD" name="Rotation3DBuilder.hpp" compile="0" resource="0"
+                file="Source/mathter/Transforms/Rotation3DBuilder.hpp"/>
+          <FILE id="An6eDN" name="ScaleBuilder.hpp" compile="0" resource="0"
+                file="Source/mathter/Transforms/ScaleBuilder.hpp"/>
+          <FILE id="xzgGHN" name="ShearBuilder.hpp" compile="0" resource="0"
+                file="Source/mathter/Transforms/ShearBuilder.hpp"/>
+          <FILE id="OVvc6Z" name="TranslationBuilder.hpp" compile="0" resource="0"
+                file="Source/mathter/Transforms/TranslationBuilder.hpp"/>
+          <FILE id="TzGfIt" name="ViewBuilder.hpp" compile="0" resource="0" file="Source/mathter/Transforms/ViewBuilder.hpp"/>
+          <FILE id="VTTCpk" name="ZeroBuilder.hpp" compile="0" resource="0" file="Source/mathter/Transforms/ZeroBuilder.hpp"/>
+        </GROUP>
+        <GROUP id="{BA088AC1-AC2B-B70C-582E-EDF9E38ABC20}" name="Vector">
+          <FILE id="KDVsvP" name="VectorArithmetic.hpp" compile="0" resource="0"
+                file="Source/mathter/Vector/VectorArithmetic.hpp"/>
+          <FILE id="qBpF7X" name="VectorCompare.hpp" compile="0" resource="0"
+                file="Source/mathter/Vector/VectorCompare.hpp"/>
+          <FILE id="IinHSU" name="VectorConcat.hpp" compile="0" resource="0"
+                file="Source/mathter/Vector/VectorConcat.hpp"/>
+          <FILE id="aVRyP9" name="VectorFunction.hpp" compile="0" resource="0"
+                file="Source/mathter/Vector/VectorFunction.hpp"/>
+          <FILE id="af10kl" name="VectorImpl.hpp" compile="0" resource="0" file="Source/mathter/Vector/VectorImpl.hpp"/>
+        </GROUP>
+        <FILE id="vOLhwO" name="CMakeLists.txt" compile="0" resource="1" file="Source/mathter/CMakeLists.txt"/>
+        <FILE id="d4t0xm" name="Geometry.hpp" compile="0" resource="0" file="Source/mathter/Geometry.hpp"/>
+        <FILE id="AZxH75" name="IoStream.hpp" compile="0" resource="0" file="Source/mathter/IoStream.hpp"/>
+        <FILE id="ev6gxl" name="Mathter.natvis" compile="0" resource="1" file="Source/mathter/Mathter.natvis"/>
+        <FILE id="VBewvB" name="Matrix.hpp" compile="0" resource="0" file="Source/mathter/Matrix.hpp"/>
+        <FILE id="vlSQrm" name="Quaternion.hpp" compile="0" resource="0" file="Source/mathter/Quaternion.hpp"/>
+        <FILE id="Aos8s3" name="Utility.hpp" compile="0" resource="0" file="Source/mathter/Utility.hpp"/>
+        <FILE id="T6rqIo" name="Vector.hpp" compile="0" resource="0" file="Source/mathter/Vector.hpp"/>
+      </GROUP>
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
         <FILE id="WDV6eI" name="AudioWebSocketServer.cpp" compile="1" resource="0"
               file="Source/audio/AudioWebSocketServer.cpp"/>
@@ -398,6 +490,8 @@
             file="Source/MidiComponent.cpp"/>
       <FILE id="GJqoJa" name="MidiComponent.h" compile="0" resource="0" file="Source/MidiComponent.h"/>
       <GROUP id="{E6ED85A9-3843-825F-EF48-BCF81E38F8AD}" name="obj">
+        <FILE id="ahOy0q" name="Camera.cpp" compile="1" resource="0" file="Source/obj/Camera.cpp"/>
+        <FILE id="dUDESs" name="Camera.h" compile="0" resource="0" file="Source/obj/Camera.h"/>
         <FILE id="T6iC8q" name="Frustum.cpp" compile="1" resource="0" file="Source/obj/Frustum.cpp"/>
         <FILE id="ky5ZfA" name="Frustum.h" compile="0" resource="0" file="Source/obj/Frustum.h"/>
         <FILE id="Yfpzzn" name="ObjectServer.cpp" compile="1" resource="0"

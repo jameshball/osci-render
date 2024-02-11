@@ -1,6 +1,6 @@
 #include <JuceHeader.h>
-#include "shape/Point.h"
-#include "obj/Frustum.h"
+#include "obj/Camera.h"
+#include "mathter/Common/Approx.hpp"
 
 class FrustumTest : public juce::UnitTest {
 public:
@@ -8,100 +8,108 @@ public:
 
     void runTest() override {
         double focalLength = 1;
-        double ratio = 1;
-        double nearDistance = 0.1;
-        double farDistance = 100;
 
-        Frustum frustum(focalLength, ratio, nearDistance, farDistance);
-        frustum.setCameraOrigin(Point(0, 0, -focalLength));
+        Camera camera;
+        camera.setFocalLength(focalLength);
+        Vec3 position = Vec3(0, 0, -focalLength);
+        camera.setPosition(position);
+        Frustum frustum = camera.getFrustum();
 
         beginTest("Focal Plane Frustum In-Bounds");
 
         // Focal plane is at z = 0
-        Point points[][2] = {
-            {Point(0, 0, 0), Point(0, 0, 0)},
-            {Point(1, 1, 0), Point(1, 1, 0)},
-            {Point(-1, -1, 0), Point(-1, -1, 0)},
-            {Point(1, -1, 0), Point(1, -1, 0)},
-            {Point(-1, 1, 0), Point(-1, 1, 0)},
-            {Point(0.5, 0.5, 0), Point(0.5, 0.5, 0)},
+        Vec3 vecs[] = {
+            Vec3(0, 0, 0), Vec3(0, 0, 0),
+            Vec3(1, 1, 0), Vec3(1, 1, 0),
+            Vec3(-1, -1, 0), Vec3(-1, -1, 0),
+            Vec3(1, -1, 0), Vec3(1, -1, 0),
+            Vec3(-1, 1, 0), Vec3(-1, 1, 0),
+            Vec3(0.5, 0.5, 0), Vec3(0.5, 0.5, 0),
         };
 
-        testFrustumClippedEqualsExpected(points, frustum, 6);
+        testFrustumClippedEqualsExpected(vecs, camera, frustum, 6);
 
         beginTest("Focal Plane Frustum Out-Of-Bounds");
 
         // Focal plane is at z = 0
-        Point points2[][2] = {
-            {Point(1.1, 1.1, 0), Point(1, 1, 0)},
-            {Point(-1.1, -1.1, 0), Point(-1, -1, 0)},
-            {Point(1.1, -1.1, 0), Point(1, -1, 0)},
-            {Point(-1.1, 1.1, 0), Point(-1, 1, 0)},
-            {Point(1.1, 0.5, 0), Point(1, 0.5, 0)},
-            {Point(-1.1, 0.5, 0), Point(-1, 0.5, 0)},
-            {Point(0.5, -1.1, 0), Point(0.5, -1, 0)},
-            {Point(0.5, 1.1, 0), Point(0.5, 1, 0)},
-            {Point(10, 10, 0), Point(1, 1, 0)},
-            {Point(-10, -10, 0), Point(-1, -1, 0)},
-            {Point(10, -10, 0), Point(1, -1, 0)},
-            {Point(-10, 10, 0), Point(-1, 1, 0)},
+        Vec3 vecs2[] = {
+            Vec3(1.1, 1.1, 0), Vec3(1, 1, 0),
+            Vec3(-1.1, -1.1, 0), Vec3(-1, -1, 0),
+            Vec3(1.1, -1.1, 0), Vec3(1, -1, 0),
+            Vec3(-1.1, 1.1, 0), Vec3(-1, 1, 0),
+            Vec3(1.1, 0.5, 0), Vec3(1, 0.5, 0),
+            Vec3(-1.1, 0.5, 0), Vec3(-1, 0.5, 0),
+            Vec3(0.5, -1.1, 0), Vec3(0.5, -1, 0),
+            Vec3(0.5, 1.1, 0), Vec3(0.5, 1, 0),
+            Vec3(10, 10, 0), Vec3(1, 1, 0),
+            Vec3(-10, -10, 0), Vec3(-1, -1, 0),
+            Vec3(10, -10, 0), Vec3(1, -1, 0),
+            Vec3(-10, 10, 0), Vec3(-1, 1, 0),
         };
 
-        testFrustumClippedEqualsExpected(points2, frustum, 12);
+        testFrustumClippedEqualsExpected(vecs2, camera, frustum, 12);
 
         beginTest("Behind Camera Out-Of-Bounds");
 
-        double minZWorldCoords = -focalLength + nearDistance;
+        double minZWorldCoords = -focalLength + frustum.nearDistance;
 
-        Point points3[][2] = {
-            {Point(0, 0, -focalLength), Point(0, 0, minZWorldCoords)},
-            {Point(0, 0, -100), Point(0, 0, minZWorldCoords)},
-            {Point(0.5, 0.5, -focalLength), Point(0.1, 0.1, minZWorldCoords)},
-            {Point(10, -10, -focalLength), Point(0.1, -0.1, minZWorldCoords)},
-            {Point(-0.5, 0.5, -100), Point(-0.1, 0.1, minZWorldCoords)},
-            {Point(-10, 10, -100), Point(-0.1, 0.1, minZWorldCoords)},
+        Vec3 vecs3[] = {
+            Vec3(0, 0, -focalLength), Vec3(0, 0, minZWorldCoords),
+            Vec3(0, 0, -100), Vec3(0, 0, minZWorldCoords),
+            Vec3(0.5, 0.5, -focalLength), Vec3(0.1, 0.1, minZWorldCoords),
+            Vec3(10, -10, -focalLength), Vec3(0.1, -0.1, minZWorldCoords),
+            Vec3(-0.5, 0.5, -100), Vec3(-0.1, 0.1, minZWorldCoords),
+            Vec3(-10, 10, -100), Vec3(-0.1, 0.1, minZWorldCoords),
         };
 
-        testFrustumClippedEqualsExpected(points3, frustum, 6);
+        testFrustumClippedEqualsExpected(vecs3, camera, frustum, 6);
 
         beginTest("3D Point Out-Of-Bounds");
 
-        Point points4[] = {
-            Point(1, 1, -0.1),
-            Point(-1, -1, -0.1),
-            Point(1, -1, -0.1),
-            Point(-1, 1, -0.1),
-            Point(0.5, 0.5, minZWorldCoords),
+        Vec3 vecs4[] = {
+            Vec3(1, 1, -0.1),
+            Vec3(-1, -1, -0.1),
+            Vec3(1, -1, -0.1),
+            Vec3(-1, 1, -0.1),
+            Vec3(0.5, 0.5, minZWorldCoords),
         };
 
-        testFrustumClipOccurs(points4, frustum, 5);
+        testFrustumClipOccurs(vecs4, camera, frustum, 5);
     }
 
-    Point project(Point& p, double focalLength) {
-        return Point(
+    Vec3 project(Vec3& p, double focalLength) {
+        return Vec3(
             p.x * focalLength / p.z,
             p.y * focalLength / p.z,
             0
         );
     }
 
-    juce::String errorMessage(Point& actual, Point& expected) {
-        return "Expected: " + expected.toString() + " Got: " + actual.toString();
+    juce::String vec3ToString(Vec3& p) {
+        return "(" + juce::String(p.x) + ", " + juce::String(p.y) + ", " + juce::String(p.z) + ")";
     }
 
-    void testFrustumClippedEqualsExpected(Point points[][2], Frustum& frustum, int length) {
+    juce::String errorMessage(Vec3& actual, Vec3& expected) {
+        return "Expected: " + vec3ToString(expected) + ", Actual: " + vec3ToString(actual);
+    }
+
+    void testFrustumClippedEqualsExpected(Vec3 vecs[], Camera& camera, Frustum& frustum, int length) {
         for (int i = 0; i < length; i++) {
-            Point p = points[i][0];
+            Vec3 p = vecs[2 * i];
+            p = camera.toCameraSpace(p);
             frustum.clipToFrustum(p);
-            expect(p == points[i][1], errorMessage(p, points[i][1]));
+            p = camera.toWorldSpace(p);
+            expect(mathter::AlmostEqual(p, vecs[2 * i + 1]), errorMessage(p, vecs[2 * i + 1]));
         }
     }
 
-    void testFrustumClipOccurs(Point points[], Frustum& frustum, int length) {
+    void testFrustumClipOccurs(Vec3 vecs[], Camera& camera, Frustum& frustum, int length) {
         for (int i = 0; i < length; i++) {
-            Point p = points[i];
+            Vec3 p = vecs[i];
+            p = camera.toCameraSpace(p);
             frustum.clipToFrustum(p);
-            expect(p != points[i], errorMessage(p, points[i]));
+            p = camera.toWorldSpace(p);
+            expect(!mathter::AlmostEqual(p, vecs[i]), errorMessage(p, vecs[i]));
         }
     }
 };

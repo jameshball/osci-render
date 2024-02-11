@@ -3,7 +3,7 @@
 #include "../shape/Point.h"
 #include "../audio/Effect.h"
 #include "../lua/LuaParser.h"
-#include "../obj/Frustum.h"
+#include "../obj/Camera.h"
 
 class PerspectiveEffect : public EffectApplication {
 public:
@@ -29,4 +29,6 @@ private:
         }
         return actualSpeed;
     }
+
+	Camera camera;
 };
