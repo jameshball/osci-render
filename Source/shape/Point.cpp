@@ -1,5 +1,7 @@
 #include "Point.h"
 
+double Point::EPSILON = 0.0001;
+
 Point::Point() : x(0), y(0), z(0) {}
 
 Point::Point(double val) : x(val), y(val), z(0) {}
@@ -78,6 +80,14 @@ Point& Point::operator=(const Point& other) {
 	return *this;
 }
 
+bool Point::operator==(const Point& other) {
+    return std::abs(x - other.x) < EPSILON && std::abs(y - other.y) < EPSILON && std::abs(z - other.z) < EPSILON;
+}
+
+bool Point::operator!=(const Point& other) {
+    return !(*this == other);
+}
+
 Point Point::operator+(const Point& other) {
     return Point(x + other.x, y + other.y, z + other.z);
 }
@@ -96,4 +106,8 @@ Point Point::operator*(const Point& other) {
 
 Point Point::operator*(double scalar) {
     return Point(x * scalar, y * scalar, z * scalar);
+}
+
+std::string Point::toString() {
+    return std::string("(" + std::to_string(x) + ", " + std::to_string(y) + ", " + std::to_string(z) + ")");
 }

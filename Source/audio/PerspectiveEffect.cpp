@@ -68,7 +68,12 @@ Point PerspectiveEffect::apply(int index, Point input, const std::vector<double>
 	Point p = Point(x3, y3, z3);
 
 	Frustum frustum = Frustum(focalLength, 1.0, 0.1, 1000);
+	Point origin = Point(0, 0, -focalLength - depth);
+	frustum.setCameraOrigin(origin);
 	frustum.clipToFrustum(p);
+
+	// need to convert point from world space to camera space before projecting
+	p = p - origin;
 
 	return Point(
 		(1 - effectScale) * input.x + effectScale * (p.x * focalLength / p.z),

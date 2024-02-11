@@ -9,7 +9,7 @@ class Frustum {
 public:
 	float ratio, nearDistance, farDistance, width, height, tang;
 
-	Point origin = Point(0, 0, 0);
+	Point origin = Point(0, 0, -1);
 
 	Point X = Point(1, 0, 0);
 	Point Y = Point(0, 1, 0);
@@ -20,6 +20,9 @@ public:
     }
 	~Frustum() {};
 
+	void setCameraOrigin(Point& p) {
+        origin = p;
+    }
 	void setCameraInternals(float fov, float ratio, float nearD, float farD);
 	void clipToFrustum(Point &p);
 };

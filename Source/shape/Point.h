@@ -23,8 +23,11 @@ public:
 	void normalize();
 	double innerProduct(Point& other);
 
-	// copy assignment operator
+	std::string toString();
+
 	Point& operator=(const Point& other);
+	bool operator==(const Point& other);
+	bool operator!=(const Point& other);
 	Point operator+(const Point& other);
 	Point operator-(const Point& other);
 	Point operator-();
@@ -33,4 +36,5 @@ public:
 
 	double x, y, z;
 	
+	static double EPSILON;
 };

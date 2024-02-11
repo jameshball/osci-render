@@ -9,8 +9,7 @@ void Frustum::setCameraInternals(float focalLength, float ratio, float nearDista
 	this->farDistance = farDistance;
 
 	// compute width and height of the near section
-	float fov = 2 * std::atan(1 / (focalLength * 2));
-	origin = Point(0, 0, -focalLength);
+	float fov = 2 * std::atan(1 / focalLength);
 	tang = (float) std::tan(fov * 0.5);
 	height = nearDistance * tang;
 	width = height * ratio;
@@ -29,7 +28,7 @@ void Frustum::clipToFrustum(Point &p) {
 
 	// compute and test the Y coordinate
 	pcy = v.innerProduct(Y);
-	aux = pcz * tang;
+	aux = std::abs(pcz * tang);
 	pcy = juce::jlimit(-aux, aux, pcy);
 
 	// compute and test the X coordinate
@@ -42,5 +41,5 @@ void Frustum::clipToFrustum(Point &p) {
 	Point y = Y * pcy;
 	Point z = Z * pcz;
 
-	p = x + y + z;
+	p = x + y + z + origin;
 }
