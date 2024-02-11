@@ -1,7 +1,5 @@
 #pragma once
-#include <vector>
-#include <memory>
-#include <JuceHeader.h>
+
 #include "../mathter/Matrix.hpp"
 #include "Frustum.h"
 
@@ -12,7 +10,6 @@ public:
 	Camera();
 
 	void setPosition(Vec3& position);
-	void findZPos(std::vector<float>& vertices);
 	Vec3 toCameraSpace(Vec3& point);
 	Vec3 toWorldSpace(Vec3& point);
 	void setFocalLength(double focalLength);

@@ -102,24 +102,6 @@
         <FILE id="V3Q6n2" name="Frustum.cpp" compile="1" resource="0" file="Source/obj/Frustum.cpp"/>
         <FILE id="m9wauB" name="Frustum.h" compile="0" resource="0" file="Source/obj/Frustum.h"/>
       </GROUP>
-      <GROUP id="{2FFB1E70-C58F-FC28-4D59-AF861B331B54}" name="shape">
-        <FILE id="J5Nnzj" name="CircleArc.cpp" compile="1" resource="0" file="Source/shape/CircleArc.cpp"/>
-        <FILE id="oNmrlE" name="CircleArc.h" compile="0" resource="0" file="Source/shape/CircleArc.h"/>
-        <FILE id="u8e3mP" name="CubicBezierCurve.cpp" compile="1" resource="0"
-              file="Source/shape/CubicBezierCurve.cpp"/>
-        <FILE id="aJoApp" name="CubicBezierCurve.h" compile="0" resource="0"
-              file="Source/shape/CubicBezierCurve.h"/>
-        <FILE id="bbtKzH" name="Line.cpp" compile="1" resource="0" file="Source/shape/Line.cpp"/>
-        <FILE id="Q4bPoy" name="Line.h" compile="0" resource="0" file="Source/shape/Line.h"/>
-        <FILE id="tZJGSA" name="Point.cpp" compile="1" resource="0" file="Source/shape/Point.cpp"/>
-        <FILE id="LaJfn7" name="Point.h" compile="0" resource="0" file="Source/shape/Point.h"/>
-        <FILE id="sRz2K2" name="QuadraticBezierCurve.cpp" compile="1" resource="0"
-              file="Source/shape/QuadraticBezierCurve.cpp"/>
-        <FILE id="DB78dq" name="QuadraticBezierCurve.h" compile="0" resource="0"
-              file="Source/shape/QuadraticBezierCurve.h"/>
-        <FILE id="NrZ4bk" name="Shape.cpp" compile="1" resource="0" file="Source/shape/Shape.cpp"/>
-        <FILE id="QmxyPg" name="Shape.h" compile="0" resource="0" file="Source/shape/Shape.h"/>
-      </GROUP>
       <FILE id="bQ1rDR" name="TestMain.cpp" compile="1" resource="0" file="Source/TestMain.cpp"/>
     </GROUP>
   </MAINGROUP>
