@@ -89,10 +89,6 @@ void SettingsComponent::update() {
     txt.update();
 }
 
-void SettingsComponent::disableMouseRotation() {
-    perspective.disableMouseRotation();
-}
-
 void SettingsComponent::toggleLayout(juce::StretchableLayoutManager& layout, double prefSize) {
     double minSize, maxSize, preferredSize;
     layout.getItemLayout(2, minSize, maxSize, preferredSize);

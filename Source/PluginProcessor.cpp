@@ -53,14 +53,17 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         std::make_shared<DistortEffect>(true),
         new EffectParameter("Distort Y", "Distorts the image in the vertical direction by jittering the audio sample being drawn.", "distortY", VERSION_HINT, 0.0, 0.0, 1.0)
     ));
+    toggleableEffects.push_back(rotate);
     toggleableEffects.push_back(std::make_shared<Effect>(
         [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
             input.x += values[0];
             input.y += values[1];
+			input.z += values[2];
             return input;
         }, std::vector<EffectParameter*>{
-            new EffectParameter("Translate X", "Moves the image horizontally.", "translateX", VERSION_HINT, 0.0, -1.0, 1.0),
-            new EffectParameter("Translate Y", "Moves the image vertically.", "translateY", VERSION_HINT, 0.0, -1.0, 1.0)
+            new EffectParameter("Translate X", "Moves the object horizontally.", "translateX", VERSION_HINT, 0.0, -1.0, 1.0),
+            new EffectParameter("Translate Y", "Moves the object vertically.", "translateY", VERSION_HINT, 0.0, -1.0, 1.0),
+			new EffectParameter("Translate Z", "Moves the object away from the camera.", "translateZ", VERSION_HINT, 0.0, -1.0, 1.0),
         }
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
@@ -119,9 +122,9 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         }
     }
 
-    booleanParameters.push_back(perspectiveEffect->fixedRotateX);
-    booleanParameters.push_back(perspectiveEffect->fixedRotateY);
-    booleanParameters.push_back(perspectiveEffect->fixedRotateZ);
+    booleanParameters.push_back(rotateEffect->fixedRotateX);
+    booleanParameters.push_back(rotateEffect->fixedRotateY);
+    booleanParameters.push_back(rotateEffect->fixedRotateZ);
     booleanParameters.push_back(midiEnabled);
     booleanParameters.push_back(inputEnabled);
 

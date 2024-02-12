@@ -84,17 +84,17 @@ void EffectsListComponent::resized() {
 }
 
 std::shared_ptr<juce::Component> EffectsListComponent::createComponent(EffectParameter* parameter) {
-	if (parameter->paramID == "perspectiveRotateX" || parameter->paramID == "perspectiveRotateY" || parameter->paramID == "perspectiveRotateZ") {
+	if (parameter->paramID == "rotateX" || parameter->paramID == "rotateY" || parameter->paramID == "rotateZ") {
 		BooleanParameter* toggle;
 		juce::String axis;
-		if (parameter->paramID == "perspectiveRotateX") {
-            toggle = audioProcessor.perspectiveEffect->fixedRotateX;
+		if (parameter->paramID == "rotateX") {
+            toggle = audioProcessor.rotateEffect->fixedRotateX;
 			axis = "X";
-		} else if (parameter->paramID == "perspectiveRotateY") {
-            toggle = audioProcessor.perspectiveEffect->fixedRotateY;
+		} else if (parameter->paramID == "rotateY") {
+            toggle = audioProcessor.rotateEffect->fixedRotateY;
 			axis = "Y";
-		} else if (parameter->paramID == "perspectiveRotateZ") {
-            toggle = audioProcessor.perspectiveEffect->fixedRotateZ;
+		} else if (parameter->paramID == "rotateZ") {
+            toggle = audioProcessor.rotateEffect->fixedRotateZ;
 			axis = "Z";
         }
 		std::shared_ptr<SvgButton> button = std::make_shared<SvgButton>(parameter->name, BinaryData::fixed_rotate_svg, juce::Colours::white, juce::Colours::red, toggle);

@@ -9,6 +9,5 @@ public:
 
 	Point apply(int index, Point input, const std::vector<double>& values, double sampleRate) override;
 private:
-	double leftAvg = 0;
-	double rightAvg = 0;
+	Point avg;
 };

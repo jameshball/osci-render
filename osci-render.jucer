@@ -165,6 +165,9 @@
         <FILE id="rQC2gX" name="PitchDetector.h" compile="0" resource="0" file="Source/audio/PitchDetector.h"/>
         <FILE id="t5g8pf" name="PublicSynthesiser.h" compile="0" resource="0"
               file="Source/audio/PublicSynthesiser.h"/>
+        <FILE id="IwGnf3" name="RotateEffect.cpp" compile="1" resource="0"
+              file="Source/audio/RotateEffect.cpp"/>
+        <FILE id="iOgy18" name="RotateEffect.h" compile="0" resource="0" file="Source/audio/RotateEffect.h"/>
         <FILE id="dBaZAV" name="ShapeSound.cpp" compile="1" resource="0" file="Source/audio/ShapeSound.cpp"/>
         <FILE id="VKBirB" name="ShapeSound.h" compile="0" resource="0" file="Source/audio/ShapeSound.h"/>
         <FILE id="UcPZ09" name="ShapeVoice.cpp" compile="1" resource="0" file="Source/audio/ShapeVoice.cpp"/>

@@ -377,9 +377,7 @@ bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
         }
     }
     
-    if (key.isKeyCode(juce::KeyPress::escapeKey)) {
-        settings.disableMouseRotation();
-    } else if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'S') {
+    if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'S') {
         saveProjectAs();
     } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'S') {
         saveProject();

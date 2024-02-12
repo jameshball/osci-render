@@ -29,10 +29,13 @@ public:
 	bool operator==(const Point& other);
 	bool operator!=(const Point& other);
 	Point operator+(const Point& other);
+	Point operator+(double scalar);
+	friend Point operator+(double scalar, const Point& point);
 	Point operator-(const Point& other);
 	Point operator-();
 	Point operator*(const Point& other);
 	Point operator*(double scalar);
+	friend Point operator*(double scalar, const Point& point);
 
 	double x, y, z;
 	

@@ -17,7 +17,6 @@ public:
 	void resized() override;
 	void fileUpdated(juce::String fileName);
 	void update();
-	void disableMouseRotation();
 	void toggleLayout(juce::StretchableLayoutManager& layout, double prefSize);
 	void mouseMove(const juce::MouseEvent& event) override;
 	void mouseDown(const juce::MouseEvent& event) override;

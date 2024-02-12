@@ -92,6 +92,12 @@ Point Point::operator+(const Point& other) {
     return Point(x + other.x, y + other.y, z + other.z);
 }
 
+Point Point::operator+(double scalar) {
+	return Point(x + scalar, y + scalar, z + scalar);
+}
+
+
+
 Point Point::operator-(const Point& other) {
     return Point(x - other.x, y - other.y, z - other.z);
 }
@@ -110,4 +116,12 @@ Point Point::operator*(double scalar) {
 
 std::string Point::toString() {
     return std::string("(" + std::to_string(x) + ", " + std::to_string(y) + ", " + std::to_string(z) + ")");
+}
+
+Point operator+(double scalar, const Point& point) {
+	return Point(point.x + scalar, point.y + scalar, point.z + scalar);
+}
+
+Point operator*(double scalar, const Point& point) {
+	return Point(point.x * scalar, point.y * scalar, point.z * scalar);
 }
