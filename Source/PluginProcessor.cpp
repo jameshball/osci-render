@@ -53,7 +53,16 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         std::make_shared<DistortEffect>(true),
         new EffectParameter("Distort Y", "Distorts the image in the vertical direction by jittering the audio sample being drawn.", "distortY", VERSION_HINT, 0.0, 0.0, 1.0)
     ));
-    toggleableEffects.push_back(rotate);
+    toggleableEffects.push_back(std::make_shared<Effect>(
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
+            input.rotate(values[0] * std::numbers::pi, values[1] * std::numbers::pi, values[2] * std::numbers::pi);
+            return input;
+        }, std::vector<EffectParameter*>{
+            new EffectParameter("Rotate X", "Controls the rotation of the object in the X axis.", "rotateX", VERSION_HINT, 0.0, -1.0, 1.0),
+            new EffectParameter("Rotate Y", "Controls the rotation of the object in the Y axis.", "rotateY", VERSION_HINT, 0.0, -1.0, 1.0),
+            new EffectParameter("Rotate Z", "Controls the rotation of the object in the Z axis.", "rotateZ", VERSION_HINT, 0.0, -1.0, 1.0),
+        }
+    ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
             input.x += values[0];
@@ -122,9 +131,6 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         }
     }
 
-    booleanParameters.push_back(rotateEffect->fixedRotateX);
-    booleanParameters.push_back(rotateEffect->fixedRotateY);
-    booleanParameters.push_back(rotateEffect->fixedRotateZ);
     booleanParameters.push_back(midiEnabled);
     booleanParameters.push_back(inputEnabled);
 

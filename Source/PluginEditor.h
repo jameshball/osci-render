@@ -24,6 +24,7 @@ public:
     void fileUpdated(juce::String fileName);
     void handleAsyncUpdate() override;
     void changeListenerCallback(juce::ChangeBroadcaster* source) override;
+    void toggleLayout(juce::StretchableLayoutManager& layout, double prefSize);
 
     void editCustomFunction(bool enabled);
 
@@ -39,6 +40,9 @@ private:
     OscirenderAudioProcessor& audioProcessor;
 public:
 
+    const double CLOSED_PREF_SIZE = 30.0;
+    const double RESIZER_BAR_SIZE = 7.0;
+
     OscirenderLookAndFeel lookAndFeel;
 
     std::atomic<bool> editingCustomFunction = false;
@@ -46,6 +50,7 @@ public:
     VisualiserComponent visualiser{2, audioProcessor};
     std::atomic<bool> visualiserFullScreen = false;
     SettingsComponent settings{audioProcessor, *this};
+    LuaComponent lua{audioProcessor, *this};
     VolumeComponent volume{audioProcessor};
 
     std::vector<std::shared_ptr<juce::CodeDocument>> codeDocuments;
@@ -63,6 +68,9 @@ public:
 
     juce::StretchableLayoutManager layout;
     juce::StretchableLayoutResizerBar resizerBar{&layout, 1, true};
+
+    juce::StretchableLayoutManager luaLayout;
+    juce::StretchableLayoutResizerBar luaResizerBar{&luaLayout, 1, false};
 
     juce::TooltipWindow tooltipWindow{this, 0};
 

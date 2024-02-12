@@ -7,11 +7,9 @@ PerspectiveComponent::PerspectiveComponent(OscirenderAudioProcessor& p, Oscirend
 
 	addAndMakeVisible(perspective);
 	addAndMakeVisible(focalLength);
-	addAndMakeVisible(distance);
 
 	perspective.setSliderOnValueChange();
 	focalLength.setSliderOnValueChange();
-	distance.setSliderOnValueChange();
 }
 
 PerspectiveComponent::~PerspectiveComponent() {}
@@ -21,5 +19,4 @@ void PerspectiveComponent::resized() {
 	double rowHeight = 30;
 	perspective.setBounds(area.removeFromTop(rowHeight));
 	focalLength.setBounds(area.removeFromTop(rowHeight));
-	distance.setBounds(area.removeFromTop(rowHeight));
 }

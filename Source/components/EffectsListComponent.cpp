@@ -84,26 +84,7 @@ void EffectsListComponent::resized() {
 }
 
 std::shared_ptr<juce::Component> EffectsListComponent::createComponent(EffectParameter* parameter) {
-	if (parameter->paramID == "rotateX" || parameter->paramID == "rotateY" || parameter->paramID == "rotateZ") {
-		BooleanParameter* toggle;
-		juce::String axis;
-		if (parameter->paramID == "rotateX") {
-            toggle = audioProcessor.rotateEffect->fixedRotateX;
-			axis = "X";
-		} else if (parameter->paramID == "rotateY") {
-            toggle = audioProcessor.rotateEffect->fixedRotateY;
-			axis = "Y";
-		} else if (parameter->paramID == "rotateZ") {
-            toggle = audioProcessor.rotateEffect->fixedRotateZ;
-			axis = "Z";
-        }
-		std::shared_ptr<SvgButton> button = std::make_shared<SvgButton>(parameter->name, BinaryData::fixed_rotate_svg, juce::Colours::white, juce::Colours::red, toggle);
-		button->setTooltip("Toggles whether the rotation around the " + axis + " axis is fixed, or changes according to the rotation speed.");
-		button->onClick = [this, toggle] {
-			toggle->setBoolValueNotifyingHost(!toggle->getBoolValue());
-        };
-		return button;
-	} else if (parameter->paramID == "customEffectStrength") {
+	if (parameter->paramID == "customEffectStrength") {
 		std::shared_ptr<SvgButton> button = std::make_shared<SvgButton>(parameter->name, BinaryData::pencil_svg, juce::Colours::white, juce::Colours::red);
 		std::weak_ptr<SvgButton> weakButton = button;
 		button->setEdgeIndent(5);

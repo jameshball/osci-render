@@ -25,7 +25,6 @@
 #include "UGen/Env.h"
 #include "UGen/ugen_JuceEnvelopeComponent.h"
 #include "audio/CustomEffect.h"
-#include "audio/RotateEffect.h"
 
 //==============================================================================
 /**
@@ -149,19 +148,7 @@ public:
         std::vector<EffectParameter*>{
             new EffectParameter("3D Perspective", "Controls the strength of the 3D perspective projection.", "perspectiveStrength", VERSION_HINT, 1.0, 0.0, 1.0),
             new EffectParameter("Focal Length", "Controls the focal length of the 3D perspective effect. A higher focal length makes the image look more flat, and a lower focal length makes the image look more 3D.", "perspectiveFocalLength", VERSION_HINT, 2.0, 0.0, 10.0),
-            new EffectParameter("Distance (z)", "Controls how far away the 3D object is drawn away from the camera (the Z position).", "perspectiveZPos", VERSION_HINT, 0.0, -10.0, 10.0),
         }
-    );
-
-    std::shared_ptr<RotateEffect> rotateEffect = std::make_shared<RotateEffect>(VERSION_HINT);
-    std::shared_ptr<Effect> rotate = std::make_shared<Effect>(
-        rotateEffect,
-        std::vector<EffectParameter*>{
-            new EffectParameter("Rotate Speed", "Controls how fast the 3D object rotates in the direction determined by the rotation sliders below.", "rotateSpeed", VERSION_HINT, 0.0, -1.0, 1.0),
-            new EffectParameter("Rotate X", "Controls the rotation of the object in the X axis.", "rotateX", VERSION_HINT, 1.0, -1.0, 1.0),
-            new EffectParameter("Rotate Y", "Controls the rotation of the object in the Y axis.", "rotateY", VERSION_HINT, 1.0, -1.0, 1.0),
-            new EffectParameter("Rotate Z", "Controls the rotation of the object in the Z axis.", "rotateZ", VERSION_HINT, 1.0, -1.0, 1.0),
-    }
     );
     
     BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false);

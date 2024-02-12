@@ -18,7 +18,6 @@ private:
 
     EffectComponent perspective{audioProcessor, *audioProcessor.perspective, 0};
     EffectComponent focalLength{audioProcessor, *audioProcessor.perspective, 1};
-    EffectComponent distance{audioProcessor, *audioProcessor.perspective, 2};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PerspectiveComponent)
 };

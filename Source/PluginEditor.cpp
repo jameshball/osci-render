@@ -80,11 +80,18 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     setResizeLimits(500, 400, 999999, 999999);
 
     layout.setItemLayout(0, -0.3, -1.0, -0.7);
-    layout.setItemLayout(1, 7, 7, 7);
+    layout.setItemLayout(1, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE);
     layout.setItemLayout(2, -0.1, -1.0, -0.3);
 
     addAndMakeVisible(settings);
     addAndMakeVisible(resizerBar);
+
+    luaLayout.setItemLayout(0, -0.3, -1.0, -0.7);
+    luaLayout.setItemLayout(1, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE);
+    luaLayout.setItemLayout(2, -0.1, -1.0, -0.3);
+
+    addAndMakeVisible(lua);
+    addAndMakeVisible(luaResizerBar);
 
     if (visualiserFullScreen) {
         addAndMakeVisible(visualiser);
@@ -134,6 +141,10 @@ void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
     if ((originalIndex != -1 || editingCustomFunction) && index < codeEditors.size() && codeEditors[index]->isVisible()) {
         auto ds = juce::DropShadow(juce::Colours::black, 5, juce::Point<int>(0, 0));
         ds.drawForRectangle(g, codeEditors[index]->getBounds());
+
+        if (editingCustomFunction || audioProcessor.getFileName(originalIndex).fromLastOccurrenceOf(".", true, false) == ".lua") {
+            ds.drawForRectangle(g, lua.getBounds());
+        }
     }
 }
 
@@ -156,8 +167,6 @@ void OscirenderAudioProcessorEditor::resized() {
     area.removeFromLeft(3);
     bool editorVisible = false;
 
-    juce::Component dummy;
-
     {
         juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
 
@@ -167,23 +176,47 @@ void OscirenderAudioProcessorEditor::resized() {
             if (codeEditors[index]->isVisible()) {
                 editorVisible = true;
 
-                juce::Component* columns[] = { &dummy, &resizerBar, codeEditors[index].get() };
+                juce::Component dummy;
+                juce::Component dummy2;
+
+                juce::Component* columns[] = { &dummy, &resizerBar, &dummy2 };
                  
                 // offsetting the y position by -1 and the height by +1 is a hack to fix a bug where the code editor
                 // doesn't draw up to the edges of the menu bar above.
                 layout.layOutComponents(columns, 3, area.getX(), area.getY() - 1, area.getWidth(), area.getHeight() + 1, false, true);
                 auto dummyBounds = dummy.getBounds();
                 collapseButton.setBounds(dummyBounds.removeFromRight(20));
-
                 area = dummyBounds;
-                
+
+                auto dummy2Bounds = dummy2.getBounds();
+                dummy2Bounds.removeFromBottom(5);
+                dummy2Bounds.removeFromTop(5);
+                dummy2Bounds.removeFromRight(5);
+
+                juce::String extension;
+                if (originalIndex >= 0) {
+                    extension = audioProcessor.getFileName(originalIndex).fromLastOccurrenceOf(".", true, false);
+                }
+
+                if (editingCustomFunction || extension == ".lua") {
+                    juce::Component* rows[] = { codeEditors[index].get(), &luaResizerBar, &lua };
+                    luaLayout.layOutComponents(rows, 3, dummy2Bounds.getX(), dummy2Bounds.getY(), dummy2Bounds.getWidth(), dummy2Bounds.getHeight(), true, true);
+                } else {
+                    codeEditors[index]->setBounds(dummy2Bounds);
+                    luaResizerBar.setBounds(0, 0, 0, 0);
+                    lua.setBounds(0, 0, 0, 0);
+                }
             } else {
                 codeEditors[index]->setBounds(0, 0, 0, 0);
                 resizerBar.setBounds(0, 0, 0, 0);
+                luaResizerBar.setBounds(0, 0, 0, 0);
+                lua.setBounds(0, 0, 0, 0);
                 collapseButton.setBounds(area.removeFromRight(20));
             }
         } else {
             collapseButton.setBounds(0, 0, 0, 0);
+            luaResizerBar.setBounds(0, 0, 0, 0);
+            lua.setBounds(0, 0, 0, 0);
         }
     }
 
@@ -295,6 +328,25 @@ void OscirenderAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcas
         juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
         // triggered when the audioProcessor changes the current file (e.g. to Blender)
         settings.fileUpdated(audioProcessor.getCurrentFileName());
+    }
+}
+
+void OscirenderAudioProcessorEditor::toggleLayout(juce::StretchableLayoutManager& layout, double prefSize) {
+    double minSize, maxSize, preferredSize;
+    double otherMinSize, otherMaxSize, otherPreferredSize;
+    layout.getItemLayout(2, minSize, maxSize, preferredSize);
+    layout.getItemLayout(0, otherMinSize, otherMaxSize, otherPreferredSize);
+
+    if (preferredSize == CLOSED_PREF_SIZE) {
+        double otherPrefSize = -(1 + prefSize);
+        if (prefSize > 0) {
+            otherPrefSize = -1.0;
+        }
+        layout.setItemLayout(2, CLOSED_PREF_SIZE, maxSize, prefSize);
+        layout.setItemLayout(0, CLOSED_PREF_SIZE, otherMaxSize, otherPrefSize);
+    } else {
+        layout.setItemLayout(2, CLOSED_PREF_SIZE, maxSize, CLOSED_PREF_SIZE);
+        layout.setItemLayout(0, CLOSED_PREF_SIZE, otherMaxSize, -1.0);
     }
 }
 

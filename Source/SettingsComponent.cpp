@@ -7,27 +7,16 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     addAndMakeVisible(perspective);
     addAndMakeVisible(midiResizerBar);
     addAndMakeVisible(mainResizerBar);
-    addAndMakeVisible(mainPerspectiveResizerBar);
-    addAndMakeVisible(effectResizerBar);
     addAndMakeVisible(midi);
-    addChildComponent(lua);
     addChildComponent(txt);
 
     midiLayout.setItemLayout(0, -0.1, -1.0, -1.0);
-    midiLayout.setItemLayout(1, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE);
-    midiLayout.setItemLayout(2, CLOSED_PREF_SIZE, -0.9, CLOSED_PREF_SIZE);
+    midiLayout.setItemLayout(1, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE);
+    midiLayout.setItemLayout(2, pluginEditor.CLOSED_PREF_SIZE, -0.9, pluginEditor.CLOSED_PREF_SIZE);
 
     mainLayout.setItemLayout(0, -0.1, -0.9, -0.4);
-    mainLayout.setItemLayout(1, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE);
+    mainLayout.setItemLayout(1, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE);
     mainLayout.setItemLayout(2, -0.1, -0.9, -0.6);
-
-    mainPerspectiveLayout.setItemLayout(0, RESIZER_BAR_SIZE, -1.0, -1.0);
-    mainPerspectiveLayout.setItemLayout(1, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE);
-    mainPerspectiveLayout.setItemLayout(2, CLOSED_PREF_SIZE, -1.0, CLOSED_PREF_SIZE);
-
-    effectLayout.setItemLayout(0, CLOSED_PREF_SIZE, -1.0, -0.6);
-    effectLayout.setItemLayout(1, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE);
-    effectLayout.setItemLayout(2, CLOSED_PREF_SIZE, -1.0, -0.4);
 }
 
 
@@ -47,38 +36,35 @@ void SettingsComponent::resized() {
     juce::Component* columns[] = { &dummy2, &mainResizerBar, &dummy };
     mainLayout.layOutComponents(columns, 3, dummy.getX(), dummy.getY(), dummy.getWidth(), dummy.getHeight(), false, true);
 
-    juce::Component* rows1[] = { &main, &mainPerspectiveResizerBar, &perspective };
-    mainPerspectiveLayout.layOutComponents(rows1, 3, dummy2.getX(), dummy2.getY(), dummy2.getWidth(), dummy2.getHeight(), true, true);
+    auto bounds = dummy2.getBounds();
+    perspective.setBounds(bounds.removeFromBottom(120));
+    bounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
+    main.setBounds(bounds);
 
     juce::Component* effectSettings = nullptr;
 
-    if (lua.isVisible()) {
-        effectSettings = &lua;
-    } else if (txt.isVisible()) {
+    if (txt.isVisible()) {
         effectSettings = &txt;
     }
 
-    juce::Component* rows2[] = {&effects, &effectResizerBar, effectSettings};
+    auto dummyBounds = dummy.getBounds();
 
-    // use the dummy component to work out the bounds of the rows
     if (effectSettings != nullptr) {
-        effectLayout.layOutComponents(rows2, 3, dummy.getX(), dummy.getY(), dummy.getWidth(), dummy.getHeight(), true, true);
-    } else {
-        effects.setBounds(dummy.getBounds());
+        effectSettings->setBounds(dummyBounds.removeFromBottom(150));
+        dummyBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
     }
+
+    effects.setBounds(dummyBounds);
 
     repaint();
 }
 
 void SettingsComponent::fileUpdated(juce::String fileName) {
     juce::String extension = fileName.fromLastOccurrenceOf(".", true, false);
-    lua.setVisible(false);
     txt.setVisible(false);
     if (fileName.isEmpty() || audioProcessor.objectServerRendering) {
         // do nothing
-    } else if (extension == ".lua") {
-        lua.setVisible(true);
-    } else if (extension == ".txt") {
+    } if (extension == ".txt") {
         txt.setVisible(true);
     }
     main.updateFileLabel();
@@ -89,25 +75,9 @@ void SettingsComponent::update() {
     txt.update();
 }
 
-void SettingsComponent::toggleLayout(juce::StretchableLayoutManager& layout, double prefSize) {
-    double minSize, maxSize, preferredSize;
-    layout.getItemLayout(2, minSize, maxSize, preferredSize);
-
-    if (preferredSize == CLOSED_PREF_SIZE) {
-        double otherPrefSize = -(1 + prefSize);
-        layout.setItemLayout(2, CLOSED_PREF_SIZE, -1.0, prefSize);
-        layout.setItemLayout(0, CLOSED_PREF_SIZE, -1.0, otherPrefSize);
-    } else {
-        layout.setItemLayout(2, CLOSED_PREF_SIZE, -1.0, CLOSED_PREF_SIZE);
-        layout.setItemLayout(0, CLOSED_PREF_SIZE, -1.0, -1.0);
-    }
-    
-    resized();
-}
-
 void SettingsComponent::mouseMove(const juce::MouseEvent& event) {
-    for (int i = 0; i < 4; i++) {
-        if (toggleComponents[i]->getBounds().removeFromTop(CLOSED_PREF_SIZE).contains(event.getPosition())) {
+    for (int i = 0; i < 2; i++) {
+        if (toggleComponents[i]->getBounds().removeFromTop(pluginEditor.CLOSED_PREF_SIZE).contains(event.getPosition())) {
             setMouseCursor(juce::MouseCursor::PointingHandCursor);
             return;
         }
@@ -117,8 +87,10 @@ void SettingsComponent::mouseMove(const juce::MouseEvent& event) {
 
 void SettingsComponent::mouseDown(const juce::MouseEvent& event) {
     for (int i = 0; i < 4; i++) {
-        if (toggleComponents[i]->getBounds().removeFromTop(CLOSED_PREF_SIZE).contains(event.getPosition())) {
-            toggleLayout(*toggleLayouts[i], prefSizes[i]);
+        if (toggleComponents[i]->getBounds().removeFromTop(pluginEditor.CLOSED_PREF_SIZE).contains(event.getPosition())) {
+            pluginEditor.toggleLayout(*toggleLayouts[i], prefSizes[i]);
+            resized();
+            return;
         }
     }
 }
@@ -131,9 +103,7 @@ void SettingsComponent::paint(juce::Graphics& g) {
     dc.drawForRectangle(g, midi.getBounds());
     dc.drawForRectangle(g, perspective.getBounds());
 
-    if (lua.isVisible()) {
-        dc.drawForRectangle(g, lua.getBounds());
-    } else if (txt.isVisible()) {
+    if (txt.isVisible()) {
         dc.drawForRectangle(g, txt.getBounds());
     }
 }
