@@ -12,6 +12,7 @@ struct pair_hash {
 
 //
 // returns all vertex indices in all connected sub-components of the graph
+// TODO: move this to a graph class
 //
 std::vector<std::vector<int>> ConnectedComponents(Graph& G) {
     std::vector<std::vector<int>> components;
@@ -67,24 +68,24 @@ WorldObject::WorldObject(const std::string& obj_string) {
     y /= numVertices;
     z /= numVertices;
 
-    double max = 0.0;
+    float max = 0.0;
     for (int i = 0; i < numVertices; i++) {
-        vs[i * 3] = vs[i * 3] - x;
-        vs[i * 3 + 1] = vs[i * 3 + 1] - y;
-        vs[i * 3 + 2] = vs[i * 3 + 2] - z;
-        if (std::abs(vs[i * 3]) > max) {
-            max = std::abs(vs[i * 3]);
-        }
-        if (std::abs(vs[i * 3 + 1]) > max) {
-            max = std::abs(vs[i * 3 + 1]);
-        }
-        if (std::abs(vs[i * 3 + 2]) > max) {
-            max = std::abs(vs[i * 3 + 2]);
-        }
+        float newX = vs[i * 3] - x;
+        float newY = vs[i * 3 + 1] - y;
+        float newZ = vs[i * 3 + 2] - z;
+
+        float det = newX * newX + newY * newY + newZ * newZ;
+        max = det > max ? det : max;
+        
+        vs[i * 3] = newX;
+        vs[i * 3 + 1] = newY;
+        vs[i * 3 + 2] = newZ;
     }
 
+    max = std::sqrt(max);
+    
     // scaling down so that it's slightly smaller
-    max = 1.75 * max;
+    max = 1.2 * max;
 
     for (int i = 0; i < vs.size(); i++) {
         vs[i] /= max;
@@ -139,6 +140,7 @@ WorldObject::WorldObject(const std::string& obj_string) {
     std::vector<std::vector<int>> connected_components = ConnectedComponents(graph);
 
     // perform chinese postman on all connected sub-components of graph
+    // TODO: move this to separate graph-related file
     for (auto& connected_component : connected_components) {
         // TODO: make this parallel: https://stackoverflow.com/questions/36246300/parallel-loops-in-c
 		// TODO: check the number of edges in the subgraph to make sure it's not too large compared to java version
