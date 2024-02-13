@@ -53,6 +53,18 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         std::make_shared<DistortEffect>(true),
         new EffectParameter("Distort Y", "Distorts the image in the vertical direction by jittering the audio sample being drawn.", "distortY", VERSION_HINT, 0.0, 0.0, 1.0)
     ));
+	toggleableEffects.push_back(std::make_shared<Effect>(
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
+            double phase = values[1] * std::numbers::pi;
+            double distance = 100 * values[2] * (input.x * input.x + input.y * input.y);
+            input.z += values[0] * std::sin(phase + distance);
+            return input;
+        }, std::vector<EffectParameter*>{
+            new EffectParameter("Ripple Depth", "Controls how large the ripples applied to the image are.", "rippleDepth", VERSION_HINT, 0.0, 0.0, 1.0),
+            new EffectParameter("Ripple Phase", "Controls the position of the ripple. Animate this to see a moving ripple effect.", "ripplePhase", VERSION_HINT, 0.0, -1.0, 1.0),
+			new EffectParameter("Ripple Amount", "Controls how many ripples are applied to the image.", "rippleAmount", VERSION_HINT, 0.1, 0.0, 1.0),
+        }
+    ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
             input.rotate(values[0] * std::numbers::pi, values[1] * std::numbers::pi, values[2] * std::numbers::pi);
