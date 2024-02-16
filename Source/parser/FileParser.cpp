@@ -53,7 +53,7 @@ Point FileParser::nextSample(lua_State*& L, const LuaVariables vars, long& step,
 		if (values.size() < 2) {
             return Point();
         }
-		return Point(values[0], values[1]);
+		return Point(values[0], values[1], values[2]);
 	}
 }
 

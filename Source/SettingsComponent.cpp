@@ -86,7 +86,7 @@ void SettingsComponent::mouseMove(const juce::MouseEvent& event) {
 }
 
 void SettingsComponent::mouseDown(const juce::MouseEvent& event) {
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 1; i++) {
         if (toggleComponents[i]->getBounds().removeFromTop(pluginEditor.CLOSED_PREF_SIZE).contains(event.getPosition())) {
             pluginEditor.toggleLayout(*toggleLayouts[i], prefSizes[i]);
             resized();

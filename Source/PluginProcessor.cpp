@@ -35,7 +35,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
 
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<BitCrushEffect>(),
-        new EffectParameter("Bit Crush", "Limits the resolution of points drawn to the screen, making the image look pixelated, and making the audio sound more 'digital' and distorted.", "bitCrush", VERSION_HINT, 0.0, 0.0, 1.0)
+        new EffectParameter("Bit Crush", "Limits the resolution of points drawn to the screen, making the object look pixelated, and making the audio sound more 'digital' and distorted.", "bitCrush", VERSION_HINT, 0.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<BulgeEffect>(),
@@ -45,13 +45,25 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         std::make_shared<VectorCancellingEffect>(),
         new EffectParameter("Vector Cancelling", "Inverts the audio and image every few samples to 'cancel out' the audio, making the audio quiet, and distorting the image.", "vectorCancelling", VERSION_HINT, 0.0, 0.0, 1.0)
     ));
+	toggleableEffects.push_back(std::make_shared<Effect>(
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
+            return input * Point(values[0], values[1], values[2]);
+		}, std::vector<EffectParameter*>{
+		    new EffectParameter("Scale X", "Scales the object in the horizontal direction.", "scaleX", VERSION_HINT, 1.0, -5.0, 5.0),
+			new EffectParameter("Scale Y", "Scales the object in the vertical direction.", "scaleY", VERSION_HINT, 1.0, -5.0, 5.0),
+			new EffectParameter("Scale Z", "Scales the depth of the object.", "scaleZ", VERSION_HINT, 1.0, -5.0, 5.0),
+	    }
+	));
     toggleableEffects.push_back(std::make_shared<Effect>(
-        std::make_shared<DistortEffect>(false),
-        new EffectParameter("Distort X", "Distorts the image in the horizontal direction by jittering the audio sample being drawn.", "distortX", VERSION_HINT, 0.0, 0.0, 1.0)
-    ));
-    toggleableEffects.push_back(std::make_shared<Effect>(
-        std::make_shared<DistortEffect>(true),
-        new EffectParameter("Distort Y", "Distorts the image in the vertical direction by jittering the audio sample being drawn.", "distortY", VERSION_HINT, 0.0, 0.0, 1.0)
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
+			int flip = index % 2 == 0 ? 1 : -1;
+			Point jitter = Point(flip * values[0], flip * values[1], flip * values[2]);
+			return input + jitter;
+        }, std::vector<EffectParameter*>{
+            new EffectParameter("Distort X", "Distorts the image in the horizontal direction by jittering the audio sample being drawn.", "distortX", VERSION_HINT, 0.0, 0.0, 1.0),
+            new EffectParameter("Distort Y", "Distorts the image in the vertical direction by jittering the audio sample being drawn.", "distortY", VERSION_HINT, 0.0, 0.0, 1.0),
+            new EffectParameter("Distort Z", "Distorts the depth of the image by jittering the audio sample being drawn.", "distortZ", VERSION_HINT, 0.0, 0.0, 1.0),
+	    }
     ));
 	toggleableEffects.push_back(std::make_shared<Effect>(
         [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
@@ -77,14 +89,21 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
-            input.x += values[0];
-            input.y += values[1];
-			input.z += values[2];
-            return input;
+            return input + Point(values[0], values[1], values[2]);
         }, std::vector<EffectParameter*>{
             new EffectParameter("Translate X", "Moves the object horizontally.", "translateX", VERSION_HINT, 0.0, -1.0, 1.0),
             new EffectParameter("Translate Y", "Moves the object vertically.", "translateY", VERSION_HINT, 0.0, -1.0, 1.0),
 			new EffectParameter("Translate Z", "Moves the object away from the camera.", "translateZ", VERSION_HINT, 0.0, -1.0, 1.0),
+        }
+    ));
+    toggleableEffects.push_back(std::make_shared<Effect>(
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
+            double length = 10 * values[0] * input.magnitude();
+            double newX = input.x * std::cos(length) - input.y * std::sin(length);
+            double newY = input.x * std::sin(length) + input.y * std::cos(length);
+            return Point(newX, newY, input.z);
+        }, std::vector<EffectParameter*>{
+            new EffectParameter("Swirl", "Swirls the image in a spiral pattern.", "swirl", VERSION_HINT, 0.0, -1.0, 1.0),
         }
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
