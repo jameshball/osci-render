@@ -41,7 +41,11 @@ std::vector<std::unique_ptr<Shape>> FileParser::nextFrame() {
 		return text->draw();
 	}
 	auto tempShapes = std::vector<std::unique_ptr<Shape>>();
-	tempShapes.push_back(std::make_unique<CircleArc>(0, 0, 0.5, 0.5, std::numbers::pi / 4.0, 2 * std::numbers::pi));
+	// return a square
+	tempShapes.push_back(std::make_unique<Line>(Point(-0.5, -0.5, 0), Point(0.5, -0.5, 0)));
+	tempShapes.push_back(std::make_unique<Line>(Point(0.5, -0.5, 0), Point(0.5, 0.5, 0)));
+	tempShapes.push_back(std::make_unique<Line>(Point(0.5, 0.5, 0), Point(-0.5, 0.5, 0)));
+	tempShapes.push_back(std::make_unique<Line>(Point(-0.5, 0.5, 0), Point(-0.5, -0.5, 0)));
 	return tempShapes;
 }
 

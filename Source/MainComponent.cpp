@@ -32,7 +32,6 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 	};
 
 	addAndMakeVisible(closeFileButton);
-	closeFileButton.setButtonText("Close File");
 	
 	closeFileButton.onClick = [this] {
 		juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
@@ -163,9 +162,14 @@ void MainComponent::resized() {
 	row.removeFromLeft(rowPadding);
 	inputEnabled.setBounds(row.removeFromLeft(20));
 	row.removeFromLeft(rowPadding);
+	if (audioProcessor.getCurrentFileIndex() != -1) {
+		closeFileButton.setBounds(row.removeFromRight(20));
+		row.removeFromRight(rowPadding);
+	} else {
+		closeFileButton.setBounds(juce::Rectangle<int>());
+	}
+	
 	fileLabel.setBounds(row);
-	bounds.removeFromTop(padding);
-	closeFileButton.setBounds(bounds.removeFromTop(buttonHeight).removeFromLeft(buttonWidth));
 
 	bounds.removeFromTop(padding);
 	row = bounds.removeFromTop(buttonHeight);

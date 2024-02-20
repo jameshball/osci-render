@@ -7,6 +7,7 @@ class Line : public Shape {
 public:
 	Line(double x1, double y1, double x2, double y2);
 	Line(double x1, double y1, double z1, double x2, double y2, double z2);
+	Line(Point p1, Point p2);
 
 	Point nextVector(double drawingProgress) override;
 	void scale(double x, double y, double z) override;
