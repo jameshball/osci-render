@@ -25,6 +25,7 @@
 #include "UGen/Env.h"
 #include "UGen/ugen_JuceEnvelopeComponent.h"
 #include "audio/CustomEffect.h"
+#include "audio/DashedLineEffect.h"
 
 //==============================================================================
 /**
@@ -138,6 +139,8 @@ public:
     );
 
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
+
+    std::shared_ptr<DashedLineEffect> dashedLineEffect = std::make_shared<DashedLineEffect>();
 
     std::function<void(int, juce::String, juce::String)> errorCallback = [this](int lineNum, juce::String fileName, juce::String error) { notifyErrorListeners(lineNum, fileName, error); };
     std::shared_ptr<CustomEffect> customEffect = std::make_shared<CustomEffect>(errorCallback);
