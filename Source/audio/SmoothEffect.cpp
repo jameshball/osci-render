@@ -5,7 +5,7 @@ SmoothEffect::SmoothEffect() {}
 SmoothEffect::~SmoothEffect() {}
 
 Point SmoothEffect::apply(int index, Point input, const std::vector<double>& values, double sampleRate) {
-    double weight = values[0];
+	double weight = juce::jmax(values[0], 0.00001);
     weight *= 0.95;
     double strength = 10;
     weight = std::log(strength * weight + 1) / std::log(strength + 1);

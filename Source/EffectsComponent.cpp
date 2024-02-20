@@ -25,6 +25,8 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
 
     addAndMakeVisible(randomiseButton);
 
+	randomiseButton.setTooltip("Randomise all effect parameter values, randomise which effects are enabled, and randomise their order.");
+
 	randomiseButton.onClick = [this] {
 		itemData.randomise();
 		listBox.updateContent();
@@ -46,8 +48,10 @@ EffectsComponent::~EffectsComponent() {
 
 void EffectsComponent::resized() {
     auto area = getLocalBounds();
-    auto titleBar = area.removeFromTop(20);
-	randomiseButton.setBounds(titleBar.removeFromRight(20));
+    auto titleBar = area.removeFromTop(30);
+    titleBar.removeFromLeft(100);
+    
+	randomiseButton.setBounds(titleBar.removeFromLeft(20));
     area = area.reduced(20);
     frequency.setBounds(area.removeFromTop(30));
 
