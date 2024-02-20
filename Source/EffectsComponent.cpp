@@ -23,6 +23,13 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
     };
     addAndMakeVisible(addBtn);*/
 
+    addAndMakeVisible(randomiseButton);
+
+	randomiseButton.onClick = [this] {
+		itemData.randomise();
+		listBox.updateContent();
+	};
+
     {
         juce::MessageManagerLock lock;
         audioProcessor.broadcaster.addChangeListener(this);
@@ -38,7 +45,10 @@ EffectsComponent::~EffectsComponent() {
 }
 
 void EffectsComponent::resized() {
-    auto area = getLocalBounds().withTrimmedTop(20).reduced(20);
+    auto area = getLocalBounds();
+    auto titleBar = area.removeFromTop(20);
+	randomiseButton.setBounds(titleBar.removeFromRight(20));
+    area = area.reduced(20);
     frequency.setBounds(area.removeFromTop(30));
 
     area.removeFromTop(6);
