@@ -21,11 +21,12 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
 
     void randomise() {
         juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+        
 		for (int i = 0; i < data.size(); i++) {
 			auto effect = data[i];
-			auto id = effect->getId();
+			auto id = effect->getId().toLowerCase();
             
-            if (id.contains("scale") || id.contains("translate")) {
+            if (id.contains("scale") || id.contains("translate") || id.contains("trace")) {
                 continue;
             }
 
@@ -41,7 +42,7 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
                     }
                 }
             }
-			effect->enabled->setValueNotifyingHost(juce::Random::getSystemRandom().nextFloat() > 0.8);
+			effect->enabled->setValueNotifyingHost(juce::Random::getSystemRandom().nextFloat() > 0.7);
 		}
 
         // shuffle precedence
