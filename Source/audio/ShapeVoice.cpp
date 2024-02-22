@@ -63,6 +63,10 @@ void ShapeVoice::incrementShapeDrawing() {
     }
 }
 
+double ShapeVoice::getFrequency() {
+    return actualFrequency;
+}
+
 // should be called if the current file is changed so that we interrupt
 // any currently playing sounds / voices
 void ShapeVoice::updateSound(juce::SynthesiserSound* sound) {
@@ -76,9 +80,9 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
 
     int numChannels = outputBuffer.getNumChannels();
 
-    float actualFrequency = frequency * pitchWheelAdjustment;
-
-    if (!audioProcessor.midiEnabled->getBoolValue()) {
+    if (audioProcessor.midiEnabled->getBoolValue()) {
+        actualFrequency = frequency * pitchWheelAdjustment;
+    } else {
         actualFrequency = audioProcessor.frequency;
     }
 

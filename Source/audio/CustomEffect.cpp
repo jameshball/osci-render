@@ -24,16 +24,22 @@ Point CustomEffect::apply(int index, Point input, const std::vector<double>& val
 			parser->setVariable("y", y);
 			parser->setVariable("z", z);
 
-			auto result = parser->run(L, LuaVariables{sampleRate, 0}, step, phase);
-			if (result.size() >= 3) {
+			auto result = parser->run(L, LuaVariables{sampleRate, frequency}, step, phase);
+			if (result.size() >= 2) {
 				x = result[0];
 				y = result[1];
-				z = result[2];
+				if (result.size() >= 3) {
+					z = result[2];
+				}
 			}
 		} else {
 			parser->resetErrors();
 		}
 	}
+
+	step++;
+	phase += 2 * std::numbers::pi * frequency / sampleRate;
+	phase = MathUtil::wrapAngle(phase);
 
 	return Point(
 		(1 - effectScale) * input.x + effectScale * x,

@@ -17,6 +17,8 @@ public:
 	void setVariable(juce::String variableName, double value);
 
 	juce::String getCode();
+	
+	double frequency = 0;
 
 private:
 	const juce::String DEFAULT_SCRIPT = "return { x, y, z }";

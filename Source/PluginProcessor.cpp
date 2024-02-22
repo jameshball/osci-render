@@ -617,6 +617,13 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
         synth.renderNextBlock(outputBuffer3d, midiMessages, 0, buffer.getNumSamples());
+        for (int i = 0; i < synth.getNumVoices(); i++) {
+            auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
+            if (voice->isVoiceActive()) {
+                customEffect->frequency = voice->getFrequency();
+                break;
+            }
+        }
     }
     
     midiMessages.clear();
