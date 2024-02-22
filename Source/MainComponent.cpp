@@ -48,8 +48,38 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 	inputEnabled.onClick = [this] {
 		audioProcessor.inputEnabled->setBoolValueNotifyingHost(!audioProcessor.inputEnabled->getBoolValue());
 	};
+	inputEnabled.setTooltip("Enable to use input audio, instead of osci-render's generated audio.");
+	
 	addAndMakeVisible(fileLabel);
 	updateFileLabel();
+
+	addAndMakeVisible(leftArrow);
+	leftArrow.onClick = [this] {
+		juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
+		juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
+
+		int index = audioProcessor.getCurrentFileIndex();
+
+		if (index > 0) {
+			audioProcessor.changeCurrentFile(index - 1);
+			pluginEditor.fileUpdated(audioProcessor.getCurrentFileName());
+		}
+	};
+	leftArrow.setTooltip("Change to previous file (k).");
+	
+	addAndMakeVisible(rightArrow);
+	rightArrow.onClick = [this] {
+		juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
+		juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
+
+		int index = audioProcessor.getCurrentFileIndex();
+
+		if (index < audioProcessor.numFiles() - 1) {
+			audioProcessor.changeCurrentFile(index + 1);
+			pluginEditor.fileUpdated(audioProcessor.getCurrentFileName());
+		}
+	};
+	rightArrow.setTooltip("Change to next file (j).");
 
 	
 	addAndMakeVisible(fileName);
@@ -138,6 +168,9 @@ MainComponent::~MainComponent() {
 }
 
 void MainComponent::updateFileLabel() {
+	showLeftArrow = audioProcessor.getCurrentFileIndex() > 0;
+	showRightArrow = audioProcessor.getCurrentFileIndex() < audioProcessor.numFiles() - 1;
+	
 	if (audioProcessor.objectServerRendering) {
 		fileLabel.setText("Rendering from Blender", juce::dontSendNotification);
 	} else if (audioProcessor.getCurrentFileIndex() == -1) {
@@ -145,6 +178,8 @@ void MainComponent::updateFileLabel() {
 	} else {
 		fileLabel.setText(audioProcessor.getCurrentFileName(), juce::dontSendNotification);
 	}
+
+	resized();
 }
 
 void MainComponent::resized() {
@@ -167,6 +202,20 @@ void MainComponent::resized() {
 		row.removeFromRight(rowPadding);
 	} else {
 		closeFileButton.setBounds(juce::Rectangle<int>());
+	}
+	
+	if (showLeftArrow) {
+		leftArrow.setBounds(row.removeFromLeft(15));
+		row.removeFromLeft(rowPadding);
+	} else {
+		row.removeFromLeft(15 + rowPadding);
+		leftArrow.setBounds(0, 0, 0, 0);
+	}
+	if (showRightArrow) {
+		rightArrow.setBounds(row.removeFromRight(15));
+		row.removeFromRight(rowPadding);
+	} else {
+		rightArrow.setBounds(0, 0, 0, 0);
 	}
 	
 	fileLabel.setBounds(row);

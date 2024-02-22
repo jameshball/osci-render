@@ -54,11 +54,14 @@ Point FileParser::nextSample(lua_State*& L, const LuaVariables vars, long& step,
 
 	if (lua != nullptr) {
 		auto values = lua->run(L, vars, step, phase);
-		if (values.size() < 2) {
-            return Point();
-        }
-		return Point(values[0], values[1], values[2]);
+		if (values.size() == 2) {
+			return Point(values[0], values[1], 0);
+		} else if (values.size() > 2) {
+			return Point(values[0], values[1], values[2]);
+		}
 	}
+
+	return Point();
 }
 
 void FileParser::closeLua(lua_State*& L) {

@@ -20,11 +20,13 @@
         <FILE id="IqXIZW" name="demo.svg" compile="0" resource="1" file="Resources/svg/demo.svg"/>
         <FILE id="YwkQpy" name="fixed_rotate.svg" compile="0" resource="1"
               file="Resources/svg/fixed_rotate.svg"/>
+        <FILE id="n1esUp" name="left_arrow.svg" compile="0" resource="1" file="Resources/svg/left_arrow.svg"/>
         <FILE id="PxYKbt" name="microphone.svg" compile="0" resource="1" file="Resources/svg/microphone.svg"/>
         <FILE id="pSc1mq" name="osci.svg" compile="0" resource="1" file="Resources/svg/osci.svg"/>
         <FILE id="D2AI1b" name="pencil.svg" compile="0" resource="1" file="Resources/svg/pencil.svg"/>
         <FILE id="PFc2q2" name="random.svg" compile="0" resource="1" file="Resources/svg/random.svg"/>
         <FILE id="n79IAy" name="record.svg" compile="0" resource="1" file="Resources/svg/record.svg"/>
+        <FILE id="OaqZb1" name="right_arrow.svg" compile="0" resource="1" file="Resources/svg/right_arrow.svg"/>
         <FILE id="rXjNlx" name="threshold.svg" compile="0" resource="1" file="Resources/svg/threshold.svg"/>
         <FILE id="rFYmV8" name="timer.svg" compile="0" resource="1" file="Resources/svg/timer.svg"/>
         <FILE id="qC6QiP" name="volume.svg" compile="0" resource="1" file="Resources/svg/volume.svg"/>

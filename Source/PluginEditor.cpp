@@ -127,25 +127,22 @@ void OscirenderAudioProcessorEditor::initialiseCodeEditors() {
 void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
     g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
 
+    auto ds = juce::DropShadow(juce::Colours::black, 5, juce::Point<int>(0, 0));
+
     if (!usingNativeMenuBar) {
         // add drop shadow to the menu bar
-        auto ds = juce::DropShadow(juce::Colours::black, 5, juce::Point<int>(0, 0));
         ds.drawForRectangle(g, menuBar.getBounds());
     }
 
-    // draw drop shadow around code editor if visible
-    juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
-
-    int originalIndex = audioProcessor.getCurrentFileIndex();
-    int index = editingCustomFunction ? 0 : audioProcessor.getCurrentFileIndex() + 1;
-    if ((originalIndex != -1 || editingCustomFunction) && index < codeEditors.size() && codeEditors[index]->isVisible()) {
-        auto ds = juce::DropShadow(juce::Colours::black, 5, juce::Point<int>(0, 0));
-        ds.drawForRectangle(g, codeEditors[index]->getBounds());
-
-        if (editingCustomFunction || audioProcessor.getFileName(originalIndex).fromLastOccurrenceOf(".", true, false) == ".lua") {
-            ds.drawForRectangle(g, lua.getBounds());
-        }
-    }
+	for (int i = 0; i < codeEditors.size(); i++) {
+		if (codeEditors[i]->getBounds().getWidth() > 0 && codeEditors[i]->getBounds().getHeight() > 0) {
+			ds.drawForRectangle(g, codeEditors[i]->getBounds());
+		}
+	}
+    
+	if (lua.getBounds().getWidth() > 0 && lua.getBounds().getHeight() > 0) {
+		ds.drawForRectangle(g, lua.getBounds());
+	}
 }
 
 void OscirenderAudioProcessorEditor::resized() {
