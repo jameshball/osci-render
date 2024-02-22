@@ -48,9 +48,10 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 	inputEnabled.onClick = [this] {
 		audioProcessor.inputEnabled->setBoolValueNotifyingHost(!audioProcessor.inputEnabled->getBoolValue());
 	};
-	inputEnabled.setTooltip("Enable to use input audio, instead of osci-render's generated audio.");
+	inputEnabled.setTooltip("Enable to use input audio, instead of the generated audio.");
 	
 	addAndMakeVisible(fileLabel);
+	fileLabel.setJustificationType(juce::Justification::centred);
 	updateFileLabel();
 
 	addAndMakeVisible(leftArrow);
@@ -138,6 +139,8 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 			pluginEditor.removeChildComponent(&pluginEditor.visualiser);
 			addAndMakeVisible(pluginEditor.visualiser);
 		}
+		pluginEditor.visualiser.setFullScreen(pluginEditor.visualiserFullScreen);
+		
 		pluginEditor.resized();
 		pluginEditor.repaint();
 		resized();
@@ -204,19 +207,21 @@ void MainComponent::resized() {
 		closeFileButton.setBounds(juce::Rectangle<int>());
 	}
 	
+	auto arrowLeftBounds = row.removeFromLeft(15);
 	if (showLeftArrow) {
-		leftArrow.setBounds(row.removeFromLeft(15));
-		row.removeFromLeft(rowPadding);
+		leftArrow.setBounds(arrowLeftBounds);
 	} else {
-		row.removeFromLeft(15 + rowPadding);
 		leftArrow.setBounds(0, 0, 0, 0);
 	}
+	row.removeFromLeft(rowPadding);
+	
+	auto arrowRightBounds = row.removeFromRight(15);
 	if (showRightArrow) {
-		rightArrow.setBounds(row.removeFromRight(15));
-		row.removeFromRight(rowPadding);
+		rightArrow.setBounds(arrowRightBounds);
 	} else {
 		rightArrow.setBounds(0, 0, 0, 0);
 	}
+	row.removeFromRight(rowPadding);
 	
 	fileLabel.setBounds(row);
 

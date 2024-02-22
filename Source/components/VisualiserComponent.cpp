@@ -5,6 +5,8 @@ VisualiserComponent::VisualiserComponent(int numChannels, OscirenderAudioProcess
     resetBuffer();
     startTimerHz(60);
     startThread();
+
+    setFullScreen(false);
     
     roughness.textBox.setValue(4);
     intensity.textBox.setValue(1.0);
@@ -117,6 +119,14 @@ bool VisualiserComponent::keyPressed(const juce::KeyPress& key) {
     }
 
     return false;
+}
+
+void VisualiserComponent::setFullScreen(bool fullScreen) {
+	if (fullScreen) {
+        setTooltip("");
+	} else {
+        setTooltip("Click to pause. Double click to toggle full screen. Right click to change quality and intensity settings.");
+	}
 }
 
 void VisualiserComponent::paintChannel(juce::Graphics& g, juce::Rectangle<float> area, int channel) {
