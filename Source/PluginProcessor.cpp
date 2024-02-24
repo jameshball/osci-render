@@ -89,7 +89,8 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
             new EffectParameter("Rotate Z", "Controls the rotation of the object in the Z axis.", "rotateZ", VERSION_HINT, 0.0, -1.0, 1.0),
         }
     );
-	rotateEffect->getParameter("rotateZ")->lfo->setUnnormalisedValueNotifyingHost((int) LfoType::Sawtooth);
+	rotateEffect->getParameter("rotateY")->lfo->setUnnormalisedValueNotifyingHost((int) LfoType::Sawtooth);
+    rotateEffect->getParameter("rotateY")->lfoRate->setUnnormalisedValueNotifyingHost(0.2);
     toggleableEffects.push_back(rotateEffect);
     toggleableEffects.push_back(std::make_shared<Effect>(
         [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
