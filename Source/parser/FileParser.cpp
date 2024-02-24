@@ -13,15 +13,12 @@ void FileParser::parse(juce::String fileName, juce::String extension, std::uniqu
 	}
 
 	object = nullptr;
-	camera = nullptr;
 	svg = nullptr;
 	text = nullptr;
 	lua = nullptr;
 	
 	if (extension == ".obj") {
 		object = std::make_shared<WorldObject>(stream->readEntireStreamAsString().toStdString());
-		camera = std::make_shared<Camera>(1.0, 0, 0, 0.0);
-		camera->findZPos(*object);
 	} else if (extension == ".svg") {
 		svg = std::make_shared<SvgParser>(stream->readEntireStreamAsString());
 	} else if (extension == ".txt") {
@@ -36,28 +33,35 @@ void FileParser::parse(juce::String fileName, juce::String extension, std::uniqu
 std::vector<std::unique_ptr<Shape>> FileParser::nextFrame() {
 	juce::SpinLock::ScopedLockType scope(lock);
 
-	if (object != nullptr && camera != nullptr) {
-		return camera->draw(*object);
+	if (object != nullptr) {
+		return object->draw();
 	} else if (svg != nullptr) {
 		return svg->draw();
 	} else if (text != nullptr) {
 		return text->draw();
 	}
 	auto tempShapes = std::vector<std::unique_ptr<Shape>>();
-	tempShapes.push_back(std::make_unique<CircleArc>(0, 0, 0.5, 0.5, std::numbers::pi / 4.0, 2 * std::numbers::pi));
+	// return a square
+	tempShapes.push_back(std::make_unique<Line>(Point(-0.5, -0.5, 0), Point(0.5, -0.5, 0)));
+	tempShapes.push_back(std::make_unique<Line>(Point(0.5, -0.5, 0), Point(0.5, 0.5, 0)));
+	tempShapes.push_back(std::make_unique<Line>(Point(0.5, 0.5, 0), Point(-0.5, 0.5, 0)));
+	tempShapes.push_back(std::make_unique<Line>(Point(-0.5, 0.5, 0), Point(-0.5, -0.5, 0)));
 	return tempShapes;
 }
 
-Vector2 FileParser::nextSample(lua_State*& L, const LuaVariables vars, long& step, double& phase) {
+Point FileParser::nextSample(lua_State*& L, const LuaVariables vars, long& step, double& phase) {
 	juce::SpinLock::ScopedLockType scope(lock);
 
 	if (lua != nullptr) {
 		auto values = lua->run(L, vars, step, phase);
-		if (values.size() < 2) {
-            return Vector2();
-        }
-		return Vector2(values[0], values[1]);
+		if (values.size() == 2) {
+			return Point(values[0], values[1], 0);
+		} else if (values.size() > 2) {
+			return Point(values[0], values[1], values[2]);
+		}
 	}
+
+	return Point();
 }
 
 void FileParser::closeLua(lua_State*& L) {
@@ -84,10 +88,6 @@ void FileParser::enable() {
 
 std::shared_ptr<WorldObject> FileParser::getObject() {
 	return object;
-}
-
-std::shared_ptr<Camera> FileParser::getCamera() {
-	return camera;
 }
 
 std::shared_ptr<SvgParser> FileParser::getSvg() {

@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - release
+      - 3d-audio
 jobs:
   build-linux:
     name: Build Linux
@@ -18,7 +19,9 @@ jobs:
       - name: "Run script"
         run: |
           export OS="linux"
-          ./ci/build.sh
+          source ./ci/setup-env.sh
+          source ./ci/test.sh
+          source ./ci/build.sh
         shell: bash
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
@@ -40,7 +43,9 @@ jobs:
       - name: "Run script"
         run: |
           export OS="mac"
-          ./ci/build.sh
+          source ./ci/setup-env.sh
+          source ./ci/test.sh
+          source ./ci/build.sh
         shell: bash
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
@@ -62,7 +67,9 @@ jobs:
       - name: "Run script"
         run: |
           export OS="win"
-          ./ci/build.sh
+          source ./ci/setup-env.sh
+          source ./ci/test.sh
+          source ./ci/build.sh
         shell: bash
       - name: Upload Artifact
         uses: actions/upload-artifact@v3

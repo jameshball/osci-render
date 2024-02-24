@@ -18,6 +18,7 @@ public:
 
 
 	void incrementShapeDrawing();
+	double getFrequency();
 
 private:
 	const double MIN_TRACE = 0.005;
@@ -37,6 +38,7 @@ private:
 
     bool currentlyPlaying = false;
 	double frequency = 1.0;
+	std::atomic<double> actualFrequency = 1.0;
     double velocity = 1.0;
 	double pitchWheelAdjustment = 1.0;
 

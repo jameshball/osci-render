@@ -32,7 +32,6 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 	};
 
 	addAndMakeVisible(closeFileButton);
-	closeFileButton.setButtonText("Close File");
 	
 	closeFileButton.onClick = [this] {
 		juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
@@ -49,8 +48,39 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 	inputEnabled.onClick = [this] {
 		audioProcessor.inputEnabled->setBoolValueNotifyingHost(!audioProcessor.inputEnabled->getBoolValue());
 	};
+	inputEnabled.setTooltip("Enable to use input audio, instead of the generated audio.");
+	
 	addAndMakeVisible(fileLabel);
+	fileLabel.setJustificationType(juce::Justification::centred);
 	updateFileLabel();
+
+	addAndMakeVisible(leftArrow);
+	leftArrow.onClick = [this] {
+		juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
+		juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
+
+		int index = audioProcessor.getCurrentFileIndex();
+
+		if (index > 0) {
+			audioProcessor.changeCurrentFile(index - 1);
+			pluginEditor.fileUpdated(audioProcessor.getCurrentFileName());
+		}
+	};
+	leftArrow.setTooltip("Change to previous file (k).");
+	
+	addAndMakeVisible(rightArrow);
+	rightArrow.onClick = [this] {
+		juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
+		juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
+
+		int index = audioProcessor.getCurrentFileIndex();
+
+		if (index < audioProcessor.numFiles() - 1) {
+			audioProcessor.changeCurrentFile(index + 1);
+			pluginEditor.fileUpdated(audioProcessor.getCurrentFileName());
+		}
+	};
+	rightArrow.setTooltip("Change to next file (j).");
 
 	
 	addAndMakeVisible(fileName);
@@ -109,6 +139,8 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 			pluginEditor.removeChildComponent(&pluginEditor.visualiser);
 			addAndMakeVisible(pluginEditor.visualiser);
 		}
+		pluginEditor.visualiser.setFullScreen(pluginEditor.visualiserFullScreen);
+		
 		pluginEditor.resized();
 		pluginEditor.repaint();
 		resized();
@@ -139,6 +171,9 @@ MainComponent::~MainComponent() {
 }
 
 void MainComponent::updateFileLabel() {
+	showLeftArrow = audioProcessor.getCurrentFileIndex() > 0;
+	showRightArrow = audioProcessor.getCurrentFileIndex() < audioProcessor.numFiles() - 1;
+	
 	if (audioProcessor.objectServerRendering) {
 		fileLabel.setText("Rendering from Blender", juce::dontSendNotification);
 	} else if (audioProcessor.getCurrentFileIndex() == -1) {
@@ -146,6 +181,8 @@ void MainComponent::updateFileLabel() {
 	} else {
 		fileLabel.setText(audioProcessor.getCurrentFileName(), juce::dontSendNotification);
 	}
+
+	resized();
 }
 
 void MainComponent::resized() {
@@ -163,9 +200,30 @@ void MainComponent::resized() {
 	row.removeFromLeft(rowPadding);
 	inputEnabled.setBounds(row.removeFromLeft(20));
 	row.removeFromLeft(rowPadding);
+	if (audioProcessor.getCurrentFileIndex() != -1) {
+		closeFileButton.setBounds(row.removeFromRight(20));
+		row.removeFromRight(rowPadding);
+	} else {
+		closeFileButton.setBounds(juce::Rectangle<int>());
+	}
+	
+	auto arrowLeftBounds = row.removeFromLeft(15);
+	if (showLeftArrow) {
+		leftArrow.setBounds(arrowLeftBounds);
+	} else {
+		leftArrow.setBounds(0, 0, 0, 0);
+	}
+	row.removeFromLeft(rowPadding);
+	
+	auto arrowRightBounds = row.removeFromRight(15);
+	if (showRightArrow) {
+		rightArrow.setBounds(arrowRightBounds);
+	} else {
+		rightArrow.setBounds(0, 0, 0, 0);
+	}
+	row.removeFromRight(rowPadding);
+	
 	fileLabel.setBounds(row);
-	bounds.removeFromTop(padding);
-	closeFileButton.setBounds(bounds.removeFromTop(buttonHeight).removeFromLeft(buttonWidth));
 
 	bounds.removeFromTop(padding);
 	row = bounds.removeFromTop(buttonHeight);

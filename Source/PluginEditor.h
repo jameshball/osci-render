@@ -24,8 +24,9 @@ public:
     void fileUpdated(juce::String fileName);
     void handleAsyncUpdate() override;
     void changeListenerCallback(juce::ChangeBroadcaster* source) override;
+    void toggleLayout(juce::StretchableLayoutManager& layout, double prefSize);
 
-    void editPerspectiveFunction(bool enabled);
+    void editCustomFunction(bool enabled);
 
     void newProject();
     void openProject();
@@ -39,13 +40,17 @@ private:
     OscirenderAudioProcessor& audioProcessor;
 public:
 
+    const double CLOSED_PREF_SIZE = 30.0;
+    const double RESIZER_BAR_SIZE = 7.0;
+
     OscirenderLookAndFeel lookAndFeel;
 
-    std::atomic<bool> editingPerspective = false;
+    std::atomic<bool> editingCustomFunction = false;
 
     VisualiserComponent visualiser{2, audioProcessor};
     std::atomic<bool> visualiserFullScreen = false;
     SettingsComponent settings{audioProcessor, *this};
+    LuaComponent lua{audioProcessor, *this};
     VolumeComponent volume{audioProcessor};
 
     std::vector<std::shared_ptr<juce::CodeDocument>> codeDocuments;
@@ -54,8 +59,8 @@ public:
     juce::LuaTokeniser luaTokeniser;
     juce::XmlTokeniser xmlTokeniser;
 	juce::ShapeButton collapseButton;
-    std::shared_ptr<juce::CodeDocument> perspectiveCodeDocument = std::make_shared<juce::CodeDocument>();
-    std::shared_ptr<ErrorCodeEditorComponent> perspectiveCodeEditor = std::make_shared<ErrorCodeEditorComponent>(*perspectiveCodeDocument, &luaTokeniser, audioProcessor, PerspectiveEffect::FILE_NAME);
+    std::shared_ptr<juce::CodeDocument> customFunctionCodeDocument = std::make_shared<juce::CodeDocument>();
+    std::shared_ptr<ErrorCodeEditorComponent> customFunctionCodeEditor = std::make_shared<ErrorCodeEditorComponent>(*customFunctionCodeDocument, &luaTokeniser, audioProcessor, CustomEffect::FILE_NAME);
 
     std::unique_ptr<juce::FileChooser> chooser;
     MainMenuBarModel menuBarModel{*this};
@@ -63,6 +68,9 @@ public:
 
     juce::StretchableLayoutManager layout;
     juce::StretchableLayoutResizerBar resizerBar{&layout, 1, true};
+
+    juce::StretchableLayoutManager luaLayout;
+    juce::StretchableLayoutResizerBar luaResizerBar{&luaLayout, 1, false};
 
     juce::TooltipWindow tooltipWindow{this, 0};
 

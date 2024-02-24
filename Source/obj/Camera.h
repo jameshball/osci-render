@@ -1,17 +1,20 @@
 #pragma once
-#include <vector>
-#include <memory>
-#include "WorldObject.h"
-#include "../shape/Shape.h"
-#include "../shape/Vector2.h"
+
+#include "../mathter/Matrix.hpp"
+#include "Frustum.h"
+
+using Matrix = mathter::Matrix<float, 4, 4, mathter::eMatrixOrder::PRECEDE_VECTOR, mathter::eMatrixLayout::ROW_MAJOR, false>;
 
 class Camera {
 public:
-	Camera(double focalLength, double x, double y, double z);
+	Camera();
 
-	std::vector<std::unique_ptr<Shape>> draw(WorldObject& object);
-	void findZPos(WorldObject& object);
+	void setPosition(Vec3& position);
+	Vec3 toCameraSpace(Vec3& point);
+	Vec3 toWorldSpace(Vec3& point);
 	void setFocalLength(double focalLength);
+	Vec3 project(Vec3& p);
+	Frustum getFrustum();
 private:
 	const double VERTEX_VALUE_THRESHOLD = 1.0;
 	const double CAMERA_MOVE_INCREMENT = -0.1;
@@ -19,10 +22,7 @@ private:
 	const int VERTEX_SAMPLES = 1000;
 	const int MAX_NUM_STEPS = 1000;
 
-	std::atomic<double> focalLength;
-	double x, y, z;
+	Frustum frustum;
 
-	std::vector<Vector2> sampleVerticesInRender(WorldObject& object);
-	double maxVertexValue(std::vector<Vector2>& vertices);
-	Vector2 project(double x, double y, double z);
+	Matrix viewMatrix;
 };

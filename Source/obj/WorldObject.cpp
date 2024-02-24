@@ -2,6 +2,7 @@
 #include "../chinese_postman/ChinesePostman.h"
 #include "tiny_obj_loader.h"
 #include "../MathUtil.h"
+#include <unordered_set>
 
 struct pair_hash {
     inline std::size_t operator()(const std::pair<int, int>& v) const {
@@ -11,6 +12,7 @@ struct pair_hash {
 
 //
 // returns all vertex indices in all connected sub-components of the graph
+// TODO: move this to a graph class
 //
 std::vector<std::vector<int>> ConnectedComponents(Graph& G) {
     std::vector<std::vector<int>> components;
@@ -57,29 +59,36 @@ WorldObject::WorldObject(const std::string& obj_string) {
     // normalising object vertices
     //
     double x = 0.0, y = 0.0, z = 0.0;
-    double max = 0.0;
     for (int i = 0; i < numVertices; i++) {
         x += vs[i * 3];
         y += vs[i * 3 + 1];
         z += vs[i * 3 + 2];
-        if (std::abs(vs[i * 3]) > max) {
-            max = std::abs(vs[i * 3]);
-        }
-        if (std::abs(vs[i * 3 + 1]) > max) {
-            max = std::abs(vs[i * 3 + 1]);
-        }
-        if (std::abs(vs[i * 3 + 2]) > max) {
-            max = std::abs(vs[i * 3 + 2]);
-        }
     }
     x /= numVertices;
     y /= numVertices;
     z /= numVertices;
 
+    float max = 0.0;
     for (int i = 0; i < numVertices; i++) {
-        vs[i * 3] = (vs[i * 3] - x) / max;
-        vs[i * 3 + 1] = (vs[i * 3 + 1] - y) / max;
-        vs[i * 3 + 2] = (vs[i * 3 + 2] - z) / max;
+        float newX = vs[i * 3] - x;
+        float newY = vs[i * 3 + 1] - y;
+        float newZ = vs[i * 3 + 2] - z;
+
+        float det = newX * newX + newY * newY + newZ * newZ;
+        max = det > max ? det : max;
+        
+        vs[i * 3] = newX;
+        vs[i * 3 + 1] = newY;
+        vs[i * 3 + 2] = newZ;
+    }
+
+    max = std::sqrt(max);
+    
+    // scaling down so that it's slightly smaller
+    max = 1.2 * max;
+
+    for (int i = 0; i < vs.size(); i++) {
+        vs[i] /= max;
     }
 
     //
@@ -131,6 +140,7 @@ WorldObject::WorldObject(const std::string& obj_string) {
     std::vector<std::vector<int>> connected_components = ConnectedComponents(graph);
 
     // perform chinese postman on all connected sub-components of graph
+    // TODO: move this to separate graph-related file
     for (auto& connected_component : connected_components) {
         // TODO: make this parallel: https://stackoverflow.com/questions/36246300/parallel-loops-in-c
 		// TODO: check the number of edges in the subgraph to make sure it's not too large compared to java version
@@ -201,57 +211,18 @@ WorldObject::WorldObject(const std::string& obj_string) {
                 double y2 = vs[vertex * 3 + 1];
                 double z2 = vs[vertex * 3 + 2];
 
-                edges.push_back(Line3D(x1, y1, z1, x2, y2, z2));
+                edges.push_back(Line(x1, y1, z1, x2, y2, z2));
             }
             prevVertex = vertex;
         }
     }
 }
 
-void WorldObject::setBaseRotationX(double x) {
-    baseRotateX = x;
-}
+std::vector<std::unique_ptr<Shape>> WorldObject::draw() {
+    std::vector<std::unique_ptr<Shape>> shapes;
 
-void WorldObject::setBaseRotationY(double y) {
-    baseRotateY = y;
-}
-
-void WorldObject::setBaseRotationZ(double z) {
-    baseRotateZ = z;
-}
-
-void WorldObject::setCurrentRotationX(double x) {
-    currentRotateX = x;
-}
-
-void WorldObject::setCurrentRotationY(double y) {
-	currentRotateY = y;
-}
-
-void WorldObject::setCurrentRotationZ(double z) {
-	currentRotateZ = z;
-}
-
-void WorldObject::setRotationSpeed(double rotateSpeed) {
-    this->rotateSpeed = linearSpeedToActualSpeed(rotateSpeed);
-}
-
-// called whenever a new frame is drawn, so that the object can update its
-// rotation
-void WorldObject::nextFrame() {
-    currentRotateX = MathUtil::wrapAngle(currentRotateX + baseRotateX * rotateSpeed);
-    currentRotateY = MathUtil::wrapAngle(currentRotateY + baseRotateY * rotateSpeed);
-    currentRotateZ = MathUtil::wrapAngle(currentRotateZ + baseRotateZ * rotateSpeed);
-    rotateX = baseRotateX + currentRotateX;
-    rotateY = baseRotateY + currentRotateY;
-    rotateZ = baseRotateZ + currentRotateZ;
-}
-
-// this just makes the range of the speed more useful
-double WorldObject::linearSpeedToActualSpeed(double rotateSpeed) {
-    double actualSpeed = (std::exp(3 * std::min(10.0, std::abs(rotateSpeed))) - 1) / 50000;
-    if (rotateSpeed < 0) {
-		actualSpeed *= -1;
-	}
-    return actualSpeed;
+    for (auto& edge : edges) {
+        shapes.push_back(edge.clone());
+    }
+    return shapes;
 }

@@ -3,7 +3,6 @@
 #include "FrameSource.h"
 #include "../shape/Shape.h"
 #include "../obj/WorldObject.h"
-#include "../obj/Camera.h"
 #include "../svg/SvgParser.h"
 #include "../txt/TextParser.h"
 #include "../lua/LuaParser.h"
@@ -14,7 +13,7 @@ public:
 
 	void parse(juce::String fileName, juce::String extension, std::unique_ptr<juce::InputStream>, juce::Font);
 	std::vector<std::unique_ptr<Shape>> nextFrame();
-	Vector2 nextSample(lua_State*& L, const LuaVariables vars, long& step, double& phase);
+	Point nextSample(lua_State*& L, const LuaVariables vars, long& step, double& phase);
 	void closeLua(lua_State*& L);
 	bool isSample();
 	bool isActive();
@@ -22,7 +21,6 @@ public:
 	void enable();
 
 	std::shared_ptr<WorldObject> getObject();
-	std::shared_ptr<Camera> getCamera();
 	std::shared_ptr<SvgParser> getSvg();
 	std::shared_ptr<TextParser> getText();
 	std::shared_ptr<LuaParser> getLua();
@@ -34,7 +32,6 @@ private:
 	juce::SpinLock lock;
 
 	std::shared_ptr<WorldObject> object;
-	std::shared_ptr<Camera> camera;
 	std::shared_ptr<SvgParser> svg;
 	std::shared_ptr<TextParser> text;
 	std::shared_ptr<LuaParser> lua;

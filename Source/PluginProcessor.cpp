@@ -10,7 +10,6 @@
 #include "PluginEditor.h"
 #include "parser/FileParser.h"
 #include "parser/FrameProducer.h"
-#include "audio/RotateEffect.h"
 #include "audio/VectorCancellingEffect.h"
 #include "audio/DistortEffect.h"
 #include "audio/SmoothEffect.h"
@@ -36,63 +35,106 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
 
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<BitCrushEffect>(),
-        new EffectParameter("Bit Crush", "Limits the resolution of points drawn to the screen, making the image look pixelated, and making the audio sound more 'digital' and distorted.", "bitCrush", VERSION_HINT, 0.0, 0.0, 1.0)
+        new EffectParameter("Bit Crush", "Limits the resolution of points drawn to the screen, making the object look pixelated, and making the audio sound more 'digital' and distorted.", "bitCrush", VERSION_HINT, 0.6, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<BulgeEffect>(),
-        new EffectParameter("Bulge", "Applies a bulge that makes the centre of the image larger, and squishes the edges of the image. This applies a distortion to the audio.", "bulge", VERSION_HINT, 0.0, 0.0, 1.0)
-    ));
-    toggleableEffects.push_back(std::make_shared<Effect>(
-        std::make_shared<RotateEffect>(),
-        new EffectParameter("2D Rotate", "Rotates the image, and pans the audio.", "2DRotateSpeed", VERSION_HINT, 0.0, 0.0, 1.0)
+        new EffectParameter("Bulge", "Applies a bulge that makes the centre of the image larger, and squishes the edges of the image. This applies a distortion to the audio.", "bulge", VERSION_HINT, 0.5, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<VectorCancellingEffect>(),
-        new EffectParameter("Vector Cancelling", "Inverts the audio and image every few samples to 'cancel out' the audio, making the audio quiet, and distorting the image.", "vectorCancelling", VERSION_HINT, 0.0, 0.0, 1.0)
+        new EffectParameter("Vector Cancelling", "Inverts the audio and image every few samples to 'cancel out' the audio, making the audio quiet, and distorting the image.", "vectorCancelling", VERSION_HINT, 0.1111111, 0.0, 1.0)
     ));
+	toggleableEffects.push_back(std::make_shared<Effect>(
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
+            return input * Point(values[0], values[1], values[2]);
+		}, std::vector<EffectParameter*>{
+		    new EffectParameter("Scale X", "Scales the object in the horizontal direction.", "scaleX", VERSION_HINT, 1.0, -5.0, 5.0),
+			new EffectParameter("Scale Y", "Scales the object in the vertical direction.", "scaleY", VERSION_HINT, 1.0, -5.0, 5.0),
+			new EffectParameter("Scale Z", "Scales the depth of the object.", "scaleZ", VERSION_HINT, 1.0, -5.0, 5.0),
+	    }
+	));
     toggleableEffects.push_back(std::make_shared<Effect>(
-        std::make_shared<DistortEffect>(false),
-        new EffectParameter("Distort X", "Distorts the image in the horizontal direction by jittering the audio sample being drawn.", "distortX", VERSION_HINT, 0.0, 0.0, 1.0)
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
+			int flip = index % 2 == 0 ? 1 : -1;
+			Point jitter = Point(flip * values[0], flip * values[1], flip * values[2]);
+			return input + jitter;
+        }, std::vector<EffectParameter*>{
+            new EffectParameter("Distort X", "Distorts the image in the horizontal direction by jittering the audio sample being drawn.", "distortX", VERSION_HINT, 0.0, 0.0, 1.0),
+            new EffectParameter("Distort Y", "Distorts the image in the vertical direction by jittering the audio sample being drawn.", "distortY", VERSION_HINT, 0.0, 0.0, 1.0),
+            new EffectParameter("Distort Z", "Distorts the depth of the image by jittering the audio sample being drawn.", "distortZ", VERSION_HINT, 0.1, 0.0, 1.0),
+	    }
     ));
-    toggleableEffects.push_back(std::make_shared<Effect>(
-        std::make_shared<DistortEffect>(true),
-        new EffectParameter("Distort Y", "Distorts the image in the vertical direction by jittering the audio sample being drawn.", "distortY", VERSION_HINT, 0.0, 0.0, 1.0)
-    ));
-    toggleableEffects.push_back(std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
-            input.x += values[0];
-            input.y += values[1];
+    auto rippleEffect = std::make_shared<Effect>(
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
+            double phase = values[1] * std::numbers::pi;
+            double distance = 100 * values[2] * (input.x * input.x + input.y * input.y);
+            input.z += values[0] * std::sin(phase + distance);
             return input;
         }, std::vector<EffectParameter*>{
-            new EffectParameter("Translate X", "Moves the image horizontally.", "translateX", VERSION_HINT, 0.0, -1.0, 1.0),
-            new EffectParameter("Translate Y", "Moves the image vertically.", "translateY", VERSION_HINT, 0.0, -1.0, 1.0)
+            new EffectParameter("Ripple Depth", "Controls how large the ripples applied to the image are.", "rippleDepth", VERSION_HINT, 0.2, 0.0, 1.0),
+            new EffectParameter("Ripple Phase", "Controls the position of the ripple. Animate this to see a moving ripple effect.", "ripplePhase", VERSION_HINT, 0.0, -1.0, 1.0),
+            new EffectParameter("Ripple Amount", "Controls how many ripples are applied to the image.", "rippleAmount", VERSION_HINT, 0.1, 0.0, 1.0),
+        }
+    );
+    rippleEffect->getParameter("ripplePhase")->lfo->setUnnormalisedValueNotifyingHost((int) LfoType::Sawtooth);
+    toggleableEffects.push_back(rippleEffect);
+    auto rotateEffect = std::make_shared<Effect>(
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
+            input.rotate(values[0] * std::numbers::pi, values[1] * std::numbers::pi, values[2] * std::numbers::pi);
+            return input;
+        }, std::vector<EffectParameter*>{
+            new EffectParameter("Rotate X", "Controls the rotation of the object in the X axis.", "rotateX", VERSION_HINT, 0.0, -1.0, 1.0),
+            new EffectParameter("Rotate Y", "Controls the rotation of the object in the Y axis.", "rotateY", VERSION_HINT, 0.0, -1.0, 1.0),
+            new EffectParameter("Rotate Z", "Controls the rotation of the object in the Z axis.", "rotateZ", VERSION_HINT, 0.0, -1.0, 1.0),
+        }
+    );
+	rotateEffect->getParameter("rotateY")->lfo->setUnnormalisedValueNotifyingHost((int) LfoType::Sawtooth);
+    rotateEffect->getParameter("rotateY")->lfoRate->setUnnormalisedValueNotifyingHost(0.2);
+    toggleableEffects.push_back(rotateEffect);
+    toggleableEffects.push_back(std::make_shared<Effect>(
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
+            return input + Point(values[0], values[1], values[2]);
+        }, std::vector<EffectParameter*>{
+            new EffectParameter("Translate X", "Moves the object horizontally.", "translateX", VERSION_HINT, 0.0, -1.0, 1.0),
+            new EffectParameter("Translate Y", "Moves the object vertically.", "translateY", VERSION_HINT, 0.0, -1.0, 1.0),
+			new EffectParameter("Translate Z", "Moves the object away from the camera.", "translateZ", VERSION_HINT, 0.0, -1.0, 1.0),
+        }
+    ));
+    toggleableEffects.push_back(std::make_shared<Effect>(
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
+            double length = 10 * values[0] * input.magnitude();
+            double newX = input.x * std::cos(length) - input.y * std::sin(length);
+            double newY = input.x * std::sin(length) + input.y * std::cos(length);
+            return Point(newX, newY, input.z);
+        }, std::vector<EffectParameter*>{
+            new EffectParameter("Swirl", "Swirls the image in a spiral pattern.", "swirl", VERSION_HINT, 0.3, -1.0, 1.0),
         }
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         std::make_shared<SmoothEffect>(),
-        new EffectParameter("Smoothing", "This works as a low-pass frequency filter that removes high frequencies, making the image look smoother, and audio sound less harsh.", "smoothing", VERSION_HINT, 0.0, 0.0, 1.0)
+        new EffectParameter("Smoothing", "This works as a low-pass frequency filter that removes high frequencies, making the image look smoother, and audio sound less harsh.", "smoothing", VERSION_HINT, 0.75, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         wobbleEffect,
-        new EffectParameter("Wobble", "Adds a sine wave of the prominent frequency in the audio currently playing. The sine wave's frequency is slightly offset to create a subtle 'wobble' in the image. Increasing the slider increases the strength of the wobble.", "wobble", VERSION_HINT, 0.0, 0.0, 1.0)
+        new EffectParameter("Wobble", "Adds a sine wave of the prominent frequency in the audio currently playing. The sine wave's frequency is slightly offset to create a subtle 'wobble' in the image. Increasing the slider increases the strength of the wobble.", "wobble", VERSION_HINT, 0.3, 0.0, 1.0)
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
         delayEffect,
         std::vector<EffectParameter*>{
-            new EffectParameter("Delay Decay", "Adds repetitions, delays, or echos to the audio. This slider controls the volume of the echo.", "delayDecay", VERSION_HINT, 0.0, 0.0, 1.0),
+            new EffectParameter("Delay Decay", "Adds repetitions, delays, or echos to the audio. This slider controls the volume of the echo.", "delayDecay", VERSION_HINT, 0.4, 0.0, 1.0),
             new EffectParameter("Delay Length", "Controls the time in seconds between echos.", "delayLength", VERSION_HINT, 0.5, 0.0, 1.0)
         }
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
-        perspectiveEffect,
+        dashedLineEffect,
         std::vector<EffectParameter*>{
-            new EffectParameter("3D Perspective", "Controls the strength of the 3D perspective effect which treats the image as a 3D object that can be rotated.", "perspectiveStrength", VERSION_HINT, 0.0, 0.0, 1.0),
-            new EffectParameter("Depth (z)", "Controls how far away the 3D object is drawn away from the camera (the Z position).", "perspectiveZPos", VERSION_HINT, 0.1, 0.0, 1.0),
-            new EffectParameter("Rotate Speed", "Controls how fast the 3D object rotates in the direction determined by the rotation sliders below.", "perspectiveRotateSpeed", VERSION_HINT, 0.0, -1.0, 1.0),
-            new EffectParameter("Rotate X", "Controls the rotation of the object in the X axis.", "perspectiveRotateX", VERSION_HINT, 1.0, -1.0, 1.0),
-            new EffectParameter("Rotate Y", "Controls the rotation of the object in the Y axis.", "perspectiveRotateY", VERSION_HINT, 1.0, -1.0, 1.0),
-            new EffectParameter("Rotate Z", "Controls the rotation of the object in the Z axis.", "perspectiveRotateZ", VERSION_HINT, 0.0, -1.0, 1.0),
+            new EffectParameter("Dash Length", "Controls the length of the dashed line.", "dashLength", VERSION_HINT, 0.2, 0.0, 1.0),
         }
+    ));
+    toggleableEffects.push_back(std::make_shared<Effect>(
+        customEffect,
+        new EffectParameter("Lua Effect", "Controls the strength of the custom Lua effect applied. You can write your own custom effect using Lua by pressing the edit button on the right.", "customEffectStrength", VERSION_HINT, 1.0, 0.0, 1.0)
     ));
     toggleableEffects.push_back(traceMax);
     toggleableEffects.push_back(traceMin);
@@ -105,14 +147,10 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         effect->setPrecedence(i);
     }
 
+    permanentEffects.push_back(perspective);
     permanentEffects.push_back(frequencyEffect);
     permanentEffects.push_back(volumeEffect);
     permanentEffects.push_back(thresholdEffect);
-    permanentEffects.push_back(rotateSpeed);
-    permanentEffects.push_back(rotateX);
-    permanentEffects.push_back(rotateY);
-    permanentEffects.push_back(rotateZ);
-    permanentEffects.push_back(focalLength);
 
     for (int i = 0; i < 26; i++) {
         addLuaSlider();
@@ -135,12 +173,6 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         }
     }
 
-    booleanParameters.push_back(fixedRotateX);
-    booleanParameters.push_back(fixedRotateY);
-    booleanParameters.push_back(fixedRotateZ);
-    booleanParameters.push_back(perspectiveEffect->fixedRotateX);
-    booleanParameters.push_back(perspectiveEffect->fixedRotateY);
-    booleanParameters.push_back(perspectiveEffect->fixedRotateZ);
     booleanParameters.push_back(midiEnabled);
     booleanParameters.push_back(inputEnabled);
 
@@ -324,15 +356,6 @@ void OscirenderAudioProcessor::removeErrorListener(ErrorListener* listener) {
     errorListeners.erase(std::remove(errorListeners.begin(), errorListeners.end(), listener), errorListeners.end());
 }
 
-// parsersLock should be held when calling this
-void OscirenderAudioProcessor::updateObjValues() {
-    focalLength->apply();
-    rotateX->apply();
-    rotateY->apply();
-    rotateZ->apply();
-    rotateSpeed->apply();
-}
-
 // effectsLock should be held when calling this
 std::shared_ptr<Effect> OscirenderAudioProcessor::getEffect(juce::String id) {
     for (auto& effect : allEffects) {
@@ -471,7 +494,6 @@ void OscirenderAudioProcessor::changeCurrentFile(int index) {
 	}
     currentFile = index;
     updateLuaValues();
-    updateObjValues();
     changeSound(sounds[index]);
 }
 
@@ -578,7 +600,14 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         inputBuffer.copyFrom(channel, 0, buffer, channel, 0, buffer.getNumSamples());
     }
 
+    juce::AudioBuffer<float> outputBuffer3d = juce::AudioBuffer<float>(3, buffer.getNumSamples());
+    outputBuffer3d.clear();
+
     if (usingInput && totalNumInputChannels >= 2) {
+        for (auto channel = 0; channel < juce::jmin(2, totalNumInputChannels); channel++) {
+            outputBuffer3d.copyFrom(channel, 0, inputBuffer, channel, 0, buffer.getNumSamples());
+        }
+
         // handle all midi messages
         auto midiIterator = midiMessages.cbegin();
         std::for_each(midiIterator,
@@ -586,11 +615,16 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             [&] (const juce::MidiMessageMetadata& meta) { synth.publicHandleMidiEvent(meta.getMessage()); }
         );
     } else {
-        // only clear buffer if we aren't using input, since we keep the input audio.
-        buffer.clear();
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
-        synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
+        synth.renderNextBlock(outputBuffer3d, midiMessages, 0, buffer.getNumSamples());
+        for (int i = 0; i < synth.getNumVoices(); i++) {
+            auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
+            if (voice->isVoiceActive()) {
+                customEffect->frequency = voice->getFrequency();
+                break;
+            }
+        }
     }
     
     midiMessages.clear();
@@ -617,12 +651,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         currentVolume = std::sqrt(squaredVolume);
         currentVolume = juce::jlimit(0.0, 1.0, currentVolume);
 
-        Vector2 channels;
-        if (totalNumOutputChannels >= 2) {
-            channels = {buffer.getSample(0, sample), buffer.getSample(1, sample)};
-        } else if (totalNumOutputChannels == 1) {
-            channels = {buffer.getSample(0, sample), buffer.getSample(0, sample)};
-        }
+        Point channels = { outputBuffer3d.getSample(0, sample), outputBuffer3d.getSample(1, sample), outputBuffer3d.getSample(2, sample) };
 
         {
             juce::SpinLock::ScopedLockType lock1(parsersLock);
@@ -713,8 +742,8 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
         parameter->save(parameterXml);
     }
 
-    auto perspectiveFunction = xml->createNewChildElement("perspectiveFunction");
-    perspectiveFunction->addTextElement(juce::Base64::toBase64(perspectiveEffect->getCode()));
+    auto customFunction = xml->createNewChildElement("customFunction");
+    customFunction->addTextElement(juce::Base64::toBase64(customEffect->getCode()));
 
     auto fontXml = xml->createNewChildElement("font");
     fontXml->setAttribute("family", font.getTypefaceName());
@@ -797,11 +826,14 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
             }
         }
 
-        auto perspectiveFunction = xml->getChildByName("perspectiveFunction");
-        if (perspectiveFunction != nullptr) {
+        auto customFunction = xml->getChildByName("customFunction");
+        if (customFunction == nullptr) {
+            customFunction = xml->getChildByName("perspectiveFunction");
+        }
+        if (customFunction != nullptr) {
             auto stream = juce::MemoryOutputStream();
-            juce::Base64::convertFromBase64(stream, perspectiveFunction->getAllSubText());
-            perspectiveEffect->updateCode(stream.toString());
+            juce::Base64::convertFromBase64(stream, customFunction->getAllSubText());
+            customEffect->updateCode(stream.toString());
         }
 
         auto fontXml = xml->getChildByName("font");

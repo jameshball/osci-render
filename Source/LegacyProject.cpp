@@ -122,7 +122,7 @@ void OscirenderAudioProcessor::openLegacyProject(const juce::XmlElement* xml) {
         if (perspectiveFunction != nullptr) {
             auto stream = juce::MemoryOutputStream();
             juce::Base64::convertFromBase64(stream, perspectiveFunction->getAllSubText());
-            perspectiveEffect->updateCode(stream.toString());
+            customEffect->updateCode(stream.toString());
         }
 
         auto fontFamilyXml = xml->getChildByName("fontFamily");

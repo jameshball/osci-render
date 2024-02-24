@@ -24,6 +24,8 @@
 #include "obj/ObjectServer.h"
 #include "UGen/Env.h"
 #include "UGen/ugen_JuceEnvelopeComponent.h"
+#include "audio/CustomEffect.h"
+#include "audio/DashedLineEffect.h"
 
 //==============================================================================
 /**
@@ -71,7 +73,7 @@ public:
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void envelopeChanged(EnvelopeComponent* changedEnvelope) override;
     
-    int VERSION_HINT = 1;
+    int VERSION_HINT = 2;
 
     std::atomic<double> currentSampleRate = 0.0;
 
@@ -80,7 +82,7 @@ public:
     std::vector<std::shared_ptr<Effect>> luaEffects;
 
     std::shared_ptr<Effect> frequencyEffect = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
             frequency = values[0];
             return input;
         }, new EffectParameter(
@@ -92,7 +94,7 @@ public:
     );
 
     std::shared_ptr<Effect> volumeEffect = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
             volume = values[0];
             return input;
         }, new EffectParameter(
@@ -104,7 +106,7 @@ public:
     );
 
     std::shared_ptr<Effect> thresholdEffect = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
             threshold = values[0];
             return input;
         }, new EffectParameter(
@@ -115,125 +117,42 @@ public:
         )
     );
     
-    std::shared_ptr<Effect> focalLength = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
-            if (getCurrentFileIndex() != -1) {
-                auto camera = getCurrentFileParser()->getCamera();
-                if (camera == nullptr) return input;
-                camera->setFocalLength(values[0]);
-            }
-            return input;
-		}, new EffectParameter(
-            "Focal length",
-            "Controls the focal length of the camera being used to render the 3D object. A lower focal length results in a wider field of view, distorting the image, and making the image smaller.",
-            "objFocalLength",
-            VERSION_HINT, 1.0, 0.0, 2.0
-        )
-    );
-
-    BooleanParameter* fixedRotateX = new BooleanParameter("Object Fixed Rotate X", "objFixedRotateX", VERSION_HINT, false);
-    BooleanParameter* fixedRotateY = new BooleanParameter("Object Fixed Rotate Y", "objFixedRotateY", VERSION_HINT, false);
-    BooleanParameter* fixedRotateZ = new BooleanParameter("Object Fixed Rotate Z", "objFixedRotateZ", VERSION_HINT, false);
-    std::shared_ptr<Effect> rotateX = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
-            if (getCurrentFileIndex() != -1) {
-                auto obj = getCurrentFileParser()->getObject();
-                if (obj == nullptr) return input;
-                auto rotation = values[0] * std::numbers::pi;
-                if (fixedRotateX->getBoolValue()) {
-                    obj->setCurrentRotationX(rotation);
-                } else {
-                    obj->setBaseRotationX(rotation);
-                }
-            }
-            return input;
-        }, new EffectParameter(
-            "Object Rotate X",
-            "Controls the rotation of the 3D object around the X axis. When Object Fixed Rotate X is enabled, the object is unaffected by the rotation speed, and remains in a fixed position.",
-            "objRotateX",
-            VERSION_HINT, 1.0, -1.0, 1.0
-        )
-    );
-    std::shared_ptr<Effect> rotateY = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
-            if (getCurrentFileIndex() != -1) {
-                auto obj = getCurrentFileParser()->getObject();
-                if (obj == nullptr) return input;
-                auto rotation = values[0] * std::numbers::pi;
-                if (fixedRotateY->getBoolValue()) {
-                    obj->setCurrentRotationY(rotation);
-                } else {
-                    obj->setBaseRotationY(rotation);
-                }
-            }
-            return input;
-        }, new EffectParameter(
-            "Object Rotate Y",
-            "Controls the rotation of the 3D object around the Y axis. When Object Fixed Rotate Y is enabled, the object is unaffected by the rotation speed, and remains in a fixed position.",
-            "objRotateY",
-            VERSION_HINT, 1.0, -1.0, 1.0
-        )
-    );
-    std::shared_ptr<Effect> rotateZ = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
-            if (getCurrentFileIndex() != -1) {
-                auto obj = getCurrentFileParser()->getObject();
-                if (obj == nullptr) return input;
-                auto rotation = values[0] * std::numbers::pi;
-                if (fixedRotateZ->getBoolValue()) {
-                    obj->setCurrentRotationZ(rotation);
-                } else {
-                    obj->setBaseRotationZ(rotation);
-                }
-            }
-            return input;
-        }, new EffectParameter(
-            "Object Rotate Z",
-            "Controls the rotation of the 3D object around the Z axis. When Object Fixed Rotate Z is enabled, the object is unaffected by the rotation speed, and remains in a fixed position.",
-            "objRotateZ",
-            VERSION_HINT, 0.0, -1.0, 1.0
-        )
-    );
-    std::shared_ptr<Effect> rotateSpeed = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
-            if (getCurrentFileIndex() != -1) {
-                auto obj = getCurrentFileParser()->getObject();
-                if (obj == nullptr) return input;
-                obj->setRotationSpeed(values[0]);
-            }
-            return input;
-		}, new EffectParameter(
-            "Rotate Speed",
-            "Controls the speed at which the 3D object rotates. A negative value results in the object rotating in the opposite direction. The rotate speed is scaled by the different Object Rotate Axis values to rotate the object.",
-            "objRotateSpeed",
-            VERSION_HINT, 0.0, -1.0, 1.0
-        )
-    );
-
     std::shared_ptr<Effect> traceMax = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
             return input;
         }, new EffectParameter(
             "Trace max",
             "Defines the maximum proportion of the image that is drawn before skipping to the next frame. This has the effect of 'tracing' out the image from a single dot when animated. By default, we draw until the end of the frame, so this value is 1.0.",
             "traceMax",
-            VERSION_HINT, 1.0, 0.0, 1.0
+            VERSION_HINT, 0.75, 0.0, 1.0
         )
     );
     std::shared_ptr<Effect> traceMin = std::make_shared<Effect>(
-        [this](int index, Vector2 input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
             return input;
         }, new EffectParameter(
             "Trace min",
             "Defines the proportion of the image that drawing starts from. This has the effect of 'tracing' out the image from a single dot when animated. By default, we start drawing from the beginning of the frame, so this value is 0.0.",
             "traceMin",
-            VERSION_HINT, 0.0, 0.0, 1.0
+            VERSION_HINT, 0.25, 0.0, 1.0
         )
     );
 
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
+
+    std::shared_ptr<DashedLineEffect> dashedLineEffect = std::make_shared<DashedLineEffect>();
+
     std::function<void(int, juce::String, juce::String)> errorCallback = [this](int lineNum, juce::String fileName, juce::String error) { notifyErrorListeners(lineNum, fileName, error); };
-    std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>(VERSION_HINT, errorCallback);
+    std::shared_ptr<CustomEffect> customEffect = std::make_shared<CustomEffect>(errorCallback);
+    
+    std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>();
+    std::shared_ptr<Effect> perspective = std::make_shared<Effect>(
+        perspectiveEffect,
+        std::vector<EffectParameter*>{
+            new EffectParameter("3D Perspective", "Controls the strength of the 3D perspective projection.", "perspectiveStrength", VERSION_HINT, 1.0, 0.0, 1.0),
+            new EffectParameter("Focal Length", "Controls the focal length of the 3D perspective effect. A higher focal length makes the image look more flat, and a lower focal length makes the image look more 3D.", "perspectiveFocalLength", VERSION_HINT, 2.0, 0.0, 10.0),
+        }
+    );
     
     BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false);
     BooleanParameter* inputEnabled = new BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false);
@@ -344,7 +263,6 @@ private:
     double squaredVolume = 0;
     double currentVolume = 0;
 
-    void updateObjValues();
     std::shared_ptr<Effect> getEffect(juce::String id);
     BooleanParameter* getBooleanParameter(juce::String id);
     FloatParameter* getFloatParameter(juce::String id);

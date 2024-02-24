@@ -13,7 +13,7 @@ enum class FullScreenMode {
     MAIN_COMPONENT,
 };
 
-class VisualiserComponent : public juce::Component, public juce::Timer, public juce::Thread, public juce::MouseListener {
+class VisualiserComponent : public juce::Component, public juce::Timer, public juce::Thread, public juce::MouseListener, public juce::SettableTooltipClient {
 public:
     VisualiserComponent(int numChannels, OscirenderAudioProcessor& p);
     ~VisualiserComponent() override;
@@ -29,6 +29,8 @@ public:
 	void run() override;
     void mouseDown(const juce::MouseEvent& event) override;
     bool keyPressed(const juce::KeyPress& key) override;
+    
+    void setFullScreen(bool fullScreen);
 
 
 private:

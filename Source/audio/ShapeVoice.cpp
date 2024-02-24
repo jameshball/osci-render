@@ -63,6 +63,10 @@ void ShapeVoice::incrementShapeDrawing() {
     }
 }
 
+double ShapeVoice::getFrequency() {
+    return actualFrequency;
+}
+
 // should be called if the current file is changed so that we interrupt
 // any currently playing sounds / voices
 void ShapeVoice::updateSound(juce::SynthesiserSound* sound) {
@@ -76,9 +80,9 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
 
     int numChannels = outputBuffer.getNumChannels();
 
-    float actualFrequency = frequency * pitchWheelAdjustment;
-    
-    if (!audioProcessor.midiEnabled->getBoolValue()) {
+    if (audioProcessor.midiEnabled->getBoolValue()) {
+        actualFrequency = frequency * pitchWheelAdjustment;
+    } else {
         actualFrequency = audioProcessor.frequency;
     }
 
@@ -92,9 +96,10 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         double proportionalLength = (traceMax - traceMin) * frameLength;
         lengthIncrement = juce::jmax(proportionalLength / (audioProcessor.currentSampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
 
-        Vector2 channels;
+        Point channels;
         double x = 0.0;
         double y = 0.0;
+        double z = 0.0;
 
         bool renderingSample = true;
 
@@ -114,6 +119,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
 
         x = channels.x;
         y = channels.y;
+        z = channels.z;
 
         time += 1.0 / audioProcessor.currentSampleRate;
 
@@ -127,7 +133,11 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         double gain = audioProcessor.midiEnabled->getBoolValue() ? adsr.lookup(time) : 1.0;
         gain *= velocity;
 
-        if (numChannels >= 2) {
+        if (numChannels >= 3) {
+            outputBuffer.addSample(0, sample, x * gain);
+            outputBuffer.addSample(1, sample, y * gain);
+            outputBuffer.addSample(2, sample, z * gain);
+        } else if (numChannels == 2) {
             outputBuffer.addSample(0, sample, x * gain);
             outputBuffer.addSample(1, sample, y * gain);
         } else if (numChannels == 1) {
@@ -136,7 +146,9 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
 
         double traceMinValue = audioProcessor.traceMin->getActualValue();
         double traceMaxValue = audioProcessor.traceMax->getActualValue();
-        actualTraceMax = juce::jmax(actualTraceMin + MIN_TRACE, juce::jmin(traceMaxValue, 1.0));
+        traceMaxValue = traceMaxEnabled ? traceMaxValue : 1.0;
+        traceMinValue = traceMinEnabled ? traceMinValue : 0.0;
+        actualTraceMax = juce::jmax(actualTraceMin, juce::jmin(traceMaxValue, 1.0));
         actualTraceMin = juce::jmax(MIN_TRACE, juce::jmin(traceMinValue, actualTraceMax - MIN_TRACE));
 
         if (!renderingSample) {
@@ -152,6 +164,10 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
                 shapeDrawn = 0.0;
                 currentShape = 0;
             }
+            frameDrawn = 0.0;
+            shapeDrawn = 0.0;
+            currentShape = 0;
+
             // TODO: updateFrame already iterates over all the shapes,
             // so we can improve performance by calculating frameDrawn
             // and shapeDrawn directly. frameDrawn is simply actualTraceMin * frameLength

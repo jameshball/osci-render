@@ -4,7 +4,7 @@ DelayEffect::DelayEffect() {}
 
 DelayEffect::~DelayEffect() {}
 
-Vector2 DelayEffect::apply(int index, Vector2 vector, const std::vector<double>& values, double sampleRate) {
+Point DelayEffect::apply(int index, Point vector, const std::vector<double>& values, double sampleRate) {
     double decay = values[0];
     double decayLength = values[1];
 	int delayBufferLength = (int)(sampleRate * decayLength);
@@ -22,10 +22,11 @@ Vector2 DelayEffect::apply(int index, Vector2 vector, const std::vector<double>&
         }
     }
 
-    Vector2 echo = delayBuffer[position];
-    vector = Vector2(
+    Point echo = delayBuffer[position];
+    vector = Point(
         vector.x + echo.x * decay,
-        vector.y + echo.y * decay
+        vector.y + echo.y * decay,
+        vector.z + echo.z * decay
     );
 
     delayBuffer[head] = vector;

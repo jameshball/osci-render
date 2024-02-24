@@ -1,64 +1,50 @@
 #include "Line.h"
 
-Line::Line(double x1, double y1, double x2, double y2) : x1(x1), y1(y1), x2(x2), y2(y2) {}
+Line::Line(double x1, double y1, double x2, double y2) : x1(x1), y1(y1), z1(0), x2(x2), y2(y2), z2(0) {}
 
-Vector2 Line::nextVector(double drawingProgress) {
-	return Vector2(
+Line::Line(double x1, double y1, double z1, double x2, double y2, double z2) : x1(x1), y1(y1), z1(z1), x2(x2), y2(y2), z2(z2) {}
+
+Line::Line(Point p1, Point p2) : x1(p1.x), y1(p1.y), z1(p1.z), x2(p2.x), y2(p2.y), z2(p2.z) {}
+
+Point Line::nextVector(double drawingProgress) {
+	return Point(
 		x1 + (x2 - x1) * drawingProgress,
-		y1 + (y2 - y1) * drawingProgress
+		y1 + (y2 - y1) * drawingProgress,
+		z1 + (z2 - z1) * drawingProgress
 	);
 }
 
-void Line::rotate(double theta) {
-	double cosTheta = std::cos(theta);
-	double sinTheta = std::sin(theta);
-
-	double newX1 = x1 * cosTheta - y1 * sinTheta;
-	double newY1 = x1 * sinTheta + y1 * cosTheta;
-	double newX2 = x2 * cosTheta - y2 * sinTheta;
-	double newY2 = x2 * sinTheta + y2 * cosTheta;
-
-	x1 = newX1;
-	y1 = newY1;
-	x2 = newX2;
-	y2 = newY2;
-}
-
-void Line::scale(double x, double y) {
+void Line::scale(double x, double y, double z) {
 	x1 *= x;
 	y1 *= y;
+	z1 *= z;
 	x2 *= x;
 	y2 *= y;
+	z2 *= z;
 }
 
-void Line::translate(double x, double y) {
+void Line::translate(double x, double y, double z) {
 	x1 += x;
 	y1 += y;
+	z1 += z;
 	x2 += x;
 	y2 += y;
+	z2 += z;
 }
 
-double Line::length(double x1, double y1, double x2, double y2) {
-	// Euclidean distance approximation based on octagonal boundary
-	double dx = std::abs(x2 - x1);
-	double dy = std::abs(y2 - y1);
-
-	return 0.41 * std::min(dx, dy) + 0.941246 * std::max(dx, dy);
+double Line::length(double x1, double y1, double z1, double x2, double y2, double z2) {
+	return sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2) + pow(z2 - z1, 2));
 }
 
 double inline Line::length() {
 	if (len < 0) {
-		// Euclidean distance approximation based on octagonal boundary
-		double dx = std::abs(x2 - x1);
-		double dy = std::abs(y2 - y1);
-
-		len = 0.41 * std::min(dx, dy) + 0.941246 * std::max(dx, dy);
+		len = length(x1, y1, z1, x2, y2, z2);
 	}
 	return len;
 }
 
 std::unique_ptr<Shape> Line::clone() {
-	return std::make_unique<Line>(x1, y1, x2, y2);
+	return std::make_unique<Line>(x1, y1, z1, x2, y2, z2);
 }
 
 std::string Line::type() {

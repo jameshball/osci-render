@@ -5,6 +5,7 @@
 #include "../audio/Effect.h"
 #include "EffectComponent.h"
 #include "ComponentList.h"
+#include <random>
 
 // Application-specific data container
 class OscirenderAudioProcessorEditor;
@@ -16,6 +17,44 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
 
     AudioEffectListBoxItemData(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), editor(editor) {
         resetData();
+    }
+
+    void randomise() {
+        juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+        
+		for (int i = 0; i < data.size(); i++) {
+			auto effect = data[i];
+			auto id = effect->getId().toLowerCase();
+            
+            if (id.contains("scale") || id.contains("translate") || id.contains("trace")) {
+                continue;
+            }
+
+            for (auto& parameter : effect->parameters) {
+                parameter->setValueNotifyingHost(juce::Random::getSystemRandom().nextFloat());
+                if (parameter->lfo != nullptr) {
+                    parameter->lfo->setUnnormalisedValueNotifyingHost((int) LfoType::Static);
+                    parameter->lfoRate->setUnnormalisedValueNotifyingHost(1);
+                    
+                    if (juce::Random::getSystemRandom().nextFloat() > 0.8) {
+                        parameter->lfo->setUnnormalisedValueNotifyingHost((int)(juce::Random::getSystemRandom().nextFloat() * (int)LfoType::Noise));
+                        parameter->lfoRate->setValueNotifyingHost(juce::Random::getSystemRandom().nextFloat() * 0.1);
+                    }
+                }
+            }
+			effect->enabled->setValueNotifyingHost(juce::Random::getSystemRandom().nextFloat() > 0.7);
+		}
+
+        // shuffle precedence
+        std::random_device rd;
+        std::mt19937 g(rd());
+		std::shuffle(data.begin(), data.end(), g);
+
+		for (int i = 0; i < data.size(); i++) {
+			data[i]->setPrecedence(i);
+		}
+
+		audioProcessor.updateEffectPrecedence();
     }
 
     void resetData() {

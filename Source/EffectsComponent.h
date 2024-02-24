@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "LookAndFeel.h"
 #include "audio/BitCrushEffect.h"
 #include "PluginProcessor.h"
 #include "components/DraggableListBox.h"
@@ -19,6 +20,8 @@ private:
 	OscirenderAudioProcessor& audioProcessor;
 
 	// juce::TextButton addBtn;
+
+	SvgButton randomiseButton{ "randomise", juce::String(BinaryData::random_svg), Colours::accentColor };
 
 	AudioEffectListBoxItemData itemData;
 	EffectsListBoxModel listBoxModel;

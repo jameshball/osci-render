@@ -69,6 +69,7 @@ void EffectComponent::setupComponent() {
 
         lfoSlider.setRange(parameter->lfoRate->min, parameter->lfoRate->max, parameter->lfoRate->step);
         lfoSlider.setValue(parameter->lfoRate->getValueUnnormalised(), juce::dontSendNotification);
+        lfoSlider.setSkewFactorFromMidPoint(parameter->lfoRate->min + 0.2 * (parameter->lfoRate->max - parameter->lfoRate->min));
 
         if (lfo.getSelectedId() == static_cast<int>(LfoType::Static)) {
             lfoSlider.setVisible(false);
@@ -196,4 +197,10 @@ void EffectComponent::handleAsyncUpdate() {
 void EffectComponent::setComponent(std::shared_ptr<juce::Component> component) {
 	this->component = component;
     addAndMakeVisible(component.get());
+}
+
+void EffectComponent::setSliderOnValueChange() {
+    slider.onValueChange = [this] {
+        effect.setValue(index, slider.getValue());
+    };
 }

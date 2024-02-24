@@ -1,11 +1,11 @@
 #pragma once
-#include "../shape/Vector2.h"
+#include "../shape/Point.h"
 #include <JuceHeader.h>
 #include "EffectApplication.h"
 #include "EffectParameter.h"
 #include "BooleanParameter.h"
 
-typedef std::function<Vector2(int index, Vector2 input, const std::vector<double>& values, double sampleRate)> EffectApplicationType;
+typedef std::function<Point(int index, Point input, const std::vector<double>& values, double sampleRate)> EffectApplicationType;
 
 class Effect {
 public:
@@ -14,7 +14,7 @@ public:
 	Effect(EffectApplicationType application, const std::vector<EffectParameter*>& parameters);
 	Effect(EffectApplicationType application, EffectParameter* parameter);
 
-	Vector2 apply(int index, Vector2 input, double volume = 0.0);
+	Point apply(int index, Point input, double volume = 0.0);
 	
 	void apply();
 	double getValue(int index);
