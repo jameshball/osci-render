@@ -15,7 +15,6 @@
 #include "audio/SmoothEffect.h"
 #include "audio/BitCrushEffect.h"
 #include "audio/BulgeEffect.h"
-#include "audio/LuaEffect.h"
 #include "audio/EffectParameter.h"
 
 //==============================================================================
@@ -132,10 +131,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
             new EffectParameter("Dash Length", "Controls the length of the dashed line.", "dashLength", VERSION_HINT, 0.2, 0.0, 1.0),
         }
     ));
-    toggleableEffects.push_back(std::make_shared<Effect>(
-        customEffect,
-        new EffectParameter("Lua Effect", "Controls the strength of the custom Lua effect applied. You can write your own custom effect using Lua by pressing the edit button on the right.", "customEffectStrength", VERSION_HINT, 1.0, 0.0, 1.0)
-    ));
+    toggleableEffects.push_back(custom);
     toggleableEffects.push_back(traceMax);
     toggleableEffects.push_back(traceMin);
 
@@ -154,10 +150,6 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
 
     for (int i = 0; i < 26; i++) {
         addLuaSlider();
-    }
-
-    for (auto& effect : luaEffects) {
-        effect->addListener(0, this);
     }
 
     allEffects = toggleableEffects;
@@ -209,9 +201,6 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
 }
 
 OscirenderAudioProcessor::~OscirenderAudioProcessor() {
-    for (auto& effect : luaEffects) {
-        effect->removeListener(0, this);
-    }
     voices->removeListener(this);
 }
 
@@ -317,7 +306,8 @@ bool OscirenderAudioProcessor::isBusesLayoutSupported (const BusesLayout& layout
 void OscirenderAudioProcessor::addLuaSlider() {
     juce::String sliderName = "";
 
-    int sliderNum = luaEffects.size() + 1;
+    int sliderIndex = luaEffects.size();
+    int sliderNum = sliderIndex + 1;
     while (sliderNum > 0) {
         int mod = (sliderNum - 1) % 26;
         sliderName = (char)(mod + 'A') + sliderName;
@@ -325,25 +315,16 @@ void OscirenderAudioProcessor::addLuaSlider() {
     }
 
     luaEffects.push_back(std::make_shared<Effect>(
-        std::make_shared<LuaEffect>(sliderName, *this),
-        new EffectParameter(
+        [this, sliderIndex](int index, Point input, const std::vector<double>& values, double sampleRate) {
+            luaValues[sliderIndex] = values[0];
+            return input;
+        }, new EffectParameter(
             "Lua Slider " + sliderName,
             "Controls the value of the Lua variable called slider_" + sliderName.toLowerCase() + ".",
             "lua" + sliderName,
             VERSION_HINT, 0.0, 0.0, 1.0, 0.001, false
         )
     ));
-
-    auto& effect = luaEffects.back();
-    effect->parameters[0]->disableLfo();
-    effect->parameters[0]->disableSidechain();
-}
-
-// effectsLock should be held when calling this
-void OscirenderAudioProcessor::updateLuaValues() {
-    for (auto& effect : luaEffects) {
-        effect->apply();
-	}
 }
 
 void OscirenderAudioProcessor::addErrorListener(ErrorListener* listener) {
@@ -493,7 +474,6 @@ void OscirenderAudioProcessor::changeCurrentFile(int index) {
 		return;
 	}
     currentFile = index;
-    updateLuaValues();
     changeSound(sounds[index]);
 }
 
@@ -665,6 +645,12 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             }
             for (auto& effect : permanentEffects) {
                 channels = effect->apply(sample, channels, currentVolume);
+            }
+            auto lua = currentFile >= 0 ? sounds[currentFile]->parser->getLua() : nullptr;
+            if (lua != nullptr || custom->enabled->getBoolValue()) {
+                for (auto& effect : luaEffects) {
+                    effect->apply(sample, channels, currentVolume);
+                }
             }
         }
 
@@ -889,14 +875,6 @@ void OscirenderAudioProcessor::consumerStop(std::shared_ptr<BufferConsumer> cons
 }
 
 void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float newValue) {
-    // call apply on lua effects
-    for (auto& effect : luaEffects) {
-        if (parameterIndex == effect->parameters[0]->getParameterIndex()) {
-            effect->apply();
-            return;
-        }
-    }
-
     if (parameterIndex == voices->getParameterIndex()) {
         int numVoices = voices->getValueUnnormalised();
         // if the number of voices has changed, update the synth without clearing all the voices

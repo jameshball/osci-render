@@ -380,7 +380,6 @@ void OscirenderAudioProcessorEditor::updateCodeDocument() {
     if (editingCustomFunction) {
         juce::String file = codeDocuments[0]->getAllContent();
         audioProcessor.customEffect->updateCode(file);
-        audioProcessor.updateLuaValues();
     } else {
         int originalIndex = audioProcessor.getCurrentFileIndex();
         int index = audioProcessor.getCurrentFileIndex();

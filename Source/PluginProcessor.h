@@ -80,6 +80,7 @@ public:
     juce::SpinLock effectsLock;
 	std::vector<std::shared_ptr<Effect>> toggleableEffects;
     std::vector<std::shared_ptr<Effect>> luaEffects;
+    double luaValues[26] = { 0.0 };
 
     std::shared_ptr<Effect> frequencyEffect = std::make_shared<Effect>(
         [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
@@ -143,8 +144,12 @@ public:
     std::shared_ptr<DashedLineEffect> dashedLineEffect = std::make_shared<DashedLineEffect>();
 
     std::function<void(int, juce::String, juce::String)> errorCallback = [this](int lineNum, juce::String fileName, juce::String error) { notifyErrorListeners(lineNum, fileName, error); };
-    std::shared_ptr<CustomEffect> customEffect = std::make_shared<CustomEffect>(errorCallback);
-    
+    std::shared_ptr<CustomEffect> customEffect = std::make_shared<CustomEffect>(errorCallback, luaValues);
+    std::shared_ptr<Effect> custom = std::make_shared<Effect>(
+        customEffect,
+        new EffectParameter("Lua Effect", "Controls the strength of the custom Lua effect applied. You can write your own custom effect using Lua by pressing the edit button on the right.", "customEffectStrength", VERSION_HINT, 1.0, 0.0, 1.0)
+    );
+
     std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>();
     std::shared_ptr<Effect> perspective = std::make_shared<Effect>(
         perspectiveEffect,
@@ -227,7 +232,6 @@ public:
     juce::String getFileId(int index);
 	std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
     void setObjectServerRendering(bool enabled);
-    void updateLuaValues();
     void addErrorListener(ErrorListener* listener);
     void removeErrorListener(ErrorListener* listener);
     void notifyErrorListeners(int lineNumber, juce::String fileName, juce::String error);
