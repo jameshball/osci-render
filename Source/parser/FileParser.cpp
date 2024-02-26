@@ -49,11 +49,11 @@ std::vector<std::unique_ptr<Shape>> FileParser::nextFrame() {
 	return tempShapes;
 }
 
-Point FileParser::nextSample(lua_State*& L, const LuaVariables vars, long& step, double& phase) {
+Point FileParser::nextSample(lua_State*& L, LuaVariables& vars) {
 	juce::SpinLock::ScopedLockType scope(lock);
 
 	if (lua != nullptr) {
-		auto values = lua->run(L, vars, step, phase);
+		auto values = lua->run(L, vars);
 		if (values.size() == 2) {
 			return Point(values[0], values[1], 0);
 		} else if (values.size() > 2) {

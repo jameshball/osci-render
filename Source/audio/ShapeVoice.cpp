@@ -108,7 +108,11 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             renderingSample = parser != nullptr && parser->isSample();
 
             if (renderingSample) {
-                channels = parser->nextSample(L, LuaVariables{ audioProcessor.currentSampleRate, actualFrequency }, step, phase);
+                vars.sampleRate = audioProcessor.currentSampleRate;
+                vars.frequency = actualFrequency;
+                std::copy(std::begin(audioProcessor.luaValues), std::end(audioProcessor.luaValues), std::begin(vars.sliders));
+
+                channels = parser->nextSample(L, vars);
             } else if (currentShape < frame.size()) {
                 auto& shape = frame[currentShape];
                 double length = shape->length();

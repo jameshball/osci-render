@@ -43,8 +43,7 @@ private:
 	double pitchWheelAdjustment = 1.0;
 
 	lua_State* L = nullptr;
-	long step = 1;
-	double phase = 0;
+	LuaVariables vars;
 
 	Env adsr;
 	double time = 0.0;

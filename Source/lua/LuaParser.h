@@ -10,9 +10,52 @@ public:
 	virtual juce::String getFileName() = 0;
 };
 
+const int NUM_SLIDERS = 26;
+
+const char SLIDER_NAMES[NUM_SLIDERS][9] = {
+	"slider_a",
+	"slider_b",
+	"slider_c",
+	"slider_d",
+	"slider_e",
+	"slider_f",
+	"slider_g",
+	"slider_h",
+	"slider_i",
+	"slider_j",
+	"slider_k",
+	"slider_l",
+	"slider_m",
+	"slider_n",
+	"slider_o",
+	"slider_p",
+	"slider_q",
+	"slider_r",
+	"slider_s",
+	"slider_t",
+	"slider_u",
+	"slider_v",
+	"slider_w",
+	"slider_x",
+	"slider_y",
+	"slider_z",
+};
+
 struct LuaVariables {
-	double sampleRate;
-	double frequency;
+
+	double sliders[NUM_SLIDERS] = { 0.0 };
+
+    double step = 1;
+    double phase = 0;
+    double sampleRate = 0;
+    double frequency = 0;
+
+	// x, y, z are only used for effects
+	bool isEffect = false;
+
+	double x = 0;
+	double y = 0;
+	double z = 0;
 };
 
 struct lua_State;
@@ -20,8 +63,7 @@ class LuaParser {
 public:
 	LuaParser(juce::String fileName, juce::String script, std::function<void(int, juce::String, juce::String)> errorCallback, juce::String fallbackScript = "return { 0.0, 0.0 }");
 
-	std::vector<float> run(lua_State*& L, const LuaVariables vars, long& step, double& phase);
-	void setVariable(juce::String variableName, double value);
+	std::vector<float> run(lua_State*& L, LuaVariables& vars);
 	bool isFunctionValid();
 	juce::String getScript();
 	void resetErrors();
@@ -37,11 +79,7 @@ private:
 	juce::String script;
 	juce::String fallbackScript;
 	std::atomic<bool> updateVariables = false;
-	juce::SpinLock variableLock;
-	std::vector<juce::String> variableNames;
-	std::vector<double> variables;
 	std::function<void(int, juce::String, juce::String)> errorCallback;
 	juce::String fileName;
 	std::vector<lua_State*> seenStates;
-	std::vector<bool> staleStates;
 };

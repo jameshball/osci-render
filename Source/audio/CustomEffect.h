@@ -6,7 +6,7 @@
 
 class CustomEffect : public EffectApplication {
 public:
-	CustomEffect(std::function<void(int, juce::String, juce::String)> errorCallback);
+	CustomEffect(std::function<void(int, juce::String, juce::String)> errorCallback, double (&luaValues)[26]);
 	~CustomEffect();
 
 	// arbitrary UUID
@@ -14,7 +14,6 @@ public:
 
 	Point apply(int index, Point input, const std::vector<double>& values, double sampleRate) override;
 	void updateCode(const juce::String& newCode);
-	void setVariable(juce::String variableName, double value);
 
 	juce::String getCode();
 	
@@ -31,6 +30,6 @@ private:
 
 	lua_State *L = nullptr;
 
-	long step = 1;
-	double phase = 0;
+	LuaVariables vars;
+	double(&luaValues)[26];
 };

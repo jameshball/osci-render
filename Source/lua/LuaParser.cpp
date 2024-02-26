@@ -58,20 +58,17 @@ void LuaParser::parse(lua_State*& L) {
 }
 
 // only the audio thread runs this fuction
-std::vector<float> LuaParser::run(lua_State*& L, const LuaVariables vars, long& step, double& phase) {
-    juce::SpinLock::ScopedLockType lock(variableLock);
-
+std::vector<float> LuaParser::run(lua_State*& L, LuaVariables& vars) {
     // if we haven't seen this state before, reset it
     int stateIndex = std::find(seenStates.begin(), seenStates.end(), L) - seenStates.begin();
     if (stateIndex == seenStates.size()) {
         reset(L, script);
         seenStates.push_back(L);
-        staleStates.push_back(true);
     }
 
     std::vector<float> values;
 	
-    lua_pushnumber(L, step);
+    lua_pushnumber(L, vars.step);
     lua_setglobal(L, "step");
 
     lua_pushnumber(L, vars.sampleRate);
@@ -80,16 +77,23 @@ std::vector<float> LuaParser::run(lua_State*& L, const LuaVariables vars, long& 
     lua_pushnumber(L, vars.frequency);
     lua_setglobal(L, "frequency");
 
-    lua_pushnumber(L, phase);
+    lua_pushnumber(L, vars.phase);
     lua_setglobal(L, "phase");
 
-    if (staleStates[stateIndex]) {
-        // update variables
-        for (int i = 0; i < variableNames.size(); i++) {
-            lua_pushnumber(L, variables[i]);
-            lua_setglobal(L, variableNames[i].toUTF8());
-        }
-        staleStates[stateIndex] = false;
+    for (int i = 0; i < NUM_SLIDERS; i++) {
+        lua_pushnumber(L, vars.sliders[i]);
+        lua_setglobal(L, SLIDER_NAMES[i]);
+    }
+
+    if (vars.isEffect) {
+        lua_pushnumber(L, vars.x);
+        lua_setglobal(L, "x");
+
+        lua_pushnumber(L, vars.y);
+        lua_setglobal(L, "y");
+
+        lua_pushnumber(L, vars.z);
+        lua_setglobal(L, "z");
     }
     
 	lua_geti(L, LUA_REGISTRYINDEX, functionRef);
@@ -130,47 +134,13 @@ std::vector<float> LuaParser::run(lua_State*& L, const LuaVariables vars, long& 
     // clear stack
     lua_settop(L, 0);
 
-	step++;
-    phase += 2 * std::numbers::pi * vars.frequency / vars.sampleRate;
-    if (phase > 2 * std::numbers::pi) {
-        phase -= 2 * std::numbers::pi;
+    vars.step++;
+    vars.phase += 2 * std::numbers::pi * vars.frequency / vars.sampleRate;
+    if (vars.phase > 2 * std::numbers::pi) {
+        vars.phase -= 2 * std::numbers::pi;
     }
     
 	return values;
-}
-
-// this CANNOT run at the same time as run()
-// many threads can run this function
-void LuaParser::setVariable(juce::String variableName, double value) {
-    juce::SpinLock::ScopedLockType lock(variableLock);
-    // find variable index
-    int index = -1;
-    for (int i = 0; i < variableNames.size(); i++) {
-        if (variableNames[i] == variableName) {
-            index = i;
-            break;
-        }
-    }
-
-    bool changed = false;
-	
-    if (index == -1) {
-        // add new variable
-        variableNames.push_back(variableName);
-        variables.push_back(value);
-        changed = true;
-    } else {
-        // update existing variable
-        changed = variables[index] != value;
-        variables[index] = value;
-    }
-
-    if (changed) {
-        // mark all states as stale
-        for (int i = 0; i < staleStates.size(); i++) {
-            staleStates[i] = true;
-        }
-    }
 }
 
 bool LuaParser::isFunctionValid() {
