@@ -2,8 +2,7 @@ name: Build
 on:
   push:
     branches:
-      - release
-      - 3d-audio
+      - master
 jobs:
   build-linux:
     name: Build Linux
