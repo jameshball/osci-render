@@ -21,11 +21,11 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 				if (url.isLocalFile()) {
 					auto file = url.getLocalFile();
 					audioProcessor.addFile(file);
+					pluginEditor.addCodeEditor(audioProcessor.getCurrentFileIndex());
 					fileAdded = true;
 				}
 			}
 			if (fileAdded) {
-				pluginEditor.addCodeEditor(audioProcessor.getCurrentFileIndex());
 				pluginEditor.fileUpdated(audioProcessor.getCurrentFileName());
 			}
 		});
