@@ -1,6 +1,31 @@
 #include "LuaParser.h"
 #include "luaimport.h"
 
+std::function<void(const juce::String&)> LuaParser::onPrint;
+
+static int customPrint(lua_State* L) {
+    int nargs = lua_gettop(L);
+
+    for (int i = 1; i <= nargs; ++i) {
+        LuaParser::onPrint(luaL_tolstring(L, i, nullptr));
+        lua_pop(L, 1);
+    }
+
+    return 0;
+}
+
+static const struct luaL_Reg printlib[] = {
+  {"print", customPrint},
+  {NULL, NULL} /* end of array */
+};
+
+extern int luaopen_customprintlib(lua_State* L) {
+    lua_getglobal(L, "_G");
+    luaL_setfuncs(L, printlib, 0);
+    lua_pop(L, 1);
+    return 0;
+}
+
 LuaParser::LuaParser(juce::String fileName, juce::String script, std::function<void(int, juce::String, juce::String)> errorCallback, juce::String fallbackScript) : script(script), fallbackScript(fallbackScript), errorCallback(errorCallback), fileName(fileName) {}
 
 void LuaParser::reset(lua_State*& L, juce::String script) {
@@ -12,6 +37,8 @@ void LuaParser::reset(lua_State*& L, juce::String script) {
     
     L = luaL_newstate();
     luaL_openlibs(L);
+	luaopen_customprintlib(L);
+    
     this->script = script;
     parse(L);
 }

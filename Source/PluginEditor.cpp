@@ -20,6 +20,14 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     }
 #endif
 
+    addAndMakeVisible(console);
+    
+	LuaParser::onPrint = [this](const juce::String& message) {
+		juce::MessageManager::callAsync([this, message] {
+			console.print(message);
+		});
+	};
+
     if (!usingNativeMenuBar) {
         menuBar.setModel(&menuBarModel);
         addAndMakeVisible(menuBar);
@@ -175,6 +183,7 @@ void OscirenderAudioProcessorEditor::resized() {
 
                 juce::Component dummy;
                 juce::Component dummy2;
+                juce::Component dummy3;
 
                 juce::Component* columns[] = { &dummy, &resizerBar, &dummy2 };
                  
@@ -196,10 +205,15 @@ void OscirenderAudioProcessorEditor::resized() {
                 }
 
                 if (editingCustomFunction || extension == ".lua") {
-                    juce::Component* rows[] = { codeEditors[index].get(), &luaResizerBar, &lua };
+                    juce::Component* rows[] = { &dummy3, &luaResizerBar, &lua };
                     luaLayout.layOutComponents(rows, 3, dummy2Bounds.getX(), dummy2Bounds.getY(), dummy2Bounds.getWidth(), dummy2Bounds.getHeight(), true, true);
+                    auto dummy3Bounds = dummy3.getBounds();
+					console.setBounds(dummy3Bounds.removeFromBottom(200));
+                    dummy3Bounds.removeFromBottom(5);
+                    codeEditors[index]->setBounds(dummy3Bounds);
                 } else {
                     codeEditors[index]->setBounds(dummy2Bounds);
+					console.setBounds(0, 0, 0, 0);
                     luaResizerBar.setBounds(0, 0, 0, 0);
                     lua.setBounds(0, 0, 0, 0);
                 }
@@ -208,12 +222,14 @@ void OscirenderAudioProcessorEditor::resized() {
                 resizerBar.setBounds(0, 0, 0, 0);
                 luaResizerBar.setBounds(0, 0, 0, 0);
                 lua.setBounds(0, 0, 0, 0);
+				console.setBounds(0, 0, 0, 0);
                 collapseButton.setBounds(area.removeFromRight(20));
             }
         } else {
             collapseButton.setBounds(0, 0, 0, 0);
             luaResizerBar.setBounds(0, 0, 0, 0);
             lua.setBounds(0, 0, 0, 0);
+			console.setBounds(0, 0, 0, 0);
         }
     }
 

@@ -8,6 +8,7 @@
 #include "components/MainMenuBarModel.h"
 #include "LookAndFeel.h"
 #include "components/ErrorCodeEditorComponent.h"
+#include "components/LuaConsole.h"
 
 
 class OscirenderAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener {
@@ -52,6 +53,8 @@ public:
     SettingsComponent settings{audioProcessor, *this};
     LuaComponent lua{audioProcessor, *this};
     VolumeComponent volume{audioProcessor};
+
+    LuaConsole console;
 
     std::vector<std::shared_ptr<juce::CodeDocument>> codeDocuments;
     std::vector<std::shared_ptr<ErrorCodeEditorComponent>> codeEditors;
