@@ -69,7 +69,7 @@
 		void resetErrors();
 		void close(lua_State*& L);
 
-		static std::function<void(const juce::String&)> onPrint;
+		static std::function<void(const std::string&)> onPrint;
 
 	private:
 		void reset(lua_State*& L, juce::String script);

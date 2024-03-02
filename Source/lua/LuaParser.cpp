@@ -1,7 +1,7 @@
 #include "LuaParser.h"
 #include "luaimport.h"
 
-std::function<void(const juce::String&)> LuaParser::onPrint;
+std::function<void(const std::string&)> LuaParser::onPrint;
 
 static int customPrint(lua_State* L) {
     int nargs = lua_gettop(L);
