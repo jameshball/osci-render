@@ -21,11 +21,10 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 #endif
 
     addAndMakeVisible(console);
+    console.setConsoleOpen(false);
     
-	LuaParser::onPrint = [this](const juce::String& message) {
-		juce::MessageManager::callAsync([this, message] {
-			console.print(message);
-		});
+	LuaParser::onPrint = [this](const std::string& message) {
+		console.print(message);
 	};
 
     if (!usingNativeMenuBar) {
@@ -151,6 +150,10 @@ void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
 	if (lua.getBounds().getWidth() > 0 && lua.getBounds().getHeight() > 0) {
 		ds.drawForRectangle(g, lua.getBounds());
 	}
+
+    if (console.getBounds().getWidth() > 0 && console.getBounds().getHeight() > 0) {
+        ds.drawForRectangle(g, console.getBounds());
+    }
 }
 
 void OscirenderAudioProcessorEditor::resized() {
@@ -208,8 +211,8 @@ void OscirenderAudioProcessorEditor::resized() {
                     juce::Component* rows[] = { &dummy3, &luaResizerBar, &lua };
                     luaLayout.layOutComponents(rows, 3, dummy2Bounds.getX(), dummy2Bounds.getY(), dummy2Bounds.getWidth(), dummy2Bounds.getHeight(), true, true);
                     auto dummy3Bounds = dummy3.getBounds();
-					console.setBounds(dummy3Bounds.removeFromBottom(200));
-                    dummy3Bounds.removeFromBottom(5);
+					console.setBounds(dummy3Bounds.removeFromBottom(console.getConsoleOpen() ? 200 : 30));
+                    dummy3Bounds.removeFromBottom(RESIZER_BAR_SIZE);
                     codeEditors[index]->setBounds(dummy3Bounds);
                 } else {
                     codeEditors[index]->setBounds(dummy2Bounds);
@@ -450,6 +453,21 @@ bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
     }
 
     return consumeKey;
+}
+
+void OscirenderAudioProcessorEditor::mouseDown(const juce::MouseEvent& e) {
+    if (console.getBoundsInParent().removeFromTop(30).contains(e.getPosition())) {
+        console.setConsoleOpen(!console.getConsoleOpen());
+        resized();
+    }
+}
+
+void OscirenderAudioProcessorEditor::mouseMove(const juce::MouseEvent& event) {
+    if (console.getBoundsInParent().removeFromTop(30).contains(event.getPosition())) {
+        setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    } else {
+        setMouseCursor(juce::MouseCursor::NormalCursor);
+    }
 }
 
 void OscirenderAudioProcessorEditor::newProject() {
