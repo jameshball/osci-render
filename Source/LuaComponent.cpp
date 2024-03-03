@@ -2,7 +2,7 @@
 #include "PluginEditor.h"
 
 LuaComponent::LuaComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor), slidersModel(sliders, p) {
-	setText("Lua Settings");
+	setText("Lua Sliders");
 
 	sliders.setModel(&slidersModel);
 	sliders.setRowHeight(30);

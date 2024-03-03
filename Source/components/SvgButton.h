@@ -5,8 +5,6 @@ class SvgButton : public juce::DrawableButton, public juce::AudioProcessorParame
  public:
     SvgButton(juce::String name, juce::String svg, juce::Colour colour, juce::Colour colourOn, BooleanParameter* toggle = nullptr) : juce::DrawableButton(name, juce::DrawableButton::ButtonStyle::ImageFitted), toggle(toggle) {
         auto doc = juce::XmlDocument::parse(svg);
-
-		setMouseCursor(juce::MouseCursor::PointingHandCursor);
         
         changeSvgColour(doc.get(), colour);
         normalImage = juce::Drawable::createFromSVG(*doc);
@@ -56,6 +54,20 @@ class SvgButton : public juce::DrawableButton, public juce::AudioProcessorParame
     void handleAsyncUpdate() override {
         setToggleState(toggle->getBoolValue(), juce::NotificationType::dontSendNotification);
     }
+
+    void mouseEnter(const juce::MouseEvent& e) override {
+        juce::DrawableButton::mouseEnter(e);
+
+        if (isEnabled()) {
+            setMouseCursor(juce::MouseCursor::PointingHandCursor);
+        }
+    }
+
+    void mouseExit(const juce::MouseEvent& e) override {
+        juce::DrawableButton::mouseExit(e);
+        setMouseCursor(juce::MouseCursor::NormalCursor);
+    }
+
 private:
     std::unique_ptr<juce::Drawable> normalImage;
 	std::unique_ptr<juce::Drawable> overImage;
