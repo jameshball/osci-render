@@ -2,7 +2,7 @@ name: Build
 on:
   push:
     branches:
-      - master
+      - main
 jobs:
   build-linux:
     name: Build Linux
