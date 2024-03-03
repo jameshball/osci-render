@@ -24,6 +24,7 @@ private:
     std::string buffer;
     juce::CodeDocument document;
     juce::CodeEditorComponent console = { document, nullptr };
+    juce::Label emptyConsoleLabel = { "emptyConsoleLabel", "Console is empty" };
     int consoleLines = 0;
 
     SvgButton clearConsoleButton { "clearConsole", juce::String(BinaryData::delete_svg), juce::Colours::red };

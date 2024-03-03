@@ -18,10 +18,13 @@ LuaConsole::LuaConsole() {
 	addAndMakeVisible(console);
 	addAndMakeVisible(clearConsoleButton);
 	addAndMakeVisible(pauseConsoleButton);
+	addAndMakeVisible(emptyConsoleLabel);
 
 	pauseConsoleButton.onClick = [this] {
         console.setScrollbarThickness(pauseConsoleButton.getToggleState() ? 10 : 0);
     };
+
+	emptyConsoleLabel.setJustificationType(juce::Justification::centred);
 }
 
 LuaConsole::~LuaConsole() {}
@@ -42,6 +45,11 @@ void LuaConsole::clear() {
 	document.clearUndoHistory();
 	consoleLines = 0;
 	buffer.clear();
+
+	juce::MessageManager::callAsync([this] {
+        console.setVisible(false);
+        emptyConsoleLabel.setVisible(true);
+    });
 }
 
 void LuaConsole::timerCallback() {
@@ -62,6 +70,11 @@ void LuaConsole::timerCallback() {
 		console.moveCaretToTop(false);
 		console.moveCaretToEnd(false);
 		console.scrollDown();
+
+		if (consoleLines > 0) {
+            console.setVisible(true);
+            emptyConsoleLabel.setVisible(false);
+        }
 	}
 }
 
@@ -81,6 +94,7 @@ void LuaConsole::resized() {
 	auto topBar = getLocalBounds().removeFromTop(30);
 	auto area = getLocalBounds().withTrimmedTop(30);
 	console.setBounds(area);
+	emptyConsoleLabel.setBounds(area);
 
 	clearConsoleButton.setBounds(topBar.removeFromRight(30).withSizeKeepingCentre(20, 20));
 	pauseConsoleButton.setBounds(topBar.removeFromRight(30).withSizeKeepingCentre(20, 20));
