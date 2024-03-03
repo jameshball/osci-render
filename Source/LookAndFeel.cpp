@@ -1,4 +1,5 @@
 #include "LookAndFeel.h"
+#include "components/SwitchButton.h"
 
 OscirenderLookAndFeel::OscirenderLookAndFeel() {
     // slider
@@ -13,6 +14,9 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     // buttons
     setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::white);
     setColour(juce::TextButton::buttonColourId, Colours::veryDark);
+    setColour(jux::SwitchButton::switchColour, juce::Colours::white);
+    setColour(jux::SwitchButton::switchOnBackgroundColour, Colours::accentColor);
+    setColour(jux::SwitchButton::switchOffBackgroundColour, Colours::dark);
 
     // windows & menus
     setColour(juce::ResizableWindow::backgroundColourId, Colours::grey);

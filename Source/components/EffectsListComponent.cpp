@@ -79,7 +79,7 @@ void EffectsListComponent::paintOverChildren(juce::Graphics& g) {
 void EffectsListComponent::resized() {
 	auto area = getLocalBounds();
 	area.removeFromLeft(20);
-	selected.setBounds(area.removeFromLeft(30));
+	selected.setBounds(area.removeFromLeft(30).withSizeKeepingCentre(30, 20));
 	list.setBounds(area);
 }
 
