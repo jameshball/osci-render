@@ -13,7 +13,6 @@ public:
 
     void resized() override;
     void paint(juce::Graphics& g) override;
-    void mouseDown(const juce::MouseEvent& event) override;
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void handleAsyncUpdate() override;
@@ -46,6 +45,8 @@ private:
     juce::Label label;
     LabelledTextBox min{"Min"};
     LabelledTextBox max{"Max"};
+
+    SvgButton rangeButton = { "rangeButton", BinaryData::range_svg, juce::Colours::white };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EffectComponent)
 };

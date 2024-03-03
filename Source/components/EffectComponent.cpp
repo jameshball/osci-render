@@ -6,6 +6,7 @@ EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, in
     addChildComponent(lfoSlider);
     addAndMakeVisible(lfo);
     addAndMakeVisible(label);
+    addAndMakeVisible(rangeButton);
 
     sidechainEnabled = effect.parameters[0]->sidechain != nullptr;
     if (sidechainEnabled) {
@@ -33,6 +34,18 @@ EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, in
     lfo.addItem("Reverse Sawtooth", static_cast<int>(LfoType::ReverseSawtooth));
     lfo.addItem("Noise", static_cast<int>(LfoType::Noise));
 
+    rangeButton.setTooltip("Click to change the range of the slider.");
+
+    rangeButton.onClick = [this] {
+        juce::PopupMenu menu;
+
+        menu.addCustomItem(1, popupLabel, 200, 30, false);
+        menu.addCustomItem(2, min, 160, 40, false);
+        menu.addCustomItem(3, max, 160, 40, false);
+
+        menu.showMenuAsync(juce::PopupMenu::Options(), [this](int result) {});
+    };
+
     effect.addListener(index, this);
     setupComponent();
 }
@@ -41,6 +54,8 @@ EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect) : 
 
 void EffectComponent::setupComponent() {
     EffectParameter* parameter = effect.parameters[index];
+
+    setEnabled(effect.enabled == nullptr || effect.enabled->getBoolValue());
 
     setTooltip(parameter->description);
     label.setText(parameter->name, juce::dontSendNotification);
@@ -109,7 +124,7 @@ void EffectComponent::setupComponent() {
         slider.setRange(effect.parameters[index]->min, effect.parameters[index]->max, effect.parameters[index]->step);
     };
 
-    popupLabel.setText(parameter->name + " Settings", juce::dontSendNotification);
+    popupLabel.setText(parameter->name + " Range", juce::dontSendNotification);
     popupLabel.setJustificationType(juce::Justification::centred);
     popupLabel.setFont(juce::Font(14.0f, juce::Font::bold));
 
@@ -147,11 +162,13 @@ void EffectComponent::resized() {
         sidechainButton->setBounds(bounds.removeFromRight(20));
     }
 
-    bool drawingSmall = bounds.getWidth() < 3 * TEXT_WIDTH;
+    bool drawingSmall = bounds.getWidth() < 3.5 * TEXT_WIDTH;
 
     if (lfoEnabled) {
-        lfo.setBounds(bounds.removeFromRight(drawingSmall ? 70 : 100).reduced(5));
+        lfo.setBounds(bounds.removeFromRight(drawingSmall ? 70 : 100).reduced(0, 5));
     }
+
+    rangeButton.setBounds(bounds.removeFromRight(20));
 
     bounds.removeFromLeft(5);
 
@@ -165,18 +182,6 @@ void EffectComponent::resized() {
 
 void EffectComponent::paint(juce::Graphics& g) {
     g.fillAll(findColour(effectComponentBackgroundColourId));
-}
-
-void EffectComponent::mouseDown(const juce::MouseEvent& event) {
-    if (event.mods.isPopupMenu()) {
-        juce::PopupMenu menu;
-
-        menu.addCustomItem(1, popupLabel, 200, 30, false);
-        menu.addCustomItem(2, min, 160, 40, false);
-        menu.addCustomItem(3, max, 160, 40, false);
-
-        menu.showMenuAsync(juce::PopupMenu::Options(), [this](int result) {});
-    }
 }
 
 void EffectComponent::parameterValueChanged(int parameterIndex, float newValue) {

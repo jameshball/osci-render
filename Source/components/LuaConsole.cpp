@@ -20,6 +20,10 @@ LuaConsole::LuaConsole() {
 	addAndMakeVisible(pauseConsoleButton);
 	addAndMakeVisible(emptyConsoleLabel);
 
+	clearConsoleButton.setTooltip("Clear console output.");
+
+	pauseConsoleButton.setTooltip("Pause console output, and show a scrollbar to navigate through the console history.");
+
 	pauseConsoleButton.onClick = [this] {
         console.setScrollbarThickness(pauseConsoleButton.getToggleState() ? 10 : 0);
     };
