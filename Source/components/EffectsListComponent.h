@@ -5,6 +5,7 @@
 #include "../audio/Effect.h"
 #include "EffectComponent.h"
 #include "ComponentList.h"
+#include "SwitchButton.h"
 #include <random>
 
 // Application-specific data container
@@ -155,7 +156,7 @@ protected:
     Effect& effect;
     ComponentListModel listModel;
     juce::ListBox list;
-    juce::ToggleButton selected;
+    jux::SwitchButton selected = { "switchButton", false };
 private:
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& editor;

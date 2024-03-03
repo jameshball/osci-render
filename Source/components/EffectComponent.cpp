@@ -43,7 +43,7 @@ EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, in
         menu.addCustomItem(2, min, 160, 40, false);
         menu.addCustomItem(3, max, 160, 40, false);
 
-        menu.showMenuAsync(juce::PopupMenu::Options(), [this](int result) {});
+        menu.showMenuAsync(juce::PopupMenu::Options().withParentComponent(audioProcessor.getActiveEditor()), [this](int result) {});
     };
 
     effect.addListener(index, this);
