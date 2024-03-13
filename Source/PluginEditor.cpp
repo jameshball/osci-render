@@ -146,16 +146,16 @@ void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
     }
 
 	for (int i = 0; i < codeEditors.size(); i++) {
-		if (codeEditors[i]->getBounds().getWidth() > 0 && codeEditors[i]->getBounds().getHeight() > 0) {
+		if (codeEditors[i]->isVisible()) {
 			ds.drawForRectangle(g, codeEditors[i]->getBounds());
 		}
 	}
     
-	if (lua.getBounds().getWidth() > 0 && lua.getBounds().getHeight() > 0) {
+	if (lua.isVisible()) {
 		ds.drawForRectangle(g, lua.getBounds());
 	}
 
-    if (console.getBounds().getWidth() > 0 && console.getBounds().getHeight() > 0) {
+    if (console.isVisible()) {
         ds.drawForRectangle(g, console.getBounds());
     }
 }
@@ -184,7 +184,12 @@ void OscirenderAudioProcessorEditor::resized() {
 
         int originalIndex = audioProcessor.getCurrentFileIndex();
         int index = editingCustomFunction ? 0 : audioProcessor.getCurrentFileIndex() + 1;
-        if (originalIndex != -1 || editingCustomFunction) {
+
+        bool ableToEditFile = originalIndex != -1 || editingCustomFunction;
+        bool fileOpen = false;
+        bool luaFileOpen = false;
+        
+        if (ableToEditFile) {
             if (codeEditors[index]->isVisible()) {
                 editorVisible = true;
 
@@ -218,26 +223,25 @@ void OscirenderAudioProcessorEditor::resized() {
 					console.setBounds(dummy3Bounds.removeFromBottom(console.getConsoleOpen() ? 200 : 30));
                     dummy3Bounds.removeFromBottom(RESIZER_BAR_SIZE);
                     codeEditors[index]->setBounds(dummy3Bounds);
+                    luaFileOpen = true;
                 } else {
                     codeEditors[index]->setBounds(dummy2Bounds);
-					console.setBounds(0, 0, 0, 0);
-                    luaResizerBar.setBounds(0, 0, 0, 0);
-                    lua.setBounds(0, 0, 0, 0);
                 }
+
+                fileOpen = true;
             } else {
-                codeEditors[index]->setBounds(0, 0, 0, 0);
-                resizerBar.setBounds(0, 0, 0, 0);
-                luaResizerBar.setBounds(0, 0, 0, 0);
-                lua.setBounds(0, 0, 0, 0);
-				console.setBounds(0, 0, 0, 0);
                 collapseButton.setBounds(area.removeFromRight(20));
             }
-        } else {
-            collapseButton.setBounds(0, 0, 0, 0);
-            luaResizerBar.setBounds(0, 0, 0, 0);
-            lua.setBounds(0, 0, 0, 0);
-			console.setBounds(0, 0, 0, 0);
         }
+
+        collapseButton.setVisible(ableToEditFile);
+
+        codeEditors[index]->setVisible(fileOpen);
+        resizerBar.setVisible(fileOpen);
+
+        console.setVisible(luaFileOpen);
+        luaResizerBar.setVisible(luaFileOpen);
+        lua.setVisible(luaFileOpen);
     }
 
     if (editorVisible) {
@@ -258,7 +262,7 @@ void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
     int originalIndex = index;
     index++;
     std::shared_ptr<juce::CodeDocument> codeDocument;
-    std::shared_ptr<ErrorCodeEditorComponent> editor;
+    std::shared_ptr<OscirenderCodeEditorComponent> editor;
 
     if (index == 0) {
         codeDocument = customFunctionCodeDocument;
@@ -272,7 +276,7 @@ void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
         } else if (extension == ".svg") {
             tokeniser = &xmlTokeniser;
         }
-        editor = std::make_shared<ErrorCodeEditorComponent>(*codeDocument, tokeniser, audioProcessor, audioProcessor.getFileId(originalIndex));
+        editor = std::make_shared<OscirenderCodeEditorComponent>(*codeDocument, tokeniser, audioProcessor, audioProcessor.getFileId(originalIndex), audioProcessor.getFileName(originalIndex));
     }
     
     codeDocuments.insert(codeDocuments.begin() + index, codeDocument);
@@ -282,7 +286,7 @@ void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
     editor->setAccessible(false);
     // listen for changes to the code editor
     codeDocument->addListener(this);
-    editor->setColourScheme(colourScheme);
+    editor->getEditor().setColourScheme(colourScheme);
 }
 
 void OscirenderAudioProcessorEditor::removeCodeEditor(int index) {
@@ -315,9 +319,9 @@ void OscirenderAudioProcessorEditor::updateCodeEditor() {
         // message thread, this is safe.
         updatingDocumentsWithParserLock = true;
         if (index == 0) {
-            codeEditors[index]->loadContent(audioProcessor.customEffect->getCode());
+            codeEditors[index]->getEditor().loadContent(audioProcessor.customEffect->getCode());
         } else {
-            codeEditors[index]->loadContent(juce::MemoryInputStream(*audioProcessor.getFileBlock(originalIndex), false).readEntireStreamAsString());
+            codeEditors[index]->getEditor().loadContent(juce::MemoryInputStream(*audioProcessor.getFileBlock(originalIndex), false).readEntireStreamAsString());
         }
         updatingDocumentsWithParserLock = false;
     }
@@ -374,8 +378,8 @@ void OscirenderAudioProcessorEditor::editCustomFunction(bool enable) {
     editingCustomFunction = enable;
     juce::SpinLock::ScopedLockType lock1(audioProcessor.parsersLock);
     juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
-    codeEditors[0]->setVisible(enable);
     updateCodeEditor();
+    codeEditors[0]->setVisible(enable);
 }
 
 // parsersLock AND effectsLock must be locked before calling this function

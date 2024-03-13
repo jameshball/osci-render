@@ -5,13 +5,7 @@
 
 class ErrorCodeEditorComponent : public juce::CodeEditorComponent, public ErrorListener, public juce::AsyncUpdater {
  public:
-    ErrorCodeEditorComponent(juce::CodeDocument& document, juce::CodeTokeniser* codeTokeniser, OscirenderAudioProcessor& p, juce::String fileName) : juce::CodeEditorComponent(document, codeTokeniser), audioProcessor(p), document(document), fileName(fileName) {
-        audioProcessor.addErrorListener(this);
-    }
-
-    ~ErrorCodeEditorComponent() override {
-        audioProcessor.removeErrorListener(this);
-    }
+    ErrorCodeEditorComponent(juce::CodeDocument& document, juce::CodeTokeniser* codeTokeniser, juce::String id) : juce::CodeEditorComponent(document, codeTokeniser), id(id) {}
 
     void paint(juce::Graphics& g) override {
         juce::CodeEditorComponent::paint(g);
@@ -35,7 +29,7 @@ class ErrorCodeEditorComponent : public juce::CodeEditorComponent, public ErrorL
             double lineIncrement = 2.5;
             double squiggleHeight = 3;
 
-            juce::String line = document.getLine(errorLine - 1);
+            juce::String line = getDocument().getLine(errorLine - 1);
             // get number of leading whitespace characters
             int leadingWhitespace = line.length() - line.trimStart().length();
             double start = getCharWidth() * leadingWhitespace;
@@ -88,7 +82,6 @@ class ErrorCodeEditorComponent : public juce::CodeEditorComponent, public ErrorL
         repaint();
     }
 
-private:
     void onError(int lineNumber, juce::String error) override {
         int oldErrorLine = errorLine;
         errorLine = lineNumber;
@@ -98,14 +91,45 @@ private:
         }
     }
 
-    juce::String getFileName() override {
-        return fileName;
+private:
+
+    juce::String getId() override {
+        return id;
     }
 
-    juce::CodeDocument& document;
-    juce::String fileName;
     int errorLine = -1;
+    juce::String id;
     juce::String errorText;
     bool errorLineHovered = false;
+};
+
+class OscirenderCodeEditorComponent : public juce::GroupComponent {
+public:
+    OscirenderCodeEditorComponent(juce::CodeDocument& document, juce::CodeTokeniser* codeTokeniser, OscirenderAudioProcessor& p, juce::String id, juce::String fileName) : editor(document, codeTokeniser, id), audioProcessor(p) {
+        setText(fileName);
+        setTextLabelPosition(juce::Justification::centred);
+        
+        addAndMakeVisible(editor);
+        
+        audioProcessor.addErrorListener(&editor);
+    }
+
+    ~OscirenderCodeEditorComponent() override {
+        audioProcessor.removeErrorListener(&editor);
+    }
+
+    void resized() override {
+        auto bounds = getLocalBounds();
+        bounds.removeFromTop(30);
+        editor.setBounds(bounds);
+    }
+
+    ErrorCodeEditorComponent& getEditor() {
+        return editor;
+    }
+
+private:
+
+    ErrorCodeEditorComponent editor;
     OscirenderAudioProcessor& audioProcessor;
 };

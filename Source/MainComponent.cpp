@@ -44,6 +44,8 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 		pluginEditor.fileUpdated(audioProcessor.getCurrentFileName());
 	};
 
+	closeFileButton.setTooltip("Close the currently open file.");
+
 	addAndMakeVisible(inputEnabled);
 	inputEnabled.onClick = [this] {
 		audioProcessor.inputEnabled->setBoolValueNotifyingHost(!audioProcessor.inputEnabled->getBoolValue());

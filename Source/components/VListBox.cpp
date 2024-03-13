@@ -180,6 +180,16 @@ public:
         return (row >= firstIndex && row < firstIndex + rows.size()) ? getComponentForRow (row) : nullptr;
     }
 
+    void updateAllRows() {
+        // TODO: Refactor this class so that this function is called to
+        // update all rows, including those offscreen, so that we never
+        // need to recalculate the row components.
+        //
+        // This makes VListBoxes that don't have many components much
+        // faster, but it would be slower for VListBoxes with many
+        // components.
+    }
+
     int getRowNumberOfComponent (Component* const rowComponent) const noexcept
     {
         const int index = getViewedComponent()->getIndexOfChildComponent (rowComponent);
@@ -259,9 +269,15 @@ public:
                 if (auto* rowComp = getComponentForRow (row))
                 {
                     rowComp->setBounds (0, owner.getPositionForRow (row), w, owner.getRowHeight (row));
-                    rowComp->update (row, owner.isRowSelected (row));
+                    if (firstIndex != prevFirstIndex || lastRow != prevLastRow) {
+                        // This is the slowest part of the UI code. Any other tricks to call this less often would help a lot.
+                        rowComp->update(row, owner.isRowSelected(row));
+                    }
                 }
             }
+
+            prevFirstIndex = firstIndex;
+            prevLastRow = lastRow;
         }
         else
         {
@@ -347,6 +363,7 @@ public:
 private:
     ListBox& owner;
     OwnedArray<RowComponent> rows;
+    int prevFirstIndex = -1, prevLastRow = -1;
     int firstIndex = 0, firstWholeIndex = 0, lastWholeIndex = 0;
     bool hasUpdated = false;
 
