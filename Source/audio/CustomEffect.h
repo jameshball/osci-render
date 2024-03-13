@@ -10,6 +10,7 @@ public:
 	~CustomEffect();
 
 	// arbitrary UUID
+	static const juce::String UNIQUE_ID;
 	static const juce::String FILE_NAME;
 
 	Point apply(int index, Point input, const std::vector<double>& values, double sampleRate) override;

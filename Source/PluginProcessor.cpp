@@ -488,10 +488,10 @@ void OscirenderAudioProcessor::changeSound(ShapeSound::Ptr sound) {
     }
 }
 
-void OscirenderAudioProcessor::notifyErrorListeners(int lineNumber, juce::String fileName, juce::String error) {
+void OscirenderAudioProcessor::notifyErrorListeners(int lineNumber, juce::String id, juce::String error) {
     juce::SpinLock::ScopedLockType lock(errorListenersLock);
     for (auto listener : errorListeners) {
-        if (listener->getFileName() == fileName) {
+        if (listener->getId() == id) {
             listener->onError(lineNumber, error);
         }
     }

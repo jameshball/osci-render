@@ -7,7 +7,7 @@
 class ErrorListener {
 public:
 	virtual void onError(int lineNumber, juce::String error) = 0;
-	virtual juce::String getFileName() = 0;
+	virtual juce::String getId() = 0;
 };
 
 const int NUM_SLIDERS = 26;

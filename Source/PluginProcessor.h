@@ -234,7 +234,7 @@ public:
     void setObjectServerRendering(bool enabled);
     void addErrorListener(ErrorListener* listener);
     void removeErrorListener(ErrorListener* listener);
-    void notifyErrorListeners(int lineNumber, juce::String fileName, juce::String error);
+    void notifyErrorListeners(int lineNumber, juce::String id, juce::String error);
 private:
     std::atomic<double> volume = 1.0;
     std::atomic<double> threshold = 1.0;

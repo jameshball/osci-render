@@ -57,13 +57,13 @@ public:
     LuaConsole console;
 
     std::vector<std::shared_ptr<juce::CodeDocument>> codeDocuments;
-    std::vector<std::shared_ptr<ErrorCodeEditorComponent>> codeEditors;
+    std::vector<std::shared_ptr<OscirenderCodeEditorComponent>> codeEditors;
     juce::CodeEditorComponent::ColourScheme colourScheme;
     juce::LuaTokeniser luaTokeniser;
     juce::XmlTokeniser xmlTokeniser;
 	juce::ShapeButton collapseButton;
     std::shared_ptr<juce::CodeDocument> customFunctionCodeDocument = std::make_shared<juce::CodeDocument>();
-    std::shared_ptr<ErrorCodeEditorComponent> customFunctionCodeEditor = std::make_shared<ErrorCodeEditorComponent>(*customFunctionCodeDocument, &luaTokeniser, audioProcessor, CustomEffect::FILE_NAME);
+    std::shared_ptr<OscirenderCodeEditorComponent> customFunctionCodeEditor = std::make_shared<OscirenderCodeEditorComponent>(*customFunctionCodeDocument, &luaTokeniser, audioProcessor, CustomEffect::UNIQUE_ID, CustomEffect::FILE_NAME);
 
     std::unique_ptr<juce::FileChooser> chooser;
     MainMenuBarModel menuBarModel{*this};
