@@ -20,7 +20,7 @@ LuaConsole::LuaConsole() {
 	addAndMakeVisible(pauseConsoleButton);
 	addAndMakeVisible(emptyConsoleLabel);
 
-	clearConsoleButton.setTooltip("Clear console output.");
+	clearConsoleButton.setTooltip("Clear console output. You can clear the console from Lua with the clear() function.");
 
 	pauseConsoleButton.setTooltip("Pause console output, and show a scrollbar to navigate through the console history.");
 
