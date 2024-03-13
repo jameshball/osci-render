@@ -12,7 +12,7 @@ LuaConsole::LuaConsole() {
 	startTimerHz(10);
 
 	clearConsoleButton.onClick = [this] {
-        clear();
+        clear(true);
     };
 
 	addAndMakeVisible(console);
@@ -42,18 +42,20 @@ void LuaConsole::print(const std::string& text) {
 	}
 }
 
-void LuaConsole::clear() {
+void LuaConsole::clear(bool forceClear) {
 	juce::SpinLock::ScopedLockType l(lock);
 
-	document.replaceAllContent("");
-	document.clearUndoHistory();
-	consoleLines = 0;
-	buffer.clear();
+	if (forceClear || !pauseConsoleButton.getToggleState()) {
+		document.replaceAllContent("");
+		document.clearUndoHistory();
+		consoleLines = 0;
+		buffer.clear();
 
-	juce::MessageManager::callAsync([this] {
-        console.setVisible(false);
-        emptyConsoleLabel.setVisible(true);
-    });
+		juce::MessageManager::callAsync([this] {
+			console.setVisible(false);
+			emptyConsoleLabel.setVisible(true);
+		});
+	}
 }
 
 void LuaConsole::timerCallback() {

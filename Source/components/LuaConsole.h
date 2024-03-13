@@ -11,7 +11,7 @@ public:
     ~LuaConsole();
 
     void print(const std::string& text);
-	void clear();
+	void clear(bool forceClear = false);
     void timerCallback() override;
     void setConsoleOpen(bool open);
     bool getConsoleOpen() { return consoleOpen; }

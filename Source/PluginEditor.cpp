@@ -27,6 +27,10 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 		console.print(message);
 	};
 
+    LuaParser::onClear = [this]() {
+        console.clear();
+    };
+
     if (!usingNativeMenuBar) {
         menuBar.setModel(&menuBarModel);
         addAndMakeVisible(menuBar);

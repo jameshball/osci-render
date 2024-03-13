@@ -2,8 +2,9 @@
 #include "luaimport.h"
 
 std::function<void(const std::string&)> LuaParser::onPrint;
+std::function<void()> LuaParser::onClear;
 
-static int customPrint(lua_State* L) {
+static int luaPrint(lua_State* L) {
     int nargs = lua_gettop(L);
 
     for (int i = 1; i <= nargs; ++i) {
@@ -14,14 +15,20 @@ static int customPrint(lua_State* L) {
     return 0;
 }
 
-static const struct luaL_Reg printlib[] = {
-  {"print", customPrint},
+static int luaClear(lua_State* L) {
+    LuaParser::onClear();
+    return 0;
+}
+
+static const struct luaL_Reg luaLib[] = {
+  {"print", luaPrint},
+  {"clear", luaClear},
   {NULL, NULL} /* end of array */
 };
 
 extern int luaopen_customprintlib(lua_State* L) {
     lua_getglobal(L, "_G");
-    luaL_setfuncs(L, printlib, 0);
+    luaL_setfuncs(L, luaLib, 0);
     lua_pop(L, 1);
     return 0;
 }
