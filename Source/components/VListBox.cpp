@@ -356,7 +356,6 @@ public:
 private:
     ListBox& owner;
     OwnedArray<RowComponent> rows;
-    int prevFirstIndex = -1, prevLastRow = -1;
     int firstIndex = 0, firstWholeIndex = 0, lastWholeIndex = 0;
     bool hasUpdated = false;
 

@@ -36,19 +36,31 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
         addAndMakeVisible(menuBar);
     }
 
+    addAndMakeVisible(layoutAnimation);
+    layoutAnimation.setBounds(juce::Rectangle<int>(0, 0, 0, 0));
+
     addAndMakeVisible(collapseButton);
 	collapseButton.onClick = [this] {
-        juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
-        int originalIndex = audioProcessor.getCurrentFileIndex();
-        int index = editingCustomFunction ? 0 : audioProcessor.getCurrentFileIndex() + 1;
-        if (originalIndex != -1 || editingCustomFunction) {
-            if (codeEditors[index]->isVisible()) {
-                codeEditors[index]->setVisible(false);
-            } else {
-                codeEditors[index]->setVisible(true);
+        bool codeEditorVisible = false;
+        {
+            juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+            int originalIndex = audioProcessor.getCurrentFileIndex();
+            int index = editingCustomFunction ? 0 : audioProcessor.getCurrentFileIndex() + 1;
+            if (originalIndex != -1 || editingCustomFunction) {
+                codeEditors[index]->setVisible(!codeEditors[index]->isVisible());
                 updateCodeEditor();
+                codeEditorVisible = codeEditors[index]->isVisible();
             }
-            triggerAsyncUpdate();
+        }
+
+        if (codeEditorVisible) {
+            layoutAnimation.setBounds(juce::Rectangle<int>(0, 0, getWidth(), 0));
+            auto finalPos = juce::Rectangle<int>(0, 0, 2 * getWidth() / 3, 0);
+            juce::Desktop::getInstance().getAnimator().animateComponent(&layoutAnimation, finalPos, 1.0, 200, false, 0.5, 0);
+        } else {
+            layoutAnimation.setBounds(juce::Rectangle<int>(0, 0, layout.getItemCurrentPosition(1), 0));
+            auto finalPos = juce::Rectangle<int>(0, 0, getWidth(), 0);
+            juce::Desktop::getInstance().getAnimator().animateComponent(&layoutAnimation, finalPos, 1.0, 200, false, 0.5, 0);
         }
 	};
 	juce::Path path;
@@ -92,7 +104,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 
     layout.setItemLayout(0, -0.3, -1.0, -0.7);
     layout.setItemLayout(1, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE);
-    layout.setItemLayout(2, -0.1, -1.0, -0.3);
+    layout.setItemLayout(2, -0.0, -1.0, -0.3);
 
     addAndMakeVisible(settings);
     addAndMakeVisible(resizerBar);
