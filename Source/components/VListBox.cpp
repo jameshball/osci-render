@@ -171,6 +171,8 @@ public:
         auto content = new Component();
         setViewedComponent (content);
         content->setWantsKeyboardFocus (false);
+
+        updateAllRows();
     }
 
     RowComponent* getComponentForRow (const int row) const noexcept { return rows[row % jmax (1, rows.size())]; }
@@ -181,13 +183,25 @@ public:
     }
 
     void updateAllRows() {
-        // TODO: Refactor this class so that this function is called to
-        // update all rows, including those offscreen, so that we never
-        // need to recalculate the row components.
+        // THIS IS A MODIFICATION OF THE ORIGINAL CLASS
+        // 
+        // This function is called to update all rows, including
+        // those offscreen, so that we never need to recalculate
+        // the row components.
         //
         // This makes VListBoxes that don't have many components much
         // faster, but it would be slower for VListBoxes with many
         // components.
+        rows.clearQuick(true);
+        auto& content = *getViewedComponent();
+        content.removeAllChildren();
+
+        for (int i = 0; i < owner.totalItems; i++) {
+            auto newRow = new RowComponent(owner);
+            rows.add(newRow);
+            content.addChildComponent(newRow);
+            newRow->update(i, owner.isRowSelected(i));
+        }
     }
 
     int getRowNumberOfComponent (Component* const rowComponent) const noexcept
@@ -229,67 +243,46 @@ public:
             updateContents();
     }
 
-    void updateContents()
-    {
+    void updateContents() {
         hasUpdated = true;
         auto& content = *getViewedComponent();
 
         auto y = getViewPositionY();
         auto w = content.getWidth();
 
-        if (w == 0 || owner.model == nullptr)
+        if (w == 0 || owner.model == nullptr) {
             return;
+        }
 
-        if (owner.totalItems > 0)
-        {
-            firstIndex = owner.getRowForPosition (y);
+        if (owner.totalItems > 0) {
+            firstIndex = owner.getRowForPosition(y);
             firstWholeIndex = firstIndex;
 
-            if (owner.getPositionForRow (firstIndex) < y)
+            if (owner.getPositionForRow(firstIndex) < y) {
                 ++firstWholeIndex;
+            }
 
-            auto lastRow = jmin (owner.getRowForPosition (y + getMaximumVisibleHeight()), owner.totalItems - 1);
+            auto lastRow = jmin (owner.getRowForPosition(y + getMaximumVisibleHeight()), owner.totalItems - 1);
 
             lastWholeIndex = lastRow - 1;
 
-            auto numNeeded = lastRow - firstIndex + 1;
-            rows.removeRange (numNeeded, rows.size());
-
-            while (numNeeded > rows.size())
-            {
-                auto newRow = new RowComponent (owner);
-                rows.add (newRow);
-                content.addAndMakeVisible (newRow);
-            }
-
-            for (int i = 0; i < numNeeded; ++i)
-            {
-                const int row = i + firstIndex;
-
-                if (auto* rowComp = getComponentForRow (row))
-                {
-                    rowComp->setBounds (0, owner.getPositionForRow (row), w, owner.getRowHeight (row));
-                    if (firstIndex != prevFirstIndex || lastRow != prevLastRow) {
-                        // This is the slowest part of the UI code. Any other tricks to call this less often would help a lot.
-                        rowComp->update(row, owner.isRowSelected(row));
+            for (int row = 0; row < owner.totalItems; row++) {
+                bool componentVisible = row >= firstIndex && row <= lastRow;
+                if (auto* rowComp = getComponentForRow(row)) {
+                    rowComp->setVisible(componentVisible);
+                    if (componentVisible) {
+                        rowComp->setBounds(0, owner.getPositionForRow(row), w, owner.getRowHeight(row));
                     }
                 }
             }
-
-            prevFirstIndex = firstIndex;
-            prevLastRow = lastRow;
-        }
-        else
-        {
+        } else {
             rows.clear();
         }
 
-
-        if (owner.headerComponent != nullptr)
-            owner.headerComponent->setBounds (owner.outlineThickness + content.getX(),
-                                              owner.outlineThickness,
-                                              jmax (owner.getWidth() - owner.outlineThickness * 2, content.getWidth()),
-                                              owner.headerComponent->getHeight());
+        if (owner.headerComponent != nullptr) {
+            auto width = jmax(owner.getWidth() - owner.outlineThickness * 2, content.getWidth());
+            owner.headerComponent->setBounds(owner.outlineThickness + content.getX(), owner.outlineThickness, width, owner.headerComponent->getHeight());
+        }
     }
 
     void selectRow (const int row, const bool dontScroll, const int lastSelectedRow, const int totalRows, const bool isMouseClick)
@@ -512,8 +505,7 @@ Viewport* ListBox::getViewport() const noexcept
 }
 
 //==============================================================================
-void ListBox::updateContent()
-{
+void ListBox::updateContent() {
     hasDoneInitialUpdate = true;
     totalItems = (model != nullptr) ? model->getNumRows() : 0;
 
@@ -526,6 +518,7 @@ void ListBox::updateContent()
         selectionChanged = true;
     }
 
+    viewport->updateAllRows();
     viewport->updateVisibleArea (isVisible());
     viewport->resized();
 
