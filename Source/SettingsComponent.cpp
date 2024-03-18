@@ -32,6 +32,7 @@ void SettingsComponent::resized() {
 
     juce::Component* midiComponents[] = { &dummy, &midiResizerBar, &midi };
     midiLayout.layOutComponents(midiComponents, 3, area.getX(), area.getY(), area.getWidth(), area.getHeight(), true, true);
+    midi.setBounds(midi.getBounds());
 
     juce::Component* columns[] = { &dummy2, &mainResizerBar, &dummy };
     mainLayout.layOutComponents(columns, 3, dummy.getX(), dummy.getY(), dummy.getWidth(), dummy.getHeight(), false, true);
@@ -93,17 +94,4 @@ void SettingsComponent::mouseDown(const juce::MouseEvent& event) {
             return;
         }
     }
-}
-
-void SettingsComponent::paint(juce::Graphics& g) {
-    // add drop shadow to each component
-    //auto dc = juce::DropShadow(juce::Colours::black, 5, juce::Point<int>(0, 0));
-    //dc.drawForRectangle(g, main.getBounds());
-    //dc.drawForRectangle(g, effects.getBounds());
-    //dc.drawForRectangle(g, midi.getBounds());
-    //dc.drawForRectangle(g, perspective.getBounds());
-
-    //if (txt.isVisible()) {
-    //    dc.drawForRectangle(g, txt.getBounds());
-    //}
 }

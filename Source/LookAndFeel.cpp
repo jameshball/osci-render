@@ -4,7 +4,7 @@
 OscirenderLookAndFeel::OscirenderLookAndFeel() {
     // slider
     setColour(juce::Slider::thumbColourId, Colours::veryDark);
-    setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::white);
+    setColour(juce::Slider::textBoxOutlineColourId, Colours::veryDark);
     setColour(juce::Slider::textBoxBackgroundColourId, Colours::veryDark);
     setColour(juce::Slider::textBoxHighlightColourId, Colours::accentColor.withMultipliedAlpha(0.5));
     setColour(juce::Slider::trackColourId, juce::Colours::grey);
@@ -35,7 +35,8 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     
     // text box
     setColour(juce::TextEditor::backgroundColourId, Colours::veryDark);
-    setColour(juce::TextEditor::outlineColourId, juce::Colours::white);
+    setColour(juce::TextEditor::outlineColourId, Colours::veryDark);
+    setColour(juce::TextEditor::focusedOutlineColourId, Colours::accentColor);
     setColour(juce::CaretComponent::caretColourId, Dracula::foreground);
     setColour(juce::TextEditor::highlightColourId, Colours::grey);
 
@@ -84,8 +85,72 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     getCurrentColourScheme().setUIColour(ColourScheme::widgetBackground, Colours::veryDark);
     getCurrentColourScheme().setUIColour(ColourScheme::UIColour::defaultFill, Colours::accentColor);
 
+    // setDefaultSansSerifTypeface(juce::Typeface::createSystemTypefaceFor(BinaryData::font_ttf, BinaryData::font_ttfSize));
+
     // I have to do this, otherwise components are initialised before the look and feel is set
     juce::LookAndFeel::setDefaultLookAndFeel(this);
+}
+
+void OscirenderLookAndFeel::drawLabel(juce::Graphics& g, juce::Label& label) {
+    g.setColour(label.findColour(juce::Label::backgroundColourId));
+    g.fillRoundedRectangle(label.getLocalBounds().toFloat(), RECT_RADIUS);
+
+    if (! label.isBeingEdited())
+    {
+        auto alpha = label.isEnabled() ? 1.0f : 0.5f;
+        const juce::Font font (getLabelFont (label));
+
+        g.setColour (label.findColour (juce::Label::textColourId).withMultipliedAlpha (alpha));
+        g.setFont (font);
+
+        auto textArea = getLabelBorderSize (label).subtractedFrom (label.getLocalBounds());
+
+        g.drawFittedText (label.getText(), textArea, label.getJustificationType(),
+            juce::jmax (1, (int) ((float) textArea.getHeight() / font.getHeight())),
+            label.getMinimumHorizontalScale());
+
+        g.setColour (label.findColour (juce::Label::outlineColourId).withMultipliedAlpha (alpha));
+    }
+    else if (label.isEnabled())
+    {
+        g.setColour (label.findColour (juce::Label::outlineColourId));
+    }
+
+    g.drawRoundedRectangle(label.getLocalBounds().toFloat(), RECT_RADIUS, 1);
+}
+
+void OscirenderLookAndFeel::fillTextEditorBackground(juce::Graphics& g, int width, int height, juce::TextEditor& textEditor) {
+    if (dynamic_cast<juce::AlertWindow*> (textEditor.getParentComponent()) != nullptr)
+    {
+        g.setColour (textEditor.findColour (juce::TextEditor::backgroundColourId));
+        g.fillRect (0, 0, width, height);
+
+        g.setColour (textEditor.findColour (juce::TextEditor::outlineColourId));
+        g.drawHorizontalLine (height - 1, 0.0f, static_cast<float> (width));
+    }
+    else
+    {
+        g.setColour (textEditor.findColour (juce::TextEditor::backgroundColourId));
+        g.fillRoundedRectangle(textEditor.getLocalBounds().toFloat(), RECT_RADIUS);
+    }
+}
+
+void OscirenderLookAndFeel::drawTextEditorOutline(juce::Graphics& g, int width, int height, juce::TextEditor& textEditor) {
+    if (textEditor.isEnabled())
+    {
+        if (textEditor.hasKeyboardFocus (true) && ! textEditor.isReadOnly())
+        {
+            const int border = 2;
+
+            g.setColour (textEditor.findColour (juce::TextEditor::focusedOutlineColourId));
+            g.drawRoundedRectangle(0, 0, width, height, RECT_RADIUS, border);
+        }
+        else
+        {
+            g.setColour (textEditor.findColour (juce::TextEditor::outlineColourId));
+            g.drawRoundedRectangle(0, 0, width, height, RECT_RADIUS, 1.0f);
+        }
+    }
 }
 
 void OscirenderLookAndFeel::drawComboBox(juce::Graphics& g, int width, int height, bool, int, int, int, int, juce::ComboBox& box) {
@@ -166,17 +231,16 @@ void OscirenderLookAndFeel::drawGroupComponentOutline(juce::Graphics& g, int wid
 
     juce::Path background;
 	background.addRoundedRectangle(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), RECT_RADIUS, RECT_RADIUS);
-    auto ds = juce::DropShadow(juce::Colours::black, 3, juce::Point<int>(0, 0));
-    ds.drawForPath(g, background);
-    
     g.setColour(group.findColour(groupComponentBackgroundColourId).withMultipliedAlpha(alpha));
     g.fillPath(background);
-    
 
     auto header = bounds.removeFromTop(2 * textH);
 
+    juce::Path headerPath;
+    headerPath.addRoundedRectangle(header.getX(), header.getY(), header.getWidth(), header.getHeight(), RECT_RADIUS, RECT_RADIUS);
+
     g.setColour(group.findColour(groupComponentHeaderColourId).withMultipliedAlpha(alpha));
-    g.fillRect(header);
+    g.fillPath(headerPath);
 
     g.setColour(group.findColour(juce::GroupComponent::textColourId).withMultipliedAlpha(alpha));
     g.setFont(f);
@@ -200,14 +264,14 @@ void OscirenderLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, in
 
 	juce::Path thumb;
 	thumb.addEllipse(juce::Rectangle<float>(static_cast<float>(thumbWidth), static_cast<float>(thumbWidth)).withCentre(point));
-	juce::DropShadow ds(juce::Colours::black, 1, { 0, 1 });
    
-	ds.drawForPath(g, thumb);
     g.setColour(slider.findColour(sliderThumbOutlineColourId).withAlpha(slider.isEnabled() ? 1.0f : 0.5f));
 	g.strokePath(thumb, juce::PathStrokeType(1.0f));
 }
 
 void OscirenderLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& button, const juce::Colour& backgroundColour, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) {
+    button.setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    
     auto bounds = button.getLocalBounds().toFloat().reduced(0.5f, 0.5f);
 
     auto baseColour = backgroundColour.withMultipliedSaturation(button.hasKeyboardFocus(true) ? 1.3f : 0.9f)
@@ -217,10 +281,10 @@ void OscirenderLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button
         baseColour = baseColour.contrasting(shouldDrawButtonAsDown ? 0.2f : 0.05f);
 
     g.setColour(baseColour);
-    g.fillRect(bounds);
+    g.fillRoundedRectangle(bounds, RECT_RADIUS);
 
     g.setColour(button.findColour(juce::ComboBox::outlineColourId));
-    g.drawRect(bounds, 1.0f);
+    g.drawRoundedRectangle(bounds, RECT_RADIUS, 1.0f);
 }
 
 void OscirenderLookAndFeel::drawMenuBarBackground(juce::Graphics& g, int width, int height, bool, juce::MenuBarComponent& menuBar) {

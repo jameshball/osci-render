@@ -36,12 +36,8 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
         addAndMakeVisible(menuBar);
     }
 
-    addAndMakeVisible(layoutAnimation);
-    layoutAnimation.setBounds(juce::Rectangle<int>(0, 0, 0, 0));
-
     addAndMakeVisible(collapseButton);
 	collapseButton.onClick = [this] {
-        bool codeEditorVisible = false;
         {
             juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
             int originalIndex = audioProcessor.getCurrentFileIndex();
@@ -49,18 +45,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
             if (originalIndex != -1 || editingCustomFunction) {
                 codeEditors[index]->setVisible(!codeEditors[index]->isVisible());
                 updateCodeEditor();
-                codeEditorVisible = codeEditors[index]->isVisible();
             }
-        }
-
-        if (codeEditorVisible) {
-            layoutAnimation.setBounds(juce::Rectangle<int>(0, 0, getWidth(), 0));
-            auto finalPos = juce::Rectangle<int>(0, 0, 2 * getWidth() / 3, 0);
-            juce::Desktop::getInstance().getAnimator().animateComponent(&layoutAnimation, finalPos, 1.0, 200, false, 0.5, 0);
-        } else {
-            layoutAnimation.setBounds(juce::Rectangle<int>(0, 0, layout.getItemCurrentPosition(1), 0));
-            auto finalPos = juce::Rectangle<int>(0, 0, getWidth(), 0);
-            juce::Desktop::getInstance().getAnimator().animateComponent(&layoutAnimation, finalPos, 1.0, 200, false, 0.5, 0);
         }
 	};
 	juce::Path path;
@@ -149,27 +134,6 @@ void OscirenderAudioProcessorEditor::initialiseCodeEditors() {
 
 void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
     g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
-
-    auto ds = juce::DropShadow(juce::Colours::black, 5, juce::Point<int>(0, 0));
-
- //   if (!usingNativeMenuBar) {
- //       // add drop shadow to the menu bar
- //       ds.drawForRectangle(g, menuBar.getBounds());
- //   }
-
-	//for (int i = 0; i < codeEditors.size(); i++) {
-	//	if (codeEditors[i]->isVisible()) {
-	//		ds.drawForRectangle(g, codeEditors[i]->getBounds());
-	//	}
-	//}
- //   
-	//if (lua.isVisible()) {
-	//	ds.drawForRectangle(g, lua.getBounds());
-	//}
-
- //   if (console.isVisible()) {
- //       ds.drawForRectangle(g, console.getBounds());
- //   }
 }
 
 void OscirenderAudioProcessorEditor::resized() {

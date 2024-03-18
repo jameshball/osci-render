@@ -10,21 +10,6 @@
 #include "components/ErrorCodeEditorComponent.h"
 #include "components/LuaConsole.h"
 
-class ProxyLayoutAnimationComponent : public juce::Component {
-public:
-    ProxyLayoutAnimationComponent(juce::StretchableLayoutManager& layout, int index) : layout(layout), index(index) {}
-
-    void resized() override {
-        layout.setItemPosition(index, getBounds().getWidth());
-        getParentComponent()->resized();
-        DBG(getBounds().getWidth());
-    }
-
-private:
-    juce::StretchableLayoutManager& layout;
-    int index;
-};
-
 class OscirenderAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener {
 public:
     OscirenderAudioProcessorEditor(OscirenderAudioProcessor&);
@@ -86,7 +71,6 @@ public:
     juce::MenuBarComponent menuBar;
 
     juce::StretchableLayoutManager layout;
-    ProxyLayoutAnimationComponent layoutAnimation{layout, 1};
     juce::StretchableLayoutResizerBar resizerBar{&layout, 1, true};
 
     juce::StretchableLayoutManager luaLayout;

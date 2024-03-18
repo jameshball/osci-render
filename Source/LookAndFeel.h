@@ -71,6 +71,9 @@ public:
 
     static const int RECT_RADIUS = 5;
 
+    void drawLabel(juce::Graphics& g, juce::Label& label) override;
+    void fillTextEditorBackground(juce::Graphics& g, int width, int height, juce::TextEditor& textEditor) override;
+    void drawTextEditorOutline(juce::Graphics& g, int width, int height, juce::TextEditor& textEditor) override;
     void drawComboBox(juce::Graphics& g, int width, int height, bool, int, int, int, int, juce::ComboBox& box) override;
     void positionComboBoxText(juce::ComboBox& box, juce::Label& label) override;
     void drawTickBox(juce::Graphics& g, juce::Component& component,
@@ -79,6 +82,7 @@ public:
         const bool isEnabled,
         const bool shouldDrawButtonAsHighlighted,
         const bool shouldDrawButtonAsDown) override;
+    static void drawGroupComponentDropShadow(juce::Graphics& g, juce::GroupComponent& group);
     void drawGroupComponentOutline(juce::Graphics&, int w, int h, const juce::String &text, const juce::Justification&, juce::GroupComponent&) override;
     void drawLinearSlider(juce::Graphics& g, int x, int y, int width, int height,
         float sliderPos,

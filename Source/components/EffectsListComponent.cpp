@@ -72,7 +72,6 @@ void EffectsListComponent::paintOverChildren(juce::Graphics& g) {
 		auto bounds = list.getBounds();
 		bounds.removeFromBottom(2);
 		g.fillRect(bounds);
-		list.repaint();
     }
 }
 
