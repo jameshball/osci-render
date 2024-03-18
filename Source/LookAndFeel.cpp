@@ -30,7 +30,7 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
 
     // combo box
     setColour(juce::ComboBox::backgroundColourId, Colours::veryDark);
-    setColour(juce::ComboBox::outlineColourId, juce::Colours::white);
+    setColour(juce::ComboBox::outlineColourId, Colours::veryDark);
     setColour(juce::ComboBox::arrowColourId, juce::Colours::white);
     
     // text box
@@ -92,10 +92,10 @@ void OscirenderLookAndFeel::drawComboBox(juce::Graphics& g, int width, int heigh
     juce::Rectangle<int> boxBounds{0, 0, width, height};
 
     g.setColour(box.findColour(juce::ComboBox::backgroundColourId));
-    g.fillRect(boxBounds.toFloat());
+    g.fillRoundedRectangle(boxBounds.toFloat(), RECT_RADIUS);
 
     g.setColour(box.findColour(juce::ComboBox::outlineColourId).withAlpha(box.isEnabled() ? 1.0f : 0.5f));
-    g.drawRect(boxBounds.toFloat(), 1.0f);
+    g.drawRoundedRectangle(boxBounds.toFloat(), RECT_RADIUS, 1.0f);
 
     juce::Rectangle<int> arrowZone{width - 15, 0, 10, height};
     juce::Path path;
@@ -164,8 +164,14 @@ void OscirenderLookAndFeel::drawGroupComponentOutline(juce::Graphics& g, int wid
 
     auto alpha = group.isEnabled() ? 1.0f : 0.5f;
 
+    juce::Path background;
+	background.addRoundedRectangle(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), RECT_RADIUS, RECT_RADIUS);
+    auto ds = juce::DropShadow(juce::Colours::black, 3, juce::Point<int>(0, 0));
+    ds.drawForPath(g, background);
+    
     g.setColour(group.findColour(groupComponentBackgroundColourId).withMultipliedAlpha(alpha));
-    g.fillRect(bounds);
+    g.fillPath(background);
+    
 
     auto header = bounds.removeFromTop(2 * textH);
 
@@ -192,8 +198,13 @@ void OscirenderLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, in
 
     auto thumbWidth = getSliderThumbRadius(slider);
 
+	juce::Path thumb;
+	thumb.addEllipse(juce::Rectangle<float>(static_cast<float>(thumbWidth), static_cast<float>(thumbWidth)).withCentre(point));
+	juce::DropShadow ds(juce::Colours::black, 1, { 0, 1 });
+   
+	ds.drawForPath(g, thumb);
     g.setColour(slider.findColour(sliderThumbOutlineColourId).withAlpha(slider.isEnabled() ? 1.0f : 0.5f));
-    g.drawEllipse(juce::Rectangle<float>(static_cast<float>(thumbWidth), static_cast<float>(thumbWidth)).withCentre(point), 1.0f);
+	g.strokePath(thumb, juce::PathStrokeType(1.0f));
 }
 
 void OscirenderLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& button, const juce::Colour& backgroundColour, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) {

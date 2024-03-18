@@ -69,6 +69,8 @@ class OscirenderLookAndFeel : public juce::LookAndFeel_V4 {
 public:
     OscirenderLookAndFeel();
 
+    static const int RECT_RADIUS = 5;
+
     void drawComboBox(juce::Graphics& g, int width, int height, bool, int, int, int, int, juce::ComboBox& box) override;
     void positionComboBoxText(juce::ComboBox& box, juce::Label& label) override;
     void drawTickBox(juce::Graphics& g, juce::Component& component,

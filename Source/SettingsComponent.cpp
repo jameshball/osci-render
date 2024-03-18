@@ -97,13 +97,13 @@ void SettingsComponent::mouseDown(const juce::MouseEvent& event) {
 
 void SettingsComponent::paint(juce::Graphics& g) {
     // add drop shadow to each component
-    auto dc = juce::DropShadow(juce::Colours::black, 5, juce::Point<int>(0, 0));
-    dc.drawForRectangle(g, main.getBounds());
-    dc.drawForRectangle(g, effects.getBounds());
-    dc.drawForRectangle(g, midi.getBounds());
-    dc.drawForRectangle(g, perspective.getBounds());
+    //auto dc = juce::DropShadow(juce::Colours::black, 5, juce::Point<int>(0, 0));
+    //dc.drawForRectangle(g, main.getBounds());
+    //dc.drawForRectangle(g, effects.getBounds());
+    //dc.drawForRectangle(g, midi.getBounds());
+    //dc.drawForRectangle(g, perspective.getBounds());
 
-    if (txt.isVisible()) {
-        dc.drawForRectangle(g, txt.getBounds());
-    }
+    //if (txt.isVisible()) {
+    //    dc.drawForRectangle(g, txt.getBounds());
+    //}
 }
