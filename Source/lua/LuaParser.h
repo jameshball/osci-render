@@ -59,6 +59,7 @@ struct LuaVariables {
 };
 
 struct lua_State;
+struct lua_Debug;
 class LuaParser {
 public:
 	LuaParser(juce::String fileName, juce::String script, std::function<void(int, juce::String, juce::String)> errorCallback, juce::String fallbackScript = "return { 0.0, 0.0 }");
@@ -73,15 +74,25 @@ public:
 	static std::function<void()> onClear;
 
 private:
+	static void maximumInstructionsReached(lua_State* L, lua_Debug* D);
+	
 	void reset(lua_State*& L, juce::String script);
 	void reportError(const char* error);
 	void parse(lua_State*& L);
+	void setGlobalVariable(lua_State*& L, const char* name, double value);
+	void setGlobalVariable(lua_State*& L, const char* name, int value);
+	void setGlobalVariables(lua_State*& L, LuaVariables& vars);
+	void incrementVars(LuaVariables& vars);
+	void clearStack(lua_State*& L);
+	void revertToFallback(lua_State*& L);
+	void readTable(lua_State*& L, std::vector<float>& values);
+	void setMaximumInstructions(lua_State*& L, int count);
+	void resetMaximumInstructions(lua_State*& L);
 
 	int functionRef = -1;
 	bool usingFallbackScript = false;
 	juce::String script;
 	juce::String fallbackScript;
-	std::atomic<bool> updateVariables = false;
 	std::function<void(int, juce::String, juce::String)> errorCallback;
 	juce::String fileName;
 	std::vector<lua_State*> seenStates;
