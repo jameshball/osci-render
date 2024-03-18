@@ -17,7 +17,6 @@ public:
 	~MainComponent() override;
 
 	void resized() override;
-	void paint(juce::Graphics& g) override;
 	void updateFileLabel();
 private:
 	OscirenderAudioProcessor& audioProcessor;

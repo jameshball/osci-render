@@ -1,7 +1,7 @@
 #include "VisualiserComponent.h"
+#include "../LookAndFeel.h"
 
 VisualiserComponent::VisualiserComponent(int numChannels, OscirenderAudioProcessor& p) : numChannels(numChannels), backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), audioProcessor(p), juce::Thread("VisualiserComponent") {
-    setOpaque(true);
     resetBuffer();
     startTimerHz(60);
     startThread();
@@ -46,8 +46,8 @@ void VisualiserComponent::setColours(juce::Colour bk, juce::Colour fg) {
 }
 
 void VisualiserComponent::paint(juce::Graphics& g) {
-    g.fillAll(backgroundColour);
-    g.drawRect(getLocalBounds(), 1);
+    g.setColour(backgroundColour);
+    g.fillRoundedRectangle(getLocalBounds().toFloat(), OscirenderLookAndFeel::RECT_RADIUS);
 
     auto r = getLocalBounds().toFloat();
     auto minDim = juce::jmin(r.getWidth(), r.getHeight());
@@ -63,7 +63,7 @@ void VisualiserComponent::paint(juce::Graphics& g) {
     if (!active) {
         // add translucent layer
         g.setColour(juce::Colours::black.withAlpha(0.5f));
-        g.fillRect(getLocalBounds());
+        g.fillRoundedRectangle(getLocalBounds().toFloat(), OscirenderLookAndFeel::RECT_RADIUS);
 
         // add text
         g.setColour(juce::Colours::white);

@@ -244,13 +244,3 @@ void MainComponent::resized() {
 		pluginEditor.visualiser.setBounds(bounds.withSizeKeepingCentre(minDim, minDim));
 	}
 }
-
-void MainComponent::paint(juce::Graphics& g) {
-	juce::GroupComponent::paint(g);
-
-	if (!pluginEditor.visualiserFullScreen) {
-		// add drop shadow to the visualiser
-		auto dc = juce::DropShadow(juce::Colours::black, 30, juce::Point<int>(0, 0));
-		dc.drawForRectangle(g, pluginEditor.visualiser.getBounds());
-	}
-}

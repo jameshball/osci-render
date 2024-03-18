@@ -19,7 +19,6 @@ public:
 	void update();
 	void mouseMove(const juce::MouseEvent& event) override;
 	void mouseDown(const juce::MouseEvent& event) override;
-	void paint(juce::Graphics& g) override;
 
 private:
 	OscirenderAudioProcessor& audioProcessor;
