@@ -4,6 +4,23 @@
 std::function<void(const std::string&)> LuaParser::onPrint;
 std::function<void()> LuaParser::onClear;
 
+void LuaParser::maximumInstructionsReached(lua_State* L, lua_Debug* D) {
+    lua_getstack(L, 1, D);
+    lua_getinfo(L, "l", D);
+    
+	std::string msg = std::to_string(D->currentline) + ": Maximum instructions reached! You may have an infinite loop.";
+	lua_pushstring(L, msg.c_str());
+	lua_error(L);
+}
+
+void LuaParser::setMaximumInstructions(lua_State*& L, int count) {
+    lua_sethook(L, LuaParser::maximumInstructionsReached, LUA_MASKCOUNT, count);
+}
+
+void LuaParser::resetMaximumInstructions(lua_State*& L) {
+    lua_sethook(L, LuaParser::maximumInstructionsReached, 0, 0);
+}
+
 static int luaPrint(lua_State* L) {
     int nargs = lua_gettop(L);
 
@@ -81,13 +98,68 @@ void LuaParser::parse(lua_State*& L) {
         const char* error = lua_tostring(L, -1);
         reportError(error);
         lua_pop(L, 1);
-        functionRef = -1;
-        usingFallbackScript = true;
-        if (script != fallbackScript) {
-            reset(L, fallbackScript);
-        }
+        revertToFallback(L);
     } else {
         functionRef = luaL_ref(L, LUA_REGISTRYINDEX);
+    }
+}
+
+void LuaParser::setGlobalVariable(lua_State*& L, const char* name, double value) {
+    lua_pushnumber(L, value);
+    lua_setglobal(L, name);
+}
+
+void LuaParser::setGlobalVariable(lua_State*& L, const char* name, int value) {
+    lua_pushnumber(L, value);
+    lua_setglobal(L, name);
+}
+
+void LuaParser::setGlobalVariables(lua_State*& L, LuaVariables& vars) {
+	setGlobalVariable(L, "step", vars.step);
+	setGlobalVariable(L, "sample_rate", vars.sampleRate);
+	setGlobalVariable(L, "frequency", vars.frequency);
+	setGlobalVariable(L, "phase", vars.phase);
+
+    for (int i = 0; i < NUM_SLIDERS; i++) {
+		setGlobalVariable(L, SLIDER_NAMES[i], vars.sliders[i]);
+    }
+
+    if (vars.isEffect) {
+		setGlobalVariable(L, "x", vars.x);
+		setGlobalVariable(L, "y", vars.y);
+		setGlobalVariable(L, "z", vars.z);
+    }
+}
+
+void LuaParser::incrementVars(LuaVariables& vars) {
+    vars.step++;
+    vars.phase += 2 * std::numbers::pi * vars.frequency / vars.sampleRate;
+    if (vars.phase > 2 * std::numbers::pi) {
+        vars.phase -= 2 * std::numbers::pi;
+    }
+}
+
+void LuaParser::clearStack(lua_State*& L) {
+    lua_settop(L, 0);
+}
+
+void LuaParser::revertToFallback(lua_State*& L) {
+    functionRef = -1;
+    usingFallbackScript = true;
+    if (script != fallbackScript) {
+        reset(L, fallbackScript);
+    }
+}
+
+void LuaParser::readTable(lua_State*& L, std::vector<float>& values) {
+    auto length = lua_rawlen(L, -1);
+
+    for (int i = 1; i <= length; i++) {
+        lua_pushinteger(L, i);
+        lua_gettable(L, -2);
+        float value = lua_tonumber(L, -1);
+        lua_pop(L, 1);
+        values.push_back(value);
     }
 }
 
@@ -102,77 +174,37 @@ std::vector<float> LuaParser::run(lua_State*& L, LuaVariables& vars) {
 
     std::vector<float> values;
 	
-    lua_pushnumber(L, vars.step);
-    lua_setglobal(L, "step");
-
-    lua_pushnumber(L, vars.sampleRate);
-    lua_setglobal(L, "sample_rate");
-
-    lua_pushnumber(L, vars.frequency);
-    lua_setglobal(L, "frequency");
-
-    lua_pushnumber(L, vars.phase);
-    lua_setglobal(L, "phase");
-
-    for (int i = 0; i < NUM_SLIDERS; i++) {
-        lua_pushnumber(L, vars.sliders[i]);
-        lua_setglobal(L, SLIDER_NAMES[i]);
-    }
-
-    if (vars.isEffect) {
-        lua_pushnumber(L, vars.x);
-        lua_setglobal(L, "x");
-
-        lua_pushnumber(L, vars.y);
-        lua_setglobal(L, "y");
-
-        lua_pushnumber(L, vars.z);
-        lua_setglobal(L, "z");
-    }
+	setGlobalVariables(L, vars);
     
+	// Get the function from the registry
 	lua_geti(L, LUA_REGISTRYINDEX, functionRef);
+
+    setMaximumInstructions(L, 1000000);
     
     if (lua_isfunction(L, -1)) {
         const int ret = lua_pcall(L, 0, LUA_MULTRET, 0);
         if (ret != LUA_OK) {
             const char* error = lua_tostring(L, -1);
             reportError(error);
-            functionRef = -1;
-            usingFallbackScript = true;
-            if (script != fallbackScript) {
-                reset(L, fallbackScript);
-            }
-        } else if (lua_istable(L, -1)) {
-            auto length = lua_rawlen(L, -1);
-
-            for (int i = 1; i <= length; i++) {
-                lua_pushinteger(L, i);
-                lua_gettable(L, -2);
-                float value = lua_tonumber(L, -1);
-                lua_pop(L, 1);
-                values.push_back(value);
+            revertToFallback(L);
+        } else {            
+            if (lua_istable(L, -1)) {
+                readTable(L, values);
             }
         }
     } else {
-        functionRef = -1;
-        usingFallbackScript = true;
-        if (script != fallbackScript) {
-            reset(L, fallbackScript);
-        }
+        revertToFallback(L);
     }
+
+    resetMaximumInstructions(L);
 
     if (functionRef != -1 && !usingFallbackScript) {
         resetErrors();
     }
 
-    // clear stack
-    lua_settop(L, 0);
-
-    vars.step++;
-    vars.phase += 2 * std::numbers::pi * vars.frequency / vars.sampleRate;
-    if (vars.phase > 2 * std::numbers::pi) {
-        vars.phase -= 2 * std::numbers::pi;
-    }
+	clearStack(L);
+    
+	incrementVars(vars);
     
 	return values;
 }

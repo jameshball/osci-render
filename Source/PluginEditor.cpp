@@ -140,24 +140,24 @@ void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
 
     auto ds = juce::DropShadow(juce::Colours::black, 5, juce::Point<int>(0, 0));
 
-    if (!usingNativeMenuBar) {
-        // add drop shadow to the menu bar
-        ds.drawForRectangle(g, menuBar.getBounds());
-    }
+ //   if (!usingNativeMenuBar) {
+ //       // add drop shadow to the menu bar
+ //       ds.drawForRectangle(g, menuBar.getBounds());
+ //   }
 
-	for (int i = 0; i < codeEditors.size(); i++) {
-		if (codeEditors[i]->isVisible()) {
-			ds.drawForRectangle(g, codeEditors[i]->getBounds());
-		}
-	}
-    
-	if (lua.isVisible()) {
-		ds.drawForRectangle(g, lua.getBounds());
-	}
+	//for (int i = 0; i < codeEditors.size(); i++) {
+	//	if (codeEditors[i]->isVisible()) {
+	//		ds.drawForRectangle(g, codeEditors[i]->getBounds());
+	//	}
+	//}
+ //   
+	//if (lua.isVisible()) {
+	//	ds.drawForRectangle(g, lua.getBounds());
+	//}
 
-    if (console.isVisible()) {
-        ds.drawForRectangle(g, console.getBounds());
-    }
+ //   if (console.isVisible()) {
+ //       ds.drawForRectangle(g, console.getBounds());
+ //   }
 }
 
 void OscirenderAudioProcessorEditor::resized() {
