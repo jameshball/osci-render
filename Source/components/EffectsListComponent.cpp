@@ -1,9 +1,11 @@
 #include "EffectsListComponent.h"
 #include "SvgButton.h"
 #include "../PluginEditor.h"
+#include "../LookAndFeel.h"
 
-EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectListBoxItemData& data, int rn, Effect& effect) : DraggableListBoxItem(lb, data, rn), effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
-	auto parameters = effect.parameters;
+EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectListBoxItemData& data, int rn, Effect& effect) : DraggableListBoxItem(lb, data, rn),
+effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
+    auto parameters = effect.parameters;
 	for (int i = 0; i < parameters.size(); i++) {
 		std::shared_ptr<EffectComponent> effectComponent = std::make_shared<EffectComponent>(audioProcessor, effect, i);
 		selected.setToggleState(effect.enabled == nullptr || effect.enabled->getValue(), juce::dontSendNotification);
@@ -24,6 +26,7 @@ EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectList
 				data.setSelected(rowNum, selected.getToggleState());
                 list.setEnabled(selected.getToggleState());
 			}
+            repaint();
 		};
 
 		auto component = createComponent(parameters[i]);
@@ -34,6 +37,7 @@ EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectList
 		listModel.addComponent(effectComponent);
 	}
 
+    list.setColour(effectComponentBackgroundColourId, juce::Colours::transparentBlack.withAlpha(0.2f));
 	list.setModel(&listModel);
 	list.setRowHeight(ROW_HEIGHT);
 	list.updateContent();
@@ -46,10 +50,12 @@ EffectsListComponent::~EffectsListComponent() {
 }
 
 void EffectsListComponent::paint(juce::Graphics& g) {
-	auto bounds = getLocalBounds();
+	auto bounds = getLocalBounds().removeFromLeft(LEFT_BAR_WIDTH);
     g.setColour(findColour(effectComponentHandleColourId));
-    bounds.removeFromBottom(2);
-	g.fillRect(bounds);
+    bounds.removeFromBottom(PADDING);
+    juce::Path path;
+    path.addRoundedRectangle(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), OscirenderLookAndFeel::RECT_RADIUS, OscirenderLookAndFeel::RECT_RADIUS, true, false, true, false);
+    g.fillPath(path);
 	g.setColour(juce::Colours::white);
 	// draw drag and drop handle using circles
 	double size = 4;
@@ -67,18 +73,23 @@ void EffectsListComponent::paint(juce::Graphics& g) {
 }
 
 void EffectsListComponent::paintOverChildren(juce::Graphics& g) {
+    g.setColour(juce::Colours::black.withAlpha(0.3f));
+    auto bounds = list.getBounds();
+    bounds.removeFromBottom(PADDING);
+    juce::Path path;
+    path.addRoundedRectangle(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), OscirenderLookAndFeel::RECT_RADIUS, OscirenderLookAndFeel::RECT_RADIUS, false, true, false, true);
+    
 	if (!selected.getToggleState()) {
-        g.setColour(juce::Colours::black.withAlpha(0.3f));
-		auto bounds = list.getBounds();
-		bounds.removeFromBottom(2);
-		g.fillRect(bounds);
+        g.fillPath(path);
     }
 }
 
 void EffectsListComponent::resized() {
 	auto area = getLocalBounds();
-	area.removeFromLeft(20);
-	selected.setBounds(area.removeFromLeft(30).withSizeKeepingCentre(30, 20));
+    auto leftBar = area.removeFromLeft(LEFT_BAR_WIDTH);
+    leftBar.removeFromLeft(20);
+    area.removeFromRight(PADDING);
+	selected.setBounds(leftBar.withSizeKeepingCentre(30, 20));
 	list.setBounds(area);
 }
 
@@ -101,7 +112,7 @@ std::shared_ptr<juce::Component> EffectsListComponent::createComponent(EffectPar
 
 int EffectsListBoxModel::getRowHeight(int row) {
 	auto data = (AudioEffectListBoxItemData&)modelData;
-	return data.getEffect(row)->parameters.size() * EffectsListComponent::ROW_HEIGHT + 2;
+	return data.getEffect(row)->parameters.size() * EffectsListComponent::ROW_HEIGHT + EffectsListComponent::PADDING;
 }
 
 bool EffectsListBoxModel::hasVariableHeightRows() const {

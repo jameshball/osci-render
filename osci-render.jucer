@@ -9,9 +9,6 @@
               companyEmail="james@ball.sh" defines="NOMINMAX=1">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
-      <GROUP id="{8B7C0BA0-BE39-1611-4D80-F5E19B9AD847}" name="fonts">
-        <FILE id="CWpZX4" name="font.ttf" compile="0" resource="1" file="Resources/fonts/font.ttf"/>
-      </GROUP>
       <GROUP id="{C2609827-4F4A-1ADA-8BA1-A40C1D92649C}" name="lua">
         <FILE id="xANsA8" name="demo.lua" compile="0" resource="1" file="Resources/lua/demo.lua"/>
       </GROUP>
