@@ -150,7 +150,9 @@ public:
     void paintOverChildren(juce::Graphics& g) override;
     void resized() override;
     
+    static const int LEFT_BAR_WIDTH = 50;
     static const int ROW_HEIGHT = 30;
+    static const int PADDING = 4;
 
 protected:
     Effect& effect;

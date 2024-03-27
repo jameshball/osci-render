@@ -181,7 +181,14 @@ void EffectComponent::resized() {
 }
 
 void EffectComponent::paint(juce::Graphics& g) {
-    g.fillAll(findColour(effectComponentBackgroundColourId));
+    auto bounds = getLocalBounds();
+    auto length = effect.parameters.size();
+    auto isEnd = index == length - 1;
+    auto isStart = index == 0;
+    g.setColour(findColour(effectComponentBackgroundColourId, true));
+    juce::Path path;
+    path.addRoundedRectangle(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), OscirenderLookAndFeel::RECT_RADIUS, OscirenderLookAndFeel::RECT_RADIUS, false, isStart, false, isEnd);
+    g.fillPath(path);
 }
 
 void EffectComponent::parameterValueChanged(int parameterIndex, float newValue) {

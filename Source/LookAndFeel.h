@@ -12,10 +12,10 @@ enum ColourIds {
 };
 
 namespace Colours {
-    const juce::Colour dark{0xff353535};
-    const juce::Colour darker{0xff212121};
+    const juce::Colour dark{0xff585858};
+    const juce::Colour darker{0xff454545};
     const juce::Colour veryDark{0xff111111};
-    const juce::Colour grey{0xff555555};
+    const juce::Colour grey{0xff6c6c6c};
     const juce::Colour accentColor{0xff00cc00};
 }
 
@@ -36,22 +36,18 @@ namespace Dracula {
 
 namespace LookAndFeelHelpers
 {
-    static juce::Colour createBaseColour (juce::Colour buttonColour,
-        bool hasKeyboardFocus,
-        bool shouldDrawButtonAsHighlighted,
-        bool shouldDrawButtonAsDown) noexcept
-    {
+    static juce::Colour createBaseColour(juce::Colour buttonColour, bool hasKeyboardFocus, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown, bool isEnabled) noexcept {
         const float sat = hasKeyboardFocus ? 1.3f : 0.9f;
-        const juce::Colour baseColour (buttonColour.withMultipliedSaturation (sat));
+        const juce::Colour baseColour(buttonColour.withMultipliedSaturation(sat).withMultipliedAlpha(isEnabled ? 1.0f : 0.5f));
 
-        if (shouldDrawButtonAsDown)        return baseColour.contrasting (0.2f);
-        if (shouldDrawButtonAsHighlighted) return baseColour.contrasting (0.1f);
+        if (shouldDrawButtonAsDown) return baseColour.contrasting (0.3f);
+        if (shouldDrawButtonAsHighlighted) return baseColour.contrasting (0.15f);
 
         return baseColour;
     }
 
-    static juce::TextLayout layoutTooltipText (const juce::String& text, juce::Colour colour) noexcept
-    {
+
+    static juce::TextLayout layoutTooltipText(const juce::String& text, juce::Colour colour) noexcept {
         const float tooltipFontSize = 13.0f;
         const int maxToolTipWidth = 400;
 
