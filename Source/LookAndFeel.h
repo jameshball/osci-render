@@ -93,4 +93,5 @@ public:
     void drawMenuBarBackground(juce::Graphics& g, int width, int height, bool, juce::MenuBarComponent& menuBar) override;
     juce::CodeEditorComponent::ColourScheme getDefaultColourScheme();
     void drawTooltip(juce::Graphics& g, const juce::String& text, int width, int height) override;
+    void drawCornerResizer(juce::Graphics&, int w, int h, bool isMouseOver, bool isMouseDragging) override;
 };
