@@ -77,6 +77,7 @@ public:
     juce::StretchableLayoutResizerBar luaResizerBar{&luaLayout, 1, false};
 
     juce::TooltipWindow tooltipWindow{this, 0};
+    juce::DropShadower tooltipDropShadow{juce::DropShadow(juce::Colours::black.withAlpha(0.5f), 6, {0,0})};
 
     std::atomic<bool> updatingDocumentsWithParserLock = false;
 

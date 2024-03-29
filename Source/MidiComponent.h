@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
+#include "components/SwitchButton.h"
 
 class OscirenderAudioProcessorEditor;
 class MidiComponent : public juce::GroupComponent, public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater {
@@ -19,7 +20,8 @@ private:
 	OscirenderAudioProcessor& audioProcessor;
 	OscirenderAudioProcessorEditor& pluginEditor;
 
-	juce::ToggleButton midiToggle{"Enable MIDI"};
+    juce::Label midiLabel{"midiLabel", "MIDI Enabled"};
+    jux::SwitchButton midiToggle = { "switchButton", false };
 	juce::Slider voicesSlider;
 	juce::Label voicesLabel;
 	juce::TextButton midiSettingsButton{"Audio/MIDI Settings..."};

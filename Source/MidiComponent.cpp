@@ -5,6 +5,7 @@ MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
     setText("MIDI Settings");
 
     addAndMakeVisible(midiToggle);
+    addAndMakeVisible(midiLabel);
     addAndMakeVisible(voicesSlider);
     addAndMakeVisible(voicesLabel);
     addAndMakeVisible(keyboard);
@@ -109,7 +110,9 @@ void MidiComponent::handleAsyncUpdate() {
 void MidiComponent::resized() {
     auto area = getLocalBounds().withTrimmedTop(20).reduced(20);
     auto topRow = area.removeFromTop(30);
-    midiToggle.setBounds(topRow.removeFromLeft(120));
+    auto midiToggleBounds = topRow.removeFromLeft(120);
+    midiToggle.setBounds(midiToggleBounds.removeFromLeft(30).withSizeKeepingCentre(30, 20).translated(0, 1));
+    midiLabel.setBounds(midiToggleBounds);
     topRow.removeFromLeft(80);
     voicesSlider.setBounds(topRow.removeFromLeft(250));
     if (midiSettingsButton.isVisible()) {
