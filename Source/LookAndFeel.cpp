@@ -310,6 +310,10 @@ void OscirenderLookAndFeel::drawTooltip(juce::Graphics& g, const juce::String& t
         .draw (g, { static_cast<float> (width), static_cast<float> (height) });
 }
 
+void OscirenderLookAndFeel::drawCornerResizer(juce::Graphics&, int w, int h, bool isMouseOver, bool isMouseDragging) {
+    
+}
+
 juce::CodeEditorComponent::ColourScheme OscirenderLookAndFeel::getDefaultColourScheme() {
     juce::CodeEditorComponent::ColourScheme cs;
 

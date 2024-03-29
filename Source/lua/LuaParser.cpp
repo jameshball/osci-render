@@ -179,7 +179,7 @@ std::vector<float> LuaParser::run(lua_State*& L, LuaVariables& vars) {
 	// Get the function from the registry
 	lua_geti(L, LUA_REGISTRYINDEX, functionRef);
 
-    setMaximumInstructions(L, 1000000);
+    setMaximumInstructions(L, 5000000);
     
     if (lua_isfunction(L, -1)) {
         const int ret = lua_pcall(L, 0, LUA_MULTRET, 0);
