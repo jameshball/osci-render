@@ -22,9 +22,9 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     setColour(juce::ResizableWindow::backgroundColourId, Colours::grey);
     setColour(groupComponentBackgroundColourId, Colours::darker);
     setColour(groupComponentHeaderColourId, Colours::veryDark);
-    setColour(juce::PopupMenu::backgroundColourId, Colours::veryDark);
-    setColour(juce::PopupMenu::highlightedBackgroundColourId, Colours::darker);
-    setColour(juce::TooltipWindow::backgroundColourId, Colours::veryDark);
+    setColour(juce::PopupMenu::backgroundColourId, Colours::darker);
+    setColour(juce::PopupMenu::highlightedBackgroundColourId, Colours::grey);
+    setColour(juce::TooltipWindow::backgroundColourId, Colours::darker);
     setColour(juce::TooltipWindow::outlineColourId, juce::Colours::white);
     setColour(juce::TextButton::buttonOnColourId, Colours::darker);
 
@@ -302,13 +302,9 @@ void OscirenderLookAndFeel::drawMenuBarBackground(juce::Graphics& g, int width, 
 
 void OscirenderLookAndFeel::drawTooltip(juce::Graphics& g, const juce::String& text, int width, int height) {
     juce::Rectangle<int> bounds (width, height);
-    auto cornerSize = 5.0f;
 
     g.setColour(findColour(juce::TooltipWindow::backgroundColourId));
-    g.fillRect(bounds.toFloat());
-
-    g.setColour(findColour(juce::TooltipWindow::outlineColourId));
-    g.drawRect(bounds.toFloat().reduced(0.5f, 0.5f), 1.0f);
+    g.fillRect(bounds);
 
     LookAndFeelHelpers::layoutTooltipText (text, findColour (juce::TooltipWindow::textColourId))
         .draw (g, { static_cast<float> (width), static_cast<float> (height) });

@@ -104,6 +104,8 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     if (visualiserFullScreen) {
         addAndMakeVisible(visualiser);
     }
+    
+    tooltipDropShadow.setOwner(&tooltipWindow);
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {

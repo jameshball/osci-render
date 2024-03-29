@@ -108,6 +108,7 @@ public:
     OscirenderCodeEditorComponent(juce::CodeDocument& document, juce::CodeTokeniser* codeTokeniser, OscirenderAudioProcessor& p, juce::String id, juce::String fileName) : editor(document, codeTokeniser, id), audioProcessor(p) {
         setText(fileName);
         setTextLabelPosition(juce::Justification::centred);
+        setColour(groupComponentBackgroundColourId, Colours::veryDark);
         
         addAndMakeVisible(editor);
         
@@ -121,6 +122,7 @@ public:
     void resized() override {
         auto bounds = getLocalBounds();
         bounds.removeFromTop(30);
+        bounds.removeFromBottom(5);
         editor.setBounds(bounds);
     }
 
