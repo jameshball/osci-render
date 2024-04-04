@@ -12,11 +12,10 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     setColour(sliderThumbOutlineColourId, juce::Colours::white);
 
     // buttons
-    setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::white);
     setColour(juce::TextButton::buttonColourId, Colours::veryDark);
     setColour(jux::SwitchButton::switchColour, juce::Colours::white);
     setColour(jux::SwitchButton::switchOnBackgroundColour, Colours::accentColor);
-    setColour(jux::SwitchButton::switchOffBackgroundColour, Colours::dark);
+    setColour(jux::SwitchButton::switchOffBackgroundColour, Colours::grey);
 
     // windows & menus
     setColour(juce::ResizableWindow::backgroundColourId, Colours::grey);
@@ -200,9 +199,7 @@ void OscirenderLookAndFeel::drawTickBox(juce::Graphics& g, juce::Component& comp
     juce::Rectangle<float> tickBounds(x, y, w, h);
 
     g.setColour(component.findColour(juce::TextButton::buttonColourId));
-    g.fillRect(tickBounds);
-    g.setColour(component.findColour(juce::ToggleButton::tickDisabledColourId));
-    g.drawRect(tickBounds, 1.0f);
+    g.fillRoundedRectangle(tickBounds, RECT_RADIUS);
 
     if (ticked) {
         g.setColour(component.findColour(juce::ToggleButton::tickColourId));
@@ -312,6 +309,10 @@ void OscirenderLookAndFeel::drawTooltip(juce::Graphics& g, const juce::String& t
 
 void OscirenderLookAndFeel::drawCornerResizer(juce::Graphics&, int w, int h, bool isMouseOver, bool isMouseDragging) {
     
+}
+
+void OscirenderLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& button, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) {
+    LookAndFeel_V4::drawToggleButton(g, button, shouldDrawButtonAsHighlighted, shouldDrawButtonAsDown);
 }
 
 juce::CodeEditorComponent::ColourScheme OscirenderLookAndFeel::getDefaultColourScheme() {

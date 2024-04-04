@@ -94,4 +94,5 @@ public:
     juce::CodeEditorComponent::ColourScheme getDefaultColourScheme();
     void drawTooltip(juce::Graphics& g, const juce::String& text, int width, int height) override;
     void drawCornerResizer(juce::Graphics&, int w, int h, bool isMouseOver, bool isMouseDragging) override;
+    void drawToggleButton(juce::Graphics&, juce::ToggleButton&, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override;
 };
