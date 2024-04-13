@@ -21,7 +21,7 @@ public:
     void initialiseCodeEditors();
     void addCodeEditor(int index);
     void removeCodeEditor(int index);
-    void fileUpdated(juce::String fileName);
+    void fileUpdated(juce::String fileName, bool shouldOpenEditor = false);
     void handleAsyncUpdate() override;
     void changeListenerCallback(juce::ChangeBroadcaster* source) override;
     void toggleLayout(juce::StretchableLayoutManager& layout, double prefSize);
@@ -90,7 +90,7 @@ public:
 	void codeDocumentTextInserted(const juce::String& newText, int insertIndex) override;
 	void codeDocumentTextDeleted(int startIndex, int endIndex) override;
     void updateCodeDocument();
-    void updateCodeEditor();
+    void updateCodeEditor(bool shouldOpenEditor = false);
 
     bool keyPressed(const juce::KeyPress& key) override;
     void mouseDown(const juce::MouseEvent& event) override;
