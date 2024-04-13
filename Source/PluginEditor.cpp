@@ -275,13 +275,15 @@ void OscirenderAudioProcessorEditor::removeCodeEditor(int index) {
 
 
 // parsersLock AND effectsLock must be locked before calling this function
-void OscirenderAudioProcessorEditor::updateCodeEditor() {
+void OscirenderAudioProcessorEditor::updateCodeEditor(bool shouldOpenEditor) {
     // check if any code editors are visible
-    bool visible = false;
-    for (int i = 0; i < codeEditors.size(); i++) {
-        if (codeEditors[i]->isVisible()) {
-            visible = true;
-            break;
+    bool visible = shouldOpenEditor;
+    if (!visible) {
+        for (int i = 0; i < codeEditors.size(); i++) {
+            if (codeEditors[i]->isVisible()) {
+                visible = true;
+                break;
+            }
         }
     }
     int originalIndex = audioProcessor.getCurrentFileIndex();
@@ -307,9 +309,9 @@ void OscirenderAudioProcessorEditor::updateCodeEditor() {
 }
 
 // parsersLock MUST be locked before calling this function
-void OscirenderAudioProcessorEditor::fileUpdated(juce::String fileName) {
+void OscirenderAudioProcessorEditor::fileUpdated(juce::String fileName, bool shouldOpenEditor) {
     settings.fileUpdated(fileName);
-    updateCodeEditor();
+    updateCodeEditor(shouldOpenEditor);
 }
 
 void OscirenderAudioProcessorEditor::handleAsyncUpdate() {

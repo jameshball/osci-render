@@ -112,7 +112,7 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 		}
 
 		pluginEditor.addCodeEditor(audioProcessor.getCurrentFileIndex());
-		pluginEditor.fileUpdated(fileName);
+        pluginEditor.fileUpdated(fileName, fileTypeText == ".lua" || fileTypeText == ".txt");
 	};
 
 	fileName.setFont(juce::Font(16.0f, juce::Font::plain));
