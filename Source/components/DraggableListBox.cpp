@@ -74,6 +74,7 @@ void DraggableListBoxItem::itemDragExit(const SourceDetails& /*dragSourceDetails
 
 void DraggableListBoxItem::itemDropped(const juce::DragAndDropTarget::SourceDetails &dragSourceDetails)
 {
+    hideInsertLines();
     if (DraggableListBoxItem* item = dynamic_cast<DraggableListBoxItem*>(dragSourceDetails.sourceComponent.get()))
     {
         if (dragSourceDetails.localPosition.y < getHeight() / 2)
@@ -82,7 +83,6 @@ void DraggableListBoxItem::itemDropped(const juce::DragAndDropTarget::SourceDeta
             modelData.moveAfter(item->rowNum, rowNum);
         listBox.updateContent();
     }
-    hideInsertLines();
 }
 
 juce::Component* DraggableListBoxModel::refreshComponentForRow(int rowNumber, bool isRowSelected, juce::Component *existingComponentToUpdate)
