@@ -356,8 +356,8 @@ void OscirenderAudioProcessorEditor::editCustomFunction(bool enable) {
     editingCustomFunction = enable;
     juce::SpinLock::ScopedLockType lock1(audioProcessor.parsersLock);
     juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
-    updateCodeEditor();
     codeEditors[0]->setVisible(enable);
+    updateCodeEditor();
 }
 
 // parsersLock AND effectsLock must be locked before calling this function
