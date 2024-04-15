@@ -5,13 +5,14 @@
 #include "../obj/WorldObject.h"
 #include "../svg/SvgParser.h"
 #include "../txt/TextParser.h"
+#include "../gpla/LineArtParser.h"
 #include "../lua/LuaParser.h"
 
 class FileParser {
 public:
 	FileParser(std::function<void(int, juce::String, juce::String)> errorCallback = nullptr);
 
-	void parse(juce::String fileName, juce::String extension, std::unique_ptr<juce::InputStream>, juce::Font);
+	void parse(juce::String fileName, juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font font);
 	std::vector<std::unique_ptr<Shape>> nextFrame();
 	Point nextSample(lua_State*& L, LuaVariables& vars);
 	void closeLua(lua_State*& L);
@@ -23,7 +24,10 @@ public:
 	std::shared_ptr<WorldObject> getObject();
 	std::shared_ptr<SvgParser> getSvg();
 	std::shared_ptr<TextParser> getText();
+	std::shared_ptr<LineArtParser> getLineArt();
 	std::shared_ptr<LuaParser> getLua();
+
+	bool isAnimatable = false;
 
 private:
 	bool active = true;
@@ -34,6 +38,7 @@ private:
 	std::shared_ptr<WorldObject> object;
 	std::shared_ptr<SvgParser> svg;
 	std::shared_ptr<TextParser> text;
+	std::shared_ptr<LineArtParser> gpla;
 	std::shared_ptr<LuaParser> lua;
 
 	juce::String fallbackLuaScript = "return { 0.0, 0.0 }";

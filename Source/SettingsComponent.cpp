@@ -9,6 +9,7 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     addAndMakeVisible(mainResizerBar);
     addAndMakeVisible(midi);
     addChildComponent(txt);
+    addChildComponent(gpla);
 
     midiLayout.setItemLayout(0, -0.1, -1.0, -1.0);
     midiLayout.setItemLayout(1, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE);
@@ -46,6 +47,8 @@ void SettingsComponent::resized() {
 
     if (txt.isVisible()) {
         effectSettings = &txt;
+    } else if (gpla.isVisible()) {
+        effectSettings = &gpla;
     }
 
     auto dummyBounds = dummy.getBounds();
@@ -63,10 +66,14 @@ void SettingsComponent::resized() {
 void SettingsComponent::fileUpdated(juce::String fileName) {
     juce::String extension = fileName.fromLastOccurrenceOf(".", true, false);
     txt.setVisible(false);
+    gpla.setVisible(false);
     if (fileName.isEmpty() || audioProcessor.objectServerRendering) {
         // do nothing
-    } if (extension == ".txt") {
+    } else if (extension == ".txt") {
         txt.setVisible(true);
+    }
+    else if (extension == ".gpla") {
+        gpla.setVisible(true);
     }
     main.updateFileLabel();
     resized();
@@ -74,6 +81,7 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
 
 void SettingsComponent::update() {
     txt.update();
+    gpla.update();
 }
 
 void SettingsComponent::mouseMove(const juce::MouseEvent& event) {

@@ -15,7 +15,9 @@ void FileParser::parse(juce::String fileName, juce::String extension, std::uniqu
 	object = nullptr;
 	svg = nullptr;
 	text = nullptr;
+	gpla = nullptr;
 	lua = nullptr;
+	isAnimatable = false;
 	
 	if (extension == ".obj") {
 		object = std::make_shared<WorldObject>(stream->readEntireStreamAsString().toStdString());
@@ -25,6 +27,9 @@ void FileParser::parse(juce::String fileName, juce::String extension, std::uniqu
 		text = std::make_shared<TextParser>(stream->readEntireStreamAsString(), font);
 	} else if (extension == ".lua") {
 		lua = std::make_shared<LuaParser>(fileName, stream->readEntireStreamAsString(), errorCallback, fallbackLuaScript);
+	} else if (extension == ".gpla") {
+		isAnimatable = true;
+		gpla = std::make_shared<LineArtParser>(stream->readEntireStreamAsString());
 	}
 
 	sampleSource = lua != nullptr;
@@ -39,6 +44,8 @@ std::vector<std::unique_ptr<Shape>> FileParser::nextFrame() {
 		return svg->draw();
 	} else if (text != nullptr) {
 		return text->draw();
+	} else if (gpla != nullptr) {
+		return gpla->draw();
 	}
 	auto tempShapes = std::vector<std::unique_ptr<Shape>>();
 	// return a square
@@ -96,6 +103,10 @@ std::shared_ptr<SvgParser> FileParser::getSvg() {
 
 std::shared_ptr<TextParser> FileParser::getText() {
 	return text;
+}
+
+std::shared_ptr<LineArtParser> FileParser::getLineArt() {
+	return gpla;
 }
 
 std::shared_ptr<LuaParser> FileParser::getLua() {
