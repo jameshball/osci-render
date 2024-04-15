@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 #include "MainComponent.h"
+#include "LineArtComponent.h"
 #include "LuaComponent.h"
 #include "PerspectiveComponent.h"
 #include "TxtComponent.h"
@@ -27,6 +28,7 @@ private:
 	MainComponent main{audioProcessor, pluginEditor};
 	PerspectiveComponent perspective{audioProcessor, pluginEditor};
 	TxtComponent txt{audioProcessor, pluginEditor};
+	LineArtComponent gpla{ audioProcessor, pluginEditor };
 	EffectsComponent effects{audioProcessor, pluginEditor};
 	MidiComponent midi{audioProcessor, pluginEditor};
 

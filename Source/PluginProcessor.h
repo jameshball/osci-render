@@ -198,6 +198,11 @@ public:
 
     IntParameter* voices = new IntParameter("Voices", "voices", VERSION_HINT, 4, 1, 16);
 
+    bool animateLineArt = false;
+    bool syncMIDIAnimation = false;
+    float animationRate = 10.f;
+    double animationTime = 0.f;
+
 private:
     juce::SpinLock consumerLock;
     std::vector<std::shared_ptr<BufferConsumer>> consumers;
@@ -278,6 +283,9 @@ private:
     void changeSound(ShapeSound::Ptr sound);
 
     const double MIN_LENGTH_INCREMENT = 0.000001;
+
+    juce::AudioPlayHead* playHead;
+    juce::AudioPlayHead::CurrentPositionInfo currentPositionInfo;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OscirenderAudioProcessor)

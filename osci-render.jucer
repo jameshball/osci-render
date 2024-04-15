@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT id="HH2E72" name="osci-render" projectType="audioplug" useAppConfig="0"
-              addUsingNamespaceToJuceHeader="0" displaySplashScreen="0" jucerFormatVersion="1"
+              addUsingNamespaceToJuceHeader="0" displaySplashScreen="1" jucerFormatVersion="1"
               pluginCharacteristicsValue="pluginWantsMidiIn" pluginManufacturer="jameshball"
               aaxIdentifier="sh.ball.oscirender" cppLanguageStandard="20" projectLineFeed="&#10;"
               headerPath="./include" version="2.1.6" companyName="James H Ball"
@@ -39,98 +39,6 @@
       </GROUP>
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
-      <GROUP id="{50F56072-D264-AC8C-EAC9-A073059CDE27}" name="mathter">
-        <GROUP id="{60CE44FE-26F8-4CE0-3BFF-5475F8E0BD75}" name="Common">
-          <FILE id="XY4AlJ" name="Approx.hpp" compile="0" resource="0" file="Source/mathter/Common/Approx.hpp"/>
-          <FILE id="LeuGwE" name="Definitions.hpp" compile="0" resource="0" file="Source/mathter/Common/Definitions.hpp"/>
-          <FILE id="HcUnQp" name="DeterministicInitializer.hpp" compile="0" resource="0"
-                file="Source/mathter/Common/DeterministicInitializer.hpp"/>
-          <FILE id="qvzdH7" name="MathUtil.hpp" compile="0" resource="0" file="Source/mathter/Common/MathUtil.hpp"/>
-          <FILE id="wy5V3L" name="Range.hpp" compile="0" resource="0" file="Source/mathter/Common/Range.hpp"/>
-          <FILE id="hsfx9V" name="Traits.hpp" compile="0" resource="0" file="Source/mathter/Common/Traits.hpp"/>
-        </GROUP>
-        <GROUP id="{AA5719C4-2684-8629-96C2-ACCCC846741E}" name="Decompositions">
-          <FILE id="mqUNTZ" name="DecomposeLU.hpp" compile="0" resource="0" file="Source/mathter/Decompositions/DecomposeLU.hpp"/>
-          <FILE id="bajVyN" name="DecomposeQR.hpp" compile="0" resource="0" file="Source/mathter/Decompositions/DecomposeQR.hpp"/>
-          <FILE id="LVojfW" name="DecomposeSVD.hpp" compile="0" resource="0"
-                file="Source/mathter/Decompositions/DecomposeSVD.hpp"/>
-        </GROUP>
-        <GROUP id="{5223A16D-BBB0-7277-2DA2-5F83E36AF6D7}" name="Matrix">
-          <FILE id="NiMdHn" name="MatrixArithmetic.hpp" compile="0" resource="0"
-                file="Source/mathter/Matrix/MatrixArithmetic.hpp"/>
-          <FILE id="OG3XE0" name="MatrixCast.hpp" compile="0" resource="0" file="Source/mathter/Matrix/MatrixCast.hpp"/>
-          <FILE id="hzHEZU" name="MatrixCompare.hpp" compile="0" resource="0"
-                file="Source/mathter/Matrix/MatrixCompare.hpp"/>
-          <FILE id="TKewDV" name="MatrixFunction.hpp" compile="0" resource="0"
-                file="Source/mathter/Matrix/MatrixFunction.hpp"/>
-          <FILE id="az9Zbs" name="MatrixImpl.hpp" compile="0" resource="0" file="Source/mathter/Matrix/MatrixImpl.hpp"/>
-          <FILE id="ZApObW" name="MatrixVectorArithmetic.hpp" compile="0" resource="0"
-                file="Source/mathter/Matrix/MatrixVectorArithmetic.hpp"/>
-        </GROUP>
-        <GROUP id="{9ED17B79-C8AF-B25C-1B0D-01C8A868E93B}" name="Quaternion">
-          <FILE id="Pg5bBV" name="QuaternionArithmetic.hpp" compile="0" resource="0"
-                file="Source/mathter/Quaternion/QuaternionArithmetic.hpp"/>
-          <FILE id="Q40Fdf" name="QuaternionCompare.hpp" compile="0" resource="0"
-                file="Source/mathter/Quaternion/QuaternionCompare.hpp"/>
-          <FILE id="lnp7Lb" name="QuaternionFunction.hpp" compile="0" resource="0"
-                file="Source/mathter/Quaternion/QuaternionFunction.hpp"/>
-          <FILE id="qDNOvo" name="QuaternionImpl.hpp" compile="0" resource="0"
-                file="Source/mathter/Quaternion/QuaternionImpl.hpp"/>
-          <FILE id="eXgZ46" name="QuaternionLiterals.hpp" compile="0" resource="0"
-                file="Source/mathter/Quaternion/QuaternionLiterals.hpp"/>
-          <FILE id="oMB7Jr" name="QuaternionVectorArithmetic.hpp" compile="0"
-                resource="0" file="Source/mathter/Quaternion/QuaternionVectorArithmetic.hpp"/>
-        </GROUP>
-        <GROUP id="{D82CFD72-F5BE-1024-94AB-5C2503423E4D}" name="Swizzle">
-          <FILE id="CeOGVV" name="Swizzle_1.inc.hpp" compile="0" resource="0"
-                file="Source/mathter/Swizzle/Swizzle_1.inc.hpp"/>
-          <FILE id="jwhhIz" name="Swizzle_2.inc.hpp" compile="0" resource="0"
-                file="Source/mathter/Swizzle/Swizzle_2.inc.hpp"/>
-          <FILE id="fPNnzc" name="Swizzle_3.inc.hpp" compile="0" resource="0"
-                file="Source/mathter/Swizzle/Swizzle_3.inc.hpp"/>
-          <FILE id="gU43mt" name="Swizzle_4.inc.hpp" compile="0" resource="0"
-                file="Source/mathter/Swizzle/Swizzle_4.inc.hpp"/>
-        </GROUP>
-        <GROUP id="{2F08F8FD-A6D7-6DE3-CAD4-564E35A9F0B9}" name="Transforms">
-          <FILE id="pltHW9" name="IdentityBuilder.hpp" compile="0" resource="0"
-                file="Source/mathter/Transforms/IdentityBuilder.hpp"/>
-          <FILE id="g2kgGu" name="OrthographicBuilder.hpp" compile="0" resource="0"
-                file="Source/mathter/Transforms/OrthographicBuilder.hpp"/>
-          <FILE id="DBDXmX" name="PerspectiveBuilder.hpp" compile="0" resource="0"
-                file="Source/mathter/Transforms/PerspectiveBuilder.hpp"/>
-          <FILE id="Gj9MnE" name="Rotation2DBuilder.hpp" compile="0" resource="0"
-                file="Source/mathter/Transforms/Rotation2DBuilder.hpp"/>
-          <FILE id="Hq0ZLD" name="Rotation3DBuilder.hpp" compile="0" resource="0"
-                file="Source/mathter/Transforms/Rotation3DBuilder.hpp"/>
-          <FILE id="An6eDN" name="ScaleBuilder.hpp" compile="0" resource="0"
-                file="Source/mathter/Transforms/ScaleBuilder.hpp"/>
-          <FILE id="xzgGHN" name="ShearBuilder.hpp" compile="0" resource="0"
-                file="Source/mathter/Transforms/ShearBuilder.hpp"/>
-          <FILE id="OVvc6Z" name="TranslationBuilder.hpp" compile="0" resource="0"
-                file="Source/mathter/Transforms/TranslationBuilder.hpp"/>
-          <FILE id="TzGfIt" name="ViewBuilder.hpp" compile="0" resource="0" file="Source/mathter/Transforms/ViewBuilder.hpp"/>
-          <FILE id="VTTCpk" name="ZeroBuilder.hpp" compile="0" resource="0" file="Source/mathter/Transforms/ZeroBuilder.hpp"/>
-        </GROUP>
-        <GROUP id="{BA088AC1-AC2B-B70C-582E-EDF9E38ABC20}" name="Vector">
-          <FILE id="KDVsvP" name="VectorArithmetic.hpp" compile="0" resource="0"
-                file="Source/mathter/Vector/VectorArithmetic.hpp"/>
-          <FILE id="qBpF7X" name="VectorCompare.hpp" compile="0" resource="0"
-                file="Source/mathter/Vector/VectorCompare.hpp"/>
-          <FILE id="IinHSU" name="VectorConcat.hpp" compile="0" resource="0"
-                file="Source/mathter/Vector/VectorConcat.hpp"/>
-          <FILE id="aVRyP9" name="VectorFunction.hpp" compile="0" resource="0"
-                file="Source/mathter/Vector/VectorFunction.hpp"/>
-          <FILE id="af10kl" name="VectorImpl.hpp" compile="0" resource="0" file="Source/mathter/Vector/VectorImpl.hpp"/>
-        </GROUP>
-        <FILE id="vOLhwO" name="CMakeLists.txt" compile="0" resource="1" file="Source/mathter/CMakeLists.txt"/>
-        <FILE id="d4t0xm" name="Geometry.hpp" compile="0" resource="0" file="Source/mathter/Geometry.hpp"/>
-        <FILE id="AZxH75" name="IoStream.hpp" compile="0" resource="0" file="Source/mathter/IoStream.hpp"/>
-        <FILE id="ev6gxl" name="Mathter.natvis" compile="0" resource="1" file="Source/mathter/Mathter.natvis"/>
-        <FILE id="VBewvB" name="Matrix.hpp" compile="0" resource="0" file="Source/mathter/Matrix.hpp"/>
-        <FILE id="vlSQrm" name="Quaternion.hpp" compile="0" resource="0" file="Source/mathter/Quaternion.hpp"/>
-        <FILE id="Aos8s3" name="Utility.hpp" compile="0" resource="0" file="Source/mathter/Utility.hpp"/>
-        <FILE id="T6rqIo" name="Vector.hpp" compile="0" resource="0" file="Source/mathter/Vector.hpp"/>
-      </GROUP>
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
         <FILE id="WDV6eI" name="AudioWebSocketServer.cpp" compile="1" resource="0"
               file="Source/audio/AudioWebSocketServer.cpp"/>
@@ -254,10 +162,11 @@
         <FILE id="WQ2W15" name="BufferConsumer.h" compile="0" resource="0"
               file="Source/concurrency/BufferConsumer.h"/>
       </GROUP>
-      <FILE id="I44EdJ" name="EffectsComponent.cpp" compile="1" resource="0"
-            file="Source/EffectsComponent.cpp"/>
-      <FILE id="qxxNX3" name="EffectsComponent.h" compile="0" resource="0"
-            file="Source/EffectsComponent.h"/>
+      <GROUP id="{A3E24187-62A5-AB8D-8837-14043B89A640}" name="gpla">
+        <FILE id="KvDV8j" name="LineArtParser.cpp" compile="1" resource="0"
+              file="Source/gpla/LineArtParser.cpp"/>
+        <FILE id="t008RG" name="LineArtParser.h" compile="0" resource="0" file="Source/gpla/LineArtParser.h"/>
+      </GROUP>
       <GROUP id="{D0D95F57-3D9D-46D9-C126-25C3C7459AC5}" name="ixwebsocket">
         <FILE id="pPOkoj" name="IXBase64.h" compile="0" resource="0" file="Source/ixwebsocket/IXBase64.h"/>
         <FILE id="qVI3x2" name="IXBench.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXBench.cpp"/>
@@ -356,6 +265,8 @@
         <FILE id="ZXs1Pm" name="IXUserAgent.h" compile="0" resource="0" file="Source/ixwebsocket/IXUserAgent.h"/>
         <FILE id="GQ7boW" name="IXUtf8Validator.h" compile="0" resource="0"
               file="Source/ixwebsocket/IXUtf8Validator.h"/>
+        <FILE id="NkmVRB" name="IXWebSocketOpenInfo.h" compile="0" resource="0"
+              file="Source/ixwebsocket/IXWebSocketOpenInfo.h"/>
         <FILE id="rnALh0" name="IXUuid.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXUuid.cpp"/>
         <FILE id="WcfqnP" name="IXUuid.h" compile="0" resource="0" file="Source/ixwebsocket/IXUuid.h"/>
         <FILE id="P6VcmE" name="IXWebSocket.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXWebSocket.cpp"/>
@@ -384,8 +295,6 @@
               file="Source/ixwebsocket/IXWebSocketMessage.h"/>
         <FILE id="Zibknu" name="IXWebSocketMessageType.h" compile="0" resource="0"
               file="Source/ixwebsocket/IXWebSocketMessageType.h"/>
-        <FILE id="NkmVRB" name="IXWebSocketOpenInfo.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXWebSocketOpenInfo.h"/>
         <FILE id="ulTERZ" name="IXWebSocketPerMessageDeflate.cpp" compile="1"
               resource="0" file="Source/ixwebsocket/IXWebSocketPerMessageDeflate.cpp"/>
         <FILE id="k27DKW" name="IXWebSocketPerMessageDeflate.h" compile="0"
@@ -417,10 +326,6 @@
         <FILE id="eAqAle" name="IXWebSocketVersion.h" compile="0" resource="0"
               file="Source/ixwebsocket/IXWebSocketVersion.h"/>
       </GROUP>
-      <FILE id="uyOdTl" name="LegacyProject.cpp" compile="1" resource="0"
-            file="Source/LegacyProject.cpp"/>
-      <FILE id="d2zFqF" name="LookAndFeel.cpp" compile="1" resource="0" file="Source/LookAndFeel.cpp"/>
-      <FILE id="TJDqWs" name="LookAndFeel.h" compile="0" resource="0" file="Source/LookAndFeel.h"/>
       <GROUP id="{75F6236A-68A5-85DA-EDAE-23D1621601DB}" name="lua">
         <FILE id="X5i9iw" name="lapi.c" compile="1" resource="0" file="Source/lua/lapi.c"/>
         <FILE id="J62WSE" name="lapi.h" compile="0" resource="0" file="Source/lua/lapi.h"/>
@@ -490,16 +395,98 @@
         <FILE id="vYPcZP" name="lzio.h" compile="0" resource="0" file="Source/lua/lzio.h"/>
         <FILE id="ktpcF1" name="onelua.c" compile="1" resource="0" file="Source/lua/onelua.c"/>
       </GROUP>
-      <FILE id="X26RjJ" name="LuaComponent.cpp" compile="1" resource="0"
-            file="Source/LuaComponent.cpp"/>
-      <FILE id="g5xRHT" name="LuaComponent.h" compile="0" resource="0" file="Source/LuaComponent.h"/>
-      <FILE id="GKBQ8j" name="MainComponent.cpp" compile="1" resource="0"
-            file="Source/MainComponent.cpp"/>
-      <FILE id="RU8fGr" name="MainComponent.h" compile="0" resource="0" file="Source/MainComponent.h"/>
-      <FILE id="cFVaxu" name="MathUtil.h" compile="0" resource="0" file="Source/MathUtil.h"/>
-      <FILE id="eB92KJ" name="MidiComponent.cpp" compile="1" resource="0"
-            file="Source/MidiComponent.cpp"/>
-      <FILE id="GJqoJa" name="MidiComponent.h" compile="0" resource="0" file="Source/MidiComponent.h"/>
+      <GROUP id="{50F56072-D264-AC8C-EAC9-A073059CDE27}" name="mathter">
+        <GROUP id="{60CE44FE-26F8-4CE0-3BFF-5475F8E0BD75}" name="Common">
+          <FILE id="XY4AlJ" name="Approx.hpp" compile="0" resource="0" file="Source/mathter/Common/Approx.hpp"/>
+          <FILE id="LeuGwE" name="Definitions.hpp" compile="0" resource="0" file="Source/mathter/Common/Definitions.hpp"/>
+          <FILE id="HcUnQp" name="DeterministicInitializer.hpp" compile="0" resource="0"
+                file="Source/mathter/Common/DeterministicInitializer.hpp"/>
+          <FILE id="qvzdH7" name="MathUtil.hpp" compile="0" resource="0" file="Source/mathter/Common/MathUtil.hpp"/>
+          <FILE id="wy5V3L" name="Range.hpp" compile="0" resource="0" file="Source/mathter/Common/Range.hpp"/>
+          <FILE id="hsfx9V" name="Traits.hpp" compile="0" resource="0" file="Source/mathter/Common/Traits.hpp"/>
+        </GROUP>
+        <GROUP id="{AA5719C4-2684-8629-96C2-ACCCC846741E}" name="Decompositions">
+          <FILE id="mqUNTZ" name="DecomposeLU.hpp" compile="0" resource="0" file="Source/mathter/Decompositions/DecomposeLU.hpp"/>
+          <FILE id="bajVyN" name="DecomposeQR.hpp" compile="0" resource="0" file="Source/mathter/Decompositions/DecomposeQR.hpp"/>
+          <FILE id="LVojfW" name="DecomposeSVD.hpp" compile="0" resource="0"
+                file="Source/mathter/Decompositions/DecomposeSVD.hpp"/>
+        </GROUP>
+        <GROUP id="{5223A16D-BBB0-7277-2DA2-5F83E36AF6D7}" name="Matrix">
+          <FILE id="NiMdHn" name="MatrixArithmetic.hpp" compile="0" resource="0"
+                file="Source/mathter/Matrix/MatrixArithmetic.hpp"/>
+          <FILE id="OG3XE0" name="MatrixCast.hpp" compile="0" resource="0" file="Source/mathter/Matrix/MatrixCast.hpp"/>
+          <FILE id="hzHEZU" name="MatrixCompare.hpp" compile="0" resource="0"
+                file="Source/mathter/Matrix/MatrixCompare.hpp"/>
+          <FILE id="TKewDV" name="MatrixFunction.hpp" compile="0" resource="0"
+                file="Source/mathter/Matrix/MatrixFunction.hpp"/>
+          <FILE id="az9Zbs" name="MatrixImpl.hpp" compile="0" resource="0" file="Source/mathter/Matrix/MatrixImpl.hpp"/>
+          <FILE id="ZApObW" name="MatrixVectorArithmetic.hpp" compile="0" resource="0"
+                file="Source/mathter/Matrix/MatrixVectorArithmetic.hpp"/>
+        </GROUP>
+        <GROUP id="{9ED17B79-C8AF-B25C-1B0D-01C8A868E93B}" name="Quaternion">
+          <FILE id="Pg5bBV" name="QuaternionArithmetic.hpp" compile="0" resource="0"
+                file="Source/mathter/Quaternion/QuaternionArithmetic.hpp"/>
+          <FILE id="Q40Fdf" name="QuaternionCompare.hpp" compile="0" resource="0"
+                file="Source/mathter/Quaternion/QuaternionCompare.hpp"/>
+          <FILE id="lnp7Lb" name="QuaternionFunction.hpp" compile="0" resource="0"
+                file="Source/mathter/Quaternion/QuaternionFunction.hpp"/>
+          <FILE id="qDNOvo" name="QuaternionImpl.hpp" compile="0" resource="0"
+                file="Source/mathter/Quaternion/QuaternionImpl.hpp"/>
+          <FILE id="eXgZ46" name="QuaternionLiterals.hpp" compile="0" resource="0"
+                file="Source/mathter/Quaternion/QuaternionLiterals.hpp"/>
+          <FILE id="oMB7Jr" name="QuaternionVectorArithmetic.hpp" compile="0"
+                resource="0" file="Source/mathter/Quaternion/QuaternionVectorArithmetic.hpp"/>
+        </GROUP>
+        <GROUP id="{D82CFD72-F5BE-1024-94AB-5C2503423E4D}" name="Swizzle">
+          <FILE id="CeOGVV" name="Swizzle_1.inc.hpp" compile="0" resource="0"
+                file="Source/mathter/Swizzle/Swizzle_1.inc.hpp"/>
+          <FILE id="jwhhIz" name="Swizzle_2.inc.hpp" compile="0" resource="0"
+                file="Source/mathter/Swizzle/Swizzle_2.inc.hpp"/>
+          <FILE id="fPNnzc" name="Swizzle_3.inc.hpp" compile="0" resource="0"
+                file="Source/mathter/Swizzle/Swizzle_3.inc.hpp"/>
+          <FILE id="gU43mt" name="Swizzle_4.inc.hpp" compile="0" resource="0"
+                file="Source/mathter/Swizzle/Swizzle_4.inc.hpp"/>
+        </GROUP>
+        <GROUP id="{2F08F8FD-A6D7-6DE3-CAD4-564E35A9F0B9}" name="Transforms">
+          <FILE id="pltHW9" name="IdentityBuilder.hpp" compile="0" resource="0"
+                file="Source/mathter/Transforms/IdentityBuilder.hpp"/>
+          <FILE id="g2kgGu" name="OrthographicBuilder.hpp" compile="0" resource="0"
+                file="Source/mathter/Transforms/OrthographicBuilder.hpp"/>
+          <FILE id="DBDXmX" name="PerspectiveBuilder.hpp" compile="0" resource="0"
+                file="Source/mathter/Transforms/PerspectiveBuilder.hpp"/>
+          <FILE id="Gj9MnE" name="Rotation2DBuilder.hpp" compile="0" resource="0"
+                file="Source/mathter/Transforms/Rotation2DBuilder.hpp"/>
+          <FILE id="Hq0ZLD" name="Rotation3DBuilder.hpp" compile="0" resource="0"
+                file="Source/mathter/Transforms/Rotation3DBuilder.hpp"/>
+          <FILE id="An6eDN" name="ScaleBuilder.hpp" compile="0" resource="0"
+                file="Source/mathter/Transforms/ScaleBuilder.hpp"/>
+          <FILE id="xzgGHN" name="ShearBuilder.hpp" compile="0" resource="0"
+                file="Source/mathter/Transforms/ShearBuilder.hpp"/>
+          <FILE id="OVvc6Z" name="TranslationBuilder.hpp" compile="0" resource="0"
+                file="Source/mathter/Transforms/TranslationBuilder.hpp"/>
+          <FILE id="TzGfIt" name="ViewBuilder.hpp" compile="0" resource="0" file="Source/mathter/Transforms/ViewBuilder.hpp"/>
+          <FILE id="VTTCpk" name="ZeroBuilder.hpp" compile="0" resource="0" file="Source/mathter/Transforms/ZeroBuilder.hpp"/>
+        </GROUP>
+        <GROUP id="{BA088AC1-AC2B-B70C-582E-EDF9E38ABC20}" name="Vector">
+          <FILE id="KDVsvP" name="VectorArithmetic.hpp" compile="0" resource="0"
+                file="Source/mathter/Vector/VectorArithmetic.hpp"/>
+          <FILE id="qBpF7X" name="VectorCompare.hpp" compile="0" resource="0"
+                file="Source/mathter/Vector/VectorCompare.hpp"/>
+          <FILE id="IinHSU" name="VectorConcat.hpp" compile="0" resource="0"
+                file="Source/mathter/Vector/VectorConcat.hpp"/>
+          <FILE id="aVRyP9" name="VectorFunction.hpp" compile="0" resource="0"
+                file="Source/mathter/Vector/VectorFunction.hpp"/>
+          <FILE id="af10kl" name="VectorImpl.hpp" compile="0" resource="0" file="Source/mathter/Vector/VectorImpl.hpp"/>
+        </GROUP>
+        <FILE id="vOLhwO" name="CMakeLists.txt" compile="0" resource="1" file="Source/mathter/CMakeLists.txt"/>
+        <FILE id="d4t0xm" name="Geometry.hpp" compile="0" resource="0" file="Source/mathter/Geometry.hpp"/>
+        <FILE id="AZxH75" name="IoStream.hpp" compile="0" resource="0" file="Source/mathter/IoStream.hpp"/>
+        <FILE id="ev6gxl" name="Mathter.natvis" compile="0" resource="1" file="Source/mathter/Mathter.natvis"/>
+        <FILE id="VBewvB" name="Matrix.hpp" compile="0" resource="0" file="Source/mathter/Matrix.hpp"/>
+        <FILE id="vlSQrm" name="Quaternion.hpp" compile="0" resource="0" file="Source/mathter/Quaternion.hpp"/>
+        <FILE id="Aos8s3" name="Utility.hpp" compile="0" resource="0" file="Source/mathter/Utility.hpp"/>
+        <FILE id="T6rqIo" name="Vector.hpp" compile="0" resource="0" file="Source/mathter/Vector.hpp"/>
+      </GROUP>
       <GROUP id="{E6ED85A9-3843-825F-EF48-BCF81E38F8AD}" name="obj">
         <FILE id="ahOy0q" name="Camera.cpp" compile="1" resource="0" file="Source/obj/Camera.cpp"/>
         <FILE id="dUDESs" name="Camera.h" compile="0" resource="0" file="Source/obj/Camera.h"/>
@@ -515,10 +502,6 @@
         <FILE id="YNsbe9" name="WorldObject.cpp" compile="1" resource="0" file="Source/obj/WorldObject.cpp"/>
         <FILE id="SZBVI9" name="WorldObject.h" compile="0" resource="0" file="Source/obj/WorldObject.h"/>
       </GROUP>
-      <FILE id="RHHuXP" name="PerspectiveComponent.cpp" compile="1" resource="0"
-            file="Source/PerspectiveComponent.cpp"/>
-      <FILE id="mliVoS" name="PerspectiveComponent.h" compile="0" resource="0"
-            file="Source/PerspectiveComponent.h"/>
       <GROUP id="{2AE40B10-2C85-6401-644A-D5F36BCC5BC1}" name="parser">
         <FILE id="q22Fiw" name="FileParser.cpp" compile="1" resource="0" file="Source/parser/FileParser.cpp"/>
         <FILE id="HWSJK8" name="FileParser.h" compile="0" resource="0" file="Source/parser/FileParser.h"/>
@@ -528,17 +511,6 @@
         <FILE id="JEcNPP" name="FrameProducer.h" compile="0" resource="0" file="Source/parser/FrameProducer.h"/>
         <FILE id="hCrVUD" name="FrameSource.h" compile="0" resource="0" file="Source/parser/FrameSource.h"/>
       </GROUP>
-      <FILE id="GF4uFx" name="PluginEditor.cpp" compile="1" resource="0"
-            file="Source/PluginEditor.cpp"/>
-      <FILE id="iySMgE" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
-      <FILE id="N4YgAT" name="PluginProcessor.cpp" compile="1" resource="0"
-            file="Source/PluginProcessor.cpp"/>
-      <FILE id="G4mTsK" name="PluginProcessor.h" compile="0" resource="0"
-            file="Source/PluginProcessor.h"/>
-      <FILE id="x57ccs" name="SettingsComponent.cpp" compile="1" resource="0"
-            file="Source/SettingsComponent.cpp"/>
-      <FILE id="Vlmozi" name="SettingsComponent.h" compile="0" resource="0"
-            file="Source/SettingsComponent.h"/>
       <GROUP id="{92CEA658-C82C-9CEB-15EB-945EF6B6B5C8}" name="shape">
         <FILE id="iglTFG" name="CircleArc.cpp" compile="1" resource="0" file="Source/shape/CircleArc.cpp"/>
         <FILE id="T3S8Sg" name="CircleArc.h" compile="0" resource="0" file="Source/shape/CircleArc.h"/>
@@ -565,9 +537,6 @@
         <FILE id="vIYWRG" name="TextParser.cpp" compile="1" resource="0" file="Source/txt/TextParser.cpp"/>
         <FILE id="LlefOK" name="TextParser.h" compile="0" resource="0" file="Source/txt/TextParser.h"/>
       </GROUP>
-      <FILE id="UxZu4n" name="TxtComponent.cpp" compile="1" resource="0"
-            file="Source/TxtComponent.cpp"/>
-      <FILE id="kxPbsL" name="TxtComponent.h" compile="0" resource="0" file="Source/TxtComponent.h"/>
       <GROUP id="{0C40BD3D-FDE8-D3CD-E1AB-14CA04799E4A}" name="UGen">
         <FILE id="zfNA3c" name="Env.cpp" compile="1" resource="0" file="Source/UGen/Env.cpp"/>
         <FILE id="DHCLp1" name="Env.h" compile="0" resource="0" file="Source/UGen/Env.h"/>
@@ -582,6 +551,46 @@
         <FILE id="mC1tUv" name="ugen_JuceUtility.h" compile="0" resource="0"
               file="Source/UGen/ugen_JuceUtility.h"/>
       </GROUP>
+      <FILE id="I44EdJ" name="EffectsComponent.cpp" compile="1" resource="0"
+            file="Source/EffectsComponent.cpp"/>
+      <FILE id="qxxNX3" name="EffectsComponent.h" compile="0" resource="0"
+            file="Source/EffectsComponent.h"/>
+      <FILE id="uyOdTl" name="LegacyProject.cpp" compile="1" resource="0"
+            file="Source/LegacyProject.cpp"/>
+      <FILE id="u7PWXF" name="LineArtComponent.cpp" compile="1" resource="0"
+            file="Source/LineArtComponent.cpp"/>
+      <FILE id="InL4cZ" name="LineArtComponent.h" compile="0" resource="0"
+            file="Source/LineArtComponent.h"/>
+      <FILE id="d2zFqF" name="LookAndFeel.cpp" compile="1" resource="0" file="Source/LookAndFeel.cpp"/>
+      <FILE id="TJDqWs" name="LookAndFeel.h" compile="0" resource="0" file="Source/LookAndFeel.h"/>
+      <FILE id="X26RjJ" name="LuaComponent.cpp" compile="1" resource="0"
+            file="Source/LuaComponent.cpp"/>
+      <FILE id="g5xRHT" name="LuaComponent.h" compile="0" resource="0" file="Source/LuaComponent.h"/>
+      <FILE id="GKBQ8j" name="MainComponent.cpp" compile="1" resource="0"
+            file="Source/MainComponent.cpp"/>
+      <FILE id="RU8fGr" name="MainComponent.h" compile="0" resource="0" file="Source/MainComponent.h"/>
+      <FILE id="cFVaxu" name="MathUtil.h" compile="0" resource="0" file="Source/MathUtil.h"/>
+      <FILE id="eB92KJ" name="MidiComponent.cpp" compile="1" resource="0"
+            file="Source/MidiComponent.cpp"/>
+      <FILE id="GJqoJa" name="MidiComponent.h" compile="0" resource="0" file="Source/MidiComponent.h"/>
+      <FILE id="RHHuXP" name="PerspectiveComponent.cpp" compile="1" resource="0"
+            file="Source/PerspectiveComponent.cpp"/>
+      <FILE id="mliVoS" name="PerspectiveComponent.h" compile="0" resource="0"
+            file="Source/PerspectiveComponent.h"/>
+      <FILE id="GF4uFx" name="PluginEditor.cpp" compile="1" resource="0"
+            file="Source/PluginEditor.cpp"/>
+      <FILE id="iySMgE" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
+      <FILE id="N4YgAT" name="PluginProcessor.cpp" compile="1" resource="0"
+            file="Source/PluginProcessor.cpp"/>
+      <FILE id="G4mTsK" name="PluginProcessor.h" compile="0" resource="0"
+            file="Source/PluginProcessor.h"/>
+      <FILE id="x57ccs" name="SettingsComponent.cpp" compile="1" resource="0"
+            file="Source/SettingsComponent.cpp"/>
+      <FILE id="Vlmozi" name="SettingsComponent.h" compile="0" resource="0"
+            file="Source/SettingsComponent.h"/>
+      <FILE id="UxZu4n" name="TxtComponent.cpp" compile="1" resource="0"
+            file="Source/TxtComponent.cpp"/>
+      <FILE id="kxPbsL" name="TxtComponent.h" compile="0" resource="0" file="Source/TxtComponent.h"/>
     </GROUP>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"
@@ -611,7 +620,7 @@
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/VisualStudio2022" smallIcon="pSc1mq" bigIcon="pSc1mq">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" enablePluginBinaryCopyStep="1"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="osci-render" alwaysGenerateDebugSymbols="1"
                        debugInformationFormat="ProgramDatabase"/>
       </CONFIGURATIONS>

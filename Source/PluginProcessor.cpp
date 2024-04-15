@@ -545,8 +545,34 @@ void OscirenderAudioProcessor::setObjectServerRendering(bool enabled) {
 
 void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
     juce::ScopedNoDenormals noDenormals;
-    auto totalNumInputChannels  = getTotalNumInputChannels();
-    auto totalNumOutputChannels = getTotalNumOutputChannels();
+    // Audio info variables
+    int totalNumInputChannels  = getTotalNumInputChannels();
+    int totalNumOutputChannels = getTotalNumOutputChannels();
+    double sampleRate = getSampleRate();
+
+    // MIDI transport info variables (defaults to 120bpm, 4/4 time signature at zero seconds and not playing)
+    double bpm = 120;
+    double playTimeSeconds = 0;
+    bool isPlaying = false;
+    int timeSigNum = 4;
+    int timeSigDen = 4;
+
+    // Get MIDI transport info
+    playHead = this->getPlayHead();
+    if (playHead->getCurrentPosition(currentPositionInfo)) {
+        bpm = currentPositionInfo.bpm;
+        playTimeSeconds = currentPositionInfo.timeInSeconds;
+        isPlaying = currentPositionInfo.isPlaying;
+        timeSigNum = currentPositionInfo.timeSigNumerator;
+        timeSigDen = currentPositionInfo.timeSigDenominator;
+    }
+
+    // Calculated number of beats
+    double playTimeBeats = bpm * playTimeSeconds / 60;
+    
+    // Calculated time per sample in seconds and beats
+    double sTimeSec = 1.f / sampleRate;
+    double sTimeBeats = bpm * sTimeSec / 60;
 
     // merge keyboard state and midi messages
     keyboardState.processNextMidiBuffer(midiMessages, 0, buffer.getNumSamples(), true);
@@ -610,8 +636,20 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     midiMessages.clear();
     
     auto* channelData = buffer.getArrayOfWritePointers();
+
+    // Update line art animation
+    if (animateLineArt) {
+        if (syncMIDIAnimation) animationTime = playTimeBeats;
+        else animationTime = playTimeSeconds;
+        if ((currentFile >= 0) ? (sounds[currentFile]->parser->isAnimatable) : false) {
+            int animFrame = (int)(animationTime * animationRate);
+            sounds[currentFile]->parser->getLineArt()->setFrame(animFrame);
+        }
+    }
+    
     
 	for (auto sample = 0; sample < buffer.getNumSamples(); ++sample) {
+
         auto left = 0.0;
         auto right = 0.0;
         if (totalNumInputChannels >= 2) {
@@ -678,6 +716,11 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
                 consumer->write(y);
                 consumer->notifyIfFull();
             }
+        }
+
+        if (isPlaying) {
+            playTimeSeconds += sTimeSec;
+            playTimeBeats += sTimeBeats;
         }
 	}
 
