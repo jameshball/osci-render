@@ -559,12 +559,14 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
     // Get MIDI transport info
     playHead = this->getPlayHead();
-    if (playHead->getCurrentPosition(currentPositionInfo)) {
-        bpm = currentPositionInfo.bpm;
-        playTimeSeconds = currentPositionInfo.timeInSeconds;
-        isPlaying = currentPositionInfo.isPlaying;
-        timeSigNum = currentPositionInfo.timeSigNumerator;
-        timeSigDen = currentPositionInfo.timeSigDenominator;
+    auto cpi = playHead->getPosition();
+    if (cpi == juce::nullopt) {
+        currentPositionInfo = *cpi;
+        bpm = *currentPositionInfo.getBpm();
+        playTimeSeconds = *currentPositionInfo.getTimeInSeconds();
+        isPlaying = currentPositionInfo.getIsPlaying();
+        timeSigNum = (*currentPositionInfo.getTimeSignature()).numerator;
+        timeSigDen = (*currentPositionInfo.getTimeSignature()).denominator; 
     }
 
     // Calculated number of beats
