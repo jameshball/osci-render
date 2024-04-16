@@ -28,8 +28,8 @@ void FileParser::parse(juce::String fileName, juce::String extension, std::uniqu
 	} else if (extension == ".lua") {
 		lua = std::make_shared<LuaParser>(fileName, stream->readEntireStreamAsString(), errorCallback, fallbackLuaScript);
 	} else if (extension == ".gpla") {
-		isAnimatable = true;
 		gpla = std::make_shared<LineArtParser>(stream->readEntireStreamAsString());
+		if (gpla != nullptr) isAnimatable = true;
 	}
 
 	sampleSource = lua != nullptr;

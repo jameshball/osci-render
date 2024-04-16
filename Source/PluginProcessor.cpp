@@ -559,14 +559,16 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
     // Get MIDI transport info
     playHead = this->getPlayHead();
-    auto cpi = playHead->getPosition();
-    if (cpi == juce::nullopt) {
-        currentPositionInfo = *cpi;
-        bpm = *currentPositionInfo.getBpm();
-        playTimeSeconds = *currentPositionInfo.getTimeInSeconds();
-        isPlaying = currentPositionInfo.getIsPlaying();
-        timeSigNum = (*currentPositionInfo.getTimeSignature()).numerator;
-        timeSigDen = (*currentPositionInfo.getTimeSignature()).denominator; 
+    if (playHead != nullptr) {
+        auto cpi = playHead->getPosition();
+        if (cpi != juce::nullopt) {
+            currentPositionInfo = *cpi;
+            bpm = *currentPositionInfo.getBpm();
+            playTimeSeconds = *currentPositionInfo.getTimeInSeconds();
+            isPlaying = currentPositionInfo.getIsPlaying();
+            timeSigNum = (*currentPositionInfo.getTimeSignature()).numerator;
+            timeSigDen = (*currentPositionInfo.getTimeSignature()).denominator;
+        }
     }
 
     // Calculated number of beats
@@ -642,7 +644,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     // Update line art animation
     if (animateLineArt) {
         if (syncMIDIAnimation) animationTime = playTimeBeats;
-        else animationTime = playTimeSeconds;
+        else animationTime = playTimeSeconds;  
         if ((currentFile >= 0) ? (sounds[currentFile]->parser->isAnimatable) : false) {
             int animFrame = (int)(animationTime * animationRate);
             sounds[currentFile]->parser->getLineArt()->setFrame(animFrame);
