@@ -285,7 +285,7 @@ private:
     const double MIN_LENGTH_INCREMENT = 0.000001;
 
     juce::AudioPlayHead* playHead;
-    juce::AudioPlayHead::CurrentPositionInfo currentPositionInfo;
+    juce::AudioPlayHead::PositionInfo currentPositionInfo;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OscirenderAudioProcessor)
