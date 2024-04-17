@@ -16,7 +16,10 @@ private:
 
     juce::ToggleButton animate{"Animate"};
     juce::ToggleButton sync{"MIDI Sync"};
-    juce::TextEditor rate{"Framerate"};
+    juce::Label rateLabel{ "Framerate","Framerate"};
+    juce::TextEditor rate;
+    juce::Label offsetLabel{ "Offset","Offset" };
+    juce::TextEditor offset;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LineArtComponent)
 };

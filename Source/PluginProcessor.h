@@ -90,7 +90,7 @@ public:
             "Frequency",
             "Controls how many times per second the image is drawn, thereby controlling the pitch of the sound. Lower frequencies result in more-accurately drawn images, but more flickering, and vice versa.",
             "frequency",
-            VERSION_HINT, 440.0, 0.0, 12000.0, 0.1
+            VERSION_HINT, 220.0, 0.0, 12000.0, 0.1
         )
     );
 
@@ -161,7 +161,7 @@ public:
     
     BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false);
     BooleanParameter* inputEnabled = new BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false);
-    std::atomic<float> frequency = 440.0f;
+    std::atomic<float> frequency = 220.0f;
     
     juce::SpinLock parsersLock;
     std::vector<std::shared_ptr<FileParser>> parsers;
@@ -200,7 +200,8 @@ public:
 
     bool animateLineArt = false;
     bool syncMIDIAnimation = false;
-    float animationRate = 10.f;
+    float animationRate = 8.f;
+    int animationOffset = 0;
     double animationTime = 0.f;
 
 private:
