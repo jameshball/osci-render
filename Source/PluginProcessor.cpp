@@ -640,19 +640,19 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     midiMessages.clear();
     
     auto* channelData = buffer.getArrayOfWritePointers();
+    
+    
+	for (int sample = 0; sample < buffer.getNumSamples(); ++sample) {
 
-    // Update line art animation
-    if (animateLineArt) {
-        if (syncMIDIAnimation) animationTime = playTimeBeats;
-        else animationTime = playTimeSeconds;  
-        if ((currentFile >= 0) ? (sounds[currentFile]->parser->isAnimatable) : false) {
-            int animFrame = (int)(animationTime * animationRate);
-            sounds[currentFile]->parser->getLineArt()->setFrame(animFrame);
+        // Update line art animation
+        if (animateLineArt && (sample % (int)(sampleRate / 200) == 0)) {
+            if (syncMIDIAnimation) animationTime = playTimeBeats;
+            else animationTime = playTimeSeconds;
+            if ((currentFile >= 0) ? (sounds[currentFile]->parser->isAnimatable) : false) {
+                int animFrame = (int)(animationTime * animationRate) + animationOffset;
+                sounds[currentFile]->parser->getLineArt()->setFrame(animFrame);
+            }
         }
-    }
-    
-    
-	for (auto sample = 0; sample < buffer.getNumSamples(); ++sample) {
 
         auto left = 0.0;
         auto right = 0.0;
@@ -793,6 +793,12 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
     }
     xml->setAttribute("currentFile", currentFile);
 
+    auto lineArtXml = xml->createNewChildElement("gpla");
+    lineArtXml->setAttribute("animateLineArt", animateLineArt);
+    lineArtXml->setAttribute("syncMIDIAnimation", syncMIDIAnimation);
+    lineArtXml->setAttribute("animationRate", animationRate);
+    lineArtXml->setAttribute("animationOffset", animationOffset);
+
     copyXmlToBinary(*xml, destData);
 }
 
@@ -895,6 +901,14 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
             }
         }
         changeCurrentFile(xml->getIntAttribute("currentFile", -1));
+
+        // Get .gpla animation stuff
+        auto lineArtXml = xml->getChildByName("gpla");
+        animateLineArt = lineArtXml->getBoolAttribute("animateLineArt", false);
+        syncMIDIAnimation = lineArtXml->getBoolAttribute("syncMIDIAnimation", false);
+        animationRate = lineArtXml->getDoubleAttribute("animationRate", 8.);
+        animationOffset = lineArtXml->getIntAttribute("animationOffset", 0);
+
         broadcaster.sendChangeMessage();
         prevMidiEnabled = !midiEnabled->getBoolValue();
     }
