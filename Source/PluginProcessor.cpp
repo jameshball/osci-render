@@ -901,13 +901,15 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
             }
         }
         changeCurrentFile(xml->getIntAttribute("currentFile", -1));
-
+{
         // Get .gpla animation stuff
         auto lineArtXml = xml->getChildByName("gpla");
-        animateLineArt = lineArtXml->getBoolAttribute("animateLineArt", false);
-        syncMIDIAnimation = lineArtXml->getBoolAttribute("syncMIDIAnimation", false);
-        animationRate = lineArtXml->getDoubleAttribute("animationRate", 8.);
-        animationOffset = lineArtXml->getIntAttribute("animationOffset", 0);
+        if (lineArtXml != nullptr) {
+            animateLineArt = lineArtXml->getBoolAttribute("animateLineArt", false);
+            syncMIDIAnimation = lineArtXml->getBoolAttribute("syncMIDIAnimation", false);
+            animationRate = lineArtXml->getDoubleAttribute("animationRate", 8.);
+            animationOffset = lineArtXml->getIntAttribute("animationOffset", 0);
+        }
 
         broadcaster.sendChangeMessage();
         prevMidiEnabled = !midiEnabled->getBoolValue();
