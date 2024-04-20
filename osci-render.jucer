@@ -39,6 +39,9 @@
       </GROUP>
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <GROUP id="{BDDC7DED-B89B-DB4D-57CF-6B26514AEF67}" name="video">
+        <FILE id="MazZlt" name="beamcaster.c" compile="1" resource="0" file="Source/video/beamcaster.c"/>
+      </GROUP>
       <GROUP id="{50F56072-D264-AC8C-EAC9-A073059CDE27}" name="mathter">
         <GROUP id="{60CE44FE-26F8-4CE0-3BFF-5475F8E0BD75}" name="Common">
           <FILE id="XY4AlJ" name="Approx.hpp" compile="0" resource="0" file="Source/mathter/Common/Approx.hpp"/>
