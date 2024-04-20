@@ -94,7 +94,11 @@ void OscirenderLookAndFeel::drawLabel(juce::Graphics& g, juce::Label& label) {
     label.setRepaintsOnMouseActivity(true);
     auto baseColour = label.findColour(juce::Label::backgroundColourId);
     if (label.isEditable()) {
-        label.setMouseCursor(juce::MouseCursor::IBeamCursor);
+        juce::MessageManager::callAsync(
+            [&label] () {
+                label.setMouseCursor(juce::MouseCursor::IBeamCursor);
+            }
+        );
         baseColour = LookAndFeelHelpers::createBaseColour(baseColour, false, label.isMouseOver(true), false, label.isEnabled());
     }
     g.setColour(baseColour);
@@ -168,7 +172,11 @@ void OscirenderLookAndFeel::drawTextEditorOutline(juce::Graphics& g, int width, 
 
 void OscirenderLookAndFeel::drawComboBox(juce::Graphics& g, int width, int height, bool, int, int, int, int, juce::ComboBox& box) {
     juce::Rectangle<int> boxBounds{0, 0, width, height};
-    box.setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    juce::MessageManager::callAsync(
+        [&box] () {
+            box.setMouseCursor(juce::MouseCursor::PointingHandCursor);
+        }
+    );
 
     g.setColour(box.findColour(juce::ComboBox::backgroundColourId));
     g.fillRoundedRectangle(boxBounds.toFloat(), RECT_RADIUS);
@@ -280,7 +288,11 @@ void OscirenderLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, in
 }
 
 void OscirenderLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& button, const juce::Colour& backgroundColour, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) {
-    button.setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    juce::MessageManager::callAsync(
+        [&button] () {
+            button.setMouseCursor(juce::MouseCursor::PointingHandCursor);
+        }
+    );
     
     auto bounds = button.getLocalBounds().toFloat().reduced(0.5f, 0.5f);
 

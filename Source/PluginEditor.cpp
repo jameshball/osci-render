@@ -20,6 +20,16 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     }
 #endif
 
+    addAndMakeVisible(&toolbar);
+    toolbar.addDefaultItems(factory);
+    auto children = toolbar.getChildren();
+    for (auto child : children) {
+        auto item = dynamic_cast<juce::ToolbarItemComponent*>(child);
+        if (item != nullptr) {
+            toolbar.addMouseListener(item, true);
+        }
+    }
+
     addAndMakeVisible(console);
     console.setConsoleOpen(false);
     
@@ -149,6 +159,9 @@ void OscirenderAudioProcessorEditor::resized() {
     if (!usingNativeMenuBar) {
         menuBar.setBounds(area.removeFromTop(25));
     }
+
+    toolbar.setBounds(area.removeFromTop(50));
+    toolbar.setEditingActive(true);
     
     area.removeFromTop(2);
     area.removeFromLeft(3);

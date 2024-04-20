@@ -10,6 +10,86 @@
 #include "components/ErrorCodeEditorComponent.h"
 #include "components/LuaConsole.h"
 
+
+class DemoToolbarItemFactory : public juce::ToolbarItemFactory
+{
+public:
+    DemoToolbarItemFactory() {}
+
+    void getAllToolbarItemIds (juce::Array<int>& ids) {
+        for (int i = 1; i < 128; ++i) {
+            ids.add(i);
+        }
+    }
+
+    void getDefaultItemSet (juce::Array<int>& ids) {
+        for (int i = 1; i < 10; ++i) {
+            ids.add(i);
+        }
+    }
+
+    juce::ToolbarItemComponent* createItem (int itemId) {
+        return new TabComponent(itemId);
+    }
+
+private:
+    juce::StringArray iconNames;
+
+    class TabComponent : public juce::ToolbarItemComponent {
+    public:
+        TabComponent(const int id) : juce::ToolbarItemComponent (id, "Custom Toolbar Item", false), label("demo toolbar combo box"), id(id) {
+            addAndMakeVisible(&label);
+
+            label.setText("tab " + juce::String(id), juce::dontSendNotification);
+            
+        }
+
+        ~TabComponent() override {
+            if (toolbar != nullptr) {
+                toolbar->removeMouseListener(this);
+            }
+        }
+
+        bool getToolbarItemSizes(int /*toolbarDepth*/, bool isToolbarVertical, int& preferredSize, int& minSize, int& maxSize) {
+            if (isToolbarVertical) {
+                return false;
+            }
+
+            preferredSize = 250;
+            minSize = 80;
+            maxSize = 300;
+            return true;
+        }
+
+        void paintButtonArea(juce::Graphics&, int, int, bool, bool) {}
+
+        void contentAreaChanged(const juce::Rectangle<int>& contentArea) {
+            label.setSize(contentArea.getWidth() - 2, juce::jmin(contentArea.getHeight() - 2, 22));
+            label.setCentrePosition(contentArea.getCentreX(), contentArea.getCentreY());
+        }
+
+        void mouseDown(const juce::MouseEvent& e) {
+            auto temp = getToolbar();
+            if (temp != nullptr) {
+                toolbar = temp;
+            }
+            if (getScreenBounds().contains(e.getScreenPosition())) {
+                label.setText("clicked!", juce::dontSendNotification);
+            }
+        }
+
+        void mouseUp(const juce::MouseEvent& e) {
+            label.setText("tab " + juce::String(id), juce::dontSendNotification);
+        }
+
+    private:
+        juce::Label label;
+        juce::Toolbar* toolbar;
+        int id;
+    };
+};
+
+
 class OscirenderAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener {
 public:
     OscirenderAudioProcessorEditor(OscirenderAudioProcessor&);
@@ -56,6 +136,9 @@ public:
     VolumeComponent volume{audioProcessor};
 
     LuaConsole console;
+
+    DemoToolbarItemFactory factory;
+    juce::Toolbar toolbar;
 
     std::vector<std::shared_ptr<juce::CodeDocument>> codeDocuments;
     std::vector<std::shared_ptr<OscirenderCodeEditorComponent>> codeEditors;
