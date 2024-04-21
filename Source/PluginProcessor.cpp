@@ -167,6 +167,8 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
 
     booleanParameters.push_back(midiEnabled);
     booleanParameters.push_back(inputEnabled);
+    booleanParameters.push_back(animateLineArt);
+    booleanParameters.push_back(syncMIDIAnimation);
 
     for (auto parameter : booleanParameters) {
         addParameter(parameter);
@@ -180,6 +182,8 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     floatParameters.push_back(sustainLevel);
     floatParameters.push_back(releaseTime);
     floatParameters.push_back(releaseShape);
+    floatParameters.push_back(animationRate);
+    floatParameters.push_back(animationOffset);
 
     for (auto parameter : floatParameters) {
         addParameter(parameter);
@@ -562,7 +566,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     if (playHead != nullptr) {
         auto cpi = playHead->getPosition();
         if (cpi != juce::nullopt) {
-            currentPositionInfo = *cpi;
+            auto currentPositionInfo = *cpi;
             bpm = *currentPositionInfo.getBpm();
             playTimeSeconds = *currentPositionInfo.getTimeInSeconds();
             isPlaying = currentPositionInfo.getIsPlaying();
@@ -645,11 +649,19 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 	for (int sample = 0; sample < buffer.getNumSamples(); ++sample) {
 
         // Update line art animation
-        if (animateLineArt && (sample % (int)(sampleRate / 200) == 0)) {
-            if (syncMIDIAnimation) animationTime = playTimeBeats;
-            else animationTime = playTimeSeconds;
+        
+        /* This limits the rate at which frames can be changed to once every 200 samples to save performance. May not be necessary
+         * if (animateLineArt && (sample % (int)(sampleRate / 200) == 0)) {
+         */
+        if (animateLineArt->getValue()) {
+            if (syncMIDIAnimation->getValue()) {
+                animationTime = playTimeBeats;
+            }
+            else {
+                animationTime = playTimeSeconds;
+            }
             if ((currentFile >= 0) ? (sounds[currentFile]->parser->isAnimatable) : false) {
-                int animFrame = (int)(animationTime * animationRate) + animationOffset;
+                int animFrame = (int)(animationTime * animationRate->getValueUnnormalised() + animationOffset->getValueUnnormalised());
                 sounds[currentFile]->parser->getLineArt()->setFrame(animFrame);
             }
         }
@@ -793,12 +805,6 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
     }
     xml->setAttribute("currentFile", currentFile);
 
-    auto lineArtXml = xml->createNewChildElement("gpla");
-    lineArtXml->setAttribute("animateLineArt", animateLineArt);
-    lineArtXml->setAttribute("syncMIDIAnimation", syncMIDIAnimation);
-    lineArtXml->setAttribute("animationRate", animationRate);
-    lineArtXml->setAttribute("animationOffset", animationOffset);
-
     copyXmlToBinary(*xml, destData);
 }
 
@@ -901,15 +907,6 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
             }
         }
         changeCurrentFile(xml->getIntAttribute("currentFile", -1));
-{
-        // Get .gpla animation stuff
-        auto lineArtXml = xml->getChildByName("gpla");
-        if (lineArtXml != nullptr) {
-            animateLineArt = lineArtXml->getBoolAttribute("animateLineArt", false);
-            syncMIDIAnimation = lineArtXml->getBoolAttribute("syncMIDIAnimation", false);
-            animationRate = lineArtXml->getDoubleAttribute("animationRate", 8.);
-            animationOffset = lineArtXml->getIntAttribute("animationOffset", 0);
-        }
 
         broadcaster.sendChangeMessage();
         prevMidiEnabled = !midiEnabled->getBoolValue();
