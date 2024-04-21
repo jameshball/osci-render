@@ -8,42 +8,32 @@ LineArtComponent::LineArtComponent(OscirenderAudioProcessor& p, OscirenderAudioP
 	addAndMakeVisible(animate);
 	addAndMakeVisible(sync);
 	addAndMakeVisible(rateLabel);
-	addAndMakeVisible(rate);
+	addAndMakeVisible(rateBox);
 	addAndMakeVisible(offsetLabel);
-	addAndMakeVisible(offset);
+	addAndMakeVisible(offsetBox);
 
 	rateLabel.setText("Framerate: ", juce::dontSendNotification);
-	rate.setText("8", false);
-	rate.setInputRestrictions(6, "0123456789.");
+	rateBox.setValue(audioProcessor.animationRate->getValueUnnormalised(), false, 2);
+	rateBox.setJustification(juce::Justification::left);
 
 	offsetLabel.setText("   Offset: ", juce::dontSendNotification);
-	offset.setText("0", false);
-	offset.setInputRestrictions(6, "0123456789");
+	offsetBox.setValue(audioProcessor.animationOffset->getValueUnnormalised(), false, 2);
+	offsetBox.setJustification(juce::Justification::left);
 
 	audioProcessor.openFile(audioProcessor.currentFile);
 	update();
 
 	auto updateAnimation = [this]() {
-		audioProcessor.animateLineArt = animate.getToggleState();
-		audioProcessor.syncMIDIAnimation = sync.getToggleState();
-		try {
-			audioProcessor.animationRate = std::stof(rate.getText().toStdString());
-		}
-		catch (std::exception e) {
-			audioProcessor.animationRate = 8.f;
-		}
-		try {
-			audioProcessor.animationOffset = std::stoi(offset.getText().toStdString());
-		}
-		catch (std::exception e) {
-			audioProcessor.animationOffset = 0;
-		}
+		audioProcessor.animateLineArt->setValue(animate.getToggleState());
+		audioProcessor.syncMIDIAnimation->setValue(sync.getToggleState());
+		audioProcessor.animationRate->setValueUnnormalised(rateBox.getValue());
+		audioProcessor.animationOffset->setValueUnnormalised(offsetBox.getValue());
 	};
 
 	animate.onClick = updateAnimation;
 	sync.onClick = updateAnimation;
-	rate.onFocusLost = updateAnimation;
-	offset.onFocusLost = updateAnimation;
+	rateBox.onFocusLost = updateAnimation;
+	offsetBox.onFocusLost = updateAnimation;
 }
 
 void LineArtComponent::resized() {
@@ -60,18 +50,18 @@ void LineArtComponent::resized() {
 
 	animateBounds = area.removeFromTop(rowHeight);
 	rateLabel.setBounds(animateBounds.removeFromLeft(100));
-	rate.setBounds(animateBounds);
+	rateBox.setBounds(animateBounds);
 	area.removeFromTop(rowSpace);
 
 	animateBounds = area.removeFromTop(rowHeight);
 	offsetLabel.setBounds(animateBounds.removeFromLeft(100));
-	offset.setBounds(animateBounds);
+	offsetBox.setBounds(animateBounds);
 	area.removeFromTop(rowSpace);
 }
 
 void LineArtComponent::update() {
-	rate.setText(juce::String(audioProcessor.animationRate));
-	offset.setText(juce::String(audioProcessor.animationOffset));
-	animate.setToggleState(audioProcessor.animateLineArt, false);
-	sync.setToggleState(audioProcessor.syncMIDIAnimation, false);
+	rateBox.setValue(audioProcessor.animationRate->getValueUnnormalised(), true, 2);
+	offsetBox.setValue(audioProcessor.animationOffset->getValueUnnormalised(), true, 2);
+	animate.setToggleState(audioProcessor.animateLineArt->getValue(), true);
+	sync.setToggleState(audioProcessor.syncMIDIAnimation->getValue(), true);
 }

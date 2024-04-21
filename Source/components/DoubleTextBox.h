@@ -17,8 +17,8 @@ public:
 		return getText().getDoubleValue();
 	}
 
-	void setValue(double value, bool sendChangeMessage = true) {
-		setText(juce::String(value, 2), sendChangeMessage);
+	void setValue(double value, bool sendChangeMessage = true, int digits = 2) {
+		setText(juce::String(value, (size_t)(digits)), sendChangeMessage);
 	}
 
 	void setText(const juce::String& newText, bool sendChangeMessage = true) {
