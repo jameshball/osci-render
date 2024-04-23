@@ -157,13 +157,18 @@ std::vector<Line> LineArtParser::generateFrame(juce::Array <juce::var> objects, 
                 double rotatedY2 = end.x * allMatrices[i][4] + end.y * allMatrices[i][5] + end.z * allMatrices[i][6] + allMatrices[i][7];
                 double rotatedZ2 = end.x * allMatrices[i][8] + end.y * allMatrices[i][9] + end.z * allMatrices[i][10] + allMatrices[i][11];
 
-                double x = rotatedX * focalLength / rotatedZ;
-                double y = rotatedY * focalLength / rotatedZ;
+                // I think this discards every line with a vertex behind the camera? Needs more testing.
+                // - DJ_Level_3
+                if (rotatedZ < 0 && rotatedZ2 < 0) {
 
-                double x2 = rotatedX2 * focalLength / rotatedZ2;
-                double y2 = rotatedY2 * focalLength / rotatedZ2;
+                    double x = rotatedX * focalLength / rotatedZ;
+                    double y = rotatedY * focalLength / rotatedZ;
 
-                frame.push_back(Line(x, y, x2, y2));
+                    double x2 = rotatedX2 * focalLength / rotatedZ2;
+                    double y2 = rotatedY2 * focalLength / rotatedZ2;
+
+                    frame.push_back(Line(x, y, x2, y2));
+                }
             }
         }
     }
