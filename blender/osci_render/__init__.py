@@ -68,8 +68,8 @@ class osci_render_save(bpy.types.Operator, ImportHelper):
     bl_idname = "render.osci_render_save"
     bl_description = "Save line art to the chosen file"
     filter_glob: bpy.props.StringProperty(
-        default='*.gpla',
-        options={'HIDDEN'}
+        default="*.gpla",
+        options={"HIDDEN"}
     )
     
     def execute(self,context):
@@ -130,8 +130,7 @@ def save_scene_to_file(scene, FilePath):
         for obj in bpy.data.objects:
             if obj.visible_get() and obj.type == 'GPENCIL':
                 object_info = {"name": obj.name}
-                strokes = obj.data.layers.active.frames.data.frames[frame+1].strokes                    
-                
+                strokes = obj.data.layers.active.frames.data.frames[frame+1].strokes
                 object_info["vertices"] = []
                 for stroke in strokes:
                     object_info["vertices"].append([{
