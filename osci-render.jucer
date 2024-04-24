@@ -8,6 +8,11 @@
               companyEmail="james@ball.sh" defines="NOMINMAX=1" pluginAUMainType="'aumu'">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
+      <GROUP id="{2A3754EB-A333-139A-56E1-4C1A8856B803}" name="line art">
+        <FILE id="tKtCYg" name="fallback.gpla" compile="0" resource="1" file="Resources/line art/fallback.gpla"/>
+        <FILE id="rBdZfZ" name="invalid.gpla" compile="0" resource="1" file="Resources/line art/invalid.gpla"/>
+        <FILE id="L3YrgX" name="noframes.gpla" compile="0" resource="1" file="Resources/line art/noframes.gpla"/>
+      </GROUP>
       <GROUP id="{C2609827-4F4A-1ADA-8BA1-A40C1D92649C}" name="lua">
         <FILE id="xANsA8" name="demo.lua" compile="0" resource="1" file="Resources/lua/demo.lua"/>
       </GROUP>
