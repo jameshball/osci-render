@@ -43,14 +43,42 @@ void LineArtParser::parseJsonFrames(juce::String jsonStr) {
 
     auto json = juce::JSON::parse(jsonStr);
 
+    // If json parse failed, stop and parse default fallback instead
+    if (json.isVoid()) {
+        parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
+        return;
+    }
+
     auto jsonFrames = *json.getProperty("frames", juce::Array<juce::var>()).getArray();
     numFrames = jsonFrames.size();
 
+    // If json does not contain any frames, stop and parse no-frames fallback instead
+    if (numFrames == 0) {
+        parseJsonFrames(juce::String(BinaryData::noframes_gpla, BinaryData::noframes_gplaSize));
+        return;
+    }
+
+    bool hasValidFrames = false;
+
     for (int f = 0; f < numFrames; f++) {
         juce::Array<juce::var> objects = *jsonFrames[f].getProperty("objects", juce::Array<juce::var>()).getArray();
-        double focalLength = jsonFrames[f].getProperty("focalLength", 1);
+        juce::var focalLengthVar = jsonFrames[f].getProperty("focalLength", juce::var());
 
-        frames.push_back(generateFrame(objects, focalLength));
+        // Ensure that there actually are objects and that the focal length is defined
+        if (objects.size() > 0 && !focalLengthVar.isVoid()) {
+            double focalLength = focalLengthVar;
+            std::vector<Line> frame = generateFrame(objects, focalLength);
+            if (frame.size() > 0) {
+                hasValidFrames = true;
+            }
+            frames.push_back(frame);
+        }
+    }
+
+    // If no frames were valid, stop and parse invalid fallback instead
+    if (!hasValidFrames) {
+        parseJsonFrames(juce::String(BinaryData::invalid_gpla, BinaryData::invalid_gplaSize));
+        return;
     }
 }
 
