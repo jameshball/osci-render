@@ -16,6 +16,7 @@ import bmesh
 import socket
 import json
 import atexit
+from bpy.props import StringProperty
 from bpy.app.handlers import persistent
 from bpy_extras.io_utils import ImportHelper
 
@@ -67,21 +68,26 @@ class osci_render_save(bpy.types.Operator, ImportHelper):
     bl_label = "Save Line Art"
     bl_idname = "render.osci_render_save"
     bl_description = "Save line art to the chosen file"
-    filter_glob: bpy.props.StringProperty(
+    filename_ext = ".gpla"
+
+    filter_glob: StringProperty(
         default="*.gpla",
         options={"HIDDEN"}
     )
     
-    def execute(self,context):
+    def execute(self, context):
         FilePath = self.filepath
         filename, extension = os.path.splitext(self.filepath)
-        if (extension != ".gpla"):
+
+        if extension != ".gpla":
             extension = ".gpla"
             FilePath = FilePath + ".gpla"
+        
         self.report({"INFO"}, FilePath)
+
         if filename is not None and extension is not None:
             fin = save_scene_to_file(bpy.context.scene, FilePath)
-            if (fin == 0):
+            if fin == 0:
                 self.report({"INFO"}, "File write successful!")
                 return {"FINISHED"}
             else:

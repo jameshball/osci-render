@@ -36,7 +36,7 @@ public:
 		// only keep negative sign at beginning
 		if (text.contains("-")) {
 			juce::String remainder = text.substring(1);
-			remainder = remainder.retainCharacters("0123456789");
+			remainder = remainder.retainCharacters("0123456789.");
 			text = text.substring(0, 1) + remainder;
 		}
 
