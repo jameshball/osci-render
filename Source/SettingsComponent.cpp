@@ -54,7 +54,7 @@ void SettingsComponent::resized() {
     auto dummyBounds = dummy.getBounds();
 
     if (effectSettings != nullptr) {
-        effectSettings->setBounds(dummyBounds.removeFromBottom(200));
+        effectSettings->setBounds(dummyBounds.removeFromBottom(140));
         dummyBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
     }
 

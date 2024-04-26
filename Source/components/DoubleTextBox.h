@@ -11,6 +11,7 @@ public:
 		onTextChange = [this]() {
 			setText(getText(), false);
 		};
+		juce::Desktop::getInstance().addGlobalMouseListener(this);
     }
 
 	double getValue() {
@@ -50,7 +51,20 @@ public:
 		juce::TextEditor::setText(text, sendChangeMessage);
 	}
 
-    ~DoubleTextBox() override {}
+	void mouseDown(const juce::MouseEvent& e) override {
+		if (getScreenBounds().contains(e.getScreenPosition())) {
+			// Delegate mouse clicks inside the editor to the TextEditor
+			// class so as to not break its functionality.
+			juce::TextEditor::mouseDown(e);
+		} else {
+			// Lose focus when mouse clicks occur outside the editor.
+			giveAwayKeyboardFocus();
+		}
+	}
+
+    ~DoubleTextBox() override {
+		juce::Desktop::getInstance().removeGlobalMouseListener(this);
+	}
 
 private:
 	double minValue;

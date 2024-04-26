@@ -12,14 +12,11 @@ LineArtComponent::LineArtComponent(OscirenderAudioProcessor& p, OscirenderAudioP
 	addAndMakeVisible(offsetBox);
 
 	rateLabel.setText("Framerate", juce::dontSendNotification);
-	rateBox.setValue(audioProcessor.animationRate->getValueUnnormalised(), false, 2);
 	rateBox.setJustification(juce::Justification::left);
 
 	offsetLabel.setText("Offset", juce::dontSendNotification);
-	offsetBox.setValue(audioProcessor.animationOffset->getValueUnnormalised(), false, 2);
 	offsetBox.setJustification(juce::Justification::left);
-
-	audioProcessor.openFile(audioProcessor.currentFile);
+	
 	update();
 
 	auto updateAnimation = [this]() {
@@ -31,8 +28,8 @@ LineArtComponent::LineArtComponent(OscirenderAudioProcessor& p, OscirenderAudioP
 
 	animate.onClick = updateAnimation;
 	sync.onClick = updateAnimation;
-	rateBox.onTextChange = updateAnimation;
-	offsetBox.onTextChange = updateAnimation;
+	rateBox.onFocusLost = updateAnimation;
+	offsetBox.onFocusLost = updateAnimation;
 
 	audioProcessor.animateLineArt->addListener(this);
 	audioProcessor.syncMIDIAnimation->addListener(this);
@@ -49,32 +46,28 @@ LineArtComponent::~LineArtComponent() {
 
 void LineArtComponent::resized() {
 	auto area = getLocalBounds().withTrimmedTop(20).reduced(20);
-	double rowHeight = 30;
-	double rowSpace = 5;
+	double rowHeight = 20;
+	double rowSpace = 10;
 	auto animateBounds = area.removeFromTop(rowHeight);
-	animate.setBounds(animateBounds);
+	animate.setBounds(animateBounds.removeFromLeft(100));
+	sync.setBounds(animateBounds.removeFromLeft(100));
 	area.removeFromTop(rowSpace);
 
 	animateBounds = area.removeFromTop(rowHeight);
-	sync.setBounds(animateBounds);
+	rateLabel.setBounds(animateBounds.removeFromLeft(80));
+	rateBox.setBounds(animateBounds.removeFromLeft(60));
 	area.removeFromTop(rowSpace);
 
 	animateBounds = area.removeFromTop(rowHeight);
-	rateLabel.setBounds(animateBounds.removeFromLeft(100));
-	rateBox.setBounds(animateBounds);
-	area.removeFromTop(rowSpace);
-
-	animateBounds = area.removeFromTop(rowHeight);
-	offsetLabel.setBounds(animateBounds.removeFromLeft(100));
-	offsetBox.setBounds(animateBounds);
-	area.removeFromTop(rowSpace);
+	offsetLabel.setBounds(animateBounds.removeFromLeft(80));
+	offsetBox.setBounds(animateBounds.removeFromLeft(60));
 }
 
 void LineArtComponent::update() {
-	rateBox.setValue(audioProcessor.animationRate->getValueUnnormalised(), true, 2);
-	offsetBox.setValue(audioProcessor.animationOffset->getValueUnnormalised(), true, 2);
-	animate.setToggleState(audioProcessor.animateLineArt->getValue(), true);
-	sync.setToggleState(audioProcessor.syncMIDIAnimation->getValue(), true);
+	rateBox.setValue(audioProcessor.animationRate->getValueUnnormalised(), false, 2);
+	offsetBox.setValue(audioProcessor.animationOffset->getValueUnnormalised(), false, 2);
+	animate.setToggleState(audioProcessor.animateLineArt->getValue(), false);
+	sync.setToggleState(audioProcessor.syncMIDIAnimation->getValue(), false);
 }
 
 void LineArtComponent::parameterValueChanged(int parameterIndex, float newValue) {

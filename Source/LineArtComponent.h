@@ -23,8 +23,8 @@ private:
     juce::ToggleButton sync{"MIDI Sync"};
     juce::Label rateLabel{ "Framerate","Framerate"};
     juce::Label offsetLabel{ "Offset","Offset" };
-    DoubleTextBox rateBox{ -256, 256 };
-    DoubleTextBox offsetBox{ -8192, 8192 };
+    DoubleTextBox rateBox{ audioProcessor.animationRate->min, audioProcessor.animationRate->max };
+    DoubleTextBox offsetBox{ audioProcessor.animationOffset->min, audioProcessor.animationRate->max };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LineArtComponent)
 };
