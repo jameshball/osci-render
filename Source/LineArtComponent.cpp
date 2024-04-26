@@ -4,7 +4,6 @@
 LineArtComponent::LineArtComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
 	setText("Line Art Settings");
 
-
 	addAndMakeVisible(animate);
 	addAndMakeVisible(sync);
 	addAndMakeVisible(rateLabel);
@@ -12,11 +11,11 @@ LineArtComponent::LineArtComponent(OscirenderAudioProcessor& p, OscirenderAudioP
 	addAndMakeVisible(offsetLabel);
 	addAndMakeVisible(offsetBox);
 
-	rateLabel.setText("Framerate: ", juce::dontSendNotification);
+	rateLabel.setText("Framerate", juce::dontSendNotification);
 	rateBox.setValue(audioProcessor.animationRate->getValueUnnormalised(), false, 2);
 	rateBox.setJustification(juce::Justification::left);
 
-	offsetLabel.setText("   Offset: ", juce::dontSendNotification);
+	offsetLabel.setText("Offset", juce::dontSendNotification);
 	offsetBox.setValue(audioProcessor.animationOffset->getValueUnnormalised(), false, 2);
 	offsetBox.setJustification(juce::Justification::left);
 
@@ -24,16 +23,28 @@ LineArtComponent::LineArtComponent(OscirenderAudioProcessor& p, OscirenderAudioP
 	update();
 
 	auto updateAnimation = [this]() {
-		audioProcessor.animateLineArt->setValue(animate.getToggleState());
-		audioProcessor.syncMIDIAnimation->setValue(sync.getToggleState());
-		audioProcessor.animationRate->setValueUnnormalised(rateBox.getValue());
-		audioProcessor.animationOffset->setValueUnnormalised(offsetBox.getValue());
+		audioProcessor.animateLineArt->setValueNotifyingHost(animate.getToggleState());
+		audioProcessor.syncMIDIAnimation->setValueNotifyingHost(sync.getToggleState());
+		audioProcessor.animationRate->setUnnormalisedValueNotifyingHost(rateBox.getValue());
+		audioProcessor.animationOffset->setUnnormalisedValueNotifyingHost(offsetBox.getValue());
 	};
 
 	animate.onClick = updateAnimation;
 	sync.onClick = updateAnimation;
-	rateBox.onFocusLost = updateAnimation;
-	offsetBox.onFocusLost = updateAnimation;
+	rateBox.onTextChange = updateAnimation;
+	offsetBox.onTextChange = updateAnimation;
+
+	audioProcessor.animateLineArt->addListener(this);
+	audioProcessor.syncMIDIAnimation->addListener(this);
+	audioProcessor.animationRate->addListener(this);
+	audioProcessor.animationOffset->addListener(this);
+}
+
+LineArtComponent::~LineArtComponent() {
+	audioProcessor.animationOffset->removeListener(this);
+	audioProcessor.animationRate->removeListener(this);
+	audioProcessor.syncMIDIAnimation->removeListener(this);
+	audioProcessor.animateLineArt->removeListener(this);
 }
 
 void LineArtComponent::resized() {
@@ -64,4 +75,14 @@ void LineArtComponent::update() {
 	offsetBox.setValue(audioProcessor.animationOffset->getValueUnnormalised(), true, 2);
 	animate.setToggleState(audioProcessor.animateLineArt->getValue(), true);
 	sync.setToggleState(audioProcessor.syncMIDIAnimation->getValue(), true);
+}
+
+void LineArtComponent::parameterValueChanged(int parameterIndex, float newValue) {
+	triggerAsyncUpdate();
+}
+
+void LineArtComponent::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
+
+void LineArtComponent::handleAsyncUpdate() {
+	update();
 }
