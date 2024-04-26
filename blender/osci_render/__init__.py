@@ -118,71 +118,60 @@ def append_matrix(object_info, obj):
     camera_space = bpy.context.scene.camera.matrix_world.inverted() @ obj.matrix_world
     object_info["matrix"] = [camera_space[i][j] for i in range(4) for j in range(4)]
     return object_info
+
+def get_frame_info():
+    frame_info = {"objects": []}
+    
+    for obj in bpy.data.objects:
+        if obj.visible_get() and obj.type == 'GPENCIL':
+            object_info = {"name": obj.name}
+            strokes = obj.data.layers.active.frames.data.active_frame.strokes
+            object_info["vertices"] = []
+            for stroke in strokes:
+                object_info["vertices"].append([{
+                    "x": vert.co[0],
+                    "y": vert.co[1],
+                    "z": vert.co[2],
+                } for vert in stroke.points])
+            
+            frame_info["objects"].append(append_matrix(object_info, obj))
+    
+    frame_info["focalLength"] = -0.05 * bpy.data.cameras[0].lens
+
+    return frame_info
     
 @persistent
-def save_scene_to_file(scene, FilePath):
-    returnFrame = scene.frame_current
+def save_scene_to_file(scene, file_path):
+    return_frame = scene.frame_current
     
     scene_info = {"frames": []}
     for frame in range(0, scene.frame_end - scene.frame_start):
-        frame_info = {"objects": []}
         scene.frame_set(frame + scene.frame_start)
-        for obj in bpy.data.objects:
-            if obj.visible_get() and obj.type == 'GPENCIL':
-                object_info = {"name": obj.name}
-                strokes = obj.data.layers.active.frames.data.frames[frame+1].strokes
-                object_info["vertices"] = []
-                for stroke in strokes:
-                    object_info["vertices"].append([{
-                        "x": vert.co[0],
-                        "y": vert.co[1],
-                        "z": vert.co[2],
-                    } for vert in stroke.points])
-                
-                frame_info["objects"].append(append_matrix(object_info, obj))
-        
-        frame_info["focalLength"] = -0.05 * bpy.data.cameras[0].lens
-        scene_info["frames"].append(frame_info)
+        scene_info["frames"].append(get_frame_info())
 
     json_str = json.dumps(scene_info, separators=(',', ':'))
     
-    if (FilePath is not None):
-        f = open(FilePath, "w")
+    if file_path is not None:
+        f = open(file_path, "w")
         f.write(json_str)
         f.close()
     else:
         return 1
         
-    scene.frame_set(returnFrame)
+    scene.frame_set(return_frame)
     return 0
 
 
 @persistent
 def send_scene_to_osci_render(scene):
     global sock
-    engine_info = {"objects": []}
 
     if sock is not None:
-        for obj in bpy.data.objects:
-            if obj.visible_get() and obj.type == 'GPENCIL':
-                object_info = {"name": obj.name}
-                strokes = obj.data.layers.active.frames.data.active_frame.strokes                    
-                
-                object_info["vertices"] = []
-                for stroke in strokes:
-                    object_info["vertices"].append([{
-                        "x": vert.co[0],
-                        "y": vert.co[1],
-                        "z": vert.co[2],
-                    } for vert in stroke.points])
-                
-                engine_info["objects"].append(append_matrix(object_info, obj))
+        frame_info = get_frame_info()
 
-
-        engine_info["focalLength"] = -0.05 * bpy.data.cameras[0].lens
-
-        json_str = json.dumps(engine_info, separators=(',', ':')) + '\n'
+        json_str = json.dumps(frame_info, separators=(',', ':')) + '\n'
         try:
+            print(json_str)
             sock.sendall(json_str.encode('utf-8'))
         except socket.error as exp:
             sock = None

@@ -558,24 +558,24 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     double bpm = 120;
     double playTimeSeconds = 0;
     bool isPlaying = false;
-    int timeSigNum = 4;
-    int timeSigDen = 4;
+    juce::AudioPlayHead::TimeSignature timeSig;
 
     // Get MIDI transport info
     playHead = this->getPlayHead();
     if (playHead != nullptr) {
-        auto cpi = playHead->getPosition();
-        if (cpi != juce::nullopt) {
-            auto currentPositionInfo = *cpi;
-            bpm = *currentPositionInfo.getBpm();
-            playTimeSeconds = *currentPositionInfo.getTimeInSeconds();
-            isPlaying = currentPositionInfo.getIsPlaying();
-            timeSigNum = (*currentPositionInfo.getTimeSignature()).numerator;
-            timeSigDen = (*currentPositionInfo.getTimeSignature()).denominator;
+        auto pos = playHead->getPosition();
+        if (pos.hasValue()) {
+            juce::AudioPlayHead::PositionInfo pi = *pos;
+            bpm = pi.getBpm().orFallback(bpm);
+            playTimeSeconds = pi.getTimeInSeconds().orFallback(playTimeSeconds);
+            isPlaying = pi.getIsPlaying();
+            timeSig = pi.getTimeSignature().orFallback(timeSig);
         }
     }
 
     // Calculated number of beats
+    // TODO: To make this more resilient to changing BPMs, we should change how this is calculated
+    // or use another property of the AudioPlayHead::PositionInfo
     double playTimeBeats = bpm * playTimeSeconds / 60;
     
     // Calculated time per sample in seconds and beats
