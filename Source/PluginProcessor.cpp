@@ -554,8 +554,8 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     int totalNumOutputChannels = getTotalNumOutputChannels();
     double sampleRate = getSampleRate();
 
-    // MIDI transport info variables (defaults to 120bpm, 4/4 time signature at zero seconds and not playing)
-    double bpm = 120;
+    // MIDI transport info variables (defaults to 60bpm, 4/4 time signature at zero seconds and not playing)
+    double bpm = 60;
     double playTimeSeconds = 0;
     bool isPlaying = false;
     juce::AudioPlayHead::TimeSignature timeSig;
