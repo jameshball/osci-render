@@ -11,17 +11,22 @@ LineArtComponent::LineArtComponent(OscirenderAudioProcessor& p, OscirenderAudioP
 	addAndMakeVisible(offsetLabel);
 	addAndMakeVisible(offsetBox);
 
-	rateLabel.setText("Framerate", juce::dontSendNotification);
+	animate.setTooltip("Enable or disable animation for line art files");
+	sync.setTooltip("Synchronize the animation's framerate with the BPM of the transport stream");
+	rateBox.setTooltip("Set the animation's framerate in frames per second");
+	offsetBox.setTooltip("Offset the animation's start point by a specified number of frames");
+
+	rateLabel.setText("Frames per Second", juce::dontSendNotification);
 	rateBox.setJustification(juce::Justification::left);
 
-	offsetLabel.setText("Offset", juce::dontSendNotification);
+	offsetLabel.setText("Start Frame", juce::dontSendNotification);
 	offsetBox.setJustification(juce::Justification::left);
 	
 	update();
 
 	auto updateAnimation = [this]() {
 		audioProcessor.animateLineArt->setValueNotifyingHost(animate.getToggleState());
-		audioProcessor.syncMIDIAnimation->setValueNotifyingHost(sync.getToggleState());
+		audioProcessor.animationSyncBPM->setValueNotifyingHost(sync.getToggleState());
 		audioProcessor.animationRate->setUnnormalisedValueNotifyingHost(rateBox.getValue());
 		audioProcessor.animationOffset->setUnnormalisedValueNotifyingHost(offsetBox.getValue());
 	};
@@ -32,7 +37,7 @@ LineArtComponent::LineArtComponent(OscirenderAudioProcessor& p, OscirenderAudioP
 	offsetBox.onFocusLost = updateAnimation;
 
 	audioProcessor.animateLineArt->addListener(this);
-	audioProcessor.syncMIDIAnimation->addListener(this);
+	audioProcessor.animationSyncBPM->addListener(this);
 	audioProcessor.animationRate->addListener(this);
 	audioProcessor.animationOffset->addListener(this);
 }
@@ -40,7 +45,7 @@ LineArtComponent::LineArtComponent(OscirenderAudioProcessor& p, OscirenderAudioP
 LineArtComponent::~LineArtComponent() {
 	audioProcessor.animationOffset->removeListener(this);
 	audioProcessor.animationRate->removeListener(this);
-	audioProcessor.syncMIDIAnimation->removeListener(this);
+	audioProcessor.animationSyncBPM->removeListener(this);
 	audioProcessor.animateLineArt->removeListener(this);
 }
 
@@ -54,12 +59,12 @@ void LineArtComponent::resized() {
 	area.removeFromTop(rowSpace);
 
 	animateBounds = area.removeFromTop(rowHeight);
-	rateLabel.setBounds(animateBounds.removeFromLeft(80));
+	rateLabel.setBounds(animateBounds.removeFromLeft(140));
 	rateBox.setBounds(animateBounds.removeFromLeft(60));
 	area.removeFromTop(rowSpace);
 
 	animateBounds = area.removeFromTop(rowHeight);
-	offsetLabel.setBounds(animateBounds.removeFromLeft(80));
+	offsetLabel.setBounds(animateBounds.removeFromLeft(140));
 	offsetBox.setBounds(animateBounds.removeFromLeft(60));
 }
 
@@ -67,10 +72,17 @@ void LineArtComponent::update() {
 	rateBox.setValue(audioProcessor.animationRate->getValueUnnormalised(), false, 2);
 	offsetBox.setValue(audioProcessor.animationOffset->getValueUnnormalised(), false, 2);
 	animate.setToggleState(audioProcessor.animateLineArt->getValue(), false);
-	sync.setToggleState(audioProcessor.syncMIDIAnimation->getValue(), false);
+	sync.setToggleState(audioProcessor.animationSyncBPM->getValue(), false);
 }
 
 void LineArtComponent::parameterValueChanged(int parameterIndex, float newValue) {
+	if (sync.getToggleState()) {
+		rateLabel.setText("Frames per Beat", juce::dontSendNotification);
+		rateBox.setTooltip("Set the animation's framerate in frames per beat");
+	} else {
+		rateLabel.setText("Frames per Second", juce::dontSendNotification);
+		rateBox.setTooltip("Set the animation's framerate in frames per second");
+	}
 	triggerAsyncUpdate();
 }
 
