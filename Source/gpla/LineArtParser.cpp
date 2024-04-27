@@ -83,9 +83,8 @@ void LineArtParser::parseJsonFrames(juce::String jsonStr) {
 }
 
 void LineArtParser::setFrame(int fNum) {
-	// Ensure that the frame number is within the bounds of the number of frames
-	// This weird modulo trick is to handle negative numbers
-    frameNumber = (numFrames + (fNum % numFrames)) % numFrames;
+	// Ensure that the frame number to set is within the bounds of the animation
+    frameNumber = fNum % numFrames;
 }
 
 std::vector<std::unique_ptr<Shape>> LineArtParser::draw() {

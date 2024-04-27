@@ -168,7 +168,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     booleanParameters.push_back(midiEnabled);
     booleanParameters.push_back(inputEnabled);
     booleanParameters.push_back(animateLineArt);
-    booleanParameters.push_back(syncMIDIAnimation);
+    booleanParameters.push_back(animationSyncBPM);
 
     for (auto parameter : booleanParameters) {
         addParameter(parameter);
@@ -654,7 +654,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
          * if (animateLineArt && (sample % (int)(sampleRate / 200) == 0)) {
          */
         if (animateLineArt->getValue()) {
-            if (syncMIDIAnimation->getValue()) {
+            if (animationSyncBPM->getValue()) {
                 animationTime = playTimeBeats;
             }
             else {

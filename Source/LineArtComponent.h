@@ -20,7 +20,7 @@ private:
     OscirenderAudioProcessorEditor& pluginEditor;
 
     juce::ToggleButton animate{"Animate"};
-    juce::ToggleButton sync{"MIDI Sync"};
+    juce::ToggleButton sync{"BPM Sync"};
     juce::Label rateLabel{ "Framerate","Framerate"};
     juce::Label offsetLabel{ "Offset","Offset" };
     DoubleTextBox rateBox{ audioProcessor.animationRate->min, audioProcessor.animationRate->max };

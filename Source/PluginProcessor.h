@@ -199,7 +199,7 @@ public:
     IntParameter* voices = new IntParameter("Voices", "voices", VERSION_HINT, 4, 1, 16);
 
     BooleanParameter* animateLineArt = new BooleanParameter("Animate", "animateLineArt", VERSION_HINT, true);
-    BooleanParameter* syncMIDIAnimation = new BooleanParameter("Sync Animation", "syncMIDIAnimation", VERSION_HINT, false);
+    BooleanParameter* animationSyncBPM = new BooleanParameter("Sync To BPM", "animationSyncBPM", VERSION_HINT, false);
     FloatParameter* animationRate = new FloatParameter("Animation Rate", "animationRate", VERSION_HINT, 30, -256, 256, 0.01);
     FloatParameter* animationOffset = new FloatParameter("Animation Offset", "animationOffset", VERSION_HINT, 0, -8192, 8192, 0.1);
     double animationTime = 0.f;
