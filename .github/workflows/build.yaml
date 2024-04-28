@@ -39,6 +39,9 @@ jobs:
         with:
           token: ${{ secrets.ACCESS_TOKEN }}
           submodules: true
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest
       - name: "Run script"
         run: |
           export OS="mac"
