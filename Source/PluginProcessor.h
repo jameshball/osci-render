@@ -200,8 +200,8 @@ public:
 
     BooleanParameter* animateLineArt = new BooleanParameter("Animate", "animateLineArt", VERSION_HINT, true);
     BooleanParameter* animationSyncBPM = new BooleanParameter("Sync To BPM", "animationSyncBPM", VERSION_HINT, false);
-    FloatParameter* animationRate = new FloatParameter("Animation Rate", "animationRate", VERSION_HINT, 30, -256, 256, 0.01);
-    FloatParameter* animationOffset = new FloatParameter("Animation Offset", "animationOffset", VERSION_HINT, 0, -8192, 8192, 0.1);
+    FloatParameter* animationRate = new FloatParameter("Animation Rate", "animationRate", VERSION_HINT, 30, -1000, 1000, 0.01);
+    FloatParameter* animationOffset = new FloatParameter("Animation Offset", "animationOffset", VERSION_HINT, 0, -10000, 10000, 0.1);
     double animationTime = 0.f;
 
 private:

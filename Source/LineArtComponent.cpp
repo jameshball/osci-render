@@ -11,10 +11,9 @@ LineArtComponent::LineArtComponent(OscirenderAudioProcessor& p, OscirenderAudioP
 	addAndMakeVisible(offsetLabel);
 	addAndMakeVisible(offsetBox);
 
-	animate.setTooltip("Enable or disable animation for line art files");
-	sync.setTooltip("Synchronize the animation's framerate with the BPM of the transport stream");
-	rateBox.setTooltip("Set the animation's framerate in frames per second");
-	offsetBox.setTooltip("Offset the animation's start point by a specified number of frames");
+	animate.setTooltip("Enables animation for line art files.");
+	sync.setTooltip("Synchronises the animation's framerate with the BPM of your DAW.");
+	offsetLabel.setTooltip("Offsets the animation's start point by a specified number of frames.");
 
 	rateLabel.setText("Frames per Second", juce::dontSendNotification);
 	rateBox.setJustification(juce::Justification::left);
@@ -73,16 +72,16 @@ void LineArtComponent::update() {
 	offsetBox.setValue(audioProcessor.animationOffset->getValueUnnormalised(), false, 2);
 	animate.setToggleState(audioProcessor.animateLineArt->getValue(), false);
 	sync.setToggleState(audioProcessor.animationSyncBPM->getValue(), false);
+	if (sync.getToggleState()) {
+		rateLabel.setText("Frames per Beat", juce::dontSendNotification);
+		rateLabel.setTooltip("Set the animation's speed in frames per beat.");
+	} else {
+		rateLabel.setText("Frames per Second", juce::dontSendNotification);
+		rateLabel.setTooltip("Set the animation's speed in frames per second.");
+	}
 }
 
 void LineArtComponent::parameterValueChanged(int parameterIndex, float newValue) {
-	if (sync.getToggleState()) {
-		rateLabel.setText("Frames per Beat", juce::dontSendNotification);
-		rateBox.setTooltip("Set the animation's framerate in frames per beat");
-	} else {
-		rateLabel.setText("Frames per Second", juce::dontSendNotification);
-		rateBox.setTooltip("Set the animation's framerate in frames per second");
-	}
 	triggerAsyncUpdate();
 }
 
