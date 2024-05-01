@@ -1,12 +1,113 @@
 #include "LineArtParser.h"
 
 
-LineArtParser::LineArtParser(juce::String json) {
-    parseJsonFrames(json);
+LineArtParser::LineArtParser(juce::String fileContents, bool b64) {
+    if (!b64) {
+        parseJsonFrames(fileContents);
+    }
+    else {
+        parseBinaryFrames(fileContents);
+    }
 }
 
 LineArtParser::~LineArtParser() {
     frames.clear();
+}
+
+void LineArtParser::parseBinaryFrames(juce::String base64) {
+    juce::MemoryOutputStream bin;
+
+    // If json parse failed, stop and parse default fallback instead
+    if (!juce::Base64::convertFromBase64(bin, base64)) {
+        return parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
+    }
+
+    int dataSize = bin.getDataSize();
+    char * data = (char*)bin.getData();
+    const char* eof = data + dataSize;
+    bool isTagged = true;
+    const char header[19] = "osci-render gpla v";
+    for (int i = 0; i < 18; i++) {
+        if (data[i] != header[i]) {
+            isTagged = false;
+        }
+    }
+
+    if (!isTagged) return parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
+
+    // Move the data pointer to the beginning of the actual data
+    data = data + 23;
+
+    // Make sure there is space for an integer, then read how many frames are contained
+    if (data + 3 >= eof) return parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
+    numFrames = ((int*)data)[0];
+    data += sizeof(int);
+
+    // If json does not contain any frames, stop and parse no-frames fallback instead
+    if (numFrames == 0) return parseJsonFrames(juce::String(BinaryData::noframes_gpla, BinaryData::noframes_gplaSize));
+
+    bool hasValidFrames = false;
+    for (int f = 0; f < numFrames; f++) {
+        std::vector < std::vector < std::vector<Point>>> frameVertices;
+        std::vector<std::vector<double>> matrices;
+
+        double focalLength;
+        int nObjects;
+
+        // Make sure there is space for some data, then read the focal length and number of objects
+        if (data + sizeof(float) + sizeof(int) >= eof) return parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
+        focalLength = ((float*)data)[0];
+        data += sizeof(float);
+        nObjects = ((int*)data)[0];
+        data += sizeof(int);
+
+        // Ensure that the reported number of objects is not negative
+        if (nObjects < 0) return parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
+
+        // Construct the set of objects
+        for (int i = 0; i < nObjects; i++) {
+            std::vector<std::vector<Point>> vertices;
+            if (data + 3 >= eof) return parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
+            int nToSkip = ((int*)data)[0];
+            data += sizeof(int);
+            data += nToSkip;
+
+            if (data + 3 >= eof) return parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
+            int nLines = ((int*)data)[0];
+            data += 4;
+
+            int linesRead = 0;
+            while (linesRead < nLines / 3) {
+                if (data + 24 > eof) return parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
+                float* vertexData = (float*)data;
+                std::vector<Point> line;
+                line.push_back(Point(vertexData[0], vertexData[1], vertexData[2]));
+                line.push_back(Point(vertexData[3], vertexData[4], vertexData[5]));
+                vertices.push_back(line);
+                data += 24;
+                linesRead += 2;
+            }
+            frameVertices.push_back(vertices);
+
+            if (data + 16 * sizeof(float) > eof) return parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
+            float* matrixData = (float*)data;
+            std::vector<double> matrix;
+            for (int m = 0; m < 16; m++) {
+                matrix.push_back((double)matrixData[m]);
+            }
+            matrices.push_back(matrix);
+            data += 16 * sizeof(float);
+        }
+
+        std::vector<Line> frame = generateFrame(frameVertices, matrices, focalLength);
+        if (frame.size() > 0) {
+            hasValidFrames = true;
+        }
+        frames.push_back(frame);
+    }
+    
+    // If no frames were valid, stop and parse invalid fallback instead
+    if (!hasValidFrames) return parseJsonFrames(juce::String(BinaryData::invalid_gpla, BinaryData::invalid_gplaSize));
 }
 
 void LineArtParser::parseJsonFrames(juce::String jsonStr) {
@@ -66,8 +167,7 @@ void LineArtParser::parseJsonFrames(juce::String jsonStr) {
 
         // Ensure that there actually are objects and that the focal length is defined
         if (objects.size() > 0 && !focalLengthVar.isVoid()) {
-            double focalLength = focalLengthVar;
-            std::vector<Line> frame = generateFrame(objects, focalLength);
+            std::vector<Line> frame = generateJsonFrame(objects, focalLengthVar);
             if (frame.size() > 0) {
                 hasValidFrames = true;
             }
@@ -97,11 +197,9 @@ std::vector<std::unique_ptr<Shape>> LineArtParser::draw() {
     return tempShapes;
 }
 
-
-std::vector<Line> LineArtParser::generateFrame(juce::Array <juce::var> objects, double focalLength)
-{
-    std::vector<std::vector<double>> allMatrices;
-    std::vector<std::vector<std::vector<Point>>> allVertices;
+std::vector<Line> LineArtParser::generateJsonFrame(juce::Array<juce::var> objects, double focalLength) {
+    std::vector < std::vector < std::vector<Point>>> frameVertices;
+    std::vector<std::vector<double>> matrices;
 
     for (int i = 0; i < objects.size(); i++) {
         auto verticesArray = *objects[i].getProperty("vertices", juce::Array<juce::var>()).getArray();
@@ -117,23 +215,36 @@ std::vector<Line> LineArtParser::generateFrame(juce::Array <juce::var> objects, 
                 vertices[vertices.size() - 1].push_back(Point(x, y, z));
             }
         }
+        frameVertices.push_back(vertices);
         auto matrix = *objects[i].getProperty("matrix", juce::Array<juce::var>()).getArray();
 
-        allMatrices.push_back(std::vector<double>());
+        matrices.push_back(std::vector<double>());
         for (auto& value : matrix) {
-            allMatrices[i].push_back(value);
+            matrices[i].push_back(value);
         }
+    }
+
+    return generateFrame(frameVertices, matrices, focalLength);
+}
+
+std::vector<Line> LineArtParser::generateFrame(std::vector< std::vector<std::vector<Point>>> inputVertices, std::vector<std::vector<double>> inputMatrices, double focalLength)
+{
+    std::vector<std::vector<double>> allMatrices = inputMatrices;
+    std::vector<std::vector<std::vector<Point>>> allVertices;
+
+    for (int i = 0; i < inputVertices.size(); i++) {
+        std::vector<std::vector<Point>> vertices = inputVertices[i];
 
         std::vector<std::vector<Point>> reorderedVertices;
 
-        if (vertices.size() > 0 && matrix.size() == 16) {
+        if (vertices.size() > 0 && allMatrices[i].size() == 16) {
             std::vector<bool> visited = std::vector<bool>(vertices.size(), false);
             std::vector<int> order = std::vector<int>(vertices.size(), 0);
             visited[0] = true;
 
             auto endPoint = vertices[0].back();
 
-            for (int i = 1; i < vertices.size(); i++) {
+            for (int k = 1; k < vertices.size(); k++) {
                 int minPath = 0;
                 double minDistance = 9999999;
                 for (int j = 0; j < vertices.size(); j++) {
@@ -152,13 +263,13 @@ std::vector<Line> LineArtParser::generateFrame(juce::Array <juce::var> objects, 
                     }
                 }
                 visited[minPath] = true;
-                order[i] = minPath;
+                order[k] = minPath;
                 endPoint = vertices[minPath].back();
             }
 
-            for (int i = 0; i < vertices.size(); i++) {
+            for (int k = 0; k < vertices.size(); k++) {
                 std::vector<Point> reorderedVertex;
-                int index = order[i];
+                int index = order[k];
                 for (int j = 0; j < vertices[index].size(); j++) {
                     reorderedVertex.push_back(vertices[index][j]);
                 }
@@ -172,7 +283,7 @@ std::vector<Line> LineArtParser::generateFrame(juce::Array <juce::var> objects, 
     // generate a frame from the vertices and matrix
     std::vector<Line> frame;
 
-    for (int i = 0; i < objects.size(); i++) {
+    for (int i = 0; i < inputVertices.size(); i++) {
         for (int j = 0; j < allVertices[i].size(); j++) {
             for (int k = 0; k < allVertices[i][j].size() - 1; k++) {
                 auto start = allVertices[i][j][k];

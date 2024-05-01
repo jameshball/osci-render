@@ -81,7 +81,7 @@ void ObjectServer::run() {
                             juce::Array<juce::var> objects = *json.getProperty("objects", juce::Array<juce::var>()).getArray();
                             double focalLength = json.getProperty("focalLength", 1);
 
-                            std::vector<Line> frameContainer = LineArtParser::generateFrame(objects, focalLength);
+                            std::vector<Line> frameContainer = LineArtParser::generateJsonFrame(objects, focalLength);
 
                             std::vector<std::unique_ptr<Shape>> frame;
 

@@ -28,7 +28,9 @@ void FileParser::parse(juce::String fileName, juce::String extension, std::uniqu
 	} else if (extension == ".lua") {
 		lua = std::make_shared<LuaParser>(fileName, stream->readEntireStreamAsString(), errorCallback, fallbackLuaScript);
 	} else if (extension == ".gpla") {
-		gpla = std::make_shared<LineArtParser>(stream->readEntireStreamAsString());
+		juce::String str = stream->readEntireStreamAsString();
+		// b3NjaS1yZW5kZXIgZ3BsYSB2 is 'osci-render gpla v' in base64
+		gpla = std::make_shared<LineArtParser>(str, str.startsWith("b3NjaS1yZW5kZXIgZ3BsYSB2"));
 		isAnimatable = gpla != nullptr;
 	}
 
