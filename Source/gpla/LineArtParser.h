@@ -21,4 +21,5 @@ private:
 	int frameNumber = 0;
 	std::vector<std::vector<Line>> frames;
 	int numFrames = 0;
+	void parsingFailed(int code);
 };

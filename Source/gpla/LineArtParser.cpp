@@ -19,32 +19,31 @@ void LineArtParser::parseBinaryFrames(juce::String base64) {
 
     // If json parse failed, stop and parse default fallback instead
     if (!juce::Base64::convertFromBase64(bin, base64)) {
-        return parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
+        return parsingFailed(0);
     }
 
     int dataSize = bin.getDataSize();
     char * data = (char*)bin.getData();
     const char* eof = data + dataSize;
-    bool isTagged = true;
-    const char header[19] = "osci-render gpla v";
-    for (int i = 0; i < 18; i++) {
-        if (data[i] != header[i]) {
-            isTagged = false;
-        }
-    }
 
-    if (!isTagged) return parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
+    // Make sure that the file is tagged as a binary GPLA file
+    const char header[19] = "osci-render gpla v";
+    bool isTagged = true;
+    for (int i = 0; i < 18; i++) {
+        isTagged = (data[i] == header[i]) && isTagged;
+    }
+    if (!isTagged) return parsingFailed(0);
 
     // Move the data pointer to the beginning of the actual data
     data = data + 23;
 
     // Make sure there is space for an integer, then read how many frames are contained
-    if (data + 3 >= eof) return parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
+    if (data + 3 >= eof) return parsingFailed(0);
     numFrames = ((int*)data)[0];
     data += sizeof(int);
 
     // If json does not contain any frames, stop and parse no-frames fallback instead
-    if (numFrames == 0) return parseJsonFrames(juce::String(BinaryData::noframes_gpla, BinaryData::noframes_gplaSize));
+    if (numFrames == 0) return parsingFailed(1);
 
     bool hasValidFrames = false;
     for (int f = 0; f < numFrames; f++) {
@@ -55,41 +54,48 @@ void LineArtParser::parseBinaryFrames(juce::String base64) {
         int nObjects;
 
         // Make sure there is space for some data, then read the focal length and number of objects
-        if (data + sizeof(float) + sizeof(int) >= eof) return parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
+        if (data + sizeof(float) + sizeof(int) >= eof) return parsingFailed(0);
         focalLength = ((float*)data)[0];
         data += sizeof(float);
         nObjects = ((int*)data)[0];
         data += sizeof(int);
 
         // Ensure that the reported number of objects is not negative
-        if (nObjects < 0) return parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
+        if (nObjects < 0) return parsingFailed(0);
 
         // Construct the set of objects
-        for (int i = 0; i < nObjects; i++) {
-            std::vector<std::vector<Point>> vertices;
-            if (data + 3 >= eof) return parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
+        for (int o = 0; o < nObjects; o++) {
+            std::vector<std::vector<Point>> strokes;
+            if (data + 3 >= eof) return parsingFailed(0);
             int nToSkip = ((int*)data)[0];
             data += sizeof(int);
             data += nToSkip;
 
-            if (data + 3 >= eof) return parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
-            int nLines = ((int*)data)[0];
+            // Make sure there is space, then read how many strokes there are
+            if (data + 3 >= eof) return parsingFailed(0);
+            int nStrokes = ((int*)data)[0];
             data += 4;
+            
+            for (int stroke = 0; stroke < nStrokes; stroke++) {
 
-            int linesRead = 0;
-            while (linesRead < nLines / 3) {
-                if (data + 24 > eof) return parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
-                float* vertexData = (float*)data;
-                std::vector<Point> line;
-                line.push_back(Point(vertexData[0], vertexData[1], vertexData[2]));
-                line.push_back(Point(vertexData[3], vertexData[4], vertexData[5]));
-                vertices.push_back(line);
-                data += 24;
-                linesRead += 2;
+                if (data + 3 >= eof) return parsingFailed(0);
+                int nLines = ((int*)data)[0];
+                data += 4;
+
+                std::vector<Point> strokePoints;
+                int linesRead = 0;
+                while (linesRead < nLines / 3) {
+                    if (data + 24 > eof) return parsingFailed(0);
+                    float* vertexData = (float*)data;
+                    strokePoints.push_back(Point(vertexData[0], vertexData[1], vertexData[2]));
+                    data += 12;
+                    linesRead += 1;
+                }
+                strokes.push_back(strokePoints);
             }
-            frameVertices.push_back(vertices);
+            frameVertices.push_back(strokes);
 
-            if (data + 16 * sizeof(float) > eof) return parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
+            if (data + 16 * sizeof(float) > eof) return parsingFailed(0);
             float* matrixData = (float*)data;
             std::vector<double> matrix;
             for (int m = 0; m < 16; m++) {
@@ -107,7 +113,7 @@ void LineArtParser::parseBinaryFrames(juce::String base64) {
     }
     
     // If no frames were valid, stop and parse invalid fallback instead
-    if (!hasValidFrames) return parseJsonFrames(juce::String(BinaryData::invalid_gpla, BinaryData::invalid_gplaSize));
+    if (!hasValidFrames) return parsingFailed(2);
 }
 
 void LineArtParser::parseJsonFrames(juce::String jsonStr) {
@@ -146,7 +152,7 @@ void LineArtParser::parseJsonFrames(juce::String jsonStr) {
 
     // If json parse failed, stop and parse default fallback instead
     if (json.isVoid()) {
-        parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
+        parsingFailed(0);
         return;
     }
 
@@ -155,7 +161,7 @@ void LineArtParser::parseJsonFrames(juce::String jsonStr) {
 
     // If json does not contain any frames, stop and parse no-frames fallback instead
     if (numFrames == 0) {
-        parseJsonFrames(juce::String(BinaryData::noframes_gpla, BinaryData::noframes_gplaSize));
+        parsingFailed(1);
         return;
     }
 
@@ -177,7 +183,7 @@ void LineArtParser::parseJsonFrames(juce::String jsonStr) {
 
     // If no frames were valid, stop and parse invalid fallback instead
     if (!hasValidFrames) {
-        parseJsonFrames(juce::String(BinaryData::invalid_gpla, BinaryData::invalid_gplaSize));
+        parsingFailed(2);
         return;
     }
 }
@@ -201,8 +207,8 @@ std::vector<Line> LineArtParser::generateJsonFrame(juce::Array<juce::var> object
     std::vector < std::vector < std::vector<Point>>> frameVertices;
     std::vector<std::vector<double>> matrices;
 
-    for (int i = 0; i < objects.size(); i++) {
-        auto verticesArray = *objects[i].getProperty("vertices", juce::Array<juce::var>()).getArray();
+    for (int o = 0; o < objects.size(); o++) {
+        auto verticesArray = *objects[o].getProperty("vertices", juce::Array<juce::var>()).getArray();
         std::vector<std::vector<Point>> vertices;
 
         for (auto& vertexArrayVar : verticesArray) {
@@ -216,11 +222,11 @@ std::vector<Line> LineArtParser::generateJsonFrame(juce::Array<juce::var> object
             }
         }
         frameVertices.push_back(vertices);
-        auto matrix = *objects[i].getProperty("matrix", juce::Array<juce::var>()).getArray();
+        auto matrix = *objects[o].getProperty("matrix", juce::Array<juce::var>()).getArray();
 
         matrices.push_back(std::vector<double>());
         for (auto& value : matrix) {
-            matrices[i].push_back(value);
+            matrices[o].push_back(value);
         }
     }
 
@@ -244,12 +250,12 @@ std::vector<Line> LineArtParser::generateFrame(std::vector< std::vector<std::vec
 
             auto endPoint = vertices[0].back();
 
-            for (int k = 1; k < vertices.size(); k++) {
+            for (int j = 1; j < vertices.size(); j++) {
                 int minPath = 0;
                 double minDistance = 9999999;
-                for (int j = 0; j < vertices.size(); j++) {
-                    if (!visited[j]) {
-                        auto startPoint = vertices[j][0];
+                for (int k = 0; k < vertices.size(); k++) {
+                    if (!visited[k]) {
+                        auto startPoint = vertices[k][0];
 
                         double diffX = endPoint.x - startPoint.x;
                         double diffY = endPoint.y - startPoint.y;
@@ -257,21 +263,21 @@ std::vector<Line> LineArtParser::generateFrame(std::vector< std::vector<std::vec
 
                         double distance = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
                         if (distance < minDistance) {
-                            minPath = j;
+                            minPath = k;
                             minDistance = distance;
                         }
                     }
                 }
                 visited[minPath] = true;
-                order[k] = minPath;
+                order[j] = minPath;
                 endPoint = vertices[minPath].back();
             }
 
-            for (int k = 0; k < vertices.size(); k++) {
+            for (int j = 0; j < vertices.size(); j++) {
                 std::vector<Point> reorderedVertex;
-                int index = order[k];
-                for (int j = 0; j < vertices[index].size(); j++) {
-                    reorderedVertex.push_back(vertices[index][j]);
+                int index = order[j];
+                for (int k = 0; k < vertices[index].size(); k++) {
+                    reorderedVertex.push_back(vertices[index][k]);
                 }
                 reorderedVertices.push_back(reorderedVertex);
             }
@@ -314,4 +320,18 @@ std::vector<Line> LineArtParser::generateFrame(std::vector< std::vector<std::vec
         }
     }
     return frame;
+}
+
+// Codes: 0 - Parsing failed | 1 - No frames read | 2 - No valid frames
+void LineArtParser::parsingFailed(int code) {
+    switch (code) {
+    case 0:
+        return parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
+    case 1:
+        return parseJsonFrames(juce::String(BinaryData::noframes_gpla, BinaryData::noframes_gplaSize));
+    case 2:
+        return parseJsonFrames(juce::String(BinaryData::invalid_gpla, BinaryData::invalid_gplaSize));
+    default:
+        return parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
+    }
 }

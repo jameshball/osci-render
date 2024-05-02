@@ -160,7 +160,7 @@ def append_matrix(object_info, obj):
 #       **matrix data**
 #   ]
 # "focalLength": focal length
-# 
+#
 def get_frame_info():
     frame_info = {"objects": []}
     
@@ -188,8 +188,11 @@ def get_frame_info():
 # [
 # object name size (4-byte int)
 # object name (utf-8 binary)
-# object vertices size (4-byte int)
-# object vertices (4-byte floats)
+# number of strokes (4-byte int)
+# [
+# stroke vertices size (4-byte int)
+# stroke vertices (4-byte floats)
+# ]
 # matrix (sixteen 4-byte floats)
 # ]
 def encode_frame_info(frame_info):
@@ -200,24 +203,23 @@ def encode_frame_info(frame_info):
         name_data = bytearray(obj["name"].encode('utf-8'))
         name_size = bytearray(struct.pack('i',len(name_data)))
         
-        # flatten vertex array
-        vertices = []
-        for line in obj["vertices"]:
-            for i in range(len(line) - 1):
-                vertices.append(line[i]["x"])
-                vertices.append(line[i]["y"])
-                vertices.append(line[i]["z"])
-                vertices.append(line[i+1]["x"])
-                vertices.append(line[i+1]["y"])
-                vertices.append(line[i+1]["z"])
-        
-        # vertices and vertices length
-        vertices_data = bytearray(struct.pack('%sf' % len(vertices), *vertices))
-        vertices_size = bytearray(struct.pack('i', len(vertices)))
+        strokes = []
+        for stroke in obj["vertices"]:
+            vertices = []
+            for i in range(len(stroke)):
+                vertices.append(stroke[i]["x"])
+                vertices.append(stroke[i]["y"])
+                vertices.append(stroke[i]["z"])
+            vertices_data = bytearray(struct.pack('%sf' % len(vertices), *vertices))
+            vertices_data = bytearray(struct.pack('i', len(vertices))) + vertices_data
+            strokes.append(vertices_data)
         
         matrix_data = bytearray(struct.pack('16f', *obj["matrix"]))
         
-        frame = frame + name_size + name_data + vertices_size + vertices_data + matrix_data
+        frame = frame + name_size + name_data + bytearray(struct.pack('i', len(strokes)))
+        for i in range(len(strokes)):
+            frame = frame + strokes[i]
+        frame = frame + matrix_data
         
     return frame
     
