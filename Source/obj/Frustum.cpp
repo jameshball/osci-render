@@ -35,3 +35,23 @@ void Frustum::clipToFrustum(Vec3 &p) {
 
 	p = Vec3(pcx, pcy, pcz);
 }
+
+bool Frustum::contains(Vec3& p) {
+	float aux;
+
+	if (p.z < nearDistance || p.z > farDistance) {
+		return false;
+	}
+
+	aux = std::abs(p.z * tang);
+	if (p.y < -aux || p.y > aux) {
+		return false;
+	}
+
+	aux = aux * ratio;
+	if (p.x < -aux || p.x > aux) {
+		return false;
+	}
+
+	return true;
+}

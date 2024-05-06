@@ -1,4 +1,5 @@
 #include "LineArtParser.h"
+#include "../obj/Frustum.h"
 
 
 LineArtParser::LineArtParser(juce::String json) {
@@ -171,6 +172,7 @@ std::vector<Line> LineArtParser::generateFrame(juce::Array <juce::var> objects, 
 
     // generate a frame from the vertices and matrix
     std::vector<Line> frame;
+    Frustum frustum{ (float) -focalLength, 1.0, 0, 100 };
 
     for (int i = 0; i < objects.size(); i++) {
         for (int j = 0; j < allVertices[i].size(); j++) {
@@ -182,23 +184,24 @@ std::vector<Line> LineArtParser::generateFrame(juce::Array <juce::var> objects, 
                 double rotatedX = start.x * allMatrices[i][0] + start.y * allMatrices[i][1] + start.z * allMatrices[i][2] + allMatrices[i][3];
                 double rotatedY = start.x * allMatrices[i][4] + start.y * allMatrices[i][5] + start.z * allMatrices[i][6] + allMatrices[i][7];
                 double rotatedZ = start.x * allMatrices[i][8] + start.y * allMatrices[i][9] + start.z * allMatrices[i][10] + allMatrices[i][11];
+                Vec3 p1{ rotatedX, rotatedY, -rotatedZ };
 
                 double rotatedX2 = end.x * allMatrices[i][0] + end.y * allMatrices[i][1] + end.z * allMatrices[i][2] + allMatrices[i][3];
                 double rotatedY2 = end.x * allMatrices[i][4] + end.y * allMatrices[i][5] + end.z * allMatrices[i][6] + allMatrices[i][7];
                 double rotatedZ2 = end.x * allMatrices[i][8] + end.y * allMatrices[i][9] + end.z * allMatrices[i][10] + allMatrices[i][11];
+                Vec3 p2{ rotatedX2, rotatedY2, -rotatedZ2 };
 
-                // I think this discards every line with a vertex behind the camera? Needs more testing.
-                // - DJ_Level_3
-                if (rotatedZ < 0 && rotatedZ2 < 0) {
-
-                    double x = rotatedX * focalLength / rotatedZ;
-                    double y = rotatedY * focalLength / rotatedZ;
-
-                    double x2 = rotatedX2 * focalLength / rotatedZ2;
-                    double y2 = rotatedY2 * focalLength / rotatedZ2;
-
-                    frame.push_back(Line(x, y, x2, y2));
+                if (!frustum.contains(p1) && !frustum.contains(p2)) {
+                    continue;
                 }
+
+                double x = rotatedX * focalLength / rotatedZ;
+                double y = rotatedY * focalLength / rotatedZ;
+
+                double x2 = rotatedX2 * focalLength / rotatedZ2;
+                double y2 = rotatedY2 * focalLength / rotatedZ2;
+
+                frame.push_back(Line(x, y, x2, y2));
             }
         }
     }

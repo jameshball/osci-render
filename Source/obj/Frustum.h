@@ -18,6 +18,7 @@ public:
 
 	void setCameraInternals(float focalLength, float ratio, float nearD, float farD);
 	void clipToFrustum(Vec3 &p);
+	bool contains(Vec3& p);
 	float getFocalLength() {
         return focalLength;
     }

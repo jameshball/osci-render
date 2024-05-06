@@ -127,6 +127,7 @@ def append_matrix(object_info, obj):
 
 def get_frame_info():
     frame_info = {"objects": []}
+    bpy.context.view_layer.update()
     
     for obj in bpy.data.objects:
         if obj.visible_get() and obj.type == 'GPENCIL':
