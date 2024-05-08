@@ -3,7 +3,7 @@
 <JUCERPROJECT id="HH2E72" name="osci-render" projectType="audioplug" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginCharacteristicsValue="pluginWantsMidiIn"
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
-              cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
+              cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="../../include"
               version="2.1.7" companyName="James H Ball" companyWebsite="https://osci-render.com"
               companyEmail="james@ball.sh" defines="NOMINMAX=1" pluginAUMainType="'aumu'">
   <MAINGROUP id="j5Ge2T" name="osci-render">
@@ -555,6 +555,10 @@
         <FILE id="mC1tUv" name="ugen_JuceUtility.h" compile="0" resource="0"
               file="Source/UGen/ugen_JuceUtility.h"/>
       </GROUP>
+      <GROUP id="{4117F63D-1D01-C995-59C3-0ABB9F6B2DC7}" name="video">
+        <FILE id="j3pfTm" name="VideoParser.cpp" compile="1" resource="0" file="Source/video/VideoParser.cpp"/>
+        <FILE id="fQ43Q3" name="VideoParser.h" compile="0" resource="0" file="Source/video/VideoParser.h"/>
+      </GROUP>
       <FILE id="I44EdJ" name="EffectsComponent.cpp" compile="1" resource="0"
             file="Source/EffectsComponent.cpp"/>
       <FILE id="qxxNX3" name="EffectsComponent.h" compile="0" resource="0"
@@ -598,7 +602,8 @@
     </GROUP>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"
-               JUCE_WIN_PER_MONITOR_DPI_AWARE="0"/>
+               JUCE_WIN_PER_MONITOR_DPI_AWARE="0" FOLEYS_USE_OPENGL="0" FOLEYS_REPORT_USAGE="0"
+               FOLEYS_SHOW_SPLASHSCREEN="0"/>
   <EXPORTFORMATS>
     <LINUX_MAKE targetFolder="Builds/LinuxMakefile" smallIcon="pSc1mq" bigIcon="pSc1mq">
       <CONFIGURATIONS>
@@ -620,11 +625,13 @@
         <MODULEPATH id="juce_gui_extra" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
+        <MODULEPATH id="foleys_video_engine" path="modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/VisualStudio2022" smallIcon="pSc1mq" bigIcon="pSc1mq">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" enablePluginBinaryCopyStep="0"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" enablePluginBinaryCopyStep="0"
+                       libraryPath="../../lib"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="osci-render" alwaysGenerateDebugSymbols="1"
                        debugInformationFormat="ProgramDatabase" enablePluginBinaryCopyStep="0"/>
       </CONFIGURATIONS>
@@ -643,6 +650,7 @@
         <MODULEPATH id="juce_gui_extra" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
+        <MODULEPATH id="foleys_video_engine" path="modules"/>
       </MODULEPATHS>
     </VS2022>
     <XCODE_MAC targetFolder="Builds/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak"
@@ -667,10 +675,12 @@
         <MODULEPATH id="juce_gui_extra" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
+        <MODULEPATH id="foleys_video_engine" path="modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
   </EXPORTFORMATS>
   <MODULES>
+    <MODULE id="foleys_video_engine" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_formats" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>

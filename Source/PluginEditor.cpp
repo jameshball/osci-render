@@ -1,6 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
+#include "video/VideoParser.h"
 
 OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p)
 	: AudioProcessorEditor(&p), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white)
@@ -19,6 +20,16 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
         menuBarModel.setMacMainMenu(&menuBarModel);
     }
 #endif
+
+	juce::File videoFile{ "C:\\proofofconcept.mp4" };
+    
+    juce::MemoryBlock data{ (size_t) videoFile.getSize() };
+	
+    if (!videoFile.loadFileAsData(data)) {
+        DBG("Failed to load video file");
+    }
+
+	VideoParser videoParser{ videoFile.getFileName(), data };
 
     addAndMakeVisible(console);
     console.setConsoleOpen(false);

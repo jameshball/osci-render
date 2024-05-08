@@ -1,0 +1,3 @@
+[submodule "modules/foleys_video_engine"]
+	path = modules/foleys_video_engine
+	url = https://github.com/jameshball/foleys_video_engine
