@@ -9,6 +9,10 @@
 **/Builds
 **/JuceLibraryCode
 
+# ignore compiled libraries
+lib
+include
+
 # User-specific files
 *.rsuser
 *.suo

@@ -13,7 +13,8 @@ VideoParser::VideoParser(juce::String fileName, juce::MemoryBlock data) {
         output.write(data.getData(), data.getSize());
     }
 
-	std::shared_ptr<foleys::AVClip> clip = videoEngine.createClipFromFile(file.getFullPathName());
+	videoEngine.getFormatManager().registerFormat(std::make_unique<foleys::FFmpegFormat>());
+	std::shared_ptr<foleys::AVClip> clip = videoEngine.createClipFromFile(juce::URL(file));
 }
 
 VideoParser::~VideoParser() {
