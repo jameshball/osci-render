@@ -72,7 +72,7 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
     } else if (extension == ".txt") {
         txt.setVisible(true);
     }
-    else if (extension == ".gpla") {
+    else if (extension == ".gpla" || extension == ".gif") {
         gpla.setVisible(true);
     }
     main.updateFileLabel();

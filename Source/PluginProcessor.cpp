@@ -155,6 +155,8 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     allEffects = toggleableEffects;
     allEffects.insert(allEffects.end(), permanentEffects.begin(), permanentEffects.end());
     allEffects.insert(allEffects.end(), luaEffects.begin(), luaEffects.end());
+    allEffects.push_back(imageThreshold);
+    allEffects.push_back(imageStride);
 
     for (auto effect : allEffects) {
         for (auto effectParameter : effect->parameters) {
@@ -167,8 +169,9 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
 
     booleanParameters.push_back(midiEnabled);
     booleanParameters.push_back(inputEnabled);
-    booleanParameters.push_back(animateLineArt);
+    booleanParameters.push_back(animateFrames);
     booleanParameters.push_back(animationSyncBPM);
+    booleanParameters.push_back(invertImage);
 
     for (auto parameter : booleanParameters) {
         addParameter(parameter);
@@ -403,8 +406,8 @@ void OscirenderAudioProcessor::addFile(juce::File file) {
     fileBlocks.push_back(std::make_shared<juce::MemoryBlock>());
     fileNames.push_back(file.getFileName());
     fileIds.push_back(currentFileId++);
-	parsers.push_back(std::make_shared<FileParser>(errorCallback));
-    sounds.push_back(new ShapeSound(parsers.back()));
+	parsers.push_back(std::make_shared<FileParser>(*this, errorCallback));
+    sounds.push_back(new ShapeSound(*this, parsers.back()));
     file.createInputStream()->readIntoMemoryBlock(*fileBlocks.back());
 
     openFile(fileBlocks.size() - 1);
@@ -415,8 +418,8 @@ void OscirenderAudioProcessor::addFile(juce::String fileName, const char* data, 
     fileBlocks.push_back(std::make_shared<juce::MemoryBlock>());
     fileNames.push_back(fileName);
     fileIds.push_back(currentFileId++);
-    parsers.push_back(std::make_shared<FileParser>(errorCallback));
-    sounds.push_back(new ShapeSound(parsers.back()));
+    parsers.push_back(std::make_shared<FileParser>(*this, errorCallback));
+    sounds.push_back(new ShapeSound(*this, parsers.back()));
     fileBlocks.back()->append(data, size);
 
     openFile(fileBlocks.size() - 1);
@@ -427,8 +430,8 @@ void OscirenderAudioProcessor::addFile(juce::String fileName, std::shared_ptr<ju
     fileBlocks.push_back(data);
     fileNames.push_back(fileName);
     fileIds.push_back(currentFileId++);
-    parsers.push_back(std::make_shared<FileParser>(errorCallback));
-    sounds.push_back(new ShapeSound(parsers.back()));
+    parsers.push_back(std::make_shared<FileParser>(*this, errorCallback));
+    sounds.push_back(new ShapeSound(*this, parsers.back()));
 
     openFile(fileBlocks.size() - 1);
 }
@@ -648,23 +651,22 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     
 	for (int sample = 0; sample < buffer.getNumSamples(); ++sample) {
 
-        // Update line art animation
-        
-        /* This limits the rate at which frames can be changed to once every 200 samples to save performance. May not be necessary
-         * if (animateLineArt && (sample % (int)(sampleRate / 200) == 0)) {
-         */
-        if (animateLineArt->getValue()) {
+        // Update frame animation
+        if (animateFrames->getValue()) {
             if (animationSyncBPM->getValue()) {
                 animationTime = playTimeBeats;
-            }
-            else {
+            } else {
                 animationTime = playTimeSeconds;
             }
-            if ((currentFile >= 0) ? (sounds[currentFile]->parser->isAnimatable) : false) {
+
+            if (currentFile >= 0 && sounds[currentFile]->parser->isAnimatable) {
                 int animFrame = (int)(animationTime * animationRate->getValueUnnormalised() + animationOffset->getValueUnnormalised());
                 auto lineArt = sounds[currentFile]->parser->getLineArt();
+                auto img = sounds[currentFile]->parser->getImg();
                 if (lineArt != nullptr) {
                     lineArt->setFrame(animFrame);
+                } else if (img != nullptr) {
+                    img->setFrame(animFrame);
                 }
             }
         }

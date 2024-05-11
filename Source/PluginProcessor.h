@@ -198,10 +198,33 @@ public:
 
     IntParameter* voices = new IntParameter("Voices", "voices", VERSION_HINT, 4, 1, 16);
 
-    BooleanParameter* animateLineArt = new BooleanParameter("Animate", "animateLineArt", VERSION_HINT, true);
+    BooleanParameter* animateFrames = new BooleanParameter("Animate", "animateFrames", VERSION_HINT, true);
     BooleanParameter* animationSyncBPM = new BooleanParameter("Sync To BPM", "animationSyncBPM", VERSION_HINT, false);
     FloatParameter* animationRate = new FloatParameter("Animation Rate", "animationRate", VERSION_HINT, 30, -1000, 1000, 0.01);
     FloatParameter* animationOffset = new FloatParameter("Animation Offset", "animationOffset", VERSION_HINT, 0, -10000, 10000, 0.1);
+
+    BooleanParameter* invertImage = new BooleanParameter("Invert Image", "invertImage", VERSION_HINT, false);
+    std::shared_ptr<Effect> imageThreshold = std::make_shared<Effect>(
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
+            return input;
+        }, new EffectParameter(
+            "Image Threshold",
+            "image threshold innit",
+            "imageThreshold",
+            VERSION_HINT, 0.5, 0, 1
+        )
+    );
+    std::shared_ptr<Effect> imageStride = std::make_shared<Effect>(
+        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
+            return input;
+        }, new EffectParameter(
+            "Image Stride",
+            "image stride innit",
+            "imageStride",
+            VERSION_HINT, 2, 1, 50, 1, false
+        )
+    );
+
     double animationTime = 0.f;
 
 private:
@@ -259,7 +282,7 @@ private:
     juce::SpinLock errorListenersLock;
     std::vector<ErrorListener*> errorListeners;
 
-    ShapeSound::Ptr defaultSound = new ShapeSound(std::make_shared<FileParser>());
+    ShapeSound::Ptr defaultSound = new ShapeSound(*this, std::make_shared<FileParser>(*this));
     PublicSynthesiser synth;
     bool retriggerMidi = true;
 

@@ -3,12 +3,13 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 #include "components/DoubleTextBox.h"
+#include "components/EffectComponent.h"
 
 class OscirenderAudioProcessorEditor;
-class LineArtComponent : public juce::GroupComponent, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater {
+class FrameSettingsComponent : public juce::GroupComponent, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater {
 public:
-    LineArtComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
-	~LineArtComponent();
+    FrameSettingsComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
+	~FrameSettingsComponent();
 
     void resized() override;
     void parameterValueChanged(int parameterIndex, float newValue) override;
@@ -26,5 +27,9 @@ private:
     DoubleTextBox rateBox{ audioProcessor.animationRate->min, audioProcessor.animationRate->max };
     DoubleTextBox offsetBox{ audioProcessor.animationOffset->min, audioProcessor.animationRate->max };
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LineArtComponent)
+    juce::ToggleButton invertImage{"Invert Image"};
+    EffectComponent threshold{ audioProcessor, *audioProcessor.imageThreshold };
+    EffectComponent stride{ audioProcessor, *audioProcessor.imageStride };
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FrameSettingsComponent)
 };

@@ -171,6 +171,12 @@
               file="Source/gpla/LineArtParser.cpp"/>
         <FILE id="t008RG" name="LineArtParser.h" compile="0" resource="0" file="Source/gpla/LineArtParser.h"/>
       </GROUP>
+      <GROUP id="{8AC1A0A6-6E5E-D533-33A6-76002E1DD885}" name="img">
+        <FILE id="xwx39V" name="gifdec.c" compile="1" resource="0" file="Source/img/gifdec.c"/>
+        <FILE id="PkBzDR" name="gifdec.h" compile="0" resource="0" file="Source/img/gifdec.h"/>
+        <FILE id="w6xTAH" name="ImageParser.cpp" compile="1" resource="0" file="Source/img/ImageParser.cpp"/>
+        <FILE id="ibvT5B" name="ImageParser.h" compile="0" resource="0" file="Source/img/ImageParser.h"/>
+      </GROUP>
       <GROUP id="{D0D95F57-3D9D-46D9-C126-25C3C7459AC5}" name="ixwebsocket">
         <FILE id="pPOkoj" name="IXBase64.h" compile="0" resource="0" file="Source/ixwebsocket/IXBase64.h"/>
         <FILE id="qVI3x2" name="IXBench.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXBench.cpp"/>
@@ -559,12 +565,12 @@
             file="Source/EffectsComponent.cpp"/>
       <FILE id="qxxNX3" name="EffectsComponent.h" compile="0" resource="0"
             file="Source/EffectsComponent.h"/>
+      <FILE id="lZGoG9" name="FrameSettingsComponent.cpp" compile="1" resource="0"
+            file="Source/FrameSettingsComponent.cpp"/>
+      <FILE id="lzBNS1" name="FrameSettingsComponent.h" compile="0" resource="0"
+            file="Source/FrameSettingsComponent.h"/>
       <FILE id="uyOdTl" name="LegacyProject.cpp" compile="1" resource="0"
             file="Source/LegacyProject.cpp"/>
-      <FILE id="u7PWXF" name="LineArtComponent.cpp" compile="1" resource="0"
-            file="Source/LineArtComponent.cpp"/>
-      <FILE id="InL4cZ" name="LineArtComponent.h" compile="0" resource="0"
-            file="Source/LineArtComponent.h"/>
       <FILE id="d2zFqF" name="LookAndFeel.cpp" compile="1" resource="0" file="Source/LookAndFeel.cpp"/>
       <FILE id="TJDqWs" name="LookAndFeel.h" compile="0" resource="0" file="Source/LookAndFeel.h"/>
       <FILE id="X26RjJ" name="LuaComponent.cpp" compile="1" resource="0"

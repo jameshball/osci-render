@@ -5,9 +5,10 @@
 #include "../parser/FrameConsumer.h"
 #include "../concurrency/BlockingQueue.h"
 
+class OscirenderAudioProcessor;
 class ShapeSound : public juce::SynthesiserSound, public FrameConsumer {
 public:
-	ShapeSound(std::shared_ptr<FileParser> parser);
+	ShapeSound(OscirenderAudioProcessor &p, std::shared_ptr<FileParser> parser);
 	ShapeSound();
 	~ShapeSound() override;
 
