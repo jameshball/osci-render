@@ -3,9 +3,9 @@
 #include "../shape/CircleArc.h"
 #include <numbers>
 
-FileParser::FileParser(std::function<void(int, juce::String, juce::String)> errorCallback) : errorCallback(errorCallback) {}
+FileParser::FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce::String, juce::String)> errorCallback) : errorCallback(errorCallback), audioProcessor(p) {}
 
-void FileParser::parse(juce::String fileName, juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font font) {
+void FileParser::parse(juce::String fileId, juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font font) {
 	juce::SpinLock::ScopedLockType scope(lock);
 
 	if (extension == ".lua" && lua != nullptr && lua->isFunctionValid()) {
@@ -17,7 +17,7 @@ void FileParser::parse(juce::String fileName, juce::String extension, std::uniqu
 	text = nullptr;
 	gpla = nullptr;
 	lua = nullptr;
-	isAnimatable = false;
+	img = nullptr;
 	
 	if (extension == ".obj") {
 		object = std::make_shared<WorldObject>(stream->readEntireStreamAsString().toStdString());
@@ -26,13 +26,17 @@ void FileParser::parse(juce::String fileName, juce::String extension, std::uniqu
 	} else if (extension == ".txt") {
 		text = std::make_shared<TextParser>(stream->readEntireStreamAsString(), font);
 	} else if (extension == ".lua") {
-		lua = std::make_shared<LuaParser>(fileName, stream->readEntireStreamAsString(), errorCallback, fallbackLuaScript);
+		lua = std::make_shared<LuaParser>(fileId, stream->readEntireStreamAsString(), errorCallback, fallbackLuaScript);
 	} else if (extension == ".gpla") {
 		gpla = std::make_shared<LineArtParser>(stream->readEntireStreamAsString());
-		isAnimatable = gpla != nullptr;
+	} else if (extension == ".gif") {
+		juce::MemoryBlock buffer{};
+		int bytesRead = stream->readIntoMemoryBlock(buffer);
+		img = std::make_shared<ImageParser>(audioProcessor, extension, buffer);
 	}
 
-	sampleSource = lua != nullptr;
+	isAnimatable = gpla != nullptr || img != nullptr;
+	sampleSource = lua != nullptr || img != nullptr;
 }
 
 std::vector<std::unique_ptr<Shape>> FileParser::nextFrame() {
@@ -66,6 +70,8 @@ Point FileParser::nextSample(lua_State*& L, LuaVariables& vars) {
 		} else if (values.size() > 2) {
 			return Point(values[0], values[1], values[2]);
 		}
+	} else if (img != nullptr) {
+		return img->getSample();
 	}
 
 	return Point();
@@ -111,4 +117,8 @@ std::shared_ptr<LineArtParser> FileParser::getLineArt() {
 
 std::shared_ptr<LuaParser> FileParser::getLua() {
 	return lua;
+}
+
+std::shared_ptr<ImageParser> FileParser::getImg() {
+	return img;
 }

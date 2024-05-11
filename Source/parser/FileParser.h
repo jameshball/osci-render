@@ -7,10 +7,12 @@
 #include "../txt/TextParser.h"
 #include "../gpla/LineArtParser.h"
 #include "../lua/LuaParser.h"
+#include "../img/ImageParser.h"
 
+class OscirenderAudioProcessor;
 class FileParser {
 public:
-	FileParser(std::function<void(int, juce::String, juce::String)> errorCallback = nullptr);
+	FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce::String, juce::String)> errorCallback = nullptr);
 
 	void parse(juce::String fileName, juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font font);
 	std::vector<std::unique_ptr<Shape>> nextFrame();
@@ -26,10 +28,13 @@ public:
 	std::shared_ptr<TextParser> getText();
 	std::shared_ptr<LineArtParser> getLineArt();
 	std::shared_ptr<LuaParser> getLua();
+	std::shared_ptr<ImageParser> getImg();
 
 	bool isAnimatable = false;
 
 private:
+	OscirenderAudioProcessor& audioProcessor;
+
 	bool active = true;
 	bool sampleSource = false;
 
@@ -40,6 +45,7 @@ private:
 	std::shared_ptr<TextParser> text;
 	std::shared_ptr<LineArtParser> gpla;
 	std::shared_ptr<LuaParser> lua;
+	std::shared_ptr<ImageParser> img;
 
 	juce::String fallbackLuaScript = "return { 0.0, 0.0 }";
 
