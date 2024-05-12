@@ -805,8 +805,7 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
     for (int i = 0; i < fileBlocks.size(); i++) {
         auto fileXml = filesXml->createNewChildElement("file");
         fileXml->setAttribute("name", fileNames[i]);
-        auto fileString = juce::MemoryInputStream(*fileBlocks[i], false).readEntireStreamAsString();
-        fileXml->addTextElement(juce::Base64::toBase64(fileString));
+        fileXml->addTextElement(fileBlocks[i]->toBase64Encoding());
     }
     xml->setAttribute("currentFile", currentFile);
 
@@ -827,6 +826,7 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
 
     if (xml.get() != nullptr && xml->hasTagName("project")) {
         auto versionXml = xml->getChildByName("version");
+        auto version = versionXml != nullptr ? versionXml->getAllSubText() : ProjectInfo::versionString;
         if (versionXml != nullptr && versionXml->getAllSubText().startsWith("v1.")) {
             openLegacyProject(xml.get());
             return;
@@ -905,9 +905,19 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         if (filesXml != nullptr) {
             for (auto fileXml : filesXml->getChildIterator()) {
                 auto fileName = fileXml->getStringAttribute("name");
-                auto stream = juce::MemoryOutputStream();
-                juce::Base64::convertFromBase64(stream, fileXml->getAllSubText());
-                auto fileBlock = std::make_shared<juce::MemoryBlock>(stream.getData(), stream.getDataSize());
+                auto text = fileXml->getAllSubText();
+                std::shared_ptr<juce::MemoryBlock> fileBlock;
+
+                if (lessThanVersion(version, "2.2.0")) {
+                    // Older versions of osci-render opened files in a silly way
+                    auto stream = juce::MemoryOutputStream();
+                    juce::Base64::convertFromBase64(stream, fileXml->getAllSubText());
+                    fileBlock = std::make_shared<juce::MemoryBlock>(stream.getData(), stream.getDataSize());
+                } else {
+                    fileBlock = std::make_shared<juce::MemoryBlock>();
+                    fileBlock->fromBase64Encoding(text);
+                }
+                
                 addFile(fileName, fileBlock);
             }
         }
