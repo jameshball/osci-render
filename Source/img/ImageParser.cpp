@@ -63,6 +63,10 @@ void ImageParser::resetPosition() {
     currentY = rng.nextInt(height);
 }
 
+int ImageParser::jumpFrequency() {
+    return audioProcessor.currentSampleRate * 0.005;
+}
+
 void ImageParser::findNearestNeighbour(int searchRadius, float thresholdPow, int stride, bool invert) {
     int spiralSteps[4][2] = {{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
     int maxSteps = 2 * searchRadius; // Maximum steps outwards in the spiral
@@ -80,7 +84,7 @@ void ImageParser::findNearestNeighbour(int searchRadius, float thresholdPow, int
 
                 if (x < 0 || x >= width || y < 0 || y >= height) break;
 
-                int index = (height - y - 1) * height + x;
+                int index = (height - y - 1) * width + x;
                 float pixel = frames[frameIndex][index] / maxValue;
                 if (invert) {
                     pixel = 1 - pixel;
@@ -103,7 +107,7 @@ void ImageParser::findNearestNeighbour(int searchRadius, float thresholdPow, int
 }
 
 Point ImageParser::getSample() {
-    if (count % 100 == 0) {
+    if (count % jumpFrequency() == 0) {
         resetPosition();
     }
 

@@ -17,6 +17,7 @@ public:
 private:
 	void findNearestNeighbour(int searchRadius, float thresholdPow, int stride, bool invert);
 	void resetPosition();
+	int jumpFrequency();
 
 	OscirenderAudioProcessor& audioProcessor;
 	juce::Random rng;
