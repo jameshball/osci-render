@@ -107,7 +107,36 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         if (sound.load() != nullptr) {
             auto parser = sound.load()->parser;
             renderingSample = parser != nullptr && parser->isSample();
+            if (!renderingSample) {
+                frameLength = sound.load()->flushFrame(frame);
+                incrementShapeDrawing();
+            }
+        }
 
+        double drawnFrameLength = traceMaxEnabled ? actualTraceMax * frameLength : frameLength;
+
+        if (!renderingSample && frameDrawn >= drawnFrameLength) {
+            if (sound.load() != nullptr && currentlyPlaying) {
+                //frameLength = sound.load()->updateFrame(frame);
+                frameLength = sound.load()->flushFrame(frame);
+            }
+            frameDrawn -= drawnFrameLength;
+            currentShape = 0;
+
+            // TODO: updateFrame already iterates over all the shapes,
+            // so we can improve performance by calculating frameDrawn
+            // and shapeDrawn directly. frameDrawn is simply actualTraceMin * frameLength
+            // but shapeDrawn is the amount of the current shape that has been drawn so
+            // we need to iterate over all the shapes to calculate it.
+            if (traceMinEnabled) {
+                while (frameDrawn < actualTraceMin * frameLength) {
+                    incrementShapeDrawing();
+                }
+            }
+        }
+
+        if (sound.load() != nullptr) {
+            auto parser = sound.load()->parser;
             if (renderingSample) {
                 vars.sampleRate = audioProcessor.currentSampleRate;
                 vars.frequency = actualFrequency;
@@ -155,32 +184,6 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         traceMinValue = traceMinEnabled ? traceMinValue : 0.0;
         actualTraceMax = juce::jmax(actualTraceMin, juce::jmin(traceMaxValue, 1.0));
         actualTraceMin = juce::jmax(MIN_TRACE, juce::jmin(traceMinValue, actualTraceMax - MIN_TRACE));
-
-        if (!renderingSample) {
-            incrementShapeDrawing();
-        }
-
-        double drawnFrameLength = traceMaxEnabled ? actualTraceMax * frameLength : frameLength;
-
-        if (!renderingSample && frameDrawn >= drawnFrameLength) {
-            if (sound.load() != nullptr && currentlyPlaying) {
-                //frameLength = sound.load()->updateFrame(frame);
-                frameLength = sound.load()->flushFrame(frame);
-            }
-            frameDrawn -= drawnFrameLength;
-            currentShape = 0;
-
-            // TODO: updateFrame already iterates over all the shapes,
-            // so we can improve performance by calculating frameDrawn
-            // and shapeDrawn directly. frameDrawn is simply actualTraceMin * frameLength
-            // but shapeDrawn is the amount of the current shape that has been drawn so
-            // we need to iterate over all the shapes to calculate it.
-            if (traceMinEnabled) {
-                while (frameDrawn < actualTraceMin * frameLength) {
-                    incrementShapeDrawing();
-                }
-            }
-        }
     }
 }
 
