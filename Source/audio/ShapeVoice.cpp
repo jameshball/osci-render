@@ -20,7 +20,8 @@ void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesiser
     if (shapeSound != nullptr) {
         int tries = 0;
         while (frame.empty() && tries < 50) {
-            frameLength = shapeSound->updateFrame(frame);
+            //frameLength = shapeSound->updateFrame(frame);
+            frameLength = shapeSound->flushFrame(frame);
             tries++;
         }
         adsr = audioProcessor.adsrEnv;
@@ -163,7 +164,8 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
 
         if (!renderingSample && frameDrawn >= drawnFrameLength) {
             if (sound.load() != nullptr && currentlyPlaying) {
-                frameLength = sound.load()->updateFrame(frame);
+                //frameLength = sound.load()->updateFrame(frame);
+                frameLength = sound.load()->flushFrame(frame);
             }
             frameDrawn -= drawnFrameLength;
             currentShape = 0;

@@ -617,6 +617,23 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     juce::AudioBuffer<float> outputBuffer3d = juce::AudioBuffer<float>(3, buffer.getNumSamples());
     outputBuffer3d.clear();
 
+    // Update line art animation
+    if (animateLineArt->getValue()) {
+        if (animationSyncBPM->getValue()) {
+            animationTime = playTimeBeats;
+        }
+        else {
+            animationTime = playTimeSeconds;
+        }
+        if ((currentFile >= 0) ? (sounds[currentFile]->parser->isAnimatable) : false) {
+            int animFrame = (int)(animationTime * animationRate->getValueUnnormalised() + animationOffset->getValueUnnormalised());
+            auto lineArt = sounds[currentFile]->parser->getLineArt();
+            if (lineArt != nullptr) {
+                lineArt->setFrame(animFrame);
+            }
+        }
+    }
+
     if (usingInput && totalNumInputChannels >= 2) {
         for (auto channel = 0; channel < juce::jmin(2, totalNumInputChannels); channel++) {
             outputBuffer3d.copyFrom(channel, 0, inputBuffer, channel, 0, buffer.getNumSamples());
@@ -647,28 +664,6 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     
     
 	for (int sample = 0; sample < buffer.getNumSamples(); ++sample) {
-
-        // Update line art animation
-        
-        /* This limits the rate at which frames can be changed to once every 200 samples to save performance. May not be necessary
-         * if (animateLineArt && (sample % (int)(sampleRate / 200) == 0)) {
-         */
-        if (animateLineArt->getValue()) {
-            if (animationSyncBPM->getValue()) {
-                animationTime = playTimeBeats;
-            }
-            else {
-                animationTime = playTimeSeconds;
-            }
-            if ((currentFile >= 0) ? (sounds[currentFile]->parser->isAnimatable) : false) {
-                int animFrame = (int)(animationTime * animationRate->getValueUnnormalised() + animationOffset->getValueUnnormalised());
-                auto lineArt = sounds[currentFile]->parser->getLineArt();
-                if (lineArt != nullptr) {
-                    lineArt->setFrame(animFrame);
-                }
-            }
-        }
-
         auto left = 0.0;
         auto right = 0.0;
         if (totalNumInputChannels >= 2) {

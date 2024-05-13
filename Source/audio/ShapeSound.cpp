@@ -34,8 +34,18 @@ void ShapeSound::addFrame(std::vector<std::unique_ptr<Shape>>& frame, bool force
     }
 }
 
+// Update to next frame in queue
 double ShapeSound::updateFrame(std::vector<std::unique_ptr<Shape>>& frame) {
     if (frames.try_pop(frame)) {
+        frameLength = Shape::totalLength(frame);
+    }
+
+    return frameLength;
+}
+
+// Update to newest frame
+double ShapeSound::flushFrame(std::vector<std::unique_ptr<Shape>>& frame) {
+    while (frames.try_pop(frame)) {
         frameLength = Shape::totalLength(frame);
     }
 
