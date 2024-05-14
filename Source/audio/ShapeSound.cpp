@@ -45,9 +45,16 @@ double ShapeSound::updateFrame(std::vector<std::unique_ptr<Shape>>& frame) {
 
 // Update to newest frame
 double ShapeSound::flushFrame(std::vector<std::unique_ptr<Shape>>& frame) {
+    bool changed = false;
     while (frames.try_pop(frame)) {
-        frameLength = Shape::totalLength(frame);
+        changed = true;
     }
+    if (changed) frameLength = Shape::totalLength(frame);
 
     return frameLength;
+}
+
+// Returns true if at least 3 frames out of date
+bool ShapeSound::checkStale() {
+    return frames.check_stale(3);
 }

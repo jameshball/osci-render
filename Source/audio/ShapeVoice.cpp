@@ -18,10 +18,10 @@ void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesiser
     currentlyPlaying = true;
     this->sound = shapeSound;
     if (shapeSound != nullptr) {
-        int tries = 0;
+        int tries = 1;
+        frameLength = shapeSound->flushFrame(frame);
         while (frame.empty() && tries < 50) {
-            //frameLength = shapeSound->updateFrame(frame);
-            frameLength = shapeSound->flushFrame(frame);
+            frameLength = shapeSound->updateFrame(frame);
             tries++;
         }
         adsr = audioProcessor.adsrEnv;
@@ -81,6 +81,11 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
 
     int numChannels = outputBuffer.getNumChannels();
 
+    // this is for debugging, it gets optimized out when building for release
+    if (currentlyPlaying) {
+        numChannels = numChannels + 0;
+    }
+
     if (audioProcessor.midiEnabled->getBoolValue()) {
         actualFrequency = frequency * pitchWheelAdjustment;
     } else {
@@ -103,22 +108,24 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         double z = 0.0;
 
         bool renderingSample = true;
+        auto s = sound.load();
 
-        if (sound.load() != nullptr) {
-            auto parser = sound.load()->parser;
-            renderingSample = parser != nullptr && parser->isSample();
-            if (!renderingSample) {
-                frameLength = sound.load()->flushFrame(frame);
-                incrementShapeDrawing();
-            }
+        if (s != nullptr) {
+            auto parser = s->parser;
+            renderingSample = (parser != nullptr) && parser->isSample();
+        }
+
+        if (!renderingSample) {
+            incrementShapeDrawing();
         }
 
         double drawnFrameLength = traceMaxEnabled ? actualTraceMax * frameLength : frameLength;
 
         if (!renderingSample && frameDrawn >= drawnFrameLength) {
-            if (sound.load() != nullptr && currentlyPlaying) {
-                //frameLength = sound.load()->updateFrame(frame);
-                frameLength = sound.load()->flushFrame(frame);
+            if (s != nullptr && currentlyPlaying) {
+                // Flush the frame buffer if stale enough, otherwise just pull from it
+                if (s->checkStale()) frameLength = s->flushFrame(frame);
+                else frameLength = s->updateFrame(frame);
             }
             frameDrawn -= drawnFrameLength;
             currentShape = 0;
@@ -135,8 +142,8 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             }
         }
 
-        if (sound.load() != nullptr) {
-            auto parser = sound.load()->parser;
+        if (s != nullptr) {
+            auto parser = s->parser;
             if (renderingSample) {
                 vars.sampleRate = audioProcessor.currentSampleRate;
                 vars.frequency = actualFrequency;

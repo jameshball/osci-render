@@ -16,6 +16,7 @@ public:
 	void addFrame(std::vector<std::unique_ptr<Shape>>& frame, bool force = true) override;
 	double updateFrame(std::vector<std::unique_ptr<Shape>>& frame);
 	double flushFrame(std::vector<std::unique_ptr<Shape>>& frame);
+	bool checkStale();
 
 	std::shared_ptr<FileParser> parser;
 
