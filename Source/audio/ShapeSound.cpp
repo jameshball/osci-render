@@ -54,7 +54,7 @@ double ShapeSound::flushFrame(std::vector<std::unique_ptr<Shape>>& frame) {
     return frameLength;
 }
 
-// Returns true if at least 3 frames out of date
+// Returns true if at least 20 frames out of date
 bool ShapeSound::checkStale() {
-    return frames.check_stale(3);
+    return frames.check_stale(20);
 }

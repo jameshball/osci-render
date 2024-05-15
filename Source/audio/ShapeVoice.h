@@ -45,6 +45,8 @@ private:
 	lua_State* L = nullptr;
 	LuaVariables vars;
 
+	int flushCount = 0;
+
 	Env adsr;
 	double time = 0.0;
 	double releaseTime = 0.0;

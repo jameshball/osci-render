@@ -18,8 +18,8 @@ void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesiser
     currentlyPlaying = true;
     this->sound = shapeSound;
     if (shapeSound != nullptr) {
-        int tries = 1;
-        frameLength = shapeSound->flushFrame(frame);
+        int tries = 0;
+        flushCount = 5;
         while (frame.empty() && tries < 50) {
             frameLength = shapeSound->updateFrame(frame);
             tries++;
@@ -123,8 +123,11 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
 
         if (!renderingSample && frameDrawn >= drawnFrameLength) {
             if (s != nullptr && currentlyPlaying) {
-                // Flush the frame buffer if stale enough, otherwise just pull from it
-                if (s->checkStale()) frameLength = s->flushFrame(frame);
+                // Flush the frame buffer if stale or if just starting a note, otherwise just pull from it
+                if (flushCount > 0 || s->checkStale()) {
+                    frameLength = s->flushFrame(frame);
+                    flushCount--;
+                }
                 else frameLength = s->updateFrame(frame);
             }
             frameDrawn -= drawnFrameLength;
