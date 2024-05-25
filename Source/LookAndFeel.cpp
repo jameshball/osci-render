@@ -94,11 +94,6 @@ void OscirenderLookAndFeel::drawLabel(juce::Graphics& g, juce::Label& label) {
     label.setRepaintsOnMouseActivity(true);
     auto baseColour = label.findColour(juce::Label::backgroundColourId);
     if (label.isEditable()) {
-        juce::MessageManager::callAsync(
-            [&label]() {
-                label.setMouseCursor(juce::MouseCursor::IBeamCursor);
-            }
-        );
         baseColour = LookAndFeelHelpers::createBaseColour(baseColour, false, label.isMouseOver(true), false, label.isEnabled());
     }
     g.setColour(baseColour);
@@ -172,11 +167,6 @@ void OscirenderLookAndFeel::drawTextEditorOutline(juce::Graphics& g, int width, 
 
 void OscirenderLookAndFeel::drawComboBox(juce::Graphics& g, int width, int height, bool, int, int, int, int, juce::ComboBox& box) {
     juce::Rectangle<int> boxBounds{0, 0, width, height};
-    juce::MessageManager::callAsync(
-        [&box]() {
-            box.setMouseCursor(juce::MouseCursor::PointingHandCursor);
-        }
-    );
 
     g.setColour(box.findColour(juce::ComboBox::backgroundColourId));
     g.fillRoundedRectangle(boxBounds.toFloat(), RECT_RADIUS);
@@ -288,12 +278,6 @@ void OscirenderLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, in
 }
 
 void OscirenderLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& button, const juce::Colour& backgroundColour, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) {
-    juce::MessageManager::callAsync(
-        [&button]() {
-            button.setMouseCursor(juce::MouseCursor::PointingHandCursor);
-        }
-    );
-    
     auto bounds = button.getLocalBounds().toFloat().reduced(0.5f, 0.5f);
 
     auto baseColour = LookAndFeelHelpers::createBaseColour(backgroundColour, button.hasKeyboardFocus(true), shouldDrawButtonAsHighlighted, shouldDrawButtonAsDown, button.isEnabled());
@@ -349,4 +333,24 @@ juce::CodeEditorComponent::ColourScheme OscirenderLookAndFeel::getDefaultColourS
     }
 
     return cs;
+}
+
+juce::MouseCursor OscirenderLookAndFeel::getMouseCursorFor(juce::Component& component) {
+    juce::Label* label = dynamic_cast<juce::Label*>(&component);
+    if (label != nullptr && label->isEditable()) {
+        return juce::MouseCursor::IBeamCursor;
+    }
+    juce::TextEditor* textEditor = dynamic_cast<juce::TextEditor*>(&component);
+    if (textEditor != nullptr) {
+        return juce::MouseCursor::IBeamCursor;
+    }
+    juce::Button* button = dynamic_cast<juce::Button*>(&component);
+    if (button != nullptr) {
+        return juce::MouseCursor::PointingHandCursor;
+    }
+    juce::ComboBox* comboBox = dynamic_cast<juce::ComboBox*>(&component);
+    if (comboBox != nullptr) {
+        return juce::MouseCursor::PointingHandCursor;
+    }
+    return juce::MouseCursor::NormalCursor;
 }
