@@ -118,13 +118,13 @@ public:
         )
     );
     
-    std::shared_ptr<Effect> traceMax = std::make_shared<Effect>(
+    std::shared_ptr<Effect> traceLen = std::make_shared<Effect>(
         [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
             return input;
         }, new EffectParameter(
-            "Trace max",
-            "Defines the maximum proportion of the image that is drawn before skipping to the next frame. This has the effect of 'tracing' out the image from a single dot when animated. By default, we draw until the end of the frame, so this value is 1.0.",
-            "traceMax",
+            "Trace length",
+            "Defines how much of the image is drawn before moving to the next frame. This has the effect of 'tracing' out the image from a single dot when animated. By default, we draw the full length of the frame, so this value is 1.0.",
+            "traceLen",
             VERSION_HINT, 0.75, 0.0, 1.0
         )
     );
