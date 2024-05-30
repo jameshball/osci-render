@@ -34,10 +34,27 @@ void ShapeSound::addFrame(std::vector<std::unique_ptr<Shape>>& frame, bool force
     }
 }
 
+// Update to next frame in queue
 double ShapeSound::updateFrame(std::vector<std::unique_ptr<Shape>>& frame) {
     if (frames.try_pop(frame)) {
         frameLength = Shape::totalLength(frame);
     }
 
     return frameLength;
+}
+
+// Update to newest frame
+double ShapeSound::flushFrame(std::vector<std::unique_ptr<Shape>>& frame) {
+    bool changed = false;
+    while (frames.try_pop(frame)) {
+        changed = true;
+    }
+    if (changed) frameLength = Shape::totalLength(frame);
+
+    return frameLength;
+}
+
+// Returns true if at least 20 frames out of date
+bool ShapeSound::checkStale() {
+    return frames.check_stale(20);
 }

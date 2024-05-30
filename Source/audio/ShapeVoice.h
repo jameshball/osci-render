@@ -28,7 +28,7 @@ private:
 	std::vector<std::unique_ptr<Shape>> frame;
 	std::atomic<ShapeSound*> sound = nullptr;
 	double actualTraceMin;
-	double actualTraceMax;
+	double actualTraceLen;
 
 	double frameLength = 0.0;
 	int currentShape = 0;
@@ -44,6 +44,8 @@ private:
 
 	lua_State* L = nullptr;
 	LuaVariables vars;
+
+	int flushCount = 0;
 
 	Env adsr;
 	double time = 0.0;

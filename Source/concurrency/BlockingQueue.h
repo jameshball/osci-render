@@ -78,4 +78,8 @@ public:
         not_full.notify_one();
         return true;
     }
+
+    bool check_stale(int howOld) {
+        return size >= howOld;
+    }
 };
