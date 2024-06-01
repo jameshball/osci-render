@@ -76,6 +76,9 @@ public:
     int VERSION_HINT = 2;
 
     std::atomic<double> currentSampleRate = 0.0;
+    
+    std::atomic<int> roughness = 4;
+    std::atomic<double> intensity = 1.0;
 
     juce::SpinLock effectsLock;
 	std::vector<std::shared_ptr<Effect>> toggleableEffects;

@@ -8,8 +8,14 @@ VisualiserComponent::VisualiserComponent(int numChannels, OscirenderAudioProcess
 
     setFullScreen(false);
     
-    roughness.textBox.setValue(4);
-    intensity.textBox.setValue(1.0);
+    roughness.textBox.setValue(audioProcessor.roughness);
+    roughness.textBox.onValueChange = [this]() {
+        audioProcessor.roughness = (int) roughness.textBox.getValue();
+    };
+    intensity.textBox.setValue(audioProcessor.intensity);
+    intensity.textBox.onValueChange = [this]() {
+        audioProcessor.intensity = intensity.textBox.getValue();
+    };
 
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
     setWantsKeyboardFocus(true);

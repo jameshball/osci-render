@@ -809,6 +809,10 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
         fileXml->addTextElement(base64);
     }
     xml->setAttribute("currentFile", currentFile);
+    
+    auto visualiserXml = xml->createNewChildElement("visualiser");
+    visualiserXml->setAttribute("roughness", roughness);
+    visualiserXml->setAttribute("intensity", intensity);
 
     copyXmlToBinary(*xml, destData);
 }
@@ -923,6 +927,12 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
             }
         }
         changeCurrentFile(xml->getIntAttribute("currentFile", -1));
+        
+        auto visualiserXml = xml->getChildByName("visualiser");
+        if (visualiserXml != nullptr) {
+            roughness = visualiserXml->getIntAttribute("roughness");
+            intensity = visualiserXml->getDoubleAttribute("intensity");
+        }
 
         broadcaster.sendChangeMessage();
         prevMidiEnabled = !midiEnabled->getBoolValue();
