@@ -306,20 +306,20 @@ private:
     double valueFromLegacy(double value, const juce::String& id);
     void changeSound(ShapeSound::Ptr sound);
 
-    void parseVersion(int result[4], const juce::String& input) {
+    void parseVersion(int result[3], const juce::String& input) {
         std::istringstream parser(input.toStdString());
         parser >> result[0];
-        for (int idx = 1; idx < 4; idx++) {
+        for (int idx = 1; idx < 3; idx++) {
             parser.get(); //Skip period
             parser >> result[idx];
         }
     }
 
     bool lessThanVersion(const juce::String& a, const juce::String& b) {
-        int parsedA[4], parsedB[4];
+        int parsedA[3], parsedB[3];
         parseVersion(parsedA, a);
         parseVersion(parsedB, b);
-        return std::lexicographical_compare(parsedA, parsedA + 4, parsedB, parsedB + 4);
+        return std::lexicographical_compare(parsedA, parsedA + 3, parsedB, parsedB + 3);
     }
 
     const double MIN_LENGTH_INCREMENT = 0.000001;

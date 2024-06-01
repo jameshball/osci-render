@@ -3,19 +3,19 @@
 #include "../PluginProcessor.h"
 
 ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, juce::MemoryBlock image) : audioProcessor(p) {
-    if (extension.equalsIgnoreCase(".gif")) {
-        juce::TemporaryFile temp{".gif"};
-        juce::File file = temp.getFile();
+    juce::TemporaryFile temp{".gif"};
+    juce::File file = temp.getFile();
 
-        {
-            juce::FileOutputStream output(file);
+    {
+        juce::FileOutputStream output(file);
 
-            if (output.openedOk()) {
-                output.write(image.getData(), image.getSize());
-                output.flush();
-            }
+        if (output.openedOk()) {
+            output.write(image.getData(), image.getSize());
+            output.flush();
         }
-
+    }
+    
+    if (extension.equalsIgnoreCase(".gif")) {
         juce::String fileName = file.getFullPathName();
         gd_GIF *gif = gd_open_gif(fileName.toRawUTF8());
 
@@ -43,6 +43,25 @@ ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, ju
 
             gd_close_gif(gif);
         }
+    } else {
+        juce::Image image = juce::ImageFileFormat::loadFrom(file);
+        image.desaturate();
+        
+        width = image.getWidth();
+        height = image.getHeight();
+        int frameSize = width * height;
+        
+        visited = std::vector<bool>(frameSize, false);
+        frames.emplace_back(std::vector<uint8_t>(frameSize));
+        
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                juce::Colour pixel = image.getPixelAt(x, y);
+                int index = y * width + x;
+                // RGB should be equal since we have desaturated
+                frames[0][index] = pixel.getRed();
+            }
+        }
     }
 
     setFrame(0);
@@ -58,9 +77,29 @@ void ImageParser::setFrame(int index) {
     std::fill(visited.begin(), visited.end(), false);
 }
 
+bool ImageParser::isOverThreshold(double pixel, double thresholdPow) {
+    float threshold = std::pow(pixel, thresholdPow);
+    return pixel > 0.2 && rng.nextFloat() < threshold;
+}
+
 void ImageParser::resetPosition() {
-    currentX = rng.nextInt(width);
-    currentY = rng.nextInt(height);
+    currentX = width > 0 ? rng.nextInt(width) : 0;
+    currentY = height > 0 ? rng.nextInt(height) : 0;
+}
+
+float ImageParser::getPixelValue(int x, int y) {
+    int index = (height - y - 1) * width + x;
+    float pixel = frames[frameIndex][index] / (float) std::numeric_limits<uint8_t>::max();
+    return pixel;
+}
+
+void ImageParser::findWhite(double thresholdPow) {
+    for (int i = 0; i < 100; i++) {
+        resetPosition();
+        if (isOverThreshold(getPixelValue(currentX, currentY), thresholdPow)) {
+            break;
+        }
+    }
 }
 
 int ImageParser::jumpFrequency() {
@@ -74,8 +113,6 @@ void ImageParser::findNearestNeighbour(int searchRadius, float thresholdPow, int
     int y = currentY;
     int dir = rng.nextInt(4);
 
-    float maxValue = std::numeric_limits<uint8_t>::max();
-
     for (int len = 1; len <= maxSteps; len++) { // Length of spiral arm
         for (int i = 0 ; i < 2; i++) { // Repeat twice for each arm length
             for (int step = 0 ; step < len; step++) { // Steps in the current direction
@@ -83,15 +120,14 @@ void ImageParser::findNearestNeighbour(int searchRadius, float thresholdPow, int
                 y += stride * spiralSteps[dir][1];
 
                 if (x < 0 || x >= width || y < 0 || y >= height) break;
-
-                int index = (height - y - 1) * width + x;
-                float pixel = frames[frameIndex][index] / maxValue;
+                
+                float pixel = getPixelValue(x, y);
                 if (invert) {
                     pixel = 1 - pixel;
                 }
-                float threshold = std::pow(pixel, thresholdPow);
 
-                if (pixel > 0.2 && rng.nextFloat() < threshold && !visited[index]) {
+                int index = (height - y - 1) * width + x;
+                if (isOverThreshold(pixel, thresholdPow) && !visited[index]) {
                     visited[index] = true;
                     currentX = x;
                     currentY = y;
@@ -103,18 +139,24 @@ void ImageParser::findNearestNeighbour(int searchRadius, float thresholdPow, int
         }
     }
 
-    resetPosition();
+    findWhite(thresholdPow);
 }
 
 Point ImageParser::getSample() {
     if (count % jumpFrequency() == 0) {
         resetPosition();
     }
+    
+    if (count % 10 * jumpFrequency() == 0) {
+        std::fill(visited.begin(), visited.end(), false);
+    }
 
     float thresholdPow = audioProcessor.imageThreshold->getValue() * 10 + 1;
 
-    findNearestNeighbour(50, thresholdPow, audioProcessor.imageStride->getValue(), audioProcessor.invertImage->getValue());
+    findNearestNeighbour(10, thresholdPow, audioProcessor.imageStride->getValue(), audioProcessor.invertImage->getValue());
     float maxDim = juce::jmax(width, height);
     count++;
-    return Point(2 * currentX / maxDim - 1, 2 * currentY / maxDim - 1);
+    float widthDiff = (maxDim - width) / 2;
+    float heightDiff = (maxDim - height) / 2;
+    return Point(2 * (currentX + widthDiff) / maxDim - 1, 2 * (currentY + heightDiff) / maxDim - 1);
 }

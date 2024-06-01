@@ -805,7 +805,8 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
     for (int i = 0; i < fileBlocks.size(); i++) {
         auto fileXml = filesXml->createNewChildElement("file");
         fileXml->setAttribute("name", fileNames[i]);
-        fileXml->addTextElement(fileBlocks[i]->toBase64Encoding());
+        auto base64 = fileBlocks[i]->toBase64Encoding();
+        fileXml->addTextElement(base64);
     }
     xml->setAttribute("currentFile", currentFile);
 
@@ -911,7 +912,7 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
                 if (lessThanVersion(version, "2.2.0")) {
                     // Older versions of osci-render opened files in a silly way
                     auto stream = juce::MemoryOutputStream();
-                    juce::Base64::convertFromBase64(stream, fileXml->getAllSubText());
+                    juce::Base64::convertFromBase64(stream, text);
                     fileBlock = std::make_shared<juce::MemoryBlock>(stream.getData(), stream.getDataSize());
                 } else {
                     fileBlock = std::make_shared<juce::MemoryBlock>();

@@ -28,7 +28,7 @@ private:
 	MainComponent main{audioProcessor, pluginEditor};
 	PerspectiveComponent perspective{audioProcessor, pluginEditor};
 	TxtComponent txt{audioProcessor, pluginEditor};
-	FrameSettingsComponent gpla{ audioProcessor, pluginEditor };
+	FrameSettingsComponent frame{ audioProcessor, pluginEditor };
 	EffectsComponent effects{audioProcessor, pluginEditor};
 	MidiComponent midi{audioProcessor, pluginEditor};
 

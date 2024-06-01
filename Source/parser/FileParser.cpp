@@ -29,13 +29,13 @@ void FileParser::parse(juce::String fileId, juce::String extension, std::unique_
 		lua = std::make_shared<LuaParser>(fileId, stream->readEntireStreamAsString(), errorCallback, fallbackLuaScript);
 	} else if (extension == ".gpla") {
 		gpla = std::make_shared<LineArtParser>(stream->readEntireStreamAsString());
-	} else if (extension == ".gif") {
+	} else if (extension == ".gif" || extension == ".png" || extension == ".jpg" || extension == ".jpeg") {
 		juce::MemoryBlock buffer{};
 		int bytesRead = stream->readIntoMemoryBlock(buffer);
 		img = std::make_shared<ImageParser>(audioProcessor, extension, buffer);
 	}
 
-	isAnimatable = gpla != nullptr || img != nullptr;
+	isAnimatable = gpla != nullptr || (img != nullptr && extension == ".gif");
 	sampleSource = lua != nullptr || img != nullptr;
 }
 

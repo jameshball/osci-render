@@ -68,30 +68,37 @@ FrameSettingsComponent::~FrameSettingsComponent() {
 
 void FrameSettingsComponent::resized() {
 	auto area = getLocalBounds().withTrimmedTop(20).reduced(20);
-	auto firstColumn = area.removeFromLeft(220);
-	double rowHeight = 20;
-	double rowSpace = 10;
-	auto animateBounds = firstColumn.removeFromTop(rowHeight);
-	animate.setBounds(animateBounds.removeFromLeft(100));
-	sync.setBounds(animateBounds.removeFromLeft(100));
-	firstColumn.removeFromTop(rowSpace);
+    double rowHeight = 20;
+    
+    if (animated) {
+        double rowSpace = 10;
+        auto firstColumn = area.removeFromLeft(220);
+        
+        auto animateBounds = firstColumn.removeFromTop(rowHeight);
+        animate.setBounds(animateBounds.removeFromLeft(100));
+        sync.setBounds(animateBounds.removeFromLeft(100));
+        firstColumn.removeFromTop(rowSpace);
 
-	animateBounds = firstColumn.removeFromTop(rowHeight);
-	rateLabel.setBounds(animateBounds.removeFromLeft(140));
-	rateBox.setBounds(animateBounds.removeFromLeft(60));
-	firstColumn.removeFromTop(rowSpace);
+        animateBounds = firstColumn.removeFromTop(rowHeight);
+        rateLabel.setBounds(animateBounds.removeFromLeft(140));
+        rateBox.setBounds(animateBounds.removeFromLeft(60));
+        firstColumn.removeFromTop(rowSpace);
 
-	animateBounds = firstColumn.removeFromTop(rowHeight);
-	offsetLabel.setBounds(animateBounds.removeFromLeft(140));
-	offsetBox.setBounds(animateBounds.removeFromLeft(60));
+        animateBounds = firstColumn.removeFromTop(rowHeight);
+        offsetLabel.setBounds(animateBounds.removeFromLeft(140));
+        offsetBox.setBounds(animateBounds.removeFromLeft(60));
+    }
 
-	auto secondColumn = area;
-	auto invertBounds = secondColumn.removeFromTop(rowHeight);
-	invertImage.setBounds(invertBounds.removeFromLeft(100));
-	secondColumn.removeFromTop(rowSpace);
-
-	threshold.setBounds(secondColumn.removeFromTop(rowHeight));
-	stride.setBounds(secondColumn.removeFromTop(rowHeight));
+    if (image) {
+        auto secondColumn = area;
+        auto invertBounds = secondColumn.removeFromTop(rowHeight);
+        invertImage.setBounds(invertBounds.removeFromLeft(100));
+        secondColumn.removeFromTop(5);
+        
+        rowHeight = 30;
+        threshold.setBounds(secondColumn.removeFromTop(rowHeight));
+        stride.setBounds(secondColumn.removeFromTop(rowHeight));
+    }
 }
 
 void FrameSettingsComponent::update() {
@@ -117,4 +124,21 @@ void FrameSettingsComponent::parameterGestureChanged(int parameterIndex, bool ge
 
 void FrameSettingsComponent::handleAsyncUpdate() {
 	update();
+}
+
+void FrameSettingsComponent::setAnimated(bool animated) {
+    this->animated = animated;
+    animate.setVisible(animated);
+    sync.setVisible(animated);
+    rateBox.setVisible(animated);
+    offsetBox.setVisible(animated);
+    rateLabel.setVisible(animated);
+    offsetLabel.setVisible(animated);
+}
+
+void FrameSettingsComponent::setImage(bool image) {
+    this->image = image;
+    invertImage.setVisible(image);
+    threshold.setVisible(image);
+    stride.setVisible(image);
 }

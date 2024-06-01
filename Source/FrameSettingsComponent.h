@@ -16,9 +16,14 @@ public:
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void handleAsyncUpdate() override;
     void update();
+    void setAnimated(bool animated);
+    void setImage(bool image);
 private:
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& pluginEditor;
+    
+    bool animated = true;
+    bool image = true;
 
     juce::ToggleButton animate{"Animate"};
     juce::ToggleButton sync{"BPM Sync"};

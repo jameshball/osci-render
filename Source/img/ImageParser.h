@@ -17,6 +17,9 @@ public:
 private:
 	void findNearestNeighbour(int searchRadius, float thresholdPow, int stride, bool invert);
 	void resetPosition();
+    float getPixelValue(int x, int y);
+    void findWhite(double thresholdPow);
+    bool isOverThreshold(double pixel, double thresholdValue);
 	int jumpFrequency();
 
 	OscirenderAudioProcessor& audioProcessor;
