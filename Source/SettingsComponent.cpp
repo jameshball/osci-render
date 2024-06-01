@@ -9,7 +9,7 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     addAndMakeVisible(mainResizerBar);
     addAndMakeVisible(midi);
     addChildComponent(txt);
-    addChildComponent(gpla);
+    addChildComponent(frame);
 
     midiLayout.setItemLayout(0, -0.1, -1.0, -1.0);
     midiLayout.setItemLayout(1, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE);
@@ -47,14 +47,14 @@ void SettingsComponent::resized() {
 
     if (txt.isVisible()) {
         effectSettings = &txt;
-    } else if (gpla.isVisible()) {
-        effectSettings = &gpla;
+    } else if (frame.isVisible()) {
+        effectSettings = &frame;
     }
 
     auto dummyBounds = dummy.getBounds();
 
     if (effectSettings != nullptr) {
-        effectSettings->setBounds(dummyBounds.removeFromBottom(140));
+        effectSettings->setBounds(dummyBounds.removeFromBottom(150));
         dummyBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
     }
 
@@ -66,14 +66,17 @@ void SettingsComponent::resized() {
 void SettingsComponent::fileUpdated(juce::String fileName) {
     juce::String extension = fileName.fromLastOccurrenceOf(".", true, false);
     txt.setVisible(false);
-    gpla.setVisible(false);
+    frame.setVisible(false);
+    bool isImage =  extension == ".gif" || extension == ".png" || extension == ".jpg" || extension == ".jpeg";
     if (fileName.isEmpty() || audioProcessor.objectServerRendering) {
         // do nothing
     } else if (extension == ".txt") {
         txt.setVisible(true);
-    }
-    else if (extension == ".gpla" || extension == ".gif") {
-        gpla.setVisible(true);
+    } else if (extension == ".gpla" || isImage) {
+        frame.setVisible(true);
+        frame.setAnimated(extension == ".gpla" || extension == ".gif");
+        frame.setImage(isImage);
+        frame.resized();
     }
     main.updateFileLabel();
     resized();
@@ -81,7 +84,7 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
 
 void SettingsComponent::update() {
     txt.update();
-    gpla.update();
+    frame.update();
 }
 
 void SettingsComponent::mouseMove(const juce::MouseEvent& event) {
