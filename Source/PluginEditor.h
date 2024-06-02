@@ -18,6 +18,7 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
     
+    bool isBinaryFile(juce::String name);
     void initialiseCodeEditors();
     void addCodeEditor(int index);
     void removeCodeEditor(int index);
@@ -90,7 +91,7 @@ public:
 	void codeDocumentTextInserted(const juce::String& newText, int insertIndex) override;
 	void codeDocumentTextDeleted(int startIndex, int endIndex) override;
     void updateCodeDocument();
-    void updateCodeEditor(bool shouldOpenEditor = false);
+    void updateCodeEditor(bool binaryFile, bool shouldOpenEditor = false);
 
     bool keyPressed(const juce::KeyPress& key) override;
     void mouseDown(const juce::MouseEvent& event) override;

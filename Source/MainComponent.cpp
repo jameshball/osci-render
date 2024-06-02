@@ -25,6 +25,8 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 					fileAdded = true;
 				}
 			}
+            
+            
 			if (fileAdded) {
 				pluginEditor.fileUpdated(audioProcessor.getCurrentFileName());
 			}
@@ -89,7 +91,7 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 	fileType.addItem(".lua", 1);
 	fileType.addItem(".svg", 2);
 	fileType.addItem(".obj", 3);
-	fileType.addItem(".txt", 4);
+    fileType.addItem(".txt", 4);
 	fileType.setSelectedId(1);
 	addAndMakeVisible(fileType);
 	addAndMakeVisible(createFile);

@@ -13,6 +13,9 @@
         <FILE id="G2dMtI" name="invalid.gpla" compile="0" resource="1" file="Resources/gpla/invalid.gpla"/>
         <FILE id="b9HuXW" name="noframes.gpla" compile="0" resource="1" file="Resources/gpla/noframes.gpla"/>
       </GROUP>
+      <GROUP id="{525C568C-29E9-D0A2-9773-8A04981C5575}" name="images">
+        <FILE id="jI9VSZ" name="logo.png" compile="0" resource="1" file="Resources/images/logo.png"/>
+      </GROUP>
       <GROUP id="{C2609827-4F4A-1ADA-8BA1-A40C1D92649C}" name="lua">
         <FILE id="xANsA8" name="demo.lua" compile="0" resource="1" file="Resources/lua/demo.lua"/>
       </GROUP>
@@ -115,6 +118,10 @@
         <FILE id="CdKZCg" name="Matching.h" compile="0" resource="0" file="Source/chinese_postman/Matching.h"/>
       </GROUP>
       <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
+        <FILE id="gPTmR4" name="AboutComponent.cpp" compile="1" resource="0"
+              file="Source/components/AboutComponent.cpp"/>
+        <FILE id="vDlOTn" name="AboutComponent.h" compile="0" resource="0"
+              file="Source/components/AboutComponent.h"/>
         <FILE id="M7wyTt" name="AudioRecordingComponent.h" compile="0" resource="0"
               file="Source/components/AudioRecordingComponent.h"/>
         <FILE id="kUinTt" name="ComponentList.cpp" compile="1" resource="0"

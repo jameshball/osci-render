@@ -151,9 +151,9 @@ Point ImageParser::getSample() {
         std::fill(visited.begin(), visited.end(), false);
     }
 
-    float thresholdPow = audioProcessor.imageThreshold->getValue() * 10 + 1;
+    float thresholdPow = audioProcessor.imageThreshold->getActualValue() * 10 + 1;
 
-    findNearestNeighbour(10, thresholdPow, audioProcessor.imageStride->getValue(), audioProcessor.invertImage->getValue());
+    findNearestNeighbour(10, thresholdPow, audioProcessor.imageStride->getActualValue(), audioProcessor.invertImage->getValue());
     float maxDim = juce::jmax(width, height);
     count++;
     float widthDiff = (maxDim - width) / 2;

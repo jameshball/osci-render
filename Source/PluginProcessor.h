@@ -212,7 +212,7 @@ public:
             return input;
         }, new EffectParameter(
             "Image Threshold",
-            "image threshold innit",
+            "Controls the probability of visiting a dark pixel versus a light pixel. Darker pixels are less likely to be visited, so turning the threshold to a lower value makes it more likely to visit dark pixels.",
             "imageThreshold",
             VERSION_HINT, 0.5, 0, 1
         )
@@ -222,9 +222,9 @@ public:
             return input;
         }, new EffectParameter(
             "Image Stride",
-            "image stride innit",
+            "Controls the spacing between pixels when drawing an image. Larger values mean more of the image can be drawn, but at a lower fidelity.",
             "imageStride",
-            VERSION_HINT, 2, 1, 50, 1, false
+            VERSION_HINT, 4, 1, 50, 1, false
         )
     );
 
