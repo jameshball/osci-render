@@ -352,5 +352,5 @@ juce::MouseCursor OscirenderLookAndFeel::getMouseCursorFor(juce::Component& comp
     if (comboBox != nullptr) {
         return juce::MouseCursor::PointingHandCursor;
     }
-    return juce::MouseCursor::NormalCursor;
+    return juce::LookAndFeel_V4::getMouseCursorFor(component);
 }
