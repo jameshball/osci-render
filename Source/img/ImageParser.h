@@ -17,8 +17,8 @@ public:
 private:
 	void findNearestNeighbour(int searchRadius, float thresholdPow, int stride, bool invert);
 	void resetPosition();
-    float getPixelValue(int x, int y);
-    void findWhite(double thresholdPow);
+    float getPixelValue(int x, int y, bool invert);
+    void findWhite(double thresholdPow, bool invert);
     bool isOverThreshold(double pixel, double thresholdValue);
 	int jumpFrequency();
 
