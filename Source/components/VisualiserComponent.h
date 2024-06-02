@@ -13,9 +13,10 @@ enum class FullScreenMode {
     MAIN_COMPONENT,
 };
 
+class VisualiserWindow;
 class VisualiserComponent : public juce::Component, public juce::Timer, public juce::Thread, public juce::MouseListener, public juce::SettableTooltipClient {
 public:
-    VisualiserComponent(int numChannels, OscirenderAudioProcessor& p);
+    VisualiserComponent(int numChannels, OscirenderAudioProcessor& p, VisualiserComponent* parent = nullptr);
     ~VisualiserComponent() override;
 
     void enableFullScreen();
@@ -29,16 +30,23 @@ public:
     void resized() override;
 	void timerCallback() override;
 	void run() override;
+    void setPaused(bool paused);
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseMove(const juce::MouseEvent& event) override;
     bool keyPressed(const juce::KeyPress& key) override;
     
     void setFullScreen(bool fullScreen);
 
+    VisualiserComponent* parent = nullptr;
+    VisualiserComponent* child = nullptr;
+    std::unique_ptr<VisualiserWindow> popout = nullptr;
+    
+    std::atomic<bool> active = true;
 
 private:
     const double BUFFER_LENGTH_SECS = 0.02;
     const double DEFAULT_SAMPLE_RATE = 192000.0;
+
     
     std::atomic<int> timerId;
     std::atomic<int> lastMouseX;
@@ -55,12 +63,11 @@ private:
     LabelledTextBox intensity{"Intensity", 0, 1, 0.01};
     
     SvgButton fullScreenButton{ "fullScreen", BinaryData::fullscreen_svg, juce::Colours::white, juce::Colours::white };
+    SvgButton popOutButton{ "popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::white };
     SvgButton settingsButton{ "settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white };
     
     std::vector<float> tempBuffer;
     int precision = 4;
-
-    std::atomic<bool> active = true;
     
     std::shared_ptr<BufferConsumer> consumer;
 
@@ -69,4 +76,20 @@ private:
     void resetBuffer();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserComponent)
+};
+
+class VisualiserWindow : public juce::DocumentWindow {
+public:
+    VisualiserWindow(juce::String name, VisualiserComponent* parent) : parent(parent), wasPaused(!parent->active), juce::DocumentWindow(name, juce::Colours::black, juce::DocumentWindow::TitleBarButtons::allButtons) {}
+    
+    void closeButtonPressed() override {
+        parent->setPaused(wasPaused);
+        parent->child = nullptr;
+        parent->resized();
+        parent->popout.reset();
+    }
+
+private:
+    VisualiserComponent* parent;
+    bool wasPaused;
 };
