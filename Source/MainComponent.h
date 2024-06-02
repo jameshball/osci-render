@@ -21,6 +21,8 @@ public:
 private:
 	OscirenderAudioProcessor& audioProcessor;
 	OscirenderAudioProcessorEditor& pluginEditor;
+    
+    bool isBinaryFile(juce::String name);
 
 	std::unique_ptr<juce::FileChooser> chooser;
 	juce::TextButton fileButton;

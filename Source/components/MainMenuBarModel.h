@@ -1,5 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
+#include "AboutComponent.h"
 
 class OscirenderAudioProcessorEditor;
 class MainMenuBarModel : public juce::MenuBarModel {

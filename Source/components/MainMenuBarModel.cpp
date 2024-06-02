@@ -3,9 +3,9 @@
 
 juce::StringArray MainMenuBarModel::getMenuBarNames() {
     if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-        return juce::StringArray("File", "Audio");
+        return juce::StringArray("File", "About", "Audio");
     } else {
-        return juce::StringArray("File");
+        return juce::StringArray("File", "About");
     }
 }
 
@@ -20,6 +20,8 @@ juce::PopupMenu MainMenuBarModel::getMenuForIndex(int topLevelMenuIndex, const j
             menu.addItem(4, "Create New Project");
         }
     } else if (topLevelMenuIndex == 1) {
+        menu.addItem(1, "About osci-render");
+    } else if (topLevelMenuIndex == 2) {
         menu.addItem(1, "Settings");
     }
 
@@ -46,7 +48,21 @@ void MainMenuBarModel::menuItemSelected(int menuItemID, int topLevelMenuIndex) {
                     break;
             }
             break;
-        case 1:
+        case 1: {
+            juce::String m = "Test";
+            juce::DialogWindow::LaunchOptions options;
+            AboutComponent* about = new AboutComponent();
+            options.content.setOwned(about);
+            options.content->setSize(500, 250);
+            options.dialogTitle = "About";
+            options.dialogBackgroundColour = Colours::dark;
+            options.escapeKeyTriggersCloseButton = true;
+            options.useNativeTitleBar = true;
+            options.resizable = false;
+            
+            juce::DialogWindow* dw = options.launchAsync();
+        } break;
+        case 2:
             editor.openAudioSettings();
             break;
         default:

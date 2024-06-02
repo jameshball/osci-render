@@ -42,6 +42,7 @@ FrameSettingsComponent::FrameSettingsComponent(OscirenderAudioProcessor& p, Osci
 	invertImage.onClick = [this]() {
         audioProcessor.invertImage->setValue(invertImage.getToggleState());
     };
+    invertImage.setTooltip("Inverts the image so that dark pixels become light, and vice versa.");
 
 	threshold.slider.onValueChange = [this]() {
         audioProcessor.imageThreshold->setValue(threshold.slider.getValue());

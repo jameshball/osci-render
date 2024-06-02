@@ -44,7 +44,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
             int index = editingCustomFunction ? 0 : audioProcessor.getCurrentFileIndex() + 1;
             if (originalIndex != -1 || editingCustomFunction) {
                 codeEditors[index]->setVisible(!codeEditors[index]->isVisible());
-                updateCodeEditor();
+                updateCodeEditor(!editingCustomFunction && isBinaryFile(audioProcessor.getCurrentFileName()));
             }
         }
 	};
@@ -122,6 +122,10 @@ OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
 #endif
 }
 
+bool OscirenderAudioProcessorEditor::isBinaryFile(juce::String name) {
+    return name.endsWith(".gpla") || name.endsWith(".gif") || name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg");
+}
+
 // parsersLock must be held
 void OscirenderAudioProcessorEditor::initialiseCodeEditors() {
     codeEditors.clear();
@@ -163,7 +167,7 @@ void OscirenderAudioProcessorEditor::resized() {
         int originalIndex = audioProcessor.getCurrentFileIndex();
         int index = editingCustomFunction ? 0 : audioProcessor.getCurrentFileIndex() + 1;
 
-        bool ableToEditFile = originalIndex != -1 || editingCustomFunction;
+        bool ableToEditFile = (originalIndex != -1 && !isBinaryFile(audioProcessor.getCurrentFileName())) || editingCustomFunction;
         bool fileOpen = false;
         bool luaFileOpen = false;
         
@@ -275,35 +279,44 @@ void OscirenderAudioProcessorEditor::removeCodeEditor(int index) {
 
 
 // parsersLock AND effectsLock must be locked before calling this function
-void OscirenderAudioProcessorEditor::updateCodeEditor(bool shouldOpenEditor) {
+void OscirenderAudioProcessorEditor::updateCodeEditor(bool binaryFile, bool shouldOpenEditor) {
     // check if any code editors are visible
     bool visible = shouldOpenEditor;
     if (!visible) {
         for (int i = 0; i < codeEditors.size(); i++) {
             if (codeEditors[i]->isVisible()) {
-                visible = true;
+                if (binaryFile) {
+                    codeEditors[i]->setVisible(false);
+                } else {
+                    visible = true;
+                }
                 break;
             }
         }
     }
-    int originalIndex = audioProcessor.getCurrentFileIndex();
-    int index = editingCustomFunction ? 0 : audioProcessor.getCurrentFileIndex() + 1;
-    if ((originalIndex != -1 || editingCustomFunction) && visible) {
-        for (int i = 0; i < codeEditors.size(); i++) {
-            codeEditors[i]->setVisible(false);
+    
+    collapseButton.setVisible(!binaryFile);
+    
+    if (!binaryFile) {
+        int originalIndex = audioProcessor.getCurrentFileIndex();
+        int index = editingCustomFunction ? 0 : audioProcessor.getCurrentFileIndex() + 1;
+        if ((originalIndex != -1 || editingCustomFunction) && visible) {
+            for (int i = 0; i < codeEditors.size(); i++) {
+                codeEditors[i]->setVisible(false);
+            }
+            codeEditors[index]->setVisible(true);
+            // used so that codeDocumentTextInserted and codeDocumentTextDeleted know whether the parserLock
+            // is held by the message thread or not. We hold the lock in this function, but not when the
+            // code document is updated by the user editing text. Since both functions are called by the
+            // message thread, this is safe.
+            updatingDocumentsWithParserLock = true;
+            if (index == 0) {
+                codeEditors[index]->getEditor().loadContent(audioProcessor.customEffect->getCode());
+            } else {
+                codeEditors[index]->getEditor().loadContent(juce::MemoryInputStream(*audioProcessor.getFileBlock(originalIndex), false).readEntireStreamAsString());
+            }
+            updatingDocumentsWithParserLock = false;
         }
-        codeEditors[index]->setVisible(true);
-        // used so that codeDocumentTextInserted and codeDocumentTextDeleted know whether the parserLock
-        // is held by the message thread or not. We hold the lock in this function, but not when the
-        // code document is updated by the user editing text. Since both functions are called by the
-        // message thread, this is safe.
-        updatingDocumentsWithParserLock = true;
-        if (index == 0) {
-            codeEditors[index]->getEditor().loadContent(audioProcessor.customEffect->getCode());
-        } else {
-            codeEditors[index]->getEditor().loadContent(juce::MemoryInputStream(*audioProcessor.getFileBlock(originalIndex), false).readEntireStreamAsString());
-        }
-        updatingDocumentsWithParserLock = false;
     }
     triggerAsyncUpdate();
 }
@@ -311,7 +324,7 @@ void OscirenderAudioProcessorEditor::updateCodeEditor(bool shouldOpenEditor) {
 // parsersLock MUST be locked before calling this function
 void OscirenderAudioProcessorEditor::fileUpdated(juce::String fileName, bool shouldOpenEditor) {
     settings.fileUpdated(fileName);
-    updateCodeEditor(shouldOpenEditor);
+    updateCodeEditor(isBinaryFile(fileName), shouldOpenEditor);
 }
 
 void OscirenderAudioProcessorEditor::handleAsyncUpdate() {
@@ -359,7 +372,7 @@ void OscirenderAudioProcessorEditor::editCustomFunction(bool enable) {
     juce::SpinLock::ScopedLockType lock1(audioProcessor.parsersLock);
     juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
     codeEditors[0]->setVisible(enable);
-    updateCodeEditor();
+    updateCodeEditor(!editingCustomFunction && isBinaryFile(audioProcessor.getCurrentFileName()));
 }
 
 // parsersLock AND effectsLock must be locked before calling this function
