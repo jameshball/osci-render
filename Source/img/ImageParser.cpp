@@ -35,7 +35,8 @@ ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, ju
                 uint8_t *pixels = tempBuffer.data();
                 for (int j = 0; j < tempBuffer.size(); j += 3) {
                     uint8_t avg = (pixels[j] + pixels[j + 1] + pixels[j + 2]) / 3;
-                    frames[i][j / 3] = avg;
+                    // value of 0 is reserved for transparent pixels
+                    frames[i][j / 3] = juce::jmax(1, (int) avg);
                 }
 
                 i++;
@@ -59,7 +60,9 @@ ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, ju
                 juce::Colour pixel = image.getPixelAt(x, y);
                 int index = y * width + x;
                 // RGB should be equal since we have desaturated
-                frames[0][index] = pixel.getRed();
+                int value = pixel.getRed();
+                // value of 0 is reserved for transparent pixels
+                frames[0][index] = pixel.isTransparent() ? 0 : juce::jmax(1, value);
             }
         }
     }
@@ -87,16 +90,20 @@ void ImageParser::resetPosition() {
     currentY = height > 0 ? rng.nextInt(height) : 0;
 }
 
-float ImageParser::getPixelValue(int x, int y) {
+float ImageParser::getPixelValue(int x, int y, bool invert) {
     int index = (height - y - 1) * width + x;
     float pixel = frames[frameIndex][index] / (float) std::numeric_limits<uint8_t>::max();
+    // never traverse transparent pixels
+    if (invert && pixel > 0) {
+        pixel = 1 - pixel;
+    }
     return pixel;
 }
 
-void ImageParser::findWhite(double thresholdPow) {
+void ImageParser::findWhite(double thresholdPow, bool invert) {
     for (int i = 0; i < 100; i++) {
         resetPosition();
-        if (isOverThreshold(getPixelValue(currentX, currentY), thresholdPow)) {
+        if (isOverThreshold(getPixelValue(currentX, currentY, invert), thresholdPow)) {
             break;
         }
     }
@@ -121,10 +128,7 @@ void ImageParser::findNearestNeighbour(int searchRadius, float thresholdPow, int
 
                 if (x < 0 || x >= width || y < 0 || y >= height) break;
                 
-                float pixel = getPixelValue(x, y);
-                if (invert) {
-                    pixel = 1 - pixel;
-                }
+                float pixel = getPixelValue(x, y, invert);
 
                 int index = (height - y - 1) * width + x;
                 if (isOverThreshold(pixel, thresholdPow) && !visited[index]) {
@@ -139,7 +143,7 @@ void ImageParser::findNearestNeighbour(int searchRadius, float thresholdPow, int
         }
     }
 
-    findWhite(thresholdPow);
+    findWhite(thresholdPow, invert);
 }
 
 Point ImageParser::getSample() {
