@@ -1,7 +1,7 @@
 #include "VisualiserComponent.h"
 #include "../LookAndFeel.h"
 
-VisualiserComponent::VisualiserComponent(int numChannels, OscirenderAudioProcessor& p) : numChannels(numChannels), backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), audioProcessor(p), juce::Thread("VisualiserComponent") {
+VisualiserComponent::VisualiserComponent(int numChannels, OscirenderAudioProcessor& p, VisualiserComponent* parent) : numChannels(numChannels), backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), audioProcessor(p), juce::Thread("VisualiserComponent"), parent(parent) {
     resetBuffer();
     startTimerHz(60);
     startThread();
@@ -20,7 +20,12 @@ VisualiserComponent::VisualiserComponent(int numChannels, OscirenderAudioProcess
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
     setWantsKeyboardFocus(true);
     
-    addChildComponent(fullScreenButton);
+    if (parent == nullptr) {
+        addChildComponent(fullScreenButton);
+    }
+    if (child == nullptr && parent == nullptr) {
+        addChildComponent(popOutButton);
+    }
     addChildComponent(settingsButton);
     
     fullScreenButton.onClick = [this]() {
@@ -34,6 +39,21 @@ VisualiserComponent::VisualiserComponent(int numChannels, OscirenderAudioProcess
         menu.addCustomItem(1, intensity, 160, 40, false);
 
         menu.showMenuAsync(juce::PopupMenu::Options(), [this](int result) {});
+    };
+    
+    popOutButton.onClick = [this, numChannels]() {
+        auto visualiser = new VisualiserComponent(numChannels, audioProcessor, this);
+        child = visualiser;
+        popOutButton.setVisible(false);
+        visualiser->setSize(300, 300);
+        popout = std::make_unique<VisualiserWindow>("Software Oscilloscope", this);
+        popout->setContentOwned(visualiser, true);
+        popout->setUsingNativeTitleBar(true);
+        popout->setResizable(true, false);
+        popout->setVisible(true);
+        setPaused(true);
+        resized();
+        popOutButton.setVisible(false);
     };
 }
 
@@ -94,7 +114,8 @@ void VisualiserComponent::paint(juce::Graphics& g) {
         // add text
         g.setColour(juce::Colours::white);
         g.setFont(14.0f);
-        g.drawFittedText("Paused", getLocalBounds(), juce::Justification::centred, 1);
+        auto text = child != nullptr ? "Open in separate window" : "Paused";
+        g.drawFittedText(text, getLocalBounds(), juce::Justification::centred, 1);
     }
 }
 
@@ -114,18 +135,22 @@ void VisualiserComponent::run() {
     }
 }
 
+void VisualiserComponent::setPaused(bool paused) {
+    active = !paused;
+    if (active) {
+        startTimerHz(60);
+        startThread();
+    } else {
+        audioProcessor.consumerStop(consumer);
+        stopTimer();
+        stopThread(1000);
+    }
+    repaint();
+}
+
 void VisualiserComponent::mouseDown(const juce::MouseEvent& event) {
-    if (event.mods.isLeftButtonDown()) {
-        active = !active;
-        if (active) {
-            startTimerHz(60);
-            startThread();
-        } else {
-            audioProcessor.consumerStop(consumer);
-            stopTimer();
-            stopThread(1000);
-        }
-        repaint();
+    if (event.mods.isLeftButtonDown() && child == nullptr) {
+        setPaused(active);
     }
 }
 
@@ -138,16 +163,31 @@ void VisualiserComponent::mouseMove(const juce::MouseEvent& event) {
     
     int newTimerId = juce::Random::getSystemRandom().nextInt();
     timerId = newTimerId;
-    fullScreenButton.setVisible(true);
+    if (parent == nullptr) {
+        fullScreenButton.setVisible(true);
+    }
+    if (child == nullptr && parent == nullptr) {
+        popOutButton.setVisible(true);
+    }
     settingsButton.setVisible(true);
     auto pos = event.getScreenPosition();
+    auto parent = this->parent;
     
-    juce::Timer::callAfterDelay(1000, [this, newTimerId, pos]() {
-        bool onButtonRow = fullScreenButton.getScreenBounds().contains(pos) || settingsButton.getScreenBounds().contains(pos);
-        if (timerId == newTimerId && !onButtonRow) {
-            fullScreenButton.setVisible(false);
-            settingsButton.setVisible(false);
-            repaint();
+    juce::Timer::callAfterDelay(1000, [this, newTimerId, pos, parent]() {
+        if (parent == nullptr || parent->child == this) {
+            bool onButtonRow = settingsButton.getScreenBounds().contains(pos);
+            if (parent == nullptr) {
+                onButtonRow |= fullScreenButton.getScreenBounds().contains(pos);
+            }
+            if (child == nullptr && parent == nullptr) {
+                onButtonRow |= popOutButton.getScreenBounds().contains(pos);
+            }
+            if (timerId == newTimerId && !onButtonRow) {
+                fullScreenButton.setVisible(false);
+                popOutButton.setVisible(false);
+                settingsButton.setVisible(false);
+                repaint();
+            }
         }
     });
     repaint();
@@ -227,6 +267,12 @@ void VisualiserComponent::resized() {
     auto area = getLocalBounds();
     area.removeFromBottom(5);
     auto buttonRow = area.removeFromBottom(25);
-    fullScreenButton.setBounds(buttonRow.removeFromRight(30));
+    
+    if (parent == nullptr) {
+        fullScreenButton.setBounds(buttonRow.removeFromRight(30));
+    }
+    if (child == nullptr && parent == nullptr) {
+        popOutButton.setBounds(buttonRow.removeFromRight(30));
+    }
     settingsButton.setBounds(buttonRow.removeFromRight(30));
 }
