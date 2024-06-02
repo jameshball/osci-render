@@ -19,6 +19,22 @@ VisualiserComponent::VisualiserComponent(int numChannels, OscirenderAudioProcess
 
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
     setWantsKeyboardFocus(true);
+    
+    addChildComponent(fullScreenButton);
+    addChildComponent(settingsButton);
+    
+    fullScreenButton.onClick = [this]() {
+        enableFullScreen();
+    };
+    
+    settingsButton.onClick = [this]() {
+        juce::PopupMenu menu;
+
+        menu.addCustomItem(1, roughness, 160, 40, false);
+        menu.addCustomItem(1, intensity, 160, 40, false);
+
+        menu.showMenuAsync(juce::PopupMenu::Options(), [this](int result) {});
+    };
 }
 
 VisualiserComponent::~VisualiserComponent() {
@@ -30,11 +46,15 @@ void VisualiserComponent::setFullScreenCallback(std::function<void(FullScreenMod
     fullScreenCallback = callback;
 }
 
-void VisualiserComponent::mouseDoubleClick(const juce::MouseEvent& event) {
+void VisualiserComponent::enableFullScreen() {
     if (fullScreenCallback) {
         fullScreenCallback(FullScreenMode::TOGGLE);
     }
     grabKeyboardFocus();
+}
+
+void VisualiserComponent::mouseDoubleClick(const juce::MouseEvent& event) {
+    enableFullScreen();
 }
 
 void VisualiserComponent::setBuffer(std::vector<float>& newBuffer) {
@@ -106,14 +126,31 @@ void VisualiserComponent::mouseDown(const juce::MouseEvent& event) {
             stopThread(1000);
         }
         repaint();
-    } else if (event.mods.isPopupMenu()) {
-        juce::PopupMenu menu;
-
-        menu.addCustomItem(1, roughness, 160, 40, false);
-        menu.addCustomItem(1, intensity, 160, 40, false);
-
-        menu.showMenuAsync(juce::PopupMenu::Options(), [this](int result) {});
     }
+}
+
+void VisualiserComponent::mouseMove(const juce::MouseEvent& event) {
+    if (event.getScreenX() == lastMouseX && event.getScreenY() == lastMouseY) {
+        return;
+    }
+    lastMouseX = event.getScreenX();
+    lastMouseY = event.getScreenY();
+    
+    int newTimerId = juce::Random::getSystemRandom().nextInt();
+    timerId = newTimerId;
+    fullScreenButton.setVisible(true);
+    settingsButton.setVisible(true);
+    auto pos = event.getScreenPosition();
+    
+    juce::Timer::callAfterDelay(1000, [this, newTimerId, pos]() {
+        bool onButtonRow = fullScreenButton.getScreenBounds().contains(pos) || settingsButton.getScreenBounds().contains(pos);
+        if (timerId == newTimerId && !onButtonRow) {
+            fullScreenButton.setVisible(false);
+            settingsButton.setVisible(false);
+            repaint();
+        }
+    });
+    repaint();
 }
 
 bool VisualiserComponent::keyPressed(const juce::KeyPress& key) {
@@ -128,11 +165,7 @@ bool VisualiserComponent::keyPressed(const juce::KeyPress& key) {
 }
 
 void VisualiserComponent::setFullScreen(bool fullScreen) {
-	if (fullScreen) {
-        setTooltip("");
-	} else {
-        setTooltip("Click to pause. Double click to toggle full screen. Right click to change quality and intensity settings.");
-	}
+	// useful as a callback from parent if needed
 }
 
 void VisualiserComponent::paintChannel(juce::Graphics& g, juce::Rectangle<float> area, int channel) {
@@ -188,4 +221,12 @@ void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area
 void VisualiserComponent::resetBuffer() {
     sampleRate = (int) audioProcessor.currentSampleRate;
     tempBuffer = std::vector<float>(2 * sampleRate * BUFFER_LENGTH_SECS);
+}
+
+void VisualiserComponent::resized() {
+    auto area = getLocalBounds();
+    area.removeFromBottom(5);
+    auto buttonRow = area.removeFromBottom(25);
+    fullScreenButton.setBounds(buttonRow.removeFromRight(30));
+    settingsButton.setBounds(buttonRow.removeFromRight(30));
 }
