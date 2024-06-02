@@ -1,5 +1,4 @@
 #include "AboutComponent.h"
-#include <format>
 
 AboutComponent::AboutComponent() {
     addAndMakeVisible(logoComponent);
