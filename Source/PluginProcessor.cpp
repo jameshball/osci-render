@@ -831,11 +831,11 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
 
     if (xml.get() != nullptr && xml->hasTagName("project")) {
         auto versionXml = xml->getChildByName("version");
-        auto version = versionXml != nullptr ? versionXml->getAllSubText() : ProjectInfo::versionString;
         if (versionXml != nullptr && versionXml->getAllSubText().startsWith("v1.")) {
             openLegacyProject(xml.get());
             return;
         }
+        auto version = xml->hasAttribute("version") ? xml->getStringAttribute("version") : "2.0.0";
 
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
