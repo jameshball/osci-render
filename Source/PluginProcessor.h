@@ -241,6 +241,7 @@ public:
     // shouldn't be accessed by audio thread, but needs to persist when GUI is closed
     // so should only be accessed by message thread
     juce::String currentProjectFile;
+    juce::File lastOpenedDirectory = juce::File::getSpecialLocation(juce::File::userHomeDirectory);
 
     juce::SpinLock fontLock;
     juce::Font font = juce::Font(juce::Font::getDefaultSansSerifFontName(), 1.0f, juce::Font::plain);

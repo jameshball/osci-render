@@ -476,7 +476,7 @@ void OscirenderAudioProcessorEditor::newProject() {
 }
 
 void OscirenderAudioProcessorEditor::openProject() {
-    chooser = std::make_unique<juce::FileChooser>("Load osci-render Project", juce::File::getSpecialLocation(juce::File::userHomeDirectory), "*.osci");
+    chooser = std::make_unique<juce::FileChooser>("Load osci-render Project", audioProcessor.lastOpenedDirectory, "*.osci");
     auto flags = juce::FileBrowserComponent::openMode |
         juce::FileBrowserComponent::canSelectFiles;
 
@@ -488,6 +488,7 @@ void OscirenderAudioProcessorEditor::openProject() {
                 audioProcessor.setStateInformation(data.getData(), data.getSize());
             }
             audioProcessor.currentProjectFile = file.getFullPathName();
+            audioProcessor.lastOpenedDirectory = file.getParentDirectory();
             updateTitle();
         }
     });
