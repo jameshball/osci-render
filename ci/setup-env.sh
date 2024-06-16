@@ -30,6 +30,7 @@ elif [ "$OS" = "mac" ]; then
 fi
 
 curl -s -S -L "https://api.juce.com/api/v1/download/juce/latest/$PROJUCER_OS" -o Projucer.zip
+unzip Projucer.zip
 
 # Set Projucer path based on OS
 if [ "$OS" = "mac" ]; then
