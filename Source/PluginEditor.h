@@ -84,7 +84,7 @@ public:
 
     bool usingNativeMenuBar = false;
 
-#if !JUCE_MAC
+#if JUCE_LINUX
     juce::OpenGLContext openGlContext;
 #endif
 
