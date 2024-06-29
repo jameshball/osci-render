@@ -22,12 +22,6 @@
       <GROUP id="{D084D1B2-6804-34C3-C831-231A00F4103A}" name="models">
         <FILE id="LbviBq" name="cube.obj" compile="0" resource="1" file="Resources/models/cube.obj"/>
       </GROUP>
-      <GROUP id="{F3C16D02-63B4-E3DA-7498-901173C37D6C}" name="oscilloscope">
-        <FILE id="dNtZYs" name="noise.jpg" compile="0" resource="1" file="Resources/oscilloscope/noise.jpg"/>
-        <FILE id="YPMnjq" name="oscilloscope.html" compile="0" resource="1"
-              file="Resources/oscilloscope/oscilloscope.html"/>
-        <FILE id="BeXHj7" name="oscilloscope.js" compile="0" resource="1" file="Resources/oscilloscope/oscilloscope.js"/>
-      </GROUP>
       <GROUP id="{82BCD6F1-A8BF-F30B-5587-81EE70168883}" name="svg">
         <FILE id="rl17ZK" name="cog.svg" compile="0" resource="1" file="Resources/svg/cog.svg"/>
         <FILE id="sDajXu" name="delete.svg" compile="0" resource="1" file="Resources/svg/delete.svg"/>

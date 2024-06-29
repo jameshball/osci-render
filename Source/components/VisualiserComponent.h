@@ -66,31 +66,6 @@ private:
     SvgButton popOutButton{ "popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::white };
     SvgButton settingsButton{ "settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white };
     
-    juce::WebBrowserComponent::ResourceProvider provider = [](const juce::String& path) {
-        juce::String mimeType;
-        if (path.endsWith(".html")) {
-            mimeType = "text/html";
-        } else if (path.endsWith(".jpg")) {
-            mimeType = "image/jpeg";
-        } else if (path.endsWith(".js")) {
-            mimeType = "text/javascript";
-        }
-        std::vector<std::byte> data;
-        int size;
-        const char* file = BinaryData::getNamedResource(path.substring(1).replaceCharacter('.', '_').toRawUTF8(), size);
-        for (int i = 0; i < size; i++) {
-            data.push_back((std::byte) file[i]);
-        }
-        juce::WebBrowserComponent::Resource resource = { data, mimeType };
-        return resource;
-    };
-    
-    juce::WebBrowserComponent browser = juce::WebBrowserComponent(
-        juce::WebBrowserComponent::Options()
-        .withNativeIntegrationEnabled()
-        .withResourceProvider(provider)
-    );
-    
     std::vector<float> tempBuffer;
     int precision = 4;
     
