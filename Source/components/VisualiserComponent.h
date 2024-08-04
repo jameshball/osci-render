@@ -100,7 +100,6 @@ private:
         .withResourceProvider(provider)
         .withNativeFunction("toggleFullscreen", [this](auto& var, auto complete) {
             enableFullScreen();
-            complete("toggleFullscreen");
         })
     );
     

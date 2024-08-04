@@ -117,23 +117,10 @@ var UI =
 {
 	sidebarWidth : 360,
 
-	init : function()
-	{
-		var kHzText = (AudioSystem.sampleRate/1000).toFixed(1)+"kHz";
-		document.getElementById("samplerate").innerHTML=kHzText;
+	init : function() {
         mainGain.oninput();
         trigger.oninput();
-		this.xInput = document.getElementById("xInput");
-		this.yInput = document.getElementById("yInput");
-		this.xInput.value = controls.xExpression;
-        this.yInput.value = controls.yExpression;
 	},
-
-	compile : function() //doesn't compile anything anymore
-	{
-		controls.xExpression = this.xInput.value;
-		controls.yExpression = this.yInput.value;
-	}
 }
 
 var Render =
@@ -696,60 +683,66 @@ var sweepPosition = -1;
 var belowTrigger = false;
 
 function doScriptProcessor(event) {
-    fetch(Juce.getBackendResourceAddress("audio"))
-      .then((response) => response.arrayBuffer())
-      .then((buffer) => {
-          var dataView = new DataView(buffer);
+    if (!killed) {
+        fetch(Juce.getBackendResourceAddress("audio"))
+          .then((response) => response.arrayBuffer())
+          .then((buffer) => {
+              var dataView = new DataView(buffer);
 
-          for (var i = 0; i < xSamples.length; i++) {
-              xSamples[i] = dataView.getFloat32(i * 4 * 2, true);
-              ySamples[i] = dataView.getFloat32(i * 4 * 2 + 4, true);
-          }
-
-          if (controls.sweepOn) {
-              var gain = Math.pow(2.0,controls.mainGain);
-              var sweepMinTime = controls.sweepMsDiv*10/1000;
-              var triggerValue = controls.sweepTriggerValue;
-              for (var i=0; i<xSamples.length; i++)
-              {
-                  xSamples[i] = sweepPosition / gain;
-                  sweepPosition += 2*AudioSystem.timePerSample/sweepMinTime;
-                  if (sweepPosition > 1.1 && belowTrigger && ySamples[i]>=triggerValue)
-                      sweepPosition =-1.3;
-                  belowTrigger = ySamples[i]<triggerValue;
+              for (var i = 0; i < xSamples.length; i++) {
+                  xSamples[i] = dataView.getFloat32(i * 4 * 2, true);
+                  ySamples[i] = dataView.getFloat32(i * 4 * 2 + 4, true);
               }
-          }
 
-          if (!controls.freezeImage)
-          {
-              if (!controls.disableFilter)
-              {
-                  Filter.generateSmoothedSamples(AudioSystem.oldXSamples, xSamples, AudioSystem.smoothedXSamples);
-                  Filter.generateSmoothedSamples(AudioSystem.oldYSamples, ySamples, AudioSystem.smoothedYSamples);
-
-                  if (!controls.swapXY) Render.drawLineTexture(AudioSystem.smoothedXSamples, AudioSystem.smoothedYSamples);
-                  else Render.drawLineTexture(AudioSystem.smoothedYSamples, AudioSystem.smoothedXSamples);
+              if (controls.sweepOn) {
+                  var gain = Math.pow(2.0,controls.mainGain);
+                  var sweepMinTime = controls.sweepMsDiv*10/1000;
+                  var triggerValue = controls.sweepTriggerValue;
+                  for (var i=0; i<xSamples.length; i++)
+                  {
+                      xSamples[i] = sweepPosition / gain;
+                      sweepPosition += 2*AudioSystem.timePerSample/sweepMinTime;
+                      if (sweepPosition > 1.1 && belowTrigger && ySamples[i]>=triggerValue)
+                          sweepPosition =-1.3;
+                      belowTrigger = ySamples[i]<triggerValue;
+                  }
               }
-              else
-              {
-                  if (!controls.swapXY) Render.drawLineTexture(xSamples, ySamples);
-                  else Render.drawLineTexture(ySamples, xSamples);
-              }
-          }
 
-          for (var i = 0; i<xSamples.length; i++) {
-              AudioSystem.oldXSamples[i] = xSamples[i];
-              AudioSystem.oldYSamples[i] = ySamples[i];
-          }
-          
-          requestAnimationFrame(drawCRTFrame);
-      });
+              if (!controls.freezeImage)
+              {
+                  if (!controls.disableFilter)
+                  {
+                      Filter.generateSmoothedSamples(AudioSystem.oldXSamples, xSamples, AudioSystem.smoothedXSamples);
+                      Filter.generateSmoothedSamples(AudioSystem.oldYSamples, ySamples, AudioSystem.smoothedYSamples);
+
+                      if (!controls.swapXY) Render.drawLineTexture(AudioSystem.smoothedXSamples, AudioSystem.smoothedYSamples);
+                      else Render.drawLineTexture(AudioSystem.smoothedYSamples, AudioSystem.smoothedXSamples);
+                  }
+                  else
+                  {
+                      if (!controls.swapXY) Render.drawLineTexture(xSamples, ySamples);
+                      else Render.drawLineTexture(ySamples, xSamples);
+                  }
+              }
+
+              for (var i = 0; i<xSamples.length; i++) {
+                  AudioSystem.oldXSamples[i] = xSamples[i];
+                  AudioSystem.oldYSamples[i] = ySamples[i];
+              }
+              
+              
+              
+              requestAnimationFrame(drawCRTFrame);
+          });
+    }
+    
 }
 
 function drawCRTFrame(timeStamp) {
 	Render.drawCRT();
 }
 
+                        
 var xSamples = new Float32Array(1920);
 var ySamples = new Float32Array(1920);
 UI.init();
