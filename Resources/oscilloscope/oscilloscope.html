@@ -1,72 +1,146 @@
 <!DOCTYPE html>
 <head>
 <style>
-audio { width: 100%; }
-body{font: 12px Courier, Monospace;}
-canvas{margin-right: 10px;}
-table {
-  border-spacing:0;
-  border-collapse: collapse;
-}
+    audio {
+        width: 100%;
+    }
+    
+    body {
+        font: 12px Courier, Monospace;
+    }
+    
+    canvas {
+        margin-right: 10px;
+    }
+    
+    table {
+        border-spacing:0;
+        border-collapse: collapse;
+    }
 
+    #buttonRow {
+        position: fixed;
+        bottom: 0;
+        right: 0;
+        display: none;
+    }
+    
+    #buttonRow button {
+        width: 40px;
+        height: 40px;
+        background-color: transparent;
+        background-repeat: no-repeat;
+        border: none;
+        cursor: pointer;
+        overflow: hidden;
+        outline: none;
+        background-size: cover;
+    }
+    
+    #buttonRow button:hover {
+        filter: brightness(70%);
+    }
+    
+    #buttonRow button:active {
+        filter: brightness(50%);
+    }
+    
+    #fullscreen {
+        background: url(fullscreen.svg) no-repeat;
+    }
+    
+    #popout {
+        background: url(open_in_new.svg) no-repeat;
+    }
+    
+    #settings {
+        background: url(cog.svg) no-repeat;
+    }
 </style>
 </head>
 
 <body bgcolor="silver" text="black" autocomplete="off" style="margin: 0px;">
 
+<div id="buttonRow">
+    <button id="fullscreen"/>
+    <button id="popout"/>
+    <button id="settings"/>
+</div>
+    
 <script>
-var controls=
-{
-	swapXY : false,
-    sweepOn : false,
-    sweepMsDiv : 1,
-    sweepTriggerValue : 0,
-	signalGeneratorOn : false,
-	mainGain : 0.0,
-	exposureStops : 0.0,
-	audioVolume : 1.0,
-	hue : 125,
-	freezeImage: false,
-	disableFilter: false,
-	aValue : 1.0,
-	aExponent : 0.0,
-	bValue : 1.0,
-	bExponent :0.0,
-	invertXY : false,
-	grid : true,
-	persistence : 0,
-	xExpression : "sin(2*PI*a*t)*cos(2*PI*b*t)",
-	yExpression : "cos(2*PI*a*t)*cos(2*PI*b*t)",
-}
+    var controls=
+    {
+        swapXY : false,
+        sweepOn : false,
+        sweepMsDiv : 1,
+        sweepTriggerValue : 0,
+        signalGeneratorOn : false,
+        mainGain : 0.0,
+        exposureStops : 0.0,
+        audioVolume : 1.0,
+        hue : 125,
+        freezeImage: false,
+        disableFilter: false,
+        aValue : 1.0,
+        aExponent : 0.0,
+        bValue : 1.0,
+        bExponent :0.0,
+        invertXY : false,
+        grid : true,
+        persistence : 0,
+        xExpression : "sin(2*PI*a*t)*cos(2*PI*b*t)",
+        yExpression : "cos(2*PI*a*t)*cos(2*PI*b*t)",
+    }
 
-Number.prototype.toFixedMinus = function(k)
-{
-	if (this<0) return this.toFixed(k);
-	//else return '\xa0'+this.toFixed(k);
-	else return '+'+this.toFixed(k);
-}
+    Number.prototype.toFixedMinus = function(k)
+    {
+        if (this<0) return this.toFixed(k);
+        //else return '\xa0'+this.toFixed(k);
+        else return '+'+this.toFixed(k);
+    }
 
-var toggleVisible = function(string)
-{
-	var element = document.getElementById(string);
-	console.log(element.style.display);
-	if (element.style.display == "none") element.style.display="block";
-	else element.style.display = "none";
-}
+    var toggleVisible = function(string)
+    {
+        var element = document.getElementById(string);
+        console.log(element.style.display);
+        if (element.style.display == "none") element.style.display="block";
+        else element.style.display = "none";
+    }
 
-
+    let timeout;
+    document.addEventListener("mousemove", function() {
+        const buttons = document.getElementById('buttonRow');
+        buttons.style.display = "block";
+        if (timeout) {
+            clearTimeout(timeout);
+        }
+        timeout = setTimeout(function() {
+            buttons.style.display = "none";
+        }, 1000)
+    });
 
 </script>
 
+<script type="module">
+    import * as Juce from "./index.js";
+    
+    const fullscreen = document.getElementById('fullscreen');
+    const toggleFullscreen = Juce.getNativeFunction("toggleFullscreen");
+    
+    document.addEventListener("dblclick", function() {
+        toggleFullscreen();
+    });
+    
+    fullscreen.onclick = function() {
+        toggleFullscreen();
+    };
+</script>
 
 <table align="center">
 <tr>
 
 <td valign="top" style="padding: 0px;">
 <canvas id="crtCanvas" width="800" height="800"></canvas>
-<b id="clicktostart" style="position: absolute; z-index: 1; left: 100px; top: 50px; width:200px; height:40px; font-size:18px; color: rgb(116, 187, 116);">
-    [CLICK  TO START]
-</b>
 </td>
 <td width="360" valign="top">
 
@@ -659,4 +733,4 @@ var Controls = {
     }
 </script>
 
-<script src="oscilloscope.js"></script>
+<script src="oscilloscope.js" type="module"></script>
