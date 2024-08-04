@@ -99,6 +99,7 @@
         else return '+'+this.toFixed(k);
     }
 
+    console.log()
     var toggleVisible = function(string)
     {
         var element = document.getElementById(string);
@@ -143,14 +144,6 @@
 <canvas id="crtCanvas" width="800" height="800"></canvas>
 </td>
 <td width="360" valign="top">
-
-<br>
-
-<b id="title" style="font-size:26px">&nbsp;XXY  OSCILLOSCOPE </b>  <b id="samplerate"></b>
-
-<br>
-
-<hr noshade>
 
 <table>
 <tr>
@@ -200,15 +193,6 @@ oninput="controls.audioVolume=this.value; audioVolumeOutput.value=parseFloat(thi
 </tr>
 </table>
 
-
-<div id="displayNotes" style="display:none">
-<p><i>Version 0.96 (May 2022). Made
-by <a href="http://venuspatrol.nfshost.com">Neil Thapen</a>.<br>
-Line-drawing code adapted from
-<a href="https://github.com/m1el/woscope">woscope</a> by e1ml.<br>
-Thanks to e1ml and ompuco for inspiration.</i>
-</div>
-
 <hr noshade>
 
 <p><b style="font-size:18px">
@@ -235,95 +219,6 @@ oninput="controls.sweepMsDiv=Math.pow(2, this.value-2); msDivOutput.value = cont
 </td>
 </tr>
 </table>
-
-
-<hr noshade>
-
-<p><b style="font-size:18px">
-<input id="generatorCheckbox" type="checkbox" onchange="controls.signalGeneratorOn=this.checked"> SIGNAL GENERATOR</b>
-
-<p>&nbspx = <input type="text" size="37" id="xInput" value = ""
-onkeydown = "if (event.keyCode == 13) {UI.compile(); xNote.value='';}"
-oninput = "if (this.value != controls.xExpression) xNote.value='X'; else xNote.value='';"/>
- <output id="xNote"> </output><br>
-
-&nbspy = <input type="text" size="37" id="yInput" value = ""
-onkeydown = "if (event.keyCode == 13) {UI.compile(); yNote.value='';}"
-oninput = "if (this.value != controls.yExpression) yNote.value='X'; else yNote.value='';"/>
- <output id="yNote"> </output><br>
-
-
-<table border="0">
-<tr>
-<td width="155"></td> <td width="45"></td><td width="155"></td> <td width="45"></td>
-</tr><tr>
-<td align="right">Parameter a</td> <td></td>
- <td><input id="aExponent" type="range" style="width:90%" min="0" max="3" value=0 step=1
-oninput="controls.aExponent=this.value; aExponentOutput.value=['  x1',' x10','x100','x1000'][this.value]"></td>
- <td> <output id="aExponentOutput">  x1</td>
-</tr><tr>
-<td colspan="3"><input id="aValue" type="range" style="width:95%" min="0.5" max="5.00" value=1.0 step=0.02
-oninput="controls.aValue=this.value; aValueOutput.value=parseFloat(this.value).toFixed(2)"><br></td>
- <td> <output id="aValueOutput">1.00</td>
- </tr>
- <tr><td height="5"></td></tr>
- <tr>
-<td align="right">Parameter b</td> <td></td>
- <td><input id="bExponent" type="range" style="width:90%" min="0" max="3" value=0 step=1
-oninput="controls.bExponent=this.value; bExponentOutput.value=['  x1',' x10','x100','x1000'][this.value]"></td>
- <td> <output id="bExponentOutput">  x1</td>
-</tr><tr>
-<td colspan="3"><input id="bValue" type="range" style="width:95%" min="0.5" max="5.00" value=1.0 step=0.02
-oninput="controls.bValue=this.value; bValueOutput.value=parseFloat(this.value).toFixed(2)"></td>
- <td> <output id="bValueOutput">1.00</td></tr>
-</table>
-
-<div id="generatorNotes" style="display:none">
-<p><i>Use javascript expressions, e.g. 'Math.tan(t)'.<br>
-t is the time, n is the number of samples.</i>
-</div>
-
-<hr noshade>
-
-<p><b style="font-size:18px">
-<input type="checkbox" id="micCheckbox"
-onchange="if (this.checked) AudioSystem.tryToGetMicrophone(); else AudioSystem.disconnectMicrophone()"> MICROPHONE</b>
-<output id="microphoneOutput">
-
-
-<div id="micNotes" style="display:none"><i>
-Set "Audio Volume" to zero to avoid feedback.<br>
-Stereo input may not work in some browsers.<br>
-<p>To get audio from another program,
-you can either physically connect your audio output to your audio input,
-or use third party software.
-E.g. <a href="http://vb-audio.pagesperso-orange.fr/Cable/">VB-CABLE</a> on Windows,
-or <a href="https://github.com/mattingalls/Soundflower">Soundflower</a> with
- <a href="https://github.com/mLupine/SoundflowerBed">SoundflowerBed</a> on Mac.
-</i></div>
-
-<hr noshade>
-
-<table>
-<tr>
-<td width=200><b style="font-size:18px"> PLAY FILE<b></td>
-<td width=200><input id="audioFile" type="file" accept="audio/*" /></td>
-</tr>
-</table>
-
-<p><audio id="audioElement" controls></audio>
-
-<script>
-var file;
-audioFile.onchange = function()
-{
-	if (file) URL.revokeObjectURL(file)
-    var files = this.files;
-    file = URL.createObjectURL(files[0]);
-    audioElement.src = file;
-    audioElement.play();
-};
-</script>
 
 <hr noshade>
 
@@ -355,19 +250,16 @@ oninput="controls.persistence=this.value; persistenceOutput.value=parseFloat(thi
 </td></tr>
 <tr><td>
 &nbsp <input id="hideGrid" type="checkbox"
-onchange="controls.grid=!controls.grid; if (Render) Render.screenTexture = Render.loadTexture('noise.jpg');"> Hide graticule
+onchange="controls.grid=!controls.grid"> Hide graticule
 </td></tr>
 </table>
 </td>
 
 </tr></table>
 
-
-<input id="urlText" type="text" size="28" style="margin-top:5px" onclick="Controls.generateUrl()"
-value=" export current settings as a URL">
-&nbsp<a href="javascript:restoreDefaults();">[reset all]</a>
-
 <script>
+    
+var killed = false;
 
 var Controls = {
     generateUrl : function()
@@ -479,7 +371,6 @@ var Controls = {
 
 </script>
 
-<div id="extraNotes" style="display:none">
 </div>
 
 
