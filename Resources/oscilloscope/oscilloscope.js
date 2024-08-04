@@ -1,3 +1,4 @@
+import * as Juce from "./index.js";
 
 var AudioSystem =
 {
@@ -5,160 +6,19 @@ var AudioSystem =
 
     init : function (bufferSize)
     {
-        window.AudioContext = window.AudioContext||window.webkitAudioContext;
-        this.audioContext = new window.AudioContext();
-        this.sampleRate = this.audioContext.sampleRate;
+        this.sampleRate = 96000;
         this.bufferSize = bufferSize;
         this.timePerSample = 1/this.sampleRate;
         this.oldXSamples = new Float32Array(this.bufferSize);
 		this.oldYSamples = new Float32Array(this.bufferSize);
     	this.smoothedXSamples = new Float32Array(Filter.nSmoothedSamples);
     	this.smoothedYSamples = new Float32Array(Filter.nSmoothedSamples);
-
-    	if (!(navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia))
-    	{
-    		microphoneOutput.value = " unavailable in this browser";
-    	}
     },
 
     startSound : function()
     {
-    	var audioElement = document.getElementById("audioElement");
-    	this.source = this.audioContext.createMediaElementSource(audioElement);
-		this.audioVolumeNode = this.audioContext.createGain();
-
-		this.generator = this.audioContext.createScriptProcessor(this.bufferSize, 0, 2);
-		this.generator.onaudioprocess = SignalGenerator.generate;
-
-        this.scopeNode = this.audioContext.createScriptProcessor(this.bufferSize, 2, 2);
-        this.scopeNode.onaudioprocess = doScriptProcessor;
-        this.source.connect(this.scopeNode);
-    	this.generator.connect(this.scopeNode);
-
-        this.scopeNode.connect(this.audioVolumeNode);
-        this.audioVolumeNode.connect(this.audioContext.destination);
-    },
-
-    tryToGetMicrophone : function()
-    {
-        if (this.microphoneActive)
-        {
-            AudioSystem.microphone.connect(AudioSystem.scopeNode);
-						audioVolume.value = 0.0;
-				    audioVolume.oninput();
-            return;
-        }
-
-    	var constraints = {audio:  { mandatory: { echoCancellation: false }}};
-    	//var constraints = {audio: {echoCancellation: false} };
-    	navigator.getUserMedia = navigator.getUserMedia ||
-                         navigator.webkitGetUserMedia ||
-                         navigator.mozGetUserMedia;
-        if (navigator.getUserMedia)
-        {
-			navigator.getUserMedia(constraints, onStream, function(){micCheckbox.checked = false;});
-       	}
-       	else
-       	{
-       		micCheckbox.checked = false;
-       	}
-    },
-
-    disconnectMicrophone : function()
-	{
-		if (this.microphone) this.microphone.disconnect();
-	}
-}
-
-
-
-onStream = function(stream)
-{
-    AudioSystem.microphoneActive = true;
-	  AudioSystem.microphone = AudioSystem.audioContext.createMediaStreamSource(stream);
-	  AudioSystem.microphone.connect(AudioSystem.scopeNode);
-
-    audioVolume.value = 0.0;
-    audioVolume.oninput();
-};
-
-var SignalGenerator =
-{
-	oldA : 1.0,
-	oldB : 1.0,
-	timeInSamples : 0,
-
-	generate : function(event)
-	{
-		var xOut = event.outputBuffer.getChannelData(0);
-		var yOut = event.outputBuffer.getChannelData(1);
-		var newA = controls.aValue * Math.pow(10.0, controls.aExponent);
-		var newB = controls.bValue * Math.pow(10.0, controls.bExponent);
-		var oldA = SignalGenerator.oldA;
-		var oldB = SignalGenerator.oldB;
-		var PI = Math.PI;
-		var cos = Math.cos;
-		var sin = Math.sin;
-		var xFunc = eval("(function xFunc(){return "+controls.xExpression+";})");
-		var yFunc = eval("(function yFunc(){return "+controls.yExpression+";})");
-		var bufferSize = AudioSystem.bufferSize;
-		var timeInSamples = SignalGenerator.timeInSamples;
-		var sampleRate = AudioSystem.sampleRate;
-		var x = 0.0;
-		var y = 0.0;
-		if (!controls.signalGeneratorOn)
-		{
-			for (var i=0; i<bufferSize; i++)
-			{
-				xOut[i] = 0;
-				yOut[i] = 0;
-			}
-		}
-		else if ((newA == oldA) && (newB == oldB))
-		{
-			var n = timeInSamples;
-			for (var i=0; i<bufferSize; i++)
-			{
-				var t = n/sampleRate;
-				var a = newA;
-				var b = newB;
-				x = xFunc();
-				y = yFunc();
-				xOut[i] = x;
-				yOut[i] = y;
-				n += 1;
-			}
-		}
-		else
-		{
-			var n = timeInSamples;
-			for (var i=0; i<bufferSize; i++)
-			{
-				var t = n/sampleRate;
-
-				var a = oldA;
-				var b = oldB;
-				var oldX = xFunc();
-				var oldY = yFunc();
-				a = newA;
-				b = newB;
-				var newX = xFunc();
-				var newY = yFunc();
-				var alpha_z = i/bufferSize;
-				x = oldX*(1.0-alpha_z)+newX*alpha_z;
-				y = oldY*(1.0-alpha_z)+newY*alpha_z;
-
-				xOut[i] = x;
-				yOut[i] = y;
-				n += 1;
-			}
-		}
-
-		SignalGenerator.timeInSamples += AudioSystem.bufferSize;
-		SignalGenerator.oldA = newA;
-		SignalGenerator.oldB = newB;
-	}
-
+        const audioUpdated = window.__JUCE__.backend.addEventListener("audioUpdated", doScriptProcessor);
+    }
 }
 
 var Filter =
@@ -756,32 +616,6 @@ var Render =
 		gl.bindRenderbuffer(gl.RENDERBUFFER, null);
 	},
 
-	drawSimpleLine : function(xSamples, ySamples, colour)
-	{
-		var nVertices = xSamples.length;
-		var vertices = new Float32Array(2*nVertices);
-		for (var i=0; i<nVertices; i++)
-		{
-			vertices[2*i] = xSamples[i];
-			vertices[2*i+1] = ySamples[i];
-		}
-
-		this.setAdditiveBlending();
-
-		var program = this.simpleShader;
-		gl.useProgram(program);
-		gl.enableVertexAttribArray(program.vertexPosition);
-		gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
-   		gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-		gl.vertexAttribPointer(program.vertexPosition, 2, gl.FLOAT, false, 0, 0);
-		gl.bindBuffer(gl.ARRAY_BUFFER, null);
-		if (colour=="green") gl.uniform4fv(program.colour, [0.01, 0.1, 0.01, 1.0]);
-		else if (colour == "red") gl.uniform4fv(program.colour, [0.1, 0.01, 0.01, 1.0]);
-
-		gl.lineWidth(3.0);
-		gl.drawArrays(gl.LINE_STRIP, 0, nVertices);
-	},
-
 	setAdditiveBlending : function()
 	{
 		//gl.blendEquation( gl.FUNC_ADD );
@@ -861,82 +695,68 @@ var Render =
 var sweepPosition = -1;
 var belowTrigger = false;
 
-function doScriptProcessor(event)
-{
-	var xSamplesRaw = event.inputBuffer.getChannelData(0);
-	var ySamplesRaw = event.inputBuffer.getChannelData(1);
-	var xOut = event.outputBuffer.getChannelData(0);
-	var yOut = event.outputBuffer.getChannelData(1);
+function doScriptProcessor(event) {
+    fetch(Juce.getBackendResourceAddress("audio"))
+      .then((response) => response.arrayBuffer())
+      .then((buffer) => {
+          var dataView = new DataView(buffer);
 
-	var length = xSamplesRaw.length;
-	for (var i=0; i<length; i++)
-	{
-		xSamples[i] = xSamplesRaw[i];// + (Math.random()-0.5)*controls.noise/2000;
-		ySamples[i] = ySamplesRaw[i];// + (Math.random()-0.5)*controls.noise/2000;
-	}
+          for (var i = 0; i < xSamples.length; i++) {
+              xSamples[i] = dataView.getFloat32(i * 4 * 2, true);
+              ySamples[i] = dataView.getFloat32(i * 4 * 2 + 4, true);
+          }
 
-    if (controls.sweepOn)
-    {
-        var gain = Math.pow(2.0,controls.mainGain);
-        var sweepMinTime = controls.sweepMsDiv*10/1000;
-        var triggerValue = controls.sweepTriggerValue;
-        for (var i=0; i<length; i++)
-        {
-            xSamples[i] = sweepPosition / gain;
-            sweepPosition += 2*AudioSystem.timePerSample/sweepMinTime;
-            if (sweepPosition > 1.1 && belowTrigger && ySamples[i]>=triggerValue)
-                sweepPosition =-1.3;
-            belowTrigger = ySamples[i]<triggerValue;
-        }
-    }
+          if (controls.sweepOn) {
+              var gain = Math.pow(2.0,controls.mainGain);
+              var sweepMinTime = controls.sweepMsDiv*10/1000;
+              var triggerValue = controls.sweepTriggerValue;
+              for (var i=0; i<xSamples.length; i++)
+              {
+                  xSamples[i] = sweepPosition / gain;
+                  sweepPosition += 2*AudioSystem.timePerSample/sweepMinTime;
+                  if (sweepPosition > 1.1 && belowTrigger && ySamples[i]>=triggerValue)
+                      sweepPosition =-1.3;
+                  belowTrigger = ySamples[i]<triggerValue;
+              }
+          }
 
-	if (!controls.freezeImage)
-	{
-		if (!controls.disableFilter)
-		{
-			Filter.generateSmoothedSamples(AudioSystem.oldXSamples, xSamples, AudioSystem.smoothedXSamples);
-			Filter.generateSmoothedSamples(AudioSystem.oldYSamples, ySamples, AudioSystem.smoothedYSamples);
+          if (!controls.freezeImage)
+          {
+              if (!controls.disableFilter)
+              {
+                  Filter.generateSmoothedSamples(AudioSystem.oldXSamples, xSamples, AudioSystem.smoothedXSamples);
+                  Filter.generateSmoothedSamples(AudioSystem.oldYSamples, ySamples, AudioSystem.smoothedYSamples);
 
-			if (!controls.swapXY) Render.drawLineTexture(AudioSystem.smoothedXSamples, AudioSystem.smoothedYSamples);
-			else Render.drawLineTexture(AudioSystem.smoothedYSamples, AudioSystem.smoothedXSamples);
-		}
-		else
-		{
-			if (!controls.swapXY) Render.drawLineTexture(xSamples, ySamples);
-			else Render.drawLineTexture(ySamples, xSamples);
-		}
-	}
+                  if (!controls.swapXY) Render.drawLineTexture(AudioSystem.smoothedXSamples, AudioSystem.smoothedYSamples);
+                  else Render.drawLineTexture(AudioSystem.smoothedYSamples, AudioSystem.smoothedXSamples);
+              }
+              else
+              {
+                  if (!controls.swapXY) Render.drawLineTexture(xSamples, ySamples);
+                  else Render.drawLineTexture(ySamples, xSamples);
+              }
+          }
 
-	for (var i = 0; i<length; i++)
-	{
-		AudioSystem.oldXSamples[i] = xSamples[i];
-		AudioSystem.oldYSamples[i] = ySamples[i];
-		xOut[i] = xSamplesRaw[i];
-		yOut[i] = ySamplesRaw[i];
-	}
-
-	AudioSystem.audioVolumeNode.gain.value = controls.audioVolume;
+          for (var i = 0; i<xSamples.length; i++) {
+              AudioSystem.oldXSamples[i] = xSamples[i];
+              AudioSystem.oldYSamples[i] = ySamples[i];
+          }
+          
+          requestAnimationFrame(drawCRTFrame);
+      });
 }
 
-function drawCRTFrame(timeStamp)
-{
+function drawCRTFrame(timeStamp) {
 	Render.drawCRT();
-	requestAnimationFrame(drawCRTFrame);
 }
 
-var xSamples = new Float32Array(1024);
-var ySamples = new Float32Array(1024);
+var xSamples = new Float32Array(1920);
+var ySamples = new Float32Array(1920);
 UI.init();
 Render.init();
-
-document.onclick = function(){ // quick fix to get around autoplay rules, May 2022 
-	document.onclick = null;
-	document.getElementById("clicktostart").remove();
-	//Filter.init(512, 10, 4);
-	Filter.init(1024, 8, 6);
-	AudioSystem.init(1024);
-	Render.setupArrays(Filter.nSmoothedSamples);
-	AudioSystem.startSound();
-	requestAnimationFrame(drawCRTFrame);
-	Controls.setupControls();
-};
+Filter.init(1920, 8, 6);
+AudioSystem.init(1920);
+Render.setupArrays(Filter.nSmoothedSamples);
+AudioSystem.startSound();
+requestAnimationFrame(drawCRTFrame);
+Controls.setupControls();

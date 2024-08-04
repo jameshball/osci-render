@@ -109,6 +109,7 @@ void VisualiserComponent::paint(juce::Graphics& g) {
 //        }
 //    }
 //
+    
     if (!active) {
         // add translucent layer
         g.setColour(juce::Colours::black.withAlpha(0.5f));
@@ -134,6 +135,7 @@ void VisualiserComponent::run() {
         
         consumer = audioProcessor.consumerRegister(tempBuffer);
         audioProcessor.consumerRead(consumer);
+        browser.emitEventIfBrowserIsVisible("audioUpdated", {});
         setBuffer(tempBuffer);
     }
 }
@@ -208,7 +210,7 @@ bool VisualiserComponent::keyPressed(const juce::KeyPress& key) {
 }
 
 void VisualiserComponent::setFullScreen(bool fullScreen) {
-	// useful as a callback from parent if needed
+    browser.goToURL(juce::WebBrowserComponent::getResourceProviderRoot() + "oscilloscope.html");
 }
 
 void VisualiserComponent::paintChannel(juce::Graphics& g, juce::Rectangle<float> area, int channel) {

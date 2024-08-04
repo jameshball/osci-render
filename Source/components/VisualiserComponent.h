@@ -66,14 +66,23 @@ private:
     SvgButton popOutButton{ "popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::white };
     SvgButton settingsButton{ "settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white };
     
-    juce::WebBrowserComponent::ResourceProvider provider = [](const juce::String& path) {
+    juce::WebBrowserComponent::ResourceProvider provider = [this](const juce::String& path) {
         juce::String mimeType;
-        if (path.endsWith(".html")) {
+        if (path.endsWith("audio")) {
+            mimeType = "application/octet-stream";
+            juce::CriticalSection::ScopedLockType scope(lock);
+            std::vector<std::byte> data(buffer.size() * sizeof(float));
+            std::memcpy(data.data(), buffer.data(), data.size());
+            juce::WebBrowserComponent::Resource resource = { data, mimeType };
+            return resource;
+        } else if (path.endsWith(".html")) {
             mimeType = "text/html";
         } else if (path.endsWith(".jpg")) {
             mimeType = "image/jpeg";
         } else if (path.endsWith(".js")) {
             mimeType = "text/javascript";
+        }  else if (path.endsWith(".svg")) {
+            mimeType = "image/svg+xml";
         }
         std::vector<std::byte> data;
         int size;
@@ -89,6 +98,10 @@ private:
         juce::WebBrowserComponent::Options()
         .withNativeIntegrationEnabled()
         .withResourceProvider(provider)
+        .withNativeFunction("toggleFullscreen", [this](auto& var, auto complete) {
+            enableFullScreen();
+            complete("toggleFullscreen");
+        })
     );
     
     std::vector<float> tempBuffer;
