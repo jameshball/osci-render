@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<head>
+<style>
+    audio {
+        width: 100%;
+    }
+    
+    body {
+        font: 12px Courier, Monospace;
+    }
+    
+    canvas {
+        margin-right: 10px;
+    }
+    
+    table {
+        border-spacing:0;
+        border-collapse: collapse;
+    }
+
+    #buttonRow {
+        position: fixed;
+        bottom: 0;
+        right: 0;
+        display: none;
+    }
+    
+    #buttonRow button {
+        width: 40px;
+        height: 40px;
+        background-color: transparent;
+        background-repeat: no-repeat;
+        border: none;
+        cursor: pointer;
+        overflow: hidden;
+        outline: none;
+        background-size: cover;
+    }
+    
+    #buttonRow button:hover {
+        filter: brightness(70%);
+    }
+    
+    #buttonRow button:active {
+        filter: brightness(50%);
+    }
+    
+    #fullscreen {
+        background: url(fullscreen.svg) no-repeat;
+    }
+    
+    #popout {
+        background: url(open_in_new.svg) no-repeat;
+    }
+    
+    #settings {
+        background: url(cog.svg) no-repeat;
+    }
+</style>
+</head>
+
+<body bgcolor="silver" text="black" autocomplete="off" style="margin: 0px;">
+
+<div id="buttonRow">
+    <button id="fullscreen"/>
+    <button id="popout"/>
+    <button id="settings"/>
+</div>
+    
+<script>
+    var controls=
+    {
+        swapXY : false,
+        sweepOn : false,
+        sweepMsDiv : 1,
+        sweepTriggerValue : 0,
+        signalGeneratorOn : false,
+        mainGain : 0.0,
+        exposureStops : 0.0,
+        audioVolume : 1.0,
+        hue : 125,
+        freezeImage: false,
+        disableFilter: false,
+        aValue : 1.0,
+        aExponent : 0.0,
+        bValue : 1.0,
+        bExponent :0.0,
+        invertXY : false,
+        grid : true,
+        persistence : 0,
+        xExpression : "sin(2*PI*a*t)*cos(2*PI*b*t)",
+        yExpression : "cos(2*PI*a*t)*cos(2*PI*b*t)",
+    }
+
+    Number.prototype.toFixedMinus = function(k)
+    {
+        if (this<0) return this.toFixed(k);
+        //else return '\xa0'+this.toFixed(k);
+        else return '+'+this.toFixed(k);
+    }
+
+    console.log()
+    var toggleVisible = function(string)
+    {
+        var element = document.getElementById(string);
+        console.log(element.style.display);
+        if (element.style.display == "none") element.style.display="block";
+        else element.style.display = "none";
+    }
+
+    let timeout;
+    document.addEventListener("mousemove", function() {
+        const buttons = document.getElementById('buttonRow');
+        buttons.style.display = "block";
+        if (timeout) {
+            clearTimeout(timeout);
+        }
+        timeout = setTimeout(function() {
+            buttons.style.display = "none";
+        }, 1000)
+    });
+
+</script>
+
+<script type="module">
+    import * as Juce from "./index.js";
+    
+    const fullscreen = document.getElementById('fullscreen');
+    const toggleFullscreen = Juce.getNativeFunction("toggleFullscreen");
+    
+    document.addEventListener("dblclick", function() {
+        toggleFullscreen();
+    });
+    
+    fullscreen.onclick = function() {
+        toggleFullscreen();
+    };
+</script>
+
+<table align="center">
+<tr>
+
+<td valign="top" style="padding: 0px;">
+<canvas id="crtCanvas" width="800" height="800"></canvas>
+</td>
+<td width="360" valign="top">
+
+<table>
+<tr>
+<td> <!--TOP LEFT CONTROL-->
+<table>
+<tr><td align="center">Gain</td></tr>
+<tr><td><input id="mainGain" type="range" width="200" min="-1" max="4" value=0.0 step=0.05
+oninput="controls.mainGain=mainGain.value; mainGainOutput.value=parseFloat(mainGain.value).toFixedMinus(2)+'&nbsp;'"></td>
+ <td> <output id="mainGainOutput">+0.00</td>
+</tr></table>
+</td>
+
+<td> <!--TOP RIGHT CONTROL-->
+<table>
+<tr><td align="center">Intensity</td></tr>
+<tr><td><input  id="exposure" type="range" width="200" min="-2" max="2" value=0.0 step=0.1
+oninput="controls.exposureStops=this.value; exposureOutput.value=parseFloat(this.value).toFixedMinus(1)"></td>
+ <td> <output id="exposureOutput">+0.0</td>
+</tr></table>
+</td>
+
+<tr>
+<td> <!--BOTTOM LEFT CONTROL-->
+<table>
+<tr><td align="center">Audio volume</td></tr>
+<tr><td><input id="audioVolume" type="range" width="200" min="0" max="1" value=1.0 step=0.01
+oninput="controls.audioVolume=this.value; audioVolumeOutput.value=parseFloat(this.value).toFixed(2)"></td>
+ <td> <output id="audioVolumeOutput">1.00</td>
+</tr></table>
+</td>
+
+
+
+<td> <!--BOTTOM RIGHT CONTROL-->
+<table>
+<tr><td> &nbsp
+<input id="swapXY" type="checkbox" onchange="controls.swapXY=this.checked"> Swap x / y
+</td></tr>
+<tr><td> &nbsp
+<input id="invertXY" type="checkbox" onchange="controls.invertXY=this.checked"> Invert x and y
+</td></tr>
+</table><div align="right">
+<a href="javascript:toggleVisible('displayNotes'); toggleVisible('generatorNotes'); toggleVisible('micNotes');">(notes)</a>
+</div>
+</td>
+
+</tr>
+</table>
+
+<hr noshade>
+
+<p><b style="font-size:18px">
+<input id="sweepCheckbox" type="checkbox" onchange="controls.sweepOn=this.checked"> SWEEP</b>
+
+<table>
+<tr>
+<td>
+<table>
+<tr><td align="center">Trigger value</td></tr>
+<tr><td><input  id="trigger" type="range" width="200" min="-1" max="1" value=0.0 step=0.001
+oninput="controls.sweepTriggerValue=0.5*this.value*Math.abs(this.value); triggerOutput.value=parseFloat(controls.sweepTriggerValue).toFixedMinus(2)+'&nbsp;'"></td>
+ <td> <output id="triggerOutput">+0.00</td>
+</tr></table>
+</td>
+
+<td>
+<table>
+<tr><td align="center">Milliseconds/div</td></tr>
+<tr><td><input id="msDiv" type="range" width="200" min="0" max="7" value=2 step=1
+oninput="controls.sweepMsDiv=Math.pow(2, this.value-2); msDivOutput.value = controls.sweepMsDiv"></td>
+ <td> <output id="msDivOutput">1</td>
+</tr></table>
+</td>
+</tr>
+</table>
+
+<hr noshade>
+
+
+<table><tr>
+
+<td>
+<table>
+<tr><td align="center">Hue</td></tr>
+<tr><td><input id="hue" type="range" width="200" min="0" max="359" value=125 step=1
+oninput="controls.hue=this.value; hueOutput.value=this.value"></td>
+ <td width=35> <output id="hueOutput">125</td>
+</tr>
+<tr><td align="center">Persistence</td></tr>
+<tr><td><input id="persistence" type="range" width="200" min="-1" max="1" value=0 step=0.01
+oninput="controls.persistence=this.value; persistenceOutput.value=parseFloat(this.value).toFixedMinus(1)"></td>
+ <td width=35> <output id="persistenceOutput">0.00</td>
+</tr>
+</table>
+</td>
+
+<td>
+<table>
+<tr><td>
+&nbsp <input id="freeze" type="checkbox" onchange="controls.freezeImage=this.checked"> Freeze image
+</td></tr>
+<tr><td>
+&nbsp <input id="disableFilter" type="checkbox" onchange="controls.disableFilter=this.checked"> Disable upsampling
+</td></tr>
+<tr><td>
+&nbsp <input id="hideGrid" type="checkbox"
+onchange="controls.grid=!controls.grid"> Hide graticule
+</td></tr>
+</table>
+</td>
+
+</tr></table>
+
+<script>
+    
+var killed = false;
+
+var Controls = {
+    generateUrl : function()
+    {
+        var locationString = location.toString();
+        var site = locationString.split('#')[0];
+        //var jsonText = JSON.stringify(getControlsArray());
+        //jsonText = jsonText.replace(/"/g, 'Q');
+        //var hm = encodeURI(jsonText);
+        var text = this.getControlsArray().toString();
+        var hm = encodeURI(text);
+        urlText.value = site+'#'+hm;
+        urlText.select();
+    },
+
+    getControlsArray : function()
+    {
+      var a = [];
+      a.push(mainGain.value);
+      a.push(exposure.value);
+      //a.push(audioVolume.value);
+      a.push(0+swapXY.checked);
+      a.push(0+invertXY.checked);
+      a.push(0+sweepCheckbox.checked);
+      a.push(trigger.value);
+      a.push(msDiv.value);
+      a.push(0+generatorCheckbox.checked);
+      a.push(this.encodeString(xInput.value));
+      a.push(this.encodeString(yInput.value));
+      a.push(aExponent.value);
+      a.push(aValue.value);
+      a.push(bExponent.value);
+      a.push(bValue.value);
+      // don't try to record microphone status
+      a.push(hue.value);
+      a.push(persistence.value);
+      a.push(0+disableFilter.checked);
+      a.push(0+hideGrid.checked);
+      return a;
+    },
+
+    setupControls : function()
+    {
+        var locationString = location.toString();
+        if (!(locationString.includes('#'))) return;
+        var hash = locationString.split('#')[1];
+        var arrayString = decodeURI(hash);
+        var a = arrayString.split(',');
+        this.setupSlider(mainGain, a.shift());
+        this.setupSlider(exposure, a.shift());
+        //this.setupSlider(audioVolume, a.shift());
+        this.setupSlider(audioVolume, "0");
+        this.setupCheckbox(swapXY, a.shift());
+        this.setupCheckbox(invertXY, a.shift());
+        this.setupCheckbox(sweepCheckbox, a.shift());
+        this.setupSlider(trigger, a.shift());
+        this.setupSlider(msDiv, a.shift());
+        this.setupCheckbox(generatorCheckbox, a.shift());
+        this.setupString(xInput, a.shift());
+        this.setupString(yInput, a.shift());
+        this.setupSlider(aExponent, a.shift());
+        this.setupSlider(aValue, a.shift());
+        this.setupSlider(bExponent, a.shift());
+        this.setupSlider(bValue, a.shift());   
+        this.setupSlider(hue, a.shift());
+        this.setupSlider(persistence, a.shift());
+        this.setupCheckbox(disableFilter, a.shift());
+        this.setupCheckbox(hideGrid, a.shift());
+        UI.compile();
+    },
+
+    encodeString : function(s)
+    {
+        s=s.replace(/ /g,"");
+        s=s.replace(/,/g,";");
+        return s;
+    },
+
+    decodeString : function(s)
+    {  
+        s=s.replace(/;/,",");
+        return s;
+    },
+
+    setupSlider : function(slider, s)
+    {
+        slider.value = parseFloat(s);
+        slider.oninput();
+    },
+
+    setupCheckbox : function(checkbox, s)
+    {
+        checkbox.checked = parseInt(s);
+        checkbox.onchange();
+    },
+
+    setupString : function(inp, s)
+    {
+        inp.value = this.decodeString(s);
+    },
+
+    restoreDefaults : function()
+    {
+        var locationString = location.toString();
+        var site = locationString.split('#')[0];
+        location = site;
+    }
+}
+
+</script>
+
+</div>
+
+
+<!-- XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX -->
+
+
+</td>
+</tr>
+</table>
+
+
+<script id="vertex" type="x-shader">
+	attribute vec2 vertexPosition;
+	void main()
+	{
+		gl_Position = vec4(vertexPosition, 0.0, 1.0);
+	}
+</script>
+
+<script id="fragment" type="x-shader">
+	precision highp float;
+	uniform vec4 colour;
+	void main()
+	{
+		gl_FragColor = colour;
+	}
+</script>
+
+<!-- The Gaussian line-drawing code, the next two shaders, is adapted
+	 from woscope by e1ml : https://github.com/m1el/woscope -->
+
+<script id="gaussianVertex" type="x-shader">
+	#define EPS 1E-6
+	uniform float uInvert;
+	uniform float uSize;
+	uniform float uNEdges;
+	uniform float uFadeAmount;
+	uniform float uIntensity;
+	uniform float uGain;
+	attribute vec2 aStart, aEnd;
+	attribute float aIdx;
+	varying vec4 uvl;
+	varying vec2 vTexCoord;
+	varying float vLen;
+	varying float vSize;
+	void main () {
+		float tang;
+		vec2 current;
+		// All points in quad contain the same data:
+		// segment start point and segment end point.
+		// We determine point position using its index.
+		float idx = mod(aIdx,4.0);
+
+		// `dir` vector is storing the normalized difference
+		// between end and start
+		vec2 dir = (aEnd-aStart)*uGain;
+		uvl.z = length(dir);
+
+		if (uvl.z > EPS)
+		{
+			dir = dir / uvl.z;
+			vSize = 0.006/pow(uvl.z,0.08);
+		}
+		else
+		{
+		// If the segment is too short, just draw a square
+			dir = vec2(1.0, 0.0);
+			vSize = 0.006/pow(EPS,0.08);
+		}
+
+		vSize = uSize;
+		vec2 norm = vec2(-dir.y, dir.x);
+
+		if (idx >= 2.0) {
+			current = aEnd*uGain;
+			tang = 1.0;
+			uvl.x = -vSize;
+		} else {
+			current = aStart*uGain;
+			tang = -1.0;
+			uvl.x = uvl.z + vSize;
+		}
+		// `side` corresponds to shift to the "right" or "left"
+		float side = (mod(idx, 2.0)-0.5)*2.0;
+		uvl.y = side * vSize;
+
+		uvl.w = uIntensity*mix(1.0-uFadeAmount, 1.0, floor(aIdx / 4.0 + 0.5)/uNEdges);
+
+		vec4 pos = vec4((current+(tang*dir+norm*side)*vSize)*uInvert,0.0,1.0);
+		gl_Position = pos;
+        vTexCoord = 0.5*pos.xy+0.5;
+        //float seed = floor(aIdx/4.0);
+        //seed = mod(sin(seed*seed), 7.0);
+        //if (mod(seed/2.0, 1.0)<0.5) gl_Position = vec4(10.0);
+	}
+</script>
+
+<script id="gaussianFragment" type="x-shader">
+	#define EPS 1E-6
+	#define TAU 6.283185307179586
+	#define TAUR 2.5066282746310002
+	#define SQRT2 1.4142135623730951
+	precision highp float;
+	uniform float uSize;
+	uniform float uIntensity;
+	uniform sampler2D uScreen;
+	varying float vSize;
+	varying vec4 uvl;
+	varying vec2 vTexCoord;
+
+	// A standard gaussian function, used for weighting samples
+	float gaussian(float x, float sigma)
+	{
+	  return exp(-(x * x) / (2.0 * sigma * sigma)) / (TAUR * sigma);
+	}
+
+	// This approximates the error function, needed for the gaussian integral
+	float erf(float x)
+	{
+	  float s = sign(x), a = abs(x);
+	  x = 1.0 + (0.278393 + (0.230389 + 0.078108 * (a * a)) * a) * a;
+	  x *= x;
+	  return s - s / (x * x);
+	}
+
+	void main (void)
+	{
+		float len = uvl.z;
+		vec2 xy = uvl.xy;
+		float brightness;
+
+		float sigma = vSize/5.0;
+		if (len < EPS)
+		{
+		// If the beam segment is too short, just calculate intensity at the position.
+			brightness = gaussian(length(xy), sigma);
+		}
+		else
+		{
+		// Otherwise, use analytical integral for accumulated intensity.
+			brightness = erf(xy.x/SQRT2/sigma) - erf((xy.x-len)/SQRT2/sigma);
+			brightness *= exp(-xy.y*xy.y/(2.0*sigma*sigma))/2.0/len;
+		}
+
+		brightness *= uvl.w;
+		gl_FragColor = 2.0 * texture2D(uScreen, vTexCoord) * brightness;
+		gl_FragColor.a = 1.0;
+	}
+</script>
+
+<script id="texturedVertex" type="x-shader">
+    precision highp float;
+    attribute vec2 aPos;
+    varying vec2 vTexCoord;
+    void main (void)
+    {
+        gl_Position = vec4(aPos, 0.0, 1.0);
+        vTexCoord = (0.5*aPos+0.5);
+    }
+</script>
+
+<script id="texturedVertexWithResize" type="x-shader">
+    precision highp float;
+    attribute vec2 aPos;
+    varying vec2 vTexCoord;
+    uniform float uResizeForCanvas;
+    void main (void)
+    {
+        gl_Position = vec4(aPos, 0.0, 1.0);
+        vTexCoord = (0.5*aPos+0.5)*uResizeForCanvas;
+    }
+</script>
+
+<script id="texturedFragment" type="x-shader">
+    precision highp float;
+    uniform sampler2D uTexture0;
+    varying vec2 vTexCoord;
+    void main (void)
+    {
+        gl_FragColor = texture2D(uTexture0, vTexCoord);
+        gl_FragColor.a= 1.0;
+    }
+</script>
+
+<script id="blurFragment" type="x-shader">
+    precision highp float;
+    uniform sampler2D uTexture0;
+    uniform vec2 uOffset;
+    varying vec2 vTexCoord;
+    void main (void)
+    {
+    	vec4 sum = vec4(0.0);
+        sum += texture2D(uTexture0, vTexCoord - uOffset*8.0) * 0.000078;
+        sum += texture2D(uTexture0, vTexCoord - uOffset*7.0) * 0.000489;
+        sum += texture2D(uTexture0, vTexCoord - uOffset*6.0) * 0.002403;
+        sum += texture2D(uTexture0, vTexCoord - uOffset*5.0) * 0.009245;
+        sum += texture2D(uTexture0, vTexCoord - uOffset*4.0) * 0.027835;
+        sum += texture2D(uTexture0, vTexCoord - uOffset*3.0) * 0.065592;
+        sum += texture2D(uTexture0, vTexCoord - uOffset*2.0) * 0.12098;
+        sum += texture2D(uTexture0, vTexCoord - uOffset*1.0) * 0.17467;
+        sum += texture2D(uTexture0, vTexCoord + uOffset*0.0) * 0.19742;
+        sum += texture2D(uTexture0, vTexCoord + uOffset*1.0) * 0.17467;
+        sum += texture2D(uTexture0, vTexCoord + uOffset*2.0) * 0.12098;
+        sum += texture2D(uTexture0, vTexCoord + uOffset*3.0) * 0.065592;
+        sum += texture2D(uTexture0, vTexCoord + uOffset*4.0) * 0.027835;
+        sum += texture2D(uTexture0, vTexCoord + uOffset*5.0) * 0.009245;
+        sum += texture2D(uTexture0, vTexCoord + uOffset*6.0) * 0.002403;
+        sum += texture2D(uTexture0, vTexCoord + uOffset*7.0) * 0.000489;
+        sum += texture2D(uTexture0, vTexCoord + uOffset*8.0) * 0.000078;
+        gl_FragColor = sum;
+    }
+</script>
+
+<script id="outputVertex" type="x-shader">
+    precision highp float;
+    attribute vec2 aPos;
+    varying vec2 vTexCoord;
+    varying vec2 vTexCoordCanvas;
+    uniform float uResizeForCanvas;
+    void main (void)
+    {
+        gl_Position = vec4(aPos, 0.0, 1.0);
+        vTexCoord = (0.5*aPos+0.5);
+        vTexCoordCanvas = vTexCoord*uResizeForCanvas;
+    }
+</script>
+
+<script id="outputFragment" type="x-shader">
+    precision highp float;
+    uniform sampler2D uTexture0; //line
+    uniform sampler2D uTexture1; //tight glow
+    uniform sampler2D uTexture2; //big glow
+    uniform sampler2D uTexture3; //screen
+    uniform float uExposure;
+    uniform vec3 uColour;
+    varying vec2 vTexCoord;
+    varying vec2 vTexCoordCanvas;
+    void main (void)
+    {
+    	vec4 line = texture2D(uTexture0, vTexCoordCanvas);
+    	// r components have grid; g components do not.
+    	vec4 screen = texture2D(uTexture3, vTexCoord);
+    	vec4 tightGlow = texture2D(uTexture1, vTexCoord);
+    	vec4 scatter = texture2D(uTexture2, vTexCoord)+0.35;
+    	float light = line.r + 1.5*screen.g*screen.g*tightGlow.r;
+    	light += 0.4*scatter.g * (2.0+1.0*screen.g + 0.5*screen.r);
+    	float tlight = 1.0-pow(2.0, -uExposure*light);
+    	float tlight2 = tlight*tlight*tlight;
+    	gl_FragColor.rgb = mix(uColour, vec3(1.0), 0.3+tlight2*tlight2*0.5)*tlight;
+        gl_FragColor.a= 1.0;
+    }
+</script>
+
+<script src="oscilloscope.js" type="module"></script>

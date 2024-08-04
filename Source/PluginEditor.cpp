@@ -100,10 +100,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 
     addAndMakeVisible(lua);
     addAndMakeVisible(luaResizerBar);
-
-    if (visualiserFullScreen) {
-        addAndMakeVisible(visualiser);
-    }
+    addAndMakeVisible(visualiser);
     
     tooltipDropShadow.setOwner(&tooltipWindow);
 }

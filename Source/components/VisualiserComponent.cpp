@@ -5,6 +5,9 @@ VisualiserComponent::VisualiserComponent(int numChannels, OscirenderAudioProcess
     resetBuffer();
     startTimerHz(60);
     startThread();
+    
+    addAndMakeVisible(browser);
+    browser.goToURL(juce::WebBrowserComponent::getResourceProviderRoot() + "oscilloscope.html");
 
     setFullScreen(false);
     
@@ -92,20 +95,21 @@ void VisualiserComponent::setColours(juce::Colour bk, juce::Colour fg) {
 }
 
 void VisualiserComponent::paint(juce::Graphics& g) {
-    g.setColour(backgroundColour);
-    g.fillRoundedRectangle(getLocalBounds().toFloat(), OscirenderLookAndFeel::RECT_RADIUS);
-
-    auto r = getLocalBounds().toFloat();
-    auto minDim = juce::jmin(r.getWidth(), r.getHeight());
-
-    {
-        juce::CriticalSection::ScopedLockType scope(lock);
-        if (buffer.size() > 0) {
-            g.setColour(waveformColour);
-            paintXY(g, r.withSizeKeepingCentre(minDim, minDim));
-        }
-    }
-
+//    g.setColour(backgroundColour);
+//    g.fillRoundedRectangle(getLocalBounds().toFloat(), OscirenderLookAndFeel::RECT_RADIUS);
+//
+//    auto r = getLocalBounds().toFloat();
+//    auto minDim = juce::jmin(r.getWidth(), r.getHeight());
+//
+//    {
+//        juce::CriticalSection::ScopedLockType scope(lock);
+//        if (buffer.size() > 0) {
+//            g.setColour(waveformColour);
+//            paintXY(g, r.withSizeKeepingCentre(minDim, minDim));
+//        }
+//    }
+//
+    
     if (!active) {
         // add translucent layer
         g.setColour(juce::Colours::black.withAlpha(0.5f));
@@ -131,6 +135,7 @@ void VisualiserComponent::run() {
         
         consumer = audioProcessor.consumerRegister(tempBuffer);
         audioProcessor.consumerRead(consumer);
+        browser.emitEventIfBrowserIsVisible("audioUpdated", {});
         setBuffer(tempBuffer);
     }
 }
@@ -205,7 +210,7 @@ bool VisualiserComponent::keyPressed(const juce::KeyPress& key) {
 }
 
 void VisualiserComponent::setFullScreen(bool fullScreen) {
-	// useful as a callback from parent if needed
+    browser.goToURL(juce::WebBrowserComponent::getResourceProviderRoot() + "oscilloscope.html");
 }
 
 void VisualiserComponent::paintChannel(juce::Graphics& g, juce::Rectangle<float> area, int channel) {
@@ -264,6 +269,7 @@ void VisualiserComponent::resetBuffer() {
 }
 
 void VisualiserComponent::resized() {
+    browser.setBounds(getLocalBounds());
     auto area = getLocalBounds();
     area.removeFromBottom(5);
     auto buttonRow = area.removeFromBottom(25);

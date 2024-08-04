@@ -136,14 +136,7 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 		} else if (mode == FullScreenMode::MAIN_COMPONENT) {
             pluginEditor.visualiserFullScreen = false;
         }
-
-		if (pluginEditor.visualiserFullScreen) {
-			removeChildComponent(&pluginEditor.visualiser);
-			pluginEditor.addAndMakeVisible(pluginEditor.visualiser);
-		} else {
-			pluginEditor.removeChildComponent(&pluginEditor.visualiser);
-			addAndMakeVisible(pluginEditor.visualiser);
-		}
+        
 		pluginEditor.visualiser.setFullScreen(pluginEditor.visualiserFullScreen);
 		
 		pluginEditor.resized();
@@ -191,7 +184,7 @@ void MainComponent::updateFileLabel() {
 }
 
 void MainComponent::resized() {
-	auto bounds = getLocalBounds().withTrimmedTop(20).reduced(20);
+    juce::Rectangle<int> bounds = getLocalBounds().withTrimmedTop(20).reduced(20);
 	auto buttonWidth = 120;
 	auto buttonHeight = 30;
 	auto padding = 10;
@@ -244,6 +237,11 @@ void MainComponent::resized() {
 	bounds.removeFromTop(padding);
 	if (!pluginEditor.visualiserFullScreen) {
 		auto minDim = juce::jmin(bounds.getWidth(), bounds.getHeight());
-		pluginEditor.visualiser.setBounds(bounds.withSizeKeepingCentre(minDim, minDim));
+        juce::Point<int> localTopLeft = {bounds.getX(), bounds.getY()};
+        juce::Point<int> topLeft = pluginEditor.getLocalPoint(this, localTopLeft);
+        auto shiftedBounds = bounds;
+        shiftedBounds.setX(topLeft.getX());
+        shiftedBounds.setY(topLeft.getY());
+		pluginEditor.visualiser.setBounds(shiftedBounds.withSizeKeepingCentre(minDim, minDim));
 	}
 }
