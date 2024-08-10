@@ -19,6 +19,10 @@ public:
     VisualiserComponent(OscirenderAudioProcessor& p, VisualiserComponent* parent = nullptr, bool useOldVisualiser = false);
     ~VisualiserComponent() override;
 
+    void setIntensity(double intensity);
+    void setPersistence(double persistence);
+    void setHue(double hue);
+    void openSettings();
     void childChanged();
     void enableFullScreen();
     void setFullScreenCallback(std::function<void(FullScreenMode)> callback);
@@ -106,7 +110,7 @@ private:
             popoutWindow();
         })
         .withNativeFunction("settings", [this](auto& var, auto complete) {
-            // need to implement
+            openSettings();
         })
         .withNativeFunction("isDebug", [this](auto& var, auto complete) {
             complete((bool) JUCE_DEBUG);

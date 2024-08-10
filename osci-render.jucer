@@ -176,6 +176,10 @@
               file="Source/components/VisualiserComponent.cpp"/>
         <FILE id="ZueyNl" name="VisualiserComponent.h" compile="0" resource="0"
               file="Source/components/VisualiserComponent.h"/>
+        <FILE id="uOtHbQ" name="VisualiserSettings.cpp" compile="1" resource="0"
+              file="Source/components/VisualiserSettings.cpp"/>
+        <FILE id="GcbeeZ" name="VisualiserSettings.h" compile="0" resource="0"
+              file="Source/components/VisualiserSettings.h"/>
         <FILE id="icFMpl" name="VListBox.cpp" compile="1" resource="0" file="Source/components/VListBox.cpp"/>
         <FILE id="mvp8je" name="VListBox.h" compile="0" resource="0" file="Source/components/VListBox.h"/>
         <FILE id="s8EVcE" name="VolumeComponent.cpp" compile="1" resource="0"

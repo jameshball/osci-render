@@ -122,9 +122,7 @@ public:
     );
     
     std::shared_ptr<Effect> traceMax = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
-            return input;
-        }, new EffectParameter(
+        new EffectParameter(
             "Trace max",
             "Defines the maximum proportion of the image that is drawn before skipping to the next frame. This has the effect of 'tracing' out the image from a single dot when animated. By default, we draw until the end of the frame, so this value is 1.0.",
             "traceMax",
@@ -132,9 +130,7 @@ public:
         )
     );
     std::shared_ptr<Effect> traceMin = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
-            return input;
-        }, new EffectParameter(
+        new EffectParameter(
             "Trace min",
             "Defines the proportion of the image that drawing starts from. This has the effect of 'tracing' out the image from a single dot when animated. By default, we start drawing from the beginning of the frame, so this value is 0.0.",
             "traceMin",
@@ -160,6 +156,32 @@ public:
             new EffectParameter("3D Perspective", "Controls the strength of the 3D perspective projection.", "perspectiveStrength", VERSION_HINT, 1.0, 0.0, 1.0),
             new EffectParameter("Focal Length", "Controls the focal length of the 3D perspective effect. A higher focal length makes the image look more flat, and a lower focal length makes the image look more 3D.", "perspectiveFocalLength", VERSION_HINT, 2.0, 0.0, 10.0),
         }
+    );
+    
+    // visualiser settings
+    std::shared_ptr<Effect> persistenceEffect = std::make_shared<Effect>(
+        new EffectParameter(
+            "Persistence",
+            "Controls how long the light glows for on the oscilloscope display.",
+            "persistence",
+            VERSION_HINT, 0.0, -1.0, 1.0
+        )
+    );
+    std::shared_ptr<Effect> hueEffect = std::make_shared<Effect>(
+        new EffectParameter(
+            "Hue",
+            "Controls the hue/colour of the oscilloscope display.",
+            "hue",
+            VERSION_HINT, 125, 0, 359, 1
+        )
+    );
+    std::shared_ptr<Effect> intensityEffect = std::make_shared<Effect>(
+        new EffectParameter(
+            "Intensity",
+            "Controls how bright the light glows for on the oscilloscope display.",
+            "intensity",
+            VERSION_HINT, 0.0, -2.0, 2.0
+        )
     );
     
     BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false);
