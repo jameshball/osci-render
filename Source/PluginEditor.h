@@ -48,7 +48,7 @@ public:
 
     std::atomic<bool> editingCustomFunction = false;
 
-    VisualiserComponent visualiser{2, audioProcessor};
+    VisualiserComponent visualiser{audioProcessor};
     std::atomic<bool> visualiserFullScreen = false;
     SettingsComponent settings{audioProcessor, *this};
 
@@ -77,7 +77,7 @@ public:
     juce::StretchableLayoutManager luaLayout;
     juce::StretchableLayoutResizerBar luaResizerBar{&luaLayout, 1, false};
 
-    juce::TooltipWindow tooltipWindow{this, 0};
+    juce::TooltipWindow tooltipWindow{nullptr, 0};
     juce::DropShadower tooltipDropShadow{juce::DropShadow(juce::Colours::black.withAlpha(0.5f), 6, {0,0})};
 
     std::atomic<bool> updatingDocumentsWithParserLock = false;

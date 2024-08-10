@@ -116,11 +116,6 @@ var Filter =
 var UI =
 {
 	sidebarWidth : 360,
-
-	init : function() {
-        mainGain.oninput();
-        trigger.oninput();
-	},
 }
 
 var Render =
@@ -745,7 +740,6 @@ function drawCRTFrame(timeStamp) {
                         
 var xSamples = new Float32Array(1920);
 var ySamples = new Float32Array(1920);
-UI.init();
 Render.init();
 Filter.init(1920, 8, 6);
 AudioSystem.init(1920);
