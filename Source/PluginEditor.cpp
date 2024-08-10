@@ -71,6 +71,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
             juce::TopLevelWindow* w = juce::TopLevelWindow::getTopLevelWindow(0);
             juce::DocumentWindow* dw = dynamic_cast<juce::DocumentWindow*>(w);
             if (dw != nullptr) {
+                dw->setBackgroundColour(Colours::veryDark);
                 dw->setColour(juce::ResizableWindow::backgroundColourId, Colours::veryDark);
                 dw->setTitleBarButtonsRequired(juce::DocumentWindow::allButtons, false);
                 dw->setUsingNativeTitleBar(true);

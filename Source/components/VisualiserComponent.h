@@ -16,15 +16,15 @@ enum class FullScreenMode {
 class VisualiserWindow;
 class VisualiserComponent : public juce::Component, public juce::Timer, public juce::Thread, public juce::MouseListener, public juce::SettableTooltipClient {
 public:
-    VisualiserComponent(int numChannels, OscirenderAudioProcessor& p, VisualiserComponent* parent = nullptr);
+    VisualiserComponent(OscirenderAudioProcessor& p, VisualiserComponent* parent = nullptr, bool useOldVisualiser = false);
     ~VisualiserComponent() override;
 
+    void childChanged();
     void enableFullScreen();
     void setFullScreenCallback(std::function<void(FullScreenMode)> callback);
     void mouseDoubleClick(const juce::MouseEvent& event) override;
     void setBuffer(std::vector<float>& buffer);
     void setColours(juce::Colour backgroundColour, juce::Colour waveformColour);
-    void paintChannel(juce::Graphics&, juce::Rectangle<float> bounds, int channel);
 	void paintXY(juce::Graphics&, juce::Rectangle<float> bounds);
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -52,10 +52,11 @@ private:
     std::atomic<int> lastMouseX;
     std::atomic<int> lastMouseY;
     
+    bool oldVisualiser;
+    
 	juce::CriticalSection lock;
     std::vector<float> buffer;
     std::vector<juce::Line<float>> prevLines;
-    int numChannels = 2;
     juce::Colour backgroundColour, waveformColour;
 	OscirenderAudioProcessor& audioProcessor;
     int sampleRate = DEFAULT_SAMPLE_RATE;
@@ -101,6 +102,21 @@ private:
         .withNativeFunction("toggleFullscreen", [this](auto& var, auto complete) {
             enableFullScreen();
         })
+        .withNativeFunction("popout", [this](auto& var, auto complete) {
+            popoutWindow();
+        })
+        .withNativeFunction("settings", [this](auto& var, auto complete) {
+            // need to implement
+        })
+        .withNativeFunction("isDebug", [this](auto& var, auto complete) {
+            complete((bool) JUCE_DEBUG);
+        })
+        .withNativeFunction("isOverlay", [this](auto& var, auto complete) {
+            complete(parent != nullptr);
+        })
+        .withNativeFunction("pause", [this](auto& var, auto complete) {
+            setPaused(active);
+        })
     );
     
     std::vector<float> tempBuffer;
@@ -111,6 +127,7 @@ private:
     std::function<void(FullScreenMode)> fullScreenCallback;
     
     void resetBuffer();
+    void popoutWindow();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserComponent)
 };
@@ -122,6 +139,7 @@ public:
     void closeButtonPressed() override {
         parent->setPaused(wasPaused);
         parent->child = nullptr;
+        parent->childChanged();
         parent->resized();
         parent->popout.reset();
     }

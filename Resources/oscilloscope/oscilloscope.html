@@ -1,16 +1,35 @@
 <!DOCTYPE html>
 <head>
 <style>
-    audio {
-        width: 100%;
+    body {
+        font-family: Sans-Serif;
+        font-size: 14px;
+        -webkit-user-select: none; /* Safari */
+        -ms-user-select: none; /* IE 10 and IE 11 */
+        user-select: none; /* Standard syntax */
     }
     
+    html,
     body {
-        font: 12px Courier, Monospace;
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
     }
     
     canvas {
-        margin-right: 10px;
+        display: block;
+        margin: auto;
+    }
+    
+    #overlay {
+        background-color: rgba(0,0,0,0.5);
+        height: 100vh;
+        width: 100vw;
+        position: absolute;
+        display: none;
+        justify-content: center;
+        align-items: center;
+        cursor: default;
     }
     
     table {
@@ -59,7 +78,7 @@
 </style>
 </head>
 
-<body bgcolor="silver" text="black" autocomplete="off" style="margin: 0px;">
+<body bgcolor="black" text="white" autocomplete="off" style="margin: 0px;">
 
 <div id="buttonRow">
     <button id="fullscreen"/>
@@ -119,6 +138,10 @@
             buttons.style.display = "none";
         }, 1000)
     });
+    
+    let isDebug = true;
+    let paused = false;
+    let openInAnotherWindow = false;
 
 </script>
 
@@ -127,135 +150,180 @@
     
     const fullscreen = document.getElementById('fullscreen');
     const toggleFullscreen = Juce.getNativeFunction("toggleFullscreen");
+    fullscreen.onclick = toggleFullscreen;
+    
+    const popout = document.getElementById('popout');
+    const popoutFn = Juce.getNativeFunction("popout");
+    popout.onclick = popoutFn;
+    
+    const settings = document.getElementById('settings');
+    const settingsFn = Juce.getNativeFunction("settings");
+    settings.onclick = settingsFn;
+    
+    const mainScreen = document.getElementById('mainScreen');
+    const overlay = document.getElementById('overlay');
+    const pauseFn = Juce.getNativeFunction("pause");
+    mainScreen.onclick = function() {
+        if (!openInAnotherWindow) {
+            pauseFn();
+            paused = !paused;
+            if (paused) {
+                overlay.style.display = "flex";
+            } else {
+                overlay.style.display = "none";
+            }
+        }
+    };
+    
+    const isDebugFn = Juce.getNativeFunction("isDebug");
+    
+    isDebugFn().then(debug => {
+        isDebug = debug;
+        if (!debug) {
+            document.addEventListener('contextmenu', event => event.preventDefault());
+        }
+    });
+    
+    const isOverlayFn = Juce.getNativeFunction("isOverlay");
+    
+    isOverlayFn().then(overlay => {
+        if (overlay) {
+            popout.remove();
+            fullscreen.remove();
+        }
+    });
+    
+    window.__JUCE__.backend.addEventListener("childPresent", hasChild => {
+        openInAnotherWindow = hasChild;
+        if (hasChild) {
+            overlay.style.display = "flex";
+            overlay.innerText = "Open in separate window";
+        } else {
+            overlay.style.display = "none";
+            overlay.innerText = "Paused";
+        }
+    });
     
     document.addEventListener("dblclick", function() {
         toggleFullscreen();
     });
-    
-    fullscreen.onclick = function() {
-        toggleFullscreen();
-    };
 </script>
 
-<table align="center">
-<tr>
-
-<td valign="top" style="padding: 0px;">
-<canvas id="crtCanvas" width="800" height="800"></canvas>
-</td>
-<td width="360" valign="top">
-
-<table>
-<tr>
-<td> <!--TOP LEFT CONTROL-->
-<table>
-<tr><td align="center">Gain</td></tr>
-<tr><td><input id="mainGain" type="range" width="200" min="-1" max="4" value=0.0 step=0.05
-oninput="controls.mainGain=mainGain.value; mainGainOutput.value=parseFloat(mainGain.value).toFixedMinus(2)+'&nbsp;'"></td>
- <td> <output id="mainGainOutput">+0.00</td>
-</tr></table>
-</td>
-
-<td> <!--TOP RIGHT CONTROL-->
-<table>
-<tr><td align="center">Intensity</td></tr>
-<tr><td><input  id="exposure" type="range" width="200" min="-2" max="2" value=0.0 step=0.1
-oninput="controls.exposureStops=this.value; exposureOutput.value=parseFloat(this.value).toFixedMinus(1)"></td>
- <td> <output id="exposureOutput">+0.0</td>
-</tr></table>
-</td>
-
-<tr>
-<td> <!--BOTTOM LEFT CONTROL-->
-<table>
-<tr><td align="center">Audio volume</td></tr>
-<tr><td><input id="audioVolume" type="range" width="200" min="0" max="1" value=1.0 step=0.01
-oninput="controls.audioVolume=this.value; audioVolumeOutput.value=parseFloat(this.value).toFixed(2)"></td>
- <td> <output id="audioVolumeOutput">1.00</td>
-</tr></table>
-</td>
-
-
-
-<td> <!--BOTTOM RIGHT CONTROL-->
-<table>
-<tr><td> &nbsp
-<input id="swapXY" type="checkbox" onchange="controls.swapXY=this.checked"> Swap x / y
-</td></tr>
-<tr><td> &nbsp
-<input id="invertXY" type="checkbox" onchange="controls.invertXY=this.checked"> Invert x and y
-</td></tr>
-</table><div align="right">
-<a href="javascript:toggleVisible('displayNotes'); toggleVisible('generatorNotes'); toggleVisible('micNotes');">(notes)</a>
+<div id="mainScreen">
+    <div id="overlay">Paused</div>
+    <canvas id="crtCanvas" width="800" height="800"></canvas>
 </div>
-</td>
 
-</tr>
-</table>
-
-<hr noshade>
-
-<p><b style="font-size:18px">
-<input id="sweepCheckbox" type="checkbox" onchange="controls.sweepOn=this.checked"> SWEEP</b>
-
-<table>
-<tr>
-<td>
-<table>
-<tr><td align="center">Trigger value</td></tr>
-<tr><td><input  id="trigger" type="range" width="200" min="-1" max="1" value=0.0 step=0.001
-oninput="controls.sweepTriggerValue=0.5*this.value*Math.abs(this.value); triggerOutput.value=parseFloat(controls.sweepTriggerValue).toFixedMinus(2)+'&nbsp;'"></td>
- <td> <output id="triggerOutput">+0.00</td>
-</tr></table>
-</td>
-
-<td>
-<table>
-<tr><td align="center">Milliseconds/div</td></tr>
-<tr><td><input id="msDiv" type="range" width="200" min="0" max="7" value=2 step=1
-oninput="controls.sweepMsDiv=Math.pow(2, this.value-2); msDivOutput.value = controls.sweepMsDiv"></td>
- <td> <output id="msDivOutput">1</td>
-</tr></table>
-</td>
-</tr>
-</table>
-
-<hr noshade>
-
-
-<table><tr>
-
-<td>
-<table>
-<tr><td align="center">Hue</td></tr>
-<tr><td><input id="hue" type="range" width="200" min="0" max="359" value=125 step=1
-oninput="controls.hue=this.value; hueOutput.value=this.value"></td>
- <td width=35> <output id="hueOutput">125</td>
-</tr>
-<tr><td align="center">Persistence</td></tr>
-<tr><td><input id="persistence" type="range" width="200" min="-1" max="1" value=0 step=0.01
-oninput="controls.persistence=this.value; persistenceOutput.value=parseFloat(this.value).toFixedMinus(1)"></td>
- <td width=35> <output id="persistenceOutput">0.00</td>
-</tr>
-</table>
-</td>
-
-<td>
-<table>
-<tr><td>
-&nbsp <input id="freeze" type="checkbox" onchange="controls.freezeImage=this.checked"> Freeze image
-</td></tr>
-<tr><td>
-&nbsp <input id="disableFilter" type="checkbox" onchange="controls.disableFilter=this.checked"> Disable upsampling
-</td></tr>
-<tr><td>
-&nbsp <input id="hideGrid" type="checkbox"
-onchange="controls.grid=!controls.grid"> Hide graticule
-</td></tr>
-</table>
-</td>
-
-</tr></table>
+<!--<tr>-->
+<!--<td> <!--TOP LEFT CONTROL-->
+<!--<table>-->
+<!--<tr><td align="center">Gain</td></tr>-->
+<!--<tr><td><input id="mainGain" type="range" width="200" min="-1" max="4" value=0.0 step=0.05-->
+<!--oninput="controls.mainGain=mainGain.value; mainGainOutput.value=parseFloat(mainGain.value).toFixedMinus(2)+'&nbsp;'"></td>-->
+<!-- <td> <output id="mainGainOutput">+0.00</td>-->
+<!--</tr></table>-->
+<!--</td>-->
+<!---->
+<!--<td> <!--TOP RIGHT CONTROL-->
+<!--<table>-->
+<!--<tr><td align="center">Intensity</td></tr>-->
+<!--<tr><td><input  id="exposure" type="range" width="200" min="-2" max="2" value=0.0 step=0.1-->
+<!--oninput="controls.exposureStops=this.value; exposureOutput.value=parseFloat(this.value).toFixedMinus(1)"></td>-->
+<!-- <td> <output id="exposureOutput">+0.0</td>-->
+<!--</tr></table>-->
+<!--</td>-->
+<!---->
+<!--<tr>-->
+<!--<td> <!--BOTTOM LEFT CONTROL-->
+<!--<table>-->
+<!--<tr><td align="center">Audio volume</td></tr>-->
+<!--<tr><td><input id="audioVolume" type="range" width="200" min="0" max="1" value=1.0 step=0.01-->
+<!--oninput="controls.audioVolume=this.value; audioVolumeOutput.value=parseFloat(this.value).toFixed(2)"></td>-->
+<!-- <td> <output id="audioVolumeOutput">1.00</td>-->
+<!--</tr></table>-->
+<!--</td>-->
+<!---->
+<!---->
+<!---->
+<!--<td> <!--BOTTOM RIGHT CONTROL-->
+<!--<table>-->
+<!--<tr><td> &nbsp-->
+<!--<input id="swapXY" type="checkbox" onchange="controls.swapXY=this.checked"> Swap x / y-->
+<!--</td></tr>-->
+<!--<tr><td> &nbsp-->
+<!--<input id="invertXY" type="checkbox" onchange="controls.invertXY=this.checked"> Invert x and y-->
+<!--</td></tr>-->
+<!--</table><div align="right">-->
+<!--<a href="javascript:toggleVisible('displayNotes'); toggleVisible('generatorNotes'); toggleVisible('micNotes');">(notes)</a>-->
+<!--</div>-->
+<!--</td>-->
+<!---->
+<!--</tr>-->
+<!--</table>-->
+<!---->
+<!--<hr noshade>-->
+<!---->
+<!--<p><b style="font-size:18px">-->
+<!--<input id="sweepCheckbox" type="checkbox" onchange="controls.sweepOn=this.checked"> SWEEP</b>-->
+<!---->
+<!--<table>-->
+<!--<tr>-->
+<!--<td>-->
+<!--<table>-->
+<!--<tr><td align="center">Trigger value</td></tr>-->
+<!--<tr><td><input  id="trigger" type="range" width="200" min="-1" max="1" value=0.0 step=0.001-->
+<!--oninput="controls.sweepTriggerValue=0.5*this.value*Math.abs(this.value); triggerOutput.value=parseFloat(controls.sweepTriggerValue).toFixedMinus(2)+'&nbsp;'"></td>-->
+<!-- <td> <output id="triggerOutput">+0.00</td>-->
+<!--</tr></table>-->
+<!--</td>-->
+<!---->
+<!--<td>-->
+<!--<table>-->
+<!--<tr><td align="center">Milliseconds/div</td></tr>-->
+<!--<tr><td><input id="msDiv" type="range" width="200" min="0" max="7" value=2 step=1-->
+<!--oninput="controls.sweepMsDiv=Math.pow(2, this.value-2); msDivOutput.value = controls.sweepMsDiv"></td>-->
+<!-- <td> <output id="msDivOutput">1</td>-->
+<!--</tr></table>-->
+<!--</td>-->
+<!--</tr>-->
+<!--</table>-->
+<!---->
+<!--<hr noshade>-->
+<!---->
+<!---->
+<!--<table><tr>-->
+<!---->
+<!--<td>-->
+<!--<table>-->
+<!--<tr><td align="center">Hue</td></tr>-->
+<!--<tr><td><input id="hue" type="range" width="200" min="0" max="359" value=125 step=1-->
+<!--oninput="controls.hue=this.value; hueOutput.value=this.value"></td>-->
+<!-- <td width=35> <output id="hueOutput">125</td>-->
+<!--</tr>-->
+<!--<tr><td align="center">Persistence</td></tr>-->
+<!--<tr><td><input id="persistence" type="range" width="200" min="-1" max="1" value=0 step=0.01-->
+<!--oninput="controls.persistence=this.value; persistenceOutput.value=parseFloat(this.value).toFixedMinus(1)"></td>-->
+<!-- <td width=35> <output id="persistenceOutput">0.00</td>-->
+<!--</tr>-->
+<!--</table>-->
+<!--</td>-->
+<!---->
+<!--<td>-->
+<!--<table>-->
+<!--<tr><td>-->
+<!--&nbsp <input id="freeze" type="checkbox" onchange="controls.freezeImage=this.checked"> Freeze image-->
+<!--</td></tr>-->
+<!--<tr><td>-->
+<!--&nbsp <input id="disableFilter" type="checkbox" onchange="controls.disableFilter=this.checked"> Disable upsampling-->
+<!--</td></tr>-->
+<!--<tr><td>-->
+<!--&nbsp <input id="hideGrid" type="checkbox"-->
+<!--onchange="controls.grid=!controls.grid"> Hide graticule-->
+<!--</td></tr>-->
+<!--</table>-->
+<!--</td>-->
+<!---->
+<!--</tr></table>-->
 
 <script>
     
