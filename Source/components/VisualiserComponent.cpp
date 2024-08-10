@@ -1,5 +1,6 @@
 #include "VisualiserComponent.h"
 #include "../LookAndFeel.h"
+#include "VisualiserSettings.h"
 
 VisualiserComponent::VisualiserComponent(OscirenderAudioProcessor& p, VisualiserComponent* parent, bool useOldVisualiser) : backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), audioProcessor(p), oldVisualiser(useOldVisualiser), juce::Thread("VisualiserComponent"), parent(parent) {
     resetBuffer();
@@ -279,4 +280,31 @@ void VisualiserComponent::popoutWindow() {
     setPaused(true);
     resized();
     popOutButton.setVisible(false);
+}
+
+void VisualiserComponent::setIntensity(double intensity) {
+    browser.emitEventIfBrowserIsVisible("intensityChanged", intensity);
+}
+
+void VisualiserComponent::setPersistence(double persistence) {
+    browser.emitEventIfBrowserIsVisible("persistenceChanged", persistence);
+}
+
+void VisualiserComponent::setHue(double hue) {
+    browser.emitEventIfBrowserIsVisible("hueChanged", hue);
+}
+
+void VisualiserComponent::openSettings() {
+    juce::DialogWindow::LaunchOptions options;
+    VisualiserSettings* settings = new VisualiserSettings(audioProcessor, *this);
+    settings->setLookAndFeel(&getLookAndFeel());
+    options.content.setOwned(settings);
+    options.content->setSize(500, 250);
+    options.dialogTitle = "Visualiser Settings";
+    options.dialogBackgroundColour = Colours::dark;
+    options.escapeKeyTriggersCloseButton = true;
+    options.useNativeTitleBar = true;
+    options.resizable = false;
+    
+    juce::DialogWindow* dw = options.launchAsync();
 }

@@ -204,6 +204,18 @@
         }
     });
     
+    window.__JUCE__.backend.addEventListener("intensityChanged", intensity => {
+        controls.exposureStops = intensity;
+    });
+    
+    window.__JUCE__.backend.addEventListener("persistenceChanged", persistence => {
+        controls.persistence = persistence;
+    });
+    
+    window.__JUCE__.backend.addEventListener("hueChanged", hue => {
+        controls.hue = hue;
+    });
+    
     document.addEventListener("dblclick", function() {
         toggleFullscreen();
     });

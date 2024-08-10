@@ -13,6 +13,8 @@ public:
 	Effect(std::shared_ptr<EffectApplication> effectApplication, EffectParameter* parameter);
 	Effect(EffectApplicationType application, const std::vector<EffectParameter*>& parameters);
 	Effect(EffectApplicationType application, EffectParameter* parameter);
+    Effect(const std::vector<EffectParameter*>& parameters);
+    Effect(EffectParameter* parameter);
 
 	Point apply(int index, Point input, double volume = 0.0);
 	

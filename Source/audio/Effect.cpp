@@ -17,6 +17,10 @@ Effect::Effect(EffectApplicationType application, const std::vector<EffectParame
 
 Effect::Effect(EffectApplicationType application, EffectParameter* parameter) : Effect(application, std::vector<EffectParameter*>{parameter}) {}
 
+Effect::Effect(const std::vector<EffectParameter*>& parameters) : Effect([](int index, Point input, const std::vector<double>& values, double sampleRate) {return input;}, parameters) {}
+
+Effect::Effect(EffectParameter* parameter) : Effect([](int index, Point input, const std::vector<double>& values, double sampleRate) {return input;}, parameter) {}
+
 Point Effect::apply(int index, Point input, double volume) {
 	animateValues(volume);
 	if (application) {

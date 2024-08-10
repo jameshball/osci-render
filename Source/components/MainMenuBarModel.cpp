@@ -49,7 +49,6 @@ void MainMenuBarModel::menuItemSelected(int menuItemID, int topLevelMenuIndex) {
             }
             break;
         case 1: {
-            juce::String m = "Test";
             juce::DialogWindow::LaunchOptions options;
             AboutComponent* about = new AboutComponent();
             options.content.setOwned(about);
