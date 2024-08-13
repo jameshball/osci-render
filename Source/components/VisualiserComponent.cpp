@@ -9,7 +9,7 @@ VisualiserComponent::VisualiserComponent(OscirenderAudioProcessor& p, Visualiser
     settingsWindow.setResizable(false, false);
     settingsWindow.setUsingNativeTitleBar(true);
     settings.setLookAndFeel(&getLookAndFeel());
-    settings.setSize(550, 130);
+    settings.setSize(550, 200);
     settingsWindow.setContentNonOwned(&settings, true);
     
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
@@ -250,6 +250,7 @@ void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area
 void VisualiserComponent::resetBuffer() {
     sampleRate = (int) audioProcessor.currentSampleRate;
     tempBuffer = std::vector<float>(2 * sampleRate * BUFFER_LENGTH_SECS);
+    browser.refresh();
 }
 
 void VisualiserComponent::resized() {

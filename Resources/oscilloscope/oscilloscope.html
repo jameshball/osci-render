@@ -93,22 +93,13 @@
         sweepOn : false,
         sweepMsDiv : 1,
         sweepTriggerValue : 0,
-        signalGeneratorOn : false,
         mainGain : 0.0,
         exposureStops : 0.0,
-        audioVolume : 1.0,
         hue : 125,
-        freezeImage: false,
-        disableFilter: false,
-        aValue : 1.0,
-        aExponent : 0.0,
-        bValue : 1.0,
-        bExponent :0.0,
         invertXY : false,
         grid : true,
+        noise : true,
         persistence : 0,
-        xExpression : "sin(2*PI*a*t)*cos(2*PI*b*t)",
-        yExpression : "cos(2*PI*a*t)*cos(2*PI*b*t)",
     }
 
     Number.prototype.toFixedMinus = function(k)
@@ -142,6 +133,8 @@
     let isDebug = true;
     let paused = false;
     let openInAnotherWindow = false;
+    let externalSampleRate = 96000;
+    let externalBufferSize = 1920;
 
 </script>
 
@@ -185,7 +178,6 @@
     });
     
     const isOverlayFn = Juce.getNativeFunction("isOverlay");
-    
     isOverlayFn().then(overlay => {
         if (overlay) {
             popout.remove();

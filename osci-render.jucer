@@ -29,6 +29,7 @@
           <FILE id="ZEUE5w" name="index.js" compile="0" resource="1" file="Resources/oscilloscope/juce/index.js"/>
           <FILE id="hWk293" name="package.json" compile="0" resource="1" file="Resources/oscilloscope/juce/package.json"/>
         </GROUP>
+        <FILE id="qpPhpN" name="empty.jpg" compile="0" resource="1" file="Resources/oscilloscope/empty.jpg"/>
         <FILE id="dNtZYs" name="noise.jpg" compile="0" resource="1" file="Resources/oscilloscope/noise.jpg"/>
         <FILE id="YPMnjq" name="oscilloscope.html" compile="0" resource="1"
               file="Resources/oscilloscope/oscilloscope.html"/>

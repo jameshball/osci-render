@@ -6,9 +6,8 @@ var AudioSystem =
 
     init : function (bufferSize)
     {
-        this.sampleRate = 96000;
         this.bufferSize = bufferSize;
-        this.timePerSample = 1/this.sampleRate;
+        this.timePerSample = 1/externalSampleRate;
         this.oldXSamples = new Float32Array(this.bufferSize);
 		this.oldYSamples = new Float32Array(this.bufferSize);
     	this.smoothedXSamples = new Float32Array(Filter.nSmoothedSamples);
@@ -231,7 +230,7 @@ var Render =
 		this.blur2Texture = this.makeTexture(256, 256);
 		this.blur3Texture = this.makeTexture(32, 32);
 		this.blur4Texture = this.makeTexture(32, 32);
-		this.screenTexture = this.loadTexture('noise.jpg');
+        this.screenTexture = Render.loadTexture('noise.jpg');
 	},
 
 	onResize : function()
@@ -694,6 +693,16 @@ function doScriptProcessor(event) {
                   controls.exposureStops = settings.intensity;
                   controls.persistence = settings.persistence;
                   controls.hue = settings.hue;
+                  if (controls.grid !== settings.graticule) {
+                      controls.grid = settings.graticule;
+                      const image = controls.noise ? 'noise.jpg' : 'empty.jpg';
+                      Render.screenTexture = Render.loadTexture(image);
+                  }
+                  if (controls.noise !== settings.smudges) {
+                      controls.noise = settings.smudges;
+                      const image = controls.noise ? 'noise.jpg' : 'empty.jpg';
+                      Render.screenTexture = Render.loadTexture(image);
+                  }
               });
 
               if (controls.sweepOn) {
@@ -743,14 +752,25 @@ function doScriptProcessor(event) {
 function drawCRTFrame(timeStamp) {
 	Render.drawCRT();
 }
+                                           
+var xSamples = new Float32Array(externalBufferSize);
+var ySamples = new Float32Array(externalBufferSize);
 
+const bufferSizeFn = Juce.getNativeFunction("bufferSize");
+Juce.getNativeFunction("bufferSize")().then(bufferSize => {
+    externalBufferSize = bufferSize;
+    Juce.getNativeFunction("sampleRate")().then(sampleRate => {
+        externalSampleRate = sampleRate;
+        xSamples = new Float32Array(externalBufferSize);
+        ySamples = new Float32Array(externalBufferSize);
+        Render.init();
+        Filter.init(externalBufferSize, 8, 6);
+        AudioSystem.init(externalBufferSize);
+        Render.setupArrays(Filter.nSmoothedSamples);
+        AudioSystem.startSound();
+        requestAnimationFrame(drawCRTFrame);
+        Controls.setupControls();
+    });
+});
                         
-var xSamples = new Float32Array(1920);
-var ySamples = new Float32Array(1920);
-Render.init();
-Filter.init(1920, 8, 6);
-AudioSystem.init(1920);
-Render.setupArrays(Filter.nSmoothedSamples);
-AudioSystem.startSound();
-requestAnimationFrame(drawCRTFrame);
-Controls.setupControls();
+

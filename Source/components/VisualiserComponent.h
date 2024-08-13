@@ -115,7 +115,11 @@ private:
             openSettings();
         })
         .withNativeFunction("isDebug", [this](auto& var, auto complete) {
-            complete((bool) JUCE_DEBUG);
+#if JUCE_DEBUG
+            complete(true);
+#else
+            complete(false);
+#endif
         })
         .withNativeFunction("isOverlay", [this](auto& var, auto complete) {
             complete(parent != nullptr);
@@ -125,6 +129,12 @@ private:
         })
         .withNativeFunction("getSettings", [this](auto& var, auto complete) {
             complete(settings.getSettings());
+        })
+        .withNativeFunction("bufferSize", [this](auto& var, auto complete) {
+            complete((int) tempBuffer.size() / 2);
+        })
+        .withNativeFunction("sampleRate", [this](auto& var, auto complete) {
+            complete(sampleRate);
         })
     );
     

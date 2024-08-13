@@ -37,13 +37,9 @@ EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, in
     rangeButton.setTooltip("Click to change the range of the slider.");
 
     rangeButton.onClick = [this] {
-        juce::PopupMenu menu;
-
-        menu.addCustomItem(1, popupLabel, 200, 30, false);
-        menu.addCustomItem(2, min, 160, 40, false);
-        menu.addCustomItem(3, max, 160, 40, false);
-
-        menu.showMenuAsync(juce::PopupMenu::Options(), [this](int result) {});
+        auto range = std::make_unique<EffectRangeComponent>(this);
+        range->setSize(200, 110);
+        auto& myBox = juce::CallOutBox::launchAsynchronously(std::move(range), rangeButton.getScreenBounds(), nullptr);
     };
 
     effect.addListener(index, this);
@@ -98,35 +94,6 @@ void EffectComponent::setupComponent() {
             effect.parameters[index]->lfoRate->setUnnormalisedValueNotifyingHost(lfoSlider.getValue());
         };
     }
-    
-    min.textBox.setValue(parameter->min, juce::dontSendNotification);
-    max.textBox.setValue(parameter->max, juce::dontSendNotification);
-
-    min.textBox.onValueChange = [this]() {
-        double minValue = min.textBox.getValue();
-        double maxValue = max.textBox.getValue();
-        if (minValue >= maxValue) {
-            minValue = maxValue - effect.parameters[index]->step;
-            min.textBox.setValue(minValue, juce::dontSendNotification);
-        }
-        effect.parameters[index]->min = minValue;
-        slider.setRange(effect.parameters[index]->min, effect.parameters[index]->max, effect.parameters[index]->step);
-    };
-
-    max.textBox.onValueChange = [this]() {
-        double minValue = min.textBox.getValue();
-        double maxValue = max.textBox.getValue();
-        if (maxValue <= minValue) {
-            maxValue = minValue + effect.parameters[index]->step;
-            max.textBox.setValue(maxValue, juce::dontSendNotification);
-        }
-        effect.parameters[index]->max = maxValue;
-        slider.setRange(effect.parameters[index]->min, effect.parameters[index]->max, effect.parameters[index]->step);
-    };
-
-    popupLabel.setText(parameter->name + " Range", juce::dontSendNotification);
-    popupLabel.setJustificationType(juce::Justification::centred);
-    popupLabel.setFont(juce::Font(14.0f, juce::Font::bold));
 
     if (sidechainEnabled) {
         sidechainButton->onClick = [this] {
