@@ -22,8 +22,8 @@ private:
     EffectComponent persistence{audioProcessor, *audioProcessor.persistenceEffect};
     EffectComponent hue{audioProcessor, *audioProcessor.hueEffect};
     
-    jux::SwitchButton gridToggle = { "gridToggle", false };
-    jux::SwitchButton noiseToggle = { "noiseToggle", false };
+    jux::SwitchButton graticuleToggle{audioProcessor.graticuleEnabled};
+    jux::SwitchButton smudgeToggle{audioProcessor.smudgesEnabled};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserSettings)
 };

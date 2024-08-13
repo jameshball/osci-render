@@ -354,3 +354,21 @@ juce::MouseCursor OscirenderLookAndFeel::getMouseCursorFor(juce::Component& comp
     }
     return juce::LookAndFeel_V4::getMouseCursorFor(component);
 }
+
+void OscirenderLookAndFeel::drawCallOutBoxBackground(juce::CallOutBox& box, juce::Graphics& g, const juce::Path& path, juce::Image& cachedImage) {
+    if (cachedImage.isNull()) {
+        cachedImage = juce::Image(juce::Image::ARGB, box.getWidth(), box.getHeight(), true);
+        juce::Graphics g2(cachedImage);
+
+        juce::DropShadow(juce::Colours::black.withAlpha(0.7f), 8, juce::Point<int>(0, 2)).drawForPath(g2, path);
+    }
+
+    g.setColour(juce::Colours::black);
+    g.drawImageAt(cachedImage, 0, 0);
+
+    g.setColour(Colours::dark);
+    g.fillPath(path);
+
+    g.setColour(juce::Colours::black);
+    g.strokePath(path, juce::PathStrokeType(1.0f));
+}

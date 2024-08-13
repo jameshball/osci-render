@@ -159,12 +159,14 @@ public:
     );
     
     // visualiser settings
+    BooleanParameter* graticuleEnabled = new BooleanParameter("Show Graticule", "graticuleEnabled", VERSION_HINT, true, "Show the graticule or grid lines over the oscilloscope display.");
+    BooleanParameter* smudgesEnabled = new BooleanParameter("Show Smudges", "smudgesEnabled", VERSION_HINT, true, "Adds a subtle layer of dirt/smudges to the oscilloscope display to make it look more realistic.");
     std::shared_ptr<Effect> persistenceEffect = std::make_shared<Effect>(
         new EffectParameter(
             "Persistence",
             "Controls how long the light glows for on the oscilloscope display.",
             "persistence",
-            VERSION_HINT, 0.0, -1.0, 1.0
+            VERSION_HINT, 0.0, -1.0, 2.0
         )
     );
     std::shared_ptr<Effect> hueEffect = std::make_shared<Effect>(
@@ -180,7 +182,7 @@ public:
             "Intensity",
             "Controls how bright the light glows for on the oscilloscope display.",
             "intensity",
-            VERSION_HINT, 0.0, -2.0, 2.0
+            VERSION_HINT, 1.0, -2.0, 2.0
         )
     );
     

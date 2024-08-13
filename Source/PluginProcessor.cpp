@@ -175,6 +175,8 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     booleanParameters.push_back(animateFrames);
     booleanParameters.push_back(animationSyncBPM);
     booleanParameters.push_back(invertImage);
+    booleanParameters.push_back(graticuleEnabled);
+    booleanParameters.push_back(smudgesEnabled);
 
     for (auto parameter : booleanParameters) {
         addParameter(parameter);
