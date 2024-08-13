@@ -51,6 +51,8 @@ Reaper project used to create the above demo: [square_spiral.rpp](projects/squar
 - Render text
 - Scriptable visuals and audio effects using Lua
 - Blender integration
+  - 3D animation via Grease Pencil Line Art
+  - Saving animations to disk
 - Software oscilloscope
 - Applying image effects
   - Bit Crush
