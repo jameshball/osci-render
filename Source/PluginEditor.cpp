@@ -67,7 +67,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     }
 
     if (juce::JUCEApplicationBase::isStandaloneApp()) {
-        if (juce::TopLevelWindow::getNumTopLevelWindows() == 1) {
+        if (juce::TopLevelWindow::getNumTopLevelWindows() > 0) {
             juce::TopLevelWindow* w = juce::TopLevelWindow::getTopLevelWindow(0);
             juce::DocumentWindow* dw = dynamic_cast<juce::DocumentWindow*>(w);
             if (dw != nullptr) {

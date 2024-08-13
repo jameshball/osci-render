@@ -4,7 +4,7 @@
 
 class BooleanParameter : public juce::AudioProcessorParameterWithID {
 public:
-    BooleanParameter(juce::String name, juce::String id, int versionHint, bool value) : AudioProcessorParameterWithID(juce::ParameterID(id, versionHint), name), value(value) {}
+    BooleanParameter(juce::String name, juce::String id, int versionHint, bool value, juce::String description) : AudioProcessorParameterWithID(juce::ParameterID(id, versionHint), name), value(value), description(description) {}
 
 	juce::String getName(int maximumStringLength) const override {
 		return name.substring(0, maximumStringLength);
@@ -83,7 +83,12 @@ public:
 	void load(juce::XmlElement* xml) {
 		setBoolValueNotifyingHost(xml->getBoolAttribute("value", getDefaultValue()));
     }
+    
+    juce::String getDescription() {
+        return description;
+    }
 
 private:
 	std::atomic<bool> value = false;
+    juce::String description;
 };

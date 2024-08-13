@@ -20,8 +20,7 @@ private:
 	OscirenderAudioProcessor& audioProcessor;
 	OscirenderAudioProcessorEditor& pluginEditor;
 
-    juce::Label midiLabel{"midiLabel", "MIDI Enabled"};
-    jux::SwitchButton midiToggle = { "switchButton", false };
+    jux::SwitchButton midiToggle = jux::SwitchButton(audioProcessor.midiEnabled);
 	juce::Slider voicesSlider;
 	juce::Label voicesLabel;
 	juce::TextButton midiSettingsButton{"Audio/MIDI Settings..."};

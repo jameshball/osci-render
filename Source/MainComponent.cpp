@@ -53,7 +53,6 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 	inputEnabled.onClick = [this] {
 		audioProcessor.inputEnabled->setBoolValueNotifyingHost(!audioProcessor.inputEnabled->getBoolValue());
 	};
-	inputEnabled.setTooltip("Enable to use input audio, instead of the generated audio.");
 	
 	addAndMakeVisible(fileLabel);
 	fileLabel.setJustificationType(juce::Justification::centred);

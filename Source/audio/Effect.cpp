@@ -167,7 +167,7 @@ void Effect::markEnableable(bool enable) {
 	if (enabled != nullptr) {
         enabled->setValue(enable);
 	} else {
-		enabled = new BooleanParameter(getName() + " Enabled", getId() + "Enabled", parameters[0]->getVersionHint(), enable);
+		enabled = new BooleanParameter(getName() + " Enabled", getId() + "Enabled", parameters[0]->getVersionHint(), enable, "Toggles the effect.");
 	}
 }
 

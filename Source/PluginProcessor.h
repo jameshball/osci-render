@@ -184,8 +184,8 @@ public:
         )
     );
     
-    BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false);
-    BooleanParameter* inputEnabled = new BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false);
+    BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false, "Enable MIDI input for the synth. If disabled, the synth will play a constant tone, as controlled by the frequency slider.");
+    BooleanParameter* inputEnabled = new BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false, "Enable to use input audio, instead of the generated audio.");
     std::atomic<float> frequency = 220.0f;
     
     juce::SpinLock parsersLock;
@@ -223,12 +223,12 @@ public:
 
     IntParameter* voices = new IntParameter("Voices", "voices", VERSION_HINT, 4, 1, 16);
 
-    BooleanParameter* animateFrames = new BooleanParameter("Animate", "animateFrames", VERSION_HINT, true);
-    BooleanParameter* animationSyncBPM = new BooleanParameter("Sync To BPM", "animationSyncBPM", VERSION_HINT, false);
+    BooleanParameter* animateFrames = new BooleanParameter("Animate", "animateFrames", VERSION_HINT, true, "Enables animation for files that have multiple frames, such as GIFs or Line Art.");
+    BooleanParameter* animationSyncBPM = new BooleanParameter("Sync To BPM", "animationSyncBPM", VERSION_HINT, false, "Synchronises the animation's framerate with the BPM of your DAW.");
     FloatParameter* animationRate = new FloatParameter("Animation Rate", "animationRate", VERSION_HINT, 30, -1000, 1000, 0.01);
     FloatParameter* animationOffset = new FloatParameter("Animation Offset", "animationOffset", VERSION_HINT, 0, -10000, 10000, 0.1);
 
-    BooleanParameter* invertImage = new BooleanParameter("Invert Image", "invertImage", VERSION_HINT, false);
+    BooleanParameter* invertImage = new BooleanParameter("Invert Image", "invertImage", VERSION_HINT, false, "Inverts the image so that dark pixels become light, and vice versa.");
     std::shared_ptr<Effect> imageThreshold = std::make_shared<Effect>(
         [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
             return input;
