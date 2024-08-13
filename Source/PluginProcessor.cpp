@@ -662,8 +662,11 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             if (currentFile >= 0 && sounds[currentFile]->parser->isAnimatable) {
                 int animFrame = (int)(animationTime * animationRate->getValueUnnormalised() + animationOffset->getValueUnnormalised());
                 auto lineArt = sounds[currentFile]->parser->getLineArt();
+                auto binLineArt = sounds[currentFile]->parser->getBinaryLineArt();
                 auto img = sounds[currentFile]->parser->getImg();
-                if (lineArt != nullptr) {
+                if (binLineArt != nullptr) {
+                    binLineArt->setFrame(animFrame);
+                } else if (lineArt != nullptr) {
                     lineArt->setFrame(animFrame);
                 } else if (img != nullptr) {
                     img->setFrame(animFrame);

@@ -16,6 +16,7 @@ void FileParser::parse(juce::String fileId, juce::String extension, std::unique_
 	svg = nullptr;
 	text = nullptr;
 	gpla = nullptr;
+	gpla_bin = nullptr;
 	lua = nullptr;
 	img = nullptr;
 	
@@ -28,14 +29,28 @@ void FileParser::parse(juce::String fileId, juce::String extension, std::unique_
 	} else if (extension == ".lua") {
 		lua = std::make_shared<LuaParser>(fileId, stream->readEntireStreamAsString(), errorCallback, fallbackLuaScript);
 	} else if (extension == ".gpla") {
-		gpla = std::make_shared<LineArtParser>(stream->readEntireStreamAsString());
+		juce::MemoryBlock buffer{};
+		int bytesRead = stream->readIntoMemoryBlock(buffer);
+		if (((char*)buffer.getData())[0] == '{') { // Deprecated JSON format
+			juce::String gplaString = buffer.toString();
+			gpla = std::make_shared<LineArtParser>(gplaString);
+		} else if (((char*)buffer.getData())[0] == 'b') { // Deprecated Base64 format
+			juce::MemoryOutputStream b64Stream;
+			juce::Base64::convertFromBase64(b64Stream, buffer.toString());
+			b64Stream.flush();
+			juce::MemoryBlock b64Buffer = b64Stream.getMemoryBlock();
+			gpla_bin = std::make_shared<BinaryLineArtParser>(b64Buffer, b64Buffer.getSize());
+			isAnimatable = true;
+		} else { // Current binary format
+			gpla_bin = std::make_shared<BinaryLineArtParser>(buffer, bytesRead);
+		}
 	} else if (extension == ".gif" || extension == ".png" || extension == ".jpg" || extension == ".jpeg") {
 		juce::MemoryBlock buffer{};
 		int bytesRead = stream->readIntoMemoryBlock(buffer);
 		img = std::make_shared<ImageParser>(audioProcessor, extension, buffer);
 	}
 
-	isAnimatable = gpla != nullptr || (img != nullptr && extension == ".gif");
+	isAnimatable = gpla != nullptr || gpla_bin != nullptr || (img != nullptr && extension == ".gif");
 	sampleSource = lua != nullptr || img != nullptr;
 }
 
@@ -50,6 +65,8 @@ std::vector<std::unique_ptr<Shape>> FileParser::nextFrame() {
 		return text->draw();
 	} else if (gpla != nullptr) {
 		return gpla->draw();
+	} else if (gpla_bin != nullptr && gpla_bin->numFrames > 0) {
+		return gpla_bin->draw();
 	}
 	auto tempShapes = std::vector<std::unique_ptr<Shape>>();
 	// return a square
@@ -113,6 +130,10 @@ std::shared_ptr<TextParser> FileParser::getText() {
 
 std::shared_ptr<LineArtParser> FileParser::getLineArt() {
 	return gpla;
+}
+
+std::shared_ptr<BinaryLineArtParser> FileParser::getBinaryLineArt() {
+	return gpla_bin;
 }
 
 std::shared_ptr<LuaParser> FileParser::getLua() {

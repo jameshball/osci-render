@@ -1,0 +1,222 @@
+#include "BinaryLineArtParser.h"
+
+
+BinaryLineArtParser::BinaryLineArtParser(juce::MemoryBlock data, int size) {
+    parseBinaryFrames(data, size);
+}
+
+BinaryLineArtParser::~BinaryLineArtParser() {
+    frames.clear();
+}
+
+void BinaryLineArtParser::parseBinaryFrames(juce::MemoryBlock inData, int inDataSize) {
+    frames.clear();
+
+    juce::MemoryOutputStream bin;
+    bin.write(inData.getData(), inDataSize);
+
+    int dataSize = bin.getDataSize();
+    char* data = (char*)bin.getData();
+    const char* eof = data + dataSize;
+
+    // Make sure that the file is tagged as a binary GPLA file
+    const char header[19] = "osci-render gpla v";
+    bool isTagged = true;
+    for (int i = 0; i < 18; i++) {
+        isTagged = (data[i] == header[i]) && isTagged;
+    }
+    if (!isTagged) return parsingFailed(0);
+
+    // Move the data pointer to the beginning of the actual data
+    data = data + 23;
+
+    // Make sure there is space for an integer, then read how many frames are contained
+    if (data + 3 >= eof) return parsingFailed(0);
+    numFrames = ((int*)data)[0];
+    data += sizeof(int);
+
+    // If json does not contain any frames, stop and parse no-frames fallback instead
+    if (numFrames == 0) return parsingFailed(1);
+
+    bool hasValidFrames = false;
+    for (int f = 0; f < numFrames; f++) {
+        std::vector < std::vector < std::vector<Point>>> frameVertices;
+        std::vector<std::vector<double>> matrices;
+
+        double focalLength;
+        int nObjects;
+
+        // Make sure there is space for some data, then read the focal length and number of objects
+        if (data + sizeof(float) + sizeof(int) >= eof) return parsingFailed(0);
+        focalLength = ((float*)data)[0];
+        data += sizeof(float);
+        nObjects = ((int*)data)[0];
+        data += sizeof(int);
+
+        // Ensure that the reported number of objects is not negative
+        if (nObjects < 0) return parsingFailed(0);
+
+        // Construct the set of objects
+        for (int o = 0; o < nObjects; o++) {
+            std::vector<std::vector<Point>> strokes;
+            if (data + 3 >= eof) return parsingFailed(0);
+            int nToSkip = ((int*)data)[0];
+            data += sizeof(int);
+            data += nToSkip;
+
+            // Make sure there is space, then read how many strokes there are
+            if (data + 3 >= eof) return parsingFailed(0);
+            int nStrokes = ((int*)data)[0];
+            data += 4;
+
+            for (int stroke = 0; stroke < nStrokes; stroke++) {
+
+                if (data + 3 >= eof) return parsingFailed(0);
+                int nLines = ((int*)data)[0];
+                data += 4;
+
+                std::vector<Point> strokePoints;
+                int linesRead = 0;
+                while (linesRead < nLines / 3) {
+                    if (data + 24 > eof) return parsingFailed(0);
+                    float* vertexData = (float*)data;
+                    strokePoints.push_back(Point(vertexData[0], vertexData[1], vertexData[2]));
+                    data += 12;
+                    linesRead += 1;
+                }
+                strokes.push_back(strokePoints);
+            }
+            frameVertices.push_back(strokes);
+
+            if (data + 16 * sizeof(float) > eof) return parsingFailed(0);
+            float* matrixData = (float*)data;
+            std::vector<double> matrix;
+            for (int m = 0; m < 16; m++) {
+                matrix.push_back((double)matrixData[m]);
+            }
+            matrices.push_back(matrix);
+            data += 16 * sizeof(float);
+        }
+
+        std::vector<Line> frame = generateFrame(frameVertices, matrices, focalLength);
+        if (frame.size() > 0) {
+            hasValidFrames = true;
+        }
+        frames.push_back(frame);
+    }
+
+    // If no frames were valid, stop and parse invalid fallback instead
+    if (!hasValidFrames) return parsingFailed(2);
+}
+
+std::vector<Line> BinaryLineArtParser::generateFrame(std::vector< std::vector<std::vector<Point>>> inputVertices, std::vector<std::vector<double>> inputMatrices, double focalLength)
+{
+    std::vector<std::vector<double>> allMatrices = inputMatrices;
+    std::vector<std::vector<std::vector<Point>>> allVertices;
+
+    for (int i = 0; i < inputVertices.size(); i++) {
+        std::vector<std::vector<Point>> vertices = inputVertices[i];
+
+        std::vector<std::vector<Point>> reorderedVertices;
+
+        if (vertices.size() > 0 && allMatrices[i].size() == 16) {
+            std::vector<bool> visited = std::vector<bool>(vertices.size(), false);
+            std::vector<int> order = std::vector<int>(vertices.size(), 0);
+            visited[0] = true;
+
+            auto endPoint = vertices[0].back();
+
+            for (int j = 1; j < vertices.size(); j++) {
+                int minPath = 0;
+                double minDistance = 9999999;
+                for (int k = 0; k < vertices.size(); k++) {
+                    if (!visited[k]) {
+                        auto startPoint = vertices[k][0];
+
+                        double diffX = endPoint.x - startPoint.x;
+                        double diffY = endPoint.y - startPoint.y;
+                        double diffZ = endPoint.z - startPoint.z;
+
+                        double distance = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
+                        if (distance < minDistance) {
+                            minPath = k;
+                            minDistance = distance;
+                        }
+                    }
+                }
+                visited[minPath] = true;
+                order[j] = minPath;
+                endPoint = vertices[minPath].back();
+            }
+
+            for (int j = 0; j < vertices.size(); j++) {
+                std::vector<Point> reorderedVertex;
+                int index = order[j];
+                for (int k = 0; k < vertices[index].size(); k++) {
+                    reorderedVertex.push_back(vertices[index][k]);
+                }
+                reorderedVertices.push_back(reorderedVertex);
+            }
+        }
+
+        allVertices.push_back(reorderedVertices);
+    }
+
+    // generate a frame from the vertices and matrix
+    std::vector<Line> frame;
+
+    for (int i = 0; i < inputVertices.size(); i++) {
+        for (int j = 0; j < allVertices[i].size(); j++) {
+            for (int k = 0; k < allVertices[i][j].size() - 1; k++) {
+                auto start = allVertices[i][j][k];
+                auto end = allVertices[i][j][k + 1];
+
+                // multiply the start and end points by the matrix
+                double rotatedX = start.x * allMatrices[i][0] + start.y * allMatrices[i][1] + start.z * allMatrices[i][2] + allMatrices[i][3];
+                double rotatedY = start.x * allMatrices[i][4] + start.y * allMatrices[i][5] + start.z * allMatrices[i][6] + allMatrices[i][7];
+                double rotatedZ = start.x * allMatrices[i][8] + start.y * allMatrices[i][9] + start.z * allMatrices[i][10] + allMatrices[i][11];
+
+                double rotatedX2 = end.x * allMatrices[i][0] + end.y * allMatrices[i][1] + end.z * allMatrices[i][2] + allMatrices[i][3];
+                double rotatedY2 = end.x * allMatrices[i][4] + end.y * allMatrices[i][5] + end.z * allMatrices[i][6] + allMatrices[i][7];
+                double rotatedZ2 = end.x * allMatrices[i][8] + end.y * allMatrices[i][9] + end.z * allMatrices[i][10] + allMatrices[i][11];
+
+                // I think this discards every line with a vertex behind the camera? Needs more testing.
+                // - DJ_Level_3
+                if (rotatedZ < 0 && rotatedZ2 < 0) {
+
+                    double x = rotatedX * focalLength / rotatedZ;
+                    double y = rotatedY * focalLength / rotatedZ;
+
+                    double x2 = rotatedX2 * focalLength / rotatedZ2;
+                    double y2 = rotatedY2 * focalLength / rotatedZ2;
+
+                    frame.push_back(Line(x, y, x2, y2));
+                }
+            }
+        }
+    }
+    return frame;
+}
+
+void BinaryLineArtParser::setFrame(int fNum) {
+    // Ensure that the frame number is within the bounds of the number of frames
+    // This weird modulo trick is to handle negative numbers
+    frameNumber = (numFrames + (fNum % numFrames)) % numFrames;
+}
+
+std::vector<std::unique_ptr<Shape>> BinaryLineArtParser::draw() {
+	std::vector<std::unique_ptr<Shape>> tempShapes;
+	
+	for (Line shape : frames[frameNumber]) {
+		tempShapes.push_back(shape.clone());
+	}
+    return tempShapes;
+}
+
+// Codes: 0 - Parsing failed | 1 - No frames read | 2 - No valid frames
+void BinaryLineArtParser::parsingFailed(int code) {
+    switch (code) {
+    default:
+        return;
+    }
+}
