@@ -5,19 +5,9 @@ MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
     setText("MIDI Settings");
 
     addAndMakeVisible(midiToggle);
-    addAndMakeVisible(midiLabel);
     addAndMakeVisible(voicesSlider);
     addAndMakeVisible(voicesLabel);
     addAndMakeVisible(keyboard);
-
-    midiToggle.setToggleState(audioProcessor.midiEnabled->getBoolValue(), juce::dontSendNotification);
-    midiToggle.setTooltip("Enable MIDI input for the synth. If disabled, the synth will play a constant tone, as controlled by the frequency slider.");
-    
-    midiToggle.onClick = [this]() {
-        audioProcessor.midiEnabled->setBoolValueNotifyingHost(midiToggle.getToggleState());
-    };
-
-    audioProcessor.midiEnabled->addListener(this);
 
     voicesSlider.setRange(1, 16, 1);
     voicesSlider.setValue(audioProcessor.voices->getValueUnnormalised(), juce::dontSendNotification);
@@ -69,7 +59,6 @@ MidiComponent::~MidiComponent() {
     audioProcessor.releaseTime->removeListener(this);
     audioProcessor.releaseShape->removeListener(this);
 
-    audioProcessor.midiEnabled->removeListener(this);
     audioProcessor.voices->removeListener(this);
 }
 
@@ -80,7 +69,6 @@ void MidiComponent::parameterValueChanged(int parameterIndex, float newValue) {
 void MidiComponent::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
 
 void MidiComponent::handleAsyncUpdate() {
-    midiToggle.setToggleState(audioProcessor.midiEnabled->getBoolValue(), juce::dontSendNotification);
     voicesSlider.setValue(audioProcessor.voices->getValueUnnormalised(), juce::dontSendNotification);
 
     Env newEnv = Env(
@@ -110,9 +98,7 @@ void MidiComponent::handleAsyncUpdate() {
 void MidiComponent::resized() {
     auto area = getLocalBounds().withTrimmedTop(20).reduced(20);
     auto topRow = area.removeFromTop(30);
-    auto midiToggleBounds = topRow.removeFromLeft(120);
-    midiToggle.setBounds(midiToggleBounds.removeFromLeft(30).withSizeKeepingCentre(30, 20).translated(0, 1));
-    midiLabel.setBounds(midiToggleBounds);
+    midiToggle.setBounds(topRow.removeFromLeft(120).translated(0, 1));
     topRow.removeFromLeft(80);
     voicesSlider.setBounds(topRow.removeFromLeft(250));
     if (midiSettingsButton.isVisible()) {

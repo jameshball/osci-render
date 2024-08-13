@@ -149,6 +149,9 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     permanentEffects.push_back(thresholdEffect);
     permanentEffects.push_back(imageThreshold);
     permanentEffects.push_back(imageStride);
+    permanentEffects.push_back(intensityEffect);
+    permanentEffects.push_back(persistenceEffect);
+    permanentEffects.push_back(hueEffect);
 
     for (int i = 0; i < 26; i++) {
         addLuaSlider();
@@ -157,9 +160,6 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     allEffects = toggleableEffects;
     allEffects.insert(allEffects.end(), permanentEffects.begin(), permanentEffects.end());
     allEffects.insert(allEffects.end(), luaEffects.begin(), luaEffects.end());
-    allEffects.push_back(intensityEffect);
-    allEffects.push_back(persistenceEffect);
-    allEffects.push_back(hueEffect);
 
     for (auto effect : allEffects) {
         for (auto effectParameter : effect->parameters) {

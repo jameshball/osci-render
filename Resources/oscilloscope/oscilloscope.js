@@ -688,6 +688,13 @@ function doScriptProcessor(event) {
                   xSamples[i] = dataView.getFloat32(i * 4 * 2, true);
                   ySamples[i] = dataView.getFloat32(i * 4 * 2 + 4, true);
               }
+              
+              const getSettingsFn = Juce.getNativeFunction("getSettings");
+              getSettingsFn().then(settings => {
+                  controls.exposureStops = settings.intensity;
+                  controls.persistence = settings.persistence;
+                  controls.hue = settings.hue;
+              });
 
               if (controls.sweepOn) {
                   var gain = Math.pow(2.0,controls.mainGain);

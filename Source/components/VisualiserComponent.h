@@ -2,10 +2,12 @@
 
 #include <algorithm>
 #include <JuceHeader.h>
+#include "../LookAndFeel.h"
 #include "../concurrency/BufferConsumer.h"
 #include "../PluginProcessor.h"
 #include "LabelledTextBox.h"
 #include "SvgButton.h"
+#include "VisualiserSettings.h"
 
 enum class FullScreenMode {
     TOGGLE,
@@ -121,6 +123,9 @@ private:
         .withNativeFunction("pause", [this](auto& var, auto complete) {
             setPaused(active);
         })
+        .withNativeFunction("getSettings", [this](auto& var, auto complete) {
+            complete(settings.getSettings());
+        })
     );
     
     std::vector<float> tempBuffer;
@@ -129,6 +134,8 @@ private:
     std::shared_ptr<BufferConsumer> consumer;
 
     std::function<void(FullScreenMode)> fullScreenCallback;
+    VisualiserSettings settings = VisualiserSettings(audioProcessor, *this);
+    SettingsWindow settingsWindow = SettingsWindow("Visualiser Settings");
     
     void resetBuffer();
     void popoutWindow();

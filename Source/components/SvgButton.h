@@ -34,6 +34,7 @@ class SvgButton : public juce::DrawableButton, public juce::AudioProcessorParame
         if (toggle != nullptr) {
             toggle->addListener(this);
             setToggleState(toggle->getBoolValue(), juce::NotificationType::dontSendNotification);
+            setTooltip(toggle->getDescription());
         }
     }
 
