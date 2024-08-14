@@ -177,6 +177,8 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     booleanParameters.push_back(invertImage);
     booleanParameters.push_back(graticuleEnabled);
     booleanParameters.push_back(smudgesEnabled);
+    booleanParameters.push_back(upsamplingEnabled);
+    booleanParameters.push_back(legacyVisualiserEnabled);
 
     for (auto parameter : booleanParameters) {
         addParameter(parameter);

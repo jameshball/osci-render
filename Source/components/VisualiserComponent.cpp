@@ -9,53 +9,48 @@ VisualiserComponent::VisualiserComponent(OscirenderAudioProcessor& p, Visualiser
     settingsWindow.setResizable(false, false);
     settingsWindow.setUsingNativeTitleBar(true);
     settings.setLookAndFeel(&getLookAndFeel());
-    settings.setSize(550, 200);
+    settings.setSize(550, 230);
     settingsWindow.setContentNonOwned(&settings, true);
     
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
     setWantsKeyboardFocus(true);
     
-    if (!oldVisualiser) {
-        addAndMakeVisible(browser);
-        browser.goToURL(juce::WebBrowserComponent::getResourceProviderRoot() + "oscilloscope.html");
-    } else {
-        addChildComponent(browser);
-        browser.goToURL("about:blank");
-        
-        roughness.textBox.setValue(audioProcessor.roughness);
-        roughness.textBox.onValueChange = [this]() {
-            audioProcessor.roughness = (int) roughness.textBox.getValue();
-        };
-        intensity.textBox.setValue(audioProcessor.intensity);
-        intensity.textBox.onValueChange = [this]() {
-            audioProcessor.intensity = intensity.textBox.getValue();
-        };
-        
-        if (parent == nullptr) {
-            addChildComponent(fullScreenButton);
-        }
-        if (child == nullptr && parent == nullptr) {
-            addChildComponent(popOutButton);
-        }
-        addChildComponent(settingsButton);
-        
-        fullScreenButton.onClick = [this]() {
-            enableFullScreen();
-        };
-        
-        settingsButton.onClick = [this]() {
-            juce::PopupMenu menu;
-
-            menu.addCustomItem(1, roughness, 160, 40, false);
-            menu.addCustomItem(1, intensity, 160, 40, false);
-
-            menu.showMenuAsync(juce::PopupMenu::Options(), [this](int result) {});
-        };
-        
-        popOutButton.onClick = [this]() {
-            popoutWindow();
-        };
+    addChildComponent(browser);
+    setVisualiserType(oldVisualiser);
+    
+    roughness.textBox.setValue(audioProcessor.roughness);
+    roughness.textBox.onValueChange = [this]() {
+        audioProcessor.roughness = (int) roughness.textBox.getValue();
+    };
+    intensity.textBox.setValue(audioProcessor.intensity);
+    intensity.textBox.onValueChange = [this]() {
+        audioProcessor.intensity = intensity.textBox.getValue();
+    };
+    
+    if (parent == nullptr) {
+        addChildComponent(fullScreenButton);
     }
+    if (child == nullptr && parent == nullptr) {
+        addChildComponent(popOutButton);
+    }
+    addChildComponent(settingsButton);
+    
+    fullScreenButton.onClick = [this]() {
+        enableFullScreen();
+    };
+    
+    settingsButton.onClick = [this]() {
+        juce::PopupMenu menu;
+
+        menu.addCustomItem(1, roughness, 160, 40, false);
+        menu.addCustomItem(1, intensity, 160, 40, false);
+
+        menu.showMenuAsync(juce::PopupMenu::Options(), [this](int result) {});
+    };
+    
+    popOutButton.onClick = [this]() {
+        popoutWindow();
+    };
 
     setFullScreen(false);
 }
@@ -63,6 +58,7 @@ VisualiserComponent::VisualiserComponent(OscirenderAudioProcessor& p, Visualiser
 VisualiserComponent::~VisualiserComponent() {
     audioProcessor.consumerStop(consumer);
     stopThread(1000);
+    masterReference.clear();
 }
 
 void VisualiserComponent::setFullScreenCallback(std::function<void(FullScreenMode)> callback) {
@@ -83,7 +79,8 @@ void VisualiserComponent::mouseDoubleClick(const juce::MouseEvent& event) {
 void VisualiserComponent::setBuffer(std::vector<float>& newBuffer) {
     juce::CriticalSection::ScopedLockType scope(lock);
     buffer.clear();
-    for (int i = 0; i < newBuffer.size(); i += (int) roughness.textBox.getValue() * 2) {
+    int stride = oldVisualiser ? roughness.textBox.getValue() : 1;
+    for (int i = 0; i < newBuffer.size(); i += stride * 2) {
         buffer.push_back(newBuffer[i]);
         buffer.push_back(newBuffer[i + 1]);
     }
@@ -139,8 +136,19 @@ void VisualiserComponent::run() {
         
         consumer = audioProcessor.consumerRegister(tempBuffer);
         audioProcessor.consumerRead(consumer);
-        browser.emitEventIfBrowserIsVisible("audioUpdated", {});
         setBuffer(tempBuffer);
+        juce::WeakReference<VisualiserComponent> visualiser(this);
+        if (!oldVisualiser) {
+            juce::MessageManager::callAsync([this, visualiser] () {
+                if (visualiser) {
+                    juce::Array<juce::var> data;
+                    for (int i = 0; i < buffer.size(); i++) {
+                        data.add(buffer[i]);
+                    }
+                    browser.emitEventIfBrowserIsVisible("audioUpdated", data);
+                }
+            });
+        }
     }
 }
 
@@ -217,6 +225,17 @@ bool VisualiserComponent::keyPressed(const juce::KeyPress& key) {
 
 void VisualiserComponent::setFullScreen(bool fullScreen) {}
 
+void VisualiserComponent::setVisualiserType(bool oldVisualiser) {
+    this->oldVisualiser = oldVisualiser;
+    if (oldVisualiser) {
+        browser.setVisible(false);
+        browser.goToURL("about:blank");
+    } else {
+        browser.setVisible(true);
+        browser.goToURL(juce::WebBrowserComponent::getResourceProviderRoot() + "oscilloscope.html");
+    }
+}
+
 void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area) {
     auto transform = juce::AffineTransform::fromTargetPoints(-1.0f, -1.0f, area.getX(), area.getBottom(), 1.0f, 1.0f, area.getRight(), area.getY(), 1.0f, -1.0f, area.getRight(), area.getBottom());
     std::vector<juce::Line<float>> lines;
@@ -250,7 +269,9 @@ void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area
 void VisualiserComponent::resetBuffer() {
     sampleRate = (int) audioProcessor.currentSampleRate;
     tempBuffer = std::vector<float>(2 * sampleRate * BUFFER_LENGTH_SECS);
-    browser.refresh();
+    if (!oldVisualiser) {
+        browser.goToURL(juce::WebBrowserComponent::getResourceProviderRoot() + "oscilloscope.html");
+    }
 }
 
 void VisualiserComponent::resized() {
@@ -274,6 +295,7 @@ void VisualiserComponent::childChanged() {
 
 void VisualiserComponent::popoutWindow() {
     auto visualiser = new VisualiserComponent(audioProcessor, this);
+    visualiser->settings.setLookAndFeel(&getLookAndFeel());
     child = visualiser;
     childChanged();
     popOutButton.setVisible(false);
