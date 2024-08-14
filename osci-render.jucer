@@ -181,9 +181,6 @@
               file="Source/gpla/BinaryLineArtParser.cpp"/>
         <FILE id="lbsWwt" name="BinaryLineArtParser.h" compile="0" resource="0"
               file="Source/gpla/BinaryLineArtParser.h"/>
-        <FILE id="KvDV8j" name="LineArtParser.cpp" compile="1" resource="0"
-              file="Source/gpla/LineArtParser.cpp"/>
-        <FILE id="t008RG" name="LineArtParser.h" compile="0" resource="0" file="Source/gpla/LineArtParser.h"/>
       </GROUP>
       <GROUP id="{8AC1A0A6-6E5E-D533-33A6-76002E1DD885}" name="img">
         <FILE id="xwx39V" name="gifdec.c" compile="1" resource="0" file="Source/img/gifdec.c"/>
