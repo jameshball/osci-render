@@ -18,7 +18,7 @@ var AudioSystem =
 
     startSound : function()
     {
-        const audioUpdated = window.__JUCE__.backend.addEventListener("audioUpdated", doScriptProcessor);
+        window.__JUCE__.backend.addEventListener("audioUpdated", doScriptProcessor);
     }
 }
 
@@ -671,67 +671,71 @@ var Render =
 var sweepPosition = -1;
 var belowTrigger = false;
 
-function doScriptProcessor(buffer) {
-    for (var i = 0; i < xSamples.length; i++) {
-      xSamples[i] = buffer[i * 2];
-      ySamples[i] = buffer[i * 2 + 1];
-    }
+function doScriptProcessor(bufferBase64) {
+	var req = new XMLHttpRequest;
+	req.open('GET', "data:application/octet;base64," + bufferBase64);
+	req.responseType = 'arraybuffer';
+	req.onload = function fileLoaded(e) {
+		var dataView = new DataView(e.target.response);
 
-    const getSettingsFn = Juce.getNativeFunction("getSettings");
-    getSettingsFn().then(settings => {
-      controls.exposureStops = settings.intensity;
-      controls.persistence = settings.persistence;
-      controls.hue = settings.hue;
-      controls.disableFilter = !settings.upsampling;
-      if (controls.grid !== settings.graticule) {
-          controls.grid = settings.graticule;
-          const image = controls.noise ? 'noise.jpg' : 'empty.jpg';
-          Render.screenTexture = Render.loadTexture(image);
-      }
-      if (controls.noise !== settings.smudges) {
-          controls.noise = settings.smudges;
-          const image = controls.noise ? 'noise.jpg' : 'empty.jpg';
-          Render.screenTexture = Render.loadTexture(image);
-      }
-    });
+		for (var i = 0; i < xSamples.length; i++) {
+			xSamples[i] = dataView.getFloat32(i * 4 * 2, true);
+			ySamples[i] = dataView.getFloat32(i * 4 * 2 + 4, true);
+		}
 
-    if (controls.sweepOn) {
-      var gain = Math.pow(2.0,controls.mainGain);
-      var sweepMinTime = controls.sweepMsDiv*10/1000;
-      var triggerValue = controls.sweepTriggerValue;
-      for (var i=0; i<xSamples.length; i++)
-      {
-          xSamples[i] = sweepPosition / gain;
-          sweepPosition += 2*AudioSystem.timePerSample/sweepMinTime;
-          if (sweepPosition > 1.1 && belowTrigger && ySamples[i]>=triggerValue)
-              sweepPosition =-1.3;
-          belowTrigger = ySamples[i]<triggerValue;
-      }
-    }
+		const getSettingsFn = Juce.getNativeFunction("getSettings");
+		getSettingsFn().then(settings => {
+			controls.exposureStops = settings.intensity;
+			controls.persistence = settings.persistence;
+			controls.hue = settings.hue;
+			controls.disableFilter = !settings.upsampling;
+			if (controls.grid !== settings.graticule) {
+				controls.grid = settings.graticule;
+				const image = controls.noise ? 'noise.jpg' : 'empty.jpg';
+				Render.screenTexture = Render.loadTexture(image);
+			}
+			if (controls.noise !== settings.smudges) {
+				controls.noise = settings.smudges;
+				const image = controls.noise ? 'noise.jpg' : 'empty.jpg';
+				Render.screenTexture = Render.loadTexture(image);
+			}
+		});
 
-    if (!controls.freezeImage)
-    {
-      if (!controls.disableFilter)
-      {
-          Filter.generateSmoothedSamples(AudioSystem.oldXSamples, xSamples, AudioSystem.smoothedXSamples);
-          Filter.generateSmoothedSamples(AudioSystem.oldYSamples, ySamples, AudioSystem.smoothedYSamples);
+		if (controls.sweepOn) {
+			var gain = Math.pow(2.0, controls.mainGain);
+			var sweepMinTime = controls.sweepMsDiv * 10 / 1000;
+			var triggerValue = controls.sweepTriggerValue;
+			for (var i = 0; i < xSamples.length; i++) {
+				xSamples[i] = sweepPosition / gain;
+				sweepPosition += 2 * AudioSystem.timePerSample / sweepMinTime;
+				if (sweepPosition > 1.1 && belowTrigger && ySamples[i] >= triggerValue)
+					sweepPosition = -1.3;
+				belowTrigger = ySamples[i] < triggerValue;
+			}
+		}
 
-          if (!controls.swapXY) Render.drawLineTexture(AudioSystem.smoothedXSamples, AudioSystem.smoothedYSamples);
-          else Render.drawLineTexture(AudioSystem.smoothedYSamples, AudioSystem.smoothedXSamples);
-      }
-      else
-      {
-          if (!controls.swapXY) Render.drawLineTexture(xSamples, ySamples);
-          else Render.drawLineTexture(ySamples, xSamples);
-      }
-    }
+		if (!controls.freezeImage) {
+			if (!controls.disableFilter) {
+				Filter.generateSmoothedSamples(AudioSystem.oldXSamples, xSamples, AudioSystem.smoothedXSamples);
+				Filter.generateSmoothedSamples(AudioSystem.oldYSamples, ySamples, AudioSystem.smoothedYSamples);
 
-    for (var i = 0; i<xSamples.length; i++) {
-      AudioSystem.oldXSamples[i] = xSamples[i];
-      AudioSystem.oldYSamples[i] = ySamples[i];
-    }
+				if (!controls.swapXY) Render.drawLineTexture(AudioSystem.smoothedXSamples, AudioSystem.smoothedYSamples);
+				else Render.drawLineTexture(AudioSystem.smoothedYSamples, AudioSystem.smoothedXSamples);
+			}
+			else {
+				if (!controls.swapXY) Render.drawLineTexture(xSamples, ySamples);
+				else Render.drawLineTexture(ySamples, xSamples);
+			}
+		}
 
-    requestAnimationFrame(drawCRTFrame);
+		for (var i = 0; i < xSamples.length; i++) {
+			AudioSystem.oldXSamples[i] = xSamples[i];
+			AudioSystem.oldYSamples[i] = ySamples[i];
+		}
+
+		requestAnimationFrame(drawCRTFrame);
+	}
+	req.send();
 }
 
 function drawCRTFrame(timeStamp) {

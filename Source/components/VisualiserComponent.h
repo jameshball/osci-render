@@ -105,6 +105,8 @@ private:
         juce::WebBrowserComponent::Options()
         .withNativeIntegrationEnabled()
         .withResourceProvider(provider)
+        .withBackend(juce::WebBrowserComponent::Options::Backend::webview2)
+        .withWinWebView2Options(juce::WebBrowserComponent::Options::WinWebView2{})
         .withNativeFunction("toggleFullscreen", [this](auto& var, auto complete) {
             enableFullScreen();
         })
