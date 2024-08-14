@@ -2,17 +2,22 @@
 #include <JuceHeader.h>
 #include "AboutComponent.h"
 
+
 class OscirenderAudioProcessorEditor;
-class MainMenuBarModel : public juce::MenuBarModel {
+class OscirenderAudioProcessor;
+class MainMenuBarModel : public juce::MenuBarModel, public juce::AudioProcessorParameter::Listener {
 public:
-    MainMenuBarModel(OscirenderAudioProcessorEditor& editor) : editor(editor) {}
-    ~MainMenuBarModel() override {}
+    MainMenuBarModel(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor);
+    ~MainMenuBarModel();
 
     juce::StringArray getMenuBarNames() override;
     juce::PopupMenu getMenuForIndex(int topLevelMenuIndex, const juce::String& menuName) override;
     void menuItemSelected(int menuItemID, int topLevelMenuIndex) override;
     void menuBarActivated(bool isActive);
+    void parameterValueChanged(int parameterIndex, float newValue) override;
+    void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
 
 private:
+    OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& editor;
 };

@@ -48,7 +48,7 @@ public:
 
     std::atomic<bool> editingCustomFunction = false;
 
-    VisualiserComponent visualiser{audioProcessor};
+    VisualiserComponent visualiser{audioProcessor, nullptr, audioProcessor.legacyVisualiserEnabled->getBoolValue()};
     std::atomic<bool> visualiserFullScreen = false;
     SettingsComponent settings{audioProcessor, *this};
 
@@ -68,7 +68,7 @@ public:
     std::shared_ptr<OscirenderCodeEditorComponent> customFunctionCodeEditor = std::make_shared<OscirenderCodeEditorComponent>(*customFunctionCodeDocument, &luaTokeniser, audioProcessor, CustomEffect::UNIQUE_ID, CustomEffect::FILE_NAME);
 
     std::unique_ptr<juce::FileChooser> chooser;
-    MainMenuBarModel menuBarModel{*this};
+    MainMenuBarModel menuBarModel{audioProcessor, *this};
     juce::MenuBarComponent menuBar;
 
     juce::StretchableLayoutManager layout;

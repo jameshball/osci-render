@@ -8,6 +8,7 @@ VisualiserSettings::VisualiserSettings(OscirenderAudioProcessor& p, VisualiserCo
     addAndMakeVisible(hue);
     addAndMakeVisible(graticuleToggle);
     addAndMakeVisible(smudgeToggle);
+    addAndMakeVisible(upsamplingToggle);
     
     intensity.setSliderOnValueChange();
     persistence.setSliderOnValueChange();
@@ -24,6 +25,7 @@ void VisualiserSettings::resized() {
     hue.setBounds(area.removeFromTop(rowHeight));
     graticuleToggle.setBounds(area.removeFromTop(rowHeight));
     smudgeToggle.setBounds(area.removeFromTop(rowHeight));
+    upsamplingToggle.setBounds(area.removeFromTop(rowHeight));
 }
 
 juce::var VisualiserSettings::getSettings() {
@@ -33,5 +35,6 @@ juce::var VisualiserSettings::getSettings() {
     settings->setProperty("hue", audioProcessor.hueEffect->getActualValue());
     settings->setProperty("graticule", audioProcessor.graticuleEnabled->getBoolValue());
     settings->setProperty("smudges", audioProcessor.smudgesEnabled->getBoolValue());
+    settings->setProperty("upsampling", audioProcessor.upsamplingEnabled->getBoolValue());
     return juce::var(settings);
 }

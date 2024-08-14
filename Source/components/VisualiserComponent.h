@@ -40,8 +40,8 @@ public:
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseMove(const juce::MouseEvent& event) override;
     bool keyPressed(const juce::KeyPress& key) override;
-    
     void setFullScreen(bool fullScreen);
+    void setVisualiserType(bool oldVisualiser);
 
     VisualiserComponent* parent = nullptr;
     VisualiserComponent* child = nullptr;
@@ -136,8 +136,12 @@ private:
         .withNativeFunction("sampleRate", [this](auto& var, auto complete) {
             complete(sampleRate);
         })
+        .withNativeFunction("killed", [this](auto& var, auto complete) {
+            browserKilled = true;
+        })
     );
     
+    bool browserKilled = false;
     std::vector<float> tempBuffer;
     int precision = 4;
     
@@ -151,6 +155,8 @@ private:
     void popoutWindow();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserComponent)
+    juce::WeakReference<VisualiserComponent>::Master masterReference;
+    friend class juce::WeakReference<VisualiserComponent>;
 };
 
 class VisualiserWindow : public juce::DocumentWindow {

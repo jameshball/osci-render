@@ -24,6 +24,7 @@ private:
     
     jux::SwitchButton graticuleToggle{audioProcessor.graticuleEnabled};
     jux::SwitchButton smudgeToggle{audioProcessor.smudgesEnabled};
+    jux::SwitchButton upsamplingToggle{audioProcessor.upsamplingEnabled};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserSettings)
 };
