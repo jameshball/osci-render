@@ -15,7 +15,7 @@ VisualiserComponent::VisualiserComponent(OscirenderAudioProcessor& p, Visualiser
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
     setWantsKeyboardFocus(true);
     
-    addChildComponent(browser);
+    addAndMakeVisible(browser);
     setVisualiserType(oldVisualiser);
     
     roughness.textBox.setValue(audioProcessor.roughness);
@@ -141,11 +141,7 @@ void VisualiserComponent::run() {
         if (!oldVisualiser) {
             juce::MessageManager::callAsync([this, visualiser] () {
                 if (visualiser) {
-                    juce::Array<juce::var> data;
-                    for (int i = 0; i < buffer.size(); i++) {
-                        data.add(buffer[i]);
-                    }
-                    browser.emitEventIfBrowserIsVisible("audioUpdated", data);
+                    browser.emitEventIfBrowserIsVisible("audioUpdated", juce::Base64::toBase64(buffer.data(), buffer.size() * sizeof(float)));
                 }
             });
         }
@@ -228,12 +224,12 @@ void VisualiserComponent::setFullScreen(bool fullScreen) {}
 void VisualiserComponent::setVisualiserType(bool oldVisualiser) {
     this->oldVisualiser = oldVisualiser;
     if (oldVisualiser) {
-        browser.setVisible(false);
+        // required to hide the browser - it is buggy if we use setVisible(false) on Windows
         browser.goToURL("about:blank");
     } else {
-        browser.setVisible(true);
         browser.goToURL(juce::WebBrowserComponent::getResourceProviderRoot() + "oscilloscope.html");
     }
+    resized();
 }
 
 void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area) {
@@ -275,7 +271,11 @@ void VisualiserComponent::resetBuffer() {
 }
 
 void VisualiserComponent::resized() {
-    browser.setBounds(getLocalBounds());
+    if (oldVisualiser) {
+        browser.setBounds(0, 0, 0, 0);
+    } else {
+        browser.setBounds(getLocalBounds());
+    }
     auto area = getLocalBounds();
     area.removeFromBottom(5);
     auto buttonRow = area.removeFromBottom(25);
