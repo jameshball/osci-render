@@ -1,16 +1,122 @@
 #include "BinaryLineArtParser.h"
 
 
-BinaryLineArtParser::BinaryLineArtParser(juce::MemoryBlock data, int size) {
-    parseBinaryFrames(data, size);
+BinaryLineArtParser::BinaryLineArtParser(juce::MemoryBlock data, int size, bool json) {
+    if (json) {
+        parseJsonFrames(data.toString());
+    } else parseBinaryFrames(data, size);
 }
+
 
 BinaryLineArtParser::~BinaryLineArtParser() {
     frames.clear();
 }
 
+void BinaryLineArtParser::parseJsonFrames(juce::String jsonStr) {
+    frames.clear();
+    numFrames = 0;
+
+    // format of json is:
+    // {
+    //   "frames":[
+    //     "objects": [
+    //       {
+    //         "name": "Line Art",
+    //         "vertices": [
+    //           [
+    //             {
+    //               "x": double value,
+    //               "y": double value,
+    //               "z": double value
+    //             },
+    //             ...
+    //           ],
+    //           ...
+    //         ],
+    //         "matrix": [
+    //           16 double values
+    //         ]
+    //       }
+    //     ],
+    //     "focalLength": double value
+    //   },
+    //   ...
+    //   ]
+    // }
+
+    auto json = juce::JSON::parse(jsonStr);
+
+    // If json parse failed, stop and parse default fallback instead
+    if (json.isVoid()) {
+        parsingFailed(0);
+        return;
+    }
+
+    auto jsonFrames = *json.getProperty("frames", juce::Array<juce::var>()).getArray();
+    numFrames = jsonFrames.size();
+
+    // If json does not contain any frames, stop and parse no-frames fallback instead
+    if (numFrames == 0) {
+        parsingFailed(1);
+        return;
+    }
+
+    bool hasValidFrames = false;
+
+    for (int f = 0; f < numFrames; f++) {
+        juce::Array<juce::var> objects = *jsonFrames[f].getProperty("objects", juce::Array<juce::var>()).getArray();
+        juce::var focalLengthVar = jsonFrames[f].getProperty("focalLength", juce::var());
+
+        // Ensure that there actually are objects and that the focal length is defined
+        if (objects.size() > 0 && !focalLengthVar.isVoid()) {
+            std::vector<Line> frame = generateJsonFrame(objects, focalLengthVar);
+            if (frame.size() > 0) {
+                hasValidFrames = true;
+            }
+            frames.push_back(frame);
+        }
+    }
+
+    // If no frames were valid, stop and parse invalid fallback instead
+    if (!hasValidFrames) {
+        parsingFailed(2);
+        return;
+    }
+}
+
+std::vector<Line> BinaryLineArtParser::generateJsonFrame(juce::Array<juce::var> objects, double focalLength) {
+    std::vector < std::vector < std::vector<Point>>> frameVertices;
+    std::vector<std::vector<double>> matrices;
+
+    for (int o = 0; o < objects.size(); o++) {
+        auto verticesArray = *objects[o].getProperty("vertices", juce::Array<juce::var>()).getArray();
+        std::vector<std::vector<Point>> vertices;
+
+        for (auto& vertexArrayVar : verticesArray) {
+            vertices.push_back(std::vector<Point>());
+            auto& vertexArray = *vertexArrayVar.getArray();
+            for (auto& vertex : vertexArray) {
+                double x = vertex.getProperty("x", 0);
+                double y = vertex.getProperty("y", 0);
+                double z = vertex.getProperty("z", 0);
+                vertices[vertices.size() - 1].push_back(Point(x, y, z));
+            }
+        }
+        frameVertices.push_back(vertices);
+        auto matrix = *objects[o].getProperty("matrix", juce::Array<juce::var>()).getArray();
+
+        matrices.push_back(std::vector<double>());
+        for (auto& value : matrix) {
+            matrices[o].push_back(value);
+        }
+    }
+
+    return generateFrame(frameVertices, matrices, focalLength);
+}
+
 void BinaryLineArtParser::parseBinaryFrames(juce::MemoryBlock inData, int inDataSize) {
     frames.clear();
+    numFrames = 0;
 
     juce::MemoryOutputStream bin;
     bin.write(inData.getData(), inDataSize);

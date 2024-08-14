@@ -5,7 +5,6 @@
 #include "../obj/WorldObject.h"
 #include "../svg/SvgParser.h"
 #include "../txt/TextParser.h"
-#include "../gpla/LineArtParser.h"
 #include "../gpla/BinaryLineArtParser.h"
 #include "../lua/LuaParser.h"
 #include "../img/ImageParser.h"
@@ -27,7 +26,6 @@ public:
 	std::shared_ptr<WorldObject> getObject();
 	std::shared_ptr<SvgParser> getSvg();
 	std::shared_ptr<TextParser> getText();
-	std::shared_ptr<LineArtParser> getLineArt();
 	std::shared_ptr<BinaryLineArtParser> getBinaryLineArt();
 	std::shared_ptr<LuaParser> getLua();
 	std::shared_ptr<ImageParser> getImg();
@@ -45,8 +43,7 @@ private:
 	std::shared_ptr<WorldObject> object;
 	std::shared_ptr<SvgParser> svg;
 	std::shared_ptr<TextParser> text;
-	std::shared_ptr<LineArtParser> gpla;
-	std::shared_ptr<BinaryLineArtParser> gpla_bin;
+	std::shared_ptr<BinaryLineArtParser> gpla;
 	std::shared_ptr<LuaParser> lua;
 	std::shared_ptr<ImageParser> img;
 
