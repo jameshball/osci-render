@@ -1,3 +1,5 @@
+// THIS CODE HAS BEEN HEAVILY ADAPTED FROM https://dood.al/oscilloscope/ AS PERMITTED BY THE AUTHOR
+
 import * as Juce from "./index.js";
 
 var AudioSystem =
@@ -112,15 +114,8 @@ var Filter =
     }
 }
 
-var UI =
-{
-	sidebarWidth : 360,
-}
-
 var Render =
 {
-	debug : 0,
-
 	init : function()
 	{
 		this.canvas = document.getElementById("crtCanvas");
@@ -759,7 +754,6 @@ Juce.getNativeFunction("bufferSize")().then(bufferSize => {
         Render.setupArrays(Filter.nSmoothedSamples);
         AudioSystem.startSound();
         requestAnimationFrame(drawCRTFrame);
-        Controls.setupControls();
     });
 });
                         
