@@ -73,6 +73,15 @@ private:
     SvgButton popOutButton{ "popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::white };
     SvgButton settingsButton{ "settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white };
     
+    std::vector<float> tempBuffer;
+    int precision = 4;
+    
+    std::shared_ptr<BufferConsumer> consumer;
+
+    std::function<void(FullScreenMode)> fullScreenCallback;
+    VisualiserSettings settings = VisualiserSettings(audioProcessor, *this);
+    SettingsWindow settingsWindow = SettingsWindow("Visualiser Settings");
+    
     juce::WebBrowserComponent::ResourceProvider provider = [this](const juce::String& path) {
         juce::String mimeType;
         if (path.endsWith("audio")) {
@@ -138,20 +147,7 @@ private:
         .withNativeFunction("sampleRate", [this](auto& var, auto complete) {
             complete(sampleRate);
         })
-        .withNativeFunction("killed", [this](auto& var, auto complete) {
-            browserKilled = true;
-        })
     );
-    
-    bool browserKilled = false;
-    std::vector<float> tempBuffer;
-    int precision = 4;
-    
-    std::shared_ptr<BufferConsumer> consumer;
-
-    std::function<void(FullScreenMode)> fullScreenCallback;
-    VisualiserSettings settings = VisualiserSettings(audioProcessor, *this);
-    SettingsWindow settingsWindow = SettingsWindow("Visualiser Settings");
     
     void resetBuffer();
     void popoutWindow();
