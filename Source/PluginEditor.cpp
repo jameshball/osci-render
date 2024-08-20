@@ -5,8 +5,8 @@
 OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p)
 	: AudioProcessorEditor(&p), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white)
 {
-#if !JUCE_MAC
-    // use OpenGL on Windows and Linux for much better performance. The default on Mac is CoreGraphics which is much faster.
+#if JUCE_LINUX
+    // use OpenGL on Linux for much better performance. The default on Mac is CoreGraphics, and on Window is Direct2D which is much faster.
     openGlContext.attachTo(*getTopLevelComponent());
 #endif
 
