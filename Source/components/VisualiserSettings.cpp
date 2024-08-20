@@ -30,8 +30,8 @@ void VisualiserSettings::resized() {
 
 juce::var VisualiserSettings::getSettings() {
     auto settings = new juce::DynamicObject();
-    settings->setProperty("intensity", audioProcessor.intensityEffect->getActualValue());
-    settings->setProperty("persistence", audioProcessor.persistenceEffect->getActualValue());
+    settings->setProperty("intensity", audioProcessor.intensityEffect->getActualValue() - 2);
+    settings->setProperty("persistence", audioProcessor.persistenceEffect->getActualValue() - 1.33);
     settings->setProperty("hue", audioProcessor.hueEffect->getActualValue());
     settings->setProperty("graticule", audioProcessor.graticuleEnabled->getBoolValue());
     settings->setProperty("smudges", audioProcessor.smudgesEnabled->getBoolValue());

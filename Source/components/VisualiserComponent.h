@@ -21,9 +21,6 @@ public:
     VisualiserComponent(OscirenderAudioProcessor& p, VisualiserComponent* parent = nullptr, bool useOldVisualiser = false);
     ~VisualiserComponent() override;
 
-    void setIntensity(double intensity);
-    void setPersistence(double persistence);
-    void setHue(double hue);
     void openSettings();
     void childChanged();
     void enableFullScreen();
@@ -109,46 +106,10 @@ private:
         juce::WebBrowserComponent::Resource resource = { data, mimeType };
         return resource;
     };
+
+    std::unique_ptr<juce::WebBrowserComponent> browser = nullptr;
     
-    juce::WebBrowserComponent browser = juce::WebBrowserComponent(
-        juce::WebBrowserComponent::Options()
-        .withNativeIntegrationEnabled()
-        .withResourceProvider(provider)
-        .withBackend(juce::WebBrowserComponent::Options::Backend::webview2)
-        .withWinWebView2Options(juce::WebBrowserComponent::Options::WinWebView2{})
-        .withNativeFunction("toggleFullscreen", [this](auto& var, auto complete) {
-            enableFullScreen();
-        })
-        .withNativeFunction("popout", [this](auto& var, auto complete) {
-            popoutWindow();
-        })
-        .withNativeFunction("settings", [this](auto& var, auto complete) {
-            openSettings();
-        })
-        .withNativeFunction("isDebug", [this](auto& var, auto complete) {
-#if JUCE_DEBUG
-            complete(true);
-#else
-            complete(false);
-#endif
-        })
-        .withNativeFunction("isOverlay", [this](auto& var, auto complete) {
-            complete(parent != nullptr);
-        })
-        .withNativeFunction("pause", [this](auto& var, auto complete) {
-            setPaused(active);
-        })
-        .withNativeFunction("getSettings", [this](auto& var, auto complete) {
-            complete(settings.getSettings());
-        })
-        .withNativeFunction("bufferSize", [this](auto& var, auto complete) {
-            complete((int) tempBuffer.size() / 2);
-        })
-        .withNativeFunction("sampleRate", [this](auto& var, auto complete) {
-            complete(sampleRate);
-        })
-    );
-    
+    void initialiseBrowser();
     void resetBuffer();
     void popoutWindow();
 

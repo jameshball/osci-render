@@ -247,7 +247,7 @@ var Render =
 
 	drawLineTexture : function(xPoints, yPoints)
 	{
-    	this.fadeAmount = Math.pow(0.5, controls.persistence)*0.2*AudioSystem.bufferSize/512 ;
+		this.fadeAmount = Math.min(1, Math.pow(0.5, controls.persistence) * 0.4);
 		this.activateTargetTexture(this.lineTexture);
 		this.fade();
 		//gl.clear(gl.COLOR_BUFFER_BIT);
@@ -432,9 +432,12 @@ var Render =
 		gl.uniform1f(program.uGain, Math.pow(2.0,controls.mainGain)*450/512);
 		if (controls.invertXY) gl.uniform1f(program.uInvert, -1.0);
 		else gl.uniform1f(program.uInvert, 1.0);
-		if (controls.disableFilter) gl.uniform1f(program.uIntensity, 0.005*(Filter.steps+1.5));
+
+		var intensity = 0.02 * (41000 / externalSampleRate);
+
+		if (controls.disableFilter) gl.uniform1f(program.uIntensity, intensity *(Filter.steps+1.5));
 		// +1.5 needed above for some reason for the brightness to match
-		else gl.uniform1f(program.uIntensity, 0.005);
+		else gl.uniform1f(program.uIntensity, intensity);
 		gl.uniform1f(program.uFadeAmount, this.fadeAmount);
 		gl.uniform1f(program.uNEdges, this.nEdges);
 
@@ -745,11 +748,10 @@ function drawCRTFrame(timeStamp) {
 var xSamples = new Float32Array(externalBufferSize);
 var ySamples = new Float32Array(externalBufferSize);
 
-const bufferSizeFn = Juce.getNativeFunction("bufferSize");
 Juce.getNativeFunction("bufferSize")().then(bufferSize => {
     externalBufferSize = bufferSize;
     Juce.getNativeFunction("sampleRate")().then(sampleRate => {
-        externalSampleRate = sampleRate;
+		externalSampleRate = sampleRate;
         xSamples = new Float32Array(externalBufferSize);
         ySamples = new Float32Array(externalBufferSize);
         Render.init();

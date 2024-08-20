@@ -68,7 +68,6 @@ void MainMenuBarModel::menuItemSelected(int menuItemID, int topLevelMenuIndex) {
             break;
         case 1: {
             audioProcessor.legacyVisualiserEnabled->setBoolValueNotifyingHost(!audioProcessor.legacyVisualiserEnabled->getBoolValue());
-            editor.visualiser.setVisualiserType(audioProcessor.legacyVisualiserEnabled->getBoolValue());
             menuItemsChanged();
         } break;
         case 2: {
