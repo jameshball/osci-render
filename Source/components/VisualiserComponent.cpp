@@ -2,6 +2,8 @@
 #include "VisualiserComponent.h"
 
 VisualiserComponent::VisualiserComponent(OscirenderAudioProcessor& p, VisualiserComponent* parent, bool useOldVisualiser) : backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), audioProcessor(p), oldVisualiser(useOldVisualiser), juce::Thread("VisualiserComponent"), parent(parent) {
+    setVisualiserType(oldVisualiser);
+    
     resetBuffer();
     startTimerHz(60);
     startThread();
@@ -11,12 +13,10 @@ VisualiserComponent::VisualiserComponent(OscirenderAudioProcessor& p, Visualiser
     settings.setLookAndFeel(&getLookAndFeel());
     settings.setSize(550, 230);
     settingsWindow.setContentNonOwned(&settings, true);
+    settingsWindow.centreWithSize(550, 230);
     
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
     setWantsKeyboardFocus(true);
-    
-    addAndMakeVisible(browser);
-    setVisualiserType(oldVisualiser);
     
     roughness.textBox.setValue(audioProcessor.roughness);
     roughness.textBox.onValueChange = [this]() {
@@ -140,8 +140,8 @@ void VisualiserComponent::run() {
         juce::WeakReference<VisualiserComponent> visualiser(this);
         if (!oldVisualiser) {
             juce::MessageManager::callAsync([this, visualiser] () {
-                if (visualiser) {
-                    browser.emitEventIfBrowserIsVisible("audioUpdated", juce::Base64::toBase64(buffer.data(), buffer.size() * sizeof(float)));
+                if (visualiser != nullptr && browser != nullptr) {
+                    browser->emitEventIfBrowserIsVisible("audioUpdated", juce::Base64::toBase64(buffer.data(), buffer.size() * sizeof(float)));
                 }
             });
         }
@@ -223,13 +223,14 @@ void VisualiserComponent::setFullScreen(bool fullScreen) {}
 
 void VisualiserComponent::setVisualiserType(bool oldVisualiser) {
     this->oldVisualiser = oldVisualiser;
-    if (oldVisualiser) {
-        // required to hide the browser - it is buggy if we use setVisible(false) on Windows
-        browser.goToURL("about:blank");
-    } else {
-        browser.goToURL(juce::WebBrowserComponent::getResourceProviderRoot() + "oscilloscope.html");
+    if (child != nullptr) {
+        child->setVisualiserType(oldVisualiser);
     }
-    resized();
+    if (oldVisualiser) {
+        browser.reset();
+    } else {
+        initialiseBrowser();
+    }
 }
 
 void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area) {
@@ -262,19 +263,73 @@ void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area
     }
 }
 
+void VisualiserComponent::initialiseBrowser() {
+    browser = std::make_unique<juce::WebBrowserComponent>(
+        juce::WebBrowserComponent::Options()
+        .withNativeIntegrationEnabled()
+        .withResourceProvider(provider)
+        .withBackend(juce::WebBrowserComponent::Options::Backend::webview2)
+        .withKeepPageLoadedWhenBrowserIsHidden()
+        .withWinWebView2Options(
+            juce::WebBrowserComponent::Options::WinWebView2{}
+            .withUserDataFolder(juce::File::getSpecialLocation(juce::File::SpecialLocationType::userApplicationDataDirectory).getChildFile("osci-render"))
+            .withStatusBarDisabled()
+            .withBuiltInErrorPageDisabled()
+        )
+        .withNativeFunction("toggleFullscreen", [this](auto& var, auto complete) {
+            enableFullScreen();
+        })
+        .withNativeFunction("popout", [this](auto& var, auto complete) {
+            popoutWindow();
+        })
+        .withNativeFunction("settings", [this](auto& var, auto complete) {
+            openSettings();
+        })
+        .withNativeFunction("isDebug", [this](auto& var, auto complete) {
+#if JUCE_DEBUG
+            complete(true);
+#else
+            complete(false);
+#endif
+        })
+        .withNativeFunction("isOverlay", [this](auto& var, auto complete) {
+            complete(parent != nullptr);
+        })
+        .withNativeFunction("isPaused", [this](auto& var, auto complete) {
+            complete(!active);
+        })
+        .withNativeFunction("pause", [this](auto& var, auto complete) {
+            setPaused(active);
+        })
+        .withNativeFunction("getSettings", [this](auto& var, auto complete) {
+            complete(settings.getSettings());
+        })
+        .withNativeFunction("bufferSize", [this](auto& var, auto complete) {
+            complete((int) tempBuffer.size() / 2);
+        })
+        .withNativeFunction("sampleRate", [this](auto& var, auto complete) {
+            complete(sampleRate);
+        })
+    );
+
+    addAndMakeVisible(*browser);
+    browser->goToURL(juce::WebBrowserComponent::getResourceProviderRoot() + "oscilloscope.html");
+    resized();
+}
+
 void VisualiserComponent::resetBuffer() {
     sampleRate = (int) audioProcessor.currentSampleRate;
     tempBuffer = std::vector<float>(2 * sampleRate * BUFFER_LENGTH_SECS);
-    if (!oldVisualiser) {
-        browser.goToURL(juce::WebBrowserComponent::getResourceProviderRoot() + "oscilloscope.html");
+    if (!oldVisualiser && isShowing()) {
+        juce::MessageManager::callAsync([this] () {
+            initialiseBrowser();
+        });
     }
 }
 
 void VisualiserComponent::resized() {
-    if (oldVisualiser) {
-        browser.setBounds(0, 0, 0, 0);
-    } else {
-        browser.setBounds(getLocalBounds());
+    if (!oldVisualiser) {
+        browser->setBounds(getLocalBounds());
     }
     auto area = getLocalBounds();
     area.removeFromBottom(5);
@@ -290,11 +345,11 @@ void VisualiserComponent::resized() {
 }
 
 void VisualiserComponent::childChanged() {
-    browser.emitEventIfBrowserIsVisible("childPresent", child != nullptr);
+    browser->emitEventIfBrowserIsVisible("childPresent", child != nullptr);
 }
 
 void VisualiserComponent::popoutWindow() {
-    auto visualiser = new VisualiserComponent(audioProcessor, this);
+    auto visualiser = new VisualiserComponent(audioProcessor, this, oldVisualiser);
     visualiser->settings.setLookAndFeel(&getLookAndFeel());
     child = visualiser;
     childChanged();
@@ -305,6 +360,7 @@ void VisualiserComponent::popoutWindow() {
     popout->setUsingNativeTitleBar(true);
     popout->setResizable(true, false);
     popout->setVisible(true);
+    popout->centreWithSize(300, 300);
     setPaused(true);
     resized();
     popOutButton.setVisible(false);

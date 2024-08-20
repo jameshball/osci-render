@@ -119,6 +119,15 @@
     
     let isDebug = true;
     let paused = false;
+    Juce.getNativeFunction("isPaused")().then(isPaused => {
+        paused = isPaused;
+        if (isPaused) {
+            overlay.style.display = "flex";
+        } else {
+            overlay.style.display = "none";
+        }
+    });
+    
     let openInAnotherWindow = false;
     let externalSampleRate = 96000;
     let externalBufferSize = 1920;
