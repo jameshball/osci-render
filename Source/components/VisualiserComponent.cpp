@@ -1,12 +1,22 @@
-#include "VisualiserComponent.h"
 #include "../LookAndFeel.h"
+#include "VisualiserComponent.h"
 
-VisualiserComponent::VisualiserComponent(int numChannels, OscirenderAudioProcessor& p, VisualiserComponent* parent) : numChannels(numChannels), backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), audioProcessor(p), juce::Thread("VisualiserComponent"), parent(parent) {
+VisualiserComponent::VisualiserComponent(OscirenderAudioProcessor& p, VisualiserComponent* parent, bool useOldVisualiser) : backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), audioProcessor(p), oldVisualiser(useOldVisualiser), juce::Thread("VisualiserComponent"), parent(parent) {
+    setVisualiserType(oldVisualiser);
+    
     resetBuffer();
     startTimerHz(60);
     startThread();
-
-    setFullScreen(false);
+    
+    settingsWindow.setResizable(false, false);
+    settingsWindow.setUsingNativeTitleBar(true);
+    settings.setLookAndFeel(&getLookAndFeel());
+    settings.setSize(550, 230);
+    settingsWindow.setContentNonOwned(&settings, true);
+    settingsWindow.centreWithSize(550, 230);
+    
+    setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    setWantsKeyboardFocus(true);
     
     roughness.textBox.setValue(audioProcessor.roughness);
     roughness.textBox.onValueChange = [this]() {
@@ -16,9 +26,6 @@ VisualiserComponent::VisualiserComponent(int numChannels, OscirenderAudioProcess
     intensity.textBox.onValueChange = [this]() {
         audioProcessor.intensity = intensity.textBox.getValue();
     };
-
-    setMouseCursor(juce::MouseCursor::PointingHandCursor);
-    setWantsKeyboardFocus(true);
     
     if (parent == nullptr) {
         addChildComponent(fullScreenButton);
@@ -41,25 +48,17 @@ VisualiserComponent::VisualiserComponent(int numChannels, OscirenderAudioProcess
         menu.showMenuAsync(juce::PopupMenu::Options(), [this](int result) {});
     };
     
-    popOutButton.onClick = [this, numChannels]() {
-        auto visualiser = new VisualiserComponent(numChannels, audioProcessor, this);
-        child = visualiser;
-        popOutButton.setVisible(false);
-        visualiser->setSize(300, 300);
-        popout = std::make_unique<VisualiserWindow>("Software Oscilloscope", this);
-        popout->setContentOwned(visualiser, true);
-        popout->setUsingNativeTitleBar(true);
-        popout->setResizable(true, false);
-        popout->setVisible(true);
-        setPaused(true);
-        resized();
-        popOutButton.setVisible(false);
+    popOutButton.onClick = [this]() {
+        popoutWindow();
     };
+
+    setFullScreen(false);
 }
 
 VisualiserComponent::~VisualiserComponent() {
     audioProcessor.consumerStop(consumer);
     stopThread(1000);
+    masterReference.clear();
 }
 
 void VisualiserComponent::setFullScreenCallback(std::function<void(FullScreenMode)> callback) {
@@ -80,7 +79,8 @@ void VisualiserComponent::mouseDoubleClick(const juce::MouseEvent& event) {
 void VisualiserComponent::setBuffer(std::vector<float>& newBuffer) {
     juce::CriticalSection::ScopedLockType scope(lock);
     buffer.clear();
-    for (int i = 0; i < newBuffer.size(); i += (int) roughness.textBox.getValue() * numChannels) {
+    int stride = oldVisualiser ? roughness.textBox.getValue() : 1;
+    for (int i = 0; i < newBuffer.size(); i += stride * 2) {
         buffer.push_back(newBuffer[i]);
         buffer.push_back(newBuffer[i + 1]);
     }
@@ -92,35 +92,40 @@ void VisualiserComponent::setColours(juce::Colour bk, juce::Colour fg) {
 }
 
 void VisualiserComponent::paint(juce::Graphics& g) {
-    g.setColour(backgroundColour);
-    g.fillRoundedRectangle(getLocalBounds().toFloat(), OscirenderLookAndFeel::RECT_RADIUS);
-
-    auto r = getLocalBounds().toFloat();
-    auto minDim = juce::jmin(r.getWidth(), r.getHeight());
-
-    {
-        juce::CriticalSection::ScopedLockType scope(lock);
-        if (buffer.size() > 0) {
-            g.setColour(waveformColour);
-            paintXY(g, r.withSizeKeepingCentre(minDim, minDim));
-        }
-    }
-
-    if (!active) {
-        // add translucent layer
-        g.setColour(juce::Colours::black.withAlpha(0.5f));
+    if (oldVisualiser) {
+        g.setColour(backgroundColour);
         g.fillRoundedRectangle(getLocalBounds().toFloat(), OscirenderLookAndFeel::RECT_RADIUS);
-
-        // add text
-        g.setColour(juce::Colours::white);
-        g.setFont(14.0f);
-        auto text = child != nullptr ? "Open in separate window" : "Paused";
-        g.drawFittedText(text, getLocalBounds(), juce::Justification::centred, 1);
+        
+        auto r = getLocalBounds().toFloat();
+        auto minDim = juce::jmin(r.getWidth(), r.getHeight());
+        
+        {
+            juce::CriticalSection::ScopedLockType scope(lock);
+            if (buffer.size() > 0) {
+                g.setColour(waveformColour);
+                paintXY(g, r.withSizeKeepingCentre(minDim, minDim));
+            }
+        }
+        
+        
+        if (!active) {
+            // add translucent layer
+            g.setColour(juce::Colours::black.withAlpha(0.5f));
+            g.fillRoundedRectangle(getLocalBounds().toFloat(), OscirenderLookAndFeel::RECT_RADIUS);
+            
+            // add text
+            g.setColour(juce::Colours::white);
+            g.setFont(14.0f);
+            auto text = child != nullptr ? "Open in separate window" : "Paused";
+            g.drawFittedText(text, getLocalBounds(), juce::Justification::centred, 1);
+        }
     }
 }
 
 void VisualiserComponent::timerCallback() {
-    repaint();
+    if (oldVisualiser) {
+        repaint();
+    }
 }
 
 void VisualiserComponent::run() {
@@ -132,6 +137,14 @@ void VisualiserComponent::run() {
         consumer = audioProcessor.consumerRegister(tempBuffer);
         audioProcessor.consumerRead(consumer);
         setBuffer(tempBuffer);
+        juce::WeakReference<VisualiserComponent> visualiser(this);
+        if (!oldVisualiser) {
+            juce::MessageManager::callAsync([this, visualiser] () {
+                if (visualiser != nullptr && browser != nullptr) {
+                    browser->emitEventIfBrowserIsVisible("audioUpdated", juce::Base64::toBase64(buffer.data(), buffer.size() * sizeof(float)));
+                }
+            });
+        }
     }
 }
 
@@ -149,12 +162,14 @@ void VisualiserComponent::setPaused(bool paused) {
 }
 
 void VisualiserComponent::mouseDown(const juce::MouseEvent& event) {
+    if (!oldVisualiser) return;
     if (event.mods.isLeftButtonDown() && child == nullptr) {
         setPaused(active);
     }
 }
 
 void VisualiserComponent::mouseMove(const juce::MouseEvent& event) {
+    if (!oldVisualiser) return;
     if (event.getScreenX() == lastMouseX && event.getScreenY() == lastMouseY) {
         return;
     }
@@ -204,28 +219,18 @@ bool VisualiserComponent::keyPressed(const juce::KeyPress& key) {
     return false;
 }
 
-void VisualiserComponent::setFullScreen(bool fullScreen) {
-	// useful as a callback from parent if needed
-}
+void VisualiserComponent::setFullScreen(bool fullScreen) {}
 
-void VisualiserComponent::paintChannel(juce::Graphics& g, juce::Rectangle<float> area, int channel) {
-    juce::Path path;
-
-    for (int i = 0; i < buffer.size(); i += numChannels) {
-        auto sample = buffer[i + channel];
-
-        if (i == 0) {
-            path.startNewSubPath(0.0f, sample);
-        } else {
-            path.lineTo((float)i, sample);
-        }
+void VisualiserComponent::setVisualiserType(bool oldVisualiser) {
+    this->oldVisualiser = oldVisualiser;
+    if (child != nullptr) {
+        child->setVisualiserType(oldVisualiser);
     }
-
-    // apply affine transform to path to fit in area
-    auto transform = juce::AffineTransform::fromTargetPoints(0.0f, -1.0f, area.getX(), area.getY(), 0.0f, 1.0f, area.getX(), area.getBottom(), buffer.size(), -1.0f, area.getRight(), area.getY());
-    path.applyTransform(transform);
-
-    g.strokePath(path, juce::PathStrokeType(1.0f));
+    if (oldVisualiser) {
+        browser.reset();
+    } else {
+        initialiseBrowser();
+    }
 }
 
 void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area) {
@@ -258,12 +263,72 @@ void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area
     }
 }
 
+void VisualiserComponent::initialiseBrowser() {
+    browser = std::make_unique<juce::WebBrowserComponent>(
+        juce::WebBrowserComponent::Options()
+        .withNativeIntegrationEnabled()
+        .withResourceProvider(provider)
+        .withBackend(juce::WebBrowserComponent::Options::Backend::webview2)
+        .withKeepPageLoadedWhenBrowserIsHidden()
+        .withWinWebView2Options(
+            juce::WebBrowserComponent::Options::WinWebView2{}
+            .withUserDataFolder(juce::File::getSpecialLocation(juce::File::SpecialLocationType::userApplicationDataDirectory).getChildFile("osci-render"))
+            .withStatusBarDisabled()
+            .withBuiltInErrorPageDisabled()
+            .withBackgroundColour(Colours::dark)
+        )
+        .withNativeFunction("toggleFullscreen", [this](auto& var, auto complete) {
+            enableFullScreen();
+        })
+        .withNativeFunction("popout", [this](auto& var, auto complete) {
+            popoutWindow();
+        })
+        .withNativeFunction("settings", [this](auto& var, auto complete) {
+            openSettings();
+        })
+        .withNativeFunction("isDebug", [this](auto& var, auto complete) {
+#if JUCE_DEBUG
+            complete(true);
+#else
+            complete(false);
+#endif
+        })
+        .withNativeFunction("isOverlay", [this](auto& var, auto complete) {
+            complete(parent != nullptr);
+        })
+        .withNativeFunction("pause", [this](auto& var, auto complete) {
+            setPaused(active);
+        })
+        .withNativeFunction("getSettings", [this](auto& var, auto complete) {
+            complete(settings.getSettings());
+        })
+        .withNativeFunction("bufferSize", [this](auto& var, auto complete) {
+            complete((int) tempBuffer.size() / 2);
+        })
+        .withNativeFunction("sampleRate", [this](auto& var, auto complete) {
+            complete(sampleRate);
+        })
+    );
+
+    addAndMakeVisible(*browser);
+    browser->goToURL(juce::WebBrowserComponent::getResourceProviderRoot() + "oscilloscope.html");
+    resized();
+}
+
 void VisualiserComponent::resetBuffer() {
     sampleRate = (int) audioProcessor.currentSampleRate;
     tempBuffer = std::vector<float>(2 * sampleRate * BUFFER_LENGTH_SECS);
+    if (!oldVisualiser && isShowing()) {
+        juce::MessageManager::callAsync([this] () {
+            initialiseBrowser();
+        });
+    }
 }
 
 void VisualiserComponent::resized() {
+    if (!oldVisualiser) {
+        browser->setBounds(getLocalBounds());
+    }
     auto area = getLocalBounds();
     area.removeFromBottom(5);
     auto buttonRow = area.removeFromBottom(25);
@@ -275,4 +340,33 @@ void VisualiserComponent::resized() {
         popOutButton.setBounds(buttonRow.removeFromRight(30));
     }
     settingsButton.setBounds(buttonRow.removeFromRight(30));
+}
+
+void VisualiserComponent::childChanged() {
+    if (!oldVisualiser) {
+        browser->emitEventIfBrowserIsVisible("childPresent", child != nullptr);
+    }
+}
+
+void VisualiserComponent::popoutWindow() {
+    auto visualiser = new VisualiserComponent(audioProcessor, this, oldVisualiser);
+    visualiser->settings.setLookAndFeel(&getLookAndFeel());
+    child = visualiser;
+    childChanged();
+    popOutButton.setVisible(false);
+    visualiser->setSize(300, 300);
+    popout = std::make_unique<VisualiserWindow>("Software Oscilloscope", this);
+    popout->setContentOwned(visualiser, true);
+    popout->setUsingNativeTitleBar(true);
+    popout->setResizable(true, false);
+    popout->setVisible(true);
+    popout->centreWithSize(300, 300);
+    setPaused(true);
+    resized();
+    popOutButton.setVisible(false);
+}
+
+void VisualiserComponent::openSettings() {
+    settingsWindow.setVisible(true);
+    settingsWindow.toFront(true);
 }

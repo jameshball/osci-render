@@ -48,7 +48,7 @@ public:
 
     std::atomic<bool> editingCustomFunction = false;
 
-    VisualiserComponent visualiser{2, audioProcessor};
+    VisualiserComponent visualiser{audioProcessor, nullptr, audioProcessor.legacyVisualiserEnabled->getBoolValue()};
     std::atomic<bool> visualiserFullScreen = false;
     SettingsComponent settings{audioProcessor, *this};
 
@@ -68,7 +68,7 @@ public:
     std::shared_ptr<OscirenderCodeEditorComponent> customFunctionCodeEditor = std::make_shared<OscirenderCodeEditorComponent>(*customFunctionCodeDocument, &luaTokeniser, audioProcessor, CustomEffect::UNIQUE_ID, CustomEffect::FILE_NAME);
 
     std::unique_ptr<juce::FileChooser> chooser;
-    MainMenuBarModel menuBarModel{*this};
+    MainMenuBarModel menuBarModel{audioProcessor, *this};
     juce::MenuBarComponent menuBar;
 
     juce::StretchableLayoutManager layout;
@@ -77,14 +77,14 @@ public:
     juce::StretchableLayoutManager luaLayout;
     juce::StretchableLayoutResizerBar luaResizerBar{&luaLayout, 1, false};
 
-    juce::TooltipWindow tooltipWindow{this, 0};
+    juce::TooltipWindow tooltipWindow{nullptr, 0};
     juce::DropShadower tooltipDropShadow{juce::DropShadow(juce::Colours::black.withAlpha(0.5f), 6, {0,0})};
 
     std::atomic<bool> updatingDocumentsWithParserLock = false;
 
     bool usingNativeMenuBar = false;
 
-#if !JUCE_MAC
+#if JUCE_LINUX
     juce::OpenGLContext openGlContext;
 #endif
 

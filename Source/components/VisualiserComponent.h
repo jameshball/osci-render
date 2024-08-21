@@ -2,10 +2,12 @@
 
 #include <algorithm>
 #include <JuceHeader.h>
+#include "../LookAndFeel.h"
 #include "../concurrency/BufferConsumer.h"
 #include "../PluginProcessor.h"
 #include "LabelledTextBox.h"
 #include "SvgButton.h"
+#include "VisualiserSettings.h"
 
 enum class FullScreenMode {
     TOGGLE,
@@ -16,15 +18,16 @@ enum class FullScreenMode {
 class VisualiserWindow;
 class VisualiserComponent : public juce::Component, public juce::Timer, public juce::Thread, public juce::MouseListener, public juce::SettableTooltipClient {
 public:
-    VisualiserComponent(int numChannels, OscirenderAudioProcessor& p, VisualiserComponent* parent = nullptr);
+    VisualiserComponent(OscirenderAudioProcessor& p, VisualiserComponent* parent = nullptr, bool useOldVisualiser = false);
     ~VisualiserComponent() override;
 
+    void openSettings();
+    void childChanged();
     void enableFullScreen();
     void setFullScreenCallback(std::function<void(FullScreenMode)> callback);
     void mouseDoubleClick(const juce::MouseEvent& event) override;
     void setBuffer(std::vector<float>& buffer);
     void setColours(juce::Colour backgroundColour, juce::Colour waveformColour);
-    void paintChannel(juce::Graphics&, juce::Rectangle<float> bounds, int channel);
 	void paintXY(juce::Graphics&, juce::Rectangle<float> bounds);
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -34,8 +37,8 @@ public:
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseMove(const juce::MouseEvent& event) override;
     bool keyPressed(const juce::KeyPress& key) override;
-    
     void setFullScreen(bool fullScreen);
+    void setVisualiserType(bool oldVisualiser);
 
     VisualiserComponent* parent = nullptr;
     VisualiserComponent* child = nullptr;
@@ -52,10 +55,11 @@ private:
     std::atomic<int> lastMouseX;
     std::atomic<int> lastMouseY;
     
+    bool oldVisualiser;
+    
 	juce::CriticalSection lock;
     std::vector<float> buffer;
     std::vector<juce::Line<float>> prevLines;
-    int numChannels = 2;
     juce::Colour backgroundColour, waveformColour;
 	OscirenderAudioProcessor& audioProcessor;
     int sampleRate = DEFAULT_SAMPLE_RATE;
@@ -72,10 +76,46 @@ private:
     std::shared_ptr<BufferConsumer> consumer;
 
     std::function<void(FullScreenMode)> fullScreenCallback;
+    VisualiserSettings settings = VisualiserSettings(audioProcessor, *this);
+    SettingsWindow settingsWindow = SettingsWindow("Visualiser Settings");
     
+    juce::WebBrowserComponent::ResourceProvider provider = [this](const juce::String& path) {
+        juce::String mimeType;
+        if (path.endsWith("audio")) {
+            mimeType = "application/octet-stream";
+            juce::CriticalSection::ScopedLockType scope(lock);
+            std::vector<std::byte> data(buffer.size() * sizeof(float));
+            std::memcpy(data.data(), buffer.data(), data.size());
+            juce::WebBrowserComponent::Resource resource = { data, mimeType };
+            return resource;
+        } else if (path.endsWith(".html")) {
+            mimeType = "text/html";
+        } else if (path.endsWith(".jpg")) {
+            mimeType = "image/jpeg";
+        } else if (path.endsWith(".js")) {
+            mimeType = "text/javascript";
+        }  else if (path.endsWith(".svg")) {
+            mimeType = "image/svg+xml";
+        }
+        std::vector<std::byte> data;
+        int size;
+        const char* file = BinaryData::getNamedResource(path.substring(1).replaceCharacter('.', '_').toRawUTF8(), size);
+        for (int i = 0; i < size; i++) {
+            data.push_back((std::byte) file[i]);
+        }
+        juce::WebBrowserComponent::Resource resource = { data, mimeType };
+        return resource;
+    };
+
+    std::unique_ptr<juce::WebBrowserComponent> browser = nullptr;
+    
+    void initialiseBrowser();
     void resetBuffer();
+    void popoutWindow();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserComponent)
+    juce::WeakReference<VisualiserComponent>::Master masterReference;
+    friend class juce::WeakReference<VisualiserComponent>;
 };
 
 class VisualiserWindow : public juce::DocumentWindow {
@@ -85,6 +125,7 @@ public:
     void closeButtonPressed() override {
         parent->setPaused(wasPaused);
         parent->child = nullptr;
+        parent->childChanged();
         parent->resized();
         parent->popout.reset();
     }

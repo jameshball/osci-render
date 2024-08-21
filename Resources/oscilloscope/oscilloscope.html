@@ -1,0 +1,445 @@
+<!-- THIS CODE HAS BEEN HEAVILY ADAPTED FROM https://dood.al/oscilloscope/ AS PERMITTED BY THE AUTHOR -->
+
+<!DOCTYPE html>
+<head>
+<style>
+    body {
+        font-family: Sans-Serif;
+        font-size: 14px;
+        -webkit-user-select: none; /* Safari */
+        -ms-user-select: none; /* IE 10 and IE 11 */
+        user-select: none; /* Standard syntax */
+    }
+    
+    html,
+    body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    canvas {
+        width: min(100vw, 100vh);
+        height: min(100vw, 100vh);
+        position: absolute;
+        top: calc(calc(100vh - min(100vw, 100vh)) / 2);
+        left: calc(calc(100vw - min(100vw, 100vh)) / 2);
+        display: block;
+        margin: auto;
+    }
+    
+    #overlay {
+        background-color: rgba(0,0,0,0.5);
+        height: 100vh;
+        width: 100vw;
+        position: absolute;
+        display: none;
+        justify-content: center;
+        align-items: center;
+        cursor: default;
+        z-index: 100;
+    }
+    
+    table {
+        border-spacing:0;
+        border-collapse: collapse;
+    }
+
+    #buttonRow {
+        position: fixed;
+        bottom: 0;
+        right: 0;
+        display: none;
+        z-index: 99;
+    }
+    
+    #buttonRow button {
+        width: 40px;
+        height: 40px;
+        background-color: transparent;
+        background-repeat: no-repeat;
+        border: none;
+        cursor: pointer;
+        overflow: hidden;
+        outline: none;
+        background-size: cover;
+    }
+    
+    #buttonRow button:hover {
+        filter: brightness(70%);
+    }
+    
+    #buttonRow button:active {
+        filter: brightness(50%);
+    }
+    
+    #fullscreen {
+        background: url(fullscreen.svg) no-repeat;
+    }
+    
+    #popout {
+        background: url(open_in_new.svg) no-repeat;
+    }
+    
+    #settings {
+        background: url(cog.svg) no-repeat;
+    }
+</style>
+</head>
+
+<body bgcolor="black" text="white" autocomplete="off" style="margin: 0px;">
+
+<div id="buttonRow">
+    <button id="fullscreen"/>
+    <button id="popout"/>
+    <button id="settings"/>
+</div>
+    
+<script>
+    var controls=
+    {
+        swapXY : false,
+        sweepOn : false,
+        sweepMsDiv : 1,
+        sweepTriggerValue : 0,
+        mainGain : 0.0,
+        exposureStops : 0.0,
+        hue : 125,
+        invertXY : false,
+        grid : true,
+        noise : true,
+        persistence : 0,
+        disableFilter : false,
+    }
+
+    let timeout;
+    document.addEventListener("mousemove", function() {
+        const buttons = document.getElementById('buttonRow');
+        buttons.style.display = "block";
+        if (timeout) {
+            clearTimeout(timeout);
+        }
+        timeout = setTimeout(function() {
+            buttons.style.display = "none";
+        }, 1000)
+    });
+    
+    let isDebug = true;
+    let paused = false;
+    let openInAnotherWindow = false;
+    let externalSampleRate = 96000;
+    let externalBufferSize = 1920;
+
+</script>
+
+<script type="module">
+    import * as Juce from "./index.js";
+    
+    const fullscreen = document.getElementById('fullscreen');
+    const toggleFullscreen = Juce.getNativeFunction("toggleFullscreen");
+    fullscreen.onclick = toggleFullscreen;
+    
+    const popout = document.getElementById('popout');
+    const popoutFn = Juce.getNativeFunction("popout");
+    popout.onclick = popoutFn;
+    
+    const settings = document.getElementById('settings');
+    const settingsFn = Juce.getNativeFunction("settings");
+    settings.onclick = settingsFn;
+    
+    const mainScreen = document.getElementById('mainScreen');
+    const overlay = document.getElementById('overlay');
+    const pauseFn = Juce.getNativeFunction("pause");
+    mainScreen.onclick = function() {
+        if (!openInAnotherWindow) {
+            pauseFn();
+            paused = !paused;
+            if (paused) {
+                overlay.style.display = "flex";
+            } else {
+                overlay.style.display = "none";
+            }
+        }
+    };
+    
+    const isDebugFn = Juce.getNativeFunction("isDebug");
+    
+    isDebugFn().then(debug => {
+        isDebug = debug;
+        if (!debug) {
+            document.addEventListener('contextmenu', event => event.preventDefault());
+        }
+    });
+    
+    const isOverlayFn = Juce.getNativeFunction("isOverlay");
+    isOverlayFn().then(overlay => {
+        if (overlay) {
+            popout.remove();
+            fullscreen.remove();
+        }
+    });
+    
+    window.__JUCE__.backend.addEventListener("childPresent", hasChild => {
+        openInAnotherWindow = hasChild;
+        if (hasChild) {
+            overlay.style.display = "flex";
+            overlay.innerText = "Open in separate window";
+        } else {
+            overlay.style.display = "none";
+            overlay.innerText = "Paused";
+        }
+    });
+    
+    document.addEventListener("dblclick", function() {
+        toggleFullscreen();
+    });
+</script>
+
+<div id="mainScreen">
+    <div id="overlay">Paused</div>
+    <canvas id="crtCanvas" width="800" height="800"></canvas>
+</div>
+
+<script id="vertex" type="x-shader">
+	attribute vec2 vertexPosition;
+	void main()
+	{
+		gl_Position = vec4(vertexPosition, 0.0, 1.0);
+	}
+</script>
+
+<script id="fragment" type="x-shader">
+	precision highp float;
+	uniform vec4 colour;
+	void main()
+	{
+		gl_FragColor = colour;
+	}
+</script>
+
+<!-- The Gaussian line-drawing code, the next two shaders, is adapted
+	 from woscope by e1ml : https://github.com/m1el/woscope -->
+
+<script id="gaussianVertex" type="x-shader">
+	#define EPS 1E-6
+	uniform float uInvert;
+	uniform float uSize;
+	uniform float uNEdges;
+	uniform float uFadeAmount;
+	uniform float uIntensity;
+	uniform float uGain;
+	attribute vec2 aStart, aEnd;
+	attribute float aIdx;
+	varying vec4 uvl;
+	varying vec2 vTexCoord;
+	varying float vLen;
+	varying float vSize;
+	void main () {
+		float tang;
+		vec2 current;
+		// All points in quad contain the same data:
+		// segment start point and segment end point.
+		// We determine point position using its index.
+		float idx = mod(aIdx,4.0);
+
+		// `dir` vector is storing the normalized difference
+		// between end and start
+		vec2 dir = (aEnd-aStart)*uGain;
+		uvl.z = length(dir);
+
+		if (uvl.z > EPS)
+		{
+			dir = dir / uvl.z;
+			vSize = 0.006/pow(uvl.z,0.08);
+		}
+		else
+		{
+		// If the segment is too short, just draw a square
+			dir = vec2(1.0, 0.0);
+			vSize = 0.006/pow(EPS,0.08);
+		}
+
+		vSize = uSize;
+		vec2 norm = vec2(-dir.y, dir.x);
+
+		if (idx >= 2.0) {
+			current = aEnd*uGain;
+			tang = 1.0;
+			uvl.x = -vSize;
+		} else {
+			current = aStart*uGain;
+			tang = -1.0;
+			uvl.x = uvl.z + vSize;
+		}
+		// `side` corresponds to shift to the "right" or "left"
+		float side = (mod(idx, 2.0)-0.5)*2.0;
+		uvl.y = side * vSize;
+
+		uvl.w = uIntensity*mix(1.0-uFadeAmount, 1.0, floor(aIdx / 4.0 + 0.5)/uNEdges);
+
+		vec4 pos = vec4((current+(tang*dir+norm*side)*vSize)*uInvert,0.0,1.0);
+		gl_Position = pos;
+        vTexCoord = 0.5*pos.xy+0.5;
+        //float seed = floor(aIdx/4.0);
+        //seed = mod(sin(seed*seed), 7.0);
+        //if (mod(seed/2.0, 1.0)<0.5) gl_Position = vec4(10.0);
+	}
+</script>
+
+<script id="gaussianFragment" type="x-shader">
+	#define EPS 1E-6
+	#define TAU 6.283185307179586
+	#define TAUR 2.5066282746310002
+	#define SQRT2 1.4142135623730951
+	precision highp float;
+	uniform float uSize;
+	uniform float uIntensity;
+	uniform sampler2D uScreen;
+	varying float vSize;
+	varying vec4 uvl;
+	varying vec2 vTexCoord;
+
+	// A standard gaussian function, used for weighting samples
+	float gaussian(float x, float sigma)
+	{
+	  return exp(-(x * x) / (2.0 * sigma * sigma)) / (TAUR * sigma);
+	}
+
+	// This approximates the error function, needed for the gaussian integral
+	float erf(float x)
+	{
+	  float s = sign(x), a = abs(x);
+	  x = 1.0 + (0.278393 + (0.230389 + 0.078108 * (a * a)) * a) * a;
+	  x *= x;
+	  return s - s / (x * x);
+	}
+
+	void main (void)
+	{
+		float len = uvl.z;
+		vec2 xy = uvl.xy;
+		float brightness;
+
+		float sigma = vSize/5.0;
+		if (len < EPS)
+		{
+		// If the beam segment is too short, just calculate intensity at the position.
+			brightness = gaussian(length(xy), sigma);
+		}
+		else
+		{
+		// Otherwise, use analytical integral for accumulated intensity.
+			brightness = erf(xy.x/SQRT2/sigma) - erf((xy.x-len)/SQRT2/sigma);
+			brightness *= exp(-xy.y*xy.y/(2.0*sigma*sigma))/2.0/len;
+		}
+
+		brightness *= uvl.w;
+		gl_FragColor = 2.0 * texture2D(uScreen, vTexCoord) * brightness;
+		gl_FragColor.a = 1.0;
+	}
+</script>
+
+<script id="texturedVertex" type="x-shader">
+    precision highp float;
+    attribute vec2 aPos;
+    varying vec2 vTexCoord;
+    void main (void)
+    {
+        gl_Position = vec4(aPos, 0.0, 1.0);
+        vTexCoord = (0.5*aPos+0.5);
+    }
+</script>
+
+<script id="texturedVertexWithResize" type="x-shader">
+    precision highp float;
+    attribute vec2 aPos;
+    varying vec2 vTexCoord;
+    uniform float uResizeForCanvas;
+    void main (void)
+    {
+        gl_Position = vec4(aPos, 0.0, 1.0);
+        vTexCoord = (0.5*aPos+0.5)*uResizeForCanvas;
+    }
+</script>
+
+<script id="texturedFragment" type="x-shader">
+    precision highp float;
+    uniform sampler2D uTexture0;
+    varying vec2 vTexCoord;
+    void main (void)
+    {
+        gl_FragColor = texture2D(uTexture0, vTexCoord);
+        gl_FragColor.a= 1.0;
+    }
+</script>
+
+<script id="blurFragment" type="x-shader">
+    precision highp float;
+    uniform sampler2D uTexture0;
+    uniform vec2 uOffset;
+    varying vec2 vTexCoord;
+    void main (void)
+    {
+    	vec4 sum = vec4(0.0);
+        sum += texture2D(uTexture0, vTexCoord - uOffset*8.0) * 0.000078;
+        sum += texture2D(uTexture0, vTexCoord - uOffset*7.0) * 0.000489;
+        sum += texture2D(uTexture0, vTexCoord - uOffset*6.0) * 0.002403;
+        sum += texture2D(uTexture0, vTexCoord - uOffset*5.0) * 0.009245;
+        sum += texture2D(uTexture0, vTexCoord - uOffset*4.0) * 0.027835;
+        sum += texture2D(uTexture0, vTexCoord - uOffset*3.0) * 0.065592;
+        sum += texture2D(uTexture0, vTexCoord - uOffset*2.0) * 0.12098;
+        sum += texture2D(uTexture0, vTexCoord - uOffset*1.0) * 0.17467;
+        sum += texture2D(uTexture0, vTexCoord + uOffset*0.0) * 0.19742;
+        sum += texture2D(uTexture0, vTexCoord + uOffset*1.0) * 0.17467;
+        sum += texture2D(uTexture0, vTexCoord + uOffset*2.0) * 0.12098;
+        sum += texture2D(uTexture0, vTexCoord + uOffset*3.0) * 0.065592;
+        sum += texture2D(uTexture0, vTexCoord + uOffset*4.0) * 0.027835;
+        sum += texture2D(uTexture0, vTexCoord + uOffset*5.0) * 0.009245;
+        sum += texture2D(uTexture0, vTexCoord + uOffset*6.0) * 0.002403;
+        sum += texture2D(uTexture0, vTexCoord + uOffset*7.0) * 0.000489;
+        sum += texture2D(uTexture0, vTexCoord + uOffset*8.0) * 0.000078;
+        gl_FragColor = sum;
+    }
+</script>
+
+<script id="outputVertex" type="x-shader">
+    precision highp float;
+    attribute vec2 aPos;
+    varying vec2 vTexCoord;
+    varying vec2 vTexCoordCanvas;
+    uniform float uResizeForCanvas;
+    void main (void)
+    {
+        gl_Position = vec4(aPos, 0.0, 1.0);
+        vTexCoord = (0.5*aPos+0.5);
+        vTexCoordCanvas = vTexCoord*uResizeForCanvas;
+    }
+</script>
+
+<script id="outputFragment" type="x-shader">
+    precision highp float;
+    uniform sampler2D uTexture0; //line
+    uniform sampler2D uTexture1; //tight glow
+    uniform sampler2D uTexture2; //big glow
+    uniform sampler2D uTexture3; //screen
+    uniform float uExposure;
+    uniform vec3 uColour;
+    varying vec2 vTexCoord;
+    varying vec2 vTexCoordCanvas;
+    void main (void)
+    {
+    	vec4 line = texture2D(uTexture0, vTexCoordCanvas);
+    	// r components have grid; g components do not.
+    	vec4 screen = texture2D(uTexture3, vTexCoord);
+    	vec4 tightGlow = texture2D(uTexture1, vTexCoord);
+    	vec4 scatter = texture2D(uTexture2, vTexCoord)+0.35;
+    	float light = line.r + 1.5*screen.g*screen.g*tightGlow.r;
+    	light += 0.4*scatter.g * (2.0+1.0*screen.g + 0.5*screen.r);
+    	float tlight = 1.0-pow(2.0, -uExposure*light);
+    	float tlight2 = tlight*tlight*tlight;
+    	gl_FragColor.rgb = mix(uColour, vec3(1.0), 0.3+tlight2*tlight2*0.5)*tlight;
+        gl_FragColor.a= 1.0;
+    }
+</script>
+
+<script src="oscilloscope.js" type="module"></script>

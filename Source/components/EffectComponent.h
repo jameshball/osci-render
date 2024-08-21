@@ -25,6 +25,58 @@ public:
     Effect& effect;
     int index = 0;
     juce::ComboBox lfo;
+    
+    class EffectRangeComponent : public juce::Component {
+    public:
+        EffectRangeComponent(EffectComponent* parent) {
+            addAndMakeVisible(popupLabel);
+            addAndMakeVisible(min);
+            addAndMakeVisible(max);
+            
+            EffectParameter* parameter = parent->effect.parameters[parent->index];
+            
+            min.textBox.setValue(parameter->min, juce::dontSendNotification);
+            max.textBox.setValue(parameter->max, juce::dontSendNotification);
+
+            min.textBox.onValueChange = [this, parameter, parent]() {
+                double minValue = min.textBox.getValue();
+                double maxValue = max.textBox.getValue();
+                if (minValue >= maxValue) {
+                    minValue = maxValue - parameter->step;
+                    min.textBox.setValue(minValue, juce::dontSendNotification);
+                }
+                parameter->min = minValue;
+                parent->slider.setRange(parameter->min, parameter->max, parameter->step);
+            };
+
+            max.textBox.onValueChange = [this, parameter, parent]() {
+                double minValue = min.textBox.getValue();
+                double maxValue = max.textBox.getValue();
+                if (maxValue <= minValue) {
+                    maxValue = minValue + parameter->step;
+                    max.textBox.setValue(maxValue, juce::dontSendNotification);
+                }
+                parameter->max = maxValue;
+                parent->slider.setRange(parameter->min, parameter->max, parameter->step);
+            };
+
+            popupLabel.setText(parameter->name + " Range", juce::dontSendNotification);
+            popupLabel.setJustificationType(juce::Justification::centred);
+            popupLabel.setFont(juce::Font(14.0f, juce::Font::bold));
+        }
+        
+        void resized() override {
+            auto bounds = getLocalBounds();
+            popupLabel.setBounds(bounds.removeFromTop(30));
+            min.setBounds(bounds.removeFromTop(40));
+            max.setBounds(bounds.removeFromTop(40));
+        }
+        
+    private:
+        juce::Label popupLabel;
+        LabelledTextBox min{"Min"};
+        LabelledTextBox max{"Max"};
+    };
 
 private:
     const int TEXT_BOX_WIDTH = 70;
@@ -41,10 +93,7 @@ private:
 
     std::unique_ptr<SvgButton> sidechainButton;
 
-    juce::Label popupLabel;
     juce::Label label;
-    LabelledTextBox min{"Min"};
-    LabelledTextBox max{"Max"};
 
     SvgButton rangeButton = { "rangeButton", BinaryData::range_svg, juce::Colours::white };
 

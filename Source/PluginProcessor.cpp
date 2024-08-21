@@ -149,6 +149,9 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     permanentEffects.push_back(thresholdEffect);
     permanentEffects.push_back(imageThreshold);
     permanentEffects.push_back(imageStride);
+    permanentEffects.push_back(intensityEffect);
+    permanentEffects.push_back(persistenceEffect);
+    permanentEffects.push_back(hueEffect);
 
     for (int i = 0; i < 26; i++) {
         addLuaSlider();
@@ -172,6 +175,10 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     booleanParameters.push_back(animateFrames);
     booleanParameters.push_back(animationSyncBPM);
     booleanParameters.push_back(invertImage);
+    booleanParameters.push_back(graticuleEnabled);
+    booleanParameters.push_back(smudgesEnabled);
+    booleanParameters.push_back(upsamplingEnabled);
+    booleanParameters.push_back(legacyVisualiserEnabled);
 
     for (auto parameter : booleanParameters) {
         addParameter(parameter);

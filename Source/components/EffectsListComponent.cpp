@@ -5,6 +5,10 @@
 
 EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectListBoxItemData& data, int rn, Effect& effect) : DraggableListBoxItem(lb, data, rn),
 effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
+    if (effect.enabled == nullptr) {
+        DBG("Effect enabled is null");
+    }
+    
     auto parameters = effect.parameters;
 	for (int i = 0; i < parameters.size(); i++) {
 		std::shared_ptr<EffectComponent> effectComponent = std::make_shared<EffectComponent>(audioProcessor, effect, i);

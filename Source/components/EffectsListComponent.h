@@ -158,7 +158,7 @@ protected:
     Effect& effect;
     ComponentListModel listModel;
     juce::ListBox list;
-    jux::SwitchButton selected = { "switchButton", false };
+    jux::SwitchButton selected = { effect.enabled };
 private:
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& editor;

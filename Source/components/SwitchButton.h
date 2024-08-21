@@ -29,6 +29,7 @@
 #pragma once
 
 #include "JuceHeader.h"
+#include "../audio/BooleanParameter.h"
 
 namespace jux
 {
@@ -40,7 +41,7 @@ namespace jux
     @see juce::ToggableButton
 
 */
-class SwitchButton : public juce::Button
+class SwitchButton : public juce::Button, public juce::AudioProcessorParameter::Listener
 {
 public:
     enum ColourIds
@@ -56,6 +57,35 @@ public:
         switchCircle.setWantsKeyboardFocus (false);
         switchCircle.setInterceptsMouseClicks (false, false);
     }
+    
+    SwitchButton(BooleanParameter* parameter) : SwitchButton(parameter->name, false) {
+        this->parameter = parameter;
+        setToggleState(parameter->getBoolValue(), juce::NotificationType::dontSendNotification);
+        parameter->addListener(this);
+        onStateChange = [this]() {
+            this->parameter->setBoolValueNotifyingHost(getToggleState());
+        };
+        addAndMakeVisible(label);
+        label.setTooltip(parameter->getDescription());
+        label.setText(parameter->name, juce::NotificationType::dontSendNotification);
+    }
+    
+    ~SwitchButton() {
+        if (parameter != nullptr) {
+            parameter->removeListener(this);
+        }
+    }
+    
+    void parameterValueChanged(int parameterIndex, float newValue) override {
+        juce::WeakReference<SwitchButton> weakThis = this;
+        juce::MessageManager::callAsync([weakThis, this]() {
+            if (weakThis != nullptr) {
+                setToggleState(parameter->getBoolValue(), juce::NotificationType::dontSendNotification);
+            }
+        });
+    }
+    
+    void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override {}
 
     void setMillisecondsToSpendMoving (int newValue)
     {
@@ -98,8 +128,10 @@ public:
     {
         Button::resized();
         auto b = getSwitchBounds();
+        label.setBounds(getLabelBounds());
+        
         juce::Rectangle<float> switchCircleBounds;
-        if (! isVertical)
+        if (!isVertical)
             switchCircleBounds = { getSwitchState() ? b.getRight() - b.getHeight() : b.getX(), b.getY(), b.getHeight(), b.getHeight() };
         else
             switchCircleBounds = {
@@ -113,6 +145,7 @@ public:
 
 private:
     int millisecondsToSpendMoving { 75 };
+    juce::Label label;
 
     bool getSwitchState() const
     {
@@ -121,13 +154,16 @@ private:
     bool isInverted = false;
     bool isVertical = false;
 
-    juce::Rectangle<float> getSwitchBounds()
-    {
-        auto b = getLocalBounds().toFloat().reduced(4, 4).translated(0, -1);
-        return b;
+    juce::Rectangle<float> getSwitchBounds() {
+        return getLocalBounds().removeFromLeft(30).withSizeKeepingCentre(30, 20).toFloat().reduced(4, 4).translated(0, -1);
+    }
+    
+    juce::Rectangle<int> getLabelBounds() {
+        auto b = getLocalBounds();
+        b.removeFromLeft(34);
+        return b.translated(0, -1);
     }
 
-    juce::String onText, offText;
     class SwitchCircle : public Component
     {
         void paint (juce::Graphics& g) override
@@ -139,6 +175,10 @@ private:
     juce::ComponentAnimator animator;
 
     bool prevToggleState = false;
+    
+    BooleanParameter* parameter = nullptr;
+    
+    JUCE_DECLARE_WEAK_REFERENCEABLE(SwitchButton)
 };
 
 } // namespace jux

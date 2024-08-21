@@ -22,6 +22,19 @@
       <GROUP id="{D084D1B2-6804-34C3-C831-231A00F4103A}" name="models">
         <FILE id="LbviBq" name="cube.obj" compile="0" resource="1" file="Resources/models/cube.obj"/>
       </GROUP>
+      <GROUP id="{F3C16D02-63B4-E3DA-7498-901173C37D6C}" name="oscilloscope">
+        <GROUP id="{DD5ACF8F-4E4F-E277-176A-5FD4A9717037}" name="juce">
+          <FILE id="FCfppP" name="check_native_interop.js" compile="0" resource="1"
+                file="Resources/oscilloscope/juce/check_native_interop.js"/>
+          <FILE id="ZEUE5w" name="index.js" compile="0" resource="1" file="Resources/oscilloscope/juce/index.js"/>
+          <FILE id="hWk293" name="package.json" compile="0" resource="1" file="Resources/oscilloscope/juce/package.json"/>
+        </GROUP>
+        <FILE id="qpPhpN" name="empty.jpg" compile="0" resource="1" file="Resources/oscilloscope/empty.jpg"/>
+        <FILE id="dNtZYs" name="noise.jpg" compile="0" resource="1" file="Resources/oscilloscope/noise.jpg"/>
+        <FILE id="YPMnjq" name="oscilloscope.html" compile="0" resource="1"
+              file="Resources/oscilloscope/oscilloscope.html"/>
+        <FILE id="BeXHj7" name="oscilloscope.js" compile="0" resource="1" file="Resources/oscilloscope/oscilloscope.js"/>
+      </GROUP>
       <GROUP id="{82BCD6F1-A8BF-F30B-5587-81EE70168883}" name="svg">
         <FILE id="rl17ZK" name="cog.svg" compile="0" resource="1" file="Resources/svg/cog.svg"/>
         <FILE id="sDajXu" name="delete.svg" compile="0" resource="1" file="Resources/svg/delete.svg"/>
@@ -50,10 +63,6 @@
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
-        <FILE id="WDV6eI" name="AudioWebSocketServer.cpp" compile="1" resource="0"
-              file="Source/audio/AudioWebSocketServer.cpp"/>
-        <FILE id="RD41Jd" name="AudioWebSocketServer.h" compile="0" resource="0"
-              file="Source/audio/AudioWebSocketServer.h"/>
         <FILE id="NWuowi" name="BitCrushEffect.cpp" compile="1" resource="0"
               file="Source/audio/BitCrushEffect.cpp"/>
         <FILE id="Bc8UeW" name="BitCrushEffect.h" compile="0" resource="0"
@@ -164,6 +173,10 @@
               file="Source/components/VisualiserComponent.cpp"/>
         <FILE id="ZueyNl" name="VisualiserComponent.h" compile="0" resource="0"
               file="Source/components/VisualiserComponent.h"/>
+        <FILE id="uOtHbQ" name="VisualiserSettings.cpp" compile="1" resource="0"
+              file="Source/components/VisualiserSettings.cpp"/>
+        <FILE id="GcbeeZ" name="VisualiserSettings.h" compile="0" resource="0"
+              file="Source/components/VisualiserSettings.h"/>
         <FILE id="icFMpl" name="VListBox.cpp" compile="1" resource="0" file="Source/components/VListBox.cpp"/>
         <FILE id="mvp8je" name="VListBox.h" compile="0" resource="0" file="Source/components/VListBox.h"/>
         <FILE id="s8EVcE" name="VolumeComponent.cpp" compile="1" resource="0"
@@ -615,7 +628,8 @@
     </GROUP>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"
-               JUCE_WIN_PER_MONITOR_DPI_AWARE="0"/>
+               JUCE_WIN_PER_MONITOR_DPI_AWARE="0" JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING="1"
+               JUCE_USE_WIN_WEBVIEW2="1"/>
   <EXPORTFORMATS>
     <LINUX_MAKE targetFolder="Builds/LinuxMakefile" smallIcon="pSc1mq" bigIcon="pSc1mq">
       <CONFIGURATIONS>

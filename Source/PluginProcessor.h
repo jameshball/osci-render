@@ -16,7 +16,6 @@
 #include "audio/ShapeVoice.h"
 #include "audio/PublicSynthesiser.h"
 #include <numbers>
-#include "audio/AudioWebSocketServer.h"
 #include "audio/DelayEffect.h"
 #include "audio/PitchDetector.h"
 #include "audio/WobbleEffect.h"
@@ -122,9 +121,7 @@ public:
     );
     
     std::shared_ptr<Effect> traceMax = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
-            return input;
-        }, new EffectParameter(
+        new EffectParameter(
             "Trace max",
             "Defines the maximum proportion of the image that is drawn before skipping to the next frame. This has the effect of 'tracing' out the image from a single dot when animated. By default, we draw until the end of the frame, so this value is 1.0.",
             "traceMax",
@@ -132,9 +129,7 @@ public:
         )
     );
     std::shared_ptr<Effect> traceMin = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
-            return input;
-        }, new EffectParameter(
+        new EffectParameter(
             "Trace min",
             "Defines the proportion of the image that drawing starts from. This has the effect of 'tracing' out the image from a single dot when animated. By default, we start drawing from the beginning of the frame, so this value is 0.0.",
             "traceMin",
@@ -162,8 +157,38 @@ public:
         }
     );
     
-    BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false);
-    BooleanParameter* inputEnabled = new BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false);
+    // visualiser settings
+    BooleanParameter* graticuleEnabled = new BooleanParameter("Show Graticule", "graticuleEnabled", VERSION_HINT, true, "Show the graticule or grid lines over the oscilloscope display.");
+    BooleanParameter* smudgesEnabled = new BooleanParameter("Show Smudges", "smudgesEnabled", VERSION_HINT, true, "Adds a subtle layer of dirt/smudges to the oscilloscope display to make it look more realistic.");
+    BooleanParameter* upsamplingEnabled = new BooleanParameter("Upsample Audio", "upsamplingEnabled", VERSION_HINT, false, "Upsamples the audio before visualising it to make it appear more realistic, at the expense of performance.");
+    BooleanParameter* legacyVisualiserEnabled = new BooleanParameter("Use Legacy Visualiser", "legacyVisualiserEnabled", VERSION_HINT, false, "Replaces the realistic oscilloscope visualiser with the legacy visualiser. This may improve performance.");
+    std::shared_ptr<Effect> persistenceEffect = std::make_shared<Effect>(
+        new EffectParameter(
+            "Persistence",
+            "Controls how long the light glows for on the oscilloscope display.",
+            "persistence",
+            VERSION_HINT, 0.5, 0, 6.0
+        )
+    );
+    std::shared_ptr<Effect> hueEffect = std::make_shared<Effect>(
+        new EffectParameter(
+            "Hue",
+            "Controls the hue/colour of the oscilloscope display.",
+            "hue",
+            VERSION_HINT, 125, 0, 359, 1
+        )
+    );
+    std::shared_ptr<Effect> intensityEffect = std::make_shared<Effect>(
+        new EffectParameter(
+            "Intensity",
+            "Controls how bright the light glows for on the oscilloscope display.",
+            "intensity",
+            VERSION_HINT, 3.0, 0.0, 10.0
+        )
+    );
+    
+    BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false, "Enable MIDI input for the synth. If disabled, the synth will play a constant tone, as controlled by the frequency slider.");
+    BooleanParameter* inputEnabled = new BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false, "Enable to use input audio, instead of the generated audio.");
     std::atomic<float> frequency = 220.0f;
     
     juce::SpinLock parsersLock;
@@ -201,12 +226,12 @@ public:
 
     IntParameter* voices = new IntParameter("Voices", "voices", VERSION_HINT, 4, 1, 16);
 
-    BooleanParameter* animateFrames = new BooleanParameter("Animate", "animateFrames", VERSION_HINT, true);
-    BooleanParameter* animationSyncBPM = new BooleanParameter("Sync To BPM", "animationSyncBPM", VERSION_HINT, false);
+    BooleanParameter* animateFrames = new BooleanParameter("Animate", "animateFrames", VERSION_HINT, true, "Enables animation for files that have multiple frames, such as GIFs or Line Art.");
+    BooleanParameter* animationSyncBPM = new BooleanParameter("Sync To BPM", "animationSyncBPM", VERSION_HINT, false, "Synchronises the animation's framerate with the BPM of your DAW.");
     FloatParameter* animationRate = new FloatParameter("Animation Rate", "animationRate", VERSION_HINT, 30, -1000, 1000, 0.01);
     FloatParameter* animationOffset = new FloatParameter("Animation Offset", "animationOffset", VERSION_HINT, 0, -10000, 10000, 0.1);
 
-    BooleanParameter* invertImage = new BooleanParameter("Invert Image", "invertImage", VERSION_HINT, false);
+    BooleanParameter* invertImage = new BooleanParameter("Invert Image", "invertImage", VERSION_HINT, false, "Inverts the image so that dark pixels become light, and vice versa.");
     std::shared_ptr<Effect> imageThreshold = std::make_shared<Effect>(
         [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
             return input;
@@ -290,7 +315,6 @@ private:
     PublicSynthesiser synth;
     bool retriggerMidi = true;
 
-    AudioWebSocketServer softwareOscilloscopeServer{*this};
     ObjectServer objectServer{*this};
 
     const double VOLUME_BUFFER_SECONDS = 0.1;

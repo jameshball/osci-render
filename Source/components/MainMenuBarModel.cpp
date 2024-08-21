@@ -1,11 +1,27 @@
 #include "MainMenuBarModel.h"
 #include "../PluginEditor.h"
+#include "../PluginProcessor.h"
+
+MainMenuBarModel::MainMenuBarModel(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), editor(editor) {
+    audioProcessor.legacyVisualiserEnabled->addListener(this);
+}
+
+MainMenuBarModel::~MainMenuBarModel() {
+    audioProcessor.legacyVisualiserEnabled->removeListener(this);
+}
+
+void MainMenuBarModel::parameterValueChanged(int parameterIndex, float legacyVisualiserEnabled) {
+    editor.visualiser.setVisualiserType(legacyVisualiserEnabled >= 0.5f);
+    menuItemsChanged();
+}
+
+void MainMenuBarModel::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
 
 juce::StringArray MainMenuBarModel::getMenuBarNames() {
     if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-        return juce::StringArray("File", "About", "Audio");
+        return juce::StringArray("File", "View", "About", "Audio");
     } else {
-        return juce::StringArray("File", "About");
+        return juce::StringArray("File", "View", "About");
     }
 }
 
@@ -20,8 +36,10 @@ juce::PopupMenu MainMenuBarModel::getMenuForIndex(int topLevelMenuIndex, const j
             menu.addItem(4, "Create New Project");
         }
     } else if (topLevelMenuIndex == 1) {
-        menu.addItem(1, "About osci-render");
+        menu.addItem(1, "Use Legacy Visualiser", true, audioProcessor.legacyVisualiserEnabled->getBoolValue());
     } else if (topLevelMenuIndex == 2) {
+        menu.addItem(1, "About osci-render");
+    } else if (topLevelMenuIndex == 3) {
         menu.addItem(1, "Settings");
     }
 
@@ -49,7 +67,10 @@ void MainMenuBarModel::menuItemSelected(int menuItemID, int topLevelMenuIndex) {
             }
             break;
         case 1: {
-            juce::String m = "Test";
+            audioProcessor.legacyVisualiserEnabled->setBoolValueNotifyingHost(!audioProcessor.legacyVisualiserEnabled->getBoolValue());
+            menuItemsChanged();
+        } break;
+        case 2: {
             juce::DialogWindow::LaunchOptions options;
             AboutComponent* about = new AboutComponent();
             options.content.setOwned(about);
@@ -62,7 +83,7 @@ void MainMenuBarModel::menuItemSelected(int menuItemID, int topLevelMenuIndex) {
             
             juce::DialogWindow* dw = options.launchAsync();
         } break;
-        case 2:
+        case 3:
             editor.openAudioSettings();
             break;
         default:
