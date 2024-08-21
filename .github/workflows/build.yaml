@@ -67,6 +67,10 @@ jobs:
         with:
           token: ${{ secrets.ACCESS_TOKEN }}
           submodules: true
+      - name: Setup NuGet.exe for use with actions
+        uses: NuGet/setup-nuget@v1.0.5
+      - name: NuGet Sources
+        run: nuget sources
       - name: "Run script"
         run: |
           export OS="win"
