@@ -190,9 +190,9 @@
               file="Source/concurrency/BufferConsumer.h"/>
       </GROUP>
       <GROUP id="{A3E24187-62A5-AB8D-8837-14043B89A640}" name="gpla">
-        <FILE id="Kzqd2E" name="BinaryLineArtParser.cpp" compile="1" resource="0"
+        <FILE id="x6XXvm" name="BinaryLineArtParser.cpp" compile="1" resource="0"
               file="Source/gpla/BinaryLineArtParser.cpp"/>
-        <FILE id="lbsWwt" name="BinaryLineArtParser.h" compile="0" resource="0"
+        <FILE id="YgVBp9" name="BinaryLineArtParser.h" compile="0" resource="0"
               file="Source/gpla/BinaryLineArtParser.h"/>
       </GROUP>
       <GROUP id="{8AC1A0A6-6E5E-D533-33A6-76002E1DD885}" name="img">
