@@ -16,7 +16,6 @@
 #include "audio/ShapeVoice.h"
 #include "audio/PublicSynthesiser.h"
 #include <numbers>
-#include "audio/AudioWebSocketServer.h"
 #include "audio/DelayEffect.h"
 #include "audio/PitchDetector.h"
 #include "audio/WobbleEffect.h"
@@ -316,7 +315,6 @@ private:
     PublicSynthesiser synth;
     bool retriggerMidi = true;
 
-    AudioWebSocketServer softwareOscilloscopeServer{*this};
     ObjectServer objectServer{*this};
 
     const double VOLUME_BUFFER_SECONDS = 0.1;
