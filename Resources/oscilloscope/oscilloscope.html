@@ -26,7 +26,6 @@
         left: calc(calc(100vw - min(100vw, 100vh)) / 2);
         display: block;
         margin: auto;
-        z-index: -1;
     }
     
     #overlay {
@@ -38,6 +37,7 @@
         justify-content: center;
         align-items: center;
         cursor: default;
+        z-index: 100;
     }
     
     table {
@@ -50,6 +50,7 @@
         bottom: 0;
         right: 0;
         display: none;
+        z-index: 99;
     }
     
     #buttonRow button {

@@ -343,7 +343,9 @@ void VisualiserComponent::resized() {
 }
 
 void VisualiserComponent::childChanged() {
-    browser->emitEventIfBrowserIsVisible("childPresent", child != nullptr);
+    if (!oldVisualiser) {
+        browser->emitEventIfBrowserIsVisible("childPresent", child != nullptr);
+    }
 }
 
 void VisualiserComponent::popoutWindow() {

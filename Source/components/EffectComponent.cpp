@@ -166,6 +166,7 @@ void EffectComponent::parameterGestureChanged(int parameterIndex, bool gestureIs
 
 void EffectComponent::handleAsyncUpdate() {
     setupComponent();
+    getParentComponent()->repaint();
     juce::SpinLock::ScopedLockType lock1(audioProcessor.parsersLock);
     juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
     if (effect.getId().contains("lua")) {
