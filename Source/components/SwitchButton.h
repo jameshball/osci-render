@@ -77,8 +77,11 @@ public:
     }
     
     void parameterValueChanged(int parameterIndex, float newValue) override {
-        juce::MessageManager::callAsync([this]() {
-            setToggleState(parameter->getBoolValue(), juce::NotificationType::dontSendNotification);
+        juce::WeakReference<SwitchButton> weakThis = this;
+        juce::MessageManager::callAsync([weakThis, this]() {
+            if (weakThis != nullptr) {
+                setToggleState(parameter->getBoolValue(), juce::NotificationType::dontSendNotification);
+            }
         });
     }
     
@@ -174,6 +177,8 @@ private:
     bool prevToggleState = false;
     
     BooleanParameter* parameter = nullptr;
+    
+    JUCE_DECLARE_WEAK_REFERENCEABLE(SwitchButton)
 };
 
 } // namespace jux
