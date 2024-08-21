@@ -22,6 +22,7 @@ public:
     ~VisualiserComponent() override;
 
     std::function<void()> openSettings;
+    std::function<void()> closeSettings;
 
     void childChanged();
     void enableFullScreen();

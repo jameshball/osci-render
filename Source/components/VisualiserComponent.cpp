@@ -221,6 +221,9 @@ void VisualiserComponent::setVisualiserType(bool oldVisualiser) {
     }
     if (oldVisualiser) {
         browser.reset();
+        if (closeSettings != nullptr) {
+            closeSettings();
+        }
     } else {
         initialiseBrowser();
     }
@@ -345,6 +348,7 @@ void VisualiserComponent::popoutWindow() {
     auto visualiser = new VisualiserComponent(audioProcessor, settings, this, oldVisualiser);
     visualiser->settings.setLookAndFeel(&getLookAndFeel());
     visualiser->openSettings = openSettings;
+    visualiser->closeSettings = closeSettings;
     child = visualiser;
     childChanged();
     popOutButton.setVisible(false);

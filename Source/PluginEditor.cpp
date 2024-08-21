@@ -108,6 +108,10 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
         visualiserSettingsWindow.toFront(true);
     };
 
+    visualiser.closeSettings = [this] {
+        visualiserSettingsWindow.setVisible(false);
+    };
+
     visualiserSettingsWindow.setResizable(false, false);
     visualiserSettingsWindow.setUsingNativeTitleBar(true);
     visualiserSettings.setLookAndFeel(&getLookAndFeel());
