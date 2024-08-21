@@ -275,6 +275,7 @@ void VisualiserComponent::initialiseBrowser() {
             .withUserDataFolder(juce::File::getSpecialLocation(juce::File::SpecialLocationType::userApplicationDataDirectory).getChildFile("osci-render"))
             .withStatusBarDisabled()
             .withBuiltInErrorPageDisabled()
+            .withBackgroundColour(Colours::dark)
         )
         .withNativeFunction("toggleFullscreen", [this](auto& var, auto complete) {
             enableFullScreen();
@@ -294,9 +295,6 @@ void VisualiserComponent::initialiseBrowser() {
         })
         .withNativeFunction("isOverlay", [this](auto& var, auto complete) {
             complete(parent != nullptr);
-        })
-        .withNativeFunction("isPaused", [this](auto& var, auto complete) {
-            complete(!active);
         })
         .withNativeFunction("pause", [this](auto& var, auto complete) {
             setPaused(active);

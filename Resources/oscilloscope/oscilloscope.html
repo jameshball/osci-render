@@ -17,10 +17,16 @@
       width: 100%;
       overflow: hidden;
     }
-    
+
     canvas {
+        width: min(100vw, 100vh);
+        height: min(100vw, 100vh);
+        position: absolute;
+        top: calc(calc(100vh - min(100vw, 100vh)) / 2);
+        left: calc(calc(100vw - min(100vw, 100vh)) / 2);
         display: block;
         margin: auto;
+        z-index: -1;
     }
     
     #overlay {
@@ -119,15 +125,6 @@
     
     let isDebug = true;
     let paused = false;
-    Juce.getNativeFunction("isPaused")().then(isPaused => {
-        paused = isPaused;
-        if (isPaused) {
-            overlay.style.display = "flex";
-        } else {
-            overlay.style.display = "none";
-        }
-    });
-    
     let openInAnotherWindow = false;
     let externalSampleRate = 96000;
     let externalBufferSize = 1920;
