@@ -2,7 +2,7 @@
 #include "VisualiserComponent.h"
 #include "../PluginEditor.h"
 
-VisualiserSettings::VisualiserSettings(OscirenderAudioProcessor& p, VisualiserComponent& visualiser) : audioProcessor(p), visualiser(visualiser) {
+VisualiserSettings::VisualiserSettings(OscirenderAudioProcessor& p) : audioProcessor(p) {
 	addAndMakeVisible(intensity);
 	addAndMakeVisible(persistence);
     addAndMakeVisible(hue);

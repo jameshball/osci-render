@@ -1,19 +1,12 @@
 #include "../LookAndFeel.h"
 #include "VisualiserComponent.h"
 
-VisualiserComponent::VisualiserComponent(OscirenderAudioProcessor& p, VisualiserComponent* parent, bool useOldVisualiser) : backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), audioProcessor(p), oldVisualiser(useOldVisualiser), juce::Thread("VisualiserComponent"), parent(parent) {
+VisualiserComponent::VisualiserComponent(OscirenderAudioProcessor& p, VisualiserSettings& settings, VisualiserComponent* parent, bool useOldVisualiser) : settings(settings), backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), audioProcessor(p), oldVisualiser(useOldVisualiser), juce::Thread("VisualiserComponent"), parent(parent) {
     setVisualiserType(oldVisualiser);
     
     resetBuffer();
     startTimerHz(60);
     startThread();
-    
-    settingsWindow.setResizable(false, false);
-    settingsWindow.setUsingNativeTitleBar(true);
-    settings.setLookAndFeel(&getLookAndFeel());
-    settings.setSize(550, 230);
-    settingsWindow.setContentNonOwned(&settings, true);
-    settingsWindow.centreWithSize(550, 230);
     
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
     setWantsKeyboardFocus(true);
@@ -349,8 +342,9 @@ void VisualiserComponent::childChanged() {
 }
 
 void VisualiserComponent::popoutWindow() {
-    auto visualiser = new VisualiserComponent(audioProcessor, this, oldVisualiser);
+    auto visualiser = new VisualiserComponent(audioProcessor, settings, this, oldVisualiser);
     visualiser->settings.setLookAndFeel(&getLookAndFeel());
+    visualiser->openSettings = openSettings;
     child = visualiser;
     childChanged();
     popOutButton.setVisible(false);
@@ -364,9 +358,4 @@ void VisualiserComponent::popoutWindow() {
     setPaused(true);
     resized();
     popOutButton.setVisible(false);
-}
-
-void VisualiserComponent::openSettings() {
-    settingsWindow.setVisible(true);
-    settingsWindow.toFront(true);
 }

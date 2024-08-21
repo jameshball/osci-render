@@ -102,6 +102,18 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     addAndMakeVisible(lua);
     addAndMakeVisible(luaResizerBar);
     addAndMakeVisible(visualiser);
+
+    visualiser.openSettings = [this] {
+        visualiserSettingsWindow.setVisible(true);
+        visualiserSettingsWindow.toFront(true);
+    };
+
+    visualiserSettingsWindow.setResizable(false, false);
+    visualiserSettingsWindow.setUsingNativeTitleBar(true);
+    visualiserSettings.setLookAndFeel(&getLookAndFeel());
+    visualiserSettings.setSize(550, 230);
+    visualiserSettingsWindow.setContentNonOwned(&visualiserSettings, true);
+    visualiserSettingsWindow.centreWithSize(550, 230);
     
     tooltipDropShadow.setOwner(&tooltipWindow);
 }

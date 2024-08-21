@@ -6,17 +6,15 @@
 #include "../LookAndFeel.h"
 #include "SwitchButton.h"
 
-class VisualiserComponent;
 class VisualiserSettings : public juce::Component {
 public:
-    VisualiserSettings(OscirenderAudioProcessor&, VisualiserComponent&);
+    VisualiserSettings(OscirenderAudioProcessor&);
     ~VisualiserSettings();
 
     void resized() override;
     juce::var getSettings();
 private:
     OscirenderAudioProcessor& audioProcessor;
-    VisualiserComponent& visualiser;
 
     EffectComponent intensity{audioProcessor, *audioProcessor.intensityEffect};
     EffectComponent persistence{audioProcessor, *audioProcessor.persistenceEffect};
