@@ -124,19 +124,19 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 		createFile.triggerClick();
 	};
 
-	if (!pluginEditor.visualiserFullScreen) {
+	if (!audioProcessor.visualiserFullScreen->getBoolValue()) {
 		addAndMakeVisible(pluginEditor.visualiser);
 	}
 	pluginEditor.visualiser.setFullScreenCallback([this](FullScreenMode mode) {
 		if (mode == FullScreenMode::TOGGLE) {
-            pluginEditor.visualiserFullScreen = !pluginEditor.visualiserFullScreen;
+			audioProcessor.visualiserFullScreen->setBoolValueNotifyingHost(!audioProcessor.visualiserFullScreen->getBoolValue());
 		} else if (mode == FullScreenMode::FULL_SCREEN) {
-            pluginEditor.visualiserFullScreen = true;
+			audioProcessor.visualiserFullScreen->setBoolValueNotifyingHost(true);
 		} else if (mode == FullScreenMode::MAIN_COMPONENT) {
-            pluginEditor.visualiserFullScreen = false;
+            audioProcessor.visualiserFullScreen->setBoolValueNotifyingHost(false);
         }
         
-		pluginEditor.visualiser.setFullScreen(pluginEditor.visualiserFullScreen);
+		pluginEditor.visualiser.setFullScreen(audioProcessor.visualiserFullScreen->getBoolValue());
 		
 		pluginEditor.resized();
 		pluginEditor.repaint();
@@ -234,7 +234,7 @@ void MainComponent::resized() {
 	frequencyLabel.setBounds(bounds.removeFromTop(20));
 
 	bounds.removeFromTop(padding);
-	if (!pluginEditor.visualiserFullScreen) {
+	if (!audioProcessor.visualiserFullScreen->getBoolValue()) {
 		auto minDim = juce::jmin(bounds.getWidth(), bounds.getHeight());
         juce::Point<int> localTopLeft = {bounds.getX(), bounds.getY()};
         juce::Point<int> topLeft = pluginEditor.getLocalPoint(this, localTopLeft);

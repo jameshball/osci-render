@@ -143,7 +143,7 @@ void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
 void OscirenderAudioProcessorEditor::resized() {
     auto area = getLocalBounds();
 
-    if (visualiserFullScreen) {
+    if (audioProcessor.visualiserFullScreen->getBoolValue()) {
         visualiser.setBounds(area);
         return;
     }

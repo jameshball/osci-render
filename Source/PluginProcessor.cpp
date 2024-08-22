@@ -179,6 +179,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     booleanParameters.push_back(smudgesEnabled);
     booleanParameters.push_back(upsamplingEnabled);
     booleanParameters.push_back(legacyVisualiserEnabled);
+    booleanParameters.push_back(visualiserFullScreen);
 
     for (auto parameter : booleanParameters) {
         addParameter(parameter);
