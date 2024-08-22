@@ -162,6 +162,8 @@ public:
     BooleanParameter* smudgesEnabled = new BooleanParameter("Show Smudges", "smudgesEnabled", VERSION_HINT, true, "Adds a subtle layer of dirt/smudges to the oscilloscope display to make it look more realistic.");
     BooleanParameter* upsamplingEnabled = new BooleanParameter("Upsample Audio", "upsamplingEnabled", VERSION_HINT, false, "Upsamples the audio before visualising it to make it appear more realistic, at the expense of performance.");
     BooleanParameter* legacyVisualiserEnabled = new BooleanParameter("Use Legacy Visualiser", "legacyVisualiserEnabled", VERSION_HINT, false, "Replaces the realistic oscilloscope visualiser with the legacy visualiser. This may improve performance.");
+    BooleanParameter* visualiserFullScreen = new BooleanParameter("Visualiser Fullscreen", "visualiserFullScreen", VERSION_HINT, false, "Makes the software visualiser fullscreen.");
+
     std::shared_ptr<Effect> persistenceEffect = std::make_shared<Effect>(
         new EffectParameter(
             "Persistence",

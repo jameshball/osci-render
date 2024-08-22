@@ -49,7 +49,6 @@ public:
     std::atomic<bool> editingCustomFunction = false;
 
     VisualiserComponent visualiser{audioProcessor, nullptr, audioProcessor.legacyVisualiserEnabled->getBoolValue()};
-    std::atomic<bool> visualiserFullScreen = false;
     SettingsComponent settings{audioProcessor, *this};
 
     juce::ComponentAnimator codeEditorAnimator;
