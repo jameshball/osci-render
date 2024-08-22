@@ -50,3 +50,18 @@ std::unique_ptr<Shape> Line::clone() {
 std::string Line::type() {
 	return std::string("Line");
 }
+
+Line& Line::operator=(const Line& other) {
+	if (this == &other) {
+		return *this;
+	}
+
+	this->x1 = other.x1;
+	this->y1 = other.y1;
+	this->z1 = other.z1;
+	this->x2 = other.x2;
+	this->y2 = other.y2;
+	this->z2 = other.z2;
+
+	return *this;
+}

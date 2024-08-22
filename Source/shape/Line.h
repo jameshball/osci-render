@@ -16,6 +16,7 @@ public:
 	double length() override;
 	std::unique_ptr<Shape> clone() override;
 	std::string type() override;
+	Line& operator=(const Line& other);
 
 	double x1, y1, z1, x2, y2, z2;
 	

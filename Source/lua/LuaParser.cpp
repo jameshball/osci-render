@@ -1,5 +1,8 @@
 #include "LuaParser.h"
 #include "luaimport.h"
+#include "../shape/Line.h"
+#include "../shape/CircleArc.h"
+#include "../shape/QuadraticBezierCurve.h"
 
 std::function<void(const std::string&)> LuaParser::onPrint;
 std::function<void()> LuaParser::onClear;
@@ -21,6 +24,293 @@ void LuaParser::resetMaximumInstructions(lua_State*& L) {
     lua_sethook(L, LuaParser::maximumInstructionsReached, 0, 0);
 }
 
+static int pointToTable(lua_State* L, Point point, int numDims) {
+    lua_newtable(L);
+    if (numDims == 1) {
+        lua_pushnumber(L, point.x);
+        lua_rawseti(L, -2, 1);
+    } else if (numDims == 2) {
+        lua_pushnumber(L, point.x);
+        lua_rawseti(L, -2, 1);
+        lua_pushnumber(L, point.y);
+        lua_rawseti(L, -2, 2);
+    } else {
+        lua_pushnumber(L, point.x);
+        lua_rawseti(L, -2, 1);
+        lua_pushnumber(L, point.y);
+        lua_rawseti(L, -2, 2);
+        lua_pushnumber(L, point.z);
+        lua_rawseti(L, -2, 3);
+    }
+
+    return 1;
+}
+
+static Point tableToPoint(lua_State* L, int index) {
+    Point point;
+    lua_pushinteger(L, 1);
+    lua_gettable(L, index);
+    point.x = lua_tonumber(L, -1);
+    lua_pop(L, 1);
+
+    lua_pushinteger(L, 2);
+    lua_gettable(L, index);
+    point.y = lua_tonumber(L, -1);
+    lua_pop(L, 1);
+
+    lua_pushinteger(L, 3);
+    lua_gettable(L, index);
+    point.z = lua_tonumber(L, -1);
+    lua_pop(L, 1);
+
+    return point;
+}
+
+static int luaLine(lua_State* L) {
+    double t = lua_tonumber(L, 1) / juce::MathConstants<double>::twoPi;
+    Point point1 = tableToPoint(L, 2);
+    Point point2 = tableToPoint(L, 3);
+
+    Line line = Line(point1, point2);
+    Point point = line.nextVector(t);
+
+    return pointToTable(L, point, 3);
+}
+
+static Point genericRect(double phase, Point topLeft, double width, double height) {
+    double t = phase / juce::MathConstants<double>::twoPi;
+    double totalLength = 2 * (width + height);
+    double progress = t * totalLength;
+
+    Line line = Line(0, 0);
+    double adjustedProgress;
+    double x = topLeft.x;
+    double y = topLeft.y;
+
+    if (progress < width) {
+        line = Line(x, y, x + width, y);
+        adjustedProgress = progress / width;
+    } else if (progress < width + height) {
+        line = Line(x + width, y, x + width, y + height);
+        adjustedProgress = (progress - width) / height;
+    } else if (progress < 2 * width + height) {
+        line = Line(x + width, y + height, x, y + height);
+        adjustedProgress = (progress - width - height) / width;
+    } else {
+        line = Line(x, y + height, x, y);
+        adjustedProgress = (progress - 2 * width - height) / height;
+    }
+
+    return line.nextVector(adjustedProgress);
+}
+
+static int luaRect(lua_State* L) {
+    int nargs = lua_gettop(L);
+
+    double phase = lua_tonumber(L, 1);
+    double width = lua_tonumber(L, 2);
+    double height = lua_tonumber(L, 3);
+
+    Point topLeft = nargs == 4 ? tableToPoint(L, 4) : Point(-width / 2, -height / 2);
+    Point point = genericRect(phase, topLeft, width, height);
+    
+    return pointToTable(L, point, 2);
+}
+
+static int luaSquare(lua_State* L) {
+    int nargs = lua_gettop(L);
+
+    double phase = lua_tonumber(L, 1);
+    double width = lua_tonumber(L,2);
+
+    Point topLeft = nargs == 3 ? tableToPoint(L, 3) : Point(-width / 2, -width / 2);
+    Point point = genericRect(phase, topLeft, width, width);
+    
+    return pointToTable(L, point, 2);
+}
+
+static int luaEllipse(lua_State* L) {
+    double t = lua_tonumber(L, 1) / juce::MathConstants<double>::twoPi;
+    double radiusX = lua_tonumber(L, 2);
+    double radiuxY = lua_tonumber(L, 3);
+
+    CircleArc ellipse = CircleArc(0, 0, radiusX, radiuxY, 0, juce::MathConstants<double>::twoPi);
+    Point point = ellipse.nextVector(t);
+    
+    return pointToTable(L, point, 2);
+}
+
+static int luaCircle(lua_State* L) {
+    double t = lua_tonumber(L, 1) / juce::MathConstants<double>::twoPi;
+    double radius = lua_tonumber(L, 2);
+
+    CircleArc ellipse = CircleArc(0, 0, radius, radius, 0, juce::MathConstants<double>::twoPi);
+    Point point = ellipse.nextVector(t);
+    
+    return pointToTable(L, point, 2);
+}
+
+static int luaArc(lua_State* L) {
+    double t = lua_tonumber(L, 1) / juce::MathConstants<double>::twoPi;
+    double radiusX = lua_tonumber(L, 2);
+    double radiusY = lua_tonumber(L, 3);
+    double startAngle = lua_tonumber(L, 4);
+    double endAngle = lua_tonumber(L, 5);
+
+    CircleArc arc = CircleArc(0, 0, radiusX, radiusY, startAngle, endAngle);
+    Point point = arc.nextVector(t);
+    
+    return pointToTable(L, point, 2);
+}
+
+static int luaPolygon(lua_State* L) {
+    double n = lua_tonumber(L, 2);
+    double t = n * lua_tonumber(L, 1) / juce::MathConstants<double>::twoPi;
+
+    int floor_t = (int) t;
+
+    double pi_n = juce::MathConstants<double>::pi / n;
+    double two_floor_t_plus_one = 2 * floor_t + 1;
+    double inner_cos = cos(pi_n * two_floor_t_plus_one);
+    double inner_sin = sin(pi_n * two_floor_t_plus_one);
+    double multiplier = 2 * t - 2 * floor_t - 1;
+
+    double x = cos(pi_n) * inner_cos - multiplier * sin(pi_n) * inner_sin;
+    double y = cos(pi_n) * inner_sin + multiplier * sin(pi_n) * inner_cos;
+
+    return pointToTable(L, Point(x, y), 2);
+}
+
+static int luaBezier(lua_State* L) {
+    int nargs = lua_gettop(L);
+
+    double t = lua_tonumber(L, 1) / juce::MathConstants<double>::twoPi;
+    Point point1 = tableToPoint(L, 2);
+    Point point2 = tableToPoint(L, 3);
+    Point point3 = tableToPoint(L, 4);
+
+    Point point;
+
+    if (nargs == 4) {
+        QuadraticBezierCurve curve = QuadraticBezierCurve(point1.x, point1.y, point2.x, point2.y, point3.x, point3.y);
+        point = curve.nextVector(t);
+    } else {
+        Point point4 = tableToPoint(L, 5);
+
+        CubicBezierCurve curve = CubicBezierCurve(point1.x, point1.y, point2.x, point2.y, point3.x, point3.y, point4.x, point4.y);
+        point = curve.nextVector(t);
+    }
+    
+    return pointToTable(L, point, 2);
+}
+
+static int luaLissajous(lua_State* L) {
+    int nargs = lua_gettop(L);
+
+    double theta = lua_tonumber(L, 1);
+    double radius = lua_tonumber(L, 2);
+    double ratioA = lua_tonumber(L, 3);
+    double ratioB = lua_tonumber(L, 4);
+    double phase = lua_tonumber(L, 5);
+
+    double x = radius * sin(ratioA * theta);
+    double y = radius * cos(ratioB * theta + phase);
+
+    return pointToTable(L, Point(x, y), 2);
+}
+
+static double squareWave(double phase) {
+    double t = phase / juce::MathConstants<double>::twoPi;
+    return (t - (int) t < 0.5) ? 1 : 0;
+}
+
+static double sawWave(double phase) {
+    double t = phase / juce::MathConstants<double>::twoPi;
+    return t - std::floor(t);
+}
+
+static double triangleWave(double phase) {
+    double t = phase / juce::MathConstants<double>::twoPi;
+    return abs(2 * (t - std::floor(t)) - 1);
+}
+
+static int luaSquareWave(lua_State* L) {
+    double phase = lua_tonumber(L, 1);
+    lua_pushnumber(L, squareWave(phase));
+    return 1;
+}
+
+static int luaSawWave(lua_State* L) {
+    double phase = lua_tonumber(L, 1);
+    lua_pushnumber(L, sawWave(phase));
+    return 1;
+}
+
+static int luaTriangleWave(lua_State* L) {
+    double phase = lua_tonumber(L, 1);
+    lua_pushnumber(L, triangleWave(phase));
+    return 1;
+}
+
+static int luaMix(lua_State* L) {
+    int nargs = lua_gettop(L);
+
+    Point point1 = tableToPoint(L, 1);
+    Point point2 = tableToPoint(L, 2);
+    double weight = lua_tonumber(L, 3);
+
+    Point point = Point(
+        point1.x * (1 - weight) + point2.x * weight,
+        point1.y * (1 - weight) + point2.y * weight,
+        point1.z * (1 - weight) + point2.z * weight
+    );
+
+    return pointToTable(L, point, 3);
+}
+
+static int luaTranslate(lua_State* L) {
+    Point point = tableToPoint(L, 1);
+    Point translation = tableToPoint(L, 2);
+
+    point.translate(translation.x, translation.y, translation.z);
+
+    return pointToTable(L, point, 3);
+}
+
+static int luaScale(lua_State* L) {
+    Point point = tableToPoint(L, 1);
+    Point scale = tableToPoint(L, 2);
+
+    point.scale(scale.x, scale.y, scale.z);
+
+    return pointToTable(L, point, 3);
+}
+
+static int luaRotate(lua_State* L) {
+    double nargs = lua_gettop(L);
+    bool twoDimRotate = nargs == 2;
+
+    Point point;
+
+    if (twoDimRotate) {
+        Point point = tableToPoint(L, 1);
+        double angle = lua_tonumber(L, 2);
+
+        point.rotate(0, 0, angle);
+
+        return pointToTable(L, point, 2);
+    } else {
+        Point point = tableToPoint(L, 1);
+        double xRotate = lua_tonumber(L, 2);
+        double yRotate = lua_tonumber(L, 3);
+        double zRotate = lua_tonumber(L, 4);
+
+        point.rotate(xRotate, yRotate, zRotate);
+
+        return pointToTable(L, point, 3);
+    }
+}
+
 static int luaPrint(lua_State* L) {
     int nargs = lua_gettop(L);
 
@@ -38,9 +328,25 @@ static int luaClear(lua_State* L) {
 }
 
 static const struct luaL_Reg luaLib[] = {
-  {"print", luaPrint},
-  {"clear", luaClear},
-  {NULL, NULL} /* end of array */
+    {"osci_line", luaLine},
+    {"osci_rect", luaRect},
+    {"osci_ellipse", luaEllipse},
+    {"osci_circle", luaCircle},
+    {"osci_arc", luaArc},
+    {"osci_polygon", luaPolygon},
+    {"osci_bezier", luaBezier},
+    {"osci_square", luaSquare},
+    {"osci_lissajous", luaLissajous},
+    {"osci_square_wave", luaSquareWave},
+    {"osci_saw_wave", luaSawWave},
+    {"osci_triangle_wave", luaTriangleWave},
+    {"osci_mix", luaMix},
+    {"osci_translate", luaTranslate},
+    {"osci_scale", luaScale},
+    {"osci_rotate", luaRotate},
+    {"print", luaPrint},
+    {"clear", luaClear},
+    {NULL, NULL} /* end of array */
 };
 
 extern int luaopen_customprintlib(lua_State* L) {
