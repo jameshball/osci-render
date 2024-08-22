@@ -121,7 +121,7 @@ OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
 }
 
 bool OscirenderAudioProcessorEditor::isBinaryFile(juce::String name) {
-    return name.endsWith(".gpla") || name.endsWith(".gif") || name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg");
+    return name.endsWith(".gpla") || name.endsWith(".gif") || name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".wav") || name.endsWith(".aiff");
 }
 
 // parsersLock must be held

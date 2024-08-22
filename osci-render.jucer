@@ -584,6 +584,10 @@
         <FILE id="mC1tUv" name="ugen_JuceUtility.h" compile="0" resource="0"
               file="Source/UGen/ugen_JuceUtility.h"/>
       </GROUP>
+      <GROUP id="{DC345620-B6F6-F3B9-D359-C265590B0F00}" name="wav">
+        <FILE id="vYzJlF" name="WavParser.cpp" compile="1" resource="0" file="Source/wav/WavParser.cpp"/>
+        <FILE id="ZRT5Xk" name="WavParser.h" compile="0" resource="0" file="Source/wav/WavParser.h"/>
+      </GROUP>
       <FILE id="I44EdJ" name="EffectsComponent.cpp" compile="1" resource="0"
             file="Source/EffectsComponent.cpp"/>
       <FILE id="qxxNX3" name="EffectsComponent.h" compile="0" resource="0"

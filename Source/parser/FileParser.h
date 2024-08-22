@@ -8,6 +8,7 @@
 #include "../gpla/LineArtParser.h"
 #include "../lua/LuaParser.h"
 #include "../img/ImageParser.h"
+#include "../wav/WavParser.h"
 
 class OscirenderAudioProcessor;
 class FileParser {
@@ -29,6 +30,7 @@ public:
 	std::shared_ptr<LineArtParser> getLineArt();
 	std::shared_ptr<LuaParser> getLua();
 	std::shared_ptr<ImageParser> getImg();
+	std::shared_ptr<WavParser> getWav();
 
 	bool isAnimatable = false;
 
@@ -46,6 +48,7 @@ private:
 	std::shared_ptr<LineArtParser> gpla;
 	std::shared_ptr<LuaParser> lua;
 	std::shared_ptr<ImageParser> img;
+	std::shared_ptr<WavParser> wav;
 
 	juce::String fallbackLuaScript = "return { 0.0, 0.0 }";
 
