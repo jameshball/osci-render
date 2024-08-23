@@ -16,6 +16,7 @@ public:
 private:
     OscirenderAudioProcessor& audioProcessor;
 
+    EffectComponent brightness{audioProcessor, *audioProcessor.brightnessEffect};
     EffectComponent intensity{audioProcessor, *audioProcessor.intensityEffect};
     EffectComponent persistence{audioProcessor, *audioProcessor.persistenceEffect};
     EffectComponent hue{audioProcessor, *audioProcessor.hueEffect};

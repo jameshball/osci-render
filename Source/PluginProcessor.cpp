@@ -149,6 +149,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     permanentEffects.push_back(thresholdEffect);
     permanentEffects.push_back(imageThreshold);
     permanentEffects.push_back(imageStride);
+    permanentEffects.push_back(brightnessEffect);
     permanentEffects.push_back(intensityEffect);
     permanentEffects.push_back(persistenceEffect);
     permanentEffects.push_back(hueEffect);

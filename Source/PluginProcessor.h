@@ -180,10 +180,18 @@ public:
             VERSION_HINT, 125, 0, 359, 1
         )
     );
+    std::shared_ptr<Effect> brightnessEffect = std::make_shared<Effect>(
+        new EffectParameter(
+            "Brightness",
+            "Controls how bright the light glows for on the oscilloscope display.",
+            "brightness",
+            VERSION_HINT, 3.0, 0.0, 10.0
+        )
+    );
     std::shared_ptr<Effect> intensityEffect = std::make_shared<Effect>(
         new EffectParameter(
             "Intensity",
-            "Controls how bright the light glows for on the oscilloscope display.",
+            "Controls how bright the electron beam of the oscilloscope is.",
             "intensity",
             VERSION_HINT, 3.0, 0.0, 10.0
         )
