@@ -102,6 +102,22 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     addAndMakeVisible(lua);
     addAndMakeVisible(luaResizerBar);
     addAndMakeVisible(visualiser);
+
+    visualiser.openSettings = [this] {
+        visualiserSettingsWindow.setVisible(true);
+        visualiserSettingsWindow.toFront(true);
+    };
+
+    visualiser.closeSettings = [this] {
+        visualiserSettingsWindow.setVisible(false);
+    };
+
+    visualiserSettingsWindow.setResizable(false, false);
+    visualiserSettingsWindow.setUsingNativeTitleBar(true);
+    visualiserSettings.setLookAndFeel(&getLookAndFeel());
+    visualiserSettings.setSize(550, 260);
+    visualiserSettingsWindow.setContentNonOwned(&visualiserSettings, true);
+    visualiserSettingsWindow.centreWithSize(550, 260);
     
     tooltipDropShadow.setOwner(&tooltipWindow);
 }
@@ -121,7 +137,7 @@ OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
 }
 
 bool OscirenderAudioProcessorEditor::isBinaryFile(juce::String name) {
-    return name.endsWith(".gpla") || name.endsWith(".gif") || name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg");
+    return name.endsWith(".gpla") || name.endsWith(".gif") || name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".wav") || name.endsWith(".aiff");
 }
 
 // parsersLock must be held

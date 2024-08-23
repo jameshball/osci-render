@@ -18,6 +18,7 @@ void FileParser::parse(juce::String fileId, juce::String extension, std::unique_
 	gpla = nullptr;
 	lua = nullptr;
 	img = nullptr;
+	wav = nullptr;
 	
 	if (extension == ".obj") {
 		object = std::make_shared<WorldObject>(stream->readEntireStreamAsString().toStdString());
@@ -33,10 +34,12 @@ void FileParser::parse(juce::String fileId, juce::String extension, std::unique_
 		juce::MemoryBlock buffer{};
 		int bytesRead = stream->readIntoMemoryBlock(buffer);
 		img = std::make_shared<ImageParser>(audioProcessor, extension, buffer);
+	} else if (extension == ".wav" || extension == ".aiff") {
+		wav = std::make_shared<WavParser>(audioProcessor, std::move(stream));
 	}
 
 	isAnimatable = gpla != nullptr || (img != nullptr && extension == ".gif");
-	sampleSource = lua != nullptr || img != nullptr;
+	sampleSource = lua != nullptr || img != nullptr || wav != nullptr;
 }
 
 std::vector<std::unique_ptr<Shape>> FileParser::nextFrame() {
@@ -72,7 +75,9 @@ Point FileParser::nextSample(lua_State*& L, LuaVariables& vars) {
 		}
 	} else if (img != nullptr) {
 		return img->getSample();
-	}
+	} else if (wav != nullptr) {
+        return wav->getSample();
+    }
 
 	return Point();
 }
@@ -121,4 +126,8 @@ std::shared_ptr<LuaParser> FileParser::getLua() {
 
 std::shared_ptr<ImageParser> FileParser::getImg() {
 	return img;
+}
+
+std::shared_ptr<WavParser> FileParser::getWav() {
+    return wav;
 }

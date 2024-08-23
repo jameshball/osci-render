@@ -297,7 +297,7 @@ var Render =
 
 		this.activateTargetTexture(null);
 		this.setShader(this.outputShader);
-		var brightness = Math.pow(2, controls.exposureStops-2.0);
+		var brightness = Math.pow(2, controls.brightness-2.0);
 		//if (controls.disableFilter) brightness *= Filter.steps;
 		gl.uniform1f(this.outputShader.uExposure, brightness);
 		gl.uniform1f(this.outputShader.uResizeForCanvas, this.lineTexture.width/1024);
@@ -433,7 +433,7 @@ var Render =
 		if (controls.invertXY) gl.uniform1f(program.uInvert, -1.0);
 		else gl.uniform1f(program.uInvert, 1.0);
 
-		var intensity = 0.02 * (41000 / externalSampleRate);
+		var intensity = controls.intensity * (41000 / externalSampleRate);
 
 		if (controls.disableFilter) gl.uniform1f(program.uIntensity, intensity *(Filter.steps+1.5));
 		// +1.5 needed above for some reason for the brightness to match
@@ -688,7 +688,8 @@ function doScriptProcessor(bufferBase64) {
 
 		const getSettingsFn = Juce.getNativeFunction("getSettings");
 		getSettingsFn().then(settings => {
-			controls.exposureStops = settings.intensity;
+			controls.brightness = settings.brightness;
+            controls.intensity = settings.intensity;
 			controls.persistence = settings.persistence;
 			controls.hue = settings.hue;
 			controls.disableFilter = !settings.upsampling;

@@ -2,14 +2,17 @@
 #include "VisualiserComponent.h"
 #include "../PluginEditor.h"
 
-VisualiserSettings::VisualiserSettings(OscirenderAudioProcessor& p, VisualiserComponent& visualiser) : audioProcessor(p), visualiser(visualiser) {
-	addAndMakeVisible(intensity);
+
+VisualiserSettings::VisualiserSettings(OscirenderAudioProcessor& p) : audioProcessor(p) {
+    addAndMakeVisible(brightness);
+    addAndMakeVisible(intensity);
 	addAndMakeVisible(persistence);
     addAndMakeVisible(hue);
     addAndMakeVisible(graticuleToggle);
     addAndMakeVisible(smudgeToggle);
     addAndMakeVisible(upsamplingToggle);
     
+    brightness.setSliderOnValueChange();
     intensity.setSliderOnValueChange();
     persistence.setSliderOnValueChange();
     hue.setSliderOnValueChange();
@@ -20,6 +23,7 @@ VisualiserSettings::~VisualiserSettings() {}
 void VisualiserSettings::resized() {
 	auto area = getLocalBounds().reduced(20);
 	double rowHeight = 30;
+    brightness.setBounds(area.removeFromTop(rowHeight));
     intensity.setBounds(area.removeFromTop(rowHeight));
     persistence.setBounds(area.removeFromTop(rowHeight));
     hue.setBounds(area.removeFromTop(rowHeight));
@@ -30,7 +34,8 @@ void VisualiserSettings::resized() {
 
 juce::var VisualiserSettings::getSettings() {
     auto settings = new juce::DynamicObject();
-    settings->setProperty("intensity", audioProcessor.intensityEffect->getActualValue() - 2);
+    settings->setProperty("brightness", audioProcessor.brightnessEffect->getActualValue() - 2);
+    settings->setProperty("intensity", audioProcessor.intensityEffect->getActualValue() / 100);
     settings->setProperty("persistence", audioProcessor.persistenceEffect->getActualValue() - 1.33);
     settings->setProperty("hue", audioProcessor.hueEffect->getActualValue());
     settings->setProperty("graticule", audioProcessor.graticuleEnabled->getBoolValue());
