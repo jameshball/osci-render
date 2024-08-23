@@ -18,10 +18,12 @@ enum class FullScreenMode {
 class VisualiserWindow;
 class VisualiserComponent : public juce::Component, public juce::Timer, public juce::Thread, public juce::MouseListener, public juce::SettableTooltipClient {
 public:
-    VisualiserComponent(OscirenderAudioProcessor& p, VisualiserComponent* parent = nullptr, bool useOldVisualiser = false);
+    VisualiserComponent(OscirenderAudioProcessor& p, VisualiserSettings& settings, VisualiserComponent* parent = nullptr, bool useOldVisualiser = false);
     ~VisualiserComponent() override;
 
-    void openSettings();
+    std::function<void()> openSettings;
+    std::function<void()> closeSettings;
+
     void childChanged();
     void enableFullScreen();
     void setFullScreenCallback(std::function<void(FullScreenMode)> callback);
@@ -76,8 +78,8 @@ private:
     std::shared_ptr<BufferConsumer> consumer;
 
     std::function<void(FullScreenMode)> fullScreenCallback;
-    VisualiserSettings settings = VisualiserSettings(audioProcessor, *this);
-    SettingsWindow settingsWindow = SettingsWindow("Visualiser Settings");
+
+    VisualiserSettings& settings;
     
     juce::WebBrowserComponent::ResourceProvider provider = [this](const juce::String& path) {
         juce::String mimeType;

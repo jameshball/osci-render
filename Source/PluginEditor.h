@@ -9,6 +9,7 @@
 #include "LookAndFeel.h"
 #include "components/ErrorCodeEditorComponent.h"
 #include "components/LuaConsole.h"
+#include "components/VisualiserSettings.h"
 
 class OscirenderAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener {
 public:
@@ -48,7 +49,10 @@ public:
 
     std::atomic<bool> editingCustomFunction = false;
 
-    VisualiserComponent visualiser{audioProcessor, nullptr, audioProcessor.legacyVisualiserEnabled->getBoolValue()};
+    VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor);
+    SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings");
+    VisualiserComponent visualiser{audioProcessor, visualiserSettings, nullptr, audioProcessor.legacyVisualiserEnabled->getBoolValue()};
+
     SettingsComponent settings{audioProcessor, *this};
 
     juce::ComponentAnimator codeEditorAnimator;
