@@ -13,15 +13,21 @@ public:
 
     void resized() override;
     void paint(juce::Graphics& g) override;
+    void mouseMove(const juce::MouseEvent& e) override;
+    void mouseExit(const juce::MouseEvent& e) override;
+    void mouseDown(const juce::MouseEvent& e) override;
+    void paintOverChildren(juce::Graphics& g) override;
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void handleAsyncUpdate() override;
 
     void setComponent(std::shared_ptr<juce::Component> component);
     void setSliderOnValueChange();
+    void setOnClick(std::function<void()> onClick);
 
     juce::Slider slider;
     juce::Slider lfoSlider;
+    juce::Label label;
     Effect& effect;
     int index = 0;
     juce::ComboBox lfo;
@@ -90,10 +96,11 @@ private:
     bool sidechainEnabled = true;
     std::shared_ptr<juce::Component> component;
     OscirenderAudioProcessor& audioProcessor;
+    
+    bool mouseOverLabel = false;
+    std::function<void()> onClick;
 
     std::unique_ptr<SvgButton> sidechainButton;
-
-    juce::Label label;
 
     SvgButton rangeButton = { "rangeButton", BinaryData::range_svg, juce::Colours::white };
 

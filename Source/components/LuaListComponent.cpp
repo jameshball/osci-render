@@ -6,6 +6,12 @@ LuaListComponent::LuaListComponent(OscirenderAudioProcessor& p, Effect& effect) 
 	effectComponent->slider.onValueChange = [this, &effect, &p] {
 		effect.setValue(effectComponent->slider.getValue());
 	};
+    
+    effectComponent->setOnClick([this] () {
+        auto rename = std::make_unique<RenameEffectComponent>(effectComponent.get());
+        rename->setSize(250, 110);
+        auto& myBox = juce::CallOutBox::launchAsynchronously(std::move(rename), effectComponent->label.getScreenBounds(), nullptr);
+    });
 
 	addAndMakeVisible(*effectComponent);
 }

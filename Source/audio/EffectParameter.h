@@ -332,6 +332,7 @@ public:
 	BooleanParameter* sidechain = new BooleanParameter(name + " Sidechain Enabled", paramID + "Sidechain", getVersionHint(), false, "Toggles " + name + " Sidechain.");
 	std::atomic<float> phase = 0.0f;
 	juce::String description;
+    juce::String alias = name;
 
 	std::vector<juce::AudioProcessorParameter*> getParameters() {
 		std::vector<juce::AudioProcessorParameter*> parameters;
@@ -362,6 +363,7 @@ public:
 
 	void save(juce::XmlElement* xml) {
 		FloatParameter::save(xml);
+        xml->setAttribute("alias", alias);
 
 		if (lfo != nullptr && lfoRate != nullptr) {
 			auto lfoXml = xml->createNewChildElement("lfo");
@@ -377,6 +379,9 @@ public:
 
 	void load(juce::XmlElement* xml) {
         FloatParameter::load(xml);
+        if (xml->hasAttribute("alias")) {
+            alias = xml->getStringAttribute("alias");
+        }
 
 		if (lfo != nullptr && lfoRate != nullptr) {
 			auto lfoXml = xml->getChildByName("lfo");

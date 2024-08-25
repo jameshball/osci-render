@@ -54,7 +54,7 @@ void EffectComponent::setupComponent() {
     setEnabled(effect.enabled == nullptr || effect.enabled->getBoolValue());
 
     setTooltip(parameter->description);
-    label.setText(parameter->name, juce::dontSendNotification);
+    label.setText(parameter->alias, juce::dontSendNotification);
     label.setInterceptsMouseClicks(false, false);
 
     slider.setRange(parameter->min, parameter->max, parameter->step);
@@ -158,6 +158,39 @@ void EffectComponent::paint(juce::Graphics& g) {
     g.fillPath(path);
 }
 
+void EffectComponent::paintOverChildren(juce::Graphics& g) {
+    auto b = label.getBounds();
+    if (mouseOverLabel && onClick != nullptr) {
+        g.setColour(juce::Colours::black.withAlpha(0.2f));
+        juce::Path path;
+        path.addRoundedRectangle(b.getX(), b.getY(), b.getWidth(), b.getHeight(), OscirenderLookAndFeel::RECT_RADIUS);
+        g.fillPath(path);
+    }
+}
+
+void EffectComponent::mouseMove(const juce::MouseEvent& e) {
+    if (label.getBounds().contains(e.getPosition())) {
+        setMouseCursor(juce::MouseCursor::PointingHandCursor);
+        mouseOverLabel = true;
+        repaint();
+    } else {
+        setMouseCursor(juce::MouseCursor::NormalCursor);
+        mouseOverLabel = false;
+        repaint();
+    }
+}
+
+void EffectComponent::mouseDown(const juce::MouseEvent& e) {
+    if (label.getBounds().contains(e.getPosition())) {
+        onClick();
+    }
+}
+
+void EffectComponent::mouseExit(const juce::MouseEvent& e) {
+    mouseOverLabel = false;
+    repaint();
+}
+
 void EffectComponent::parameterValueChanged(int parameterIndex, float newValue) {
     triggerAsyncUpdate();
 }
@@ -183,4 +216,8 @@ void EffectComponent::setSliderOnValueChange() {
     slider.onValueChange = [this] {
         effect.setValue(index, slider.getValue());
     };
+}
+
+void EffectComponent::setOnClick(std::function<void()> onClick) {
+    this->onClick = onClick;
 }
