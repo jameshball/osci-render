@@ -74,11 +74,16 @@ void MainMenuBarModel::menuItemSelected(int menuItemID, int topLevelMenuIndex) {
             juce::DialogWindow::LaunchOptions options;
             AboutComponent* about = new AboutComponent();
             options.content.setOwned(about);
-            options.content->setSize(500, 250);
+            options.content->setSize(500, 270);
             options.dialogTitle = "About";
             options.dialogBackgroundColour = Colours::dark;
             options.escapeKeyTriggersCloseButton = true;
+#if JUCE_WINDOWS
+            // if not standalone, use native title bar for compatibility with DAWs
+            options.useNativeTitleBar = editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone;
+#elif JUCE_MAC
             options.useNativeTitleBar = true;
+#endif
             options.resizable = false;
             
             juce::DialogWindow* dw = options.launchAsync();
