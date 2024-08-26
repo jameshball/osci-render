@@ -7,5 +7,5 @@ public:
 	BulgeEffect();
 	~BulgeEffect();
 
-	Point apply(int index, Point input, const std::vector<double>&, double sampleRate) override;
+	Point apply(int index, Point input, const std::vector<std::atomic<double>>&, double sampleRate) override;
 };

@@ -5,7 +5,7 @@ Effect::Effect(std::shared_ptr<EffectApplication> effectApplication, const std::
 	effectApplication(effectApplication),
 	parameters(parameters),
 	enabled(nullptr),
-	actualValues(std::vector<double>(parameters.size(), 0.0)) {}
+	actualValues(std::vector<std::atomic<double>>(parameters.size())) {}
 
 Effect::Effect(std::shared_ptr<EffectApplication> effectApplication, EffectParameter* parameter) : Effect(effectApplication, std::vector<EffectParameter*>{parameter}) {}
 
@@ -13,13 +13,13 @@ Effect::Effect(EffectApplicationType application, const std::vector<EffectParame
 	application(application),
 	parameters(parameters),
 	enabled(nullptr),
-	actualValues(std::vector<double>(parameters.size(), 0.0)) {}
+	actualValues(std::vector<std::atomic<double>>(parameters.size())) {}
 
 Effect::Effect(EffectApplicationType application, EffectParameter* parameter) : Effect(application, std::vector<EffectParameter*>{parameter}) {}
 
-Effect::Effect(const std::vector<EffectParameter*>& parameters) : Effect([](int index, Point input, const std::vector<double>& values, double sampleRate) {return input;}, parameters) {}
+Effect::Effect(const std::vector<EffectParameter*>& parameters) : Effect([](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {return input;}, parameters) {}
 
-Effect::Effect(EffectParameter* parameter) : Effect([](int index, Point input, const std::vector<double>& values, double sampleRate) {return input;}, parameter) {}
+Effect::Effect(EffectParameter* parameter) : Effect([](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {return input;}, parameter) {}
 
 Point Effect::apply(int index, Point input, double volume) {
 	animateValues(volume);
@@ -105,12 +105,10 @@ double Effect::getValue() {
 	return getValue(0);
 }
 
-// Not thread safe! Should only be called from the audio thread
 double Effect::getActualValue(int index) {
     return actualValues[index];
 }
 
-// Not thread safe! Should only be called from the audio thread
 double Effect::getActualValue() {
 	return actualValues[0];
 }

@@ -45,7 +45,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         new EffectParameter("Vector Cancelling", "Inverts the audio and image every few samples to 'cancel out' the audio, making the audio quiet, and distorting the image.", "vectorCancelling", VERSION_HINT, 0.1111111, 0.0, 1.0)
     ));
 	toggleableEffects.push_back(std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             return input * Point(values[0], values[1], values[2]);
 		}, std::vector<EffectParameter*>{
 		    new EffectParameter("Scale X", "Scales the object in the horizontal direction.", "scaleX", VERSION_HINT, 1.0, -5.0, 5.0),
@@ -54,7 +54,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
 	    }
 	));
     toggleableEffects.push_back(std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
 			int flip = index % 2 == 0 ? 1 : -1;
 			Point jitter = Point(flip * values[0], flip * values[1], flip * values[2]);
 			return input + jitter;
@@ -65,7 +65,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
 	    }
     ));
     auto rippleEffect = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             double phase = values[1] * std::numbers::pi;
             double distance = 100 * values[2] * (input.x * input.x + input.y * input.y);
             input.z += values[0] * std::sin(phase + distance);
@@ -79,7 +79,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     rippleEffect->getParameter("ripplePhase")->lfo->setUnnormalisedValueNotifyingHost((int) LfoType::Sawtooth);
     toggleableEffects.push_back(rippleEffect);
     auto rotateEffect = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             input.rotate(values[0] * std::numbers::pi, values[1] * std::numbers::pi, values[2] * std::numbers::pi);
             return input;
         }, std::vector<EffectParameter*>{
@@ -92,7 +92,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     rotateEffect->getParameter("rotateY")->lfoRate->setUnnormalisedValueNotifyingHost(0.2);
     toggleableEffects.push_back(rotateEffect);
     toggleableEffects.push_back(std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             return input + Point(values[0], values[1], values[2]);
         }, std::vector<EffectParameter*>{
             new EffectParameter("Translate X", "Moves the object horizontally.", "translateX", VERSION_HINT, 0.0, -1.0, 1.0),
@@ -101,7 +101,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         }
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             double length = 10 * values[0] * input.magnitude();
             double newX = input.x * std::cos(length) - input.y * std::sin(length);
             double newY = input.x * std::sin(length) + input.y * std::cos(length);
@@ -331,7 +331,7 @@ void OscirenderAudioProcessor::addLuaSlider() {
     }
 
     luaEffects.push_back(std::make_shared<Effect>(
-        [this, sliderIndex](int index, Point input, const std::vector<double>& values, double sampleRate) {
+        [this, sliderIndex](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             luaValues[sliderIndex] = values[0];
             return input;
         }, new EffectParameter(
@@ -668,6 +668,8 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
                 animationTime = playTimeSeconds;
             }
 
+            juce::SpinLock::ScopedLockType lock1(parsersLock);
+            juce::SpinLock::ScopedLockType lock2(effectsLock);
             if (currentFile >= 0 && sounds[currentFile]->parser->isAnimatable) {
                 int animFrame = (int)(animationTime * animationRate->getValueUnnormalised() + animationOffset->getValueUnnormalised());
                 auto lineArt = sounds[currentFile]->parser->getLineArt();

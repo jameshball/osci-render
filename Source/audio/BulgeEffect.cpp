@@ -4,7 +4,7 @@ BulgeEffect::BulgeEffect() {}
 
 BulgeEffect::~BulgeEffect() {}
 
-Point BulgeEffect::apply(int index, Point input, const std::vector<double>& values, double sampleRate) {
+Point BulgeEffect::apply(int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
     double value = values[0];
     double translatedBulge = -value + 1;
 

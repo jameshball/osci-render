@@ -143,12 +143,6 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 		resized();
 		repaint();
     });
-	addAndMakeVisible(openOscilloscope);
-
-	openOscilloscope.onClick = [this] {
-		// TODO: Log if this fails
-		juce::URL("https://james.ball.sh/oscilloscope").launchInDefaultBrowser();
-    };
 
 	addAndMakeVisible(frequencyLabel);
 

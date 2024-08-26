@@ -5,7 +5,7 @@
 #include "EffectParameter.h"
 #include "BooleanParameter.h"
 
-typedef std::function<Point(int index, Point input, const std::vector<double>& values, double sampleRate)> EffectApplicationType;
+typedef std::function<Point(int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate)> EffectApplicationType;
 
 class Effect {
 public:
@@ -43,7 +43,7 @@ public:
 private:
 	
 	juce::SpinLock listenerLock;
-	std::vector<double> actualValues;
+	std::vector<std::atomic<double>> actualValues;
 	int precedence = -1;
 	int sampleRate = 192000;
 	EffectApplicationType application;

@@ -7,9 +7,9 @@ PerspectiveEffect::PerspectiveEffect() {}
 
 PerspectiveEffect::~PerspectiveEffect() {}
 
-Point PerspectiveEffect::apply(int index, Point input, const std::vector<double>& values, double sampleRate) {
-	auto effectScale = values[0];
-	auto focalLength = juce::jmax(values[1], 0.001);
+Point PerspectiveEffect::apply(int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+	auto effectScale = values[0].load();
+	auto focalLength = juce::jmax(values[1].load(), 0.001);
 
 	Vec3 origin = Vec3(0, 0, -focalLength);
 	camera.setPosition(origin);

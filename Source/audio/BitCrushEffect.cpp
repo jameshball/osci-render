@@ -3,7 +3,7 @@
 BitCrushEffect::BitCrushEffect() {}
 
 // algorithm from https://www.kvraudio.com/forum/viewtopic.php?t=163880
-Point BitCrushEffect::apply(int index, Point input, const std::vector<double>& values, double sampleRate) {
+Point BitCrushEffect::apply(int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
 	double value = values[0];
 	// change rage of value from 0-1 to 0.0-0.78
 	double rangedValue = value * 0.78;

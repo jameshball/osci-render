@@ -4,7 +4,7 @@ DelayEffect::DelayEffect() {}
 
 DelayEffect::~DelayEffect() {}
 
-Point DelayEffect::apply(int index, Point vector, const std::vector<double>& values, double sampleRate) {
+Point DelayEffect::apply(int index, Point vector, const std::vector<std::atomic<double>>& values, double sampleRate) {
     double decay = values[0];
     double decayLength = values[1];
 	int delayBufferLength = (int)(sampleRate * decayLength);

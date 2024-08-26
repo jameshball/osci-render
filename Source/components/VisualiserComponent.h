@@ -16,7 +16,7 @@ enum class FullScreenMode {
 };
 
 class VisualiserWindow;
-class VisualiserComponent : public juce::Component, public juce::Timer, public juce::Thread, public juce::MouseListener, public juce::SettableTooltipClient {
+class VisualiserComponent : public juce::Component, public juce::Timer, public juce::Thread, public juce::MouseListener, public juce::SettableTooltipClient, public juce::AsyncUpdater {
 public:
     VisualiserComponent(OscirenderAudioProcessor& p, VisualiserSettings& settings, VisualiserComponent* parent = nullptr, bool useOldVisualiser = false);
     ~VisualiserComponent() override;
@@ -41,6 +41,7 @@ public:
     bool keyPressed(const juce::KeyPress& key) override;
     void setFullScreen(bool fullScreen);
     void setVisualiserType(bool oldVisualiser);
+    void handleAsyncUpdate() override;
 
     VisualiserComponent* parent = nullptr;
     VisualiserComponent* child = nullptr;
@@ -52,12 +53,13 @@ private:
     const double BUFFER_LENGTH_SECS = 0.02;
     const double DEFAULT_SAMPLE_RATE = 192000.0;
 
-    
+    std::atomic<bool> restartBrowser = false;
+    std::atomic<bool> audioUpdated = false;
     std::atomic<int> timerId;
     std::atomic<int> lastMouseX;
     std::atomic<int> lastMouseY;
     
-    bool oldVisualiser;
+    std::atomic<bool> oldVisualiser;
     
 	juce::CriticalSection lock;
     std::vector<float> buffer;
@@ -75,6 +77,7 @@ private:
     std::vector<float> tempBuffer;
     int precision = 4;
     
+    juce::CriticalSection consumerLock;
     std::shared_ptr<BufferConsumer> consumer;
 
     std::function<void(FullScreenMode)> fullScreenCallback;
@@ -110,14 +113,15 @@ private:
     };
 
     std::unique_ptr<juce::WebBrowserComponent> browser = nullptr;
+    // keeping this around for memory management reasons
+    std::unique_ptr<juce::WebBrowserComponent> oldBrowser = nullptr;
     
     void initialiseBrowser();
     void resetBuffer();
     void popoutWindow();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserComponent)
-    juce::WeakReference<VisualiserComponent>::Master masterReference;
-    friend class juce::WeakReference<VisualiserComponent>;
+    JUCE_DECLARE_WEAK_REFERENCEABLE(VisualiserComponent)
 };
 
 class VisualiserWindow : public juce::DocumentWindow {

@@ -8,7 +8,7 @@ public:
 	WobbleEffect(PitchDetector& pitchDetector);
 	~WobbleEffect();
 
-	Point apply(int index, Point input, const std::vector<double>& values, double sampleRate) override;
+	Point apply(int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override;
 
 private:
 	PitchDetector& pitchDetector;

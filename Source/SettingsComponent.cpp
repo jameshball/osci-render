@@ -88,7 +88,7 @@ void SettingsComponent::update() {
 }
 
 void SettingsComponent::mouseMove(const juce::MouseEvent& event) {
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 1; i++) {
         if (toggleComponents[i]->getBounds().removeFromTop(pluginEditor.CLOSED_PREF_SIZE).contains(event.getPosition())) {
             setMouseCursor(juce::MouseCursor::PointingHandCursor);
             return;

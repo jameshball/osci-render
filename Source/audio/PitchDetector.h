@@ -20,6 +20,7 @@ private:
 	static constexpr int fftOrder = 15;
 	static constexpr int fftSize = 1 << fftOrder;
 
+    juce::CriticalSection consumerLock;
     std::shared_ptr<BufferConsumer> consumer;
     std::vector<float> buffer = std::vector<float>(2 * fftSize);
     juce::dsp::FFT forwardFFT{fftOrder};

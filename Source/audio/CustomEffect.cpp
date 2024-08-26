@@ -13,8 +13,8 @@ CustomEffect::~CustomEffect() {
 	parser->close(L);
 }
 
-Point CustomEffect::apply(int index, Point input, const std::vector<double>& values, double sampleRate) {
-	auto effectScale = values[0];
+Point CustomEffect::apply(int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+	auto effectScale = values[0].load();
 
 	auto x = input.x;
 	auto y = input.y;

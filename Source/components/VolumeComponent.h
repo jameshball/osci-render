@@ -91,6 +91,7 @@ private:
     std::unique_ptr<juce::Drawable> volumeIcon;
     std::unique_ptr<juce::Drawable> thresholdIcon;
     
+    juce::CriticalSection consumerLock;
     std::shared_ptr<BufferConsumer> consumer;
     
     void resetBuffer();
