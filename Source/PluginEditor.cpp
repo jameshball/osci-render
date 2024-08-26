@@ -113,11 +113,16 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     };
 
     visualiserSettingsWindow.setResizable(false, false);
+#if JUCE_WINDOWS
+    // if not standalone, use native title bar for compatibility with DAWs
+    visualiserSettingsWindow.setUsingNativeTitleBar(processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone);
+#elif JUCE_MAC
     visualiserSettingsWindow.setUsingNativeTitleBar(true);
+#endif
     visualiserSettings.setLookAndFeel(&getLookAndFeel());
-    visualiserSettings.setSize(550, 260);
+    visualiserSettings.setSize(550, 280);
     visualiserSettingsWindow.setContentNonOwned(&visualiserSettings, true);
-    visualiserSettingsWindow.centreWithSize(550, 260);
+    visualiserSettingsWindow.centreWithSize(550, 280);
     
     tooltipDropShadow.setOwner(&tooltipWindow);
 }
