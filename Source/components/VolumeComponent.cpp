@@ -49,7 +49,10 @@ VolumeComponent::VolumeComponent(OscirenderAudioProcessor& p) : audioProcessor(p
 }
 
 VolumeComponent::~VolumeComponent() {
-    audioProcessor.consumerStop(consumer);
+    {
+        juce::CriticalSection::ScopedLockType lock(consumerLock);
+        audioProcessor.consumerStop(consumer);
+    }
     stopThread(1000);
 }
 
@@ -103,7 +106,10 @@ void VolumeComponent::run() {
             continue;
         }
         
-        consumer = audioProcessor.consumerRegister(buffer);
+        {
+            juce::CriticalSection::ScopedLockType lock(consumerLock);
+            consumer = audioProcessor.consumerRegister(buffer);
+        }
         audioProcessor.consumerRead(consumer);
 
         float leftVolume = 0;

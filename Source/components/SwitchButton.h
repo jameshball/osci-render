@@ -78,9 +78,9 @@ public:
     
     void parameterValueChanged(int parameterIndex, float newValue) override {
         juce::WeakReference<SwitchButton> weakThis = this;
-        juce::MessageManager::callAsync([weakThis, this]() {
+        juce::MessageManager::callAsync([weakThis]() {
             if (weakThis != nullptr) {
-                setToggleState(parameter->getBoolValue(), juce::NotificationType::dontSendNotification);
+                weakThis->setToggleState(weakThis->parameter->getBoolValue(), juce::NotificationType::dontSendNotification);
             }
         });
     }

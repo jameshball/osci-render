@@ -38,8 +38,6 @@ private:
 	juce::ComboBox fileType;
 	juce::TextButton createFile{"Create File"};
 
-	juce::TextButton openOscilloscope{"Open Oscilloscope"};
-
 	juce::Label frequencyLabel;
 	int callbackIndex = -1;
 

@@ -85,8 +85,8 @@ public:
     double luaValues[26] = { 0.0 };
 
     std::shared_ptr<Effect> frequencyEffect = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
-            frequency = values[0];
+        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+            frequency = values[0].load();
             return input;
         }, new EffectParameter(
             "Frequency",
@@ -97,8 +97,8 @@ public:
     );
 
     std::shared_ptr<Effect> volumeEffect = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
-            volume = values[0];
+        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+            volume = values[0].load();
             return input;
         }, new EffectParameter(
             "Volume",
@@ -109,8 +109,8 @@ public:
     );
 
     std::shared_ptr<Effect> thresholdEffect = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
-            threshold = values[0];
+        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+            threshold = values[0].load();
             return input;
         }, new EffectParameter(
             "Threshold",
@@ -243,7 +243,7 @@ public:
 
     BooleanParameter* invertImage = new BooleanParameter("Invert Image", "invertImage", VERSION_HINT, false, "Inverts the image so that dark pixels become light, and vice versa.");
     std::shared_ptr<Effect> imageThreshold = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             return input;
         }, new EffectParameter(
             "Image Threshold",
@@ -253,7 +253,7 @@ public:
         )
     );
     std::shared_ptr<Effect> imageStride = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<double>& values, double sampleRate) {
+        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             return input;
         }, new EffectParameter(
             "Image Stride",

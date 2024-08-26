@@ -4,7 +4,7 @@ DashedLineEffect::DashedLineEffect() {}
 
 DashedLineEffect::~DashedLineEffect() {}
 
-Point DashedLineEffect::apply(int index, Point vector, const std::vector<double>& values, double sampleRate) {
+Point DashedLineEffect::apply(int index, Point vector, const std::vector<std::atomic<double>>& values, double sampleRate) {
 	// dash length in seconds
 	double dashLength = values[0] / 400;
 	int dashLengthSamples = (int)(dashLength * sampleRate);

@@ -1,10 +1,11 @@
 #include "../LookAndFeel.h"
 #include "VisualiserComponent.h"
 
-VisualiserComponent::VisualiserComponent(OscirenderAudioProcessor& p, VisualiserSettings& settings, VisualiserComponent* parent, bool useOldVisualiser) : settings(settings), backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), audioProcessor(p), oldVisualiser(useOldVisualiser), juce::Thread("VisualiserComponent"), parent(parent) {
-    setVisualiserType(oldVisualiser);
-    
+VisualiserComponent::VisualiserComponent(OscirenderAudioProcessor& p, VisualiserSettings& settings, VisualiserComponent* parent, bool useOldVisualiser) : settings(settings), backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), audioProcessor(p), oldVisualiser(useOldVisualiser), juce::Thread("VisualiserComponent"), parent(parent) {    
     resetBuffer();
+    if (!oldVisualiser) {
+        initialiseBrowser();
+    }
     startTimerHz(60);
     startThread();
     
@@ -49,7 +50,10 @@ VisualiserComponent::VisualiserComponent(OscirenderAudioProcessor& p, Visualiser
 }
 
 VisualiserComponent::~VisualiserComponent() {
-    audioProcessor.consumerStop(consumer);
+    {
+        juce::CriticalSection::ScopedLockType scope(consumerLock);
+        audioProcessor.consumerStop(consumer);
+    }
     stopThread(1000);
     masterReference.clear();
 }
@@ -127,16 +131,16 @@ void VisualiserComponent::run() {
             resetBuffer();
         }
         
-        consumer = audioProcessor.consumerRegister(tempBuffer);
+        {
+            juce::CriticalSection::ScopedLockType scope(consumerLock);
+            consumer = audioProcessor.consumerRegister(tempBuffer);
+        }
         audioProcessor.consumerRead(consumer);
+        
         setBuffer(tempBuffer);
-        juce::WeakReference<VisualiserComponent> visualiser(this);
         if (!oldVisualiser) {
-            juce::MessageManager::callAsync([this, visualiser] () {
-                if (visualiser != nullptr && browser != nullptr) {
-                    browser->emitEventIfBrowserIsVisible("audioUpdated", juce::Base64::toBase64(buffer.data(), buffer.size() * sizeof(float)));
-                }
-            });
+            audioUpdated = true;
+            triggerAsyncUpdate();
         }
     }
 }
@@ -147,7 +151,10 @@ void VisualiserComponent::setPaused(bool paused) {
         startTimerHz(60);
         startThread();
     } else {
-        audioProcessor.consumerStop(consumer);
+        {
+            juce::CriticalSection::ScopedLockType scope(consumerLock);
+            audioProcessor.consumerStop(consumer);
+        }
         stopTimer();
         stopThread(1000);
     }
@@ -220,7 +227,11 @@ void VisualiserComponent::setVisualiserType(bool oldVisualiser) {
         child->setVisualiserType(oldVisualiser);
     }
     if (oldVisualiser) {
-        browser.reset();
+        oldBrowser = std::move(browser);
+        if (oldBrowser != nullptr) {
+            removeChildComponent(oldBrowser.get());
+            oldBrowser->goToURL("about:blank");
+        }
         if (closeSettings != nullptr) {
             closeSettings();
         }
@@ -260,6 +271,12 @@ void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area
 }
 
 void VisualiserComponent::initialiseBrowser() {
+    oldBrowser = std::move(browser);
+    if (oldBrowser != nullptr) {
+        removeChildComponent(oldBrowser.get());
+        oldBrowser->goToURL("about:blank");
+    }
+    
     browser = std::make_unique<juce::WebBrowserComponent>(
         juce::WebBrowserComponent::Options()
         .withNativeIntegrationEnabled()
@@ -315,9 +332,20 @@ void VisualiserComponent::resetBuffer() {
     sampleRate = (int) audioProcessor.currentSampleRate;
     tempBuffer = std::vector<float>(2 * sampleRate * BUFFER_LENGTH_SECS);
     if (!oldVisualiser && isShowing()) {
-        juce::MessageManager::callAsync([this] () {
-            initialiseBrowser();
-        });
+        restartBrowser = true;
+        triggerAsyncUpdate();
+    }
+}
+
+void VisualiserComponent::handleAsyncUpdate() {
+    if (restartBrowser) {
+        initialiseBrowser();
+        restartBrowser = false;
+    }
+    if (audioUpdated && browser != nullptr) {
+        juce::CriticalSection::ScopedLockType scope(lock);
+        browser->emitEventIfBrowserIsVisible("audioUpdated", juce::Base64::toBase64(buffer.data(), buffer.size() * sizeof(float)));
+        audioUpdated = false;
     }
 }
 
@@ -339,7 +367,7 @@ void VisualiserComponent::resized() {
 }
 
 void VisualiserComponent::childChanged() {
-    if (!oldVisualiser) {
+    if (!oldVisualiser && browser != nullptr) {
         browser->emitEventIfBrowserIsVisible("childPresent", child != nullptr);
     }
 }

@@ -6,13 +6,19 @@ PitchDetector::PitchDetector(OscirenderAudioProcessor& audioProcessor) : juce::T
 }
 
 PitchDetector::~PitchDetector() {
-    audioProcessor.consumerStop(consumer);
+    {
+        juce::CriticalSection::ScopedLockType scope(consumerLock);
+        audioProcessor.consumerStop(consumer);
+    }
     stopThread(1000);
 }
 
 void PitchDetector::run() {
 	while (!threadShouldExit()) {
-        consumer = audioProcessor.consumerRegister(buffer);
+        {
+            juce::CriticalSection::ScopedLockType scope(consumerLock);
+            consumer = audioProcessor.consumerRegister(buffer);
+        }
         audioProcessor.consumerRead(consumer);
 
         // buffer is for 2 channels, so we need to only use one
