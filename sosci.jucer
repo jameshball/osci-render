@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<JUCERPROJECT id="HH2E72" name="sosci" projectType="audioplug" useAppConfig="0"
+              addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginManufacturer="jameshball"
+              aaxIdentifier="sh.ball.sosci" cppLanguageStandard="20" projectLineFeed="&#10;"
+              headerPath="./include" version="1.0.0" companyName="James H Ball"
+              companyWebsite="https://osci-render.com" companyEmail="james@ball.sh"
+              defines="NOMINMAX=1" pluginAUMainType="'aumf'" binaryDataNamespace="SosciBinaryData">
+  <MAINGROUP id="j5Ge2T" name="sosci">
+    <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
+      <GROUP id="{525C568C-29E9-D0A2-9773-8A04981C5575}" name="images">
+        <FILE id="jI9VSZ" name="logo.png" compile="0" resource="1" file="Resources/images/logo.png"/>
+      </GROUP>
+      <GROUP id="{F3C16D02-63B4-E3DA-7498-901173C37D6C}" name="oscilloscope">
+        <GROUP id="{DD5ACF8F-4E4F-E277-176A-5FD4A9717037}" name="juce">
+          <FILE id="FCfppP" name="check_native_interop.js" compile="0" resource="1"
+                file="Resources/oscilloscope/juce/check_native_interop.js"/>
+          <FILE id="ZEUE5w" name="index.js" compile="0" resource="1" file="Resources/oscilloscope/juce/index.js"/>
+          <FILE id="hWk293" name="package.json" compile="0" resource="1" file="Resources/oscilloscope/juce/package.json"/>
+        </GROUP>
+        <FILE id="qpPhpN" name="empty.jpg" compile="0" resource="1" file="Resources/oscilloscope/empty.jpg"/>
+        <FILE id="dNtZYs" name="noise.jpg" compile="0" resource="1" file="Resources/oscilloscope/noise.jpg"/>
+        <FILE id="YPMnjq" name="oscilloscope.html" compile="0" resource="1"
+              file="Resources/oscilloscope/oscilloscope.html"/>
+        <FILE id="BeXHj7" name="oscilloscope.js" compile="0" resource="1" file="Resources/oscilloscope/oscilloscope.js"/>
+      </GROUP>
+      <GROUP id="{82BCD6F1-A8BF-F30B-5587-81EE70168883}" name="svg">
+        <FILE id="rl17ZK" name="cog.svg" compile="0" resource="1" file="Resources/svg/cog.svg"/>
+        <FILE id="sDajXu" name="delete.svg" compile="0" resource="1" file="Resources/svg/delete.svg"/>
+        <FILE id="IqXIZW" name="demo.svg" compile="0" resource="1" file="Resources/svg/demo.svg"/>
+        <FILE id="YwkQpy" name="fixed_rotate.svg" compile="0" resource="1"
+              file="Resources/svg/fixed_rotate.svg"/>
+        <FILE id="WIkl6l" name="fullscreen.svg" compile="0" resource="1" file="Resources/svg/fullscreen.svg"/>
+        <FILE id="n1esUp" name="left_arrow.svg" compile="0" resource="1" file="Resources/svg/left_arrow.svg"/>
+        <FILE id="PxYKbt" name="microphone.svg" compile="0" resource="1" file="Resources/svg/microphone.svg"/>
+        <FILE id="hJHxFY" name="open_in_new.svg" compile="0" resource="1" file="Resources/svg/open_in_new.svg"/>
+        <FILE id="pSc1mq" name="osci.svg" compile="0" resource="1" file="Resources/svg/osci.svg"/>
+        <FILE id="f2D5tv" name="pause.svg" compile="0" resource="1" file="Resources/svg/pause.svg"/>
+        <FILE id="D2AI1b" name="pencil.svg" compile="0" resource="1" file="Resources/svg/pencil.svg"/>
+        <FILE id="PFc2q2" name="random.svg" compile="0" resource="1" file="Resources/svg/random.svg"/>
+        <FILE id="CE6di2" name="range.svg" compile="0" resource="1" file="Resources/svg/range.svg"/>
+        <FILE id="n79IAy" name="record.svg" compile="0" resource="1" file="Resources/svg/record.svg"/>
+        <FILE id="OaqZb1" name="right_arrow.svg" compile="0" resource="1" file="Resources/svg/right_arrow.svg"/>
+        <FILE id="rXjNlx" name="threshold.svg" compile="0" resource="1" file="Resources/svg/threshold.svg"/>
+        <FILE id="rFYmV8" name="timer.svg" compile="0" resource="1" file="Resources/svg/timer.svg"/>
+        <FILE id="qC6QiP" name="volume.svg" compile="0" resource="1" file="Resources/svg/volume.svg"/>
+      </GROUP>
+    </GROUP>
+    <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
+        <FILE id="S5ChqG" name="BooleanParameter.h" compile="0" resource="0"
+              file="Source/audio/BooleanParameter.h"/>
+        <FILE id="mP5lpY" name="Effect.cpp" compile="1" resource="0" file="Source/audio/Effect.cpp"/>
+        <FILE id="LKeNnY" name="Effect.h" compile="0" resource="0" file="Source/audio/Effect.h"/>
+        <FILE id="ca2VrC" name="EffectApplication.cpp" compile="1" resource="0"
+              file="Source/audio/EffectApplication.cpp"/>
+        <FILE id="MIYJ9y" name="EffectApplication.h" compile="0" resource="0"
+              file="Source/audio/EffectApplication.h"/>
+        <FILE id="aE0RtD" name="EffectParameter.h" compile="0" resource="0"
+              file="Source/audio/EffectParameter.h"/>
+        <FILE id="aziWU2" name="SampleRateManager.h" compile="0" resource="0"
+              file="Source/audio/SampleRateManager.h"/>
+      </GROUP>
+      <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
+        <FILE id="xLAEHK" name="EffectComponent.cpp" compile="1" resource="0"
+              file="Source/components/EffectComponent.cpp"/>
+        <FILE id="u4UCwb" name="EffectComponent.h" compile="0" resource="0"
+              file="Source/components/EffectComponent.h"/>
+        <FILE id="qzfstC" name="SwitchButton.h" compile="0" resource="0" file="Source/components/SwitchButton.h"/>
+        <FILE id="y3UiR0" name="VisualiserComponent.cpp" compile="1" resource="0"
+              file="Source/components/VisualiserComponent.cpp"/>
+        <FILE id="ZueyNl" name="VisualiserComponent.h" compile="0" resource="0"
+              file="Source/components/VisualiserComponent.h"/>
+        <FILE id="uOtHbQ" name="VisualiserSettings.cpp" compile="1" resource="0"
+              file="Source/components/VisualiserSettings.cpp"/>
+        <FILE id="GcbeeZ" name="VisualiserSettings.h" compile="0" resource="0"
+              file="Source/components/VisualiserSettings.h"/>
+      </GROUP>
+      <GROUP id="{9F5970A9-8094-E7F3-7AC1-812AE5589B9F}" name="concurrency">
+        <FILE id="F5kUMH" name="BlockingQueue.h" compile="0" resource="0" file="Source/concurrency/BlockingQueue.h"/>
+        <FILE id="WQ2W15" name="BufferConsumer.h" compile="0" resource="0"
+              file="Source/concurrency/BufferConsumer.h"/>
+        <FILE id="HIYtj5" name="ConsumerManager.h" compile="0" resource="0"
+              file="Source/concurrency/ConsumerManager.h"/>
+      </GROUP>
+      <GROUP id="{92CEA658-C82C-9CEB-15EB-945EF6B6B5C8}" name="shape">
+        <FILE id="G5fbub" name="Shape.cpp" compile="1" resource="0" file="Source/shape/Shape.cpp"/>
+        <FILE id="nUpro8" name="Point.cpp" compile="1" resource="0" file="Source/shape/Point.cpp"/>
+        <FILE id="X6A0jk" name="Point.h" compile="0" resource="0" file="Source/shape/Point.h"/>
+        <FILE id="NmptSY" name="Shape.h" compile="0" resource="0" file="Source/shape/Shape.h"/>
+      </GROUP>
+      <FILE id="d2zFqF" name="LookAndFeel.cpp" compile="1" resource="0" file="Source/LookAndFeel.cpp"/>
+      <FILE id="TJDqWs" name="LookAndFeel.h" compile="0" resource="0" file="Source/LookAndFeel.h"/>
+      <FILE id="ajg1QS" name="SosciPluginEditor.cpp" compile="1" resource="0"
+            file="Source/SosciPluginEditor.cpp"/>
+      <FILE id="SgIFr0" name="SosciPluginEditor.h" compile="0" resource="0"
+            file="Source/SosciPluginEditor.h"/>
+      <FILE id="uSfvvP" name="SosciPluginProcessor.cpp" compile="1" resource="0"
+            file="Source/SosciPluginProcessor.cpp"/>
+      <FILE id="nSDgxn" name="SosciPluginProcessor.h" compile="0" resource="0"
+            file="Source/SosciPluginProcessor.h"/>
+    </GROUP>
+  </MAINGROUP>
+  <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"
+               JUCE_WIN_PER_MONITOR_DPI_AWARE="0" JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING="1"
+               JUCE_USE_WIN_WEBVIEW2="1"/>
+  <EXPORTFORMATS>
+    <LINUX_MAKE targetFolder="Builds/sosci/LinuxMakefile" smallIcon="pSc1mq"
+                bigIcon="pSc1mq">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_devices" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_formats" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_plugin_client" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_utils" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_graphics" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_basics" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_extra" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
+      </MODULEPATHS>
+    </LINUX_MAKE>
+    <VS2022 targetFolder="Builds/sosci/VisualStudio2022" smallIcon="pSc1mq"
+            bigIcon="pSc1mq">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render" alwaysGenerateDebugSymbols="1"
+                       debugInformationFormat="ProgramDatabase"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_devices" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_formats" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_plugin_client" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_utils" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_graphics" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_basics" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_extra" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
+      </MODULEPATHS>
+    </VS2022>
+    <XCODE_MAC targetFolder="Builds/sosci/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak"
+               extraDefs="JUCE_SILENCE_XCODE_15_LINKER_WARNING=1" smallIcon="pSc1mq"
+               bigIcon="pSc1mq" applicationCategory="public.app-category.music">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render"/>
+        <CONFIGURATION name="Release" targetName="osci-render"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_devices" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_formats" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_plugin_client" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_utils" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_graphics" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_basics" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_extra" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
+      </MODULEPATHS>
+    </XCODE_MAC>
+  </EXPORTFORMATS>
+  <MODULES>
+    <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_formats" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_plugin_client" showAllCode="1" useLocalCopy="0"
+            useGlobalPath="1"/>
+    <MODULE id="juce_audio_processors" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_dsp" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_events" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_graphics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+  </MODULES>
+</JUCERPROJECT>

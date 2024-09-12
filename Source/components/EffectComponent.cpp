@@ -1,7 +1,7 @@
 #include "EffectComponent.h"
 #include "../LookAndFeel.h"
 
-EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, int index) : effect(effect), index(index), audioProcessor(p) {
+EffectComponent::EffectComponent(Effect& effect, int index) : effect(effect), index(index) {
     addAndMakeVisible(slider);
     addChildComponent(lfoSlider);
     addAndMakeVisible(lfo);
@@ -46,7 +46,7 @@ EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, in
     setupComponent();
 }
 
-EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect) : EffectComponent(p, effect, 0) {}
+EffectComponent::EffectComponent(Effect& effect) : EffectComponent(effect, 0) {}
 
 void EffectComponent::setupComponent() {
     EffectParameter* parameter = effect.parameters[index];
@@ -167,11 +167,6 @@ void EffectComponent::parameterGestureChanged(int parameterIndex, bool gestureIs
 void EffectComponent::handleAsyncUpdate() {
     setupComponent();
     getParentComponent()->repaint();
-    juce::SpinLock::ScopedLockType lock1(audioProcessor.parsersLock);
-    juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
-    if (effect.getId().contains("lua")) {
-        effect.apply();
-    }
 }
 
 void EffectComponent::setComponent(std::shared_ptr<juce::Component> component) {

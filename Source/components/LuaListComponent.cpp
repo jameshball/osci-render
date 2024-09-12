@@ -1,7 +1,7 @@
 #include "LuaListComponent.h"
 
 LuaListComponent::LuaListComponent(OscirenderAudioProcessor& p, Effect& effect) {
-	effectComponent = std::make_shared<EffectComponent>(p, effect);
+	effectComponent = std::make_shared<EffectComponent>(effect);
 
 	effectComponent->slider.onValueChange = [this, &effect, &p] {
 		effect.setValue(effectComponent->slider.getValue());

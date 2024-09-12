@@ -8,13 +8,17 @@
 
 #pragma once
 
+#define VERSION_HINT 2
+
 #include <JuceHeader.h>
 #include "shape/Shape.h"
-#include "concurrency/BufferConsumer.h"
+#include "concurrency/ConsumerManager.h"
+#include "components/VisualiserSettings.h"
 #include "audio/Effect.h"
 #include "audio/ShapeSound.h"
 #include "audio/ShapeVoice.h"
 #include "audio/PublicSynthesiser.h"
+#include "audio/SampleRateManager.h"
 #include <numbers>
 #include "audio/DelayEffect.h"
 #include "audio/PitchDetector.h"
@@ -29,7 +33,7 @@
 //==============================================================================
 /**
 */
-class OscirenderAudioProcessor  : public juce::AudioProcessor, juce::AudioProcessorParameter::Listener, public EnvelopeComponentListener
+class OscirenderAudioProcessor  : public juce::AudioProcessor, juce::AudioProcessorParameter::Listener, public EnvelopeComponentListener, public ConsumerManager, public SampleRateManager
                             #if JucePlugin_Enable_ARA
                              , public juce::AudioProcessorARAExtension
                             #endif
@@ -65,24 +69,17 @@ public:
     void changeProgramName(int index, const juce::String& newName) override;
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
-    std::shared_ptr<BufferConsumer> consumerRegister(std::vector<float>& buffer);
-    void consumerStop(std::shared_ptr<BufferConsumer> consumer);
-    void consumerRead(std::shared_ptr<BufferConsumer> consumer);
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void envelopeChanged(EnvelopeComponent* changedEnvelope) override;
-    
-    int VERSION_HINT = 2;
+    double getSampleRate() override;
 
     std::atomic<double> currentSampleRate = 0.0;
-    
-    std::atomic<int> roughness = 4;
-    std::atomic<double> intensity = 1.0;
 
     juce::SpinLock effectsLock;
 	std::vector<std::shared_ptr<Effect>> toggleableEffects;
     std::vector<std::shared_ptr<Effect>> luaEffects;
-    double luaValues[26] = { 0.0 };
+    std::atomic<double> luaValues[26] = { 0.0 };
 
     std::shared_ptr<Effect> frequencyEffect = std::make_shared<Effect>(
         [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
@@ -156,46 +153,8 @@ public:
             new EffectParameter("Focal Length", "Controls the focal length of the 3D perspective effect. A higher focal length makes the image look more flat, and a lower focal length makes the image look more 3D.", "perspectiveFocalLength", VERSION_HINT, 2.0, 0.0, 10.0),
         }
     );
-    
-    // visualiser settings
-    BooleanParameter* graticuleEnabled = new BooleanParameter("Show Graticule", "graticuleEnabled", VERSION_HINT, true, "Show the graticule or grid lines over the oscilloscope display.");
-    BooleanParameter* smudgesEnabled = new BooleanParameter("Show Smudges", "smudgesEnabled", VERSION_HINT, true, "Adds a subtle layer of dirt/smudges to the oscilloscope display to make it look more realistic.");
-    BooleanParameter* upsamplingEnabled = new BooleanParameter("Upsample Audio", "upsamplingEnabled", VERSION_HINT, false, "Upsamples the audio before visualising it to make it appear more realistic, at the expense of performance.");
-    BooleanParameter* legacyVisualiserEnabled = new BooleanParameter("Use Legacy Visualiser", "legacyVisualiserEnabled", VERSION_HINT, false, "Replaces the realistic oscilloscope visualiser with the legacy visualiser. This may improve performance.");
-    BooleanParameter* visualiserFullScreen = new BooleanParameter("Visualiser Fullscreen", "visualiserFullScreen", VERSION_HINT, false, "Makes the software visualiser fullscreen.");
 
-    std::shared_ptr<Effect> persistenceEffect = std::make_shared<Effect>(
-        new EffectParameter(
-            "Persistence",
-            "Controls how long the light glows for on the oscilloscope display.",
-            "persistence",
-            VERSION_HINT, 0.5, 0, 6.0
-        )
-    );
-    std::shared_ptr<Effect> hueEffect = std::make_shared<Effect>(
-        new EffectParameter(
-            "Hue",
-            "Controls the hue/colour of the oscilloscope display.",
-            "hue",
-            VERSION_HINT, 125, 0, 359, 1
-        )
-    );
-    std::shared_ptr<Effect> brightnessEffect = std::make_shared<Effect>(
-        new EffectParameter(
-            "Brightness",
-            "Controls how bright the light glows for on the oscilloscope display.",
-            "brightness",
-            VERSION_HINT, 3.0, 0.0, 10.0
-        )
-    );
-    std::shared_ptr<Effect> intensityEffect = std::make_shared<Effect>(
-        new EffectParameter(
-            "Intensity",
-            "Controls how bright the electron beam of the oscilloscope is.",
-            "intensity",
-            VERSION_HINT, 3.0, 0.0, 10.0
-        )
-    );
+    VisualiserParameters visualiserParameters;
     
     BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false, "Enable MIDI input for the synth. If disabled, the synth will play a constant tone, as controlled by the frequency slider.");
     BooleanParameter* inputEnabled = new BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false, "Enable to use input audio, instead of the generated audio.");
@@ -264,11 +223,6 @@ public:
     );
 
     double animationTime = 0.f;
-
-private:
-    juce::SpinLock consumerLock;
-    std::vector<std::shared_ptr<BufferConsumer>> consumers;
-public:
     
     PitchDetector pitchDetector{*this};
     std::shared_ptr<WobbleEffect> wobbleEffect = std::make_shared<WobbleEffect>(pitchDetector);

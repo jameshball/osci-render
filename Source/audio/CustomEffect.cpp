@@ -5,7 +5,7 @@
 const juce::String CustomEffect::UNIQUE_ID = "6a3580b0-c5fc-4b28-a33e-e26a487f052f";
 const juce::String CustomEffect::FILE_NAME = "Custom Lua Effect";
 
-CustomEffect::CustomEffect(std::function<void(int, juce::String, juce::String)> errorCallback, double (&luaValues)[26]) : errorCallback(errorCallback), luaValues(luaValues) {
+CustomEffect::CustomEffect(std::function<void(int, juce::String, juce::String)> errorCallback, std::atomic<double>* luaValues) : errorCallback(errorCallback), luaValues(luaValues) {
 	vars.isEffect = true;
 }
 
@@ -30,7 +30,7 @@ Point CustomEffect::apply(int index, Point input, const std::vector<std::atomic<
 			vars.y = y;
 			vars.z = z;
 
-			std::copy(std::begin(luaValues), std::end(luaValues), std::begin(vars.sliders));
+			std::copy(luaValues, luaValues + 26, std::begin(vars.sliders));
 
 			auto result = parser->run(L, vars);
 			if (result.size() >= 2) {

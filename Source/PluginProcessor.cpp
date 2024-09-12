@@ -149,10 +149,10 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     permanentEffects.push_back(thresholdEffect);
     permanentEffects.push_back(imageThreshold);
     permanentEffects.push_back(imageStride);
-    permanentEffects.push_back(brightnessEffect);
-    permanentEffects.push_back(intensityEffect);
-    permanentEffects.push_back(persistenceEffect);
-    permanentEffects.push_back(hueEffect);
+    permanentEffects.push_back(visualiserParameters.brightnessEffect);
+    permanentEffects.push_back(visualiserParameters.intensityEffect);
+    permanentEffects.push_back(visualiserParameters.persistenceEffect);
+    permanentEffects.push_back(visualiserParameters.hueEffect);
 
     for (int i = 0; i < 26; i++) {
         addLuaSlider();
@@ -176,11 +176,11 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     booleanParameters.push_back(animateFrames);
     booleanParameters.push_back(animationSyncBPM);
     booleanParameters.push_back(invertImage);
-    booleanParameters.push_back(graticuleEnabled);
-    booleanParameters.push_back(smudgesEnabled);
-    booleanParameters.push_back(upsamplingEnabled);
-    booleanParameters.push_back(legacyVisualiserEnabled);
-    booleanParameters.push_back(visualiserFullScreen);
+    booleanParameters.push_back(visualiserParameters.graticuleEnabled);
+    booleanParameters.push_back(visualiserParameters.smudgesEnabled);
+    booleanParameters.push_back(visualiserParameters.upsamplingEnabled);
+    booleanParameters.push_back(visualiserParameters.legacyVisualiserEnabled);
+    booleanParameters.push_back(visualiserParameters.visualiserFullScreen);
 
     for (auto parameter : booleanParameters) {
         addParameter(parameter);
@@ -212,11 +212,18 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     }
 
     voices->addListener(this);
+
+    for (int i = 0; i < luaEffects.size(); i++) {
+        luaEffects[i]->parameters[0]->addListener(this);
+    }
         
     synth.addSound(defaultSound);
 }
 
 OscirenderAudioProcessor::~OscirenderAudioProcessor() {
+    for (int i = luaEffects.size() - 1; i >= 0; i--) {
+        luaEffects[i]->parameters[0]->removeListener(this);
+    }
     voices->removeListener(this);
 }
 
@@ -332,7 +339,7 @@ void OscirenderAudioProcessor::addLuaSlider() {
 
     luaEffects.push_back(std::make_shared<Effect>(
         [this, sliderIndex](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
-            luaValues[sliderIndex] = values[0];
+            luaValues[sliderIndex].store(values[0]);
             return input;
         }, new EffectParameter(
             "Lua Slider " + sliderName,
@@ -822,8 +829,8 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
     xml->setAttribute("currentFile", currentFile);
     
     auto visualiserXml = xml->createNewChildElement("visualiser");
-    visualiserXml->setAttribute("roughness", roughness);
-    visualiserXml->setAttribute("intensity", intensity);
+    visualiserXml->setAttribute("roughness", visualiserParameters.roughness);
+    visualiserXml->setAttribute("intensity", visualiserParameters.intensity);
 
     copyXmlToBinary(*xml, destData);
 }
@@ -941,8 +948,8 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         
         auto visualiserXml = xml->getChildByName("visualiser");
         if (visualiserXml != nullptr) {
-            roughness = visualiserXml->getIntAttribute("roughness");
-            intensity = visualiserXml->getDoubleAttribute("intensity");
+            visualiserParameters.roughness = visualiserXml->getIntAttribute("roughness");
+            visualiserParameters.intensity = visualiserXml->getDoubleAttribute("intensity");
         }
 
         broadcaster.sendChangeMessage();
@@ -950,28 +957,12 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
     }
 }
 
-std::shared_ptr<BufferConsumer> OscirenderAudioProcessor::consumerRegister(std::vector<float>& buffer) {
-    std::shared_ptr<BufferConsumer> consumer = std::make_shared<BufferConsumer>(buffer);
-    juce::SpinLock::ScopedLockType scope(consumerLock);
-    consumers.push_back(consumer);
-    
-    return consumer;
-}
-
-void OscirenderAudioProcessor::consumerRead(std::shared_ptr<BufferConsumer> consumer) {
-    consumer->waitUntilFull();
-    juce::SpinLock::ScopedLockType scope(consumerLock);
-    consumers.erase(std::remove(consumers.begin(), consumers.end(), consumer), consumers.end());
-}
-
-void OscirenderAudioProcessor::consumerStop(std::shared_ptr<BufferConsumer> consumer) {
-    if (consumer != nullptr) {
-        juce::SpinLock::ScopedLockType scope(consumerLock);
-        consumer->forceNotify();
-    }
-}
-
 void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float newValue) {
+    for (auto effect : luaEffects) {
+        if (parameterIndex == effect->parameters[0]->getParameterIndex()) {
+            effect->apply();
+        }
+    }
     if (parameterIndex == voices->getParameterIndex()) {
         int numVoices = voices->getValueUnnormalised();
         // if the number of voices has changed, update the synth without clearing all the voices
@@ -1017,6 +1008,10 @@ void OscirenderAudioProcessor::envelopeChanged(EnvelopeComponent* changedEnvelop
         updateIfApproxEqual(releaseTime, times[2]);
         updateIfApproxEqual(releaseShape, curves[2].getCurve());
     }
+}
+
+double OscirenderAudioProcessor::getSampleRate() {
+    return currentSampleRate;
 }
 
 

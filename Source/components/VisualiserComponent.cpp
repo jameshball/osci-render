@@ -1,7 +1,7 @@
 #include "../LookAndFeel.h"
 #include "VisualiserComponent.h"
 
-VisualiserComponent::VisualiserComponent(OscirenderAudioProcessor& p, VisualiserSettings& settings, VisualiserComponent* parent, bool useOldVisualiser) : settings(settings), backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), audioProcessor(p), oldVisualiser(useOldVisualiser), juce::Thread("VisualiserComponent"), parent(parent) {    
+VisualiserComponent::VisualiserComponent(SampleRateManager& sampleRateManager, ConsumerManager& consumerManager, VisualiserSettings& settings, VisualiserComponent* parent, bool useOldVisualiser) : settings(settings), backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), sampleRateManager(sampleRateManager), consumerManager(consumerManager), oldVisualiser(useOldVisualiser), juce::Thread("VisualiserComponent"), parent(parent) {    
     resetBuffer();
     if (!oldVisualiser) {
         initialiseBrowser();
@@ -12,13 +12,13 @@ VisualiserComponent::VisualiserComponent(OscirenderAudioProcessor& p, Visualiser
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
     setWantsKeyboardFocus(true);
     
-    roughness.textBox.setValue(audioProcessor.roughness);
+    roughness.textBox.setValue(settings.parameters.roughness);
     roughness.textBox.onValueChange = [this]() {
-        audioProcessor.roughness = (int) roughness.textBox.getValue();
+        this->settings.parameters.roughness = (int) roughness.textBox.getValue();
     };
-    intensity.textBox.setValue(audioProcessor.intensity);
+    intensity.textBox.setValue(settings.parameters.intensity);
     intensity.textBox.onValueChange = [this]() {
-        audioProcessor.intensity = intensity.textBox.getValue();
+        this->settings.parameters.intensity = intensity.textBox.getValue();
     };
     
     if (parent == nullptr) {
@@ -52,7 +52,7 @@ VisualiserComponent::VisualiserComponent(OscirenderAudioProcessor& p, Visualiser
 VisualiserComponent::~VisualiserComponent() {
     {
         juce::CriticalSection::ScopedLockType scope(consumerLock);
-        audioProcessor.consumerStop(consumer);
+        consumerManager.consumerStop(consumer);
     }
     stopThread(1000);
     masterReference.clear();
@@ -127,15 +127,15 @@ void VisualiserComponent::timerCallback() {
 
 void VisualiserComponent::run() {
     while (!threadShouldExit()) {
-        if (sampleRate != (int) audioProcessor.currentSampleRate) {
+        if (sampleRate != (int) sampleRateManager.getSampleRate()) {
             resetBuffer();
         }
         
         {
             juce::CriticalSection::ScopedLockType scope(consumerLock);
-            consumer = audioProcessor.consumerRegister(tempBuffer);
+            consumer = consumerManager.consumerRegister(tempBuffer);
         }
-        audioProcessor.consumerRead(consumer);
+        consumerManager.consumerRead(consumer);
         
         setBuffer(tempBuffer);
         if (!oldVisualiser) {
@@ -153,7 +153,7 @@ void VisualiserComponent::setPaused(bool paused) {
     } else {
         {
             juce::CriticalSection::ScopedLockType scope(consumerLock);
-            audioProcessor.consumerStop(consumer);
+            consumerManager.consumerStop(consumer);
         }
         stopTimer();
         stopThread(1000);
@@ -329,7 +329,7 @@ void VisualiserComponent::initialiseBrowser() {
 }
 
 void VisualiserComponent::resetBuffer() {
-    sampleRate = (int) audioProcessor.currentSampleRate;
+    sampleRate = (int) sampleRateManager.getSampleRate();
     tempBuffer = std::vector<float>(2 * sampleRate * BUFFER_LENGTH_SECS);
     if (!oldVisualiser && isShowing()) {
         restartBrowser = true;
@@ -373,7 +373,7 @@ void VisualiserComponent::childChanged() {
 }
 
 void VisualiserComponent::popoutWindow() {
-    auto visualiser = new VisualiserComponent(audioProcessor, settings, this, oldVisualiser);
+    auto visualiser = new VisualiserComponent(sampleRateManager, consumerManager, settings, this, oldVisualiser);
     visualiser->settings.setLookAndFeel(&getLookAndFeel());
     visualiser->openSettings = openSettings;
     visualiser->closeSettings = closeSettings;

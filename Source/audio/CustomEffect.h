@@ -6,7 +6,7 @@
 
 class CustomEffect : public EffectApplication {
 public:
-	CustomEffect(std::function<void(int, juce::String, juce::String)> errorCallback, double (&luaValues)[26]);
+	CustomEffect(std::function<void(int, juce::String, juce::String)> errorCallback, std::atomic<double>* luaValues);
 	~CustomEffect();
 
 	// arbitrary UUID
@@ -32,5 +32,5 @@ private:
 	lua_State *L = nullptr;
 
 	LuaVariables vars;
-	double(&luaValues)[26];
+	std::atomic<double>* luaValues;
 };

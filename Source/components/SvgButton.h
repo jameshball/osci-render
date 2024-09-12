@@ -1,5 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
+#include "../audio/BooleanParameter.h"
 
 class SvgButton : public juce::DrawableButton, public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater {
  public:

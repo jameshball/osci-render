@@ -100,6 +100,8 @@
         <FILE id="rQC2gX" name="PitchDetector.h" compile="0" resource="0" file="Source/audio/PitchDetector.h"/>
         <FILE id="t5g8pf" name="PublicSynthesiser.h" compile="0" resource="0"
               file="Source/audio/PublicSynthesiser.h"/>
+        <FILE id="Q5kjpU" name="SampleRateManager.h" compile="0" resource="0"
+              file="Source/audio/SampleRateManager.h"/>
         <FILE id="dBaZAV" name="ShapeSound.cpp" compile="1" resource="0" file="Source/audio/ShapeSound.cpp"/>
         <FILE id="VKBirB" name="ShapeSound.h" compile="0" resource="0" file="Source/audio/ShapeSound.h"/>
         <FILE id="UcPZ09" name="ShapeVoice.cpp" compile="1" resource="0" file="Source/audio/ShapeVoice.cpp"/>
@@ -188,6 +190,8 @@
         <FILE id="F5kUMH" name="BlockingQueue.h" compile="0" resource="0" file="Source/concurrency/BlockingQueue.h"/>
         <FILE id="WQ2W15" name="BufferConsumer.h" compile="0" resource="0"
               file="Source/concurrency/BufferConsumer.h"/>
+        <FILE id="VMSdiT" name="ConsumerManager.h" compile="0" resource="0"
+              file="Source/concurrency/ConsumerManager.h"/>
       </GROUP>
       <GROUP id="{A3E24187-62A5-AB8D-8837-14043B89A640}" name="gpla">
         <FILE id="KvDV8j" name="LineArtParser.cpp" compile="1" resource="0"
@@ -658,9 +662,9 @@
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/VisualStudio2022" smallIcon="pSc1mq" bigIcon="pSc1mq">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" useRuntimeLibDLL="0"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="osci-render" alwaysGenerateDebugSymbols="1"
-                       debugInformationFormat="ProgramDatabase" useRuntimeLibDLL="0"/>
+                       debugInformationFormat="ProgramDatabase"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>

@@ -3,8 +3,8 @@
 #include <algorithm>
 #include <JuceHeader.h>
 #include "../LookAndFeel.h"
-#include "../concurrency/BufferConsumer.h"
-#include "../PluginProcessor.h"
+#include "../concurrency/ConsumerManager.h"
+#include "../audio/SampleRateManager.h"
 #include "LabelledTextBox.h"
 #include "SvgButton.h"
 #include "VisualiserSettings.h"
@@ -18,7 +18,7 @@ enum class FullScreenMode {
 class VisualiserWindow;
 class VisualiserComponent : public juce::Component, public juce::Timer, public juce::Thread, public juce::MouseListener, public juce::SettableTooltipClient, public juce::AsyncUpdater {
 public:
-    VisualiserComponent(OscirenderAudioProcessor& p, VisualiserSettings& settings, VisualiserComponent* parent = nullptr, bool useOldVisualiser = false);
+    VisualiserComponent(SampleRateManager& sampleRateManager, ConsumerManager& consumerManager, VisualiserSettings& settings, VisualiserComponent* parent = nullptr, bool useOldVisualiser = false);
     ~VisualiserComponent() override;
 
     std::function<void()> openSettings;
@@ -65,7 +65,8 @@ private:
     std::vector<float> buffer;
     std::vector<juce::Line<float>> prevLines;
     juce::Colour backgroundColour, waveformColour;
-	OscirenderAudioProcessor& audioProcessor;
+    SampleRateManager& sampleRateManager;
+    ConsumerManager& consumerManager;
     int sampleRate = DEFAULT_SAMPLE_RATE;
     LabelledTextBox roughness{"Roughness", 1, 8, 1};
     LabelledTextBox intensity{"Intensity", 0, 1, 0.01};

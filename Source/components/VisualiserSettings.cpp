@@ -3,7 +3,7 @@
 #include "../PluginEditor.h"
 
 
-VisualiserSettings::VisualiserSettings(OscirenderAudioProcessor& p) : audioProcessor(p) {
+VisualiserSettings::VisualiserSettings(VisualiserParameters& parameters) : parameters(parameters) {
     addAndMakeVisible(brightness);
     addAndMakeVisible(intensity);
 	addAndMakeVisible(persistence);
@@ -34,12 +34,12 @@ void VisualiserSettings::resized() {
 
 juce::var VisualiserSettings::getSettings() {
     auto settings = new juce::DynamicObject();
-    settings->setProperty("brightness", audioProcessor.brightnessEffect->getActualValue() - 2);
-    settings->setProperty("intensity", audioProcessor.intensityEffect->getActualValue() / 100);
-    settings->setProperty("persistence", audioProcessor.persistenceEffect->getActualValue() - 1.33);
-    settings->setProperty("hue", audioProcessor.hueEffect->getActualValue());
-    settings->setProperty("graticule", audioProcessor.graticuleEnabled->getBoolValue());
-    settings->setProperty("smudges", audioProcessor.smudgesEnabled->getBoolValue());
-    settings->setProperty("upsampling", audioProcessor.upsamplingEnabled->getBoolValue());
+    settings->setProperty("brightness", parameters.brightnessEffect->getActualValue() - 2);
+    settings->setProperty("intensity", parameters.intensityEffect->getActualValue() / 100);
+    settings->setProperty("persistence", parameters.persistenceEffect->getActualValue() - 1.33);
+    settings->setProperty("hue", parameters.hueEffect->getActualValue());
+    settings->setProperty("graticule", parameters.graticuleEnabled->getBoolValue());
+    settings->setProperty("smudges", parameters.smudgesEnabled->getBoolValue());
+    settings->setProperty("upsampling", parameters.upsamplingEnabled->getBoolValue());
     return juce::var(settings);
 }
