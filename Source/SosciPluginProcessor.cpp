@@ -13,14 +13,9 @@
 //==============================================================================
 SosciAudioProcessor::SosciAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
-     : AudioProcessor (BusesProperties()
-                     #if ! JucePlugin_IsMidiEffect
-                      #if ! JucePlugin_IsSynth
-                       .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
-                      #endif
-                       .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
-                     #endif
-                       )
+     : AudioProcessor (BusesProperties().withInput("Input", juce::AudioChannelSet::stereo(), true)
+                                        .withInput("Brightness", juce::AudioChannelSet::mono(), true)
+                                        .withOutput("Output", juce::AudioChannelSet::stereo(), true))
 #endif
     {
     // locking isn't necessary here because we are in the constructor
@@ -123,31 +118,12 @@ void SosciAudioProcessor::releaseResources() {
     // spare memory, etc.
 }
 
-#ifndef JucePlugin_PreferredChannelConfigurations
-bool SosciAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
-{
-  #if JucePlugin_IsMidiEffect
-    juce::ignoreUnused (layouts);
-    return true;
-  #else
-    // This is the place where you check if the layout is supported.
-    // In this template code we only support mono or stereo.
-    // Some plugin hosts, such as certain GarageBand versions, will only
-    // load plugins that support stereo bus layouts.
-    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono()
-     && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
-        return false;
+bool SosciAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
+    auto numIns  = layouts.getMainInputChannels();
+    auto numOuts = layouts.getMainOutputChannels();
 
-    // This checks if the input layout matches the output layout
-   #if ! JucePlugin_IsSynth
-    if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
-        return false;
-   #endif
-
-    return true;
-  #endif
+    return numIns >= 2 && numOuts >= 2;
 }
-#endif
 
 // effectsLock should be held when calling this
 std::shared_ptr<Effect> SosciAudioProcessor::getEffect(juce::String id) {
@@ -191,25 +167,30 @@ IntParameter* SosciAudioProcessor::getIntParameter(juce::String id) {
 
 void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
     juce::ScopedNoDenormals noDenormals;
-    // Audio info variables
-    int numInputs  = getTotalNumInputChannels();
-    int numOutputs = getTotalNumOutputChannels();
-    double sampleRate = getSampleRate();
+
+    auto input = getBusBuffer(buffer, true, 0);
+    auto brightness = getBusBuffer(buffer, true, 1);
 
     midiMessages.clear();
 
-    auto* channelData = buffer.getArrayOfWritePointers();
+    auto inputArray = input.getArrayOfWritePointers();
+    auto brightnessArray = brightness.getArrayOfWritePointers();
 
-	for (int sample = 0; sample < buffer.getNumSamples(); ++sample) {
+	for (int sample = 0; sample < input.getNumSamples(); ++sample) {
         juce::SpinLock::ScopedLockType scope(consumerLock);
 
-        double x = numOutputs > 0 ? channelData[0][sample] : 0;
-        double y = numOutputs > 1 ? channelData[1][sample] : 0;
-        double z = numOutputs > 2 ? channelData[2][sample] : 0;
+        float x = input.getNumChannels() > 0 ? inputArray[0][sample] : 0.0f;
+        float y = input.getNumChannels() > 1 ? inputArray[1][sample] : 0.0f;
+        float z = brightness.getNumChannels() > 0 ? brightnessArray[0][sample] : 1.0f;
+
+        Point point = { x, y, z };
+
+        for (auto& effect : allEffects) {
+            point = effect->apply(sample, point);
+        }
 
         for (auto consumer : consumers) {
-            consumer->write(x);
-            consumer->write(y);
+            consumer->write(point);
             consumer->notifyIfFull();
         }
 	}

@@ -59,11 +59,6 @@ public:
     juce::SpinLock effectsLock;
     VisualiserParameters parameters;
 
-private:
-    juce::SpinLock consumerLock;
-    std::vector<std::shared_ptr<BufferConsumer>> consumers;
-public:
-
     // shouldn't be accessed by audio thread, but needs to persist when GUI is closed
     // so should only be accessed by message thread
     juce::String currentProjectFile;

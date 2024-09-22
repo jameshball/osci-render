@@ -23,7 +23,7 @@ void PitchDetector::run() {
 
         // buffer is for 2 channels, so we need to only use one
         for (int i = 0; i < fftSize; i++) {
-            fftData[i] = buffer[2 * i];
+            fftData[i] = buffer[i].x;
         }
 
         forwardFFT.performFrequencyOnlyForwardTransform(fftData.data());

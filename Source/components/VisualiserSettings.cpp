@@ -3,7 +3,7 @@
 #include "../PluginEditor.h"
 
 
-VisualiserSettings::VisualiserSettings(VisualiserParameters& parameters) : parameters(parameters) {
+VisualiserSettings::VisualiserSettings(VisualiserParameters& parameters, int numChannels) : parameters(parameters), numChannels(numChannels) {
     addAndMakeVisible(brightness);
     addAndMakeVisible(intensity);
 	addAndMakeVisible(persistence);
@@ -41,5 +41,6 @@ juce::var VisualiserSettings::getSettings() {
     settings->setProperty("graticule", parameters.graticuleEnabled->getBoolValue());
     settings->setProperty("smudges", parameters.smudgesEnabled->getBoolValue());
     settings->setProperty("upsampling", parameters.upsamplingEnabled->getBoolValue());
+    settings->setProperty("numChannels", numChannels);
     return juce::var(settings);
 }

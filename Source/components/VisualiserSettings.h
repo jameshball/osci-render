@@ -55,13 +55,14 @@ public:
 
 class VisualiserSettings : public juce::Component {
 public:
-    VisualiserSettings(VisualiserParameters&);
+    VisualiserSettings(VisualiserParameters&, int numChannels = 2);
     ~VisualiserSettings();
 
     void resized() override;
     juce::var getSettings();
 
     VisualiserParameters& parameters;
+    int numChannels;
 
 private:
     EffectComponent brightness{*parameters.brightnessEffect};

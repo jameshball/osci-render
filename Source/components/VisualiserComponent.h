@@ -28,7 +28,7 @@ public:
     void enableFullScreen();
     void setFullScreenCallback(std::function<void(FullScreenMode)> callback);
     void mouseDoubleClick(const juce::MouseEvent& event) override;
-    void setBuffer(std::vector<float>& buffer);
+    void setBuffer(std::vector<Point>& buffer);
     void setColours(juce::Colour backgroundColour, juce::Colour waveformColour);
 	void paintXY(juce::Graphics&, juce::Rectangle<float> bounds);
     void paint(juce::Graphics&) override;
@@ -62,7 +62,7 @@ private:
     std::atomic<bool> oldVisualiser;
     
 	juce::CriticalSection lock;
-    std::vector<float> buffer;
+    std::vector<Point> buffer;
     std::vector<juce::Line<float>> prevLines;
     juce::Colour backgroundColour, waveformColour;
     SampleRateManager& sampleRateManager;
@@ -75,7 +75,7 @@ private:
     SvgButton popOutButton{ "popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::white };
     SvgButton settingsButton{ "settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white };
     
-    std::vector<float> tempBuffer;
+    std::vector<Point> tempBuffer;
     int precision = 4;
     
     juce::CriticalSection consumerLock;

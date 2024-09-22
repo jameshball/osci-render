@@ -5,7 +5,7 @@
               aaxIdentifier="sh.ball.sosci" cppLanguageStandard="20" projectLineFeed="&#10;"
               headerPath="./include" version="1.0.0" companyName="James H Ball"
               companyWebsite="https://osci-render.com" companyEmail="james@ball.sh"
-              defines="NOMINMAX=1" pluginAUMainType="'aumf'" binaryDataNamespace="SosciBinaryData">
+              defines="NOMINMAX=1" pluginAUMainType="'aumf'">
   <MAINGROUP id="j5Ge2T" name="sosci">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
       <GROUP id="{525C568C-29E9-D0A2-9773-8A04981C5575}" name="images">
@@ -62,10 +62,18 @@
               file="Source/audio/SampleRateManager.h"/>
       </GROUP>
       <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
+        <FILE id="URb7Ok" name="AboutComponent.cpp" compile="1" resource="0"
+              file="Source/components/AboutComponent.cpp"/>
+        <FILE id="FtOv3F" name="AboutComponent.h" compile="0" resource="0"
+              file="Source/components/AboutComponent.h"/>
         <FILE id="xLAEHK" name="EffectComponent.cpp" compile="1" resource="0"
               file="Source/components/EffectComponent.cpp"/>
         <FILE id="u4UCwb" name="EffectComponent.h" compile="0" resource="0"
               file="Source/components/EffectComponent.h"/>
+        <FILE id="eaHM09" name="SosciMainMenuBarModel.cpp" compile="1" resource="0"
+              file="Source/components/SosciMainMenuBarModel.cpp"/>
+        <FILE id="EymEr3" name="SosciMainMenuBarModel.h" compile="0" resource="0"
+              file="Source/components/SosciMainMenuBarModel.h"/>
         <FILE id="qzfstC" name="SwitchButton.h" compile="0" resource="0" file="Source/components/SwitchButton.h"/>
         <FILE id="y3UiR0" name="VisualiserComponent.cpp" compile="1" resource="0"
               file="Source/components/VisualiserComponent.cpp"/>

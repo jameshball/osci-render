@@ -73,13 +73,12 @@ void VisualiserComponent::mouseDoubleClick(const juce::MouseEvent& event) {
     enableFullScreen();
 }
 
-void VisualiserComponent::setBuffer(std::vector<float>& newBuffer) {
+void VisualiserComponent::setBuffer(std::vector<Point>& newBuffer) {
     juce::CriticalSection::ScopedLockType scope(lock);
     buffer.clear();
     int stride = oldVisualiser ? roughness.textBox.getValue() : 1;
-    for (int i = 0; i < newBuffer.size(); i += stride * 2) {
+    for (int i = 0; i < newBuffer.size(); i += stride) {
         buffer.push_back(newBuffer[i]);
-        buffer.push_back(newBuffer[i + 1]);
     }
 }
 
@@ -244,8 +243,8 @@ void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area
     auto transform = juce::AffineTransform::fromTargetPoints(-1.0f, -1.0f, area.getX(), area.getBottom(), 1.0f, 1.0f, area.getRight(), area.getY(), 1.0f, -1.0f, area.getRight(), area.getBottom());
     std::vector<juce::Line<float>> lines;
 
-    for (int i = 2; i < buffer.size(); i += 2) {
-        lines.emplace_back(buffer[i - 2], buffer[i - 1], buffer[i], buffer[i + 1]);
+    for (int i = 2; i < buffer.size(); i++) {
+        lines.emplace_back(buffer[i - 1].x, buffer[i - 1].y, buffer[i].x, buffer[i].y);
     }
 
     double strength = 15;
@@ -316,7 +315,7 @@ void VisualiserComponent::initialiseBrowser() {
             complete(settings.getSettings());
         })
         .withNativeFunction("bufferSize", [this](auto& var, auto complete) {
-            complete((int) tempBuffer.size() / 2);
+            complete((int) tempBuffer.size());
         })
         .withNativeFunction("sampleRate", [this](auto& var, auto complete) {
             complete(sampleRate);
@@ -330,7 +329,7 @@ void VisualiserComponent::initialiseBrowser() {
 
 void VisualiserComponent::resetBuffer() {
     sampleRate = (int) sampleRateManager.getSampleRate();
-    tempBuffer = std::vector<float>(2 * sampleRate * BUFFER_LENGTH_SECS);
+    tempBuffer = std::vector<Point>(sampleRate * BUFFER_LENGTH_SECS);
     if (!oldVisualiser && isShowing()) {
         restartBrowser = true;
         triggerAsyncUpdate();
@@ -344,7 +343,22 @@ void VisualiserComponent::handleAsyncUpdate() {
     }
     if (audioUpdated && browser != nullptr) {
         juce::CriticalSection::ScopedLockType scope(lock);
-        browser->emitEventIfBrowserIsVisible("audioUpdated", juce::Base64::toBase64(buffer.data(), buffer.size() * sizeof(float)));
+        std::vector<float> rawBuffer;
+        if (settings.numChannels == 2) {
+            rawBuffer.reserve(buffer.size() * 2);
+            for (auto& point : buffer) {
+                rawBuffer.push_back(point.x);
+                rawBuffer.push_back(point.y);
+            }
+        } else if (settings.numChannels == 3) {
+            rawBuffer.reserve(buffer.size() * 3);
+            for (auto& point : buffer) {
+                rawBuffer.push_back(point.x);
+                rawBuffer.push_back(point.y);
+                rawBuffer.push_back(point.z);
+            }
+        }
+        browser->emitEventIfBrowserIsVisible("audioUpdated", juce::Base64::toBase64(rawBuffer.data(), rawBuffer.size() * sizeof(float)));
         audioUpdated = false;
     }
 }

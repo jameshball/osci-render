@@ -12,17 +12,17 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p)
 
     setLookAndFeel(&lookAndFeel);
 
-// #if JUCE_MAC
-//     if (audioProcessor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-//         usingNativeMenuBar = true;
-//         menuBarModel.setMacMainMenu(&menuBarModel);
-//     }
-// #endif
+#if JUCE_MAC
+    if (audioProcessor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
+        usingNativeMenuBar = true;
+        menuBarModel.setMacMainMenu(&menuBarModel);
+    }
+#endif
 
-//     if (!usingNativeMenuBar) {
-//         menuBar.setModel(&menuBarModel);
-//         addAndMakeVisible(menuBar);
-//     }
+    if (!usingNativeMenuBar) {
+        menuBar.setModel(&menuBarModel);
+        addAndMakeVisible(menuBar);
+    }
 
     if (juce::JUCEApplicationBase::isStandaloneApp()) {
         if (juce::TopLevelWindow::getNumTopLevelWindows() > 0) {
@@ -44,6 +44,27 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p)
 
     addAndMakeVisible(visualiser);
 
+    visualiser.openSettings = [this] {
+        visualiserSettingsWindow.setVisible(true);
+        visualiserSettingsWindow.toFront(true);
+    };
+
+    visualiser.closeSettings = [this] {
+        visualiserSettingsWindow.setVisible(false);
+    };
+
+    visualiserSettingsWindow.setResizable(false, false);
+#if JUCE_WINDOWS
+    // if not standalone, use native title bar for compatibility with DAWs
+    visualiserSettingsWindow.setUsingNativeTitleBar(processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone);
+#elif JUCE_MAC
+    visualiserSettingsWindow.setUsingNativeTitleBar(true);
+#endif
+    visualiserSettings.setLookAndFeel(&getLookAndFeel());
+    visualiserSettings.setSize(550, 280);
+    visualiserSettingsWindow.setContentNonOwned(&visualiserSettings, true);
+    visualiserSettingsWindow.centreWithSize(550, 280);
+
     setSize(750, 750);
     setResizable(true, true);
     setResizeLimits(250, 250, 999999, 999999);
@@ -53,11 +74,11 @@ SosciPluginEditor::~SosciPluginEditor() {
     setLookAndFeel(nullptr);
     juce::Desktop::getInstance().setDefaultLookAndFeel(nullptr);
     
-// #if JUCE_MAC
-//     if (usingNativeMenuBar) {
-//         menuBarModel.setMacMainMenu(nullptr);
-//     }
-// #endif
+#if JUCE_MAC
+    if (usingNativeMenuBar) {
+        menuBarModel.setMacMainMenu(nullptr);
+    }
+#endif
 }
 
 void SosciPluginEditor::paint(juce::Graphics& g) {
@@ -66,11 +87,12 @@ void SosciPluginEditor::paint(juce::Graphics& g) {
 
 void SosciPluginEditor::resized() {
     auto area = getLocalBounds();
-    visualiser.setBounds(area);
 
-    // if (!usingNativeMenuBar) {
-    //     menuBar.setBounds(area.removeFromTop(25));
-    // }
+    if (!usingNativeMenuBar) {
+        menuBar.setBounds(area.removeFromTop(25));
+    }
+
+    visualiser.setBounds(area);
 }
 
 bool SosciPluginEditor::keyPressed(const juce::KeyPress& key) {
