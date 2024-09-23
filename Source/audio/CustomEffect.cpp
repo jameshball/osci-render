@@ -33,13 +33,14 @@ Point CustomEffect::apply(int index, Point input, const std::vector<std::atomic<
 			std::copy(std::begin(luaValues), std::end(luaValues), std::begin(vars.sliders));
 
 			auto result = parser->run(L, vars);
-			if (result.size() >= 2) {
-				x = result[0];
-				y = result[1];
-				if (result.size() >= 3) {
-					z = result[2];
-				}
-			}
+			int rs = result.size();
+
+			if (rs < 1) return input;
+
+			x = result[0];
+			y = (rs > 1) ? result[1] : y;
+			z = (rs > 2) ? result[2] : z;
+
 		} else {
 			parser->resetErrors();
 		}

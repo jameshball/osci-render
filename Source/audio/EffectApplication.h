@@ -7,6 +7,7 @@ public:
 	EffectApplication() {};
 
 	virtual Point apply(int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) = 0;
+	void extInput(Point newInput) { return; }
 	
 	void resetPhase();
 	double nextPhase(double frequency, double sampleRate);

@@ -15,6 +15,7 @@ public:
 
 	Point apply(int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override;
 	void updateCode(const juce::String& newCode);
+	void extInput(Point newInput) { vars.ext_x = newInput.x; vars.ext_y = newInput.y; }
 
 	juce::String getCode();
 	
