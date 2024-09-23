@@ -17,7 +17,10 @@ public:
     Effect(EffectParameter* parameter);
 
 	Point apply(int index, Point input, double volume = 0.0);
-	void extInput(Point newInput) { effectApplication->extInput(newInput); }
+	void extInput(Point newInput) {
+		effectApplication->extInput(newInput);
+		return;
+	}
 	
 	void apply();
 	double getValue(int index);
