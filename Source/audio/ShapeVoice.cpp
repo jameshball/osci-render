@@ -192,7 +192,6 @@ void ShapeVoice::stopNote(float velocity, bool allowTailOff) {
 
 void ShapeVoice::noteStopped() {
     clearCurrentNote();
-    sound = nullptr;
 }
 
 void ShapeVoice::pitchWheelMoved(int newPitchWheelValue) {

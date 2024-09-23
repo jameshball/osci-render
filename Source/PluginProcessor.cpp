@@ -698,6 +698,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         currentVolume = juce::jlimit(0.0, 1.0, currentVolume);
 
         Point channels = { outputBuffer3d.getSample(0, sample), outputBuffer3d.getSample(1, sample), outputBuffer3d.getSample(2, sample) };
+        Point extChannels = { left, right };
 
         {
             juce::SpinLock::ScopedLockType lock1(parsersLock);
@@ -705,17 +706,17 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             if (volume > EPSILON) {
                 for (auto& effect : toggleableEffects) {
                     if (effect->enabled->getValue()) {
-                        channels = effect->apply(sample, channels, currentVolume);
+                        channels = effect->apply(sample, channels, extChannels, currentVolume);
                     }
                 }
             }
             for (auto& effect : permanentEffects) {
-                channels = effect->apply(sample, channels, currentVolume);
+                channels = effect->apply(sample, channels, extChannels, currentVolume);
             }
             auto lua = currentFile >= 0 ? sounds[currentFile]->parser->getLua() : nullptr;
             if (lua != nullptr || custom->enabled->getBoolValue()) {
                 for (auto& effect : luaEffects) {
-                    effect->apply(sample, channels, currentVolume);
+                    effect->apply(sample, channels, extChannels, currentVolume);
                 }
             }
         }

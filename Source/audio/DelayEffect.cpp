@@ -37,3 +37,7 @@ Point DelayEffect::apply(int index, Point vector, const std::vector<double>& val
 
     return vector;
 }
+
+Point DelayEffect::apply(int index, Point vector, const std::vector<double>& values, double sampleRate, Point extInput) {
+    return apply(index, vector, values, sampleRate);
+}

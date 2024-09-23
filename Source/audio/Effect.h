@@ -17,6 +17,7 @@ public:
     Effect(EffectParameter* parameter);
 
 	Point apply(int index, Point input, double volume = 0.0);
+	Point apply(int index, Point input, Point extInput, double volume = 0.0);
 	
 	void apply();
 	double getValue(int index);

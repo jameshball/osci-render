@@ -12,3 +12,7 @@ Point WobbleEffect::apply(int index, Point input, const std::vector<double>& val
 
     return input + delta;
 }
+
+Point WobbleEffect::apply(int index, Point input, const std::vector<double>& values, double sampleRate, Point extInput) {
+    return apply(index, input, values, sampleRate);
+}

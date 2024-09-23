@@ -50,6 +50,9 @@ struct LuaVariables {
 	double sampleRate = 0;
 	double frequency = 0;
 
+	double ext_x = 0;
+	double ext_y = 0;
+
 	// x, y, z are only used for effects
 	bool isEffect = false;
 

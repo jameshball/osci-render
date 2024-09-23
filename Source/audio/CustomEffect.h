@@ -13,6 +13,7 @@ public:
 	static const juce::String UNIQUE_ID;
 	static const juce::String FILE_NAME;
 
+	Point apply(int index, Point input, const std::vector<double>& values, double sampleRate, Point extInput) override;
 	Point apply(int index, Point input, const std::vector<double>& values, double sampleRate) override;
 	void updateCode(const juce::String& newCode);
 

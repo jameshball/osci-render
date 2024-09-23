@@ -26,3 +26,7 @@ Point DashedLineEffect::apply(int index, Point vector, const std::vector<double>
 	
 	return vector;
 }
+
+Point DashedLineEffect::apply(int index, Point vector, const std::vector<double>& values, double sampleRate, Point extInput) {
+	return apply(index, vector, values, sampleRate);
+}

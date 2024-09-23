@@ -10,6 +10,7 @@ public:
 	~PerspectiveEffect();
 
 	Point apply(int index, Point input, const std::vector<double>& values, double sampleRate) override;
+	Point apply(int index, Point input, const std::vector<double>& values, double sampleRate, Point extInput) override;
 
 private:
 

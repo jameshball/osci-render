@@ -14,3 +14,7 @@ Point BitCrushEffect::apply(int index, Point input, const std::vector<double>& v
 	double dequant = 1.0f / quant;
 	return Point(dequant * (int)(input.x * quant), dequant * (int)(input.y * quant), dequant * (int)(input.z * quant));
 }
+
+Point BitCrushEffect::apply(int index, Point input, const std::vector<double>& values, double sampleRate, Point extInput) {
+	return apply(index, input, values, sampleRate);
+}

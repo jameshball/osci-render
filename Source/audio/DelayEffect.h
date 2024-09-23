@@ -8,6 +8,7 @@ public:
 	~DelayEffect();
 
 	Point apply(int index, Point input, const std::vector<double>& values, double sampleRate) override;
+	Point apply(int index, Point input, const std::vector<double>& values, double sampleRate, Point extInput) override;
 
 private:
 	const static int MAX_DELAY = 192000 * 10;
