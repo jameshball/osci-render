@@ -22,15 +22,11 @@ Effect::Effect(const std::vector<EffectParameter*>& parameters) : Effect([](int 
 Effect::Effect(EffectParameter* parameter) : Effect([](int index, Point input, const std::vector<double>& values, double sampleRate) {return input;}, parameter) {}
 
 Point Effect::apply(int index, Point input, double volume) {
-	return(apply(index, input, Point(0, 0), volume));
-}
-Point Effect::apply(int index, Point input, Point extInput, double volume) {
 	animateValues(volume);
 	if (application) {
 		return application(index, input, actualValues, sampleRate);
-	}
-	else if (effectApplication != nullptr) {
-		return effectApplication->apply(index, input, actualValues, sampleRate, extInput);
+	} else if (effectApplication != nullptr) {
+		return effectApplication->apply(index, input, actualValues, sampleRate);
 	}
 	return input;
 }

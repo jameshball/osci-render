@@ -119,8 +119,6 @@ void LuaParser::setGlobalVariables(lua_State*& L, LuaVariables& vars) {
 	setGlobalVariable(L, "sample_rate", vars.sampleRate);
 	setGlobalVariable(L, "frequency", vars.frequency);
 	setGlobalVariable(L, "phase", vars.phase);
-    setGlobalVariable(L, "ext_x", vars.ext_x);
-    setGlobalVariable(L, "ext_y", vars.ext_y);
 
     for (int i = 0; i < NUM_SLIDERS; i++) {
 		setGlobalVariable(L, SLIDER_NAMES[i], vars.sliders[i]);

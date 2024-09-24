@@ -7,7 +7,6 @@ const juce::String CustomEffect::FILE_NAME = "Custom Lua Effect";
 
 CustomEffect::CustomEffect(std::function<void(int, juce::String, juce::String)> errorCallback, double (&luaValues)[26]) : errorCallback(errorCallback), luaValues(luaValues) {
 	vars.isEffect = true;
-	lua = true;
 }
 
 CustomEffect::~CustomEffect() {
@@ -15,27 +14,17 @@ CustomEffect::~CustomEffect() {
 }
 
 Point CustomEffect::apply(int index, Point input, const std::vector<double>& values, double sampleRate) {
-	return apply(index, input, values, sampleRate, Point(0, 0));
-}
+	auto effectScale = values[0];
 
-Point CustomEffect::apply(int index, Point input, const std::vector<double>& values, double sampleRate, Point extInput) {
-	double effectScale = values[0];
-
-	double ext_x = extInput.x;
-	double ext_y = extInput.y;
-
-	double x = input.x;
-	double y = input.y;
-	double z = input.z;
+	auto x = input.x;
+	auto y = input.y;
+	auto z = input.z;
 
 	{
 		juce::SpinLock::ScopedLockType lock(codeLock);
 		if (!defaultScript) {
 			vars.sampleRate = sampleRate;
 			vars.frequency = frequency;
-
-			vars.ext_x = ext_x;
-			vars.ext_y = ext_y;
 
 			vars.x = x;
 			vars.y = y;

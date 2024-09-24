@@ -14,7 +14,3 @@ Point BulgeEffect::apply(int index, Point input, const std::vector<double>& valu
 
     return Point(rn * cos(theta), rn * sin(theta), input.z);
 }
-
-Point BulgeEffect::apply(int index, Point input, const std::vector<double>& values, double sampleRate, Point extInput) {
-    return apply(index, input, values, sampleRate);
-}

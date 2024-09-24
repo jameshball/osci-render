@@ -24,8 +24,3 @@ Point PerspectiveEffect::apply(int index, Point input, const std::vector<double>
 		0
 	);
 }
-
-
-Point PerspectiveEffect::apply(int index, Point input, const std::vector<double>& values, double sampleRate, Point extInput) {
-	return apply(index, input, values, sampleRate);
-}
