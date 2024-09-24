@@ -440,13 +440,13 @@ void LuaParser::setGlobalVariables(lua_State*& L, LuaVariables& vars) {
 		setGlobalVariable(L, SLIDER_NAMES[i], vars.sliders[i]);
     }
 
+    setGlobalVariable(L, "ext_x", vars.ext_x);
+    setGlobalVariable(L, "ext_y", vars.ext_y);
+
     if (vars.isEffect) {
         setGlobalVariable(L, "x", vars.x);
         setGlobalVariable(L, "y", vars.y);
 		setGlobalVariable(L, "z", vars.z);
-        
-        setGlobalVariable(L, "ext_x", vars.ext_x);
-        setGlobalVariable(L, "ext_y", vars.ext_y);
     }
 }
 

@@ -75,6 +75,11 @@ void ShapeVoice::updateSound(juce::SynthesiserSound* sound) {
     }
 }
 
+void ShapeVoice::extInput(juce::AudioSampleBuffer& inputBuffer)
+{
+    exIn = inputBuffer;
+}
+
 void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int startSample, int numSamples) {
     juce::ScopedNoDenormals noDenormals;
 
@@ -111,7 +116,10 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
                 vars.sampleRate = audioProcessor.currentSampleRate;
                 vars.frequency = actualFrequency;
                 std::copy(std::begin(audioProcessor.luaValues), std::end(audioProcessor.luaValues), std::begin(vars.sliders));
-
+                if (exIn.getNumChannels() > 1 && exIn.getNumSamples() >= startSample + numSamples) {
+                    vars.ext_x = exIn.getSample(0, sample);
+                    vars.ext_y = exIn.getSample(1, sample);
+                }
                 channels = parser->nextSample(L, vars);
             } else if (currentShape < frame.size()) {
                 auto& shape = frame[currentShape];

@@ -718,12 +718,14 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             }
         }
         for (auto& effect : permanentEffects) {
+            effect->extInput(exIn);
             channels = effect->apply(sample, channels, currentVolume);
         }
-        // nothing is done from here
+        // looks like nothing is done from here
         auto lua = currentFile >= 0 ? sounds[currentFile]->parser->getLua() : nullptr;
         if (lua != nullptr || custom->enabled->getBoolValue()) {
             for (auto& effect : luaEffects) {
+                effect->extInput(exIn);
                 effect->apply(sample, channels, currentVolume);
             }
         }
