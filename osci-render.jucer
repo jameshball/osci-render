@@ -190,10 +190,9 @@
               file="Source/concurrency/BufferConsumer.h"/>
       </GROUP>
       <GROUP id="{A3E24187-62A5-AB8D-8837-14043B89A640}" name="gpla">
-        <FILE id="x6XXvm" name="BinaryLineArtParser.cpp" compile="1" resource="0"
-              file="Source/gpla/BinaryLineArtParser.cpp"/>
-        <FILE id="YgVBp9" name="BinaryLineArtParser.h" compile="0" resource="0"
-              file="Source/gpla/BinaryLineArtParser.h"/>
+        <FILE id="KvDV8j" name="LineArtParser.cpp" compile="1" resource="0"
+              file="Source/gpla/LineArtParser.cpp"/>
+        <FILE id="t008RG" name="LineArtParser.h" compile="0" resource="0" file="Source/gpla/LineArtParser.h"/>
       </GROUP>
       <GROUP id="{8AC1A0A6-6E5E-D533-33A6-76002E1DD885}" name="img">
         <FILE id="xwx39V" name="gifdec.c" compile="1" resource="0" file="Source/img/gifdec.c"/>
@@ -659,9 +658,10 @@
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/VisualStudio2022" smallIcon="pSc1mq" bigIcon="pSc1mq">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" useRuntimeLibDLL="0"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="osci-render" alwaysGenerateDebugSymbols="1"
-                       debugInformationFormat="ProgramDatabase"/>
+                       debugInformationFormat="ProgramDatabase" useRuntimeLibDLL="0"
+                       enablePluginBinaryCopyStep="1" vst3BinaryLocation="C:\Users\DJ_Level_3\Documents\Ableton VSTs"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>

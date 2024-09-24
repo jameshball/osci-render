@@ -1,8 +1,8 @@
 bl_info = {
     "name": "osci-render",
     "author": "James Ball", 
-    "version": (2, 2, 2),
-    "blender": (4, 2, 0),
+    "version": (1, 0, 2),
+    "blender": (3, 1, 2),
     "location": "View3D",
     "description": "Addon to send gpencil frames over to osci-render",
     "warning": "Requires a camera and gpencil object",
@@ -16,7 +16,6 @@ import bmesh
 import socket
 import json
 import atexit
-import struct
 from bpy.props import StringProperty
 from bpy.app.handlers import persistent
 from bpy_extras.io_utils import ImportHelper
@@ -126,40 +125,6 @@ def append_matrix(object_info, obj):
     object_info["matrix"] = [camera_space[i][j] for i in range(4) for j in range(4)]
     return object_info
 
-# Frame Info Format
-# "objects":
-#   [
-#     "name": name
-#     "vertices":
-#       **vertex data**
-#       **vertex data**
-#       **vertex data**
-#       **vertex data**
-#     "matrix":
-#       **matrix data**
-#   ]
-#   [
-#     "name": name
-#     "vertices":
-#       **vertex data**
-#       **vertex data**
-#       **vertex data**
-#       **vertex data**
-#     "matrix":
-#       **matrix data**
-#   ]
-#   [
-#     "name": name
-#     "vertices":
-#       **vertex data**
-#       **vertex data**
-#       **vertex data**
-#       **vertex data**
-#     "matrix":
-#       **matrix data**
-#   ]
-# "focalLength": focal length
-#
 def get_frame_info():
     frame_info = {"objects": []}
     
@@ -180,65 +145,22 @@ def get_frame_info():
     frame_info["focalLength"] = -0.05 * bpy.data.cameras[0].lens
 
     return frame_info
-
-# Encoded frame binary format:
-# focal length (4-byte float)
-# number of objects (4-byte int)
-# [
-# object name size (4-byte int)
-# object name (utf-8 binary)
-# number of strokes (4-byte int)
-# [
-# stroke vertices size (4-byte int)
-# stroke vertices (4-byte floats)
-# ]
-# matrix (sixteen 4-byte floats)
-# ]
-def encode_frame_info(frame_info):
-    # focal length, number of objects
-    frame = bytearray(struct.pack('f', frame_info["focalLength"])) + bytearray(struct.pack('i', len(frame_info["objects"])))
-    for obj in frame_info["objects"]:
-        # object name and object name length
-        name_data = bytearray(obj["name"].encode('utf-8'))
-        name_size = bytearray(struct.pack('i',len(name_data)))
-        
-        strokes = []
-        for stroke in obj["vertices"]:
-            vertices = []
-            for i in range(len(stroke)):
-                vertices.append(stroke[i]["x"])
-                vertices.append(stroke[i]["y"])
-                vertices.append(stroke[i]["z"])
-            vertices_data = bytearray(struct.pack('%sf' % len(vertices), *vertices))
-            vertices_data = bytearray(struct.pack('i', len(vertices))) + vertices_data
-            strokes.append(vertices_data)
-        
-        matrix_data = bytearray(struct.pack('16f', *obj["matrix"]))
-        
-        frame = frame + name_size + name_data + bytearray(struct.pack('i', len(strokes)))
-        for i in range(len(strokes)):
-            frame = frame + strokes[i]
-        frame = frame + matrix_data
-        
-    return frame
     
 @persistent
 def save_scene_to_file(scene, file_path):
     return_frame = scene.frame_current
     
-    # we have to add 1 here as frame_end is inclusive
-    n_frames = scene.frame_end - scene.frame_start + 1
-    
-    scene_info_encoded = bytearray("osci-render gpla v1.1.0".encode('utf-8')) + bytearray(struct.pack('i', n_frames))
-    for frame in range(0, n_frames):
+    scene_info = {"frames": []}
+    for frame in range(0, scene.frame_end - scene.frame_start):
         scene.frame_set(frame + scene.frame_start)
-        fi = get_frame_info()
-        scene_info_encoded = scene_info_encoded + encode_frame_info(fi)
+        scene_info["frames"].append(get_frame_info())
 
+    json_str = json.dumps(scene_info, separators=(',', ':'))
     
     if file_path is not None:
-        with open(file_path, "wb") as f:
-            f.write(bytes(scene_info_encoded))
+        f = open(file_path, "w")
+        f.write(json_str)
+        f.close()
     else:
         return 1
         
@@ -255,6 +177,7 @@ def send_scene_to_osci_render(scene):
 
         json_str = json.dumps(frame_info, separators=(',', ':')) + '\n'
         try:
+            print(json_str)
             sock.sendall(json_str.encode('utf-8'))
         except socket.error as exp:
             sock = None

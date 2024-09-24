@@ -29,19 +29,7 @@ void FileParser::parse(juce::String fileId, juce::String extension, std::unique_
 	} else if (extension == ".lua") {
 		lua = std::make_shared<LuaParser>(fileId, stream->readEntireStreamAsString(), errorCallback, fallbackLuaScript);
 	} else if (extension == ".gpla") {
-		juce::MemoryBlock buffer{};
-		int bytesRead = stream->readIntoMemoryBlock(buffer);
-		if (((char*)buffer.getData())[0] == '{') { // Deprecated JSON format
-			gpla = std::make_shared<BinaryLineArtParser>(buffer, bytesRead, true);
-		} else if (((char*)buffer.getData())[0] == 'b') { // Deprecated Base64 format
-			juce::MemoryOutputStream b64Stream;
-			juce::Base64::convertFromBase64(b64Stream, buffer.toString());
-			b64Stream.flush();
-			juce::MemoryBlock b64Buffer = b64Stream.getMemoryBlock();
-			gpla = std::make_shared<BinaryLineArtParser>(b64Buffer, b64Buffer.getSize());
-		} else { // Current binary format
-			gpla = std::make_shared<BinaryLineArtParser>(buffer, bytesRead);
-		}
+		gpla = std::make_shared<LineArtParser>(stream->readEntireStreamAsString());
 	} else if (extension == ".gif" || extension == ".png" || extension == ".jpg" || extension == ".jpeg") {
 		juce::MemoryBlock buffer{};
 		int bytesRead = stream->readIntoMemoryBlock(buffer);
@@ -63,7 +51,7 @@ std::vector<std::unique_ptr<Shape>> FileParser::nextFrame() {
 		return svg->draw();
 	} else if (text != nullptr) {
 		return text->draw();
-	} else if (gpla != nullptr && gpla->numFrames > 0) {
+	} else if (gpla != nullptr) {
 		return gpla->draw();
 	}
 	auto tempShapes = std::vector<std::unique_ptr<Shape>>();
@@ -128,7 +116,7 @@ std::shared_ptr<TextParser> FileParser::getText() {
 	return text;
 }
 
-std::shared_ptr<BinaryLineArtParser> FileParser::getBinaryLineArt() {
+std::shared_ptr<LineArtParser> FileParser::getLineArt() {
 	return gpla;
 }
 

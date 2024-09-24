@@ -52,12 +52,36 @@ void ObjectServer::run() {
                                 break;
                             }
 
+                            // format of json is:
+                            // {
+                            //   "objects": [
+                            //     {
+                            //       "name": "Line Art",
+                            //       "vertices": [
+                            //         [
+                            //           {
+                            //             "x": double value,
+                            //             "y": double value,
+                            //             "z": double value
+                            //           },
+                            //           ...
+                            //         ],
+                            //         ...
+                            //       ],
+                            //       "matrix": [
+                            //         16 double values
+                            //       ]
+                            //     }
+                            //   ],
+                            //   "focalLength": double value
+                            // }
+
                             auto json = juce::JSON::parse(message.get());
 
                             juce::Array<juce::var> objects = *json.getProperty("objects", juce::Array<juce::var>()).getArray();
                             double focalLength = json.getProperty("focalLength", 1);
 
-                            std::vector<Line> frameContainer = BinaryLineArtParser::generateJsonFrame(objects, focalLength);
+                            std::vector<Line> frameContainer = LineArtParser::generateFrame(objects, focalLength);
 
                             std::vector<std::unique_ptr<Shape>> frame;
 
