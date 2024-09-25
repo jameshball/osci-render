@@ -2,6 +2,10 @@
 #include <JuceHeader.h>
 #include <regex>
 #include <numbers>
+#include "lua.hpp"
+#include "../shape/Line.h"
+#include "../shape/CircleArc.h"
+#include "../shape/QuadraticBezierCurve.h"
 #include "../shape/Shape.h"
 
 class ErrorListener {
