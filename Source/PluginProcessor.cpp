@@ -706,7 +706,10 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         currentVolume = std::sqrt(squaredVolume);
         currentVolume = juce::jlimit(0.0, 1.0, currentVolume);
 
-        Point channels = { outputBuffer3d.getSample(0, sample), outputBuffer3d.getSample(1, sample), outputBuffer3d.getSample(2, sample), left, right };
+        double sx = outputBuffer3d.getSample(0, sample);
+        double sy = outputBuffer3d.getSample(1, sample);
+        double sz = outputBuffer3d.getSample(2, sample);
+        Point channels = { sx, sy, sz, left, right };
 
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);

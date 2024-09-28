@@ -86,10 +86,17 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         actualFrequency = audioProcessor.frequency;
     }
 
+    std::shared_ptr<FileParser> parser;
+
     if (sound.load() != nullptr) {
-        auto parser = sound.load()->parser;
-        if (!(parser != nullptr && parser->isSample())) outputBuffer.clear();
+        parser = sound.load()->parser;
+        if (!(parser != nullptr && parser->isSample())) {
+            outputBuffer.clear(startSample, numSamples);
+        }
     }
+    double x = 0.0;
+    double y = 0.0;
+    double z = 0.0;
 
     for (auto sample = startSample; sample < startSample + numSamples; ++sample) {
         bool traceMinEnabled = audioProcessor.traceMin->enabled->getBoolValue();
@@ -102,9 +109,9 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         lengthIncrement = juce::jmax(proportionalLength / (audioProcessor.currentSampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
 
         Point channels = { 0,0,0 };
-        double x = 0.0;
-        double y = 0.0;
-        double z = 0.0;
+        x = 0.0;
+        y = 0.0;
+        z = 0.0;
 
         bool renderingSample = true;
 
@@ -170,7 +177,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         double drawnFrameLength = traceMaxEnabled ? actualTraceMax * frameLength : frameLength;
 
         if (!renderingSample && frameDrawn >= drawnFrameLength) {
-            if (sound.load() != nullptr && currentlyPlaying) {
+            if (sound.load() != nullptr && currentlyPlaying) { 
                 frameLength = sound.load()->updateFrame(frame);
             }
             frameDrawn -= drawnFrameLength;
@@ -188,10 +195,10 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             }
         }
     }
+    return;
 }
 
 void ShapeVoice::stopNote(float velocity, bool allowTailOff) {
-    currentlyPlaying = false;
     waitingForRelease = false;
     if (!allowTailOff) {
         noteStopped();
@@ -200,6 +207,7 @@ void ShapeVoice::stopNote(float velocity, bool allowTailOff) {
 
 void ShapeVoice::noteStopped() {
     clearCurrentNote();
+    currentlyPlaying = false;
     sound = nullptr;
 }
 
