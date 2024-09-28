@@ -79,6 +79,8 @@ Point& Point::operator=(const Point& other) {
 	x = other.x;
 	y = other.y;
 	z = other.z;
+    v = other.v;
+    w = other.w;
 	return *this;
 }
 
@@ -91,39 +93,44 @@ bool Point::operator!=(const Point& other) {
 }
 
 Point Point::operator+(const Point& other) {
-    return Point(x + other.x, y + other.y, z + other.z);
+    return Point(x + other.x, y + other.y, z + other.z, v + other.v, w + other.w);
 }
 
 Point Point::operator+(double scalar) {
-	return Point(x + scalar, y + scalar, z + scalar);
+	return Point(x + scalar, y + scalar, z + scalar, v + scalar, w + scalar);
 }
 
 
 
 Point Point::operator-(const Point& other) {
-    return Point(x - other.x, y - other.y, z - other.z);
+    return Point(x - other.x, y - other.y, z - other.z, v - other.v, w - other.w);
 }
 
 Point Point::operator-() {
-    return Point(-x, -y, -z);
+    return Point(-x, -y, -z, -v, -w);
 }
 
 Point Point::operator*(const Point& other) {
-    return Point(x * other.x, y * other.y, z * other.z);
+    return Point(x * other.x, y * other.y, z * other.z, v * other.v, w * other.w);
 }
 
 Point Point::operator*(double scalar) {
-    return Point(x * scalar, y * scalar, z * scalar);
+    return Point(x * scalar, y * scalar, z * scalar, v * scalar, w * scalar);
 }
 
 std::string Point::toString() {
-    return std::string("(" + std::to_string(x) + ", " + std::to_string(y) + ", " + std::to_string(z) + ")");
+    if (v != 0 || w != 0) {
+        return std::string("(" + std::to_string(x) + ", " + std::to_string(y) + ", " + std::to_string(z) + "), <" + std::to_string(v) + ", " + std::to_string(w) + ">");
+    }
+    else {
+        return std::string("(" + std::to_string(x) + ", " + std::to_string(y) + ", " + std::to_string(z) + ")");
+    }
 }
 
 Point operator+(double scalar, const Point& point) {
-	return Point(point.x + scalar, point.y + scalar, point.z + scalar);
+	return Point(point.x + scalar, point.y + scalar, point.z + scalar, point.v + scalar, point.w + scalar);
 }
 
 Point operator*(double scalar, const Point& point) {
-	return Point(point.x * scalar, point.y * scalar, point.z * scalar);
+	return Point(point.x * scalar, point.y * scalar, point.z * scalar, point.v * scalar, point.w * scalar);
 }

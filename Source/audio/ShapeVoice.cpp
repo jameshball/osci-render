@@ -13,7 +13,7 @@ bool ShapeVoice::canPlaySound(juce::SynthesiserSound* sound) {
 void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::SynthesiserSound* sound, int currentPitchWheelPosition) {
     this->velocity = velocity;
     pitchWheelMoved(currentPitchWheelPosition);
-    auto* shapeSound = dynamic_cast<ShapeSound*>(sound);
+    ShapeSound* shapeSound = dynamic_cast<ShapeSound*>(sound);
 
     currentlyPlaying = true;
     this->sound = shapeSound;
@@ -86,6 +86,11 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         actualFrequency = audioProcessor.frequency;
     }
 
+    if (sound.load() != nullptr) {
+        auto parser = sound.load()->parser;
+        if (!(parser != nullptr && parser->isSample())) outputBuffer.clear();
+    }
+
     for (auto sample = startSample; sample < startSample + numSamples; ++sample) {
         bool traceMinEnabled = audioProcessor.traceMin->enabled->getBoolValue();
         bool traceMaxEnabled = audioProcessor.traceMax->enabled->getBoolValue();
@@ -115,7 +120,6 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
                 vars.ext_y = outputBuffer.getSample(1, sample);
                 channels = parser->nextSample(L, vars);
             } else {
-                outputBuffer.clear();
                 if (currentShape < frame.size()) {
                     auto& shape = frame[currentShape];
                     double length = shape->length();

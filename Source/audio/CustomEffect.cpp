@@ -19,6 +19,8 @@ Point CustomEffect::apply(int index, Point input, const std::vector<std::atomic<
 	auto x = input.x;
 	auto y = input.y;
 	auto z = input.z;
+	auto eX = input.v;
+	auto eY = input.w;
 
 	{
 		juce::SpinLock::ScopedLockType lock(codeLock);
@@ -29,6 +31,9 @@ Point CustomEffect::apply(int index, Point input, const std::vector<std::atomic<
 			vars.x = x;
 			vars.y = y;
 			vars.z = z;
+
+			vars.ext_x = eX;
+			vars.ext_y = eY;
 
 			std::copy(std::begin(luaValues), std::end(luaValues), std::begin(vars.sliders));
 
@@ -49,7 +54,9 @@ Point CustomEffect::apply(int index, Point input, const std::vector<std::atomic<
 	return Point(
 		(1 - effectScale) * input.x + effectScale * x,
 		(1 - effectScale) * input.y + effectScale * y,
-		(1 - effectScale) * input.z + effectScale * z
+		(1 - effectScale) * input.z + effectScale * z,
+		input.v,
+		input.w
 	);
 }
 
