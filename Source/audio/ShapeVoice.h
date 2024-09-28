@@ -16,8 +16,6 @@ public:
 	void pitchWheelMoved(int newPitchWheelValue) override;
 	void controllerMoved(int controllerNumber, int newControllerValue) override;
 
-	void extInput(juce::AudioSampleBuffer& inputBuffer);
-
 
 	void incrementShapeDrawing();
 	double getFrequency();
@@ -52,8 +50,6 @@ private:
 	double releaseTime = 0.0;
 	double endTime = 99999999;
 	bool waitingForRelease = false;
-
-	juce::AudioSampleBuffer exIn;
 
 	void noteStopped();
 };

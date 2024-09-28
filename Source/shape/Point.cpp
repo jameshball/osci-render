@@ -2,16 +2,18 @@
 
 double Point::EPSILON = 0.0001;
 
-Point::Point() : x(0), y(0), z(0) {}
+Point::Point() : x(0), y(0), z(0), v(0), w(0) {}
 
-Point::Point(double val) : x(val), y(val), z(0) {}
+Point::Point(double val) : x(val), y(val), z(0), v(0), w(0) {}
 
-Point::Point(double x, double y) : x(x), y(y), z(0) {}
+Point::Point(double x, double y) : x(x), y(y), z(0), v(0), w(0) {}
 
-Point::Point(double x, double y, double z) : x(x), y(y), z(z) {}
+Point::Point(double x, double y, double z) : x(x), y(y), z(z), v(0), w(0) {}
+
+Point::Point(double x, double y, double z, double v, double w) : x(x), y(y), z(z), v(v), w(w) {}
 
 Point Point::nextVector(double drawingProgress){
-	return Point(x, y, z);
+	return Point(x, y, z, v, w);
 }
 
 void Point::rotate(double rotateX, double rotateY, double rotateZ) {

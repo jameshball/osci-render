@@ -6,7 +6,6 @@
 #include "BooleanParameter.h"
 
 typedef std::function<Point(int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate)> EffectApplicationType;
-typedef std::function<void(Point newInput)> ExtInputType;
 
 class Effect {
 public:

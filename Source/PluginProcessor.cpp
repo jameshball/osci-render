@@ -629,11 +629,13 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     juce::AudioBuffer<float> outputBuffer3d = juce::AudioBuffer<float>(3, buffer.getNumSamples());
     outputBuffer3d.clear();
 
-    if (usingInput && totalNumInputChannels >= 2) {
-        for (auto channel = 0; channel < juce::jmin(2, totalNumInputChannels); channel++) {
-            outputBuffer3d.copyFrom(channel, 0, inputBuffer, channel, 0, buffer.getNumSamples());
-        }
+    // Put the external input data into the output buffer in case the synth voice is a Lua synth.
+    // It will be cleared by the synth if this is not the case.
+    for (int channel = 0; channel < juce::jmin(2, totalNumInputChannels); channel++) {
+        outputBuffer3d.copyFrom(channel, 0, inputBuffer, channel, 0, buffer.getNumSamples());
+    }
 
+    if (usingInput && totalNumInputChannels >= 2) {
         // handle all midi messages
         auto midiIterator = midiMessages.cbegin();
         std::for_each(midiIterator,
@@ -721,7 +723,6 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             effect->extInput(exIn);
             channels = effect->apply(sample, channels, currentVolume);
         }
-        // looks like nothing is done from here
         auto lua = currentFile >= 0 ? sounds[currentFile]->parser->getLua() : nullptr;
         if (lua != nullptr || custom->enabled->getBoolValue()) {
             for (auto& effect : luaEffects) {
@@ -729,7 +730,6 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
                 effect->apply(sample, channels, currentVolume);
             }
         }
-        // to here. can I delete it?
 
 		double x = channels.x;
 		double y = channels.y;

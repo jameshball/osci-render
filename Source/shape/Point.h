@@ -6,6 +6,7 @@
 
 class Point : public Shape {
 public:
+	Point(double x, double y, double z, double v, double w);
 	Point(double x, double y, double z);
 	Point(double x, double y);
 	Point(double val);
@@ -37,7 +38,7 @@ public:
 	Point operator*(double scalar);
 	friend Point operator*(double scalar, const Point& point);
 
-	double x, y, z;
+	double x, y, z, v, w;
 	
 	static double EPSILON;
 };

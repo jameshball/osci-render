@@ -75,11 +75,6 @@ void ShapeVoice::updateSound(juce::SynthesiserSound* sound) {
     }
 }
 
-void ShapeVoice::extInput(juce::AudioSampleBuffer& inputBuffer)
-{
-    exIn = inputBuffer;
-}
-
 void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int startSample, int numSamples) {
     juce::ScopedNoDenormals noDenormals;
 
@@ -101,7 +96,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         double proportionalLength = (traceMax - traceMin) * frameLength;
         lengthIncrement = juce::jmax(proportionalLength / (audioProcessor.currentSampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
 
-        Point channels;
+        Point channels = { 0,0,0 };
         double x = 0.0;
         double y = 0.0;
         double z = 0.0;
@@ -116,16 +111,17 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
                 vars.sampleRate = audioProcessor.currentSampleRate;
                 vars.frequency = actualFrequency;
                 std::copy(std::begin(audioProcessor.luaValues), std::end(audioProcessor.luaValues), std::begin(vars.sliders));
-                if (exIn.getNumChannels() > 1 && exIn.getNumSamples() >= startSample + numSamples) {
-                    vars.ext_x = exIn.getSample(0, sample);
-                    vars.ext_y = exIn.getSample(1, sample);
-                }
+                vars.ext_x = outputBuffer.getSample(0, sample);
+                vars.ext_y = outputBuffer.getSample(1, sample);
                 channels = parser->nextSample(L, vars);
-            } else if (currentShape < frame.size()) {
-                auto& shape = frame[currentShape];
-                double length = shape->length();
-                double drawingProgress = length == 0.0 ? 1 : shapeDrawn / length;
-                channels = shape->nextVector(drawingProgress);
+            } else {
+                outputBuffer.clear();
+                if (currentShape < frame.size()) {
+                    auto& shape = frame[currentShape];
+                    double length = shape->length();
+                    double drawingProgress = length == 0.0 ? 1 : shapeDrawn / length;
+                    channels = shape->nextVector(drawingProgress);
+                }
             }
         }
 
