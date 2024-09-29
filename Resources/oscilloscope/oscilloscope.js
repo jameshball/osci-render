@@ -165,6 +165,7 @@ var Render =
 		this.outputShader.uTexture2 = gl.getUniformLocation(this.outputShader, "uTexture2");
 		this.outputShader.uTexture3 = gl.getUniformLocation(this.outputShader, "uTexture3");
 		this.outputShader.uExposure = gl.getUniformLocation(this.outputShader, "uExposure");
+        this.outputShader.uSaturation = gl.getUniformLocation(this.outputShader, "uSaturation");
 		this.outputShader.uColour = gl.getUniformLocation(this.outputShader, "uColour");
 		this.outputShader.uResizeForCanvas = gl.getUniformLocation(this.outputShader, "uResizeForCanvas");
 
@@ -302,6 +303,7 @@ var Render =
 		var brightness = Math.pow(2, controls.brightness-2.0);
 		//if (controls.disableFilter) brightness *= Filter.steps;
 		gl.uniform1f(this.outputShader.uExposure, brightness);
+        gl.uniform1f(this.outputShader.uSaturation, controls.saturation);
 		gl.uniform1f(this.outputShader.uResizeForCanvas, this.lineTexture.width/1024);
 		var colour = this.getColourFromHue(controls.hue);
 		gl.uniform3fv(this.outputShader.uColour, colour);
@@ -677,6 +679,7 @@ function doScriptProcessor(bufferBase64) {
 			controls.brightness = settings.brightness;
 			controls.intensity = settings.intensity;
 			controls.persistence = settings.persistence;
+            controls.saturation = settings.saturation;
 			controls.hue = settings.hue;
 			controls.disableFilter = !settings.upsampling;
 			let numChannels = settings.numChannels;

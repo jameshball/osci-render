@@ -8,6 +8,7 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& parameters, int num
     addAndMakeVisible(intensity);
 	addAndMakeVisible(persistence);
     addAndMakeVisible(hue);
+    addAndMakeVisible(saturation);
     addAndMakeVisible(graticuleToggle);
     addAndMakeVisible(smudgeToggle);
     addAndMakeVisible(upsamplingToggle);
@@ -16,6 +17,7 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& parameters, int num
     intensity.setSliderOnValueChange();
     persistence.setSliderOnValueChange();
     hue.setSliderOnValueChange();
+    saturation.setSliderOnValueChange();
 }
 
 VisualiserSettings::~VisualiserSettings() {}
@@ -27,6 +29,7 @@ void VisualiserSettings::resized() {
     intensity.setBounds(area.removeFromTop(rowHeight));
     persistence.setBounds(area.removeFromTop(rowHeight));
     hue.setBounds(area.removeFromTop(rowHeight));
+    saturation.setBounds(area.removeFromTop(rowHeight));
     graticuleToggle.setBounds(area.removeFromTop(rowHeight));
     smudgeToggle.setBounds(area.removeFromTop(rowHeight));
     upsamplingToggle.setBounds(area.removeFromTop(rowHeight));
@@ -37,6 +40,7 @@ juce::var VisualiserSettings::getSettings() {
     settings->setProperty("brightness", parameters.brightnessEffect->getActualValue() - 2);
     settings->setProperty("intensity", parameters.intensityEffect->getActualValue() / 100);
     settings->setProperty("persistence", parameters.persistenceEffect->getActualValue() - 1.33);
+    settings->setProperty("saturation", parameters.saturationEffect->getActualValue());
     settings->setProperty("hue", parameters.hueEffect->getActualValue());
     settings->setProperty("graticule", parameters.graticuleEnabled->getBoolValue());
     settings->setProperty("smudges", parameters.smudgesEnabled->getBoolValue());

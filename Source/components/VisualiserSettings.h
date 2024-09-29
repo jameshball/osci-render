@@ -51,6 +51,14 @@ public:
             VERSION_HINT, 3.0, 0.0, 10.0
         )
     );
+    std::shared_ptr<Effect> saturationEffect = std::make_shared<Effect>(
+        new EffectParameter(
+            "Saturation",
+            "Controls how saturated the colours are on the oscilloscope.",
+            "saturation",
+            VERSION_HINT, 1.0, 0.0, 5.0
+        )
+    );
 };
 
 class VisualiserSettings : public juce::Component {
@@ -69,6 +77,7 @@ private:
     EffectComponent intensity{*parameters.intensityEffect};
     EffectComponent persistence{*parameters.persistenceEffect};
     EffectComponent hue{*parameters.hueEffect};
+    EffectComponent saturation{*parameters.saturationEffect};
     
     jux::SwitchButton graticuleToggle{parameters.graticuleEnabled};
     jux::SwitchButton smudgeToggle{parameters.smudgesEnabled};

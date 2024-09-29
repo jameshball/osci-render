@@ -153,6 +153,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     permanentEffects.push_back(visualiserParameters.intensityEffect);
     permanentEffects.push_back(visualiserParameters.persistenceEffect);
     permanentEffects.push_back(visualiserParameters.hueEffect);
+    permanentEffects.push_back(visualiserParameters.saturationEffect);
 
     for (int i = 0; i < 26; i++) {
         addLuaSlider();
