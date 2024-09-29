@@ -215,7 +215,7 @@ var Render =
 		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
 
 
-		this.scratchVertices = new Float32Array(8*nPoints);
+		this.scratchVertices = new Float32Array(12*nPoints);
 	},
 
 	setupTextures : function()
