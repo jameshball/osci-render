@@ -94,9 +94,6 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             outputBuffer.clear(startSample, numSamples);
         }
     }
-    double x = 0.0;
-    double y = 0.0;
-    double z = 0.0;
 
     for (auto sample = startSample; sample < startSample + numSamples; ++sample) {
         bool traceMinEnabled = audioProcessor.traceMin->enabled->getBoolValue();
@@ -109,9 +106,6 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         lengthIncrement = juce::jmax(proportionalLength / (audioProcessor.currentSampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
 
         Point channels = { 0,0,0 };
-        x = 0.0;
-        y = 0.0;
-        z = 0.0;
 
         bool renderingSample = true;
 
@@ -135,10 +129,6 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
                 }
             }
         }
-
-        x = channels.x;
-        y = channels.y;
-        z = channels.z;
 
         time += 1.0 / audioProcessor.currentSampleRate;
 
