@@ -43,7 +43,6 @@ var Filter =
 
 	generateSmoothedSamples : function (oldSamples, samples, smoothedSamples)
 	{
-		//this.createLanczosKernel();
 		var bufferSize = this.bufferSize;
 		var allSamples = this.allSamples;
 		var nSmoothedSamples = this.nSmoothedSamples;
@@ -56,26 +55,6 @@ var Filter =
 			allSamples[i] = oldSamples[i];
 			allSamples[bufferSize+i] = samples[i];
 		}
-
-		/*for (var s= -a+1; s<a; s++)
-		{
-			for (var r=0; r<steps; r++)
-			{
-				if (r==0 && !(s==0)) continue;
-				var kernelPosition = -r+s*steps;
-				if (kernelPosition<0) k = K[-kernelPosition];
-				else k = K[kernelPosition];
-
-				var i = r;
-				var pStart = bufferSize - 2*a + s;
-				var pEnd = pStart + bufferSize;
-				for (var p=pStart; p<pEnd; p++)
-				{
-					smoothedSamples[i] += k * allSamples[p];
-					i += steps;
-				}
-			}
-		}*/
 
 		var pStart = bufferSize - 2*a;
 		var pEnd = pStart + bufferSize;
@@ -424,7 +403,7 @@ var Render =
 		gl.bindTexture(gl.TEXTURE_2D, this.screenTexture);
 		gl.uniform1i(program.uScreen, 0);
 
-		gl.uniform1f(program.uSize, 0.015);
+		gl.uniform1f(program.uSize, controls.focus);
 		gl.uniform1f(program.uGain, Math.pow(2.0,controls.mainGain)*450/512);
 		if (controls.invertXY) gl.uniform1f(program.uInvert, -1.0);
 		else gl.uniform1f(program.uInvert, 1.0);
@@ -680,6 +659,7 @@ function doScriptProcessor(bufferBase64) {
 			controls.intensity = settings.intensity;
 			controls.persistence = settings.persistence;
             controls.saturation = settings.saturation;
+            controls.focus = settings.focus;
 			controls.hue = settings.hue;
 			controls.disableFilter = !settings.upsampling;
 			let numChannels = settings.numChannels;

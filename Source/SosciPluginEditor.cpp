@@ -61,9 +61,9 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p)
     visualiserSettingsWindow.setUsingNativeTitleBar(true);
 #endif
     visualiserSettings.setLookAndFeel(&getLookAndFeel());
-    visualiserSettings.setSize(550, 280);
+    visualiserSettings.setSize(550, 340);
     visualiserSettingsWindow.setContentNonOwned(&visualiserSettings, true);
-    visualiserSettingsWindow.centreWithSize(550, 280);
+    visualiserSettingsWindow.centreWithSize(550, 340);
 
     setSize(750, 750);
     setResizable(true, true);

@@ -59,6 +59,14 @@ public:
             VERSION_HINT, 1.0, 0.0, 5.0
         )
     );
+    std::shared_ptr<Effect> focusEffect = std::make_shared<Effect>(
+        new EffectParameter(
+            "Focus",
+            "Controls how focused the electron beam of the oscilloscope is.",
+            "focus",
+            VERSION_HINT, 1.0, 0.01, 10.0
+        )
+    );
 };
 
 class VisualiserSettings : public juce::Component {
@@ -78,6 +86,7 @@ private:
     EffectComponent persistence{*parameters.persistenceEffect};
     EffectComponent hue{*parameters.hueEffect};
     EffectComponent saturation{*parameters.saturationEffect};
+    EffectComponent focus{*parameters.focusEffect};
     
     jux::SwitchButton graticuleToggle{parameters.graticuleEnabled};
     jux::SwitchButton smudgeToggle{parameters.smudgesEnabled};

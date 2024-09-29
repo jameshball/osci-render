@@ -106,6 +106,7 @@
         brightness : 0.0,
         intensity: 0.02,
         saturation: 1.0,
+        focus: 0.01,
         hue : 125,
         invertXY : false,
         grid : true,
@@ -261,19 +262,15 @@
         vec2 dir = (aEndPos-aStartPos)*uGain;
         uvl.z = length(dir);
 
-        if (uvl.z > EPS)
-        {
+        if (uvl.z > EPS) {
             dir = dir / uvl.z;
-            vSize = 0.006/pow(uvl.z,0.08);
-        }
-        else
-        {
-        // If the segment is too short, just draw a square
+        } else {
+            // If the segment is too short, just draw a square
             dir = vec2(1.0, 0.0);
-            vSize = 0.006/pow(EPS,0.08);
         }
 
         vSize = uSize;
+        float intensity = 0.015 * uIntensity / uSize;
         vec2 norm = vec2(-dir.y, dir.x);
 
         if (idx >= 2.0) {
@@ -291,7 +288,7 @@
         float side = (mod(idx, 2.0)-0.5)*2.0;
         uvl.y = side * vSize;
 
-        uvl.w *= uIntensity * mix(1.0-uFadeAmount, 1.0, floor(aIdx / 4.0 + 0.5)/uNEdges);
+        uvl.w *= intensity * mix(1.0-uFadeAmount, 1.0, floor(aIdx / 4.0 + 0.5)/uNEdges);
 
         vec4 pos = vec4((current+(tang*dir+norm*side)*vSize)*uInvert,0.0,1.0);
         gl_Position = pos;
