@@ -1,7 +1,7 @@
 #include "../LookAndFeel.h"
 #include "VisualiserComponent.h"
 
-VisualiserComponent::VisualiserComponent(SampleRateManager& sampleRateManager, ConsumerManager& consumerManager, VisualiserSettings& settings, VisualiserComponent* parent, bool useOldVisualiser) : settings(settings), backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), sampleRateManager(sampleRateManager), consumerManager(consumerManager), oldVisualiser(useOldVisualiser), juce::Thread("VisualiserComponent"), parent(parent) {    
+VisualiserComponent::VisualiserComponent(SampleRateManager& sampleRateManager, ConsumerManager& consumerManager, VisualiserSettings& settings, VisualiserComponent* parent, bool useOldVisualiser, bool visualiserOnly) : settings(settings), backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), sampleRateManager(sampleRateManager), consumerManager(consumerManager), oldVisualiser(useOldVisualiser), visualiserOnly(visualiserOnly), juce::Thread("VisualiserComponent"), parent(parent) {
     resetBuffer();
     if (!oldVisualiser) {
         initialiseBrowser();
@@ -319,6 +319,9 @@ void VisualiserComponent::initialiseBrowser() {
         })
         .withNativeFunction("sampleRate", [this](auto& var, auto complete) {
             complete(sampleRate);
+        })
+        .withNativeFunction("isVisualiserOnly", [this](auto& var, auto complete) {
+            complete(visualiserOnly);
         })
     );
 

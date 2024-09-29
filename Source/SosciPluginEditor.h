@@ -29,7 +29,7 @@ public:
 
     VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.parameters, 3);
     SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings");
-    VisualiserComponent visualiser{audioProcessor, audioProcessor, visualiserSettings, nullptr, audioProcessor.parameters.legacyVisualiserEnabled->getBoolValue()};
+    VisualiserComponent visualiser{audioProcessor, audioProcessor, visualiserSettings, nullptr, false, true};
 
     std::unique_ptr<juce::FileChooser> chooser;
     SosciMainMenuBarModel menuBarModel{*this};

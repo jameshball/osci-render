@@ -18,7 +18,7 @@ enum class FullScreenMode {
 class VisualiserWindow;
 class VisualiserComponent : public juce::Component, public juce::Timer, public juce::Thread, public juce::MouseListener, public juce::SettableTooltipClient, public juce::AsyncUpdater {
 public:
-    VisualiserComponent(SampleRateManager& sampleRateManager, ConsumerManager& consumerManager, VisualiserSettings& settings, VisualiserComponent* parent = nullptr, bool useOldVisualiser = false);
+    VisualiserComponent(SampleRateManager& sampleRateManager, ConsumerManager& consumerManager, VisualiserSettings& settings, VisualiserComponent* parent = nullptr, bool useOldVisualiser = false, bool visualiserOnly = false);
     ~VisualiserComponent() override;
 
     std::function<void()> openSettings;
@@ -60,6 +60,8 @@ private:
     std::atomic<int> lastMouseY;
     
     std::atomic<bool> oldVisualiser;
+    
+    bool visualiserOnly;
     
 	juce::CriticalSection lock;
     std::vector<Point> buffer;

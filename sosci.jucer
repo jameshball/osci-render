@@ -5,7 +5,8 @@
               aaxIdentifier="sh.ball.sosci" cppLanguageStandard="20" projectLineFeed="&#10;"
               headerPath="./include" version="1.0.0" companyName="James H Ball"
               companyWebsite="https://osci-render.com" companyEmail="james@ball.sh"
-              defines="NOMINMAX=1" pluginAUMainType="'aumf'">
+              defines="NOMINMAX=1" pluginManufacturerCode="Jhba" pluginCode="Sosc"
+              pluginAUMainType="'aufx'">
   <MAINGROUP id="j5Ge2T" name="sosci">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
       <GROUP id="{525C568C-29E9-D0A2-9773-8A04981C5575}" name="images">
@@ -116,8 +117,8 @@
     <LINUX_MAKE targetFolder="Builds/sosci/LinuxMakefile" smallIcon="pSc1mq"
                 bigIcon="pSc1mq">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render"/>
-        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="sosci"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="sosci"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
@@ -139,8 +140,8 @@
     <VS2022 targetFolder="Builds/sosci/VisualStudio2022" smallIcon="pSc1mq"
             bigIcon="pSc1mq">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render"/>
-        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render" alwaysGenerateDebugSymbols="1"
+        <CONFIGURATION isDebug="1" name="Debug" targetName="sosci"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="sosci" alwaysGenerateDebugSymbols="1"
                        debugInformationFormat="ProgramDatabase"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
@@ -164,8 +165,8 @@
                extraDefs="JUCE_SILENCE_XCODE_15_LINKER_WARNING=1" smallIcon="pSc1mq"
                bigIcon="pSc1mq" applicationCategory="public.app-category.music">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render"/>
-        <CONFIGURATION name="Release" targetName="osci-render"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="sosci"/>
+        <CONFIGURATION name="Release" targetName="sosci"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>

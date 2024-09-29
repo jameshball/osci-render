@@ -180,6 +180,13 @@
         }
     });
     
+    Juce.getNativeFunction("isVisualiserOnly")().then(visualiserOnly => {
+        if (visualiserOnly) {
+            popout.remove();
+            fullscreen.remove();
+        }
+    });
+    
     window.__JUCE__.backend.addEventListener("childPresent", hasChild => {
         openInAnotherWindow = hasChild;
         if (hasChild) {
