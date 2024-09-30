@@ -142,7 +142,13 @@ OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
 }
 
 bool OscirenderAudioProcessorEditor::isBinaryFile(juce::String name) {
-    return name.endsWith(".gpla") || name.endsWith(".gif") || name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".wav") || name.endsWith(".aiff");
+    return name.endsWithIgnoreCase(".gpla")
+        || name.endsWithIgnoreCase(".gif")
+        || name.endsWithIgnoreCase(".png")
+        || name.endsWithIgnoreCase(".jpg")
+        || name.endsWithIgnoreCase(".jpeg")
+        || name.endsWithIgnoreCase(".wav")
+        || name.endsWithIgnoreCase(".aiff");
 }
 
 // parsersLock must be held

@@ -44,6 +44,17 @@ ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, ju
 
             gd_close_gif(gif);
         }
+        else {
+            width = 128;
+            height = 128;
+            visited = std::vector<bool>(width * height, false);
+            for (int fr = 0; fr < 14; fr++) {
+                frames.emplace_back(std::vector<uint8_t>(width * height));
+                for (int px = 0; px < width * height; px++) {
+                    frames[fr][px] = ((px + 9 * fr) % 126) * 2;
+                }
+            }
+        }
     } else {
         juce::Image image = juce::ImageFileFormat::loadFrom(file);
         image.desaturate();

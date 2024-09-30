@@ -7,6 +7,7 @@ FileParser::FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce
 
 void FileParser::parse(juce::String fileId, juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font font) {
 	juce::SpinLock::ScopedLockType scope(lock);
+	extension = extension.toLowerCase();
 
 	if (extension == ".lua" && lua != nullptr && lua->isFunctionValid()) {
 		fallbackLuaScript = lua->getScript();

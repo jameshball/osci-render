@@ -2,6 +2,10 @@
 #include <JuceHeader.h>
 #include <regex>
 #include <numbers>
+#include "lua.hpp"
+#include "../shape/Line.h"
+#include "../shape/CircleArc.h"
+#include "../shape/QuadraticBezierCurve.h"
 #include "../shape/Shape.h"
 
 class ErrorListener {
@@ -49,6 +53,9 @@ struct LuaVariables {
 	double phase = 0;
 	double sampleRate = 0;
 	double frequency = 0;
+
+	double ext_x = 0;
+	double ext_y = 0;
 
 	// x, y, z are only used for effects
 	bool isEffect = false;

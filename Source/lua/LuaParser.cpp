@@ -1,8 +1,4 @@
 #include "LuaParser.h"
-#include "luaimport.h"
-#include "../shape/Line.h"
-#include "../shape/CircleArc.h"
-#include "../shape/QuadraticBezierCurve.h"
 
 std::function<void(const std::string&)> LuaParser::onPrint;
 std::function<void()> LuaParser::onClear;
@@ -325,7 +321,7 @@ static int luaPrint(lua_State* L) {
     int nargs = lua_gettop(L);
 
     for (int i = 1; i <= nargs; ++i) {
-        LuaParser::onPrint(luaL_tolstring(L, i, nullptr));
+        LuaParser::onPrint(lua_tolstring(L, i, nullptr));
         lua_pop(L, 1);
     }
 
@@ -440,9 +436,12 @@ void LuaParser::setGlobalVariables(lua_State*& L, LuaVariables& vars) {
 		setGlobalVariable(L, SLIDER_NAMES[i], vars.sliders[i]);
     }
 
+    setGlobalVariable(L, "ext_x", vars.ext_x);
+    setGlobalVariable(L, "ext_y", vars.ext_y);
+
     if (vars.isEffect) {
-		setGlobalVariable(L, "x", vars.x);
-		setGlobalVariable(L, "y", vars.y);
+        setGlobalVariable(L, "x", vars.x);
+        setGlobalVariable(L, "y", vars.y);
 		setGlobalVariable(L, "z", vars.z);
     }
 }
@@ -468,7 +467,7 @@ void LuaParser::revertToFallback(lua_State*& L) {
 }
 
 void LuaParser::readTable(lua_State*& L, std::vector<float>& values) {
-    auto length = lua_rawlen(L, -1);
+    auto length = lua_objlen(L, -1);
 
     for (int i = 1; i <= length; i++) {
         lua_pushinteger(L, i);
@@ -493,7 +492,7 @@ std::vector<float> LuaParser::run(lua_State*& L, LuaVariables& vars) {
 	setGlobalVariables(L, vars);
     
 	// Get the function from the registry
-	lua_geti(L, LUA_REGISTRYINDEX, functionRef);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, functionRef);
 
     setMaximumInstructions(L, 5000000);
     

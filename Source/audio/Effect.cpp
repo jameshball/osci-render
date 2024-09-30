@@ -23,10 +23,10 @@ Effect::Effect(EffectParameter* parameter) : Effect([](int index, Point input, c
 
 Point Effect::apply(int index, Point input, double volume) {
 	animateValues(volume);
-	if (application) {
-		return application(index, input, actualValues, sampleRate);
-	} else if (effectApplication != nullptr) {
+	if (effectApplication != nullptr) {
 		return effectApplication->apply(index, input, actualValues, sampleRate);
+	} else if (application) {
+		return application(index, input, actualValues, sampleRate);
 	}
 	return input;
 }

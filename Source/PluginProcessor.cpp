@@ -629,11 +629,13 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     juce::AudioBuffer<float> outputBuffer3d = juce::AudioBuffer<float>(3, buffer.getNumSamples());
     outputBuffer3d.clear();
 
-    if (usingInput && totalNumInputChannels >= 2) {
-        for (auto channel = 0; channel < juce::jmin(2, totalNumInputChannels); channel++) {
-            outputBuffer3d.copyFrom(channel, 0, inputBuffer, channel, 0, buffer.getNumSamples());
-        }
+    // Put the external input data into the output buffer in case the synth voice is a Lua synth.
+    // It will be cleared by the synth if this is not the case.
+    for (int channel = 0; channel < juce::jmin(2, totalNumInputChannels); channel++) {
+        outputBuffer3d.copyFrom(channel, 0, inputBuffer, channel, 0, buffer.getNumSamples());
+    }
 
+    if (usingInput && totalNumInputChannels >= 2) {
         // handle all midi messages
         auto midiIterator = midiMessages.cbegin();
         std::for_each(midiIterator,
@@ -658,13 +660,14 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     auto* channelData = buffer.getArrayOfWritePointers();
     
     
-	for (int sample = 0; sample < buffer.getNumSamples(); ++sample) {
+    for (int sample = 0; sample < buffer.getNumSamples(); ++sample) {
 
         // Update frame animation
         if (animateFrames->getValue()) {
             if (animationSyncBPM->getValue()) {
                 animationTime = playTimeBeats;
-            } else {
+            }
+            else {
                 animationTime = playTimeSeconds;
             }
 
@@ -676,7 +679,8 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
                 auto img = sounds[currentFile]->parser->getImg();
                 if (lineArt != nullptr) {
                     lineArt->setFrame(animFrame);
-                } else if (img != nullptr) {
+                }
+                else if (img != nullptr) {
                     img->setFrame(animFrame);
                 }
             }
@@ -687,7 +691,8 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         if (totalNumInputChannels >= 2) {
             left = inputBuffer.getSample(0, sample);
             right = inputBuffer.getSample(1, sample);
-        } else if (totalNumInputChannels == 1) {
+        }
+        else if (totalNumInputChannels == 1) {
             left = inputBuffer.getSample(0, sample);
             right = inputBuffer.getSample(0, sample);
         }
@@ -701,26 +706,27 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         currentVolume = std::sqrt(squaredVolume);
         currentVolume = juce::jlimit(0.0, 1.0, currentVolume);
 
-        Point channels = { outputBuffer3d.getSample(0, sample), outputBuffer3d.getSample(1, sample), outputBuffer3d.getSample(2, sample) };
+        double sx = outputBuffer3d.getSample(0, sample);
+        double sy = outputBuffer3d.getSample(1, sample);
+        double sz = outputBuffer3d.getSample(2, sample);
+        Point channels = { sx, sy, sz, left, right };
 
-        {
-            juce::SpinLock::ScopedLockType lock1(parsersLock);
-            juce::SpinLock::ScopedLockType lock2(effectsLock);
-            if (volume > EPSILON) {
-                for (auto& effect : toggleableEffects) {
-                    if (effect->enabled->getValue()) {
-                        channels = effect->apply(sample, channels, currentVolume);
-                    }
+        juce::SpinLock::ScopedLockType lock1(parsersLock);
+        juce::SpinLock::ScopedLockType lock2(effectsLock);
+        if (volume > EPSILON) {
+            for (auto& effect : toggleableEffects) {
+                if (effect->enabled->getValue()) {
+                    channels = effect->apply(sample, channels, currentVolume);
                 }
             }
-            for (auto& effect : permanentEffects) {
-                channels = effect->apply(sample, channels, currentVolume);
-            }
-            auto lua = currentFile >= 0 ? sounds[currentFile]->parser->getLua() : nullptr;
-            if (lua != nullptr || custom->enabled->getBoolValue()) {
-                for (auto& effect : luaEffects) {
-                    effect->apply(sample, channels, currentVolume);
-                }
+        }
+        for (auto& effect : permanentEffects) {
+            channels = effect->apply(sample, channels, currentVolume);
+        }
+        auto lua = currentFile >= 0 ? sounds[currentFile]->parser->getLua() : nullptr;
+        if (lua != nullptr || custom->enabled->getBoolValue()) {
+            for (auto& effect : luaEffects) {
+                effect->apply(sample, channels, currentVolume);
             }
         }
 

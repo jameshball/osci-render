@@ -13,7 +13,7 @@ bool ShapeVoice::canPlaySound(juce::SynthesiserSound* sound) {
 void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::SynthesiserSound* sound, int currentPitchWheelPosition) {
     this->velocity = velocity;
     pitchWheelMoved(currentPitchWheelPosition);
-    auto* shapeSound = dynamic_cast<ShapeSound*>(sound);
+    ShapeSound* shapeSound = dynamic_cast<ShapeSound*>(sound);
 
     currentlyPlaying = true;
     this->sound = shapeSound;
@@ -86,6 +86,15 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         actualFrequency = audioProcessor.frequency;
     }
 
+    std::shared_ptr<FileParser> parser;
+
+    if (sound.load() != nullptr) {
+        parser = sound.load()->parser;
+        if (!(parser != nullptr && parser->isSample())) {
+            outputBuffer.clear(startSample, numSamples);
+        }
+    }
+
     for (auto sample = startSample; sample < startSample + numSamples; ++sample) {
         bool traceMinEnabled = audioProcessor.traceMin->enabled->getBoolValue();
         bool traceMaxEnabled = audioProcessor.traceMax->enabled->getBoolValue();
@@ -96,10 +105,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         double proportionalLength = (traceMax - traceMin) * frameLength;
         lengthIncrement = juce::jmax(proportionalLength / (audioProcessor.currentSampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
 
-        Point channels;
-        double x = 0.0;
-        double y = 0.0;
-        double z = 0.0;
+        Point channels = { 0,0,0 };
 
         bool renderingSample = true;
 
@@ -111,19 +117,18 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
                 vars.sampleRate = audioProcessor.currentSampleRate;
                 vars.frequency = actualFrequency;
                 std::copy(std::begin(audioProcessor.luaValues), std::end(audioProcessor.luaValues), std::begin(vars.sliders));
-
+                vars.ext_x = outputBuffer.getSample(0, sample);
+                vars.ext_y = outputBuffer.getSample(1, sample);
                 channels = parser->nextSample(L, vars);
-            } else if (currentShape < frame.size()) {
-                auto& shape = frame[currentShape];
-                double length = shape->length();
-                double drawingProgress = length == 0.0 ? 1 : shapeDrawn / length;
-                channels = shape->nextVector(drawingProgress);
+            } else {
+                if (currentShape < frame.size()) {
+                    auto& shape = frame[currentShape];
+                    double length = shape->length();
+                    double drawingProgress = length == 0.0 ? 1 : shapeDrawn / length;
+                    channels = shape->nextVector(drawingProgress);
+                }
             }
         }
-
-        x = channels.x;
-        y = channels.y;
-        z = channels.z;
 
         time += 1.0 / audioProcessor.currentSampleRate;
 
@@ -138,14 +143,16 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         gain *= velocity;
 
         if (numChannels >= 3) {
-            outputBuffer.addSample(0, sample, x * gain);
-            outputBuffer.addSample(1, sample, y * gain);
-            outputBuffer.addSample(2, sample, z * gain);
-        } else if (numChannels == 2) {
-            outputBuffer.addSample(0, sample, x * gain);
-            outputBuffer.addSample(1, sample, y * gain);
-        } else if (numChannels == 1) {
-            outputBuffer.addSample(0, sample, x * gain);
+            outputBuffer.addSample(0, sample, channels.x * gain);
+            outputBuffer.addSample(1, sample, channels.y * gain);
+            outputBuffer.addSample(2, sample, channels.z * gain);
+        }
+        else if (numChannels == 2) {
+            outputBuffer.addSample(0, sample, channels.x * gain);
+            outputBuffer.addSample(1, sample, channels.y * gain);
+        }
+        else if (numChannels == 1) {
+            outputBuffer.addSample(0, sample, channels.x * gain);
         }
 
         double traceMinValue = audioProcessor.traceMin->getActualValue();
@@ -162,7 +169,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         double drawnFrameLength = traceMaxEnabled ? actualTraceMax * frameLength : frameLength;
 
         if (!renderingSample && frameDrawn >= drawnFrameLength) {
-            if (sound.load() != nullptr && currentlyPlaying) {
+            if (sound.load() != nullptr && currentlyPlaying) { 
                 frameLength = sound.load()->updateFrame(frame);
             }
             frameDrawn -= drawnFrameLength;
@@ -180,10 +187,10 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             }
         }
     }
+    return;
 }
 
 void ShapeVoice::stopNote(float velocity, bool allowTailOff) {
-    currentlyPlaying = false;
     waitingForRelease = false;
     if (!allowTailOff) {
         noteStopped();
@@ -192,6 +199,7 @@ void ShapeVoice::stopNote(float velocity, bool allowTailOff) {
 
 void ShapeVoice::noteStopped() {
     clearCurrentNote();
+    currentlyPlaying = false;
     sound = nullptr;
 }
 
