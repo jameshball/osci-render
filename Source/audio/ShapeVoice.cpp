@@ -143,14 +143,16 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         gain *= velocity;
 
         if (numChannels >= 3) {
-            outputBuffer.addSample(0, sample, x * gain);
-            outputBuffer.addSample(1, sample, y * gain);
-            outputBuffer.addSample(2, sample, z * gain);
-        } else if (numChannels == 2) {
-            outputBuffer.addSample(0, sample, x * gain);
-            outputBuffer.addSample(1, sample, y * gain);
-        } else if (numChannels == 1) {
-            outputBuffer.addSample(0, sample, x * gain);
+            outputBuffer.addSample(0, sample, channels.x * gain);
+            outputBuffer.addSample(1, sample, channels.y * gain);
+            outputBuffer.addSample(2, sample, channels.z * gain);
+        }
+        else if (numChannels == 2) {
+            outputBuffer.addSample(0, sample, channels.x * gain);
+            outputBuffer.addSample(1, sample, channels.y * gain);
+        }
+        else if (numChannels == 1) {
+            outputBuffer.addSample(0, sample, channels.x * gain);
         }
 
         double traceMinValue = audioProcessor.traceMin->getActualValue();
