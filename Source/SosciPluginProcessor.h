@@ -58,6 +58,8 @@ public:
     std::atomic<double> currentSampleRate = 0.0;
     juce::SpinLock effectsLock;
     VisualiserParameters parameters;
+    
+    std::atomic<bool> forceDisableBrightnessInput = false;
 
     // shouldn't be accessed by audio thread, but needs to persist when GUI is closed
     // so should only be accessed by message thread
@@ -65,6 +67,8 @@ public:
     juce::File lastOpenedDirectory = juce::File::getSpecialLocation(juce::File::userHomeDirectory);
 
 private:
+    
+    bool brightnessEnabled = false;
     
     std::vector<BooleanParameter*> booleanParameters;
     std::vector<FloatParameter*> floatParameters;

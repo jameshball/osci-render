@@ -1,16 +1,13 @@
 #include "SosciMainMenuBarModel.h"
 #include "../SosciPluginEditor.h"
+#include "../SosciPluginProcessor.h"
 
-SosciMainMenuBarModel::SosciMainMenuBarModel(SosciPluginEditor& editor) : editor(editor) {}
+SosciMainMenuBarModel::SosciMainMenuBarModel(SosciPluginEditor& editor, SosciAudioProcessor& processor) : editor(editor), processor(processor) {}
 
 SosciMainMenuBarModel::~SosciMainMenuBarModel() {}
 
 juce::StringArray SosciMainMenuBarModel::getMenuBarNames() {
-    if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-        return juce::StringArray("File", "About", "Audio");
-    } else {
-        return juce::StringArray("File", "About");
-    }
+    return juce::StringArray("File", "About", "Audio");
 }
 
 juce::PopupMenu SosciMainMenuBarModel::getMenuForIndex(int topLevelMenuIndex, const juce::String& menuName) {
@@ -26,7 +23,10 @@ juce::PopupMenu SosciMainMenuBarModel::getMenuForIndex(int topLevelMenuIndex, co
     } else if (topLevelMenuIndex == 1) {
         menu.addItem(1, "About sosci");
     } else if (topLevelMenuIndex == 2) {
-        menu.addItem(1, "Settings");
+        menu.addItem(1, "Force Disable Brightness Input", true, processor.forceDisableBrightnessInput);
+        if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
+            menu.addItem(2, "Settings...");
+        }
     }
 
     return menu;
@@ -71,7 +71,17 @@ void SosciMainMenuBarModel::menuItemSelected(int menuItemID, int topLevelMenuInd
             juce::DialogWindow* dw = options.launchAsync();
         } break;
         case 2:
-            editor.openAudioSettings();
+            switch (menuItemID) {
+                case 1:
+                    processor.forceDisableBrightnessInput = !processor.forceDisableBrightnessInput;
+                    menuItemsChanged();
+                    break;
+                case 2:
+                    editor.openAudioSettings();
+                    break;
+                default:
+                    break;
+            }
             break;
         default:
             break;

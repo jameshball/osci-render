@@ -13,8 +13,7 @@
 //==============================================================================
 SosciAudioProcessor::SosciAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
-     : AudioProcessor (BusesProperties().withInput("Input", juce::AudioChannelSet::stereo(), true)
-                                        .withInput("Brightness", juce::AudioChannelSet::mono(), true)
+     : AudioProcessor (BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(3), true)
                                         .withOutput("Output", juce::AudioChannelSet::stereo(), true))
 #endif
     {
@@ -121,10 +120,7 @@ void SosciAudioProcessor::releaseResources() {
 }
 
 bool SosciAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
-    auto numIns  = layouts.getMainInputChannels();
-    auto numOuts = layouts.getMainOutputChannels();
-
-    return numIns >= 2 && numOuts >= 2;
+    return true;
 }
 
 // effectsLock should be held when calling this
@@ -171,21 +167,30 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     juce::ScopedNoDenormals noDenormals;
 
     auto input = getBusBuffer(buffer, true, 0);
-    auto brightness = getBusBuffer(buffer, true, 1);
+    float EPSILON = 0.0001f;
 
     midiMessages.clear();
 
     auto inputArray = input.getArrayOfWritePointers();
-    auto brightnessArray = brightness.getArrayOfWritePointers();
 
 	for (int sample = 0; sample < input.getNumSamples(); ++sample) {
         juce::SpinLock::ScopedLockType scope(consumerLock);
 
         float x = input.getNumChannels() > 0 ? inputArray[0][sample] : 0.0f;
         float y = input.getNumChannels() > 1 ? inputArray[1][sample] : 0.0f;
-        float z = brightness.getNumChannels() > 0 ? brightnessArray[0][sample] : 1.0f;
+        float brightness = 1.0f;
+        if (input.getNumChannels() > 2 && !forceDisableBrightnessInput) {
+            float brightnessChannel = inputArray[2][sample];
+            // Only enable brightness if we actually receive a signal on the brightness channel
+            if (!brightnessEnabled && brightnessChannel > EPSILON) {
+                brightnessEnabled = true;
+            }
+            if (brightnessEnabled) {
+                brightness = brightnessChannel;
+            }
+        }
 
-        Point point = { x, y, z };
+        Point point = { x, y, brightness };
 
         for (auto& effect : allEffects) {
             point = effect->apply(sample, point);

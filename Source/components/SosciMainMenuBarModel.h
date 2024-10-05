@@ -4,9 +4,10 @@
 
 
 class SosciPluginEditor;
+class SosciAudioProcessor;
 class SosciMainMenuBarModel : public juce::MenuBarModel {
 public:
-    SosciMainMenuBarModel(SosciPluginEditor& editor);
+    SosciMainMenuBarModel(SosciPluginEditor& editor, SosciAudioProcessor& processor);
     ~SosciMainMenuBarModel();
 
     juce::StringArray getMenuBarNames() override;
@@ -16,4 +17,5 @@ public:
 
 private:
     SosciPluginEditor& editor;
+    SosciAudioProcessor& processor;
 };

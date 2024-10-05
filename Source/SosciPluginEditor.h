@@ -32,7 +32,7 @@ public:
     VisualiserComponent visualiser{audioProcessor, audioProcessor, visualiserSettings, nullptr, false, true};
 
     std::unique_ptr<juce::FileChooser> chooser;
-    SosciMainMenuBarModel menuBarModel{*this};
+    SosciMainMenuBarModel menuBarModel{*this, audioProcessor};
     juce::MenuBarComponent menuBar;
 
     juce::TooltipWindow tooltipWindow{nullptr, 0};
