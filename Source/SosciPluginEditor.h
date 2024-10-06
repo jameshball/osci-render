@@ -6,6 +6,7 @@
 #include "LookAndFeel.h"
 #include "components/VisualiserSettings.h"
 #include "components/SosciMainMenuBarModel.h"
+#include "components/SvgButton.h"
 
 class SosciPluginEditor : public juce::AudioProcessorEditor {
 public:
@@ -21,6 +22,7 @@ public:
     void updateTitle();
     void openAudioSettings();
     void resetToDefault();
+    void openVisualiserSettings();
 
 private:
     SosciAudioProcessor& audioProcessor;
@@ -36,6 +38,8 @@ public:
     juce::MenuBarComponent menuBar;
 
     juce::TooltipWindow tooltipWindow{nullptr, 0};
+    
+    SvgButton settings{"Settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white};
 
     bool usingNativeMenuBar = false;
 

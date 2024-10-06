@@ -75,6 +75,7 @@
               file="Source/components/SosciMainMenuBarModel.cpp"/>
         <FILE id="EymEr3" name="SosciMainMenuBarModel.h" compile="0" resource="0"
               file="Source/components/SosciMainMenuBarModel.h"/>
+        <FILE id="f2kkHV" name="SvgButton.h" compile="0" resource="0" file="Source/components/SvgButton.h"/>
         <FILE id="qzfstC" name="SwitchButton.h" compile="0" resource="0" file="Source/components/SwitchButton.h"/>
         <FILE id="y3UiR0" name="VisualiserComponent.cpp" compile="1" resource="0"
               file="Source/components/VisualiserComponent.cpp"/>

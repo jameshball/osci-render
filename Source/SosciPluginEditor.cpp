@@ -12,17 +12,8 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p)
 
     setLookAndFeel(&lookAndFeel);
 
-#if JUCE_MAC
-    if (audioProcessor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-        usingNativeMenuBar = true;
-        menuBarModel.setMacMainMenu(&menuBarModel);
-    }
-#endif
-
-    if (!usingNativeMenuBar) {
-        menuBar.setModel(&menuBarModel);
-        addAndMakeVisible(menuBar);
-    }
+    menuBar.setModel(&menuBarModel);
+    addAndMakeVisible(menuBar);
 
     if (juce::JUCEApplicationBase::isStandaloneApp()) {
         if (juce::TopLevelWindow::getNumTopLevelWindows() > 0) {
@@ -42,11 +33,16 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p)
         }
     }
 
+    addAndMakeVisible(settings);
+    
+    settings.onClick = [this] {
+        openVisualiserSettings();
+    };
+    
     addAndMakeVisible(visualiser);
 
     visualiser.openSettings = [this] {
-        visualiserSettingsWindow.setVisible(true);
-        visualiserSettingsWindow.toFront(true);
+        openVisualiserSettings();
     };
 
     visualiser.closeSettings = [this] {
@@ -73,24 +69,18 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p)
 SosciPluginEditor::~SosciPluginEditor() {
     setLookAndFeel(nullptr);
     juce::Desktop::getInstance().setDefaultLookAndFeel(nullptr);
-    
-#if JUCE_MAC
-    if (usingNativeMenuBar) {
-        menuBarModel.setMacMainMenu(nullptr);
-    }
-#endif
 }
 
 void SosciPluginEditor::paint(juce::Graphics& g) {
-    g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
+    g.fillAll(Colours::veryDark);
 }
 
 void SosciPluginEditor::resized() {
     auto area = getLocalBounds();
 
-    if (!usingNativeMenuBar) {
-        menuBar.setBounds(area.removeFromTop(25));
-    }
+    auto topBar = area.removeFromTop(25);
+    settings.setBounds(topBar.removeFromRight(25));
+    menuBar.setBounds(topBar);
 
     visualiser.setBounds(area);
 }
@@ -170,4 +160,9 @@ void SosciPluginEditor::resetToDefault() {
     if (window != nullptr) {
         window->resetToDefaultState();
     }
+}
+
+void SosciPluginEditor::openVisualiserSettings() {
+    visualiserSettingsWindow.setVisible(true);
+    visualiserSettingsWindow.toFront(true);
 }
