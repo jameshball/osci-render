@@ -50,7 +50,8 @@ public:
     std::atomic<bool> active = true;
 
 private:
-    const double BUFFER_LENGTH_SECS = 0.02;
+    // 60fps
+    const double BUFFER_LENGTH_SECS = 1/60.0;
     const double DEFAULT_SAMPLE_RATE = 192000.0;
 
     std::atomic<bool> restartBrowser = false;
