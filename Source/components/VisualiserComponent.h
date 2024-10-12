@@ -43,6 +43,7 @@ public:
     void setVisualiserType(bool oldVisualiser);
     void handleAsyncUpdate() override;
     void toggleRecording();
+    void haltRecording();
 
     VisualiserComponent* parent = nullptr;
     VisualiserComponent* child = nullptr;
@@ -124,6 +125,7 @@ private:
     std::unique_ptr<juce::WebBrowserComponent> oldBrowser = nullptr;
     
     std::unique_ptr<juce::FileChooser> chooser;
+    juce::File tempVideoFile;
     
     void initialiseBrowser();
     void resetBuffer();

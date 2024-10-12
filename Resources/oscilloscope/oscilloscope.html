@@ -139,7 +139,8 @@
         let externalBufferSize = 1920;
         let recording = false;
         let mediaRecorder = undefined;
-        let downloadCallback = undefined;
+        let sendVideoDataCallback = undefined;
+        let finishRecordingCallback = undefined;
         
         const toggleRecording = () => {
             recording = !recording;
@@ -148,19 +149,16 @@
                 const data = [];
                 const stream = canvas.captureStream(60);
                 mediaRecorder = new MediaRecorder(stream);
-                mediaRecorder.ondataavailable = (e) => data.push(e.data);
-                mediaRecorder.onstop = (e) => {
-                    const div = document.getElementById("buttonRow");
-                    var a = document.createElement("a");
-                    const video = new Blob(data, { type: "video/webm;codecs=h264" });
+                mediaRecorder.ondataavailable = (e) => {
                     var reader = new FileReader();
-                    reader.readAsDataURL(video);
+                    reader.readAsDataURL(e.data);
                     reader.onloadend = function() {
                         var dataUrl = reader.result;
                         var base64 = dataUrl.split(',')[1];
-                        downloadCallback(base64);
+                        sendVideoDataCallback(base64);
                     }
                 };
+                mediaRecorder.onstop = (e) => finishRecordingCallback();
                 mediaRecorder.start();
             } else {
                 mediaRecorder.stop();
@@ -242,8 +240,12 @@
             toggleFullscreen();
         });
         
-        downloadCallback = (base64) => {
-            Juce.getNativeFunction("downloadVideo")(base64);
+        finishRecordingCallback = () => {
+            Juce.getNativeFunction("finishRecording")();
+        };
+        
+        sendVideoDataCallback = (base64) => {
+            Juce.getNativeFunction("sendVideoData")(base64);
         };
     </script>
     

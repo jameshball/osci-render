@@ -270,9 +270,7 @@ void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area
 }
 
 void VisualiserComponent::initialiseBrowser() {
-    if (recordingHalted != nullptr) {
-        recordingHalted();
-    }
+    haltRecording();
     oldBrowser = std::move(browser);
     if (oldBrowser != nullptr) {
         removeChildComponent(oldBrowser.get());
@@ -326,18 +324,18 @@ void VisualiserComponent::initialiseBrowser() {
         .withNativeFunction("isVisualiserOnly", [this](auto& var, auto complete) {
             complete(visualiserOnly);
         })
-        .withNativeFunction("downloadVideo", [this](const juce::Array<juce::var>& args, auto complete) {
-            juce::String base64 = args[0].toString();
+        .withNativeFunction("sendVideoData", [this](const juce::Array<juce::var>& args, auto complete) {
+            juce::FileOutputStream stream{tempVideoFile};
+            juce::Base64::convertFromBase64(stream, args[0].toString());
+            stream.flush();
+        })
+        .withNativeFunction("finishRecording", [this](auto& var, auto complete) {
             chooser = std::make_unique<juce::FileChooser>("Save video", juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDesktopDirectory).getChildFile("osci-render.webm"), "*.webm");
             chooser->launchAsync(juce::FileBrowserComponent::saveMode,
-                [base64](const juce::FileChooser& chooser) {
+                [this](const juce::FileChooser& chooser) {
                     juce::File result = chooser.getResult();
                     if (result.getFullPathName().isNotEmpty()) {
-                        juce::FileOutputStream stream(result);
-                        stream.setPosition(0);
-                        stream.truncate();
-                        juce::Base64::convertFromBase64(stream, base64);
-                        stream.flush();
+                        tempVideoFile.moveFileTo(result);
                     }
                 });
         })
@@ -388,7 +386,17 @@ void VisualiserComponent::toggleRecording() {
     if (oldVisualiser) {
         return;
     }
+    tempVideoFile = juce::File::createTempFile(".webm");
     browser->emitEventIfBrowserIsVisible("toggleRecording", juce::var());
+}
+
+void VisualiserComponent::haltRecording() {
+    if (oldVisualiser) {
+        return;
+    }
+    if (recordingHalted != nullptr) {
+        recordingHalted();
+    }
 }
 
 void VisualiserComponent::resized() {
@@ -415,9 +423,7 @@ void VisualiserComponent::childChanged() {
 }
 
 void VisualiserComponent::popoutWindow() {
-    if (recordingHalted != nullptr) {
-        recordingHalted();
-    }
+    haltRecording();
     auto visualiser = new VisualiserComponent(sampleRateManager, consumerManager, settings, this, oldVisualiser);
     visualiser->settings.setLookAndFeel(&getLookAndFeel());
     visualiser->openSettings = openSettings;
