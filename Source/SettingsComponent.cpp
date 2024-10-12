@@ -64,7 +64,7 @@ void SettingsComponent::resized() {
 }
 
 void SettingsComponent::fileUpdated(juce::String fileName) {
-    juce::String extension = fileName.fromLastOccurrenceOf(".", true, false);
+    juce::String extension = fileName.fromLastOccurrenceOf(".", true, false).toLowerCase();
     txt.setVisible(false);
     frame.setVisible(false);
     bool isImage =  extension == ".gif" || extension == ".png" || extension == ".jpg" || extension == ".jpeg";

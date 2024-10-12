@@ -25,7 +25,7 @@ class SvgButton : public juce::DrawableButton, public juce::AudioProcessorParame
 		changeSvgColour(doc.get(), colourOn.withBrightness(0.3f));
 		disabledImageOn = juce::Drawable::createFromSVG(*doc);
         
-        path = normalImage->getOutlineAsPath();
+        basePath = normalImage->getOutlineAsPath();
 
         getLookAndFeel().setColour(juce::DrawableButton::backgroundOnColourId, juce::Colours::transparentWhite);
 
@@ -78,10 +78,20 @@ class SvgButton : public juce::DrawableButton, public juce::AudioProcessorParame
         this->pulseUsed = pulseUsed;
     }
     
+    void resized() override {
+        juce::DrawableButton::resized();
+        if (pulseUsed) {
+            resizedPath = basePath;
+            // scale path to fit image
+            resizedPath.applyTransform(resizedPath.getTransformToScaleToFit(getImageBounds(), true));
+            repaint();
+        }
+    }
+    
     void paintOverChildren(juce::Graphics& g) override {
         if (pulseUsed && getToggleState()) {
             g.setColour(juce::Colours::black.withAlpha(colourFade / 1.5f));
-            g.fillPath(path);
+            g.fillPath(resizedPath);
         }
     }
     
@@ -115,7 +125,8 @@ private:
     float colourFade = 0.0;
     bool pulseUsed = false;
     bool prevToggleState = false;
-    juce::Path path;
+    juce::Path basePath;
+    juce::Path resizedPath;
     juce::Animator pulse = juce::ValueAnimatorBuilder {}
         .withEasing([] (float t) { return std::sin(3.14159 * t) / 2 + 0.5; })
         .withDurationMs(500)

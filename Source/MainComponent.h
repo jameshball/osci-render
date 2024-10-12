@@ -38,9 +38,6 @@ private:
 	juce::ComboBox fileType;
 	juce::TextButton createFile{"Create File"};
 
-	juce::Label frequencyLabel;
-	int callbackIndex = -1;
-
 	AudioRecordingComponent recorder{audioProcessor};
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)

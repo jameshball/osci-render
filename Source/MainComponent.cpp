@@ -146,22 +146,10 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 		repaint();
     });
 
-	addAndMakeVisible(frequencyLabel);
-
-	callbackIndex = audioProcessor.pitchDetector.addCallback(
-		[this](float frequency) {
-			// round to nearest integer
-			int roundedFrequency = static_cast<int>(frequency + 0.5f);
-			frequencyLabel.setText(juce::String(roundedFrequency) + "Hz", juce::dontSendNotification);
-		}
-	);
-
 	addAndMakeVisible(recorder);
 }
 
-MainComponent::~MainComponent() {
-	audioProcessor.pitchDetector.removeCallback(callbackIndex);
-}
+MainComponent::~MainComponent() {}
 
 void MainComponent::updateFileLabel() {
 	showLeftArrow = audioProcessor.getCurrentFileIndex() > 0;
@@ -225,9 +213,6 @@ void MainComponent::resized() {
 	fileType.setBounds(row.removeFromLeft(buttonWidth / 2));
 	row.removeFromLeft(rowPadding);
 	createFile.setBounds(row.removeFromLeft(buttonWidth));
-
-	bounds.removeFromTop(padding);
-	frequencyLabel.setBounds(bounds.removeFromTop(20));
 
 	bounds.removeFromTop(padding);
 	if (!audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {

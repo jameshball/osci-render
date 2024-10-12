@@ -23,7 +23,7 @@ EffectComponent::EffectComponent(Effect& effect, int index) : effect(effect), in
     lfoSlider.setTextValueSuffix("Hz");
     lfoSlider.setColour(sliderThumbOutlineColourId, juce::Colour(0xff00ff00));
 
-    label.setFont(juce::Font(13.0f));
+    label.setFont(juce::Font(14.0f));
 
     lfo.addItem("Static", static_cast<int>(LfoType::Static));
     lfo.addItem("Sine", static_cast<int>(LfoType::Sine));
