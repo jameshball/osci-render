@@ -24,6 +24,8 @@ class SvgButton : public juce::DrawableButton, public juce::AudioProcessorParame
 		downImageOn = juce::Drawable::createFromSVG(*doc);
 		changeSvgColour(doc.get(), colourOn.withBrightness(0.3f));
 		disabledImageOn = juce::Drawable::createFromSVG(*doc);
+        
+        path = normalImage->getOutlineAsPath();
 
         getLookAndFeel().setColour(juce::DrawableButton::backgroundOnColourId, juce::Colours::transparentWhite);
 
@@ -37,6 +39,8 @@ class SvgButton : public juce::DrawableButton, public juce::AudioProcessorParame
             setToggleState(toggle->getBoolValue(), juce::NotificationType::dontSendNotification);
             setTooltip(toggle->getDescription());
         }
+        
+        updater.addAnimator(pulse);
     }
 
     SvgButton(juce::String name, juce::String svg, juce::Colour colour) : SvgButton(name, svg, colour, colour) {}
@@ -69,6 +73,30 @@ class SvgButton : public juce::DrawableButton, public juce::AudioProcessorParame
         juce::DrawableButton::mouseExit(e);
         setMouseCursor(juce::MouseCursor::NormalCursor);
     }
+    
+    void setPulseAnimation(bool pulseUsed) {
+        this->pulseUsed = pulseUsed;
+    }
+    
+    void paintOverChildren(juce::Graphics& g) override {
+        if (pulseUsed && getToggleState()) {
+            g.setColour(juce::Colours::black.withAlpha(colourFade / 1.5f));
+            g.fillPath(path);
+        }
+    }
+    
+    void buttonStateChanged() override {
+        juce::DrawableButton::buttonStateChanged();
+        if (pulseUsed && getToggleState() != prevToggleState) {
+            if (getToggleState()) {
+                pulse.start();
+            } else {
+                pulse.complete();
+                colourFade = 1.0;
+            }
+            prevToggleState = getToggleState();
+        }
+    }
 
 private:
     std::unique_ptr<juce::Drawable> normalImage;
@@ -82,6 +110,21 @@ private:
     std::unique_ptr<juce::Drawable> disabledImageOn;
 
     BooleanParameter* toggle;
+    
+    juce::VBlankAnimatorUpdater updater{this};
+    float colourFade = 0.0;
+    bool pulseUsed = false;
+    bool prevToggleState = false;
+    juce::Path path;
+    juce::Animator pulse = juce::ValueAnimatorBuilder {}
+        .withEasing([] (float t) { return std::sin(3.14159 * t) / 2 + 0.5; })
+        .withDurationMs(500)
+        .runningInfinitely()
+        .withValueChangedCallback([this] (auto value) {
+            colourFade = value;
+            repaint();
+        })
+        .build();
 
     void changeSvgColour(juce::XmlElement* xml, juce::Colour colour) {
         forEachXmlChildElement(*xml, xmlnode) {

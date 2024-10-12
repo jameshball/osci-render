@@ -39,6 +39,12 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p)
         openVisualiserSettings();
     };
     
+    addAndMakeVisible(record);
+    record.setPulseAnimation(true);
+    record.onClick = [this] {
+        visualiser.toggleRecording();
+    };
+    
     addAndMakeVisible(visualiser);
 
     visualiser.openSettings = [this] {
@@ -47,6 +53,10 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p)
 
     visualiser.closeSettings = [this] {
         visualiserSettingsWindow.setVisible(false);
+    };
+    
+    visualiser.recordingHalted = [this] {
+        record.setToggleState(false, juce::NotificationType::dontSendNotification);
     };
 
     visualiserSettingsWindow.setResizable(false, false);
@@ -80,6 +90,7 @@ void SosciPluginEditor::resized() {
 
     auto topBar = area.removeFromTop(25);
     settings.setBounds(topBar.removeFromRight(25));
+    record.setBounds(topBar.removeFromRight(25));
     menuBar.setBounds(topBar);
 
     visualiser.setBounds(area);

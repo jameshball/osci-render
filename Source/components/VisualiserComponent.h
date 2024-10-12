@@ -42,12 +42,15 @@ public:
     void setFullScreen(bool fullScreen);
     void setVisualiserType(bool oldVisualiser);
     void handleAsyncUpdate() override;
+    void toggleRecording();
 
     VisualiserComponent* parent = nullptr;
     VisualiserComponent* child = nullptr;
     std::unique_ptr<VisualiserWindow> popout = nullptr;
     
     std::atomic<bool> active = true;
+    
+    std::function<void()> recordingHalted;
 
 private:
     // 60fps
@@ -119,6 +122,8 @@ private:
     std::unique_ptr<juce::WebBrowserComponent> browser = nullptr;
     // keeping this around for memory management reasons
     std::unique_ptr<juce::WebBrowserComponent> oldBrowser = nullptr;
+    
+    std::unique_ptr<juce::FileChooser> chooser;
     
     void initialiseBrowser();
     void resetBuffer();
