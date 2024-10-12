@@ -214,7 +214,7 @@ var Render =
 	{
 		var windowWidth = Math.max(document.documentElement.clientWidth, window.innerWidth || 0)
 		var windowHeight = Math.max(document.documentElement.clientHeight, window.innerHeight || 0)
-		var canvasSize = Math.min(windowHeight, windowWidth);
+        var canvasSize = Math.min(windowHeight, windowWidth) * window.devicePixelRatio;
 		Render.canvas.width = canvasSize;
 		Render.canvas.height = canvasSize;
 		if (Render.lineTexture)
