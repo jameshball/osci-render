@@ -256,7 +256,7 @@ private:
     RecordingThumbnail recordingThumbnail;
     AudioRecorder recorder{ audioProcessor, recordingThumbnail.getAudioThumbnail() };
 
-    SvgButton recordButton{ "record", BinaryData::record_2_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f) };
+    SvgButton recordButton{ "record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f) };
     juce::File lastRecording;
     juce::FileChooser chooser { "Output file...", juce::File::getCurrentWorkingDirectory().getChildFile("recording.wav"), "*.wav" };
 	SvgButton timedRecord{ "timedRecord", BinaryData::timer_svg, juce::Colours::white, juce::Colours::red };
