@@ -43,7 +43,15 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p)
     record.setPulseAnimation(true);
     record.onClick = [this] {
         visualiser.toggleRecording();
+        stopwatch.stop();
+        stopwatch.reset();
+        if (record.getToggleState()) {
+            stopwatch.start();
+        }
+        resized();
     };
+    
+    addAndMakeVisible(stopwatch);
     
     addAndMakeVisible(visualiser);
 
@@ -90,7 +98,15 @@ void SosciPluginEditor::resized() {
 
     auto topBar = area.removeFromTop(25);
     settings.setBounds(topBar.removeFromRight(25));
+    topBar.removeFromRight(5);
     record.setBounds(topBar.removeFromRight(25));
+    if (record.getToggleState()) {
+        stopwatch.setVisible(true);
+        stopwatch.setBounds(topBar.removeFromRight(100));
+    } else {
+        stopwatch.setVisible(false);
+    }
+    
     menuBar.setBounds(topBar);
 
     visualiser.setBounds(area);

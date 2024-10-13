@@ -7,6 +7,7 @@
 #include "components/VisualiserSettings.h"
 #include "components/SosciMainMenuBarModel.h"
 #include "components/SvgButton.h"
+#include "components/StopwatchComponent.h"
 
 class SosciPluginEditor : public juce::AudioProcessorEditor {
 public:
@@ -39,6 +40,8 @@ public:
 
     juce::TooltipWindow tooltipWindow{nullptr, 0};
     
+    juce::Label recordTimer{"Record Timer"};
+    StopwatchComponent stopwatch;
     SvgButton record{"Record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f)};
     SvgButton settings{"Settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white};
 
