@@ -3,11 +3,13 @@
 #include "../PluginEditor.h"
 
 
-VisualiserSettings::VisualiserSettings(OscirenderAudioProcessor& p) : audioProcessor(p) {
+VisualiserSettings::VisualiserSettings(VisualiserParameters& parameters, int numChannels) : parameters(parameters), numChannels(numChannels) {
     addAndMakeVisible(brightness);
     addAndMakeVisible(intensity);
 	addAndMakeVisible(persistence);
     addAndMakeVisible(hue);
+    addAndMakeVisible(saturation);
+    addAndMakeVisible(focus);
     addAndMakeVisible(graticuleToggle);
     addAndMakeVisible(smudgeToggle);
     addAndMakeVisible(upsamplingToggle);
@@ -16,6 +18,8 @@ VisualiserSettings::VisualiserSettings(OscirenderAudioProcessor& p) : audioProce
     intensity.setSliderOnValueChange();
     persistence.setSliderOnValueChange();
     hue.setSliderOnValueChange();
+    saturation.setSliderOnValueChange();
+    focus.setSliderOnValueChange();
 }
 
 VisualiserSettings::~VisualiserSettings() {}
@@ -27,6 +31,8 @@ void VisualiserSettings::resized() {
     intensity.setBounds(area.removeFromTop(rowHeight));
     persistence.setBounds(area.removeFromTop(rowHeight));
     hue.setBounds(area.removeFromTop(rowHeight));
+    saturation.setBounds(area.removeFromTop(rowHeight));
+    focus.setBounds(area.removeFromTop(rowHeight));
     graticuleToggle.setBounds(area.removeFromTop(rowHeight));
     smudgeToggle.setBounds(area.removeFromTop(rowHeight));
     upsamplingToggle.setBounds(area.removeFromTop(rowHeight));
@@ -34,12 +40,15 @@ void VisualiserSettings::resized() {
 
 juce::var VisualiserSettings::getSettings() {
     auto settings = new juce::DynamicObject();
-    settings->setProperty("brightness", audioProcessor.brightnessEffect->getActualValue() - 2);
-    settings->setProperty("intensity", audioProcessor.intensityEffect->getActualValue() / 100);
-    settings->setProperty("persistence", audioProcessor.persistenceEffect->getActualValue() - 1.33);
-    settings->setProperty("hue", audioProcessor.hueEffect->getActualValue());
-    settings->setProperty("graticule", audioProcessor.graticuleEnabled->getBoolValue());
-    settings->setProperty("smudges", audioProcessor.smudgesEnabled->getBoolValue());
-    settings->setProperty("upsampling", audioProcessor.upsamplingEnabled->getBoolValue());
+    settings->setProperty("brightness", parameters.brightnessEffect->getActualValue() - 2);
+    settings->setProperty("intensity", parameters.intensityEffect->getActualValue() / 100);
+    settings->setProperty("persistence", parameters.persistenceEffect->getActualValue() - 1.33);
+    settings->setProperty("saturation", parameters.saturationEffect->getActualValue());
+    settings->setProperty("hue", parameters.hueEffect->getActualValue());
+    settings->setProperty("focus", parameters.focusEffect->getActualValue() / 100);
+    settings->setProperty("graticule", parameters.graticuleEnabled->getBoolValue());
+    settings->setProperty("smudges", parameters.smudgesEnabled->getBoolValue());
+    settings->setProperty("upsampling", parameters.upsamplingEnabled->getBoolValue());
+    settings->setProperty("numChannels", numChannels);
     return juce::var(settings);
 }

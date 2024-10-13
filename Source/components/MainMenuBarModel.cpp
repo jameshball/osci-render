@@ -3,11 +3,11 @@
 #include "../PluginProcessor.h"
 
 MainMenuBarModel::MainMenuBarModel(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), editor(editor) {
-    audioProcessor.legacyVisualiserEnabled->addListener(this);
+    audioProcessor.visualiserParameters.legacyVisualiserEnabled->addListener(this);
 }
 
 MainMenuBarModel::~MainMenuBarModel() {
-    audioProcessor.legacyVisualiserEnabled->removeListener(this);
+    audioProcessor.visualiserParameters.legacyVisualiserEnabled->removeListener(this);
 }
 
 void MainMenuBarModel::parameterValueChanged(int parameterIndex, float legacyVisualiserEnabled) {
@@ -36,7 +36,7 @@ juce::PopupMenu MainMenuBarModel::getMenuForIndex(int topLevelMenuIndex, const j
             menu.addItem(4, "Create New Project");
         }
     } else if (topLevelMenuIndex == 1) {
-        menu.addItem(1, "Use Legacy Visualiser", true, audioProcessor.legacyVisualiserEnabled->getBoolValue());
+        menu.addItem(1, "Use Legacy Visualiser", true, audioProcessor.visualiserParameters.legacyVisualiserEnabled->getBoolValue());
     } else if (topLevelMenuIndex == 2) {
         menu.addItem(1, "About osci-render");
     } else if (topLevelMenuIndex == 3) {
@@ -67,12 +67,20 @@ void MainMenuBarModel::menuItemSelected(int menuItemID, int topLevelMenuIndex) {
             }
             break;
         case 1: {
-            audioProcessor.legacyVisualiserEnabled->setBoolValueNotifyingHost(!audioProcessor.legacyVisualiserEnabled->getBoolValue());
+            audioProcessor.visualiserParameters.legacyVisualiserEnabled->setBoolValueNotifyingHost(!audioProcessor.visualiserParameters.legacyVisualiserEnabled->getBoolValue());
             menuItemsChanged();
         } break;
         case 2: {
             juce::DialogWindow::LaunchOptions options;
-            AboutComponent* about = new AboutComponent();
+            AboutComponent* about = new AboutComponent(BinaryData::logo_png, BinaryData::logo_pngSize, 
+                juce::String(ProjectInfo::projectName) + " by " + ProjectInfo::companyName + "\n"
+                "Version " + ProjectInfo::versionString + "\n\n"
+                "A huge thank you to:\n"
+                "DJ_Level_3, for contributing several features to osci-render\n"
+                "BUS ERROR Collective, for providing the source code for the Hilligoss encoder\n"
+                "All the community, for suggesting features and reporting issues!\n\n"
+                "I am open for commissions! Email me at james@ball.sh."
+            );
             options.content.setOwned(about);
             options.content->setSize(500, 270);
             options.dialogTitle = "About";

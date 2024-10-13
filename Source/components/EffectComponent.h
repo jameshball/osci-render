@@ -1,14 +1,13 @@
 #pragma once
 #include <JuceHeader.h>
-#include "../PluginProcessor.h"
 #include "../audio/Effect.h"
 #include "LabelledTextBox.h"
 #include "SvgButton.h"
 
 class EffectComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater, public juce::SettableTooltipClient {
 public:
-    EffectComponent(OscirenderAudioProcessor& p, Effect& effect, int index);
-    EffectComponent(OscirenderAudioProcessor& p, Effect& effect);
+    EffectComponent(Effect& effect, int index);
+    EffectComponent(Effect& effect);
     ~EffectComponent();
 
     void resized() override;
@@ -89,7 +88,6 @@ private:
     bool lfoEnabled = true;
     bool sidechainEnabled = true;
     std::shared_ptr<juce::Component> component;
-    OscirenderAudioProcessor& audioProcessor;
 
     std::unique_ptr<SvgButton> sidechainButton;
 

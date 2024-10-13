@@ -1,7 +1,7 @@
 #include "../LookAndFeel.h"
 #include "VisualiserComponent.h"
 
-VisualiserComponent::VisualiserComponent(OscirenderAudioProcessor& p, VisualiserSettings& settings, VisualiserComponent* parent, bool useOldVisualiser) : settings(settings), backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), audioProcessor(p), oldVisualiser(useOldVisualiser), juce::Thread("VisualiserComponent"), parent(parent) {    
+VisualiserComponent::VisualiserComponent(SampleRateManager& sampleRateManager, ConsumerManager& consumerManager, VisualiserSettings& settings, VisualiserComponent* parent, bool useOldVisualiser, bool visualiserOnly) : settings(settings), backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), sampleRateManager(sampleRateManager), consumerManager(consumerManager), oldVisualiser(useOldVisualiser), visualiserOnly(visualiserOnly), juce::Thread("VisualiserComponent"), parent(parent) {
     resetBuffer();
     if (!oldVisualiser) {
         initialiseBrowser();
@@ -12,13 +12,13 @@ VisualiserComponent::VisualiserComponent(OscirenderAudioProcessor& p, Visualiser
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
     setWantsKeyboardFocus(true);
     
-    roughness.textBox.setValue(audioProcessor.roughness);
+    roughness.textBox.setValue(settings.parameters.roughness);
     roughness.textBox.onValueChange = [this]() {
-        audioProcessor.roughness = (int) roughness.textBox.getValue();
+        this->settings.parameters.roughness = (int) roughness.textBox.getValue();
     };
-    intensity.textBox.setValue(audioProcessor.intensity);
+    intensity.textBox.setValue(settings.parameters.intensity);
     intensity.textBox.onValueChange = [this]() {
-        audioProcessor.intensity = intensity.textBox.getValue();
+        this->settings.parameters.intensity = intensity.textBox.getValue();
     };
     
     if (parent == nullptr) {
@@ -52,7 +52,7 @@ VisualiserComponent::VisualiserComponent(OscirenderAudioProcessor& p, Visualiser
 VisualiserComponent::~VisualiserComponent() {
     {
         juce::CriticalSection::ScopedLockType scope(consumerLock);
-        audioProcessor.consumerStop(consumer);
+        consumerManager.consumerStop(consumer);
     }
     stopThread(1000);
     masterReference.clear();
@@ -73,13 +73,12 @@ void VisualiserComponent::mouseDoubleClick(const juce::MouseEvent& event) {
     enableFullScreen();
 }
 
-void VisualiserComponent::setBuffer(std::vector<float>& newBuffer) {
+void VisualiserComponent::setBuffer(std::vector<Point>& newBuffer) {
     juce::CriticalSection::ScopedLockType scope(lock);
     buffer.clear();
     int stride = oldVisualiser ? roughness.textBox.getValue() : 1;
-    for (int i = 0; i < newBuffer.size(); i += stride * 2) {
+    for (int i = 0; i < newBuffer.size(); i += stride) {
         buffer.push_back(newBuffer[i]);
-        buffer.push_back(newBuffer[i + 1]);
     }
 }
 
@@ -127,15 +126,15 @@ void VisualiserComponent::timerCallback() {
 
 void VisualiserComponent::run() {
     while (!threadShouldExit()) {
-        if (sampleRate != (int) audioProcessor.currentSampleRate) {
+        if (sampleRate != (int) sampleRateManager.getSampleRate()) {
             resetBuffer();
         }
         
         {
             juce::CriticalSection::ScopedLockType scope(consumerLock);
-            consumer = audioProcessor.consumerRegister(tempBuffer);
+            consumer = consumerManager.consumerRegister(tempBuffer);
         }
-        audioProcessor.consumerRead(consumer);
+        consumerManager.consumerRead(consumer);
         
         setBuffer(tempBuffer);
         if (!oldVisualiser) {
@@ -153,7 +152,7 @@ void VisualiserComponent::setPaused(bool paused) {
     } else {
         {
             juce::CriticalSection::ScopedLockType scope(consumerLock);
-            audioProcessor.consumerStop(consumer);
+            consumerManager.consumerStop(consumer);
         }
         stopTimer();
         stopThread(1000);
@@ -244,8 +243,8 @@ void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area
     auto transform = juce::AffineTransform::fromTargetPoints(-1.0f, -1.0f, area.getX(), area.getBottom(), 1.0f, 1.0f, area.getRight(), area.getY(), 1.0f, -1.0f, area.getRight(), area.getBottom());
     std::vector<juce::Line<float>> lines;
 
-    for (int i = 2; i < buffer.size(); i += 2) {
-        lines.emplace_back(buffer[i - 2], buffer[i - 1], buffer[i], buffer[i + 1]);
+    for (int i = 2; i < buffer.size(); i++) {
+        lines.emplace_back(buffer[i - 1].x, buffer[i - 1].y, buffer[i].x, buffer[i].y);
     }
 
     double strength = 15;
@@ -271,6 +270,7 @@ void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area
 }
 
 void VisualiserComponent::initialiseBrowser() {
+    haltRecording();
     oldBrowser = std::move(browser);
     if (oldBrowser != nullptr) {
         removeChildComponent(oldBrowser.get());
@@ -316,10 +316,28 @@ void VisualiserComponent::initialiseBrowser() {
             complete(settings.getSettings());
         })
         .withNativeFunction("bufferSize", [this](auto& var, auto complete) {
-            complete((int) tempBuffer.size() / 2);
+            complete((int) tempBuffer.size());
         })
         .withNativeFunction("sampleRate", [this](auto& var, auto complete) {
             complete(sampleRate);
+        })
+        .withNativeFunction("isVisualiserOnly", [this](auto& var, auto complete) {
+            complete(visualiserOnly);
+        })
+        .withNativeFunction("sendVideoData", [this](const juce::Array<juce::var>& args, auto complete) {
+            juce::FileOutputStream stream{tempVideoFile};
+            juce::Base64::convertFromBase64(stream, args[0].toString());
+            stream.flush();
+        })
+        .withNativeFunction("finishRecording", [this](auto& var, auto complete) {
+            chooser = std::make_unique<juce::FileChooser>("Save video", juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDesktopDirectory).getChildFile("osci-render.webm"), "*.webm");
+            chooser->launchAsync(juce::FileBrowserComponent::saveMode,
+                [this](const juce::FileChooser& chooser) {
+                    juce::File result = chooser.getResult();
+                    if (result.getFullPathName().isNotEmpty()) {
+                        tempVideoFile.moveFileTo(result);
+                    }
+                });
         })
     );
 
@@ -329,8 +347,8 @@ void VisualiserComponent::initialiseBrowser() {
 }
 
 void VisualiserComponent::resetBuffer() {
-    sampleRate = (int) audioProcessor.currentSampleRate;
-    tempBuffer = std::vector<float>(2 * sampleRate * BUFFER_LENGTH_SECS);
+    sampleRate = (int) sampleRateManager.getSampleRate();
+    tempBuffer = std::vector<Point>(sampleRate * BUFFER_LENGTH_SECS);
     if (!oldVisualiser && isShowing()) {
         restartBrowser = true;
         triggerAsyncUpdate();
@@ -344,8 +362,40 @@ void VisualiserComponent::handleAsyncUpdate() {
     }
     if (audioUpdated && browser != nullptr) {
         juce::CriticalSection::ScopedLockType scope(lock);
-        browser->emitEventIfBrowserIsVisible("audioUpdated", juce::Base64::toBase64(buffer.data(), buffer.size() * sizeof(float)));
+        std::vector<float> rawBuffer;
+        if (settings.numChannels == 2) {
+            rawBuffer.reserve(buffer.size() * 2);
+            for (auto& point : buffer) {
+                rawBuffer.push_back(point.x);
+                rawBuffer.push_back(point.y);
+            }
+        } else if (settings.numChannels == 3) {
+            rawBuffer.reserve(buffer.size() * 3);
+            for (auto& point : buffer) {
+                rawBuffer.push_back(point.x);
+                rawBuffer.push_back(point.y);
+                rawBuffer.push_back(point.z);
+            }
+        }
+        browser->emitEventIfBrowserIsVisible("audioUpdated", juce::Base64::toBase64(rawBuffer.data(), rawBuffer.size() * sizeof(float)));
         audioUpdated = false;
+    }
+}
+
+void VisualiserComponent::toggleRecording() {
+    if (oldVisualiser) {
+        return;
+    }
+    tempVideoFile = juce::File::createTempFile(".webm");
+    browser->emitEventIfBrowserIsVisible("toggleRecording", juce::var());
+}
+
+void VisualiserComponent::haltRecording() {
+    if (oldVisualiser) {
+        return;
+    }
+    if (recordingHalted != nullptr) {
+        recordingHalted();
     }
 }
 
@@ -373,10 +423,12 @@ void VisualiserComponent::childChanged() {
 }
 
 void VisualiserComponent::popoutWindow() {
-    auto visualiser = new VisualiserComponent(audioProcessor, settings, this, oldVisualiser);
+    haltRecording();
+    auto visualiser = new VisualiserComponent(sampleRateManager, consumerManager, settings, this, oldVisualiser);
     visualiser->settings.setLookAndFeel(&getLookAndFeel());
     visualiser->openSettings = openSettings;
     visualiser->closeSettings = closeSettings;
+    visualiser->recordingHalted = recordingHalted;
     child = visualiser;
     childChanged();
     popOutButton.setVisible(false);

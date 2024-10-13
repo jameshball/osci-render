@@ -84,7 +84,7 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     getCurrentColourScheme().setUIColour(ColourScheme::widgetBackground, Colours::veryDark);
     getCurrentColourScheme().setUIColour(ColourScheme::UIColour::defaultFill, Colours::accentColor);
 
-    // setDefaultSansSerifTypeface(juce::Typeface::createSystemTypefaceFor(BinaryData::font_ttf, BinaryData::font_ttfSize));
+    setDefaultSansSerifTypeface(juce::Typeface::createSystemTypefaceFor(BinaryData::font_ttf, BinaryData::font_ttfSize));
 
     // I have to do this, otherwise components are initialised before the look and feel is set
     juce::LookAndFeel::setDefaultLookAndFeel(this);
