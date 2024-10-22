@@ -12,6 +12,7 @@ struct Texture {
 class VisualiserOpenGLComponent : public juce::Component, public juce::OpenGLRenderer {
 public:
     VisualiserOpenGLComponent(VisualiserSettings& settings);
+    ~VisualiserOpenGLComponent() override;
 
     void newOpenGLContextCreated() override;
     void renderOpenGL() override;
