@@ -37,18 +37,3 @@ void VisualiserSettings::resized() {
     smudgeToggle.setBounds(area.removeFromTop(rowHeight));
     upsamplingToggle.setBounds(area.removeFromTop(rowHeight));
 }
-
-juce::var VisualiserSettings::getSettings() {
-    auto settings = new juce::DynamicObject();
-    settings->setProperty("brightness", parameters.brightnessEffect->getActualValue() - 2);
-    settings->setProperty("intensity", parameters.intensityEffect->getActualValue() / 100);
-    settings->setProperty("persistence", parameters.persistenceEffect->getActualValue() - 1.33);
-    settings->setProperty("saturation", parameters.saturationEffect->getActualValue());
-    settings->setProperty("hue", parameters.hueEffect->getActualValue());
-    settings->setProperty("focus", parameters.focusEffect->getActualValue() / 100);
-    settings->setProperty("graticule", parameters.graticuleEnabled->getBoolValue());
-    settings->setProperty("smudges", parameters.smudgesEnabled->getBoolValue());
-    settings->setProperty("upsampling", parameters.upsamplingEnabled->getBoolValue());
-    settings->setProperty("numChannels", numChannels);
-    return juce::var(settings);
-}

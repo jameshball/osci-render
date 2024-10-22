@@ -75,7 +75,42 @@ public:
     ~VisualiserSettings();
 
     void resized() override;
-    juce::var getSettings();
+    
+    double getBrightness() {
+        return parameters.brightnessEffect->getActualValue() - 2;
+    }
+    
+    double getIntensity() {
+        return parameters.intensityEffect->getActualValue() / 100;
+    }
+    
+    double getPersistence() {
+        return parameters.persistenceEffect->getActualValue() - 1.33;
+    }
+    
+    double getHue() {
+        return parameters.hueEffect->getActualValue();
+    }
+    
+    double getSaturation() {
+        return parameters.saturationEffect->getActualValue();
+    }
+    
+    double getFocus() {
+        return parameters.focusEffect->getActualValue() / 100;
+    }
+    
+    bool getGraticuleEnabled() {
+        return parameters.graticuleEnabled->getBoolValue();
+    }
+    
+    bool getSmudgesEnabled() {
+        return parameters.smudgesEnabled->getBoolValue();
+    }
+    
+    bool getUpsamplingEnabled() {
+        return parameters.upsamplingEnabled->getBoolValue();
+    }
 
     VisualiserParameters& parameters;
     int numChannels;

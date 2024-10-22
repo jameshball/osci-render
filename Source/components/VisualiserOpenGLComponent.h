@@ -47,6 +47,8 @@ private:
     Texture blur3Texture;
     Texture blur4Texture;
     juce::OpenGLTexture screenOpenGLTexture;
+    juce::Image screenTextureImage = juce::ImageFileFormat::loadFrom(BinaryData::noise_jpg, BinaryData::noise_jpgSize);
+    juce::Image emptyScreenImage = juce::ImageFileFormat::loadFrom(BinaryData::empty_jpg, BinaryData::empty_jpgSize);
     Texture screenTexture;
     std::optional<Texture> targetTexture = std::nullopt;
     
@@ -60,6 +62,8 @@ private:
     VisualiserSettings& settings;
     SampleRateManager& sampleRateManager;
     float fadeAmount;
+    bool smudgesEnabled = settings.getSmudgesEnabled();
+    bool graticuleEnabled = settings.getGraticuleEnabled();
     
     Texture makeTexture(int width, int height);
     void setupArrays(int num_points);
@@ -76,6 +80,7 @@ private:
     void drawCRT();
     void checkGLErrors(const juce::String& location);
     void viewportChanged();
+    Texture createScreenTexture();
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserOpenGLComponent)
 };

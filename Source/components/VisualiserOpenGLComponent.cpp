@@ -326,6 +326,12 @@ void VisualiserOpenGLComponent::renderOpenGL() {
     if (openGLContext.isActive()) {
         juce::CriticalSection::ScopedLockType lock(samplesLock);
         
+        if (graticuleEnabled != settings.getGraticuleEnabled() || smudgesEnabled != settings.getSmudgesEnabled()) {
+            graticuleEnabled = settings.getGraticuleEnabled();
+            smudgesEnabled = settings.getSmudgesEnabled();
+            screenTexture = createScreenTexture();
+        }
+        
         renderScale = (float) openGLContext.getRenderingScale();
         
         drawLineTexture(samples);
@@ -355,6 +361,10 @@ void VisualiserOpenGLComponent::viewportChanged() {
 
 void VisualiserOpenGLComponent::setupArrays(int nPoints) {
     using namespace juce::gl;
+    
+    if (nPoints == 0) {
+        return;
+    }
     
     this->nPoints = nPoints;
     this->nEdges = this->nPoints - 1;
@@ -406,13 +416,8 @@ void VisualiserOpenGLComponent::setupTextures() {
     blur2Texture = makeTexture(256, 256);
     blur3Texture = makeTexture(32, 32);
     blur4Texture = makeTexture(32, 32);
-
-    // Load the screen texture from file
-    juce::Image screenTextureImage = juce::ImageFileFormat::loadFrom(BinaryData::noise_jpg, BinaryData::noise_jpgSize);
-    if (screenTextureImage.isValid()) {
-        screenOpenGLTexture.loadImage(screenTextureImage);
-        screenTexture = { screenOpenGLTexture.getTextureID(), screenTextureImage.getWidth(), screenTextureImage.getHeight() };
-    }
+    
+    screenTexture = createScreenTexture();
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0); // Unbind
 }
@@ -441,8 +446,7 @@ Texture VisualiserOpenGLComponent::makeTexture(int width, int height) {
 void VisualiserOpenGLComponent::drawLineTexture(std::vector<Point>& points) {
     using namespace juce::gl;
     
-    float persistence = settings.parameters.persistenceEffect->getActualValue() - 1.33;
-    fadeAmount = juce::jmin(1.0, std::pow(0.5, persistence) * 0.4);
+    fadeAmount = juce::jmin(1.0, std::pow(0.5, settings.getPersistence()) * 0.4);
     activateTargetTexture(lineTexture);
     fade();
     drawLine(points);
@@ -600,15 +604,12 @@ void VisualiserOpenGLComponent::drawLine(std::vector<Point>& points) {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, screenTexture.id);
     lineShader->setUniform("uScreen", 0);
-
-    float focus = settings.parameters.focusEffect->getActualValue() / 100;
-    lineShader->setUniform("uSize", focus);
+    lineShader->setUniform("uSize", (GLfloat) settings.getFocus());
     lineShader->setUniform("uGain", 450.0f / 512.0f);
     lineShader->setUniform("uInvert", 1.0f);
 
-    float modifiedIntensity = settings.parameters.intensityEffect->getActualValue() / 100;
-    float intensity = modifiedIntensity * (41000.0f / sampleRateManager.getSampleRate());
-    if (settings.parameters.upsamplingEnabled->getBoolValue()) {
+    float intensity = settings.getIntensity() * (41000.0f / sampleRateManager.getSampleRate());
+    if (settings.getUpsamplingEnabled()) {
         lineShader->setUniform("uIntensity", intensity);
     } else {
         // TODO: filter steps
@@ -675,8 +676,7 @@ void VisualiserOpenGLComponent::drawCRT() {
     setShader(blurShader.get());
     blurShader->setUniform("uOffset", 1.0f / 32.0f, 1.0f / 60.0f);
     drawTexture(blur3Texture);
-    
-    
+
     //vertical blur 64x64
     activateTargetTexture(blur3Texture);
     blurShader->setUniform("uOffset", -1.0f / 60.0f, 1.0f / 32.0f);
@@ -684,13 +684,83 @@ void VisualiserOpenGLComponent::drawCRT() {
     
     activateTargetTexture(std::nullopt);
     setShader(outputShader.get());
-    float brightness = std::pow(2, settings.parameters.brightnessEffect->getActualValue() - 4);
+    float brightness = std::pow(2, settings.getBrightness() - 2);
     outputShader->setUniform("uExposure", brightness);
-    outputShader->setUniform("uSaturation", (float) settings.parameters.saturationEffect->getActualValue());
+    outputShader->setUniform("uSaturation", (float) settings.getSaturation());
     outputShader->setUniform("uResizeForCanvas", lineTexture.width / 1024.0f);
-    juce::Colour colour = juce::Colour::fromHSV(settings.parameters.hueEffect->getActualValue() / 360.0f, 1.0, 1.0, 1.0);
+    juce::Colour colour = juce::Colour::fromHSV(settings.getHue() / 360.0f, 1.0, 1.0, 1.0);
     outputShader->setUniform("uColour", colour.getFloatRed(), colour.getFloatGreen(), colour.getFloatBlue());
     drawTexture(lineTexture, blur1Texture, blur3Texture, screenTexture);
+}
+
+Texture VisualiserOpenGLComponent::createScreenTexture() {
+    using namespace juce::gl;
+    
+    if (settings.getSmudgesEnabled()) {
+        screenOpenGLTexture.loadImage(screenTextureImage);
+    } else {
+        screenOpenGLTexture.loadImage(emptyScreenImage);
+    }
+    Texture texture = { screenOpenGLTexture.getTextureID(), screenTextureImage.getWidth(), screenTextureImage.getHeight() };
+    
+    if (settings.getGraticuleEnabled()) {
+        activateTargetTexture(texture);
+        setNormalBlending();
+        setShader(simpleShader.get());
+        glColorMask(true, false, false, true);
+        
+        std::vector<float> data;
+        
+        int step = 45;
+        
+        for (int i = 0; i < 11; i++) {
+            float s = i * step;
+            
+            // Inserting at the beginning of the vector (equivalent to splice(0,0,...))
+            data.insert(data.begin(), {0, s, 10.0f * step, s});
+            data.insert(data.begin(), {s, 0, s, 10.0f * step});
+            
+            if (i != 0 && i != 10) {
+                for (int j = 0; j < 51; j++) {
+                    float t = j * step / 5;
+                    if (i != 5) {
+                        data.insert(data.begin(), {t, s - 2, t, s + 1});
+                        data.insert(data.begin(), {s - 2, t, s + 1, t});
+                    } else {
+                        data.insert(data.begin(), {t, s - 5, t, s + 4});
+                        data.insert(data.begin(), {s - 5, t, s + 4, t});
+                    }
+                }
+            }
+        }
+        
+        for (int j = 0; j < 51; j++) {
+            float t = j * step / 5;
+            if (static_cast<int>(t) % 5 == 0) continue;
+            
+            data.insert(data.begin(), {t - 2, 2.5f * step, t + 2, 2.5f * step});
+            data.insert(data.begin(), {t - 2, 7.5f * step, t + 2, 7.5f * step});
+        }
+        
+        // Normalize the data
+        for (size_t i = 0; i < data.size(); i++) {
+            data[i] = (data[i] + 31.0f) / 256.0f - 1;
+        }
+        
+        glEnableVertexAttribArray(glGetAttribLocation(simpleShader->getProgramID(), "vertexPosition"));
+        glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(float) * data.size(), data.data(), GL_STATIC_DRAW);
+        glVertexAttribPointer(glGetAttribLocation(simpleShader->getProgramID(), "vertexPosition"), 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        simpleShader->setUniform("colour", 0.01f, 0.1f, 0.01f, 1.0f);
+        glLineWidth(1.0f);
+        glDrawArrays(GL_LINES, 0, data.size());
+        glBindTexture(GL_TEXTURE_2D, targetTexture.value().id);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    }
+    
+    return texture;
 }
 
 void VisualiserOpenGLComponent::checkGLErrors(const juce::String& location) {
