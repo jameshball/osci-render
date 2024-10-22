@@ -8,6 +8,10 @@ VisualiserOpenGLComponent::VisualiserOpenGLComponent(VisualiserSettings& setting
     openGLContext.setContinuousRepainting(true);
 }
 
+VisualiserOpenGLComponent::~VisualiserOpenGLComponent() {
+    openGLContext.detach();
+}
+
 void VisualiserOpenGLComponent::newOpenGLContextCreated() {
     using namespace juce::gl;
     
@@ -278,6 +282,21 @@ void VisualiserOpenGLComponent::newOpenGLContextCreated() {
     setupArrays(1024);
 }
 
+void VisualiserOpenGLComponent::openGLContextClosing() {
+    using namespace juce::gl;
+    
+    glDeleteBuffers(1, &quadIndexBuffer);
+    glDeleteBuffers(1, &vertexIndexBuffer);
+    glDeleteBuffers(1, &vertexBuffer);
+    glDeleteFramebuffers(1, &frameBuffer);
+    glDeleteTextures(1, &lineTexture.id);
+    glDeleteTextures(1, &blur1Texture.id);
+    glDeleteTextures(1, &blur2Texture.id);
+    glDeleteTextures(1, &blur3Texture.id);
+    glDeleteTextures(1, &blur4Texture.id);
+    screenOpenGLTexture.release();
+}
+
 void VisualiserOpenGLComponent::renderOpenGL() {
     if (openGLContext.isActive()) {
         xSamples.clear();
@@ -299,8 +318,6 @@ void VisualiserOpenGLComponent::renderOpenGL() {
         checkGLErrors("drawCRT");
     }
 }
-
-void VisualiserOpenGLComponent::openGLContextClosing() {}
 
 void VisualiserOpenGLComponent::resized() {
     viewportChanged();
