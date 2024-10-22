@@ -275,17 +275,20 @@ void VisualiserOpenGLComponent::newOpenGLContextCreated() {
     glGenBuffers(1, &vertexBuffer);
     setupTextures();
     
-    for (int i = 0; i < 1024; i++) {
-        xSamples.push_back(std::sin(i / 200));
-        ySamples.push_back(std::cos(i / 200));
-        zSamples.push_back(1);
-    }
-    
-    setupArrays(xSamples.size());
+    setupArrays(1024);
 }
 
 void VisualiserOpenGLComponent::renderOpenGL() {
     if (openGLContext.isActive()) {
+        xSamples.clear();
+        ySamples.clear();
+        zSamples.clear();
+        for (int i = 0; i < 1024; i++) {
+            xSamples.push_back(std::sin(i * 0.1));
+            ySamples.push_back(std::cos(i * 0.1));
+            zSamples.push_back(1);
+        }
+        
         drawLineTexture(xSamples, ySamples, zSamples);
         drawCRT();
     }
@@ -392,18 +395,69 @@ void VisualiserOpenGLComponent::drawLineTexture(std::vector<float>& xPoints, std
     float persistence = settings.parameters.persistenceEffect->getActualValue() - 1.33;
     fadeAmount = juce::jmin(1.0, std::pow(0.5, persistence) * 0.4);
     activateTargetTexture(lineTexture);
+    checkGLErrors("activateTargetTexture - lineTexture");
     fade();
     drawLine(xPoints, yPoints, zPoints);
     glBindTexture(GL_TEXTURE_2D, targetTexture.value().id);
     glGenerateMipmap(GL_TEXTURE_2D);
 }
 
+void VisualiserOpenGLComponent::saveTextureToFile(GLuint textureID, int width, int height, const juce::File& file) {
+    using namespace juce::gl;
+    
+    // Bind the texture to read its data
+    glBindTexture(GL_TEXTURE_2D, textureID);
+
+    // Create a vector to store the pixel data (RGBA)
+    std::vector<unsigned char> pixels(width * height * 4);
+
+    // Read the pixels from the texture
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+
+    // Convert raw pixel data to JUCE Image
+    juce::Image image(juce::Image::PixelFormat::ARGB, width, height, true);  // Create a JUCE image
+
+    // Lock the image to get access to its pixel data
+    juce::Image::BitmapData bitmapData(image, juce::Image::BitmapData::writeOnly);
+
+    // Copy the pixel data to the JUCE image (and swap R and B channels)
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            int srcIndex = (y * width + x) * 4; // RGBA format
+            juce::uint8 r = pixels[srcIndex];     // Red
+            juce::uint8 g = pixels[srcIndex + 1]; // Green
+            juce::uint8 b = pixels[srcIndex + 2]; // Blue
+            juce::uint8 a = pixels[srcIndex + 3]; // Alpha
+
+            // JUCE stores colors in ARGB, so we need to adjust the channel order
+            bitmapData.setPixelColour(x, y, juce::Colour(a, r, g, b));
+        }
+    }
+
+    // Unbind the texture
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    // Save the JUCE image to file (PNG in this case)
+    juce::PNGImageFormat pngFormat;
+    std::unique_ptr<juce::FileOutputStream> outputStream(file.createOutputStream());
+    if (outputStream != nullptr) {
+        outputStream->setPosition(0);
+        pngFormat.writeImageToStream(image, *outputStream);
+        outputStream->flush();
+    }
+}
+
+
 void VisualiserOpenGLComponent::activateTargetTexture(std::optional<Texture> texture) {
     using namespace juce::gl;
     
     if (texture.has_value()) {
         glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+        checkGLErrors("activateTargetTexture - glBindFramebuffer");
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture.value().id, 0);
+        checkGLErrors("activateTargetTexture - glFramebufferTexture2D");
         glViewport(0, 0, texture.value().width, texture.value().height);
+        checkGLErrors("activateTargetTexture - glViewport");
     } else {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glViewport(0, 0, getWidth(), getHeight());
@@ -473,6 +527,7 @@ void VisualiserOpenGLComponent::drawLine(std::vector<float>& xPoints, std::vecto
     using namespace juce::gl;
     
     setAdditiveBlending();
+    checkGLErrors("drawLine - setAdditiveBlending");
 
     int nPoints = xPoints.size();
     
@@ -486,29 +541,34 @@ void VisualiserOpenGLComponent::drawLine(std::vector<float>& xPoints, std::vecto
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
     glBufferData(GL_ARRAY_BUFFER, scratchVertices.size() * sizeof(float), scratchVertices.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+    checkGLErrors("drawLine - glBindBuffer");
 
     lineShader->use();
     glEnableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aStart"));
     glEnableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aEnd"));
     glEnableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aIdx"));
+    checkGLErrors("drawLine - glEnableVertexAttribArray");
 
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
     glVertexAttribPointer(glGetAttribLocation(lineShader->getProgramID(), "aStart"), 3, GL_FLOAT, GL_FALSE, 0, 0);
     glVertexAttribPointer(glGetAttribLocation(lineShader->getProgramID(), "aEnd"), 3, GL_FLOAT, GL_FALSE, 0, (void*)(12 * sizeof(float)));
     glBindBuffer(GL_ARRAY_BUFFER, quadIndexBuffer);
     glVertexAttribPointer(glGetAttribLocation(lineShader->getProgramID(), "aIdx"), 1, GL_FLOAT, GL_FALSE, 0, 0);
+    checkGLErrors("drawLine - glVertexAttribPointer");
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, screenTexture.id);
     lineShader->setUniform("uScreen", 0);
+    checkGLErrors("drawLine - glBindTexture");
 
     float focus = settings.parameters.focusEffect->getActualValue() / 100;
     lineShader->setUniform("uSize", focus);
     // TODO: change gain
-    double mainGain = 1;
+    double mainGain = 0;
     lineShader->setUniform("uGain", (GLfloat) (pow(2.0, mainGain) * 450.0 / 512.0));
     bool invertXY = false;
     lineShader->setUniform("uInvert", invertXY ? -1.0f : 1.0f);
+    checkGLErrors("drawLine - setUniform - uSize");
 
     // TODO: integrate sampleRate
     int sampleRate = 192000;
@@ -521,79 +581,127 @@ void VisualiserOpenGLComponent::drawLine(std::vector<float>& xPoints, std::vecto
         int steps = 6;
         lineShader->setUniform("uIntensity", (GLfloat) (intensity * (steps + 1.5)));
     }
+    checkGLErrors("drawLine - setUniform - uIntensity");
     
     lineShader->setUniform("uFadeAmount", fadeAmount);
-    lineShader->setUniform("uNEdges", nEdges);
+    lineShader->setUniform("uNEdges", (GLfloat) nEdges);
+    checkGLErrors("drawLine - setUniform - uFadeAmount");
 
-    glBindBuffer(GL_ARRAY_BUFFER, vertexIndexBuffer);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vertexIndexBuffer);
     int nEdgesThisTime = xPoints.size() - 1;
-    glDrawElements(GL_TRIANGLES, nEdgesThisTime * 6, GL_UNSIGNED_SHORT, nullptr);
+    glDrawElements(GL_TRIANGLES, nEdgesThisTime, GL_UNSIGNED_SHORT, 0);
+    checkGLErrors("drawLine - glDrawElements");
 
     glDisableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aStart"));
     glDisableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aEnd"));
     glDisableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aIdx"));
+    checkGLErrors("drawLine - glDisableVertexAttribArray");
 }
 
 void VisualiserOpenGLComponent::fade() {
     using namespace juce::gl;
     
     setNormalBlending();
+    checkGLErrors("fade - setNormalBlending");
     
     simpleShader->use();
+    checkGLErrors("fade - simpleShader->use");
     glEnableVertexAttribArray(glGetAttribLocation(simpleShader->getProgramID(), "vertexPosition"));
+    checkGLErrors("fade - glEnableVertexAttribArray");
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * fullScreenQuad.size(), fullScreenQuad.data(), GL_STATIC_DRAW);    
+    checkGLErrors("fade - glBindBuffer");
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * fullScreenQuad.size(), fullScreenQuad.data(), GL_STATIC_DRAW);
+    checkGLErrors("fade - glBufferData");
     glVertexAttribPointer(glGetAttribLocation(simpleShader->getProgramID(), "vertexPosition"), 2, GL_FLOAT, GL_FALSE, 0, 0);
+    checkGLErrors("fade - glVertexAttribPointer");
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+    checkGLErrors("fade - glBindBuffer");
     
     simpleShader->setUniform("colour", 0.0f, 0.0f, 0.0f, fadeAmount);
+    checkGLErrors("fade - setUniform");
     glDrawArrays(GL_TRIANGLES, 0, 6);
+    checkGLErrors("fade - glDrawArrays");
     glDisableVertexAttribArray(glGetAttribLocation(simpleShader->getProgramID(), "vertexPosition"));
+    checkGLErrors("fade - glDisableVertexAttribArray");
 }
 
 void VisualiserOpenGLComponent::drawCRT() {
     setNormalBlending();
     
     activateTargetTexture(blur1Texture);
+    checkGLErrors("drawCRT - activateTargetTexture - blur1Texture");
     setShader(texturedShader.get());
-    texturedShader->setUniform("uResizeForCanvas", lineTexture.width / 1024);
+    checkGLErrors("drawCRT - setShader - texturedShader");
+    texturedShader->setUniform("uResizeForCanvas", lineTexture.width / 1024.0f);
+    checkGLErrors("drawCRT - texturedShader - uResizeForCanvas");
     drawTexture(lineTexture);
+    checkGLErrors("drawCRT - drawTexture - lineTexture");
     
     //horizontal blur 256x256
     activateTargetTexture(blur2Texture);
     setShader(blurShader.get());
     blurShader->setUniform("uOffset", 1.0f / 256.0f, 0.0f);
     drawTexture(blur1Texture);
+    checkGLErrors("drawCRT - blurShader");
     
     //vertical blur 256x256
     activateTargetTexture(blur1Texture);
     blurShader->setUniform("uOffset", 0.0f, 1.0f / 256.0f);
     drawTexture(blur2Texture);
+    checkGLErrors("drawCRT - blurShader");
     
     //preserve blur1 for later
     activateTargetTexture(blur3Texture);
+    checkGLErrors("drawCRT - activateTargetTexture - blur3Texture");
     setShader(texturedShader.get());
-    texturedShader->setUniform("uResizeForCanvas", 1);
+    checkGLErrors("drawCRT - setShader - texturedShader");
+    texturedShader->setUniform("uResizeForCanvas", 1.0f);
+    checkGLErrors("drawCRT - texturedShader - uResizeForCanvas");
     drawTexture(blur1Texture);
+    checkGLErrors("drawCRT - drawTexture - blur1Texture");
     
     //horizontal blur 64x64
     activateTargetTexture(blur4Texture);
     setShader(blurShader.get());
     blurShader->setUniform("uOffset", 1.0f / 32.0f, 1.0f / 60.0f);
     drawTexture(blur3Texture);
+    checkGLErrors("drawCRT - blurShader - blur3Texture");
+    
     
     //vertical blur 64x64
     activateTargetTexture(blur3Texture);
     blurShader->setUniform("uOffset", -1.0f / 60.0f, 1.0f / 32.0f);
     drawTexture(blur4Texture);
+    checkGLErrors("drawCRT - blurShader - blur4Texture");
     
     activateTargetTexture(std::nullopt);
     setShader(outputShader.get());
-    float brightness = std::pow(2, settings.parameters.brightnessEffect->getActualValue() - 2);
+    float brightness = std::pow(2, settings.parameters.brightnessEffect->getActualValue() - 4);
     outputShader->setUniform("uExposure", brightness);
     outputShader->setUniform("uSaturation", (float) settings.parameters.saturationEffect->getActualValue());
-    outputShader->setUniform("uResizeForCanvas", lineTexture.width / 1024);
-    juce::Colour colour = juce::Colour::fromHSV(settings.parameters.saturationEffect->getActualValue() / 360.0f, 1.0, 1.0, 1.0);
+    outputShader->setUniform("uResizeForCanvas", lineTexture.width / 1024.0f);
+    juce::Colour colour = juce::Colour::fromHSV(settings.parameters.hueEffect->getActualValue() / 360.0f, 1.0, 1.0, 1.0);
     outputShader->setUniform("uColour", colour.getFloatRed(), colour.getFloatGreen(), colour.getFloatBlue());
     drawTexture(lineTexture, blur1Texture, blur3Texture, screenTexture);
+    checkGLErrors("drawCRT - outputShader");
+}
+
+void VisualiserOpenGLComponent::checkGLErrors(const juce::String& location) {
+    using namespace juce::gl;
+    
+    GLenum error;
+    while ((error = glGetError()) != GL_NO_ERROR) {
+        juce::String errorMessage;
+        switch (error) {
+            case GL_INVALID_ENUM:      errorMessage = "GL_INVALID_ENUM"; break;
+            case GL_INVALID_VALUE:     errorMessage = "GL_INVALID_VALUE"; break;
+            case GL_INVALID_OPERATION: errorMessage = "GL_INVALID_OPERATION"; break;
+            case GL_STACK_OVERFLOW:    errorMessage = "GL_STACK_OVERFLOW"; break;
+            case GL_STACK_UNDERFLOW:   errorMessage = "GL_STACK_UNDERFLOW"; break;
+            case GL_OUT_OF_MEMORY:     errorMessage = "GL_OUT_OF_MEMORY"; break;
+            case GL_INVALID_FRAMEBUFFER_OPERATION: errorMessage = "GL_INVALID_FRAMEBUFFER_OPERATION"; break;
+            default: errorMessage = "Unknown OpenGL error"; break;
+        }
+        DBG("OpenGL error at " + location + ": " + errorMessage);
+    }
 }
