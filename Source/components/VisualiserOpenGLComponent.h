@@ -60,6 +60,7 @@ private:
     void setupArrays(int num_points);
     void setupTextures();
     void drawLineTexture(std::vector<float>& xPoints, std::vector<float>& yPoints, std::vector<float>& zPoints);
+    void saveTextureToFile(GLuint textureID, int width, int height, const juce::File& file);
     void activateTargetTexture(std::optional<Texture> texture);
     void setShader(juce::OpenGLShaderProgram* program);
     void drawTexture(std::optional<Texture> texture0, std::optional<Texture> texture1 = std::nullopt, std::optional<Texture> texture2 = std::nullopt, std::optional<Texture> texture3 = std::nullopt);
@@ -68,6 +69,7 @@ private:
     void drawLine(std::vector<float>& xPoints, std::vector<float>& yPoints, std::vector<float>& zPoints);
     void fade();
     void drawCRT();
+    void checkGLErrors(const juce::String& location);
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserOpenGLComponent)
 };
