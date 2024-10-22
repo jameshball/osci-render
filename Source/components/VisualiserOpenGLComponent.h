@@ -21,6 +21,8 @@ public:
 private:
     juce::OpenGLContext openGLContext;
     
+    float renderScale = 1.0f;
+    
     GLuint quadIndexBuffer = 0;
     GLuint vertexIndexBuffer = 0;
     GLuint vertexBuffer = 0;
@@ -52,7 +54,6 @@ private:
     std::unique_ptr<juce::OpenGLShaderProgram> outputShader;
     juce::OpenGLShaderProgram* currentShader;
     
-    // controls / inputs / settings
     VisualiserSettings& settings;
     float fadeAmount;
     
@@ -70,6 +71,7 @@ private:
     void fade();
     void drawCRT();
     void checkGLErrors(const juce::String& location);
+    void viewportChanged();
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserOpenGLComponent)
 };
