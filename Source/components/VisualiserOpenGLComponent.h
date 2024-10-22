@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include "VisualiserSettings.h"
+#include "../audio/SampleRateManager.h"
 
 struct Texture {
     GLuint id;
@@ -11,13 +12,14 @@ struct Texture {
 
 class VisualiserOpenGLComponent : public juce::Component, public juce::OpenGLRenderer {
 public:
-    VisualiserOpenGLComponent(VisualiserSettings& settings);
+    VisualiserOpenGLComponent(VisualiserSettings& settings, SampleRateManager& sampleRateManager);
     ~VisualiserOpenGLComponent() override;
 
     void newOpenGLContextCreated() override;
     void renderOpenGL() override;
     void openGLContextClosing() override;
     void resized() override;
+    void updateBuffer(std::vector<Point>& buffer);
 
 private:
     juce::OpenGLContext openGLContext;
@@ -31,9 +33,9 @@ private:
     int nPoints = 0;
     int nEdges = 0;
 
-    std::vector<float> xSamples;
-    std::vector<float> ySamples;
-    std::vector<float> zSamples;
+    juce::CriticalSection samplesLock;
+    bool needsReattach = true;
+    std::vector<Point> samples = std::vector<Point>(2);
     
     std::vector<float> scratchVertices;
     std::vector<float> fullScreenQuad;
@@ -56,19 +58,20 @@ private:
     juce::OpenGLShaderProgram* currentShader;
     
     VisualiserSettings& settings;
+    SampleRateManager& sampleRateManager;
     float fadeAmount;
     
     Texture makeTexture(int width, int height);
     void setupArrays(int num_points);
     void setupTextures();
-    void drawLineTexture(std::vector<float>& xPoints, std::vector<float>& yPoints, std::vector<float>& zPoints);
+    void drawLineTexture(std::vector<Point>& points);
     void saveTextureToFile(GLuint textureID, int width, int height, const juce::File& file);
     void activateTargetTexture(std::optional<Texture> texture);
     void setShader(juce::OpenGLShaderProgram* program);
     void drawTexture(std::optional<Texture> texture0, std::optional<Texture> texture1 = std::nullopt, std::optional<Texture> texture2 = std::nullopt, std::optional<Texture> texture3 = std::nullopt);
     void setAdditiveBlending();
     void setNormalBlending();
-    void drawLine(std::vector<float>& xPoints, std::vector<float>& yPoints, std::vector<float>& zPoints);
+    void drawLine(std::vector<Point>& points);
     void fade();
     void drawCRT();
     void checkGLErrors(const juce::String& location);

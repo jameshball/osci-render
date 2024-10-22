@@ -2,10 +2,9 @@
 #include "VisualiserOpenGLComponent.h"
 
 
-VisualiserOpenGLComponent::VisualiserOpenGLComponent(VisualiserSettings& settings) : settings(settings) {
+VisualiserOpenGLComponent::VisualiserOpenGLComponent(VisualiserSettings& settings, SampleRateManager& sampleRateManager) : settings(settings), sampleRateManager(sampleRateManager) {
     openGLContext.setRenderer(this);
     openGLContext.attachTo(*this);
-    openGLContext.setContinuousRepainting(true);
 }
 
 VisualiserOpenGLComponent::~VisualiserOpenGLComponent() {
@@ -279,7 +278,7 @@ void VisualiserOpenGLComponent::newOpenGLContextCreated() {
     glGenBuffers(1, &vertexBuffer);
     setupTextures();
     
-    setupArrays(1024);
+    setupArrays(samples.size());
 }
 
 void VisualiserOpenGLComponent::openGLContextClosing() {
@@ -295,24 +294,41 @@ void VisualiserOpenGLComponent::openGLContextClosing() {
     glDeleteTextures(1, &blur3Texture.id);
     glDeleteTextures(1, &blur4Texture.id);
     screenOpenGLTexture.release();
+    
+    simpleShader.reset();
+    texturedShader.reset();
+    blurShader.reset();
+    lineShader.reset();
+    outputShader.reset();
+}
+
+void VisualiserOpenGLComponent::updateBuffer(std::vector<Point>& buffer) {
+    juce::CriticalSection::ScopedLockType lock(samplesLock);
+    
+    if (samples.size() != buffer.size()) {
+        needsReattach = true;
+    }
+    samples.clear();
+    for (auto& point : buffer) {
+        samples.push_back(point);
+    }
+    juce::MessageManager::getInstance()->callAsync([this] {
+        if (needsReattach) {
+            openGLContext.detach();
+            openGLContext.attachTo(*this);
+            needsReattach = false;
+        }
+        repaint();
+    });
 }
 
 void VisualiserOpenGLComponent::renderOpenGL() {
     if (openGLContext.isActive()) {
-        xSamples.clear();
-        ySamples.clear();
-        zSamples.clear();
-        for (int i = 0; i < 1024; i++) {
-            //xSamples.push_back(std::sin(i * 0.1));
-            //ySamples.push_back(std::cos(i * 0.1));
-            xSamples.push_back(0);
-            ySamples.push_back(0);
-            zSamples.push_back(1);
-        }
+        juce::CriticalSection::ScopedLockType lock(samplesLock);
         
         renderScale = (float) openGLContext.getRenderingScale();
         
-        drawLineTexture(xSamples, ySamples, zSamples);
+        drawLineTexture(samples);
         checkGLErrors("drawLineTexture");
         drawCRT();
         checkGLErrors("drawCRT");
@@ -422,14 +438,14 @@ Texture VisualiserOpenGLComponent::makeTexture(int width, int height) {
     return { textureID, width, height };
 }
 
-void VisualiserOpenGLComponent::drawLineTexture(std::vector<float>& xPoints, std::vector<float>& yPoints, std::vector<float>& zPoints) {
+void VisualiserOpenGLComponent::drawLineTexture(std::vector<Point>& points) {
     using namespace juce::gl;
     
     float persistence = settings.parameters.persistenceEffect->getActualValue() - 1.33;
     fadeAmount = juce::jmin(1.0, std::pow(0.5, persistence) * 0.4);
     activateTargetTexture(lineTexture);
     fade();
-    drawLine(xPoints, yPoints, zPoints);
+    drawLine(points);
     glBindTexture(GL_TEXTURE_2D, targetTexture.value().id);
     glGenerateMipmap(GL_TEXTURE_2D);
 }
@@ -552,18 +568,18 @@ void VisualiserOpenGLComponent::setNormalBlending() {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
-void VisualiserOpenGLComponent::drawLine(std::vector<float>& xPoints, std::vector<float>& yPoints, std::vector<float>& zPoints) {
+void VisualiserOpenGLComponent::drawLine(std::vector<Point>& points) {
     using namespace juce::gl;
     
     setAdditiveBlending();
 
-    int nPoints = xPoints.size();
+    int nPoints = points.size();
     
     for (int i = 0; i < nPoints; ++i) {
         int p = i * 12;
-        scratchVertices[p]     = scratchVertices[p + 3] = scratchVertices[p + 6] = scratchVertices[p + 9]  = xPoints[i];
-        scratchVertices[p + 1] = scratchVertices[p + 4] = scratchVertices[p + 7] = scratchVertices[p + 10] = yPoints[i];
-        scratchVertices[p + 2] = scratchVertices[p + 5] = scratchVertices[p + 8] = scratchVertices[p + 11] = zPoints[i];
+        scratchVertices[p]     = scratchVertices[p + 3] = scratchVertices[p + 6] = scratchVertices[p + 9]  = points[i].x;
+        scratchVertices[p + 1] = scratchVertices[p + 4] = scratchVertices[p + 7] = scratchVertices[p + 10] = points[i].y;
+        scratchVertices[p + 2] = scratchVertices[p + 5] = scratchVertices[p + 8] = scratchVertices[p + 11] = points[i].z;
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
@@ -590,10 +606,8 @@ void VisualiserOpenGLComponent::drawLine(std::vector<float>& xPoints, std::vecto
     lineShader->setUniform("uGain", 450.0f / 512.0f);
     lineShader->setUniform("uInvert", 1.0f);
 
-    // TODO: integrate sampleRate
-    int sampleRate = 192000;
     float modifiedIntensity = settings.parameters.intensityEffect->getActualValue() / 100;
-    float intensity = modifiedIntensity * (41000.0f / sampleRate);
+    float intensity = modifiedIntensity * (41000.0f / sampleRateManager.getSampleRate());
     if (settings.parameters.upsamplingEnabled->getBoolValue()) {
         lineShader->setUniform("uIntensity", intensity);
     } else {
@@ -606,7 +620,7 @@ void VisualiserOpenGLComponent::drawLine(std::vector<float>& xPoints, std::vecto
     lineShader->setUniform("uNEdges", (GLfloat) nEdges);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vertexIndexBuffer);
-    int nEdgesThisTime = xPoints.size() - 1;
+    int nEdgesThisTime = points.size() - 1;
     glDrawElements(GL_TRIANGLES, nEdgesThisTime, GL_UNSIGNED_SHORT, 0);
 
     glDisableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aStart"));

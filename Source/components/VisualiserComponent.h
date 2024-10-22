@@ -25,7 +25,6 @@ public:
     std::function<void()> openSettings;
     std::function<void()> closeSettings;
 
-    void childChanged();
     void enableFullScreen();
     void setFullScreenCallback(std::function<void(FullScreenMode)> callback);
     void mouseDoubleClick(const juce::MouseEvent& event) override;
@@ -58,7 +57,6 @@ private:
     const double BUFFER_LENGTH_SECS = 1/60.0;
     const double DEFAULT_SAMPLE_RATE = 192000.0;
 
-    std::atomic<bool> audioUpdated = false;
     std::atomic<int> timerId;
     std::atomic<int> lastMouseX;
     std::atomic<int> lastMouseY;
@@ -91,7 +89,7 @@ private:
 
     VisualiserSettings& settings;
     
-    VisualiserOpenGLComponent openGLVisualiser {settings};
+    VisualiserOpenGLComponent openGLVisualiser {settings, sampleRateManager};
     std::unique_ptr<juce::FileChooser> chooser;
     juce::File tempVideoFile;
     
@@ -109,7 +107,6 @@ public:
     void closeButtonPressed() override {
         parent->setPaused(wasPaused);
         parent->child = nullptr;
-        parent->childChanged();
         parent->resized();
         parent->popout.reset();
     }
