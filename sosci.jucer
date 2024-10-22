@@ -86,6 +86,10 @@
               file="Source/components/VisualiserComponent.cpp"/>
         <FILE id="ZueyNl" name="VisualiserComponent.h" compile="0" resource="0"
               file="Source/components/VisualiserComponent.h"/>
+        <FILE id="Z6HHHg" name="VisualiserOpenGLComponent.cpp" compile="1"
+              resource="0" file="Source/components/VisualiserOpenGLComponent.cpp"/>
+        <FILE id="V3Pl3I" name="VisualiserOpenGLComponent.h" compile="0" resource="0"
+              file="Source/components/VisualiserOpenGLComponent.h"/>
         <FILE id="uOtHbQ" name="VisualiserSettings.cpp" compile="1" resource="0"
               file="Source/components/VisualiserSettings.cpp"/>
         <FILE id="GcbeeZ" name="VisualiserSettings.h" compile="0" resource="0"

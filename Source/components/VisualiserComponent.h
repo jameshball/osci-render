@@ -8,6 +8,7 @@
 #include "LabelledTextBox.h"
 #include "SvgButton.h"
 #include "VisualiserSettings.h"
+#include "VisualiserOpenGLComponent.h"
 
 enum class FullScreenMode {
     TOGGLE,
@@ -16,7 +17,7 @@ enum class FullScreenMode {
 };
 
 class VisualiserWindow;
-class VisualiserComponent : public juce::Component, public juce::Timer, public juce::Thread, public juce::MouseListener, public juce::SettableTooltipClient, public juce::AsyncUpdater {
+class VisualiserComponent : public juce::Component, public juce::Timer, public juce::Thread, public juce::MouseListener, public juce::SettableTooltipClient {
 public:
     VisualiserComponent(SampleRateManager& sampleRateManager, ConsumerManager& consumerManager, VisualiserSettings& settings, VisualiserComponent* parent = nullptr, bool useOldVisualiser = false, bool visualiserOnly = false);
     ~VisualiserComponent() override;
@@ -41,7 +42,6 @@ public:
     bool keyPressed(const juce::KeyPress& key) override;
     void setFullScreen(bool fullScreen);
     void setVisualiserType(bool oldVisualiser);
-    void handleAsyncUpdate() override;
     void toggleRecording();
     void haltRecording();
 
@@ -58,7 +58,6 @@ private:
     const double BUFFER_LENGTH_SECS = 1/60.0;
     const double DEFAULT_SAMPLE_RATE = 192000.0;
 
-    std::atomic<bool> restartBrowser = false;
     std::atomic<bool> audioUpdated = false;
     std::atomic<int> timerId;
     std::atomic<int> lastMouseX;
@@ -92,42 +91,10 @@ private:
 
     VisualiserSettings& settings;
     
-    juce::WebBrowserComponent::ResourceProvider provider = [this](const juce::String& path) {
-        juce::String mimeType;
-        if (path.endsWith("audio")) {
-            mimeType = "application/octet-stream";
-            juce::CriticalSection::ScopedLockType scope(lock);
-            std::vector<std::byte> data(buffer.size() * sizeof(float));
-            std::memcpy(data.data(), buffer.data(), data.size());
-            juce::WebBrowserComponent::Resource resource = { data, mimeType };
-            return resource;
-        } else if (path.endsWith(".html")) {
-            mimeType = "text/html";
-        } else if (path.endsWith(".jpg")) {
-            mimeType = "image/jpeg";
-        } else if (path.endsWith(".js")) {
-            mimeType = "text/javascript";
-        }  else if (path.endsWith(".svg")) {
-            mimeType = "image/svg+xml";
-        }
-        std::vector<std::byte> data;
-        int size;
-        const char* file = BinaryData::getNamedResource(path.substring(1).replaceCharacter('.', '_').toRawUTF8(), size);
-        for (int i = 0; i < size; i++) {
-            data.push_back((std::byte) file[i]);
-        }
-        juce::WebBrowserComponent::Resource resource = { data, mimeType };
-        return resource;
-    };
-
-    std::unique_ptr<juce::WebBrowserComponent> browser = nullptr;
-    // keeping this around for memory management reasons
-    std::unique_ptr<juce::WebBrowserComponent> oldBrowser = nullptr;
-    
+    VisualiserOpenGLComponent openGLVisualiser {settings};
     std::unique_ptr<juce::FileChooser> chooser;
     juce::File tempVideoFile;
     
-    void initialiseBrowser();
     void resetBuffer();
     void popoutWindow();
 
