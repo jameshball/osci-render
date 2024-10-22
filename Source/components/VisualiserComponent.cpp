@@ -4,7 +4,7 @@
 VisualiserComponent::VisualiserComponent(SampleRateManager& sampleRateManager, ConsumerManager& consumerManager, VisualiserSettings& settings, VisualiserComponent* parent, bool useOldVisualiser, bool visualiserOnly) : settings(settings), backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), sampleRateManager(sampleRateManager), consumerManager(consumerManager), oldVisualiser(useOldVisualiser), visualiserOnly(visualiserOnly), juce::Thread("VisualiserComponent"), parent(parent) {
     resetBuffer();
     if (!oldVisualiser) {
-        initialiseBrowser();
+        addAndMakeVisible(openGLVisualiser);
     }
     startTimerHz(60);
     startThread();
@@ -139,7 +139,7 @@ void VisualiserComponent::run() {
         setBuffer(tempBuffer);
         if (!oldVisualiser) {
             audioUpdated = true;
-            triggerAsyncUpdate();
+            // triggerAsyncUpdate();
         }
     }
 }
@@ -226,16 +226,9 @@ void VisualiserComponent::setVisualiserType(bool oldVisualiser) {
         child->setVisualiserType(oldVisualiser);
     }
     if (oldVisualiser) {
-        oldBrowser = std::move(browser);
-        if (oldBrowser != nullptr) {
-            removeChildComponent(oldBrowser.get());
-            oldBrowser->goToURL("about:blank");
-        }
         if (closeSettings != nullptr) {
             closeSettings();
         }
-    } else {
-        initialiseBrowser();
     }
 }
 
@@ -269,139 +262,22 @@ void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area
     }
 }
 
-void VisualiserComponent::initialiseBrowser() {
-    haltRecording();
-    oldBrowser = std::move(browser);
-    if (oldBrowser != nullptr) {
-        removeChildComponent(oldBrowser.get());
-        oldBrowser->goToURL("about:blank");
-    }
-    
-    browser = std::make_unique<juce::WebBrowserComponent>(
-        juce::WebBrowserComponent::Options()
-        .withNativeIntegrationEnabled()
-        .withResourceProvider(provider)
-        .withBackend(juce::WebBrowserComponent::Options::Backend::webview2)
-        .withKeepPageLoadedWhenBrowserIsHidden()
-        .withWinWebView2Options(
-            juce::WebBrowserComponent::Options::WinWebView2{}
-            .withUserDataFolder(juce::File::getSpecialLocation(juce::File::SpecialLocationType::userApplicationDataDirectory).getChildFile("osci-render"))
-            .withStatusBarDisabled()
-            .withBuiltInErrorPageDisabled()
-            .withBackgroundColour(Colours::dark)
-        )
-        .withNativeFunction("toggleFullscreen", [this](auto& var, auto complete) {
-            enableFullScreen();
-        })
-        .withNativeFunction("popout", [this](auto& var, auto complete) {
-            popoutWindow();
-        })
-        .withNativeFunction("settings", [this](auto& var, auto complete) {
-            openSettings();
-        })
-        .withNativeFunction("isDebug", [this](auto& var, auto complete) {
-#if JUCE_DEBUG
-            complete(true);
-#else
-            complete(false);
-#endif
-        })
-        .withNativeFunction("isOverlay", [this](auto& var, auto complete) {
-            complete(parent != nullptr);
-        })
-        .withNativeFunction("pause", [this](auto& var, auto complete) {
-            setPaused(active);
-        })
-        .withNativeFunction("getSettings", [this](auto& var, auto complete) {
-            complete(settings.getSettings());
-        })
-        .withNativeFunction("bufferSize", [this](auto& var, auto complete) {
-            complete((int) tempBuffer.size());
-        })
-        .withNativeFunction("sampleRate", [this](auto& var, auto complete) {
-            complete(sampleRate);
-        })
-        .withNativeFunction("isVisualiserOnly", [this](auto& var, auto complete) {
-            complete(visualiserOnly);
-        })
-        .withNativeFunction("sendVideoData", [this](const juce::Array<juce::var>& args, auto complete) {
-            juce::FileOutputStream stream{tempVideoFile};
-            juce::Base64::convertFromBase64(stream, args[0].toString());
-            stream.flush();
-        })
-        .withNativeFunction("finishRecording", [this](auto& var, auto complete) {
-            chooser = std::make_unique<juce::FileChooser>("Save video", juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDesktopDirectory).getChildFile("osci-render.webm"), "*.webm");
-            chooser->launchAsync(juce::FileBrowserComponent::saveMode,
-                [this](const juce::FileChooser& chooser) {
-                    juce::File result = chooser.getResult();
-                    if (result.getFullPathName().isNotEmpty()) {
-                        tempVideoFile.moveFileTo(result);
-                    }
-                });
-        })
-    );
-
-    addAndMakeVisible(*browser);
-    browser->goToURL(juce::WebBrowserComponent::getResourceProviderRoot() + "oscilloscope.html");
-    resized();
-}
-
 void VisualiserComponent::resetBuffer() {
     sampleRate = (int) sampleRateManager.getSampleRate();
     tempBuffer = std::vector<Point>(sampleRate * BUFFER_LENGTH_SECS);
-    if (!oldVisualiser && isShowing()) {
-        restartBrowser = true;
-        triggerAsyncUpdate();
-    }
-}
-
-void VisualiserComponent::handleAsyncUpdate() {
-    if (restartBrowser) {
-        initialiseBrowser();
-        restartBrowser = false;
-    }
-    if (audioUpdated && browser != nullptr) {
-        juce::CriticalSection::ScopedLockType scope(lock);
-        std::vector<float> rawBuffer;
-        if (settings.numChannels == 2) {
-            rawBuffer.reserve(buffer.size() * 2);
-            for (auto& point : buffer) {
-                rawBuffer.push_back(point.x);
-                rawBuffer.push_back(point.y);
-            }
-        } else if (settings.numChannels == 3) {
-            rawBuffer.reserve(buffer.size() * 3);
-            for (auto& point : buffer) {
-                rawBuffer.push_back(point.x);
-                rawBuffer.push_back(point.y);
-                rawBuffer.push_back(point.z);
-            }
-        }
-        browser->emitEventIfBrowserIsVisible("audioUpdated", juce::Base64::toBase64(rawBuffer.data(), rawBuffer.size() * sizeof(float)));
-        audioUpdated = false;
-    }
 }
 
 void VisualiserComponent::toggleRecording() {
-    if (oldVisualiser) {
-        return;
-    }
-    tempVideoFile = juce::File::createTempFile(".webm");
-    browser->emitEventIfBrowserIsVisible("toggleRecording", juce::var());
+    
 }
 
 void VisualiserComponent::haltRecording() {
-    if (oldVisualiser) {
-        return;
-    }
-    if (recordingHalted != nullptr) {
-        recordingHalted();
-    }
+    
 }
 
 void VisualiserComponent::resized() {
     if (!oldVisualiser) {
-        browser->setBounds(getLocalBounds());
+        openGLVisualiser.setBounds(getLocalBounds());
     }
     auto area = getLocalBounds();
     area.removeFromBottom(5);
@@ -417,9 +293,7 @@ void VisualiserComponent::resized() {
 }
 
 void VisualiserComponent::childChanged() {
-    if (!oldVisualiser && browser != nullptr) {
-        browser->emitEventIfBrowserIsVisible("childPresent", child != nullptr);
-    }
+    
 }
 
 void VisualiserComponent::popoutWindow() {
