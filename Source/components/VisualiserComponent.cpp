@@ -75,6 +75,10 @@ void VisualiserComponent::mouseDoubleClick(const juce::MouseEvent& event) {
 
 void VisualiserComponent::setBuffer(std::vector<Point>& newBuffer) {
     juce::CriticalSection::ScopedLockType scope(lock);
+    if (!oldVisualiser) {
+        openGLVisualiser.updateBuffer(newBuffer);
+        return;
+    }
     buffer.clear();
     int stride = oldVisualiser ? roughness.textBox.getValue() : 1;
     for (int i = 0; i < newBuffer.size(); i += stride) {
@@ -137,10 +141,6 @@ void VisualiserComponent::run() {
         consumerManager.consumerRead(consumer);
         
         setBuffer(tempBuffer);
-        if (!oldVisualiser) {
-            audioUpdated = true;
-            // triggerAsyncUpdate();
-        }
     }
 }
 
@@ -292,10 +292,6 @@ void VisualiserComponent::resized() {
     settingsButton.setBounds(buttonRow.removeFromRight(30));
 }
 
-void VisualiserComponent::childChanged() {
-    
-}
-
 void VisualiserComponent::popoutWindow() {
     haltRecording();
     auto visualiser = new VisualiserComponent(sampleRateManager, consumerManager, settings, this, oldVisualiser);
@@ -304,7 +300,6 @@ void VisualiserComponent::popoutWindow() {
     visualiser->closeSettings = closeSettings;
     visualiser->recordingHalted = recordingHalted;
     child = visualiser;
-    childChanged();
     popOutButton.setVisible(false);
     visualiser->setSize(300, 300);
     popout = std::make_unique<VisualiserWindow>("Software Oscilloscope", this);
