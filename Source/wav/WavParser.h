@@ -1,5 +1,5 @@
 #pragma once
-#include "../shape/Point.h"
+#include "../shape/OsciPoint.h"
 #include <JuceHeader.h>
 
 class OscirenderAudioProcessor;
@@ -8,7 +8,7 @@ public:
 	WavParser(OscirenderAudioProcessor& p, std::unique_ptr<juce::InputStream> stream);
 	~WavParser();
 
-	Point getSample();
+	OsciPoint getSample();
 
 private:
 	void setSampleRate(double sampleRate);

@@ -303,8 +303,10 @@ void VisualiserOpenGLComponent::openGLContextClosing() {
     outputShader.reset();
 }
 
-void VisualiserOpenGLComponent::updateBuffer(std::vector<Point>& buffer) {
+void VisualiserOpenGLComponent::updateBuffer(std::vector<OsciPoint>& buffer) {
     juce::CriticalSection::ScopedLockType lock(samplesLock);
+    
+    int newResampledSize = buffer.size() * RESAMPLE_RATIO + 1;
     
     if (samples.size() != buffer.size()) {
         needsReattach = true;
@@ -313,6 +315,12 @@ void VisualiserOpenGLComponent::updateBuffer(std::vector<Point>& buffer) {
     for (auto& point : buffer) {
         samples.push_back(point);
     }
+    
+    if (sampleRate != sampleRateManager.getSampleRate()) {
+        sampleRate = sampleRateManager.getSampleRate();
+        resampler.prepare(sampleRate, RESAMPLE_RATIO);
+    }
+    
     juce::MessageManager::getInstance()->callAsync([this] {
         if (needsReattach) {
             openGLContext.detach();
@@ -444,7 +452,7 @@ Texture VisualiserOpenGLComponent::makeTexture(int width, int height) {
     return { textureID, width, height };
 }
 
-void VisualiserOpenGLComponent::drawLineTexture(std::vector<Point>& points) {
+void VisualiserOpenGLComponent::drawLineTexture(std::vector<OsciPoint>& points) {
     using namespace juce::gl;
     
     fadeAmount = juce::jmin(1.0, std::pow(0.5, settings.getPersistence()) * 0.4);
@@ -573,7 +581,7 @@ void VisualiserOpenGLComponent::setNormalBlending() {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
-void VisualiserOpenGLComponent::drawLine(std::vector<Point>& points) {
+void VisualiserOpenGLComponent::drawLine(std::vector<OsciPoint>& points) {
     using namespace juce::gl;
     
     setAdditiveBlending();

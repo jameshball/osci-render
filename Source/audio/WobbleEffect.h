@@ -1,6 +1,6 @@
 #pragma once
 #include "EffectApplication.h"
-#include "../shape/Point.h"
+#include "../shape/OsciPoint.h"
 #include "PitchDetector.h"
 
 class WobbleEffect : public EffectApplication {
@@ -8,7 +8,7 @@ public:
 	WobbleEffect(PitchDetector& pitchDetector);
 	~WobbleEffect();
 
-	Point apply(int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override;
+	OsciPoint apply(int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) override;
 
 private:
 	PitchDetector& pitchDetector;

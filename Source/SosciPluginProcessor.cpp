@@ -190,7 +190,7 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             }
         }
 
-        Point point = { x, y, brightness };
+        OsciPoint point = { x, y, brightness };
 
         for (auto& effect : allEffects) {
             point = effect->apply(sample, point);

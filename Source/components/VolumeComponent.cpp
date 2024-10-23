@@ -149,5 +149,5 @@ void VolumeComponent::resized() {
 
 void VolumeComponent::resetBuffer() {
     sampleRate = (int) audioProcessor.currentSampleRate;
-    buffer = std::vector<Point>(BUFFER_DURATION_SECS * sampleRate);
+    buffer = std::vector<OsciPoint>(BUFFER_DURATION_SECS * sampleRate);
 }

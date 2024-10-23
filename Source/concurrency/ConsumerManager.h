@@ -1,7 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "../shape/Point.h"
+#include "../shape/OsciPoint.h"
 #include "BufferConsumer.h"
 
 
@@ -10,7 +10,7 @@ public:
     ConsumerManager() {}
     ~ConsumerManager() {}
 
-    std::shared_ptr<BufferConsumer> consumerRegister(std::vector<Point>& buffer) {
+    std::shared_ptr<BufferConsumer> consumerRegister(std::vector<OsciPoint>& buffer) {
         std::shared_ptr<BufferConsumer> consumer = std::make_shared<BufferConsumer>(buffer);
         juce::SpinLock::ScopedLockType scope(consumerLock);
         consumers.push_back(consumer);

@@ -25,19 +25,19 @@ void WavParser::setSampleRate(double sampleRate) {
     currentSampleRate = sampleRate;
 }
 
-Point WavParser::getSample() {
+OsciPoint WavParser::getSample() {
     if (currentSampleRate != audioProcessor.currentSampleRate) {
         setSampleRate(audioProcessor.currentSampleRate);
     }
     if (source == nullptr) {
-        return Point();
+        return OsciPoint();
     }
 
     source->getNextAudioBlock(juce::AudioSourceChannelInfo(audioBuffer));
     
     if (audioBuffer.getNumChannels() == 1) {
-        return Point(audioBuffer.getSample(0, 0), audioBuffer.getSample(0, 0));
+        return OsciPoint(audioBuffer.getSample(0, 0), audioBuffer.getSample(0, 0));
     } else {
-        return Point(audioBuffer.getSample(0, 0), audioBuffer.getSample(1, 0));
+        return OsciPoint(audioBuffer.getSample(0, 0), audioBuffer.getSample(1, 0));
     }
 }

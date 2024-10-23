@@ -1,5 +1,5 @@
 #pragma once
-#include "../shape/Point.h"
+#include "../shape/OsciPoint.h"
 #include <JuceHeader.h>
 #include "../shape/Shape.h"
 #include "../svg/SvgParser.h"
@@ -12,7 +12,7 @@ public:
 	~ImageParser();
 
 	void setFrame(int index);
-	Point getSample();
+	OsciPoint getSample();
 
 private:
 	void findNearestNeighbour(int searchRadius, float thresholdPow, int stride, bool invert);

@@ -1,11 +1,11 @@
 #pragma once
-#include "../shape/Point.h"
+#include "../shape/OsciPoint.h"
 #include <JuceHeader.h>
 #include "EffectApplication.h"
 #include "EffectParameter.h"
 #include "BooleanParameter.h"
 
-typedef std::function<Point(int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate)> EffectApplicationType;
+typedef std::function<OsciPoint(int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate)> EffectApplicationType;
 
 class Effect {
 public:
@@ -16,7 +16,7 @@ public:
     Effect(const std::vector<EffectParameter*>& parameters);
     Effect(EffectParameter* parameter);
 
-	Point apply(int index, Point input, double volume = 0.0);
+	OsciPoint apply(int index, OsciPoint input, double volume = 0.0);
 	
 	void apply();
 	double getValue(int index);

@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include "VisualiserSettings.h"
 #include "../audio/SampleRateManager.h"
+#include "../shape/OsciPoint.h"
 
 struct Texture {
     GLuint id;
@@ -20,7 +21,7 @@ public:
     void openGLContextClosing() override;
     void resized() override;
     void paint(juce::Graphics& g) override;
-    void updateBuffer(std::vector<Point>& buffer);
+    void updateBuffer(std::vector<OsciPoint>& buffer);
     void setPaused(bool paused);
 
 private:
@@ -37,7 +38,13 @@ private:
 
     juce::CriticalSection samplesLock;
     bool needsReattach = true;
-    std::vector<Point> samples = std::vector<Point>(2);
+    std::vector<OsciPoint> samples = std::vector<OsciPoint>(2);
+    std::vector<float> xSamples;
+    std::vector<float> ySamples;
+    std::vector<float> zSamples;
+    std::vector<float> smoothedXSamples;
+    std::vector<float> smoothedYSamples;
+    std::vector<float> smoothedZSamples;
     
     std::vector<float> scratchVertices;
     std::vector<float> fullScreenQuad;
@@ -69,17 +76,21 @@ private:
     
     bool paused = false;
     
+    const double RESAMPLE_RATIO = 6.0;
+    double sampleRate = -1;
+    chowdsp::ResamplingTypes::LanczosResampler<4096, 8> resampler;
+    
     Texture makeTexture(int width, int height);
     void setupArrays(int num_points);
     void setupTextures();
-    void drawLineTexture(std::vector<Point>& points);
+    void drawLineTexture(std::vector<OsciPoint>& points);
     void saveTextureToFile(GLuint textureID, int width, int height, const juce::File& file);
     void activateTargetTexture(std::optional<Texture> texture);
     void setShader(juce::OpenGLShaderProgram* program);
     void drawTexture(std::optional<Texture> texture0, std::optional<Texture> texture1 = std::nullopt, std::optional<Texture> texture2 = std::nullopt, std::optional<Texture> texture3 = std::nullopt);
     void setAdditiveBlending();
     void setNormalBlending();
-    void drawLine(std::vector<Point>& points);
+    void drawLine(std::vector<OsciPoint>& points);
     void fade();
     void drawCRT();
     void checkGLErrors(const juce::String& location);
