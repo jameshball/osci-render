@@ -5,6 +5,7 @@
 VisualiserOpenGLComponent::VisualiserOpenGLComponent(VisualiserSettings& settings, SampleRateManager& sampleRateManager) : settings(settings), sampleRateManager(sampleRateManager) {
     openGLContext.setRenderer(this);
     openGLContext.attachTo(*this);
+    setInterceptsMouseClicks(false, false);
 }
 
 VisualiserOpenGLComponent::~VisualiserOpenGLComponent() {
@@ -780,5 +781,21 @@ void VisualiserOpenGLComponent::checkGLErrors(const juce::String& location) {
             default: errorMessage = "Unknown OpenGL error"; break;
         }
         DBG("OpenGL error at " + location + ": " + errorMessage);
+    }
+}
+
+void VisualiserOpenGLComponent::setPaused(bool paused) {
+    this->paused = paused;
+    repaint();
+}
+
+void VisualiserOpenGLComponent::paint(juce::Graphics& g) {
+    if (paused) {
+        g.setColour(juce::Colours::black.withAlpha(0.5f));
+        g.fillRect(getLocalBounds());
+        
+        g.setColour(juce::Colours::white);
+        g.setFont(30.0f);
+        g.drawText("Paused", getLocalBounds(), juce::Justification::centred);
     }
 }
