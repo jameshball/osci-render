@@ -32,26 +32,6 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p)
             standalone->getMuteInputValue().setValue(false);
         }
     }
-
-    addAndMakeVisible(settings);
-    
-    settings.onClick = [this] {
-        openVisualiserSettings();
-    };
-    
-    addAndMakeVisible(record);
-    record.setPulseAnimation(true);
-    record.onClick = [this] {
-        visualiser.toggleRecording();
-        stopwatch.stop();
-        stopwatch.reset();
-        if (record.getToggleState()) {
-            stopwatch.start();
-        }
-        resized();
-    };
-    
-    addAndMakeVisible(stopwatch);
     
     addAndMakeVisible(visualiser);
 
@@ -61,10 +41,6 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p)
 
     visualiser.closeSettings = [this] {
         visualiserSettingsWindow.setVisible(false);
-    };
-    
-    visualiser.recordingHalted = [this] {
-        record.setToggleState(false, juce::NotificationType::dontSendNotification);
     };
 
     visualiserSettingsWindow.setResizable(false, false);
@@ -78,8 +54,10 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p)
     visualiserSettings.setSize(550, 340);
     visualiserSettingsWindow.setContentNonOwned(&visualiserSettings, true);
     visualiserSettingsWindow.centreWithSize(550, 340);
+    
+    menuBar.toFront(true);
 
-    setSize(750, 750);
+    setSize(725, 750);
     setResizable(true, true);
     setResizeLimits(250, 250, 999999, 999999);
 }
@@ -96,20 +74,10 @@ void SosciPluginEditor::paint(juce::Graphics& g) {
 void SosciPluginEditor::resized() {
     auto area = getLocalBounds();
 
-    auto topBar = area.removeFromTop(25);
-    settings.setBounds(topBar.removeFromRight(25));
-    topBar.removeFromRight(5);
-    record.setBounds(topBar.removeFromRight(25));
-    if (record.getToggleState()) {
-        stopwatch.setVisible(true);
-        stopwatch.setBounds(topBar.removeFromRight(100));
-    } else {
-        stopwatch.setVisible(false);
-    }
+    auto topBar = area.removeFromTop(25).removeFromLeft(200);
     
     menuBar.setBounds(topBar);
-
-    visualiser.setBounds(area);
+    visualiser.setBounds(getLocalBounds());
 }
 
 bool SosciPluginEditor::keyPressed(const juce::KeyPress& key) {

@@ -19,7 +19,9 @@ public:
     void renderOpenGL() override;
     void openGLContextClosing() override;
     void resized() override;
+    void paint(juce::Graphics& g) override;
     void updateBuffer(std::vector<Point>& buffer);
+    void setPaused(bool paused);
 
 private:
     juce::OpenGLContext openGLContext;
@@ -64,6 +66,8 @@ private:
     float fadeAmount;
     bool smudgesEnabled = settings.getSmudgesEnabled();
     bool graticuleEnabled = settings.getGraticuleEnabled();
+    
+    bool paused = false;
     
     Texture makeTexture(int width, int height);
     void setupArrays(int num_points);

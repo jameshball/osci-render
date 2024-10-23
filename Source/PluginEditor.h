@@ -27,6 +27,9 @@ public:
     void handleAsyncUpdate() override;
     void changeListenerCallback(juce::ChangeBroadcaster* source) override;
     void toggleLayout(juce::StretchableLayoutManager& layout, double prefSize);
+    
+    void openVisualiserSettings();
+    void closeVisualiserSettings();
 
     void editCustomFunction(bool enabled);
 

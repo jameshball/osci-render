@@ -3,11 +3,24 @@
 
 VisualiserComponent::VisualiserComponent(SampleRateManager& sampleRateManager, ConsumerManager& consumerManager, VisualiserSettings& settings, VisualiserComponent* parent, bool useOldVisualiser, bool visualiserOnly) : settings(settings), backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), sampleRateManager(sampleRateManager), consumerManager(consumerManager), oldVisualiser(useOldVisualiser), visualiserOnly(visualiserOnly), juce::Thread("VisualiserComponent"), parent(parent) {
     resetBuffer();
-    if (!oldVisualiser) {
-        addAndMakeVisible(openGLVisualiser);
-    }
+    addChildComponent(openGLVisualiser);
+    setVisualiserType(oldVisualiser);
     startTimerHz(60);
     startThread();
+    
+    addAndMakeVisible(record);
+    record.setPulseAnimation(true);
+    record.onClick = [this] {
+        toggleRecording();
+        stopwatch.stop();
+        stopwatch.reset();
+        if (record.getToggleState()) {
+            stopwatch.start();
+        }
+        resized();
+    };
+    
+    addAndMakeVisible(stopwatch);
     
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
     setWantsKeyboardFocus(true);
@@ -21,25 +34,29 @@ VisualiserComponent::VisualiserComponent(SampleRateManager& sampleRateManager, C
         this->settings.parameters.intensity = intensity.textBox.getValue();
     };
     
-    if (parent == nullptr) {
-        addChildComponent(fullScreenButton);
+    if (parent == nullptr && !visualiserOnly) {
+        addAndMakeVisible(fullScreenButton);
     }
-    if (child == nullptr && parent == nullptr) {
-        addChildComponent(popOutButton);
+    if (child == nullptr && parent == nullptr && !visualiserOnly) {
+        addAndMakeVisible(popOutButton);
     }
-    addChildComponent(settingsButton);
+    addAndMakeVisible(settingsButton);
     
     fullScreenButton.onClick = [this]() {
         enableFullScreen();
     };
     
     settingsButton.onClick = [this]() {
-        juce::PopupMenu menu;
+        if (oldVisualiser) {
+            juce::PopupMenu menu;
 
-        menu.addCustomItem(1, roughness, 160, 40, false);
-        menu.addCustomItem(1, intensity, 160, 40, false);
+            menu.addCustomItem(1, roughness, 160, 40, false);
+            menu.addCustomItem(1, intensity, 160, 40, false);
 
-        menu.showMenuAsync(juce::PopupMenu::Options(), [this](int result) {});
+            menu.showMenuAsync(juce::PopupMenu::Options(), [this](int result) {});
+        } else if (openSettings != nullptr) {
+            openSettings();
+        }
     };
     
     popOutButton.onClick = [this]() {
@@ -92,11 +109,13 @@ void VisualiserComponent::setColours(juce::Colour bk, juce::Colour fg) {
 }
 
 void VisualiserComponent::paint(juce::Graphics& g) {
+    g.fillAll(Colours::veryDark);
     if (oldVisualiser) {
         g.setColour(backgroundColour);
         g.fillRoundedRectangle(getLocalBounds().toFloat(), OscirenderLookAndFeel::RECT_RADIUS);
         
         auto r = getLocalBounds().toFloat();
+        r.removeFromBottom(25);
         auto minDim = juce::jmin(r.getWidth(), r.getHeight());
         
         {
@@ -111,13 +130,13 @@ void VisualiserComponent::paint(juce::Graphics& g) {
         if (!active) {
             // add translucent layer
             g.setColour(juce::Colours::black.withAlpha(0.5f));
-            g.fillRoundedRectangle(getLocalBounds().toFloat(), OscirenderLookAndFeel::RECT_RADIUS);
+            g.fillRoundedRectangle(r, OscirenderLookAndFeel::RECT_RADIUS);
             
             // add text
             g.setColour(juce::Colours::white);
             g.setFont(14.0f);
             auto text = child != nullptr ? "Open in separate window" : "Paused";
-            g.drawFittedText(text, getLocalBounds(), juce::Justification::centred, 1);
+            g.drawFittedText(text, r.toNearestInt(), juce::Justification::centred, 1);
         }
     }
 }
@@ -145,6 +164,7 @@ void VisualiserComponent::run() {
 }
 
 void VisualiserComponent::setPaused(bool paused) {
+    openGLVisualiser.setPaused(paused);
     active = !paused;
     if (active) {
         startTimerHz(60);
@@ -161,50 +181,9 @@ void VisualiserComponent::setPaused(bool paused) {
 }
 
 void VisualiserComponent::mouseDown(const juce::MouseEvent& event) {
-    if (!oldVisualiser) return;
     if (event.mods.isLeftButtonDown() && child == nullptr) {
         setPaused(active);
     }
-}
-
-void VisualiserComponent::mouseMove(const juce::MouseEvent& event) {
-    if (!oldVisualiser) return;
-    if (event.getScreenX() == lastMouseX && event.getScreenY() == lastMouseY) {
-        return;
-    }
-    lastMouseX = event.getScreenX();
-    lastMouseY = event.getScreenY();
-    
-    int newTimerId = juce::Random::getSystemRandom().nextInt();
-    timerId = newTimerId;
-    if (parent == nullptr) {
-        fullScreenButton.setVisible(true);
-    }
-    if (child == nullptr && parent == nullptr) {
-        popOutButton.setVisible(true);
-    }
-    settingsButton.setVisible(true);
-    auto pos = event.getScreenPosition();
-    auto parent = this->parent;
-    
-    juce::Timer::callAfterDelay(1000, [this, newTimerId, pos, parent]() {
-        if (parent == nullptr || parent->child == this) {
-            bool onButtonRow = settingsButton.getScreenBounds().contains(pos);
-            if (parent == nullptr) {
-                onButtonRow |= fullScreenButton.getScreenBounds().contains(pos);
-            }
-            if (child == nullptr && parent == nullptr) {
-                onButtonRow |= popOutButton.getScreenBounds().contains(pos);
-            }
-            if (timerId == newTimerId && !onButtonRow) {
-                fullScreenButton.setVisible(false);
-                popOutButton.setVisible(false);
-                settingsButton.setVisible(false);
-                repaint();
-            }
-        }
-    });
-    repaint();
 }
 
 bool VisualiserComponent::keyPressed(const juce::KeyPress& key) {
@@ -230,6 +209,9 @@ void VisualiserComponent::setVisualiserType(bool oldVisualiser) {
             closeSettings();
         }
     }
+    openGLVisualiser.setVisible(!oldVisualiser);
+    resized();
+    repaint();
 }
 
 void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area) {
@@ -272,24 +254,34 @@ void VisualiserComponent::toggleRecording() {
 }
 
 void VisualiserComponent::haltRecording() {
-    
+    record.setToggleState(false, juce::NotificationType::dontSendNotification);
 }
 
 void VisualiserComponent::resized() {
-    if (!oldVisualiser) {
-        openGLVisualiser.setBounds(getLocalBounds());
-    }
     auto area = getLocalBounds();
-    area.removeFromBottom(5);
-    auto buttonRow = area.removeFromBottom(25);
-    
-    if (parent == nullptr) {
-        fullScreenButton.setBounds(buttonRow.removeFromRight(30));
+    juce::Rectangle<int> topRow;
+    if (visualiserOnly) {
+        topRow = area.removeFromTop(25);
+    } else {
+        topRow = area.removeFromBottom(25);
     }
-    if (child == nullptr && parent == nullptr) {
-        popOutButton.setBounds(buttonRow.removeFromRight(30));
+    if (parent == nullptr && !visualiserOnly) {
+        fullScreenButton.setBounds(topRow.removeFromRight(30));
     }
-    settingsButton.setBounds(buttonRow.removeFromRight(30));
+    if (child == nullptr && parent == nullptr && !visualiserOnly) {
+        popOutButton.setBounds(topRow.removeFromRight(30));
+    }
+    settingsButton.setBounds(topRow.removeFromRight(30));
+    record.setBounds(topRow.removeFromRight(25));
+    if (record.getToggleState()) {
+        stopwatch.setVisible(true);
+        stopwatch.setBounds(topRow.removeFromRight(100));
+    } else {
+        stopwatch.setVisible(false);
+    }
+    if (!oldVisualiser) {
+        openGLVisualiser.setBounds(area);
+    }
 }
 
 void VisualiserComponent::popoutWindow() {
@@ -300,15 +292,18 @@ void VisualiserComponent::popoutWindow() {
     visualiser->closeSettings = closeSettings;
     visualiser->recordingHalted = recordingHalted;
     child = visualiser;
-    popOutButton.setVisible(false);
-    visualiser->setSize(300, 300);
+    childUpdated();
+    visualiser->setSize(300, 325);
     popout = std::make_unique<VisualiserWindow>("Software Oscilloscope", this);
     popout->setContentOwned(visualiser, true);
     popout->setUsingNativeTitleBar(true);
     popout->setResizable(true, false);
     popout->setVisible(true);
-    popout->centreWithSize(300, 300);
+    popout->centreWithSize(300, 325);
     setPaused(true);
     resized();
-    popOutButton.setVisible(false);
+}
+
+void VisualiserComponent::childUpdated() {
+    popOutButton.setVisible(child == nullptr);
 }

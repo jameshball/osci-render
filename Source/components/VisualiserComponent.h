@@ -9,6 +9,7 @@
 #include "SvgButton.h"
 #include "VisualiserSettings.h"
 #include "VisualiserOpenGLComponent.h"
+#include "StopwatchComponent.h"
 
 enum class FullScreenMode {
     TOGGLE,
@@ -37,12 +38,12 @@ public:
 	void run() override;
     void setPaused(bool paused);
     void mouseDown(const juce::MouseEvent& event) override;
-    void mouseMove(const juce::MouseEvent& event) override;
     bool keyPressed(const juce::KeyPress& key) override;
     void setFullScreen(bool fullScreen);
     void setVisualiserType(bool oldVisualiser);
     void toggleRecording();
     void haltRecording();
+    void childUpdated();
 
     VisualiserComponent* parent = nullptr;
     VisualiserComponent* child = nullptr;
@@ -93,6 +94,9 @@ private:
     std::unique_ptr<juce::FileChooser> chooser;
     juce::File tempVideoFile;
     
+    StopwatchComponent stopwatch;
+    SvgButton record{"Record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f)};
+    
     void resetBuffer();
     void popoutWindow();
 
@@ -107,6 +111,7 @@ public:
     void closeButtonPressed() override {
         parent->setPaused(wasPaused);
         parent->child = nullptr;
+        parent->childUpdated();
         parent->resized();
         parent->popout.reset();
     }

@@ -104,8 +104,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     addAndMakeVisible(visualiser);
 
     visualiser.openSettings = [this] {
-        visualiserSettingsWindow.setVisible(true);
-        visualiserSettingsWindow.toFront(true);
+        openVisualiserSettings();
     };
 
     visualiser.closeSettings = [this] {
@@ -139,6 +138,15 @@ OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
         menuBarModel.setMacMainMenu(nullptr);
     }
 #endif
+}
+
+void OscirenderAudioProcessorEditor::openVisualiserSettings() {
+    visualiserSettingsWindow.setVisible(true);
+    visualiserSettingsWindow.toFront(true);
+}
+
+void OscirenderAudioProcessorEditor::closeVisualiserSettings() {
+    visualiserSettingsWindow.setVisible(false);
 }
 
 bool OscirenderAudioProcessorEditor::isBinaryFile(juce::String name) {
