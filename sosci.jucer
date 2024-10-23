@@ -103,9 +103,9 @@
               file="Source/concurrency/ConsumerManager.h"/>
       </GROUP>
       <GROUP id="{92CEA658-C82C-9CEB-15EB-945EF6B6B5C8}" name="shape">
+        <FILE id="VdK1eT" name="OsciPoint.cpp" compile="1" resource="0" file="Source/shape/OsciPoint.cpp"/>
+        <FILE id="rjbwYE" name="OsciPoint.h" compile="0" resource="0" file="Source/shape/OsciPoint.h"/>
         <FILE id="G5fbub" name="Shape.cpp" compile="1" resource="0" file="Source/shape/Shape.cpp"/>
-        <FILE id="nUpro8" name="Point.cpp" compile="1" resource="0" file="Source/shape/Point.cpp"/>
-        <FILE id="X6A0jk" name="Point.h" compile="0" resource="0" file="Source/shape/Point.h"/>
         <FILE id="NmptSY" name="Shape.h" compile="0" resource="0" file="Source/shape/Shape.h"/>
       </GROUP>
       <FILE id="d2zFqF" name="LookAndFeel.cpp" compile="1" resource="0" file="Source/LookAndFeel.cpp"/>
@@ -146,6 +146,14 @@
         <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
         <MODULEPATH id="juce_animation" path="../../../JUCE/modules"/>
+        <MODULEPATH id="chowdsp_dsp_utils" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_filters" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_simd" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_buffers" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
       </MODULEPATHS>
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/sosci/VisualStudio2022" smallIcon="pSc1mq"
@@ -171,6 +179,14 @@
         <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
         <MODULEPATH id="juce_animation" path="../../../JUCE/modules"/>
+        <MODULEPATH id="chowdsp_dsp_utils" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_filters" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_simd" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_buffers" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
       </MODULEPATHS>
     </VS2022>
     <XCODE_MAC targetFolder="Builds/sosci/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak"
@@ -197,10 +213,28 @@
         <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
         <MODULEPATH id="juce_animation" path="../../../JUCE/modules"/>
+        <MODULEPATH id="chowdsp_dsp_utils" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_filters" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_simd" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_buffers" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
       </MODULEPATHS>
     </XCODE_MAC>
   </EXPORTFORMATS>
   <MODULES>
+    <MODULE id="chowdsp_buffers" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="chowdsp_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="chowdsp_data_structures" showAllCode="1" useLocalCopy="0"
+            useGlobalPath="0"/>
+    <MODULE id="chowdsp_dsp_data_structures" showAllCode="1" useLocalCopy="0"
+            useGlobalPath="0"/>
+    <MODULE id="chowdsp_dsp_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="chowdsp_filters" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="chowdsp_math" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="chowdsp_simd" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="juce_animation" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>

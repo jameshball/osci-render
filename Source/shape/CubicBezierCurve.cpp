@@ -2,7 +2,7 @@
 
 CubicBezierCurve::CubicBezierCurve(double x1, double y1, double x2, double y2, double x3, double y3, double x4, double y4) : x1(x1), y1(y1), x2(x2), y2(y2), x3(x3), y3(y3), x4(x4), y4(y4) {}
 
-Point CubicBezierCurve::nextVector(double t) {
+OsciPoint CubicBezierCurve::nextVector(double t) {
 	double pow1 = pow(1 - t, 3);
 	double pow2 = pow(1 - t, 2);
 	double pow3 = pow(t, 2);
@@ -11,7 +11,7 @@ Point CubicBezierCurve::nextVector(double t) {
 	double x = pow1 * x1 + 3 * pow2 * t * x2 + 3 * (1 - t) * pow3 * x3 + pow4 * x4;
 	double y = pow1 * y1 + 3 * pow2 * t * y2 + 3 * (1 - t) * pow3 * y3 + pow4 * y4;
 	
-	return Point(x, y);
+	return OsciPoint(x, y);
 }
 
 void CubicBezierCurve::scale(double x, double y, double z) {

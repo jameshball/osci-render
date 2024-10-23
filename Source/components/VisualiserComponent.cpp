@@ -90,7 +90,7 @@ void VisualiserComponent::mouseDoubleClick(const juce::MouseEvent& event) {
     enableFullScreen();
 }
 
-void VisualiserComponent::setBuffer(std::vector<Point>& newBuffer) {
+void VisualiserComponent::setBuffer(std::vector<OsciPoint>& newBuffer) {
     juce::CriticalSection::ScopedLockType scope(lock);
     if (!oldVisualiser) {
         openGLVisualiser.updateBuffer(newBuffer);
@@ -246,7 +246,7 @@ void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area
 
 void VisualiserComponent::resetBuffer() {
     sampleRate = (int) sampleRateManager.getSampleRate();
-    tempBuffer = std::vector<Point>(sampleRate * BUFFER_LENGTH_SECS);
+    tempBuffer = std::vector<OsciPoint>(sampleRate * BUFFER_LENGTH_SECS);
 }
 
 void VisualiserComponent::toggleRecording() {

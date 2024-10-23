@@ -4,7 +4,7 @@ SmoothEffect::SmoothEffect() {}
 
 SmoothEffect::~SmoothEffect() {}
 
-Point SmoothEffect::apply(int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+OsciPoint SmoothEffect::apply(int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
     double weight = juce::jmax(values[0].load(), 0.00001);
     weight *= 0.95;
     double strength = 10;

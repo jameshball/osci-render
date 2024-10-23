@@ -1,0 +1,3 @@
+[submodule "modules/chowdsp_utils"]
+	path = modules/chowdsp_utils
+	url = git@github.com:Chowdhury-DSP/chowdsp_utils.git

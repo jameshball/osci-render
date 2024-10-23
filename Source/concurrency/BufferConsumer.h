@@ -1,7 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "../shape/Point.h"
+#include "../shape/OsciPoint.h"
 #include <mutex>
 #include <condition_variable>
 
@@ -42,7 +42,7 @@ public:
 
 class BufferConsumer {
 public:
-    BufferConsumer(std::vector<Point>& buffer) : buffer(buffer) {}
+    BufferConsumer(std::vector<OsciPoint>& buffer) : buffer(buffer) {}
 
     ~BufferConsumer() {}
     
@@ -62,14 +62,14 @@ public:
         sema.release();
     }
 
-    void write(Point point) {
+    void write(OsciPoint point) {
         if (offset < buffer.size()) {
             buffer[offset++] = point;
         }
     }
 
 private:
-    std::vector<Point>& buffer;
+    std::vector<OsciPoint>& buffer;
     Semaphore sema{0};
     int offset = 0;
 };

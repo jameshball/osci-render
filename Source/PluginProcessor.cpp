@@ -45,8 +45,8 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         new EffectParameter("Vector Cancelling", "Inverts the audio and image every few samples to 'cancel out' the audio, making the audio quiet, and distorting the image.", "vectorCancelling", VERSION_HINT, 0.1111111, 0.0, 1.0)
     ));
 	toggleableEffects.push_back(std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
-            return input * Point(values[0], values[1], values[2]);
+        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+            return input * OsciPoint(values[0], values[1], values[2]);
 		}, std::vector<EffectParameter*>{
 		    new EffectParameter("Scale X", "Scales the object in the horizontal direction.", "scaleX", VERSION_HINT, 1.0, -5.0, 5.0),
 			new EffectParameter("Scale Y", "Scales the object in the vertical direction.", "scaleY", VERSION_HINT, 1.0, -5.0, 5.0),
@@ -54,9 +54,9 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
 	    }
 	));
     toggleableEffects.push_back(std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
 			int flip = index % 2 == 0 ? 1 : -1;
-			Point jitter = Point(flip * values[0], flip * values[1], flip * values[2]);
+			OsciPoint jitter = OsciPoint(flip * values[0], flip * values[1], flip * values[2]);
 			return input + jitter;
         }, std::vector<EffectParameter*>{
             new EffectParameter("Distort X", "Distorts the image in the horizontal direction by jittering the audio sample being drawn.", "distortX", VERSION_HINT, 0.0, 0.0, 1.0),
@@ -65,7 +65,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
 	    }
     ));
     auto rippleEffect = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             double phase = values[1] * std::numbers::pi;
             double distance = 100 * values[2] * (input.x * input.x + input.y * input.y);
             input.z += values[0] * std::sin(phase + distance);
@@ -79,7 +79,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     rippleEffect->getParameter("ripplePhase")->lfo->setUnnormalisedValueNotifyingHost((int) LfoType::Sawtooth);
     toggleableEffects.push_back(rippleEffect);
     auto rotateEffect = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             input.rotate(values[0] * std::numbers::pi, values[1] * std::numbers::pi, values[2] * std::numbers::pi);
             return input;
         }, std::vector<EffectParameter*>{
@@ -92,8 +92,8 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     rotateEffect->getParameter("rotateY")->lfoRate->setUnnormalisedValueNotifyingHost(0.2);
     toggleableEffects.push_back(rotateEffect);
     toggleableEffects.push_back(std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
-            return input + Point(values[0], values[1], values[2]);
+        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+            return input + OsciPoint(values[0], values[1], values[2]);
         }, std::vector<EffectParameter*>{
             new EffectParameter("Translate X", "Moves the object horizontally.", "translateX", VERSION_HINT, 0.0, -1.0, 1.0),
             new EffectParameter("Translate Y", "Moves the object vertically.", "translateY", VERSION_HINT, 0.0, -1.0, 1.0),
@@ -101,11 +101,11 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         }
     ));
     toggleableEffects.push_back(std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             double length = 10 * values[0] * input.magnitude();
             double newX = input.x * std::cos(length) - input.y * std::sin(length);
             double newY = input.x * std::sin(length) + input.y * std::cos(length);
-            return Point(newX, newY, input.z);
+            return OsciPoint(newX, newY, input.z);
         }, std::vector<EffectParameter*>{
             new EffectParameter("Swirl", "Swirls the image in a spiral pattern.", "swirl", VERSION_HINT, 0.3, -1.0, 1.0),
         }
@@ -340,7 +340,7 @@ void OscirenderAudioProcessor::addLuaSlider() {
     }
 
     luaEffects.push_back(std::make_shared<Effect>(
-        [this, sliderIndex](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+        [this, sliderIndex](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             luaValues[sliderIndex].store(values[0]);
             return input;
         }, new EffectParameter(
@@ -710,7 +710,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         currentVolume = std::sqrt(squaredVolume);
         currentVolume = juce::jlimit(0.0, 1.0, currentVolume);
 
-        Point channels = { outputBuffer3d.getSample(0, sample), outputBuffer3d.getSample(1, sample), outputBuffer3d.getSample(2, sample) };
+        OsciPoint channels = { outputBuffer3d.getSample(0, sample), outputBuffer3d.getSample(1, sample), outputBuffer3d.getSample(2, sample) };
 
         {
             juce::SpinLock::ScopedLockType lock1(parsersLock);
@@ -753,7 +753,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         {
             juce::SpinLock::ScopedLockType scope(consumerLock);
             for (auto consumer : consumers) {
-                consumer->write(Point(x, y, 1));
+                consumer->write(OsciPoint(x, y, 1));
                 consumer->notifyIfFull();
             }
         }

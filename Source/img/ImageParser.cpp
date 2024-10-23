@@ -146,7 +146,7 @@ void ImageParser::findNearestNeighbour(int searchRadius, float thresholdPow, int
     findWhite(thresholdPow, invert);
 }
 
-Point ImageParser::getSample() {
+OsciPoint ImageParser::getSample() {
     if (count % jumpFrequency() == 0) {
         resetPosition();
     }
@@ -162,5 +162,5 @@ Point ImageParser::getSample() {
     count++;
     float widthDiff = (maxDim - width) / 2;
     float heightDiff = (maxDim - height) / 2;
-    return Point(2 * (currentX + widthDiff) / maxDim - 1, 2 * (currentY + heightDiff) / maxDim - 1);
+    return OsciPoint(2 * (currentX + widthDiff) / maxDim - 1, 2 * (currentY + heightDiff) / maxDim - 1);
 }

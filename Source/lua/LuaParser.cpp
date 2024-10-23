@@ -24,7 +24,7 @@ void LuaParser::resetMaximumInstructions(lua_State*& L) {
     lua_sethook(L, LuaParser::maximumInstructionsReached, 0, 0);
 }
 
-static int pointToTable(lua_State* L, Point point, int numDims) {
+static int pointToTable(lua_State* L, OsciPoint point, int numDims) {
     lua_newtable(L);
     if (numDims == 1) {
         lua_pushnumber(L, point.x);
@@ -46,8 +46,8 @@ static int pointToTable(lua_State* L, Point point, int numDims) {
     return 1;
 }
 
-static Point tableToPoint(lua_State* L, int index) {
-    Point point;
+static OsciPoint tableToPoint(lua_State* L, int index) {
+    OsciPoint point;
     lua_pushinteger(L, 1);
     lua_gettable(L, index);
     point.x = lua_tonumber(L, -1);
@@ -70,16 +70,16 @@ static int luaLine(lua_State* L) {
     int nargs = lua_gettop(L);
 
     double t = lua_tonumber(L, 1) / juce::MathConstants<double>::twoPi;
-    Point point1 = nargs == 3 ? tableToPoint(L, 2) : Point(-1, -1);
-    Point point2 = nargs == 3 ? tableToPoint(L, 3) : Point(1, 1);
+    OsciPoint point1 = nargs == 3 ? tableToPoint(L, 2) : OsciPoint(-1, -1);
+    OsciPoint point2 = nargs == 3 ? tableToPoint(L, 3) : OsciPoint(1, 1);
 
     Line line = Line(point1, point2);
-    Point point = line.nextVector(t);
+    OsciPoint point = line.nextVector(t);
 
     return pointToTable(L, point, 3);
 }
 
-static Point genericRect(double phase, Point topLeft, double width, double height) {
+static OsciPoint genericRect(double phase, OsciPoint topLeft, double width, double height) {
     double t = phase / juce::MathConstants<double>::twoPi;
     double totalLength = 2 * (width + height);
     double progress = t * totalLength;
@@ -113,8 +113,8 @@ static int luaRect(lua_State* L) {
     double width = nargs == 1 ? 1 : lua_tonumber(L, 2);
     double height = nargs == 1 ? 1.5 : lua_tonumber(L, 3);
 
-    Point topLeft = nargs == 4 ? tableToPoint(L, 4) : Point(-width / 2, -height / 2);
-    Point point = genericRect(phase, topLeft, width, height);
+    OsciPoint topLeft = nargs == 4 ? tableToPoint(L, 4) : OsciPoint(-width / 2, -height / 2);
+    OsciPoint point = genericRect(phase, topLeft, width, height);
     
     return pointToTable(L, point, 2);
 }
@@ -125,8 +125,8 @@ static int luaSquare(lua_State* L) {
     double phase = lua_tonumber(L, 1);
     double width = nargs == 1 ? 1 : lua_tonumber(L,2);
 
-    Point topLeft = nargs == 3 ? tableToPoint(L, 3) : Point(-width / 2, -width / 2);
-    Point point = genericRect(phase, topLeft, width, width);
+    OsciPoint topLeft = nargs == 3 ? tableToPoint(L, 3) : OsciPoint(-width / 2, -width / 2);
+    OsciPoint point = genericRect(phase, topLeft, width, width);
     
     return pointToTable(L, point, 2);
 }
@@ -139,7 +139,7 @@ static int luaEllipse(lua_State* L) {
     double radiuxY = nargs == 1 ? 0.8 : lua_tonumber(L, 3);
 
     CircleArc ellipse = CircleArc(0, 0, radiusX, radiuxY, 0, juce::MathConstants<double>::twoPi);
-    Point point = ellipse.nextVector(t);
+    OsciPoint point = ellipse.nextVector(t);
     
     return pointToTable(L, point, 2);
 }
@@ -151,7 +151,7 @@ static int luaCircle(lua_State* L) {
     double radius = nargs == 1 ? 0.8 : lua_tonumber(L, 2);
 
     CircleArc ellipse = CircleArc(0, 0, radius, radius, 0, juce::MathConstants<double>::twoPi);
-    Point point = ellipse.nextVector(t);
+    OsciPoint point = ellipse.nextVector(t);
     
     return pointToTable(L, point, 2);
 }
@@ -166,7 +166,7 @@ static int luaArc(lua_State* L) {
     double endAngle = nargs == 1 ? juce::MathConstants<double>::halfPi : lua_tonumber(L, 5);
 
     CircleArc arc = CircleArc(0, 0, radiusX, radiusY, startAngle, endAngle);
-    Point point = arc.nextVector(t);
+    OsciPoint point = arc.nextVector(t);
     
     return pointToTable(L, point, 2);
 }
@@ -188,21 +188,21 @@ static int luaPolygon(lua_State* L) {
     double x = cos(pi_n) * inner_cos - multiplier * sin(pi_n) * inner_sin;
     double y = cos(pi_n) * inner_sin + multiplier * sin(pi_n) * inner_cos;
 
-    return pointToTable(L, Point(x, y), 2);
+    return pointToTable(L, OsciPoint(x, y), 2);
 }
 
 static int luaBezier(lua_State* L) {
     int nargs = lua_gettop(L);
 
     double t = lua_tonumber(L, 1) / juce::MathConstants<double>::twoPi;
-    Point point1 = nargs == 1 ? Point(-1, -1) : tableToPoint(L, 2);
-    Point point2 = nargs == 1 ? Point(-1, 1) : tableToPoint(L, 3);
-    Point point3 = nargs == 1 ? Point(1, 1) : tableToPoint(L, 4);
+    OsciPoint point1 = nargs == 1 ? OsciPoint(-1, -1) : tableToPoint(L, 2);
+    OsciPoint point2 = nargs == 1 ? OsciPoint(-1, 1) : tableToPoint(L, 3);
+    OsciPoint point3 = nargs == 1 ? OsciPoint(1, 1) : tableToPoint(L, 4);
 
-    Point point;
+    OsciPoint point;
 
     if (nargs == 5) {
-        Point point4 = tableToPoint(L, 5);
+        OsciPoint point4 = tableToPoint(L, 5);
 
         CubicBezierCurve curve = CubicBezierCurve(point1.x, point1.y, point2.x, point2.y, point3.x, point3.y, point4.x, point4.y);
         point = curve.nextVector(t);
@@ -226,7 +226,7 @@ static int luaLissajous(lua_State* L) {
     double x = radius * sin(ratioA * phase);
     double y = radius * cos(ratioB * phase + theta);
 
-    return pointToTable(L, Point(x, y), 2);
+    return pointToTable(L, OsciPoint(x, y), 2);
 }
 
 static double squareWave(double phase) {
@@ -265,11 +265,11 @@ static int luaTriangleWave(lua_State* L) {
 static int luaMix(lua_State* L) {
     int nargs = lua_gettop(L);
 
-    Point point1 = tableToPoint(L, 1);
-    Point point2 = tableToPoint(L, 2);
+    OsciPoint point1 = tableToPoint(L, 1);
+    OsciPoint point2 = tableToPoint(L, 2);
     double weight = lua_tonumber(L, 3);
 
-    Point point = Point(
+    OsciPoint point = OsciPoint(
         point1.x * (1 - weight) + point2.x * weight,
         point1.y * (1 - weight) + point2.y * weight,
         point1.z * (1 - weight) + point2.z * weight
@@ -279,8 +279,8 @@ static int luaMix(lua_State* L) {
 }
 
 static int luaTranslate(lua_State* L) {
-    Point point = tableToPoint(L, 1);
-    Point translation = tableToPoint(L, 2);
+    OsciPoint point = tableToPoint(L, 1);
+    OsciPoint translation = tableToPoint(L, 2);
 
     point.translate(translation.x, translation.y, translation.z);
 
@@ -288,8 +288,8 @@ static int luaTranslate(lua_State* L) {
 }
 
 static int luaScale(lua_State* L) {
-    Point point = tableToPoint(L, 1);
-    Point scale = tableToPoint(L, 2);
+    OsciPoint point = tableToPoint(L, 1);
+    OsciPoint scale = tableToPoint(L, 2);
 
     point.scale(scale.x, scale.y, scale.z);
 
@@ -300,17 +300,17 @@ static int luaRotate(lua_State* L) {
     double nargs = lua_gettop(L);
     bool twoDimRotate = nargs == 2;
 
-    Point point;
+    OsciPoint point;
 
     if (twoDimRotate) {
-        Point point = tableToPoint(L, 1);
+        OsciPoint point = tableToPoint(L, 1);
         double angle = lua_tonumber(L, 2);
 
         point.rotate(0, 0, angle);
 
         return pointToTable(L, point, 2);
     } else {
-        Point point = tableToPoint(L, 1);
+        OsciPoint point = tableToPoint(L, 1);
         double xRotate = lua_tonumber(L, 2);
         double yRotate = lua_tonumber(L, 3);
         double zRotate = lua_tonumber(L, 4);
