@@ -159,6 +159,7 @@ void VisualiserComponent::run() {
         }
         consumerManager.consumerRead(consumer);
         
+        // TODO: Find a way to immediately call consumerRegister after consumerRead so that no audio is missed
         setBuffer(tempBuffer);
     }
 }
