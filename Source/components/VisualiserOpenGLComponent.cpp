@@ -279,7 +279,7 @@ void VisualiserOpenGLComponent::newOpenGLContextCreated() {
     glGenBuffers(1, &vertexBuffer);
     setupTextures();
     
-    setupArrays(samples.size());
+    setupArrays(smoothedXSamples.size());
 }
 
 void VisualiserOpenGLComponent::openGLContextClosing() {
@@ -304,36 +304,53 @@ void VisualiserOpenGLComponent::openGLContextClosing() {
 }
 
 void VisualiserOpenGLComponent::updateBuffer(std::vector<OsciPoint>& buffer) {
-    juce::CriticalSection::ScopedLockType lock(samplesLock);
+    // TODO: Figure out whether locking on samplesLock is required
+    //juce::CriticalSection::ScopedLockType lock(samplesLock);
     
-    int newResampledSize = buffer.size() * RESAMPLE_RATIO + 1;
-    
-    if (samples.size() != buffer.size()) {
+    if (xSamples.size() != buffer.size()) {
         needsReattach = true;
     }
-    samples.clear();
+    xSamples.clear();
+    ySamples.clear();
+    zSamples.clear();
     for (auto& point : buffer) {
-        samples.push_back(point);
+        xSamples.push_back(point.x);
+        ySamples.push_back(point.y);
+        zSamples.push_back(point.z);
     }
+    
+    triggerAsyncUpdate();
+}
+
+void VisualiserOpenGLComponent::handleAsyncUpdate() {
+    int newResampledSize = xSamples.size() * RESAMPLE_RATIO;
+    
+    smoothedXSamples.resize(newResampledSize);
+    smoothedYSamples.resize(newResampledSize);
+    smoothedZSamples.resize(newResampledSize);
     
     if (sampleRate != sampleRateManager.getSampleRate()) {
         sampleRate = sampleRateManager.getSampleRate();
-        resampler.prepare(sampleRate, RESAMPLE_RATIO);
+        xResampler.prepare(sampleRate, RESAMPLE_RATIO);
+        yResampler.prepare(sampleRate, RESAMPLE_RATIO);
+        zResampler.prepare(sampleRate, RESAMPLE_RATIO);
     }
     
-    juce::MessageManager::getInstance()->callAsync([this] {
-        if (needsReattach) {
-            openGLContext.detach();
-            openGLContext.attachTo(*this);
-            needsReattach = false;
-        }
-        repaint();
-    });
+    xResampler.process(xSamples.data(), smoothedXSamples.data(), xSamples.size());
+    yResampler.process(ySamples.data(), smoothedYSamples.data(), ySamples.size());
+    zResampler.process(zSamples.data(), smoothedZSamples.data(), zSamples.size());
+    
+    if (needsReattach) {
+        openGLContext.detach();
+        openGLContext.attachTo(*this);
+        needsReattach = false;
+    }
+    repaint();
 }
 
 void VisualiserOpenGLComponent::renderOpenGL() {
     if (openGLContext.isActive()) {
-        juce::CriticalSection::ScopedLockType lock(samplesLock);
+        //juce::CriticalSection::ScopedLockType lock(samplesLock);
         
         if (graticuleEnabled != settings.getGraticuleEnabled() || smudgesEnabled != settings.getSmudgesEnabled()) {
             graticuleEnabled = settings.getGraticuleEnabled();
@@ -343,7 +360,7 @@ void VisualiserOpenGLComponent::renderOpenGL() {
         
         renderScale = (float) openGLContext.getRenderingScale();
         
-        drawLineTexture(samples);
+        drawLineTexture(smoothedXSamples, smoothedYSamples, smoothedZSamples);
         checkGLErrors("drawLineTexture");
         drawCRT();
         checkGLErrors("drawCRT");
@@ -452,13 +469,13 @@ Texture VisualiserOpenGLComponent::makeTexture(int width, int height) {
     return { textureID, width, height };
 }
 
-void VisualiserOpenGLComponent::drawLineTexture(std::vector<OsciPoint>& points) {
+void VisualiserOpenGLComponent::drawLineTexture(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints) {
     using namespace juce::gl;
     
     fadeAmount = juce::jmin(1.0, std::pow(0.5, settings.getPersistence()) * 0.4);
     activateTargetTexture(lineTexture);
     fade();
-    drawLine(points);
+    drawLine(xPoints, yPoints, zPoints);
     glBindTexture(GL_TEXTURE_2D, targetTexture.value().id);
     glGenerateMipmap(GL_TEXTURE_2D);
 }
@@ -581,18 +598,18 @@ void VisualiserOpenGLComponent::setNormalBlending() {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
-void VisualiserOpenGLComponent::drawLine(std::vector<OsciPoint>& points) {
+void VisualiserOpenGLComponent::drawLine(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints) {
     using namespace juce::gl;
     
     setAdditiveBlending();
 
-    int nPoints = points.size();
+    int nPoints = xPoints.size();
     
     for (int i = 0; i < nPoints; ++i) {
         int p = i * 12;
-        scratchVertices[p]     = scratchVertices[p + 3] = scratchVertices[p + 6] = scratchVertices[p + 9]  = points[i].x;
-        scratchVertices[p + 1] = scratchVertices[p + 4] = scratchVertices[p + 7] = scratchVertices[p + 10] = points[i].y;
-        scratchVertices[p + 2] = scratchVertices[p + 5] = scratchVertices[p + 8] = scratchVertices[p + 11] = points[i].z;
+        scratchVertices[p]     = scratchVertices[p + 3] = scratchVertices[p + 6] = scratchVertices[p + 9]  = xPoints[i];
+        scratchVertices[p + 1] = scratchVertices[p + 4] = scratchVertices[p + 7] = scratchVertices[p + 10] = yPoints[i];
+        scratchVertices[p + 2] = scratchVertices[p + 5] = scratchVertices[p + 8] = scratchVertices[p + 11] = zPoints[i];
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
@@ -630,8 +647,8 @@ void VisualiserOpenGLComponent::drawLine(std::vector<OsciPoint>& points) {
     lineShader->setUniform("uNEdges", (GLfloat) nEdges);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vertexIndexBuffer);
-    int nEdgesThisTime = points.size() - 1;
-    glDrawElements(GL_TRIANGLES, nEdgesThisTime, GL_UNSIGNED_SHORT, 0);
+    int nEdgesThisTime = xPoints.size() - 1;
+    glDrawElements(GL_TRIANGLES, nEdgesThisTime * 6, GL_UNSIGNED_SHORT, 0);
 
     glDisableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aStart"));
     glDisableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aEnd"));
