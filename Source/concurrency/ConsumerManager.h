@@ -10,8 +10,8 @@ public:
     ConsumerManager() {}
     ~ConsumerManager() {}
 
-    std::shared_ptr<BufferConsumer> consumerRegister(std::vector<OsciPoint>& buffer) {
-        std::shared_ptr<BufferConsumer> consumer = std::make_shared<BufferConsumer>(buffer);
+    std::shared_ptr<BufferConsumer> consumerRegister(std::size_t size) {
+        std::shared_ptr<BufferConsumer> consumer = std::make_shared<BufferConsumer>(size);
         juce::SpinLock::ScopedLockType scope(consumerLock);
         consumers.push_back(consumer);
 
@@ -20,8 +20,6 @@ public:
     
     void consumerRead(std::shared_ptr<BufferConsumer> consumer) {
         consumer->waitUntilFull();
-        juce::SpinLock::ScopedLockType scope(consumerLock);
-        consumers.erase(std::remove(consumers.begin(), consumers.end(), consumer), consumers.end());
     }
 
     void consumerStop(std::shared_ptr<BufferConsumer> consumer) {
