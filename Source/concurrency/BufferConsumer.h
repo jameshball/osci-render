@@ -42,18 +42,15 @@ public:
 
 class BufferConsumer {
 public:
-    BufferConsumer(std::vector<OsciPoint>& buffer) : buffer(buffer) {}
+    BufferConsumer(std::size_t size) {
+        buffer1.resize(size);
+        buffer2.resize(size);
+    }
 
     ~BufferConsumer() {}
     
     void waitUntilFull() {
         sema.acquire();
-    }
-
-    void notifyIfFull() {
-        if (offset >= buffer.size()) {
-            sema.release();
-        }
     }
     
     // to be used when the audio thread is being destroyed to
@@ -63,13 +60,24 @@ public:
     }
 
     void write(OsciPoint point) {
-        if (offset < buffer.size()) {
-            buffer[offset++] = point;
+        if (offset >= buffer->size()) {
+            buffer = buffer == &buffer1 ? &buffer2 : &buffer1;
+            offset = 0;
+            sema.release();
         }
+        
+        (*buffer)[offset++] = point;
+    }
+    
+    // whatever buffer is not currently being written to
+    std::vector<OsciPoint>& getFullBuffer() {
+        return buffer == &buffer1 ? buffer2 : buffer1;
     }
 
 private:
-    std::vector<OsciPoint>& buffer;
+    std::vector<OsciPoint> buffer1;
+    std::vector<OsciPoint> buffer2;
+    std::vector<OsciPoint>* buffer = &buffer1;
     Semaphore sema{0};
     int offset = 0;
 };

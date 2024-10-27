@@ -102,15 +102,9 @@ void VolumeComponent::run() {
             resetBuffer();
         }
 
-        if (buffer.size() == 0) {
-            continue;
-        }
-        
-        {
-            juce::CriticalSection::ScopedLockType lock(consumerLock);
-            consumer = audioProcessor.consumerRegister(buffer);
-        }
         audioProcessor.consumerRead(consumer);
+        
+        auto buffer = consumer->getFullBuffer();
 
         float leftVolume = 0;
         float rightVolume = 0;
@@ -149,5 +143,10 @@ void VolumeComponent::resized() {
 
 void VolumeComponent::resetBuffer() {
     sampleRate = (int) audioProcessor.currentSampleRate;
-    buffer = std::vector<OsciPoint>(BUFFER_DURATION_SECS * sampleRate);
+    
+    {
+        juce::CriticalSection::ScopedLockType scope(consumerLock);
+        audioProcessor.consumerStop(consumer);
+        consumer = audioProcessor.consumerRegister(BUFFER_DURATION_SECS * sampleRate);
+    }
 }

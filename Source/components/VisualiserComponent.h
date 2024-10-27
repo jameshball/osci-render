@@ -80,7 +80,6 @@ private:
     SvgButton popOutButton{ "popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::white };
     SvgButton settingsButton{ "settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white };
     
-    std::vector<OsciPoint> tempBuffer;
     int precision = 4;
     
     juce::CriticalSection consumerLock;

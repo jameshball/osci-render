@@ -15,6 +15,8 @@ VisualiserOpenGLComponent::~VisualiserOpenGLComponent() {
 void VisualiserOpenGLComponent::newOpenGLContextCreated() {
     using namespace juce::gl;
     
+    juce::CriticalSection::ScopedLockType lock(samplesLock);
+    
     juce::OpenGLHelpers::clear(juce::Colours::black);
     glColorMask(true, true, true, true);
 
@@ -304,8 +306,7 @@ void VisualiserOpenGLComponent::openGLContextClosing() {
 }
 
 void VisualiserOpenGLComponent::updateBuffer(std::vector<OsciPoint>& buffer) {
-    // TODO: Figure out whether locking on samplesLock is required
-    //juce::CriticalSection::ScopedLockType lock(samplesLock);
+    juce::CriticalSection::ScopedLockType lock(samplesLock);
     
     if (xSamples.size() != buffer.size()) {
         needsReattach = true;
@@ -323,6 +324,8 @@ void VisualiserOpenGLComponent::updateBuffer(std::vector<OsciPoint>& buffer) {
 }
 
 void VisualiserOpenGLComponent::handleAsyncUpdate() {
+    juce::CriticalSection::ScopedLockType lock(samplesLock);
+    
     int newResampledSize = xSamples.size() * RESAMPLE_RATIO;
     
     smoothedXSamples.resize(newResampledSize);
@@ -350,7 +353,7 @@ void VisualiserOpenGLComponent::handleAsyncUpdate() {
 
 void VisualiserOpenGLComponent::renderOpenGL() {
     if (openGLContext.isActive()) {
-        //juce::CriticalSection::ScopedLockType lock(samplesLock);
+        juce::CriticalSection::ScopedLockType lock(samplesLock);
         
         if (graticuleEnabled != settings.getGraticuleEnabled() || smudgesEnabled != settings.getSmudgesEnabled()) {
             graticuleEnabled = settings.getGraticuleEnabled();
@@ -457,12 +460,10 @@ Texture VisualiserOpenGLComponent::makeTexture(int width, int height) {
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
 
     // Set texture filtering and wrapping
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-    glGenerateMipmap(GL_TEXTURE_2D);
     
     glBindTexture(GL_TEXTURE_2D, 0); // Unbind
     
@@ -477,7 +478,6 @@ void VisualiserOpenGLComponent::drawLineTexture(const std::vector<float>& xPoint
     fade();
     drawLine(xPoints, yPoints, zPoints);
     glBindTexture(GL_TEXTURE_2D, targetTexture.value().id);
-    glGenerateMipmap(GL_TEXTURE_2D);
 }
 
 void VisualiserOpenGLComponent::saveTextureToFile(GLuint textureID, int width, int height, const juce::File& file) {
@@ -582,7 +582,6 @@ void VisualiserOpenGLComponent::drawTexture(std::optional<Texture> texture0, std
 
     if (targetTexture.has_value()) {
         glBindTexture(GL_TEXTURE_2D, targetTexture.value().id);
-        glGenerateMipmap(GL_TEXTURE_2D);
     }
 }
 
@@ -782,7 +781,6 @@ Texture VisualiserOpenGLComponent::createScreenTexture() {
         glLineWidth(1.0f);
         glDrawArrays(GL_LINES, 0, data.size());
         glBindTexture(GL_TEXTURE_2D, targetTexture.value().id);
-        glGenerateMipmap(GL_TEXTURE_2D);
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     }
     

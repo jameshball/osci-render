@@ -152,15 +152,11 @@ void VisualiserComponent::run() {
         if (sampleRate != (int) sampleRateManager.getSampleRate()) {
             resetBuffer();
         }
-        
-        {
-            juce::CriticalSection::ScopedLockType scope(consumerLock);
-            consumer = consumerManager.consumerRegister(tempBuffer);
-        }
+
         consumerManager.consumerRead(consumer);
         
         // TODO: Find a way to immediately call consumerRegister after consumerRead so that no audio is missed
-        setBuffer(tempBuffer);
+        setBuffer(consumer->getFullBuffer());
     }
 }
 
@@ -247,7 +243,12 @@ void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area
 
 void VisualiserComponent::resetBuffer() {
     sampleRate = (int) sampleRateManager.getSampleRate();
-    tempBuffer = std::vector<OsciPoint>(sampleRate * BUFFER_LENGTH_SECS);
+    
+    {
+        juce::CriticalSection::ScopedLockType scope(consumerLock);
+        consumerManager.consumerStop(consumer);
+        consumer = consumerManager.consumerRegister(sampleRate * BUFFER_LENGTH_SECS);
+    }
 }
 
 void VisualiserComponent::toggleRecording() {

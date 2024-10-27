@@ -754,7 +754,6 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             juce::SpinLock::ScopedLockType scope(consumerLock);
             for (auto consumer : consumers) {
                 consumer->write(OsciPoint(x, y, 1));
-                consumer->notifyIfFull();
             }
         }
 
