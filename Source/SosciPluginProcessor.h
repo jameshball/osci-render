@@ -9,7 +9,8 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "concurrency/ConsumerManager.h"
+#include "concurrency/AudioBackgroundThread.h"
+#include "concurrency/AudioBackgroundThreadManager.h"
 #include "audio/SampleRateManager.h"
 #include "components/VisualiserSettings.h"
 #include "audio/Effect.h"
@@ -17,7 +18,7 @@
 //==============================================================================
 /**
 */
-class SosciAudioProcessor  : public juce::AudioProcessor, public ConsumerManager, public SampleRateManager
+class SosciAudioProcessor  : public juce::AudioProcessor, public SampleRateManager
                             #if JucePlugin_Enable_ARA
                              , public juce::AudioProcessorARAExtension
                             #endif
@@ -58,6 +59,8 @@ public:
     std::atomic<double> currentSampleRate = 0.0;
     juce::SpinLock effectsLock;
     VisualiserParameters parameters;
+    
+    AudioBackgroundThreadManager threadManager;
     
     std::atomic<bool> forceDisableBrightnessInput = false;
 

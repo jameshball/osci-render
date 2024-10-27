@@ -12,7 +12,8 @@
 
 #include <JuceHeader.h>
 #include "shape/Shape.h"
-#include "concurrency/ConsumerManager.h"
+#include "concurrency/AudioBackgroundThread.h"
+#include "concurrency/AudioBackgroundThreadManager.h"
 #include "components/VisualiserSettings.h"
 #include "audio/Effect.h"
 #include "audio/ShapeSound.h"
@@ -33,7 +34,7 @@
 //==============================================================================
 /**
 */
-class OscirenderAudioProcessor  : public juce::AudioProcessor, juce::AudioProcessorParameter::Listener, public EnvelopeComponentListener, public ConsumerManager, public SampleRateManager
+class OscirenderAudioProcessor  : public juce::AudioProcessor, juce::AudioProcessorParameter::Listener, public EnvelopeComponentListener, public SampleRateManager
                             #if JucePlugin_Enable_ARA
                              , public juce::AudioProcessorARAExtension
                             #endif
@@ -75,6 +76,8 @@ public:
     double getSampleRate() override;
 
     std::atomic<double> currentSampleRate = 0.0;
+    
+    AudioBackgroundThreadManager threadManager;
 
     juce::SpinLock effectsLock;
 	std::vector<std::shared_ptr<Effect>> toggleableEffects;

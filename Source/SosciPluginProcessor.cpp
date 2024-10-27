@@ -112,6 +112,8 @@ void SosciAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) 
     for (auto& effect : allEffects) {
         effect->updateSampleRate(currentSampleRate);
     }
+    
+    threadManager.prepare(sampleRate, samplesPerBlock);
 }
 
 void SosciAudioProcessor::releaseResources() {
@@ -174,8 +176,6 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     auto inputArray = input.getArrayOfWritePointers();
 
 	for (int sample = 0; sample < input.getNumSamples(); ++sample) {
-        juce::SpinLock::ScopedLockType scope(consumerLock);
-
         float x = input.getNumChannels() > 0 ? inputArray[0][sample] : 0.0f;
         float y = input.getNumChannels() > 1 ? inputArray[1][sample] : 0.0f;
         float brightness = 1.0f;
@@ -196,10 +196,7 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             point = effect->apply(sample, point);
         }
 
-        for (auto consumer : consumers) {
-            consumer->write(point);
-            consumer->notifyIfFull();
-        }
+        threadManager.write(point);
 	}
 }
 

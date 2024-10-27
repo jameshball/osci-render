@@ -1,46 +1,36 @@
 #include "PitchDetector.h"
 #include "../PluginProcessor.h"
 
-PitchDetector::PitchDetector(OscirenderAudioProcessor& audioProcessor) : juce::Thread("PitchDetector"), audioProcessor(audioProcessor) {
-    consumer = audioProcessor.consumerRegister(fftSize);
-    startThread();
-}
+PitchDetector::PitchDetector(OscirenderAudioProcessor& audioProcessor) : AudioBackgroundThread("PitchDetector", audioProcessor.threadManager), audioProcessor(audioProcessor) {}
 
-PitchDetector::~PitchDetector() {
-    {
-        juce::CriticalSection::ScopedLockType scope(consumerLock);
-        audioProcessor.consumerStop(consumer);
+void PitchDetector::runTask(const std::vector<OsciPoint>& points) {
+    // buffer is for 2 channels, so we need to only use one
+    for (int i = 0; i < fftSize; i++) {
+        fftData[i] = points[i].x;
     }
-    stopThread(1000);
+
+    forwardFFT.performFrequencyOnlyForwardTransform(fftData.data());
+
+    // get frequency of the peak
+    int maxIndex = 0;
+    for (int i = 0; i < fftSize / 2; ++i) {
+        if (frequencyFromIndex(i) < 20 || frequencyFromIndex(i) > 20000) {
+            continue;
+        }
+
+        auto current = fftData[i];
+        if (current > fftData[maxIndex]) {
+            maxIndex = i;
+        }
+    }
+
+    frequency = frequencyFromIndex(maxIndex);
+    triggerAsyncUpdate();
 }
 
-void PitchDetector::run() {
-	while (!threadShouldExit()) {
-        audioProcessor.consumerRead(consumer);
-
-        // buffer is for 2 channels, so we need to only use one
-        for (int i = 0; i < fftSize; i++) {
-            fftData[i] = consumer->getFullBuffer()[i].x;
-        }
-
-        forwardFFT.performFrequencyOnlyForwardTransform(fftData.data());
-
-        // get frequency of the peak
-        int maxIndex = 0;
-        for (int i = 0; i < fftSize / 2; ++i) {
-            if (frequencyFromIndex(i) < 20 || frequencyFromIndex(i) > 20000) {
-                continue;
-            }
-
-            auto current = fftData[i];
-            if (current > fftData[maxIndex]) {
-                maxIndex = i;
-            }
-        }
-
-        frequency = frequencyFromIndex(maxIndex);
-        triggerAsyncUpdate();
-	}
+int PitchDetector::prepareTask(double sampleRate, int samplesPerBlock) {
+    this->sampleRate = sampleRate;
+    return fftSize;
 }
 
 void PitchDetector::handleAsyncUpdate() {
@@ -59,10 +49,6 @@ int PitchDetector::addCallback(std::function<void(float)> callback) {
 void PitchDetector::removeCallback(int index) {
     juce::SpinLock::ScopedLockType scope(lock);
     callbacks.erase(callbacks.begin() + index);
-}
-
-void PitchDetector::setSampleRate(float sampleRate) {
-    this->sampleRate = sampleRate;
 }
 
 float PitchDetector::frequencyFromIndex(int index) {

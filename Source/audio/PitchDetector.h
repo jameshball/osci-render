@@ -1,18 +1,17 @@
 #pragma once
 #include <JuceHeader.h>
-#include "../concurrency/BufferConsumer.h"
+#include "../concurrency/AudioBackgroundThread.h"
 
 class OscirenderAudioProcessor;
-class PitchDetector : public juce::Thread, public juce::AsyncUpdater {
+class PitchDetector : public AudioBackgroundThread, public juce::AsyncUpdater {
 public:
 	PitchDetector(OscirenderAudioProcessor& audioProcessor);
-	~PitchDetector();
 
-    void run() override;
+    int prepareTask(double sampleRate, int samplesPerBlock) override;
+    void runTask(const std::vector<OsciPoint>& points) override;
     void handleAsyncUpdate() override;
     int addCallback(std::function<void(float)> callback);
     void removeCallback(int index);
-    void setSampleRate(float sampleRate);
 
     std::atomic<float> frequency = 0.0f;
 
@@ -20,8 +19,6 @@ private:
 	static constexpr int fftOrder = 15;
 	static constexpr int fftSize = 1 << fftOrder;
 
-    juce::CriticalSection consumerLock;
-    std::shared_ptr<BufferConsumer> consumer;
     juce::dsp::FFT forwardFFT{fftOrder};
     std::array<float, fftSize * 2> fftData;
     OscirenderAudioProcessor& audioProcessor;

@@ -54,7 +54,7 @@ public:
 
     VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.visualiserParameters);
     SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings");
-    VisualiserComponent visualiser{audioProcessor, audioProcessor, visualiserSettings, nullptr, audioProcessor.visualiserParameters.legacyVisualiserEnabled->getBoolValue()};
+    VisualiserComponent visualiser{audioProcessor, audioProcessor.threadManager, visualiserSettings, nullptr, audioProcessor.visualiserParameters.legacyVisualiserEnabled->getBoolValue()};
 
     SettingsComponent settings{audioProcessor, *this};
 

@@ -305,7 +305,7 @@ void VisualiserOpenGLComponent::openGLContextClosing() {
     outputShader.reset();
 }
 
-void VisualiserOpenGLComponent::updateBuffer(std::vector<OsciPoint>& buffer) {
+void VisualiserOpenGLComponent::updateBuffer(const std::vector<OsciPoint>& buffer) {
     juce::CriticalSection::ScopedLockType lock(samplesLock);
     
     if (xSamples.size() != buffer.size()) {

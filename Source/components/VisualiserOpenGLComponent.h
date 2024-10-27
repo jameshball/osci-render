@@ -21,7 +21,7 @@ public:
     void openGLContextClosing() override;
     void resized() override;
     void paint(juce::Graphics& g) override;
-    void updateBuffer(std::vector<OsciPoint>& buffer);
+    void updateBuffer(const std::vector<OsciPoint>& buffer);
     void setPaused(bool paused);
     void handleAsyncUpdate() override;
 

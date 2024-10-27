@@ -40,6 +40,8 @@ public:
 };
 
 
+// TODO: I am aware this will cause read/write data races, but I don't think
+// this matters too much in practice.
 class BufferConsumer {
 public:
     BufferConsumer(std::size_t size) {
@@ -70,7 +72,7 @@ public:
     }
     
     // whatever buffer is not currently being written to
-    std::vector<OsciPoint>& getFullBuffer() {
+    std::vector<OsciPoint>& getBuffer() {
         return buffer == &buffer1 ? buffer2 : buffer1;
     }
 
