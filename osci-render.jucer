@@ -26,17 +26,8 @@
         <FILE id="LbviBq" name="cube.obj" compile="0" resource="1" file="Resources/models/cube.obj"/>
       </GROUP>
       <GROUP id="{F3C16D02-63B4-E3DA-7498-901173C37D6C}" name="oscilloscope">
-        <GROUP id="{DD5ACF8F-4E4F-E277-176A-5FD4A9717037}" name="juce">
-          <FILE id="FCfppP" name="check_native_interop.js" compile="0" resource="1"
-                file="Resources/oscilloscope/juce/check_native_interop.js"/>
-          <FILE id="ZEUE5w" name="index.js" compile="0" resource="1" file="Resources/oscilloscope/juce/index.js"/>
-          <FILE id="hWk293" name="package.json" compile="0" resource="1" file="Resources/oscilloscope/juce/package.json"/>
-        </GROUP>
         <FILE id="qpPhpN" name="empty.jpg" compile="0" resource="1" file="Resources/oscilloscope/empty.jpg"/>
         <FILE id="dNtZYs" name="noise.jpg" compile="0" resource="1" file="Resources/oscilloscope/noise.jpg"/>
-        <FILE id="YPMnjq" name="oscilloscope.html" compile="0" resource="1"
-              file="Resources/oscilloscope/oscilloscope.html"/>
-        <FILE id="BeXHj7" name="oscilloscope.js" compile="0" resource="1" file="Resources/oscilloscope/oscilloscope.js"/>
       </GROUP>
       <GROUP id="{82BCD6F1-A8BF-F30B-5587-81EE70168883}" name="svg">
         <FILE id="rl17ZK" name="cog.svg" compile="0" resource="1" file="Resources/svg/cog.svg"/>
