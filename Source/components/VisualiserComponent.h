@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <JuceHeader.h>
 #include "../LookAndFeel.h"
-#include "../concurrency/ConsumerManager.h"
+#include "../concurrency/AudioBackgroundThread.h"
 #include "../audio/SampleRateManager.h"
 #include "LabelledTextBox.h"
 #include "SvgButton.h"
@@ -18,9 +18,9 @@ enum class FullScreenMode {
 };
 
 class VisualiserWindow;
-class VisualiserComponent : public juce::Component, public juce::Timer, public juce::Thread, public juce::MouseListener, public juce::SettableTooltipClient {
+class VisualiserComponent : public juce::Component, public juce::Timer, public AudioBackgroundThread, public juce::MouseListener, public juce::SettableTooltipClient {
 public:
-    VisualiserComponent(SampleRateManager& sampleRateManager, ConsumerManager& consumerManager, VisualiserSettings& settings, VisualiserComponent* parent = nullptr, bool useOldVisualiser = false, bool visualiserOnly = false);
+    VisualiserComponent(SampleRateManager& sampleRateManager, AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, VisualiserComponent* parent = nullptr, bool useOldVisualiser = false, bool visualiserOnly = false);
     ~VisualiserComponent() override;
 
     std::function<void()> openSettings;
@@ -29,13 +29,14 @@ public:
     void enableFullScreen();
     void setFullScreenCallback(std::function<void(FullScreenMode)> callback);
     void mouseDoubleClick(const juce::MouseEvent& event) override;
-    void setBuffer(std::vector<OsciPoint>& buffer);
+    void setBuffer(const std::vector<OsciPoint>& buffer);
     void setColours(juce::Colour backgroundColour, juce::Colour waveformColour);
 	void paintXY(juce::Graphics&, juce::Rectangle<float> bounds);
     void paint(juce::Graphics&) override;
     void resized() override;
 	void timerCallback() override;
-	void run() override;
+    int prepareTask(double sampleRate, int samplesPerBlock) override;
+    void runTask(const std::vector<OsciPoint>& points) override;
     void setPaused(bool paused);
     void mouseDown(const juce::MouseEvent& event) override;
     bool keyPressed(const juce::KeyPress& key) override;
@@ -71,7 +72,7 @@ private:
     std::vector<juce::Line<float>> prevLines;
     juce::Colour backgroundColour, waveformColour;
     SampleRateManager& sampleRateManager;
-    ConsumerManager& consumerManager;
+    AudioBackgroundThreadManager& threadManager;
     int sampleRate = DEFAULT_SAMPLE_RATE;
     LabelledTextBox roughness{"Roughness", 1, 8, 1};
     LabelledTextBox intensity{"Intensity", 0, 1, 0.01};
@@ -81,9 +82,6 @@ private:
     SvgButton settingsButton{ "settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white };
     
     int precision = 4;
-    
-    juce::CriticalSection consumerLock;
-    std::shared_ptr<BufferConsumer> consumer;
 
     std::function<void(FullScreenMode)> fullScreenCallback;
 
@@ -96,7 +94,6 @@ private:
     StopwatchComponent stopwatch;
     SvgButton record{"Record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f)};
     
-    void resetBuffer();
     void popoutWindow();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserComponent)

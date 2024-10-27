@@ -287,13 +287,14 @@ void OscirenderAudioProcessor::changeProgramName(int index, const juce::String& 
 void OscirenderAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
 	currentSampleRate = sampleRate;
     volumeBuffer = std::vector<double>(VOLUME_BUFFER_SECONDS * sampleRate, 0);
-    pitchDetector.setSampleRate(sampleRate);
     synth.setCurrentPlaybackSampleRate(sampleRate);
     retriggerMidi = true;
     
     for (auto& effect : allEffects) {
         effect->updateSampleRate(currentSampleRate);
     }
+    
+    threadManager.prepare(sampleRate, samplesPerBlock);
 }
 
 void OscirenderAudioProcessor::releaseResources() {
@@ -749,13 +750,8 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 		} else if (totalNumOutputChannels == 1) {
             channelData[0][sample] = x;
         }
-
-        {
-            juce::SpinLock::ScopedLockType scope(consumerLock);
-            for (auto consumer : consumers) {
-                consumer->write(OsciPoint(x, y, 1));
-            }
-        }
+        
+        threadManager.write(OsciPoint(x, y, 1));
 
         if (isPlaying) {
             playTimeSeconds += sTimeSec;

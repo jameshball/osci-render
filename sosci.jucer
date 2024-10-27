@@ -96,11 +96,17 @@
               file="Source/components/VisualiserSettings.h"/>
       </GROUP>
       <GROUP id="{9F5970A9-8094-E7F3-7AC1-812AE5589B9F}" name="concurrency">
+        <FILE id="wAUzPb" name="AudioBackgroundThread.cpp" compile="1" resource="0"
+              file="Source/concurrency/AudioBackgroundThread.cpp"/>
+        <FILE id="WeTiu9" name="AudioBackgroundThread.h" compile="0" resource="0"
+              file="Source/concurrency/AudioBackgroundThread.h"/>
+        <FILE id="I5aijs" name="AudioBackgroundThreadManager.cpp" compile="1"
+              resource="0" file="Source/concurrency/AudioBackgroundThreadManager.cpp"/>
+        <FILE id="BEXsvz" name="AudioBackgroundThreadManager.h" compile="0"
+              resource="0" file="Source/concurrency/AudioBackgroundThreadManager.h"/>
         <FILE id="F5kUMH" name="BlockingQueue.h" compile="0" resource="0" file="Source/concurrency/BlockingQueue.h"/>
         <FILE id="WQ2W15" name="BufferConsumer.h" compile="0" resource="0"
               file="Source/concurrency/BufferConsumer.h"/>
-        <FILE id="HIYtj5" name="ConsumerManager.h" compile="0" resource="0"
-              file="Source/concurrency/ConsumerManager.h"/>
       </GROUP>
       <GROUP id="{92CEA658-C82C-9CEB-15EB-945EF6B6B5C8}" name="shape">
         <FILE id="VdK1eT" name="OsciPoint.cpp" compile="1" resource="0" file="Source/shape/OsciPoint.cpp"/>

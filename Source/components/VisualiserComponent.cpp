@@ -1,12 +1,11 @@
 #include "../LookAndFeel.h"
 #include "VisualiserComponent.h"
 
-VisualiserComponent::VisualiserComponent(SampleRateManager& sampleRateManager, ConsumerManager& consumerManager, VisualiserSettings& settings, VisualiserComponent* parent, bool useOldVisualiser, bool visualiserOnly) : settings(settings), backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), sampleRateManager(sampleRateManager), consumerManager(consumerManager), oldVisualiser(useOldVisualiser), visualiserOnly(visualiserOnly), juce::Thread("VisualiserComponent"), parent(parent) {
-    resetBuffer();
+VisualiserComponent::VisualiserComponent(SampleRateManager& sampleRateManager, AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, VisualiserComponent* parent, bool useOldVisualiser, bool visualiserOnly) : settings(settings), backgroundColour(juce::Colours::black), waveformColour(juce::Colour(0xff00ff00)), sampleRateManager(sampleRateManager), threadManager(threadManager), oldVisualiser(useOldVisualiser), visualiserOnly(visualiserOnly), AudioBackgroundThread("VisualiserComponent", threadManager), parent(parent) {
     addChildComponent(openGLVisualiser);
     setVisualiserType(oldVisualiser);
     startTimerHz(60);
-    startThread();
+    setShouldBeRunning(true);
     
     addAndMakeVisible(record);
     record.setPulseAnimation(true);
@@ -67,11 +66,6 @@ VisualiserComponent::VisualiserComponent(SampleRateManager& sampleRateManager, C
 }
 
 VisualiserComponent::~VisualiserComponent() {
-    {
-        juce::CriticalSection::ScopedLockType scope(consumerLock);
-        consumerManager.consumerStop(consumer);
-    }
-    stopThread(1000);
     masterReference.clear();
 }
 
@@ -90,7 +84,7 @@ void VisualiserComponent::mouseDoubleClick(const juce::MouseEvent& event) {
     enableFullScreen();
 }
 
-void VisualiserComponent::setBuffer(std::vector<OsciPoint>& newBuffer) {
+void VisualiserComponent::setBuffer(const std::vector<OsciPoint>& newBuffer) {
     juce::CriticalSection::ScopedLockType scope(lock);
     if (!oldVisualiser) {
         openGLVisualiser.updateBuffer(newBuffer);
@@ -147,17 +141,12 @@ void VisualiserComponent::timerCallback() {
     }
 }
 
-void VisualiserComponent::run() {
-    while (!threadShouldExit()) {
-        if (sampleRate != (int) sampleRateManager.getSampleRate()) {
-            resetBuffer();
-        }
+void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
+    setBuffer(points);
+}
 
-        consumerManager.consumerRead(consumer);
-        
-        // TODO: Find a way to immediately call consumerRegister after consumerRead so that no audio is missed
-        setBuffer(consumer->getFullBuffer());
-    }
+int VisualiserComponent::prepareTask(double sampleRate, int bufferSize) {
+    return sampleRate * BUFFER_LENGTH_SECS;
 }
 
 void VisualiserComponent::setPaused(bool paused) {
@@ -165,15 +154,10 @@ void VisualiserComponent::setPaused(bool paused) {
     active = !paused;
     if (active) {
         startTimerHz(60);
-        startThread();
     } else {
-        {
-            juce::CriticalSection::ScopedLockType scope(consumerLock);
-            consumerManager.consumerStop(consumer);
-        }
         stopTimer();
-        stopThread(1000);
     }
+    setShouldBeRunning(active);
     repaint();
 }
 
@@ -241,16 +225,6 @@ void VisualiserComponent::paintXY(juce::Graphics& g, juce::Rectangle<float> area
     }
 }
 
-void VisualiserComponent::resetBuffer() {
-    sampleRate = (int) sampleRateManager.getSampleRate();
-    
-    {
-        juce::CriticalSection::ScopedLockType scope(consumerLock);
-        consumerManager.consumerStop(consumer);
-        consumer = consumerManager.consumerRegister(sampleRate * BUFFER_LENGTH_SECS);
-    }
-}
-
 void VisualiserComponent::toggleRecording() {
     
 }
@@ -288,7 +262,7 @@ void VisualiserComponent::resized() {
 
 void VisualiserComponent::popoutWindow() {
     haltRecording();
-    auto visualiser = new VisualiserComponent(sampleRateManager, consumerManager, settings, this, oldVisualiser);
+    auto visualiser = new VisualiserComponent(sampleRateManager, threadManager, settings, this, oldVisualiser);
     visualiser->settings.setLookAndFeel(&getLookAndFeel());
     visualiser->openSettings = openSettings;
     visualiser->closeSettings = closeSettings;
