@@ -29,7 +29,7 @@ void AudioBackgroundThread::prepare(double sampleRate, int samplesPerBlock) {
 }
 
 void AudioBackgroundThread::setShouldBeRunning(bool shouldBeRunning) {
-    if (!isPrepared) {
+    if (!isPrepared && shouldBeRunning) {
         prepare(manager.sampleRate, manager.samplesPerBlock);
     }
     
