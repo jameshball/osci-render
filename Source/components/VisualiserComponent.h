@@ -5,11 +5,11 @@
 #include "../LookAndFeel.h"
 #include "../concurrency/AudioBackgroundThread.h"
 #include "../audio/SampleRateManager.h"
-#include "LabelledTextBox.h"
-#include "SvgButton.h"
+#include "../components/LabelledTextBox.h"
+#include "../components/SvgButton.h"
 #include "VisualiserSettings.h"
 #include "VisualiserOpenGLComponent.h"
-#include "StopwatchComponent.h"
+#include "../components/StopwatchComponent.h"
 
 enum class FullScreenMode {
     TOGGLE,

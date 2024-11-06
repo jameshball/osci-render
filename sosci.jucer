@@ -40,6 +40,28 @@
         <FILE id="rFYmV8" name="timer.svg" compile="0" resource="1" file="Resources/svg/timer.svg"/>
         <FILE id="qC6QiP" name="volume.svg" compile="0" resource="1" file="Resources/svg/volume.svg"/>
       </GROUP>
+      <GROUP id="{30FB8C4D-D6E9-397E-AFCF-F0E3DB8D3452}" name="visualiser">
+        <FILE id="ubvkbM" name="BlurFragmentShader.glsl" compile="0" resource="1"
+              file="Resources/visualiser/BlurFragmentShader.glsl"/>
+        <FILE id="yx3ze8" name="BlurVertexShader.glsl" compile="0" resource="1"
+              file="Resources/visualiser/BlurVertexShader.glsl"/>
+        <FILE id="TFSFmo" name="LineFragmentShader.glsl" compile="0" resource="1"
+              file="Resources/visualiser/LineFragmentShader.glsl"/>
+        <FILE id="HFl7ZR" name="LineVertexShader.glsl" compile="0" resource="1"
+              file="Resources/visualiser/LineVertexShader.glsl"/>
+        <FILE id="cbvxCE" name="OutputFragmentShader.glsl" compile="0" resource="1"
+              file="Resources/visualiser/OutputFragmentShader.glsl"/>
+        <FILE id="pFp9Fz" name="OutputVertexShader.glsl" compile="0" resource="1"
+              file="Resources/visualiser/OutputVertexShader.glsl"/>
+        <FILE id="iaabuJ" name="SimpleFragmentShader.glsl" compile="0" resource="1"
+              file="Resources/visualiser/SimpleFragmentShader.glsl"/>
+        <FILE id="IeFRq9" name="SimpleVertexShader.glsl" compile="0" resource="1"
+              file="Resources/visualiser/SimpleVertexShader.glsl"/>
+        <FILE id="TAi8uQ" name="TexturedFragmentShader.glsl" compile="0" resource="1"
+              file="Resources/visualiser/TexturedFragmentShader.glsl"/>
+        <FILE id="H28hvi" name="TexturedVertexShader.glsl" compile="0" resource="1"
+              file="Resources/visualiser/TexturedVertexShader.glsl"/>
+      </GROUP>
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
@@ -73,17 +95,17 @@
               file="Source/components/StopwatchComponent.h"/>
         <FILE id="f2kkHV" name="SvgButton.h" compile="0" resource="0" file="Source/components/SvgButton.h"/>
         <FILE id="qzfstC" name="SwitchButton.h" compile="0" resource="0" file="Source/components/SwitchButton.h"/>
-        <FILE id="y3UiR0" name="VisualiserComponent.cpp" compile="1" resource="0"
+        <FILE id="CAr661" name="VisualiserComponent.cpp" compile="1" resource="0"
               file="Source/components/VisualiserComponent.cpp"/>
-        <FILE id="ZueyNl" name="VisualiserComponent.h" compile="0" resource="0"
+        <FILE id="wEqs55" name="VisualiserComponent.h" compile="0" resource="0"
               file="Source/components/VisualiserComponent.h"/>
-        <FILE id="Z6HHHg" name="VisualiserOpenGLComponent.cpp" compile="1"
+        <FILE id="Hdm7tx" name="VisualiserOpenGLComponent.cpp" compile="1"
               resource="0" file="Source/components/VisualiserOpenGLComponent.cpp"/>
-        <FILE id="V3Pl3I" name="VisualiserOpenGLComponent.h" compile="0" resource="0"
+        <FILE id="KdwehX" name="VisualiserOpenGLComponent.h" compile="0" resource="0"
               file="Source/components/VisualiserOpenGLComponent.h"/>
-        <FILE id="uOtHbQ" name="VisualiserSettings.cpp" compile="1" resource="0"
+        <FILE id="JxmEAH" name="VisualiserSettings.cpp" compile="1" resource="0"
               file="Source/components/VisualiserSettings.cpp"/>
-        <FILE id="GcbeeZ" name="VisualiserSettings.h" compile="0" resource="0"
+        <FILE id="cY2WUE" name="VisualiserSettings.h" compile="0" resource="0"
               file="Source/components/VisualiserSettings.h"/>
       </GROUP>
       <GROUP id="{9F5970A9-8094-E7F3-7AC1-812AE5589B9F}" name="concurrency">

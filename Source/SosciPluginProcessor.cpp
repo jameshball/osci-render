@@ -25,6 +25,7 @@ SosciAudioProcessor::SosciAudioProcessor()
     allEffects.push_back(parameters.hueEffect);
     allEffects.push_back(parameters.saturationEffect);
     allEffects.push_back(parameters.focusEffect);
+    allEffects.push_back(parameters.noiseEffect);
 
     for (auto effect : allEffects) {
         for (auto effectParameter : effect->parameters) {
