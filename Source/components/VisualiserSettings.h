@@ -3,10 +3,10 @@
 #define VERSION_HINT 2
 
 #include <JuceHeader.h>
-#include "EffectComponent.h"
-#include "SvgButton.h"
+#include "../components/EffectComponent.h"
+#include "../components/SvgButton.h"
 #include "../LookAndFeel.h"
-#include "SwitchButton.h"
+#include "../components/SwitchButton.h"
 
 class VisualiserParameters {
 public:
@@ -67,6 +67,14 @@ public:
             VERSION_HINT, 1.0, 0.01, 10.0
         )
     );
+    std::shared_ptr<Effect> noiseEffect = std::make_shared<Effect>(
+        new EffectParameter(
+            "Noise",
+            "Controls how much noise/grain is added to the oscilloscope display.",
+            "noise",
+            VERSION_HINT, 1.0, 0.01, 1.0
+        )
+    );
 };
 
 class VisualiserSettings : public juce::Component {
@@ -98,6 +106,10 @@ public:
     
     double getFocus() {
         return parameters.focusEffect->getActualValue() / 100;
+    }
+    
+    double getNoise() {
+        return parameters.noiseEffect->getActualValue();
     }
     
     bool getGraticuleEnabled() {

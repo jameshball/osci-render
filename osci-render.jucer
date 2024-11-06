@@ -54,6 +54,28 @@
         <FILE id="N9Q6Zg" name="greek.txt" compile="0" resource="1" file="Resources/text/greek.txt"/>
         <FILE id="OABuJy" name="helloworld.txt" compile="0" resource="1" file="Resources/text/helloworld.txt"/>
       </GROUP>
+      <GROUP id="{4CF78D2F-9583-3931-AC9C-E26821FA8A38}" name="visualiser">
+        <FILE id="uEd2jz" name="BlurFragmentShader.glsl" compile="0" resource="1"
+              file="Resources/visualiser/BlurFragmentShader.glsl"/>
+        <FILE id="DG8mXB" name="BlurVertexShader.glsl" compile="0" resource="1"
+              file="Resources/visualiser/BlurVertexShader.glsl"/>
+        <FILE id="tLvJZI" name="LineFragmentShader.glsl" compile="0" resource="1"
+              file="Resources/visualiser/LineFragmentShader.glsl"/>
+        <FILE id="FWis2l" name="LineVertexShader.glsl" compile="0" resource="1"
+              file="Resources/visualiser/LineVertexShader.glsl"/>
+        <FILE id="T8tAlt" name="OutputFragmentShader.glsl" compile="0" resource="1"
+              file="Resources/visualiser/OutputFragmentShader.glsl"/>
+        <FILE id="RYUdS3" name="OutputVertexShader.glsl" compile="0" resource="1"
+              file="Resources/visualiser/OutputVertexShader.glsl"/>
+        <FILE id="Jj50qw" name="SimpleFragmentShader.glsl" compile="0" resource="1"
+              file="Resources/visualiser/SimpleFragmentShader.glsl"/>
+        <FILE id="jwWJN2" name="SimpleVertexShader.glsl" compile="0" resource="1"
+              file="Resources/visualiser/SimpleVertexShader.glsl"/>
+        <FILE id="IkEMkv" name="TexturedFragmentShader.glsl" compile="0" resource="1"
+              file="Resources/visualiser/TexturedFragmentShader.glsl"/>
+        <FILE id="JNBqis" name="TexturedVertexShader.glsl" compile="0" resource="1"
+              file="Resources/visualiser/TexturedVertexShader.glsl"/>
+      </GROUP>
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
@@ -165,17 +187,17 @@
         <FILE id="QQzSwh" name="SliderTextBox.h" compile="0" resource="0" file="Source/components/SliderTextBox.h"/>
         <FILE id="QrDKRZ" name="SvgButton.h" compile="0" resource="0" file="Source/components/SvgButton.h"/>
         <FILE id="qzfstC" name="SwitchButton.h" compile="0" resource="0" file="Source/components/SwitchButton.h"/>
-        <FILE id="y3UiR0" name="VisualiserComponent.cpp" compile="1" resource="0"
+        <FILE id="w2BHaX" name="VisualiserComponent.cpp" compile="1" resource="0"
               file="Source/components/VisualiserComponent.cpp"/>
-        <FILE id="ZueyNl" name="VisualiserComponent.h" compile="0" resource="0"
+        <FILE id="QFef4T" name="VisualiserComponent.h" compile="0" resource="0"
               file="Source/components/VisualiserComponent.h"/>
-        <FILE id="aMqSt5" name="VisualiserOpenGLComponent.cpp" compile="1"
+        <FILE id="kz22Iu" name="VisualiserOpenGLComponent.cpp" compile="1"
               resource="0" file="Source/components/VisualiserOpenGLComponent.cpp"/>
-        <FILE id="gRIcUl" name="VisualiserOpenGLComponent.h" compile="0" resource="0"
+        <FILE id="EyhCOm" name="VisualiserOpenGLComponent.h" compile="0" resource="0"
               file="Source/components/VisualiserOpenGLComponent.h"/>
-        <FILE id="uOtHbQ" name="VisualiserSettings.cpp" compile="1" resource="0"
+        <FILE id="VDt1r3" name="VisualiserSettings.cpp" compile="1" resource="0"
               file="Source/components/VisualiserSettings.cpp"/>
-        <FILE id="GcbeeZ" name="VisualiserSettings.h" compile="0" resource="0"
+        <FILE id="IqelJa" name="VisualiserSettings.h" compile="0" resource="0"
               file="Source/components/VisualiserSettings.h"/>
         <FILE id="icFMpl" name="VListBox.cpp" compile="1" resource="0" file="Source/components/VListBox.cpp"/>
         <FILE id="mvp8je" name="VListBox.h" compile="0" resource="0" file="Source/components/VListBox.h"/>
