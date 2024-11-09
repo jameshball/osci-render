@@ -1,3 +1,5 @@
+std::string blurFragmentShader = R"(
+
 uniform sampler2D uTexture0;
 uniform vec2 uOffset;
 varying vec2 vTexCoord;
@@ -23,3 +25,5 @@ void main() {
     sum += texture2D(uTexture0, vTexCoord + uOffset*8.0) * 0.000078;
     gl_FragColor = sum;
 }
+
+)";

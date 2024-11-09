@@ -1,20 +1,194 @@
-#define CPP_GLSL_INCLUDE
-
 #include "../LookAndFeel.h"
-#include "VisualiserOpenGLComponent.h"
+#include "VisualiserComponent.h"
+#include "BlurFragmentShader.glsl"
+#include "BlurVertexShader.glsl"
+#include "LineFragmentShader.glsl"
+#include "LineVertexShader.glsl"
+#include "OutputFragmentShader.glsl"
+#include "OutputVertexShader.glsl"
+#include "SimpleFragmentShader.glsl"
+#include "SimpleVertexShader.glsl"
+#include "TexturedFragmentShader.glsl"
+#include "TexturedVertexShader.glsl"
 
+VisualiserComponent::VisualiserComponent(AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, VisualiserComponent* parent, bool visualiserOnly) : settings(settings), threadManager(threadManager), visualiserOnly(visualiserOnly), AudioBackgroundThread("VisualiserComponent", threadManager), parent(parent) {
+    setShouldBeRunning(true);
+    
+    addAndMakeVisible(record);
+    record.setPulseAnimation(true);
+    record.onClick = [this] {
+        toggleRecording();
+        stopwatch.stop();
+        stopwatch.reset();
+        if (record.getToggleState()) {
+            stopwatch.start();
+        }
+        resized();
+    };
+    
+    addAndMakeVisible(stopwatch);
+    
+    setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    setWantsKeyboardFocus(true);
+    
+    if (parent == nullptr && !visualiserOnly) {
+        addAndMakeVisible(fullScreenButton);
+    }
+    if (child == nullptr && parent == nullptr && !visualiserOnly) {
+        addAndMakeVisible(popOutButton);
+    }
+    addAndMakeVisible(settingsButton);
+    
+    fullScreenButton.onClick = [this]() {
+        enableFullScreen();
+    };
+    
+    settingsButton.onClick = [this]() {
+        openSettings();
+    };
+    
+    popOutButton.onClick = [this]() {
+        popoutWindow();
+    };
 
-VisualiserOpenGLComponent::VisualiserOpenGLComponent(VisualiserSettings& settings, SampleRateManager& sampleRateManager) : settings(settings), sampleRateManager(sampleRateManager) {
+    setFullScreen(false);
+    
     openGLContext.setRenderer(this);
     openGLContext.attachTo(*this);
-    setInterceptsMouseClicks(false, false);
 }
 
-VisualiserOpenGLComponent::~VisualiserOpenGLComponent() {
+VisualiserComponent::~VisualiserComponent() {
     openGLContext.detach();
 }
 
-void VisualiserOpenGLComponent::newOpenGLContextCreated() {
+void VisualiserComponent::setFullScreenCallback(std::function<void(FullScreenMode)> callback) {
+    fullScreenCallback = callback;
+}
+
+void VisualiserComponent::enableFullScreen() {
+    if (fullScreenCallback) {
+        fullScreenCallback(FullScreenMode::TOGGLE);
+    }
+    grabKeyboardFocus();
+}
+
+void VisualiserComponent::mouseDoubleClick(const juce::MouseEvent& event) {
+    enableFullScreen();
+}
+
+void VisualiserComponent::setBuffer(const std::vector<OsciPoint>& buffer) {
+    juce::CriticalSection::ScopedLockType lock(samplesLock);
+    
+    if (xSamples.size() != buffer.size()) {
+        needsReattach = true;
+    }
+    xSamples.clear();
+    ySamples.clear();
+    zSamples.clear();
+    for (auto& point : buffer) {
+        xSamples.push_back(point.x);
+        ySamples.push_back(point.y);
+        zSamples.push_back(point.z);
+    }
+    
+    triggerAsyncUpdate();
+}
+
+void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
+    setBuffer(points);
+}
+
+int VisualiserComponent::prepareTask(double sampleRate, int bufferSize) {
+    this->sampleRate = sampleRate;
+    xResampler.prepare(sampleRate, RESAMPLE_RATIO);
+    yResampler.prepare(sampleRate, RESAMPLE_RATIO);
+    zResampler.prepare(sampleRate, RESAMPLE_RATIO);
+    return sampleRate / FRAME_RATE;
+}
+
+void VisualiserComponent::setPaused(bool paused) {
+    active = !paused;
+    setShouldBeRunning(active);
+    repaint();
+}
+
+void VisualiserComponent::mouseDown(const juce::MouseEvent& event) {
+    if (event.mods.isLeftButtonDown() && child == nullptr) {
+        setPaused(active);
+    }
+}
+
+bool VisualiserComponent::keyPressed(const juce::KeyPress& key) {
+    if (key.isKeyCode(juce::KeyPress::escapeKey)) {
+        if (fullScreenCallback) {
+            fullScreenCallback(FullScreenMode::MAIN_COMPONENT);
+        }
+        return true;
+    }
+
+    return false;
+}
+
+void VisualiserComponent::setFullScreen(bool fullScreen) {}
+
+void VisualiserComponent::toggleRecording() {
+    
+}
+
+void VisualiserComponent::haltRecording() {
+    record.setToggleState(false, juce::NotificationType::dontSendNotification);
+}
+
+void VisualiserComponent::resized() {
+    auto area = getLocalBounds();
+    if (visualiserOnly) {
+        buttonRow = area.removeFromTop(25);
+    } else {
+        buttonRow = area.removeFromBottom(25);
+    }
+    if (parent == nullptr && !visualiserOnly) {
+        fullScreenButton.setBounds(buttonRow.removeFromRight(30));
+    }
+    if (child == nullptr && parent == nullptr && !visualiserOnly) {
+        popOutButton.setBounds(buttonRow.removeFromRight(30));
+    }
+    settingsButton.setBounds(buttonRow.removeFromRight(30));
+    record.setBounds(buttonRow.removeFromRight(25));
+    if (record.getToggleState()) {
+        stopwatch.setVisible(true);
+        stopwatch.setBounds(buttonRow.removeFromRight(100));
+    } else {
+        stopwatch.setVisible(false);
+    }
+    viewportArea = area;
+    viewportChanged(viewportArea);
+}
+
+void VisualiserComponent::popoutWindow() {
+    haltRecording();
+    auto visualiser = new VisualiserComponent(threadManager, settings, this);
+    visualiser->settings.setLookAndFeel(&getLookAndFeel());
+    visualiser->openSettings = openSettings;
+    visualiser->closeSettings = closeSettings;
+    visualiser->recordingHalted = recordingHalted;
+    child = visualiser;
+    childUpdated();
+    visualiser->setSize(300, 325);
+    popout = std::make_unique<VisualiserWindow>("Software Oscilloscope", this);
+    popout->setContentOwned(visualiser, true);
+    popout->setUsingNativeTitleBar(true);
+    popout->setResizable(true, false);
+    popout->setVisible(true);
+    popout->centreWithSize(300, 325);
+    setPaused(true);
+    resized();
+}
+
+void VisualiserComponent::childUpdated() {
+    popOutButton.setVisible(child == nullptr);
+}
+
+void VisualiserComponent::newOpenGLContextCreated() {
     using namespace juce::gl;
     
     juce::CriticalSection::ScopedLockType lock(samplesLock);
@@ -22,35 +196,35 @@ void VisualiserOpenGLComponent::newOpenGLContextCreated() {
     juce::OpenGLHelpers::clear(juce::Colours::black);
     glColorMask(true, true, true, true);
 
-    viewportChanged();
+    viewportChanged(viewportArea);
     glEnable(GL_BLEND);
     glBlendEquation(GL_FUNC_ADD);
     
     fullScreenQuad = { -1.0f, 1.0f, 1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, -1.0f, -1.0f, -1.0f };
     
     simpleShader = std::make_unique<juce::OpenGLShaderProgram>(openGLContext);
-    simpleShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(BinaryData::SimpleVertexShader_glsl));
-    simpleShader->addFragmentShader(BinaryData::SimpleFragmentShader_glsl);
+    simpleShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(simpleVertexShader));
+    simpleShader->addFragmentShader(simpleFragmentShader);
     simpleShader->link();
     
     lineShader = std::make_unique<juce::OpenGLShaderProgram>(openGLContext);
-    lineShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(BinaryData::LineVertexShader_glsl));
-    lineShader->addFragmentShader(BinaryData::LineFragmentShader_glsl);
+    lineShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(lineVertexShader));
+    lineShader->addFragmentShader(lineFragmentShader);
     lineShader->link();
     
     outputShader = std::make_unique<juce::OpenGLShaderProgram>(openGLContext);
-    outputShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(BinaryData::OutputVertexShader_glsl));
-    outputShader->addFragmentShader(BinaryData::OutputFragmentShader_glsl);
+    outputShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(outputVertexShader));
+    outputShader->addFragmentShader(outputFragmentShader);
     outputShader->link();
     
     texturedShader = std::make_unique<juce::OpenGLShaderProgram>(openGLContext);
-    texturedShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(BinaryData::TexturedVertexShader_glsl));
-    texturedShader->addFragmentShader(BinaryData::TexturedFragmentShader_glsl);
+    texturedShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(texturedVertexShader));
+    texturedShader->addFragmentShader(texturedFragmentShader);
     texturedShader->link();
     
     blurShader = std::make_unique<juce::OpenGLShaderProgram>(openGLContext);
-    blurShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(BinaryData::BlurVertexShader_glsl));
-    blurShader->addFragmentShader(BinaryData::BlurFragmentShader_glsl);
+    blurShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(blurVertexShader));
+    blurShader->addFragmentShader(blurFragmentShader);
     blurShader->link();
     
     glGenBuffers(1, &vertexBuffer);
@@ -59,7 +233,7 @@ void VisualiserOpenGLComponent::newOpenGLContextCreated() {
     setupArrays(smoothedXSamples.size());
 }
 
-void VisualiserOpenGLComponent::openGLContextClosing() {
+void VisualiserComponent::openGLContextClosing() {
     using namespace juce::gl;
     
     glDeleteBuffers(1, &quadIndexBuffer);
@@ -80,43 +254,21 @@ void VisualiserOpenGLComponent::openGLContextClosing() {
     outputShader.reset();
 }
 
-void VisualiserOpenGLComponent::updateBuffer(const std::vector<OsciPoint>& buffer) {
-    juce::CriticalSection::ScopedLockType lock(samplesLock);
-    
-    if (xSamples.size() != buffer.size()) {
-        needsReattach = true;
+void VisualiserComponent::handleAsyncUpdate() {
+    {
+        juce::CriticalSection::ScopedLockType lock(samplesLock);
+        
+        int newResampledSize = xSamples.size() * RESAMPLE_RATIO;
+        
+        smoothedXSamples.resize(newResampledSize);
+        smoothedYSamples.resize(newResampledSize);
+        smoothedZSamples.resize(newResampledSize);
+        smoothedZSamples.resize(newResampledSize);
+        
+        xResampler.process(xSamples.data(), smoothedXSamples.data(), xSamples.size());
+        yResampler.process(ySamples.data(), smoothedYSamples.data(), ySamples.size());
+        zResampler.process(zSamples.data(), smoothedZSamples.data(), zSamples.size());
     }
-    xSamples.clear();
-    ySamples.clear();
-    zSamples.clear();
-    for (auto& point : buffer) {
-        xSamples.push_back(point.x);
-        ySamples.push_back(point.y);
-        zSamples.push_back(point.z);
-    }
-    
-    triggerAsyncUpdate();
-}
-
-void VisualiserOpenGLComponent::handleAsyncUpdate() {
-    juce::CriticalSection::ScopedLockType lock(samplesLock);
-    
-    int newResampledSize = xSamples.size() * RESAMPLE_RATIO;
-    
-    smoothedXSamples.resize(newResampledSize);
-    smoothedYSamples.resize(newResampledSize);
-    smoothedZSamples.resize(newResampledSize);
-    
-    if (sampleRate != sampleRateManager.getSampleRate()) {
-        sampleRate = sampleRateManager.getSampleRate();
-        xResampler.prepare(sampleRate, RESAMPLE_RATIO);
-        yResampler.prepare(sampleRate, RESAMPLE_RATIO);
-        zResampler.prepare(sampleRate, RESAMPLE_RATIO);
-    }
-    
-    xResampler.process(xSamples.data(), smoothedXSamples.data(), xSamples.size());
-    yResampler.process(ySamples.data(), smoothedYSamples.data(), ySamples.size());
-    zResampler.process(zSamples.data(), smoothedZSamples.data(), zSamples.size());
     
     if (needsReattach) {
         openGLContext.detach();
@@ -126,44 +278,47 @@ void VisualiserOpenGLComponent::handleAsyncUpdate() {
     repaint();
 }
 
-void VisualiserOpenGLComponent::renderOpenGL() {
+void VisualiserComponent::renderOpenGL() {
     if (openGLContext.isActive()) {
-        juce::CriticalSection::ScopedLockType lock(samplesLock);
-        
-        if (graticuleEnabled != settings.getGraticuleEnabled() || smudgesEnabled != settings.getSmudgesEnabled()) {
-            graticuleEnabled = settings.getGraticuleEnabled();
-            smudgesEnabled = settings.getSmudgesEnabled();
-            screenTexture = createScreenTexture();
+        juce::OpenGLHelpers::clear(juce::Colours::black);
+        if (active) {
+            juce::CriticalSection::ScopedLockType lock(samplesLock);
+            
+            if (graticuleEnabled != settings.getGraticuleEnabled() || smudgesEnabled != settings.getSmudgesEnabled()) {
+                graticuleEnabled = settings.getGraticuleEnabled();
+                smudgesEnabled = settings.getSmudgesEnabled();
+                screenTexture = createScreenTexture();
+            }
+            
+            renderScale = (float) openGLContext.getRenderingScale();
+            
+            drawLineTexture(smoothedXSamples, smoothedYSamples, smoothedZSamples);
+            checkGLErrors("drawLineTexture");
+            drawCRT();
+            checkGLErrors("drawCRT");
         }
-        
-        renderScale = (float) openGLContext.getRenderingScale();
-        
-        drawLineTexture(smoothedXSamples, smoothedYSamples, smoothedZSamples);
-        checkGLErrors("drawLineTexture");
-        drawCRT();
-        checkGLErrors("drawCRT");
     }
 }
 
-void VisualiserOpenGLComponent::resized() {
-    viewportChanged();
-}
-
-void VisualiserOpenGLComponent::viewportChanged() {
+void VisualiserComponent::viewportChanged(juce::Rectangle<int> area) {
     using namespace juce::gl;
     
     if (openGLContext.isAttached()) {
-        float realWidth = getWidth() * renderScale;
-        float realHeight = getHeight() * renderScale;
+        float realWidth = area.getWidth() * renderScale;
+        float realHeight = area.getHeight() * renderScale;
+        
+        float xOffset = getWidth() * renderScale - realWidth;
+        float yOffset = getHeight() * renderScale - realHeight;
+        
         float minDim = juce::jmin(realWidth, realHeight);
-        float x = (realWidth - minDim) / 2;
-        float y = (realHeight - minDim) / 2;
+        float x = (realWidth - minDim) / 2 + area.getX() * renderScale + xOffset;
+        float y = (realHeight - minDim) / 2 + area.getY() * renderScale + yOffset;
         
         glViewport(juce::roundToInt(x), juce::roundToInt(y), juce::roundToInt(minDim), juce::roundToInt(minDim));
     }
 }
 
-void VisualiserOpenGLComponent::setupArrays(int nPoints) {
+void VisualiserComponent::setupArrays(int nPoints) {
     using namespace juce::gl;
     
     if (nPoints == 0) {
@@ -207,7 +362,7 @@ void VisualiserOpenGLComponent::setupArrays(int nPoints) {
     scratchVertices.resize(12 * nPoints);
 }
 
-void VisualiserOpenGLComponent::setupTextures() {
+void VisualiserComponent::setupTextures() {
     using namespace juce::gl;
     
     // Create the framebuffer
@@ -226,7 +381,7 @@ void VisualiserOpenGLComponent::setupTextures() {
     glBindFramebuffer(GL_FRAMEBUFFER, 0); // Unbind
 }
 
-Texture VisualiserOpenGLComponent::makeTexture(int width, int height) {
+Texture VisualiserComponent::makeTexture(int width, int height) {
     using namespace juce::gl;
     
     GLuint textureID;
@@ -245,7 +400,7 @@ Texture VisualiserOpenGLComponent::makeTexture(int width, int height) {
     return { textureID, width, height };
 }
 
-void VisualiserOpenGLComponent::drawLineTexture(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints) {
+void VisualiserComponent::drawLineTexture(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints) {
     using namespace juce::gl;
     
     fadeAmount = juce::jmin(1.0, std::pow(0.5, settings.getPersistence()) * 0.4);
@@ -255,7 +410,7 @@ void VisualiserOpenGLComponent::drawLineTexture(const std::vector<float>& xPoint
     glBindTexture(GL_TEXTURE_2D, targetTexture.value().id);
 }
 
-void VisualiserOpenGLComponent::saveTextureToFile(GLuint textureID, int width, int height, const juce::File& file) {
+void VisualiserComponent::saveTextureToFile(GLuint textureID, int width, int height, const juce::File& file) {
     using namespace juce::gl;
     
     // Bind the texture to read its data
@@ -301,7 +456,7 @@ void VisualiserOpenGLComponent::saveTextureToFile(GLuint textureID, int width, i
 }
 
 
-void VisualiserOpenGLComponent::activateTargetTexture(std::optional<Texture> texture) {
+void VisualiserComponent::activateTargetTexture(std::optional<Texture> texture) {
     using namespace juce::gl;
     
     if (texture.has_value()) {
@@ -310,17 +465,17 @@ void VisualiserOpenGLComponent::activateTargetTexture(std::optional<Texture> tex
         glViewport(0, 0, texture.value().width, texture.value().height);
     } else {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        viewportChanged();
+        viewportChanged(viewportArea);
     }
     targetTexture = texture;
 }
 
-void VisualiserOpenGLComponent::setShader(juce::OpenGLShaderProgram* program) {
+void VisualiserComponent::setShader(juce::OpenGLShaderProgram* program) {
     currentShader = program;
     program->use();
 }
 
-void VisualiserOpenGLComponent::drawTexture(std::optional<Texture> texture0, std::optional<Texture> texture1, std::optional<Texture> texture2, std::optional<Texture> texture3) {
+void VisualiserComponent::drawTexture(std::optional<Texture> texture0, std::optional<Texture> texture1, std::optional<Texture> texture2, std::optional<Texture> texture3) {
     using namespace juce::gl;
     
     glEnableVertexAttribArray(glGetAttribLocation(currentShader->getProgramID(), "aPos"));
@@ -360,19 +515,19 @@ void VisualiserOpenGLComponent::drawTexture(std::optional<Texture> texture0, std
     }
 }
 
-void VisualiserOpenGLComponent::setAdditiveBlending() {
+void VisualiserComponent::setAdditiveBlending() {
     using namespace juce::gl;
     
     glBlendFunc(GL_ONE, GL_ONE);
 }
 
-void VisualiserOpenGLComponent::setNormalBlending() {
+void VisualiserComponent::setNormalBlending() {
     using namespace juce::gl;
     
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
-void VisualiserOpenGLComponent::drawLine(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints) {
+void VisualiserComponent::drawLine(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints) {
     using namespace juce::gl;
     
     setAdditiveBlending();
@@ -408,7 +563,7 @@ void VisualiserOpenGLComponent::drawLine(const std::vector<float>& xPoints, cons
     lineShader->setUniform("uGain", 450.0f / 512.0f);
     lineShader->setUniform("uInvert", 1.0f);
 
-    float intensity = settings.getIntensity() * (41000.0f / sampleRateManager.getSampleRate());
+    float intensity = settings.getIntensity() * (41000.0f / sampleRate);
     if (settings.getUpsamplingEnabled()) {
         lineShader->setUniform("uIntensity", intensity);
     } else {
@@ -429,7 +584,7 @@ void VisualiserOpenGLComponent::drawLine(const std::vector<float>& xPoints, cons
     glDisableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aIdx"));
 }
 
-void VisualiserOpenGLComponent::fade() {
+void VisualiserComponent::fade() {
     using namespace juce::gl;
     
     setNormalBlending();
@@ -446,7 +601,7 @@ void VisualiserOpenGLComponent::fade() {
     glDisableVertexAttribArray(glGetAttribLocation(simpleShader->getProgramID(), "vertexPosition"));
 }
 
-void VisualiserOpenGLComponent::drawCRT() {
+void VisualiserComponent::drawCRT() {
     setNormalBlending();
     
     activateTargetTexture(blur1Texture);
@@ -493,7 +648,7 @@ void VisualiserOpenGLComponent::drawCRT() {
     drawTexture(lineTexture, blur1Texture, blur3Texture, screenTexture);
 }
 
-Texture VisualiserOpenGLComponent::createScreenTexture() {
+Texture VisualiserComponent::createScreenTexture() {
     using namespace juce::gl;
     
     if (settings.getSmudgesEnabled()) {
@@ -562,7 +717,7 @@ Texture VisualiserOpenGLComponent::createScreenTexture() {
     return texture;
 }
 
-void VisualiserOpenGLComponent::checkGLErrors(const juce::String& location) {
+void VisualiserComponent::checkGLErrors(const juce::String& location) {
     using namespace juce::gl;
     
     GLenum error;
@@ -582,18 +737,14 @@ void VisualiserOpenGLComponent::checkGLErrors(const juce::String& location) {
     }
 }
 
-void VisualiserOpenGLComponent::setPaused(bool paused) {
-    this->paused = paused;
-    repaint();
-}
 
-void VisualiserOpenGLComponent::paint(juce::Graphics& g) {
-    if (paused) {
-        g.setColour(juce::Colours::black.withAlpha(0.5f));
-        g.fillRect(getLocalBounds());
-        
+void VisualiserComponent::paint(juce::Graphics& g) {
+    g.setColour(juce::Colours::black);
+    g.fillRect(buttonRow);
+    if (!active) {
         g.setColour(juce::Colours::white);
         g.setFont(30.0f);
-        g.drawText("Paused", getLocalBounds(), juce::Justification::centred);
+        juce::String text = child == nullptr ? "Paused" : "Open in another window";
+        g.drawText(text, viewportArea, juce::Justification::centred);
     }
 }

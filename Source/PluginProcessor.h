@@ -14,7 +14,7 @@
 #include "shape/Shape.h"
 #include "concurrency/AudioBackgroundThread.h"
 #include "concurrency/AudioBackgroundThreadManager.h"
-#include "components/VisualiserSettings.h"
+#include "visualiser/VisualiserSettings.h"
 #include "audio/Effect.h"
 #include "audio/ShapeSound.h"
 #include "audio/ShapeVoice.h"

@@ -39,7 +39,6 @@ SosciAudioProcessor::SosciAudioProcessor()
     booleanParameters.push_back(parameters.graticuleEnabled);
     booleanParameters.push_back(parameters.smudgesEnabled);
     booleanParameters.push_back(parameters.upsamplingEnabled);
-    booleanParameters.push_back(parameters.legacyVisualiserEnabled);
     booleanParameters.push_back(parameters.visualiserFullScreen);
 
     for (auto parameter : booleanParameters) {

@@ -2,9 +2,9 @@
 
 #include <JuceHeader.h>
 #include "SosciPluginProcessor.h"
-#include "components/VisualiserComponent.h"
+#include "visualiser/VisualiserComponent.h"
 #include "LookAndFeel.h"
-#include "components/VisualiserSettings.h"
+#include "visualiser/VisualiserSettings.h"
 #include "components/SosciMainMenuBarModel.h"
 #include "components/SvgButton.h"
 
@@ -31,7 +31,7 @@ public:
 
     VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.parameters, 3);
     SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings");
-    VisualiserComponent visualiser{audioProcessor, audioProcessor.threadManager, visualiserSettings, nullptr, false, true};
+    VisualiserComponent visualiser{audioProcessor.threadManager, visualiserSettings, nullptr, true};
 
     std::unique_ptr<juce::FileChooser> chooser;
     SosciMainMenuBarModel menuBarModel{*this, audioProcessor};
