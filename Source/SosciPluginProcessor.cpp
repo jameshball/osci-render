@@ -16,16 +16,12 @@ SosciAudioProcessor::SosciAudioProcessor()
      : AudioProcessor (BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(3), true)
                                         .withOutput("Output", juce::AudioChannelSet::stereo(), true))
 #endif
-    {
+{
     // locking isn't necessary here because we are in the constructor
 
-    allEffects.push_back(parameters.brightnessEffect);
-    allEffects.push_back(parameters.intensityEffect);
-    allEffects.push_back(parameters.persistenceEffect);
-    allEffects.push_back(parameters.hueEffect);
-    allEffects.push_back(parameters.saturationEffect);
-    allEffects.push_back(parameters.focusEffect);
-    allEffects.push_back(parameters.noiseEffect);
+    for (auto effect : parameters.effects) {
+        allEffects.push_back(effect);
+    }
 
     for (auto effect : allEffects) {
         for (auto effectParameter : effect->parameters) {
@@ -35,11 +31,10 @@ SosciAudioProcessor::SosciAudioProcessor()
             }
         }
     }
-
-    booleanParameters.push_back(parameters.graticuleEnabled);
-    booleanParameters.push_back(parameters.smudgesEnabled);
-    booleanParameters.push_back(parameters.upsamplingEnabled);
-    booleanParameters.push_back(parameters.visualiserFullScreen);
+        
+    for (auto parameter : parameters.booleans) {
+        booleanParameters.push_back(parameter);
+    }
 
     for (auto parameter : booleanParameters) {
         addParameter(parameter);

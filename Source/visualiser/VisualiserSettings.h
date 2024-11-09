@@ -12,7 +12,7 @@ class VisualiserParameters {
 public:
     BooleanParameter* graticuleEnabled = new BooleanParameter("Show Graticule", "graticuleEnabled", VERSION_HINT, true, "Show the graticule or grid lines over the oscilloscope display.");
     BooleanParameter* smudgesEnabled = new BooleanParameter("Show Smudges", "smudgesEnabled", VERSION_HINT, true, "Adds a subtle layer of dirt/smudges to the oscilloscope display to make it look more realistic.");
-    BooleanParameter* upsamplingEnabled = new BooleanParameter("Upsample Audio", "upsamplingEnabled", VERSION_HINT, false, "Upsamples the audio before visualising it to make it appear more realistic, at the expense of performance.");
+    BooleanParameter* upsamplingEnabled = new BooleanParameter("Upsample Audio", "upsamplingEnabled", VERSION_HINT, true, "Upsamples the audio before visualising it to make it appear more realistic, at the expense of performance.");
     BooleanParameter* visualiserFullScreen = new BooleanParameter("Visualiser Fullscreen", "visualiserFullScreen", VERSION_HINT, false, "Makes the software visualiser fullscreen.");
 
     std::shared_ptr<Effect> persistenceEffect = std::make_shared<Effect>(
@@ -68,9 +68,20 @@ public:
             "Noise",
             "Controls how much noise/grain is added to the oscilloscope display.",
             "noise",
-            VERSION_HINT, 1.0, 0.01, 1.0
+            VERSION_HINT, 0.1, 0.0, 1.0
         )
     );
+    std::shared_ptr<Effect> glowEffect = std::make_shared<Effect>(
+        new EffectParameter(
+            "Glow",
+            "Controls how much the light glows on the oscilloscope display.",
+            "glow",
+            VERSION_HINT, 0.3, 0.0, 1.0
+        )
+    );
+    
+    std::vector<std::shared_ptr<Effect>> effects = {persistenceEffect, hueEffect, brightnessEffect, intensityEffect, saturationEffect, focusEffect, noiseEffect, glowEffect};
+    std::vector<BooleanParameter*> booleans = {graticuleEnabled, smudgesEnabled, upsamplingEnabled, visualiserFullScreen};
 };
 
 class VisualiserSettings : public juce::Component {
@@ -108,6 +119,10 @@ public:
         return parameters.noiseEffect->getActualValue();
     }
     
+    double getGlow() {
+        return parameters.glowEffect->getActualValue() * 3;
+    }
+    
     bool getGraticuleEnabled() {
         return parameters.graticuleEnabled->getBoolValue();
     }
@@ -130,6 +145,8 @@ private:
     EffectComponent hue{*parameters.hueEffect};
     EffectComponent saturation{*parameters.saturationEffect};
     EffectComponent focus{*parameters.focusEffect};
+    EffectComponent noise{*parameters.noiseEffect};
+    EffectComponent glow{*parameters.glowEffect};
     
     jux::SwitchButton graticuleToggle{parameters.graticuleEnabled};
     jux::SwitchButton smudgeToggle{parameters.smudgesEnabled};

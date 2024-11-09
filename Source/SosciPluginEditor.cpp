@@ -51,13 +51,13 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p)
     visualiserSettingsWindow.setUsingNativeTitleBar(true);
 #endif
     visualiserSettings.setLookAndFeel(&getLookAndFeel());
-    visualiserSettings.setSize(550, 340);
+    visualiserSettings.setSize(550, 370);
     visualiserSettingsWindow.setContentNonOwned(&visualiserSettings, true);
-    visualiserSettingsWindow.centreWithSize(550, 340);
+    visualiserSettingsWindow.centreWithSize(550, 370);
     
     menuBar.toFront(true);
 
-    setSize(725, 750);
+    setSize(700, 750);
     setResizable(true, true);
     setResizeLimits(250, 250, 999999, 999999);
 }
@@ -72,12 +72,11 @@ void SosciPluginEditor::paint(juce::Graphics& g) {
 }
 
 void SosciPluginEditor::resized() {
-    auto area = getLocalBounds();
-
-    auto topBar = area.removeFromTop(25).removeFromLeft(200);
-    
+    auto topBar = getLocalBounds().removeFromTop(25).removeFromLeft(200);
     menuBar.setBounds(topBar);
-    visualiser.setBounds(getLocalBounds());
+    auto visualiserArea = getLocalBounds();
+    visualiserArea.removeFromTop(25);
+    visualiser.setBounds(visualiserArea);
 }
 
 bool SosciPluginEditor::keyPressed(const juce::KeyPress& key) {

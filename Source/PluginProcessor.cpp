@@ -149,13 +149,10 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     permanentEffects.push_back(thresholdEffect);
     permanentEffects.push_back(imageThreshold);
     permanentEffects.push_back(imageStride);
-    permanentEffects.push_back(visualiserParameters.brightnessEffect);
-    permanentEffects.push_back(visualiserParameters.intensityEffect);
-    permanentEffects.push_back(visualiserParameters.persistenceEffect);
-    permanentEffects.push_back(visualiserParameters.hueEffect);
-    permanentEffects.push_back(visualiserParameters.saturationEffect);
-    permanentEffects.push_back(visualiserParameters.focusEffect);
-    permanentEffects.push_back(visualiserParameters.noiseEffect);
+    
+    for (auto effect : visualiserParameters.effects) {
+        permanentEffects.push_back(effect);
+    }
 
     for (int i = 0; i < 26; i++) {
         addLuaSlider();
@@ -179,10 +176,10 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     booleanParameters.push_back(animateFrames);
     booleanParameters.push_back(animationSyncBPM);
     booleanParameters.push_back(invertImage);
-    booleanParameters.push_back(visualiserParameters.graticuleEnabled);
-    booleanParameters.push_back(visualiserParameters.smudgesEnabled);
-    booleanParameters.push_back(visualiserParameters.upsamplingEnabled);
-    booleanParameters.push_back(visualiserParameters.visualiserFullScreen);
+        
+    for (auto parameter : visualiserParameters.booleans) {
+        booleanParameters.push_back(parameter);
+    }
 
     for (auto parameter : booleanParameters) {
         addParameter(parameter);
