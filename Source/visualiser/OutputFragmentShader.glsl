@@ -1,3 +1,5 @@
+std::string outputFragmentShader = R"(
+
 uniform sampler2D uTexture0; //line
 uniform sampler2D uTexture1; //tight glow
 uniform sampler2D uTexture2; //big glow
@@ -35,3 +37,5 @@ void main() {
     gl_FragColor.rgb += (1.0 / 255.0) * gradientNoise(gl_FragCoord.xy) - (0.5 / 255.0);
     gl_FragColor.a = 1.0;
 }
+
+)";

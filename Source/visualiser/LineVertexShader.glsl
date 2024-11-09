@@ -1,3 +1,5 @@
+std::string lineVertexShader = R"(
+
 #define EPS 1E-6
 
 uniform float uInvert;
@@ -66,3 +68,5 @@ void main () {
     //seed = mod(sin(seed*seed), 7.0);
     //if (mod(seed/2.0, 1.0)<0.5) gl_Position = vec4(10.0);
 }
+
+)";

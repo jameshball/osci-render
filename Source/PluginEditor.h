@@ -9,7 +9,7 @@
 #include "LookAndFeel.h"
 #include "components/ErrorCodeEditorComponent.h"
 #include "components/LuaConsole.h"
-#include "components/VisualiserSettings.h"
+#include "visualiser/VisualiserSettings.h"
 
 class OscirenderAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener {
 public:
@@ -54,7 +54,7 @@ public:
 
     VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.visualiserParameters);
     SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings");
-    VisualiserComponent visualiser{audioProcessor, audioProcessor.threadManager, visualiserSettings, nullptr, audioProcessor.visualiserParameters.legacyVisualiserEnabled->getBoolValue()};
+    VisualiserComponent visualiser{audioProcessor.threadManager, visualiserSettings, nullptr};
 
     SettingsComponent settings{audioProcessor, *this};
 

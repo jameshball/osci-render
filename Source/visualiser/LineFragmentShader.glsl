@@ -1,3 +1,5 @@
+std::string lineFragmentShader = R"(
+
 #define EPS 1E-6
 #define TAU 6.283185307179586
 #define TAUR 2.5066282746310002
@@ -43,3 +45,5 @@ void main() {
     gl_FragColor = 2.0 * texture2D(uScreen, vTexCoord) * brightness;
     gl_FragColor.a = 1.0;
 }
+
+)";

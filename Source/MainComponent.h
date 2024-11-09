@@ -4,7 +4,7 @@
 #include "PluginProcessor.h"
 #include "parser/FileParser.h"
 #include "parser/FrameProducer.h"
-#include "components/VisualiserComponent.h"
+#include "visualiser/VisualiserComponent.h"
 #include "audio/PitchDetector.h"
 #include "UGen/ugen_JuceEnvelopeComponent.h"
 #include "components/SvgButton.h"
