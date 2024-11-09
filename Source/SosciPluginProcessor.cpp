@@ -22,6 +22,8 @@ SosciAudioProcessor::SosciAudioProcessor()
     for (auto effect : parameters.effects) {
         allEffects.push_back(effect);
     }
+    
+    allEffects.push_back(parameters.smoothEffect);
 
     for (auto effect : allEffects) {
         for (auto effectParameter : effect->parameters) {

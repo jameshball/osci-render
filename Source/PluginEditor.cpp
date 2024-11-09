@@ -119,9 +119,9 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     visualiserSettingsWindow.setUsingNativeTitleBar(true);
 #endif
     visualiserSettings.setLookAndFeel(&getLookAndFeel());
-    visualiserSettings.setSize(550, 370);
+    visualiserSettings.setSize(550, 400);
     visualiserSettingsWindow.setContentNonOwned(&visualiserSettings, true);
-    visualiserSettingsWindow.centreWithSize(550, 370);
+    visualiserSettingsWindow.centreWithSize(550, 400);
     
     tooltipDropShadow.setOwner(&tooltipWindow);
 }

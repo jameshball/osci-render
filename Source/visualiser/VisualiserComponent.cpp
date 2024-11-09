@@ -86,9 +86,10 @@ void VisualiserComponent::setBuffer(const std::vector<OsciPoint>& buffer) {
     ySamples.clear();
     zSamples.clear();
     for (auto& point : buffer) {
-        xSamples.push_back(point.x);
-        ySamples.push_back(point.y);
-        zSamples.push_back(point.z);
+        OsciPoint smoothPoint = settings.parameters.smoothEffect->apply(0, point);
+        xSamples.push_back(smoothPoint.x);
+        ySamples.push_back(smoothPoint.y);
+        zSamples.push_back(smoothPoint.z);
     }
     
     triggerAsyncUpdate();

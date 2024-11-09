@@ -7,12 +7,14 @@
 #include "../components/SvgButton.h"
 #include "../LookAndFeel.h"
 #include "../components/SwitchButton.h"
+#include "../audio/SmoothEffect.h"
 
 class VisualiserParameters {
 public:
     BooleanParameter* graticuleEnabled = new BooleanParameter("Show Graticule", "graticuleEnabled", VERSION_HINT, true, "Show the graticule or grid lines over the oscilloscope display.");
     BooleanParameter* smudgesEnabled = new BooleanParameter("Show Smudges", "smudgesEnabled", VERSION_HINT, true, "Adds a subtle layer of dirt/smudges to the oscilloscope display to make it look more realistic.");
     BooleanParameter* upsamplingEnabled = new BooleanParameter("Upsample Audio", "upsamplingEnabled", VERSION_HINT, true, "Upsamples the audio before visualising it to make it appear more realistic, at the expense of performance.");
+    BooleanParameter* sweepEnabled = new BooleanParameter("Sweep", "sweepEnabled", VERSION_HINT, true, "Plots the audio signal over time, sweeping from left to right");
     BooleanParameter* visualiserFullScreen = new BooleanParameter("Visualiser Fullscreen", "visualiserFullScreen", VERSION_HINT, false, "Makes the software visualiser fullscreen.");
 
     std::shared_ptr<Effect> persistenceEffect = std::make_shared<Effect>(
@@ -36,7 +38,7 @@ public:
             "Brightness",
             "Controls how bright the light glows for on the oscilloscope display.",
             "brightness",
-            VERSION_HINT, 3.0, 0.0, 10.0
+            VERSION_HINT, 2.0, 0.0, 10.0
         )
     );
     std::shared_ptr<Effect> intensityEffect = std::make_shared<Effect>(
@@ -80,8 +82,18 @@ public:
         )
     );
     
+    std::shared_ptr<Effect> smoothEffect = std::make_shared<Effect>(
+        std::make_shared<SmoothEffect>(),
+        new EffectParameter(
+            "Smoothing",
+            "This works as a low-pass frequency filter, effectively reducing the sample rate of the audio being visualised.",
+            "visualiserSmoothing",
+            VERSION_HINT, 0, 0.0, 1.0
+        )
+    );
+    
     std::vector<std::shared_ptr<Effect>> effects = {persistenceEffect, hueEffect, brightnessEffect, intensityEffect, saturationEffect, focusEffect, noiseEffect, glowEffect};
-    std::vector<BooleanParameter*> booleans = {graticuleEnabled, smudgesEnabled, upsamplingEnabled, visualiserFullScreen};
+    std::vector<BooleanParameter*> booleans = {graticuleEnabled, smudgesEnabled, upsamplingEnabled, visualiserFullScreen, sweepEnabled};
 };
 
 class VisualiserSettings : public juce::Component {
@@ -147,6 +159,7 @@ private:
     EffectComponent focus{*parameters.focusEffect};
     EffectComponent noise{*parameters.noiseEffect};
     EffectComponent glow{*parameters.glowEffect};
+    EffectComponent smooth{*parameters.smoothEffect};
     
     jux::SwitchButton graticuleToggle{parameters.graticuleEnabled};
     jux::SwitchButton smudgeToggle{parameters.smudgesEnabled};
