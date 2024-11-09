@@ -29,7 +29,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
                      #endif
                        )
 #endif
-    {
+{
     // locking isn't necessary here because we are in the constructor
 
     toggleableEffects.push_back(std::make_shared<Effect>(
@@ -161,6 +161,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     allEffects = toggleableEffects;
     allEffects.insert(allEffects.end(), permanentEffects.begin(), permanentEffects.end());
     allEffects.insert(allEffects.end(), luaEffects.begin(), luaEffects.end());
+    allEffects.push_back(visualiserParameters.smoothEffect);
 
     for (auto effect : allEffects) {
         for (auto effectParameter : effect->parameters) {

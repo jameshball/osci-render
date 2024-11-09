@@ -55,6 +55,9 @@
               file="Source/audio/EffectParameter.h"/>
         <FILE id="aziWU2" name="SampleRateManager.h" compile="0" resource="0"
               file="Source/audio/SampleRateManager.h"/>
+        <FILE id="vj5mRC" name="SmoothEffect.cpp" compile="1" resource="0"
+              file="Source/audio/SmoothEffect.cpp"/>
+        <FILE id="GSnwBW" name="SmoothEffect.h" compile="0" resource="0" file="Source/audio/SmoothEffect.h"/>
       </GROUP>
       <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
         <FILE id="URb7Ok" name="AboutComponent.cpp" compile="1" resource="0"
