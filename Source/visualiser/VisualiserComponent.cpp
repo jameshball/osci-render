@@ -141,11 +141,7 @@ void VisualiserComponent::haltRecording() {
 
 void VisualiserComponent::resized() {
     auto area = getLocalBounds();
-    if (visualiserOnly) {
-        buttonRow = area.removeFromTop(25);
-    } else {
-        buttonRow = area.removeFromBottom(25);
-    }
+    buttonRow = area.removeFromBottom(25);
     if (parent == nullptr && !visualiserOnly) {
         fullScreenButton.setBounds(buttonRow.removeFromRight(30));
     }
@@ -230,7 +226,7 @@ void VisualiserComponent::newOpenGLContextCreated() {
     glGenBuffers(1, &vertexBuffer);
     setupTextures();
     
-    setupArrays(smoothedXSamples.size());
+    setupArrays(xSamples.size() * RESAMPLE_RATIO);
 }
 
 void VisualiserComponent::openGLContextClosing() {
@@ -255,7 +251,7 @@ void VisualiserComponent::openGLContextClosing() {
 }
 
 void VisualiserComponent::handleAsyncUpdate() {
-    {
+    if (settings.parameters.upsamplingEnabled->getBoolValue()) {
         juce::CriticalSection::ScopedLockType lock(samplesLock);
         
         int newResampledSize = xSamples.size() * RESAMPLE_RATIO;
@@ -280,6 +276,7 @@ void VisualiserComponent::handleAsyncUpdate() {
 
 void VisualiserComponent::renderOpenGL() {
     if (openGLContext.isActive()) {
+        time += 0.01f;
         juce::OpenGLHelpers::clear(juce::Colours::black);
         if (active) {
             juce::CriticalSection::ScopedLockType lock(samplesLock);
@@ -292,7 +289,11 @@ void VisualiserComponent::renderOpenGL() {
             
             renderScale = (float) openGLContext.getRenderingScale();
             
-            drawLineTexture(smoothedXSamples, smoothedYSamples, smoothedZSamples);
+            if (settings.parameters.upsamplingEnabled->getBoolValue()) {
+                drawLineTexture(smoothedXSamples, smoothedYSamples, smoothedZSamples);
+            } else {
+                drawLineTexture(xSamples, ySamples, zSamples);
+            }
             checkGLErrors("drawLineTexture");
             drawCRT();
             checkGLErrors("drawCRT");
@@ -312,7 +313,7 @@ void VisualiserComponent::viewportChanged(juce::Rectangle<int> area) {
         
         float minDim = juce::jmin(realWidth, realHeight);
         float x = (realWidth - minDim) / 2 + area.getX() * renderScale + xOffset;
-        float y = (realHeight - minDim) / 2 + area.getY() * renderScale + yOffset;
+        float y = (realHeight - minDim) / 2 - area.getY() * renderScale + yOffset;
         
         glViewport(juce::roundToInt(x), juce::roundToInt(y), juce::roundToInt(minDim), juce::roundToInt(minDim));
     }
@@ -567,9 +568,7 @@ void VisualiserComponent::drawLine(const std::vector<float>& xPoints, const std:
     if (settings.getUpsamplingEnabled()) {
         lineShader->setUniform("uIntensity", intensity);
     } else {
-        // TODO: filter steps
-        int steps = 6;
-        lineShader->setUniform("uIntensity", (GLfloat) (intensity * (steps + 1.5)));
+        lineShader->setUniform("uIntensity", (GLfloat) (intensity * RESAMPLE_RATIO * 1.5));
     }
     
     lineShader->setUniform("uFadeAmount", fadeAmount);
@@ -642,6 +641,9 @@ void VisualiserComponent::drawCRT() {
     float brightness = std::pow(2, settings.getBrightness() - 2);
     outputShader->setUniform("uExposure", brightness);
     outputShader->setUniform("uSaturation", (float) settings.getSaturation());
+    outputShader->setUniform("uNoise", (float) settings.getNoise());
+    outputShader->setUniform("uTime", time);
+    outputShader->setUniform("uGlow", (float) settings.getGlow());
     outputShader->setUniform("uResizeForCanvas", lineTexture.width / 1024.0f);
     juce::Colour colour = juce::Colour::fromHSV(settings.getHue() / 360.0f, 1.0, 1.0, 1.0);
     outputShader->setUniform("uColour", colour.getFloatRed(), colour.getFloatGreen(), colour.getFloatBlue());

@@ -10,6 +10,8 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& parameters, int num
     addAndMakeVisible(hue);
     addAndMakeVisible(saturation);
     addAndMakeVisible(focus);
+    addAndMakeVisible(noise);
+    addAndMakeVisible(glow);
     addAndMakeVisible(graticuleToggle);
     addAndMakeVisible(smudgeToggle);
     addAndMakeVisible(upsamplingToggle);
@@ -20,6 +22,8 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& parameters, int num
     hue.setSliderOnValueChange();
     saturation.setSliderOnValueChange();
     focus.setSliderOnValueChange();
+    noise.setSliderOnValueChange();
+    glow.setSliderOnValueChange();
 }
 
 VisualiserSettings::~VisualiserSettings() {}
@@ -33,6 +37,8 @@ void VisualiserSettings::resized() {
     hue.setBounds(area.removeFromTop(rowHeight));
     saturation.setBounds(area.removeFromTop(rowHeight));
     focus.setBounds(area.removeFromTop(rowHeight));
+    noise.setBounds(area.removeFromTop(rowHeight));
+    glow.setBounds(area.removeFromTop(rowHeight));
     graticuleToggle.setBounds(area.removeFromTop(rowHeight));
     smudgeToggle.setBounds(area.removeFromTop(rowHeight));
     upsamplingToggle.setBounds(area.removeFromTop(rowHeight));
