@@ -571,11 +571,11 @@ void VisualiserComponent::drawLine(const std::vector<float>& xPoints, const std:
     lineShader->setUniform("uGain", 450.0f / 512.0f);
     lineShader->setUniform("uInvert", 1.0f);
 
-    float intensity = 16384.0 / sampleRate;
+    float intensity = 16384.f / sampleRate;
     if (settings.getUpsamplingEnabled()) {
         lineShader->setUniform("uIntensity", intensity);
     } else {
-        lineShader->setUniform("uIntensity", (GLfloat) (intensity * RESAMPLE_RATIO * 1.5));
+        lineShader->setUniform("uIntensity", (GLfloat) (intensity * RESAMPLE_RATIO));
     }
     
     lineShader->setUniform("uFadeAmount", fadeAmount);
