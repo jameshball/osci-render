@@ -95,6 +95,21 @@ void VisualiserComponent::setBuffer(const std::vector<OsciPoint>& buffer) {
         ySamples.push_back(smoothPoint.y);
         zSamples.push_back(smoothPoint.z);
     }
+
+    if (settings.parameters.upsamplingEnabled->getBoolValue()) {
+        juce::CriticalSection::ScopedLockType lock(samplesLock);
+
+        int newResampledSize = xSamples.size() * RESAMPLE_RATIO;
+
+        smoothedXSamples.resize(newResampledSize);
+        smoothedYSamples.resize(newResampledSize);
+        smoothedZSamples.resize(newResampledSize);
+        smoothedZSamples.resize(newResampledSize);
+
+        xResampler.process(xSamples.data(), smoothedXSamples.data(), xSamples.size());
+        yResampler.process(ySamples.data(), smoothedYSamples.data(), ySamples.size());
+        zResampler.process(zSamples.data(), smoothedZSamples.data(), zSamples.size());
+    }
     
     triggerAsyncUpdate();
 }
@@ -256,21 +271,6 @@ void VisualiserComponent::openGLContextClosing() {
 }
 
 void VisualiserComponent::handleAsyncUpdate() {
-    if (settings.parameters.upsamplingEnabled->getBoolValue()) {
-        juce::CriticalSection::ScopedLockType lock(samplesLock);
-        
-        int newResampledSize = xSamples.size() * RESAMPLE_RATIO;
-        
-        smoothedXSamples.resize(newResampledSize);
-        smoothedYSamples.resize(newResampledSize);
-        smoothedZSamples.resize(newResampledSize);
-        smoothedZSamples.resize(newResampledSize);
-        
-        xResampler.process(xSamples.data(), smoothedXSamples.data(), xSamples.size());
-        yResampler.process(ySamples.data(), smoothedYSamples.data(), ySamples.size());
-        zResampler.process(zSamples.data(), smoothedZSamples.data(), zSamples.size());
-    }
-    
     if (needsReattach) {
         //openGLContext.detach();
         //openGLContext.attachTo(*this);
