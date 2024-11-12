@@ -539,6 +539,8 @@ void VisualiserComponent::drawLine(const std::vector<float>& xPoints, const std:
     setAdditiveBlending();
 
     int nPoints = xPoints.size();
+
+    scratchVertices.resize(nPoints * 12);
     
     for (int i = 0; i < nPoints; ++i) {
         int p = i * 12;
@@ -569,7 +571,7 @@ void VisualiserComponent::drawLine(const std::vector<float>& xPoints, const std:
     lineShader->setUniform("uGain", 450.0f / 512.0f);
     lineShader->setUniform("uInvert", 1.0f);
 
-    float intensity = settings.getIntensity() * (41000.0f / sampleRate);
+    float intensity = 16384.0 / sampleRate;
     if (settings.getUpsamplingEnabled()) {
         lineShader->setUniform("uIntensity", intensity);
     } else {

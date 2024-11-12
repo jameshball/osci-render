@@ -35,18 +35,10 @@ public:
     );
     std::shared_ptr<Effect> brightnessEffect = std::make_shared<Effect>(
         new EffectParameter(
-            "Brightness",
+            "Intensity",
             "Controls the brightness of the activated phosphor.",
             "brightness",
             VERSION_HINT, 1.0, 0.0, 2.0
-        )
-    );
-    std::shared_ptr<Effect> intensityEffect = std::make_shared<Effect>(
-        new EffectParameter(
-            "Intensity",
-            "Controls how intensely the electron beam activates the phosphor.",
-            "intensity",
-            VERSION_HINT, 3.0, 0.0, 10.0
         )
     );
     std::shared_ptr<Effect> saturationEffect = std::make_shared<Effect>(
@@ -92,7 +84,7 @@ public:
         )
     );
     
-    std::vector<std::shared_ptr<Effect>> effects = {persistenceEffect, hueEffect, brightnessEffect, intensityEffect, saturationEffect, focusEffect, noiseEffect, glowEffect};
+    std::vector<std::shared_ptr<Effect>> effects = {persistenceEffect, hueEffect, brightnessEffect, saturationEffect, focusEffect, noiseEffect, glowEffect};
     std::vector<BooleanParameter*> booleans = {graticuleEnabled, smudgesEnabled, upsamplingEnabled, visualiserFullScreen, sweepEnabled};
 };
 
@@ -105,10 +97,6 @@ public:
     
     double getBrightness() {
         return parameters.brightnessEffect->getActualValue();
-    }
-    
-    double getIntensity() {
-        return parameters.intensityEffect->getActualValue() / 100;
     }
     
     double getPersistence() {
@@ -152,7 +140,6 @@ public:
 
 private:
     EffectComponent brightness{*parameters.brightnessEffect};
-    EffectComponent intensity{*parameters.intensityEffect};
     EffectComponent persistence{*parameters.persistenceEffect};
     EffectComponent hue{*parameters.hueEffect};
     EffectComponent saturation{*parameters.saturationEffect};

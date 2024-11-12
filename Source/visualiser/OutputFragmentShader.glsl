@@ -24,7 +24,7 @@ float noise(in vec2 uv, in float time) {
 }
 
 void main() {
-    float glow = uGlow / (2 * max(0.0001,sqrt(uExposure)));
+    float glow = uGlow / (2.0 * max(0.0001,sqrt(uExposure)));
     vec4 line = texture2D(uTexture0, vTexCoordCanvas);
     // r components have grid; g components do not.
     vec4 screen = texture2D(uTexture3, vTexCoord);
