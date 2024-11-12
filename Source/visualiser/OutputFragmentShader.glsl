@@ -24,13 +24,14 @@ float noise(in vec2 uv, in float time) {
 }
 
 void main() {
+    float glow = uGlow / (2.0 * max(0.0001,sqrt(uExposure)));
     vec4 line = texture2D(uTexture0, vTexCoordCanvas);
     // r components have grid; g components do not.
     vec4 screen = texture2D(uTexture3, vTexCoord);
     vec4 tightGlow = texture2D(uTexture1, vTexCoord);
-    vec4 scatter = texture2D(uTexture2, vTexCoord)+0.35;
-    float light = line.r + uGlow * 1.5 * screen.g * screen.g * tightGlow.r;
-    light += uGlow * 0.4 * scatter.g * (2.0 + 1.0 * screen.g + 0.5 * screen.r);
+    vec4 scatter = texture2D(uTexture2, vTexCoord)+glow;
+    float light = line.r * 1.2 * screen.r + 1.5 * screen.r * screen.g * tightGlow.r;
+    light += glow * 0.4 * scatter.g * (2.0 + 1.0 * screen.r + 0.5 * screen.r);
     float tlight = 1.0-pow(2.0, -uExposure*light);
     float tlight2 = tlight * tlight * tlight;
     gl_FragColor.rgb = mix(uColour, vec3(1.0), 0.3+tlight2*tlight2*0.5)*tlight;

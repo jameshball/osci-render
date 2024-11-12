@@ -5,7 +5,6 @@
 
 VisualiserSettings::VisualiserSettings(VisualiserParameters& parameters, int numChannels) : parameters(parameters), numChannels(numChannels) {
     addAndMakeVisible(brightness);
-    addAndMakeVisible(intensity);
 	addAndMakeVisible(persistence);
     addAndMakeVisible(hue);
     addAndMakeVisible(saturation);
@@ -18,7 +17,6 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& parameters, int num
     addAndMakeVisible(upsamplingToggle);
     
     brightness.setSliderOnValueChange();
-    intensity.setSliderOnValueChange();
     persistence.setSliderOnValueChange();
     hue.setSliderOnValueChange();
     saturation.setSliderOnValueChange();
@@ -34,7 +32,6 @@ void VisualiserSettings::resized() {
 	auto area = getLocalBounds().reduced(20);
 	double rowHeight = 30;
     brightness.setBounds(area.removeFromTop(rowHeight));
-    intensity.setBounds(area.removeFromTop(rowHeight));
     persistence.setBounds(area.removeFromTop(rowHeight));
     hue.setBounds(area.removeFromTop(rowHeight));
     saturation.setBounds(area.removeFromTop(rowHeight));

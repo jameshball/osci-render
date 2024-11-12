@@ -100,7 +100,7 @@ private:
 
     juce::CriticalSection samplesLock;
     bool needsReattach = true;
-    std::vector<float> xSamples{2};
+    std::vector<float> xSamples;
     std::vector<float> ySamples;
     std::vector<float> zSamples;
     std::vector<float> smoothedXSamples;

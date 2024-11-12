@@ -12,8 +12,6 @@
 #include "TexturedVertexShader.glsl"
 
 VisualiserComponent::VisualiserComponent(AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, VisualiserComponent* parent, bool visualiserOnly) : settings(settings), threadManager(threadManager), visualiserOnly(visualiserOnly), AudioBackgroundThread("VisualiserComponent", threadManager), parent(parent) {
-    setShouldBeRunning(true);
-    
     addAndMakeVisible(record);
     record.setPulseAnimation(true);
     record.onClick = [this] {
@@ -55,6 +53,12 @@ VisualiserComponent::VisualiserComponent(AudioBackgroundThreadManager& threadMan
     
     openGLContext.setRenderer(this);
     openGLContext.attachTo(*this);
+
+    std::vector<OsciPoint> initBuffer;
+    initBuffer.resize(1024, OsciPoint(0, 0, 0));
+    setBuffer(initBuffer);
+
+    setShouldBeRunning(true);
 }
 
 VisualiserComponent::~VisualiserComponent() {
@@ -90,6 +94,21 @@ void VisualiserComponent::setBuffer(const std::vector<OsciPoint>& buffer) {
         xSamples.push_back(smoothPoint.x);
         ySamples.push_back(smoothPoint.y);
         zSamples.push_back(smoothPoint.z);
+    }
+
+    if (settings.parameters.upsamplingEnabled->getBoolValue()) {
+        juce::CriticalSection::ScopedLockType lock(samplesLock);
+
+        int newResampledSize = xSamples.size() * RESAMPLE_RATIO;
+
+        smoothedXSamples.resize(newResampledSize);
+        smoothedYSamples.resize(newResampledSize);
+        smoothedZSamples.resize(newResampledSize);
+        smoothedZSamples.resize(newResampledSize);
+
+        xResampler.process(xSamples.data(), smoothedXSamples.data(), xSamples.size());
+        yResampler.process(ySamples.data(), smoothedYSamples.data(), ySamples.size());
+        zResampler.process(zSamples.data(), smoothedZSamples.data(), zSamples.size());
     }
     
     triggerAsyncUpdate();
@@ -252,24 +271,9 @@ void VisualiserComponent::openGLContextClosing() {
 }
 
 void VisualiserComponent::handleAsyncUpdate() {
-    if (settings.parameters.upsamplingEnabled->getBoolValue()) {
-        juce::CriticalSection::ScopedLockType lock(samplesLock);
-        
-        int newResampledSize = xSamples.size() * RESAMPLE_RATIO;
-        
-        smoothedXSamples.resize(newResampledSize);
-        smoothedYSamples.resize(newResampledSize);
-        smoothedZSamples.resize(newResampledSize);
-        smoothedZSamples.resize(newResampledSize);
-        
-        xResampler.process(xSamples.data(), smoothedXSamples.data(), xSamples.size());
-        yResampler.process(ySamples.data(), smoothedYSamples.data(), ySamples.size());
-        zResampler.process(zSamples.data(), smoothedZSamples.data(), zSamples.size());
-    }
-    
     if (needsReattach) {
-        openGLContext.detach();
-        openGLContext.attachTo(*this);
+        //openGLContext.detach();
+        //openGLContext.attachTo(*this);
         needsReattach = false;
     }
     repaint();
@@ -535,6 +539,8 @@ void VisualiserComponent::drawLine(const std::vector<float>& xPoints, const std:
     setAdditiveBlending();
 
     int nPoints = xPoints.size();
+
+    scratchVertices.resize(nPoints * 12);
     
     for (int i = 0; i < nPoints; ++i) {
         int p = i * 12;
@@ -565,11 +571,11 @@ void VisualiserComponent::drawLine(const std::vector<float>& xPoints, const std:
     lineShader->setUniform("uGain", 450.0f / 512.0f);
     lineShader->setUniform("uInvert", 1.0f);
 
-    float intensity = settings.getIntensity() * (41000.0f / sampleRate);
+    float intensity = 16384.f / sampleRate;
     if (settings.getUpsamplingEnabled()) {
         lineShader->setUniform("uIntensity", intensity);
     } else {
-        lineShader->setUniform("uIntensity", (GLfloat) (intensity * RESAMPLE_RATIO * 1.5));
+        lineShader->setUniform("uIntensity", (GLfloat) (intensity * RESAMPLE_RATIO));
     }
     
     lineShader->setUniform("uFadeAmount", fadeAmount);
@@ -639,7 +645,7 @@ void VisualiserComponent::drawCRT() {
     
     activateTargetTexture(std::nullopt);
     setShader(outputShader.get());
-    float brightness = std::pow(2, settings.getBrightness() - 2);
+    float brightness = std::pow(2, settings.getBrightness()*3);
     outputShader->setUniform("uExposure", brightness);
     outputShader->setUniform("uSaturation", (float) settings.getSaturation());
     outputShader->setUniform("uNoise", (float) settings.getNoise());
