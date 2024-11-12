@@ -12,8 +12,6 @@
 #include "TexturedVertexShader.glsl"
 
 VisualiserComponent::VisualiserComponent(AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, VisualiserComponent* parent, bool visualiserOnly) : settings(settings), threadManager(threadManager), visualiserOnly(visualiserOnly), AudioBackgroundThread("VisualiserComponent", threadManager), parent(parent) {
-    setShouldBeRunning(true);
-    
     addAndMakeVisible(record);
     record.setPulseAnimation(true);
     record.onClick = [this] {
@@ -55,6 +53,12 @@ VisualiserComponent::VisualiserComponent(AudioBackgroundThreadManager& threadMan
     
     openGLContext.setRenderer(this);
     openGLContext.attachTo(*this);
+
+    std::vector<OsciPoint> initBuffer;
+    initBuffer.resize(1024, OsciPoint(0, 0, 0));
+    setBuffer(initBuffer);
+
+    setShouldBeRunning(true);
 }
 
 VisualiserComponent::~VisualiserComponent() {
@@ -268,8 +272,8 @@ void VisualiserComponent::handleAsyncUpdate() {
     }
     
     if (needsReattach) {
-        openGLContext.detach();
-        openGLContext.attachTo(*this);
+        //openGLContext.detach();
+        //openGLContext.attachTo(*this);
         needsReattach = false;
     }
     repaint();
@@ -639,7 +643,7 @@ void VisualiserComponent::drawCRT() {
     
     activateTargetTexture(std::nullopt);
     setShader(outputShader.get());
-    float brightness = std::pow(2, settings.getBrightness() - 2);
+    float brightness = std::pow(2, settings.getBrightness()*3);
     outputShader->setUniform("uExposure", brightness);
     outputShader->setUniform("uSaturation", (float) settings.getSaturation());
     outputShader->setUniform("uNoise", (float) settings.getNoise());

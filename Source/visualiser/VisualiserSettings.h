@@ -20,7 +20,7 @@ public:
     std::shared_ptr<Effect> persistenceEffect = std::make_shared<Effect>(
         new EffectParameter(
             "Persistence",
-            "Controls how long the light glows for on the oscilloscope display.",
+            "Controls how long the phosphor remains lit after being hit by the beam.",
             "persistence",
             VERSION_HINT, 0.5, 0, 6.0
         )
@@ -28,7 +28,7 @@ public:
     std::shared_ptr<Effect> hueEffect = std::make_shared<Effect>(
         new EffectParameter(
             "Hue",
-            "Controls the hue/colour of the oscilloscope display.",
+            "Controls the hue of the phosphor screen's colour.",
             "hue",
             VERSION_HINT, 125, 0, 359, 1
         )
@@ -36,15 +36,15 @@ public:
     std::shared_ptr<Effect> brightnessEffect = std::make_shared<Effect>(
         new EffectParameter(
             "Brightness",
-            "Controls how bright the light glows for on the oscilloscope display.",
+            "Controls the brightness of the activated phosphor.",
             "brightness",
-            VERSION_HINT, 2.0, 0.0, 10.0
+            VERSION_HINT, 1.0, 0.0, 2.0
         )
     );
     std::shared_ptr<Effect> intensityEffect = std::make_shared<Effect>(
         new EffectParameter(
             "Intensity",
-            "Controls how bright the electron beam of the oscilloscope is.",
+            "Controls how intensely the electron beam activates the phosphor.",
             "intensity",
             VERSION_HINT, 3.0, 0.0, 10.0
         )
@@ -52,7 +52,7 @@ public:
     std::shared_ptr<Effect> saturationEffect = std::make_shared<Effect>(
         new EffectParameter(
             "Saturation",
-            "Controls how saturated the colours are on the oscilloscope.",
+            "Controls the saturation of the phosphor screen's colour.",
             "saturation",
             VERSION_HINT, 1.0, 0.0, 5.0
         )
@@ -68,15 +68,15 @@ public:
     std::shared_ptr<Effect> noiseEffect = std::make_shared<Effect>(
         new EffectParameter(
             "Noise",
-            "Controls how much noise/grain is added to the oscilloscope display.",
+            "Controls how much visual noise is added to the oscilloscope display.",
             "noise",
-            VERSION_HINT, 0.1, 0.0, 1.0
+            VERSION_HINT, 0.0, 0.0, 1.0
         )
     );
     std::shared_ptr<Effect> glowEffect = std::make_shared<Effect>(
         new EffectParameter(
-            "Glow",
-            "Controls how much the light glows on the oscilloscope display.",
+            "Frontlight",
+            "Controls how brightly the screen is lit from the front.",
             "glow",
             VERSION_HINT, 0.3, 0.0, 1.0
         )
@@ -104,7 +104,7 @@ public:
     void resized() override;
     
     double getBrightness() {
-        return parameters.brightnessEffect->getActualValue() - 2;
+        return parameters.brightnessEffect->getActualValue();
     }
     
     double getIntensity() {
