@@ -99,7 +99,6 @@ private:
     int nEdges = 0;
 
     juce::CriticalSection samplesLock;
-    bool needsReattach = true;
     std::vector<float> xSamples{2};
     std::vector<float> ySamples;
     std::vector<float> zSamples;
