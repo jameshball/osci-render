@@ -12,8 +12,7 @@
 #include "TexturedVertexShader.glsl"
 
 VisualiserComponent::VisualiserComponent(AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, VisualiserComponent* parent, bool visualiserOnly) : settings(settings), threadManager(threadManager), visualiserOnly(visualiserOnly), AudioBackgroundThread("VisualiserComponent", threadManager), parent(parent) {
-    setShouldBeRunning(true);
-    
+
     addAndMakeVisible(record);
     record.setPulseAnimation(true);
     record.onClick = [this] {
@@ -55,6 +54,12 @@ VisualiserComponent::VisualiserComponent(AudioBackgroundThreadManager& threadMan
     
     openGLContext.setRenderer(this);
     openGLContext.attachTo(*this);
+    
+    std::vector<OsciPoint> initBuffer;
+    initBuffer.resize(1024, OsciPoint(0, 0, 0));
+    setBuffer(initBuffer);
+
+    setShouldBeRunning(true);
 }
 
 VisualiserComponent::~VisualiserComponent() {
@@ -78,10 +83,7 @@ void VisualiserComponent::mouseDoubleClick(const juce::MouseEvent& event) {
 
 void VisualiserComponent::setBuffer(const std::vector<OsciPoint>& buffer) {
     juce::CriticalSection::ScopedLockType lock(samplesLock);
-    
-    if (xSamples.size() != buffer.size()) {
-        needsReattach = true;
-    }
+
     xSamples.clear();
     ySamples.clear();
     zSamples.clear();
@@ -267,11 +269,6 @@ void VisualiserComponent::handleAsyncUpdate() {
         zResampler.process(zSamples.data(), smoothedZSamples.data(), zSamples.size());
     }
     
-    if (needsReattach) {
-        openGLContext.detach();
-        openGLContext.attachTo(*this);
-        needsReattach = false;
-    }
     repaint();
 }
 
