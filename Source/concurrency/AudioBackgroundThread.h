@@ -23,7 +23,7 @@ private:
     AudioBackgroundThreadManager& manager;
     std::unique_ptr<BufferConsumer> consumer = nullptr;
     bool shouldBeRunning = false;
-    bool isPrepared = false;
+    std::atomic<bool> isPrepared = false;
 
 protected:
     
@@ -31,6 +31,3 @@ protected:
 
     virtual void runTask(const std::vector<OsciPoint>& points) = 0;
 };
-
-
-

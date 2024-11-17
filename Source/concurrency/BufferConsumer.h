@@ -63,7 +63,10 @@ public:
 
     void write(OsciPoint point) {
         if (offset >= buffer->size()) {
-            buffer = buffer == &buffer1 ? &buffer2 : &buffer1;
+            {
+                juce::SpinLock::ScopedLockType scope(bufferLock);
+                buffer = buffer == &buffer1 ? &buffer2 : &buffer1;
+            }
             offset = 0;
             sema.release();
         }
@@ -73,12 +76,14 @@ public:
     
     // whatever buffer is not currently being written to
     std::vector<OsciPoint>& getBuffer() {
+        juce::SpinLock::ScopedLockType scope(bufferLock);
         return buffer == &buffer1 ? buffer2 : buffer1;
     }
 
 private:
     std::vector<OsciPoint> buffer1;
     std::vector<OsciPoint> buffer2;
+    juce::SpinLock bufferLock;
     std::vector<OsciPoint>* buffer = &buffer1;
     Semaphore sema{0};
     int offset = 0;

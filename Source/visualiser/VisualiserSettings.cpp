@@ -13,9 +13,11 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& parameters, int num
     addAndMakeVisible(noise);
     addAndMakeVisible(glow);
     addAndMakeVisible(smooth);
+    addChildComponent(sweepMs);
     addAndMakeVisible(graticuleToggle);
     addAndMakeVisible(smudgeToggle);
     addAndMakeVisible(upsamplingToggle);
+    addAndMakeVisible(sweepToggle);
     
     brightness.setSliderOnValueChange();
     intensity.setSliderOnValueChange();
@@ -26,6 +28,12 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& parameters, int num
     noise.setSliderOnValueChange();
     glow.setSliderOnValueChange();
     smooth.setSliderOnValueChange();
+    sweepMs.setSliderOnValueChange();
+    
+    sweepToggle.onClick = [this] {
+        sweepMs.setVisible(sweepToggle.getToggleState());
+        resized();
+    };
 }
 
 VisualiserSettings::~VisualiserSettings() {}
@@ -45,4 +53,9 @@ void VisualiserSettings::resized() {
     graticuleToggle.setBounds(area.removeFromTop(rowHeight));
     smudgeToggle.setBounds(area.removeFromTop(rowHeight));
     upsamplingToggle.setBounds(area.removeFromTop(rowHeight));
+    
+    sweepToggle.setBounds(area.removeFromTop(rowHeight));
+    if (sweepToggle.getToggleState()) {
+        sweepMs.setBounds(area.removeFromTop(rowHeight));
+    }
 }
