@@ -108,7 +108,7 @@ private:
     std::vector<float> scratchVertices;
     std::vector<float> fullScreenQuad;
     
-    GLuint frameBuffer = 0;
+    juce::OpenGLFrameBuffer frameBuffer;
     Texture lineTexture;
     Texture blur1Texture;
     Texture blur2Texture;
@@ -138,6 +138,8 @@ private:
     chowdsp::ResamplingTypes::LanczosResampler<2048, 8> yResampler;
     chowdsp::ResamplingTypes::LanczosResampler<2048, 8> zResampler;
     
+    SharedTextureSender* sharedTextureSender = nullptr;
+    
     Texture makeTexture(int width, int height);
     void setupArrays(int num_points);
     void setupTextures();
@@ -151,6 +153,7 @@ private:
     void drawLine(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints);
     void fade();
     void drawCRT();
+    void drawOutput(std::optional<Texture> texture);
     void checkGLErrors(const juce::String& location);
     void viewportChanged(juce::Rectangle<int> area);
     Texture createScreenTexture();

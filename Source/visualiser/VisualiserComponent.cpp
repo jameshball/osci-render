@@ -160,6 +160,10 @@ void VisualiserComponent::resized() {
     }
     viewportArea = area;
     viewportChanged(viewportArea);
+    
+    if (sharedTextureSender != nullptr) {
+        sharedTextureSender->setSize(viewportArea.getWidth(), viewportArea.getHeight());
+    }
 }
 
 void VisualiserComponent::popoutWindow() {
@@ -230,15 +234,26 @@ void VisualiserComponent::newOpenGLContextCreated() {
     glGenBuffers(1, &vertexIndexBuffer);
     
     setupTextures();
+    
+    SharedTextureManager::getInstance()->initGL();
+    
+    sharedTextureSender = SharedTextureManager::getInstance()->addSender("TEST OSCI-RENDER", viewportArea.getWidth(), viewportArea.getHeight());
+    sharedTextureSender->setExternalFBO(&frameBuffer);
+    sharedTextureSender->textureId = lineTexture.id;
 }
 
 void VisualiserComponent::openGLContextClosing() {
     using namespace juce::gl;
     
+    if (SharedTextureManager::getInstanceWithoutCreating() != nullptr) {
+        SharedTextureManager::getInstance()->removeSender(sharedTextureSender);
+    }
+    sharedTextureSender = nullptr;
+    
     glDeleteBuffers(1, &quadIndexBuffer);
     glDeleteBuffers(1, &vertexIndexBuffer);
     glDeleteBuffers(1, &vertexBuffer);
-    glDeleteFramebuffers(1, &frameBuffer);
+    frameBuffer.release();
     glDeleteTextures(1, &lineTexture.id);
     glDeleteTextures(1, &blur1Texture.id);
     glDeleteTextures(1, &blur2Texture.id);
@@ -299,6 +314,10 @@ void VisualiserComponent::renderOpenGL() {
             checkGLErrors("drawLineTexture");
             drawCRT();
             checkGLErrors("drawCRT");
+            
+            if (SharedTextureManager::getInstanceWithoutCreating() != nullptr) {
+                SharedTextureManager::getInstance()->renderGL();
+            }
         }
     }
 }
@@ -364,8 +383,8 @@ void VisualiserComponent::setupTextures() {
     using namespace juce::gl;
     
     // Create the framebuffer
-    glGenFramebuffers(1, &frameBuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+    frameBuffer.initialise(openGLContext, 1024, 1024);
+    frameBuffer.makeCurrentRenderingTarget();
 
     // Create textures
     lineTexture = makeTexture(1024, 1024);
@@ -376,7 +395,7 @@ void VisualiserComponent::setupTextures() {
     
     screenTexture = createScreenTexture();
 
-    glBindFramebuffer(GL_FRAMEBUFFER, 0); // Unbind
+    frameBuffer.releaseAsRenderingTarget();
 }
 
 Texture VisualiserComponent::makeTexture(int width, int height) {
@@ -458,11 +477,11 @@ void VisualiserComponent::activateTargetTexture(std::optional<Texture> texture) 
     using namespace juce::gl;
     
     if (texture.has_value()) {
-        glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+        frameBuffer.makeCurrentRenderingTarget();
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture.value().id, 0);
         glViewport(0, 0, texture.value().width, texture.value().height);
     } else {
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        frameBuffer.releaseAsRenderingTarget();
         viewportChanged(viewportArea);
     }
     targetTexture = texture;
@@ -625,15 +644,23 @@ void VisualiserComponent::drawCRT() {
     //horizontal blur 64x64
     activateTargetTexture(blur4Texture);
     setShader(blurShader.get());
-    blurShader->setUniform("uOffset", 1.0f / 32.0f, 1.0f / 60.0f);
+    blurShader->setUniform("uOffset", 1.0f / 32.0f, 0.0f);
     drawTexture(blur3Texture);
 
     //vertical blur 64x64
     activateTargetTexture(blur3Texture);
-    blurShader->setUniform("uOffset", -1.0f / 60.0f, 1.0f / 32.0f);
+    blurShader->setUniform("uOffset", 0.0f, 1.0f / 32.0f);
     drawTexture(blur4Texture);
     
-    activateTargetTexture(std::nullopt);
+    Texture texture = { frameBuffer.getTextureID(), 1024, 1024 };
+    drawOutput(texture);
+    // drawOutput(std::nullopt);
+}
+
+void VisualiserComponent::drawOutput(std::optional<Texture> texture) {
+    using namespace juce::gl;
+    
+    activateTargetTexture(texture);
     setShader(outputShader.get());
     float brightness = std::pow(2, settings.getBrightness() - 2);
     outputShader->setUniform("uExposure", brightness);

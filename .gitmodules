@@ -1,3 +1,6 @@
 [submodule "modules/chowdsp_utils"]
 	path = modules/chowdsp_utils
 	url = git@github.com:Chowdhury-DSP/chowdsp_utils.git
+[submodule "juce_sharedtexture"]
+	path = modules/juce_sharedtexture
+	url = https://github.com/benkuper/juce_sharedtexture.git
