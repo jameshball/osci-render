@@ -45,7 +45,7 @@ private:
 	juce::SpinLock listenerLock;
 	std::vector<std::atomic<double>> actualValues;
 	int precedence = -1;
-	int sampleRate = 192000;
+	std::atomic<int> sampleRate = 192000;
 	EffectApplicationType application;
 	
 	std::shared_ptr<EffectApplication> effectApplication;

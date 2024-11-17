@@ -11,10 +11,10 @@
 
 class VisualiserParameters {
 public:
-    BooleanParameter* graticuleEnabled = new BooleanParameter("Show Graticule", "graticuleEnabled", VERSION_HINT, true, "Show the graticule or grid lines over the oscilloscope display.");
-    BooleanParameter* smudgesEnabled = new BooleanParameter("Show Smudges", "smudgesEnabled", VERSION_HINT, true, "Adds a subtle layer of dirt/smudges to the oscilloscope display to make it look more realistic.");
-    BooleanParameter* upsamplingEnabled = new BooleanParameter("Upsample Audio", "upsamplingEnabled", VERSION_HINT, false, "Upsamples the audio before visualising it to make it appear more realistic, at the expense of performance.");
-    BooleanParameter* sweepEnabled = new BooleanParameter("Sweep", "sweepEnabled", VERSION_HINT, true, "Plots the audio signal over time, sweeping from left to right");
+    BooleanParameter* graticuleEnabled = new BooleanParameter("Show Graticule", "graticuleEnabled", VERSION_HINT, false, "Show the graticule or grid lines over the oscilloscope display.");
+    BooleanParameter* smudgesEnabled = new BooleanParameter("Show Smudges", "smudgesEnabled", VERSION_HINT, false, "Adds a subtle layer of dirt/smudges to the oscilloscope display to make it look more realistic.");
+    BooleanParameter* upsamplingEnabled = new BooleanParameter("Upsample Audio", "upsamplingEnabled", VERSION_HINT, true, "Upsamples the audio before visualising it to make it appear more realistic, at the expense of performance.");
+    BooleanParameter* sweepEnabled = new BooleanParameter("Sweep", "sweepEnabled", VERSION_HINT, false, "Plots the audio signal over time, sweeping from left to right");
     BooleanParameter* visualiserFullScreen = new BooleanParameter("Visualiser Fullscreen", "visualiserFullScreen", VERSION_HINT, false, "Makes the software visualiser fullscreen.");
 
     std::shared_ptr<Effect> persistenceEffect = std::make_shared<Effect>(
@@ -46,7 +46,7 @@ public:
             "Intensity",
             "Controls how bright the electron beam of the oscilloscope is.",
             "intensity",
-            VERSION_HINT, 3.0, 0.0, 10.0
+            VERSION_HINT, 5.0, 0.0, 10.0
         )
     );
     std::shared_ptr<Effect> saturationEffect = std::make_shared<Effect>(
@@ -70,7 +70,7 @@ public:
             "Noise",
             "Controls how much noise/grain is added to the oscilloscope display.",
             "noise",
-            VERSION_HINT, 0.1, 0.0, 1.0
+            VERSION_HINT, 0.0, 0.0, 1.0
         )
     );
     std::shared_ptr<Effect> glowEffect = std::make_shared<Effect>(
@@ -81,7 +81,6 @@ public:
             VERSION_HINT, 0.3, 0.0, 1.0
         )
     );
-    
     std::shared_ptr<Effect> smoothEffect = std::make_shared<Effect>(
         std::make_shared<SmoothEffect>(),
         new EffectParameter(
@@ -91,8 +90,16 @@ public:
             VERSION_HINT, 0, 0.0, 1.0
         )
     );
+    std::shared_ptr<Effect> sweepMsEffect = std::make_shared<Effect>(
+        new EffectParameter(
+            "Sweep (ms)",
+            "The number of milliseconds it takes for the oscilloscope to sweep from left to right.",
+            "sweepMs",
+            VERSION_HINT, 0.3, 0.0, 1.0
+        )
+    );
     
-    std::vector<std::shared_ptr<Effect>> effects = {persistenceEffect, hueEffect, brightnessEffect, intensityEffect, saturationEffect, focusEffect, noiseEffect, glowEffect};
+    std::vector<std::shared_ptr<Effect>> effects = {persistenceEffect, hueEffect, brightnessEffect, intensityEffect, saturationEffect, focusEffect, noiseEffect, glowEffect, sweepMsEffect};
     std::vector<BooleanParameter*> booleans = {graticuleEnabled, smudgesEnabled, upsamplingEnabled, visualiserFullScreen, sweepEnabled};
 };
 
@@ -160,10 +167,12 @@ private:
     EffectComponent noise{*parameters.noiseEffect};
     EffectComponent glow{*parameters.glowEffect};
     EffectComponent smooth{*parameters.smoothEffect};
+    EffectComponent sweepMs{*parameters.sweepMsEffect};
     
     jux::SwitchButton graticuleToggle{parameters.graticuleEnabled};
     jux::SwitchButton smudgeToggle{parameters.smudgesEnabled};
     jux::SwitchButton upsamplingToggle{parameters.upsamplingEnabled};
+    jux::SwitchButton sweepToggle{parameters.sweepEnabled};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserSettings)
 };

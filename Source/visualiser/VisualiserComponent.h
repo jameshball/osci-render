@@ -95,13 +95,12 @@ private:
     GLuint vertexIndexBuffer = 0;
     GLuint vertexBuffer = 0;
 
-    int nPoints = 0;
     int nEdges = 0;
 
     juce::CriticalSection samplesLock;
     std::vector<float> xSamples{2};
-    std::vector<float> ySamples;
-    std::vector<float> zSamples;
+    std::vector<float> ySamples{2};
+    std::vector<float> zSamples{2};
     std::vector<float> smoothedXSamples;
     std::vector<float> smoothedYSamples;
     std::vector<float> smoothedZSamples;
@@ -134,6 +133,7 @@ private:
     
     const double RESAMPLE_RATIO = 6.0;
     double sampleRate = -1;
+    double oldSampleRate = -1;
     chowdsp::ResamplingTypes::LanczosResampler<2048, 8> xResampler;
     chowdsp::ResamplingTypes::LanczosResampler<2048, 8> yResampler;
     chowdsp::ResamplingTypes::LanczosResampler<2048, 8> zResampler;

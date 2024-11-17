@@ -54,10 +54,6 @@ VisualiserComponent::VisualiserComponent(AudioBackgroundThreadManager& threadMan
     
     openGLContext.setRenderer(this);
     openGLContext.attachTo(*this);
-    
-    std::vector<OsciPoint> initBuffer;
-    initBuffer.resize(1024, OsciPoint(0, 0, 0));
-    setBuffer(initBuffer);
 
     setShouldBeRunning(true);
 }
@@ -106,7 +102,10 @@ int VisualiserComponent::prepareTask(double sampleRate, int bufferSize) {
     xResampler.prepare(sampleRate, RESAMPLE_RATIO);
     yResampler.prepare(sampleRate, RESAMPLE_RATIO);
     zResampler.prepare(sampleRate, RESAMPLE_RATIO);
-    return sampleRate / FRAME_RATE;
+    
+    int desiredBufferSize = sampleRate / FRAME_RATE;
+    
+    return desiredBufferSize;
 }
 
 void VisualiserComponent::setPaused(bool paused) {
@@ -227,9 +226,10 @@ void VisualiserComponent::newOpenGLContextCreated() {
     blurShader->link();
     
     glGenBuffers(1, &vertexBuffer);
-    setupTextures();
+    glGenBuffers(1, &quadIndexBuffer);
+    glGenBuffers(1, &vertexIndexBuffer);
     
-    setupArrays(xSamples.size() * RESAMPLE_RATIO);
+    setupTextures();
 }
 
 void VisualiserComponent::openGLContextClosing() {
@@ -274,6 +274,10 @@ void VisualiserComponent::handleAsyncUpdate() {
 
 void VisualiserComponent::renderOpenGL() {
     if (openGLContext.isActive()) {
+        if (sampleRate != oldSampleRate) {
+            oldSampleRate = sampleRate;
+            setupArrays(RESAMPLE_RATIO * sampleRate / FRAME_RATE);
+        }
         time += 0.01f;
         juce::OpenGLHelpers::clear(juce::Colours::black);
         if (active) {
@@ -324,11 +328,8 @@ void VisualiserComponent::setupArrays(int nPoints) {
         return;
     }
     
-    this->nPoints = nPoints;
-    this->nEdges = this->nPoints - 1;
+    nEdges = nPoints - 1;
 
-    // Create the quad index buffer
-    glGenBuffers(1, &quadIndexBuffer);
     std::vector<float> indices(4 * nEdges);
     for (size_t i = 0; i < indices.size(); ++i) {
         indices[i] = static_cast<float>(i);
@@ -337,11 +338,9 @@ void VisualiserComponent::setupArrays(int nPoints) {
     glBindBuffer(GL_ARRAY_BUFFER, quadIndexBuffer);
     glBufferData(GL_ARRAY_BUFFER, indices.size() * sizeof(float), indices.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0); // Unbind
-
-    // Create the vertex index buffer
-    glGenBuffers(1, &vertexIndexBuffer);
+    
     int len = nEdges * 2 * 3;
-    std::vector<uint16_t> vertexIndices(len);
+    std::vector<uint32_t> vertexIndices(len);
 
     for (int i = 0, pos = 0; i < len;) {
         vertexIndices[i++] = pos;
@@ -354,7 +353,7 @@ void VisualiserComponent::setupArrays(int nPoints) {
     }
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vertexIndexBuffer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, vertexIndices.size() * sizeof(uint16_t), vertexIndices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, vertexIndices.size() * sizeof(uint32_t), vertexIndices.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); // Unbind
 
     // Initialize scratch vertices
@@ -541,7 +540,7 @@ void VisualiserComponent::drawLine(const std::vector<float>& xPoints, const std:
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, scratchVertices.size() * sizeof(float), scratchVertices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, nPoints * 12 * sizeof(float), scratchVertices.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     lineShader->use();
@@ -574,7 +573,7 @@ void VisualiserComponent::drawLine(const std::vector<float>& xPoints, const std:
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vertexIndexBuffer);
     int nEdgesThisTime = xPoints.size() - 1;
-    glDrawElements(GL_TRIANGLES, nEdgesThisTime * 6, GL_UNSIGNED_SHORT, 0);
+    glDrawElements(GL_TRIANGLES, nEdgesThisTime * 6, GL_UNSIGNED_INT, 0);
 
     glDisableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aStart"));
     glDisableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aEnd"));
