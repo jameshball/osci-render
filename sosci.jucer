@@ -42,6 +42,9 @@
       </GROUP>
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <GROUP id="{14EE14E4-7A22-160E-CA5B-BD291DB4B4A3}" name="img">
+        <FILE id="Zum0qz" name="qoixx.hpp" compile="0" resource="0" file="Source/img/qoixx.hpp"/>
+      </GROUP>
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
         <FILE id="S5ChqG" name="BooleanParameter.h" compile="0" resource="0"
               file="Source/audio/BooleanParameter.h"/>
