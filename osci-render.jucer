@@ -195,6 +195,7 @@
         <FILE id="PkBzDR" name="gifdec.h" compile="0" resource="0" file="Source/img/gifdec.h"/>
         <FILE id="w6xTAH" name="ImageParser.cpp" compile="1" resource="0" file="Source/img/ImageParser.cpp"/>
         <FILE id="ibvT5B" name="ImageParser.h" compile="0" resource="0" file="Source/img/ImageParser.h"/>
+        <FILE id="e1dNTX" name="qoixx.hpp" compile="0" resource="0" file="Source/img/qoixx.hpp"/>
       </GROUP>
       <GROUP id="{D0D95F57-3D9D-46D9-C126-25C3C7459AC5}" name="ixwebsocket">
         <FILE id="pPOkoj" name="IXBase64.h" compile="0" resource="0" file="Source/ixwebsocket/IXBase64.h"/>
