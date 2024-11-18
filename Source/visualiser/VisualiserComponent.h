@@ -7,6 +7,11 @@
 #include "../components/SvgButton.h"
 #include "VisualiserSettings.h"
 #include "../components/StopwatchComponent.h"
+#include "../img/qoixx.hpp"
+
+#define FILE_RENDER_DUMMY 0
+#define FILE_RENDER_PNG 1
+#define FILE_RENDER_QOI 2
 
 enum class FullScreenMode {
     TOGGLE,
@@ -58,6 +63,7 @@ public:
     std::function<void()> recordingHalted;
 
 private:
+    float intensity;
     const double FRAME_RATE = 60.0;
     
     bool visualiserOnly;
@@ -114,6 +120,7 @@ private:
     Texture blur2Texture;
     Texture blur3Texture;
     Texture blur4Texture;
+    Texture renderTexture;
     juce::OpenGLTexture screenOpenGLTexture;
     juce::Image screenTextureImage = juce::ImageFileFormat::loadFrom(BinaryData::noise_jpg, BinaryData::noise_jpgSize);
     juce::Image emptyScreenImage = juce::ImageFileFormat::loadFrom(BinaryData::empty_jpg, BinaryData::empty_jpgSize);
@@ -142,7 +149,8 @@ private:
     void setupArrays(int num_points);
     void setupTextures();
     void drawLineTexture(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints);
-    void saveTextureToFile(GLuint textureID, int width, int height, const juce::File& file);
+    void saveTextureToPNG(Texture texture, const juce::File& file);
+    void saveTextureToQOI(Texture texture, const juce::File& file);
     void activateTargetTexture(std::optional<Texture> texture);
     void setShader(juce::OpenGLShaderProgram* program);
     void drawTexture(std::optional<Texture> texture0, std::optional<Texture> texture1 = std::nullopt, std::optional<Texture> texture2 = std::nullopt, std::optional<Texture> texture3 = std::nullopt);
@@ -153,7 +161,16 @@ private:
     void drawCRT();
     void checkGLErrors(const juce::String& location);
     void viewportChanged(juce::Rectangle<int> area);
+
+    void renderScope(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints);
+    int renderAudioFile(juce::File& sourceAudio, int method = 1, int width = 1024, int height = 1024);
+
     Texture createScreenTexture();
+
+    juce::File audioFile;
+
+    std::vector<unsigned char> pixels;
+    const qoixx::qoi::desc imageFormat{ .width = 1024, .height = 1024, .channels = 4, .colorspace = qoixx::qoi::colorspace::srgb };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserComponent)
 };
