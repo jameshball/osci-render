@@ -799,7 +799,7 @@ void VisualiserComponent::renderScope(const std::vector<float>& xp, const std::v
 // sourceAudio must be a .wav file
 int VisualiserComponent::renderAudioFile(juce::File& sourceAudio, int method, int width, int height) {
     if (!sourceAudio.existsAsFile()) return 0;
-    if (sourceAudio.getFileExtension() != ".wav" && sourceAudio.getFileExtension() != ".flacI ") return -1;
+    if (sourceAudio.getFileExtension() != ".wav" && sourceAudio.getFileExtension() != ".flac") return -1;
 
     using namespace juce::gl;
 
