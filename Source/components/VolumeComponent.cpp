@@ -115,13 +115,13 @@ void VolumeComponent::run() {
         float leftVolume = 0;
         float rightVolume = 0;
 
-        for (int i = 0; i < buffer.size(); i += 2) {
-            leftVolume += buffer[i] * buffer[i];
-            rightVolume += buffer[i + 1] * buffer[i + 1];
+        for (int i = 0; i < buffer.size(); i++) {
+            leftVolume += buffer[i].x * buffer[i].x;
+            rightVolume += buffer[i].y * buffer[i].y;
         }
         // RMS
-        leftVolume = std::sqrt(leftVolume / (buffer.size() / 2));
-        rightVolume = std::sqrt(rightVolume / (buffer.size() / 2));
+        leftVolume = std::sqrt(leftVolume / buffer.size());
+        rightVolume = std::sqrt(rightVolume / buffer.size());
 
         if (std::isnan(leftVolume) || std::isnan(rightVolume)) {
             leftVolume = 0;
@@ -149,5 +149,5 @@ void VolumeComponent::resized() {
 
 void VolumeComponent::resetBuffer() {
     sampleRate = (int) audioProcessor.currentSampleRate;
-    buffer = std::vector<float>(2 * BUFFER_DURATION_SECS * sampleRate);
+    buffer = std::vector<Point>(BUFFER_DURATION_SECS * sampleRate);
 }

@@ -34,8 +34,8 @@ private:
     DoubleTextBox offsetBox{ audioProcessor.animationOffset->min, audioProcessor.animationRate->max };
 
     jux::SwitchButton invertImage{audioProcessor.invertImage};
-    EffectComponent threshold{ audioProcessor, *audioProcessor.imageThreshold };
-    EffectComponent stride{ audioProcessor, *audioProcessor.imageStride };
+    EffectComponent threshold{*audioProcessor.imageThreshold};
+    EffectComponent stride{*audioProcessor.imageStride};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FrameSettingsComponent)
 };

@@ -4,12 +4,12 @@
 
 class AboutComponent : public juce::Component {
 public:
-    AboutComponent();
+    AboutComponent(const void *image, size_t imageSize, juce::String sectionText);
 
     void resized() override;
 
 private:
-    juce::Image logo = juce::ImageFileFormat::loadFrom(BinaryData::logo_png, BinaryData::logo_pngSize);
+    juce::Image logo;
     juce::ImageComponent logoComponent;
     
     juce::TextEditor text;

@@ -120,9 +120,9 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     visualiserSettingsWindow.setUsingNativeTitleBar(true);
 #endif
     visualiserSettings.setLookAndFeel(&getLookAndFeel());
-    visualiserSettings.setSize(550, 280);
+    visualiserSettings.setSize(550, 310);
     visualiserSettingsWindow.setContentNonOwned(&visualiserSettings, true);
-    visualiserSettingsWindow.centreWithSize(550, 280);
+    visualiserSettingsWindow.centreWithSize(550, 310);
     
     tooltipDropShadow.setOwner(&tooltipWindow);
 }
@@ -164,7 +164,7 @@ void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
 void OscirenderAudioProcessorEditor::resized() {
     auto area = getLocalBounds();
 
-    if (audioProcessor.visualiserFullScreen->getBoolValue()) {
+    if (audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
         visualiser.setBounds(area);
         return;
     }

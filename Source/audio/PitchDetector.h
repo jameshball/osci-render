@@ -22,7 +22,7 @@ private:
 
     juce::CriticalSection consumerLock;
     std::shared_ptr<BufferConsumer> consumer;
-    std::vector<float> buffer = std::vector<float>(2 * fftSize);
+    std::vector<Point> buffer = std::vector<Point>(fftSize);
     juce::dsp::FFT forwardFFT{fftOrder};
     std::array<float, fftSize * 2> fftData;
     OscirenderAudioProcessor& audioProcessor;

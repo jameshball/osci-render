@@ -49,9 +49,9 @@ public:
 
     std::atomic<bool> editingCustomFunction = false;
 
-    VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor);
+    VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.visualiserParameters);
     SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings");
-    VisualiserComponent visualiser{audioProcessor, visualiserSettings, nullptr, audioProcessor.legacyVisualiserEnabled->getBoolValue()};
+    VisualiserComponent visualiser{audioProcessor, audioProcessor, visualiserSettings, nullptr, audioProcessor.visualiserParameters.legacyVisualiserEnabled->getBoolValue()};
 
     SettingsComponent settings{audioProcessor, *this};
 

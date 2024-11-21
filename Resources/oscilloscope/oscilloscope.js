@@ -12,8 +12,10 @@ var AudioSystem =
         this.timePerSample = 1/externalSampleRate;
         this.oldXSamples = new Float32Array(this.bufferSize);
 		this.oldYSamples = new Float32Array(this.bufferSize);
+		this.oldZSamples = new Float32Array(this.bufferSize);
     	this.smoothedXSamples = new Float32Array(Filter.nSmoothedSamples);
-    	this.smoothedYSamples = new Float32Array(Filter.nSmoothedSamples);
+		this.smoothedYSamples = new Float32Array(Filter.nSmoothedSamples);
+		this.smoothedZSamples = new Float32Array(Filter.nSmoothedSamples);
     },
 
     startSound : function()
@@ -41,7 +43,6 @@ var Filter =
 
 	generateSmoothedSamples : function (oldSamples, samples, smoothedSamples)
 	{
-		//this.createLanczosKernel();
 		var bufferSize = this.bufferSize;
 		var allSamples = this.allSamples;
 		var nSmoothedSamples = this.nSmoothedSamples;
@@ -54,26 +55,6 @@ var Filter =
 			allSamples[i] = oldSamples[i];
 			allSamples[bufferSize+i] = samples[i];
 		}
-
-		/*for (var s= -a+1; s<a; s++)
-		{
-			for (var r=0; r<steps; r++)
-			{
-				if (r==0 && !(s==0)) continue;
-				var kernelPosition = -r+s*steps;
-				if (kernelPosition<0) k = K[-kernelPosition];
-				else k = K[kernelPosition];
-
-				var i = r;
-				var pStart = bufferSize - 2*a + s;
-				var pEnd = pStart + bufferSize;
-				for (var p=pStart; p<pEnd; p++)
-				{
-					smoothedSamples[i] += k * allSamples[p];
-					i += steps;
-				}
-			}
-		}*/
 
 		var pStart = bufferSize - 2*a;
 		var pEnd = pStart + bufferSize;
@@ -163,6 +144,7 @@ var Render =
 		this.outputShader.uTexture2 = gl.getUniformLocation(this.outputShader, "uTexture2");
 		this.outputShader.uTexture3 = gl.getUniformLocation(this.outputShader, "uTexture3");
 		this.outputShader.uExposure = gl.getUniformLocation(this.outputShader, "uExposure");
+        this.outputShader.uSaturation = gl.getUniformLocation(this.outputShader, "uSaturation");
 		this.outputShader.uColour = gl.getUniformLocation(this.outputShader, "uColour");
 		this.outputShader.uResizeForCanvas = gl.getUniformLocation(this.outputShader, "uResizeForCanvas");
 
@@ -213,7 +195,7 @@ var Render =
 		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
 
 
-		this.scratchVertices = new Float32Array(8*nPoints);
+		this.scratchVertices = new Float32Array(12*nPoints);
 	},
 
 	setupTextures : function()
@@ -232,7 +214,7 @@ var Render =
 	{
 		var windowWidth = Math.max(document.documentElement.clientWidth, window.innerWidth || 0)
 		var windowHeight = Math.max(document.documentElement.clientHeight, window.innerHeight || 0)
-		var canvasSize = Math.min(windowHeight, windowWidth);
+        var canvasSize = Math.min(windowHeight, windowWidth) * window.devicePixelRatio;
 		Render.canvas.width = canvasSize;
 		Render.canvas.height = canvasSize;
 		if (Render.lineTexture)
@@ -245,13 +227,13 @@ var Render =
 
 	},
 
-	drawLineTexture : function(xPoints, yPoints)
+	drawLineTexture: function (xPoints, yPoints, zPoints)
 	{
 		this.fadeAmount = Math.min(1, Math.pow(0.5, controls.persistence) * 0.4);
 		this.activateTargetTexture(this.lineTexture);
 		this.fade();
 		//gl.clear(gl.COLOR_BUFFER_BIT);
-		this.drawLine(xPoints, yPoints);
+		this.drawLine(xPoints, yPoints, zPoints);
 		gl.bindTexture(gl.TEXTURE_2D, this.targetTexture);
 		gl.generateMipmap(gl.TEXTURE_2D);
 	},
@@ -300,6 +282,7 @@ var Render =
 		var brightness = Math.pow(2, controls.brightness-2.0);
 		//if (controls.disableFilter) brightness *= Filter.steps;
 		gl.uniform1f(this.outputShader.uExposure, brightness);
+        gl.uniform1f(this.outputShader.uSaturation, controls.saturation);
 		gl.uniform1f(this.outputShader.uResizeForCanvas, this.lineTexture.width/1024);
 		var colour = this.getColourFromHue(controls.hue);
 		gl.uniform3fv(this.outputShader.uColour, colour);
@@ -385,7 +368,7 @@ var Render =
 		}
 	},
 
-	drawLine : function(xPoints, yPoints)
+	drawLine : function(xPoints, yPoints, zPoints)
 	{
 		this.setAdditiveBlending();
 
@@ -394,19 +377,11 @@ var Render =
 		var nPoints = xPoints.length;
 		for (var i=0; i<nPoints; i++)
 		{
-			var p = i*8;
-			scratchVertices[p]=scratchVertices[p+2]=scratchVertices[p+4]=scratchVertices[p+6]=xPoints[i];
-			scratchVertices[p+1]=scratchVertices[p+3]=scratchVertices[p+5]=scratchVertices[p+7]=yPoints[i];
-			/*if (i>0)
-			{
-				var xDelta = xPoints[i]-xPoints[i-1];
-				if (xDelta<0) xDelta = -xDelta;
-				var yDelta = yPoints[i]-yPoints[i-1];
-				if (yDelta<0) yDelta = -yDelta;
-				this.totalLength += xDelta + yDelta;
-			}*/
+			var p = i * 12;
+			scratchVertices[p]     = scratchVertices[p + 3] = scratchVertices[p + 6] = scratchVertices[p + 9]  = xPoints[i];
+			scratchVertices[p + 1] = scratchVertices[p + 4] = scratchVertices[p + 7] = scratchVertices[p + 10] = yPoints[i];
+			scratchVertices[p + 2] = scratchVertices[p + 5] = scratchVertices[p + 8] = scratchVertices[p + 11] = zPoints[i];
 		}
-		//testOutputElement.value = this.totalLength;
 
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
 		gl.bufferData(gl.ARRAY_BUFFER, scratchVertices, gl.STATIC_DRAW);
@@ -419,8 +394,8 @@ var Render =
 		gl.enableVertexAttribArray(program.aIdx);
 
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
-		gl.vertexAttribPointer(program.aStart, 2, gl.FLOAT, false, 0, 0);
-		gl.vertexAttribPointer(program.aEnd, 2, gl.FLOAT, false, 0, 8*4);
+		gl.vertexAttribPointer(program.aStart, 3, gl.FLOAT, false, 0, 0);
+		gl.vertexAttribPointer(program.aEnd, 3, gl.FLOAT, false, 0, 12*4);
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.quadIndexBuffer);
 		gl.vertexAttribPointer(program.aIdx, 1, gl.FLOAT, false, 0, 0);
 
@@ -428,7 +403,7 @@ var Render =
 		gl.bindTexture(gl.TEXTURE_2D, this.screenTexture);
 		gl.uniform1i(program.uScreen, 0);
 
-		gl.uniform1f(program.uSize, 0.015);
+		gl.uniform1f(program.uSize, controls.focus);
 		gl.uniform1f(program.uGain, Math.pow(2.0,controls.mainGain)*450/512);
 		if (controls.invertXY) gl.uniform1f(program.uInvert, -1.0);
 		else gl.uniform1f(program.uInvert, 1.0);
@@ -679,65 +654,81 @@ function doScriptProcessor(bufferBase64) {
 	req.open('GET', "data:application/octet;base64," + bufferBase64);
 	req.responseType = 'arraybuffer';
 	req.onload = function fileLoaded(e) {
-		var dataView = new DataView(e.target.response);
-
-		for (var i = 0; i < xSamples.length; i++) {
-			xSamples[i] = dataView.getFloat32(i * 4 * 2, true);
-			ySamples[i] = dataView.getFloat32(i * 4 * 2 + 4, true);
-		}
-
-		const getSettingsFn = Juce.getNativeFunction("getSettings");
-		getSettingsFn().then(settings => {
+		Juce.getNativeFunction("getSettings")().then(settings => {
 			controls.brightness = settings.brightness;
-            controls.intensity = settings.intensity;
+			controls.intensity = settings.intensity;
 			controls.persistence = settings.persistence;
+            controls.saturation = settings.saturation;
+            controls.focus = settings.focus;
 			controls.hue = settings.hue;
 			controls.disableFilter = !settings.upsampling;
+			let numChannels = settings.numChannels;
+
 			if (controls.grid !== settings.graticule) {
 				controls.grid = settings.graticule;
 				const image = controls.noise ? 'noise.jpg' : 'empty.jpg';
 				Render.screenTexture = Render.loadTexture(image);
 			}
+
 			if (controls.noise !== settings.smudges) {
 				controls.noise = settings.smudges;
 				const image = controls.noise ? 'noise.jpg' : 'empty.jpg';
 				Render.screenTexture = Render.loadTexture(image);
 			}
-		});
 
-		if (controls.sweepOn) {
-			var gain = Math.pow(2.0, controls.mainGain);
-			var sweepMinTime = controls.sweepMsDiv * 10 / 1000;
-			var triggerValue = controls.sweepTriggerValue;
+			var dataView = new DataView(e.target.response);
+
+			const stride = 4 * numChannels;
 			for (var i = 0; i < xSamples.length; i++) {
-				xSamples[i] = sweepPosition / gain;
-				sweepPosition += 2 * AudioSystem.timePerSample / sweepMinTime;
-				if (sweepPosition > 1.1 && belowTrigger && ySamples[i] >= triggerValue)
-					sweepPosition = -1.3;
-				belowTrigger = ySamples[i] < triggerValue;
+				xSamples[i] = dataView.getFloat32(i * stride, true);
+				ySamples[i] = dataView.getFloat32(i * stride + 4, true);
+				if (numChannels === 3) {
+					zSamples[i] = dataView.getFloat32(i * stride + 8, true);
+				} else {
+					zSamples[i] = 1;
+				}
 			}
-		}
 
-		if (!controls.freezeImage) {
-			if (!controls.disableFilter) {
-				Filter.generateSmoothedSamples(AudioSystem.oldXSamples, xSamples, AudioSystem.smoothedXSamples);
-				Filter.generateSmoothedSamples(AudioSystem.oldYSamples, ySamples, AudioSystem.smoothedYSamples);
-
-				if (!controls.swapXY) Render.drawLineTexture(AudioSystem.smoothedXSamples, AudioSystem.smoothedYSamples);
-				else Render.drawLineTexture(AudioSystem.smoothedYSamples, AudioSystem.smoothedXSamples);
+			if (controls.sweepOn) {
+				var gain = Math.pow(2.0, controls.mainGain);
+				var sweepMinTime = controls.sweepMsDiv * 10 / 1000;
+				var triggerValue = controls.sweepTriggerValue;
+				for (var i = 0; i < xSamples.length; i++) {
+					xSamples[i] = sweepPosition / gain;
+					sweepPosition += 2 * AudioSystem.timePerSample / sweepMinTime;
+					if (sweepPosition > 1.1 && belowTrigger && ySamples[i] >= triggerValue)
+						sweepPosition = -1.3;
+					belowTrigger = ySamples[i] < triggerValue;
+				}
 			}
-			else {
-				if (!controls.swapXY) Render.drawLineTexture(xSamples, ySamples);
-				else Render.drawLineTexture(ySamples, xSamples);
+
+			if (!controls.freezeImage) {
+				if (!controls.disableFilter) {
+					Filter.generateSmoothedSamples(AudioSystem.oldXSamples, xSamples, AudioSystem.smoothedXSamples);
+					Filter.generateSmoothedSamples(AudioSystem.oldYSamples, ySamples, AudioSystem.smoothedYSamples);
+					if (numChannels === 3) {
+						Filter.generateSmoothedSamples(AudioSystem.oldZSamples, zSamples, AudioSystem.smoothedZSamples);
+					} else {
+						AudioSystem.smoothedZSamples.fill(1);
+					}
+
+					if (!controls.swapXY) Render.drawLineTexture(AudioSystem.smoothedXSamples, AudioSystem.smoothedYSamples, AudioSystem.smoothedZSamples);
+					else Render.drawLineTexture(AudioSystem.smoothedYSamples, AudioSystem.smoothedXSamples, AudioSystem.smoothedZSamples);
+				}
+				else {
+					if (!controls.swapXY) Render.drawLineTexture(xSamples, ySamples, zSamples);
+					else Render.drawLineTexture(ySamples, xSamples, zSamples);
+				}
 			}
-		}
 
-		for (var i = 0; i < xSamples.length; i++) {
-			AudioSystem.oldXSamples[i] = xSamples[i];
-			AudioSystem.oldYSamples[i] = ySamples[i];
-		}
+			for (var i = 0; i < xSamples.length; i++) {
+				AudioSystem.oldXSamples[i] = xSamples[i];
+				AudioSystem.oldYSamples[i] = ySamples[i];
+				AudioSystem.oldZSamples[i] = zSamples[i];
+			}
 
-		requestAnimationFrame(drawCRTFrame);
+			requestAnimationFrame(drawCRTFrame);
+		});
 	}
 	req.send();
 }
@@ -748,13 +739,15 @@ function drawCRTFrame(timeStamp) {
                                            
 var xSamples = new Float32Array(externalBufferSize);
 var ySamples = new Float32Array(externalBufferSize);
+var zSamples = new Float32Array(externalBufferSize);
 
 Juce.getNativeFunction("bufferSize")().then(bufferSize => {
     externalBufferSize = bufferSize;
     Juce.getNativeFunction("sampleRate")().then(sampleRate => {
 		externalSampleRate = sampleRate;
         xSamples = new Float32Array(externalBufferSize);
-        ySamples = new Float32Array(externalBufferSize);
+		ySamples = new Float32Array(externalBufferSize);
+		zSamples = new Float32Array(externalBufferSize);
         Render.init();
         Filter.init(externalBufferSize, 8, 6);
         AudioSystem.init(externalBufferSize);

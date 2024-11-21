@@ -7,7 +7,7 @@ EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectList
 effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
     auto parameters = effect.parameters;
 	for (int i = 0; i < parameters.size(); i++) {
-		std::shared_ptr<EffectComponent> effectComponent = std::make_shared<EffectComponent>(audioProcessor, effect, i);
+		std::shared_ptr<EffectComponent> effectComponent = std::make_shared<EffectComponent>(effect, i);
 		selected.setToggleState(effect.enabled == nullptr || effect.enabled->getValue(), juce::dontSendNotification);
 		// using weak_ptr to avoid circular reference and memory leak
 		std::weak_ptr<EffectComponent> weakEffectComponent = effectComponent;
