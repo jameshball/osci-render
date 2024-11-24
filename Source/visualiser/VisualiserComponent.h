@@ -37,7 +37,6 @@ public:
     void enableFullScreen();
     void setFullScreenCallback(std::function<void(FullScreenMode)> callback);
     void mouseDoubleClick(const juce::MouseEvent& event) override;
-    void setBuffer(const std::vector<OsciPoint>& buffer);
     void resized() override;
     void paint(juce::Graphics& g) override;
     int prepareTask(double sampleRate, int samplesPerBlock) override;
@@ -84,6 +83,8 @@ private:
     StopwatchComponent stopwatch;
     SvgButton record{"Record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f)};
     
+    Semaphore renderingSemaphore{0};
+    
     void popoutWindow();
     
     // OPENGL
@@ -110,6 +111,8 @@ private:
     std::vector<float> smoothedXSamples;
     std::vector<float> smoothedYSamples;
     std::vector<float> smoothedZSamples;
+    int sampleBufferCount = 0;
+    int prevSampleBufferCount = 0;
     
     std::vector<float> scratchVertices;
     std::vector<float> fullScreenQuad;

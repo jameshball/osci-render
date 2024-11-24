@@ -11,8 +11,9 @@ public:
     ~AudioBackgroundThread() override;
     
     void prepare(double sampleRate, int samplesPerBlock);
-    void setShouldBeRunning(bool shouldBeRunning);
+    void setShouldBeRunning(bool shouldBeRunning, std::function<void()> stopCallback = nullptr);
     void write(const OsciPoint& point);
+    void setBlockOnAudioThread(bool block);
     
 private:
     
