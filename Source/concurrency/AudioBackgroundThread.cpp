@@ -28,7 +28,7 @@ void AudioBackgroundThread::prepare(double sampleRate, int samplesPerBlock) {
     }
 }
 
-void AudioBackgroundThread::setShouldBeRunning(bool shouldBeRunning) {
+void AudioBackgroundThread::setShouldBeRunning(bool shouldBeRunning, std::function<void()> stopCallback) {
     if (!isPrepared && shouldBeRunning) {
         prepare(manager.sampleRate, manager.samplesPerBlock);
     }
@@ -36,6 +36,9 @@ void AudioBackgroundThread::setShouldBeRunning(bool shouldBeRunning) {
     this->shouldBeRunning = shouldBeRunning;
     
     if (!shouldBeRunning && isThreadRunning()) {
+        if (stopCallback) {
+            stopCallback();
+        }
         stop();
     } else if (isPrepared && shouldBeRunning && !isThreadRunning()) {
         start();
@@ -55,6 +58,10 @@ void AudioBackgroundThread::run() {
             runTask(consumer->getBuffer());
         }
     }
+}
+
+void AudioBackgroundThread::setBlockOnAudioThread(bool block) {
+    consumer->setBlockOnWrite(block);
 }
 
 void AudioBackgroundThread::start() {

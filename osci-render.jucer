@@ -184,6 +184,8 @@
         <FILE id="F5kUMH" name="BlockingQueue.h" compile="0" resource="0" file="Source/concurrency/BlockingQueue.h"/>
         <FILE id="WQ2W15" name="BufferConsumer.h" compile="0" resource="0"
               file="Source/concurrency/BufferConsumer.h"/>
+        <FILE id="L9aCHY" name="readerwritercircularbuffer.h" compile="0" resource="0"
+              file="Source/concurrency/readerwritercircularbuffer.h"/>
       </GROUP>
       <GROUP id="{A3E24187-62A5-AB8D-8837-14043B89A640}" name="gpla">
         <FILE id="KvDV8j" name="LineArtParser.cpp" compile="1" resource="0"
