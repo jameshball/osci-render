@@ -1,6 +1,7 @@
 #include <JuceHeader.h>
 #include "obj/Camera.h"
 #include "mathter/Common/Approx.hpp"
+#include "concurrency/BufferConsumer.h"
 
 class FrustumTest : public juce::UnitTest {
 public:
@@ -114,7 +115,77 @@ public:
     }
 };
 
+class ProducerThread : public juce::Thread {
+public:
+    ProducerThread(BufferConsumer& consumer) : juce::Thread("Producer Thread"), consumer(consumer) {}
+    
+    void run() override {
+        for (int i = 0; i < 1024 * 100; i++) {
+            consumer.write(OsciPoint(counter++));
+        }
+    }
+
+private:
+    BufferConsumer& consumer;
+    int counter = 0;
+};
+
+class ConsumerThread : public juce::Thread {
+public:
+    ConsumerThread(BufferConsumer& consumer) : juce::Thread("Consumer Thread"), consumer(consumer) {}
+    
+    void run() override {
+        for (int i = 0; i < 100; i++) {
+            consumer.waitUntilFull();
+            auto buffer = consumer.getBuffer();
+            for (auto& point : buffer) {
+                values.push_back(point.x);
+            }
+        }
+    }
+    
+    bool containsGap() {
+        for (int i = 0; i < values.size() - 1; i++) {
+            if (values[i] + 1 != values[i + 1]) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+private:
+    BufferConsumer& consumer;
+    std::vector<double> values;
+};
+
+class BufferConsumerTest : public juce::UnitTest {
+public:
+    BufferConsumerTest() : juce::UnitTest("Buffer Consumer") {}
+
+    void runTest() override {
+        beginTest("All data received");
+        
+        BufferConsumer consumer(1024);
+        ProducerThread producer(consumer);
+        ConsumerThread consumerThread(consumer);
+        
+        consumer.setBlockOnWrite(true);
+        
+        for (int i = 0; i < 100; i++) {
+            producer.startThread();
+            consumerThread.startThread();
+            
+            producer.waitForThreadToExit(-1);
+            consumerThread.waitForThreadToExit(-1);
+            
+            expect(!consumerThread.containsGap(), "There was a gap in the data");
+        }
+    }
+};
+
 static FrustumTest frustumTest;
+static BufferConsumerTest bufferConsumerTest;
 
 int main(int argc, char* argv[]) {
     juce::UnitTestRunner runner;

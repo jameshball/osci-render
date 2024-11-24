@@ -14,17 +14,16 @@
 VisualiserComponent::VisualiserComponent(AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, VisualiserComponent* parent, bool visualiserOnly) : settings(settings), threadManager(threadManager), visualiserOnly(visualiserOnly), AudioBackgroundThread("VisualiserComponent", threadManager), parent(parent) {
 
     addAndMakeVisible(record);
-    //record.setPulseAnimation(true);
+    record.setPulseAnimation(true);
     record.onClick = [this] {
         toggleRecording();
-        //stopwatch.stop();
-        //stopwatch.reset();
-        /*
+        stopwatch.stop();
+        stopwatch.reset();
+        
         if (record.getToggleState()) {
             stopwatch.start();
         }
-        */
-        record.setToggleState(false, juce::NotificationType::dontSendNotification);
+        
         resized();
     };
     
@@ -63,6 +62,9 @@ VisualiserComponent::VisualiserComponent(AudioBackgroundThreadManager& threadMan
 
 VisualiserComponent::~VisualiserComponent() {
     openGLContext.detach();
+    setShouldBeRunning(false, [this] {
+        renderingSemaphore.release();
+    });
 }
 
 void VisualiserComponent::setFullScreenCallback(std::function<void(FullScreenMode)> callback) {
@@ -80,24 +82,40 @@ void VisualiserComponent::mouseDoubleClick(const juce::MouseEvent& event) {
     enableFullScreen();
 }
 
-void VisualiserComponent::setBuffer(const std::vector<OsciPoint>& buffer) {
-    juce::CriticalSection::ScopedLockType lock(samplesLock);
-
-    xSamples.clear();
-    ySamples.clear();
-    zSamples.clear();
-    for (auto& point : buffer) {
-        OsciPoint smoothPoint = settings.parameters.smoothEffect->apply(0, point);
-        xSamples.push_back(smoothPoint.x);
-        ySamples.push_back(smoothPoint.y);
-        zSamples.push_back(smoothPoint.z);
+void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
+    {
+        juce::CriticalSection::ScopedLockType lock(samplesLock);
+        
+        xSamples.clear();
+        ySamples.clear();
+        zSamples.clear();
+        for (auto& point : points) {
+            OsciPoint smoothPoint = settings.parameters.smoothEffect->apply(0, point);
+            xSamples.push_back(smoothPoint.x);
+            ySamples.push_back(smoothPoint.y);
+            zSamples.push_back(smoothPoint.z);
+        }
+        
+        sampleBufferCount++;
+        
+        if (settings.parameters.upsamplingEnabled->getBoolValue()) {
+            int newResampledSize = xSamples.size() * RESAMPLE_RATIO;
+            
+            smoothedXSamples.resize(newResampledSize);
+            smoothedYSamples.resize(newResampledSize);
+            smoothedZSamples.resize(newResampledSize);
+            smoothedZSamples.resize(newResampledSize);
+            
+            xResampler.process(xSamples.data(), smoothedXSamples.data(), xSamples.size());
+            yResampler.process(ySamples.data(), smoothedYSamples.data(), ySamples.size());
+            zResampler.process(zSamples.data(), smoothedZSamples.data(), zSamples.size());
+        }
     }
     
+    // this just triggers a repaint
     triggerAsyncUpdate();
-}
-
-void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
-    setBuffer(points);
+    // wait for rendering to complete
+    renderingSemaphore.acquire();
 }
 
 int VisualiserComponent::prepareTask(double sampleRate, int bufferSize) {
@@ -113,6 +131,7 @@ int VisualiserComponent::prepareTask(double sampleRate, int bufferSize) {
 
 void VisualiserComponent::setPaused(bool paused) {
     active = !paused;
+    renderingSemaphore.release();
     setShouldBeRunning(active);
     repaint();
 }
@@ -137,11 +156,7 @@ bool VisualiserComponent::keyPressed(const juce::KeyPress& key) {
 void VisualiserComponent::setFullScreen(bool fullScreen) {}
 
 void VisualiserComponent::toggleRecording() {
-    chooser = std::make_unique<juce::FileChooser>("Choose a .wav file to render...", juce::File(), "*.wav;*.flac");
-    auto chooserFlags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
-    chooser->launchAsync(chooserFlags, [this](const juce::FileChooser& fc) {
-        audioFile = fc.getResult();
-    });
+    setBlockOnAudioThread(record.getToggleState());
 }
 
 void VisualiserComponent::haltRecording() {
@@ -262,46 +277,30 @@ void VisualiserComponent::openGLContextClosing() {
 }
 
 void VisualiserComponent::handleAsyncUpdate() {
-    if (settings.parameters.upsamplingEnabled->getBoolValue()) {
-        juce::CriticalSection::ScopedLockType lock(samplesLock);
-        
-        int newResampledSize = xSamples.size() * RESAMPLE_RATIO;
-        
-        smoothedXSamples.resize(newResampledSize);
-        smoothedYSamples.resize(newResampledSize);
-        smoothedZSamples.resize(newResampledSize);
-        smoothedZSamples.resize(newResampledSize);
-        
-        xResampler.process(xSamples.data(), smoothedXSamples.data(), xSamples.size());
-        yResampler.process(ySamples.data(), smoothedYSamples.data(), ySamples.size());
-        zResampler.process(zSamples.data(), smoothedZSamples.data(), zSamples.size());
-    }
-    
     repaint();
 }
 
 void VisualiserComponent::renderOpenGL() {
     if (openGLContext.isActive()) {
-        if (sampleRate != oldSampleRate) {
-            oldSampleRate = sampleRate;
-            setupArrays(RESAMPLE_RATIO * sampleRate / FRAME_RATE);
-        }
-        time += 0.01f;
-        intensity = settings.getIntensity() * (41000.0f / sampleRate);
-        if (active) {
+        juce::OpenGLHelpers::clear(juce::Colours::black);
+        
+        // we have a new buffer to render
+        if (sampleBufferCount != prevSampleBufferCount) {
+            prevSampleBufferCount = sampleBufferCount;
             juce::CriticalSection::ScopedLockType lock(samplesLock);
-
-            if (audioFile != juce::File{}) {
-                renderAudioFile(audioFile, FILE_RENDER_QOI);
-                audioFile = juce::File{};
-            }
             
             if (settings.parameters.upsamplingEnabled->getBoolValue()) {
                 renderScope(smoothedXSamples, smoothedYSamples, smoothedZSamples);
             } else {
                 renderScope(xSamples, ySamples, zSamples);
             }
+            renderingSemaphore.release();
         }
+        
+        // render texture to screen
+        activateTargetTexture(std::nullopt);
+        setShader(texturedShader.get());
+        drawTexture(renderTexture);
     }
 }
 
@@ -380,7 +379,6 @@ void VisualiserComponent::setupTextures() {
     screenTexture = createScreenTexture();
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0); // Unbind
-
 }
 
 Texture VisualiserComponent::makeTexture(int width, int height) {
@@ -402,13 +400,13 @@ Texture VisualiserComponent::makeTexture(int width, int height) {
     return { textureID, width, height };
 }
 
-void VisualiserComponent::drawLineTexture(const std::vector<float>& xP, const std::vector<float>& yP, const std::vector<float>& zP) {
+void VisualiserComponent::drawLineTexture(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints) {
     using namespace juce::gl;
     
     fadeAmount = juce::jmin(1.0, std::pow(0.5, settings.getPersistence()) * 0.4);
     activateTargetTexture(lineTexture);
     fade();
-    drawLine(xP, yP, zP);
+    drawLine(xPoints, yPoints, zPoints);
     glBindTexture(GL_TEXTURE_2D, targetTexture.value().id);
 }
 
@@ -550,21 +548,21 @@ void VisualiserComponent::setNormalBlending() {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
-void VisualiserComponent::drawLine(const std::vector<float>& xP, const std::vector<float>& yP, const std::vector<float>& zP) {
+void VisualiserComponent::drawLine(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints) {
     using namespace juce::gl;
     
     setAdditiveBlending();
 
-    int nPoints = xP.size();
+    int nPoints = xPoints.size();
 
     // Without this, there's an access violation that seems to occur only on some systems
     if (scratchVertices.size() != nPoints * 12) scratchVertices.resize(nPoints * 12);
     
     for (int i = 0; i < nPoints; ++i) {
         int p = i * 12;
-        scratchVertices[p]     = scratchVertices[p + 3] = scratchVertices[p + 6] = scratchVertices[p + 9]  = xP[i];
-        scratchVertices[p + 1] = scratchVertices[p + 4] = scratchVertices[p + 7] = scratchVertices[p + 10] = yP[i];
-        scratchVertices[p + 2] = scratchVertices[p + 5] = scratchVertices[p + 8] = scratchVertices[p + 11] = zP[i];
+        scratchVertices[p]     = scratchVertices[p + 3] = scratchVertices[p + 6] = scratchVertices[p + 9]  = xPoints[i];
+        scratchVertices[p + 1] = scratchVertices[p + 4] = scratchVertices[p + 7] = scratchVertices[p + 10] = yPoints[i];
+        scratchVertices[p + 2] = scratchVertices[p + 5] = scratchVertices[p + 8] = scratchVertices[p + 11] = zPoints[i];
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
@@ -599,7 +597,7 @@ void VisualiserComponent::drawLine(const std::vector<float>& xP, const std::vect
     lineShader->setUniform("uNEdges", (GLfloat) nEdges);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vertexIndexBuffer);
-    int nEdgesThisTime = xP.size() - 1;
+    int nEdgesThisTime = xPoints.size() - 1;
     glDrawElements(GL_TRIANGLES, nEdgesThisTime * 6, GL_UNSIGNED_INT, 0);
 
     glDisableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aStart"));
@@ -626,6 +624,7 @@ void VisualiserComponent::fade() {
 
 void VisualiserComponent::drawCRT() {
     using namespace juce::gl;
+    
     setNormalBlending();
 
     activateTargetTexture(blur1Texture);
@@ -665,19 +664,15 @@ void VisualiserComponent::drawCRT() {
     setShader(outputShader.get());
     float brightness = std::pow(2, settings.getBrightness() - 2);
     outputShader->setUniform("uExposure", brightness);
-    outputShader->setUniform("uSaturation", (float)settings.getSaturation());
-    outputShader->setUniform("uNoise", (float)settings.getNoise());
+    outputShader->setUniform("uSaturation", (float) settings.getSaturation());
+    outputShader->setUniform("uNoise", (float) settings.getNoise());
     outputShader->setUniform("uTime", time);
-    outputShader->setUniform("uGlow", (float)settings.getGlow());
+    outputShader->setUniform("uGlow", (float) settings.getGlow());
     outputShader->setUniform("uResizeForCanvas", lineTexture.width / 1024.0f);
     juce::Colour colour = juce::Colour::fromHSV(settings.getHue() / 360.0f, 1.0, 1.0, 1.0);
     outputShader->setUniform("uColour", colour.getFloatRed(), colour.getFloatGreen(), colour.getFloatBlue());
     activateTargetTexture(renderTexture);
     drawTexture(lineTexture, blur1Texture, blur3Texture, screenTexture);
-
-    activateTargetTexture(std::nullopt);
-    setShader(texturedShader.get());
-    drawTexture(renderTexture);
 }
 
 Texture VisualiserComponent::createScreenTexture() {
@@ -781,16 +776,24 @@ void VisualiserComponent::paint(juce::Graphics& g) {
     }
 }
 
-void VisualiserComponent::renderScope(const std::vector<float>& xp, const std::vector<float>& yp, const std::vector<float>& zp) {
+void VisualiserComponent::renderScope(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints) {
+    time += 0.01f;
+    
     if (graticuleEnabled != settings.getGraticuleEnabled() || smudgesEnabled != settings.getSmudgesEnabled()) {
         graticuleEnabled = settings.getGraticuleEnabled();
         smudgesEnabled = settings.getSmudgesEnabled();
         screenTexture = createScreenTexture();
     }
+    
+    if (sampleRate != oldSampleRate) {
+        oldSampleRate = sampleRate;
+        setupArrays(RESAMPLE_RATIO * sampleRate / FRAME_RATE);
+    }
+    intensity = settings.getIntensity() * (41000.0f / sampleRate);
 
     renderScale = (float)openGLContext.getRenderingScale();
 
-    drawLineTexture(xp, yp, zp);
+    drawLineTexture(xPoints, yPoints, zPoints);
     checkGLErrors("drawLineTexture");
     drawCRT();
     checkGLErrors("drawCRT");
@@ -880,7 +883,6 @@ int VisualiserComponent::renderAudioFile(juce::File& sourceAudio, int method, in
             saveTextureToQOI(renderTexture, destDir.getChildFile(fileName + ".qoi"));
             break;
         };
-        time += 0.01f;
     }
 
     // cleanup

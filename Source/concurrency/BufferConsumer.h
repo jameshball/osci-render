@@ -4,6 +4,7 @@
 #include "../shape/OsciPoint.h"
 #include <mutex>
 #include <condition_variable>
+#include "readerwritercircularbuffer.h"
 
 // FROM https://gist.github.com/Kuxe/6bdd5b748b5f11b303a5cccbb8c8a731
 /** General semaphore with N permissions **/
@@ -45,45 +46,82 @@ public:
 class BufferConsumer {
 public:
     BufferConsumer(std::size_t size) {
+        returnBuffer.resize(size);
         buffer1.resize(size);
         buffer2.resize(size);
+        queue = std::make_unique<moodycamel::BlockingReaderWriterCircularBuffer<OsciPoint>>(2 * size);
     }
 
     ~BufferConsumer() {}
     
+    // CONSUMER
+    // loop dequeuing until full
+    // get buffer
+    
+    // PRODUCER
+    // enqueue point
+    
     void waitUntilFull() {
-        sema.acquire();
+        if (blockOnWrite) {
+            for (int i = 0; i < returnBuffer.size() && blockOnWrite; i++) {
+                queue->wait_dequeue(returnBuffer[i]);
+            }
+        } else {
+            sema.acquire();
+        }
     }
     
     // to be used when the audio thread is being destroyed to
     // make sure that everything waiting on it stops waiting.
     void forceNotify() {
         sema.release();
+        queue->try_enqueue(OsciPoint());
     }
 
     void write(OsciPoint point) {
-        if (offset >= buffer->size()) {
-            {
-                juce::SpinLock::ScopedLockType scope(bufferLock);
-                buffer = buffer == &buffer1 ? &buffer2 : &buffer1;
+        if (blockOnWrite) {
+            queue->wait_enqueue(point);
+        } else {
+            if (offset >= buffer->size()) {
+                {
+                    juce::SpinLock::ScopedLockType scope(bufferLock);
+                    buffer = buffer == &buffer1 ? &buffer2 : &buffer1;
+                }
+                offset = 0;
+                sema.release();
             }
-            offset = 0;
-            sema.release();
+            
+            (*buffer)[offset++] = point;
         }
-        
-        (*buffer)[offset++] = point;
+    }
+
+    std::vector<OsciPoint>& getBuffer() {
+        if (blockOnWrite) {
+            return returnBuffer;
+        } else {
+            // whatever buffer is not currently being written to
+            juce::SpinLock::ScopedLockType scope(bufferLock);
+            return buffer == &buffer1 ? buffer2 : buffer1;
+        }
     }
     
-    // whatever buffer is not currently being written to
-    std::vector<OsciPoint>& getBuffer() {
-        juce::SpinLock::ScopedLockType scope(bufferLock);
-        return buffer == &buffer1 ? buffer2 : buffer1;
+    void setBlockOnWrite(bool block) {
+        blockOnWrite = block;
+        if (blockOnWrite) {
+            sema.release();
+        } else {
+            OsciPoint item;
+            queue->try_dequeue(item);
+        }
     }
 
 private:
+    std::unique_ptr<moodycamel::BlockingReaderWriterCircularBuffer<OsciPoint>> queue;
+    std::vector<OsciPoint> returnBuffer;
     std::vector<OsciPoint> buffer1;
     std::vector<OsciPoint> buffer2;
     juce::SpinLock bufferLock;
+    std::atomic<bool> blockOnWrite = false;
     std::vector<OsciPoint>* buffer = &buffer1;
     Semaphore sema{0};
     int offset = 0;
