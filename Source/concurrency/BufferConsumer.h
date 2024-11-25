@@ -111,7 +111,12 @@ public:
             sema.release();
         } else {
             OsciPoint item;
+            // We dequeue an item so that the audio thread is unblocked
+            // if it's trying to wait until the queue is no longer full.
             queue->try_dequeue(item);
+            // We enqueue an item so that the consumer is unblocked
+            // if it's trying to wait until the queue is no longer empty.
+            queue->try_enqueue(item);
         }
     }
 

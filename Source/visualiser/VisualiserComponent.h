@@ -28,7 +28,7 @@ struct Texture {
 class VisualiserWindow;
 class VisualiserComponent : public juce::Component, public AudioBackgroundThread, public juce::MouseListener, public juce::OpenGLRenderer, public juce::AsyncUpdater {
 public:
-    VisualiserComponent(AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, VisualiserComponent* parent = nullptr, bool visualiserOnly = false);
+    VisualiserComponent(std::function<void()>& haltRecording, AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, VisualiserComponent* parent = nullptr, bool visualiserOnly = false);
     ~VisualiserComponent() override;
 
     std::function<void()> openSettings;
@@ -49,8 +49,7 @@ public:
     void renderOpenGL() override;
     void openGLContextClosing() override;
     void setFullScreen(bool fullScreen);
-    void toggleRecording();
-    void haltRecording();
+    void setRecording(bool recording);
     void childUpdated();
 
     VisualiserComponent* parent = nullptr;
@@ -58,14 +57,13 @@ public:
     std::unique_ptr<VisualiserWindow> popout = nullptr;
     
     std::atomic<bool> active = true;
-    
-    std::function<void()> recordingHalted;
 
 private:
     float intensity;
     const double FRAME_RATE = 60.0;
     
     bool visualiserOnly;
+    std::function<void()>& haltRecording;
     
     AudioBackgroundThreadManager& threadManager;
     

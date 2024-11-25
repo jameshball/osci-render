@@ -239,6 +239,8 @@ public:
     juce::Font font = juce::Font(juce::Font::getDefaultSansSerifFontName(), 1.0f, juce::Font::plain);
 
     ShapeSound::Ptr objectServerSound = new ShapeSound();
+    
+    std::function<void()> haltRecording;
 
     void addLuaSlider();
     void updateEffectPrecedence();
