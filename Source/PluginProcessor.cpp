@@ -776,6 +776,14 @@ juce::AudioProcessorEditor* OscirenderAudioProcessor::createEditor() {
 
 //==============================================================================
 void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
+    // we need to stop recording the visualiser when saving the state, otherwise
+    // there are issues. This is the only place we can do this because there is
+    // no callback when closing the standalone app except for this.
+    
+    if (haltRecording != nullptr && juce::JUCEApplicationBase::isStandaloneApp()) {
+        haltRecording();
+    }
+    
     juce::SpinLock::ScopedLockType lock1(parsersLock);
     juce::SpinLock::ScopedLockType lock2(effectsLock);
 
