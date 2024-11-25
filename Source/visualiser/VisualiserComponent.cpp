@@ -11,12 +11,16 @@
 #include "TexturedFragmentShader.glsl"
 #include "TexturedVertexShader.glsl"
 
-VisualiserComponent::VisualiserComponent(AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, VisualiserComponent* parent, bool visualiserOnly) : settings(settings), threadManager(threadManager), visualiserOnly(visualiserOnly), AudioBackgroundThread("VisualiserComponent", threadManager), parent(parent) {
+VisualiserComponent::VisualiserComponent(std::function<void()>& haltRecording, AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, VisualiserComponent* parent, bool visualiserOnly) : haltRecording(haltRecording), settings(settings), threadManager(threadManager), visualiserOnly(visualiserOnly), AudioBackgroundThread("VisualiserComponent" + juce::String(parent != nullptr ? " Child" : ""), threadManager), parent(parent) {
 
+    haltRecording = [this] {
+        setRecording(false);
+    };
+    
     addAndMakeVisible(record);
     record.setPulseAnimation(true);
     record.onClick = [this] {
-        toggleRecording();
+        setRecording(record.getToggleState());
         stopwatch.stop();
         stopwatch.reset();
         
@@ -61,6 +65,10 @@ VisualiserComponent::VisualiserComponent(AudioBackgroundThreadManager& threadMan
 }
 
 VisualiserComponent::~VisualiserComponent() {
+    setRecording(false);
+    if (parent == nullptr) {
+        haltRecording = nullptr;
+    }
     openGLContext.detach();
     setShouldBeRunning(false, [this] {
         renderingSemaphore.release();
@@ -137,7 +145,7 @@ void VisualiserComponent::setPaused(bool paused) {
 }
 
 void VisualiserComponent::mouseDown(const juce::MouseEvent& event) {
-    if (event.mods.isLeftButtonDown() && child == nullptr) {
+    if (event.mods.isLeftButtonDown() && child == nullptr && !record.getToggleState()) {
         setPaused(active);
     }
 }
@@ -155,12 +163,12 @@ bool VisualiserComponent::keyPressed(const juce::KeyPress& key) {
 
 void VisualiserComponent::setFullScreen(bool fullScreen) {}
 
-void VisualiserComponent::toggleRecording() {
-    setBlockOnAudioThread(record.getToggleState());
-}
-
-void VisualiserComponent::haltRecording() {
-    record.setToggleState(false, juce::NotificationType::dontSendNotification);
+void VisualiserComponent::setRecording(bool recording) {
+    record.setToggleState(recording, juce::NotificationType::dontSendNotification);
+    if (recording) {
+        setPaused(false);
+    }
+    setBlockOnAudioThread(recording);
 }
 
 void VisualiserComponent::resized() {
@@ -185,12 +193,12 @@ void VisualiserComponent::resized() {
 }
 
 void VisualiserComponent::popoutWindow() {
-    haltRecording();
-    auto visualiser = new VisualiserComponent(threadManager, settings, this);
+    setRecording(false);
+    record.setEnabled(false);
+    auto visualiser = new VisualiserComponent(haltRecording, threadManager, settings, this);
     visualiser->settings.setLookAndFeel(&getLookAndFeel());
     visualiser->openSettings = openSettings;
     visualiser->closeSettings = closeSettings;
-    visualiser->recordingHalted = recordingHalted;
     child = visualiser;
     childUpdated();
     visualiser->setSize(300, 325);
@@ -206,6 +214,17 @@ void VisualiserComponent::popoutWindow() {
 
 void VisualiserComponent::childUpdated() {
     popOutButton.setVisible(child == nullptr);
+    record.setEnabled(child == nullptr);
+    if (child != nullptr) {
+        haltRecording = [this] {
+            setRecording(false);
+            child->setRecording(false);
+        };
+    } else {
+        haltRecording = [this] {
+            setRecording(false);
+        };
+    }
 }
 
 void VisualiserComponent::newOpenGLContextCreated() {
@@ -295,6 +314,7 @@ void VisualiserComponent::renderOpenGL() {
                 renderScope(xSamples, ySamples, zSamples);
             }
             renderingSemaphore.release();
+            stopwatch.addTime(juce::RelativeTime::seconds(1.0 / FRAME_RATE));
         }
         
         // render texture to screen
