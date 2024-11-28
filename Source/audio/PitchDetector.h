@@ -9,6 +9,7 @@ public:
 
     int prepareTask(double sampleRate, int samplesPerBlock) override;
     void runTask(const std::vector<OsciPoint>& points) override;
+    void stopTask() override;
     void handleAsyncUpdate() override;
     int addCallback(std::function<void(float)> callback);
     void removeCallback(int index);

@@ -61,6 +61,7 @@ public:
     VisualiserParameters parameters;
     
     AudioBackgroundThreadManager threadManager;
+    std::function<void()> haltRecording;
     
     std::atomic<bool> forceDisableBrightnessInput = false;
 

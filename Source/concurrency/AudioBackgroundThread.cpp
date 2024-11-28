@@ -69,6 +69,7 @@ void AudioBackgroundThread::start() {
 }
 
 void AudioBackgroundThread::stop() {
+    stopTask();
     consumer->forceNotify();
     stopThread(1000);
 }
