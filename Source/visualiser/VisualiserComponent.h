@@ -41,6 +41,7 @@ public:
     void paint(juce::Graphics& g) override;
     int prepareTask(double sampleRate, int samplesPerBlock) override;
     void runTask(const std::vector<OsciPoint>& points) override;
+    void stopTask() override;
     void setPaused(bool paused);
     void mouseDown(const juce::MouseEvent& event) override;
     bool keyPressed(const juce::KeyPress& key) override;
@@ -80,6 +81,9 @@ private:
     
     StopwatchComponent stopwatch;
     SvgButton record{"Record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f)};
+    long numFrames = 0;
+    std::vector<unsigned char> framePixels;
+    FILE* ffmpeg = nullptr;
     
     Semaphore renderingSemaphore{0};
     
@@ -170,7 +174,6 @@ private:
 
     juce::File audioFile;
 
-    std::vector<unsigned char> pixels;
     const qoixx::qoi::desc imageFormat{ .width = 1024, .height = 1024, .channels = 4, .colorspace = qoixx::qoi::colorspace::srgb };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserComponent)

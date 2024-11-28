@@ -209,6 +209,14 @@ juce::AudioProcessorEditor* SosciAudioProcessor::createEditor() {
 
 //==============================================================================
 void SosciAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
+    // we need to stop recording the visualiser when saving the state, otherwise
+    // there are issues. This is the only place we can do this because there is
+    // no callback when closing the standalone app except for this.
+    
+    if (haltRecording != nullptr && juce::JUCEApplicationBase::isStandaloneApp()) {
+        haltRecording();
+    }
+    
     juce::SpinLock::ScopedLockType lock2(effectsLock);
 
     std::unique_ptr<juce::XmlElement> xml = std::make_unique<juce::XmlElement>("project");

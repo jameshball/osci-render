@@ -67,6 +67,7 @@ public:
     void handleAsyncUpdate() override;
     int prepareTask(double sampleRate, int bufferSize) override;
     void runTask(const std::vector<OsciPoint>& points) override;
+    void stopTask() override;
 	void resized() override;
 
 private:
