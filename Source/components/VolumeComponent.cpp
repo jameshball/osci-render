@@ -115,6 +115,8 @@ int VolumeComponent::prepareTask(double sampleRate, int bufferSize) {
     return BUFFER_DURATION_SECS * sampleRate;
 }
 
+void VolumeComponent::stopTask() {}
+
 void VolumeComponent::resized() {
     auto r = getLocalBounds();
 

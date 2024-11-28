@@ -33,6 +33,8 @@ int PitchDetector::prepareTask(double sampleRate, int samplesPerBlock) {
     return fftSize;
 }
 
+void PitchDetector::stopTask() {}
+
 void PitchDetector::handleAsyncUpdate() {
     juce::SpinLock::ScopedLockType scope(lock);
     for (auto& callback : callbacks) {

@@ -137,6 +137,11 @@ int VisualiserComponent::prepareTask(double sampleRate, int bufferSize) {
     return desiredBufferSize;
 }
 
+void VisualiserComponent::stopTask() {
+    setRecording(false);
+    renderingSemaphore.release();
+}
+
 void VisualiserComponent::setPaused(bool paused) {
     active = !paused;
     renderingSemaphore.release();
@@ -164,11 +169,37 @@ bool VisualiserComponent::keyPressed(const juce::KeyPress& key) {
 void VisualiserComponent::setFullScreen(bool fullScreen) {}
 
 void VisualiserComponent::setRecording(bool recording) {
-    record.setToggleState(recording, juce::NotificationType::dontSendNotification);
     if (recording) {
+        juce::File ffmpegPath = juce::File::getSpecialLocation(juce::File::SpecialLocationType::userApplicationDataDirectory)
+            .getChildFile("osci-render")
+            .getChildFile("ffmpeg");
+        juce::TemporaryFile tempFile = juce::TemporaryFile(".mp4");
+        juce::String cmd = ffmpegPath.getFullPathName() +
+                           " -r 60 -f rawvideo -pix_fmt rgba -s 1024x1024 -i - " +
+                           "-threads 0 -preset fast -y -pix_fmt yuv420p -crf 21 -vf vflip " + tempFile.getFile().getFullPathName();
+
+        // open pipe to ffmpeg's stdin in binary write mode
+#if JUCE_WINDOWS
+        ffmpeg = _popen(cmd.toStdString().c_str(), "wb");
+#else
+        ffmpeg = popen(cmd.toStdString().c_str(), "w");
+        if (ffmpeg == nullptr) {
+            DBG("popen failed: " + juce::String(std::strerror(errno)));
+        }
+#endif
+        framePixels.resize(renderTexture.width * renderTexture.height * 4);
         setPaused(false);
+    } else if (ffmpeg != nullptr) {
+#if JUCE_WINDOWS
+        _pclose(ffmpeg);
+#else
+        pclose(ffmpeg);
+#endif
+        ffmpeg = nullptr;
     }
     setBlockOnAudioThread(recording);
+    numFrames = 0;
+    record.setToggleState(recording, juce::NotificationType::dontSendNotification);
 }
 
 void VisualiserComponent::resized() {
@@ -300,6 +331,8 @@ void VisualiserComponent::handleAsyncUpdate() {
 }
 
 void VisualiserComponent::renderOpenGL() {
+    using namespace juce::gl;
+    
     if (openGLContext.isActive()) {
         juce::OpenGLHelpers::clear(juce::Colours::black);
         
@@ -313,6 +346,14 @@ void VisualiserComponent::renderOpenGL() {
             } else {
                 renderScope(xSamples, ySamples, zSamples);
             }
+            
+            if (record.getToggleState()) {
+                // draw frame to ffmpeg
+                glBindTexture(GL_TEXTURE_2D, renderTexture.id);
+                glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, framePixels.data());
+                fwrite(framePixels.data(), 4 * renderTexture.width * renderTexture.height, 1, ffmpeg);
+            }
+            
             renderingSemaphore.release();
             stopwatch.addTime(juce::RelativeTime::seconds(1.0 / FRAME_RATE));
         }
@@ -439,11 +480,8 @@ void VisualiserComponent::saveTextureToPNG(Texture texture, const juce::File& fi
     // Bind the texture to read its data
     glBindTexture(GL_TEXTURE_2D, textureID);
 
-    // Create a vector to store the pixel data (RGBA)
-    std::vector<unsigned char> pixels(width * height * 8);
-
     // Read the pixels from the texture
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, framePixels.data());
 
     // Convert raw pixel data to JUCE Image
     juce::Image* image = new juce::Image (juce::Image::PixelFormat::ARGB, width, height, true);  // Create a JUCE image
@@ -455,10 +493,10 @@ void VisualiserComponent::saveTextureToPNG(Texture texture, const juce::File& fi
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
             int srcIndex = (y * width + x) * 4; // RGBA format
-            juce::uint8 r = (pixels)[srcIndex];     // Red
-            juce::uint8 g = (pixels)[srcIndex + 1]; // Green
-            juce::uint8 b = (pixels)[srcIndex + 2]; // Blue
-            juce::uint8 a = (pixels)[srcIndex + 3]; // Alpha
+            juce::uint8 r = (framePixels)[srcIndex];     // Red
+            juce::uint8 g = (framePixels)[srcIndex + 1]; // Green
+            juce::uint8 b = (framePixels)[srcIndex + 2]; // Blue
+            juce::uint8 a = (framePixels)[srcIndex + 3]; // Alpha
 
             // This method uses colors in RGBA
             bitmapData.setPixelColour(x, height-y-1, juce::Colour(r, g, b, a));
@@ -487,13 +525,10 @@ void VisualiserComponent::saveTextureToQOI(Texture texture, const juce::File& fi
 
     // Bind the texture to read its data
     glBindTexture(GL_TEXTURE_2D, textureID);
-
-    if (pixels.size() < 1024 * 1024 * 4) pixels.resize(1024 * 1024 * 4);
-
     // Read the pixels from the texture
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, framePixels.data());
 
-    std::vector<unsigned char> binaryData = qoixx::qoi::encode<std::vector<unsigned char>>(pixels, imageFormat);
+    std::vector<unsigned char> binaryData = qoixx::qoi::encode<std::vector<unsigned char>>(framePixels, imageFormat);
     file.replaceWithData(binaryData.data(), binaryData.size());
 }
 
@@ -817,96 +852,4 @@ void VisualiserComponent::renderScope(const std::vector<float>& xPoints, const s
     checkGLErrors("drawLineTexture");
     drawCRT();
     checkGLErrors("drawCRT");
-}
-
-// sourceAudio must be a .wav file
-int VisualiserComponent::renderAudioFile(juce::File& sourceAudio, int method, int width, int height) {
-    if (!sourceAudio.existsAsFile()) return 0;
-    if (sourceAudio.getFileExtension() != ".wav" && sourceAudio.getFileExtension() != ".flac") return -1;
-
-    using namespace juce::gl;
-
-    juce::AudioFormatManager manager;
-    manager.registerBasicFormats();
-    juce::AudioFormat *audioFormat = manager.getDefaultFormat();
-    juce::AudioFormatReader* reader = manager.createReaderFor(sourceAudio);
-    juce::AudioSampleBuffer buffer;
-    buffer.setSize(2, reader->lengthInSamples, false, false, false);
-    bool readSucceeded = reader->read(&buffer, 0, reader->lengthInSamples, 0, true, true);
-    if (!readSucceeded) return -2;
-
-    int fileChannels = buffer.getNumChannels();
-    int fileSamples = buffer.getNumSamples();
-    double fileSampleRate = reader->sampleRate;
-
-    sampleRate = fileSampleRate;
-    intensity = settings.getIntensity() * 41000.f / sampleRate;
-    oldSampleRate = fileSampleRate;
-    int frameNSamples = sampleRate / FRAME_RATE;
-    int frameNSamplesResampled = frameNSamples * RESAMPLE_RATIO;
-    bool resample = settings.parameters.upsamplingEnabled->getBoolValue();
-
-    if (resample) setupArrays(frameNSamplesResampled);
-    else setupArrays(frameNSamples);
-
-    xResampler.prepare(sampleRate, RESAMPLE_RATIO);
-    yResampler.prepare(sampleRate, RESAMPLE_RATIO);
-    zResampler.prepare(sampleRate, RESAMPLE_RATIO);
-
-    int nFrames = std::ceil(((float)fileSamples) / frameNSamples);
-
-    std::vector<float> fileXSamples(frameNSamples);
-    std::vector<float> fileYSamples(frameNSamples);
-    std::vector<float> fileZSamples(frameNSamples);
-
-    std::vector<float> frameXSamples(resample ? frameNSamplesResampled : frameNSamples);
-    std::vector<float> frameYSamples(resample ? frameNSamplesResampled : frameNSamples);
-    std::vector<float> frameZSamples(resample ? frameNSamplesResampled : frameNSamples);
-
-    std::string fileName;
-    juce::File destDir = sourceAudio.getParentDirectory().getChildFile("sosci export/");
-    int f;
-    for (f = 0; f < nFrames; f++) {
-        for (int s = 0; s < frameNSamples; s++) {
-            if (fileChannels > 0) (fileXSamples)[s] = (buffer.getSample(0, std::min(f * frameNSamples + s, fileSamples - 1)));
-            if (fileChannels > 1) (fileYSamples)[s] = -(buffer.getSample(1, std::min(f * frameNSamples + s, fileSamples - 1)));
-            else fileYSamples[s] = fileXSamples[s];
-            if (fileChannels > 2) (fileZSamples)[s] = (buffer.getSample(2, std::min(f * frameNSamples + s, fileSamples - 1)));
-            else fileZSamples[s] = 1;
-        }
-
-        if (resample) {
-            xResampler.process((fileXSamples).data(), (frameXSamples).data(), frameNSamples);
-            yResampler.process((fileYSamples).data(), (frameYSamples).data(), frameNSamples);
-            zResampler.process((fileZSamples).data(), (frameZSamples).data(), frameNSamples);
-        }
-        else {
-            for (int s = 0; s < frameNSamples; s++) {
-                (frameXSamples)[s] = (fileXSamples)[s];
-                (frameYSamples)[s] = (fileYSamples)[s];
-                (frameZSamples)[s] = (fileZSamples)[s];
-            }
-        }
-
-        renderScope(frameXSamples, frameYSamples, frameZSamples);
-
-        fileName = std::to_string(f);
-        fileName = std::string(std::max(0, (int)(6 - fileName.length())), '0') + fileName;
-
-        switch (method) {
-        case FILE_RENDER_DUMMY:
-            break;
-        case FILE_RENDER_PNG:
-            saveTextureToPNG(renderTexture, destDir.getChildFile(fileName + ".png"));
-            break;
-        case FILE_RENDER_QOI:
-            saveTextureToQOI(renderTexture, destDir.getChildFile(fileName + ".qoi"));
-            break;
-        };
-    }
-
-    // cleanup
-    delete reader;
-
-    return f;
 }
