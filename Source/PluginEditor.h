@@ -43,6 +43,9 @@ public:
 
 private:
     OscirenderAudioProcessor& audioProcessor;
+    
+    juce::File applicationFolder = juce::File::getSpecialLocation(juce::File::SpecialLocationType::userApplicationDataDirectory)
+        .getChildFile("osci-render");
 public:
 
     const double CLOSED_PREF_SIZE = 30.0;
@@ -54,7 +57,7 @@ public:
 
     VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.visualiserParameters);
     SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings");
-    VisualiserComponent visualiser{audioProcessor.haltRecording, audioProcessor.threadManager, visualiserSettings, nullptr};
+    VisualiserComponent visualiser{applicationFolder.getChildFile("ffmpeg"), audioProcessor.haltRecording, audioProcessor.threadManager, visualiserSettings, nullptr};
 
     SettingsComponent settings{audioProcessor, *this};
 
