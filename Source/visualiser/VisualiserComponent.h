@@ -28,7 +28,7 @@ struct Texture {
 class VisualiserWindow;
 class VisualiserComponent : public juce::Component, public AudioBackgroundThread, public juce::MouseListener, public juce::OpenGLRenderer, public juce::AsyncUpdater {
 public:
-    VisualiserComponent(std::function<void()>& haltRecording, AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, VisualiserComponent* parent = nullptr, bool visualiserOnly = false);
+    VisualiserComponent(juce::File ffmpegPath, std::function<void()>& haltRecording, AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, VisualiserComponent* parent = nullptr, bool visualiserOnly = false);
     ~VisualiserComponent() override;
 
     std::function<void()> openSettings;
@@ -76,14 +76,12 @@ private:
 
     VisualiserSettings& settings;
     
-    std::unique_ptr<juce::FileChooser> chooser;
-    juce::File tempVideoFile;
-    
     StopwatchComponent stopwatch;
     SvgButton record{"Record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f)};
     long numFrames = 0;
     std::vector<unsigned char> framePixels;
     FILE* ffmpeg = nullptr;
+    juce::File ffmpegPath;
     
     Semaphore renderingSemaphore{0};
     
