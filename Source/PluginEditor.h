@@ -45,6 +45,9 @@ private:
     OscirenderAudioProcessor& audioProcessor;
     
     juce::File applicationFolder = juce::File::getSpecialLocation(juce::File::SpecialLocationType::userApplicationDataDirectory)
+#if JUCE_MAC
+        .getChildFile("Application Support")
+#endif
         .getChildFile("osci-render");
 public:
 

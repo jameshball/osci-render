@@ -8,6 +8,7 @@
 #include "VisualiserSettings.h"
 #include "../components/StopwatchComponent.h"
 #include "../img/qoixx.hpp"
+#include "../components/DownloaderComponent.h"
 
 #define FILE_RENDER_DUMMY 0
 #define FILE_RENDER_PNG 1
@@ -28,7 +29,7 @@ struct Texture {
 class VisualiserWindow;
 class VisualiserComponent : public juce::Component, public AudioBackgroundThread, public juce::MouseListener, public juce::OpenGLRenderer, public juce::AsyncUpdater {
 public:
-    VisualiserComponent(juce::File ffmpegPath, std::function<void()>& haltRecording, AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, VisualiserComponent* parent = nullptr, bool visualiserOnly = false);
+    VisualiserComponent(juce::File ffmpegFile, std::function<void()>& haltRecording, AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, VisualiserComponent* parent = nullptr, bool visualiserOnly = false);
     ~VisualiserComponent() override;
 
     std::function<void()> openSettings;
@@ -81,7 +82,37 @@ private:
     long numFrames = 0;
     std::vector<unsigned char> framePixels;
     FILE* ffmpeg = nullptr;
-    juce::File ffmpegPath;
+    juce::File ffmpegFile;
+    juce::String ffmpegURL = juce::String("https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/") +
+#if JUCE_WINDOWS
+    #if JUCE_64BIT
+        "ffmpeg-win32-x64"
+    #elif JUCE_32BIT
+        "ffmpeg-win32-ia32"
+    #endif
+#elif JUCE_MAC
+    #if JUCE_ARM
+        "ffmpeg-darwin-arm64"
+    #elif JUCE_INTEL
+        "ffmpeg-darwin-x64"
+    #endif
+#elif JUCE_LINUX
+    #if JUCE_ARM
+        #if JUCE_64BIT
+            "ffmpeg-linux-arm64"
+        #elif JUCE_32BIT
+            "ffmpeg-linux-arm"
+        #endif
+    #elif JUCE_INTEL
+        #if JUCE_64BIT
+            "ffmpeg-linux-x64"
+        #elif JUCE_32BIT
+            "ffmpeg-linux-ia32"
+        #endif
+    #endif
+#endif
+    + ".gz";
+    DownloaderComponent ffmpegDownloader{ffmpegURL, ffmpegFile, "Downloading ffmpeg...", this};
     
     Semaphore renderingSemaphore{0};
     
