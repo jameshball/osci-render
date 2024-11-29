@@ -26,12 +26,15 @@ public:
 
 private:
     SosciAudioProcessor& audioProcessor;
+    
+    juce::File applicationFolder = juce::File::getSpecialLocation(juce::File::SpecialLocationType::userApplicationDataDirectory)
+        .getChildFile("osci-render");
 public:
     OscirenderLookAndFeel lookAndFeel;
 
     VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.parameters, 3);
     SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings");
-    VisualiserComponent visualiser{audioProcessor.haltRecording, audioProcessor.threadManager, visualiserSettings, nullptr, true};
+    VisualiserComponent visualiser{applicationFolder.getChildFile("ffmpeg"), audioProcessor.haltRecording, audioProcessor.threadManager, visualiserSettings, nullptr, true};
 
     std::unique_ptr<juce::FileChooser> chooser;
     SosciMainMenuBarModel menuBarModel{*this, audioProcessor};
