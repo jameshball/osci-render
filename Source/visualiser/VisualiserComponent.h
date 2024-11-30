@@ -112,7 +112,7 @@ private:
     #endif
 #endif
     + ".gz";
-    DownloaderComponent ffmpegDownloader{ffmpegURL, ffmpegFile, "Downloading ffmpeg...", this};
+    DownloaderComponent ffmpegDownloader{ffmpegURL, ffmpegFile};
     
     Semaphore renderingSemaphore{0};
     

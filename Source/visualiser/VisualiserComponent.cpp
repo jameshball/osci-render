@@ -12,7 +12,14 @@
 #include "TexturedVertexShader.glsl"
 
 VisualiserComponent::VisualiserComponent(juce::File ffmpegFile, std::function<void()>& haltRecording, AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, VisualiserComponent* parent, bool visualiserOnly) : ffmpegFile(ffmpegFile), haltRecording(haltRecording), settings(settings), threadManager(threadManager), visualiserOnly(visualiserOnly), AudioBackgroundThread("VisualiserComponent" + juce::String(parent != nullptr ? " Child" : ""), threadManager), parent(parent) {
-
+    addAndMakeVisible(ffmpegDownloader);
+    
+    ffmpegDownloader.onSuccessfulDownload = [this] {
+        juce::MessageManager::callAsync([this] {
+            record.setEnabled(true);
+        });
+    };
+    
     haltRecording = [this] {
         setRecording(false);
     };
@@ -21,14 +28,6 @@ VisualiserComponent::VisualiserComponent(juce::File ffmpegFile, std::function<vo
     record.setPulseAnimation(true);
     record.onClick = [this] {
         setRecording(record.getToggleState());
-        stopwatch.stop();
-        stopwatch.reset();
-        
-        if (record.getToggleState()) {
-            stopwatch.start();
-        }
-        
-        resized();
     };
     
     addAndMakeVisible(stopwatch);
@@ -169,10 +168,27 @@ bool VisualiserComponent::keyPressed(const juce::KeyPress& key) {
 void VisualiserComponent::setFullScreen(bool fullScreen) {}
 
 void VisualiserComponent::setRecording(bool recording) {
+    stopwatch.stop();
+    stopwatch.reset();
+
     if (recording) {
         if (!ffmpegFile.exists()) {
-            ffmpegDownloader.download();
-            record.setToggleState(false, juce::NotificationType::sendNotification);
+            // ask the user if they want to download ffmpeg
+            juce::MessageBoxOptions options = juce::MessageBoxOptions()
+                .withTitle("FFmpeg not found")
+                .withMessage("FFmpeg not found. This is required to record video to .mp4.\n\nWould you like to download it now?")
+                .withButton("Yes")
+                .withButton("No")
+                .withIconType(juce::AlertWindow::WarningIcon)
+                .withAssociatedComponent(this);
+            
+            juce::AlertWindow::showAsync(options, [this](int result) {
+                if (result == 1) {
+                    record.setEnabled(false);
+                    ffmpegDownloader.download();
+                }
+            });
+            record.setToggleState(false, juce::NotificationType::dontSendNotification);
             return;
         }
         juce::TemporaryFile tempFile = juce::TemporaryFile(".mp4");
@@ -191,6 +207,7 @@ void VisualiserComponent::setRecording(bool recording) {
         }
         framePixels.resize(renderTexture.width * renderTexture.height * 4);
         setPaused(false);
+        stopwatch.start();
     } else if (ffmpeg != nullptr) {
 #if JUCE_WINDOWS
         _pclose(ffmpeg);
@@ -202,6 +219,7 @@ void VisualiserComponent::setRecording(bool recording) {
     setBlockOnAudioThread(recording);
     numFrames = 0;
     record.setToggleState(recording, juce::NotificationType::dontSendNotification);
+    resized();
 }
 
 void VisualiserComponent::resized() {
@@ -221,13 +239,16 @@ void VisualiserComponent::resized() {
     } else {
         stopwatch.setVisible(false);
     }
+    if (child == nullptr) {
+        auto bounds = buttonRow.removeFromRight(160);
+        ffmpegDownloader.setBounds(bounds.withSizeKeepingCentre(bounds.getWidth() - 10, bounds.getHeight() - 10));
+    }
     viewportArea = area;
     viewportChanged(viewportArea);
 }
 
 void VisualiserComponent::popoutWindow() {
     setRecording(false);
-    record.setEnabled(false);
     auto visualiser = new VisualiserComponent(ffmpegFile, haltRecording, threadManager, settings, this);
     visualiser->settings.setLookAndFeel(&getLookAndFeel());
     visualiser->openSettings = openSettings;
@@ -247,7 +268,8 @@ void VisualiserComponent::popoutWindow() {
 
 void VisualiserComponent::childUpdated() {
     popOutButton.setVisible(child == nullptr);
-    record.setEnabled(child == nullptr);
+    ffmpegDownloader.setVisible(child == nullptr);
+    record.setVisible(child == nullptr);
     if (child != nullptr) {
         haltRecording = [this] {
             setRecording(false);
@@ -826,6 +848,10 @@ void VisualiserComponent::paint(juce::Graphics& g) {
     g.setColour(juce::Colours::black);
     g.fillRect(buttonRow);
     if (!active) {
+        // draw a translucent overlay
+        g.setColour(juce::Colours::black.withAlpha(0.5f));
+        g.fillRect(viewportArea);
+        
         g.setColour(juce::Colours::white);
         g.setFont(30.0f);
         juce::String text = child == nullptr ? "Paused" : "Open in another window";
