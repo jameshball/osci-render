@@ -19,20 +19,26 @@ private:
     std::unique_ptr<juce::URL::DownloadTask>& task;
 };
 
-class DownloaderComponent : public juce::ThreadWithProgressWindow, public juce::URL::DownloadTaskListener {
+class DownloaderComponent : public juce::Component, public juce::Thread, public juce::URL::DownloadTaskListener {
 public:
-    DownloaderComponent(juce::URL url, juce::File file, juce::String title, juce::Component* parent);
+    DownloaderComponent(juce::URL url, juce::File file);
 
     void download();
     void run() override;
-    void threadComplete(bool userPressedCancel) override;
+    void threadComplete();
+    void resized() override;
     void finished(juce::URL::DownloadTask* task, bool success) override;
     void progress(juce::URL::DownloadTask* task, juce::int64 bytesDownloaded, juce::int64 totalLength) override;
+    
+    std::function<void()> onSuccessfulDownload;
 
 private:
     
     juce::URL url;
     juce::File file;
+    double progressValue = -1;
+    juce::ProgressBar progressBar = juce::ProgressBar(progressValue);
+    juce::Label successLabel;
     juce::CriticalSection taskLock;
     std::unique_ptr<juce::URL::DownloadTask> task;
     std::unique_ptr<DownloaderThread> downloader;

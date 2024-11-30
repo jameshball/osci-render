@@ -131,6 +131,9 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
+    if (audioProcessor.haltRecording != nullptr) {
+        audioProcessor.haltRecording();
+    }
     setLookAndFeel(nullptr);
     juce::Desktop::getInstance().setDefaultLookAndFeel(nullptr);
     juce::MessageManagerLock lock;

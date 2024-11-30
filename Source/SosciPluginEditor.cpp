@@ -67,6 +67,9 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p)
 }
 
 SosciPluginEditor::~SosciPluginEditor() {
+    if (audioProcessor.haltRecording != nullptr) {
+        audioProcessor.haltRecording();
+    }
     setLookAndFeel(nullptr);
     juce::Desktop::getInstance().setDefaultLookAndFeel(nullptr);
 }

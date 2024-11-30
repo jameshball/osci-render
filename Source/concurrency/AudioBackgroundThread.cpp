@@ -9,6 +9,7 @@ AudioBackgroundThread::AudioBackgroundThread(const juce::String& name, AudioBack
 }
 
 AudioBackgroundThread::~AudioBackgroundThread() {
+    deleting = true;
     setShouldBeRunning(false);
     manager.unregisterThread(this);
 }
@@ -69,7 +70,9 @@ void AudioBackgroundThread::start() {
 }
 
 void AudioBackgroundThread::stop() {
-    stopTask();
+    if (!deleting) {
+        stopTask();
+    }
     consumer->forceNotify();
     stopThread(1000);
 }
