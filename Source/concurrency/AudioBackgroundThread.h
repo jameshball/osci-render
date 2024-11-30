@@ -25,6 +25,7 @@ private:
     std::unique_ptr<BufferConsumer> consumer = nullptr;
     bool shouldBeRunning = false;
     std::atomic<bool> isPrepared = false;
+    std::atomic<bool> deleting = false;
 
 protected:
     

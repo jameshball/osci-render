@@ -66,6 +66,9 @@ public:
     OscirenderLookAndFeel();
 
     static const int RECT_RADIUS = 5;
+    juce::Typeface::Ptr regularTypeface = juce::Typeface::createSystemTypefaceFor(BinaryData::FiraSansRegular_ttf, BinaryData::FiraSansRegular_ttfSize);
+    juce::Typeface::Ptr boldTypeface = juce::Typeface::createSystemTypefaceFor(BinaryData::FiraSansBold_ttf, BinaryData::FiraSansBold_ttfSize);
+    juce::Typeface::Ptr italicTypeface = juce::Typeface::createSystemTypefaceFor(BinaryData::FiraSansItalic_ttf, BinaryData::FiraSansItalic_ttfSize);
 
     void drawLabel(juce::Graphics& g, juce::Label& label) override;
     void fillTextEditorBackground(juce::Graphics& g, int width, int height, juce::TextEditor& textEditor) override;
@@ -97,4 +100,7 @@ public:
     void drawToggleButton(juce::Graphics&, juce::ToggleButton&, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override;
     juce::MouseCursor getMouseCursorFor(juce::Component& component) override;
     void drawCallOutBoxBackground(juce::CallOutBox& box, juce::Graphics& g, const juce::Path& path, juce::Image& cachedImage) override;
+    void drawProgressBar(juce::Graphics& g, juce::ProgressBar& progressBar, int width, int height, double progress, const juce::String& textToShow) override;
+    void customDrawLinearProgressBar(juce::Graphics& g, const juce::ProgressBar& progressBar, int width, int height, double progress, const juce::String& textToShow);
+    juce::Typeface::Ptr getTypefaceForFont(const juce::Font& font) override;
 };

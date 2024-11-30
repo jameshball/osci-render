@@ -10,7 +10,12 @@
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
       <GROUP id="{8930EC48-30FD-646B-9DC5-0861171F8B2E}" name="fonts">
-        <FILE id="sqtSiu" name="font.ttf" compile="0" resource="1" file="Resources/fonts/font.ttf"/>
+        <FILE id="GXGPCT" name="FiraSans-Bold.ttf" compile="0" resource="1"
+              file="Resources/fonts/FiraSans-Bold.ttf"/>
+        <FILE id="TvdkVI" name="FiraSans-Italic.ttf" compile="0" resource="1"
+              file="Resources/fonts/FiraSans-Italic.ttf"/>
+        <FILE id="uStS0H" name="FiraSans-Regular.ttf" compile="0" resource="1"
+              file="Resources/fonts/FiraSans-Regular.ttf"/>
       </GROUP>
       <GROUP id="{F3815953-00C0-3876-5552-BDE98F3233D9}" name="gpla">
         <FILE id="euGQq0" name="fallback.gpla" compile="0" resource="1" file="Resources/gpla/fallback.gpla"/>
@@ -137,6 +142,10 @@
               file="Source/components/ComponentList.cpp"/>
         <FILE id="HGTPEW" name="ComponentList.h" compile="0" resource="0" file="Source/components/ComponentList.h"/>
         <FILE id="IvySRY" name="DoubleTextBox.h" compile="0" resource="0" file="Source/components/DoubleTextBox.h"/>
+        <FILE id="Jh9JQ3" name="DownloaderComponent.cpp" compile="1" resource="0"
+              file="Source/components/DownloaderComponent.cpp"/>
+        <FILE id="rCLnwK" name="DownloaderComponent.h" compile="0" resource="0"
+              file="Source/components/DownloaderComponent.h"/>
         <FILE id="poPVxL" name="DraggableListBox.cpp" compile="1" resource="0"
               file="Source/components/DraggableListBox.cpp"/>
         <FILE id="Y9NEGn" name="DraggableListBox.h" compile="0" resource="0"
