@@ -40,7 +40,7 @@ void main() {
         brightness = erf(xy.x/SQRT2/sigma) - erf((xy.x-len)/SQRT2/sigma);
         brightness *= exp(-xy.y*xy.y/(2.0*sigma*sigma))/2.0/len;
     }
-                              
+
     brightness *= uvl.w;
     gl_FragColor = 2.0 * texture2D(uScreen, vTexCoord) * brightness;
     gl_FragColor.a = 1.0;
