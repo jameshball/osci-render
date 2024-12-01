@@ -5,11 +5,17 @@
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
               version="2.3.0" companyName="James H Ball" companyWebsite="https://osci-render.com"
-              companyEmail="james@ball.sh" defines="NOMINMAX=1" pluginAUMainType="'aumf'">
+              companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0"
+              pluginAUMainType="'aumf'">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
       <GROUP id="{8930EC48-30FD-646B-9DC5-0861171F8B2E}" name="fonts">
-        <FILE id="sqtSiu" name="font.ttf" compile="0" resource="1" file="Resources/fonts/font.ttf"/>
+        <FILE id="GXGPCT" name="FiraSans-Bold.ttf" compile="0" resource="1"
+              file="Resources/fonts/FiraSans-Bold.ttf"/>
+        <FILE id="TvdkVI" name="FiraSans-Italic.ttf" compile="0" resource="1"
+              file="Resources/fonts/FiraSans-Italic.ttf"/>
+        <FILE id="uStS0H" name="FiraSans-Regular.ttf" compile="0" resource="1"
+              file="Resources/fonts/FiraSans-Regular.ttf"/>
       </GROUP>
       <GROUP id="{F3815953-00C0-3876-5552-BDE98F3233D9}" name="gpla">
         <FILE id="euGQq0" name="fallback.gpla" compile="0" resource="1" file="Resources/gpla/fallback.gpla"/>
@@ -26,17 +32,8 @@
         <FILE id="LbviBq" name="cube.obj" compile="0" resource="1" file="Resources/models/cube.obj"/>
       </GROUP>
       <GROUP id="{F3C16D02-63B4-E3DA-7498-901173C37D6C}" name="oscilloscope">
-        <GROUP id="{DD5ACF8F-4E4F-E277-176A-5FD4A9717037}" name="juce">
-          <FILE id="FCfppP" name="check_native_interop.js" compile="0" resource="1"
-                file="Resources/oscilloscope/juce/check_native_interop.js"/>
-          <FILE id="ZEUE5w" name="index.js" compile="0" resource="1" file="Resources/oscilloscope/juce/index.js"/>
-          <FILE id="hWk293" name="package.json" compile="0" resource="1" file="Resources/oscilloscope/juce/package.json"/>
-        </GROUP>
         <FILE id="qpPhpN" name="empty.jpg" compile="0" resource="1" file="Resources/oscilloscope/empty.jpg"/>
         <FILE id="dNtZYs" name="noise.jpg" compile="0" resource="1" file="Resources/oscilloscope/noise.jpg"/>
-        <FILE id="YPMnjq" name="oscilloscope.html" compile="0" resource="1"
-              file="Resources/oscilloscope/oscilloscope.html"/>
-        <FILE id="BeXHj7" name="oscilloscope.js" compile="0" resource="1" file="Resources/oscilloscope/oscilloscope.js"/>
       </GROUP>
       <GROUP id="{82BCD6F1-A8BF-F30B-5587-81EE70168883}" name="svg">
         <FILE id="rl17ZK" name="cog.svg" compile="0" resource="1" file="Resources/svg/cog.svg"/>
@@ -145,6 +142,10 @@
               file="Source/components/ComponentList.cpp"/>
         <FILE id="HGTPEW" name="ComponentList.h" compile="0" resource="0" file="Source/components/ComponentList.h"/>
         <FILE id="IvySRY" name="DoubleTextBox.h" compile="0" resource="0" file="Source/components/DoubleTextBox.h"/>
+        <FILE id="Jh9JQ3" name="DownloaderComponent.cpp" compile="1" resource="0"
+              file="Source/components/DownloaderComponent.cpp"/>
+        <FILE id="rCLnwK" name="DownloaderComponent.h" compile="0" resource="0"
+              file="Source/components/DownloaderComponent.h"/>
         <FILE id="poPVxL" name="DraggableListBox.cpp" compile="1" resource="0"
               file="Source/components/DraggableListBox.cpp"/>
         <FILE id="Y9NEGn" name="DraggableListBox.h" compile="0" resource="0"
@@ -174,14 +175,6 @@
         <FILE id="QQzSwh" name="SliderTextBox.h" compile="0" resource="0" file="Source/components/SliderTextBox.h"/>
         <FILE id="QrDKRZ" name="SvgButton.h" compile="0" resource="0" file="Source/components/SvgButton.h"/>
         <FILE id="qzfstC" name="SwitchButton.h" compile="0" resource="0" file="Source/components/SwitchButton.h"/>
-        <FILE id="y3UiR0" name="VisualiserComponent.cpp" compile="1" resource="0"
-              file="Source/components/VisualiserComponent.cpp"/>
-        <FILE id="ZueyNl" name="VisualiserComponent.h" compile="0" resource="0"
-              file="Source/components/VisualiserComponent.h"/>
-        <FILE id="uOtHbQ" name="VisualiserSettings.cpp" compile="1" resource="0"
-              file="Source/components/VisualiserSettings.cpp"/>
-        <FILE id="GcbeeZ" name="VisualiserSettings.h" compile="0" resource="0"
-              file="Source/components/VisualiserSettings.h"/>
         <FILE id="icFMpl" name="VListBox.cpp" compile="1" resource="0" file="Source/components/VListBox.cpp"/>
         <FILE id="mvp8je" name="VListBox.h" compile="0" resource="0" file="Source/components/VListBox.h"/>
         <FILE id="s8EVcE" name="VolumeComponent.cpp" compile="1" resource="0"
@@ -190,11 +183,20 @@
               file="Source/components/VolumeComponent.h"/>
       </GROUP>
       <GROUP id="{9F5970A9-8094-E7F3-7AC1-812AE5589B9F}" name="concurrency">
+        <FILE id="PcRInQ" name="AudioBackgroundThread.cpp" compile="1" resource="0"
+              file="Source/concurrency/AudioBackgroundThread.cpp"/>
+        <FILE id="jtc1vv" name="AudioBackgroundThread.h" compile="0" resource="0"
+              file="Source/concurrency/AudioBackgroundThread.h"/>
+        <FILE id="pQ2gD8" name="AudioBackgroundThreadManager.cpp" compile="1"
+              resource="0" file="Source/concurrency/AudioBackgroundThreadManager.cpp"/>
+        <FILE id="CN7dD7" name="AudioBackgroundThreadManager.h" compile="0"
+              resource="0" file="Source/concurrency/AudioBackgroundThreadManager.h"/>
         <FILE id="F5kUMH" name="BlockingQueue.h" compile="0" resource="0" file="Source/concurrency/BlockingQueue.h"/>
         <FILE id="WQ2W15" name="BufferConsumer.h" compile="0" resource="0"
               file="Source/concurrency/BufferConsumer.h"/>
-        <FILE id="VMSdiT" name="ConsumerManager.h" compile="0" resource="0"
-              file="Source/concurrency/ConsumerManager.h"/>
+        <FILE id="L9aCHY" name="readerwritercircularbuffer.h" compile="0" resource="0"
+              file="Source/concurrency/readerwritercircularbuffer.h"/>
+        <FILE id="aat2Je" name="WriteProcess.h" compile="0" resource="0" file="Source/concurrency/WriteProcess.h"/>
       </GROUP>
       <GROUP id="{A3E24187-62A5-AB8D-8837-14043B89A640}" name="gpla">
         <FILE id="KvDV8j" name="LineArtParser.cpp" compile="1" resource="0"
@@ -206,6 +208,7 @@
         <FILE id="PkBzDR" name="gifdec.h" compile="0" resource="0" file="Source/img/gifdec.h"/>
         <FILE id="w6xTAH" name="ImageParser.cpp" compile="1" resource="0" file="Source/img/ImageParser.cpp"/>
         <FILE id="ibvT5B" name="ImageParser.h" compile="0" resource="0" file="Source/img/ImageParser.h"/>
+        <FILE id="e1dNTX" name="qoixx.hpp" compile="0" resource="0" file="Source/img/qoixx.hpp"/>
       </GROUP>
       <GROUP id="{D0D95F57-3D9D-46D9-C126-25C3C7459AC5}" name="ixwebsocket">
         <FILE id="pPOkoj" name="IXBase64.h" compile="0" resource="0" file="Source/ixwebsocket/IXBase64.h"/>
@@ -552,6 +555,8 @@
         <FILE id="hCrVUD" name="FrameSource.h" compile="0" resource="0" file="Source/parser/FrameSource.h"/>
       </GROUP>
       <GROUP id="{92CEA658-C82C-9CEB-15EB-945EF6B6B5C8}" name="shape">
+        <FILE id="XkKRyp" name="OsciPoint.cpp" compile="1" resource="0" file="Source/shape/OsciPoint.cpp"/>
+        <FILE id="AnooP3" name="OsciPoint.h" compile="0" resource="0" file="Source/shape/OsciPoint.h"/>
         <FILE id="iglTFG" name="CircleArc.cpp" compile="1" resource="0" file="Source/shape/CircleArc.cpp"/>
         <FILE id="T3S8Sg" name="CircleArc.h" compile="0" resource="0" file="Source/shape/CircleArc.h"/>
         <FILE id="G5fbub" name="Shape.cpp" compile="1" resource="0" file="Source/shape/Shape.cpp"/>
@@ -565,8 +570,6 @@
               file="Source/shape/QuadraticBezierCurve.h"/>
         <FILE id="W19EPg" name="Line.cpp" compile="1" resource="0" file="Source/shape/Line.cpp"/>
         <FILE id="i1A2s1" name="Line.h" compile="0" resource="0" file="Source/shape/Line.h"/>
-        <FILE id="nUpro8" name="Point.cpp" compile="1" resource="0" file="Source/shape/Point.cpp"/>
-        <FILE id="X6A0jk" name="Point.h" compile="0" resource="0" file="Source/shape/Point.h"/>
         <FILE id="NmptSY" name="Shape.h" compile="0" resource="0" file="Source/shape/Shape.h"/>
       </GROUP>
       <GROUP id="{56A27063-1FE7-31C3-8263-98389240A8CB}" name="svg">
@@ -590,6 +593,36 @@
               file="Source/UGen/ugen_JuceUtility.cpp"/>
         <FILE id="mC1tUv" name="ugen_JuceUtility.h" compile="0" resource="0"
               file="Source/UGen/ugen_JuceUtility.h"/>
+      </GROUP>
+      <GROUP id="{16A8DC64-BA02-898D-4DBA-AA3DDF6F9297}" name="visualiser">
+        <FILE id="kfMvdQ" name="BlurFragmentShader.glsl" compile="0" resource="0"
+              file="Source/visualiser/BlurFragmentShader.glsl" xcodeResource="0"/>
+        <FILE id="c59gvD" name="BlurVertexShader.glsl" compile="0" resource="0"
+              file="Source/visualiser/BlurVertexShader.glsl" xcodeResource="0"/>
+        <FILE id="WZFPXF" name="LineFragmentShader.glsl" compile="0" resource="0"
+              file="Source/visualiser/LineFragmentShader.glsl" xcodeResource="0"/>
+        <FILE id="iS2Ipw" name="LineVertexShader.glsl" compile="0" resource="0"
+              file="Source/visualiser/LineVertexShader.glsl" xcodeResource="0"/>
+        <FILE id="hrzO1G" name="OutputFragmentShader.glsl" compile="0" resource="0"
+              file="Source/visualiser/OutputFragmentShader.glsl" xcodeResource="0"/>
+        <FILE id="A0CrLF" name="OutputVertexShader.glsl" compile="0" resource="0"
+              file="Source/visualiser/OutputVertexShader.glsl" xcodeResource="0"/>
+        <FILE id="Gwupwc" name="SimpleFragmentShader.glsl" compile="0" resource="0"
+              file="Source/visualiser/SimpleFragmentShader.glsl"/>
+        <FILE id="RX1oPv" name="SimpleVertexShader.glsl" compile="0" resource="0"
+              file="Source/visualiser/SimpleVertexShader.glsl"/>
+        <FILE id="zR2PyI" name="TexturedFragmentShader.glsl" compile="0" resource="0"
+              file="Source/visualiser/TexturedFragmentShader.glsl"/>
+        <FILE id="TSORlO" name="TexturedVertexShader.glsl" compile="0" resource="0"
+              file="Source/visualiser/TexturedVertexShader.glsl"/>
+        <FILE id="Ju0mVn" name="VisualiserComponent.cpp" compile="1" resource="0"
+              file="Source/visualiser/VisualiserComponent.cpp"/>
+        <FILE id="frfxSR" name="VisualiserComponent.h" compile="0" resource="0"
+              file="Source/visualiser/VisualiserComponent.h"/>
+        <FILE id="iZM7s0" name="VisualiserSettings.cpp" compile="1" resource="0"
+              file="Source/visualiser/VisualiserSettings.cpp"/>
+        <FILE id="CaPdPD" name="VisualiserSettings.h" compile="0" resource="0"
+              file="Source/visualiser/VisualiserSettings.h"/>
       </GROUP>
       <GROUP id="{DC345620-B6F6-F3B9-D359-C265590B0F00}" name="wav">
         <FILE id="vYzJlF" name="WavParser.cpp" compile="1" resource="0" file="Source/wav/WavParser.cpp"/>
@@ -662,6 +695,14 @@
         <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
         <MODULEPATH id="juce_animation" path="../JUCE/modules"/>
+        <MODULEPATH id="chowdsp_dsp_utils" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_filters" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_simd" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_buffers" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
       </MODULEPATHS>
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/VisualStudio2022" smallIcon="pSc1mq" bigIcon="pSc1mq">
@@ -686,6 +727,14 @@
         <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
         <MODULEPATH id="juce_animation" path="../JUCE/modules"/>
+        <MODULEPATH id="chowdsp_dsp_utils" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_filters" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_simd" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_buffers" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
       </MODULEPATHS>
     </VS2022>
     <XCODE_MAC targetFolder="Builds/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak"
@@ -712,10 +761,28 @@
         <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
         <MODULEPATH id="juce_animation" path="../JUCE/modules"/>
+        <MODULEPATH id="chowdsp_dsp_utils" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_filters" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_simd" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_buffers" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
       </MODULEPATHS>
     </XCODE_MAC>
   </EXPORTFORMATS>
   <MODULES>
+    <MODULE id="chowdsp_buffers" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="chowdsp_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="chowdsp_data_structures" showAllCode="1" useLocalCopy="0"
+            useGlobalPath="0"/>
+    <MODULE id="chowdsp_dsp_data_structures" showAllCode="1" useLocalCopy="0"
+            useGlobalPath="0"/>
+    <MODULE id="chowdsp_dsp_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="chowdsp_filters" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="chowdsp_math" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="chowdsp_simd" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="juce_animation" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>

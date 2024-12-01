@@ -10,9 +10,14 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& parameters, int num
     addAndMakeVisible(hue);
     addAndMakeVisible(saturation);
     addAndMakeVisible(focus);
+    addAndMakeVisible(noise);
+    addAndMakeVisible(glow);
+    addAndMakeVisible(smooth);
+    addChildComponent(sweepMs);
     addAndMakeVisible(graticuleToggle);
     addAndMakeVisible(smudgeToggle);
     addAndMakeVisible(upsamplingToggle);
+    addAndMakeVisible(sweepToggle);
     
     brightness.setSliderOnValueChange();
     intensity.setSliderOnValueChange();
@@ -20,6 +25,15 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& parameters, int num
     hue.setSliderOnValueChange();
     saturation.setSliderOnValueChange();
     focus.setSliderOnValueChange();
+    noise.setSliderOnValueChange();
+    glow.setSliderOnValueChange();
+    smooth.setSliderOnValueChange();
+    sweepMs.setSliderOnValueChange();
+    
+    sweepToggle.onClick = [this] {
+        sweepMs.setVisible(sweepToggle.getToggleState());
+        resized();
+    };
 }
 
 VisualiserSettings::~VisualiserSettings() {}
@@ -33,22 +47,15 @@ void VisualiserSettings::resized() {
     hue.setBounds(area.removeFromTop(rowHeight));
     saturation.setBounds(area.removeFromTop(rowHeight));
     focus.setBounds(area.removeFromTop(rowHeight));
+    noise.setBounds(area.removeFromTop(rowHeight));
+    glow.setBounds(area.removeFromTop(rowHeight));
+    smooth.setBounds(area.removeFromTop(rowHeight));
     graticuleToggle.setBounds(area.removeFromTop(rowHeight));
     smudgeToggle.setBounds(area.removeFromTop(rowHeight));
     upsamplingToggle.setBounds(area.removeFromTop(rowHeight));
-}
-
-juce::var VisualiserSettings::getSettings() {
-    auto settings = new juce::DynamicObject();
-    settings->setProperty("brightness", parameters.brightnessEffect->getActualValue() - 2);
-    settings->setProperty("intensity", parameters.intensityEffect->getActualValue() / 100);
-    settings->setProperty("persistence", parameters.persistenceEffect->getActualValue() - 1.33);
-    settings->setProperty("saturation", parameters.saturationEffect->getActualValue());
-    settings->setProperty("hue", parameters.hueEffect->getActualValue());
-    settings->setProperty("focus", parameters.focusEffect->getActualValue() / 100);
-    settings->setProperty("graticule", parameters.graticuleEnabled->getBoolValue());
-    settings->setProperty("smudges", parameters.smudgesEnabled->getBoolValue());
-    settings->setProperty("upsampling", parameters.upsamplingEnabled->getBoolValue());
-    settings->setProperty("numChannels", numChannels);
-    return juce::var(settings);
+    
+    sweepToggle.setBounds(area.removeFromTop(rowHeight));
+    if (sweepToggle.getToggleState()) {
+        sweepMs.setBounds(area.removeFromTop(rowHeight));
+    }
 }

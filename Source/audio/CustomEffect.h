@@ -1,6 +1,6 @@
 #pragma once
 #include "EffectApplication.h"
-#include "../shape/Point.h"
+#include "../shape/OsciPoint.h"
 #include "../audio/Effect.h"
 #include "../lua/LuaParser.h"
 
@@ -13,7 +13,7 @@ public:
 	static const juce::String UNIQUE_ID;
 	static const juce::String FILE_NAME;
 
-	Point apply(int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override;
+	OsciPoint apply(int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) override;
 	void updateCode(const juce::String& newCode);
 
 	juce::String getCode();

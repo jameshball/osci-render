@@ -222,6 +222,6 @@ void MainComponent::resized() {
         auto shiftedBounds = bounds;
         shiftedBounds.setX(topLeft.getX());
         shiftedBounds.setY(topLeft.getY());
-		pluginEditor.visualiser.setBounds(shiftedBounds.withSizeKeepingCentre(minDim, minDim));
+		pluginEditor.visualiser.setBounds(shiftedBounds.withSizeKeepingCentre(minDim - 25, minDim));
 	}
 }

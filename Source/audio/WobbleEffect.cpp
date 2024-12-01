@@ -4,7 +4,7 @@ WobbleEffect::WobbleEffect(PitchDetector& pitchDetector) : pitchDetector(pitchDe
 
 WobbleEffect::~WobbleEffect() {}
 
-Point WobbleEffect::apply(int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+OsciPoint WobbleEffect::apply(int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
     // TODO: this doesn't consider sample rate
     smoothedFrequency = smoothedFrequency * 0.99995 + pitchDetector.frequency * 0.00005;
     double theta = nextPhase(smoothedFrequency, sampleRate);

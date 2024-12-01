@@ -9,7 +9,7 @@
 #include "LookAndFeel.h"
 #include "components/ErrorCodeEditorComponent.h"
 #include "components/LuaConsole.h"
-#include "components/VisualiserSettings.h"
+#include "visualiser/VisualiserSettings.h"
 
 class OscirenderAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener {
 public:
@@ -27,6 +27,9 @@ public:
     void handleAsyncUpdate() override;
     void changeListenerCallback(juce::ChangeBroadcaster* source) override;
     void toggleLayout(juce::StretchableLayoutManager& layout, double prefSize);
+    
+    void openVisualiserSettings();
+    void closeVisualiserSettings();
 
     void editCustomFunction(bool enabled);
 
@@ -40,6 +43,19 @@ public:
 
 private:
     OscirenderAudioProcessor& audioProcessor;
+    
+    juce::File applicationFolder = juce::File::getSpecialLocation(juce::File::SpecialLocationType::userApplicationDataDirectory)
+#if JUCE_MAC
+        .getChildFile("Application Support")
+#endif
+        .getChildFile("osci-render");
+
+    juce::String ffmpegFileName =
+#if JUCE_WINDOWS
+        "ffmpeg.exe";
+#else
+        "ffmpeg";
+#endif
 public:
 
     const double CLOSED_PREF_SIZE = 30.0;
@@ -51,7 +67,7 @@ public:
 
     VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.visualiserParameters);
     SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings");
-    VisualiserComponent visualiser{audioProcessor, audioProcessor, visualiserSettings, nullptr, audioProcessor.visualiserParameters.legacyVisualiserEnabled->getBoolValue()};
+    VisualiserComponent visualiser{audioProcessor.lastOpenedDirectory, applicationFolder.getChildFile(ffmpegFileName), audioProcessor.haltRecording, audioProcessor.threadManager, visualiserSettings, nullptr};
 
     SettingsComponent settings{audioProcessor, *this};
 

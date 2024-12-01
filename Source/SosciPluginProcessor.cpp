@@ -16,15 +16,14 @@ SosciAudioProcessor::SosciAudioProcessor()
      : AudioProcessor (BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(3), true)
                                         .withOutput("Output", juce::AudioChannelSet::stereo(), true))
 #endif
-    {
+{
     // locking isn't necessary here because we are in the constructor
 
-    allEffects.push_back(parameters.brightnessEffect);
-    allEffects.push_back(parameters.intensityEffect);
-    allEffects.push_back(parameters.persistenceEffect);
-    allEffects.push_back(parameters.hueEffect);
-    allEffects.push_back(parameters.saturationEffect);
-    allEffects.push_back(parameters.focusEffect);
+    for (auto effect : parameters.effects) {
+        allEffects.push_back(effect);
+    }
+    
+    allEffects.push_back(parameters.smoothEffect);
 
     for (auto effect : allEffects) {
         for (auto effectParameter : effect->parameters) {
@@ -34,12 +33,10 @@ SosciAudioProcessor::SosciAudioProcessor()
             }
         }
     }
-
-    booleanParameters.push_back(parameters.graticuleEnabled);
-    booleanParameters.push_back(parameters.smudgesEnabled);
-    booleanParameters.push_back(parameters.upsamplingEnabled);
-    booleanParameters.push_back(parameters.legacyVisualiserEnabled);
-    booleanParameters.push_back(parameters.visualiserFullScreen);
+        
+    for (auto parameter : parameters.booleans) {
+        booleanParameters.push_back(parameter);
+    }
 
     for (auto parameter : booleanParameters) {
         addParameter(parameter);
@@ -112,6 +109,8 @@ void SosciAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) 
     for (auto& effect : allEffects) {
         effect->updateSampleRate(currentSampleRate);
     }
+    
+    threadManager.prepare(sampleRate, samplesPerBlock);
 }
 
 void SosciAudioProcessor::releaseResources() {
@@ -174,8 +173,6 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     auto inputArray = input.getArrayOfWritePointers();
 
 	for (int sample = 0; sample < input.getNumSamples(); ++sample) {
-        juce::SpinLock::ScopedLockType scope(consumerLock);
-
         float x = input.getNumChannels() > 0 ? inputArray[0][sample] : 0.0f;
         float y = input.getNumChannels() > 1 ? inputArray[1][sample] : 0.0f;
         float brightness = 1.0f;
@@ -190,16 +187,13 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             }
         }
 
-        Point point = { x, y, brightness };
+        OsciPoint point = { x, y, brightness };
 
         for (auto& effect : allEffects) {
             point = effect->apply(sample, point);
         }
 
-        for (auto consumer : consumers) {
-            consumer->write(point);
-            consumer->notifyIfFull();
-        }
+        threadManager.write(point);
 	}
 }
 
@@ -215,6 +209,14 @@ juce::AudioProcessorEditor* SosciAudioProcessor::createEditor() {
 
 //==============================================================================
 void SosciAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
+    // we need to stop recording the visualiser when saving the state, otherwise
+    // there are issues. This is the only place we can do this because there is
+    // no callback when closing the standalone app except for this.
+    
+    if (haltRecording != nullptr && juce::JUCEApplicationBase::isStandaloneApp()) {
+        haltRecording();
+    }
+    
     juce::SpinLock::ScopedLockType lock2(effectsLock);
 
     std::unique_ptr<juce::XmlElement> xml = std::make_unique<juce::XmlElement>("project");

@@ -13,7 +13,7 @@ CustomEffect::~CustomEffect() {
 	parser->close(L);
 }
 
-Point CustomEffect::apply(int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+OsciPoint CustomEffect::apply(int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
 	auto effectScale = values[0].load();
 
 	auto x = input.x;
@@ -45,7 +45,7 @@ Point CustomEffect::apply(int index, Point input, const std::vector<std::atomic<
 		}
 	}
 
-	return Point(
+	return OsciPoint(
 		(1 - effectScale) * input.x + effectScale * x,
 		(1 - effectScale) * input.y + effectScale * y,
 		(1 - effectScale) * input.z + effectScale * z

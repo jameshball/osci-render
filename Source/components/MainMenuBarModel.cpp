@@ -2,26 +2,15 @@
 #include "../PluginEditor.h"
 #include "../PluginProcessor.h"
 
-MainMenuBarModel::MainMenuBarModel(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), editor(editor) {
-    audioProcessor.visualiserParameters.legacyVisualiserEnabled->addListener(this);
-}
+MainMenuBarModel::MainMenuBarModel(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), editor(editor) {}
 
-MainMenuBarModel::~MainMenuBarModel() {
-    audioProcessor.visualiserParameters.legacyVisualiserEnabled->removeListener(this);
-}
-
-void MainMenuBarModel::parameterValueChanged(int parameterIndex, float legacyVisualiserEnabled) {
-    editor.visualiser.setVisualiserType(legacyVisualiserEnabled >= 0.5f);
-    menuItemsChanged();
-}
-
-void MainMenuBarModel::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
+MainMenuBarModel::~MainMenuBarModel() {}
 
 juce::StringArray MainMenuBarModel::getMenuBarNames() {
     if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-        return juce::StringArray("File", "View", "About", "Audio");
+        return juce::StringArray("File", "About", "Audio");
     } else {
-        return juce::StringArray("File", "View", "About");
+        return juce::StringArray("File", "About");
     }
 }
 
@@ -36,10 +25,8 @@ juce::PopupMenu MainMenuBarModel::getMenuForIndex(int topLevelMenuIndex, const j
             menu.addItem(4, "Create New Project");
         }
     } else if (topLevelMenuIndex == 1) {
-        menu.addItem(1, "Use Legacy Visualiser", true, audioProcessor.visualiserParameters.legacyVisualiserEnabled->getBoolValue());
-    } else if (topLevelMenuIndex == 2) {
         menu.addItem(1, "About osci-render");
-    } else if (topLevelMenuIndex == 3) {
+    } else if (topLevelMenuIndex == 2) {
         menu.addItem(1, "Settings");
     }
 
@@ -67,10 +54,6 @@ void MainMenuBarModel::menuItemSelected(int menuItemID, int topLevelMenuIndex) {
             }
             break;
         case 1: {
-            audioProcessor.visualiserParameters.legacyVisualiserEnabled->setBoolValueNotifyingHost(!audioProcessor.visualiserParameters.legacyVisualiserEnabled->getBoolValue());
-            menuItemsChanged();
-        } break;
-        case 2: {
             juce::DialogWindow::LaunchOptions options;
             AboutComponent* about = new AboutComponent(BinaryData::logo_png, BinaryData::logo_pngSize, 
                 juce::String(ProjectInfo::projectName) + " by " + ProjectInfo::companyName + "\n"
@@ -96,7 +79,7 @@ void MainMenuBarModel::menuItemSelected(int menuItemID, int topLevelMenuIndex) {
             
             juce::DialogWindow* dw = options.launchAsync();
         } break;
-        case 3:
+        case 2:
             editor.openAudioSettings();
             break;
         default:

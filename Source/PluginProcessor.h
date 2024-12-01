@@ -12,8 +12,9 @@
 
 #include <JuceHeader.h>
 #include "shape/Shape.h"
-#include "concurrency/ConsumerManager.h"
-#include "components/VisualiserSettings.h"
+#include "concurrency/AudioBackgroundThread.h"
+#include "concurrency/AudioBackgroundThreadManager.h"
+#include "visualiser/VisualiserSettings.h"
 #include "audio/Effect.h"
 #include "audio/ShapeSound.h"
 #include "audio/ShapeVoice.h"
@@ -33,7 +34,7 @@
 //==============================================================================
 /**
 */
-class OscirenderAudioProcessor  : public juce::AudioProcessor, juce::AudioProcessorParameter::Listener, public EnvelopeComponentListener, public ConsumerManager, public SampleRateManager
+class OscirenderAudioProcessor  : public juce::AudioProcessor, juce::AudioProcessorParameter::Listener, public EnvelopeComponentListener, public SampleRateManager
                             #if JucePlugin_Enable_ARA
                              , public juce::AudioProcessorARAExtension
                             #endif
@@ -75,6 +76,8 @@ public:
     double getSampleRate() override;
 
     std::atomic<double> currentSampleRate = 0.0;
+    
+    AudioBackgroundThreadManager threadManager;
 
     juce::SpinLock effectsLock;
 	std::vector<std::shared_ptr<Effect>> toggleableEffects;
@@ -82,7 +85,7 @@ public:
     std::atomic<double> luaValues[26] = { 0.0 };
 
     std::shared_ptr<Effect> frequencyEffect = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             frequency = values[0].load();
             return input;
         }, new EffectParameter(
@@ -94,7 +97,7 @@ public:
     );
 
     std::shared_ptr<Effect> volumeEffect = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             volume = values[0].load();
             return input;
         }, new EffectParameter(
@@ -106,7 +109,7 @@ public:
     );
 
     std::shared_ptr<Effect> thresholdEffect = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             threshold = values[0].load();
             return input;
         }, new EffectParameter(
@@ -202,7 +205,7 @@ public:
 
     BooleanParameter* invertImage = new BooleanParameter("Invert Image", "invertImage", VERSION_HINT, false, "Inverts the image so that dark pixels become light, and vice versa.");
     std::shared_ptr<Effect> imageThreshold = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             return input;
         }, new EffectParameter(
             "Image Threshold",
@@ -212,7 +215,7 @@ public:
         )
     );
     std::shared_ptr<Effect> imageStride = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             return input;
         }, new EffectParameter(
             "Image Stride",
@@ -236,6 +239,8 @@ public:
     juce::Font font = juce::Font(juce::Font::getDefaultSansSerifFontName(), 1.0f, juce::Font::plain);
 
     ShapeSound::Ptr objectServerSound = new ShapeSound();
+    
+    std::function<void()> haltRecording;
 
     void addLuaSlider();
     void updateEffectPrecedence();

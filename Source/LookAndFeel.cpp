@@ -26,6 +26,8 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     setColour(juce::TooltipWindow::backgroundColourId, Colours::darker);
     setColour(juce::TooltipWindow::outlineColourId, juce::Colours::white);
     setColour(juce::TextButton::buttonOnColourId, Colours::darker);
+    setColour(juce::AlertWindow::outlineColourId, Colours::darker);
+    setColour(juce::AlertWindow::backgroundColourId, Colours::darker);
 
     // combo box
     setColour(juce::ComboBox::backgroundColourId, Colours::veryDark);
@@ -79,12 +81,14 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     setColour(juce::MidiKeyboardComponent::shadowColourId, juce::Colours::transparentBlack);
     setColour(juce::MidiKeyboardComponent::upDownButtonBackgroundColourId, Colours::veryDark);
     setColour(juce::MidiKeyboardComponent::upDownButtonArrowColourId, juce::Colours::white);
+    
+    // progress bar
+    setColour(juce::ProgressBar::backgroundColourId, juce::Colours::transparentBlack);
+    setColour(juce::ProgressBar::foregroundColourId, Colours::accentColor);
 
     // UI colours
     getCurrentColourScheme().setUIColour(ColourScheme::widgetBackground, Colours::veryDark);
     getCurrentColourScheme().setUIColour(ColourScheme::UIColour::defaultFill, Colours::accentColor);
-
-    setDefaultSansSerifTypeface(juce::Typeface::createSystemTypefaceFor(BinaryData::font_ttf, BinaryData::font_ttfSize));
 
     // I have to do this, otherwise components are initialised before the look and feel is set
     juce::LookAndFeel::setDefaultLookAndFeel(this);
@@ -371,4 +375,89 @@ void OscirenderLookAndFeel::drawCallOutBoxBackground(juce::CallOutBox& box, juce
 
     g.setColour(juce::Colours::black);
     g.strokePath(path, juce::PathStrokeType(1.0f));
+}
+
+void OscirenderLookAndFeel::drawProgressBar(juce::Graphics& g, juce::ProgressBar& progressBar, int width, int height, double progress, const juce::String& textToShow) {
+    switch (progressBar.getResolvedStyle()) {
+        case juce::ProgressBar::Style::linear:
+            customDrawLinearProgressBar(g, progressBar, width, height, progress, textToShow);
+            break;
+        case juce::ProgressBar::Style::circular:
+            juce::LookAndFeel_V4::drawProgressBar(g, progressBar, width, height, progress, textToShow);
+            break;
+    }
+}
+
+void OscirenderLookAndFeel::customDrawLinearProgressBar(juce::Graphics& g, const juce::ProgressBar& progressBar, int width, int height, double progress, const juce::String& textToShow) {
+    auto background = progressBar.findColour(juce::ProgressBar::backgroundColourId);
+    auto foreground = progressBar.findColour(juce::ProgressBar::foregroundColourId).withAlpha(0.5f);
+    int rectRadius = 2;
+
+    auto barBounds = progressBar.getLocalBounds().toFloat();
+
+    g.setColour(background);
+    g.fillRoundedRectangle(barBounds, rectRadius);
+    
+    juce::String text = textToShow.isEmpty() ? "waiting..." : textToShow;
+
+    if (progress >= 0.0f && progress <= 1.0f) {
+        juce::Path p;
+        p.addRoundedRectangle(barBounds, rectRadius);
+        g.reduceClipRegion(p);
+
+        barBounds.setWidth(barBounds.getWidth() * (float) progress);
+        g.setColour(foreground);
+        g.fillRoundedRectangle(barBounds, rectRadius);
+    } else {
+        if (progress == -2) {
+            background = juce::Colours::red;
+            text = "Error";
+        }
+        
+        // spinning bar..
+        g.setColour(background);
+
+        auto stripeWidth = height * 2;
+        auto position = static_cast<int>(juce::Time::getMillisecondCounter() / 15) % stripeWidth;
+
+        juce::Path p;
+
+        for (auto x = static_cast<float> (-position); x < (float) (width + stripeWidth); x += (float) stripeWidth) {
+            p.addQuadrilateral (x, 0.0f,
+                                x + (float) stripeWidth * 0.5f, 0.0f,
+                                x, static_cast<float> (height),
+                                x - (float) stripeWidth * 0.5f, static_cast<float> (height));
+        }
+
+        juce::Image im(juce::Image::ARGB, width, height, true);
+
+        {
+            juce::Graphics g2(im);
+            g2.setColour(foreground);
+            g2.fillRoundedRectangle(barBounds, rectRadius);
+        }
+
+        g.setTiledImageFill(im, 0, 0, 0.85f);
+        g.fillPath(p);
+    }
+    
+    g.setColour(juce::Colours::white);
+    juce::Font font = juce::Font(juce::FontOptions((float) height * 0.9f, juce::Font::bold));
+    g.setFont(font);
+
+    g.drawText(text, 0, 0, width, height, juce::Justification::centred, false);
+}
+
+juce::Typeface::Ptr OscirenderLookAndFeel::getTypefaceForFont(const juce::Font& font) {
+    if (font.getTypefaceName() == juce::Font::getDefaultSansSerifFontName()) {
+        if (font.getTypefaceStyle() == "Regular") {
+            return regularTypeface;
+        } else if (font.getTypefaceStyle() == "Bold") {
+            return boldTypeface;
+        } else if (font.getTypefaceStyle() == "Italic") {
+            return italicTypeface;
+        }
+    }
+
+    return juce::Font::getDefaultTypefaceForFont(font);
 }

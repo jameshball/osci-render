@@ -14,8 +14,11 @@ class StopwatchComponent : public juce::Component, public juce::Timer {
     }
     
     void start() {
-        startTime = juce::Time::getCurrentTime();
         startTimerHz(60);
+    }
+    
+    void addTime(juce::RelativeTime time) {
+        elapsedTime += time;
     }
     
     void stop() {
@@ -23,13 +26,11 @@ class StopwatchComponent : public juce::Component, public juce::Timer {
     }
     
     void reset() {
-        startTime = juce::Time::getCurrentTime();
+        elapsedTime = juce::RelativeTime();
         timerCallback();
     }
     
     void timerCallback() override {
-        juce::Time currentTime = juce::Time::getCurrentTime();
-        juce::RelativeTime elapsedTime = currentTime - startTime;
         int hours = elapsedTime.inHours();
         int minutes = (int) elapsedTime.inMinutes() % 60;
         int seconds = (int) elapsedTime.inSeconds() % 60;
@@ -45,7 +46,7 @@ class StopwatchComponent : public juce::Component, public juce::Timer {
 private:
 
     juce::Label label;
-    juce::Time startTime;
+    juce::RelativeTime elapsedTime;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StopwatchComponent)
 };

@@ -17,11 +17,11 @@ Effect::Effect(EffectApplicationType application, const std::vector<EffectParame
 
 Effect::Effect(EffectApplicationType application, EffectParameter* parameter) : Effect(application, std::vector<EffectParameter*>{parameter}) {}
 
-Effect::Effect(const std::vector<EffectParameter*>& parameters) : Effect([](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {return input;}, parameters) {}
+Effect::Effect(const std::vector<EffectParameter*>& parameters) : Effect([](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {return input;}, parameters) {}
 
-Effect::Effect(EffectParameter* parameter) : Effect([](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {return input;}, parameter) {}
+Effect::Effect(EffectParameter* parameter) : Effect([](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {return input;}, parameter) {}
 
-Point Effect::apply(int index, Point input, double volume) {
+OsciPoint Effect::apply(int index, OsciPoint input, double volume) {
 	animateValues(volume);
 	if (application) {
 		return application(index, input, actualValues, sampleRate);
@@ -94,7 +94,7 @@ float Effect::nextPhase(EffectParameter* parameter) {
 }
 
 void Effect::apply() {
-	apply(0, Point());
+	apply(0, OsciPoint());
 }
 
 double Effect::getValue(int index) {

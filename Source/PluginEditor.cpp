@@ -5,6 +5,10 @@
 OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p)
 	: AudioProcessorEditor(&p), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white)
 {
+    if (applicationFolder.exists()) {
+        applicationFolder.createDirectory();
+    }
+    
 #if JUCE_LINUX
     // use OpenGL on Linux for much better performance. The default on Mac is CoreGraphics, and on Window is Direct2D which is much faster.
     openGlContext.attachTo(*getTopLevelComponent());
@@ -104,8 +108,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     addAndMakeVisible(visualiser);
 
     visualiser.openSettings = [this] {
-        visualiserSettingsWindow.setVisible(true);
-        visualiserSettingsWindow.toFront(true);
+        openVisualiserSettings();
     };
 
     visualiser.closeSettings = [this] {
@@ -120,14 +123,17 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     visualiserSettingsWindow.setUsingNativeTitleBar(true);
 #endif
     visualiserSettings.setLookAndFeel(&getLookAndFeel());
-    visualiserSettings.setSize(550, 310);
+    visualiserSettings.setSize(550, 470);
     visualiserSettingsWindow.setContentNonOwned(&visualiserSettings, true);
-    visualiserSettingsWindow.centreWithSize(550, 310);
+    visualiserSettingsWindow.centreWithSize(550, 470);
     
     tooltipDropShadow.setOwner(&tooltipWindow);
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
+    if (audioProcessor.haltRecording != nullptr) {
+        audioProcessor.haltRecording();
+    }
     setLookAndFeel(nullptr);
     juce::Desktop::getInstance().setDefaultLookAndFeel(nullptr);
     juce::MessageManagerLock lock;
@@ -139,6 +145,15 @@ OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
         menuBarModel.setMacMainMenu(nullptr);
     }
 #endif
+}
+
+void OscirenderAudioProcessorEditor::openVisualiserSettings() {
+    visualiserSettingsWindow.setVisible(true);
+    visualiserSettingsWindow.toFront(true);
+}
+
+void OscirenderAudioProcessorEditor::closeVisualiserSettings() {
+    visualiserSettingsWindow.setVisible(false);
 }
 
 bool OscirenderAudioProcessorEditor::isBinaryFile(juce::String name) {
@@ -534,6 +549,7 @@ void OscirenderAudioProcessorEditor::saveProjectAs() {
         auto file = chooser.getResult();
         if (file != juce::File()) {
             audioProcessor.currentProjectFile = file.getFullPathName();
+            audioProcessor.lastOpenedDirectory = file.getParentDirectory();
             saveProject();
         }
     });

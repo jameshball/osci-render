@@ -2,12 +2,11 @@
 
 #include <JuceHeader.h>
 #include "SosciPluginProcessor.h"
-#include "components/VisualiserComponent.h"
+#include "visualiser/VisualiserComponent.h"
 #include "LookAndFeel.h"
-#include "components/VisualiserSettings.h"
+#include "visualiser/VisualiserSettings.h"
 #include "components/SosciMainMenuBarModel.h"
 #include "components/SvgButton.h"
-#include "components/StopwatchComponent.h"
 
 class SosciPluginEditor : public juce::AudioProcessorEditor {
 public:
@@ -27,23 +26,31 @@ public:
 
 private:
     SosciAudioProcessor& audioProcessor;
+    
+    juce::File applicationFolder = juce::File::getSpecialLocation(juce::File::SpecialLocationType::userApplicationDataDirectory)
+#if JUCE_MAC
+        .getChildFile("Application Support")
+#endif
+        .getChildFile("osci-render");
+
+    juce::String ffmpegFileName =
+#if JUCE_WINDOWS
+        "ffmpeg.exe";
+#else
+        "ffmpeg";
+#endif
 public:
     OscirenderLookAndFeel lookAndFeel;
 
     VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.parameters, 3);
     SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings");
-    VisualiserComponent visualiser{audioProcessor, audioProcessor, visualiserSettings, nullptr, false, true};
+    VisualiserComponent visualiser{audioProcessor.lastOpenedDirectory, applicationFolder.getChildFile(ffmpegFileName), audioProcessor.haltRecording, audioProcessor.threadManager, visualiserSettings, nullptr, true};
 
     std::unique_ptr<juce::FileChooser> chooser;
     SosciMainMenuBarModel menuBarModel{*this, audioProcessor};
     juce::MenuBarComponent menuBar;
 
     juce::TooltipWindow tooltipWindow{nullptr, 0};
-    
-    juce::Label recordTimer{"Record Timer"};
-    StopwatchComponent stopwatch;
-    SvgButton record{"Record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f)};
-    SvgButton settings{"Settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white};
 
     bool usingNativeMenuBar = false;
 

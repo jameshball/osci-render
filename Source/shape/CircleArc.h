@@ -1,13 +1,13 @@
 #pragma once
 
 #include "Shape.h"
-#include "Point.h"
+#include "OsciPoint.h"
 
 class CircleArc : public Shape {
 public:
 	CircleArc(double x, double y, double radiusX, double radiusY, double startAngle, double endAngle);
 
-	Point nextVector(double drawingProgress) override;
+	OsciPoint nextVector(double drawingProgress) override;
 	void scale(double x, double y, double z) override;
 	void translate(double x, double y, double z) override;
 	double length() override;
