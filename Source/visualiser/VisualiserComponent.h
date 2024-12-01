@@ -203,8 +203,6 @@ private:
 
     juce::File audioFile;
 
-    const qoixx::qoi::desc imageFormat{ .width = 1024, .height = 1024, .channels = 4, .colorspace = qoixx::qoi::colorspace::srgb };
-
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserComponent)
 };
 
