@@ -196,6 +196,7 @@
               file="Source/concurrency/BufferConsumer.h"/>
         <FILE id="L9aCHY" name="readerwritercircularbuffer.h" compile="0" resource="0"
               file="Source/concurrency/readerwritercircularbuffer.h"/>
+        <FILE id="aat2Je" name="WriteProcess.h" compile="0" resource="0" file="Source/concurrency/WriteProcess.h"/>
       </GROUP>
       <GROUP id="{A3E24187-62A5-AB8D-8837-14043B89A640}" name="gpla">
         <FILE id="KvDV8j" name="LineArtParser.cpp" compile="1" resource="0"

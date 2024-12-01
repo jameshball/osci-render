@@ -195,29 +195,13 @@ void VisualiserComponent::setRecording(bool recording) {
         juce::String resolution = std::to_string(renderTexture.width) + "x" + std::to_string(renderTexture.height);
         juce::String cmd = "\"" + ffmpegFile.getFullPathName() +
         "\" -r " + juce::String(FRAME_RATE) + " -f rawvideo -pix_fmt rgba -s " + resolution + " -i - -threads 0 -preset fast -y -pix_fmt yuv420p -crf " + juce::String(21) + " -vf vflip \"" + tempFile.getFile().getFullPathName() + "\"";
-#if JUCE_WINDOWS
-        cmd = "cmd /c \"" + cmd + "\"";
-#endif
 
-        // open pipe to ffmpeg's stdin in binary write mode
-#if JUCE_WINDOWS
-        ffmpeg = _popen(cmd.toStdString().c_str(), "wb");
-#else
-        ffmpeg = popen(cmd.toStdString().c_str(), "w");
-#endif
-        if (ffmpeg == nullptr) {
-            DBG("popen failed: " + juce::String(std::strerror(errno)));
-        }
+        ffmpegProcess.start(cmd);
         framePixels.resize(renderTexture.width * renderTexture.height * 4);
         setPaused(false);
         stopwatch.start();
-    } else if (ffmpeg != nullptr) {
-#if JUCE_WINDOWS
-        _pclose(ffmpeg);
-#else
-        pclose(ffmpeg);
-#endif
-        ffmpeg = nullptr;
+    } else if (ffmpegProcess.isRunning()) {
+        ffmpegProcess.close();
     }
     setBlockOnAudioThread(recording);
     numFrames = 0;
@@ -378,7 +362,7 @@ void VisualiserComponent::renderOpenGL() {
                 // draw frame to ffmpeg
                 glBindTexture(GL_TEXTURE_2D, renderTexture.id);
                 glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, framePixels.data());
-                fwrite(framePixels.data(), 4 * renderTexture.width * renderTexture.height, 1, ffmpeg);
+                ffmpegProcess.write(framePixels.data(), 4 * renderTexture.width * renderTexture.height);
             }
             
             renderingSemaphore.release();

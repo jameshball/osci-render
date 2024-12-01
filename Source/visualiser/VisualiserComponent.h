@@ -9,6 +9,7 @@
 #include "../components/StopwatchComponent.h"
 #include "../img/qoixx.hpp"
 #include "../components/DownloaderComponent.h"
+#include "../concurrency/WriteProcess.h"
 
 #define FILE_RENDER_DUMMY 0
 #define FILE_RENDER_PNG 1
@@ -81,7 +82,7 @@ private:
     SvgButton record{"Record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f)};
     long numFrames = 0;
     std::vector<unsigned char> framePixels;
-    FILE* ffmpeg = nullptr;
+    WriteProcess ffmpegProcess;
     juce::File ffmpegFile;
     juce::String ffmpegURL = juce::String("https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/") +
 #if JUCE_WINDOWS
