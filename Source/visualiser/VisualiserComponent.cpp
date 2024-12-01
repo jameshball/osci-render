@@ -175,11 +175,11 @@ void VisualiserComponent::setRecording(bool recording) {
         if (!ffmpegFile.exists()) {
             // ask the user if they want to download ffmpeg
             juce::MessageBoxOptions options = juce::MessageBoxOptions()
-                .withTitle("FFmpeg not found")
-                .withMessage("FFmpeg not found. This is required to record video to .mp4.\n\nWould you like to download it now?")
+                .withTitle("Recording requires FFmpeg")
+                .withMessage("FFmpeg is required to record video to .mp4.\n\nWould you like to download it now?")
                 .withButton("Yes")
                 .withButton("No")
-                .withIconType(juce::AlertWindow::WarningIcon)
+                .withIconType(juce::AlertWindow::QuestionIcon)
                 .withAssociatedComponent(this);
             
             juce::AlertWindow::showAsync(options, [this](int result) {
