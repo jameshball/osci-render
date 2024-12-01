@@ -284,6 +284,8 @@ void VisualiserComponent::childUpdated() {
 
 void VisualiserComponent::newOpenGLContextCreated() {
     using namespace juce::gl;
+
+    glDebugMessageControl(GL_DEBUG_SOURCE_API, GL_DEBUG_TYPE_OTHER, GL_DEBUG_SEVERITY_NOTIFICATION, 0, 0, GL_FALSE);
     
     juce::CriticalSection::ScopedLockType lock(samplesLock);
     
@@ -503,31 +505,27 @@ void VisualiserComponent::saveTextureToPNG(Texture texture, const juce::File& fi
     
     // Bind the texture to read its data
     glBindTexture(GL_TEXTURE_2D, textureID);
-
+    std::vector<unsigned char> pixels = std::vector<unsigned char>(width * height * 4);
     // Read the pixels from the texture
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, framePixels.data());
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
 
-    // Convert raw pixel data to JUCE Image
-    juce::Image* image = new juce::Image (juce::Image::PixelFormat::ARGB, width, height, true);  // Create a JUCE image
-
-    // Lock the image to get access to its pixel data
-    juce::Image::BitmapData bitmapData(*image, juce::Image::BitmapData::writeOnly);
+    juce::Image image = juce::Image (juce::Image::PixelFormat::ARGB, width, height, true);
+    juce::Image::BitmapData bitmapData(image, juce::Image::BitmapData::writeOnly);
 
     // Copy the pixel data to the JUCE image (and swap R and B channels)
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
             int srcIndex = (y * width + x) * 4; // RGBA format
-            juce::uint8 r = (framePixels)[srcIndex];     // Red
-            juce::uint8 g = (framePixels)[srcIndex + 1]; // Green
-            juce::uint8 b = (framePixels)[srcIndex + 2]; // Blue
-            juce::uint8 a = (framePixels)[srcIndex + 3]; // Alpha
+            juce::uint8 r = (pixels)[srcIndex];     // Red
+            juce::uint8 g = (pixels)[srcIndex + 1]; // Green
+            juce::uint8 b = (pixels)[srcIndex + 2]; // Blue
+            juce::uint8 a = (pixels)[srcIndex + 3]; // Alpha
 
             // This method uses colors in RGBA
             bitmapData.setPixelColour(x, height-y-1, juce::Colour(r, g, b, a));
         }
     }
 
-    // Unbind the texture
     glBindTexture(GL_TEXTURE_2D, 0);
 
     // Save the JUCE image to file (PNG in this case)
@@ -535,10 +533,9 @@ void VisualiserComponent::saveTextureToPNG(Texture texture, const juce::File& fi
     std::unique_ptr<juce::FileOutputStream> outputStream(file.createOutputStream());
     if (outputStream != nullptr) {
         outputStream->setPosition(0);
-        pngFormat.writeImageToStream(*image, *outputStream);
+        pngFormat.writeImageToStream(image, *outputStream);
         outputStream->flush();
     }
-    delete image;
 }
 
 void VisualiserComponent::saveTextureToQOI(Texture texture, const juce::File& file) {
@@ -549,10 +546,12 @@ void VisualiserComponent::saveTextureToQOI(Texture texture, const juce::File& fi
 
     // Bind the texture to read its data
     glBindTexture(GL_TEXTURE_2D, textureID);
+    std::vector<unsigned char> pixels = std::vector<unsigned char>(width * height * 4);
     // Read the pixels from the texture
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, framePixels.data());
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
 
-    std::vector<unsigned char> binaryData = qoixx::qoi::encode<std::vector<unsigned char>>(framePixels, imageFormat);
+    const qoixx::qoi::desc imageFormat{ .width = (uint32_t) width, .height = (uint32_t) height, .channels = 4, .colorspace = qoixx::qoi::colorspace::srgb };
+    std::vector<unsigned char> binaryData = qoixx::qoi::encode<std::vector<unsigned char>>(pixels, imageFormat);
     file.replaceWithData(binaryData.data(), binaryData.size());
 }
 
@@ -703,6 +702,8 @@ void VisualiserComponent::fade() {
 
 void VisualiserComponent::drawCRT() {
     using namespace juce::gl;
+
+    saveTextureToQOI(lineTexture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDesktopDirectory).getChildFile("line.qoi"));
     
     setNormalBlending();
 
@@ -710,34 +711,40 @@ void VisualiserComponent::drawCRT() {
     setShader(texturedShader.get());
     texturedShader->setUniform("uResizeForCanvas", lineTexture.width / 1024.0f);
     drawTexture(lineTexture);
+    saveTextureToQOI(blur1Texture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDesktopDirectory).getChildFile("blur1.qoi"));
 
     //horizontal blur 256x256
     activateTargetTexture(blur2Texture);
     setShader(blurShader.get());
     blurShader->setUniform("uOffset", 1.0f / 256.0f, 0.0f);
     drawTexture(blur1Texture);
+    saveTextureToQOI(blur2Texture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDesktopDirectory).getChildFile("blur2.qoi"));
 
     //vertical blur 256x256
     activateTargetTexture(blur1Texture);
     blurShader->setUniform("uOffset", 0.0f, 1.0f / 256.0f);
     drawTexture(blur2Texture);
+    saveTextureToQOI(blur1Texture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDesktopDirectory).getChildFile("blur1_2.qoi"));
 
     //preserve blur1 for later
     activateTargetTexture(blur3Texture);
     setShader(texturedShader.get());
     texturedShader->setUniform("uResizeForCanvas", 1.0f);
     drawTexture(blur1Texture);
+    saveTextureToQOI(blur3Texture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDesktopDirectory).getChildFile("blur3.qoi"));
 
     //horizontal blur 64x64
     activateTargetTexture(blur4Texture);
     setShader(blurShader.get());
     blurShader->setUniform("uOffset", 1.0f / 32.0f, 1.0f / 60.0f);
     drawTexture(blur3Texture);
+    saveTextureToQOI(blur4Texture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDesktopDirectory).getChildFile("blur4.qoi"));
 
     //vertical blur 64x64
     activateTargetTexture(blur3Texture);
     blurShader->setUniform("uOffset", -1.0f / 60.0f, 1.0f / 32.0f);
     drawTexture(blur4Texture);
+    saveTextureToQOI(blur3Texture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDesktopDirectory).getChildFile("blur3_2.qoi"));
 
     activateTargetTexture(renderTexture);
     setShader(outputShader.get());
@@ -752,6 +759,7 @@ void VisualiserComponent::drawCRT() {
     outputShader->setUniform("uColour", colour.getFloatRed(), colour.getFloatGreen(), colour.getFloatBlue());
     activateTargetTexture(renderTexture);
     drawTexture(lineTexture, blur1Texture, blur3Texture, screenTexture);
+    saveTextureToQOI(renderTexture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDesktopDirectory).getChildFile("render.qoi"));
 }
 
 Texture VisualiserComponent::createScreenTexture() {
