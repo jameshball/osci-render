@@ -11,7 +11,7 @@
 #include "TexturedFragmentShader.glsl"
 #include "TexturedVertexShader.glsl"
 
-VisualiserComponent::VisualiserComponent(juce::File ffmpegFile, std::function<void()>& haltRecording, AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, VisualiserComponent* parent, bool visualiserOnly) : ffmpegFile(ffmpegFile), haltRecording(haltRecording), settings(settings), threadManager(threadManager), visualiserOnly(visualiserOnly), AudioBackgroundThread("VisualiserComponent" + juce::String(parent != nullptr ? " Child" : ""), threadManager), parent(parent) {
+VisualiserComponent::VisualiserComponent(juce::File& lastOpenedDirectory, juce::File ffmpegFile, std::function<void()>& haltRecording, AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, VisualiserComponent* parent, bool visualiserOnly) : lastOpenedDirectory(lastOpenedDirectory), ffmpegFile(ffmpegFile), haltRecording(haltRecording), settings(settings), threadManager(threadManager), visualiserOnly(visualiserOnly), AudioBackgroundThread("VisualiserComponent" + juce::String(parent != nullptr ? " Child" : ""), threadManager), parent(parent) {
     addAndMakeVisible(ffmpegDownloader);
     
     ffmpegDownloader.onSuccessfulDownload = [this] {
@@ -191,10 +191,10 @@ void VisualiserComponent::setRecording(bool recording) {
             record.setToggleState(false, juce::NotificationType::dontSendNotification);
             return;
         }
-        juce::TemporaryFile tempFile = juce::TemporaryFile(".mp4");
+        tempVideoFile = std::make_unique<juce::TemporaryFile>(".mp4");
         juce::String resolution = std::to_string(renderTexture.width) + "x" + std::to_string(renderTexture.height);
         juce::String cmd = "\"" + ffmpegFile.getFullPathName() +
-        "\" -r " + juce::String(FRAME_RATE) + " -f rawvideo -pix_fmt rgba -s " + resolution + " -i - -threads 0 -preset fast -y -pix_fmt yuv420p -crf " + juce::String(21) + " -vf vflip \"" + tempFile.getFile().getFullPathName() + "\"";
+        "\" -r " + juce::String(FRAME_RATE) + " -f rawvideo -pix_fmt rgba -s " + resolution + " -i - -threads 0 -preset fast -y -pix_fmt yuv420p -crf " + juce::String(21) + " -vf vflip \"" + tempVideoFile->getFile().getFullPathName() + "\"";
 
         ffmpegProcess.start(cmd);
         framePixels.resize(renderTexture.width * renderTexture.height * 4);
@@ -202,6 +202,17 @@ void VisualiserComponent::setRecording(bool recording) {
         stopwatch.start();
     } else if (ffmpegProcess.isRunning()) {
         ffmpegProcess.close();
+        chooser = std::make_unique<juce::FileChooser>("Save recording", lastOpenedDirectory, "*.mp4");
+        auto flags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting;
+
+        chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
+            auto file = chooser.getResult();
+            if (file != juce::File()) {
+                // move the temporary file to the final location
+                tempVideoFile->getFile().moveFileTo(file);
+                lastOpenedDirectory = file.getParentDirectory();
+            }
+        });
     }
     setBlockOnAudioThread(recording);
     numFrames = 0;
@@ -236,7 +247,7 @@ void VisualiserComponent::resized() {
 
 void VisualiserComponent::popoutWindow() {
     setRecording(false);
-    auto visualiser = new VisualiserComponent(ffmpegFile, haltRecording, threadManager, settings, this);
+    auto visualiser = new VisualiserComponent(lastOpenedDirectory, ffmpegFile, haltRecording, threadManager, settings, this);
     visualiser->settings.setLookAndFeel(&getLookAndFeel());
     visualiser->openSettings = openSettings;
     visualiser->closeSettings = closeSettings;
