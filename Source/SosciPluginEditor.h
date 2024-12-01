@@ -44,7 +44,7 @@ public:
 
     VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.parameters, 3);
     SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings");
-    VisualiserComponent visualiser{applicationFolder.getChildFile(ffmpegFileName), audioProcessor.haltRecording, audioProcessor.threadManager, visualiserSettings, nullptr, true};
+    VisualiserComponent visualiser{audioProcessor.lastOpenedDirectory, applicationFolder.getChildFile(ffmpegFileName), audioProcessor.haltRecording, audioProcessor.threadManager, visualiserSettings, nullptr, true};
 
     std::unique_ptr<juce::FileChooser> chooser;
     SosciMainMenuBarModel menuBarModel{*this, audioProcessor};

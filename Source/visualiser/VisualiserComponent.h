@@ -30,7 +30,7 @@ struct Texture {
 class VisualiserWindow;
 class VisualiserComponent : public juce::Component, public AudioBackgroundThread, public juce::MouseListener, public juce::OpenGLRenderer, public juce::AsyncUpdater {
 public:
-    VisualiserComponent(juce::File ffmpegFile, std::function<void()>& haltRecording, AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, VisualiserComponent* parent = nullptr, bool visualiserOnly = false);
+    VisualiserComponent(juce::File& lastOpenedDirectory, juce::File ffmpegFile, std::function<void()>& haltRecording, AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, VisualiserComponent* parent = nullptr, bool visualiserOnly = false);
     ~VisualiserComponent() override;
 
     std::function<void()> openSettings;
@@ -84,6 +84,9 @@ private:
     std::vector<unsigned char> framePixels;
     WriteProcess ffmpegProcess;
     juce::File ffmpegFile;
+    juce::File& lastOpenedDirectory;
+    std::unique_ptr<juce::FileChooser> chooser;
+    std::unique_ptr<juce::TemporaryFile> tempVideoFile;
     juce::String ffmpegURL = juce::String("https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/") +
 #if JUCE_WINDOWS
     #if JUCE_64BIT

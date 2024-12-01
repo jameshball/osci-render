@@ -549,6 +549,7 @@ void OscirenderAudioProcessorEditor::saveProjectAs() {
         auto file = chooser.getResult();
         if (file != juce::File()) {
             audioProcessor.currentProjectFile = file.getFullPathName();
+            audioProcessor.lastOpenedDirectory = file.getParentDirectory();
             saveProject();
         }
     });
