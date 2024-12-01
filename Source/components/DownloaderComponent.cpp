@@ -42,6 +42,7 @@ void DownloaderComponent::threadComplete() {
         } else {
             uncompressedFile.setExecutePermission(true);
         }
+        file.deleteFile();
     }
     
     if (error) {

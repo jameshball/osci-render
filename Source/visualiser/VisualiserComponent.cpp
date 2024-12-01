@@ -195,6 +195,9 @@ void VisualiserComponent::setRecording(bool recording) {
         juce::String resolution = std::to_string(renderTexture.width) + "x" + std::to_string(renderTexture.height);
         juce::String cmd = "\"" + ffmpegFile.getFullPathName() +
         "\" -r " + juce::String(FRAME_RATE) + " -f rawvideo -pix_fmt rgba -s " + resolution + " -i - -threads 0 -preset fast -y -pix_fmt yuv420p -crf " + juce::String(21) + " -vf vflip \"" + tempFile.getFile().getFullPathName() + "\"";
+#if JUCE_WINDOWS
+        cmd = "cmd /c \"" + cmd + "\"";
+#endif
 
         // open pipe to ffmpeg's stdin in binary write mode
 #if JUCE_WINDOWS

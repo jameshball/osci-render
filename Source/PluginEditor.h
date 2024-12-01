@@ -49,6 +49,13 @@ private:
         .getChildFile("Application Support")
 #endif
         .getChildFile("osci-render");
+
+    juce::String ffmpegFileName =
+#if JUCE_WINDOWS
+        "ffmpeg.exe";
+#else
+        "ffmpeg";
+#endif
 public:
 
     const double CLOSED_PREF_SIZE = 30.0;
@@ -60,7 +67,7 @@ public:
 
     VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.visualiserParameters);
     SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings");
-    VisualiserComponent visualiser{applicationFolder.getChildFile("ffmpeg"), audioProcessor.haltRecording, audioProcessor.threadManager, visualiserSettings, nullptr};
+    VisualiserComponent visualiser{applicationFolder.getChildFile(ffmpegFileName), audioProcessor.haltRecording, audioProcessor.threadManager, visualiserSettings, nullptr};
 
     SettingsComponent settings{audioProcessor, *this};
 
