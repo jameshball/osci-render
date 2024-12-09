@@ -129,18 +129,30 @@ def get_frame_info():
     frame_info = {"objects": []}
     
     for obj in bpy.data.objects:
-        if obj.visible_get() and obj.type == 'GPENCIL':
-            object_info = {"name": obj.name}
-            strokes = obj.data.layers.active.frames.data.active_frame.strokes
-            object_info["vertices"] = []
-            for stroke in strokes:
-                object_info["vertices"].append([{
-                    "x": vert.co[0],
-                    "y": vert.co[1],
-                    "z": vert.co[2],
-                } for vert in stroke.points])
-            
-            frame_info["objects"].append(append_matrix(object_info, obj))
+        if obj.visible_get():
+            if (4, 3, 0) >= bpy.app.version and obj.type == 'GREASEPENCIL':
+                object_info = {"name": obj.name}
+                strokes = obj.data.layers.active.frames.data.current_frame().drawing.strokes
+                object_info["vertices"] = []
+                for stroke in strokes:
+                    object_info["vertices"].append([{
+                        "x": vert.position.x,
+                        "y": vert.position.y,
+                        "z": vert.position.z,
+                    } for vert in stroke.points])
+                frame_info["objects"].append(append_matrix(object_info, obj))
+                
+            elif (4, 3, 0) < bpy.app.version and obj.type == 'GPENCIL':
+                object_info = {"name": obj.name}
+                strokes = obj.data.layers.active.frames.data.active_frame.strokes                            
+                object_info["vertices"] = []
+                for stroke in strokes:
+                    object_info["vertices"].append([{
+                        "x": vert.co[0],
+                        "y": vert.co[1],
+                        "z": vert.co[2],
+                    } for vert in stroke.points])            
+                frame_info["objects"].append(append_matrix(object_info, obj))
     
     frame_info["focalLength"] = -0.05 * bpy.data.cameras[0].lens
 
