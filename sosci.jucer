@@ -47,6 +47,14 @@
       </GROUP>
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <FILE id="qJ122J" name="CommonPluginEditor.cpp" compile="1" resource="0"
+            file="Source/CommonPluginEditor.cpp"/>
+      <FILE id="ANZRtQ" name="CommonPluginEditor.h" compile="0" resource="0"
+            file="Source/CommonPluginEditor.h"/>
+      <FILE id="bR8U39" name="CommonPluginProcessor.cpp" compile="1" resource="0"
+            file="Source/CommonPluginProcessor.cpp"/>
+      <FILE id="r2FzhS" name="CommonPluginProcessor.h" compile="0" resource="0"
+            file="Source/CommonPluginProcessor.h"/>
       <GROUP id="{14EE14E4-7A22-160E-CA5B-BD291DB4B4A3}" name="img">
         <FILE id="Zum0qz" name="qoixx.hpp" compile="0" resource="0" file="Source/img/qoixx.hpp"/>
       </GROUP>
@@ -81,6 +89,10 @@
               file="Source/components/EffectComponent.cpp"/>
         <FILE id="u4UCwb" name="EffectComponent.h" compile="0" resource="0"
               file="Source/components/EffectComponent.h"/>
+        <FILE id="ka6rAh" name="MainMenuBarModel.cpp" compile="1" resource="0"
+              file="Source/components/MainMenuBarModel.cpp"/>
+        <FILE id="t6oUhv" name="MainMenuBarModel.h" compile="0" resource="0"
+              file="Source/components/MainMenuBarModel.h"/>
         <FILE id="eaHM09" name="SosciMainMenuBarModel.cpp" compile="1" resource="0"
               file="Source/components/SosciMainMenuBarModel.cpp"/>
         <FILE id="EymEr3" name="SosciMainMenuBarModel.h" compile="0" resource="0"

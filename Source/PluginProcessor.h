@@ -14,7 +14,6 @@
 #include "shape/Shape.h"
 #include "concurrency/AudioBackgroundThread.h"
 #include "concurrency/AudioBackgroundThreadManager.h"
-#include "visualiser/VisualiserSettings.h"
 #include "audio/Effect.h"
 #include "audio/ShapeSound.h"
 #include "audio/ShapeVoice.h"
@@ -30,11 +29,12 @@
 #include "UGen/ugen_JuceEnvelopeComponent.h"
 #include "audio/CustomEffect.h"
 #include "audio/DashedLineEffect.h"
+#include "CommonPluginProcessor.h"
 
 //==============================================================================
 /**
 */
-class OscirenderAudioProcessor  : public juce::AudioProcessor, juce::AudioProcessorParameter::Listener, public EnvelopeComponentListener, public SampleRateManager
+class OscirenderAudioProcessor  : public CommonAudioProcessor, juce::AudioProcessorParameter::Listener, public EnvelopeComponentListener
                             #if JucePlugin_Enable_ARA
                              , public juce::AudioProcessorARAExtension
                             #endif
@@ -44,42 +44,18 @@ public:
     ~OscirenderAudioProcessor() override;
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
-    void releaseResources() override;
-
-   #ifndef JucePlugin_PreferredChannelConfigurations
-    bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
-   #endif
-
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
     juce::AudioProcessorEditor* createEditor() override;
-    bool hasEditor() const override;
-
-    const juce::String getName() const override;
 
     void setAudioThreadCallback(std::function<void(const juce::AudioBuffer<float>&)> callback);
 
-    bool acceptsMidi() const override;
-    bool producesMidi() const override;
-    bool isMidiEffect() const override;
-    double getTailLengthSeconds() const override;
-    int getNumPrograms() override;
-    int getCurrentProgram() override;
-    void setCurrentProgram(int index) override;
-    const juce::String getProgramName(int index) override;
-    void changeProgramName(int index, const juce::String& newName) override;
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void envelopeChanged(EnvelopeComponent* changedEnvelope) override;
-    double getSampleRate() override;
 
-    std::atomic<double> currentSampleRate = 0.0;
-    
-    AudioBackgroundThreadManager threadManager;
-
-    juce::SpinLock effectsLock;
 	std::vector<std::shared_ptr<Effect>> toggleableEffects;
     std::vector<std::shared_ptr<Effect>> luaEffects;
     std::atomic<double> luaValues[26] = { 0.0 };
@@ -156,8 +132,6 @@ public:
             new EffectParameter("Focal Length", "Controls the focal length of the 3D perspective effect. A higher focal length makes the image look more flat, and a lower focal length makes the image look more 3D.", "perspectiveFocalLength", VERSION_HINT, 2.0, 0.0, 10.0),
         }
     );
-
-    VisualiserParameters visualiserParameters;
     
     BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false, "Enable MIDI input for the synth. If disabled, the synth will play a constant tone, as controlled by the frequency slider.");
     BooleanParameter* inputEnabled = new BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false, "Enable to use input audio, instead of the generated audio.");
@@ -230,11 +204,6 @@ public:
     PitchDetector pitchDetector{*this};
     std::shared_ptr<WobbleEffect> wobbleEffect = std::make_shared<WobbleEffect>(pitchDetector);
 
-    // shouldn't be accessed by audio thread, but needs to persist when GUI is closed
-    // so should only be accessed by message thread
-    juce::String currentProjectFile;
-    juce::File lastOpenedDirectory = juce::File::getSpecialLocation(juce::File::userHomeDirectory);
-
     juce::SpinLock fontLock;
     juce::Font font = juce::Font(juce::Font::getDefaultSansSerifFontName(), 1.0f, juce::Font::plain);
 
@@ -271,12 +240,6 @@ private:
     juce::SpinLock audioThreadCallbackLock;
     std::function<void(const juce::AudioBuffer<float>&)> audioThreadCallback;
 
-    std::vector<BooleanParameter*> booleanParameters;
-    std::vector<FloatParameter*> floatParameters;
-    std::vector<IntParameter*> intParameters;
-    std::vector<std::shared_ptr<Effect>> allEffects;
-    std::vector<std::shared_ptr<Effect>> permanentEffects;
-
     juce::SpinLock errorListenersLock;
     std::vector<ErrorListener*> errorListeners;
 
@@ -293,10 +256,6 @@ private:
     double squaredVolume = 0;
     double currentVolume = 0;
 
-    std::shared_ptr<Effect> getEffect(juce::String id);
-    BooleanParameter* getBooleanParameter(juce::String id);
-    FloatParameter* getFloatParameter(juce::String id);
-    IntParameter* getIntParameter(juce::String id);
     void openLegacyProject(const juce::XmlElement* xml);
     std::pair<std::shared_ptr<Effect>, EffectParameter*> effectFromLegacyId(const juce::String& id, bool updatePrecedence = false);
     LfoType lfoTypeFromLegacyAnimationType(const juce::String& type);

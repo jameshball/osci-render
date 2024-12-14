@@ -173,6 +173,10 @@
               file="Source/components/MainMenuBarModel.cpp"/>
         <FILE id="ubDcnO" name="MainMenuBarModel.h" compile="0" resource="0"
               file="Source/components/MainMenuBarModel.h"/>
+        <FILE id="FbaaC9" name="OsciMainMenuBarModel.cpp" compile="1" resource="0"
+              file="Source/components/OsciMainMenuBarModel.cpp"/>
+        <FILE id="qAklil" name="OsciMainMenuBarModel.h" compile="0" resource="0"
+              file="Source/components/OsciMainMenuBarModel.h"/>
         <FILE id="QQzSwh" name="SliderTextBox.h" compile="0" resource="0" file="Source/components/SliderTextBox.h"/>
         <FILE id="QrDKRZ" name="SvgButton.h" compile="0" resource="0" file="Source/components/SvgButton.h"/>
         <FILE id="qzfstC" name="SwitchButton.h" compile="0" resource="0" file="Source/components/SwitchButton.h"/>
@@ -629,6 +633,14 @@
         <FILE id="vYzJlF" name="WavParser.cpp" compile="1" resource="0" file="Source/wav/WavParser.cpp"/>
         <FILE id="ZRT5Xk" name="WavParser.h" compile="0" resource="0" file="Source/wav/WavParser.h"/>
       </GROUP>
+      <FILE id="fWbyS1" name="CommonPluginEditor.cpp" compile="1" resource="0"
+            file="Source/CommonPluginEditor.cpp"/>
+      <FILE id="nKwxzJ" name="CommonPluginEditor.h" compile="0" resource="0"
+            file="Source/CommonPluginEditor.h"/>
+      <FILE id="fg6MpN" name="CommonPluginProcessor.cpp" compile="1" resource="0"
+            file="Source/CommonPluginProcessor.cpp"/>
+      <FILE id="PGeV6d" name="CommonPluginProcessor.h" compile="0" resource="0"
+            file="Source/CommonPluginProcessor.h"/>
       <FILE id="I44EdJ" name="EffectsComponent.cpp" compile="1" resource="0"
             file="Source/EffectsComponent.cpp"/>
       <FILE id="qxxNX3" name="EffectsComponent.h" compile="0" resource="0"
