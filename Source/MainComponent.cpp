@@ -126,6 +126,7 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 
 	BooleanParameter* visualiserFullScreen = audioProcessor.visualiserParameters.visualiserFullScreen;
 
+    addAndMakeVisible(pluginEditor.visualiser);
 	pluginEditor.visualiser.setFullScreenCallback([this, visualiserFullScreen](FullScreenMode mode) {
 		if (mode == FullScreenMode::TOGGLE) {
 			visualiserFullScreen->setBoolValueNotifyingHost(!visualiserFullScreen->getBoolValue());
@@ -142,8 +143,6 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 		resized();
 		repaint();
     });
-
-	addAndMakeVisible(recorder);
 }
 
 MainComponent::~MainComponent() {}
@@ -169,9 +168,6 @@ void MainComponent::resized() {
 	auto buttonHeight = 30;
 	auto padding = 10;
 	auto rowPadding = 10;
-
-	recorder.setBounds(bounds.removeFromBottom(30));
-	bounds.removeFromBottom(padding);
 	
 	auto row = bounds.removeFromTop(buttonHeight);
     fileButton.setBounds(row.removeFromLeft(buttonWidth));
@@ -212,6 +208,7 @@ void MainComponent::resized() {
 	createFile.setBounds(row.removeFromLeft(buttonWidth));
 
 	bounds.removeFromTop(padding);
+	bounds.expand(10, 0);
 	if (!audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
 		auto minDim = juce::jmin(bounds.getWidth(), bounds.getHeight());
         juce::Point<int> localTopLeft = {bounds.getX(), bounds.getY()};

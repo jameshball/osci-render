@@ -2,7 +2,7 @@
 #include "CommonPluginEditor.h"
 #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
 
-CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String appName, juce::String projectFileType)
+CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String appName, juce::String projectFileType, int width, int height)
 	: AudioProcessorEditor(&p), audioProcessor(p), appName(appName), projectFileType(projectFileType)
 {
     if (!applicationFolder.exists()) {
@@ -60,7 +60,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     
     menuBar.toFront(true);
 
-    setSize(700, 750);
+    setSize(width, height);
     setResizable(true, true);
     setResizeLimits(250, 250, 999999, 999999);
 
