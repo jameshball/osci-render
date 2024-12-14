@@ -10,6 +10,7 @@
 #include "../img/qoixx.hpp"
 #include "../components/DownloaderComponent.h"
 #include "../concurrency/WriteProcess.h"
+#include "../audio/AudioRecorder.h"
 
 #define FILE_RENDER_DUMMY 0
 #define FILE_RENDER_PNG 1
@@ -87,6 +88,8 @@ private:
     juce::File& lastOpenedDirectory;
     std::unique_ptr<juce::FileChooser> chooser;
     std::unique_ptr<juce::TemporaryFile> tempVideoFile;
+    std::unique_ptr<juce::TemporaryFile> tempAudioFile;
+    AudioRecorder audioRecorder;
     juce::String ffmpegURL = juce::String("https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/") +
 #if JUCE_WINDOWS
     #if JUCE_64BIT

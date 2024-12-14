@@ -130,6 +130,8 @@ int VisualiserComponent::prepareTask(double sampleRate, int bufferSize) {
     xResampler.prepare(sampleRate, RESAMPLE_RATIO);
     yResampler.prepare(sampleRate, RESAMPLE_RATIO);
     zResampler.prepare(sampleRate, RESAMPLE_RATIO);
+
+    audioRecorder.setSampleRate(sampleRate);
     
     int desiredBufferSize = sampleRate / FRAME_RATE;
     
@@ -198,9 +200,14 @@ void VisualiserComponent::setRecording(bool recording) {
 
         ffmpegProcess.start(cmd);
         framePixels.resize(renderTexture.width * renderTexture.height * 4);
+
+        tempAudioFile = std::make_unique<juce::TemporaryFile>(".wav");
+        audioRecorder.startRecording(tempAudioFile->getFile());
+
         setPaused(false);
         stopwatch.start();
     } else if (ffmpegProcess.isRunning()) {
+        audioRecorder.stop();
         ffmpegProcess.close();
         chooser = std::make_unique<juce::FileChooser>("Save recording", lastOpenedDirectory, "*.mp4");
         auto flags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting;
@@ -208,8 +215,8 @@ void VisualiserComponent::setRecording(bool recording) {
         chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
             auto file = chooser.getResult();
             if (file != juce::File()) {
-                // move the temporary file to the final location
-                tempVideoFile->getFile().moveFileTo(file);
+                ffmpegProcess.start("\"" + ffmpegFile.getFullPathName() + "\" -i \"" + tempVideoFile->getFile().getFullPathName() + "\" -i \"" + tempAudioFile->getFile().getFullPathName() + "\" -c:v copy -c:a aac -y \"" + file.getFullPathName() + "\"");
+                ffmpegProcess.close();
                 lastOpenedDirectory = file.getParentDirectory();
             }
         });
@@ -374,6 +381,8 @@ void VisualiserComponent::renderOpenGL() {
                 glBindTexture(GL_TEXTURE_2D, renderTexture.id);
                 glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, framePixels.data());
                 ffmpegProcess.write(framePixels.data(), 4 * renderTexture.width * renderTexture.height);
+
+                audioRecorder.audioThreadCallback(xSamples, ySamples);
             }
             
             renderingSemaphore.release();
