@@ -137,8 +137,6 @@
               file="Source/components/AboutComponent.cpp"/>
         <FILE id="vDlOTn" name="AboutComponent.h" compile="0" resource="0"
               file="Source/components/AboutComponent.h"/>
-        <FILE id="M7wyTt" name="AudioRecordingComponent.h" compile="0" resource="0"
-              file="Source/components/AudioRecordingComponent.h"/>
         <FILE id="kUinTt" name="ComponentList.cpp" compile="1" resource="0"
               file="Source/components/ComponentList.cpp"/>
         <FILE id="HGTPEW" name="ComponentList.h" compile="0" resource="0" file="Source/components/ComponentList.h"/>
@@ -628,6 +626,10 @@
               file="Source/visualiser/VisualiserSettings.cpp"/>
         <FILE id="CaPdPD" name="VisualiserSettings.h" compile="0" resource="0"
               file="Source/visualiser/VisualiserSettings.h"/>
+        <FILE id="Qa4JGo" name="WideBlurFragmentShader.glsl" compile="0" resource="0"
+              file="Source/visualiser/WideBlurFragmentShader.glsl"/>
+        <FILE id="mSCsyS" name="WideBlurVertexShader.glsl" compile="0" resource="0"
+              file="Source/visualiser/WideBlurVertexShader.glsl"/>
       </GROUP>
       <GROUP id="{DC345620-B6F6-F3B9-D359-C265590B0F00}" name="wav">
         <FILE id="vYzJlF" name="WavParser.cpp" compile="1" resource="0" file="Source/wav/WavParser.cpp"/>

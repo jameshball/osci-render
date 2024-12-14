@@ -30,7 +30,7 @@ void main() {
     vec4 tightGlow = texture2D(uTexture1, vTexCoord);
     vec4 scatter = texture2D(uTexture2, vTexCoord)+0.35;
     float light = line.r + uGlow * 1.5 * screen.g * screen.g * tightGlow.r;
-    light += uGlow * 0.4 * scatter.g * (2.0 + 1.0 * screen.g + 0.5 * screen.r);
+    light += uGlow * 0.3 * scatter.g * (2.0 + 1.0 * screen.g + 0.5 * screen.r);
     float tlight = 1.0-pow(2.0, -uExposure*light);
     float tlight2 = tlight * tlight * tlight;
     gl_FragColor.rgb = mix(uColour, vec3(1.0), 0.3+tlight2*tlight2*0.5)*tlight;

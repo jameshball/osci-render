@@ -2,6 +2,8 @@
 #include "VisualiserComponent.h"
 #include "BlurFragmentShader.glsl"
 #include "BlurVertexShader.glsl"
+#include "WideBlurFragmentShader.glsl"
+#include "WideBlurVertexShader.glsl"
 #include "LineFragmentShader.glsl"
 #include "LineVertexShader.glsl"
 #include "OutputFragmentShader.glsl"
@@ -325,6 +327,11 @@ void VisualiserComponent::newOpenGLContextCreated() {
     blurShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(blurVertexShader));
     blurShader->addFragmentShader(blurFragmentShader);
     blurShader->link();
+
+    wideBlurShader = std::make_unique<juce::OpenGLShaderProgram>(openGLContext);
+    wideBlurShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(wideBlurVertexShader));
+    wideBlurShader->addFragmentShader(wideBlurFragmentShader);
+    wideBlurShader->link();
     
     glGenBuffers(1, &vertexBuffer);
     glGenBuffers(1, &quadIndexBuffer);
@@ -462,10 +469,10 @@ void VisualiserComponent::setupTextures() {
 
     // Create textures
     lineTexture = makeTexture(1024, 1024);
-    blur1Texture = makeTexture(256, 256);
-    blur2Texture = makeTexture(256, 256);
-    blur3Texture = makeTexture(32, 32);
-    blur4Texture = makeTexture(32, 32);
+    blur1Texture = makeTexture(512, 512);
+    blur2Texture = makeTexture(512, 512);
+    blur3Texture = makeTexture(128, 128);
+    blur4Texture = makeTexture(128, 128);
     renderTexture = makeTexture(1024, 1024);
     
     screenTexture = createScreenTexture();
@@ -707,8 +714,6 @@ void VisualiserComponent::fade() {
 
 void VisualiserComponent::drawCRT() {
     using namespace juce::gl;
-
-    saveTextureToQOI(lineTexture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDocumentsDirectory).getChildFile("line.qoi"));
     
     setNormalBlending();
 
@@ -717,22 +722,16 @@ void VisualiserComponent::drawCRT() {
     texturedShader->setUniform("uResizeForCanvas", lineTexture.width / 1024.0f);
     drawTexture(lineTexture);
 
-    saveTextureToQOI(blur1Texture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDocumentsDirectory).getChildFile("blur1.qoi"));
-
     //horizontal blur 256x256
     activateTargetTexture(blur2Texture);
     setShader(blurShader.get());
-    blurShader->setUniform("uOffset", 1.0f / 256.0f, 0.0f);
+    blurShader->setUniform("uOffset", 1.0f / 512.0f, 0.0f);
     drawTexture(blur1Texture);
-
-    saveTextureToQOI(blur2Texture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDocumentsDirectory).getChildFile("blur2.qoi"));
 
     //vertical blur 256x256
     activateTargetTexture(blur1Texture);
-    blurShader->setUniform("uOffset", 0.0f, 1.0f / 256.0f);
+    blurShader->setUniform("uOffset", 0.0f, 1.0f / 512.0f);
     drawTexture(blur2Texture);
-
-    saveTextureToQOI(blur1Texture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDocumentsDirectory).getChildFile("blur1_1.qoi"));
 
     //preserve blur1 for later
     activateTargetTexture(blur3Texture);
@@ -740,22 +739,16 @@ void VisualiserComponent::drawCRT() {
     texturedShader->setUniform("uResizeForCanvas", 1.0f);
     drawTexture(blur1Texture);
 
-    saveTextureToQOI(blur3Texture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDocumentsDirectory).getChildFile("blur3.qoi"));
-
-    //horizontal blur 64x64
+    //horizontal blur 128x128
     activateTargetTexture(blur4Texture);
-    setShader(blurShader.get());
-    blurShader->setUniform("uOffset", 1.0f / 32.0f, 1.0f / 60.0f);
+    setShader(wideBlurShader.get());
+    wideBlurShader->setUniform("uOffset", 1.0f / 128.0f, 0.0f);
     drawTexture(blur3Texture);
 
-    saveTextureToQOI(blur4Texture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDocumentsDirectory).getChildFile("blur4.qoi"));
-
-    //vertical blur 64x64
+    //vertical blur 128x128
     activateTargetTexture(blur3Texture);
-    blurShader->setUniform("uOffset", -1.0f / 60.0f, 1.0f / 32.0f);
+    wideBlurShader->setUniform("uOffset", 0.0f, 1.0f / 128.0f);
     drawTexture(blur4Texture);
-
-    saveTextureToQOI(blur3Texture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDocumentsDirectory).getChildFile("blur3_1.qoi"));
 
     activateTargetTexture(renderTexture);
     setShader(outputShader.get());
@@ -770,8 +763,6 @@ void VisualiserComponent::drawCRT() {
     outputShader->setUniform("uColour", colour.getFloatRed(), colour.getFloatGreen(), colour.getFloatBlue());
     activateTargetTexture(renderTexture);
     drawTexture(lineTexture, blur1Texture, blur3Texture, screenTexture);
-
-    saveTextureToQOI(renderTexture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDocumentsDirectory).getChildFile("render.qoi"));
 }
 
 Texture VisualiserComponent::createScreenTexture() {

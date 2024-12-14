@@ -171,6 +171,7 @@ private:
     std::unique_ptr<juce::OpenGLShaderProgram> simpleShader;
     std::unique_ptr<juce::OpenGLShaderProgram> texturedShader;
     std::unique_ptr<juce::OpenGLShaderProgram> blurShader;
+    std::unique_ptr<juce::OpenGLShaderProgram> wideBlurShader;
     std::unique_ptr<juce::OpenGLShaderProgram> lineShader;
     std::unique_ptr<juce::OpenGLShaderProgram> outputShader;
     juce::OpenGLShaderProgram* currentShader;

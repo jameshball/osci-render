@@ -8,7 +8,6 @@
 #include "audio/PitchDetector.h"
 #include "UGen/ugen_JuceEnvelopeComponent.h"
 #include "components/SvgButton.h"
-#include "components/AudioRecordingComponent.h"
 
 class OscirenderAudioProcessorEditor;
 class MainComponent : public juce::GroupComponent {
@@ -37,8 +36,6 @@ private:
 	juce::TextEditor fileName;
 	juce::ComboBox fileType;
 	juce::TextButton createFile{"Create File"};
-
-	AudioRecordingComponent recorder{audioProcessor};
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };

@@ -10,7 +10,7 @@
 
 class CommonPluginEditor : public juce::AudioProcessorEditor {
 public:
-    CommonPluginEditor(CommonAudioProcessor&, juce::String appName, juce::String projectFileType);
+    CommonPluginEditor(CommonAudioProcessor&, juce::String appName, juce::String projectFileType, int width, int height);
     ~CommonPluginEditor() override;
 
     void initialiseMenuBar(juce::MenuBarModel& menuBarModel);

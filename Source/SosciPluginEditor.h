@@ -12,6 +12,7 @@
 class SosciPluginEditor : public CommonPluginEditor {
 public:
     SosciPluginEditor(SosciAudioProcessor&);
+    ~SosciPluginEditor() override;
 
     void paint(juce::Graphics&) override;
     void resized() override;
