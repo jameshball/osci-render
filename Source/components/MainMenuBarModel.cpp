@@ -1,91 +1,36 @@
 #include "MainMenuBarModel.h"
-#include "../PluginEditor.h"
-#include "../PluginProcessor.h"
 
-MainMenuBarModel::MainMenuBarModel(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), editor(editor) {}
+MainMenuBarModel::MainMenuBarModel() {}
 
 MainMenuBarModel::~MainMenuBarModel() {}
 
+void MainMenuBarModel::addTopLevelMenu(const juce::String& name) {
+    topLevelMenuNames.add(name);
+    menuItems.push_back(std::vector<std::pair<juce::String, std::function<void()>>>());
+    menuItemsChanged();
+}
+
+void MainMenuBarModel::addMenuItem(int topLevelMenuIndex, const juce::String& name, std::function<void()> action) {
+    menuItems[topLevelMenuIndex].push_back(std::make_pair(name, action));
+    menuItemsChanged();
+}
+
 juce::StringArray MainMenuBarModel::getMenuBarNames() {
-    if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-        return juce::StringArray("File", "About", "Audio");
-    } else {
-        return juce::StringArray("File", "About");
-    }
+    return topLevelMenuNames;
 }
 
 juce::PopupMenu MainMenuBarModel::getMenuForIndex(int topLevelMenuIndex, const juce::String& menuName) {
     juce::PopupMenu menu;
 
-    if (topLevelMenuIndex == 0) {
-        menu.addItem(1, "Open");
-        menu.addItem(2, "Save");
-        menu.addItem(3, "Save As");
-        if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-            menu.addItem(4, "Create New Project");
-        }
-    } else if (topLevelMenuIndex == 1) {
-        menu.addItem(1, "About osci-render");
-    } else if (topLevelMenuIndex == 2) {
-        menu.addItem(1, "Settings");
+    for (int i = 0; i < menuItems[topLevelMenuIndex].size(); i++) {
+        menu.addItem(i + 1, menuItems[topLevelMenuIndex][i].first);
     }
 
     return menu;
 }
 
 void MainMenuBarModel::menuItemSelected(int menuItemID, int topLevelMenuIndex) {
-    switch (topLevelMenuIndex) {
-        case 0:
-            switch (menuItemID) {
-                case 1:
-                    editor.openProject();
-                    break;
-                case 2:
-                    editor.saveProject();
-                    break;
-                case 3:
-                    editor.saveProjectAs();
-                    break;
-                case 4:
-                    editor.resetToDefault();
-                    break;
-                default:
-                    break;
-            }
-            break;
-        case 1: {
-            juce::DialogWindow::LaunchOptions options;
-            AboutComponent* about = new AboutComponent(BinaryData::logo_png, BinaryData::logo_pngSize, 
-                juce::String(ProjectInfo::projectName) + " by " + ProjectInfo::companyName + "\n"
-                "Version " + ProjectInfo::versionString + "\n\n"
-                "A huge thank you to:\n"
-                "DJ_Level_3, for contributing several features to osci-render\n"
-                "BUS ERROR Collective, for providing the source code for the Hilligoss encoder\n"
-                "All the community, for suggesting features and reporting issues!\n\n"
-                "I am open for commissions! Email me at james@ball.sh."
-            );
-            options.content.setOwned(about);
-            options.content->setSize(500, 270);
-            options.dialogTitle = "About";
-            options.dialogBackgroundColour = Colours::dark;
-            options.escapeKeyTriggersCloseButton = true;
-#if JUCE_WINDOWS
-            // if not standalone, use native title bar for compatibility with DAWs
-            options.useNativeTitleBar = editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone;
-#elif JUCE_MAC
-            options.useNativeTitleBar = true;
-#endif
-            options.resizable = false;
-            
-            juce::DialogWindow* dw = options.launchAsync();
-        } break;
-        case 2:
-            editor.openAudioSettings();
-            break;
-        default:
-            break;
-    }
-    
+    menuItems[topLevelMenuIndex][menuItemID - 1].second();
 }
 
 void MainMenuBarModel::menuBarActivated(bool isActive) {}
