@@ -297,14 +297,39 @@ void OscirenderLookAndFeel::drawMenuBarBackground(juce::Graphics& g, int width, 
     g.fillRect(r);
 }
 
+juce::TextLayout OscirenderLookAndFeel::layoutTooltipText(const juce::String& text, juce::Colour colour) {
+    const float tooltipFontSize = 17.0f;
+    const int maxToolTipWidth = 600;
+
+    juce::AttributedString s;
+    s.setJustification (juce::Justification::centred);
+    s.append (text, juce::Font (tooltipFontSize, juce::Font::bold), colour);
+
+    juce::TextLayout tl;
+    tl.createLayoutWithBalancedLineLengths (s, (float) maxToolTipWidth);
+    return tl;
+}
+
+juce::Rectangle<int> OscirenderLookAndFeel::getTooltipBounds (const juce::String& tipText, juce::Point<int> screenPos, juce::Rectangle<int> parentArea) {
+    const juce::TextLayout tl (layoutTooltipText(tipText, juce::Colours::black));
+
+    auto w = (int) (tl.getWidth() + 14.0f);
+    auto h = (int) (tl.getHeight() + 6.0f);
+
+    return juce::Rectangle<int> (screenPos.x > parentArea.getCentreX() ? screenPos.x - (w + 12) : screenPos.x + 24,
+        screenPos.y > parentArea.getCentreY() ? screenPos.y - (h + 6)  : screenPos.y + 6,
+        w, h)
+        .constrainedWithin (parentArea);
+}
+
 void OscirenderLookAndFeel::drawTooltip(juce::Graphics& g, const juce::String& text, int width, int height) {
     juce::Rectangle<int> bounds (width, height);
 
     g.setColour(findColour(juce::TooltipWindow::backgroundColourId));
     g.fillRect(bounds);
 
-    LookAndFeelHelpers::layoutTooltipText (text, findColour (juce::TooltipWindow::textColourId))
-        .draw (g, { static_cast<float> (width), static_cast<float> (height) });
+    layoutTooltipText(text, findColour(juce::TooltipWindow::textColourId))
+        .draw(g, {static_cast<float> (width), static_cast<float> (height)});
 }
 
 void OscirenderLookAndFeel::drawCornerResizer(juce::Graphics&, int w, int h, bool isMouseOver, bool isMouseDragging) {

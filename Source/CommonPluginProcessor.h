@@ -13,6 +13,7 @@
 #include "concurrency/AudioBackgroundThreadManager.h"
 #include "audio/SampleRateManager.h"
 #include "visualiser/VisualiserSettings.h"
+#include "visualiser/RecordingSettings.h"
 #include "audio/Effect.h"
 
 //==============================================================================
@@ -57,6 +58,7 @@ public:
     std::atomic<double> currentSampleRate = 0.0;
     juce::SpinLock effectsLock;
     VisualiserParameters visualiserParameters;
+    RecordingParameters recordingParameters;
     
     AudioBackgroundThreadManager threadManager;
     std::function<void()> haltRecording;
