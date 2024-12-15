@@ -45,7 +45,7 @@ OsciMainMenuBarModel::OsciMainMenuBarModel(OscirenderAudioProcessor& p, Oscirend
     });
 
     addMenuItem(2, "Settings...", [this] {
-        //editor.openRecordingSettings();
+        editor.openRecordingSettings();
     });
 
     addMenuItem(3, "Settings...", [this] {

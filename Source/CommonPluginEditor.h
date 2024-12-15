@@ -19,6 +19,7 @@ public:
     void saveProjectAs();
     void updateTitle();
     void openAudioSettings();
+    void openRecordingSettings();
     void resetToDefault();
     void openVisualiserSettings();
 
@@ -45,7 +46,9 @@ public:
 
     VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.visualiserParameters, 3);
     SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings");
-    VisualiserComponent visualiser{audioProcessor.lastOpenedDirectory, applicationFolder.getChildFile(ffmpegFileName), audioProcessor.haltRecording, audioProcessor.threadManager, visualiserSettings, nullptr, appName == "sosci"};
+    RecordingSettings recordingSettings = RecordingSettings(audioProcessor.recordingParameters);
+    SettingsWindow recordingSettingsWindow = SettingsWindow("Recording Settings");
+    VisualiserComponent visualiser{audioProcessor.lastOpenedDirectory, applicationFolder.getChildFile(ffmpegFileName), audioProcessor.haltRecording, audioProcessor.threadManager, visualiserSettings, audioProcessor.recordingParameters, nullptr, appName == "sosci"};
 
     std::unique_ptr<juce::FileChooser> chooser;
     juce::MenuBarComponent menuBar;

@@ -610,6 +610,10 @@
               file="Source/visualiser/OutputFragmentShader.glsl" xcodeResource="0"/>
         <FILE id="A0CrLF" name="OutputVertexShader.glsl" compile="0" resource="0"
               file="Source/visualiser/OutputVertexShader.glsl" xcodeResource="0"/>
+        <FILE id="XpwLUN" name="RecordingSettings.cpp" compile="1" resource="0"
+              file="Source/visualiser/RecordingSettings.cpp"/>
+        <FILE id="EOcvBc" name="RecordingSettings.h" compile="0" resource="0"
+              file="Source/visualiser/RecordingSettings.h"/>
         <FILE id="Gwupwc" name="SimpleFragmentShader.glsl" compile="0" resource="0"
               file="Source/visualiser/SimpleFragmentShader.glsl"/>
         <FILE id="RX1oPv" name="SimpleVertexShader.glsl" compile="0" resource="0"

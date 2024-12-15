@@ -122,8 +122,8 @@ void EffectComponent::resized() {
     auto bounds = getLocalBounds();
     auto componentBounds = bounds.removeFromRight(25);
     if (component != nullptr) {
-		component->setBounds(componentBounds);
-	}
+        component->setBounds(componentBounds);
+    }
 
     if (sidechainEnabled) {
         sidechainButton->setBounds(bounds.removeFromRight(20));
@@ -135,7 +135,9 @@ void EffectComponent::resized() {
         lfo.setBounds(bounds.removeFromRight(drawingSmall ? 70 : 100).reduced(0, 5));
     }
 
-    rangeButton.setBounds(bounds.removeFromRight(20));
+    if (rangeButton.isVisible()) {
+        rangeButton.setBounds(bounds.removeFromRight(20));
+    }   
 
     bounds.removeFromLeft(5);
 
@@ -167,6 +169,10 @@ void EffectComponent::parameterGestureChanged(int parameterIndex, bool gestureIs
 void EffectComponent::handleAsyncUpdate() {
     setupComponent();
     getParentComponent()->repaint();
+}
+
+void EffectComponent::setRangeEnabled(bool enabled) {
+    rangeButton.setVisible(enabled);
 }
 
 void EffectComponent::setComponent(std::shared_ptr<juce::Component> component) {

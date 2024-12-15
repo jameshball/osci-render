@@ -13,7 +13,7 @@
 #include "TexturedFragmentShader.glsl"
 #include "TexturedVertexShader.glsl"
 
-VisualiserComponent::VisualiserComponent(juce::File& lastOpenedDirectory, juce::File ffmpegFile, std::function<void()>& haltRecording, AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, VisualiserComponent* parent, bool visualiserOnly) : lastOpenedDirectory(lastOpenedDirectory), ffmpegFile(ffmpegFile), haltRecording(haltRecording), settings(settings), threadManager(threadManager), visualiserOnly(visualiserOnly), AudioBackgroundThread("VisualiserComponent" + juce::String(parent != nullptr ? " Child" : ""), threadManager), parent(parent) {
+VisualiserComponent::VisualiserComponent(juce::File& lastOpenedDirectory, juce::File ffmpegFile, std::function<void()>& haltRecording, AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, RecordingParameters& recordingParameters, VisualiserComponent* parent, bool visualiserOnly) : lastOpenedDirectory(lastOpenedDirectory), ffmpegFile(ffmpegFile), haltRecording(haltRecording), settings(settings), recordingParameters(recordingParameters), threadManager(threadManager), visualiserOnly(visualiserOnly), AudioBackgroundThread("VisualiserComponent" + juce::String(parent != nullptr ? " Child" : ""), threadManager), parent(parent) {
     addAndMakeVisible(ffmpegDownloader);
     
     ffmpegDownloader.onSuccessfulDownload = [this] {
@@ -176,49 +176,87 @@ void VisualiserComponent::setRecording(bool recording) {
     stopwatch.reset();
 
     if (recording) {
-        if (!ffmpegFile.exists()) {
-            // ask the user if they want to download ffmpeg
-            juce::MessageBoxOptions options = juce::MessageBoxOptions()
-                .withTitle("Recording requires FFmpeg")
-                .withMessage("FFmpeg is required to record video to .mp4.\n\nWould you like to download it now?")
-                .withButton("Yes")
-                .withButton("No")
-                .withIconType(juce::AlertWindow::QuestionIcon)
-                .withAssociatedComponent(this);
-            
-            juce::AlertWindow::showAsync(options, [this](int result) {
-                if (result == 1) {
-                    record.setEnabled(false);
-                    ffmpegDownloader.download();
-                }
-            });
+        recordingVideo = recordingParameters.recordingVideo();
+        recordingAudio = recordingParameters.recordingAudio();
+        if (!recordingVideo && !recordingAudio) {
             record.setToggleState(false, juce::NotificationType::dontSendNotification);
             return;
         }
-        tempVideoFile = std::make_unique<juce::TemporaryFile>(".mp4");
-        juce::String resolution = std::to_string(renderTexture.width) + "x" + std::to_string(renderTexture.height);
-        juce::String cmd = "\"" + ffmpegFile.getFullPathName() +
-        "\" -r " + juce::String(FRAME_RATE) + " -f rawvideo -pix_fmt rgba -s " + resolution + " -i - -threads 0 -preset fast -y -pix_fmt yuv420p -crf " + juce::String(21) + " -vf vflip \"" + tempVideoFile->getFile().getFullPathName() + "\"";
 
-        ffmpegProcess.start(cmd);
-        framePixels.resize(renderTexture.width * renderTexture.height * 4);
+        if (recordingVideo) {
+            if (!ffmpegFile.exists()) {
+                // ask the user if they want to download ffmpeg
+                juce::MessageBoxOptions options = juce::MessageBoxOptions()
+                    .withTitle("Recording requires FFmpeg")
+                    .withMessage("FFmpeg is required to record video to .mp4.\n\nWould you like to download it now?")
+                    .withButton("Yes")
+                    .withButton("No")
+                    .withIconType(juce::AlertWindow::QuestionIcon)
+                    .withAssociatedComponent(this);
 
-        tempAudioFile = std::make_unique<juce::TemporaryFile>(".wav");
-        audioRecorder.startRecording(tempAudioFile->getFile());
+                juce::AlertWindow::showAsync(options, [this](int result) {
+                    if (result == 1) {
+                        record.setEnabled(false);
+                        ffmpegDownloader.download();
+                    }
+                    });
+                record.setToggleState(false, juce::NotificationType::dontSendNotification);
+                return;
+            }
+            tempVideoFile = std::make_unique<juce::TemporaryFile>(".mp4");
+            juce::String resolution = std::to_string(renderTexture.width) + "x" + std::to_string(renderTexture.height);
+            juce::String cmd = "\"" + ffmpegFile.getFullPathName() + "\"" +
+                " -r " + juce::String(FRAME_RATE) +
+                " -f rawvideo" +
+                " -pix_fmt rgba" +
+                " -s " + resolution +
+                " -i -" +
+                " -threads 4" +
+                " -preset " + recordingParameters.getCompressionPreset() +
+                " -y" +
+                " -pix_fmt yuv420p" +
+                " -crf " + juce::String(recordingParameters.getCRF()) +
+                " -vf vflip" +
+                " \"" + tempVideoFile->getFile().getFullPathName() + "\"";
+
+            ffmpegProcess.start(cmd);
+            framePixels.resize(renderTexture.width * renderTexture.height * 4);
+        }
+
+        if (recordingAudio) {
+            tempAudioFile = std::make_unique<juce::TemporaryFile>(".wav");
+            audioRecorder.startRecording(tempAudioFile->getFile());
+        }
 
         setPaused(false);
         stopwatch.start();
-    } else if (ffmpegProcess.isRunning()) {
-        audioRecorder.stop();
-        ffmpegProcess.close();
-        chooser = std::make_unique<juce::FileChooser>("Save recording", lastOpenedDirectory, "*.mp4");
+    } else if (ffmpegProcess.isRunning() || audioRecorder.isRecording()) {
+        bool wasRecordingAudio = recordingAudio;
+        bool wasRecordingVideo = recordingVideo;
+        recordingAudio = false;
+        recordingVideo = false;
+
+        juce::String extension = wasRecordingVideo ? "mp4" : "wav";
+        if (wasRecordingAudio) {
+            audioRecorder.stop();
+        }
+        if (wasRecordingVideo) {
+            ffmpegProcess.close();
+        }
+        chooser = std::make_unique<juce::FileChooser>("Save recording", lastOpenedDirectory, "*." + extension);
         auto flags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting;
 
-        chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
+        chooser->launchAsync(flags, [this, wasRecordingAudio, wasRecordingVideo](const juce::FileChooser& chooser) {
             auto file = chooser.getResult();
             if (file != juce::File()) {
-                ffmpegProcess.start("\"" + ffmpegFile.getFullPathName() + "\" -i \"" + tempVideoFile->getFile().getFullPathName() + "\" -i \"" + tempAudioFile->getFile().getFullPathName() + "\" -c:v copy -c:a aac -y \"" + file.getFullPathName() + "\"");
-                ffmpegProcess.close();
+                if (wasRecordingAudio && wasRecordingVideo) {
+                    ffmpegProcess.start("\"" + ffmpegFile.getFullPathName() + "\" -i \"" + tempVideoFile->getFile().getFullPathName() + "\" -i \"" + tempAudioFile->getFile().getFullPathName() + "\" -c:v copy -c:a aac -y \"" + file.getFullPathName() + "\"");
+                    ffmpegProcess.close();
+                } else if (wasRecordingAudio) {
+                    tempAudioFile->getFile().copyFileTo(file);
+                } else if (wasRecordingVideo) {
+                    tempVideoFile->getFile().copyFileTo(file);
+                }
                 lastOpenedDirectory = file.getParentDirectory();
             }
         });
@@ -256,7 +294,7 @@ void VisualiserComponent::resized() {
 
 void VisualiserComponent::popoutWindow() {
     setRecording(false);
-    auto visualiser = new VisualiserComponent(lastOpenedDirectory, ffmpegFile, haltRecording, threadManager, settings, this);
+    auto visualiser = new VisualiserComponent(lastOpenedDirectory, ffmpegFile, haltRecording, threadManager, settings, recordingParameters, this);
     visualiser->settings.setLookAndFeel(&getLookAndFeel());
     visualiser->openSettings = openSettings;
     visualiser->closeSettings = closeSettings;
@@ -384,12 +422,16 @@ void VisualiserComponent::renderOpenGL() {
             }
             
             if (record.getToggleState()) {
-                // draw frame to ffmpeg
-                glBindTexture(GL_TEXTURE_2D, renderTexture.id);
-                glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, framePixels.data());
-                ffmpegProcess.write(framePixels.data(), 4 * renderTexture.width * renderTexture.height);
+                if (recordingVideo) {
+                    // draw frame to ffmpeg
+                    glBindTexture(GL_TEXTURE_2D, renderTexture.id);
+                    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, framePixels.data());
+                    ffmpegProcess.write(framePixels.data(), 4 * renderTexture.width * renderTexture.height);
+                }
 
-                audioRecorder.audioThreadCallback(xSamples, ySamples);
+                if (recordingAudio) {
+                    audioRecorder.audioThreadCallback(xSamples, ySamples);
+                }
             }
             
             renderingSemaphore.release();

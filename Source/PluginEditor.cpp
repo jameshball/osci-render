@@ -414,8 +414,3 @@ void OscirenderAudioProcessorEditor::mouseMove(const juce::MouseEvent& event) {
         setMouseCursor(juce::MouseCursor::NormalCursor);
     }
 }
-
-void OscirenderAudioProcessorEditor::openAudioSettings() {
-    juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
-    standalone->showAudioSettingsDialog();
-}

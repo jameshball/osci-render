@@ -2,7 +2,9 @@
 #include "SosciPluginEditor.h"
 #include "audio/EffectParameter.h"
 
-SosciAudioProcessor::SosciAudioProcessor() {}
+SosciAudioProcessor::SosciAudioProcessor() {
+    addAllParameters();
+}
 
 SosciAudioProcessor::~SosciAudioProcessor() {}
 
@@ -77,6 +79,8 @@ void SosciAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
         parameter->save(parameterXml);
     }
 
+    recordingParameters.save(xml.get());
+
     copyXmlToBinary(*xml, destData);
 }
 
@@ -134,6 +138,8 @@ void SosciAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
                 }
             }
         }
+
+        recordingParameters.load(xml.get());
     }
 }
 

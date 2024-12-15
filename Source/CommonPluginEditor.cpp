@@ -46,17 +46,27 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
         visualiserSettingsWindow.setVisible(false);
     };
 
-    visualiserSettingsWindow.setResizable(false, false);
+    visualiserSettings.setLookAndFeel(&getLookAndFeel());
+    visualiserSettings.setSize(550, 400);
+    visualiserSettingsWindow.setContentNonOwned(&visualiserSettings, true);
+    visualiserSettingsWindow.centreWithSize(550, 400);
 #if JUCE_WINDOWS
     // if not standalone, use native title bar for compatibility with DAWs
     visualiserSettingsWindow.setUsingNativeTitleBar(processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone);
 #elif JUCE_MAC
     visualiserSettingsWindow.setUsingNativeTitleBar(true);
 #endif
-    visualiserSettings.setLookAndFeel(&getLookAndFeel());
-    visualiserSettings.setSize(550, 400);
-    visualiserSettingsWindow.setContentNonOwned(&visualiserSettings, true);
-    visualiserSettingsWindow.centreWithSize(550, 400);
+
+    recordingSettings.setLookAndFeel(&getLookAndFeel());
+    recordingSettings.setSize(300, 200);
+    recordingSettingsWindow.setContentNonOwned(&recordingSettings, true);
+    recordingSettingsWindow.centreWithSize(300, 200);
+#if JUCE_WINDOWS
+    // if not standalone, use native title bar for compatibility with DAWs
+    recordingSettingsWindow.setUsingNativeTitleBar(processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone);
+#elif JUCE_MAC
+    recordingSettingsWindow.setUsingNativeTitleBar(true);
+#endif
     
     menuBar.toFront(true);
 
@@ -147,6 +157,11 @@ void CommonPluginEditor::updateTitle() {
 void CommonPluginEditor::openAudioSettings() {
     juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
     standalone->showAudioSettingsDialog();
+}
+
+void CommonPluginEditor::openRecordingSettings() {
+    recordingSettingsWindow.setVisible(true);
+    recordingSettingsWindow.toFront(true);
 }
 
 void CommonPluginEditor::resetToDefault() {

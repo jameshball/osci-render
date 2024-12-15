@@ -31,8 +31,6 @@ public:
 
     void editCustomFunction(bool enabled);
 
-    void openAudioSettings();
-
 private:
     OscirenderAudioProcessor& audioProcessor;
 public:

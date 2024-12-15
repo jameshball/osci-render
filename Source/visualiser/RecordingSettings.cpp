@@ -1,61 +1,44 @@
-#include "VisualiserSettings.h"
+#include "RecordingSettings.h"
 #include "VisualiserComponent.h"
 #include "../PluginEditor.h"
 
 
-VisualiserSettings::VisualiserSettings(VisualiserParameters& parameters, int numChannels) : parameters(parameters), numChannels(numChannels) {
-    addAndMakeVisible(brightness);
-    addAndMakeVisible(intensity);
-	addAndMakeVisible(persistence);
-    addAndMakeVisible(hue);
-    addAndMakeVisible(saturation);
-    addAndMakeVisible(focus);
-    addAndMakeVisible(noise);
-    addAndMakeVisible(glow);
-    addAndMakeVisible(smooth);
-    addChildComponent(sweepMs);
-    addAndMakeVisible(graticuleToggle);
-    addAndMakeVisible(smudgeToggle);
-    addAndMakeVisible(upsamplingToggle);
-    addAndMakeVisible(sweepToggle);
-    
-    brightness.setSliderOnValueChange();
-    intensity.setSliderOnValueChange();
-    persistence.setSliderOnValueChange();
-    hue.setSliderOnValueChange();
-    saturation.setSliderOnValueChange();
-    focus.setSliderOnValueChange();
-    noise.setSliderOnValueChange();
-    glow.setSliderOnValueChange();
-    smooth.setSliderOnValueChange();
-    sweepMs.setSliderOnValueChange();
-    
-    sweepToggle.onClick = [this] {
-        sweepMs.setVisible(sweepToggle.getToggleState());
-        resized();
+RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
+    addAndMakeVisible(quality);
+    addAndMakeVisible(recordAudio);
+    addAndMakeVisible(recordVideo);
+    addAndMakeVisible(compressionPreset);
+    addAndMakeVisible(compressionPresetLabel);
+
+    quality.setSliderOnValueChange();
+    quality.setRangeEnabled(false);
+    recordAudio.onClick = [this] {
+        if (!recordAudio.getToggleState() && !recordVideo.getToggleState()) {
+            recordVideo.setToggleState(true, juce::NotificationType::sendNotification);
+        }
     };
+    recordVideo.onClick = [this] {
+        if (!recordAudio.getToggleState() && !recordVideo.getToggleState()) {
+            recordAudio.setToggleState(true, juce::NotificationType::sendNotification);
+        }
+    };
+    compressionPreset.onChange = [this] {
+        parameters.compressionPreset = parameters.compressionPresets[compressionPreset.getSelectedId() - 1];
+    };
+    compressionPreset.addItemList(parameters.compressionPresets, 1);
+    compressionPreset.setSelectedId(parameters.compressionPresets.indexOf(parameters.compressionPreset) + 1);
+    compressionPresetLabel.setTooltip("The compression preset to use when recording video. Slower presets will produce smaller files at the expense of encoding time.");
 }
 
-VisualiserSettings::~VisualiserSettings() {}
+RecordingSettings::~RecordingSettings() {}
 
-void VisualiserSettings::resized() {
+void RecordingSettings::resized() {
 	auto area = getLocalBounds().reduced(20);
-	double rowHeight = 30;
-    brightness.setBounds(area.removeFromTop(rowHeight));
-    intensity.setBounds(area.removeFromTop(rowHeight));
-    persistence.setBounds(area.removeFromTop(rowHeight));
-    hue.setBounds(area.removeFromTop(rowHeight));
-    saturation.setBounds(area.removeFromTop(rowHeight));
-    focus.setBounds(area.removeFromTop(rowHeight));
-    noise.setBounds(area.removeFromTop(rowHeight));
-    glow.setBounds(area.removeFromTop(rowHeight));
-    smooth.setBounds(area.removeFromTop(rowHeight));
-    graticuleToggle.setBounds(area.removeFromTop(rowHeight));
-    smudgeToggle.setBounds(area.removeFromTop(rowHeight));
-    upsamplingToggle.setBounds(area.removeFromTop(rowHeight));
-    
-    sweepToggle.setBounds(area.removeFromTop(rowHeight));
-    if (sweepToggle.getToggleState()) {
-        sweepMs.setBounds(area.removeFromTop(rowHeight));
-    }
+    double rowHeight = 30;
+    quality.setBounds(area.removeFromTop(rowHeight).expanded(6, 0));
+    recordAudio.setBounds(area.removeFromTop(rowHeight));
+    recordVideo.setBounds(area.removeFromTop(rowHeight));
+    auto row = area.removeFromTop(rowHeight);
+    compressionPresetLabel.setBounds(row.removeFromLeft(140));
+    compressionPreset.setBounds(row.removeFromRight(80));
 }
