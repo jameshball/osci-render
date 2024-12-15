@@ -3,7 +3,7 @@
 #include <JuceHeader.h>
 #include "../PluginProcessor.h"
 #include "../LookAndFeel.h"
-#include "../concurrency/BufferConsumer.h"
+#include "../concurrency/AudioBackgroundThread.h"
 
 class ThumbRadiusLookAndFeel : public OscirenderLookAndFeel {
 public:
@@ -59,14 +59,15 @@ public:
     }
 };
 
-class VolumeComponent : public juce::Component, public juce::Timer, public juce::Thread {
+class VolumeComponent : public juce::Component, public juce::AsyncUpdater, public AudioBackgroundThread {
 public:
 	VolumeComponent(OscirenderAudioProcessor& p);
-    ~VolumeComponent() override;
 
     void paint(juce::Graphics&) override;
-	void timerCallback() override;
-	void run() override;
+    void handleAsyncUpdate() override;
+    int prepareTask(double sampleRate, int bufferSize) override;
+    void runTask(const std::vector<OsciPoint>& points) override;
+    void stopTask() override;
 	void resized() override;
 
 private:
@@ -76,7 +77,6 @@ private:
     const double BUFFER_DURATION_SECS = 0.02;
     
     int sampleRate = DEFAULT_SAMPLE_RATE;
-	std::vector<Point> buffer = std::vector<Point>(BUFFER_DURATION_SECS * DEFAULT_SAMPLE_RATE);
 
 	std::atomic<float> leftVolume = 0;
 	std::atomic<float> rightVolume = 0;
@@ -90,11 +90,6 @@ private:
 
     std::unique_ptr<juce::Drawable> volumeIcon;
     std::unique_ptr<juce::Drawable> thresholdIcon;
-    
-    juce::CriticalSection consumerLock;
-    std::shared_ptr<BufferConsumer> consumer;
-    
-    void resetBuffer();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VolumeComponent)
 };

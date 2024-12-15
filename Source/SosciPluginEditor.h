@@ -2,14 +2,14 @@
 
 #include <JuceHeader.h>
 #include "SosciPluginProcessor.h"
-#include "components/VisualiserComponent.h"
+#include "CommonPluginEditor.h"
+#include "visualiser/VisualiserComponent.h"
 #include "LookAndFeel.h"
-#include "components/VisualiserSettings.h"
+#include "visualiser/VisualiserSettings.h"
 #include "components/SosciMainMenuBarModel.h"
 #include "components/SvgButton.h"
-#include "components/StopwatchComponent.h"
 
-class SosciPluginEditor : public juce::AudioProcessorEditor {
+class SosciPluginEditor : public CommonPluginEditor {
 public:
     SosciPluginEditor(SosciAudioProcessor&);
     ~SosciPluginEditor() override;
@@ -17,41 +17,10 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
-    void openProject();
-    void saveProject();
-    void saveProjectAs();
-    void updateTitle();
-    void openAudioSettings();
-    void resetToDefault();
-    void openVisualiserSettings();
-
 private:
     SosciAudioProcessor& audioProcessor;
-public:
-    OscirenderLookAndFeel lookAndFeel;
-
-    VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.parameters, 3);
-    SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings");
-    VisualiserComponent visualiser{audioProcessor, audioProcessor, visualiserSettings, nullptr, false, true};
-
-    std::unique_ptr<juce::FileChooser> chooser;
-    SosciMainMenuBarModel menuBarModel{*this, audioProcessor};
-    juce::MenuBarComponent menuBar;
-
-    juce::TooltipWindow tooltipWindow{nullptr, 0};
     
-    juce::Label recordTimer{"Record Timer"};
-    StopwatchComponent stopwatch;
-    SvgButton record{"Record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f)};
-    SvgButton settings{"Settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white};
-
-    bool usingNativeMenuBar = false;
-
-#if JUCE_LINUX
-    juce::OpenGLContext openGlContext;
-#endif
-
-    bool keyPressed(const juce::KeyPress& key) override;
+    SosciMainMenuBarModel model{*this, audioProcessor};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SosciPluginEditor)
 };

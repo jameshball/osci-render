@@ -6,10 +6,10 @@
 #include <memory>
 #include <string>
 
-class Point;
+class OsciPoint;
 class Shape {
 public:
-	virtual Point nextVector(double drawingProgress) = 0;
+	virtual OsciPoint nextVector(double drawingProgress) = 0;
 	virtual void scale(double x, double y, double z) = 0;
 	virtual void translate(double x, double y, double z) = 0;
 	virtual double length() = 0;
@@ -21,7 +21,7 @@ public:
 	static void normalize(std::vector<std::unique_ptr<Shape>>&);
 	static double height(std::vector<std::unique_ptr<Shape>>&);
 	static double width(std::vector<std::unique_ptr<Shape>>&);
-	static Point maxVector(std::vector<std::unique_ptr<Shape>>&);
+	static OsciPoint maxVector(std::vector<std::unique_ptr<Shape>>&);
 	static void removeOutOfBounds(std::vector<std::unique_ptr<Shape>>&);
 
 	const double INVALID_LENGTH = -1.0;

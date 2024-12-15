@@ -16,6 +16,8 @@ public:
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void handleAsyncUpdate() override;
 
+    void setRangeEnabled(bool enabled);
+
     void setComponent(std::shared_ptr<juce::Component> component);
     void setSliderOnValueChange();
 

@@ -1,5 +1,5 @@
 #pragma once
-#include "../shape/Point.h"
+#include "../shape/OsciPoint.h"
 #include <JuceHeader.h>
 
 class BooleanParameter : public juce::AudioProcessorParameterWithID {

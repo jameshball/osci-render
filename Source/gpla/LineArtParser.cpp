@@ -101,20 +101,20 @@ std::vector<std::unique_ptr<Shape>> LineArtParser::draw() {
 std::vector<Line> LineArtParser::generateFrame(juce::Array <juce::var> objects, double focalLength)
 {
     std::vector<std::vector<double>> allMatrices;
-    std::vector<std::vector<std::vector<Point>>> allVertices;
+    std::vector<std::vector<std::vector<OsciPoint>>> allVertices;
 
     for (int i = 0; i < objects.size(); i++) {
         auto verticesArray = *objects[i].getProperty("vertices", juce::Array<juce::var>()).getArray();
-        std::vector<std::vector<Point>> vertices;
+        std::vector<std::vector<OsciPoint>> vertices;
 
         for (auto& vertexArrayVar : verticesArray) {
-            vertices.push_back(std::vector<Point>());
+            vertices.push_back(std::vector<OsciPoint>());
             auto& vertexArray = *vertexArrayVar.getArray();
             for (auto& vertex : vertexArray) {
                 double x = vertex.getProperty("x", 0);
                 double y = vertex.getProperty("y", 0);
                 double z = vertex.getProperty("z", 0);
-                vertices[vertices.size() - 1].push_back(Point(x, y, z));
+                vertices[vertices.size() - 1].push_back(OsciPoint(x, y, z));
             }
         }
         auto matrix = *objects[i].getProperty("matrix", juce::Array<juce::var>()).getArray();
@@ -124,7 +124,7 @@ std::vector<Line> LineArtParser::generateFrame(juce::Array <juce::var> objects, 
             allMatrices[i].push_back(value);
         }
 
-        std::vector<std::vector<Point>> reorderedVertices;
+        std::vector<std::vector<OsciPoint>> reorderedVertices;
 
         if (vertices.size() > 0 && matrix.size() == 16) {
             std::vector<bool> visited = std::vector<bool>(vertices.size(), false);
@@ -157,7 +157,7 @@ std::vector<Line> LineArtParser::generateFrame(juce::Array <juce::var> objects, 
             }
 
             for (int i = 0; i < vertices.size(); i++) {
-                std::vector<Point> reorderedVertex;
+                std::vector<OsciPoint> reorderedVertex;
                 int index = order[i];
                 for (int j = 0; j < vertices[index].size(); j++) {
                     reorderedVertex.push_back(vertices[index][j]);
