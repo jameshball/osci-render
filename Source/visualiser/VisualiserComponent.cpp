@@ -328,9 +328,13 @@ void VisualiserComponent::childUpdated() {
 }
 
 void VisualiserComponent::initialiseSharedTexture() {
-    sharedTextureSender = SharedTextureManager::getInstance()->addSender("TEST OSCI-RENDER", viewportArea.getWidth(), viewportArea.getHeight());
-    sharedTextureSender->setExternalFBO(renderTexture.id);
-    sharedTextureSender->setSize(renderTexture.width, renderTexture.height);
+    sharedTextureSender = SharedTextureManager::getInstance()->addSender("osci-render - " + juce::String(juce::Time::getCurrentTime().toMilliseconds()), renderTexture.width, renderTexture.height);
+    sharedTextureSender->initGL();
+    sharedTextureSender->setSharedTextureId(renderTexture.id);
+    sharedTextureSender->setDrawFunction([this] {
+        setShader(texturedShader.get());
+        drawTexture(renderTexture);
+    });
 }
 
 void VisualiserComponent::closeSharedTexture() {
@@ -444,8 +448,8 @@ void VisualiserComponent::renderOpenGL() {
             }
 
             if (parent == nullptr) {
-                if (SharedTextureManager::getInstanceWithoutCreating() != nullptr) {
-                    SharedTextureManager::getInstance()->renderGL();
+                if (sharedTextureSender != nullptr) {
+                    sharedTextureSender->renderGL();
                 }
             }
             
@@ -831,7 +835,6 @@ void VisualiserComponent::drawCRT() {
     outputShader->setUniform("uResizeForCanvas", lineTexture.width / 1024.0f);
     juce::Colour colour = juce::Colour::fromHSV(settings.getHue() / 360.0f, 1.0, 1.0, 1.0);
     outputShader->setUniform("uColour", colour.getFloatRed(), colour.getFloatGreen(), colour.getFloatBlue());
-    activateTargetTexture(renderTexture);
     drawTexture(lineTexture, blur1Texture, blur3Texture, screenTexture);
 }
 
