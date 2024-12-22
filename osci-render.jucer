@@ -722,6 +722,7 @@
         <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
         <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="juce_sharedtexture" path="modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/VisualStudio2022" smallIcon="pSc1mq" bigIcon="pSc1mq">
@@ -754,12 +755,15 @@
         <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
         <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="juce_sharedtexture" path="modules"/>
       </MODULEPATHS>
     </VS2022>
     <XCODE_MAC targetFolder="Builds/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak"
                extraDefs="JUCE_SILENCE_XCODE_15_LINKER_WARNING=1" smallIcon="pSc1mq"
                bigIcon="pSc1mq" applicationCategory="public.app-category.music"
-               microphonePermissionNeeded="1">
+               microphonePermissionNeeded="1" frameworkSearchPaths="../../External/syphon"
+               extraCustomFrameworks="../../External/syphon/Syphon.framework"
+               embeddedFrameworks="../../External/syphon/Syphon.framework">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render"/>
         <CONFIGURATION name="Release" targetName="osci-render"/>
@@ -788,6 +792,7 @@
         <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
         <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="juce_sharedtexture" path="modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
   </EXPORTFORMATS>
@@ -818,5 +823,6 @@
     <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_sharedtexture" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>
 </JUCERPROJECT>

@@ -202,6 +202,7 @@
         <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
         <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="juce_sharedtexture" path="modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/sosci/VisualStudio2022" smallIcon="pSc1mq"
@@ -235,6 +236,7 @@
         <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
         <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="juce_sharedtexture" path="modules"/>
       </MODULEPATHS>
     </VS2022>
     <XCODE_MAC targetFolder="Builds/sosci/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak"
@@ -269,6 +271,7 @@
         <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
         <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="juce_sharedtexture" path="modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
   </EXPORTFORMATS>
@@ -299,5 +302,6 @@
     <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_sharedtexture" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>
 </JUCERPROJECT>

@@ -9,6 +9,8 @@
 **/Builds
 **/JuceLibraryCode
 
+packaging/Output
+
 # User-specific files
 *.rsuser
 *.suo

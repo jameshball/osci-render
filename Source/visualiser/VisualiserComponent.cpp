@@ -327,6 +327,20 @@ void VisualiserComponent::childUpdated() {
     }
 }
 
+void VisualiserComponent::initialiseSharedTexture() {
+    sharedTextureSender = SharedTextureManager::getInstance()->addSender("TEST OSCI-RENDER", viewportArea.getWidth(), viewportArea.getHeight());
+    sharedTextureSender->setExternalFBO(renderTexture.id);
+    sharedTextureSender->setSize(renderTexture.width, renderTexture.height);
+}
+
+void VisualiserComponent::closeSharedTexture() {
+    if (SharedTextureManager::getInstanceWithoutCreating() != nullptr) {
+        SharedTextureManager::getInstance()->removeSender(sharedTextureSender);
+    }
+    sharedTextureSender = nullptr;
+
+}
+
 void VisualiserComponent::newOpenGLContextCreated() {
     using namespace juce::gl;
     
@@ -376,11 +390,19 @@ void VisualiserComponent::newOpenGLContextCreated() {
     glGenBuffers(1, &vertexIndexBuffer);
     
     setupTextures();
+
+    if (parent == nullptr) {
+        initialiseSharedTexture();
+    }
 }
 
 void VisualiserComponent::openGLContextClosing() {
     using namespace juce::gl;
-    
+
+    if (parent == nullptr) {
+        closeSharedTexture();
+    }
+
     glDeleteBuffers(1, &quadIndexBuffer);
     glDeleteBuffers(1, &vertexIndexBuffer);
     glDeleteBuffers(1, &vertexBuffer);
@@ -419,6 +441,12 @@ void VisualiserComponent::renderOpenGL() {
                 renderScope(smoothedXSamples, smoothedYSamples, smoothedZSamples);
             } else {
                 renderScope(xSamples, ySamples, zSamples);
+            }
+
+            if (parent == nullptr) {
+                if (SharedTextureManager::getInstanceWithoutCreating() != nullptr) {
+                    SharedTextureManager::getInstance()->renderGL();
+                }
             }
             
             if (record.getToggleState()) {

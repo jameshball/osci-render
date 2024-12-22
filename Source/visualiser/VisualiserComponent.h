@@ -78,6 +78,8 @@ private:
 
     std::function<void(FullScreenMode)> fullScreenCallback;
 
+    SharedTextureSender* sharedTextureSender = nullptr;
+
     VisualiserSettings& settings;
     RecordingParameters& recordingParameters;
     bool recordingAudio = false;
@@ -191,6 +193,8 @@ private:
     chowdsp::ResamplingTypes::LanczosResampler<2048, 8> yResampler;
     chowdsp::ResamplingTypes::LanczosResampler<2048, 8> zResampler;
     
+    void initialiseSharedTexture();
+    void closeSharedTexture();
     Texture makeTexture(int width, int height);
     void setupArrays(int num_points);
     void setupTextures();
