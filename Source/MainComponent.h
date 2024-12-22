@@ -4,11 +4,10 @@
 #include "PluginProcessor.h"
 #include "parser/FileParser.h"
 #include "parser/FrameProducer.h"
-#include "components/VisualiserComponent.h"
+#include "visualiser/VisualiserComponent.h"
 #include "audio/PitchDetector.h"
 #include "UGen/ugen_JuceEnvelopeComponent.h"
 #include "components/SvgButton.h"
-#include "components/AudioRecordingComponent.h"
 
 class OscirenderAudioProcessorEditor;
 class MainComponent : public juce::GroupComponent {
@@ -37,11 +36,6 @@ private:
 	juce::TextEditor fileName;
 	juce::ComboBox fileType;
 	juce::TextButton createFile{"Create File"};
-
-	juce::Label frequencyLabel;
-	int callbackIndex = -1;
-
-	AudioRecordingComponent recorder{audioProcessor};
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };

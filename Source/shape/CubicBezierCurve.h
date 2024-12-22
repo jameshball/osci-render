@@ -1,13 +1,13 @@
 #pragma once
 
 #include "Shape.h"
-#include "Point.h"
+#include "OsciPoint.h"
 
 class CubicBezierCurve : public Shape {
 public:
 	CubicBezierCurve(double x1, double y1, double x2, double y2, double x3, double y3, double x4, double y4);
 
-	Point nextVector(double drawingProgress) override;
+	OsciPoint nextVector(double drawingProgress) override;
 	void scale(double x, double y, double z) override;
 	void translate(double x, double y, double z) override;
 	double length() override;

@@ -1,14 +1,13 @@
 #pragma once
 #include <JuceHeader.h>
-#include "../PluginProcessor.h"
 #include "../audio/Effect.h"
 #include "LabelledTextBox.h"
 #include "SvgButton.h"
 
 class EffectComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater, public juce::SettableTooltipClient {
 public:
-    EffectComponent(OscirenderAudioProcessor& p, Effect& effect, int index);
-    EffectComponent(OscirenderAudioProcessor& p, Effect& effect);
+    EffectComponent(Effect& effect, int index);
+    EffectComponent(Effect& effect);
     ~EffectComponent();
 
     void resized() override;
@@ -16,6 +15,8 @@ public:
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void handleAsyncUpdate() override;
+
+    void setRangeEnabled(bool enabled);
 
     void setComponent(std::shared_ptr<juce::Component> component);
     void setSliderOnValueChange();
@@ -89,7 +90,6 @@ private:
     bool lfoEnabled = true;
     bool sidechainEnabled = true;
     std::shared_ptr<juce::Component> component;
-    OscirenderAudioProcessor& audioProcessor;
 
     std::unique_ptr<SvgButton> sidechainButton;
 

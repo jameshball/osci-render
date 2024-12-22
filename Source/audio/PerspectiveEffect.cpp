@@ -7,7 +7,7 @@ PerspectiveEffect::PerspectiveEffect() {}
 
 PerspectiveEffect::~PerspectiveEffect() {}
 
-Point PerspectiveEffect::apply(int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+OsciPoint PerspectiveEffect::apply(int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
 	auto effectScale = values[0].load();
 	auto focalLength = juce::jmax(values[1].load(), 0.001);
 
@@ -18,7 +18,7 @@ Point PerspectiveEffect::apply(int index, Point input, const std::vector<std::at
 
 	Vec3 projected = camera.project(vec);
 
-	return Point(
+	return OsciPoint(
 		(1 - effectScale) * input.x + effectScale * projected.x,
 		(1 - effectScale) * input.y + effectScale * projected.y,
 		0

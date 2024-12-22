@@ -1,5 +1,5 @@
 #pragma once
-#include "../shape/Point.h"
+#include "../shape/OsciPoint.h"
 #include <JuceHeader.h>
 #include "../shape/Shape.h"
 #include "../svg/SvgParser.h"

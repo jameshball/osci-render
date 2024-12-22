@@ -1,23 +1,20 @@
 #pragma once
 #include <JuceHeader.h>
-#include "AboutComponent.h"
 
-
-class OscirenderAudioProcessorEditor;
-class OscirenderAudioProcessor;
-class MainMenuBarModel : public juce::MenuBarModel, public juce::AudioProcessorParameter::Listener {
+class MainMenuBarModel : public juce::MenuBarModel {
 public:
-    MainMenuBarModel(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor);
+    MainMenuBarModel();
     ~MainMenuBarModel();
 
+    void addTopLevelMenu(const juce::String& name);
+    void addMenuItem(int topLevelMenuIndex, const juce::String& name, std::function<void()> action);
+
+private:
     juce::StringArray getMenuBarNames() override;
     juce::PopupMenu getMenuForIndex(int topLevelMenuIndex, const juce::String& menuName) override;
     void menuItemSelected(int menuItemID, int topLevelMenuIndex) override;
     void menuBarActivated(bool isActive);
-    void parameterValueChanged(int parameterIndex, float newValue) override;
-    void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
 
-private:
-    OscirenderAudioProcessor& audioProcessor;
-    OscirenderAudioProcessorEditor& editor;
+    juce::StringArray topLevelMenuNames;
+    std::vector<std::vector<std::pair<juce::String, std::function<void()>>>> menuItems;
 };

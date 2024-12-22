@@ -1,6 +1,6 @@
 #include "Shape.h"
 #include "Line.h"
-#include "Point.h"
+#include "OsciPoint.h"
 
 double Shape::totalLength(std::vector<std::unique_ptr<Shape>>& shapes) {
     double length = 0.0;
@@ -30,7 +30,7 @@ void Shape::normalize(std::vector<std::unique_ptr<Shape>>& shapes) {
 		shape->scale(2.0 / maxDim, -2.0 / maxDim, 2.0 / maxDim);
 	}
 
-	Point max = maxVector(shapes);
+	OsciPoint max = maxVector(shapes);
 	double newHeight = height(shapes);
 
 	for (auto& shape : shapes) {
@@ -42,7 +42,7 @@ double Shape::height(std::vector<std::unique_ptr<Shape>>& shapes) {
 	double maxY = std::numeric_limits<double>::min();
 	double minY = std::numeric_limits<double>::max();
 
-    Point vectors[4];
+    OsciPoint vectors[4];
 
     for (auto& shape : shapes) {
         for (int i = 0; i < 4; i++) {
@@ -62,7 +62,7 @@ double Shape::width(std::vector<std::unique_ptr<Shape>>& shapes) {
     double maxX = std::numeric_limits<double>::min();
     double minX = std::numeric_limits<double>::max();
 
-    Point vectors[4];
+    OsciPoint vectors[4];
 
     for (auto& shape : shapes) {
         for (int i = 0; i < 4; i++) {
@@ -78,13 +78,13 @@ double Shape::width(std::vector<std::unique_ptr<Shape>>& shapes) {
     return std::abs(maxX - minX);
 }
 
-Point Shape::maxVector(std::vector<std::unique_ptr<Shape>>& shapes) {
+OsciPoint Shape::maxVector(std::vector<std::unique_ptr<Shape>>& shapes) {
     double maxX = std::numeric_limits<double>::min();
     double maxY = std::numeric_limits<double>::min();
 
     for (auto& shape : shapes) {
-        Point startVector = shape->nextVector(0);
-        Point endVector = shape->nextVector(1);
+        OsciPoint startVector = shape->nextVector(0);
+        OsciPoint endVector = shape->nextVector(1);
 
         double x = std::max(startVector.x, endVector.x);
         double y = std::max(startVector.y, endVector.y);
@@ -93,22 +93,22 @@ Point Shape::maxVector(std::vector<std::unique_ptr<Shape>>& shapes) {
         maxY = std::max(y, maxY);
     }
 
-	return Point(maxX, maxY);
+	return OsciPoint(maxX, maxY);
 }
 
 void Shape::removeOutOfBounds(std::vector<std::unique_ptr<Shape>>& shapes) {
     std::vector<int> toRemove;
 
     for (int i = 0; i < shapes.size(); i++) {
-		Point start = shapes[i]->nextVector(0);
-		Point end = shapes[i]->nextVector(1);
+		OsciPoint start = shapes[i]->nextVector(0);
+		OsciPoint end = shapes[i]->nextVector(1);
         bool keep = false;
 
         if ((start.x < 1 && start.x > -1) || (start.y < 1 && start.y > -1)) {
             if ((end.x < 1 && end.x > -1) || (end.y < 1 && end.y > -1)) {
 				if (shapes[i]->type() == "Line") {
-                    Point newStart(std::min(std::max(start.x, -1.0), 1.0), std::min(std::max(start.y, -1.0), 1.0));
-                    Point newEnd(std::min(std::max(end.x, -1.0), 1.0), std::min(std::max(end.y, -1.0), 1.0));
+                    OsciPoint newStart(std::min(std::max(start.x, -1.0), 1.0), std::min(std::max(start.y, -1.0), 1.0));
+                    OsciPoint newEnd(std::min(std::max(end.x, -1.0), 1.0), std::min(std::max(end.y, -1.0), 1.0));
 					shapes[i] = std::make_unique<Line>(newStart.x, newStart.y, newEnd.x, newEnd.y);
                 }
                 keep = true;
