@@ -16,7 +16,7 @@ void SosciPluginEditor::paint(juce::Graphics& g) {
 }
 
 void SosciPluginEditor::resized() {
-    auto topBar = getLocalBounds().removeFromTop(25).removeFromLeft(200);
+    auto topBar = getLocalBounds().removeFromTop(25);
     menuBar.setBounds(topBar);
     auto visualiserArea = getLocalBounds();
     visualiserArea.removeFromTop(25);
