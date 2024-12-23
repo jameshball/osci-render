@@ -2,9 +2,10 @@
 #include "../SosciPluginEditor.h"
 #include "../SosciPluginProcessor.h"
 
-SosciMainMenuBarModel::SosciMainMenuBarModel(SosciPluginEditor& editor, SosciAudioProcessor& processor) : editor(editor), processor(processor) {
+SosciMainMenuBarModel::SosciMainMenuBarModel(SosciPluginEditor& e, SosciAudioProcessor& processor) : editor(e), processor(processor) {
     addTopLevelMenu("File");
     addTopLevelMenu("About");
+    addTopLevelMenu("Recording");
     addTopLevelMenu("Audio");
 
     addMenuItem(0, "Open", [&]() { editor.openProject(); });
@@ -32,13 +33,17 @@ SosciMainMenuBarModel::SosciMainMenuBarModel(SosciPluginEditor& editor, SosciAud
 
         juce::DialogWindow* dw = options.launchAsync();
     });
+    
+    addMenuItem(2, "Settings...", [this] {
+        editor.openRecordingSettings();
+    });
 
-    addMenuItem(2, "Force Disable Brightness Input", [&]() {
+    addMenuItem(3, "Force Disable Brightness Input", [&]() {
         processor.forceDisableBrightnessInput = !processor.forceDisableBrightnessInput;
         menuItemsChanged();
     });
 
     if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-        addMenuItem(2, "Settings...", [&]() { editor.openAudioSettings(); });
+        addMenuItem(3, "Settings...", [&]() { editor.openAudioSettings(); });
     }
 }

@@ -27,6 +27,7 @@ VisualiserComponent::VisualiserComponent(juce::File& lastOpenedDirectory, juce::
     };
     
     addAndMakeVisible(record);
+    record.setTooltip("Toggles recording of the oscilloscope's visuals and audio.");
     record.setPulseAnimation(true);
     record.onClick = [this] {
         setRecording(record.getToggleState());
@@ -39,11 +40,29 @@ VisualiserComponent::VisualiserComponent(juce::File& lastOpenedDirectory, juce::
     
     if (parent == nullptr && !visualiserOnly) {
         addAndMakeVisible(fullScreenButton);
+        fullScreenButton.setTooltip("Toggles fullscreen mode.");
     }
     if (child == nullptr && parent == nullptr && !visualiserOnly) {
         addAndMakeVisible(popOutButton);
+        popOutButton.setTooltip("Opens the oscilloscope in a new window.");
     }
     addAndMakeVisible(settingsButton);
+    settingsButton.setTooltip("Opens the visualiser settings window.");
+    //if (visualiserOnly) {
+        addAndMakeVisible(sharedTextureButton);
+        sharedTextureButton.setTooltip("Toggles sending the oscilloscope's visuals to a Syphon/Spout receiver.");
+        sharedTextureButton.onClick = [this] {
+            if (sharedTextureSender != nullptr) {
+                openGLContext.executeOnGLThread([this](juce::OpenGLContext& context) {
+                    closeSharedTexture();
+                }, false);
+            } else {
+                openGLContext.executeOnGLThread([this](juce::OpenGLContext& context) {
+                    initialiseSharedTexture();
+                }, false);
+            }
+        };
+    //}
     
     fullScreenButton.onClick = [this]() {
         enableFullScreen();
@@ -277,6 +296,9 @@ void VisualiserComponent::resized() {
         popOutButton.setBounds(buttonRow.removeFromRight(30));
     }
     settingsButton.setBounds(buttonRow.removeFromRight(30));
+    //if (visualiserOnly) {
+        sharedTextureButton.setBounds(buttonRow.removeFromRight(30));
+    //}
     record.setBounds(buttonRow.removeFromRight(25));
     if (record.getToggleState()) {
         stopwatch.setVisible(true);
@@ -293,6 +315,9 @@ void VisualiserComponent::resized() {
 }
 
 void VisualiserComponent::popoutWindow() {
+    if (sharedTextureButton.getToggleState()) {
+        sharedTextureButton.triggerClick();
+    }
     setRecording(false);
     auto visualiser = new VisualiserComponent(lastOpenedDirectory, ffmpegFile, haltRecording, threadManager, settings, recordingParameters, this);
     visualiser->settings.setLookAndFeel(&getLookAndFeel());
@@ -338,10 +363,12 @@ void VisualiserComponent::initialiseSharedTexture() {
 }
 
 void VisualiserComponent::closeSharedTexture() {
-    if (SharedTextureManager::getInstanceWithoutCreating() != nullptr) {
-        SharedTextureManager::getInstance()->removeSender(sharedTextureSender);
+    if (sharedTextureSender != nullptr) {
+        if (SharedTextureManager::getInstanceWithoutCreating() != nullptr) {
+            SharedTextureManager::getInstance()->removeSender(sharedTextureSender);
+        }
+        sharedTextureSender = nullptr;
     }
-    sharedTextureSender = nullptr;
 
 }
 
@@ -394,18 +421,12 @@ void VisualiserComponent::newOpenGLContextCreated() {
     glGenBuffers(1, &vertexIndexBuffer);
     
     setupTextures();
-
-    if (parent == nullptr) {
-        initialiseSharedTexture();
-    }
 }
 
 void VisualiserComponent::openGLContextClosing() {
     using namespace juce::gl;
-
-    if (parent == nullptr) {
-        closeSharedTexture();
-    }
+    
+    closeSharedTexture();
 
     glDeleteBuffers(1, &quadIndexBuffer);
     glDeleteBuffers(1, &vertexIndexBuffer);
@@ -447,11 +468,11 @@ void VisualiserComponent::renderOpenGL() {
                 renderScope(xSamples, ySamples, zSamples);
             }
 
-            if (parent == nullptr) {
+            //if (parent == nullptr) {
                 if (sharedTextureSender != nullptr) {
                     sharedTextureSender->renderGL();
                 }
-            }
+            //}
             
             if (record.getToggleState()) {
                 if (recordingVideo) {
