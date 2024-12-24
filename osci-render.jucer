@@ -6,7 +6,7 @@
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
               version="2.3.0" companyName="James H Ball" companyWebsite="https://osci-render.com"
               companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0"
-              pluginAUMainType="'aumf'">
+              pluginAUMainType="'aumf'" postExportShellCommandPosix="%%1%%/ci/remove_embed_frameworks.sh %%1%%/Builds/MacOSX/osci-render.xcodeproj/project.pbxproj osci-render">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
       <GROUP id="{8930EC48-30FD-646B-9DC5-0861171F8B2E}" name="fonts">
@@ -763,11 +763,10 @@
                extraDefs="JUCE_SILENCE_XCODE_15_LINKER_WARNING=1" smallIcon="pSc1mq"
                bigIcon="pSc1mq" applicationCategory="public.app-category.music"
                microphonePermissionNeeded="1" frameworkSearchPaths="../../External/syphon"
-               extraCustomFrameworks="../../External/syphon/Syphon.framework"
-               embeddedFrameworks="../../External/syphon/Syphon.framework">
+               embeddedFrameworks="../../External/syphon/Syphon.framework" extraCustomFrameworks="../../External/syphon/Syphon.framework">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS=@executable_path/../Frameworks"/>
-        <CONFIGURATION name="Release" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS=@executable_path/../Frameworks"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '@executable_path/../Frameworks' '@executable_path/'"/>
+        <CONFIGURATION name="Release" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '@executable_path/../Frameworks' '@executable_path/'"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
