@@ -5,6 +5,8 @@
 
 .DS_Store
 
+*.psd
+
 # ignore JUCE
 **/Builds
 **/JuceLibraryCode

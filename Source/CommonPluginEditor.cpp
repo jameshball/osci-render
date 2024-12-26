@@ -47,9 +47,9 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     };
 
     visualiserSettings.setLookAndFeel(&getLookAndFeel());
-    visualiserSettings.setSize(550, 400);
+    visualiserSettings.setSize(550, 450);
     visualiserSettingsWindow.setContentNonOwned(&visualiserSettings, true);
-    visualiserSettingsWindow.centreWithSize(550, 400);
+    visualiserSettingsWindow.centreWithSize(550, 450);
 #if JUCE_WINDOWS
     // if not standalone, use native title bar for compatibility with DAWs
     visualiserSettingsWindow.setUsingNativeTitleBar(processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone);

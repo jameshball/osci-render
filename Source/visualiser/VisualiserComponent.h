@@ -172,6 +172,11 @@ private:
     juce::OpenGLTexture screenOpenGLTexture;
     juce::Image screenTextureImage = juce::ImageFileFormat::loadFrom(BinaryData::noise_jpg, BinaryData::noise_jpgSize);
     juce::Image emptyScreenImage = juce::ImageFileFormat::loadFrom(BinaryData::empty_jpg, BinaryData::empty_jpgSize);
+    juce::Image oscilloscopeImage = juce::ImageFileFormat::loadFrom(BinaryData::real_jpg, BinaryData::real_jpgSize);
+    
+    OsciPoint REAL_SCREEN_OFFSET = { 0.02, -0.15 };
+    OsciPoint REAL_SCREEN_SCALE = { 0.6 };
+    
     Texture screenTexture;
     std::optional<Texture> targetTexture = std::nullopt;
     
@@ -184,8 +189,7 @@ private:
     juce::OpenGLShaderProgram* currentShader;
     
     float fadeAmount;
-    bool smudgesEnabled = settings.getSmudgesEnabled();
-    bool graticuleEnabled = settings.getGraticuleEnabled();
+    ScreenType screenType = settings.getScreenType();
     
     const double RESAMPLE_RATIO = 6.0;
     double sampleRate = -1;

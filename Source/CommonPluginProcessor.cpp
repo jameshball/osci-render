@@ -30,6 +30,10 @@ CommonAudioProcessor::CommonAudioProcessor()
     for (auto parameter : visualiserParameters.booleans) {
         booleanParameters.push_back(parameter);
     }
+    
+    for (auto parameter : visualiserParameters.integers) {
+        intParameters.push_back(parameter);
+    }
 }
 
 void CommonAudioProcessor::addAllParameters() {

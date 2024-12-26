@@ -9,6 +9,10 @@ uniform float uSaturation;
 uniform float uNoise;
 uniform float uTime;
 uniform float uGlow;
+uniform float uAmbient;
+uniform float uRealScreen;
+uniform vec2 uOffset;
+uniform vec2 uScale;
 uniform vec3 uColour;
 varying vec2 vTexCoord;
 varying vec2 vTexCoordCanvas;
@@ -24,16 +28,21 @@ float noise(in vec2 uv, in float time) {
 }
 
 void main() {
-    vec4 line = texture2D(uTexture0, vTexCoordCanvas);
+    vec2 linePos = (vTexCoordCanvas - 0.5) / uScale + 0.5 + uOffset;
+    vec4 line = texture2D(uTexture0, linePos);
     // r components have grid; g components do not.
     vec4 screen = texture2D(uTexture3, vTexCoord);
-    vec4 tightGlow = texture2D(uTexture1, vTexCoord);
-    vec4 scatter = texture2D(uTexture2, vTexCoord)+0.35;
+    vec4 tightGlow = texture2D(uTexture1, linePos);
+    vec4 scatter = texture2D(uTexture2, linePos) + (1.0 - uRealScreen) * max(uAmbient - 0.45, 0.0);
     float light = line.r + uGlow * 1.5 * screen.g * screen.g * tightGlow.r;
     light += uGlow * 0.3 * scatter.g * (2.0 + 1.0 * screen.g + 0.5 * screen.r);
     float tlight = 1.0-pow(2.0, -uExposure*light);
     float tlight2 = tlight * tlight * tlight;
-    gl_FragColor.rgb = mix(uColour, vec3(1.0), 0.3+tlight2*tlight2*0.5)*tlight;
+    gl_FragColor.rgb = mix(uColour, vec3(1.0), 0.3+tlight2*tlight2*0.5) * tlight;
+    if (uRealScreen > 0.5) {
+        float ambient = pow(2.0, uExposure) * uAmbient;
+        gl_FragColor.rgb += ambient * screen.rgb;
+    }
     gl_FragColor.rgb = desaturate(gl_FragColor.rgb, 1.0 - uSaturation);
     gl_FragColor.rgb += uNoise * noise(gl_FragCoord.xy, uTime);
     gl_FragColor.a = 1.0;

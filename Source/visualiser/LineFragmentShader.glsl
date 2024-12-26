@@ -7,6 +7,8 @@ std::string lineFragmentShader = R"(
 
 uniform float uSize;
 uniform float uIntensity;
+uniform float uOffset;
+uniform float uScale;
 uniform sampler2D uScreen;
 varying float vSize;
 varying vec4 uvl;
@@ -27,6 +29,7 @@ float erf(float x) {
                
                
 void main() {
+    vec2 texCoord =  (vTexCoord - 0.5) / uScale + 0.5 + uOffset;
     float len = uvl.z;
     vec2 xy = uvl.xy;
     float brightness;
@@ -42,7 +45,7 @@ void main() {
     }
 
     brightness *= uvl.w;
-    gl_FragColor = 2.0 * texture2D(uScreen, vTexCoord) * brightness;
+    gl_FragColor = 2.0 * texture2D(uScreen, texCoord) * brightness;
     gl_FragColor.a = 1.0;
 }
 

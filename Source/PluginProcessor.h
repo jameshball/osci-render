@@ -128,7 +128,7 @@ public:
     std::shared_ptr<Effect> perspective = std::make_shared<Effect>(
         perspectiveEffect,
         std::vector<EffectParameter*>{
-            new EffectParameter("3D Perspective", "Controls the strength of the 3D perspective projection.", "perspectiveStrength", VERSION_HINT, 1.0, 0.0, 1.0),
+            new EffectParameter("Perspective", "Controls the strength of the 3D perspective projection.", "perspectiveStrength", VERSION_HINT, 1.0, 0.0, 1.0),
             new EffectParameter("Focal Length", "Controls the focal length of the 3D perspective effect. A higher focal length makes the image look more flat, and a lower focal length makes the image look more 3D.", "perspectiveFocalLength", VERSION_HINT, 2.0, 0.0, 10.0),
         }
     );

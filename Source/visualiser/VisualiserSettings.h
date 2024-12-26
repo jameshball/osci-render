@@ -9,10 +9,65 @@
 #include "../components/SwitchButton.h"
 #include "../audio/SmoothEffect.h"
 
+enum class ScreenType : int {
+    Empty = 1,
+    Graticule = 2,
+    Smudged = 3,
+    SmudgedGraticule = 4,
+    Real = 5
+};
+
+class ScreenTypeParameter : public IntParameter {
+public:
+    ScreenTypeParameter(juce::String name, juce::String id, int versionHint, ScreenType value) : IntParameter(name, id, versionHint, (int) value, 1, 5) {}
+
+    juce::String getText(float value, int maximumStringLength = 100) const override {
+        switch ((ScreenType)(int)getUnnormalisedValue(value)) {
+            case ScreenType::Empty:
+                return "Empty";
+            case ScreenType::Graticule:
+                return "Graticule";
+            case ScreenType::Smudged:
+                return "Smudged";
+            case ScreenType::SmudgedGraticule:
+                return "Smudged Graticule";
+            case ScreenType::Real:
+                return "Real Oscilloscope";
+            default:
+                return "Unknown";
+        }
+    }
+
+    float getValueForText(const juce::String& text) const override {
+        int unnormalisedValue;
+        if (text == "Empty") {
+            unnormalisedValue = (int)ScreenType::Empty;
+        } else if (text == "Graticule") {
+            unnormalisedValue = (int)ScreenType::Graticule;
+        } else if (text == "Smudged") {
+            unnormalisedValue = (int)ScreenType::Smudged;
+        } else if (text == "Smudged Graticule") {
+            unnormalisedValue = (int)ScreenType::SmudgedGraticule;
+        } else if (text == "Real Oscilloscope") {
+            unnormalisedValue = (int)ScreenType::Real;
+        } else {
+            unnormalisedValue = (int)ScreenType::Empty;
+        }
+        return getNormalisedValue(unnormalisedValue);
+    }
+
+    void save(juce::XmlElement* xml) {
+        xml->setAttribute("screenType", getText(getValue()));
+    }
+
+    void load(juce::XmlElement* xml) {
+        setValueNotifyingHost(getValueForText(xml->getStringAttribute("screenType")));
+    }
+};
+
 class VisualiserParameters {
 public:
-    BooleanParameter* graticuleEnabled = new BooleanParameter("Show Graticule", "graticuleEnabled", VERSION_HINT, true, "Show the graticule or grid lines over the oscilloscope display.");
-    BooleanParameter* smudgesEnabled = new BooleanParameter("Show Smudges", "smudgesEnabled", VERSION_HINT, true, "Adds a subtle layer of dirt/smudges to the oscilloscope display to make it look more realistic.");
+    ScreenTypeParameter* screenType = new ScreenTypeParameter("Screen Type", "screenType", VERSION_HINT, ScreenType::SmudgedGraticule);
     BooleanParameter* upsamplingEnabled = new BooleanParameter("Upsample Audio", "upsamplingEnabled", VERSION_HINT, true, "Upsamples the audio before visualising it to make it appear more realistic, at the expense of performance.");
     BooleanParameter* sweepEnabled = new BooleanParameter("Sweep", "sweepEnabled", VERSION_HINT, false, "Plots the audio signal over time, sweeping from left to right");
     BooleanParameter* visualiserFullScreen = new BooleanParameter("Visualiser Fullscreen", "visualiserFullScreen", VERSION_HINT, false, "Makes the software visualiser fullscreen.");
@@ -31,14 +86,6 @@ public:
             "Controls the hue/colour of the oscilloscope display.",
             "hue",
             VERSION_HINT, 125, 0, 359, 1
-        )
-    );
-    std::shared_ptr<Effect> brightnessEffect = std::make_shared<Effect>(
-        new EffectParameter(
-            "Brightness",
-            "Controls how bright the light glows for on the oscilloscope display.",
-            "brightness",
-            VERSION_HINT, 2.0, 0.0, 10.0
         )
     );
     std::shared_ptr<Effect> intensityEffect = std::make_shared<Effect>(
@@ -81,6 +128,14 @@ public:
             VERSION_HINT, 0.3, 0.0, 1.0
         )
     );
+    std::shared_ptr<Effect> ambientEffect = std::make_shared<Effect>(
+        new EffectParameter(
+            "Ambient Light",
+            "Controls how much ambient light is added to the oscilloscope display.",
+            "ambient",
+            VERSION_HINT, 0.8, 0.0, 5.0
+        )
+    );
     std::shared_ptr<Effect> smoothEffect = std::make_shared<Effect>(
         std::make_shared<SmoothEffect>(),
         new EffectParameter(
@@ -99,8 +154,9 @@ public:
         )
     );
     
-    std::vector<std::shared_ptr<Effect>> effects = {persistenceEffect, hueEffect, brightnessEffect, intensityEffect, saturationEffect, focusEffect, noiseEffect, glowEffect, sweepMsEffect};
-    std::vector<BooleanParameter*> booleans = {graticuleEnabled, smudgesEnabled, upsamplingEnabled, visualiserFullScreen, sweepEnabled};
+    std::vector<std::shared_ptr<Effect>> effects = {persistenceEffect, hueEffect, intensityEffect, saturationEffect, focusEffect, noiseEffect, glowEffect, ambientEffect, sweepMsEffect};
+    std::vector<BooleanParameter*> booleans = {upsamplingEnabled, visualiserFullScreen, sweepEnabled};
+    std::vector<IntParameter*> integers = {screenType};
 };
 
 class VisualiserSettings : public juce::Component {
@@ -109,10 +165,6 @@ public:
     ~VisualiserSettings();
 
     void resized() override;
-    
-    double getBrightness() {
-        return parameters.brightnessEffect->getActualValue() - 2;
-    }
     
     double getIntensity() {
         return parameters.intensityEffect->getActualValue() / 100;
@@ -142,12 +194,12 @@ public:
         return parameters.glowEffect->getActualValue() * 3;
     }
     
-    bool getGraticuleEnabled() {
-        return parameters.graticuleEnabled->getBoolValue();
+    double getAmbient() {
+        return parameters.ambientEffect->getActualValue();
     }
     
-    bool getSmudgesEnabled() {
-        return parameters.smudgesEnabled->getBoolValue();
+    ScreenType getScreenType() {
+        return (ScreenType)parameters.screenType->getValueUnnormalised();
     }
     
     bool getUpsamplingEnabled() {
@@ -158,7 +210,6 @@ public:
     int numChannels;
 
 private:
-    EffectComponent brightness{*parameters.brightnessEffect};
     EffectComponent intensity{*parameters.intensityEffect};
     EffectComponent persistence{*parameters.persistenceEffect};
     EffectComponent hue{*parameters.hueEffect};
@@ -166,11 +217,13 @@ private:
     EffectComponent focus{*parameters.focusEffect};
     EffectComponent noise{*parameters.noiseEffect};
     EffectComponent glow{*parameters.glowEffect};
+    EffectComponent ambient{*parameters.ambientEffect};
     EffectComponent smooth{*parameters.smoothEffect};
     EffectComponent sweepMs{*parameters.sweepMsEffect};
     
-    jux::SwitchButton graticuleToggle{parameters.graticuleEnabled};
-    jux::SwitchButton smudgeToggle{parameters.smudgesEnabled};
+    juce::Label screenTypeLabel{"Screen Type", "Screen Type"};
+    juce::ComboBox screenType;
+    
     jux::SwitchButton upsamplingToggle{parameters.upsamplingEnabled};
     jux::SwitchButton sweepToggle{parameters.sweepEnabled};
 

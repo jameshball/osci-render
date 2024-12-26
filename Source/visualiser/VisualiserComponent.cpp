@@ -289,25 +289,26 @@ void VisualiserComponent::setRecording(bool recording) {
 void VisualiserComponent::resized() {
     auto area = getLocalBounds();
     buttonRow = area.removeFromBottom(25);
+    auto buttons = buttonRow;
     if (parent == nullptr && !visualiserOnly) {
-        fullScreenButton.setBounds(buttonRow.removeFromRight(30));
+        fullScreenButton.setBounds(buttons.removeFromRight(30));
     }
     if (child == nullptr && parent == nullptr && !visualiserOnly) {
-        popOutButton.setBounds(buttonRow.removeFromRight(30));
+        popOutButton.setBounds(buttons.removeFromRight(30));
     }
-    settingsButton.setBounds(buttonRow.removeFromRight(30));
+    settingsButton.setBounds(buttons.removeFromRight(30));
     //if (visualiserOnly) {
-        sharedTextureButton.setBounds(buttonRow.removeFromRight(30));
+        sharedTextureButton.setBounds(buttons.removeFromRight(30));
     //}
-    record.setBounds(buttonRow.removeFromRight(25));
+    record.setBounds(buttons.removeFromRight(25));
     if (record.getToggleState()) {
         stopwatch.setVisible(true);
-        stopwatch.setBounds(buttonRow.removeFromRight(100));
+        stopwatch.setBounds(buttons.removeFromRight(100));
     } else {
         stopwatch.setVisible(false);
     }
     if (child == nullptr) {
-        auto bounds = buttonRow.removeFromRight(160);
+        auto bounds = buttons.removeFromRight(160);
         ffmpegDownloader.setBounds(bounds.withSizeKeepingCentre(bounds.getWidth() - 10, bounds.getHeight() - 10));
     }
     viewportArea = area;
@@ -377,7 +378,6 @@ void VisualiserComponent::newOpenGLContextCreated() {
     
     juce::CriticalSection::ScopedLockType lock(samplesLock);
     
-    juce::OpenGLHelpers::clear(juce::Colours::black);
     glColorMask(true, true, true, true);
 
     viewportChanged(viewportArea);
@@ -455,7 +455,7 @@ void VisualiserComponent::renderOpenGL() {
     using namespace juce::gl;
     
     if (openGLContext.isActive()) {
-        juce::OpenGLHelpers::clear(juce::Colours::black);
+        juce::OpenGLHelpers::clear(Colours::veryDark);
         
         // we have a new buffer to render
         if (sampleBufferCount != prevSampleBufferCount) {
@@ -586,8 +586,10 @@ Texture VisualiserComponent::makeTexture(int width, int height) {
     // Set texture filtering and wrapping
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    float borderColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
     
     glBindTexture(GL_TEXTURE_2D, 0); // Unbind
     
@@ -780,6 +782,11 @@ void VisualiserComponent::drawLine(const std::vector<float>& xPoints, const std:
     
     lineShader->setUniform("uFadeAmount", fadeAmount);
     lineShader->setUniform("uNEdges", (GLfloat) nEdges);
+    
+    OsciPoint offset = settings.getScreenType() == ScreenType::Real ? REAL_SCREEN_OFFSET : OsciPoint();
+    OsciPoint scale = settings.getScreenType() == ScreenType::Real ? REAL_SCREEN_SCALE : OsciPoint(1);
+    lineShader->setUniform("uOffset", (float) offset.x, (float) offset.y);
+    lineShader->setUniform("uScale", (float) scale.x, (float) scale.y);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vertexIndexBuffer);
     int nEdgesThisTime = xPoints.size() - 1;
@@ -847,12 +854,17 @@ void VisualiserComponent::drawCRT() {
 
     activateTargetTexture(renderTexture);
     setShader(outputShader.get());
-    float brightness = std::pow(2, settings.getBrightness() - 2);
-    outputShader->setUniform("uExposure", brightness);
+    outputShader->setUniform("uExposure", 0.25f);
     outputShader->setUniform("uSaturation", (float) settings.getSaturation());
     outputShader->setUniform("uNoise", (float) settings.getNoise());
     outputShader->setUniform("uTime", time);
     outputShader->setUniform("uGlow", (float) settings.getGlow());
+    outputShader->setUniform("uAmbient", (float) settings.getAmbient());
+    OsciPoint offset = settings.getScreenType() == ScreenType::Real ? REAL_SCREEN_OFFSET : OsciPoint();
+    OsciPoint scale = settings.getScreenType() == ScreenType::Real ? REAL_SCREEN_SCALE : OsciPoint(1);
+    outputShader->setUniform("uOffset", (float) offset.x, (float) offset.y);
+    outputShader->setUniform("uScale", (float) scale.x, (float) scale.y);
+    outputShader->setUniform("uRealScreen", settings.getScreenType() == ScreenType::Real ? 1.0f : 0.0f);
     outputShader->setUniform("uResizeForCanvas", lineTexture.width / 1024.0f);
     juce::Colour colour = juce::Colour::fromHSV(settings.getHue() / 360.0f, 1.0, 1.0, 1.0);
     outputShader->setUniform("uColour", colour.getFloatRed(), colour.getFloatGreen(), colour.getFloatBlue());
@@ -862,14 +874,16 @@ void VisualiserComponent::drawCRT() {
 Texture VisualiserComponent::createScreenTexture() {
     using namespace juce::gl;
     
-    if (settings.getSmudgesEnabled()) {
+    if (screenType == ScreenType::Smudged || screenType == ScreenType::SmudgedGraticule) {
         screenOpenGLTexture.loadImage(screenTextureImage);
+    } else if (screenType == ScreenType::Real) {
+        screenOpenGLTexture.loadImage(oscilloscopeImage);
     } else {
         screenOpenGLTexture.loadImage(emptyScreenImage);
     }
     Texture texture = { screenOpenGLTexture.getTextureID(), screenTextureImage.getWidth(), screenTextureImage.getHeight() };
     
-    if (settings.getGraticuleEnabled()) {
+    if (screenType == ScreenType::Graticule || screenType == ScreenType::SmudgedGraticule) {
         activateTargetTexture(texture);
         setNormalBlending();
         setShader(simpleShader.get());
@@ -919,7 +933,7 @@ Texture VisualiserComponent::createScreenTexture() {
         glVertexAttribPointer(glGetAttribLocation(simpleShader->getProgramID(), "vertexPosition"), 2, GL_FLOAT, GL_FALSE, 0, nullptr);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         simpleShader->setUniform("colour", 0.01f, 0.1f, 0.01f, 1.0f);
-        glLineWidth(1.0f);
+        glLineWidth(2.0f);
         glDrawArrays(GL_LINES, 0, data.size());
         glBindTexture(GL_TEXTURE_2D, targetTexture.value().id);
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
@@ -950,7 +964,7 @@ void VisualiserComponent::checkGLErrors(const juce::String& location) {
 
 
 void VisualiserComponent::paint(juce::Graphics& g) {
-    g.setColour(juce::Colours::black);
+    g.setColour(settings.getScreenType() == ScreenType::Real ? Colours::dark : Colours::veryDark);
     g.fillRect(buttonRow);
     if (!active) {
         // draw a translucent overlay
@@ -967,9 +981,8 @@ void VisualiserComponent::paint(juce::Graphics& g) {
 void VisualiserComponent::renderScope(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints) {
     time += 0.01f;
     
-    if (graticuleEnabled != settings.getGraticuleEnabled() || smudgesEnabled != settings.getSmudgesEnabled()) {
-        graticuleEnabled = settings.getGraticuleEnabled();
-        smudgesEnabled = settings.getSmudgesEnabled();
+    if (screenType != settings.getScreenType()) {
+        screenType = settings.getScreenType();
         screenTexture = createScreenTexture();
     }
     
