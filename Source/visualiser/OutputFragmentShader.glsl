@@ -4,6 +4,8 @@ uniform sampler2D uTexture0; //line
 uniform sampler2D uTexture1; //tight glow
 uniform sampler2D uTexture2; //big glow
 uniform sampler2D uTexture3; //screen
+uniform sampler2D uTexture4; //reflection
+uniform sampler2D uTexture5; //screen glow
 uniform float uExposure;
 uniform float uSaturation;
 uniform float uNoise;
@@ -43,6 +45,13 @@ void main() {
     vec4 screen = texture2D(uTexture3, vTexCoord);
     vec4 tightGlow = texture2D(uTexture1, linePos);
     vec4 scatter = texture2D(uTexture2, linePos) + (1.0 - uRealScreen) * max(uAmbient - 0.35, 0.0);
+    
+    if (uRealScreen > 0.5) {
+        vec4 reflection = texture2D(uTexture4, vTexCoord);
+        vec4 screenGlow = texture2D(uTexture5, vTexCoord);
+        scatter += screenGlow * reflection * max(1.0 - uAmbient, 0.0);
+    }
+    
     float light = line.r + uGlow * 1.5 * screen.g * screen.g * tightGlow.r;
     light += uGlow * 0.3 * scatter.g * (2.0 + 1.0 * screen.g + 0.5 * screen.r);
     float tlight = 1.0-pow(2.0, -uExposure*light);

@@ -168,12 +168,17 @@ private:
     Texture blur2Texture;
     Texture blur3Texture;
     Texture blur4Texture;
+    Texture glowTexture;
     Texture renderTexture;
     juce::OpenGLTexture screenOpenGLTexture;
+    juce::OpenGLTexture reflectionOpenGLTexture;
     juce::Image screenTextureImage = juce::ImageFileFormat::loadFrom(BinaryData::noise_jpg, BinaryData::noise_jpgSize);
     juce::Image emptyScreenImage = juce::ImageFileFormat::loadFrom(BinaryData::empty_jpg, BinaryData::empty_jpgSize);
     juce::Image oscilloscopeImage = juce::ImageFileFormat::loadFrom(BinaryData::real_jpg, BinaryData::real_jpgSize);
     juce::Image vectorDisplayImage = juce::ImageFileFormat::loadFrom(BinaryData::vector_display_jpg, BinaryData::vector_display_jpgSize);
+    
+    juce::Image emptyReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::no_reflection_jpg, BinaryData::no_reflection_jpgSize);
+    juce::Image vectorDisplayReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::vector_display_reflection_jpg, BinaryData::vector_display_reflection_jpgSize);
     
     OsciPoint REAL_SCREEN_OFFSET = { 0.02, -0.15 };
     OsciPoint REAL_SCREEN_SCALE = { 0.6 };
@@ -183,12 +188,14 @@ private:
     float VECTOR_DISPLAY_FISH_EYE = 0.5;
     
     Texture screenTexture;
+    Texture reflectionTexture;
     std::optional<Texture> targetTexture = std::nullopt;
     
     std::unique_ptr<juce::OpenGLShaderProgram> simpleShader;
     std::unique_ptr<juce::OpenGLShaderProgram> texturedShader;
     std::unique_ptr<juce::OpenGLShaderProgram> blurShader;
     std::unique_ptr<juce::OpenGLShaderProgram> wideBlurShader;
+    std::unique_ptr<juce::OpenGLShaderProgram> glowShader;
     std::unique_ptr<juce::OpenGLShaderProgram> lineShader;
     std::unique_ptr<juce::OpenGLShaderProgram> outputShader;
     juce::OpenGLShaderProgram* currentShader;
@@ -214,7 +221,7 @@ private:
     void saveTextureToQOI(Texture texture, const juce::File& file);
     void activateTargetTexture(std::optional<Texture> texture);
     void setShader(juce::OpenGLShaderProgram* program);
-    void drawTexture(std::optional<Texture> texture0, std::optional<Texture> texture1 = std::nullopt, std::optional<Texture> texture2 = std::nullopt, std::optional<Texture> texture3 = std::nullopt);
+    void drawTexture(std::vector<std::optional<Texture>> textures);
     void setAdditiveBlending();
     void setNormalBlending();
     void drawLine(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints);
@@ -227,6 +234,7 @@ private:
     int renderAudioFile(juce::File& sourceAudio, int method = 1, int width = 1024, int height = 1024);
 
     Texture createScreenTexture();
+    Texture createReflectionTexture();
 
     juce::File audioFile;
 

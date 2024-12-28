@@ -4,6 +4,8 @@
 #include "BlurVertexShader.glsl"
 #include "WideBlurFragmentShader.glsl"
 #include "WideBlurVertexShader.glsl"
+#include "GlowFragmentShader.glsl"
+#include "GlowVertexShader.glsl"
 #include "LineFragmentShader.glsl"
 #include "LineVertexShader.glsl"
 #include "OutputFragmentShader.glsl"
@@ -359,7 +361,7 @@ void VisualiserComponent::initialiseSharedTexture() {
     sharedTextureSender->setSharedTextureId(renderTexture.id);
     sharedTextureSender->setDrawFunction([this] {
         setShader(texturedShader.get());
-        drawTexture(renderTexture);
+        drawTexture({renderTexture});
     });
 }
 
@@ -416,6 +418,11 @@ void VisualiserComponent::newOpenGLContextCreated() {
     wideBlurShader->addFragmentShader(wideBlurFragmentShader);
     wideBlurShader->link();
     
+    glowShader = std::make_unique<juce::OpenGLShaderProgram>(openGLContext);
+    glowShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(glowVertexShader));
+    glowShader->addFragmentShader(glowFragmentShader);
+    glowShader->link();
+    
     glGenBuffers(1, &vertexBuffer);
     glGenBuffers(1, &quadIndexBuffer);
     glGenBuffers(1, &vertexIndexBuffer);
@@ -437,12 +444,16 @@ void VisualiserComponent::openGLContextClosing() {
     glDeleteTextures(1, &blur2Texture.id);
     glDeleteTextures(1, &blur3Texture.id);
     glDeleteTextures(1, &blur4Texture.id);
+    glDeleteTextures(1, &glowTexture.id);
     glDeleteTextures(1, &renderTexture.id);
     screenOpenGLTexture.release();
+    reflectionOpenGLTexture.release();
     
     simpleShader.reset();
     texturedShader.reset();
     blurShader.reset();
+    wideBlurShader.reset();
+    glowShader.reset();
     lineShader.reset();
     outputShader.reset();
 }
@@ -494,7 +505,7 @@ void VisualiserComponent::renderOpenGL() {
         // render texture to screen
         activateTargetTexture(std::nullopt);
         setShader(texturedShader.get());
-        drawTexture(renderTexture);
+        drawTexture({renderTexture});
     }
 }
 
@@ -568,8 +579,10 @@ void VisualiserComponent::setupTextures() {
     blur2Texture = makeTexture(512, 512);
     blur3Texture = makeTexture(128, 128);
     blur4Texture = makeTexture(128, 128);
+    glowTexture = makeTexture(512, 512);
     renderTexture = makeTexture(1024, 1024);
     
+    reflectionTexture = createReflectionTexture();
     screenTexture = createScreenTexture();
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0); // Unbind
@@ -683,31 +696,17 @@ void VisualiserComponent::setShader(juce::OpenGLShaderProgram* program) {
     program->use();
 }
 
-void VisualiserComponent::drawTexture(std::optional<Texture> texture0, std::optional<Texture> texture1, std::optional<Texture> texture2, std::optional<Texture> texture3) {
+void VisualiserComponent::drawTexture(std::vector<std::optional<Texture>> textures) {
     using namespace juce::gl;
     
     glEnableVertexAttribArray(glGetAttribLocation(currentShader->getProgramID(), "aPos"));
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture0.value().id);
-    currentShader->setUniform("uTexture0", 0);
-
-    if (texture1.has_value()) {
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, texture1.value().id);
-        currentShader->setUniform("uTexture1", 1);
-    }
-
-    if (texture2.has_value()) {
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, texture2.value().id);
-        currentShader->setUniform("uTexture2", 2);
-    }
-
-    if (texture3.has_value()) {
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, texture3.value().id);
-        currentShader->setUniform("uTexture3", 3);
+    for (int i = 0; i < textures.size(); ++i) {
+        if (textures[i].has_value()) {
+            glActiveTexture(GL_TEXTURE0 + i);
+            glBindTexture(GL_TEXTURE_2D, textures[i].value().id);
+            currentShader->setUniform(("uTexture" + juce::String(i)).toStdString().c_str(), i);
+        }
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
@@ -822,35 +821,53 @@ void VisualiserComponent::drawCRT() {
     activateTargetTexture(blur1Texture);
     setShader(texturedShader.get());
     texturedShader->setUniform("uResizeForCanvas", lineTexture.width / 1024.0f);
-    drawTexture(lineTexture);
+    drawTexture({lineTexture});
 
-    //horizontal blur 256x256
+    //horizontal blur 512x512
     activateTargetTexture(blur2Texture);
     setShader(blurShader.get());
     blurShader->setUniform("uOffset", 1.0f / 512.0f, 0.0f);
-    drawTexture(blur1Texture);
+    drawTexture({blur1Texture});
 
-    //vertical blur 256x256
+    //vertical blur 512x512
     activateTargetTexture(blur1Texture);
     blurShader->setUniform("uOffset", 0.0f, 1.0f / 512.0f);
-    drawTexture(blur2Texture);
+    drawTexture({blur2Texture});
 
     //preserve blur1 for later
     activateTargetTexture(blur3Texture);
     setShader(texturedShader.get());
     texturedShader->setUniform("uResizeForCanvas", 1.0f);
-    drawTexture(blur1Texture);
+    drawTexture({blur1Texture});
 
     //horizontal blur 128x128
     activateTargetTexture(blur4Texture);
     setShader(wideBlurShader.get());
     wideBlurShader->setUniform("uOffset", 1.0f / 128.0f, 0.0f);
-    drawTexture(blur3Texture);
+    drawTexture({blur3Texture});
 
     //vertical blur 128x128
     activateTargetTexture(blur3Texture);
     wideBlurShader->setUniform("uOffset", 0.0f, 1.0f / 128.0f);
-    drawTexture(blur4Texture);
+    drawTexture({blur4Texture});
+    
+    // create glow texture
+    activateTargetTexture(glowTexture);
+    setShader(glowShader.get());
+    setOffsetAndScale(glowShader.get());
+    drawTexture({blur3Texture});
+    
+    // blur the glow texture to blend it nicely. blur3Texture and blur1Texture are reserved, so we can't use them
+    // horizontal 512x512
+    activateTargetTexture(blur2Texture);
+    setShader(wideBlurShader.get());
+    wideBlurShader->setUniform("uOffset", 1.0f / 512.0f, 0.0f);
+    drawTexture({glowTexture});
+    
+    // vertical 512x512
+    activateTargetTexture(glowTexture);
+    wideBlurShader->setUniform("uOffset", 0.0f, 1.0f / 512.0f);
+    drawTexture({blur2Texture});
 
     activateTargetTexture(renderTexture);
     setShader(outputShader.get());
@@ -866,7 +883,7 @@ void VisualiserComponent::drawCRT() {
     outputShader->setUniform("uResizeForCanvas", lineTexture.width / 1024.0f);
     juce::Colour colour = juce::Colour::fromHSV(settings.getHue() / 360.0f, 1.0, 1.0, 1.0);
     outputShader->setUniform("uColour", colour.getFloatRed(), colour.getFloatGreen(), colour.getFloatBlue());
-    drawTexture(lineTexture, blur1Texture, blur3Texture, screenTexture);
+    drawTexture({lineTexture, blur1Texture, blur3Texture, screenTexture, reflectionTexture, glowTexture});
 }
 
 void VisualiserComponent::setOffsetAndScale(juce::OpenGLShaderProgram* shader) {
@@ -882,8 +899,21 @@ void VisualiserComponent::setOffsetAndScale(juce::OpenGLShaderProgram* shader) {
         scale = { 1.0f };
     }
     shader->setUniform("uOffset", (float) offset.x, (float) offset.y);
-    checkGLErrors("test 4");
     shader->setUniform("uScale", (float) scale.x, (float) scale.y);
+}
+
+Texture VisualiserComponent::createReflectionTexture() {
+    using namespace juce::gl;
+    
+    if (settings.getScreenType() == ScreenType::VectorDisplay) {
+        reflectionOpenGLTexture.loadImage(vectorDisplayReflectionImage);
+    } else {
+        reflectionOpenGLTexture.loadImage(emptyReflectionImage);
+    }
+    
+    Texture texture = { reflectionOpenGLTexture.getTextureID(), reflectionOpenGLTexture.getWidth(), reflectionOpenGLTexture.getHeight() };
+    
+    return texture;
 }
 
 Texture VisualiserComponent::createScreenTexture() {
@@ -1000,6 +1030,7 @@ void VisualiserComponent::renderScope(const std::vector<float>& xPoints, const s
     
     if (screenType != settings.getScreenType()) {
         screenType = settings.getScreenType();
+        reflectionTexture = createReflectionTexture();
         screenTexture = createScreenTexture();
     }
     

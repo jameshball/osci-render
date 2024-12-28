@@ -33,10 +33,14 @@
       </GROUP>
       <GROUP id="{F3C16D02-63B4-E3DA-7498-901173C37D6C}" name="oscilloscope">
         <FILE id="qpPhpN" name="empty.jpg" compile="0" resource="1" file="Resources/oscilloscope/empty.jpg"/>
+        <FILE id="RgmiPU" name="no_reflection.jpg" compile="0" resource="1"
+              file="Resources/oscilloscope/no_reflection.jpg"/>
         <FILE id="dNtZYs" name="noise.jpg" compile="0" resource="1" file="Resources/oscilloscope/noise.jpg"/>
         <FILE id="FyEDbA" name="real.jpg" compile="0" resource="1" file="Resources/oscilloscope/real.jpg"/>
         <FILE id="QrCP4w" name="vector_display.jpg" compile="0" resource="1"
               file="Resources/oscilloscope/vector_display.jpg"/>
+        <FILE id="s3VNsJ" name="vector_display_reflection.jpg" compile="0"
+              resource="1" file="Resources/oscilloscope/vector_display_reflection.jpg"/>
       </GROUP>
       <GROUP id="{82BCD6F1-A8BF-F30B-5587-81EE70168883}" name="svg">
         <FILE id="rl17ZK" name="cog.svg" compile="0" resource="1" file="Resources/svg/cog.svg"/>
@@ -606,6 +610,10 @@
               file="Source/visualiser/BlurFragmentShader.glsl" xcodeResource="0"/>
         <FILE id="c59gvD" name="BlurVertexShader.glsl" compile="0" resource="0"
               file="Source/visualiser/BlurVertexShader.glsl" xcodeResource="0"/>
+        <FILE id="dma1IP" name="GlowFragmentShader.glsl" compile="0" resource="0"
+              file="Source/visualiser/GlowFragmentShader.glsl"/>
+        <FILE id="ytSpvX" name="GlowVertexShader.glsl" compile="0" resource="0"
+              file="Source/visualiser/GlowVertexShader.glsl"/>
         <FILE id="WZFPXF" name="LineFragmentShader.glsl" compile="0" resource="0"
               file="Source/visualiser/LineFragmentShader.glsl" xcodeResource="0"/>
         <FILE id="iS2Ipw" name="LineVertexShader.glsl" compile="0" resource="0"
