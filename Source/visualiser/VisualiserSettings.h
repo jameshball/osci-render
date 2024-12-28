@@ -14,12 +14,13 @@ enum class ScreenType : int {
     Graticule = 2,
     Smudged = 3,
     SmudgedGraticule = 4,
-    Real = 5
+    Real = 5,
+    VectorDisplay = 6,
 };
 
 class ScreenTypeParameter : public IntParameter {
 public:
-    ScreenTypeParameter(juce::String name, juce::String id, int versionHint, ScreenType value) : IntParameter(name, id, versionHint, (int) value, 1, 5) {}
+    ScreenTypeParameter(juce::String name, juce::String id, int versionHint, ScreenType value) : IntParameter(name, id, versionHint, (int) value, 1, 6) {}
 
     juce::String getText(float value, int maximumStringLength = 100) const override {
         switch ((ScreenType)(int)getUnnormalisedValue(value)) {
@@ -33,6 +34,8 @@ public:
                 return "Smudged Graticule";
             case ScreenType::Real:
                 return "Real Oscilloscope";
+            case ScreenType::VectorDisplay:
+                return "Vector Display";
             default:
                 return "Unknown";
         }
@@ -50,6 +53,8 @@ public:
             unnormalisedValue = (int)ScreenType::SmudgedGraticule;
         } else if (text == "Real Oscilloscope") {
             unnormalisedValue = (int)ScreenType::Real;
+        } else if (text == "Vector Display") {
+            unnormalisedValue = (int)ScreenType::VectorDisplay;
         } else {
             unnormalisedValue = (int)ScreenType::Empty;
         }
@@ -62,6 +67,11 @@ public:
 
     void load(juce::XmlElement* xml) {
         setValueNotifyingHost(getValueForText(xml->getStringAttribute("screenType")));
+    }
+    
+    bool isRealisticDisplay() {
+        ScreenType type = (ScreenType)(int)getValueUnnormalised();
+        return type == ScreenType::Real || type == ScreenType::VectorDisplay;
     }
 };
 
@@ -133,7 +143,7 @@ public:
             "Ambient Light",
             "Controls how much ambient light is added to the oscilloscope display.",
             "ambient",
-            VERSION_HINT, 0.8, 0.0, 5.0
+            VERSION_HINT, 0.7, 0.0, 5.0
         )
     );
     std::shared_ptr<Effect> smoothEffect = std::make_shared<Effect>(

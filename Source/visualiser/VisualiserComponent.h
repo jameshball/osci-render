@@ -173,9 +173,14 @@ private:
     juce::Image screenTextureImage = juce::ImageFileFormat::loadFrom(BinaryData::noise_jpg, BinaryData::noise_jpgSize);
     juce::Image emptyScreenImage = juce::ImageFileFormat::loadFrom(BinaryData::empty_jpg, BinaryData::empty_jpgSize);
     juce::Image oscilloscopeImage = juce::ImageFileFormat::loadFrom(BinaryData::real_jpg, BinaryData::real_jpgSize);
+    juce::Image vectorDisplayImage = juce::ImageFileFormat::loadFrom(BinaryData::vector_display_jpg, BinaryData::vector_display_jpgSize);
     
     OsciPoint REAL_SCREEN_OFFSET = { 0.02, -0.15 };
     OsciPoint REAL_SCREEN_SCALE = { 0.6 };
+    
+    OsciPoint VECTOR_DISPLAY_OFFSET = { 0.075, -0.045 };
+    OsciPoint VECTOR_DISPLAY_SCALE = { 0.6 };
+    float VECTOR_DISPLAY_FISH_EYE = 0.5;
     
     Texture screenTexture;
     std::optional<Texture> targetTexture = std::nullopt;
@@ -198,6 +203,7 @@ private:
     chowdsp::ResamplingTypes::LanczosResampler<2048, 8> yResampler;
     chowdsp::ResamplingTypes::LanczosResampler<2048, 8> zResampler;
     
+    void setOffsetAndScale(juce::OpenGLShaderProgram* shader);
     void initialiseSharedTexture();
     void closeSharedTexture();
     Texture makeTexture(int width, int height);

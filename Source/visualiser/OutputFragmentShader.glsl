@@ -10,6 +10,7 @@ uniform float uNoise;
 uniform float uTime;
 uniform float uGlow;
 uniform float uAmbient;
+uniform float uFishEye;
 uniform float uRealScreen;
 uniform vec2 uOffset;
 uniform vec2 uScale;
@@ -29,11 +30,19 @@ float noise(in vec2 uv, in float time) {
 
 void main() {
     vec2 linePos = (vTexCoordCanvas - 0.5) / uScale + 0.5 + uOffset;
+    
+    // fish eye distortion
+    vec2 uv = linePos - vec2(0.5);
+    float uva = atan(uv.x, uv.y);
+    float uvd = sqrt(dot(uv, uv));
+    uvd = uvd * (1.0 + uFishEye * uvd * uvd);
+    linePos = vec2(0.5) + vec2(sin(uva), cos(uva)) * uvd;
+    
     vec4 line = texture2D(uTexture0, linePos);
     // r components have grid; g components do not.
     vec4 screen = texture2D(uTexture3, vTexCoord);
     vec4 tightGlow = texture2D(uTexture1, linePos);
-    vec4 scatter = texture2D(uTexture2, linePos) + (1.0 - uRealScreen) * max(uAmbient - 0.45, 0.0);
+    vec4 scatter = texture2D(uTexture2, linePos) + (1.0 - uRealScreen) * max(uAmbient - 0.35, 0.0);
     float light = line.r + uGlow * 1.5 * screen.g * screen.g * tightGlow.r;
     light += uGlow * 0.3 * scatter.g * (2.0 + 1.0 * screen.g + 0.5 * screen.r);
     float tlight = 1.0-pow(2.0, -uExposure*light);

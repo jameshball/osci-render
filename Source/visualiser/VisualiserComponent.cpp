@@ -783,10 +783,10 @@ void VisualiserComponent::drawLine(const std::vector<float>& xPoints, const std:
     lineShader->setUniform("uFadeAmount", fadeAmount);
     lineShader->setUniform("uNEdges", (GLfloat) nEdges);
     
-    OsciPoint offset = settings.getScreenType() == ScreenType::Real ? REAL_SCREEN_OFFSET : OsciPoint();
-    OsciPoint scale = settings.getScreenType() == ScreenType::Real ? REAL_SCREEN_SCALE : OsciPoint(1);
-    lineShader->setUniform("uOffset", (float) offset.x, (float) offset.y);
-    lineShader->setUniform("uScale", (float) scale.x, (float) scale.y);
+    lineShader->setUniform("uScreenType", (GLfloat) screenType);
+    lineShader->setUniform("uFishEye", screenType == ScreenType::VectorDisplay ? VECTOR_DISPLAY_FISH_EYE : 0.0f);
+    setOffsetAndScale(lineShader.get());
+    
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vertexIndexBuffer);
     int nEdgesThisTime = xPoints.size() - 1;
@@ -860,15 +860,30 @@ void VisualiserComponent::drawCRT() {
     outputShader->setUniform("uTime", time);
     outputShader->setUniform("uGlow", (float) settings.getGlow());
     outputShader->setUniform("uAmbient", (float) settings.getAmbient());
-    OsciPoint offset = settings.getScreenType() == ScreenType::Real ? REAL_SCREEN_OFFSET : OsciPoint();
-    OsciPoint scale = settings.getScreenType() == ScreenType::Real ? REAL_SCREEN_SCALE : OsciPoint(1);
-    outputShader->setUniform("uOffset", (float) offset.x, (float) offset.y);
-    outputShader->setUniform("uScale", (float) scale.x, (float) scale.y);
-    outputShader->setUniform("uRealScreen", settings.getScreenType() == ScreenType::Real ? 1.0f : 0.0f);
+    outputShader->setUniform("uFishEye", screenType == ScreenType::VectorDisplay ? VECTOR_DISPLAY_FISH_EYE : 0.0f);
+    setOffsetAndScale(outputShader.get());
+    outputShader->setUniform("uRealScreen", settings.parameters.screenType->isRealisticDisplay() ? 1.0f : 0.0f);
     outputShader->setUniform("uResizeForCanvas", lineTexture.width / 1024.0f);
     juce::Colour colour = juce::Colour::fromHSV(settings.getHue() / 360.0f, 1.0, 1.0, 1.0);
     outputShader->setUniform("uColour", colour.getFloatRed(), colour.getFloatGreen(), colour.getFloatBlue());
     drawTexture(lineTexture, blur1Texture, blur3Texture, screenTexture);
+}
+
+void VisualiserComponent::setOffsetAndScale(juce::OpenGLShaderProgram* shader) {
+    OsciPoint offset;
+    OsciPoint scale;
+    if (settings.getScreenType() == ScreenType::Real) {
+        offset = REAL_SCREEN_OFFSET;
+        scale = REAL_SCREEN_SCALE;
+    } else if (settings.getScreenType() == ScreenType::VectorDisplay) {
+        offset = VECTOR_DISPLAY_OFFSET;
+        scale = VECTOR_DISPLAY_SCALE;
+    } else {
+        scale = { 1.0f };
+    }
+    shader->setUniform("uOffset", (float) offset.x, (float) offset.y);
+    checkGLErrors("test 4");
+    shader->setUniform("uScale", (float) scale.x, (float) scale.y);
 }
 
 Texture VisualiserComponent::createScreenTexture() {
@@ -878,6 +893,8 @@ Texture VisualiserComponent::createScreenTexture() {
         screenOpenGLTexture.loadImage(screenTextureImage);
     } else if (screenType == ScreenType::Real) {
         screenOpenGLTexture.loadImage(oscilloscopeImage);
+    } else if (screenType == ScreenType::VectorDisplay) {
+        screenOpenGLTexture.loadImage(vectorDisplayImage);
     } else {
         screenOpenGLTexture.loadImage(emptyScreenImage);
     }
