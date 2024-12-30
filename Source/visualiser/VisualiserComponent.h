@@ -75,11 +75,13 @@ private:
     SvgButton fullScreenButton{ "fullScreen", BinaryData::fullscreen_svg, juce::Colours::white, juce::Colours::white };
     SvgButton popOutButton{ "popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::white };
     SvgButton settingsButton{ "settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white };
+    
+#if SOSCI_FEATURES
     SvgButton sharedTextureButton{ "sharedTexture", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red };
+    SharedTextureSender* sharedTextureSender = nullptr;
+#endif
 
     std::function<void(FullScreenMode)> fullScreenCallback;
-
-    SharedTextureSender* sharedTextureSender = nullptr;
 
     VisualiserSettings& settings;
     RecordingParameters& recordingParameters;
@@ -170,14 +172,19 @@ private:
     Texture blur4Texture;
     Texture glowTexture;
     Texture renderTexture;
+    Texture screenTexture;
     juce::OpenGLTexture screenOpenGLTexture;
-    juce::OpenGLTexture reflectionOpenGLTexture;
+    std::optional<Texture> targetTexture = std::nullopt;
+    
     juce::Image screenTextureImage = juce::ImageFileFormat::loadFrom(BinaryData::noise_jpg, BinaryData::noise_jpgSize);
     juce::Image emptyScreenImage = juce::ImageFileFormat::loadFrom(BinaryData::empty_jpg, BinaryData::empty_jpgSize);
+    
+#if SOSCI_FEATURES
     juce::Image oscilloscopeImage = juce::ImageFileFormat::loadFrom(BinaryData::real_jpg, BinaryData::real_jpgSize);
     juce::Image vectorDisplayImage = juce::ImageFileFormat::loadFrom(BinaryData::vector_display_jpg, BinaryData::vector_display_jpgSize);
     
     juce::Image emptyReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::no_reflection_jpg, BinaryData::no_reflection_jpgSize);
+    juce::Image oscilloscopeReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::real_reflection_jpg, BinaryData::real_reflection_jpgSize);
     juce::Image vectorDisplayReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::vector_display_reflection_jpg, BinaryData::vector_display_reflection_jpgSize);
     
     OsciPoint REAL_SCREEN_OFFSET = { 0.02, -0.15 };
@@ -187,15 +194,16 @@ private:
     OsciPoint VECTOR_DISPLAY_SCALE = { 0.6 };
     float VECTOR_DISPLAY_FISH_EYE = 0.5;
     
-    Texture screenTexture;
+    juce::OpenGLTexture reflectionOpenGLTexture;
     Texture reflectionTexture;
-    std::optional<Texture> targetTexture = std::nullopt;
+    
+    std::unique_ptr<juce::OpenGLShaderProgram> glowShader;
+#endif
     
     std::unique_ptr<juce::OpenGLShaderProgram> simpleShader;
     std::unique_ptr<juce::OpenGLShaderProgram> texturedShader;
     std::unique_ptr<juce::OpenGLShaderProgram> blurShader;
     std::unique_ptr<juce::OpenGLShaderProgram> wideBlurShader;
-    std::unique_ptr<juce::OpenGLShaderProgram> glowShader;
     std::unique_ptr<juce::OpenGLShaderProgram> lineShader;
     std::unique_ptr<juce::OpenGLShaderProgram> outputShader;
     juce::OpenGLShaderProgram* currentShader;
@@ -209,10 +217,12 @@ private:
     chowdsp::ResamplingTypes::LanczosResampler<2048, 8> xResampler;
     chowdsp::ResamplingTypes::LanczosResampler<2048, 8> yResampler;
     chowdsp::ResamplingTypes::LanczosResampler<2048, 8> zResampler;
-    
+
     void setOffsetAndScale(juce::OpenGLShaderProgram* shader);
+#if SOSCI_FEATURES
     void initialiseSharedTexture();
     void closeSharedTexture();
+#endif
     Texture makeTexture(int width, int height);
     void setupArrays(int num_points);
     void setupTextures();

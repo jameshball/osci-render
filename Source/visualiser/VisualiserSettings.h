@@ -14,13 +14,18 @@ enum class ScreenType : int {
     Graticule = 2,
     Smudged = 3,
     SmudgedGraticule = 4,
+#if SOSCI_FEATURES
     Real = 5,
     VectorDisplay = 6,
+    MAX = 6,
+#else
+    MAX = 4,
+#endif
 };
 
 class ScreenTypeParameter : public IntParameter {
 public:
-    ScreenTypeParameter(juce::String name, juce::String id, int versionHint, ScreenType value) : IntParameter(name, id, versionHint, (int) value, 1, 6) {}
+    ScreenTypeParameter(juce::String name, juce::String id, int versionHint, ScreenType value) : IntParameter(name, id, versionHint, (int) value, 1, (int)ScreenType::MAX) {}
 
     juce::String getText(float value, int maximumStringLength = 100) const override {
         switch ((ScreenType)(int)getUnnormalisedValue(value)) {
@@ -32,10 +37,12 @@ public:
                 return "Smudged";
             case ScreenType::SmudgedGraticule:
                 return "Smudged Graticule";
+#if SOSCI_FEATURES
             case ScreenType::Real:
                 return "Real Oscilloscope";
             case ScreenType::VectorDisplay:
                 return "Vector Display";
+#endif
             default:
                 return "Unknown";
         }
@@ -51,10 +58,12 @@ public:
             unnormalisedValue = (int)ScreenType::Smudged;
         } else if (text == "Smudged Graticule") {
             unnormalisedValue = (int)ScreenType::SmudgedGraticule;
+#if SOSCI_FEATURES
         } else if (text == "Real Oscilloscope") {
             unnormalisedValue = (int)ScreenType::Real;
         } else if (text == "Vector Display") {
             unnormalisedValue = (int)ScreenType::VectorDisplay;
+#endif
         } else {
             unnormalisedValue = (int)ScreenType::Empty;
         }
@@ -69,10 +78,12 @@ public:
         setValueNotifyingHost(getValueForText(xml->getStringAttribute("screenType")));
     }
     
+#if SOSCI_FEATURES
     bool isRealisticDisplay() {
         ScreenType type = (ScreenType)(int)getValueUnnormalised();
         return type == ScreenType::Real || type == ScreenType::VectorDisplay;
     }
+#endif
 };
 
 class VisualiserParameters {

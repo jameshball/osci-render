@@ -50,21 +50,22 @@ VisualiserComponent::VisualiserComponent(juce::File& lastOpenedDirectory, juce::
     }
     addAndMakeVisible(settingsButton);
     settingsButton.setTooltip("Opens the visualiser settings window.");
-    //if (visualiserOnly) {
-        addAndMakeVisible(sharedTextureButton);
-        sharedTextureButton.setTooltip("Toggles sending the oscilloscope's visuals to a Syphon/Spout receiver.");
-        sharedTextureButton.onClick = [this] {
-            if (sharedTextureSender != nullptr) {
-                openGLContext.executeOnGLThread([this](juce::OpenGLContext& context) {
-                    closeSharedTexture();
-                }, false);
-            } else {
-                openGLContext.executeOnGLThread([this](juce::OpenGLContext& context) {
-                    initialiseSharedTexture();
-                }, false);
-            }
-        };
-    //}
+
+#if SOSCI_FEATURES
+    addAndMakeVisible(sharedTextureButton);
+    sharedTextureButton.setTooltip("Toggles sending the oscilloscope's visuals to a Syphon/Spout receiver.");
+    sharedTextureButton.onClick = [this] {
+        if (sharedTextureSender != nullptr) {
+            openGLContext.executeOnGLThread([this](juce::OpenGLContext& context) {
+                closeSharedTexture();
+            }, false);
+        } else {
+            openGLContext.executeOnGLThread([this](juce::OpenGLContext& context) {
+                initialiseSharedTexture();
+            }, false);
+        }
+    };
+#endif
     
     fullScreenButton.onClick = [this]() {
         enableFullScreen();
@@ -299,9 +300,9 @@ void VisualiserComponent::resized() {
         popOutButton.setBounds(buttons.removeFromRight(30));
     }
     settingsButton.setBounds(buttons.removeFromRight(30));
-    //if (visualiserOnly) {
-        sharedTextureButton.setBounds(buttons.removeFromRight(30));
-    //}
+#if SOSCI_FEATURES
+    sharedTextureButton.setBounds(buttons.removeFromRight(30));
+#endif
     record.setBounds(buttons.removeFromRight(25));
     if (record.getToggleState()) {
         stopwatch.setVisible(true);
@@ -318,9 +319,11 @@ void VisualiserComponent::resized() {
 }
 
 void VisualiserComponent::popoutWindow() {
+#if SOSCI_FEATURES
     if (sharedTextureButton.getToggleState()) {
         sharedTextureButton.triggerClick();
     }
+#endif
     setRecording(false);
     auto visualiser = new VisualiserComponent(lastOpenedDirectory, ffmpegFile, haltRecording, threadManager, settings, recordingParameters, this);
     visualiser->settings.setLookAndFeel(&getLookAndFeel());
@@ -355,6 +358,7 @@ void VisualiserComponent::childUpdated() {
     }
 }
 
+#if SOSCI_FEATURES
 void VisualiserComponent::initialiseSharedTexture() {
     sharedTextureSender = SharedTextureManager::getInstance()->addSender("osci-render - " + juce::String(juce::Time::getCurrentTime().toMilliseconds()), renderTexture.width, renderTexture.height);
     sharedTextureSender->initGL();
@@ -374,6 +378,7 @@ void VisualiserComponent::closeSharedTexture() {
     }
 
 }
+#endif
 
 void VisualiserComponent::newOpenGLContextCreated() {
     using namespace juce::gl;
@@ -418,10 +423,12 @@ void VisualiserComponent::newOpenGLContextCreated() {
     wideBlurShader->addFragmentShader(wideBlurFragmentShader);
     wideBlurShader->link();
     
+#if SOSCI_FEATURES
     glowShader = std::make_unique<juce::OpenGLShaderProgram>(openGLContext);
     glowShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(glowVertexShader));
     glowShader->addFragmentShader(glowFragmentShader);
     glowShader->link();
+#endif
     
     glGenBuffers(1, &vertexBuffer);
     glGenBuffers(1, &quadIndexBuffer);
@@ -433,7 +440,9 @@ void VisualiserComponent::newOpenGLContextCreated() {
 void VisualiserComponent::openGLContextClosing() {
     using namespace juce::gl;
     
+#if SOSCI_FEATURES
     closeSharedTexture();
+#endif
 
     glDeleteBuffers(1, &quadIndexBuffer);
     glDeleteBuffers(1, &vertexIndexBuffer);
@@ -444,16 +453,19 @@ void VisualiserComponent::openGLContextClosing() {
     glDeleteTextures(1, &blur2Texture.id);
     glDeleteTextures(1, &blur3Texture.id);
     glDeleteTextures(1, &blur4Texture.id);
-    glDeleteTextures(1, &glowTexture.id);
     glDeleteTextures(1, &renderTexture.id);
     screenOpenGLTexture.release();
+    
+#if SOSCI_FEATURES
+    glDeleteTextures(1, &glowTexture.id);
     reflectionOpenGLTexture.release();
+    glowShader.reset();
+#endif
     
     simpleShader.reset();
     texturedShader.reset();
     blurShader.reset();
     wideBlurShader.reset();
-    glowShader.reset();
     lineShader.reset();
     outputShader.reset();
 }
@@ -479,11 +491,11 @@ void VisualiserComponent::renderOpenGL() {
                 renderScope(xSamples, ySamples, zSamples);
             }
 
-            //if (parent == nullptr) {
-                if (sharedTextureSender != nullptr) {
-                    sharedTextureSender->renderGL();
-                }
-            //}
+#if SOSCI_FEATURES
+            if (sharedTextureSender != nullptr) {
+                sharedTextureSender->renderGL();
+            }
+#endif
             
             if (record.getToggleState()) {
                 if (recordingVideo) {
@@ -579,11 +591,14 @@ void VisualiserComponent::setupTextures() {
     blur2Texture = makeTexture(512, 512);
     blur3Texture = makeTexture(128, 128);
     blur4Texture = makeTexture(128, 128);
-    glowTexture = makeTexture(512, 512);
     renderTexture = makeTexture(1024, 1024);
     
-    reflectionTexture = createReflectionTexture();
     screenTexture = createScreenTexture();
+    
+#if SOSCI_FEATURES
+    glowTexture = makeTexture(512, 512);
+    reflectionTexture = createReflectionTexture();
+#endif
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0); // Unbind
 }
@@ -781,11 +796,12 @@ void VisualiserComponent::drawLine(const std::vector<float>& xPoints, const std:
     
     lineShader->setUniform("uFadeAmount", fadeAmount);
     lineShader->setUniform("uNEdges", (GLfloat) nEdges);
-    
-    lineShader->setUniform("uScreenType", (GLfloat) screenType);
-    lineShader->setUniform("uFishEye", screenType == ScreenType::VectorDisplay ? VECTOR_DISPLAY_FISH_EYE : 0.0f);
     setOffsetAndScale(lineShader.get());
     
+#if SOSCI_FEATURES
+    lineShader->setUniform("uScreenType", (GLfloat) screenType);
+    lineShader->setUniform("uFishEye", screenType == ScreenType::VectorDisplay ? VECTOR_DISPLAY_FISH_EYE : 0.0f);
+#endif
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vertexIndexBuffer);
     int nEdgesThisTime = xPoints.size() - 1;
@@ -851,23 +867,27 @@ void VisualiserComponent::drawCRT() {
     wideBlurShader->setUniform("uOffset", 0.0f, 1.0f / 128.0f);
     drawTexture({blur4Texture});
     
-    // create glow texture
-    activateTargetTexture(glowTexture);
-    setShader(glowShader.get());
-    setOffsetAndScale(glowShader.get());
-    drawTexture({blur3Texture});
-    
-    // blur the glow texture to blend it nicely. blur3Texture and blur1Texture are reserved, so we can't use them
-    // horizontal 512x512
-    activateTargetTexture(blur2Texture);
-    setShader(wideBlurShader.get());
-    wideBlurShader->setUniform("uOffset", 1.0f / 512.0f, 0.0f);
-    drawTexture({glowTexture});
-    
-    // vertical 512x512
-    activateTargetTexture(glowTexture);
-    wideBlurShader->setUniform("uOffset", 0.0f, 1.0f / 512.0f);
-    drawTexture({blur2Texture});
+#if SOSCI_FEATURES
+    if (settings.parameters.screenType->isRealisticDisplay()) {
+        // create glow texture
+        activateTargetTexture(glowTexture);
+        setShader(glowShader.get());
+        setOffsetAndScale(glowShader.get());
+        drawTexture({blur3Texture});
+        
+        // blur the glow texture to blend it nicely. blur3Texture and blur1Texture are reserved, so we can't use them
+        // horizontal 512x512
+        activateTargetTexture(blur2Texture);
+        setShader(wideBlurShader.get());
+        wideBlurShader->setUniform("uOffset", 1.0f / 512.0f, 0.0f);
+        drawTexture({glowTexture});
+        
+        // vertical 512x512
+        activateTargetTexture(glowTexture);
+        wideBlurShader->setUniform("uOffset", 0.0f, 1.0f / 512.0f);
+        drawTexture({blur2Texture});
+    }
+#endif
 
     activateTargetTexture(renderTexture);
     setShader(outputShader.get());
@@ -877,36 +897,50 @@ void VisualiserComponent::drawCRT() {
     outputShader->setUniform("uTime", time);
     outputShader->setUniform("uGlow", (float) settings.getGlow());
     outputShader->setUniform("uAmbient", (float) settings.getAmbient());
-    outputShader->setUniform("uFishEye", screenType == ScreenType::VectorDisplay ? VECTOR_DISPLAY_FISH_EYE : 0.0f);
     setOffsetAndScale(outputShader.get());
+#if SOSCI_FEATURES
+    outputShader->setUniform("uFishEye", screenType == ScreenType::VectorDisplay ? VECTOR_DISPLAY_FISH_EYE : 0.0f);
     outputShader->setUniform("uRealScreen", settings.parameters.screenType->isRealisticDisplay() ? 1.0f : 0.0f);
+#endif
     outputShader->setUniform("uResizeForCanvas", lineTexture.width / 1024.0f);
     juce::Colour colour = juce::Colour::fromHSV(settings.getHue() / 360.0f, 1.0, 1.0, 1.0);
     outputShader->setUniform("uColour", colour.getFloatRed(), colour.getFloatGreen(), colour.getFloatBlue());
-    drawTexture({lineTexture, blur1Texture, blur3Texture, screenTexture, reflectionTexture, glowTexture});
+    drawTexture({
+        lineTexture,
+        blur1Texture,
+        blur3Texture,
+        screenTexture,
+#if SOSCI_FEATURES
+        reflectionTexture,
+        glowTexture,
+#endif
+    });
 }
 
 void VisualiserComponent::setOffsetAndScale(juce::OpenGLShaderProgram* shader) {
     OsciPoint offset;
-    OsciPoint scale;
+    OsciPoint scale = { 1.0f };
+#if SOSCI_FEATURES
     if (settings.getScreenType() == ScreenType::Real) {
         offset = REAL_SCREEN_OFFSET;
         scale = REAL_SCREEN_SCALE;
     } else if (settings.getScreenType() == ScreenType::VectorDisplay) {
         offset = VECTOR_DISPLAY_OFFSET;
         scale = VECTOR_DISPLAY_SCALE;
-    } else {
-        scale = { 1.0f };
     }
+#endif
     shader->setUniform("uOffset", (float) offset.x, (float) offset.y);
     shader->setUniform("uScale", (float) scale.x, (float) scale.y);
 }
 
+#if SOSCI_FEATURES
 Texture VisualiserComponent::createReflectionTexture() {
     using namespace juce::gl;
     
     if (settings.getScreenType() == ScreenType::VectorDisplay) {
         reflectionOpenGLTexture.loadImage(vectorDisplayReflectionImage);
+    } else if (settings.getScreenType() == ScreenType::Real) {
+        reflectionOpenGLTexture.loadImage(oscilloscopeReflectionImage);
     } else {
         reflectionOpenGLTexture.loadImage(emptyReflectionImage);
     }
@@ -915,16 +949,19 @@ Texture VisualiserComponent::createReflectionTexture() {
     
     return texture;
 }
+#endif
 
 Texture VisualiserComponent::createScreenTexture() {
     using namespace juce::gl;
     
     if (screenType == ScreenType::Smudged || screenType == ScreenType::SmudgedGraticule) {
         screenOpenGLTexture.loadImage(screenTextureImage);
+#if SOSCI_FEATURES
     } else if (screenType == ScreenType::Real) {
         screenOpenGLTexture.loadImage(oscilloscopeImage);
     } else if (screenType == ScreenType::VectorDisplay) {
         screenOpenGLTexture.loadImage(vectorDisplayImage);
+#endif
     } else {
         screenOpenGLTexture.loadImage(emptyScreenImage);
     }
@@ -1011,7 +1048,11 @@ void VisualiserComponent::checkGLErrors(const juce::String& location) {
 
 
 void VisualiserComponent::paint(juce::Graphics& g) {
+#if SOSCI_FEATURES
     g.setColour(settings.getScreenType() == ScreenType::Real ? Colours::dark : Colours::veryDark);
+#else
+    g.setColour(Colours::veryDark);
+#endif
     g.fillRect(buttonRow);
     if (!active) {
         // draw a translucent overlay
@@ -1030,7 +1071,9 @@ void VisualiserComponent::renderScope(const std::vector<float>& xPoints, const s
     
     if (screenType != settings.getScreenType()) {
         screenType = settings.getScreenType();
+#if SOSCI_FEATURES
         reflectionTexture = createReflectionTexture();
+#endif
         screenTexture = createScreenTexture();
     }
     

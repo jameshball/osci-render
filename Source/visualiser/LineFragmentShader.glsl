@@ -28,8 +28,7 @@ float erf(float x) {
     x *= x;
     return s - s / (x * x);
 }
-               
-               
+
 void main() {
     // fish eye distortion
     vec2 uv = vTexCoord - vec2(0.5);

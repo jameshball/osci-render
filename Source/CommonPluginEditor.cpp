@@ -76,7 +76,9 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
 
     tooltipDropShadow.setOwner(&tooltipWindow);
 
+#if SOSCI_FEATURES
     SharedTextureManager::getInstance()->initGL();
+#endif
 }
 
 void CommonPluginEditor::initialiseMenuBar(juce::MenuBarModel& menuBarModel) {
