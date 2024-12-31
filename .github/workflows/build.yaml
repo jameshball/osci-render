@@ -61,17 +61,17 @@ jobs:
           source ./ci/build.sh
         shell: bash
 
-      # - name: Codesign AU plugin
-      #   working-directory: ${{ github.workspace }}/ci/bin
-      #   run: codesign --force --deep -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.component --timestamp
+      - name: Codesign AU plugin
+        working-directory: ${{ github.workspace }}/ci/bin
+        run: codesign -v --force -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.component --timestamp --deep --strict --options=runtime
 
-      # - name: Codesign VST3 plugin
-      #   working-directory: ${{ github.workspace }}/ci/bin
-      #   run: codesign --force --deep -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.vst3 --timestamp
+      - name: Codesign VST3 plugin
+        working-directory: ${{ github.workspace }}/ci/bin
+        run: codesign -v --force -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.vst3 --timestamp --deep --strict --options=runtime
 
-      # - name: Codesign Standalone app
-      #   working-directory: ${{ github.workspace }}/ci/bin
-      #   run: codesign --force --deep -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.app --timestamp
+      - name: Codesign Standalone app
+        working-directory: ${{ github.workspace }}/ci/bin
+        run: codesign -v --force -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.app --timestamp --deep --strict --options=runtime
 
       - name: Download Packages installer build tool
         run: wget http://s.sudre.free.fr/files/Packages_1211_dev.dmg
@@ -91,7 +91,7 @@ jobs:
       - name: Notarize installer
         uses: lando/notarize-action@v2
         with:
-          product-path: ${{ github.workspace }}/packaging/build/osci-render.pkg
+          product-path: ${{ github.workspace }}/bin/osci-render.pkg
           appstore-connect-username: ${{ secrets.APPLE_ID }}
           appstore-connect-password: ${{ secrets.APPLE_NOTARIZATION_PASSWORD }}
           appstore-connect-team-id: ${{ secrets.APPLE_TEAM_ID }}

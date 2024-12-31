@@ -3,6 +3,8 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
+ci/sign.sh
+
 .DS_Store
 
 *.pkg

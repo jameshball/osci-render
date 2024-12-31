@@ -777,8 +777,7 @@
                bigIcon="pSc1mq" applicationCategory="public.app-category.music"
                microphonePermissionNeeded="1" frameworkSearchPaths="../../External/syphon"
                embeddedFrameworks="../../External/syphon/Syphon.framework" extraCustomFrameworks="../../External/syphon/Syphon.framework"
-               hardenedRuntime="1" hardenedRuntimeOptions="com.apple.security.device.audio-input"
-               iosDevelopmentTeamID="D86A3M3H2L">
+               hardenedRuntime="1" hardenedRuntimeOptions="com.apple.security.device.audio-input">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '@executable_path/../Frameworks' '@executable_path/'"/>
         <CONFIGURATION name="Release" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '@executable_path/../Frameworks' '@executable_path/'"/>
