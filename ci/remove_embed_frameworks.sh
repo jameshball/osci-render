@@ -8,6 +8,7 @@ fi
 # Path to the project.pbxproj file
 PBXPROJ_FILE="$1"
 PROJECT_NAME="$2"
+TARGET_NAME="$3"
 
 if [[ ! -f "$PBXPROJ_FILE" ]]; then
     echo "Error: File '$PBXPROJ_FILE' not found!"
@@ -47,23 +48,23 @@ awk '
     }
 ' "$PBXPROJ_FILE" > "$TEMP_EMBED_FILE"
 
-# Step 2: Find the ID of the 'VST3 Manifest Helper' target
-TARGET_ID=$(grep -E "^\s*[A-Z0-9]+ \/\* $PROJECT_NAME - VST3 Manifest Helper \*\/ = {" "$PBXPROJ_FILE" | grep -oE '^\s*[A-Z0-9]+' | tr -d '[:space:]')
+# Step 2: Find the ID of the target
+TARGET_ID=$(grep -E "^\s*[A-Z0-9]+ \/\* $PROJECT_NAME - $TARGET_NAME \*\/ = {" "$PBXPROJ_FILE" | grep -oE '^\s*[A-Z0-9]+' | tr -d '[:space:]')
 
 if [[ -z "$TARGET_ID" ]]; then
-    echo "Error: Could not find the 'VST3 Manifest Helper' target!"
+    echo "Error: Could not find the '$TARGET_NAME' target!"
     exit 1
 fi
 
 echo "Debug: Found target ID: $TARGET_ID"
 
-# Step 3: Extract the buildPhases for the 'VST3 Manifest Helper' target
-echo "Debug: Extracting buildPhases for the 'VST3 Manifest Helper' target..."
-BUILD_PHASES=$(awk -v target_id="$TARGET_ID" -v project_name="$PROJECT_NAME" '
+# Step 3: Extract the buildPhases for the target
+echo "Debug: Extracting buildPhases for the '$TARGET_NAME' target..."
+BUILD_PHASES=$(awk -v target_id="$TARGET_ID" -v project_name="$PROJECT_NAME" -v target_name="$TARGET_NAME" '
     BEGIN { found_target = 0; in_build_phases = 0; }
     {
         # Look for the target block
-        if ($0 ~ target_id " /\\* " project_name " - VST3 Manifest Helper \\*/ = \\{") { found_target = 1; }
+        if ($0 ~ target_id " /\\* " project_name " - " target_name " \\*/ = \\{") { found_target = 1; }
 
         # Capture the buildPhases section
         if (found_target && $0 ~ /buildPhases = \(/) { 
@@ -87,7 +88,7 @@ BUILD_PHASES=$(awk -v target_id="$TARGET_ID" -v project_name="$PROJECT_NAME" '
 ' "$PBXPROJ_FILE" | grep -oE '^\s*[A-Z0-9]+' | tr -d "[:blank:]")
 
 # Debug: Show the captured buildPhases
-echo "Debug: Build Phases for 'VST3 Manifest Helper':"
+echo "Debug: Build Phases for '$TARGET_NAME':"
 echo "$BUILD_PHASES"
 
 # Step 4: Extract the Embed Framework ID that matches the build phase ID
@@ -132,4 +133,4 @@ awk -v embed_id="$EMBED_ID" '
 # Replace the original file with the modified file
 mv "$TEMP_FILE" "$PBXPROJ_FILE"
 
-echo "Successfully removed the Embed Frameworks block for 'VST3 Manifest Helper'."
+echo "Successfully removed the Embed Frameworks block for '$TARGET_NAME'."
