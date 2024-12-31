@@ -37,13 +37,22 @@ jobs:
       - name: Fix up git URLs
         run: echo -e '[url "https://github.com/"]\n  insteadOf = "git@github.com:"' >> ~/.gitconfig
         shell: bash
+
       - uses: actions/checkout@v1
         with:
           token: ${{ secrets.ACCESS_TOKEN }}
           submodules: true
+
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest
+
+      - name: Setup temporary keychain and add application and installer signing certificate
+        uses: apple-actions/import-codesign-certs@v1
+        with: 
+          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
+          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
       - name: "Run script"
         run: |
           export OS="mac"
@@ -52,23 +61,17 @@ jobs:
           source ./ci/build.sh
         shell: bash
 
-      - name: Setup temporary keychain and add application and installer signing certificate
-        uses: apple-actions/import-codesign-certs@v1
-        with: 
-          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
-          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      # - name: Codesign AU plugin
+      #   working-directory: ${{ github.workspace }}/ci/bin
+      #   run: codesign --force --deep -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.component --timestamp
 
-      - name: Codesign AU plugin
-        working-directory: ${{ github.workspace }}/ci/bin
-        run: codesign --force --deep -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.component --timestamp
+      # - name: Codesign VST3 plugin
+      #   working-directory: ${{ github.workspace }}/ci/bin
+      #   run: codesign --force --deep -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.vst3 --timestamp
 
-      - name: Codesign VST3 plugin
-        working-directory: ${{ github.workspace }}/ci/bin
-        run: codesign --force --deep -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.vst3 --timestamp
-
-      - name: Codesign Standalone app
-        working-directory: ${{ github.workspace }}/ci/bin
-        run: codesign --force --deep -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.app --timestamp
+      # - name: Codesign Standalone app
+      #   working-directory: ${{ github.workspace }}/ci/bin
+      #   run: codesign --force --deep -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.app --timestamp
 
       - name: Download Packages installer build tool
         run: wget http://s.sudre.free.fr/files/Packages_1211_dev.dmg
