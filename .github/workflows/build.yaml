@@ -86,7 +86,21 @@ jobs:
         run: productsign -s "${{ secrets.APPLE_DEVELOPER_ID_INSTALLER }}" "${{ github.workspace }}/packaging/build/osci-render.pkg" "${{ github.workspace }}/bin/osci-render.pkg"
     
       - name: Notarize installer
-        run: xcrun altool --notarize-app -f "${{ github.workspace }}/bin/osci-render.pkg" --primary-bundle-id com.osci-render.pkg --username "${{ secrets.APPLE_ID }}" --password "${{ secrets.APPLE_NOTARIZATION_PASSWORD }}"
+        uses: lando/notarize-action@v2
+        with:
+          product-path: ${{ github.workspace }}/packaging/build/osci-render.pkg
+          appstore-connect-username: ${{ secrets.APPLE_ID }}
+          appstore-connect-password: ${{ secrets.APPLE_NOTARIZATION_PASSWORD }}
+          appstore-connect-team-id: ${{ secrets.APPLE_TEAM_ID }}
+          primary-bundle-id: com.osci-render.pkg
+          tool: notarytool
+          verbose: true
+      
+      - name: Staple installer
+        run: xcrun stapler staple "${{ github.workspace }}/bin/osci-render.pkg"
+      
+      - name: Check installer
+        run: spctl -a -vvv -t install "${{ github.workspace }}/bin/osci-render.pkg"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
