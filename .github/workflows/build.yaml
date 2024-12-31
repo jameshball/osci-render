@@ -60,15 +60,15 @@ jobs:
 
       - name: Codesign AU plugin
         working-directory: ${{ github.workspace }}/ci/bin
-        run: codesign --force -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.component --timestamp
+        run: codesign --force --deep -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.component --timestamp
 
       - name: Codesign VST3 plugin
         working-directory: ${{ github.workspace }}/ci/bin
-        run: codesign --force -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.vst3 --timestamp
+        run: codesign --force --deep -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.vst3 --timestamp
 
       - name: Codesign Standalone app
         working-directory: ${{ github.workspace }}/ci/bin
-        run: codesign --force -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.app --timestamp
+        run: codesign --force --deep -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.app --timestamp
 
       - name: Download Packages installer build tool
         run: wget http://s.sudre.free.fr/files/Packages_1211_dev.dmg
