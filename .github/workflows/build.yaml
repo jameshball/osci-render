@@ -52,11 +52,11 @@ jobs:
           source ./ci/build.sh
         shell: bash
 
-      - name: Setup temporary keychain and add application signing certificate
+      - name: Setup temporary keychain and add application and installer signing certificate
         uses: apple-actions/import-codesign-certs@v1
         with: 
-          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE_APPLICATION }}
-          p12-password: ${{ secrets.APPLE_CERTIFICATE_APPLICATION_PASSWORD }}
+          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
+          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
       - name: Codesign AU plugin
         working-directory: ${{ github.workspace }}/ci/bin
@@ -81,12 +81,6 @@ jobs:
 
       - name: Build installer
         run: packagesbuild --project "${{ github.workspace }}/packaging/osci-render.pkgproj"
-
-      - name: Setup temporary keychain and add installer signing certificate
-        uses: apple-actions/import-codesign-certs@v1
-        with: 
-          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE_INSTALLER }}
-          p12-password: ${{ secrets.APPLE_CERTIFICATE_INSTALLER_PASSWORD }}
 
       - name: Sign installer
         run: productsign -s "${{ secrets.APPLE_DEVELOPER_ID_INSTALLER }}" "${{ github.workspace }}/packaging/osci-render.pkg" "${{ github.workspace }}/bin/osci-render.pkg"
