@@ -92,7 +92,7 @@ jobs:
         run: productsign -s "${{ secrets.APPLE_DEVELOPER_ID_INSTALLER }}" "${{ github.workspace }}/packaging/osci-render.pkg" "${{ github.workspace }}/bin/osci-render.pkg"
     
       - name: Notarize installer
-        run: npx notarize-cli --file "${{ github.workspace }}/packaging/osci-render-signed.pkg" --bundle-id com.osci-render.pkg --username ${{ secrets.APPLE_ID }} --password ${{ secrets.APPLE_NOTARIZATION_PW }}
+        run: npx notarize-cli --file "${{ github.workspace }}/packaging/osci-render-signed.pkg" --bundle-id com.osci-render.pkg --username ${{ secrets.APPLE_ID }} --password ${{ secrets.APPLE_NOTARIZATION_PASSWORD }}
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
