@@ -8,9 +8,6 @@ eval "$RESAVE_COMMAND"
 
 # Build mac version
 if [ "$OS" = "mac" ]; then
-  cat "$ROOT/Builds/MacOSX/$PLUGIN.xcodeproj/project.pbxproj"
-  "$ROOT/ci/remove_embed_frameworks.sh" "$ROOT/Builds/MacOSX/$PLUGIN.xcodeproj/project.pbxproj" $PLUGIN
-
   cd "$ROOT/Builds/MacOSX"
   xcodebuild -configuration Release || exit 1
 
