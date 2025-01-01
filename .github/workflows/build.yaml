@@ -72,26 +72,26 @@ jobs:
           source ./ci/build.sh
         shell: bash
 
-      - name: Codesign AU plugin
-        working-directory: ${{ github.workspace }}/ci/bin
-        run: |
-          codesign -vvvv --force -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.component --timestamp --deep --strict --options=runtime
-          codesign -vvvv --deep --strict osci-render.component
-          codesign -dv --verbose=4 osci-render.component
+      # - name: Codesign AU plugin
+      #   working-directory: ${{ github.workspace }}/ci/bin
+      #   run: |
+      #     codesign -vvvv --force -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.component --timestamp --deep --strict --options=runtime
+      #     codesign -vvvv --deep --strict osci-render.component
+      #     codesign -dv --verbose=4 osci-render.component
 
-      - name: Codesign VST3 plugin
-        working-directory: ${{ github.workspace }}/ci/bin
-        run: |
-          codesign -vvvv --force -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.vst3 --timestamp --deep --strict --options=runtime
-          codesign -vvvv --deep --strict osci-render.vst3
-          codesign -dv --verbose=4 osci-render.vst3
+      # - name: Codesign VST3 plugin
+      #   working-directory: ${{ github.workspace }}/ci/bin
+      #   run: |
+      #     codesign -vvvv --force -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.vst3 --timestamp --deep --strict --options=runtime
+      #     codesign -vvvv --deep --strict osci-render.vst3
+      #     codesign -dv --verbose=4 osci-render.vst3
 
-      - name: Codesign Standalone app
-        working-directory: ${{ github.workspace }}/ci/bin
-        run: |
-          codesign -vvvv --force -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.app --timestamp --deep --strict --options=runtime
-          codesign -vvvv --deep --strict osci-render.app
-          codesign -dv --verbose=4 osci-render.app
+      # - name: Codesign Standalone app
+      #   working-directory: ${{ github.workspace }}/ci/bin
+      #   run: |
+      #     codesign -vvvv --force -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.app --timestamp --deep --strict --options=runtime
+      #     codesign -vvvv --deep --strict osci-render.app
+      #     codesign -dv --verbose=4 osci-render.app
 
       - name: Download Packages installer build tool
         run: wget http://s.sudre.free.fr/files/Packages_1211_dev.dmg
