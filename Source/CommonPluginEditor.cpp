@@ -47,8 +47,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     };
 
     visualiserSettings.setLookAndFeel(&getLookAndFeel());
-    visualiserSettings.setSize(550, 450);
-    visualiserSettingsWindow.setContentNonOwned(&visualiserSettings, true);
+    visualiserSettings.setSize(550, 600);
     visualiserSettingsWindow.centreWithSize(550, 450);
 #if JUCE_WINDOWS
     // if not standalone, use native title bar for compatibility with DAWs
@@ -58,8 +57,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
 #endif
 
     recordingSettings.setLookAndFeel(&getLookAndFeel());
-    recordingSettings.setSize(300, 200);
-    recordingSettingsWindow.setContentNonOwned(&recordingSettings, true);
+    recordingSettings.setSize(300, 300);
     recordingSettingsWindow.centreWithSize(300, 200);
 #if JUCE_WINDOWS
     // if not standalone, use native title bar for compatibility with DAWs

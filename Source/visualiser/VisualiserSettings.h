@@ -253,11 +253,23 @@ private:
 
 class SettingsWindow : public juce::DocumentWindow {
 public:
-    SettingsWindow(juce::String name) : juce::DocumentWindow(name, Colours::darker, juce::DocumentWindow::TitleBarButtons::closeButton) {
+    SettingsWindow(juce::String name, juce::Component& component) : juce::DocumentWindow(name, Colours::darker, juce::DocumentWindow::TitleBarButtons::closeButton), component(component) {
+        juce::Component::addAndMakeVisible(viewport);
         setResizable(false, false);
+        viewport.setViewedComponent(&component, false);
+        viewport.setScrollBarsShown(false, false, true, false);
+        setAlwaysOnTop(true);
     }
     
     void closeButtonPressed() override {
         setVisible(false);
     }
+    
+    void resized() override {
+        viewport.setBounds(getLocalBounds());
+    }
+    
+private:
+    juce::Viewport viewport;
+    juce::Component& component;
 };
