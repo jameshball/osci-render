@@ -47,9 +47,9 @@ if [ "$OS" = "win" ]; then
   cd "$ROOT/Builds/$PLUGIN/VisualStudio2022"
   "$MSBUILD_EXE" "$PLUGIN.sln" "//p:VisualStudioVersion=16.0" "//m" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64" "//restore" "//p:RestorePackagesConfig=true"
   cd "$ROOT/ci/bin"
-  cp "$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Release/Standalone Plugin/$PLUGIN.exe" "$ROOT/bin"
-  cp "$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Release/Standalone Plugin/$PLUGIN.pdb" "$ROOT/bin"
-  cp -r "$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Release/VST3/$PLUGIN.vst3/Contents/x86_64-win/$PLUGIN.vst3" "$ROOT/bin"
+  cp "$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Release/Standalone Plugin/$PLUGIN.exe" "$ROOT/bin/$PLUGIN-win.exe"
+  cp "$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Release/Standalone Plugin/$PLUGIN.pdb" "$ROOT/bin/$PLUGIN-win.pdb"
+  cp -r "$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Release/VST3/$PLUGIN.vst3/Contents/x86_64-win/$PLUGIN.vst3" "$ROOT/bin/$PLUGIN-win.vst3"
 fi
 
 cd "$ROOT"

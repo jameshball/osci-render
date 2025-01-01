@@ -16,10 +16,12 @@ jobs:
       - name: Fix up git URLs
         run: echo -e '[url "https://github.com/"]\n  insteadOf = "git@github.com:"' >> ~/.gitconfig
         shell: bash
+
       - uses: actions/checkout@v1
         with:
           token: ${{ secrets.ACCESS_TOKEN }}
           submodules: true
+
       - name: "Run script"
         run: |
           export OS="linux"
@@ -27,6 +29,7 @@ jobs:
           source ./ci/test.sh
           source ./ci/build.sh "${{ matrix.project }}"
         shell: bash
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
@@ -88,17 +91,17 @@ jobs:
         run: sudo installer -pkg /Volumes/Packages\ 1.2.11/Install\ Packages.pkg -target /
 
       - name: Build installer
-        run: packagesbuild --project "${{ github.workspace }}/packaging/${{ matrix.project }}.pkgproj"
+        run: packagesbuild --project "packaging/${{ matrix.project }}.pkgproj"
 
       - name: Sign installer
         run: |
-          productsign -s "${{ secrets.APPLE_DEVELOPER_ID_INSTALLER }}" "${{ github.workspace }}/packaging/build/${{ matrix.project }}.pkg" "${{ github.workspace }}/bin/${{ matrix.project }}.pkg"
-          pkgutil --check-signature "${{ github.workspace }}/bin/${{ matrix.project }}.pkg"
+          productsign -s "${{ secrets.APPLE_DEVELOPER_ID_INSTALLER }}" "packaging/build/${{ matrix.project }}.pkg" "bin/${{ matrix.project }}.pkg"
+          pkgutil --check-signature "bin/${{ matrix.project }}.pkg"
     
       - name: Notarize installer
         uses: lando/notarize-action@v2
         with:
-          product-path: ${{ github.workspace }}/bin/${{ matrix.project }}.pkg
+          product-path: "bin/${{ matrix.project }}.pkg"
           appstore-connect-username: ${{ secrets.APPLE_ID }}
           appstore-connect-password: ${{ secrets.APPLE_NOTARIZATION_PASSWORD }}
           appstore-connect-team-id: ${{ secrets.APPLE_TEAM_ID }}
@@ -107,10 +110,10 @@ jobs:
           verbose: true
       
       - name: Staple installer
-        run: xcrun stapler staple "${{ github.workspace }}/bin/${{ matrix.project }}.pkg"
+        run: xcrun stapler staple "bin/${{ matrix.project }}.pkg"
       
       - name: Check installer
-        run: spctl -a -vvv -t install "${{ github.workspace }}/bin/${{ matrix.project }}.pkg"
+        run: spctl -a -vvv -t install "bin/${{ matrix.project }}.pkg"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
@@ -128,14 +131,18 @@ jobs:
       - name: Fix up git URLs
         run: echo -e '[url "https://github.com/"]\n  insteadOf = "git@github.com:"' >> ~/.gitconfig
         shell: bash
+
       - uses: actions/checkout@v1
         with:
           token: ${{ secrets.ACCESS_TOKEN }}
           submodules: true
+
       - name: Setup NuGet.exe for use with actions
         uses: NuGet/setup-nuget@v1.0.5
+
       - name: NuGet Sources
         run: nuget sources
+
       - name: "Run script"
         run: |
           export OS="win"
@@ -143,6 +150,15 @@ jobs:
           source ./ci/test.sh
           source ./ci/build.sh "${{ matrix.project }}"
         shell: bash
+      
+      - name: Compile .ISS to .EXE Installer
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+        with:
+          path: "packaging/${{ matrix.project }}.iss"
+      
+      - name: Move installer to bin
+        run: mv "packaging/build/${{ matrix.project }}.exe" "bin/${{ matrix.project }}.exe"
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:

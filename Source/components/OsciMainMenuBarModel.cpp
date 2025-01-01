@@ -48,7 +48,9 @@ OsciMainMenuBarModel::OsciMainMenuBarModel(OscirenderAudioProcessor& p, Oscirend
         editor.openRecordingSettings();
     });
 
-    addMenuItem(3, "Settings...", [this] {
-        editor.openAudioSettings();
-    });
+    if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
+        addMenuItem(3, "Settings...", [this] {
+            editor.openAudioSettings();
+        });
+    }
 }
