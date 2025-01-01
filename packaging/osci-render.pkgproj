@@ -79,7 +79,7 @@
 															<key>GID</key>
 															<integer>0</integer>
 															<key>PATH</key>
-															<string>../Builds/MacOSX/build/Release/osci-render.component</string>
+															<string>../Builds/osci-render/MacOSX/build/Release/osci-render.component</string>
 															<key>PATH_TYPE</key>
 															<integer>1</integer>
 															<key>PERMISSIONS</key>
@@ -647,7 +647,7 @@
 															<key>GID</key>
 															<integer>0</integer>
 															<key>PATH</key>
-															<string>../Builds/MacOSX/build/Release/osci-render.vst3</string>
+															<string>../Builds/osci-render/MacOSX/build/Release/osci-render.vst3</string>
 															<key>PATH_TYPE</key>
 															<integer>1</integer>
 															<key>PERMISSIONS</key>
@@ -1159,7 +1159,7 @@
 									<key>GID</key>
 									<integer>80</integer>
 									<key>PATH</key>
-									<string>../Builds/MacOSX/build/Release/osci-render.app</string>
+									<string>../Builds/osci-render/MacOSX/build/Release/osci-render.app</string>
 									<key>PATH_TYPE</key>
 									<integer>1</integer>
 									<key>PERMISSIONS</key>
