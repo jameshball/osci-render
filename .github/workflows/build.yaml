@@ -47,11 +47,26 @@ jobs:
         with:
           xcode-version: latest
 
-      - name: Setup temporary keychain and add application and installer signing certificate
-        uses: apple-actions/import-codesign-certs@v1
-        with: 
-          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
-          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      - name: Import application certificates
+        id: import-certificates
+        if: startsWith(matrix.os, 'mac')
+        uses: apple-actions/import-codesign-certs@v2
+        with:
+          keychain: oscirender
+          keychain-password: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
+          p12-file-base64: ${{ secrets.APPLE_APPLICATION_CERTIFICATE }}
+          p12-password: ${{ secrets.APPLE_APPLICATION_CERTIFICATE_PASSWORD }}
+
+      - name: Import installer certificates
+        id: import-installer-certificates
+        if: startsWith(matrix.os, 'mac')
+        uses: apple-actions/import-codesign-certs@v2
+        with:
+          keychain: oscirender
+          keychain-password: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
+          p12-file-base64: ${{ secrets.APPLE_INSTALLER_CERTIFICATE }}
+          p12-password: ${{ secrets.APPLE_INSTALLER_CERTIFICATE_PASSWORD }}
+          create-keychain: false
 
       - name: "Run script"
         run: |
@@ -63,15 +78,21 @@ jobs:
 
       - name: Codesign AU plugin
         working-directory: ${{ github.workspace }}/ci/bin
-        run: codesign -vvv --force -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.component --timestamp --deep --strict --options=runtime
+        run: |
+          codesign -vvv --force -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.component --timestamp --deep --strict --options=runtime
+          codesign -vvv --deep --strict osci-render.component
 
       - name: Codesign VST3 plugin
         working-directory: ${{ github.workspace }}/ci/bin
-        run: codesign -vvv --force -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.vst3 --timestamp --deep --strict --options=runtime
+        run: |
+          codesign -vvv --force -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.vst3 --timestamp --deep --strict --options=runtime
+          codesign -vvv --deep --strict osci-render.vst3
 
       - name: Codesign Standalone app
         working-directory: ${{ github.workspace }}/ci/bin
-        run: codesign -vvv --force -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.app --timestamp --deep --strict --options=runtime
+        run: |
+          codesign -vvv --force -s "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}" osci-render.app --timestamp --deep --strict --options=runtime
+          codesign -vvv --deep --strict osci-render.app
 
       - name: Download Packages installer build tool
         run: wget http://s.sudre.free.fr/files/Packages_1211_dev.dmg
@@ -86,7 +107,9 @@ jobs:
         run: packagesbuild --project "${{ github.workspace }}/packaging/osci-render.pkgproj"
 
       - name: Sign installer
-        run: productsign -s "${{ secrets.APPLE_DEVELOPER_ID_INSTALLER }}" "${{ github.workspace }}/packaging/build/osci-render.pkg" "${{ github.workspace }}/bin/osci-render.pkg"
+        run: |
+          productsign -s "${{ secrets.APPLE_DEVELOPER_ID_INSTALLER }}" "${{ github.workspace }}/packaging/build/osci-render.pkg" "${{ github.workspace }}/bin/osci-render.pkg"
+          pkgutil --check-signature "${{ github.workspace }}/bin/osci-render.pkg"
     
       - name: Notarize installer
         uses: lando/notarize-action@v2
