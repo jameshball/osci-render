@@ -48,9 +48,7 @@ jobs:
           xcode-version: latest
 
       - name: Import application certificates
-        id: import-certificates
-        if: startsWith(matrix.os, 'mac')
-        uses: apple-actions/import-codesign-certs@v2
+        uses: apple-actions/import-codesign-certs@v3
         with:
           keychain: oscirender
           keychain-password: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
@@ -58,9 +56,7 @@ jobs:
           p12-password: ${{ secrets.APPLE_APPLICATION_CERTIFICATE_PASSWORD }}
 
       - name: Import installer certificates
-        id: import-installer-certificates
-        if: startsWith(matrix.os, 'mac')
-        uses: apple-actions/import-codesign-certs@v2
+        uses: apple-actions/import-codesign-certs@v3
         with:
           keychain: oscirender
           keychain-password: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
