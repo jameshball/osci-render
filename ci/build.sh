@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-PLUGIN="osci-render"
+PLUGIN="$1"
 
 # Resave jucer file
 RESAVE_COMMAND="$PROJUCER_PATH --resave '$ROOT/$PLUGIN.jucer'"
@@ -8,10 +8,10 @@ eval "$RESAVE_COMMAND"
 
 # Build mac version
 if [ "$OS" = "mac" ]; then
-  cd "$ROOT/Builds/MacOSX"
+  cd "$ROOT/Builds/$PLUGIN/MacOSX"
   xcodebuild -configuration Release || exit 1
 
-  cp -R "$ROOT/Builds/MacOSX/build/Release/$PLUGIN.app" "$ROOT/ci/bin"
+  cp -R "$ROOT/Builds/$PLUGIN/MacOSX/build/Release/$PLUGIN.app" "$ROOT/ci/bin"
   cp -R ~/Library/Audio/Plug-Ins/VST3/$PLUGIN.vst3 "$ROOT/ci/bin"
   cp -R ~/Library/Audio/Plug-Ins/Components/$PLUGIN.component "$ROOT/ci/bin"
 
@@ -25,7 +25,7 @@ fi
 
 # Build linux version
 if [ "$OS" = "linux" ]; then
-  cd "$ROOT/Builds/LinuxMakefile"
+  cd "$ROOT/Builds/$PLUGIN/LinuxMakefile"
   make CONFIG=Release
 
   cp -r ./build/$PLUGIN.vst3 ./build/$PLUGIN "$ROOT/ci/bin"
@@ -44,12 +44,12 @@ if [ "$OS" = "win" ]; then
   MSBUILD_EXE=$("$VS_WHERE" -latest -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\MSBuild.exe")
   echo $MSBUILD_EXE
 
-  cd "$ROOT/Builds/VisualStudio2022"
+  cd "$ROOT/Builds/$PLUGIN/VisualStudio2022"
   "$MSBUILD_EXE" "$PLUGIN.sln" "//p:VisualStudioVersion=16.0" "//m" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64" "//restore" "//p:RestorePackagesConfig=true"
   cd "$ROOT/ci/bin"
-  cp "$ROOT/Builds/VisualStudio2022/x64/Release/Standalone Plugin/$PLUGIN.exe" "$ROOT/bin"
-  cp "$ROOT/Builds/VisualStudio2022/x64/Release/Standalone Plugin/$PLUGIN.pdb" "$ROOT/bin"
-  cp -r "$ROOT/Builds/VisualStudio2022/x64/Release/VST3/$PLUGIN.vst3/Contents/x86_64-win/$PLUGIN.vst3" "$ROOT/bin"
+  cp "$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Release/Standalone Plugin/$PLUGIN.exe" "$ROOT/bin"
+  cp "$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Release/Standalone Plugin/$PLUGIN.pdb" "$ROOT/bin"
+  cp -r "$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Release/VST3/$PLUGIN.vst3/Contents/x86_64-win/$PLUGIN.vst3" "$ROOT/bin"
 fi
 
 cd "$ROOT"
