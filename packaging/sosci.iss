@@ -32,7 +32,8 @@ ChangesAssociations=yes
 DisableProgramGroupPage=yes
 ; Uncomment the following line to run in non administrative install mode (install for current user only.)
 ;PrivilegesRequired=lowest
-OutputBaseFilename=osci-render
+OutputDir=build
+OutputBaseFilename=sosci
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -45,8 +46,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "deletefiles"; Description: "Remove any existing settings (Clean installation)"; Flags: unchecked
 
 [Files]
-Source: "..\Builds\VisualStudio2022\x64\Release\Standalone Plugin\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\Builds\VisualStudio2022\x64\Release\VST3\{#MyAppVstName}\Contents\x86_64-win\{#MyAppVstName}"; DestDir: "{cf}\VST3"
+Source: "..\Builds\sosci\VisualStudio2022\x64\Release\Standalone Plugin\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\Builds\sosci\VisualStudio2022\x64\Release\VST3\{#MyAppVstName}\Contents\x86_64-win\{#MyAppVstName}"; DestDir: "{cf}\VST3"
 Source: "..\External\spout\SpoutLibrary.dll"; DestDir: "{app}"
 Source: "..\External\spout\SpoutLibrary.dll"; DestDir: "{sys}"
 
