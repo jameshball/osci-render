@@ -20,6 +20,9 @@
       </GROUP>
       <GROUP id="{525C568C-29E9-D0A2-9773-8A04981C5575}" name="images">
         <FILE id="jI9VSZ" name="logo.png" compile="0" resource="1" file="Resources/images/logo.png"/>
+        <FILE id="G294jK" name="sosci_mac.png" compile="0" resource="1" file="Resources/images/sosci_mac.png"/>
+        <FILE id="CeSRLV" name="sosci_mac_saturated.png" compile="0" resource="1"
+              file="Resources/images/sosci_mac_saturated.png"/>
       </GROUP>
       <GROUP id="{F3C16D02-63B4-E3DA-7498-901173C37D6C}" name="oscilloscope">
         <FILE id="qpPhpN" name="empty.jpg" compile="0" resource="1" file="Resources/oscilloscope/empty.jpg"/>
@@ -251,8 +254,8 @@
       </MODULEPATHS>
     </VS2022>
     <XCODE_MAC targetFolder="Builds/sosci/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak"
-               extraDefs="JUCE_SILENCE_XCODE_15_LINKER_WARNING=1" smallIcon="pSc1mq"
-               bigIcon="pSc1mq" applicationCategory="public.app-category.music"
+               extraDefs="JUCE_SILENCE_XCODE_15_LINKER_WARNING=1" smallIcon="CeSRLV"
+               bigIcon="CeSRLV" applicationCategory="public.app-category.music"
                microphonePermissionNeeded="1" embeddedFrameworks="../../../External/syphon/Syphon.framework"
                extraCustomFrameworks="../../../External/syphon/Syphon.framework"
                frameworkSearchPaths="../../../External/syphon" hardenedRuntime="1"
