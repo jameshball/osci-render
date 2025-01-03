@@ -25,7 +25,6 @@ CommonAudioProcessor::CommonAudioProcessor()
     }
     
     effects.push_back(visualiserParameters.smoothEffect);
-    permanentEffects.push_back(visualiserParameters.smoothEffect);
         
     for (auto parameter : visualiserParameters.booleans) {
         booleanParameters.push_back(parameter);

@@ -263,6 +263,8 @@
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
         <CONFIGURATION name="Release" targetName="sosci" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '@executable_path/../Frameworks' '@executable_path/',CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO,OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
+        <CONFIGURATION name="Release (Development)" targetName="sosci" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '@executable_path/../Frameworks' '@executable_path/',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
+                       codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>

@@ -171,11 +171,19 @@ public:
             "Sweep (ms)",
             "The number of milliseconds it takes for the oscilloscope to sweep from left to right.",
             "sweepMs",
-            VERSION_HINT, 0.3, 0.0, 1.0
+            VERSION_HINT, 30.0, 0.0, 1000.0
+        )
+    );
+    std::shared_ptr<Effect> triggerValueEffect = std::make_shared<Effect>(
+        new EffectParameter(
+            "Trigger Value",
+            "The trigger value sets the signal level that starts waveform capture to display a stable waveform.",
+            "triggerValue",
+            VERSION_HINT, 0.0, -1.0, 1.0
         )
     );
     
-    std::vector<std::shared_ptr<Effect>> effects = {persistenceEffect, hueEffect, intensityEffect, saturationEffect, focusEffect, noiseEffect, glowEffect, ambientEffect, sweepMsEffect};
+    std::vector<std::shared_ptr<Effect>> effects = {persistenceEffect, hueEffect, intensityEffect, saturationEffect, focusEffect, noiseEffect, glowEffect, ambientEffect, sweepMsEffect, triggerValueEffect};
     std::vector<BooleanParameter*> booleans = {upsamplingEnabled, visualiserFullScreen, sweepEnabled};
     std::vector<IntParameter*> integers = {screenType};
 };
@@ -226,6 +234,18 @@ public:
     bool getUpsamplingEnabled() {
         return parameters.upsamplingEnabled->getBoolValue();
     }
+    
+    bool isSweepEnabled() {
+        return parameters.sweepEnabled->getBoolValue();
+    }
+    
+    double getSweepSeconds() {
+        return parameters.sweepMsEffect->getActualValue() / 1000.0;
+    }
+    
+    double getTriggerValue() {
+        return parameters.triggerValueEffect->getActualValue();
+    }
 
     VisualiserParameters& parameters;
     int numChannels;
@@ -241,6 +261,7 @@ private:
     EffectComponent ambient{*parameters.ambientEffect};
     EffectComponent smooth{*parameters.smoothEffect};
     EffectComponent sweepMs{*parameters.sweepMsEffect};
+    EffectComponent triggerValue{*parameters.triggerValueEffect};
     
     juce::Label screenTypeLabel{"Screen Type", "Screen Type"};
     juce::ComboBox screenType;
@@ -257,7 +278,7 @@ public:
         juce::Component::addAndMakeVisible(viewport);
         setResizable(false, false);
         viewport.setViewedComponent(&component, false);
-        viewport.setScrollBarsShown(false, false, true, false);
+        viewport.setScrollBarsShown(true, false, true, false);
         setAlwaysOnTop(true);
     }
     

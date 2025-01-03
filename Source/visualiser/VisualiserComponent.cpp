@@ -120,11 +120,42 @@ void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
         xSamples.clear();
         ySamples.clear();
         zSamples.clear();
-        for (auto& point : points) {
-            OsciPoint smoothPoint = settings.parameters.smoothEffect->apply(0, point);
-            xSamples.push_back(smoothPoint.x);
-            ySamples.push_back(smoothPoint.y);
-            zSamples.push_back(smoothPoint.z);
+        
+        if (settings.isSweepEnabled()) {
+            double sweepIncrement = getSweepIncrement();
+            long samplesPerSweep = sampleRate * settings.getSweepSeconds();
+            
+            double triggerValue = settings.getTriggerValue();
+            bool belowTrigger = false;
+            
+            for (auto& point : points) {
+                OsciPoint smoothPoint = settings.parameters.smoothEffect->apply(0, point);
+                
+                long samplePosition = sampleCount - lastTriggerPosition;
+                double startPoint = 1.135;
+                double sweep = samplePosition * sweepIncrement * 2 * startPoint - startPoint;
+                
+                double value = smoothPoint.x;
+                
+                if (sweep > startPoint && belowTrigger && value >= triggerValue) {
+                    lastTriggerPosition = sampleCount;
+                }
+                
+                belowTrigger = value < triggerValue;
+                
+                xSamples.push_back(sweep);
+                ySamples.push_back(value);
+                zSamples.push_back(1);
+                
+                sampleCount++;
+            }
+        } else {
+            for (auto& point : points) {
+                OsciPoint smoothPoint = settings.parameters.smoothEffect->apply(0, point);
+                xSamples.push_back(smoothPoint.x);
+                ySamples.push_back(smoothPoint.y);
+                zSamples.push_back(smoothPoint.z);
+            }
         }
         
         sampleBufferCount++;
@@ -137,7 +168,25 @@ void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
             smoothedZSamples.resize(newResampledSize);
             smoothedZSamples.resize(newResampledSize);
             
-            xResampler.process(xSamples.data(), smoothedXSamples.data(), xSamples.size());
+            if (settings.isSweepEnabled()) {
+                // interpolate between sweep values to avoid any artifacts from quickly going from one sweep to the next
+                for (int i = 0; i < newResampledSize; ++i) {
+                    int index = i / RESAMPLE_RATIO;
+                    if (index < xSamples.size() - 1) {
+                        double thisSample = xSamples[index];
+                        double nextSample = xSamples[index + 1];
+                        if (nextSample > thisSample) {
+                            smoothedXSamples[i] = xSamples[index] + (i % (int) RESAMPLE_RATIO) * (nextSample - thisSample) / RESAMPLE_RATIO;
+                        } else {
+                            smoothedXSamples[i] = xSamples[index];
+                        }
+                    } else {
+                        smoothedXSamples[i] = xSamples[index];
+                    }
+                }
+            } else {
+                xResampler.process(xSamples.data(), smoothedXSamples.data(), xSamples.size());
+            }
             yResampler.process(ySamples.data(), smoothedYSamples.data(), ySamples.size());
             zResampler.process(zSamples.data(), smoothedZSamples.data(), zSamples.size());
         }
@@ -165,6 +214,10 @@ int VisualiserComponent::prepareTask(double sampleRate, int bufferSize) {
 void VisualiserComponent::stopTask() {
     setRecording(false);
     renderingSemaphore.release();
+}
+
+double VisualiserComponent::getSweepIncrement() {
+    return 1.0 / (sampleRate * settings.getSweepSeconds());
 }
 
 void VisualiserComponent::setPaused(bool paused) {
@@ -506,7 +559,11 @@ void VisualiserComponent::renderOpenGL() {
                 }
 
                 if (recordingAudio) {
-                    audioRecorder.audioThreadCallback(xSamples, ySamples);
+                    if (settings.isSweepEnabled()) {
+                        audioRecorder.audioThreadCallback(ySamples, ySamples);
+                    } else {
+                        audioRecorder.audioThreadCallback(xSamples, ySamples);
+                    }
                 }
             }
             
@@ -753,7 +810,8 @@ void VisualiserComponent::drawLine(const std::vector<float>& xPoints, const std:
     using namespace juce::gl;
     
     setAdditiveBlending();
-
+    
+    // TODO: need to add the last point from the previous frame to the start of the frame so they connect?
     int nPoints = xPoints.size();
 
     // Without this, there's an access violation that seems to occur only on some systems

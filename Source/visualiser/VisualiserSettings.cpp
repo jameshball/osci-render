@@ -13,7 +13,8 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
     addAndMakeVisible(glow);
     addAndMakeVisible(ambient);
     addAndMakeVisible(smooth);
-    addChildComponent(sweepMs);
+    addAndMakeVisible(sweepMs);
+    addAndMakeVisible(triggerValue);
     addAndMakeVisible(upsamplingToggle);
     addAndMakeVisible(sweepToggle);
     addAndMakeVisible(screenTypeLabel);
@@ -37,9 +38,16 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
     ambient.setSliderOnValueChange();
     smooth.setSliderOnValueChange();
     sweepMs.setSliderOnValueChange();
+    triggerValue.setSliderOnValueChange();
+    
+    sweepMs.setEnabled(sweepToggle.getToggleState());
+    triggerValue.setEnabled(sweepToggle.getToggleState());
+    
+    sweepMs.slider.setSkewFactorFromMidPoint(100);
     
     sweepToggle.onClick = [this] {
-        sweepMs.setVisible(sweepToggle.getToggleState());
+        sweepMs.setEnabled(sweepToggle.getToggleState());
+        triggerValue.setEnabled(sweepToggle.getToggleState());
         resized();
     };
 }
@@ -68,7 +76,6 @@ void VisualiserSettings::resized() {
     upsamplingToggle.setBounds(area.removeFromTop(rowHeight));
     
     sweepToggle.setBounds(area.removeFromTop(rowHeight));
-    if (sweepToggle.getToggleState()) {
-        sweepMs.setBounds(area.removeFromTop(rowHeight));
-    }
+    sweepMs.setBounds(area.removeFromTop(rowHeight));
+    triggerValue.setBounds(area.removeFromTop(rowHeight));
 }

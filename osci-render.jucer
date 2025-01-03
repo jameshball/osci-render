@@ -24,6 +24,7 @@
       </GROUP>
       <GROUP id="{525C568C-29E9-D0A2-9773-8A04981C5575}" name="images">
         <FILE id="jI9VSZ" name="logo.png" compile="0" resource="1" file="Resources/images/logo.png"/>
+        <FILE id="aZXbCi" name="osci_mac.png" compile="0" resource="1" file="Resources/images/osci_mac.png"/>
       </GROUP>
       <GROUP id="{C2609827-4F4A-1ADA-8BA1-A40C1D92649C}" name="lua">
         <FILE id="xANsA8" name="demo.lua" compile="0" resource="1" file="Resources/lua/demo.lua"/>
@@ -775,8 +776,8 @@
       </MODULEPATHS>
     </VS2022>
     <XCODE_MAC targetFolder="Builds/osci-render/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak"
-               extraDefs="JUCE_SILENCE_XCODE_15_LINKER_WARNING=1" smallIcon="pSc1mq"
-               bigIcon="pSc1mq" applicationCategory="public.app-category.music"
+               extraDefs="JUCE_SILENCE_XCODE_15_LINKER_WARNING=1" smallIcon="aZXbCi"
+               bigIcon="aZXbCi" applicationCategory="public.app-category.music"
                microphonePermissionNeeded="1" frameworkSearchPaths="../../../External/syphon"
                embeddedFrameworks="../../../External/syphon/Syphon.framework"
                extraCustomFrameworks="../../../External/syphon/Syphon.framework"
@@ -786,6 +787,8 @@
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '@executable_path/../Frameworks' '@executable_path/',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
         <CONFIGURATION name="Release" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '@executable_path/../Frameworks' '@executable_path/',CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO,OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
+                       codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
+        <CONFIGURATION name="Release (Development)" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '@executable_path/../Frameworks' '@executable_path/',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
       </CONFIGURATIONS>
       <MODULEPATHS>

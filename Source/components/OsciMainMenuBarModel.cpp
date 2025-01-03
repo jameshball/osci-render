@@ -25,6 +25,7 @@ OsciMainMenuBarModel::OsciMainMenuBarModel(OscirenderAudioProcessor& p, Oscirend
             "A huge thank you to:\n"
             "DJ_Level_3, for contributing several features to osci-render\n"
             "BUS ERROR Collective, for providing the source code for the Hilligoss encoder\n"
+            "Jean Perbet (@jeanprbt) for the osci-render macOS icon\n"
             "All the community, for suggesting features and reporting issues!\n\n"
             "I am open for commissions! Email me at james@ball.sh."
         );

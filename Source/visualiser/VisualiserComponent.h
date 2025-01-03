@@ -152,6 +152,7 @@ private:
     int nEdges = 0;
 
     juce::CriticalSection samplesLock;
+    long sampleCount = 0;
     std::vector<float> xSamples{2};
     std::vector<float> ySamples{2};
     std::vector<float> zSamples{2};
@@ -160,6 +161,7 @@ private:
     std::vector<float> smoothedZSamples;
     int sampleBufferCount = 0;
     int prevSampleBufferCount = 0;
+    long lastTriggerPosition = 0;
     
     std::vector<float> scratchVertices;
     std::vector<float> fullScreenQuad;
@@ -242,6 +244,8 @@ private:
 
     void renderScope(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints);
     int renderAudioFile(juce::File& sourceAudio, int method = 1, int width = 1024, int height = 1024);
+    
+    double getSweepIncrement();
 
     Texture createScreenTexture();
     Texture createReflectionTexture();

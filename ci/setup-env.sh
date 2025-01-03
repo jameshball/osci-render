@@ -41,6 +41,15 @@ else
   PROJUCER_PATH="$ROOT/ci/bin/JUCE/Projucer.exe"
 fi
 
+# Get the Spout SDK and SpoutLibrary.dll
+if [ "$OS" = "win" ]; then
+  curl -s -S -L https://github.com/leadedge/Spout2/releases/download/2.007.015/Spout-SDK-binaries_2-007-015.zip -o Spout.zip
+  unzip Spout.zip
+  ls -R
+  # move to system32
+  cp Spout-SDK-binaries/2-007-015/Libs/MD/bin/SpoutLibrary.dll /c/Windows/System32
+fi
+
 # Set global path
 GLOBAL_PATH_COMMAND="$PROJUCER_PATH --set-global-search-path $PROJUCER_OS 'defaultJuceModulePath' '$ROOT/ci/bin/JUCE/modules'"
 eval "$GLOBAL_PATH_COMMAND"
