@@ -8,6 +8,9 @@ public:
 
     void addTopLevelMenu(const juce::String& name);
     void addMenuItem(int topLevelMenuIndex, const juce::String& name, std::function<void()> action);
+    
+    std::function<void(juce::PopupMenu&, int)> customMenuLogic;
+    std::function<bool(int, int)> customMenuSelectedLogic;
 
 private:
     juce::StringArray getMenuBarNames() override;

@@ -12,4 +12,6 @@ public:
 
     SosciPluginEditor& editor;
     SosciAudioProcessor& processor;
+    
+    const int SUBMENU_ID = 100;
 };

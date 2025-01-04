@@ -21,6 +21,10 @@ juce::StringArray MainMenuBarModel::getMenuBarNames() {
 
 juce::PopupMenu MainMenuBarModel::getMenuForIndex(int topLevelMenuIndex, const juce::String& menuName) {
     juce::PopupMenu menu;
+    
+    if (customMenuLogic) {
+        customMenuLogic(menu, topLevelMenuIndex);
+    }
 
     for (int i = 0; i < menuItems[topLevelMenuIndex].size(); i++) {
         menu.addItem(i + 1, menuItems[topLevelMenuIndex][i].first);
@@ -30,6 +34,9 @@ juce::PopupMenu MainMenuBarModel::getMenuForIndex(int topLevelMenuIndex, const j
 }
 
 void MainMenuBarModel::menuItemSelected(int menuItemID, int topLevelMenuIndex) {
+    if (customMenuSelectedLogic && customMenuSelectedLogic(menuItemID, topLevelMenuIndex)) {
+        return;
+    }
     menuItems[topLevelMenuIndex][menuItemID - 1].second();
 }
 

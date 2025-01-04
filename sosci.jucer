@@ -18,7 +18,7 @@
               file="Resources/fonts/FiraSans-Regular.ttf"/>
       </GROUP>
       <GROUP id="{525C568C-29E9-D0A2-9773-8A04981C5575}" name="images">
-        <FILE id="jI9VSZ" name="logo.png" compile="0" resource="1" file="Resources/images/logo.png"/>
+        <FILE id="vNhqT4" name="sosci_logo.png" compile="0" resource="1" file="Resources/images/sosci_logo.png"/>
         <FILE id="G294jK" name="sosci_mac.png" compile="0" resource="1" file="Resources/images/sosci_mac.png"/>
         <FILE id="CeSRLV" name="sosci_mac_saturated.png" compile="0" resource="1"
               file="Resources/images/sosci_mac_saturated.png"/>
@@ -35,6 +35,9 @@
               file="Resources/oscilloscope/vector_display.jpg"/>
         <FILE id="XojumY" name="vector_display_reflection.jpg" compile="0"
               resource="1" file="Resources/oscilloscope/vector_display_reflection.jpg"/>
+      </GROUP>
+      <GROUP id="{08DE8F94-4A00-7C71-4AF3-4C34C821A5DF}" name="sosci">
+        <FILE id="AHn0sU" name="default.sosci" compile="0" resource="1" file="Resources/sosci/default.sosci"/>
       </GROUP>
       <GROUP id="{82BCD6F1-A8BF-F30B-5587-81EE70168883}" name="svg">
         <FILE id="rl17ZK" name="cog.svg" compile="0" resource="1" file="Resources/svg/cog.svg"/>
