@@ -45,7 +45,7 @@ fi
 if [ "$OS" = "win" ]; then
   cp "$ROOT/External/spout/SpoutLibrary.dll" /c/Windows/System32
 elif [ "$OS" = "mac" ]; then
-  cp -R "$ROOT/External/syphon/Syphon.framework" "/Library/Frameworks"
+  sudo cp -R "$ROOT/External/syphon/Syphon.framework" "/Library/Frameworks"
 fi
 
 # Set global path
