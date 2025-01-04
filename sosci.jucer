@@ -6,8 +6,7 @@
               headerPath="./include" version="1.0.0" companyName="James H Ball"
               companyWebsite="https://osci-render.com" companyEmail="james@ball.sh"
               defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;SOSCI_FEATURES=1"
-              pluginManufacturerCode="Jhba" pluginCode="Sosc" pluginAUMainType="'aufx'"
-              postExportShellCommandPosix="%%1%%/ci/post_export.sh %%1%% %%1%%/Builds/sosci/MacOSX/sosci.xcodeproj/project.pbxproj sosci">
+              pluginManufacturerCode="Jhba" pluginCode="Sosc" pluginAUMainType="'aufx'">
   <MAINGROUP id="j5Ge2T" name="sosci">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
       <GROUP id="{1C0FC3AA-01F6-8768-381C-200ED18AB5F2}" name="fonts">
@@ -255,17 +254,16 @@
     <XCODE_MAC targetFolder="Builds/sosci/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak"
                extraDefs="JUCE_SILENCE_XCODE_15_LINKER_WARNING=1" smallIcon="CeSRLV"
                bigIcon="CeSRLV" applicationCategory="public.app-category.music"
-               microphonePermissionNeeded="1" embeddedFrameworks="../../../External/syphon/Syphon.framework"
-               extraCustomFrameworks="../../../External/syphon/Syphon.framework"
-               frameworkSearchPaths="../../../External/syphon" hardenedRuntime="1"
-               hardenedRuntimeOptions="com.apple.security.device.audio-input"
+               microphonePermissionNeeded="1" extraCustomFrameworks="/Library/Frameworks/Syphon.framework"
+               frameworkSearchPaths="/Library/Frameworks" hardenedRuntime="1"
+               hardenedRuntimeOptions="com.apple.security.cs.disable-library-validation,com.apple.security.device.audio-input"
                iosDevelopmentTeamID="D86A3M3H2L">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="sosci" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '@executable_path/../Frameworks' '@executable_path/',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
+        <CONFIGURATION isDebug="1" name="Debug" targetName="sosci" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
-        <CONFIGURATION name="Release" targetName="sosci" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '@executable_path/../Frameworks' '@executable_path/',CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO,OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
+        <CONFIGURATION name="Release" targetName="sosci" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO,OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
-        <CONFIGURATION name="Release (Development)" targetName="sosci" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '@executable_path/../Frameworks' '@executable_path/',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
+        <CONFIGURATION name="Release (Development)" targetName="sosci" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
       </CONFIGURATIONS>
       <MODULEPATHS>

@@ -197,7 +197,36 @@
 								</dict>
 								<dict>
 									<key>CHILDREN</key>
-									<array/>
+									<array>
+										<dict>
+											<key>BUNDLE_CAN_DOWNGRADE</key>
+											<false/>
+											<key>BUNDLE_POSTINSTALL_PATH</key>
+											<dict>
+												<key>PATH_TYPE</key>
+												<integer>0</integer>
+											</dict>
+											<key>BUNDLE_PREINSTALL_PATH</key>
+											<dict>
+												<key>PATH_TYPE</key>
+												<integer>0</integer>
+											</dict>
+											<key>CHILDREN</key>
+											<array/>
+											<key>GID</key>
+											<integer>0</integer>
+											<key>PATH</key>
+											<string>../External/syphon/Syphon.framework</string>
+											<key>PATH_TYPE</key>
+											<integer>1</integer>
+											<key>PERMISSIONS</key>
+											<integer>509</integer>
+											<key>TYPE</key>
+											<integer>3</integer>
+											<key>UID</key>
+											<integer>0</integer>
+										</dict>
+									</array>
 									<key>GID</key>
 									<integer>0</integer>
 									<key>PATH</key>
@@ -765,7 +794,36 @@
 								</dict>
 								<dict>
 									<key>CHILDREN</key>
-									<array/>
+									<array>
+										<dict>
+											<key>BUNDLE_CAN_DOWNGRADE</key>
+											<false/>
+											<key>BUNDLE_POSTINSTALL_PATH</key>
+											<dict>
+												<key>PATH_TYPE</key>
+												<integer>0</integer>
+											</dict>
+											<key>BUNDLE_PREINSTALL_PATH</key>
+											<dict>
+												<key>PATH_TYPE</key>
+												<integer>0</integer>
+											</dict>
+											<key>CHILDREN</key>
+											<array/>
+											<key>GID</key>
+											<integer>0</integer>
+											<key>PATH</key>
+											<string>../External/syphon/Syphon.framework</string>
+											<key>PATH_TYPE</key>
+											<integer>1</integer>
+											<key>PERMISSIONS</key>
+											<integer>509</integer>
+											<key>TYPE</key>
+											<integer>3</integer>
+											<key>UID</key>
+											<integer>0</integer>
+										</dict>
+									</array>
 									<key>GID</key>
 									<integer>0</integer>
 									<key>PATH</key>
@@ -1268,7 +1326,36 @@
 								</dict>
 								<dict>
 									<key>CHILDREN</key>
-									<array/>
+									<array>
+										<dict>
+											<key>BUNDLE_CAN_DOWNGRADE</key>
+											<false/>
+											<key>BUNDLE_POSTINSTALL_PATH</key>
+											<dict>
+												<key>PATH_TYPE</key>
+												<integer>0</integer>
+											</dict>
+											<key>BUNDLE_PREINSTALL_PATH</key>
+											<dict>
+												<key>PATH_TYPE</key>
+												<integer>0</integer>
+											</dict>
+											<key>CHILDREN</key>
+											<array/>
+											<key>GID</key>
+											<integer>0</integer>
+											<key>PATH</key>
+											<string>../External/syphon/Syphon.framework</string>
+											<key>PATH_TYPE</key>
+											<integer>1</integer>
+											<key>PERMISSIONS</key>
+											<integer>509</integer>
+											<key>TYPE</key>
+											<integer>3</integer>
+											<key>UID</key>
+											<integer>0</integer>
+										</dict>
+									</array>
 									<key>GID</key>
 									<integer>0</integer>
 									<key>PATH</key>
