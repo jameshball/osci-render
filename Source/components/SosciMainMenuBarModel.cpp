@@ -17,7 +17,20 @@ SosciMainMenuBarModel::SosciMainMenuBarModel(SosciPluginEditor& e, SosciAudioPro
 
     addMenuItem(1, "About sosci", [&]() {
         juce::DialogWindow::LaunchOptions options;
-        AboutComponent* about = new AboutComponent(BinaryData::logo_png, BinaryData::logo_pngSize, "Sosci");
+        AboutComponent* about = new AboutComponent(BinaryData::logo_png, BinaryData::logo_pngSize,
+            juce::String(ProjectInfo::projectName) + " by " + ProjectInfo::companyName + "\n"
+#if SOSCI_FEATURES
+            "Thank you for purchasing sosci!\n"
+#else
+            "Free version\n"
+#endif
+            "Version " + ProjectInfo::versionString + "\n\n"
+            "A huge thank you to:\n"
+            "Neil Thapen, for allowing me to adapt the brilliant dood.al/oscilloscope\n"
+            "Kevin Kripper, for guiding much of the features and development of sosci\n"
+            "DJ_Level_3, for testing throughout and helping add features\n"
+            "All the community, for suggesting features and reporting issues!"
+        );
         options.content.setOwned(about);
         options.content->setSize(500, 270);
         options.dialogTitle = "About";

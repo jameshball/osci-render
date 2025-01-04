@@ -14,6 +14,16 @@ public:
         qualityParameter.disableLfo();
         qualityParameter.disableSidechain();
     }
+    
+private:
+
+#if SOSCI_FEATURES
+    const bool sosciFeatures = true;
+#else
+    const bool sosciFeatures = false;
+#endif
+    
+public:
 
     EffectParameter qualityParameter = EffectParameter(
         "Quality",
@@ -24,7 +34,7 @@ public:
     Effect qualityEffect = Effect(&qualityParameter);
 
     BooleanParameter recordAudio = BooleanParameter("Record Audio", "recordAudio", VERSION_HINT, true, "Record audio along with the video.");
-    BooleanParameter recordVideo = BooleanParameter("Record Video", "recordVideo", VERSION_HINT, true, "Record video output of the visualiser.");
+    BooleanParameter recordVideo = BooleanParameter("Record Video", "recordVideo", VERSION_HINT, sosciFeatures, "Record video output of the visualiser.");
 
     juce::String compressionPreset = "fast";
 
@@ -91,6 +101,11 @@ private:
 
     jux::SwitchButton recordAudio{&parameters.recordAudio};
     jux::SwitchButton recordVideo{&parameters.recordVideo};
+    
+#if !SOSCI_FEATURES
+    juce::TextEditor recordVideoWarning{"recordVideoWarning"};
+    juce::HyperlinkButton sosciLink{"Purchase here", juce::URL("https://osci-render.com/sosci")};
+#endif
 
     juce::Label compressionPresetLabel{"Compression Speed", "Compression Speed"};
     juce::ComboBox compressionPreset;

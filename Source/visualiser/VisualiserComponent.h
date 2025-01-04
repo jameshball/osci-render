@@ -85,20 +85,17 @@ private:
 
     VisualiserSettings& settings;
     RecordingParameters& recordingParameters;
-    bool recordingAudio = false;
-    bool recordingVideo = false;
+    juce::File ffmpegFile;
+    bool recordingAudio = true;
     
-    StopwatchComponent stopwatch;
-    SvgButton record{"Record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f)};
+#if SOSCI_FEATURES
+    bool recordingVideo = true;
+    
     long numFrames = 0;
     std::vector<unsigned char> framePixels;
     WriteProcess ffmpegProcess;
-    juce::File ffmpegFile;
-    juce::File& lastOpenedDirectory;
-    std::unique_ptr<juce::FileChooser> chooser;
     std::unique_ptr<juce::TemporaryFile> tempVideoFile;
-    std::unique_ptr<juce::TemporaryFile> tempAudioFile;
-    AudioRecorder audioRecorder;
+    
     juce::String ffmpegURL = juce::String("https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/") +
 #if JUCE_WINDOWS
     #if JUCE_64BIT
@@ -129,6 +126,15 @@ private:
 #endif
     + ".gz";
     DownloaderComponent ffmpegDownloader{ffmpegURL, ffmpegFile};
+#endif
+    
+    StopwatchComponent stopwatch;
+    SvgButton record{"Record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f)};
+    
+    juce::File& lastOpenedDirectory;
+    std::unique_ptr<juce::FileChooser> chooser;
+    std::unique_ptr<juce::TemporaryFile> tempAudioFile;
+    AudioRecorder audioRecorder;
     
     Semaphore renderingSemaphore{0};
     

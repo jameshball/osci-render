@@ -41,6 +41,10 @@ public:
     std::atomic<bool> editingCustomFunction = false;
 
     SettingsComponent settings{audioProcessor, *this};
+    
+#if !SOSCI_FEATURES
+    juce::TextButton upgradeButton{"Upgrade to premium!"};
+#endif
 
     juce::ComponentAnimator codeEditorAnimator;
     LuaComponent lua{audioProcessor, *this};

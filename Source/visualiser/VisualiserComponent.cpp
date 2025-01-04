@@ -16,6 +16,7 @@
 #include "TexturedVertexShader.glsl"
 
 VisualiserComponent::VisualiserComponent(juce::File& lastOpenedDirectory, juce::File ffmpegFile, std::function<void()>& haltRecording, AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, RecordingParameters& recordingParameters, VisualiserComponent* parent, bool visualiserOnly) : lastOpenedDirectory(lastOpenedDirectory), ffmpegFile(ffmpegFile), haltRecording(haltRecording), settings(settings), recordingParameters(recordingParameters), threadManager(threadManager), visualiserOnly(visualiserOnly), AudioBackgroundThread("VisualiserComponent" + juce::String(parent != nullptr ? " Child" : ""), threadManager), parent(parent) {
+#if SOSCI_FEATURES
     addAndMakeVisible(ffmpegDownloader);
     
     ffmpegDownloader.onSuccessfulDownload = [this] {
@@ -23,13 +24,18 @@ VisualiserComponent::VisualiserComponent(juce::File& lastOpenedDirectory, juce::
             record.setEnabled(true);
         });
     };
+#endif
     
     haltRecording = [this] {
         setRecording(false);
     };
     
     addAndMakeVisible(record);
+#if SOSCI_FEATURES
     record.setTooltip("Toggles recording of the oscilloscope's visuals and audio.");
+#else
+    record.setTooltip("Toggles recording of the audio.");
+#endif
     record.setPulseAnimation(true);
     record.onClick = [this] {
         setRecording(record.getToggleState());
@@ -249,8 +255,15 @@ void VisualiserComponent::setFullScreen(bool fullScreen) {}
 void VisualiserComponent::setRecording(bool recording) {
     stopwatch.stop();
     stopwatch.reset();
+    
+#if SOSCI_FEATURES
+    bool stillRecording = ffmpegProcess.isRunning() || audioRecorder.isRecording();
+#else
+    bool stillRecording = audioRecorder.isRecording();
+#endif
 
     if (recording) {
+#if SOSCI_FEATURES
         recordingVideo = recordingParameters.recordingVideo();
         recordingAudio = recordingParameters.recordingAudio();
         if (!recordingVideo && !recordingAudio) {
@@ -302,10 +315,16 @@ void VisualiserComponent::setRecording(bool recording) {
             tempAudioFile = std::make_unique<juce::TemporaryFile>(".wav");
             audioRecorder.startRecording(tempAudioFile->getFile());
         }
+#else
+        // audio only recording
+        tempAudioFile = std::make_unique<juce::TemporaryFile>(".wav");
+        audioRecorder.startRecording(tempAudioFile->getFile());
+#endif
 
         setPaused(false);
         stopwatch.start();
-    } else if (ffmpegProcess.isRunning() || audioRecorder.isRecording()) {
+    } else if (stillRecording) {
+#if SOSCI_FEATURES
         bool wasRecordingAudio = recordingAudio;
         bool wasRecordingVideo = recordingVideo;
         recordingAudio = false;
@@ -318,9 +337,14 @@ void VisualiserComponent::setRecording(bool recording) {
         if (wasRecordingVideo) {
             ffmpegProcess.close();
         }
+#else
+        audioRecorder.stop();
+        juce::String extension = "wav";
+#endif
         chooser = std::make_unique<juce::FileChooser>("Save recording", lastOpenedDirectory, "*." + extension);
         auto flags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting;
 
+#if SOSCI_FEATURES
         chooser->launchAsync(flags, [this, wasRecordingAudio, wasRecordingVideo](const juce::FileChooser& chooser) {
             auto file = chooser.getResult();
             if (file != juce::File()) {
@@ -335,9 +359,21 @@ void VisualiserComponent::setRecording(bool recording) {
                 lastOpenedDirectory = file.getParentDirectory();
             }
         });
+#else
+        chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
+            auto file = chooser.getResult();
+            if (file != juce::File()) {
+                tempAudioFile->getFile().copyFileTo(file);
+                lastOpenedDirectory = file.getParentDirectory();
+            }
+        });
+#endif
     }
+    
     setBlockOnAudioThread(recording);
+#if SOSCI_FEATURES
     numFrames = 0;
+#endif
     record.setToggleState(recording, juce::NotificationType::dontSendNotification);
     resized();
 }
@@ -363,10 +399,12 @@ void VisualiserComponent::resized() {
     } else {
         stopwatch.setVisible(false);
     }
+#if SOSCI_FEATURES
     if (child == nullptr) {
         auto bounds = buttons.removeFromRight(160);
         ffmpegDownloader.setBounds(bounds.withSizeKeepingCentre(bounds.getWidth() - 10, bounds.getHeight() - 10));
     }
+#endif
     viewportArea = area;
     viewportChanged(viewportArea);
 }
@@ -397,7 +435,9 @@ void VisualiserComponent::popoutWindow() {
 
 void VisualiserComponent::childUpdated() {
     popOutButton.setVisible(child == nullptr);
+#if SOSCI_FEATURES
     ffmpegDownloader.setVisible(child == nullptr);
+#endif
     record.setVisible(child == nullptr);
     if (child != nullptr) {
         haltRecording = [this] {
@@ -551,13 +591,14 @@ void VisualiserComponent::renderOpenGL() {
 #endif
             
             if (record.getToggleState()) {
+#if SOSCI_FEATURES
                 if (recordingVideo) {
                     // draw frame to ffmpeg
                     glBindTexture(GL_TEXTURE_2D, renderTexture.id);
                     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, framePixels.data());
                     ffmpegProcess.write(framePixels.data(), 4 * renderTexture.width * renderTexture.height);
                 }
-
+#endif
                 if (recordingAudio) {
                     if (settings.isSweepEnabled()) {
                         audioRecorder.audioThreadCallback(ySamples, ySamples);

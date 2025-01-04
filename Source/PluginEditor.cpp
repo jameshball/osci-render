@@ -4,6 +4,15 @@
 
 OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p)
 	: CommonPluginEditor(p, "osci-render", "osci", 1100, 750), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white) {
+#if !SOSCI_FEATURES
+    addAndMakeVisible(upgradeButton);
+    upgradeButton.onClick = [this] {
+        juce::URL("https://osci-render.com/sosci").launchInDefaultBrowser();
+    };
+    upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor);
+    upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark);
+#endif
+        
     addAndMakeVisible(volume);
     
     addAndMakeVisible(console);
@@ -101,7 +110,11 @@ void OscirenderAudioProcessorEditor::resized() {
     }
 
     if (!usingNativeMenuBar) {
-        menuBar.setBounds(area.removeFromTop(25));
+        auto topBar = area.removeFromTop(25);
+        menuBar.setBounds(topBar);
+#if !SOSCI_FEATURES
+        upgradeButton.setBounds(topBar.removeFromRight(150).reduced(2, 2));
+#endif
     }
     
     area.removeFromTop(2);

@@ -9,6 +9,7 @@ ci/sign.sh
 
 *.pkg
 *.psd
+*.xcf
 
 # ignore JUCE
 **/Builds

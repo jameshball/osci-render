@@ -132,19 +132,21 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() {
         effect->setPrecedence(i);
     }
 
-    permanentEffects.push_back(perspective);
-    permanentEffects.push_back(frequencyEffect);
-    permanentEffects.push_back(volumeEffect);
-    permanentEffects.push_back(thresholdEffect);
-    permanentEffects.push_back(imageThreshold);
-    permanentEffects.push_back(imageStride);
+    std::vector<std::shared_ptr<Effect>> osciPermanentEffects;
+    osciPermanentEffects.push_back(perspective);
+    osciPermanentEffects.push_back(frequencyEffect);
+    osciPermanentEffects.push_back(volumeEffect);
+    osciPermanentEffects.push_back(thresholdEffect);
+    osciPermanentEffects.push_back(imageThreshold);
+    osciPermanentEffects.push_back(imageStride);
 
     for (int i = 0; i < 26; i++) {
         addLuaSlider();
     }
 
-    effects = toggleableEffects;
-    effects.insert(effects.end(), permanentEffects.begin(), permanentEffects.end());
+    effects.insert(effects.end(), toggleableEffects.begin(), toggleableEffects.end());
+    permanentEffects.insert(permanentEffects.end(), osciPermanentEffects.begin(), osciPermanentEffects.end());
+    effects.insert(effects.end(), osciPermanentEffects.begin(), osciPermanentEffects.end());
     effects.insert(effects.end(), luaEffects.begin(), luaEffects.end());
 
     booleanParameters.push_back(midiEnabled);
