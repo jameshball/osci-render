@@ -11,13 +11,14 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        project: [osci-render, sosci]
         include:
-          - version: premium
-            project: [osci-render, sosci]
-          - version: free
-            project: [osci-render]
-    steps:
+          - project: osci-render
+            version: free
+          - project: osci-render
+            version: premium
+          - project: sosci
+            version: premium
+      steps:
       - name: Fix up git URLs
         run: echo -e '[url "https://github.com/"]\n  insteadOf = "git@github.com:"' >> ~/.gitconfig
         shell: bash
@@ -46,7 +47,13 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        project: [osci-render, sosci]
+        include:
+          - project: osci-render
+            version: free
+          - project: osci-render
+            version: premium
+          - project: sosci
+            version: premium
     steps:
       - name: Fix up git URLs
         run: echo -e '[url "https://github.com/"]\n  insteadOf = "git@github.com:"' >> ~/.gitconfig
@@ -131,7 +138,13 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        project: [osci-render, sosci]
+        include:
+          - project: osci-render
+            version: free
+          - project: osci-render
+            version: premium
+          - project: sosci
+            version: premium
     steps:
       - name: Fix up git URLs
         run: echo -e '[url "https://github.com/"]\n  insteadOf = "git@github.com:"' >> ~/.gitconfig
