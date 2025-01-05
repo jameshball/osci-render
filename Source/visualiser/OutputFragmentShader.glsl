@@ -7,11 +7,12 @@ uniform sampler2D uTexture3; //screen
 uniform sampler2D uTexture4; //reflection
 uniform sampler2D uTexture5; //screen glow
 uniform float uExposure;
-uniform float uSaturation;
+uniform float uLineSaturation;
+uniform float uScreenSaturation;
 uniform float uNoise;
 uniform float uRandom;
 uniform float uGlow;
-uniform float uAmbient;
+uniform float uAmbient; 
 uniform float uFishEye;
 uniform float uRealScreen;
 uniform vec2 uOffset;
@@ -65,15 +66,14 @@ void main() {
     float tlight = 1.0-pow(2.0, -uExposure*light);
     float tlight2 = tlight * tlight * tlight;
     gl_FragColor.rgb = mix(uColour, vec3(1.0), 0.3+tlight2*tlight2*0.5) * tlight;
+    gl_FragColor.rgb = desaturate(gl_FragColor.rgb, 1.0 - uLineSaturation);
     if (uRealScreen > 0.5) {
-        float ambient = pow(2.0, uExposure) * uAmbient;
-        gl_FragColor.rgb += ambient * screen.rgb;
+        // this isn't how light works, but it looks cool
+        float ambient = uExposure * uAmbient;
+        vec3 screen = ambient * screen.rgb;
+        gl_FragColor.rgb += desaturate(screen, 1.0 - uScreenSaturation);
     }
-    gl_FragColor.rgb = desaturate(gl_FragColor.rgb, 1.0 - uSaturation);
-    float noiseR = noise(gl_FragCoord.xy * 0.01, uRandom * 100.0);
-    float noiseG = noise(gl_FragCoord.xy * 0.005, uRandom * 50.0);
-    float noiseB = noise(gl_FragCoord.xy * 0.07, uRandom * 80.0);
-    gl_FragColor.rgb += uNoise * vec3(noiseR, noiseG, noiseB);
+    gl_FragColor.rgb += uNoise * noise(gl_FragCoord.xy * 0.01, uRandom * 100.0);
     gl_FragColor.a = 1.0;
 }
 

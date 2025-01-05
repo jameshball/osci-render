@@ -7,7 +7,8 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
     addAndMakeVisible(intensity);
 	addAndMakeVisible(persistence);
     addAndMakeVisible(hue);
-    addAndMakeVisible(saturation);
+    addAndMakeVisible(lineSaturation);
+    addAndMakeVisible(screenSaturation);
     addAndMakeVisible(focus);
     addAndMakeVisible(noise);
     addAndMakeVisible(glow);
@@ -31,7 +32,8 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
     intensity.setSliderOnValueChange();
     persistence.setSliderOnValueChange();
     hue.setSliderOnValueChange();
-    saturation.setSliderOnValueChange();
+    lineSaturation.setSliderOnValueChange();
+    screenSaturation.setSliderOnValueChange();
     focus.setSliderOnValueChange();
     noise.setSliderOnValueChange();
     glow.setSliderOnValueChange();
@@ -66,7 +68,8 @@ void VisualiserSettings::resized() {
     intensity.setBounds(area.removeFromTop(rowHeight));
     persistence.setBounds(area.removeFromTop(rowHeight));
     hue.setBounds(area.removeFromTop(rowHeight));
-    saturation.setBounds(area.removeFromTop(rowHeight));
+    lineSaturation.setBounds(area.removeFromTop(rowHeight));
+    screenSaturation.setBounds(area.removeFromTop(rowHeight));
     focus.setBounds(area.removeFromTop(rowHeight));
     noise.setBounds(area.removeFromTop(rowHeight));
     glow.setBounds(area.removeFromTop(rowHeight));

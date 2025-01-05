@@ -1011,7 +1011,8 @@ void VisualiserComponent::drawCRT() {
     activateTargetTexture(renderTexture);
     setShader(outputShader.get());
     outputShader->setUniform("uExposure", 0.25f);
-    outputShader->setUniform("uSaturation", (float) settings.getSaturation());
+    outputShader->setUniform("uLineSaturation", (float) settings.getLineSaturation());
+    outputShader->setUniform("uScreenSaturation", (float) settings.getScreenSaturation());
     outputShader->setUniform("uNoise", (float) settings.getNoise());
     outputShader->setUniform("uRandom", juce::Random::getSystemRandom().nextFloat());
     outputShader->setUniform("uGlow", (float) settings.getGlow());

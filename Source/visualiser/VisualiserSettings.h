@@ -117,11 +117,19 @@ public:
             VERSION_HINT, 5.0, 0.0, 10.0
         )
     );
-    std::shared_ptr<Effect> saturationEffect = std::make_shared<Effect>(
+    std::shared_ptr<Effect> lineSaturationEffect = std::make_shared<Effect>(
         new EffectParameter(
-            "Saturation",
-            "Controls how saturated the colours are on the oscilloscope.",
-            "saturation",
+            "Line Saturation",
+            "Controls how saturated the colours are on the oscilloscope lines.",
+            "lineSaturation",
+            VERSION_HINT, 1.0, 0.0, 5.0
+        )
+    );
+    std::shared_ptr<Effect> screenSaturationEffect = std::make_shared<Effect>(
+        new EffectParameter(
+            "Screen Saturation",
+            "Controls how saturated the colours are on the oscilloscope screen.",
+            "screenSaturation",
             VERSION_HINT, 1.0, 0.0, 5.0
         )
     );
@@ -130,7 +138,7 @@ public:
             "Focus",
             "Controls how focused the electron beam of the oscilloscope is.",
             "focus",
-            VERSION_HINT, 1.0, 0.01, 10.0
+            VERSION_HINT, 1.0, 0.3, 10.0
         )
     );
     std::shared_ptr<Effect> noiseEffect = std::make_shared<Effect>(
@@ -183,7 +191,7 @@ public:
         )
     );
     
-    std::vector<std::shared_ptr<Effect>> effects = {persistenceEffect, hueEffect, intensityEffect, saturationEffect, focusEffect, noiseEffect, glowEffect, ambientEffect, sweepMsEffect, triggerValueEffect};
+    std::vector<std::shared_ptr<Effect>> effects = {persistenceEffect, hueEffect, intensityEffect, lineSaturationEffect, screenSaturationEffect, focusEffect, noiseEffect, glowEffect, ambientEffect, sweepMsEffect, triggerValueEffect};
     std::vector<BooleanParameter*> booleans = {upsamplingEnabled, visualiserFullScreen, sweepEnabled};
     std::vector<IntParameter*> integers = {screenType};
 };
@@ -207,8 +215,12 @@ public:
         return parameters.hueEffect->getActualValue();
     }
     
-    double getSaturation() {
-        return parameters.saturationEffect->getActualValue();
+    double getLineSaturation() {
+        return parameters.lineSaturationEffect->getActualValue();
+    }
+
+    double getScreenSaturation() {
+        return parameters.screenSaturationEffect->getActualValue();
     }
     
     double getFocus() {
@@ -216,7 +228,7 @@ public:
     }
     
     double getNoise() {
-        return parameters.noiseEffect->getActualValue();
+        return parameters.noiseEffect->getActualValue() / 5;
     }
     
     double getGlow() {
@@ -254,7 +266,8 @@ private:
     EffectComponent intensity{*parameters.intensityEffect};
     EffectComponent persistence{*parameters.persistenceEffect};
     EffectComponent hue{*parameters.hueEffect};
-    EffectComponent saturation{*parameters.saturationEffect};
+    EffectComponent lineSaturation{*parameters.lineSaturationEffect};
+    EffectComponent screenSaturation{*parameters.screenSaturationEffect};
     EffectComponent focus{*parameters.focusEffect};
     EffectComponent noise{*parameters.noiseEffect};
     EffectComponent glow{*parameters.glowEffect};
