@@ -8,7 +8,11 @@ OUTPUT_NAME="$PLUGIN-$VERSION"
 # If we are on the free version, we need to disable the build flag SOSCI_FEATURES
 if [ "$VERSION" = "free" ]; then
   # Edit the jucer file to disable the SOSCI_FEATURES flag
-  sed 's/SOSCI_FEATURES=1/SOSCI_FEATURES=0/' "$ROOT/$PLUGIN.jucer"
+  if [ "$OS" = "mac" ]; then
+    sed -i '' 's/SOSCI_FEATURES=1/SOSCI_FEATURES=0/' "$ROOT/$PLUGIN.jucer"
+  else
+    sed -i 's/SOSCI_FEATURES=1/SOSCI_FEATURES=0/' "$ROOT/$PLUGIN.jucer"
+  fi
 fi
 
 # Resave jucer file
