@@ -12,6 +12,11 @@ jobs:
     strategy:
       matrix:
         project: [osci-render, sosci]
+        include:
+          - version: premium
+            project: [osci-render, sosci]
+          - version: free
+            project: [osci-render]
     steps:
       - name: Fix up git URLs
         run: echo -e '[url "https://github.com/"]\n  insteadOf = "git@github.com:"' >> ~/.gitconfig
@@ -27,7 +32,7 @@ jobs:
           export OS="linux"
           source ./ci/setup-env.sh
           source ./ci/test.sh
-          source ./ci/build.sh "${{ matrix.project }}"
+          source ./ci/build.sh "${{ matrix.project }}" "${{ matrix.version }}"
         shell: bash
 
       - name: Upload Artifact

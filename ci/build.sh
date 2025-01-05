@@ -1,6 +1,13 @@
 #!/bin/bash -e
 
 PLUGIN="$1"
+VERSION="$2"
+
+# If we are on the free version, we need to disable the build flag SOSCI_FEATURES
+if [ "$VERSION" = "free" ]; then
+  # Edit the jucer file to disable the SOSCI_FEATURES flag
+  sed -i '' 's/SOSCI_FEATURES=1/SOSCI_FEATURES=0/' "$ROOT/$PLUGIN.jucer"
+fi
 
 # Resave jucer file
 RESAVE_COMMAND="$PROJUCER_PATH --resave '$ROOT/$PLUGIN.jucer'"
