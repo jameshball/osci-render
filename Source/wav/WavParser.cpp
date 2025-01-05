@@ -1,8 +1,8 @@
 #include "WavParser.h"
-#include "../PluginProcessor.h"
+#include "../CommonPluginProcessor.h"
 
 
-WavParser::WavParser(OscirenderAudioProcessor& p, std::unique_ptr<juce::InputStream> stream) : audioProcessor(p) {
+WavParser::WavParser(CommonAudioProcessor& p, std::unique_ptr<juce::InputStream> stream) : audioProcessor(p) {
     juce::AudioFormatManager formatManager;
     formatManager.registerBasicFormats();
     juce::AudioFormatReader* reader = formatManager.createReaderFor(std::move(stream));

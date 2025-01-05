@@ -13,5 +13,7 @@ public:
     SosciPluginEditor& editor;
     SosciAudioProcessor& processor;
     
+    std::unique_ptr<juce::FileChooser> fileChooser;
+    
     const int SUBMENU_ID = 100;
 };

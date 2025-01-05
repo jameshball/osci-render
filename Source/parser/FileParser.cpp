@@ -2,6 +2,7 @@
 #include "../shape/Line.h"
 #include "../shape/CircleArc.h"
 #include <numbers>
+#include "../PluginProcessor.h"
 
 FileParser::FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce::String, juce::String)> errorCallback) : errorCallback(errorCallback), audioProcessor(p) {}
 

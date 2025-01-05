@@ -63,6 +63,10 @@
       </GROUP>
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <GROUP id="{C63A0AA5-8550-16AC-EE89-C05416216534}" name="wav">
+        <FILE id="jxAiTf" name="WavParser.cpp" compile="1" resource="0" file="Source/wav/WavParser.cpp"/>
+        <FILE id="Q6iTsL" name="WavParser.h" compile="0" resource="0" file="Source/wav/WavParser.h"/>
+      </GROUP>
       <FILE id="qJ122J" name="CommonPluginEditor.cpp" compile="1" resource="0"
             file="Source/CommonPluginEditor.cpp"/>
       <FILE id="ANZRtQ" name="CommonPluginEditor.h" compile="0" resource="0"

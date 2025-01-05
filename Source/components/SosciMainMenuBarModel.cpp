@@ -36,9 +36,22 @@ SosciMainMenuBarModel::SosciMainMenuBarModel(SosciPluginEditor& e, SosciAudioPro
         return false;
     };
 
-    addMenuItem(0, "Open", [&]() { editor.openProject(); });
-    addMenuItem(0, "Save", [&]() { editor.saveProject(); });
-    addMenuItem(0, "Save As", [&]() { editor.saveProjectAs(); });
+    addMenuItem(0, "Open Audio File", [&]() {
+        fileChooser = std::make_unique<juce::FileChooser>("Open Audio File", processor.lastOpenedDirectory, "*.wav;*.aiff");
+        auto flags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
+        fileChooser->launchAsync(flags, [&](const juce::FileChooser& chooser) {
+            auto file = chooser.getResult();
+            if (file != juce::File()) {
+                processor.loadAudioFile(file);
+            }
+        });
+    });
+    addMenuItem(0, "Stop Audio File", [&]() {
+        processor.stopAudioFile();
+    });
+    addMenuItem(0, "Open Project", [&]() { editor.openProject(); });
+    addMenuItem(0, "Save Project", [&]() { editor.saveProject(); });
+    addMenuItem(0, "Save Project As", [&]() { editor.saveProjectAs(); });
     if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
         addMenuItem(0, "Create New Project", [&]() { editor.resetToDefault(); });
     }

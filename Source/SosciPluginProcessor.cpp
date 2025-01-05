@@ -12,34 +12,56 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     juce::ScopedNoDenormals noDenormals;
 
     auto input = getBusBuffer(buffer, true, 0);
+    auto output = getBusBuffer(buffer, false, 0);
     float EPSILON = 0.0001f;
 
     midiMessages.clear();
 
     auto inputArray = input.getArrayOfWritePointers();
-
+    auto outputArray = output.getArrayOfWritePointers();
+    
+    juce::CriticalSection::ScopedLockType lock2(wavParserLock);
+    bool readingFromWav = wavParser != nullptr;
+    
 	for (int sample = 0; sample < input.getNumSamples(); ++sample) {
-        float x = input.getNumChannels() > 0 ? inputArray[0][sample] : 0.0f;
-        float y = input.getNumChannels() > 1 ? inputArray[1][sample] : 0.0f;
-        float brightness = 1.0f;
-        if (input.getNumChannels() > 2 && !forceDisableBrightnessInput) {
-            float brightnessChannel = inputArray[2][sample];
-            // Only enable brightness if we actually receive a signal on the brightness channel
-            if (!brightnessEnabled && brightnessChannel > EPSILON) {
-                brightnessEnabled = true;
+        OsciPoint point;
+        
+        if (readingFromWav) {
+            point = wavParser->getSample();
+            point.z = 1.0f;
+        } else {
+            float x = input.getNumChannels() > 0 ? inputArray[0][sample] : 0.0f;
+            float y = input.getNumChannels() > 1 ? inputArray[1][sample] : 0.0f;
+            float brightness = 1.0f;
+            if (input.getNumChannels() > 2 && !forceDisableBrightnessInput) {
+                float brightnessChannel = inputArray[2][sample];
+                // Only enable brightness if we actually receive a signal on the brightness channel
+                if (!brightnessEnabled && brightnessChannel > EPSILON) {
+                    brightnessEnabled = true;
+                }
+                if (brightnessEnabled) {
+                    brightness = brightnessChannel;
+                }
             }
-            if (brightnessEnabled) {
-                brightness = brightnessChannel;
-            }
+            
+            point = { x, y, brightness };
         }
-
-        OsciPoint point = { x, y, brightness };
 
         for (auto& effect : effects) {
             point = effect->apply(sample, point);
         }
 
         threadManager.write(point);
+        
+        if (output.getNumChannels() > 0) {
+            outputArray[0][sample] = point.x;
+        }
+        if (output.getNumChannels() > 1) {
+            outputArray[1][sample] = point.y;
+        }
+        if (output.getNumChannels() > 2) {
+            outputArray[2][sample] = point.z;
+        }
 	}
 }
 
@@ -141,6 +163,19 @@ void SosciAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 
         recordingParameters.load(xml.get());
     }
+}
+
+void SosciAudioProcessor::loadAudioFile(const juce::File& file) {
+    auto stream = std::make_unique<juce::FileInputStream>(file);
+    if (stream->openedOk()) {
+        juce::CriticalSection::ScopedLockType lock(wavParserLock);
+        wavParser = std::make_unique<WavParser>(*this, std::move(stream));
+    }
+}
+
+void SosciAudioProcessor::stopAudioFile() {
+    juce::CriticalSection::ScopedLockType lock(wavParserLock);
+    wavParser = nullptr;
 }
 
 juce::AudioProcessorEditor* SosciAudioProcessor::createEditor() {

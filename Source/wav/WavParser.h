@@ -2,10 +2,10 @@
 #include "../shape/OsciPoint.h"
 #include <JuceHeader.h>
 
-class OscirenderAudioProcessor;
+class CommonAudioProcessor;
 class WavParser {
 public:
-	WavParser(OscirenderAudioProcessor& p, std::unique_ptr<juce::InputStream> stream);
+    WavParser(CommonAudioProcessor& p, std::unique_ptr<juce::InputStream> stream);
 	~WavParser();
 
 	OsciPoint getSample();
@@ -18,5 +18,5 @@ private:
     int currentSample = 0;
 	int fileSampleRate;
 	int currentSampleRate;
-	OscirenderAudioProcessor& audioProcessor;
+    CommonAudioProcessor& audioProcessor;
 };
