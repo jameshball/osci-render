@@ -43,12 +43,28 @@ public:
 
     juce::String appName;
     juce::String projectFileType;
+    
+#if SOSCI_FEATURES
+    SharedTextureManager sharedTextureManager;
+#endif
 
     VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.visualiserParameters, 3);
     SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings", visualiserSettings);
     RecordingSettings recordingSettings = RecordingSettings(audioProcessor.recordingParameters);
     SettingsWindow recordingSettingsWindow = SettingsWindow("Recording Settings", recordingSettings);
-    VisualiserComponent visualiser{audioProcessor.lastOpenedDirectory, applicationFolder.getChildFile(ffmpegFileName), audioProcessor.haltRecording, audioProcessor.threadManager, visualiserSettings, audioProcessor.recordingParameters, nullptr, appName == "sosci"};
+    VisualiserComponent visualiser{
+        audioProcessor.lastOpenedDirectory,
+#if SOSCI_FEATURES
+        sharedTextureManager,
+#endif
+        applicationFolder.getChildFile(ffmpegFileName),
+        audioProcessor.haltRecording,
+        audioProcessor.threadManager,
+        visualiserSettings,
+        audioProcessor.recordingParameters,
+        nullptr,
+        appName == "sosci"
+    };
 
     std::unique_ptr<juce::FileChooser> chooser;
     juce::MenuBarComponent menuBar;

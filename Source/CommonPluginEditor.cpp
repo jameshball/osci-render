@@ -75,7 +75,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     tooltipDropShadow.setOwner(&tooltipWindow);
 
 #if SOSCI_FEATURES
-    SharedTextureManager::getInstance()->initGL();
+    sharedTextureManager.initGL();
 #endif
 }
 

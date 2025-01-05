@@ -32,7 +32,19 @@ struct Texture {
 class VisualiserWindow;
 class VisualiserComponent : public juce::Component, public AudioBackgroundThread, public juce::MouseListener, public juce::OpenGLRenderer, public juce::AsyncUpdater {
 public:
-    VisualiserComponent(juce::File& lastOpenedDirectory, juce::File ffmpegFile, std::function<void()>& haltRecording, AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, RecordingParameters& recordingParameters, VisualiserComponent* parent = nullptr, bool visualiserOnly = false);
+    VisualiserComponent(
+        juce::File& lastOpenedDirectory,
+#if SOSCI_FEATURES
+        SharedTextureManager& sharedTextureManager,
+#endif
+        juce::File ffmpegFile,
+        std::function<void()>& haltRecording,
+        AudioBackgroundThreadManager& threadManager,
+        VisualiserSettings& settings,
+        RecordingParameters& recordingParameters,
+        VisualiserComponent* parent = nullptr,
+        bool visualiserOnly = false
+    );
     ~VisualiserComponent() override;
 
     std::function<void()> openSettings;
@@ -78,6 +90,7 @@ private:
     
 #if SOSCI_FEATURES
     SvgButton sharedTextureButton{ "sharedTexture", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red };
+    SharedTextureManager& sharedTextureManager;
     SharedTextureSender* sharedTextureSender = nullptr;
 #endif
 

@@ -15,7 +15,30 @@
 #include "TexturedFragmentShader.glsl"
 #include "TexturedVertexShader.glsl"
 
-VisualiserComponent::VisualiserComponent(juce::File& lastOpenedDirectory, juce::File ffmpegFile, std::function<void()>& haltRecording, AudioBackgroundThreadManager& threadManager, VisualiserSettings& settings, RecordingParameters& recordingParameters, VisualiserComponent* parent, bool visualiserOnly) : lastOpenedDirectory(lastOpenedDirectory), ffmpegFile(ffmpegFile), haltRecording(haltRecording), settings(settings), recordingParameters(recordingParameters), threadManager(threadManager), visualiserOnly(visualiserOnly), AudioBackgroundThread("VisualiserComponent" + juce::String(parent != nullptr ? " Child" : ""), threadManager), parent(parent) {
+VisualiserComponent::VisualiserComponent(
+    juce::File& lastOpenedDirectory,
+#if SOSCI_FEATURES
+    SharedTextureManager& sharedTextureManager,
+#endif
+    juce::File ffmpegFile,
+    std::function<void()>& haltRecording,
+    AudioBackgroundThreadManager& threadManager,
+    VisualiserSettings& settings,
+    RecordingParameters& recordingParameters,
+    VisualiserComponent* parent,
+    bool visualiserOnly
+) : lastOpenedDirectory(lastOpenedDirectory),
+    ffmpegFile(ffmpegFile),
+#if SOSCI_FEATURES
+    sharedTextureManager(sharedTextureManager),
+#endif
+    haltRecording(haltRecording),
+    settings(settings),
+    recordingParameters(recordingParameters),
+    threadManager(threadManager),
+    visualiserOnly(visualiserOnly),
+    AudioBackgroundThread("VisualiserComponent" + juce::String(parent != nullptr ? " Child" : ""), threadManager),
+    parent(parent) {
 #if SOSCI_FEATURES
     addAndMakeVisible(ffmpegDownloader);
     
@@ -416,7 +439,18 @@ void VisualiserComponent::popoutWindow() {
     }
 #endif
     setRecording(false);
-    auto visualiser = new VisualiserComponent(lastOpenedDirectory, ffmpegFile, haltRecording, threadManager, settings, recordingParameters, this);
+    auto visualiser = new VisualiserComponent(
+        lastOpenedDirectory,
+#if SOSCI_FEATURES
+        sharedTextureManager,
+#endif
+        ffmpegFile,
+        haltRecording,
+        threadManager,
+        settings,
+        recordingParameters,
+        this
+    );
     visualiser->settings.setLookAndFeel(&getLookAndFeel());
     visualiser->openSettings = openSettings;
     visualiser->closeSettings = closeSettings;
@@ -453,7 +487,7 @@ void VisualiserComponent::childUpdated() {
 
 #if SOSCI_FEATURES
 void VisualiserComponent::initialiseSharedTexture() {
-    sharedTextureSender = SharedTextureManager::getInstance()->addSender("osci-render - " + juce::String(juce::Time::getCurrentTime().toMilliseconds()), renderTexture.width, renderTexture.height);
+    sharedTextureSender = sharedTextureManager.addSender("osci-render - " + juce::String(juce::Time::getCurrentTime().toMilliseconds()), renderTexture.width, renderTexture.height);
     sharedTextureSender->initGL();
     sharedTextureSender->setSharedTextureId(renderTexture.id);
     sharedTextureSender->setDrawFunction([this] {
@@ -464,9 +498,7 @@ void VisualiserComponent::initialiseSharedTexture() {
 
 void VisualiserComponent::closeSharedTexture() {
     if (sharedTextureSender != nullptr) {
-        if (SharedTextureManager::getInstanceWithoutCreating() != nullptr) {
-            SharedTextureManager::getInstance()->removeSender(sharedTextureSender);
-        }
+        sharedTextureManager.removeSender(sharedTextureSender);
         sharedTextureSender = nullptr;
     }
 
