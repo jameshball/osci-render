@@ -19,9 +19,10 @@
       </GROUP>
       <GROUP id="{525C568C-29E9-D0A2-9773-8A04981C5575}" name="images">
         <FILE id="vNhqT4" name="sosci_logo.png" compile="0" resource="1" file="Resources/images/sosci_logo.png"/>
-        <FILE id="G294jK" name="sosci_mac.png" compile="0" resource="1" file="Resources/images/sosci_mac.png"/>
         <FILE id="CeSRLV" name="sosci_mac_saturated.png" compile="0" resource="1"
               file="Resources/images/sosci_mac_saturated.png"/>
+        <FILE id="KigaoN" name="sosci_win_saturated.png" compile="0" resource="1"
+              file="Resources/images/sosci_win_saturated.png"/>
       </GROUP>
       <GROUP id="{F3C16D02-63B4-E3DA-7498-901173C37D6C}" name="oscilloscope">
         <FILE id="qpPhpN" name="empty.jpg" compile="0" resource="1" file="Resources/oscilloscope/empty.jpg"/>
@@ -195,8 +196,8 @@
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"
                JUCE_WIN_PER_MONITOR_DPI_AWARE="0" JUCE_WEB_BROWSER="0"/>
   <EXPORTFORMATS>
-    <LINUX_MAKE targetFolder="Builds/sosci/LinuxMakefile" smallIcon="pSc1mq"
-                bigIcon="pSc1mq">
+    <LINUX_MAKE targetFolder="Builds/sosci/LinuxMakefile" smallIcon="KigaoN"
+                bigIcon="KigaoN">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="sosci"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="sosci"/>
@@ -228,8 +229,8 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
-    <VS2022 targetFolder="Builds/sosci/VisualStudio2022" smallIcon="pSc1mq"
-            bigIcon="pSc1mq">
+    <VS2022 targetFolder="Builds/sosci/VisualStudio2022" smallIcon="KigaoN"
+            bigIcon="KigaoN">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="sosci"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="sosci" alwaysGenerateDebugSymbols="1"
