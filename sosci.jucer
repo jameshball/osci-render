@@ -147,6 +147,10 @@
               file="Source/visualiser/BlurFragmentShader.glsl"/>
         <FILE id="Fimn0E" name="BlurVertexShader.glsl" compile="0" resource="0"
               file="Source/visualiser/BlurVertexShader.glsl"/>
+        <FILE id="ahlSbF" name="GlowFragmentShader.glsl" compile="0" resource="0"
+              file="Source/visualiser/GlowFragmentShader.glsl"/>
+        <FILE id="yKcFST" name="GlowVertexShader.glsl" compile="0" resource="0"
+              file="Source/visualiser/GlowVertexShader.glsl"/>
         <FILE id="R6Yr8V" name="LineFragmentShader.glsl" compile="0" resource="0"
               file="Source/visualiser/LineFragmentShader.glsl"/>
         <FILE id="aK7kZN" name="LineVertexShader.glsl" compile="0" resource="0"

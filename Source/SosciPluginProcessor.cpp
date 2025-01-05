@@ -47,7 +47,7 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             point = { x, y, brightness };
         }
 
-        for (auto& effect : effects) {
+        for (auto& effect : permanentEffects) {
             point = effect->apply(sample, point);
         }
 

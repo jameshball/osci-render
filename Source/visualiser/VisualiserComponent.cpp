@@ -1005,18 +1005,6 @@ void VisualiserComponent::drawCRT() {
         setShader(glowShader.get());
         setOffsetAndScale(glowShader.get());
         drawTexture({blur3Texture});
-        
-        // blur the glow texture to blend it nicely. blur3Texture and blur1Texture are reserved, so we can't use them
-        // horizontal 512x512
-        activateTargetTexture(blur2Texture);
-        setShader(wideBlurShader.get());
-        wideBlurShader->setUniform("uOffset", 1.0f / 512.0f, 0.0f);
-        drawTexture({glowTexture});
-        
-        // vertical 512x512
-        activateTargetTexture(glowTexture);
-        wideBlurShader->setUniform("uOffset", 0.0f, 1.0f / 512.0f);
-        drawTexture({blur2Texture});
     }
 #endif
 
@@ -1025,7 +1013,7 @@ void VisualiserComponent::drawCRT() {
     outputShader->setUniform("uExposure", 0.25f);
     outputShader->setUniform("uSaturation", (float) settings.getSaturation());
     outputShader->setUniform("uNoise", (float) settings.getNoise());
-    outputShader->setUniform("uTime", time);
+    outputShader->setUniform("uRandom", juce::Random::getSystemRandom().nextFloat());
     outputShader->setUniform("uGlow", (float) settings.getGlow());
     outputShader->setUniform("uAmbient", (float) settings.getAmbient());
     setOffsetAndScale(outputShader.get());
@@ -1198,8 +1186,6 @@ void VisualiserComponent::paint(juce::Graphics& g) {
 }
 
 void VisualiserComponent::renderScope(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints) {
-    time += 0.01f;
-    
     if (screenType != settings.getScreenType()) {
         screenType = settings.getScreenType();
 #if SOSCI_FEATURES

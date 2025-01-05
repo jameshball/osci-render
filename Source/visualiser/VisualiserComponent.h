@@ -157,8 +157,6 @@ private:
     
     juce::OpenGLContext openGLContext;
     
-    float time = 0;
-    
     juce::Rectangle<int> buttonRow;
     juce::Rectangle<int> viewportArea;
     

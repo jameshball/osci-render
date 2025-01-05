@@ -9,7 +9,7 @@ uniform sampler2D uTexture5; //screen glow
 uniform float uExposure;
 uniform float uSaturation;
 uniform float uNoise;
-uniform float uTime;
+uniform float uRandom;
 uniform float uGlow;
 uniform float uAmbient;
 uniform float uFishEye;
@@ -26,8 +26,16 @@ vec3 desaturate(vec3 color, float factor) {
     return vec3(mix(color, gray, factor));
 }
 
-float noise(in vec2 uv, in float time) {
-    return (fract(sin(dot(uv, vec2(12.9898,78.233)*2.0 + time)) * 43758.5453)) - 0.5;
+float noise(vec2 texCoord, float time) {
+    // Combine texture coordinate and time to create a unique seed
+    float seed = dot(texCoord, vec2(12.9898, 78.233)) + time;
+    
+    // Use fract and sin to generate a pseudo-random value
+    return fract(sin(seed) * 43758.5453) - 0.5;
+}
+
+vec4 max4(vec4 a, vec4 b) {
+	return vec4(max(a.r, b.r), max(a.g, b.g), max(a.b, b.b), max(a.a, b.a));
 }
 
 void main() {
@@ -49,7 +57,7 @@ void main() {
     if (uRealScreen > 0.5) {
         vec4 reflection = texture2D(uTexture4, vTexCoord);
         vec4 screenGlow = texture2D(uTexture5, vTexCoord);
-        scatter += screenGlow * reflection * max(1.0 - uAmbient, 0.0);
+        scatter += max4(screenGlow * reflection * max(1.0 - uAmbient, 0.0), vec4(0.0));
     }
     
     float light = line.r + uGlow * 1.5 * screen.g * screen.g * tightGlow.r;
@@ -62,7 +70,10 @@ void main() {
         gl_FragColor.rgb += ambient * screen.rgb;
     }
     gl_FragColor.rgb = desaturate(gl_FragColor.rgb, 1.0 - uSaturation);
-    gl_FragColor.rgb += uNoise * noise(gl_FragCoord.xy, uTime);
+    float noiseR = noise(gl_FragCoord.xy * 0.01, uRandom * 100.0);
+    float noiseG = noise(gl_FragCoord.xy * 0.005, uRandom * 50.0);
+    float noiseB = noise(gl_FragCoord.xy * 0.07, uRandom * 80.0);
+    gl_FragColor.rgb += uNoise * vec3(noiseR, noiseG, noiseB);
     gl_FragColor.a = 1.0;
 }
 
