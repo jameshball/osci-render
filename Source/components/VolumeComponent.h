@@ -1,7 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "../PluginProcessor.h"
+#include "../CommonPluginProcessor.h"
 #include "../LookAndFeel.h"
 #include "../concurrency/AudioBackgroundThread.h"
 
@@ -61,7 +61,7 @@ public:
 
 class VolumeComponent : public juce::Component, public juce::AsyncUpdater, public AudioBackgroundThread {
 public:
-	VolumeComponent(OscirenderAudioProcessor& p);
+	VolumeComponent(CommonAudioProcessor& p);
 
     void paint(juce::Graphics&) override;
     void handleAsyncUpdate() override;
@@ -71,7 +71,7 @@ public:
 	void resized() override;
 
 private:
-	OscirenderAudioProcessor& audioProcessor;
+    CommonAudioProcessor& audioProcessor;
     
     const int DEFAULT_SAMPLE_RATE = 192000;
     const double BUFFER_DURATION_SECS = 0.02;

@@ -51,7 +51,17 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             point = effect->apply(sample, point);
         }
 
+        // no negative brightness
+        point.z = juce::jmax(0.0, juce::jmin(1.0, point.z));
+
+        // this is the point that the visualiser will draw
         threadManager.write(point);
+
+        point.scale(volume, volume, volume);
+
+        // clip
+        point.x = juce::jmax(-threshold, juce::jmin(threshold.load(), point.x));
+        point.y = juce::jmax(-threshold, juce::jmin(threshold.load(), point.y));
         
         if (output.getNumChannels() > 0) {
             outputArray[0][sample] = point.x;

@@ -122,6 +122,10 @@
               file="Source/components/StopwatchComponent.h"/>
         <FILE id="f2kkHV" name="SvgButton.h" compile="0" resource="0" file="Source/components/SvgButton.h"/>
         <FILE id="qzfstC" name="SwitchButton.h" compile="0" resource="0" file="Source/components/SwitchButton.h"/>
+        <FILE id="HC8nNY" name="VolumeComponent.cpp" compile="1" resource="0"
+              file="Source/components/VolumeComponent.cpp"/>
+        <FILE id="qwpGcH" name="VolumeComponent.h" compile="0" resource="0"
+              file="Source/components/VolumeComponent.h"/>
       </GROUP>
       <GROUP id="{9F5970A9-8094-E7F3-7AC1-812AE5589B9F}" name="concurrency">
         <FILE id="wAUzPb" name="AudioBackgroundThread.cpp" compile="1" resource="0"

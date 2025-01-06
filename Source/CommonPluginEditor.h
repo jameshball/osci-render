@@ -7,6 +7,7 @@
 #include "visualiser/VisualiserSettings.h"
 #include "components/SosciMainMenuBarModel.h"
 #include "components/SvgButton.h"
+#include "components/VolumeComponent.h"
 
 class CommonPluginEditor : public juce::AudioProcessorEditor {
 public:
@@ -65,6 +66,8 @@ public:
         nullptr,
         appName == "sosci"
     };
+
+    VolumeComponent volume{audioProcessor};
 
     std::unique_ptr<juce::FileChooser> chooser;
     juce::MenuBarComponent menuBar;

@@ -603,7 +603,7 @@ void VisualiserComponent::renderOpenGL() {
     using namespace juce::gl;
     
     if (openGLContext.isActive()) {
-        juce::OpenGLHelpers::clear(Colours::veryDark);
+        juce::OpenGLHelpers::clear(juce::Colours::black);
         
         // we have a new buffer to render
         if (sampleBufferCount != prevSampleBufferCount) {

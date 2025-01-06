@@ -4,7 +4,6 @@
 #include "PluginProcessor.h"
 #include "SettingsComponent.h"
 #include "MidiComponent.h"
-#include "components/VolumeComponent.h"
 #include "components/OsciMainMenuBarModel.h"
 #include "LookAndFeel.h"
 #include "components/ErrorCodeEditorComponent.h"
@@ -48,7 +47,6 @@ public:
 
     juce::ComponentAnimator codeEditorAnimator;
     LuaComponent lua{audioProcessor, *this};
-    VolumeComponent volume{audioProcessor};
 
     LuaConsole console;
 

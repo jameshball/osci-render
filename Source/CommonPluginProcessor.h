@@ -55,6 +55,33 @@ public:
     void changeProgramName(int index, const juce::String& newName) override;
     double getSampleRate() override;
 
+    std::atomic<double> volume = 1.0;
+    std::atomic<double> threshold = 1.0;
+
+    std::shared_ptr<Effect> volumeEffect = std::make_shared<Effect>(
+        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+            volume = values[0].load();
+            return input;
+        }, new EffectParameter(
+            "Volume",
+            "Controls the volume of the output audio.",
+            "volume",
+            VERSION_HINT, 1.0, 0.0, 3.0
+        )
+    );
+
+    std::shared_ptr<Effect> thresholdEffect = std::make_shared<Effect>(
+        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+            threshold = values[0].load();
+            return input;
+        }, new EffectParameter(
+            "Threshold",
+            "Clips the audio to a maximum value. Applying a harsher threshold results in a more distorted sound.",
+            "threshold",
+            VERSION_HINT, 1.0, 0.0, 1.0
+        )
+    );
+
     std::atomic<double> currentSampleRate = 0.0;
     juce::SpinLock effectsLock;
     VisualiserParameters visualiserParameters;

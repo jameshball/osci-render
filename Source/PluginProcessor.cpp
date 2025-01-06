@@ -135,8 +135,6 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() {
     std::vector<std::shared_ptr<Effect>> osciPermanentEffects;
     osciPermanentEffects.push_back(perspective);
     osciPermanentEffects.push_back(frequencyEffect);
-    osciPermanentEffects.push_back(volumeEffect);
-    osciPermanentEffects.push_back(thresholdEffect);
     osciPermanentEffects.push_back(imageThreshold);
     osciPermanentEffects.push_back(imageStride);
 

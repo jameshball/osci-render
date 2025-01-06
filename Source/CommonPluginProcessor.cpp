@@ -33,6 +33,11 @@ CommonAudioProcessor::CommonAudioProcessor()
     for (auto parameter : visualiserParameters.integers) {
         intParameters.push_back(parameter);
     }
+
+    permanentEffects.push_back(volumeEffect);
+    permanentEffects.push_back(thresholdEffect);
+    effects.push_back(volumeEffect);
+    effects.push_back(thresholdEffect);
 }
 
 void CommonAudioProcessor::addAllParameters() {

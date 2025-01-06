@@ -1,6 +1,6 @@
 #include "VolumeComponent.h"
 
-VolumeComponent::VolumeComponent(OscirenderAudioProcessor& p) : AudioBackgroundThread("VolumeComponent", p.threadManager), audioProcessor(p) {
+VolumeComponent::VolumeComponent(CommonAudioProcessor& p) : AudioBackgroundThread("VolumeComponent", p.threadManager), audioProcessor(p) {
     setOpaque(false);
     setShouldBeRunning(true);
 

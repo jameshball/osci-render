@@ -4,6 +4,7 @@
 
 SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p) : CommonPluginEditor(p, "sosci", "sosci", 700, 750), audioProcessor(p) {
     initialiseMenuBar(model);
+    addAndMakeVisible(volume);
     resized();
 }
 
@@ -16,9 +17,12 @@ void SosciPluginEditor::paint(juce::Graphics& g) {
 }
 
 void SosciPluginEditor::resized() {
-    auto topBar = getLocalBounds().removeFromTop(25);
-    menuBar.setBounds(topBar);
-    auto visualiserArea = getLocalBounds();
-    visualiserArea.removeFromTop(25);
-    visualiser.setBounds(visualiserArea);
+    auto area = getLocalBounds();
+
+    menuBar.setBounds(area.removeFromTop(25));
+
+    auto volumeArea = area.removeFromLeft(30);
+    volume.setBounds(volumeArea.withSizeKeepingCentre(volumeArea.getWidth(), juce::jmin(volumeArea.getHeight(), 300)));
+
+    visualiser.setBounds(area);
 }
