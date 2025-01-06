@@ -19,6 +19,8 @@ public:
 
 private:
     SosciAudioProcessor& audioProcessor;
+
+    ScrollableComponent visualiserSettingsWrapper = ScrollableComponent(visualiserSettings);
     
     SosciMainMenuBarModel model{*this, audioProcessor};
 

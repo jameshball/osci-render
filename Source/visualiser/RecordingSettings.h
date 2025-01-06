@@ -26,7 +26,7 @@ private:
 public:
 
     EffectParameter qualityParameter = EffectParameter(
-        "Quality",
+        "Video Quality",
         "Controls the quality of the recording video. 0 is the worst possible quality, and 1 is lossless.",
         "brightness",
         VERSION_HINT, 0.7, 0.0, 1.0

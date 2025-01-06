@@ -22,7 +22,6 @@ public:
     void openAudioSettings();
     void openRecordingSettings();
     void resetToDefault();
-    void openVisualiserSettings();
 
 private:
     CommonAudioProcessor& audioProcessor;
@@ -50,7 +49,6 @@ public:
 #endif
 
     VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.visualiserParameters, 3);
-    SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings", visualiserSettings);
     RecordingSettings recordingSettings = RecordingSettings(audioProcessor.recordingParameters);
     SettingsWindow recordingSettingsWindow = SettingsWindow("Recording Settings", recordingSettings);
     VisualiserComponent visualiser{

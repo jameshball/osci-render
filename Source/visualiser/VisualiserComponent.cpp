@@ -101,7 +101,9 @@ VisualiserComponent::VisualiserComponent(
     };
     
     settingsButton.onClick = [this]() {
-        openSettings();
+        if (openSettings != nullptr) {
+            openSettings();
+        }
     };
     
     popOutButton.onClick = [this]() {
@@ -411,7 +413,12 @@ void VisualiserComponent::resized() {
     if (child == nullptr && parent == nullptr && !visualiserOnly) {
         popOutButton.setBounds(buttons.removeFromRight(30));
     }
-    settingsButton.setBounds(buttons.removeFromRight(30));
+    if (openSettings != nullptr) {
+        settingsButton.setVisible(true);
+        settingsButton.setBounds(buttons.removeFromRight(30));
+    } else {
+        settingsButton.setVisible(false);
+    }
 #if SOSCI_FEATURES
     sharedTextureButton.setBounds(buttons.removeFromRight(30));
 #endif

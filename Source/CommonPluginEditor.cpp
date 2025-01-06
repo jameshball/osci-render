@@ -38,26 +38,12 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     
     addAndMakeVisible(visualiser);
 
-    visualiser.openSettings = [this] {
-        openVisualiserSettings();
-    };
-
-    visualiser.closeSettings = [this] {
-        visualiserSettingsWindow.setVisible(false);
-    };
-
     visualiserSettings.setLookAndFeel(&getLookAndFeel());
     visualiserSettings.setSize(550, 550);
-    visualiserSettingsWindow.centreWithSize(550, 400);
-#if JUCE_WINDOWS
-    // if not standalone, use native title bar for compatibility with DAWs
-    visualiserSettingsWindow.setUsingNativeTitleBar(processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone);
-#elif JUCE_MAC
-    visualiserSettingsWindow.setUsingNativeTitleBar(true);
-#endif
+    visualiserSettings.setColour(juce::ResizableWindow::backgroundColourId, Colours::dark);
 
     recordingSettings.setLookAndFeel(&getLookAndFeel());
-    recordingSettings.setSize(300, 300);
+    recordingSettings.setSize(300, 200);
     recordingSettingsWindow.centreWithSize(300, 200);
 #if JUCE_WINDOWS
     // if not standalone, use native title bar for compatibility with DAWs
@@ -163,7 +149,6 @@ void CommonPluginEditor::openAudioSettings() {
 
 void CommonPluginEditor::openRecordingSettings() {
     recordingSettingsWindow.setVisible(true);
-    recordingSettingsWindow.toFront(true);
 }
 
 void CommonPluginEditor::resetToDefault() {
@@ -171,9 +156,4 @@ void CommonPluginEditor::resetToDefault() {
     if (window != nullptr) {
         window->resetToDefaultState();
     }
-}
-
-void CommonPluginEditor::openVisualiserSettings() {
-    visualiserSettingsWindow.setVisible(true);
-    visualiserSettingsWindow.toFront(true);
 }

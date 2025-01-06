@@ -179,7 +179,7 @@ public:
             "Sweep (ms)",
             "The number of milliseconds it takes for the oscilloscope to sweep from left to right.",
             "sweepMs",
-            VERSION_HINT, 30.0, 0.0, 1000.0
+            VERSION_HINT, 10.0, 0.0, 1000.0
         )
     );
     std::shared_ptr<Effect> triggerValueEffect = std::make_shared<Effect>(
@@ -201,6 +201,7 @@ public:
     VisualiserSettings(VisualiserParameters&, int numChannels = 2);
     ~VisualiserSettings();
 
+    void paint(juce::Graphics& g) override;
     void resized() override;
     
     double getIntensity() {
@@ -285,6 +286,27 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserSettings)
 };
 
+class ScrollableComponent : public juce::Component {
+public:
+    ScrollableComponent(juce::Component& component) : component(component) {
+        addAndMakeVisible(viewport);
+        viewport.setViewedComponent(&component, false);
+        viewport.setScrollBarsShown(true, false, true, false);
+    }
+
+    void paint(juce::Graphics& g) override {
+        g.fillAll(Colours::darker);
+    }
+
+    void resized() override {
+        viewport.setBounds(getLocalBounds());
+    }
+
+private:
+    juce::Viewport viewport;
+    juce::Component& component;
+};
+
 class SettingsWindow : public juce::DocumentWindow {
 public:
     SettingsWindow(juce::String name, juce::Component& component) : juce::DocumentWindow(name, Colours::darker, juce::DocumentWindow::TitleBarButtons::closeButton), component(component) {
@@ -294,15 +316,15 @@ public:
         viewport.setScrollBarsShown(true, false, true, false);
         setAlwaysOnTop(true);
     }
-    
+
     void closeButtonPressed() override {
         setVisible(false);
     }
-    
+
     void resized() override {
         viewport.setBounds(getLocalBounds());
     }
-    
+
 private:
     juce::Viewport viewport;
     juce::Component& component;

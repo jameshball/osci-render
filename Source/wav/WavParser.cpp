@@ -6,6 +6,9 @@ WavParser::WavParser(CommonAudioProcessor& p, std::unique_ptr<juce::InputStream>
     juce::AudioFormatManager formatManager;
     formatManager.registerBasicFormats();
     juce::AudioFormatReader* reader = formatManager.createReaderFor(std::move(stream));
+    if (reader == nullptr) {
+        return;
+    }
     auto* afSource = new juce::AudioFormatReaderSource(reader, true);
     afSource->setLooping(true);
     source = std::make_unique<juce::ResamplingAudioSource>(afSource, true);

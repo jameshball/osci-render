@@ -56,6 +56,10 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
 
 VisualiserSettings::~VisualiserSettings() {}
 
+void VisualiserSettings::paint(juce::Graphics& g) {
+    g.fillAll(Colours::darker);
+}
+
 void VisualiserSettings::resized() {
 	auto area = getLocalBounds().reduced(20, 0).withTrimmedBottom(20);
 	double rowHeight = 30;
