@@ -144,14 +144,14 @@ def get_frame_info():
                 
             elif (4, 3, 0) < bpy.app.version and obj.type == 'GPENCIL':
                 object_info = {"name": obj.name}
-                strokes = obj.data.layers.active.frames.data.active_frame.strokes                            
+                strokes = obj.data.layers.active.frames.data.active_frame.strokes
                 object_info["vertices"] = []
                 for stroke in strokes:
                     object_info["vertices"].append([{
                         "x": vert.co[0],
                         "y": vert.co[1],
                         "z": vert.co[2],
-                    } for vert in stroke.points])            
+                    } for vert in stroke.points])
                 frame_info["objects"].append(append_matrix(object_info, obj))
     
     frame_info["focalLength"] = -0.05 * bpy.data.cameras[0].lens
