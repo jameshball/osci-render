@@ -372,7 +372,7 @@ void VisualiserComponent::setRecording(bool recording) {
             auto file = chooser.getResult();
             if (file != juce::File()) {
                 if (wasRecordingAudio && wasRecordingVideo) {
-                    ffmpegProcess.start("\"" + ffmpegFile.getFullPathName() + "\" -i \"" + tempVideoFile->getFile().getFullPathName() + "\" -i \"" + tempAudioFile->getFile().getFullPathName() + "\" -c:v copy -c:a aac -y \"" + file.getFullPathName() + "\"");
+                    ffmpegProcess.start("\"" + ffmpegFile.getFullPathName() + "\" -i \"" + tempVideoFile->getFile().getFullPathName() + "\" -i \"" + tempAudioFile->getFile().getFullPathName() + "\" -c:v copy -c:a aac -b:a 384k -y \"" + file.getFullPathName() + "\"");
                     ffmpegProcess.close();
                 } else if (wasRecordingAudio) {
                     tempAudioFile->getFile().copyFileTo(file);
