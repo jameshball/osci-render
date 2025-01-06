@@ -44,7 +44,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
 
     recordingSettings.setLookAndFeel(&getLookAndFeel());
     recordingSettings.setSize(300, 200);
-    recordingSettingsWindow.centreWithSize(300, 200);
+    recordingSettingsWindow.centreWithSize(300, 230);
 #if JUCE_WINDOWS
     // if not standalone, use native title bar for compatibility with DAWs
     recordingSettingsWindow.setUsingNativeTitleBar(processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone);

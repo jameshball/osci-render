@@ -307,11 +307,12 @@ private:
     juce::Component& component;
 };
 
-class SettingsWindow : public juce::DocumentWindow {
+class SettingsWindow : public juce::DialogWindow {
 public:
-    SettingsWindow(juce::String name, juce::Component& component) : juce::DocumentWindow(name, Colours::darker, juce::DocumentWindow::TitleBarButtons::closeButton), component(component) {
-        juce::Component::addAndMakeVisible(viewport);
+    SettingsWindow(juce::String name, juce::Component& component) : juce::DialogWindow(name, Colours::darker, true, true), component(component) {
+        setContentComponent(&viewport);
         setResizable(false, false);
+        viewport.setColour(juce::ScrollBar::trackColourId, juce::Colours::white);
         viewport.setViewedComponent(&component, false);
         viewport.setScrollBarsShown(true, false, true, false);
         setAlwaysOnTop(true);
@@ -319,10 +320,6 @@ public:
 
     void closeButtonPressed() override {
         setVisible(false);
-    }
-
-    void resized() override {
-        viewport.setBounds(getLocalBounds());
     }
 
 private:

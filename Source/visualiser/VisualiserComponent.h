@@ -12,6 +12,8 @@
 #include "../components/DownloaderComponent.h"
 #include "../concurrency/WriteProcess.h"
 #include "../audio/AudioRecorder.h"
+#include "../wav/WavParser.h"
+#include "../components/AudioPlayerComponent.h"
 
 #define FILE_RENDER_DUMMY 0
 #define FILE_RENDER_PNG 1
@@ -29,19 +31,18 @@ struct Texture {
     int height;
 };
 
+class CommonAudioProcessor;
 class VisualiserWindow;
 class VisualiserComponent : public juce::Component, public AudioBackgroundThread, public juce::MouseListener, public juce::OpenGLRenderer, public juce::AsyncUpdater {
 public:
     VisualiserComponent(
-        juce::File& lastOpenedDirectory,
+        CommonAudioProcessor& processor,
 #if SOSCI_FEATURES
         SharedTextureManager& sharedTextureManager,
 #endif
         juce::File ffmpegFile,
-        std::function<void()>& haltRecording,
-        AudioBackgroundThreadManager& threadManager,
         VisualiserSettings& settings,
-        RecordingParameters& recordingParameters,
+        RecordingSettings& recordingSettings,
         VisualiserComponent* parent = nullptr,
         bool visualiserOnly = false
     );
@@ -76,13 +77,13 @@ public:
     std::atomic<bool> active = true;
 
 private:
+    CommonAudioProcessor& audioProcessor;
+
     float intensity;
     const double FRAME_RATE = 60.0;
     
     bool visualiserOnly;
-    std::function<void()>& haltRecording;
-    
-    AudioBackgroundThreadManager& threadManager;
+    AudioPlayerComponent audioPlayer{audioProcessor};
     
     SvgButton fullScreenButton{ "fullScreen", BinaryData::fullscreen_svg, juce::Colours::white, juce::Colours::white };
     SvgButton popOutButton{ "popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::white };
@@ -97,12 +98,13 @@ private:
     std::function<void(FullScreenMode)> fullScreenCallback;
 
     VisualiserSettings& settings;
-    RecordingParameters& recordingParameters;
+    RecordingSettings& recordingSettings;
     juce::File ffmpegFile;
     bool recordingAudio = true;
     
 #if SOSCI_FEATURES
     bool recordingVideo = true;
+    bool downloading = false;
     
     long numFrames = 0;
     std::vector<unsigned char> framePixels;
@@ -144,7 +146,6 @@ private:
     StopwatchComponent stopwatch;
     SvgButton record{"Record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f)};
     
-    juce::File& lastOpenedDirectory;
     std::unique_ptr<juce::FileChooser> chooser;
     std::unique_ptr<juce::TemporaryFile> tempAudioFile;
     AudioRecorder audioRecorder;
@@ -260,7 +261,6 @@ private:
     void viewportChanged(juce::Rectangle<int> area);
 
     void renderScope(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints);
-    int renderAudioFile(juce::File& sourceAudio, int method = 1, int width = 1024, int height = 1024);
     
     double getSweepIncrement();
 

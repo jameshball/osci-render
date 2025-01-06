@@ -129,8 +129,6 @@ private:
 	// value is not necessarily in the range [min, max] so effect applications may need to clip to a valid range
 	std::atomic<float> value = 0.0;
 	juce::String label;
-    
-    JUCE_HEAVYWEIGHT_LEAK_DETECTOR(FloatParameter)
 };
 
 class IntParameter : public juce::AudioProcessorParameterWithID {
@@ -253,8 +251,6 @@ public:
 private:
 	// value is not necessarily in the range [min, max] so effect applications may need to clip to a valid range
 	std::atomic<int> value = 0;
-    
-    JUCE_HEAVYWEIGHT_LEAK_DETECTOR(IntParameter)
 };
 
 enum class LfoType : int {
@@ -404,6 +400,4 @@ public:
     }
 
 	EffectParameter(juce::String name, juce::String description, juce::String id, int versionHint, float value, float min, float max, float step = 0.01, bool smoothValueChange = true) : FloatParameter(name, id, versionHint, value, min, max, step), smoothValueChange(smoothValueChange), description(description) {}
-
-    JUCE_HEAVYWEIGHT_LEAK_DETECTOR(EffectParameter)
 };

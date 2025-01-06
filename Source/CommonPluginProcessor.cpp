@@ -9,6 +9,7 @@
 #include "CommonPluginProcessor.h"
 #include "CommonPluginEditor.h"
 #include "audio/EffectParameter.h"
+#include "components/AudioPlayerComponent.h"
 
 //==============================================================================
 CommonAudioProcessor::CommonAudioProcessor()
@@ -181,4 +182,37 @@ bool CommonAudioProcessor::hasEditor() const {
 
 double CommonAudioProcessor::getSampleRate() {
     return currentSampleRate;
+}
+
+void CommonAudioProcessor::loadAudioFile(const juce::File& file) {
+    auto stream = std::make_unique<juce::FileInputStream>(file);
+    if (stream->openedOk()) {
+        juce::SpinLock::ScopedLockType lock(wavParserLock);
+        wavParser = std::make_shared<WavParser>(*this, std::move(stream));
+
+        juce::SpinLock::ScopedLockType lock2(audioPlayerListenersLock);
+        for (auto listener : audioPlayerListeners) {
+            listener->parserChanged(wavParser);
+        }
+    }
+}
+
+void CommonAudioProcessor::stopAudioFile() {
+    juce::SpinLock::ScopedLockType lock(wavParserLock);
+    wavParser = nullptr;
+
+    juce::SpinLock::ScopedLockType lock2(audioPlayerListenersLock);
+    for (auto listener : audioPlayerListeners) {
+        listener->parserChanged(wavParser);
+    }
+}
+
+void CommonAudioProcessor::addAudioPlayerListener(AudioPlayerListener* listener) {
+    juce::SpinLock::ScopedLockType lock(audioPlayerListenersLock);
+    audioPlayerListeners.push_back(listener);
+}
+
+void CommonAudioProcessor::removeAudioPlayerListener(AudioPlayerListener* listener) {
+    juce::SpinLock::ScopedLockType lock(audioPlayerListenersLock);
+    audioPlayerListeners.erase(std::remove(audioPlayerListeners.begin(), audioPlayerListeners.end(), listener), audioPlayerListeners.end());
 }

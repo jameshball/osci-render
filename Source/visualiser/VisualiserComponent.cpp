@@ -1,5 +1,7 @@
 #include "../LookAndFeel.h"
 #include "VisualiserComponent.h"
+#include "../CommonPluginProcessor.h"
+
 #include "BlurFragmentShader.glsl"
 #include "BlurVertexShader.glsl"
 #include "WideBlurFragmentShader.glsl"
@@ -16,28 +18,24 @@
 #include "TexturedVertexShader.glsl"
 
 VisualiserComponent::VisualiserComponent(
-    juce::File& lastOpenedDirectory,
+    CommonAudioProcessor& processor,
 #if SOSCI_FEATURES
     SharedTextureManager& sharedTextureManager,
 #endif
     juce::File ffmpegFile,
-    std::function<void()>& haltRecording,
-    AudioBackgroundThreadManager& threadManager,
     VisualiserSettings& settings,
-    RecordingParameters& recordingParameters,
+    RecordingSettings& recordingSettings,
     VisualiserComponent* parent,
     bool visualiserOnly
-) : lastOpenedDirectory(lastOpenedDirectory),
+) : audioProcessor(processor),
     ffmpegFile(ffmpegFile),
 #if SOSCI_FEATURES
     sharedTextureManager(sharedTextureManager),
 #endif
-    haltRecording(haltRecording),
     settings(settings),
-    recordingParameters(recordingParameters),
-    threadManager(threadManager),
+    recordingSettings(recordingSettings),
     visualiserOnly(visualiserOnly),
-    AudioBackgroundThread("VisualiserComponent" + juce::String(parent != nullptr ? " Child" : ""), threadManager),
+    AudioBackgroundThread("VisualiserComponent" + juce::String(parent != nullptr ? " Child" : ""), processor.threadManager),
     parent(parent) {
 #if SOSCI_FEATURES
     addAndMakeVisible(ffmpegDownloader);
@@ -45,11 +43,18 @@ VisualiserComponent::VisualiserComponent(
     ffmpegDownloader.onSuccessfulDownload = [this] {
         juce::MessageManager::callAsync([this] {
             record.setEnabled(true);
+            juce::Timer::callAfterDelay(3000, [this] {
+                juce::MessageManager::callAsync([this] {
+                    ffmpegDownloader.setVisible(false);
+                    downloading = false;
+                    resized();
+                });
+            });
         });
     };
 #endif
     
-    haltRecording = [this] {
+    audioProcessor.haltRecording = [this] {
         setRecording(false);
     };
     
@@ -110,6 +115,8 @@ VisualiserComponent::VisualiserComponent(
         popoutWindow();
     };
 
+    addAndMakeVisible(audioPlayer);
+
     setFullScreen(false);
     
     openGLContext.setRenderer(this);
@@ -121,7 +128,7 @@ VisualiserComponent::VisualiserComponent(
 VisualiserComponent::~VisualiserComponent() {
     setRecording(false);
     if (parent == nullptr) {
-        haltRecording = nullptr;
+        audioProcessor.haltRecording = nullptr;
     }
     openGLContext.detach();
     setShouldBeRunning(false, [this] {
@@ -255,6 +262,7 @@ void VisualiserComponent::setPaused(bool paused) {
     active = !paused;
     renderingSemaphore.release();
     setShouldBeRunning(active);
+    audioPlayer.setPaused(paused);
     repaint();
 }
 
@@ -289,8 +297,8 @@ void VisualiserComponent::setRecording(bool recording) {
 
     if (recording) {
 #if SOSCI_FEATURES
-        recordingVideo = recordingParameters.recordingVideo();
-        recordingAudio = recordingParameters.recordingAudio();
+        recordingVideo = recordingSettings.recordingVideo();
+        recordingAudio = recordingSettings.recordingAudio();
         if (!recordingVideo && !recordingAudio) {
             record.setToggleState(false, juce::NotificationType::dontSendNotification);
             return;
@@ -311,6 +319,9 @@ void VisualiserComponent::setRecording(bool recording) {
                     if (result == 1) {
                         record.setEnabled(false);
                         ffmpegDownloader.download();
+                        ffmpegDownloader.setVisible(true);
+                        downloading = true;
+                        resized();
                     }
                     });
                 record.setToggleState(false, juce::NotificationType::dontSendNotification);
@@ -325,10 +336,10 @@ void VisualiserComponent::setRecording(bool recording) {
                 " -s " + resolution +
                 " -i -" +
                 " -threads 4" +
-                " -preset " + recordingParameters.getCompressionPreset() +
+                " -preset " + recordingSettings.getCompressionPreset() +
                 " -y" +
                 " -pix_fmt yuv420p" +
-                " -crf " + juce::String(recordingParameters.getCRF()) +
+                " -crf " + juce::String(recordingSettings.getCRF()) +
                 " -vf vflip" +
                 " \"" + tempVideoFile->getFile().getFullPathName() + "\"";
 
@@ -366,7 +377,7 @@ void VisualiserComponent::setRecording(bool recording) {
         audioRecorder.stop();
         juce::String extension = "wav";
 #endif
-        chooser = std::make_unique<juce::FileChooser>("Save recording", lastOpenedDirectory, "*." + extension);
+        chooser = std::make_unique<juce::FileChooser>("Save recording", audioProcessor.lastOpenedDirectory, "*." + extension);
         auto flags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting;
 
 #if SOSCI_FEATURES
@@ -381,7 +392,7 @@ void VisualiserComponent::setRecording(bool recording) {
                 } else if (wasRecordingVideo) {
                     tempVideoFile->getFile().copyFileTo(file);
                 }
-                lastOpenedDirectory = file.getParentDirectory();
+                audioProcessor.lastOpenedDirectory = file.getParentDirectory();
             }
         });
 #else
@@ -389,7 +400,7 @@ void VisualiserComponent::setRecording(bool recording) {
             auto file = chooser.getResult();
             if (file != juce::File()) {
                 tempAudioFile->getFile().copyFileTo(file);
-                lastOpenedDirectory = file.getParentDirectory();
+                audioProcessor.lastOpenedDirectory = file.getParentDirectory();
             }
         });
 #endif
@@ -430,11 +441,13 @@ void VisualiserComponent::resized() {
         stopwatch.setVisible(false);
     }
 #if SOSCI_FEATURES
-    if (child == nullptr) {
+    if (child == nullptr && downloading) {
         auto bounds = buttons.removeFromRight(160);
         ffmpegDownloader.setBounds(bounds.withSizeKeepingCentre(bounds.getWidth() - 10, bounds.getHeight() - 10));
     }
 #endif
+    buttons.removeFromRight(10); // padding
+    audioPlayer.setBounds(buttons);
     viewportArea = area;
     viewportChanged(viewportArea);
 }
@@ -447,15 +460,13 @@ void VisualiserComponent::popoutWindow() {
 #endif
     setRecording(false);
     auto visualiser = new VisualiserComponent(
-        lastOpenedDirectory,
+        audioProcessor,
 #if SOSCI_FEATURES
         sharedTextureManager,
 #endif
         ffmpegFile,
-        haltRecording,
-        threadManager,
         settings,
-        recordingParameters,
+        recordingSettings,
         this
     );
     visualiser->settings.setLookAndFeel(&getLookAndFeel());
@@ -481,12 +492,12 @@ void VisualiserComponent::childUpdated() {
 #endif
     record.setVisible(child == nullptr);
     if (child != nullptr) {
-        haltRecording = [this] {
+        audioProcessor.haltRecording = [this] {
             setRecording(false);
             child->setRecording(false);
         };
     } else {
-        haltRecording = [this] {
+        audioProcessor.haltRecording = [this] {
             setRecording(false);
         };
     }
@@ -660,7 +671,7 @@ void VisualiserComponent::renderOpenGL() {
 
 void VisualiserComponent::viewportChanged(juce::Rectangle<int> area) {
     using namespace juce::gl;
-    
+
     if (openGLContext.isAttached()) {
         float realWidth = area.getWidth() * renderScale;
         float realHeight = area.getHeight() * renderScale;
@@ -1175,11 +1186,7 @@ void VisualiserComponent::checkGLErrors(const juce::String& location) {
 
 
 void VisualiserComponent::paint(juce::Graphics& g) {
-#if SOSCI_FEATURES
-    g.setColour(settings.getScreenType() == ScreenType::Real ? Colours::dark : Colours::veryDark);
-#else
     g.setColour(Colours::veryDark);
-#endif
     g.fillRect(buttonRow);
     if (!active) {
         // draw a translucent overlay

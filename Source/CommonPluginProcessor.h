@@ -15,10 +15,10 @@
 #include "visualiser/VisualiserSettings.h"
 #include "visualiser/RecordingSettings.h"
 #include "audio/Effect.h"
+#include "wav/WavParser.h"
 
-//==============================================================================
-/**
-*/
+
+class AudioPlayerListener;
 class CommonAudioProcessor  : public juce::AudioProcessor, public SampleRateManager
                             #if JucePlugin_Enable_ARA
                              , public juce::AudioProcessorARAExtension
@@ -54,6 +54,13 @@ public:
     const juce::String getProgramName(int index) override;
     void changeProgramName(int index, const juce::String& newName) override;
     double getSampleRate() override;
+    void loadAudioFile(const juce::File& file);
+    void stopAudioFile();
+    void addAudioPlayerListener(AudioPlayerListener* listener);
+    void removeAudioPlayerListener(AudioPlayerListener* listener);
+
+    juce::SpinLock audioPlayerListenersLock;
+    std::vector<AudioPlayerListener*> audioPlayerListeners;
 
     std::atomic<double> volume = 1.0;
     std::atomic<double> threshold = 1.0;
@@ -81,6 +88,9 @@ public:
             VERSION_HINT, 1.0, 0.0, 1.0
         )
     );
+
+    juce::SpinLock wavParserLock;
+    std::shared_ptr<WavParser> wavParser;
 
     std::atomic<double> currentSampleRate = 0.0;
     juce::SpinLock effectsLock;

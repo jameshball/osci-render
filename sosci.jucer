@@ -53,11 +53,14 @@
         <FILE id="pSc1mq" name="osci.svg" compile="0" resource="1" file="Resources/svg/osci.svg"/>
         <FILE id="f2D5tv" name="pause.svg" compile="0" resource="1" file="Resources/svg/pause.svg"/>
         <FILE id="D2AI1b" name="pencil.svg" compile="0" resource="1" file="Resources/svg/pencil.svg"/>
+        <FILE id="Tf7MT4" name="play.svg" compile="0" resource="1" file="Resources/svg/play.svg"/>
         <FILE id="PFc2q2" name="random.svg" compile="0" resource="1" file="Resources/svg/random.svg"/>
         <FILE id="CE6di2" name="range.svg" compile="0" resource="1" file="Resources/svg/range.svg"/>
         <FILE id="n79IAy" name="record.svg" compile="0" resource="1" file="Resources/svg/record.svg"/>
+        <FILE id="WDxwSi" name="repeat.svg" compile="0" resource="1" file="Resources/svg/repeat.svg"/>
         <FILE id="OaqZb1" name="right_arrow.svg" compile="0" resource="1" file="Resources/svg/right_arrow.svg"/>
         <FILE id="z3A7FT" name="spout.svg" compile="0" resource="1" file="Resources/svg/spout.svg"/>
+        <FILE id="wD6mre" name="stop.svg" compile="0" resource="1" file="Resources/svg/stop.svg"/>
         <FILE id="rXjNlx" name="threshold.svg" compile="0" resource="1" file="Resources/svg/threshold.svg"/>
         <FILE id="rFYmV8" name="timer.svg" compile="0" resource="1" file="Resources/svg/timer.svg"/>
         <FILE id="qC6QiP" name="volume.svg" compile="0" resource="1" file="Resources/svg/volume.svg"/>
@@ -102,6 +105,10 @@
               file="Source/components/AboutComponent.cpp"/>
         <FILE id="FtOv3F" name="AboutComponent.h" compile="0" resource="0"
               file="Source/components/AboutComponent.h"/>
+        <FILE id="bbqJIb" name="AudioPlayerComponent.cpp" compile="1" resource="0"
+              file="Source/components/AudioPlayerComponent.cpp"/>
+        <FILE id="UJoX67" name="AudioPlayerComponent.h" compile="0" resource="0"
+              file="Source/components/AudioPlayerComponent.h"/>
         <FILE id="aihIvJ" name="DownloaderComponent.cpp" compile="1" resource="0"
               file="Source/components/DownloaderComponent.cpp"/>
         <FILE id="wBQEfb" name="DownloaderComponent.h" compile="0" resource="0"
@@ -198,7 +205,7 @@
     </GROUP>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"
-               JUCE_WIN_PER_MONITOR_DPI_AWARE="0" JUCE_WEB_BROWSER="0"/>
+               JUCE_WIN_PER_MONITOR_DPI_AWARE="0" JUCE_WEB_BROWSER="0" JUCE_USE_MP3AUDIOFORMAT="1"/>
   <EXPORTFORMATS>
     <LINUX_MAKE targetFolder="Builds/sosci/LinuxMakefile" smallIcon="KigaoN"
                 bigIcon="KigaoN">

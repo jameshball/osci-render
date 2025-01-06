@@ -38,24 +38,6 @@ public:
 
     juce::String compressionPreset = "fast";
 
-    int getCRF() {
-        double quality = juce::jlimit(0.0, 1.0, qualityEffect.getValue());
-        // mapping to 0-51 for ffmpeg's crf value
-        return 51 * (1.0 - quality) ;
-    }
-
-    bool recordingVideo() {
-        return recordVideo.getBoolValue();
-    }
-
-    bool recordingAudio() {
-        return recordAudio.getBoolValue();
-    }
-
-    juce::String getCompressionPreset() {
-        return compressionPreset;
-    }
-
     void save(juce::XmlElement* xml) {
         auto settingsXml = xml->createNewChildElement("recordingSettings");
         recordAudio.save(settingsXml->createNewChildElement("recordAudio"));
@@ -93,6 +75,24 @@ public:
     ~RecordingSettings();
 
     void resized() override;
+
+    int getCRF() {
+        double quality = juce::jlimit(0.0, 1.0, parameters.qualityEffect.getValue());
+        // mapping to 0-51 for ffmpeg's crf value
+        return 51 * (1.0 - quality) ;
+    }
+
+    bool recordingVideo() {
+        return parameters.recordVideo.getBoolValue();
+    }
+
+    bool recordingAudio() {
+        return parameters.recordAudio.getBoolValue();
+    }
+
+    juce::String getCompressionPreset() {
+        return parameters.compressionPreset;
+    }
 
     RecordingParameters& parameters;
 

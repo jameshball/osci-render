@@ -37,17 +37,15 @@ SosciMainMenuBarModel::SosciMainMenuBarModel(SosciPluginEditor& e, SosciAudioPro
     };
 
     addMenuItem(0, "Open Audio File", [&]() {
-        fileChooser = std::make_unique<juce::FileChooser>("Open Audio File", processor.lastOpenedDirectory, "*.wav;*.aiff;*.flac;*.ogg");
+        fileChooser = std::make_unique<juce::FileChooser>("Open Audio File", processor.lastOpenedDirectory, "*.wav;*.aiff;*.flac;*.ogg;*.mp3");
         auto flags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
         fileChooser->launchAsync(flags, [&](const juce::FileChooser& chooser) {
             auto file = chooser.getResult();
             if (file != juce::File()) {
                 processor.loadAudioFile(file);
+                processor.lastOpenedDirectory = file.getParentDirectory();
             }
         });
-    });
-    addMenuItem(0, "Stop Audio File", [&]() {
-        processor.stopAudioFile();
     });
     addMenuItem(0, "Open Project", [&]() { editor.openProject(); });
     addMenuItem(0, "Save Project", [&]() { editor.saveProject(); });

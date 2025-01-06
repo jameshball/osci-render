@@ -52,15 +52,13 @@ public:
     RecordingSettings recordingSettings = RecordingSettings(audioProcessor.recordingParameters);
     SettingsWindow recordingSettingsWindow = SettingsWindow("Recording Settings", recordingSettings);
     VisualiserComponent visualiser{
-        audioProcessor.lastOpenedDirectory,
+        audioProcessor,
 #if SOSCI_FEATURES
         sharedTextureManager,
 #endif
         applicationFolder.getChildFile(ffmpegFileName),
-        audioProcessor.haltRecording,
-        audioProcessor.threadManager,
         visualiserSettings,
-        audioProcessor.recordingParameters,
+        recordingSettings,
         nullptr,
         appName == "sosci"
     };

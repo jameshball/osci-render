@@ -20,7 +20,7 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     auto inputArray = input.getArrayOfWritePointers();
     auto outputArray = output.getArrayOfWritePointers();
     
-    juce::CriticalSection::ScopedLockType lock2(wavParserLock);
+    juce::SpinLock::ScopedLockType lock2(wavParserLock);
     bool readingFromWav = wavParser != nullptr;
     
 	for (int sample = 0; sample < input.getNumSamples(); ++sample) {
@@ -173,19 +173,6 @@ void SosciAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 
         recordingParameters.load(xml.get());
     }
-}
-
-void SosciAudioProcessor::loadAudioFile(const juce::File& file) {
-    auto stream = std::make_unique<juce::FileInputStream>(file);
-    if (stream->openedOk()) {
-        juce::CriticalSection::ScopedLockType lock(wavParserLock);
-        wavParser = std::make_unique<WavParser>(*this, std::move(stream));
-    }
-}
-
-void SosciAudioProcessor::stopAudioFile() {
-    juce::CriticalSection::ScopedLockType lock(wavParserLock);
-    wavParser = nullptr;
 }
 
 juce::AudioProcessorEditor* SosciAudioProcessor::createEditor() {
