@@ -115,7 +115,7 @@ You can change the allowed range of each effect by right-clicking on the effect 
 
 ### Rendering a Blender scene
 
-**osci-render currently only works with blender 4.1.x**
+**osci-render currently only works with blender 4.1.x and below!**
 
 This [video](https://www.youtube.com/watch?v=pCn297Ejvlw) explains how to install and use osci-render with Blender. Please note that the video is made for osci-render 1.0, so the interface will look slightly different, but the process is the same.
 
