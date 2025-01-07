@@ -141,9 +141,13 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 		resized();
 		repaint();
     });
+
+	visualiserFullScreen->addListener(this);
 }
 
-MainComponent::~MainComponent() {}
+MainComponent::~MainComponent() {
+	audioProcessor.visualiserParameters.visualiserFullScreen->removeListener(this);
+}
 
 void MainComponent::updateFileLabel() {
 	showLeftArrow = audioProcessor.getCurrentFileIndex() > 0;
@@ -159,6 +163,17 @@ void MainComponent::updateFileLabel() {
 
 	resized();
 }
+
+void MainComponent::parameterValueChanged(int parameterIndex, float newValue) {
+	juce::MessageManager::callAsync([this] {
+		pluginEditor.resized();
+		pluginEditor.repaint();
+		resized();
+		repaint();
+    });
+}
+
+void MainComponent::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
 
 void MainComponent::resized() {
     juce::Rectangle<int> bounds = getLocalBounds().withTrimmedTop(20).reduced(20);

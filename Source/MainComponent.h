@@ -10,13 +10,16 @@
 #include "components/SvgButton.h"
 
 class OscirenderAudioProcessorEditor;
-class MainComponent : public juce::GroupComponent {
+class MainComponent : public juce::GroupComponent, public juce::AudioProcessorParameter::Listener {
 public:
 	MainComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
 	~MainComponent() override;
 
 	void resized() override;
 	void updateFileLabel();
+	void parameterValueChanged(int parameterIndex, float newValue) override;
+	void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
+
 private:
 	OscirenderAudioProcessor& audioProcessor;
 	OscirenderAudioProcessorEditor& pluginEditor;

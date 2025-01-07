@@ -20,15 +20,14 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p) : CommonPluginEdito
         }
 
         visualiserFullScreenChanged();
-
-        resized();
-        repaint();
     });
 
     resized();
+    visualiserFullScreen->addListener(this);
 }
 
 SosciPluginEditor::~SosciPluginEditor() {
+    audioProcessor.visualiserParameters.visualiserFullScreen->removeListener(this);
     menuBar.setModel(nullptr);
 }
 
@@ -85,4 +84,14 @@ void SosciPluginEditor::visualiserFullScreenChanged() {
     volume.setVisible(!fullScreen);
     visualiserSettingsWrapper.setVisible(!fullScreen);
     menuBar.setVisible(!fullScreen);
+    resized();
+    repaint();
 }
+
+void SosciPluginEditor::parameterValueChanged(int parameterIndex, float newValue) {
+    juce::MessageManager::callAsync([this] {
+        visualiserFullScreenChanged();
+    });
+}
+
+void SosciPluginEditor::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}

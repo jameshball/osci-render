@@ -9,7 +9,7 @@
 #include "components/SosciMainMenuBarModel.h"
 #include "components/SvgButton.h"
 
-class SosciPluginEditor : public CommonPluginEditor, public juce::FileDragAndDropTarget {
+class SosciPluginEditor : public CommonPluginEditor, public juce::FileDragAndDropTarget, public juce::AudioProcessorParameter::Listener {
 public:
     SosciPluginEditor(SosciAudioProcessor&);
     ~SosciPluginEditor() override;
@@ -19,6 +19,8 @@ public:
     bool isInterestedInFileDrag(const juce::StringArray& files) override;
     void filesDropped(const juce::StringArray& files, int x, int y) override;
     void visualiserFullScreenChanged();
+    void parameterValueChanged(int parameterIndex, float newValue) override;
+    void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
 
 private:
     SosciAudioProcessor& audioProcessor;
