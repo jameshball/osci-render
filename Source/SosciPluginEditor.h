@@ -18,6 +18,7 @@ public:
     void resized() override;
     bool isInterestedInFileDrag(const juce::StringArray& files) override;
     void filesDropped(const juce::StringArray& files, int x, int y) override;
+    void visualiserFullScreenChanged();
 
 private:
     SosciAudioProcessor& audioProcessor;

@@ -66,7 +66,6 @@ public:
     void newOpenGLContextCreated() override;
     void renderOpenGL() override;
     void openGLContextClosing() override;
-    void setFullScreen(bool fullScreen);
     void setRecording(bool recording);
     void childUpdated();
 
@@ -229,7 +228,7 @@ private:
     juce::OpenGLShaderProgram* currentShader;
     
     float fadeAmount;
-    ScreenType screenType = settings.getScreenType();
+    ScreenOverlay screenOverlay = settings.getScreenOverlay();
     
     const double RESAMPLE_RATIO = 6.0;
     double sampleRate = -1;

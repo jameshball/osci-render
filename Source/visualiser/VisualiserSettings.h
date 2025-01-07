@@ -9,7 +9,7 @@
 #include "../components/SwitchButton.h"
 #include "../audio/SmoothEffect.h"
 
-enum class ScreenType : int {
+enum class ScreenOverlay : int {
     Empty = 1,
     Graticule = 2,
     Smudged = 3,
@@ -23,24 +23,24 @@ enum class ScreenType : int {
 #endif
 };
 
-class ScreenTypeParameter : public IntParameter {
+class ScreenOverlayParameter : public IntParameter {
 public:
-    ScreenTypeParameter(juce::String name, juce::String id, int versionHint, ScreenType value) : IntParameter(name, id, versionHint, (int) value, 1, (int)ScreenType::MAX) {}
+    ScreenOverlayParameter(juce::String name, juce::String id, int versionHint, ScreenOverlay value) : IntParameter(name, id, versionHint, (int) value, 1, (int)ScreenOverlay::MAX) {}
 
     juce::String getText(float value, int maximumStringLength = 100) const override {
-        switch ((ScreenType)(int)getUnnormalisedValue(value)) {
-            case ScreenType::Empty:
+        switch ((ScreenOverlay)(int)getUnnormalisedValue(value)) {
+            case ScreenOverlay::Empty:
                 return "Empty";
-            case ScreenType::Graticule:
+            case ScreenOverlay::Graticule:
                 return "Graticule";
-            case ScreenType::Smudged:
+            case ScreenOverlay::Smudged:
                 return "Smudged";
-            case ScreenType::SmudgedGraticule:
+            case ScreenOverlay::SmudgedGraticule:
                 return "Smudged Graticule";
 #if SOSCI_FEATURES
-            case ScreenType::Real:
+            case ScreenOverlay::Real:
                 return "Real Oscilloscope";
-            case ScreenType::VectorDisplay:
+            case ScreenOverlay::VectorDisplay:
                 return "Vector Display";
 #endif
             default:
@@ -51,44 +51,44 @@ public:
     float getValueForText(const juce::String& text) const override {
         int unnormalisedValue;
         if (text == "Empty") {
-            unnormalisedValue = (int)ScreenType::Empty;
+            unnormalisedValue = (int)ScreenOverlay::Empty;
         } else if (text == "Graticule") {
-            unnormalisedValue = (int)ScreenType::Graticule;
+            unnormalisedValue = (int)ScreenOverlay::Graticule;
         } else if (text == "Smudged") {
-            unnormalisedValue = (int)ScreenType::Smudged;
+            unnormalisedValue = (int)ScreenOverlay::Smudged;
         } else if (text == "Smudged Graticule") {
-            unnormalisedValue = (int)ScreenType::SmudgedGraticule;
+            unnormalisedValue = (int)ScreenOverlay::SmudgedGraticule;
 #if SOSCI_FEATURES
         } else if (text == "Real Oscilloscope") {
-            unnormalisedValue = (int)ScreenType::Real;
+            unnormalisedValue = (int)ScreenOverlay::Real;
         } else if (text == "Vector Display") {
-            unnormalisedValue = (int)ScreenType::VectorDisplay;
+            unnormalisedValue = (int)ScreenOverlay::VectorDisplay;
 #endif
         } else {
-            unnormalisedValue = (int)ScreenType::Empty;
+            unnormalisedValue = (int)ScreenOverlay::Empty;
         }
         return getNormalisedValue(unnormalisedValue);
     }
 
     void save(juce::XmlElement* xml) {
-        xml->setAttribute("screenType", getText(getValue()));
+        xml->setAttribute("screenOverlay", getText(getValue()));
     }
 
     void load(juce::XmlElement* xml) {
-        setValueNotifyingHost(getValueForText(xml->getStringAttribute("screenType")));
+        setValueNotifyingHost(getValueForText(xml->getStringAttribute("screenOverlay")));
     }
     
 #if SOSCI_FEATURES
     bool isRealisticDisplay() {
-        ScreenType type = (ScreenType)(int)getValueUnnormalised();
-        return type == ScreenType::Real || type == ScreenType::VectorDisplay;
+        ScreenOverlay type = (ScreenOverlay)(int)getValueUnnormalised();
+        return type == ScreenOverlay::Real || type == ScreenOverlay::VectorDisplay;
     }
 #endif
 };
 
 class VisualiserParameters {
 public:
-    ScreenTypeParameter* screenType = new ScreenTypeParameter("Screen Type", "screenType", VERSION_HINT, ScreenType::SmudgedGraticule);
+    ScreenOverlayParameter* screenOverlay = new ScreenOverlayParameter("Screen Overlay", "screenOverlay", VERSION_HINT, ScreenOverlay::SmudgedGraticule);
     BooleanParameter* upsamplingEnabled = new BooleanParameter("Upsample Audio", "upsamplingEnabled", VERSION_HINT, true, "Upsamples the audio before visualising it to make it appear more realistic, at the expense of performance.");
     BooleanParameter* sweepEnabled = new BooleanParameter("Sweep", "sweepEnabled", VERSION_HINT, false, "Plots the audio signal over time, sweeping from left to right");
     BooleanParameter* visualiserFullScreen = new BooleanParameter("Visualiser Fullscreen", "visualiserFullScreen", VERSION_HINT, false, "Makes the software visualiser fullscreen.");
@@ -193,7 +193,7 @@ public:
     
     std::vector<std::shared_ptr<Effect>> effects = {persistenceEffect, hueEffect, intensityEffect, lineSaturationEffect, screenSaturationEffect, focusEffect, noiseEffect, glowEffect, ambientEffect, sweepMsEffect, triggerValueEffect};
     std::vector<BooleanParameter*> booleans = {upsamplingEnabled, visualiserFullScreen, sweepEnabled};
-    std::vector<IntParameter*> integers = {screenType};
+    std::vector<IntParameter*> integers = {screenOverlay};
 };
 
 class VisualiserSettings : public juce::Component {
@@ -240,8 +240,8 @@ public:
         return parameters.ambientEffect->getActualValue();
     }
     
-    ScreenType getScreenType() {
-        return (ScreenType)parameters.screenType->getValueUnnormalised();
+    ScreenOverlay getScreenOverlay() {
+        return (ScreenOverlay)parameters.screenOverlay->getValueUnnormalised();
     }
     
     bool getUpsamplingEnabled() {
@@ -277,8 +277,8 @@ private:
     EffectComponent sweepMs{*parameters.sweepMsEffect};
     EffectComponent triggerValue{*parameters.triggerValueEffect};
     
-    juce::Label screenTypeLabel{"Screen Type", "Screen Type"};
-    juce::ComboBox screenType;
+    juce::Label screenOverlayLabel{"Screen Overlay", "Screen Overlay"};
+    juce::ComboBox screenOverlay;
     
     jux::SwitchButton upsamplingToggle{parameters.upsamplingEnabled};
     jux::SwitchButton sweepToggle{parameters.sweepEnabled};

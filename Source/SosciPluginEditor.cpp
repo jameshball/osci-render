@@ -7,6 +7,24 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p) : CommonPluginEdito
     addAndMakeVisible(volume);
     addAndMakeVisible(visualiserSettingsWrapper);
 
+    BooleanParameter* visualiserFullScreen = audioProcessor.visualiserParameters.visualiserFullScreen;
+    visualiserFullScreenChanged();
+
+    visualiser.setFullScreenCallback([this, visualiserFullScreen](FullScreenMode mode) {
+        if (mode == FullScreenMode::TOGGLE) {
+            visualiserFullScreen->setBoolValueNotifyingHost(!visualiserFullScreen->getBoolValue());
+        } else if (mode == FullScreenMode::FULL_SCREEN) {
+            visualiserFullScreen->setBoolValueNotifyingHost(true);
+        } else if (mode == FullScreenMode::MAIN_COMPONENT) {
+            visualiserFullScreen->setBoolValueNotifyingHost(false);
+        }
+
+        visualiserFullScreenChanged();
+
+        resized();
+        repaint();
+    });
+
     resized();
 }
 
@@ -21,19 +39,23 @@ void SosciPluginEditor::paint(juce::Graphics& g) {
 void SosciPluginEditor::resized() {
     auto area = getLocalBounds();
 
-    menuBar.setBounds(area.removeFromTop(25));
+    if (audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
+        visualiser.setBounds(area);
+    } else {
+        menuBar.setBounds(area.removeFromTop(25));
 
-    auto volumeArea = area.removeFromLeft(30);
-    volume.setBounds(volumeArea.withSizeKeepingCentre(volumeArea.getWidth(), juce::jmin(volumeArea.getHeight(), 300)));
+        auto volumeArea = area.removeFromLeft(30);
+        volume.setBounds(volumeArea.withSizeKeepingCentre(volumeArea.getWidth(), juce::jmin(volumeArea.getHeight(), 300)));
 
-    auto settingsArea = area.removeFromRight(juce::jmax(juce::jmin(0.4 * getWidth(), 550.0), 350.0));
-    visualiserSettings.setSize(settingsArea.getWidth(), 550);
-    visualiserSettingsWrapper.setBounds(settingsArea);
+        auto settingsArea = area.removeFromRight(juce::jmax(juce::jmin(0.4 * getWidth(), 550.0), 350.0));
+        visualiserSettings.setSize(settingsArea.getWidth(), 550);
+        visualiserSettingsWrapper.setBounds(settingsArea);
 
-    if (area.getWidth() < 10 || area.getHeight() < 10) {
-        return;
+        if (area.getWidth() < 10 || area.getHeight() < 10) {
+            return;
+        }
+        visualiser.setBounds(area);
     }
-    visualiser.setBounds(area);
 }
 
 bool SosciPluginEditor::isInterestedInFileDrag(const juce::StringArray& files) {
@@ -55,4 +77,12 @@ void SosciPluginEditor::filesDropped(const juce::StringArray& files, int x, int 
     }
     juce::File file(files[0]);
     audioProcessor.loadAudioFile(file);
+}
+
+void SosciPluginEditor::visualiserFullScreenChanged() {
+    bool fullScreen = audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue();
+
+    volume.setVisible(!fullScreen);
+    visualiserSettingsWrapper.setVisible(!fullScreen);
+    menuBar.setVisible(!fullScreen);
 }

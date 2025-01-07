@@ -135,8 +135,6 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 		} else if (mode == FullScreenMode::MAIN_COMPONENT) {
 			visualiserFullScreen->setBoolValueNotifyingHost(false);
         }
-        
-		pluginEditor.visualiser.setFullScreen(visualiserFullScreen->getBoolValue());
 		
 		pluginEditor.resized();
 		pluginEditor.repaint();

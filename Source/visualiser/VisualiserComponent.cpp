@@ -74,7 +74,7 @@ VisualiserComponent::VisualiserComponent(
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
     setWantsKeyboardFocus(true);
     
-    if (parent == nullptr && !visualiserOnly) {
+    if (parent == nullptr) {
         addAndMakeVisible(fullScreenButton);
         fullScreenButton.setTooltip("Toggles fullscreen mode.");
     }
@@ -116,8 +116,6 @@ VisualiserComponent::VisualiserComponent(
     };
 
     addAndMakeVisible(audioPlayer);
-
-    setFullScreen(false);
     
     openGLContext.setRenderer(this);
     openGLContext.attachTo(*this);
@@ -283,8 +281,6 @@ bool VisualiserComponent::keyPressed(const juce::KeyPress& key) {
     return false;
 }
 
-void VisualiserComponent::setFullScreen(bool fullScreen) {}
-
 void VisualiserComponent::setRecording(bool recording) {
     stopwatch.stop();
     stopwatch.reset();
@@ -418,7 +414,7 @@ void VisualiserComponent::resized() {
     auto area = getLocalBounds();
     buttonRow = area.removeFromBottom(25);
     auto buttons = buttonRow;
-    if (parent == nullptr && !visualiserOnly) {
+    if (parent == nullptr) {
         fullScreenButton.setBounds(buttons.removeFromRight(30));
     }
     if (child == nullptr && parent == nullptr && !visualiserOnly) {
@@ -948,8 +944,8 @@ void VisualiserComponent::drawLine(const std::vector<float>& xPoints, const std:
     setOffsetAndScale(lineShader.get());
     
 #if SOSCI_FEATURES
-    lineShader->setUniform("uScreenType", (GLfloat) screenType);
-    lineShader->setUniform("uFishEye", screenType == ScreenType::VectorDisplay ? VECTOR_DISPLAY_FISH_EYE : 0.0f);
+    lineShader->setUniform("uScreenOverlay", (GLfloat) screenOverlay);
+    lineShader->setUniform("uFishEye", screenOverlay == ScreenOverlay::VectorDisplay ? VECTOR_DISPLAY_FISH_EYE : 0.0f);
 #endif
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vertexIndexBuffer);
@@ -1017,7 +1013,7 @@ void VisualiserComponent::drawCRT() {
     drawTexture({blur4Texture});
     
 #if SOSCI_FEATURES
-    if (settings.parameters.screenType->isRealisticDisplay()) {
+    if (settings.parameters.screenOverlay->isRealisticDisplay()) {
         // create glow texture
         activateTargetTexture(glowTexture);
         setShader(glowShader.get());
@@ -1037,8 +1033,8 @@ void VisualiserComponent::drawCRT() {
     outputShader->setUniform("uAmbient", (float) settings.getAmbient());
     setOffsetAndScale(outputShader.get());
 #if SOSCI_FEATURES
-    outputShader->setUniform("uFishEye", screenType == ScreenType::VectorDisplay ? VECTOR_DISPLAY_FISH_EYE : 0.0f);
-    outputShader->setUniform("uRealScreen", settings.parameters.screenType->isRealisticDisplay() ? 1.0f : 0.0f);
+    outputShader->setUniform("uFishEye", screenOverlay == ScreenOverlay::VectorDisplay ? VECTOR_DISPLAY_FISH_EYE : 0.0f);
+    outputShader->setUniform("uRealScreen", settings.parameters.screenOverlay->isRealisticDisplay() ? 1.0f : 0.0f);
 #endif
     outputShader->setUniform("uResizeForCanvas", lineTexture.width / 1024.0f);
     juce::Colour colour = juce::Colour::fromHSV(settings.getHue() / 360.0f, 1.0, 1.0, 1.0);
@@ -1059,10 +1055,10 @@ void VisualiserComponent::setOffsetAndScale(juce::OpenGLShaderProgram* shader) {
     OsciPoint offset;
     OsciPoint scale = { 1.0f };
 #if SOSCI_FEATURES
-    if (settings.getScreenType() == ScreenType::Real) {
+    if (settings.getScreenOverlay() == ScreenOverlay::Real) {
         offset = REAL_SCREEN_OFFSET;
         scale = REAL_SCREEN_SCALE;
-    } else if (settings.getScreenType() == ScreenType::VectorDisplay) {
+    } else if (settings.getScreenOverlay() == ScreenOverlay::VectorDisplay) {
         offset = VECTOR_DISPLAY_OFFSET;
         scale = VECTOR_DISPLAY_SCALE;
     }
@@ -1075,9 +1071,9 @@ void VisualiserComponent::setOffsetAndScale(juce::OpenGLShaderProgram* shader) {
 Texture VisualiserComponent::createReflectionTexture() {
     using namespace juce::gl;
     
-    if (settings.getScreenType() == ScreenType::VectorDisplay) {
+    if (settings.getScreenOverlay() == ScreenOverlay::VectorDisplay) {
         reflectionOpenGLTexture.loadImage(vectorDisplayReflectionImage);
-    } else if (settings.getScreenType() == ScreenType::Real) {
+    } else if (settings.getScreenOverlay() == ScreenOverlay::Real) {
         reflectionOpenGLTexture.loadImage(oscilloscopeReflectionImage);
     } else {
         reflectionOpenGLTexture.loadImage(emptyReflectionImage);
@@ -1092,12 +1088,12 @@ Texture VisualiserComponent::createReflectionTexture() {
 Texture VisualiserComponent::createScreenTexture() {
     using namespace juce::gl;
     
-    if (screenType == ScreenType::Smudged || screenType == ScreenType::SmudgedGraticule) {
+    if (screenOverlay == ScreenOverlay::Smudged || screenOverlay == ScreenOverlay::SmudgedGraticule) {
         screenOpenGLTexture.loadImage(screenTextureImage);
 #if SOSCI_FEATURES
-    } else if (screenType == ScreenType::Real) {
+    } else if (screenOverlay == ScreenOverlay::Real) {
         screenOpenGLTexture.loadImage(oscilloscopeImage);
-    } else if (screenType == ScreenType::VectorDisplay) {
+    } else if (screenOverlay == ScreenOverlay::VectorDisplay) {
         screenOpenGLTexture.loadImage(vectorDisplayImage);
 #endif
     } else {
@@ -1105,7 +1101,7 @@ Texture VisualiserComponent::createScreenTexture() {
     }
     Texture texture = { screenOpenGLTexture.getTextureID(), screenTextureImage.getWidth(), screenTextureImage.getHeight() };
     
-    if (screenType == ScreenType::Graticule || screenType == ScreenType::SmudgedGraticule) {
+    if (screenOverlay == ScreenOverlay::Graticule || screenOverlay == ScreenOverlay::SmudgedGraticule) {
         activateTargetTexture(texture);
         setNormalBlending();
         setShader(simpleShader.get());
@@ -1201,8 +1197,8 @@ void VisualiserComponent::paint(juce::Graphics& g) {
 }
 
 void VisualiserComponent::renderScope(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints) {
-    if (screenType != settings.getScreenType()) {
-        screenType = settings.getScreenType();
+    if (screenOverlay != settings.getScreenOverlay()) {
+        screenOverlay = settings.getScreenOverlay();
 #if SOSCI_FEATURES
         reflectionTexture = createReflectionTexture();
 #endif

@@ -18,15 +18,15 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
     addAndMakeVisible(triggerValue);
     addAndMakeVisible(upsamplingToggle);
     addAndMakeVisible(sweepToggle);
-    addAndMakeVisible(screenTypeLabel);
-    addAndMakeVisible(screenType);
+    addAndMakeVisible(screenOverlayLabel);
+    addAndMakeVisible(screenOverlay);
     
-    for (int i = 1; i <= parameters.screenType->max; i++) {
-        screenType.addItem(parameters.screenType->getText(parameters.screenType->getNormalisedValue(i)), i);
+    for (int i = 1; i <= parameters.screenOverlay->max; i++) {
+        screenOverlay.addItem(parameters.screenOverlay->getText(parameters.screenOverlay->getNormalisedValue(i)), i);
     }
-    screenType.setSelectedId(parameters.screenType->getValueUnnormalised());
-    screenType.onChange = [this] {
-        parameters.screenType->setUnnormalisedValueNotifyingHost(screenType.getSelectedId());
+    screenOverlay.setSelectedId(parameters.screenOverlay->getValueUnnormalised());
+    screenOverlay.onChange = [this] {
+        parameters.screenOverlay->setUnnormalisedValueNotifyingHost(screenOverlay.getSelectedId());
     };
     
     intensity.setSliderOnValueChange();
@@ -64,10 +64,10 @@ void VisualiserSettings::resized() {
 	auto area = getLocalBounds().reduced(20, 0).withTrimmedBottom(20);
 	double rowHeight = 30;
     
-    auto screenTypeArea = area.removeFromTop(2 * rowHeight);
-    screenTypeArea = screenTypeArea.withSizeKeepingCentre(300, rowHeight);
-    screenTypeLabel.setBounds(screenTypeArea.removeFromLeft(120));
-    screenType.setBounds(screenTypeArea.removeFromRight(180));
+    auto screenOverlayArea = area.removeFromTop(2 * rowHeight);
+    screenOverlayArea = screenOverlayArea.withSizeKeepingCentre(300, rowHeight);
+    screenOverlayLabel.setBounds(screenOverlayArea.removeFromLeft(120));
+    screenOverlay.setBounds(screenOverlayArea.removeFromRight(180));
     
     intensity.setBounds(area.removeFromTop(rowHeight));
     persistence.setBounds(area.removeFromTop(rowHeight));
