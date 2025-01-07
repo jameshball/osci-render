@@ -55,6 +55,7 @@ public:
     void changeProgramName(int index, const juce::String& newName) override;
     double getSampleRate() override;
     void loadAudioFile(const juce::File& file);
+    void loadAudioFile(std::unique_ptr<juce::InputStream> stream);
     void stopAudioFile();
     void addAudioPlayerListener(AudioPlayerListener* listener);
     void removeAudioPlayerListener(AudioPlayerListener* listener);

@@ -26,8 +26,6 @@ AudioPlayerComponent::AudioPlayerComponent(CommonAudioProcessor& processor) : au
     playButton.setTooltip("Play audio file");
     pauseButton.setTooltip("Pause audio file");
 
-    repeatButton.setToggleState(true, juce::dontSendNotification);
-
     playButton.onClick = [this]() {
         audioProcessor.wavParser.setPaused(false);
         if (audioProcessor.wavParser.isInitialised()) {
@@ -73,6 +71,8 @@ AudioPlayerComponent::~AudioPlayerComponent() {
 
 // must hold lock
 void AudioPlayerComponent::setup() {
+    repeatButton.setToggleState(audioProcessor.wavParser.isLooping(), juce::dontSendNotification);
+
     if (audioProcessor.wavParser.isInitialised()) {
         slider.setVisible(true);
         repeatButton.setVisible(true);
@@ -88,7 +88,6 @@ void AudioPlayerComponent::setup() {
         };
         playButton.setVisible(audioProcessor.wavParser.isPaused());
         pauseButton.setVisible(!audioProcessor.wavParser.isPaused());
-        audioProcessor.wavParser.setLooping(repeatButton.getToggleState());
     } else {
         slider.setVisible(false);
         repeatButton.setVisible(false);

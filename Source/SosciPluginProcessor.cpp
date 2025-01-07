@@ -3,6 +3,12 @@
 #include "audio/EffectParameter.h"
 
 SosciAudioProcessor::SosciAudioProcessor() {
+    // demo audio file on standalone only
+    if (juce::JUCEApplicationBase::isStandaloneApp()) {
+        std::unique_ptr<juce::InputStream> stream = std::make_unique<juce::MemoryInputStream>(BinaryData::sosci_flac, BinaryData::sosci_flacSize, false);
+        loadAudioFile(std::move(stream));
+    }
+
     addAllParameters();
 }
 

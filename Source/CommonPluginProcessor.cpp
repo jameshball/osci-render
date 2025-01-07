@@ -39,6 +39,8 @@ CommonAudioProcessor::CommonAudioProcessor()
     permanentEffects.push_back(thresholdEffect);
     effects.push_back(volumeEffect);
     effects.push_back(thresholdEffect);
+
+    wavParser.setLooping(false);
 }
 
 void CommonAudioProcessor::addAllParameters() {
@@ -187,6 +189,12 @@ double CommonAudioProcessor::getSampleRate() {
 void CommonAudioProcessor::loadAudioFile(const juce::File& file) {
     auto stream = std::make_unique<juce::FileInputStream>(file);
     if (stream->openedOk()) {
+        loadAudioFile(std::move(stream));
+    }
+}
+
+void CommonAudioProcessor::loadAudioFile(std::unique_ptr<juce::InputStream> stream) {
+    if (stream != nullptr) {
         juce::SpinLock::ScopedLockType lock(wavParserLock);
         wavParser.parse(std::move(stream));
 
