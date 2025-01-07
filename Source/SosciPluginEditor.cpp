@@ -35,3 +35,24 @@ void SosciPluginEditor::resized() {
     }
     visualiser.setBounds(area);
 }
+
+bool SosciPluginEditor::isInterestedInFileDrag(const juce::StringArray& files) {
+    if (files.size() != 1) {
+        return false;
+    }
+    juce::File file(files[0]);
+    return 
+        file.hasFileExtension("wav") ||
+        file.hasFileExtension("mp3") ||
+        file.hasFileExtension("aiff") ||
+        file.hasFileExtension("flac") ||
+        file.hasFileExtension("ogg");
+}
+
+void SosciPluginEditor::filesDropped(const juce::StringArray& files, int x, int y) {
+    if (files.size() != 1) {
+        return;
+    }
+    juce::File file(files[0]);
+    audioProcessor.loadAudioFile(file);
+}

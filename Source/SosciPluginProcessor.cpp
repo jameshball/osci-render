@@ -28,7 +28,6 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         
         if (readingFromWav) {
             point = wavParser->getSample();
-            point.z = 1.0f;
         } else {
             float x = input.getNumChannels() > 0 ? inputArray[0][sample] : 0.0f;
             float y = input.getNumChannels() > 1 ? inputArray[1][sample] : 0.0f;
@@ -47,12 +46,12 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             point = { x, y, brightness };
         }
 
+        // no negative brightness
+        point.z = juce::jlimit(0.0, 1.0, point.z);
+
         for (auto& effect : permanentEffects) {
             point = effect->apply(sample, point);
         }
-
-        // no negative brightness
-        point.z = juce::jmax(0.0, juce::jmin(1.0, point.z));
 
         // this is the point that the visualiser will draw
         threadManager.write(point);

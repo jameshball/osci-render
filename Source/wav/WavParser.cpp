@@ -12,7 +12,7 @@ WavParser::WavParser(CommonAudioProcessor& p, std::unique_ptr<juce::InputStream>
     afSource = new juce::AudioFormatReaderSource(reader, true);
     totalSamples = afSource->getTotalLength();
     afSource->setLooping(true);
-    source = std::make_unique<juce::ResamplingAudioSource>(afSource, true);
+    source = std::make_unique<juce::ResamplingAudioSource>(afSource, true, reader->numChannels);
     fileSampleRate = reader->sampleRate;
     audioBuffer.setSize(reader->numChannels, 1);
     setSampleRate(audioProcessor.currentSampleRate);
@@ -52,9 +52,13 @@ OsciPoint WavParser::getSample() {
     }
     
     if (audioBuffer.getNumChannels() == 1) {
-        return OsciPoint(audioBuffer.getSample(0, 0), audioBuffer.getSample(0, 0));
+        return OsciPoint(audioBuffer.getSample(0, 0), audioBuffer.getSample(0, 0), 1.0);
+    } else if (audioBuffer.getNumChannels() == 2) {
+        return OsciPoint(audioBuffer.getSample(0, 0), audioBuffer.getSample(1, 0), 1.0);
+    } else if (audioBuffer.getNumChannels() >= 3) {
+        return OsciPoint(audioBuffer.getSample(0, 0), audioBuffer.getSample(1, 0), audioBuffer.getSample(2, 0));
     } else {
-        return OsciPoint(audioBuffer.getSample(0, 0), audioBuffer.getSample(1, 0));
+        return OsciPoint();
     }
 }
 

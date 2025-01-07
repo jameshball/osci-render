@@ -9,13 +9,15 @@
 #include "components/SosciMainMenuBarModel.h"
 #include "components/SvgButton.h"
 
-class SosciPluginEditor : public CommonPluginEditor {
+class SosciPluginEditor : public CommonPluginEditor, public juce::FileDragAndDropTarget {
 public:
     SosciPluginEditor(SosciAudioProcessor&);
     ~SosciPluginEditor() override;
 
     void paint(juce::Graphics&) override;
     void resized() override;
+    bool isInterestedInFileDrag(const juce::StringArray& files) override;
+    void filesDropped(const juce::StringArray& files, int x, int y) override;
 
 private:
     SosciAudioProcessor& audioProcessor;
