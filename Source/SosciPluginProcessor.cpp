@@ -21,13 +21,13 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     auto outputArray = output.getArrayOfWritePointers();
     
     juce::SpinLock::ScopedLockType lock2(wavParserLock);
-    bool readingFromWav = wavParser != nullptr;
+    bool readingFromWav = wavParser.isInitialised();
     
 	for (int sample = 0; sample < input.getNumSamples(); ++sample) {
         OsciPoint point;
         
         if (readingFromWav) {
-            point = wavParser->getSample();
+            point = wavParser.getSample();
         } else {
             float x = input.getNumChannels() > 0 ? inputArray[0][sample] : 0.0f;
             float y = input.getNumChannels() > 1 ? inputArray[1][sample] : 0.0f;

@@ -5,7 +5,7 @@
 class CommonAudioProcessor;
 class WavParser {
 public:
-    WavParser(CommonAudioProcessor& p, std::unique_ptr<juce::InputStream> stream);
+    WavParser(CommonAudioProcessor& p);
 	~WavParser();
 
 	OsciPoint getSample();
@@ -15,18 +15,22 @@ public:
 	bool isPaused();
 	void setLooping(bool looping);
 	bool isLooping();
+	bool parse(std::unique_ptr<juce::InputStream> stream);
+	void close();
+	bool isInitialised();
 
 	std::function<void(double)> onProgress;
 
 private:
 	void setSampleRate(double sampleRate);
 
-	juce::AudioFormatReaderSource* afSource;
-	bool looping = true;
-	std::unique_ptr<juce::ResamplingAudioSource> source;
+	std::atomic<bool> initialised = false;
+	juce::AudioFormatReaderSource* afSource = nullptr;
+	std::atomic<bool> looping = true;
+	std::unique_ptr<juce::ResamplingAudioSource> source = nullptr;
 	juce::AudioBuffer<float> audioBuffer;
-	long totalSamples;
-	long counter = 0;
+	std::atomic<long> totalSamples;
+	std::atomic<long> counter = 0;
     std::atomic<double> currentSample = 0;
 	std::atomic<bool> paused = false;
 	int fileSampleRate;

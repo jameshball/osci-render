@@ -50,7 +50,7 @@ public:
 
 class AudioPlayerListener {
 public:
-    virtual void parserChanged(std::shared_ptr<WavParser> parser) = 0;
+    virtual void parserChanged() = 0;
 };
 
 class CommonAudioProcessor;
@@ -61,14 +61,11 @@ public:
 
 	void resized() override;
     void setup();
-    void parserChanged(std::shared_ptr<WavParser> parser) override;
+    void parserChanged() override;
     void setPaused(bool paused);
 
 private:
     CommonAudioProcessor& audioProcessor;
-
-    bool parserWasNull = true;
-    std::shared_ptr<WavParser> parser;
     
     TimelineLookAndFeel timelineLookAndFeel;
 

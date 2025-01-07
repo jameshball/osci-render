@@ -260,8 +260,8 @@ double VisualiserComponent::getSweepIncrement() {
 
 void VisualiserComponent::setPaused(bool paused) {
     active = !paused;
-    renderingSemaphore.release();
     setShouldBeRunning(active);
+    renderingSemaphore.release();
     audioPlayer.setPaused(paused);
     repaint();
 }

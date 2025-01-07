@@ -36,7 +36,8 @@ void FileParser::parse(juce::String fileId, juce::String extension, std::unique_
 		int bytesRead = stream->readIntoMemoryBlock(buffer);
 		img = std::make_shared<ImageParser>(audioProcessor, extension, buffer);
 	} else if (extension == ".wav" || extension == ".aiff") {
-		wav = std::make_shared<WavParser>(audioProcessor, std::move(stream));
+		wav = std::make_shared<WavParser>(audioProcessor);
+		wav->parse(std::move(stream));
 	}
 
 	isAnimatable = gpla != nullptr || (img != nullptr && extension == ".gif");

@@ -188,22 +188,22 @@ void CommonAudioProcessor::loadAudioFile(const juce::File& file) {
     auto stream = std::make_unique<juce::FileInputStream>(file);
     if (stream->openedOk()) {
         juce::SpinLock::ScopedLockType lock(wavParserLock);
-        wavParser = std::make_shared<WavParser>(*this, std::move(stream));
+        wavParser.parse(std::move(stream));
 
         juce::SpinLock::ScopedLockType lock2(audioPlayerListenersLock);
         for (auto listener : audioPlayerListeners) {
-            listener->parserChanged(wavParser);
+            listener->parserChanged();
         }
     }
 }
 
 void CommonAudioProcessor::stopAudioFile() {
     juce::SpinLock::ScopedLockType lock(wavParserLock);
-    wavParser = nullptr;
+    wavParser.close();
 
     juce::SpinLock::ScopedLockType lock2(audioPlayerListenersLock);
     for (auto listener : audioPlayerListeners) {
-        listener->parserChanged(wavParser);
+        listener->parserChanged();
     }
 }
 

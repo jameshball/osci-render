@@ -6,8 +6,6 @@ AudioPlayerComponent::AudioPlayerComponent(CommonAudioProcessor& processor) : au
 
     audioProcessor.addAudioPlayerListener(this);
 
-    parser = audioProcessor.wavParser;
-
     addAndMakeVisible(slider);
     slider.setSliderStyle(juce::Slider::SliderStyle::LinearHorizontal);
     slider.setTextBoxStyle(juce::Slider::NoTextBox, true, 0, 0);
@@ -19,11 +17,7 @@ AudioPlayerComponent::AudioPlayerComponent(CommonAudioProcessor& processor) : au
     slider.onValueChange = [this]() {
         juce::SpinLock::ScopedLockType sl(audioProcessor.wavParserLock);
 
-        if (parser != nullptr) {
-            parser->setProgress(slider.getValue());
-        } else {
-            slider.setValue(0, juce::dontSendNotification);
-        }
+        audioProcessor.wavParser.setProgress(slider.getValue());
     };
 
     addChildComponent(playButton);
@@ -35,20 +29,16 @@ AudioPlayerComponent::AudioPlayerComponent(CommonAudioProcessor& processor) : au
     repeatButton.setToggleState(true, juce::dontSendNotification);
 
     playButton.onClick = [this]() {
-        juce::SpinLock::ScopedLockType sl(audioProcessor.wavParserLock);
-
-        if (parser != nullptr) {
-            parser->setPaused(false);
+        audioProcessor.wavParser.setPaused(false);
+        if (audioProcessor.wavParser.isInitialised()) {
             playButton.setVisible(false);
             pauseButton.setVisible(true);
         }
     };
 
     pauseButton.onClick = [this]() {
-        juce::SpinLock::ScopedLockType sl(audioProcessor.wavParserLock);
-
-        if (parser != nullptr) {
-            parser->setPaused(true);
+        audioProcessor.wavParser.setPaused(true);
+        if (audioProcessor.wavParser.isInitialised()) {
             playButton.setVisible(true);
             pauseButton.setVisible(false);
         }
@@ -59,11 +49,7 @@ AudioPlayerComponent::AudioPlayerComponent(CommonAudioProcessor& processor) : au
     repeatButton.setTooltip("Repeat audio file once it finishes playing");
 
     repeatButton.onClick = [this]() {
-        juce::SpinLock::ScopedLockType sl(audioProcessor.wavParserLock);
-
-        if (parser != nullptr) {
-            parser->setLooping(repeatButton.getToggleState());
-        }
+        audioProcessor.wavParser.setLooping(repeatButton.getToggleState());
     };
 
     addAndMakeVisible(stopButton);
@@ -82,19 +68,16 @@ AudioPlayerComponent::AudioPlayerComponent(CommonAudioProcessor& processor) : au
 
 AudioPlayerComponent::~AudioPlayerComponent() {
     audioProcessor.removeAudioPlayerListener(this);
-    juce::SpinLock::ScopedLockType sl(audioProcessor.wavParserLock);
-    if (parser != nullptr) {
-        parser->onProgress = nullptr;
-    }
+    audioProcessor.wavParser.onProgress = nullptr;
 }
 
 // must hold lock
 void AudioPlayerComponent::setup() {
-    if (parser != nullptr) {
+    if (audioProcessor.wavParser.isInitialised()) {
         slider.setVisible(true);
         repeatButton.setVisible(true);
         stopButton.setVisible(true);
-        parser->onProgress = [this](double progress) {
+        audioProcessor.wavParser.onProgress = [this](double progress) {
             juce::WeakReference<AudioPlayerComponent> weakRef(this);
             juce::MessageManager::callAsync([this, progress, weakRef]() {
                 if (weakRef) {
@@ -103,9 +86,9 @@ void AudioPlayerComponent::setup() {
                 }
             });
         };
-        playButton.setVisible(parser->isPaused());
-        pauseButton.setVisible(!parser->isPaused());
-        parser->setLooping(repeatButton.getToggleState());
+        playButton.setVisible(audioProcessor.wavParser.isPaused());
+        pauseButton.setVisible(!audioProcessor.wavParser.isPaused());
+        audioProcessor.wavParser.setLooping(repeatButton.getToggleState());
     } else {
         slider.setVisible(false);
         repeatButton.setVisible(false);
@@ -114,8 +97,6 @@ void AudioPlayerComponent::setup() {
         playButton.setVisible(false);
         pauseButton.setVisible(false);
     }
-
-    parserWasNull = parser == nullptr;
 }
 
 void AudioPlayerComponent::setPaused(bool paused) {
@@ -126,8 +107,7 @@ void AudioPlayerComponent::setPaused(bool paused) {
     }
 }
 
-void AudioPlayerComponent::parserChanged(std::shared_ptr<WavParser> parser) {
-    this->parser = parser;
+void AudioPlayerComponent::parserChanged() {
     setup();
     repaint();
 }

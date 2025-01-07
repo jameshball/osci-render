@@ -90,7 +90,7 @@ public:
     );
 
     juce::SpinLock wavParserLock;
-    std::shared_ptr<WavParser> wavParser;
+    WavParser wavParser{ *this };
 
     std::atomic<double> currentSampleRate = 0.0;
     juce::SpinLock effectsLock;
