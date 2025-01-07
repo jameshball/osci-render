@@ -5,7 +5,7 @@
 #include "BufferConsumer.h"
 
 class AudioBackgroundThreadManager;
-class AudioBackgroundThread : private juce::Thread {
+class AudioBackgroundThread : public juce::Thread {
 public:
     AudioBackgroundThread(const juce::String& name, AudioBackgroundThreadManager& manager);
     ~AudioBackgroundThread() override;

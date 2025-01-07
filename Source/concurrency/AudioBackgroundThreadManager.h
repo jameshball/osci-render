@@ -13,6 +13,7 @@ public:
     void registerThread(AudioBackgroundThread* thread);
     void unregisterThread(AudioBackgroundThread* thread);
     void write(const OsciPoint& point);
+    void write(const OsciPoint& point, juce::String name);
     void prepare(double sampleRate, int samplesPerBlock);
     
     double sampleRate = 44100.0;
