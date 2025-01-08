@@ -155,11 +155,6 @@ jobs:
           token: ${{ secrets.ACCESS_TOKEN }}
           submodules: true
 
-      - name: Add msbuild to PATH
-        uses: microsoft/setup-msbuild@v2
-        with:
-          msbuild-architecture: x64
-
       - name: Setup NuGet.exe for use with actions
         uses: NuGet/setup-nuget@v1.0.5
 
