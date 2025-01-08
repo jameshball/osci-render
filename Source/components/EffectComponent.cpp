@@ -80,7 +80,7 @@ void EffectComponent::setupComponent() {
 
         lfoSlider.setRange(parameter->lfoRate->min, parameter->lfoRate->max, parameter->lfoRate->step);
         lfoSlider.setValue(parameter->lfoRate->getValueUnnormalised(), juce::dontSendNotification);
-        lfoSlider.setSkewFactorFromMidPoint(parameter->lfoRate->min + 0.2 * (parameter->lfoRate->max - parameter->lfoRate->min));
+        lfoSlider.setSkewFactorFromMidPoint(parameter->lfoRate->min + 0.1 * (parameter->lfoRate->max - parameter->lfoRate->min));
 
         if (lfo.getSelectedId() == static_cast<int>(LfoType::Static)) {
             lfoSlider.setVisible(false);

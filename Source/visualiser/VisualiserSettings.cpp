@@ -52,9 +52,13 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
         triggerValue.setEnabled(sweepToggle.getToggleState());
         resized();
     };
+
+    parameters.screenOverlay->addListener(this);
 }
 
-VisualiserSettings::~VisualiserSettings() {}
+VisualiserSettings::~VisualiserSettings() {
+    parameters.screenOverlay->removeListener(this);
+}
 
 void VisualiserSettings::paint(juce::Graphics& g) {
     g.fillAll(Colours::darker);
@@ -86,3 +90,11 @@ void VisualiserSettings::resized() {
     sweepMs.setBounds(area.removeFromTop(rowHeight));
     triggerValue.setBounds(area.removeFromTop(rowHeight));
 }
+
+void VisualiserSettings::parameterValueChanged(int parameterIndex, float newValue) {
+    if (parameterIndex == parameters.screenOverlay->getParameterIndex()) {
+        screenOverlay.setSelectedId(parameters.screenOverlay->getValueUnnormalised());
+    }
+}
+
+void VisualiserSettings::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}

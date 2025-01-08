@@ -196,13 +196,15 @@ public:
     std::vector<IntParameter*> integers = {screenOverlay};
 };
 
-class VisualiserSettings : public juce::Component {
+class VisualiserSettings : public juce::Component, public juce::AudioProcessorParameter::Listener {
 public:
     VisualiserSettings(VisualiserParameters&, int numChannels = 2);
     ~VisualiserSettings();
 
     void paint(juce::Graphics& g) override;
     void resized() override;
+    void parameterValueChanged(int parameterIndex, float newValue) override;
+    void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     
     double getIntensity() {
         return parameters.intensityEffect->getActualValue() / 100;

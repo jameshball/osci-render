@@ -41,7 +41,13 @@
               resource="1" file="Resources/oscilloscope/vector_display_reflection.jpg"/>
       </GROUP>
       <GROUP id="{08DE8F94-4A00-7C71-4AF3-4C34C821A5DF}" name="sosci">
+        <FILE id="jtOYDo" name="clean.sosci" compile="0" resource="1" file="Resources/sosci/clean.sosci"/>
         <FILE id="AHn0sU" name="default.sosci" compile="0" resource="1" file="Resources/sosci/default.sosci"/>
+        <FILE id="nisXT4" name="rainbow.sosci" compile="0" resource="1" file="Resources/sosci/rainbow.sosci"/>
+        <FILE id="OxpU7u" name="real_oscilloscope.sosci" compile="0" resource="1"
+              file="Resources/sosci/real_oscilloscope.sosci"/>
+        <FILE id="LDoLqS" name="vector_display.sosci" compile="0" resource="1"
+              file="Resources/sosci/vector_display.sosci"/>
       </GROUP>
       <GROUP id="{82BCD6F1-A8BF-F30B-5587-81EE70168883}" name="svg">
         <FILE id="rl17ZK" name="cog.svg" compile="0" resource="1" file="Resources/svg/cog.svg"/>

@@ -10,6 +10,10 @@ SosciMainMenuBarModel::SosciMainMenuBarModel(SosciPluginEditor& e, SosciAudioPro
     
     std::vector<std::tuple<juce::String, const void *, int>> examples = {
         {"default.sosci", BinaryData::default_sosci, BinaryData::default_sosciSize},
+        {"clean.sosci", BinaryData::clean_sosci, BinaryData::clean_sosciSize},
+        {"vector_display.sosci", BinaryData::vector_display_sosci, BinaryData::vector_display_sosciSize},
+        {"real_oscilloscope.sosci", BinaryData::real_oscilloscope_sosci, BinaryData::real_oscilloscope_sosciSize},
+        {"rainbow.sosci", BinaryData::rainbow_sosci, BinaryData::rainbow_sosciSize},
     };
     
     // This is a hack - ideally I would improve the MainMenuBarModel class to allow for submenus
