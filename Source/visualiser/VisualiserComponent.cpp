@@ -607,6 +607,9 @@ void VisualiserComponent::openGLContextClosing() {
     wideBlurShader.reset();
     lineShader.reset();
     outputShader.reset();
+
+    // this triggers setupArrays to be called again when the scope next renders
+    scratchVertices.clear();
 }
 
 void VisualiserComponent::handleAsyncUpdate() {
@@ -1205,7 +1208,7 @@ void VisualiserComponent::renderScope(const std::vector<float>& xPoints, const s
         screenTexture = createScreenTexture();
     }
     
-    if (sampleRate != oldSampleRate) {
+    if (sampleRate != oldSampleRate || scratchVertices.empty()) {
         oldSampleRate = sampleRate;
         setupArrays(RESAMPLE_RATIO * sampleRate / FRAME_RATE);
     }
