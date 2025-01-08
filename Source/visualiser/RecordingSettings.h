@@ -27,10 +27,11 @@ public:
 
     EffectParameter qualityParameter = EffectParameter(
         "Video Quality",
-        "Controls the quality of the recording video. 0 is the worst possible quality, and 1 is lossless.",
+        "Controls the quality of the recording video. 0 is the worst possible quality, and 1 is almost lossless.",
         "brightness",
         VERSION_HINT, 0.7, 0.0, 1.0
     );
+    BooleanParameter losslessVideo = BooleanParameter("Lossless Video", "losslessVideo", VERSION_HINT, false, "Record video in a lossless format. WARNING: This is not supported by all media players.");
     Effect qualityEffect = Effect(&qualityParameter);
 
     BooleanParameter recordAudio = BooleanParameter("Record Audio", "recordAudio", VERSION_HINT, true, "Record audio along with the video.");
@@ -40,6 +41,7 @@ public:
 
     void save(juce::XmlElement* xml) {
         auto settingsXml = xml->createNewChildElement("recordingSettings");
+        losslessVideo.save(settingsXml->createNewChildElement("losslessVideo"));
         recordAudio.save(settingsXml->createNewChildElement("recordAudio"));
         recordVideo.save(settingsXml->createNewChildElement("recordVideo"));
         settingsXml->setAttribute("compressionPreset", compressionPreset);
@@ -51,6 +53,9 @@ public:
     // opt to not change any values if not found
     void load(juce::XmlElement* xml) {
         if (auto* settingsXml = xml->getChildByName("recordingSettings")) {
+            if (auto* losslessVideoXml = settingsXml->getChildByName("losslessVideo")) {
+                losslessVideo.load(losslessVideoXml);
+            }
             if (auto* recordAudioXml = settingsXml->getChildByName("recordAudio")) {
                 recordAudio.load(recordAudioXml);
             }
@@ -77,9 +82,13 @@ public:
     void resized() override;
 
     int getCRF() {
+        if (parameters.losslessVideo.getBoolValue()) {
+            return 0;
+        }
         double quality = juce::jlimit(0.0, 1.0, parameters.qualityEffect.getValue());
-        // mapping to 0-51 for ffmpeg's crf value
-        return 51 * (1.0 - quality) ;
+        // mapping to 1-51 for ffmpeg's crf value (ignoring 0 as this is lossless and
+        // not supported by all media players)
+        return 50 * (1.0 - quality) + 1;
     }
 
     bool recordingVideo() {
@@ -99,6 +108,7 @@ public:
 private:
     EffectComponent quality{parameters.qualityEffect};
 
+    jux::SwitchButton losslessVideo{&parameters.losslessVideo};
     jux::SwitchButton recordAudio{&parameters.recordAudio};
     jux::SwitchButton recordVideo{&parameters.recordVideo};
     

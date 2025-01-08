@@ -6,6 +6,7 @@
 RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
 #if SOSCI_FEATURES
     addAndMakeVisible(quality);
+    addAndMakeVisible(losslessVideo);
     addAndMakeVisible(recordAudio);
     addAndMakeVisible(recordVideo);
     addAndMakeVisible(compressionPreset);
@@ -22,6 +23,10 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
         if (!recordAudio.getToggleState() && !recordVideo.getToggleState()) {
             recordAudio.setToggleState(true, juce::NotificationType::sendNotification);
         }
+    };
+    quality.setEnabled(!losslessVideo.getToggleState());
+    losslessVideo.onClick = [this] {
+        quality.setEnabled(!losslessVideo.getToggleState());
     };
     compressionPreset.onChange = [this] {
         parameters.compressionPreset = parameters.compressionPresets[compressionPreset.getSelectedId() - 1];
@@ -51,6 +56,7 @@ void RecordingSettings::resized() {
     double rowHeight = 30;
     
 #if SOSCI_FEATURES
+    losslessVideo.setBounds(area.removeFromTop(rowHeight));
     quality.setBounds(area.removeFromTop(rowHeight).expanded(6, 0));
     recordAudio.setBounds(area.removeFromTop(rowHeight));
     recordVideo.setBounds(area.removeFromTop(rowHeight));
