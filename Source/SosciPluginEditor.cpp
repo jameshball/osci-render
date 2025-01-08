@@ -50,6 +50,12 @@ void SosciPluginEditor::resized() {
         visualiserSettings.setSize(settingsArea.getWidth(), 550);
         visualiserSettingsWrapper.setBounds(settingsArea);
 
+        if (area.getWidth() < 10) {
+            area.setWidth(10);
+        }
+        if (area.getHeight() < 10) {
+            area.setHeight(10);
+        }
         visualiser.setBounds(area);
     }
 }
