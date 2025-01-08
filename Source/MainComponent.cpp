@@ -124,19 +124,17 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 		createFile.triggerClick();
 	};
 
-	if (!audioProcessor.visualiserFullScreen->getBoolValue()) {
-		addAndMakeVisible(pluginEditor.visualiser);
-	}
-	pluginEditor.visualiser.setFullScreenCallback([this](FullScreenMode mode) {
+	BooleanParameter* visualiserFullScreen = audioProcessor.visualiserParameters.visualiserFullScreen;
+
+    addAndMakeVisible(pluginEditor.visualiser);
+	pluginEditor.visualiser.setFullScreenCallback([this, visualiserFullScreen](FullScreenMode mode) {
 		if (mode == FullScreenMode::TOGGLE) {
-			audioProcessor.visualiserFullScreen->setBoolValueNotifyingHost(!audioProcessor.visualiserFullScreen->getBoolValue());
+			visualiserFullScreen->setBoolValueNotifyingHost(!visualiserFullScreen->getBoolValue());
 		} else if (mode == FullScreenMode::FULL_SCREEN) {
-			audioProcessor.visualiserFullScreen->setBoolValueNotifyingHost(true);
+			visualiserFullScreen->setBoolValueNotifyingHost(true);
 		} else if (mode == FullScreenMode::MAIN_COMPONENT) {
-            audioProcessor.visualiserFullScreen->setBoolValueNotifyingHost(false);
+			visualiserFullScreen->setBoolValueNotifyingHost(false);
         }
-        
-		pluginEditor.visualiser.setFullScreen(audioProcessor.visualiserFullScreen->getBoolValue());
 		
 		pluginEditor.resized();
 		pluginEditor.repaint();
@@ -144,21 +142,11 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 		repaint();
     });
 
-	addAndMakeVisible(frequencyLabel);
-
-	callbackIndex = audioProcessor.pitchDetector.addCallback(
-		[this](float frequency) {
-			// round to nearest integer
-			int roundedFrequency = static_cast<int>(frequency + 0.5f);
-			frequencyLabel.setText(juce::String(roundedFrequency) + "Hz", juce::dontSendNotification);
-		}
-	);
-
-	addAndMakeVisible(recorder);
+	visualiserFullScreen->addListener(this);
 }
 
 MainComponent::~MainComponent() {
-	audioProcessor.pitchDetector.removeCallback(callbackIndex);
+	audioProcessor.visualiserParameters.visualiserFullScreen->removeListener(this);
 }
 
 void MainComponent::updateFileLabel() {
@@ -176,15 +164,23 @@ void MainComponent::updateFileLabel() {
 	resized();
 }
 
+void MainComponent::parameterValueChanged(int parameterIndex, float newValue) {
+	juce::MessageManager::callAsync([this] {
+		pluginEditor.resized();
+		pluginEditor.repaint();
+		resized();
+		repaint();
+    });
+}
+
+void MainComponent::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
+
 void MainComponent::resized() {
     juce::Rectangle<int> bounds = getLocalBounds().withTrimmedTop(20).reduced(20);
 	auto buttonWidth = 120;
 	auto buttonHeight = 30;
 	auto padding = 10;
 	auto rowPadding = 10;
-
-	recorder.setBounds(bounds.removeFromBottom(30));
-	bounds.removeFromBottom(padding);
 	
 	auto row = bounds.removeFromTop(buttonHeight);
     fileButton.setBounds(row.removeFromLeft(buttonWidth));
@@ -225,16 +221,14 @@ void MainComponent::resized() {
 	createFile.setBounds(row.removeFromLeft(buttonWidth));
 
 	bounds.removeFromTop(padding);
-	frequencyLabel.setBounds(bounds.removeFromTop(20));
-
-	bounds.removeFromTop(padding);
-	if (!audioProcessor.visualiserFullScreen->getBoolValue()) {
+	bounds.expand(10, 0);
+	if (!audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
 		auto minDim = juce::jmin(bounds.getWidth(), bounds.getHeight());
         juce::Point<int> localTopLeft = {bounds.getX(), bounds.getY()};
         juce::Point<int> topLeft = pluginEditor.getLocalPoint(this, localTopLeft);
         auto shiftedBounds = bounds;
         shiftedBounds.setX(topLeft.getX());
         shiftedBounds.setY(topLeft.getY());
-		pluginEditor.visualiser.setBounds(shiftedBounds.withSizeKeepingCentre(minDim, minDim));
+		pluginEditor.visualiser.setBounds(shiftedBounds.withSizeKeepingCentre(minDim - 25, minDim));
 	}
 }

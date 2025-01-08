@@ -1,19 +1,19 @@
 #pragma once
 #include "EffectApplication.h"
-#include "../shape/Point.h"
+#include "../shape/OsciPoint.h"
 #include "../audio/Effect.h"
 #include "../lua/LuaParser.h"
 
 class CustomEffect : public EffectApplication {
 public:
-	CustomEffect(std::function<void(int, juce::String, juce::String)> errorCallback, double (&luaValues)[26]);
+	CustomEffect(std::function<void(int, juce::String, juce::String)> errorCallback, std::atomic<double>* luaValues);
 	~CustomEffect();
 
 	// arbitrary UUID
 	static const juce::String UNIQUE_ID;
 	static const juce::String FILE_NAME;
 
-	Point apply(int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override;
+	OsciPoint apply(int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) override;
 	void updateCode(const juce::String& newCode);
 
 	juce::String getCode();
@@ -32,5 +32,5 @@ private:
 	lua_State *L = nullptr;
 
 	LuaVariables vars;
-	double(&luaValues)[26];
+	std::atomic<double>* luaValues;
 };

@@ -1,11 +1,8 @@
 #include "VolumeComponent.h"
 
-VolumeComponent::VolumeComponent(OscirenderAudioProcessor& p) : audioProcessor(p), juce::Thread("VolumeComponent") {
-    resetBuffer();
-    
+VolumeComponent::VolumeComponent(CommonAudioProcessor& p) : AudioBackgroundThread("VolumeComponent", p.threadManager), audioProcessor(p) {
     setOpaque(false);
-    startTimerHz(60);
-    startThread();
+    setShouldBeRunning(true);
 
     addAndMakeVisible(volumeSlider);
     volumeSlider.setSliderStyle(juce::Slider::SliderStyle::LinearVertical);
@@ -48,14 +45,6 @@ VolumeComponent::VolumeComponent(OscirenderAudioProcessor& p) : audioProcessor(p
     addAndMakeVisible(*thresholdIcon);
 }
 
-VolumeComponent::~VolumeComponent() {
-    {
-        juce::CriticalSection::ScopedLockType lock(consumerLock);
-        audioProcessor.consumerStop(consumer);
-    }
-    stopThread(1000);
-}
-
 void VolumeComponent::paint(juce::Graphics& g) {
     auto r = getLocalBounds().toFloat();
     r.removeFromTop(20);
@@ -90,51 +79,43 @@ void VolumeComponent::paint(juce::Graphics& g) {
     g.fillRect(leftRegion.getX(), rightRegion.getBottom() - (thresholdSlider.getValue() * channelHeight) - barWidth / 2, leftRegion.getWidth() + rightRegion.getWidth(), barWidth);
 }
 
-void VolumeComponent::timerCallback() {
+void VolumeComponent::handleAsyncUpdate() {
     repaint();
     volumeSlider.setValue(audioProcessor.volumeEffect->getValue(), juce::NotificationType::dontSendNotification);
     thresholdSlider.setValue(audioProcessor.thresholdEffect->getValue(), juce::NotificationType::dontSendNotification);
 }
 
-void VolumeComponent::run() {
-    while (!threadShouldExit()) {
-        if (sampleRate != (int) audioProcessor.currentSampleRate) {
-            resetBuffer();
-        }
+void VolumeComponent::runTask(const std::vector<OsciPoint>& buffer) {
+    float leftVolume = 0;
+    float rightVolume = 0;
 
-        if (buffer.size() == 0) {
-            continue;
-        }
-        
-        {
-            juce::CriticalSection::ScopedLockType lock(consumerLock);
-            consumer = audioProcessor.consumerRegister(buffer);
-        }
-        audioProcessor.consumerRead(consumer);
-
-        float leftVolume = 0;
-        float rightVolume = 0;
-
-        for (int i = 0; i < buffer.size(); i += 2) {
-            leftVolume += buffer[i] * buffer[i];
-            rightVolume += buffer[i + 1] * buffer[i + 1];
-        }
-        // RMS
-        leftVolume = std::sqrt(leftVolume / (buffer.size() / 2));
-        rightVolume = std::sqrt(rightVolume / (buffer.size() / 2));
-
-        if (std::isnan(leftVolume) || std::isnan(rightVolume)) {
-            leftVolume = 0;
-            rightVolume = 0;
-        }
-
-        this->leftVolume = leftVolume;
-        this->rightVolume = rightVolume;
-
-        avgLeftVolume = (avgLeftVolume * 0.95) + (leftVolume * 0.05);
-        avgRightVolume = (avgRightVolume * 0.95) + (rightVolume * 0.05);
+    for (int i = 0; i < buffer.size(); i++) {
+        leftVolume += buffer[i].x * buffer[i].x;
+        rightVolume += buffer[i].y * buffer[i].y;
     }
+    // RMS
+    leftVolume = std::sqrt(leftVolume / buffer.size());
+    rightVolume = std::sqrt(rightVolume / buffer.size());
+
+    if (std::isnan(leftVolume) || std::isnan(rightVolume)) {
+        leftVolume = 0;
+        rightVolume = 0;
+    }
+
+    this->leftVolume = leftVolume;
+    this->rightVolume = rightVolume;
+
+    avgLeftVolume = (avgLeftVolume * 0.95) + (leftVolume * 0.05);
+    avgRightVolume = (avgRightVolume * 0.95) + (rightVolume * 0.05);
+    
+    triggerAsyncUpdate();
 }
+
+int VolumeComponent::prepareTask(double sampleRate, int bufferSize) {
+    return BUFFER_DURATION_SECS * sampleRate;
+}
+
+void VolumeComponent::stopTask() {}
 
 void VolumeComponent::resized() {
     auto r = getLocalBounds();
@@ -145,9 +126,4 @@ void VolumeComponent::resized() {
     volumeSlider.setBounds(r.removeFromLeft(r.getWidth() / 2));
     auto radius = volumeSlider.getLookAndFeel().getSliderThumbRadius(volumeSlider);
     thresholdSlider.setBounds(r.reduced(0, radius / 2));
-}
-
-void VolumeComponent::resetBuffer() {
-    sampleRate = (int) audioProcessor.currentSampleRate;
-    buffer = std::vector<float>(2 * BUFFER_DURATION_SECS * sampleRate);
 }

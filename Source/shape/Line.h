@@ -1,15 +1,15 @@
 #pragma once
 
 #include "Shape.h"
-#include "Point.h"
+#include "OsciPoint.h"
 
 class Line : public Shape {
 public:
 	Line(double x1, double y1, double x2, double y2);
 	Line(double x1, double y1, double z1, double x2, double y2, double z2);
-	Line(Point p1, Point p2);
+	Line(OsciPoint p1, OsciPoint p2);
 
-	Point nextVector(double drawingProgress) override;
+	OsciPoint nextVector(double drawingProgress) override;
 	void scale(double x, double y, double z) override;
 	void translate(double x, double y, double z) override;
 	static double length(double x1, double y1, double z1, double x2, double y2, double z2);

@@ -1,5 +1,5 @@
 #pragma once
-#include "../shape/Point.h"
+#include "../shape/OsciPoint.h"
 #include <JuceHeader.h>
 #include "BooleanParameter.h"
 
@@ -328,7 +328,7 @@ class EffectParameter : public FloatParameter {
 public:
 	std::atomic<bool> smoothValueChange = true;
 	LfoTypeParameter* lfo = new LfoTypeParameter(name + " LFO", paramID + "Lfo", getVersionHint(), 1);
-	FloatParameter* lfoRate = new FloatParameter(name + " LFO Rate", paramID + "LfoRate", getVersionHint(), 1.0f, 0.0f, 1000.0f, 0.01f, "Hz");
+	FloatParameter* lfoRate = new FloatParameter(name + " LFO Rate", paramID + "LfoRate", getVersionHint(), 1.0f, 0.0f, 10000.0f, 0.01f, "Hz");
 	BooleanParameter* sidechain = new BooleanParameter(name + " Sidechain Enabled", paramID + "Sidechain", getVersionHint(), false, "Toggles " + name + " Sidechain.");
 	std::atomic<float> phase = 0.0f;
 	juce::String description;

@@ -16,8 +16,8 @@ private:
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& pluginEditor;
 
-    EffectComponent perspective{audioProcessor, *audioProcessor.perspective, 0};
-    EffectComponent focalLength{audioProcessor, *audioProcessor.perspective, 1};
+    EffectComponent perspective{*audioProcessor.perspective, 0};
+    EffectComponent focalLength{*audioProcessor.perspective, 1};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PerspectiveComponent)
 };

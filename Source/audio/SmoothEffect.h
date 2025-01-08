@@ -1,13 +1,13 @@
 #pragma once
 #include "EffectApplication.h"
-#include "../shape/Point.h"
+#include "../shape/OsciPoint.h"
 
 class SmoothEffect : public EffectApplication {
 public:
 	SmoothEffect();
 	~SmoothEffect();
 
-	Point apply(int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override;
+	OsciPoint apply(int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) override;
 private:
-	Point avg;
+	OsciPoint avg;
 };

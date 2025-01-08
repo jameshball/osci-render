@@ -1,21 +1,52 @@
 #include "WavParser.h"
-#include "../PluginProcessor.h"
+#include "../CommonPluginProcessor.h"
 
 
-WavParser::WavParser(OscirenderAudioProcessor& p, std::unique_ptr<juce::InputStream> stream) : audioProcessor(p) {
+WavParser::WavParser(CommonAudioProcessor& p) : audioProcessor(p) {}
+
+WavParser::~WavParser() {}
+
+bool WavParser::parse(std::unique_ptr<juce::InputStream> stream) {
+    initialised = false;
+    if (stream == nullptr) {
+        return false;
+    }
+    counter = 0;
+    currentSample = 0;
     juce::AudioFormatManager formatManager;
     formatManager.registerBasicFormats();
     juce::AudioFormatReader* reader = formatManager.createReaderFor(std::move(stream));
-    auto* afSource = new juce::AudioFormatReaderSource(reader, true);
-    afSource->setLooping(true);
-    source = std::make_unique<juce::ResamplingAudioSource>(afSource, true);
+    if (reader == nullptr) {
+        return false;
+    }
+    afSource = new juce::AudioFormatReaderSource(reader, true);
+    if (afSource == nullptr) {
+        return false;
+    }
+    totalSamples = afSource->getTotalLength();
+    afSource->setLooping(looping);
+    source = std::make_unique<juce::ResamplingAudioSource>(afSource, true, reader->numChannels);
+    if (source == nullptr) {
+        return false;
+    }
     fileSampleRate = reader->sampleRate;
     audioBuffer.setSize(reader->numChannels, 1);
     setSampleRate(audioProcessor.currentSampleRate);
-    source->prepareToPlay(1, audioProcessor.currentSampleRate);
+    initialised = true;
+
+    return true;
 }
 
-WavParser::~WavParser() {
+void WavParser::close() {
+    if (initialised) {
+        initialised = false;
+        source.reset();
+        afSource = nullptr;
+    }
+}
+
+bool WavParser::isInitialised() {
+    return initialised;
 }
 
 void WavParser::setSampleRate(double sampleRate) {
@@ -25,19 +56,64 @@ void WavParser::setSampleRate(double sampleRate) {
     currentSampleRate = sampleRate;
 }
 
-Point WavParser::getSample() {
+OsciPoint WavParser::getSample() {
+    if (!initialised || paused) {
+        return OsciPoint();
+    }
+
     if (currentSampleRate != audioProcessor.currentSampleRate) {
         setSampleRate(audioProcessor.currentSampleRate);
     }
-    if (source == nullptr) {
-        return Point();
+
+    if (looping != afSource->isLooping()) {
+        afSource->setLooping(looping);
     }
 
     source->getNextAudioBlock(juce::AudioSourceChannelInfo(audioBuffer));
+    currentSample += source->getResamplingRatio();
+    counter++;
+    if (currentSample >= totalSamples && afSource->isLooping()) {
+        currentSample = 0;
+        counter = 0;
+        afSource->setNextReadPosition(0);
+    }
+    if (counter % currentSampleRate == 0) {
+        if (onProgress != nullptr) {
+            onProgress((double)currentSample / totalSamples);
+        }
+    }
     
     if (audioBuffer.getNumChannels() == 1) {
-        return Point(audioBuffer.getSample(0, 0), audioBuffer.getSample(0, 0));
+        return OsciPoint(audioBuffer.getSample(0, 0), audioBuffer.getSample(0, 0), 1.0);
+    } else if (audioBuffer.getNumChannels() == 2) {
+        return OsciPoint(audioBuffer.getSample(0, 0), audioBuffer.getSample(1, 0), 1.0);
+    } else if (audioBuffer.getNumChannels() >= 3) {
+        return OsciPoint(audioBuffer.getSample(0, 0), audioBuffer.getSample(1, 0), audioBuffer.getSample(2, 0));
     } else {
-        return Point(audioBuffer.getSample(0, 0), audioBuffer.getSample(1, 0));
+        return OsciPoint();
     }
+}
+
+void WavParser::setProgress(double progress) {
+    if (initialised) {
+        afSource->setNextReadPosition(progress * totalSamples);
+        currentSample = progress * totalSamples;
+    }
+}
+
+void WavParser::setLooping(bool looping) {
+    this->looping = looping;
+}
+
+bool WavParser::isLooping() {
+    return looping;
+}
+
+void WavParser::setPaused(bool paused) {
+    this->paused = paused;
+    counter = 0;
+}
+
+bool WavParser::isPaused() {
+    return paused;
 }

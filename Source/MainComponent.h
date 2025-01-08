@@ -4,20 +4,22 @@
 #include "PluginProcessor.h"
 #include "parser/FileParser.h"
 #include "parser/FrameProducer.h"
-#include "components/VisualiserComponent.h"
+#include "visualiser/VisualiserComponent.h"
 #include "audio/PitchDetector.h"
 #include "UGen/ugen_JuceEnvelopeComponent.h"
 #include "components/SvgButton.h"
-#include "components/AudioRecordingComponent.h"
 
 class OscirenderAudioProcessorEditor;
-class MainComponent : public juce::GroupComponent {
+class MainComponent : public juce::GroupComponent, public juce::AudioProcessorParameter::Listener {
 public:
 	MainComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
 	~MainComponent() override;
 
 	void resized() override;
 	void updateFileLabel();
+	void parameterValueChanged(int parameterIndex, float newValue) override;
+	void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
+
 private:
 	OscirenderAudioProcessor& audioProcessor;
 	OscirenderAudioProcessorEditor& pluginEditor;
@@ -37,11 +39,6 @@ private:
 	juce::TextEditor fileName;
 	juce::ComboBox fileType;
 	juce::TextButton createFile{"Create File"};
-
-	juce::Label frequencyLabel;
-	int callbackIndex = -1;
-
-	AudioRecordingComponent recorder{audioProcessor};
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };

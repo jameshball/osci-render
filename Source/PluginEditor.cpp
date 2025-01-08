@@ -3,23 +3,18 @@
 #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
 
 OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p)
-	: AudioProcessorEditor(&p), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white)
-{
-#if JUCE_LINUX
-    // use OpenGL on Linux for much better performance. The default on Mac is CoreGraphics, and on Window is Direct2D which is much faster.
-    openGlContext.attachTo(*getTopLevelComponent());
+	: CommonPluginEditor(p, "osci-render", "osci", 1100, 750), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white) {
+#if !SOSCI_FEATURES
+    addAndMakeVisible(upgradeButton);
+    upgradeButton.onClick = [this] {
+        juce::URL("https://osci-render.com/sosci").launchInDefaultBrowser();
+    };
+    upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor);
+    upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark);
 #endif
-
-    setLookAndFeel(&lookAndFeel);
+        
     addAndMakeVisible(volume);
-
-#if JUCE_MAC
-    if (audioProcessor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-        usingNativeMenuBar = true;
-        menuBarModel.setMacMainMenu(&menuBarModel);
-    }
-#endif
-
+    
     addAndMakeVisible(console);
     console.setConsoleOpen(false);
     
@@ -30,11 +25,6 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     LuaParser::onClear = [this]() {
         console.clear();
     };
-
-    if (!usingNativeMenuBar) {
-        menuBar.setModel(&menuBarModel);
-        addAndMakeVisible(menuBar);
-    }
 
     addAndMakeVisible(collapseButton);
 	collapseButton.onClick = [this] {
@@ -66,28 +56,6 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
         audioProcessor.broadcaster.addChangeListener(this);
     }
 
-    if (juce::JUCEApplicationBase::isStandaloneApp()) {
-        if (juce::TopLevelWindow::getNumTopLevelWindows() > 0) {
-            juce::TopLevelWindow* w = juce::TopLevelWindow::getTopLevelWindow(0);
-            juce::DocumentWindow* dw = dynamic_cast<juce::DocumentWindow*>(w);
-            if (dw != nullptr) {
-                dw->setBackgroundColour(Colours::veryDark);
-                dw->setColour(juce::ResizableWindow::backgroundColourId, Colours::veryDark);
-                dw->setTitleBarButtonsRequired(juce::DocumentWindow::allButtons, false);
-                dw->setUsingNativeTitleBar(true);
-            }
-        }
-
-        juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
-        if (standalone != nullptr) {
-            standalone->getMuteInputValue().setValue(false);
-        }
-    }
-
-    setSize(1100, 750);
-    setResizable(true, true);
-    setResizeLimits(500, 400, 999999, 999999);
-
     layout.setItemLayout(0, -0.3, -1.0, -0.7);
     layout.setItemLayout(1, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE);
     layout.setItemLayout(2, -0.0, -1.0, -0.3);
@@ -104,41 +72,29 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     addAndMakeVisible(visualiser);
 
     visualiser.openSettings = [this] {
-        visualiserSettingsWindow.setVisible(true);
-        visualiserSettingsWindow.toFront(true);
+        openVisualiserSettings();
     };
 
     visualiser.closeSettings = [this] {
         visualiserSettingsWindow.setVisible(false);
     };
 
-    visualiserSettingsWindow.setResizable(false, false);
+    visualiserSettingsWindow.centreWithSize(550, 400);
 #if JUCE_WINDOWS
     // if not standalone, use native title bar for compatibility with DAWs
     visualiserSettingsWindow.setUsingNativeTitleBar(processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone);
 #elif JUCE_MAC
     visualiserSettingsWindow.setUsingNativeTitleBar(true);
 #endif
-    visualiserSettings.setLookAndFeel(&getLookAndFeel());
-    visualiserSettings.setSize(550, 280);
-    visualiserSettingsWindow.setContentNonOwned(&visualiserSettings, true);
-    visualiserSettingsWindow.centreWithSize(550, 280);
-    
-    tooltipDropShadow.setOwner(&tooltipWindow);
+
+    initialiseMenuBar(model);
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
-    setLookAndFeel(nullptr);
-    juce::Desktop::getInstance().setDefaultLookAndFeel(nullptr);
+    menuBar.setModel(nullptr);
     juce::MessageManagerLock lock;
     audioProcessor.broadcaster.removeChangeListener(this);
     audioProcessor.fileChangeBroadcaster.removeChangeListener(this);
-    
-#if JUCE_MAC
-    if (usingNativeMenuBar) {
-        menuBarModel.setMacMainMenu(nullptr);
-    }
-#endif
 }
 
 bool OscirenderAudioProcessorEditor::isBinaryFile(juce::String name) {
@@ -164,13 +120,17 @@ void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
 void OscirenderAudioProcessorEditor::resized() {
     auto area = getLocalBounds();
 
-    if (audioProcessor.visualiserFullScreen->getBoolValue()) {
+    if (audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
         visualiser.setBounds(area);
         return;
     }
 
     if (!usingNativeMenuBar) {
-        menuBar.setBounds(area.removeFromTop(25));
+        auto topBar = area.removeFromTop(25);
+        menuBar.setBounds(topBar);
+#if !SOSCI_FEATURES
+        upgradeButton.setBounds(topBar.removeFromRight(150).reduced(2, 2));
+#endif
     }
     
     area.removeFromTop(2);
@@ -464,13 +424,7 @@ bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
         }
     }
     
-    if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'S') {
-        saveProjectAs();
-    } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'S') {
-        saveProject();
-    } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'O') {
-        openProject();
-    }
+    CommonPluginEditor::keyPressed(key);
 
     return consumeKey;
 }
@@ -490,71 +444,7 @@ void OscirenderAudioProcessorEditor::mouseMove(const juce::MouseEvent& event) {
     }
 }
 
-void OscirenderAudioProcessorEditor::newProject() {
-    // TODO: open a default project
-}
-
-void OscirenderAudioProcessorEditor::openProject() {
-    chooser = std::make_unique<juce::FileChooser>("Load osci-render Project", audioProcessor.lastOpenedDirectory, "*.osci");
-    auto flags = juce::FileBrowserComponent::openMode |
-        juce::FileBrowserComponent::canSelectFiles;
-
-    chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
-        auto file = chooser.getResult();
-        if (file != juce::File()) {
-            auto data = juce::MemoryBlock();
-            if (file.loadFileAsData(data)) {
-                audioProcessor.setStateInformation(data.getData(), data.getSize());
-            }
-            audioProcessor.currentProjectFile = file.getFullPathName();
-            audioProcessor.lastOpenedDirectory = file.getParentDirectory();
-            updateTitle();
-        }
-    });
-}
-
-void OscirenderAudioProcessorEditor::saveProject() {
-    if (audioProcessor.currentProjectFile.isEmpty()) {
-        saveProjectAs();
-    } else {
-        auto data = juce::MemoryBlock();
-        audioProcessor.getStateInformation(data);
-        auto file = juce::File(audioProcessor.currentProjectFile);
-        file.create();
-        file.replaceWithData(data.getData(), data.getSize());
-        updateTitle();
-    }
-}
-
-void OscirenderAudioProcessorEditor::saveProjectAs() {
-    chooser = std::make_unique<juce::FileChooser>("Save osci-render Project", juce::File::getSpecialLocation(juce::File::userHomeDirectory), "*.osci");
-    auto flags = juce::FileBrowserComponent::saveMode;
-
-    chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
-        auto file = chooser.getResult();
-        if (file != juce::File()) {
-            audioProcessor.currentProjectFile = file.getFullPathName();
-            saveProject();
-        }
-    });
-}
-
-void OscirenderAudioProcessorEditor::updateTitle() {
-    juce::String title = "osci-render";
-    if (!audioProcessor.currentProjectFile.isEmpty()) {
-        title += " - " + audioProcessor.currentProjectFile;
-    }
-    getTopLevelComponent()->setName(title);
-}
-
-void OscirenderAudioProcessorEditor::openAudioSettings() {
-    juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
-    standalone->showAudioSettingsDialog();
-}
-
-void OscirenderAudioProcessorEditor::resetToDefault() {
-    juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
-    if (window != nullptr) {
-        window->resetToDefaultState();
-    }
+void OscirenderAudioProcessorEditor::openVisualiserSettings() {
+    visualiserSettingsWindow.setVisible(true);
+    visualiserSettingsWindow.toFront(true);
 }

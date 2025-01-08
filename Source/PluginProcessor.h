@@ -8,13 +8,17 @@
 
 #pragma once
 
+#define VERSION_HINT 2
+
 #include <JuceHeader.h>
 #include "shape/Shape.h"
-#include "concurrency/BufferConsumer.h"
+#include "concurrency/AudioBackgroundThread.h"
+#include "concurrency/AudioBackgroundThreadManager.h"
 #include "audio/Effect.h"
 #include "audio/ShapeSound.h"
 #include "audio/ShapeVoice.h"
 #include "audio/PublicSynthesiser.h"
+#include "audio/SampleRateManager.h"
 #include <numbers>
 #include "audio/DelayEffect.h"
 #include "audio/PitchDetector.h"
@@ -25,11 +29,12 @@
 #include "UGen/ugen_JuceEnvelopeComponent.h"
 #include "audio/CustomEffect.h"
 #include "audio/DashedLineEffect.h"
+#include "CommonPluginProcessor.h"
 
 //==============================================================================
 /**
 */
-class OscirenderAudioProcessor  : public juce::AudioProcessor, juce::AudioProcessorParameter::Listener, public EnvelopeComponentListener
+class OscirenderAudioProcessor  : public CommonAudioProcessor, juce::AudioProcessorParameter::Listener, public EnvelopeComponentListener
                             #if JucePlugin_Enable_ARA
                              , public juce::AudioProcessorARAExtension
                             #endif
@@ -39,53 +44,24 @@ public:
     ~OscirenderAudioProcessor() override;
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
-    void releaseResources() override;
-
-   #ifndef JucePlugin_PreferredChannelConfigurations
-    bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
-   #endif
-
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
     juce::AudioProcessorEditor* createEditor() override;
-    bool hasEditor() const override;
-
-    const juce::String getName() const override;
 
     void setAudioThreadCallback(std::function<void(const juce::AudioBuffer<float>&)> callback);
 
-    bool acceptsMidi() const override;
-    bool producesMidi() const override;
-    bool isMidiEffect() const override;
-    double getTailLengthSeconds() const override;
-    int getNumPrograms() override;
-    int getCurrentProgram() override;
-    void setCurrentProgram(int index) override;
-    const juce::String getProgramName(int index) override;
-    void changeProgramName(int index, const juce::String& newName) override;
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
-    std::shared_ptr<BufferConsumer> consumerRegister(std::vector<float>& buffer);
-    void consumerStop(std::shared_ptr<BufferConsumer> consumer);
-    void consumerRead(std::shared_ptr<BufferConsumer> consumer);
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void envelopeChanged(EnvelopeComponent* changedEnvelope) override;
-    
-    int VERSION_HINT = 2;
 
-    std::atomic<double> currentSampleRate = 0.0;
-    
-    std::atomic<int> roughness = 4;
-    std::atomic<double> intensity = 1.0;
-
-    juce::SpinLock effectsLock;
 	std::vector<std::shared_ptr<Effect>> toggleableEffects;
     std::vector<std::shared_ptr<Effect>> luaEffects;
-    double luaValues[26] = { 0.0 };
+    std::atomic<double> luaValues[26] = { 0.0 };
 
     std::shared_ptr<Effect> frequencyEffect = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             frequency = values[0].load();
             return input;
         }, new EffectParameter(
@@ -93,30 +69,6 @@ public:
             "Controls how many times per second the image is drawn, thereby controlling the pitch of the sound. Lower frequencies result in more-accurately drawn images, but more flickering, and vice versa.",
             "frequency",
             VERSION_HINT, 220.0, 0.0, 12000.0, 0.1
-        )
-    );
-
-    std::shared_ptr<Effect> volumeEffect = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
-            volume = values[0].load();
-            return input;
-        }, new EffectParameter(
-            "Volume",
-            "Controls the volume of the sound. Works by scaling the image and sound by a factor.",
-            "volume",
-            VERSION_HINT, 1.0, 0.0, 3.0
-        )
-    );
-
-    std::shared_ptr<Effect> thresholdEffect = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
-            threshold = values[0].load();
-            return input;
-        }, new EffectParameter(
-            "Threshold",
-            "Clips the sound and image to a maximum value. Applying a harsher threshold results in a more distorted sound.",
-            "threshold",
-            VERSION_HINT, 1.0, 0.0, 1.0
         )
     );
     
@@ -152,49 +104,9 @@ public:
     std::shared_ptr<Effect> perspective = std::make_shared<Effect>(
         perspectiveEffect,
         std::vector<EffectParameter*>{
-            new EffectParameter("3D Perspective", "Controls the strength of the 3D perspective projection.", "perspectiveStrength", VERSION_HINT, 1.0, 0.0, 1.0),
+            new EffectParameter("Perspective", "Controls the strength of the 3D perspective projection.", "perspectiveStrength", VERSION_HINT, 1.0, 0.0, 1.0),
             new EffectParameter("Focal Length", "Controls the focal length of the 3D perspective effect. A higher focal length makes the image look more flat, and a lower focal length makes the image look more 3D.", "perspectiveFocalLength", VERSION_HINT, 2.0, 0.0, 10.0),
         }
-    );
-    
-    // visualiser settings
-    BooleanParameter* graticuleEnabled = new BooleanParameter("Show Graticule", "graticuleEnabled", VERSION_HINT, true, "Show the graticule or grid lines over the oscilloscope display.");
-    BooleanParameter* smudgesEnabled = new BooleanParameter("Show Smudges", "smudgesEnabled", VERSION_HINT, true, "Adds a subtle layer of dirt/smudges to the oscilloscope display to make it look more realistic.");
-    BooleanParameter* upsamplingEnabled = new BooleanParameter("Upsample Audio", "upsamplingEnabled", VERSION_HINT, false, "Upsamples the audio before visualising it to make it appear more realistic, at the expense of performance.");
-    BooleanParameter* legacyVisualiserEnabled = new BooleanParameter("Use Legacy Visualiser", "legacyVisualiserEnabled", VERSION_HINT, false, "Replaces the realistic oscilloscope visualiser with the legacy visualiser. This may improve performance.");
-    BooleanParameter* visualiserFullScreen = new BooleanParameter("Visualiser Fullscreen", "visualiserFullScreen", VERSION_HINT, false, "Makes the software visualiser fullscreen.");
-
-    std::shared_ptr<Effect> persistenceEffect = std::make_shared<Effect>(
-        new EffectParameter(
-            "Persistence",
-            "Controls how long the light glows for on the oscilloscope display.",
-            "persistence",
-            VERSION_HINT, 0.5, 0, 6.0
-        )
-    );
-    std::shared_ptr<Effect> hueEffect = std::make_shared<Effect>(
-        new EffectParameter(
-            "Hue",
-            "Controls the hue/colour of the oscilloscope display.",
-            "hue",
-            VERSION_HINT, 125, 0, 359, 1
-        )
-    );
-    std::shared_ptr<Effect> brightnessEffect = std::make_shared<Effect>(
-        new EffectParameter(
-            "Brightness",
-            "Controls how bright the light glows for on the oscilloscope display.",
-            "brightness",
-            VERSION_HINT, 3.0, 0.0, 10.0
-        )
-    );
-    std::shared_ptr<Effect> intensityEffect = std::make_shared<Effect>(
-        new EffectParameter(
-            "Intensity",
-            "Controls how bright the electron beam of the oscilloscope is.",
-            "intensity",
-            VERSION_HINT, 3.0, 0.0, 10.0
-        )
     );
     
     BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false, "Enable MIDI input for the synth. If disabled, the synth will play a constant tone, as controlled by the frequency slider.");
@@ -243,7 +155,7 @@ public:
 
     BooleanParameter* invertImage = new BooleanParameter("Invert Image", "invertImage", VERSION_HINT, false, "Inverts the image so that dark pixels become light, and vice versa.");
     std::shared_ptr<Effect> imageThreshold = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             return input;
         }, new EffectParameter(
             "Image Threshold",
@@ -253,7 +165,7 @@ public:
         )
     );
     std::shared_ptr<Effect> imageStride = std::make_shared<Effect>(
-        [this](int index, Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             return input;
         }, new EffectParameter(
             "Image Stride",
@@ -264,24 +176,16 @@ public:
     );
 
     double animationTime = 0.f;
-
-private:
-    juce::SpinLock consumerLock;
-    std::vector<std::shared_ptr<BufferConsumer>> consumers;
-public:
     
     PitchDetector pitchDetector{*this};
     std::shared_ptr<WobbleEffect> wobbleEffect = std::make_shared<WobbleEffect>(pitchDetector);
-
-    // shouldn't be accessed by audio thread, but needs to persist when GUI is closed
-    // so should only be accessed by message thread
-    juce::String currentProjectFile;
-    juce::File lastOpenedDirectory = juce::File::getSpecialLocation(juce::File::userHomeDirectory);
 
     juce::SpinLock fontLock;
     juce::Font font = juce::Font(juce::Font::getDefaultSansSerifFontName(), 1.0f, juce::Font::plain);
 
     ShapeSound::Ptr objectServerSound = new ShapeSound();
+    
+    std::function<void()> haltRecording;
 
     void addLuaSlider();
     void updateEffectPrecedence();
@@ -304,19 +208,11 @@ public:
     void removeErrorListener(ErrorListener* listener);
     void notifyErrorListeners(int lineNumber, juce::String id, juce::String error);
 private:
-    std::atomic<double> volume = 1.0;
-    std::atomic<double> threshold = 1.0;
     
     bool prevMidiEnabled = !midiEnabled->getBoolValue();
 
     juce::SpinLock audioThreadCallbackLock;
     std::function<void(const juce::AudioBuffer<float>&)> audioThreadCallback;
-
-    std::vector<BooleanParameter*> booleanParameters;
-    std::vector<FloatParameter*> floatParameters;
-    std::vector<IntParameter*> intParameters;
-    std::vector<std::shared_ptr<Effect>> allEffects;
-    std::vector<std::shared_ptr<Effect>> permanentEffects;
 
     juce::SpinLock errorListenersLock;
     std::vector<ErrorListener*> errorListeners;
@@ -334,10 +230,6 @@ private:
     double squaredVolume = 0;
     double currentVolume = 0;
 
-    std::shared_ptr<Effect> getEffect(juce::String id);
-    BooleanParameter* getBooleanParameter(juce::String id);
-    FloatParameter* getFloatParameter(juce::String id);
-    IntParameter* getIntParameter(juce::String id);
     void openLegacyProject(const juce::XmlElement* xml);
     std::pair<std::shared_ptr<Effect>, EffectParameter*> effectFromLegacyId(const juce::String& id, bool updatePrecedence = false);
     LfoType lfoTypeFromLegacyAnimationType(const juce::String& type);

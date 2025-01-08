@@ -41,6 +41,13 @@ else
   PROJUCER_PATH="$ROOT/ci/bin/JUCE/Projucer.exe"
 fi
 
+# Get the Spout SDK and SpoutLibrary.dll
+if [ "$OS" = "win" ]; then
+  cp "$ROOT/External/spout/SpoutLibrary.dll" /c/Windows/System32
+elif [ "$OS" = "mac" ]; then
+  sudo cp -R "$ROOT/External/syphon/Syphon.framework" "/Library/Frameworks"
+fi
+
 # Set global path
 GLOBAL_PATH_COMMAND="$PROJUCER_PATH --set-global-search-path $PROJUCER_OS 'defaultJuceModulePath' '$ROOT/ci/bin/JUCE/modules'"
 eval "$GLOBAL_PATH_COMMAND"

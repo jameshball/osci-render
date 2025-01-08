@@ -1,7 +1,7 @@
 #include "EffectComponent.h"
 #include "../LookAndFeel.h"
 
-EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, int index) : effect(effect), index(index), audioProcessor(p) {
+EffectComponent::EffectComponent(Effect& effect, int index) : effect(effect), index(index) {
     addAndMakeVisible(slider);
     addChildComponent(lfoSlider);
     addAndMakeVisible(lfo);
@@ -23,7 +23,7 @@ EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, in
     lfoSlider.setTextValueSuffix("Hz");
     lfoSlider.setColour(sliderThumbOutlineColourId, juce::Colour(0xff00ff00));
 
-    label.setFont(juce::Font(13.0f));
+    label.setFont(juce::Font(14.0f));
 
     lfo.addItem("Static", static_cast<int>(LfoType::Static));
     lfo.addItem("Sine", static_cast<int>(LfoType::Sine));
@@ -46,7 +46,7 @@ EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect, in
     setupComponent();
 }
 
-EffectComponent::EffectComponent(OscirenderAudioProcessor& p, Effect& effect) : EffectComponent(p, effect, 0) {}
+EffectComponent::EffectComponent(Effect& effect) : EffectComponent(effect, 0) {}
 
 void EffectComponent::setupComponent() {
     EffectParameter* parameter = effect.parameters[index];
@@ -80,7 +80,7 @@ void EffectComponent::setupComponent() {
 
         lfoSlider.setRange(parameter->lfoRate->min, parameter->lfoRate->max, parameter->lfoRate->step);
         lfoSlider.setValue(parameter->lfoRate->getValueUnnormalised(), juce::dontSendNotification);
-        lfoSlider.setSkewFactorFromMidPoint(parameter->lfoRate->min + 0.2 * (parameter->lfoRate->max - parameter->lfoRate->min));
+        lfoSlider.setSkewFactorFromMidPoint(parameter->lfoRate->min + 0.1 * (parameter->lfoRate->max - parameter->lfoRate->min));
 
         if (lfo.getSelectedId() == static_cast<int>(LfoType::Static)) {
             lfoSlider.setVisible(false);
@@ -122,8 +122,8 @@ void EffectComponent::resized() {
     auto bounds = getLocalBounds();
     auto componentBounds = bounds.removeFromRight(25);
     if (component != nullptr) {
-		component->setBounds(componentBounds);
-	}
+        component->setBounds(componentBounds);
+    }
 
     if (sidechainEnabled) {
         sidechainButton->setBounds(bounds.removeFromRight(20));
@@ -135,7 +135,9 @@ void EffectComponent::resized() {
         lfo.setBounds(bounds.removeFromRight(drawingSmall ? 70 : 100).reduced(0, 5));
     }
 
-    rangeButton.setBounds(bounds.removeFromRight(20));
+    if (rangeButton.isVisible()) {
+        rangeButton.setBounds(bounds.removeFromRight(20));
+    }   
 
     bounds.removeFromLeft(5);
 
@@ -167,11 +169,10 @@ void EffectComponent::parameterGestureChanged(int parameterIndex, bool gestureIs
 void EffectComponent::handleAsyncUpdate() {
     setupComponent();
     getParentComponent()->repaint();
-    juce::SpinLock::ScopedLockType lock1(audioProcessor.parsersLock);
-    juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
-    if (effect.getId().contains("lua")) {
-        effect.apply();
-    }
+}
+
+void EffectComponent::setRangeEnabled(bool enabled) {
+    rangeButton.setVisible(enabled);
 }
 
 void EffectComponent::setComponent(std::shared_ptr<juce::Component> component) {

@@ -3,11 +3,19 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
+ci/sign.sh
+
 .DS_Store
+
+*.pkg
+*.psd
+*.xcf
 
 # ignore JUCE
 **/Builds
 **/JuceLibraryCode
+
+packaging/Output
 
 # User-specific files
 *.rsuser
