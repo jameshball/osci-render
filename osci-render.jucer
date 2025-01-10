@@ -4,7 +4,7 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginCharacteristicsValue="pluginWantsMidiIn"
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
-              version="2.4.2" companyName="James H Ball" companyWebsite="https://osci-render.com"
+              version="2.4.3" companyName="James H Ball" companyWebsite="https://osci-render.com"
               companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;SOSCI_FEATURES=1"
               pluginAUMainType="'aumf'">
   <MAINGROUP id="j5Ge2T" name="osci-render">
@@ -124,6 +124,9 @@
         <FILE id="iUEfwT" name="SmoothEffect.cpp" compile="1" resource="0"
               file="Source/audio/SmoothEffect.cpp"/>
         <FILE id="Vwjht7" name="SmoothEffect.h" compile="0" resource="0" file="Source/audio/SmoothEffect.h"/>
+        <FILE id="agQEM3" name="StereoEffect.cpp" compile="1" resource="0"
+              file="Source/audio/StereoEffect.cpp"/>
+        <FILE id="WACNMe" name="StereoEffect.h" compile="0" resource="0" file="Source/audio/StereoEffect.h"/>
         <FILE id="VBskjq" name="VectorCancellingEffect.cpp" compile="1" resource="0"
               file="Source/audio/VectorCancellingEffect.cpp"/>
         <FILE id="Be21D0" name="VectorCancellingEffect.h" compile="0" resource="0"

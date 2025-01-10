@@ -213,12 +213,14 @@ void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
                 for (auto& effect : settings.parameters.audioEffects) {
                     point = effect->apply(0, point);
                 }
+#if SOSCI_FEATURES
                 if (settings.isFlippedHorizontal()) {
                     point.x = -point.x;
                 }
                 if (settings.isFlippedVertical()) {
                     point.y = -point.y;
                 }
+#endif
                 xSamples.push_back(point.x);
                 ySamples.push_back(point.y);
                 zSamples.push_back(point.z);
@@ -1058,7 +1060,11 @@ void VisualiserComponent::drawCRT() {
     setShader(outputShader.get());
     outputShader->setUniform("uExposure", 0.25f);
     outputShader->setUniform("uLineSaturation", (float) settings.getLineSaturation());
+#if SOSCI_FEATURES
     outputShader->setUniform("uScreenSaturation", (float) settings.getScreenSaturation());
+#else
+    outputShader->setUniform("uScreenSaturation", 1.0f);
+#endif
     outputShader->setUniform("uNoise", (float) settings.getNoise());
     outputShader->setUniform("uRandom", juce::Random::getSystemRandom().nextFloat());
     outputShader->setUniform("uGlow", (float) settings.getGlow());
