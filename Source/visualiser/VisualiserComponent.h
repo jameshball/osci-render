@@ -52,6 +52,7 @@ public:
     std::function<void()> closeSettings;
 
     void enableFullScreen();
+    void setFullScreen(bool fullScreen);
     void setFullScreenCallback(std::function<void(FullScreenMode)> callback);
     void mouseDoubleClick(const juce::MouseEvent& event) override;
     void resized() override;
@@ -60,6 +61,8 @@ public:
     void runTask(const std::vector<OsciPoint>& points) override;
     void stopTask() override;
     void setPaused(bool paused);
+    void mouseDrag(const juce::MouseEvent& event) override;
+    void mouseMove(const juce::MouseEvent& event) override;
     void mouseDown(const juce::MouseEvent& event) override;
     bool keyPressed(const juce::KeyPress& key) override;
     void handleAsyncUpdate() override;
@@ -95,6 +98,11 @@ private:
     SharedTextureSender* sharedTextureSender = nullptr;
 #endif
 
+    int lastMouseX = 0;
+    int lastMouseY = 0;
+    int timerId = 0;
+    bool hideButtonRow = false;
+    bool fullScreen = false;
     std::function<void(FullScreenMode)> fullScreenCallback;
 
     VisualiserSettings& settings;
@@ -271,6 +279,7 @@ private:
     juce::File audioFile;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserComponent)
+    JUCE_DECLARE_WEAK_REFERENCEABLE(VisualiserComponent)
 };
 
 class VisualiserWindow : public juce::DocumentWindow {

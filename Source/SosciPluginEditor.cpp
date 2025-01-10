@@ -95,6 +95,8 @@ void SosciPluginEditor::filesDropped(const juce::StringArray& files, int x, int 
 
 void SosciPluginEditor::visualiserFullScreenChanged() {
     bool fullScreen = audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue();
+    
+    visualiser.setFullScreen(fullScreen);
 
     volume.setVisible(!fullScreen);
     visualiserSettingsWrapper.setVisible(!fullScreen);

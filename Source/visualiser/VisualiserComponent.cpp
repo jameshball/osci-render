@@ -132,6 +132,7 @@ VisualiserComponent::VisualiserComponent(
 
     addAndMakeVisible(audioPlayer);
     
+    audioPlayer.addMouseListener(static_cast<juce::Component*>(this), true);
     
     openGLContext.setRenderer(this);
     openGLContext.attachTo(*this);
@@ -150,6 +151,13 @@ VisualiserComponent::~VisualiserComponent() {
     });
 }
 
+void VisualiserComponent::setFullScreen(bool fullScreen) {
+    this->fullScreen = fullScreen;
+    hideButtonRow = false;
+    setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    resized();
+}
+
 void VisualiserComponent::setFullScreenCallback(std::function<void(FullScreenMode)> callback) {
     fullScreenCallback = callback;
 }
@@ -162,7 +170,9 @@ void VisualiserComponent::enableFullScreen() {
 }
 
 void VisualiserComponent::mouseDoubleClick(const juce::MouseEvent& event) {
-    enableFullScreen();
+    if (event.originalComponent == this) {
+        enableFullScreen();
+    }
 }
 
 void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
@@ -297,9 +307,49 @@ void VisualiserComponent::setPaused(bool paused) {
     repaint();
 }
 
+void VisualiserComponent::mouseDrag(const juce::MouseEvent& event) {
+    timerId = -1;
+}
+
+void VisualiserComponent::mouseMove(const juce::MouseEvent& event) {
+    if (event.getScreenX() == lastMouseX && event.getScreenY() == lastMouseY) {
+        return;
+    }
+    hideButtonRow = false;
+    setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    
+    if (fullScreen) {
+        if (!getScreenBounds().removeFromBottom(25).contains(event.getScreenX(), event.getScreenY()) && !event.mods.isLeftButtonDown()) {
+            lastMouseX = event.getScreenX();
+            lastMouseY = event.getScreenY();
+            
+            int newTimerId = juce::Random::getSystemRandom().nextInt();
+            timerId = newTimerId;
+            auto pos = event.getScreenPosition();
+            auto parent = this->parent;
+            
+            juce::WeakReference<VisualiserComponent> weakRef = this;
+            juce::Timer::callAfterDelay(1000, [this, weakRef, newTimerId, pos, parent]() {
+                if (weakRef) {
+                    if (parent == nullptr || parent->child == this) {
+                        if (timerId == newTimerId && fullScreen) {
+                            hideButtonRow = true;
+                            setMouseCursor(juce::MouseCursor::NoCursor);
+                            resized();
+                        }
+                    }
+                }
+            });
+        }
+        resized();
+    }
+}
+
 void VisualiserComponent::mouseDown(const juce::MouseEvent& event) {
-    if (event.mods.isLeftButtonDown() && child == nullptr && !record.getToggleState()) {
-        setPaused(active);
+    if (event.originalComponent == this) {
+        if (event.mods.isLeftButtonDown() && child == nullptr && !record.getToggleState()) {
+            setPaused(active);
+        }
     }
 }
 
@@ -445,7 +495,11 @@ void VisualiserComponent::setRecording(bool recording) {
 
 void VisualiserComponent::resized() {
     auto area = getLocalBounds();
-    buttonRow = area.removeFromBottom(25);
+    if (fullScreen && hideButtonRow) {
+        buttonRow = area.removeFromBottom(0);
+    } else {
+        buttonRow = area.removeFromBottom(25);
+    }
     auto buttons = buttonRow;
     if (parent == nullptr) {
         fullScreenButton.setBounds(buttons.removeFromRight(30));
