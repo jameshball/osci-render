@@ -8,7 +8,6 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
 	addAndMakeVisible(persistence);
     addAndMakeVisible(hue);
     addAndMakeVisible(lineSaturation);
-    addAndMakeVisible(screenSaturation);
     addAndMakeVisible(focus);
     addAndMakeVisible(noise);
     addAndMakeVisible(glow);
@@ -20,6 +19,15 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
     addAndMakeVisible(sweepToggle);
     addAndMakeVisible(screenOverlayLabel);
     addAndMakeVisible(screenOverlay);
+#if SOSCI_FEATURES
+    addAndMakeVisible(screenSaturation);
+    addAndMakeVisible(xOffset);
+    addAndMakeVisible(yOffset);
+    addAndMakeVisible(xScale);
+    addAndMakeVisible(yScale);
+    addAndMakeVisible(flipVerticalToggle);
+    addAndMakeVisible(flipHorizontalToggle);
+#endif
     
     for (int i = 1; i <= parameters.screenOverlay->max; i++) {
         screenOverlay.addItem(parameters.screenOverlay->getText(parameters.screenOverlay->getNormalisedValue(i)), i);
@@ -33,7 +41,6 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
     persistence.setSliderOnValueChange();
     hue.setSliderOnValueChange();
     lineSaturation.setSliderOnValueChange();
-    screenSaturation.setSliderOnValueChange();
     focus.setSliderOnValueChange();
     noise.setSliderOnValueChange();
     glow.setSliderOnValueChange();
@@ -52,6 +59,14 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
         triggerValue.setEnabled(sweepToggle.getToggleState());
         resized();
     };
+
+#if SOSCI_FEATURES
+    screenSaturation.setSliderOnValueChange();
+    xOffset.setSliderOnValueChange();
+    yOffset.setSliderOnValueChange();
+    xScale.setSliderOnValueChange();
+    yScale.setSliderOnValueChange();
+#endif
 
     parameters.screenOverlay->addListener(this);
 }
@@ -77,15 +92,25 @@ void VisualiserSettings::resized() {
     persistence.setBounds(area.removeFromTop(rowHeight));
     hue.setBounds(area.removeFromTop(rowHeight));
     lineSaturation.setBounds(area.removeFromTop(rowHeight));
+#if SOSCI_FEATURES
     screenSaturation.setBounds(area.removeFromTop(rowHeight));
+#endif
     focus.setBounds(area.removeFromTop(rowHeight));
     noise.setBounds(area.removeFromTop(rowHeight));
     glow.setBounds(area.removeFromTop(rowHeight));
     ambient.setBounds(area.removeFromTop(rowHeight));
     smooth.setBounds(area.removeFromTop(rowHeight));
     
+#if SOSCI_FEATURES
+    xScale.setBounds(area.removeFromTop(rowHeight));
+    yScale.setBounds(area.removeFromTop(rowHeight));
+    xOffset.setBounds(area.removeFromTop(rowHeight));
+    yOffset.setBounds(area.removeFromTop(rowHeight));
+    flipVerticalToggle.setBounds(area.removeFromTop(rowHeight));
+    flipHorizontalToggle.setBounds(area.removeFromTop(rowHeight));
+#endif
+
     upsamplingToggle.setBounds(area.removeFromTop(rowHeight));
-    
     sweepToggle.setBounds(area.removeFromTop(rowHeight));
     sweepMs.setBounds(area.removeFromTop(rowHeight));
     triggerValue.setBounds(area.removeFromTop(rowHeight));

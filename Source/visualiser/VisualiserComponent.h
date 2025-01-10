@@ -170,6 +170,7 @@ private:
 
     juce::CriticalSection samplesLock;
     long sampleCount = 0;
+    juce::AudioBuffer<float> audioOutputBuffer;
     std::vector<float> xSamples{2};
     std::vector<float> ySamples{2};
     std::vector<float> zSamples{2};

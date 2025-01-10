@@ -153,6 +153,13 @@ void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
     {
         juce::CriticalSection::ScopedLockType lock(samplesLock);
         
+        // copy the points before applying effects
+        audioOutputBuffer.setSize(2, points.size(), false, true, true);
+        for (int i = 0; i < points.size(); ++i) {
+            audioOutputBuffer.setSample(0, i, points[i].x);
+            audioOutputBuffer.setSample(1, i, points[i].y);
+        }
+        
         xSamples.clear();
         ySamples.clear();
         zSamples.clear();
@@ -186,11 +193,19 @@ void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
                 sampleCount++;
             }
         } else {
-            for (auto& point : points) {
-                OsciPoint smoothPoint = settings.parameters.smoothEffect->apply(0, point);
-                xSamples.push_back(smoothPoint.x);
-                ySamples.push_back(smoothPoint.y);
-                zSamples.push_back(smoothPoint.z);
+            for (OsciPoint point : points) {
+                for (auto& effect : settings.parameters.audioEffects) {
+                    point = effect->apply(0, point);
+                }
+                if (settings.isFlippedHorizontal()) {
+                    point.x = -point.x;
+                }
+                if (settings.isFlippedVertical()) {
+                    point.y = -point.y;
+                }
+                xSamples.push_back(point.x);
+                ySamples.push_back(point.y);
+                zSamples.push_back(point.z);
             }
         }
         
@@ -230,7 +245,7 @@ void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
     
     // this just triggers a repaint
     triggerAsyncUpdate();
-    // wait for rendering to complete
+    // wait for rendering on the OpenGLRenderer thread to complete
     renderingSemaphore.acquire();
 }
 
@@ -649,11 +664,7 @@ void VisualiserComponent::renderOpenGL() {
                 }
 #endif
                 if (recordingAudio) {
-                    if (settings.isSweepEnabled()) {
-                        audioRecorder.audioThreadCallback(ySamples, ySamples);
-                    } else {
-                        audioRecorder.audioThreadCallback(xSamples, ySamples);
-                    }
+                    audioRecorder.audioThreadCallback(audioOutputBuffer);
                 }
             }
             
@@ -901,7 +912,6 @@ void VisualiserComponent::drawLine(const std::vector<float>& xPoints, const std:
     
     setAdditiveBlending();
     
-    // TODO: need to add the last point from the previous frame to the start of the frame so they connect?
     int nPoints = xPoints.size();
 
     // Without this, there's an access violation that seems to occur only on some systems

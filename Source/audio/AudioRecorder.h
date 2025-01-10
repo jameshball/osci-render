@@ -79,13 +79,6 @@ public:
         }
     }
 
-    void audioThreadCallback(const std::vector<float>& left, const std::vector<float>& right) {
-        juce::AudioBuffer<float> buffer(2, left.size());
-        buffer.copyFrom(0, 0, left.data(), left.size());
-        buffer.copyFrom(1, 0, right.data(), right.size());
-        audioThreadCallback(buffer);
-    }
-
     void setRecordLength(double recordLength) {
         recordingLength = recordLength;
     }

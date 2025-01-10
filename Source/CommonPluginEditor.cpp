@@ -39,7 +39,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     addAndMakeVisible(visualiser);
 
     visualiserSettings.setLookAndFeel(&getLookAndFeel());
-    visualiserSettings.setSize(550, 550);
+    visualiserSettings.setSize(550, VISUALISER_SETTINGS_HEIGHT);
     visualiserSettings.setColour(juce::ResizableWindow::backgroundColourId, Colours::dark);
 
     recordingSettings.setLookAndFeel(&getLookAndFeel());

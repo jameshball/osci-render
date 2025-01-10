@@ -25,7 +25,9 @@ CommonAudioProcessor::CommonAudioProcessor()
         effects.push_back(effect);
     }
     
-    effects.push_back(visualiserParameters.smoothEffect);
+    for (auto effect : visualiserParameters.audioEffects) {
+        effects.push_back(effect);
+    }
         
     for (auto parameter : visualiserParameters.booleans) {
         booleanParameters.push_back(parameter);
