@@ -21,6 +21,7 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
     addAndMakeVisible(screenOverlay);
 #if SOSCI_FEATURES
     addAndMakeVisible(screenSaturation);
+    addAndMakeVisible(stereo);
     addAndMakeVisible(xOffset);
     addAndMakeVisible(yOffset);
     addAndMakeVisible(xScale);
@@ -62,6 +63,7 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
 
 #if SOSCI_FEATURES
     screenSaturation.setSliderOnValueChange();
+    stereo.setSliderOnValueChange();
     xOffset.setSliderOnValueChange();
     yOffset.setSliderOnValueChange();
     xScale.setSliderOnValueChange();
@@ -102,6 +104,7 @@ void VisualiserSettings::resized() {
     smooth.setBounds(area.removeFromTop(rowHeight));
     
 #if SOSCI_FEATURES
+    stereo.setBounds(area.removeFromTop(rowHeight));
     xScale.setBounds(area.removeFromTop(rowHeight));
     yScale.setBounds(area.removeFromTop(rowHeight));
     xOffset.setBounds(area.removeFromTop(rowHeight));

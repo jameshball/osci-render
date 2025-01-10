@@ -8,6 +8,7 @@
 #include "../LookAndFeel.h"
 #include "../components/SwitchButton.h"
 #include "../audio/SmoothEffect.h"
+#include "../audio/StereoEffect.h"
 
 enum class ScreenOverlay : int {
     Empty = 1,
@@ -103,6 +104,16 @@ public:
             "Controls how saturated the colours are on the oscilloscope screen.",
             "screenSaturation",
             VERSION_HINT, 1.0, 0.0, 5.0
+        )
+    );
+    std::shared_ptr<StereoEffect> stereoEffectApplication = std::make_shared<StereoEffect>();
+    std::shared_ptr<Effect> stereoEffect = std::make_shared<Effect>(
+        stereoEffectApplication,
+        new EffectParameter(
+            "Stereo",
+            "Turns mono audio that is uninteresting to visualise into stereo audio that is interesting to visualise.",
+            "stereo",
+            VERSION_HINT, 0.0, 0.0, 1.0
         )
     );
     std::shared_ptr<Effect> scaleEffect = std::make_shared<Effect>(
@@ -249,6 +260,7 @@ public:
         smoothEffect,
 #if SOSCI_FEATURES
         screenSaturationEffect,
+        stereoEffect,
         scaleEffect,
         offsetEffect,
 #endif
@@ -367,6 +379,7 @@ private:
 
 #if SOSCI_FEATURES
     EffectComponent screenSaturation{*parameters.screenSaturationEffect};
+    EffectComponent stereo{*parameters.stereoEffect};
     EffectComponent xScale{*parameters.scaleEffect, 0};
     EffectComponent yScale{*parameters.scaleEffect, 1};
     EffectComponent xOffset{*parameters.offsetEffect, 0};

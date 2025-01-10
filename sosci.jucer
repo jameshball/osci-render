@@ -108,6 +108,9 @@
         <FILE id="vj5mRC" name="SmoothEffect.cpp" compile="1" resource="0"
               file="Source/audio/SmoothEffect.cpp"/>
         <FILE id="GSnwBW" name="SmoothEffect.h" compile="0" resource="0" file="Source/audio/SmoothEffect.h"/>
+        <FILE id="Iq5LKp" name="StereoEffect.cpp" compile="1" resource="0"
+              file="Source/audio/StereoEffect.cpp"/>
+        <FILE id="jq3EXV" name="StereoEffect.h" compile="0" resource="0" file="Source/audio/StereoEffect.h"/>
       </GROUP>
       <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
         <FILE id="URb7Ok" name="AboutComponent.cpp" compile="1" resource="0"
