@@ -126,21 +126,33 @@ def append_matrix(object_info, obj):
     return object_info
 
 def get_frame_info():
-    frame_info = {"objects": []}
-    
-    for obj in bpy.data.objects:
-        if obj.visible_get() and obj.type == 'GPENCIL':
-            object_info = {"name": obj.name}
-            strokes = obj.data.layers.active.frames.data.active_frame.strokes
-            object_info["vertices"] = []
-            for stroke in strokes:
-                object_info["vertices"].append([{
-                    "x": vert.co[0],
-                    "y": vert.co[1],
-                    "z": vert.co[2],
-                } for vert in stroke.points])
-            
-            frame_info["objects"].append(append_matrix(object_info, obj))
+    frame_info = {"objects": []}    
+    if (bpy.app.version[0] >= 4 and bpy.app.version[1] >= 3):
+        for obj in bpy.data.objects:
+            if obj.visible_get() and obj.type == 'GREASEPENCIL':                
+                object_info = {"name": obj.name}
+                strokes = obj.data.layers.active.frames.data.current_frame().drawing.strokes
+                object_info["vertices"] = []
+                for stroke in strokes:
+                    object_info["vertices"].append([{
+                        "x": vert.position.x,
+                        "y": vert.position.y,
+                        "z": vert.position.z,
+                    } for vert in stroke.points])
+                frame_info["objects"].append(append_matrix(object_info, obj))
+    else:
+        for obj in bpy.data.objects: 
+            if obj.visible_get() and obj.type == 'GPENCIL':
+                object_info = {"name": obj.name}
+                strokes = obj.data.layers.active.frames.data.active_frame.strokes
+                object_info["vertices"] = []
+                for stroke in strokes:
+                    object_info["vertices"].append([{
+                        "x": vert.co[0],
+                        "y": vert.co[1],
+                        "z": vert.co[2],
+                    } for vert in stroke.points])
+                frame_info["objects"].append(append_matrix(object_info, obj))
     
     frame_info["focalLength"] = -0.05 * bpy.data.cameras[0].lens
 
@@ -177,7 +189,6 @@ def send_scene_to_osci_render(scene):
 
         json_str = json.dumps(frame_info, separators=(',', ':')) + '\n'
         try:
-            print(json_str)
             sock.sendall(json_str.encode('utf-8'))
         except socket.error as exp:
             sock = None
