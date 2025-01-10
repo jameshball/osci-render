@@ -9,7 +9,7 @@
 #include "components/SosciMainMenuBarModel.h"
 #include "components/SvgButton.h"
 
-class SosciPluginEditor : public CommonPluginEditor, public juce::FileDragAndDropTarget, public juce::AudioProcessorParameter::Listener {
+class SosciPluginEditor : public CommonPluginEditor, public juce::FileDragAndDropTarget, public juce::AudioProcessorParameter::Listener, public juce::ChangeListener {
 public:
     SosciPluginEditor(SosciAudioProcessor&);
     ~SosciPluginEditor() override;
@@ -21,9 +21,14 @@ public:
     void visualiserFullScreenChanged();
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
+    void changeListenerCallback(juce::ChangeBroadcaster* source) override;
 
 private:
     SosciAudioProcessor& audioProcessor;
+
+    juce::String getInputDeviceName();
+
+    juce::String currentInputDevice;
 
     ScrollableComponent visualiserSettingsWrapper = ScrollableComponent(visualiserSettings);
     

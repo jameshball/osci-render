@@ -87,6 +87,7 @@ private:
     SvgButton fullScreenButton{ "fullScreen", BinaryData::fullscreen_svg, juce::Colours::white, juce::Colours::white };
     SvgButton popOutButton{ "popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::white };
     SvgButton settingsButton{ "settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white };
+    SvgButton audioInputButton{ "audioInput", BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red };
     
 #if SOSCI_FEATURES
     SvgButton sharedTextureButton{ "sharedTexture", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red };

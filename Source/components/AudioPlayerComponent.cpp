@@ -109,6 +109,9 @@ void AudioPlayerComponent::setPaused(bool paused) {
 void AudioPlayerComponent::parserChanged() {
     setup();
     repaint();
+    if (onParserChanged != nullptr) {
+        onParserChanged();
+    }
 }
 
 void AudioPlayerComponent::resized() {

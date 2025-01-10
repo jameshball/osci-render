@@ -115,7 +115,23 @@ VisualiserComponent::VisualiserComponent(
         popoutWindow();
     };
 
+    if (visualiserOnly && juce::JUCEApplication::isStandaloneApp()) {
+        addAndMakeVisible(audioInputButton);
+        audioInputButton.setTooltip("Appears red when audio input is being used. Click to enable audio input and close any open audio files.");
+        audioInputButton.setClickingTogglesState(false);
+        audioInputButton.setToggleState(!audioPlayer.isInitialised(), juce::NotificationType::dontSendNotification);
+        audioPlayer.onParserChanged = [this] {
+            juce::MessageManager::callAsync([this] {
+                audioInputButton.setToggleState(!audioPlayer.isInitialised(), juce::NotificationType::dontSendNotification);
+            });
+        };
+        audioInputButton.onClick = [this] {
+            audioProcessor.stopAudioFile();
+        };
+    }
+
     addAndMakeVisible(audioPlayer);
+    
     
     openGLContext.setRenderer(this);
     openGLContext.attachTo(*this);
@@ -440,6 +456,9 @@ void VisualiserComponent::resized() {
         settingsButton.setBounds(buttons.removeFromRight(30));
     } else {
         settingsButton.setVisible(false);
+    }
+    if (visualiserOnly && juce::JUCEApplication::isStandaloneApp()) {
+        audioInputButton.setBounds(buttons.removeFromRight(30));
     }
 #if SOSCI_FEATURES
     sharedTextureButton.setBounds(buttons.removeFromRight(30));

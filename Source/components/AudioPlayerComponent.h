@@ -63,6 +63,9 @@ public:
     void setup();
     void parserChanged() override;
     void setPaused(bool paused);
+    bool isInitialised() const { return audioProcessor.wavParser.isInitialised(); }
+
+    std::function<void()> onParserChanged;
 
 private:
     CommonAudioProcessor& audioProcessor;

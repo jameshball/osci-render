@@ -24,9 +24,21 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p) : CommonPluginEdito
 
     resized();
     visualiserFullScreen->addListener(this);
+
+    if (juce::JUCEApplication::isStandaloneApp()) {
+        juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
+        juce::AudioDeviceManager& manager = standalone->deviceManager;
+        manager.addChangeListener(this);
+        currentInputDevice = getInputDeviceName();
+    }
 }
 
 SosciPluginEditor::~SosciPluginEditor() {
+    if (juce::JUCEApplication::isStandaloneApp()) {
+        juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
+        juce::AudioDeviceManager& manager = standalone->deviceManager;
+        manager.removeChangeListener(this);
+    }
     audioProcessor.visualiserParameters.visualiserFullScreen->removeListener(this);
     menuBar.setModel(nullptr);
 }
@@ -98,3 +110,28 @@ void SosciPluginEditor::parameterValueChanged(int parameterIndex, float newValue
 }
 
 void SosciPluginEditor::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
+
+void SosciPluginEditor::changeListenerCallback(juce::ChangeBroadcaster* source) {
+    if (juce::JUCEApplication::isStandaloneApp()) {
+        juce::String inputDevice = getInputDeviceName();
+        if (inputDevice != currentInputDevice) {
+            currentInputDevice = inputDevice;
+            // switch to getting audio from input if the user changes the input device
+            // because we assume they are debugging and want to hear the audio from mic
+            audioProcessor.stopAudioFile();
+        }
+    }
+}
+
+juce::String SosciPluginEditor::getInputDeviceName() {
+    if (juce::StandalonePluginHolder::getInstance() == nullptr) {
+        return "Unknown";
+    }
+    juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
+    juce::AudioDeviceManager& manager = standalone->deviceManager;
+    auto device = manager.getCurrentAudioDevice();
+    auto deviceType = manager.getCurrentDeviceTypeObject();
+    int inputIndex = deviceType->getIndexOfDevice(device, true);
+    auto inputName = deviceType->getDeviceNames(true)[inputIndex];
+    return inputName;
+}
