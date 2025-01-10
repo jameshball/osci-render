@@ -48,7 +48,7 @@ public:
     SharedTextureManager sharedTextureManager;
 #endif
 
-    int VISUALISER_SETTINGS_HEIGHT = 700;
+    int VISUALISER_SETTINGS_HEIGHT = 750;
 
     VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.visualiserParameters, 3);
     RecordingSettings recordingSettings = RecordingSettings(audioProcessor.recordingParameters);

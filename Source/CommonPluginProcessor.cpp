@@ -14,7 +14,7 @@
 //==============================================================================
 CommonAudioProcessor::CommonAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
-     : AudioProcessor (BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(3), true)
+     : AudioProcessor (BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(4), true)
                                         .withOutput("Output", juce::AudioChannelSet::stereo(), true))
 #endif
 {
