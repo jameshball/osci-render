@@ -1,7 +1,7 @@
 bl_info = {
     "name": "osci-render",
     "author": "James Ball", 
-    "version": (1, 0, 2),
+    "version": (1, 0, 3),
     "blender": (3, 1, 2),
     "location": "View3D",
     "description": "Addon to send gpencil frames over to osci-render",
