@@ -127,7 +127,7 @@ def append_matrix(object_info, obj):
 
 def get_frame_info():
     frame_info = {"objects": []}    
-    if (bpy.app.version[0] >= 4 and bpy.app.version[1] >= 3):
+    if (bpy.app.version[0] > 4) or (bpy.app.version[0] == 4 and bpy.app.version[1] >= 3):
         for obj in bpy.data.objects:
             if obj.visible_get() and obj.type == 'GREASEPENCIL':                
                 object_info = {"name": obj.name}
