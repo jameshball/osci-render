@@ -131,9 +131,9 @@ VisualiserComponent::VisualiserComponent(
     }
 
     addAndMakeVisible(audioPlayer);
-    
     audioPlayer.addMouseListener(static_cast<juce::Component*>(this), true);
-    
+
+    openGLContext.setOpenGLVersionRequired(juce::OpenGLContext::OpenGLVersion::openGL3_2);
     openGLContext.setRenderer(this);
     openGLContext.attachTo(*this);
 
@@ -826,7 +826,8 @@ void VisualiserComponent::setupTextures() {
     blur4Texture = makeTexture(128, 128);
     renderTexture = makeTexture(1024, 1024);
     
-    screenTexture = createScreenTexture();
+    screenOpenGLTexture.loadImage(emptyScreenImage);
+    screenTexture = { screenOpenGLTexture.getTextureID(), screenTextureImage.getWidth(), screenTextureImage.getHeight() };
     
 #if SOSCI_FEATURES
     glowTexture = makeTexture(512, 512);
@@ -1191,12 +1192,16 @@ Texture VisualiserComponent::createScreenTexture() {
     } else {
         screenOpenGLTexture.loadImage(emptyScreenImage);
     }
+    checkGLErrors(__FILE__, __LINE__);
     Texture texture = { screenOpenGLTexture.getTextureID(), screenTextureImage.getWidth(), screenTextureImage.getHeight() };
     
     if (screenOverlay == ScreenOverlay::Graticule || screenOverlay == ScreenOverlay::SmudgedGraticule) {
         activateTargetTexture(texture);
+        checkGLErrors(__FILE__, __LINE__);
         setNormalBlending();
+        checkGLErrors(__FILE__, __LINE__);
         setShader(simpleShader.get());
+        checkGLErrors(__FILE__, __LINE__);
         glColorMask(true, false, false, true);
         
         std::vector<float> data;
@@ -1242,9 +1247,9 @@ Texture VisualiserComponent::createScreenTexture() {
         glBufferData(GL_ARRAY_BUFFER, sizeof(float) * data.size(), data.data(), GL_STATIC_DRAW);
         glVertexAttribPointer(glGetAttribLocation(simpleShader->getProgramID(), "vertexPosition"), 2, GL_FLOAT, GL_FALSE, 0, nullptr);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
-        simpleShader->setUniform("colour", 0.01f, 0.1f, 0.01f, 1.0f);
+        simpleShader->setUniform("colour", 0.01f, 0.05f, 0.01f, 1.0f);
         glLineWidth(2.0f);
-        glDrawArrays(GL_LINES, 0, data.size());
+        glDrawArrays(GL_LINES, 0, data.size() / 2);
         glBindTexture(GL_TEXTURE_2D, targetTexture.value().id);
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     }
@@ -1252,7 +1257,7 @@ Texture VisualiserComponent::createScreenTexture() {
     return texture;
 }
 
-void VisualiserComponent::checkGLErrors(const juce::String& location) {
+void VisualiserComponent::checkGLErrors(juce::String file, int line) {
     using namespace juce::gl;
     
     GLenum error;
@@ -1268,7 +1273,7 @@ void VisualiserComponent::checkGLErrors(const juce::String& location) {
             case GL_INVALID_FRAMEBUFFER_OPERATION: errorMessage = "GL_INVALID_FRAMEBUFFER_OPERATION"; break;
             default: errorMessage = "Unknown OpenGL error"; break;
         }
-        DBG("OpenGL error at " + location + ": " + errorMessage);
+        DBG("OpenGL error at " + file + ":" + juce::String(line) + " - " + errorMessage);
     }
 }
 
@@ -1306,7 +1311,7 @@ void VisualiserComponent::renderScope(const std::vector<float>& xPoints, const s
     renderScale = (float)openGLContext.getRenderingScale();
 
     drawLineTexture(xPoints, yPoints, zPoints);
-    checkGLErrors("drawLineTexture");
+    checkGLErrors(__FILE__, __LINE__);
     drawCRT();
-    checkGLErrors("drawCRT");
+    checkGLErrors(__FILE__, __LINE__);
 }

@@ -232,9 +232,9 @@ void MainComponent::resized() {
         auto shiftedBounds = bounds;
         shiftedBounds.setX(topLeft.getX());
         shiftedBounds.setY(topLeft.getY());
-        if (minDim < 35) {
-            minDim = 35;
-        }
+        //if (minDim < 35) {
+        //    minDim = 35;
+        //}
 		pluginEditor.visualiser.setBounds(shiftedBounds.withSizeKeepingCentre(minDim - 25, minDim));
 	}
 }

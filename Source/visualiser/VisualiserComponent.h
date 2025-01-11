@@ -238,7 +238,7 @@ private:
     juce::OpenGLShaderProgram* currentShader;
     
     float fadeAmount;
-    ScreenOverlay screenOverlay = settings.getScreenOverlay();
+    ScreenOverlay screenOverlay = ScreenOverlay::MAX;
     
     const double RESAMPLE_RATIO = 6.0;
     double sampleRate = -1;
@@ -266,7 +266,7 @@ private:
     void drawLine(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints);
     void fade();
     void drawCRT();
-    void checkGLErrors(const juce::String& location);
+    void checkGLErrors(juce::String file, int line);
     void viewportChanged(juce::Rectangle<int> area);
 
     void renderScope(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints);
