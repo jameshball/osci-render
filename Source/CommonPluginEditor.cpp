@@ -43,8 +43,8 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     visualiserSettings.setColour(juce::ResizableWindow::backgroundColourId, Colours::dark);
 
     recordingSettings.setLookAndFeel(&getLookAndFeel());
-    recordingSettings.setSize(300, 200);
-    recordingSettingsWindow.centreWithSize(300, 230);
+    recordingSettings.setSize(350, 230);
+    recordingSettingsWindow.centreWithSize(350, 260);
 #if JUCE_WINDOWS
     // if not standalone, use native title bar for compatibility with DAWs
     recordingSettingsWindow.setUsingNativeTitleBar(processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone);

@@ -598,7 +598,7 @@ void VisualiserComponent::childUpdated() {
 
 #if SOSCI_FEATURES
 void VisualiserComponent::initialiseSharedTexture() {
-    sharedTextureSender = sharedTextureManager.addSender("osci-render - " + juce::String(juce::Time::getCurrentTime().toMilliseconds()), renderTexture.width, renderTexture.height);
+    sharedTextureSender = sharedTextureManager.addSender(recordingSettings.getCustomSharedTextureServerName(), renderTexture.width, renderTexture.height);
     sharedTextureSender->initGL();
     sharedTextureSender->setSharedTextureId(renderTexture.id);
     sharedTextureSender->setDrawFunction([this] {
