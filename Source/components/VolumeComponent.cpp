@@ -13,6 +13,7 @@ VolumeComponent::VolumeComponent(CommonAudioProcessor& p) : AudioBackgroundThrea
     auto volumeParam = audioProcessor.volumeEffect->parameters[0];
     volumeSlider.setRange(volumeParam->min, volumeParam->max, volumeParam->step);
     volumeSlider.setValue(volumeParam->getValueUnnormalised());
+    volumeSlider.setDoubleClickReturnValue(true, 1.0);
     volumeSlider.setLookAndFeel(&thumbRadiusLookAndFeel);
     volumeSlider.setColour(juce::Slider::ColourIds::thumbColourId, juce::Colours::black);
 
@@ -25,6 +26,7 @@ VolumeComponent::VolumeComponent(CommonAudioProcessor& p) : AudioBackgroundThrea
     auto& thresholdParam = audioProcessor.thresholdEffect->parameters[0];
     thresholdSlider.setRange(thresholdParam->min, thresholdParam->max, thresholdParam->step);
     thresholdSlider.setValue(thresholdParam->getValueUnnormalised());
+    thresholdSlider.setDoubleClickReturnValue(true, 1.0);
     thresholdSlider.setLookAndFeel(&thresholdLookAndFeel);
     thresholdSlider.setColour(juce::Slider::ColourIds::thumbColourId, juce::Colours::black);
 

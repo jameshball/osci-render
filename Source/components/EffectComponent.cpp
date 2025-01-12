@@ -59,6 +59,7 @@ void EffectComponent::setupComponent() {
 
     slider.setRange(parameter->min, parameter->max, parameter->step);
     slider.setValue(parameter->getValueUnnormalised(), juce::dontSendNotification);
+    slider.setDoubleClickReturnValue(true, parameter->defaultValue);
 
     lfoEnabled = parameter->lfo != nullptr && parameter->lfoRate != nullptr;
     if (lfoEnabled) {
@@ -81,6 +82,7 @@ void EffectComponent::setupComponent() {
         lfoSlider.setRange(parameter->lfoRate->min, parameter->lfoRate->max, parameter->lfoRate->step);
         lfoSlider.setValue(parameter->lfoRate->getValueUnnormalised(), juce::dontSendNotification);
         lfoSlider.setSkewFactorFromMidPoint(parameter->lfoRate->min + 0.1 * (parameter->lfoRate->max - parameter->lfoRate->min));
+        lfoSlider.setDoubleClickReturnValue(true, 1.0);
 
         if (lfo.getSelectedId() == static_cast<int>(LfoType::Static)) {
             lfoSlider.setVisible(false);

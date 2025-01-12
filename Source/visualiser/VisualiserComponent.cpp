@@ -1066,53 +1066,39 @@ void VisualiserComponent::drawCRT() {
     using namespace juce::gl;
     
     setNormalBlending();
-    
-    saveTextureToQOI(lineTexture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDesktopDirectory).getChildFile("line.qoi"));
 
     activateTargetTexture(blur1Texture);
     setShader(texturedShader.get());
     texturedShader->setUniform("uResizeForCanvas", lineTexture.width / 1024.0f);
     drawTexture({lineTexture});
-    
-    saveTextureToQOI(blur1Texture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDesktopDirectory).getChildFile("blur1.qoi"));
 
     //horizontal blur 512x512
     activateTargetTexture(blur2Texture);
     setShader(blurShader.get());
     blurShader->setUniform("uOffset", 1.0f / 512.0f, 0.0f);
     drawTexture({blur1Texture});
-    
-    saveTextureToQOI(blur2Texture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDesktopDirectory).getChildFile("blur2.qoi"));
 
     //vertical blur 512x512
     activateTargetTexture(blur1Texture);
     blurShader->setUniform("uOffset", 0.0f, 1.0f / 512.0f);
     drawTexture({blur2Texture});
-    
-    saveTextureToQOI(blur2Texture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDesktopDirectory).getChildFile("blur1_1.qoi"));
 
     //preserve blur1 for later
     activateTargetTexture(blur3Texture);
     setShader(texturedShader.get());
     texturedShader->setUniform("uResizeForCanvas", 1.0f);
     drawTexture({blur1Texture});
-    
-    saveTextureToQOI(blur2Texture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDesktopDirectory).getChildFile("blur3.qoi"));
 
     //horizontal blur 128x128
     activateTargetTexture(blur4Texture);
     setShader(wideBlurShader.get());
     wideBlurShader->setUniform("uOffset", 1.0f / 128.0f, 0.0f);
     drawTexture({blur3Texture});
-    
-    saveTextureToQOI(blur2Texture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDesktopDirectory).getChildFile("blur4.qoi"));
 
     //vertical blur 128x128
     activateTargetTexture(blur3Texture);
     wideBlurShader->setUniform("uOffset", 0.0f, 1.0f / 128.0f);
     drawTexture({blur4Texture});
-    
-    saveTextureToQOI(blur2Texture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDesktopDirectory).getChildFile("blur3_1.qoi"));
     
 #if SOSCI_FEATURES
     if (settings.parameters.screenOverlay->isRealisticDisplay()) {
@@ -1121,8 +1107,6 @@ void VisualiserComponent::drawCRT() {
         setShader(glowShader.get());
         setOffsetAndScale(glowShader.get());
         drawTexture({blur3Texture});
-        
-        saveTextureToQOI(blur2Texture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDesktopDirectory).getChildFile("glow.qoi"));
     }
 #endif
 
@@ -1157,8 +1141,6 @@ void VisualiserComponent::drawCRT() {
         glowTexture,
 #endif
     });
-    
-    saveTextureToQOI(renderTexture, juce::File::getSpecialLocation(juce::File::SpecialLocationType::userDesktopDirectory).getChildFile("render.qoi"));
 }
 
 void VisualiserComponent::setOffsetAndScale(juce::OpenGLShaderProgram* shader) {

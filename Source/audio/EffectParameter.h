@@ -331,6 +331,8 @@ public:
 	FloatParameter* lfoRate = new FloatParameter(name + " LFO Rate", paramID + "LfoRate", getVersionHint(), 1.0f, 0.0f, 10000.0f, 0.01f, "Hz");
 	BooleanParameter* sidechain = new BooleanParameter(name + " Sidechain Enabled", paramID + "Sidechain", getVersionHint(), false, "Toggles " + name + " Sidechain.");
 	std::atomic<float> phase = 0.0f;
+    // this is what the value will get reset to on double-click.
+    std::atomic<float> defaultValue;
 	juce::String description;
 
 	std::vector<juce::AudioProcessorParameter*> getParameters() {
@@ -399,5 +401,5 @@ public:
 		}
     }
 
-	EffectParameter(juce::String name, juce::String description, juce::String id, int versionHint, float value, float min, float max, float step = 0.01, bool smoothValueChange = true) : FloatParameter(name, id, versionHint, value, min, max, step), smoothValueChange(smoothValueChange), description(description) {}
+    EffectParameter(juce::String name, juce::String description, juce::String id, int versionHint, float value, float min, float max, float step = 0.01, bool smoothValueChange = true) : FloatParameter(name, id, versionHint, value, min, max, step), smoothValueChange(smoothValueChange), description(description), defaultValue(value) {}
 };
