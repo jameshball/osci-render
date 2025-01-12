@@ -284,7 +284,9 @@ private:
 
 class VisualiserWindow : public juce::DocumentWindow {
 public:
-    VisualiserWindow(juce::String name, VisualiserComponent* parent) : parent(parent), wasPaused(!parent->active), juce::DocumentWindow(name, juce::Colours::black, juce::DocumentWindow::TitleBarButtons::allButtons) {}
+    VisualiserWindow(juce::String name, VisualiserComponent* parent) : parent(parent), wasPaused(!parent->active), juce::DocumentWindow(name, juce::Colours::black, juce::DocumentWindow::TitleBarButtons::allButtons) {
+        setAlwaysOnTop(true);
+    }
     
     void closeButtonPressed() override {
         parent->setPaused(wasPaused);
