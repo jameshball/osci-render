@@ -25,7 +25,7 @@ class CommonAudioProcessor  : public juce::AudioProcessor, public SampleRateMana
                             #endif
 {
 public:
-    CommonAudioProcessor();
+    CommonAudioProcessor(const BusesProperties& busesProperties);
     ~CommonAudioProcessor() override;
 
     void addAllParameters();

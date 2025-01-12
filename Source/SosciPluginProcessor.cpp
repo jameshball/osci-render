@@ -2,7 +2,7 @@
 #include "SosciPluginEditor.h"
 #include "audio/EffectParameter.h"
 
-SosciAudioProcessor::SosciAudioProcessor() {
+SosciAudioProcessor::SosciAudioProcessor() : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(4), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
     // demo audio file on standalone only
     if (juce::JUCEApplicationBase::isStandaloneApp()) {
         std::unique_ptr<juce::InputStream> stream = std::make_unique<juce::MemoryInputStream>(BinaryData::sosci_flac, BinaryData::sosci_flacSize, false);

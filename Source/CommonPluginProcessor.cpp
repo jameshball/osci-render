@@ -12,10 +12,9 @@
 #include "components/AudioPlayerComponent.h"
 
 //==============================================================================
-CommonAudioProcessor::CommonAudioProcessor()
+CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesProperties)
 #ifndef JucePlugin_PreferredChannelConfigurations
-     : AudioProcessor (BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(4), true)
-                                        .withOutput("Output", juce::AudioChannelSet::stereo(), true))
+     : AudioProcessor(busesProperties)
 #endif
 {
     // locking isn't necessary here because we are in the constructor
