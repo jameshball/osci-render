@@ -17,11 +17,13 @@ EffectComponent::EffectComponent(Effect& effect, int index) : effect(effect), in
 
     slider.setSliderStyle(juce::Slider::LinearHorizontal);
     slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, TEXT_BOX_WIDTH, slider.getTextBoxHeight());
+    slider.setNumDecimalPlacesToDisplay(4);
 
     lfoSlider.setSliderStyle(juce::Slider::LinearHorizontal);
     lfoSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, TEXT_BOX_WIDTH, lfoSlider.getTextBoxHeight());
     lfoSlider.setTextValueSuffix("Hz");
     lfoSlider.setColour(sliderThumbOutlineColourId, juce::Colour(0xff00ff00));
+    lfoSlider.setNumDecimalPlacesToDisplay(3);
 
     label.setFont(juce::Font(14.0f));
 
