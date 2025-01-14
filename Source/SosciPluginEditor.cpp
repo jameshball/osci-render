@@ -4,7 +4,9 @@
 
 SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p) : CommonPluginEditor(p, "sosci", "sosci", 1180, 750), audioProcessor(p) {
     initialiseMenuBar(model);
-    addAndMakeVisible(volume);
+    if (juce::JUCEApplication::isStandaloneApp()) {
+        addAndMakeVisible(volume);
+    }
     addAndMakeVisible(visualiserSettingsWrapper);
 
     BooleanParameter* visualiserFullScreen = audioProcessor.visualiserParameters.visualiserFullScreen;
@@ -55,8 +57,10 @@ void SosciPluginEditor::resized() {
     } else {
         menuBar.setBounds(area.removeFromTop(25));
 
-        auto volumeArea = area.removeFromLeft(30);
-        volume.setBounds(volumeArea.withSizeKeepingCentre(volumeArea.getWidth(), juce::jmin(volumeArea.getHeight(), 300)));
+        if (juce::JUCEApplication::isStandaloneApp()) {
+            auto volumeArea = area.removeFromLeft(30);
+            volume.setBounds(volumeArea.withSizeKeepingCentre(volumeArea.getWidth(), juce::jmin(volumeArea.getHeight(), 300)));
+        }
 
         auto settingsArea = area.removeFromRight(juce::jmax(juce::jmin(0.4 * getWidth(), 550.0), 350.0));
         visualiserSettings.setSize(settingsArea.getWidth(), VISUALISER_SETTINGS_HEIGHT);
@@ -98,7 +102,9 @@ void SosciPluginEditor::visualiserFullScreenChanged() {
     
     visualiser.setFullScreen(fullScreen);
 
-    volume.setVisible(!fullScreen);
+    if (juce::JUCEApplication::isStandaloneApp()) {
+        volume.setVisible(!fullScreen);
+    }
     visualiserSettingsWrapper.setVisible(!fullScreen);
     menuBar.setVisible(!fullScreen);
     resized();

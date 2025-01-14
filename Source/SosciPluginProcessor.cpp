@@ -62,14 +62,16 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         // this is the point that the visualiser will draw
         threadManager.write(point, "VisualiserComponent");
 
-        point.scale(volume, volume, 1.0);
+        if (juce::JUCEApplication::isStandaloneApp()) {
+            point.scale(volume, volume, 1.0);
 
-        // clip
-        point.x = juce::jmax(-threshold, juce::jmin(threshold.load(), point.x));
-        point.y = juce::jmax(-threshold, juce::jmin(threshold.load(), point.y));
+            // clip
+            point.x = juce::jmax(-threshold, juce::jmin(threshold.load(), point.x));
+            point.y = juce::jmax(-threshold, juce::jmin(threshold.load(), point.y));
 
-        // this is the point that the volume component will draw (i.e. post scale/clipping)
-        threadManager.write(point, "VolumeComponent");
+            // this is the point that the volume component will draw (i.e. post scale/clipping)
+            threadManager.write(point, "VolumeComponent");
+        }
         
         if (output.getNumChannels() > 0) {
             outputArray[0][sample] = point.x;
