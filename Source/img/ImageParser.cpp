@@ -66,6 +66,16 @@ ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, ju
             }
         }
     }
+    
+    if (frames.size() == 0) {
+        juce::MessageManager::callAsync([this] {
+            juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::AlertIconType::WarningIcon, "Invalid GIF", "The image could not be loaded. Please try optimising the GIF with https://ezgif.com/optimize.");
+        });
+        
+        width = 1;
+        height = 1;
+        frames.emplace_back(std::vector<uint8_t>(1));
+    }
 
     setFrame(0);
 }

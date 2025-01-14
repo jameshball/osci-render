@@ -361,11 +361,6 @@ bool VisualiserComponent::keyPressed(const juce::KeyPress& key) {
     } else if (key.isKeyCode(juce::KeyPress::spaceKey)) {
         setPaused(active);
         return true;
-    } else if (key.isKeyCode(juce::KeyPress::F11Key)) {
-        // set fullscreen
-        juce::Component* component = juce::TopLevelWindow::getTopLevelWindow(0);
-        juce::Desktop::getInstance().setKioskModeComponent(component, true);
-        return true;
     }
 
     return false;

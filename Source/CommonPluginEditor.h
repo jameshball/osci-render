@@ -25,6 +25,7 @@ public:
 
 private:
     CommonAudioProcessor& audioProcessor;
+    bool fullScreen = false;
     
     juce::File applicationFolder = juce::File::getSpecialLocation(juce::File::SpecialLocationType::userApplicationDataDirectory)
 #if JUCE_MAC

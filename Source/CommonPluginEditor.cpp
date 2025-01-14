@@ -84,6 +84,12 @@ bool CommonPluginEditor::keyPressed(const juce::KeyPress& key) {
         saveProject();
     } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'O') {
         openProject();
+    } else if (key.isKeyCode(juce::KeyPress::F11Key) && juce::JUCEApplicationBase::isStandaloneApp()) {
+        // set fullscreen
+        juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
+        if (window != nullptr) {
+            window->setFullScreen(!fullScreen);
+        }
     }
 
     return false;
