@@ -121,8 +121,8 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() {
         }
     ));
     toggleableEffects.push_back(custom);
-    toggleableEffects.push_back(traceMax);
-    toggleableEffects.push_back(traceMin);
+    toggleableEffects.push_back(traceLength);
+    toggleableEffects.push_back(traceStart);
 
     for (int i = 0; i < toggleableEffects.size(); i++) {
         auto effect = toggleableEffects[i];

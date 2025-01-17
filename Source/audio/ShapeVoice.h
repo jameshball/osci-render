@@ -27,8 +27,8 @@ private:
 	OscirenderAudioProcessor& audioProcessor;
 	std::vector<std::unique_ptr<Shape>> frame;
 	std::atomic<ShapeSound*> sound = nullptr;
-	double actualTraceMin;
-	double actualTraceMax;
+	double actualTraceStart;
+	double actualTraceLength;
 
 	double frameLength = 0.0;
 	int currentShape = 0;
