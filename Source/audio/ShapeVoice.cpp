@@ -55,7 +55,6 @@ void ShapeVoice::incrementShapeDrawing() {
         currentShape++;
         if (currentShape >= frame.size()) {
             currentShape = 0;
-            break;
         }
         // POTENTIAL TODO: Think of a way to make this more efficient when iterating
         // this loop many times
@@ -93,7 +92,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         // update length increment
         double traceMax = traceMaxEnabled ? actualTraceMax : 1.0;
         double traceMin = traceMinEnabled ? actualTraceMin : 0.0;
-        double proportionalLength = (traceMax - traceMin) * frameLength;
+        double proportionalLength = (traceMax) * frameLength;
         lengthIncrement = juce::jmax(proportionalLength / (audioProcessor.currentSampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
 
         OsciPoint channels;
@@ -152,20 +151,29 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         double traceMaxValue = audioProcessor.traceMax->getActualValue();
         traceMaxValue = traceMaxEnabled ? traceMaxValue : 1.0;
         traceMinValue = traceMinEnabled ? traceMinValue : 0.0;
-        actualTraceMax = juce::jmax(actualTraceMin, juce::jmin(traceMaxValue, 1.0));
-        actualTraceMin = juce::jmax(MIN_TRACE, juce::jmin(traceMinValue, actualTraceMax - MIN_TRACE));
+        actualTraceMax = traceMaxValue;
+        actualTraceMin = traceMinValue;
+        if (actualTraceMin < 0) {
+            actualTraceMin = 0;
+        }
 
         if (!renderingSample) {
             incrementShapeDrawing();
         }
 
-        double drawnFrameLength = traceMaxEnabled ? actualTraceMax * frameLength : frameLength;
+        double drawnFrameLength = frameLength;
+        bool willLoopOver = false;
+        if (traceMaxEnabled || traceMinEnabled) {
+            drawnFrameLength *= actualTraceMax + actualTraceMin;
+        }
 
         if (!renderingSample && frameDrawn >= drawnFrameLength) {
             if (sound.load() != nullptr && currentlyPlaying) {
                 frameLength = sound.load()->updateFrame(frame);
             }
-            frameDrawn -= drawnFrameLength;
+            //frameDrawn -= drawnFrameLength;
+            frameDrawn = 0;
+            shapeDrawn = 0;
             currentShape = 0;
 
             // TODO: updateFrame already iterates over all the shapes,
