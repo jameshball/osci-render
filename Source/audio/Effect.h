@@ -5,6 +5,8 @@
 #include "EffectParameter.h"
 #include "BooleanParameter.h"
 
+#define SMOOTHING_SPEED_CONSTANT 0.0005
+
 typedef std::function<OsciPoint(int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate)> EffectApplicationType;
 
 class Effect {
