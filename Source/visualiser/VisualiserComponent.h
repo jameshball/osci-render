@@ -52,6 +52,7 @@ public:
     std::function<void()> closeSettings;
 
     void enableFullScreen();
+    void setFullScreen(bool fullScreen);
     void setFullScreenCallback(std::function<void(FullScreenMode)> callback);
     void mouseDoubleClick(const juce::MouseEvent& event) override;
     void resized() override;
@@ -60,6 +61,8 @@ public:
     void runTask(const std::vector<OsciPoint>& points) override;
     void stopTask() override;
     void setPaused(bool paused);
+    void mouseDrag(const juce::MouseEvent& event) override;
+    void mouseMove(const juce::MouseEvent& event) override;
     void mouseDown(const juce::MouseEvent& event) override;
     bool keyPressed(const juce::KeyPress& key) override;
     void handleAsyncUpdate() override;
@@ -87,6 +90,7 @@ private:
     SvgButton fullScreenButton{ "fullScreen", BinaryData::fullscreen_svg, juce::Colours::white, juce::Colours::white };
     SvgButton popOutButton{ "popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::white };
     SvgButton settingsButton{ "settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white };
+    SvgButton audioInputButton{ "audioInput", BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red };
     
 #if SOSCI_FEATURES
     SvgButton sharedTextureButton{ "sharedTexture", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red };
@@ -94,6 +98,11 @@ private:
     SharedTextureSender* sharedTextureSender = nullptr;
 #endif
 
+    int lastMouseX = 0;
+    int lastMouseY = 0;
+    int timerId = 0;
+    bool hideButtonRow = false;
+    bool fullScreen = false;
     std::function<void(FullScreenMode)> fullScreenCallback;
 
     VisualiserSettings& settings;
@@ -170,6 +179,7 @@ private:
 
     juce::CriticalSection samplesLock;
     long sampleCount = 0;
+    juce::AudioBuffer<float> audioOutputBuffer;
     std::vector<float> xSamples{2};
     std::vector<float> ySamples{2};
     std::vector<float> zSamples{2};
@@ -228,7 +238,7 @@ private:
     juce::OpenGLShaderProgram* currentShader;
     
     float fadeAmount;
-    ScreenOverlay screenOverlay = settings.getScreenOverlay();
+    ScreenOverlay screenOverlay = ScreenOverlay::MAX;
     
     const double RESAMPLE_RATIO = 6.0;
     double sampleRate = -1;
@@ -256,7 +266,7 @@ private:
     void drawLine(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints);
     void fade();
     void drawCRT();
-    void checkGLErrors(const juce::String& location);
+    void checkGLErrors(juce::String file, int line);
     void viewportChanged(juce::Rectangle<int> area);
 
     void renderScope(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints);
@@ -269,11 +279,14 @@ private:
     juce::File audioFile;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserComponent)
+    JUCE_DECLARE_WEAK_REFERENCEABLE(VisualiserComponent)
 };
 
 class VisualiserWindow : public juce::DocumentWindow {
 public:
-    VisualiserWindow(juce::String name, VisualiserComponent* parent) : parent(parent), wasPaused(!parent->active), juce::DocumentWindow(name, juce::Colours::black, juce::DocumentWindow::TitleBarButtons::allButtons) {}
+    VisualiserWindow(juce::String name, VisualiserComponent* parent) : parent(parent), wasPaused(!parent->active), juce::DocumentWindow(name, juce::Colours::black, juce::DocumentWindow::TitleBarButtons::allButtons) {
+        setAlwaysOnTop(true);
+    }
     
     void closeButtonPressed() override {
         parent->setPaused(wasPaused);

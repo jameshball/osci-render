@@ -18,7 +18,7 @@
 #include "audio/EffectParameter.h"
 
 //==============================================================================
-OscirenderAudioProcessor::OscirenderAudioProcessor() {
+OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(2), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
     // locking isn't necessary here because we are in the constructor
 
     toggleableEffects.push_back(std::make_shared<Effect>(

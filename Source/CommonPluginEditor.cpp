@@ -39,12 +39,12 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     addAndMakeVisible(visualiser);
 
     visualiserSettings.setLookAndFeel(&getLookAndFeel());
-    visualiserSettings.setSize(550, 550);
+    visualiserSettings.setSize(550, VISUALISER_SETTINGS_HEIGHT);
     visualiserSettings.setColour(juce::ResizableWindow::backgroundColourId, Colours::dark);
 
     recordingSettings.setLookAndFeel(&getLookAndFeel());
-    recordingSettings.setSize(300, 200);
-    recordingSettingsWindow.centreWithSize(300, 230);
+    recordingSettings.setSize(350, 230);
+    recordingSettingsWindow.centreWithSize(350, 260);
 #if JUCE_WINDOWS
     // if not standalone, use native title bar for compatibility with DAWs
     recordingSettingsWindow.setUsingNativeTitleBar(processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone);
@@ -84,6 +84,12 @@ bool CommonPluginEditor::keyPressed(const juce::KeyPress& key) {
         saveProject();
     } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'O') {
         openProject();
+    } else if (key.isKeyCode(juce::KeyPress::F11Key) && juce::JUCEApplicationBase::isStandaloneApp()) {
+        // set fullscreen
+        juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
+        if (window != nullptr) {
+            window->setFullScreen(!fullScreen);
+        }
     }
 
     return false;

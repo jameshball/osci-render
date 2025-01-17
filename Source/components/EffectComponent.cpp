@@ -17,11 +17,13 @@ EffectComponent::EffectComponent(Effect& effect, int index) : effect(effect), in
 
     slider.setSliderStyle(juce::Slider::LinearHorizontal);
     slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, TEXT_BOX_WIDTH, slider.getTextBoxHeight());
+    slider.setNumDecimalPlacesToDisplay(4);
 
     lfoSlider.setSliderStyle(juce::Slider::LinearHorizontal);
     lfoSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, TEXT_BOX_WIDTH, lfoSlider.getTextBoxHeight());
     lfoSlider.setTextValueSuffix("Hz");
     lfoSlider.setColour(sliderThumbOutlineColourId, juce::Colour(0xff00ff00));
+    lfoSlider.setNumDecimalPlacesToDisplay(3);
 
     label.setFont(juce::Font(14.0f));
 
@@ -59,6 +61,7 @@ void EffectComponent::setupComponent() {
 
     slider.setRange(parameter->min, parameter->max, parameter->step);
     slider.setValue(parameter->getValueUnnormalised(), juce::dontSendNotification);
+    slider.setDoubleClickReturnValue(true, parameter->defaultValue);
 
     lfoEnabled = parameter->lfo != nullptr && parameter->lfoRate != nullptr;
     if (lfoEnabled) {
@@ -81,6 +84,7 @@ void EffectComponent::setupComponent() {
         lfoSlider.setRange(parameter->lfoRate->min, parameter->lfoRate->max, parameter->lfoRate->step);
         lfoSlider.setValue(parameter->lfoRate->getValueUnnormalised(), juce::dontSendNotification);
         lfoSlider.setSkewFactorFromMidPoint(parameter->lfoRate->min + 0.1 * (parameter->lfoRate->max - parameter->lfoRate->min));
+        lfoSlider.setDoubleClickReturnValue(true, 1.0);
 
         if (lfo.getSelectedId() == static_cast<int>(LfoType::Static)) {
             lfoSlider.setVisible(false);

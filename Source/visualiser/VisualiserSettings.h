@@ -8,6 +8,7 @@
 #include "../LookAndFeel.h"
 #include "../components/SwitchButton.h"
 #include "../audio/SmoothEffect.h"
+#include "../audio/StereoEffect.h"
 
 enum class ScreenOverlay : int {
     Empty = 1,
@@ -93,6 +94,66 @@ public:
     BooleanParameter* sweepEnabled = new BooleanParameter("Sweep", "sweepEnabled", VERSION_HINT, false, "Plots the audio signal over time, sweeping from left to right");
     BooleanParameter* visualiserFullScreen = new BooleanParameter("Visualiser Fullscreen", "visualiserFullScreen", VERSION_HINT, false, "Makes the software visualiser fullscreen.");
 
+#if SOSCI_FEATURES
+    BooleanParameter* flipVertical = new BooleanParameter("Flip Vertical", "flipVertical", VERSION_HINT, false, "Flips the visualiser vertically.");
+    BooleanParameter* flipHorizontal = new BooleanParameter("Flip Horizontal", "flipHorizontal", VERSION_HINT, false, "Flips the visualiser horizontally.");
+
+    std::shared_ptr<Effect> screenSaturationEffect = std::make_shared<Effect>(
+        new EffectParameter(
+            "Screen Saturation",
+            "Controls how saturated the colours are on the oscilloscope screen.",
+            "screenSaturation",
+            VERSION_HINT, 1.0, 0.0, 5.0
+        )
+    );
+    std::shared_ptr<StereoEffect> stereoEffectApplication = std::make_shared<StereoEffect>();
+    std::shared_ptr<Effect> stereoEffect = std::make_shared<Effect>(
+        stereoEffectApplication,
+        new EffectParameter(
+            "Stereo",
+            "Turns mono audio that is uninteresting to visualise into stereo audio that is interesting to visualise.",
+            "stereo",
+            VERSION_HINT, 0.0, 0.0, 1.0
+        )
+    );
+    std::shared_ptr<Effect> scaleEffect = std::make_shared<Effect>(
+        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+            input.scale(values[0].load(), values[1].load(), 1.0);
+            return input;
+        }, std::vector<EffectParameter*>{
+        new EffectParameter(
+            "X Scale",
+            "Controls the horizontal scale of the oscilloscope display.",
+            "xScale",
+            VERSION_HINT, 1.0, -3.0, 3.0
+        ),
+            new EffectParameter(
+                "Y Scale",
+                "Controls the vertical scale of the oscilloscope display.",
+                "yScale",
+                VERSION_HINT, 1.0, -3.0, 3.0
+            ),
+    });
+    std::shared_ptr<Effect> offsetEffect = std::make_shared<Effect>(
+        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+            input.translate(values[0].load(), values[1].load(), 0.0);
+            return input;
+        }, std::vector<EffectParameter*>{
+        new EffectParameter(
+            "X Offset",
+            "Controls the horizontal position offset of the oscilloscope display.",
+            "xOffset",
+            VERSION_HINT, 0.0, -1.0, 1.0
+        ),
+        new EffectParameter(
+            "Y Offset",
+            "Controls the vertical position offset of the oscilloscope display.",
+            "yOffset",
+            VERSION_HINT, 0.0, -1.0, 1.0
+        ),
+    });
+#endif
+
     std::shared_ptr<Effect> persistenceEffect = std::make_shared<Effect>(
         new EffectParameter(
             "Persistence",
@@ -122,14 +183,6 @@ public:
             "Line Saturation",
             "Controls how saturated the colours are on the oscilloscope lines.",
             "lineSaturation",
-            VERSION_HINT, 1.0, 0.0, 5.0
-        )
-    );
-    std::shared_ptr<Effect> screenSaturationEffect = std::make_shared<Effect>(
-        new EffectParameter(
-            "Screen Saturation",
-            "Controls how saturated the colours are on the oscilloscope screen.",
-            "screenSaturation",
             VERSION_HINT, 1.0, 0.0, 5.0
         )
     );
@@ -191,9 +244,39 @@ public:
         )
     );
     
-    std::vector<std::shared_ptr<Effect>> effects = {persistenceEffect, hueEffect, intensityEffect, lineSaturationEffect, screenSaturationEffect, focusEffect, noiseEffect, glowEffect, ambientEffect, sweepMsEffect, triggerValueEffect};
-    std::vector<BooleanParameter*> booleans = {upsamplingEnabled, visualiserFullScreen, sweepEnabled};
-    std::vector<IntParameter*> integers = {screenOverlay};
+    std::vector<std::shared_ptr<Effect>> effects = {
+        persistenceEffect,
+        hueEffect,
+        intensityEffect,
+        lineSaturationEffect,
+        focusEffect,
+        noiseEffect,
+        glowEffect,
+        ambientEffect,
+        sweepMsEffect,
+        triggerValueEffect,
+    };
+    std::vector<std::shared_ptr<Effect>> audioEffects = {
+        smoothEffect,
+#if SOSCI_FEATURES
+        screenSaturationEffect,
+        stereoEffect,
+        scaleEffect,
+        offsetEffect,
+#endif
+    };
+    std::vector<BooleanParameter*> booleans = {
+        upsamplingEnabled,
+        visualiserFullScreen,
+        sweepEnabled,
+#if SOSCI_FEATURES
+        flipVertical,
+        flipHorizontal,
+#endif
+    };
+    std::vector<IntParameter*> integers = {
+        screenOverlay,
+    };
 };
 
 class VisualiserSettings : public juce::Component, public juce::AudioProcessorParameter::Listener {
@@ -222,9 +305,19 @@ public:
         return parameters.lineSaturationEffect->getActualValue();
     }
 
+#if SOSCI_FEATURES
     double getScreenSaturation() {
         return parameters.screenSaturationEffect->getActualValue();
     }
+
+    bool isFlippedVertical() {
+        return parameters.flipVertical->getBoolValue();
+    }
+
+    bool isFlippedHorizontal() {
+        return parameters.flipHorizontal->getBoolValue();
+    }
+#endif
     
     double getFocus() {
         return parameters.focusEffect->getActualValue() / 100;
@@ -270,7 +363,6 @@ private:
     EffectComponent persistence{*parameters.persistenceEffect};
     EffectComponent hue{*parameters.hueEffect};
     EffectComponent lineSaturation{*parameters.lineSaturationEffect};
-    EffectComponent screenSaturation{*parameters.screenSaturationEffect};
     EffectComponent focus{*parameters.focusEffect};
     EffectComponent noise{*parameters.noiseEffect};
     EffectComponent glow{*parameters.glowEffect};
@@ -284,6 +376,18 @@ private:
     
     jux::SwitchButton upsamplingToggle{parameters.upsamplingEnabled};
     jux::SwitchButton sweepToggle{parameters.sweepEnabled};
+
+#if SOSCI_FEATURES
+    EffectComponent screenSaturation{*parameters.screenSaturationEffect};
+    EffectComponent stereo{*parameters.stereoEffect};
+    EffectComponent xScale{*parameters.scaleEffect, 0};
+    EffectComponent yScale{*parameters.scaleEffect, 1};
+    EffectComponent xOffset{*parameters.offsetEffect, 0};
+    EffectComponent yOffset{*parameters.offsetEffect, 1};
+
+    jux::SwitchButton flipVerticalToggle{parameters.flipVertical};
+    jux::SwitchButton flipHorizontalToggle{parameters.flipHorizontal};
+#endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserSettings)
 };
