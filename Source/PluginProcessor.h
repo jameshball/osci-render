@@ -77,7 +77,7 @@ public:
             "Trace Length",
             "Defines how much of the frame is drawn per cycle. This has the effect of 'tracing' out the image from a single dot when animated. By default, we draw the whole frame, corresponding to a value of 1.0.",
             "traceLength",
-            VERSION_HINT, 1.0, 0.0, 1.0
+            VERSION_HINT, 1.0, 0.0, 1.0, 0.01f, 0.005
         )
     );
     std::shared_ptr<Effect> traceStart = std::make_shared<Effect>(
@@ -85,7 +85,7 @@ public:
             "Trace Start",
             "Defines how far into the frame the drawing is started at. This has the effect of 'tracing' out the image from a single dot when animated. By default, we start drawing from the beginning of the frame, so this value is 0.0.",
             "traceStart",
-            VERSION_HINT, 0.0, 0.0, 1.0
+            VERSION_HINT, 0.0, 0.0, 1.0, 0.01f, 0.005
         )
     );
 
