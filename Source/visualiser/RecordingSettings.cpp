@@ -11,6 +11,8 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
     addAndMakeVisible(recordVideo);
     addAndMakeVisible(compressionPreset);
     addAndMakeVisible(compressionPresetLabel);
+    addAndMakeVisible(customSharedTextureOutputLabel);
+    addAndMakeVisible(customSharedTextureOutputEditor);
     
     quality.setSliderOnValueChange();
     quality.setRangeEnabled(false);
@@ -34,6 +36,12 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
     compressionPreset.addItemList(parameters.compressionPresets, 1);
     compressionPreset.setSelectedId(parameters.compressionPresets.indexOf(parameters.compressionPreset) + 1);
     compressionPresetLabel.setTooltip("The compression preset to use when recording video. Slower presets will produce smaller files at the expense of encoding time.");
+    
+    customSharedTextureOutputLabel.setTooltip("Custom name for when creating a new Syphon/Spout server. WARNING: You should not use the same name when running multiple servers at once!.");
+    customSharedTextureOutputEditor.setText(parameters.customSharedTextureServerName);
+    customSharedTextureOutputEditor.onTextChange = [this] {
+        parameters.customSharedTextureServerName = customSharedTextureOutputEditor.getText();
+    };
 #else
     addAndMakeVisible(recordVideoWarning);
     addAndMakeVisible(sosciLink);
@@ -61,8 +69,13 @@ void RecordingSettings::resized() {
     recordAudio.setBounds(area.removeFromTop(rowHeight));
     recordVideo.setBounds(area.removeFromTop(rowHeight));
     auto row = area.removeFromTop(rowHeight);
-    compressionPresetLabel.setBounds(row.removeFromLeft(140));
-    compressionPreset.setBounds(row.removeFromRight(80));
+    compressionPresetLabel.setBounds(row.removeFromLeft(170));
+    compressionPreset.setBounds(row.removeFromRight(100));
+    
+    area.removeFromTop(5);
+    row = area.removeFromTop(rowHeight);
+    customSharedTextureOutputLabel.setBounds(row.removeFromLeft(170));
+    customSharedTextureOutputEditor.setBounds(row.removeFromRight(100));
 #else
     recordVideoWarning.setBounds(area.removeFromTop(2 * rowHeight));
     area.removeFromTop(rowHeight / 2);

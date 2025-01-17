@@ -45,6 +45,7 @@ public:
         recordAudio.save(settingsXml->createNewChildElement("recordAudio"));
         recordVideo.save(settingsXml->createNewChildElement("recordVideo"));
         settingsXml->setAttribute("compressionPreset", compressionPreset);
+        settingsXml->setAttribute("customSharedTextureServerName", customSharedTextureServerName);
         
         auto qualityXml = settingsXml->createNewChildElement("quality");
         qualityEffect.save(qualityXml);
@@ -65,6 +66,9 @@ public:
             if (settingsXml->hasAttribute("compressionPreset")) {
                 compressionPreset = settingsXml->getStringAttribute("compressionPreset");
             }
+            if (settingsXml->hasAttribute("customSharedTextureServerName")) {
+                customSharedTextureServerName = settingsXml->getStringAttribute("customSharedTextureServerName");
+            }
             if (auto* qualityXml = settingsXml->getChildByName("quality")) {
                 qualityEffect.load(qualityXml);
             }
@@ -72,6 +76,7 @@ public:
     }
    
     juce::StringArray compressionPresets = { "ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow" };
+    juce::String customSharedTextureServerName = "";
 };
 
 class RecordingSettings : public juce::Component {
@@ -102,6 +107,13 @@ public:
     juce::String getCompressionPreset() {
         return parameters.compressionPreset;
     }
+    
+    juce::String getCustomSharedTextureServerName() {
+        if (parameters.customSharedTextureServerName.isEmpty()) {
+            return "osci-render - " + juce::String(juce::Time::getCurrentTime().toMilliseconds());
+        }
+        return parameters.customSharedTextureServerName;
+    }
 
     RecordingParameters& parameters;
 
@@ -119,6 +131,9 @@ private:
 
     juce::Label compressionPresetLabel{"Compression Speed", "Compression Speed"};
     juce::ComboBox compressionPreset;
+    
+    juce::Label customSharedTextureOutputLabel{"Custom Syphon/Spout Name", "Custom Syphon/Spout Name"};
+    juce::TextEditor customSharedTextureOutputEditor{"customSharedTextureOutputEditor"};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RecordingSettings)
 };

@@ -125,6 +125,7 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 	};
 
 	BooleanParameter* visualiserFullScreen = audioProcessor.visualiserParameters.visualiserFullScreen;
+    pluginEditor.visualiser.setFullScreen(visualiserFullScreen->getBoolValue());
 
     addAndMakeVisible(pluginEditor.visualiser);
 	pluginEditor.visualiser.setFullScreenCallback([this, visualiserFullScreen](FullScreenMode mode) {
@@ -135,6 +136,8 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 		} else if (mode == FullScreenMode::MAIN_COMPONENT) {
 			visualiserFullScreen->setBoolValueNotifyingHost(false);
         }
+        
+        pluginEditor.visualiser.setFullScreen(visualiserFullScreen->getBoolValue());
 		
 		pluginEditor.resized();
 		pluginEditor.repaint();
@@ -229,9 +232,9 @@ void MainComponent::resized() {
         auto shiftedBounds = bounds;
         shiftedBounds.setX(topLeft.getX());
         shiftedBounds.setY(topLeft.getY());
-        if (minDim < 35) {
-            minDim = 35;
-        }
+        //if (minDim < 35) {
+        //    minDim = 35;
+        //}
 		pluginEditor.visualiser.setBounds(shiftedBounds.withSizeKeepingCentre(minDim - 25, minDim));
 	}
 }

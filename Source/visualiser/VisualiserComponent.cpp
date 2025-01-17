@@ -115,8 +115,24 @@ VisualiserComponent::VisualiserComponent(
         popoutWindow();
     };
 
+    if (visualiserOnly && juce::JUCEApplication::isStandaloneApp()) {
+        addAndMakeVisible(audioInputButton);
+        audioInputButton.setTooltip("Appears red when audio input is being used. Click to enable audio input and close any open audio files.");
+        audioInputButton.setClickingTogglesState(false);
+        audioInputButton.setToggleState(!audioPlayer.isInitialised(), juce::NotificationType::dontSendNotification);
+        audioPlayer.onParserChanged = [this] {
+            juce::MessageManager::callAsync([this] {
+                audioInputButton.setToggleState(!audioPlayer.isInitialised(), juce::NotificationType::dontSendNotification);
+            });
+        };
+        audioInputButton.onClick = [this] {
+            audioProcessor.stopAudioFile();
+        };
+    }
+
     addAndMakeVisible(audioPlayer);
-    
+    audioPlayer.addMouseListener(static_cast<juce::Component*>(this), true);
+
     openGLContext.setRenderer(this);
     openGLContext.attachTo(*this);
 
@@ -134,6 +150,13 @@ VisualiserComponent::~VisualiserComponent() {
     });
 }
 
+void VisualiserComponent::setFullScreen(bool fullScreen) {
+    this->fullScreen = fullScreen;
+    hideButtonRow = false;
+    setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    resized();
+}
+
 void VisualiserComponent::setFullScreenCallback(std::function<void(FullScreenMode)> callback) {
     fullScreenCallback = callback;
 }
@@ -146,12 +169,21 @@ void VisualiserComponent::enableFullScreen() {
 }
 
 void VisualiserComponent::mouseDoubleClick(const juce::MouseEvent& event) {
-    enableFullScreen();
+    if (event.originalComponent == this) {
+        enableFullScreen();
+    }
 }
 
 void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
     {
         juce::CriticalSection::ScopedLockType lock(samplesLock);
+        
+        // copy the points before applying effects
+        audioOutputBuffer.setSize(2, points.size(), false, true, true);
+        for (int i = 0; i < points.size(); ++i) {
+            audioOutputBuffer.setSample(0, i, points[i].x);
+            audioOutputBuffer.setSample(1, i, points[i].y);
+        }
         
         xSamples.clear();
         ySamples.clear();
@@ -186,11 +218,21 @@ void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
                 sampleCount++;
             }
         } else {
-            for (auto& point : points) {
-                OsciPoint smoothPoint = settings.parameters.smoothEffect->apply(0, point);
-                xSamples.push_back(smoothPoint.x);
-                ySamples.push_back(smoothPoint.y);
-                zSamples.push_back(smoothPoint.z);
+            for (OsciPoint point : points) {
+                for (auto& effect : settings.parameters.audioEffects) {
+                    point = effect->apply(0, point);
+                }
+#if SOSCI_FEATURES
+                if (settings.isFlippedHorizontal()) {
+                    point.x = -point.x;
+                }
+                if (settings.isFlippedVertical()) {
+                    point.y = -point.y;
+                }
+#endif
+                xSamples.push_back(point.x);
+                ySamples.push_back(point.y);
+                zSamples.push_back(point.z);
             }
         }
         
@@ -230,7 +272,7 @@ void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
     
     // this just triggers a repaint
     triggerAsyncUpdate();
-    // wait for rendering to complete
+    // wait for rendering on the OpenGLRenderer thread to complete
     renderingSemaphore.acquire();
 }
 
@@ -264,9 +306,49 @@ void VisualiserComponent::setPaused(bool paused) {
     repaint();
 }
 
+void VisualiserComponent::mouseDrag(const juce::MouseEvent& event) {
+    timerId = -1;
+}
+
+void VisualiserComponent::mouseMove(const juce::MouseEvent& event) {
+    if (event.getScreenX() == lastMouseX && event.getScreenY() == lastMouseY) {
+        return;
+    }
+    hideButtonRow = false;
+    setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    
+    if (fullScreen) {
+        if (!getScreenBounds().removeFromBottom(25).contains(event.getScreenX(), event.getScreenY()) && !event.mods.isLeftButtonDown()) {
+            lastMouseX = event.getScreenX();
+            lastMouseY = event.getScreenY();
+            
+            int newTimerId = juce::Random::getSystemRandom().nextInt();
+            timerId = newTimerId;
+            auto pos = event.getScreenPosition();
+            auto parent = this->parent;
+            
+            juce::WeakReference<VisualiserComponent> weakRef = this;
+            juce::Timer::callAfterDelay(1000, [this, weakRef, newTimerId, pos, parent]() {
+                if (weakRef) {
+                    if (parent == nullptr || parent->child == this) {
+                        if (timerId == newTimerId && fullScreen) {
+                            hideButtonRow = true;
+                            setMouseCursor(juce::MouseCursor::NoCursor);
+                            resized();
+                        }
+                    }
+                }
+            });
+        }
+        resized();
+    }
+}
+
 void VisualiserComponent::mouseDown(const juce::MouseEvent& event) {
-    if (event.mods.isLeftButtonDown() && child == nullptr && !record.getToggleState()) {
-        setPaused(active);
+    if (event.originalComponent == this) {
+        if (event.mods.isLeftButtonDown() && child == nullptr && !record.getToggleState()) {
+            setPaused(active);
+        }
     }
 }
 
@@ -275,6 +357,9 @@ bool VisualiserComponent::keyPressed(const juce::KeyPress& key) {
         if (fullScreenCallback) {
             fullScreenCallback(FullScreenMode::MAIN_COMPONENT);
         }
+        return true;
+    } else if (key.isKeyCode(juce::KeyPress::spaceKey)) {
+        setPaused(active);
         return true;
     }
 
@@ -412,7 +497,11 @@ void VisualiserComponent::setRecording(bool recording) {
 
 void VisualiserComponent::resized() {
     auto area = getLocalBounds();
-    buttonRow = area.removeFromBottom(25);
+    if (fullScreen && hideButtonRow) {
+        buttonRow = area.removeFromBottom(0);
+    } else {
+        buttonRow = area.removeFromBottom(25);
+    }
     auto buttons = buttonRow;
     if (parent == nullptr) {
         fullScreenButton.setBounds(buttons.removeFromRight(30));
@@ -425,6 +514,9 @@ void VisualiserComponent::resized() {
         settingsButton.setBounds(buttons.removeFromRight(30));
     } else {
         settingsButton.setVisible(false);
+    }
+    if (visualiserOnly && juce::JUCEApplication::isStandaloneApp()) {
+        audioInputButton.setBounds(buttons.removeFromRight(30));
     }
 #if SOSCI_FEATURES
     sharedTextureButton.setBounds(buttons.removeFromRight(30));
@@ -501,7 +593,7 @@ void VisualiserComponent::childUpdated() {
 
 #if SOSCI_FEATURES
 void VisualiserComponent::initialiseSharedTexture() {
-    sharedTextureSender = sharedTextureManager.addSender("osci-render - " + juce::String(juce::Time::getCurrentTime().toMilliseconds()), renderTexture.width, renderTexture.height);
+    sharedTextureSender = sharedTextureManager.addSender(recordingSettings.getCustomSharedTextureServerName(), renderTexture.width, renderTexture.height);
     sharedTextureSender->initGL();
     sharedTextureSender->setSharedTextureId(renderTexture.id);
     sharedTextureSender->setDrawFunction([this] {
@@ -649,11 +741,7 @@ void VisualiserComponent::renderOpenGL() {
                 }
 #endif
                 if (recordingAudio) {
-                    if (settings.isSweepEnabled()) {
-                        audioRecorder.audioThreadCallback(ySamples, ySamples);
-                    } else {
-                        audioRecorder.audioThreadCallback(xSamples, ySamples);
-                    }
+                    audioRecorder.audioThreadCallback(audioOutputBuffer);
                 }
             }
             
@@ -740,7 +828,8 @@ void VisualiserComponent::setupTextures() {
     blur4Texture = makeTexture(128, 128);
     renderTexture = makeTexture(1024, 1024);
     
-    screenTexture = createScreenTexture();
+    screenOpenGLTexture.loadImage(emptyScreenImage);
+    screenTexture = { screenOpenGLTexture.getTextureID(), screenTextureImage.getWidth(), screenTextureImage.getHeight() };
     
 #if SOSCI_FEATURES
     glowTexture = makeTexture(512, 512);
@@ -901,7 +990,6 @@ void VisualiserComponent::drawLine(const std::vector<float>& xPoints, const std:
     
     setAdditiveBlending();
     
-    // TODO: need to add the last point from the previous frame to the start of the frame so they connect?
     int nPoints = xPoints.size();
 
     // Without this, there's an access violation that seems to occur only on some systems
@@ -1029,7 +1117,11 @@ void VisualiserComponent::drawCRT() {
     setShader(outputShader.get());
     outputShader->setUniform("uExposure", 0.25f);
     outputShader->setUniform("uLineSaturation", (float) settings.getLineSaturation());
+#if SOSCI_FEATURES
     outputShader->setUniform("uScreenSaturation", (float) settings.getScreenSaturation());
+#else
+    outputShader->setUniform("uScreenSaturation", 1.0f);
+#endif
     outputShader->setUniform("uNoise", (float) settings.getNoise());
     outputShader->setUniform("uRandom", juce::Random::getSystemRandom().nextFloat());
     outputShader->setUniform("uGlow", (float) settings.getGlow());
@@ -1102,12 +1194,16 @@ Texture VisualiserComponent::createScreenTexture() {
     } else {
         screenOpenGLTexture.loadImage(emptyScreenImage);
     }
+    checkGLErrors(__FILE__, __LINE__);
     Texture texture = { screenOpenGLTexture.getTextureID(), screenTextureImage.getWidth(), screenTextureImage.getHeight() };
     
     if (screenOverlay == ScreenOverlay::Graticule || screenOverlay == ScreenOverlay::SmudgedGraticule) {
         activateTargetTexture(texture);
+        checkGLErrors(__FILE__, __LINE__);
         setNormalBlending();
+        checkGLErrors(__FILE__, __LINE__);
         setShader(simpleShader.get());
+        checkGLErrors(__FILE__, __LINE__);
         glColorMask(true, false, false, true);
         
         std::vector<float> data;
@@ -1153,9 +1249,9 @@ Texture VisualiserComponent::createScreenTexture() {
         glBufferData(GL_ARRAY_BUFFER, sizeof(float) * data.size(), data.data(), GL_STATIC_DRAW);
         glVertexAttribPointer(glGetAttribLocation(simpleShader->getProgramID(), "vertexPosition"), 2, GL_FLOAT, GL_FALSE, 0, nullptr);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
-        simpleShader->setUniform("colour", 0.01f, 0.1f, 0.01f, 1.0f);
+        simpleShader->setUniform("colour", 0.01f, 0.05f, 0.01f, 1.0f);
         glLineWidth(2.0f);
-        glDrawArrays(GL_LINES, 0, data.size());
+        glDrawArrays(GL_LINES, 0, data.size() / 2);
         glBindTexture(GL_TEXTURE_2D, targetTexture.value().id);
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     }
@@ -1163,7 +1259,7 @@ Texture VisualiserComponent::createScreenTexture() {
     return texture;
 }
 
-void VisualiserComponent::checkGLErrors(const juce::String& location) {
+void VisualiserComponent::checkGLErrors(juce::String file, int line) {
     using namespace juce::gl;
     
     GLenum error;
@@ -1179,7 +1275,7 @@ void VisualiserComponent::checkGLErrors(const juce::String& location) {
             case GL_INVALID_FRAMEBUFFER_OPERATION: errorMessage = "GL_INVALID_FRAMEBUFFER_OPERATION"; break;
             default: errorMessage = "Unknown OpenGL error"; break;
         }
-        DBG("OpenGL error at " + location + ": " + errorMessage);
+        DBG("OpenGL error at " + file + ":" + juce::String(line) + " - " + errorMessage);
     }
 }
 
@@ -1217,7 +1313,7 @@ void VisualiserComponent::renderScope(const std::vector<float>& xPoints, const s
     renderScale = (float)openGLContext.getRenderingScale();
 
     drawLineTexture(xPoints, yPoints, zPoints);
-    checkGLErrors("drawLineTexture");
+    checkGLErrors(__FILE__, __LINE__);
     drawCRT();
-    checkGLErrors("drawCRT");
+    checkGLErrors(__FILE__, __LINE__);
 }

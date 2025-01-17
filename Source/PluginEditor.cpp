@@ -151,7 +151,7 @@ void OscirenderAudioProcessorEditor::resized() {
         bool luaFileOpen = false;
         
         if (ableToEditFile) {
-            if (codeEditors[index]->isVisible()) {
+            if (index < codeEditors.size() && codeEditors[index]->isVisible()) {
                 editorVisible = true;
 
                 juce::Component dummy;
@@ -197,7 +197,9 @@ void OscirenderAudioProcessorEditor::resized() {
 
         collapseButton.setVisible(ableToEditFile);
 
-        codeEditors[index]->setVisible(fileOpen);
+        if (index < codeEditors.size()) {
+            codeEditors[index]->setVisible(fileOpen);
+        }
         resizerBar.setVisible(fileOpen);
 
         console.setVisible(luaFileOpen);

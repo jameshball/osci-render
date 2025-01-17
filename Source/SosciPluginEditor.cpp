@@ -4,7 +4,9 @@
 
 SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p) : CommonPluginEditor(p, "sosci", "sosci", 1180, 750), audioProcessor(p) {
     initialiseMenuBar(model);
-    addAndMakeVisible(volume);
+    if (juce::JUCEApplication::isStandaloneApp()) {
+        addAndMakeVisible(volume);
+    }
     addAndMakeVisible(visualiserSettingsWrapper);
 
     BooleanParameter* visualiserFullScreen = audioProcessor.visualiserParameters.visualiserFullScreen;
@@ -24,9 +26,21 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p) : CommonPluginEdito
 
     resized();
     visualiserFullScreen->addListener(this);
+
+    if (juce::JUCEApplication::isStandaloneApp()) {
+        juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
+        juce::AudioDeviceManager& manager = standalone->deviceManager;
+        manager.addChangeListener(this);
+        currentInputDevice = getInputDeviceName();
+    }
 }
 
 SosciPluginEditor::~SosciPluginEditor() {
+    if (juce::JUCEApplication::isStandaloneApp()) {
+        juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
+        juce::AudioDeviceManager& manager = standalone->deviceManager;
+        manager.removeChangeListener(this);
+    }
     audioProcessor.visualiserParameters.visualiserFullScreen->removeListener(this);
     menuBar.setModel(nullptr);
 }
@@ -43,11 +57,13 @@ void SosciPluginEditor::resized() {
     } else {
         menuBar.setBounds(area.removeFromTop(25));
 
-        auto volumeArea = area.removeFromLeft(30);
-        volume.setBounds(volumeArea.withSizeKeepingCentre(volumeArea.getWidth(), juce::jmin(volumeArea.getHeight(), 300)));
+        if (juce::JUCEApplication::isStandaloneApp()) {
+            auto volumeArea = area.removeFromLeft(30);
+            volume.setBounds(volumeArea.withSizeKeepingCentre(volumeArea.getWidth(), juce::jmin(volumeArea.getHeight(), 300)));
+        }
 
         auto settingsArea = area.removeFromRight(juce::jmax(juce::jmin(0.4 * getWidth(), 550.0), 350.0));
-        visualiserSettings.setSize(settingsArea.getWidth(), 550);
+        visualiserSettings.setSize(settingsArea.getWidth(), VISUALISER_SETTINGS_HEIGHT);
         visualiserSettingsWrapper.setBounds(settingsArea);
 
         if (area.getWidth() < 10) {
@@ -83,8 +99,12 @@ void SosciPluginEditor::filesDropped(const juce::StringArray& files, int x, int 
 
 void SosciPluginEditor::visualiserFullScreenChanged() {
     bool fullScreen = audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue();
+    
+    visualiser.setFullScreen(fullScreen);
 
-    volume.setVisible(!fullScreen);
+    if (juce::JUCEApplication::isStandaloneApp()) {
+        volume.setVisible(!fullScreen);
+    }
     visualiserSettingsWrapper.setVisible(!fullScreen);
     menuBar.setVisible(!fullScreen);
     resized();
@@ -98,3 +118,28 @@ void SosciPluginEditor::parameterValueChanged(int parameterIndex, float newValue
 }
 
 void SosciPluginEditor::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
+
+void SosciPluginEditor::changeListenerCallback(juce::ChangeBroadcaster* source) {
+    if (juce::JUCEApplication::isStandaloneApp()) {
+        juce::String inputDevice = getInputDeviceName();
+        if (inputDevice != currentInputDevice) {
+            currentInputDevice = inputDevice;
+            // switch to getting audio from input if the user changes the input device
+            // because we assume they are debugging and want to hear the audio from mic
+            audioProcessor.stopAudioFile();
+        }
+    }
+}
+
+juce::String SosciPluginEditor::getInputDeviceName() {
+    if (juce::StandalonePluginHolder::getInstance() == nullptr) {
+        return "Unknown";
+    }
+    juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
+    juce::AudioDeviceManager& manager = standalone->deviceManager;
+    auto device = manager.getCurrentAudioDevice();
+    auto deviceType = manager.getCurrentDeviceTypeObject();
+    int inputIndex = deviceType->getIndexOfDevice(device, true);
+    auto inputName = deviceType->getDeviceNames(true)[inputIndex];
+    return inputName;
+}
