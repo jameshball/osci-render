@@ -3,7 +3,7 @@
 #include <JuceHeader.h>
 #include "BooleanParameter.h"
 
-#define SMOOTHING_SPEED_CONSTANT 0.0005
+#define SMOOTHING_SPEED_CONSTANT 0.0003
 #define SMOOTHING_SPEED_MIN 0.0001
 
 class FloatParameter : public juce::AudioProcessorParameterWithID {
@@ -26,7 +26,8 @@ public:
 		return label;
 	}
 
-	// returns value in range [0, 1]
+	// returns value in 
+	// [0, 1]
 	float getNormalisedValue(float value) const {
 		// clip value to valid range
 		auto min = this->min.load();
@@ -402,5 +403,5 @@ public:
 		}
     }
 
-	EffectParameter(juce::String name, juce::String description, juce::String id, int versionHint, float value, float min, float max, float step = 0.01, double smoothValueChange = SMOOTHING_SPEED_CONSTANT) : FloatParameter(name, id, versionHint, value, min, max, step), smoothValueChange(smoothValueChange), description(description) {}
+	EffectParameter(juce::String name, juce::String description, juce::String id, int versionHint, float value, float min, float max, float step = 0.001, double smoothValueChange = SMOOTHING_SPEED_CONSTANT) : FloatParameter(name, id, versionHint, value, min, max, step), smoothValueChange(smoothValueChange), description(description) {}
 };
