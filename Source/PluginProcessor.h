@@ -68,25 +68,25 @@ public:
             "Frequency",
             "Controls how many times per second the image is drawn, thereby controlling the pitch of the sound. Lower frequencies result in more-accurately drawn images, but more flickering, and vice versa.",
             "frequency",
-            VERSION_HINT, 220.0, 0.0, 12000.0
+            VERSION_HINT, 220.0, 0.0, 4200.0
         )
     );
     
-    std::shared_ptr<Effect> traceMax = std::make_shared<Effect>(
-        new EffectParameter(
-            "Trace max",
-            "Defines the maximum proportion of the image that is drawn before skipping to the next frame. This has the effect of 'tracing' out the image from a single dot when animated. By default, we draw until the end of the frame, so this value is 1.0.",
-            "traceMax",
-            VERSION_HINT, 0.75, 0.0, 1.0
-        )
-    );
-    std::shared_ptr<Effect> traceMin = std::make_shared<Effect>(
-        new EffectParameter(
-            "Trace min",
-            "Defines the proportion of the image that drawing starts from. This has the effect of 'tracing' out the image from a single dot when animated. By default, we start drawing from the beginning of the frame, so this value is 0.0.",
-            "traceMin",
-            VERSION_HINT, 0.25, 0.0, 1.0
-        )
+    std::shared_ptr<Effect> trace = std::make_shared<Effect>(
+        std::vector<EffectParameter*>{
+            new EffectParameter(
+                "Trace Start",
+                "Defines how far into the frame the drawing is started at. This has the effect of 'tracing' out the image from a single dot when animated. By default, we start drawing from the beginning of the frame, so this value is 0.0.",
+                "traceStart",
+                VERSION_HINT, 0.0, 0.0, 1.0, 0.001, 0.001
+            ),
+            new EffectParameter(
+                "Trace Length",
+                "Defines how much of the frame is drawn per cycle. This has the effect of 'tracing' out the image from a single dot when animated. By default, we draw the whole frame, corresponding to a value of 1.0.",
+                "traceLength",
+                VERSION_HINT, 1.0, 0.0, 1.0, 0.001, 0.001
+            ),
+        }
     );
 
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();

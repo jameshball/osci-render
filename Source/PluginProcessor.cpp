@@ -121,8 +121,8 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
         }
     ));
     toggleableEffects.push_back(custom);
-    toggleableEffects.push_back(traceMax);
-    toggleableEffects.push_back(traceMin);
+    toggleableEffects.push_back(trace);
+    trace->getParameter("traceLength")->lfo->setUnnormalisedValueNotifyingHost((int) LfoType::Sawtooth);
 
     for (int i = 0; i < toggleableEffects.size(); i++) {
         auto effect = toggleableEffects[i];
