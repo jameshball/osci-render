@@ -421,6 +421,14 @@ void VisualiserComponent::setRecording(bool recording) {
                 " -y" +
                 " -pix_fmt yuv420p" +
                 " -crf " + juce::String(recordingSettings.getCRF()) +
+#if JUCE_MAC
+    #if JUCE_ARM
+                // use software encoding on Apple Silicon
+                " -c:v hevc_videotoolbox" +
+                " -q:v " + juce::String(recordingSettings.getVideoToolboxQuality()) +
+                " -tag:v hvc1" +
+    #endif
+#endif
                 " -vf vflip" +
                 " \"" + tempVideoFile->getFile().getFullPathName() + "\"";
 
@@ -821,12 +829,12 @@ void VisualiserComponent::setupTextures() {
     glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
 
     // Create textures
-    lineTexture = makeTexture(1024, 1024);
+    lineTexture = makeTexture(2048, 2048);
     blur1Texture = makeTexture(512, 512);
     blur2Texture = makeTexture(512, 512);
     blur3Texture = makeTexture(128, 128);
     blur4Texture = makeTexture(128, 128);
-    renderTexture = makeTexture(1024, 1024);
+    renderTexture = makeTexture(2048, 2048);
     
     screenOpenGLTexture.loadImage(emptyScreenImage);
     screenTexture = { screenOpenGLTexture.getTextureID(), screenTextureImage.getWidth(), screenTextureImage.getHeight() };
@@ -1072,7 +1080,7 @@ void VisualiserComponent::drawCRT() {
 
     activateTargetTexture(blur1Texture);
     setShader(texturedShader.get());
-    texturedShader->setUniform("uResizeForCanvas", lineTexture.width / 1024.0f);
+    texturedShader->setUniform("uResizeForCanvas", lineTexture.width / 2048.0f);
     drawTexture({lineTexture});
 
     //horizontal blur 512x512
@@ -1131,7 +1139,7 @@ void VisualiserComponent::drawCRT() {
     outputShader->setUniform("uFishEye", screenOverlay == ScreenOverlay::VectorDisplay ? VECTOR_DISPLAY_FISH_EYE : 0.0f);
     outputShader->setUniform("uRealScreen", settings.parameters.screenOverlay->isRealisticDisplay() ? 1.0f : 0.0f);
 #endif
-    outputShader->setUniform("uResizeForCanvas", lineTexture.width / 1024.0f);
+    outputShader->setUniform("uResizeForCanvas", lineTexture.width / 2048.0f);
     juce::Colour colour = juce::Colour::fromHSV(settings.getHue() / 360.0f, 1.0, 1.0, 1.0);
     outputShader->setUniform("uColour", colour.getFloatRed(), colour.getFloatGreen(), colour.getFloatBlue());
     drawTexture({
@@ -1250,7 +1258,7 @@ Texture VisualiserComponent::createScreenTexture() {
         glVertexAttribPointer(glGetAttribLocation(simpleShader->getProgramID(), "vertexPosition"), 2, GL_FLOAT, GL_FALSE, 0, nullptr);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         simpleShader->setUniform("colour", 0.01f, 0.05f, 0.01f, 1.0f);
-        glLineWidth(2.0f);
+        glLineWidth(4.0f);
         glDrawArrays(GL_LINES, 0, data.size() / 2);
         glBindTexture(GL_TEXTURE_2D, targetTexture.value().id);
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);

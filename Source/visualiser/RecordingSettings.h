@@ -95,6 +95,14 @@ public:
         // not supported by all media players)
         return 50 * (1.0 - quality) + 1;
     }
+    
+    int getVideoToolboxQuality() {
+        if (parameters.losslessVideo.getBoolValue()) {
+            return 100;
+        }
+        double quality = juce::jlimit(0.0, 1.0, parameters.qualityEffect.getValue());
+        return 100 * quality;
+    }
 
     bool recordingVideo() {
         return parameters.recordVideo.getBoolValue();

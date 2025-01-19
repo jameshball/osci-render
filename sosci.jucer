@@ -32,13 +32,13 @@
         <FILE id="ZgcesA" name="no_reflection.jpg" compile="0" resource="1"
               file="Resources/oscilloscope/no_reflection.jpg"/>
         <FILE id="dNtZYs" name="noise.jpg" compile="0" resource="1" file="Resources/oscilloscope/noise.jpg"/>
-        <FILE id="xxXx4Q" name="real.jpg" compile="0" resource="1" file="Resources/oscilloscope/real.jpg"/>
-        <FILE id="nuEXXn" name="real_reflection.jpg" compile="0" resource="1"
-              file="Resources/oscilloscope/real_reflection.jpg"/>
-        <FILE id="bdQp0Q" name="vector_display.jpg" compile="0" resource="1"
-              file="Resources/oscilloscope/vector_display.jpg"/>
-        <FILE id="XojumY" name="vector_display_reflection.jpg" compile="0"
-              resource="1" file="Resources/oscilloscope/vector_display_reflection.jpg"/>
+        <FILE id="LAmlcm" name="real.png" compile="0" resource="1" file="Resources/oscilloscope/real.png"/>
+        <FILE id="FKUOID" name="real_reflection.png" compile="0" resource="1"
+              file="Resources/oscilloscope/real_reflection.png"/>
+        <FILE id="P9kYdq" name="vector_display.png" compile="0" resource="1"
+              file="Resources/oscilloscope/vector_display.png"/>
+        <FILE id="IiqBke" name="vector_display_reflection.png" compile="0"
+              resource="1" file="Resources/oscilloscope/vector_display_reflection.png"/>
       </GROUP>
       <GROUP id="{08DE8F94-4A00-7C71-4AF3-4C34C821A5DF}" name="sosci">
         <FILE id="jtOYDo" name="clean.sosci" compile="0" resource="1" file="Resources/sosci/clean.sosci"/>
