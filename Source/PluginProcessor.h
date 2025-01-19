@@ -72,21 +72,21 @@ public:
         )
     );
     
-    std::shared_ptr<Effect> traceLength = std::make_shared<Effect>(
-        new EffectParameter(
-            "Trace Length",
-            "Defines how much of the frame is drawn per cycle. This has the effect of 'tracing' out the image from a single dot when animated. By default, we draw the whole frame, corresponding to a value of 1.0.",
-            "traceLength",
-            VERSION_HINT, 1.0, 0.0, 1.0, 0.001, 0.001
-        )
-    );
-    std::shared_ptr<Effect> traceStart = std::make_shared<Effect>(
-        new EffectParameter(
-            "Trace Start",
-            "Defines how far into the frame the drawing is started at. This has the effect of 'tracing' out the image from a single dot when animated. By default, we start drawing from the beginning of the frame, so this value is 0.0.",
-            "traceStart",
-            VERSION_HINT, 0.0, 0.0, 1.0, 0.001, 0.001
-        )
+    std::shared_ptr<Effect> trace = std::make_shared<Effect>(
+        std::vector<EffectParameter*>{
+            new EffectParameter(
+                "Trace Start",
+                "Defines how far into the frame the drawing is started at. This has the effect of 'tracing' out the image from a single dot when animated. By default, we start drawing from the beginning of the frame, so this value is 0.0.",
+                "traceStart",
+                VERSION_HINT, 0.0, 0.0, 1.0, 0.001, 0.001
+            ),
+            new EffectParameter(
+                "Trace Length",
+                "Defines how much of the frame is drawn per cycle. This has the effect of 'tracing' out the image from a single dot when animated. By default, we draw the whole frame, corresponding to a value of 1.0.",
+                "traceLength",
+                VERSION_HINT, 1.0, 0.0, 1.0, 0.001, 0.001
+            ),
+        }
     );
 
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
