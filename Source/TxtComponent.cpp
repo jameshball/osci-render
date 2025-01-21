@@ -23,8 +23,9 @@ TxtComponent::TxtComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 			audioProcessor.font.setBold(bold.getToggleState());
 			audioProcessor.font.setItalic(italic.getToggleState());
 		}
-		
-		audioProcessor.openFile(audioProcessor.currentFile);
+		if (audioProcessor.currentFileId > 0 && audioProcessor.parsers[audioProcessor.currentFileId - 1]->getText() != nullptr) {
+			audioProcessor.openFile(audioProcessor.currentFile);
+		}
     };
 
 	font.onChange = updateFont;

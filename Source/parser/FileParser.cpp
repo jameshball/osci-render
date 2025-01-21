@@ -30,7 +30,22 @@ void FileParser::parse(juce::String fileId, juce::String extension, std::unique_
 	} else if (extension == ".lua") {
 		lua = std::make_shared<LuaParser>(fileId, stream->readEntireStreamAsString(), errorCallback, fallbackLuaScript);
 	} else if (extension == ".gpla") {
-		gpla = std::make_shared<LineArtParser>(stream->readEntireStreamAsString());
+		juce::MemoryBlock buffer{};
+		int bytesRead = stream->readIntoMemoryBlock(buffer);
+		if (bytesRead < 8) return;
+		char* gplaData = (char*)buffer.getData();
+		const char tag[] = "GPLA    ";
+		bool isBinary = true;
+		for (int i = 0; i < 8; i++) {
+			isBinary = isBinary && tag[i] == gplaData[i];
+		}
+		if (isBinary) {
+			gpla = std::make_shared<LineArtParser>(gplaData, bytesRead);
+		}
+		else {
+			stream->setPosition(0);
+			gpla = std::make_shared<LineArtParser>(stream->readEntireStreamAsString());
+		}
 	} else if (extension == ".gif" || extension == ".png" || extension == ".jpg" || extension == ".jpeg") {
 		juce::MemoryBlock buffer{};
 		int bytesRead = stream->readIntoMemoryBlock(buffer);

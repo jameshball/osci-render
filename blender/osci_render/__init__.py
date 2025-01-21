@@ -1,7 +1,7 @@
 bl_info = {
     "name": "osci-render",
     "author": "James Ball", 
-    "version": (1, 0, 3),
+    "version": (1, 1, 0),
     "blender": (3, 1, 2),
     "location": "View3D",
     "description": "Addon to send gpencil frames over to osci-render",
@@ -16,6 +16,7 @@ import bmesh
 import socket
 import json
 import atexit
+import struct
 from bpy.props import StringProperty
 from bpy.app.handlers import persistent
 from bpy_extras.io_utils import ImportHelper
@@ -26,9 +27,14 @@ PORT = 51677
 sock = None
 
 
+GPLA_MAJOR = 2
+GPLA_MINOR = 0
+GPLA_PATCH = 0
+
+
 class OBJECT_PT_osci_render_settings(bpy.types.Panel):
     bl_idname = "OBJECT_PT_osci_render_settings"
-    bl_label = "osci-render settings"
+    bl_label = "DEVELOPMENT osci-render settings"
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = "render"
@@ -157,28 +163,136 @@ def get_frame_info():
     frame_info["focalLength"] = -0.05 * bpy.data.cameras[0].lens
 
     return frame_info
-    
+
 @persistent
 def save_scene_to_file(scene, file_path):
     return_frame = scene.frame_current
+    bin = bytearray()
     
-    scene_info = {"frames": []}
-    for frame in range(0, scene.frame_end - scene.frame_start):
+    # header
+    bin.extend(("GPLA    ").encode("utf8"))
+    bin.extend(GPLA_MAJOR.to_bytes(8, "little"))
+    bin.extend(GPLA_MINOR.to_bytes(8, "little"))
+    bin.extend(GPLA_PATCH.to_bytes(8, "little"))
+    
+    # file info
+    bin.extend(("FILE    ").encode("utf8"))
+    bin.extend(("fCount  ").encode("utf8"))
+    bin.extend((scene.frame_end - scene.frame_start + 1).to_bytes(8, "little"))
+    bin.extend(("fRate   ").encode("utf8"))
+    bin.extend(scene.render.fps.to_bytes(8, "little"))
+    bin.extend(("DONE    ").encode("utf8"))
+    
+    for frame in range(0, scene.frame_end - scene.frame_start + 1):
         scene.frame_set(frame + scene.frame_start)
-        scene_info["frames"].append(get_frame_info())
-
-    json_str = json.dumps(scene_info, separators=(',', ':'))
+        bin.extend(get_frame_info_binary())
+    
+    bin.extend(("END GPLA").encode("utf8"))
     
     if file_path is not None:
-        f = open(file_path, "w")
-        f.write(json_str)
-        f.close()
+        with open(file_path, "wb") as f:
+            f.write(bytes(bin))
     else:
         return 1
-        
+    
     scene.frame_set(return_frame)
     return 0
 
+def get_frame_info_binary():
+    frame_info = bytearray() 
+    frame_info.extend(("FRAME   ").encode("utf8"))
+    
+    frame_info.extend(("focalLen").encode("utf8"))
+    frame_info.extend(struct.pack("d", -0.05 * bpy.data.cameras[0].lens))
+    
+    frame_info.extend(("OBJECTS ").encode("utf8"))
+    
+    if (bpy.app.version[0] > 4) or (bpy.app.version[0] == 4 and bpy.app.version[1] >= 3):
+        for obj in bpy.data.objects:
+            if obj.visible_get() and obj.type == 'GREASEPENCIL':
+                frame_info.extend(("OBJECT  ").encode("utf8"))
+                
+                # matrix
+                frame_info.extend(("MATRIX  ").encode("utf8"))
+                camera_space = bpy.context.scene.camera.matrix_world.inverted() @ obj.matrix_world
+                for i in range(4):
+                    for j in range(4):
+                        frame_info.extend(struct.pack("d", camera_space[i][j]))
+                frame_info.extend(("DONE    ").encode("utf8"))
+                
+                # strokes
+                frame_info.extend(("STROKES ").encode("utf8"))
+                strokes = obj.data.layers.active.frames.data.current_frame().drawing.strokes
+                for stroke in strokes:
+                    frame_info.extend(("STROKE  ").encode("utf8"))
+                    
+                    frame_info.extend(("vertexCt").encode("utf8"))
+                    frame_info.extend(len(stroke.points).to_bytes(8, "little"))
+                    
+                    frame_info.extend(("VERTICES").encode("utf8"))
+                    for vert in stroke.points:
+                        frame_info.extend(struct.pack("d", vert.position.x))
+                        frame_info.extend(struct.pack("d", vert.position.y))
+                        frame_info.extend(struct.pack("d", vert.position.z))
+                    # VERTICES
+                    frame_info.extend(("DONE    ").encode("utf8"))
+                
+                    # STROKE
+                    frame_info.extend(("DONE    ").encode("utf8"))
+                
+                # STROKES
+                frame_info.extend(("DONE    ").encode("utf8"))
+                
+                # OBJECT
+                frame_info.extend(("DONE    ").encode("utf8"))
+    else:
+        for obj in bpy.data.objects: 
+            if obj.visible_get() and obj.type == 'GPENCIL':
+                frame_info.extend(("OBJECT  ").encode("utf8"))
+                
+                # matrix
+                frame_info.extend(("MATRIX  ").encode("utf8"))
+                camera_space = bpy.context.scene.camera.matrix_world.inverted() @ obj.matrix_world
+                for i in range(4):
+                    for j in range(4):
+                        frame_info.extend(camera_space[i][j].to_bytes(8, "little"))
+                # MATRIX
+                frame_info.extend(("DONE    ").encode("utf8"))
+                
+                # strokes
+                frame_info.extend(("STROKES ").encode("utf8"))
+                strokes = obj.data.layers.active.frames.data.active_frame.strokes
+                for stroke in strokes:
+                    frame_info.extend(("STROKE  ").encode("utf8"))
+                    
+                    frame_info.extend(("vertexCt").encode("utf8"))
+                    frame_info.extend(len(stroke.points).to_bytes(8, "little"))
+                    
+                    frame_info.extend(("VERTICES").encode("utf8"))
+                    for vert in stroke.points:
+                        frame_info.extend(struct.pack("d", vert.co[0]))
+                        frame_info.extend(struct.pack("d", vert.co[1]))
+                        frame_info.extend(struct.pack("d", vert.co[2]))
+                    # VERTICES
+                    frame_info.extend(("DONE    ").encode("utf8"))
+                
+                    # STROKE
+                    frame_info.extend(("DONE    ").encode("utf8"))
+                
+                # STROKES
+                frame_info.extend(("DONE    ").encode("utf8"))
+                
+                # OBJECT
+                frame_info.extend(("DONE    ").encode("utf8"))
+    
+    # OBJECTS
+    frame_info.extend(("DONE    ").encode("utf8"))
+    
+    # FRAME
+    frame_info.extend(("DONE    ").encode("utf8"))
+    
+    return frame_info
+    
 
 @persistent
 def send_scene_to_osci_render(scene):

@@ -5,8 +5,207 @@ LineArtParser::LineArtParser(juce::String json) {
     parseJsonFrames(json);
 }
 
+LineArtParser::LineArtParser(char* data, int dataLength) {
+    parseBinaryFrames(data, dataLength);
+    if (numFrames == 0) {
+        parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
+    }
+}
+
 LineArtParser::~LineArtParser() {
     frames.clear();
+}
+
+double LineArtParser::makeDouble(int64_t data) {
+    return *(double*)&data;
+}
+
+void LineArtParser::makeChars(int64_t data, char* chars) {
+    for (int i = 0; i < 8; i++) {
+        chars[i] = (data >> (i * 8)) & 0xFF;
+    }
+}
+
+void LineArtParser::parseBinaryFrames(char* bytes, int bytesLength) {
+    frames.clear();
+    numFrames = 0;
+    int64_t* data = (int64_t*)bytes;
+    int dataLength = bytesLength / 4;
+
+    int index = 0;
+    int64_t rawData = data[index];
+    index++;
+
+    char tag[9] = "        ";
+    makeChars(rawData, tag);
+
+    if (strcmp(tag, "GPLA    ") != 0) return;
+
+    // Major
+    rawData = data[index];
+    index++;
+    // Minor
+    rawData = data[index];
+    index++;
+    // Patch
+    rawData = data[index];
+    index++;
+
+    rawData = data[index];
+    index++;
+    makeChars(rawData, tag);
+    if (strcmp(tag, "FILE    ") != 0) return;
+
+    int reportedNumFrames = 0;
+    int frameRate = 0;
+
+    rawData = data[index];
+    index++;
+    makeChars(rawData, tag);
+
+    while (strcmp(tag, "DONE    ") != 0) {
+        rawData = data[index];
+        index++;
+
+        if (strcmp(tag, "fCount  ") == 0) {
+            reportedNumFrames = rawData;
+        } else if (strcmp(tag, "fRate   ") == 0) {
+            frameRate = rawData;
+        }
+
+        rawData = data[index];
+        index++;
+        makeChars(rawData, tag);
+    }
+
+    rawData = data[index];
+    index++;
+    makeChars(rawData, tag);
+    
+    while (strcmp(tag, "END GPLA") != 0) {
+        if (strcmp(tag, "FRAME   ") == 0) {
+            std::vector<std::vector<double>> allMatrices;
+            std::vector<std::vector<std::vector<OsciPoint>>> allVertices;
+            double focalLength;
+            rawData = data[index];
+            index++;
+            makeChars(rawData, tag);
+            while (strcmp(tag, "OBJECTS ") != 0) {
+                rawData = data[index];
+                index++;
+
+                if (strcmp(tag, "focalLen") == 0) {
+                    focalLength = makeDouble(rawData);
+                }
+
+                rawData = data[index];
+                index++;
+                makeChars(rawData, tag);
+            }
+
+            rawData = data[index];
+            index++;
+            makeChars(rawData, tag);
+            
+            while (strcmp(tag, "DONE    ") != 0) {
+                if (strcmp(tag, "OBJECT  ") == 0) {
+                    std::vector<std::vector<OsciPoint>> vertices;
+                    std::vector<double> matrix;
+                    int strokeNum = 0;
+                    rawData = data[index];
+                    index++;
+                    makeChars(rawData, tag);
+                    while (strcmp(tag, "DONE    ") != 0) {
+                        if (strcmp(tag, "MATRIX  ") == 0) {
+                            matrix.clear();
+                            for (int i = 0; i < 16; i++) {
+                                rawData = data[index];
+                                index++;
+                                matrix.push_back(makeDouble(rawData));
+                            }
+                            rawData = data[index];
+                            index++;
+                        } else if (strcmp(tag, "STROKES ") == 0) {
+                            rawData = data[index];
+                            index++;
+                            makeChars(rawData, tag);
+
+                            while (strcmp(tag, "DONE    ") != 0) {
+                                if (strcmp(tag, "STROKE  ") == 0) {
+                                    vertices.push_back(std::vector<OsciPoint>());
+                                    rawData = data[index];
+                                    index++;
+                                    makeChars(rawData, tag);
+
+                                    int vertexCount = 0;
+                                    while (strcmp(tag, "DONE    ") != 0) {
+                                        if (strcmp(tag, "vertexCt") == 0) {
+                                            rawData = data[index];
+                                            index++;
+                                            vertexCount = rawData;
+                                        }
+                                        else if (strcmp(tag, "VERTICES") == 0) {
+                                            double x = 0;
+                                            double y = 0;
+                                            double z = 0;
+                                            for (int i = 0; i < vertexCount; i++) {
+                                                rawData = data[index];
+                                                index++;
+                                                x = makeDouble(rawData);
+
+                                                rawData = data[index];
+                                                index++;
+                                                y = makeDouble(rawData);
+
+                                                rawData = data[index];
+                                                index++;
+                                                z = makeDouble(rawData);
+
+                                                vertices[strokeNum].push_back(OsciPoint(x, y, z));
+                                            }
+                                            rawData = data[index];
+                                            index++;
+                                            makeChars(rawData, tag);
+                                            while (strcmp(tag, "DONE    ") != 0) {
+                                                rawData = data[index];
+                                                index++;
+                                                makeChars(rawData, tag);
+                                            }
+                                        }
+                                        rawData = data[index];
+                                        index++;
+                                        makeChars(rawData, tag);
+                                    }
+                                    strokeNum++;
+                                }
+                                rawData = data[index];
+                                index++;
+                                makeChars(rawData, tag);
+                            }
+                        }
+                        rawData = data[index];
+                        index++;
+                        makeChars(rawData, tag);
+                    }
+                    allVertices.push_back(reorderVertices(vertices));
+                    allMatrices.push_back(matrix);
+                    vertices.clear();
+                    matrix.clear();
+                }
+                rawData = data[index];
+                index++;
+                makeChars(rawData, tag);
+            }
+            
+            frames.push_back(assembleFrame(allVertices, allMatrices, focalLength));
+        }
+
+        rawData = data[index];
+        index++;
+        makeChars(rawData, tag);
+    }
+    numFrames = frames.size();
+    return;
 }
 
 void LineArtParser::parseJsonFrames(juce::String jsonStr) {
@@ -97,6 +296,50 @@ std::vector<std::unique_ptr<Shape>> LineArtParser::draw() {
     return tempShapes;
 }
 
+std::vector<std::vector<OsciPoint>> LineArtParser::reorderVertices(std::vector<std::vector<OsciPoint>> vertices) {
+    std::vector<std::vector<OsciPoint>> reorderedVertices;
+
+    if (vertices.size() > 0) {
+        std::vector<bool> visited = std::vector<bool>(vertices.size(), false);
+        std::vector<int> order = std::vector<int>(vertices.size(), 0);
+        visited[0] = true;
+
+        auto endPoint = vertices[0].back();
+
+        for (int i = 1; i < vertices.size(); i++) {
+            int minPath = 0;
+            double minDistance = 9999999;
+            for (int j = 0; j < vertices.size(); j++) {
+                if (!visited[j]) {
+                    auto startPoint = vertices[j][0];
+
+                    double diffX = endPoint.x - startPoint.x;
+                    double diffY = endPoint.y - startPoint.y;
+                    double diffZ = endPoint.z - startPoint.z;
+
+                    double distance = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
+                    if (distance < minDistance) {
+                        minPath = j;
+                        minDistance = distance;
+                    }
+                }
+            }
+            visited[minPath] = true;
+            order[i] = minPath;
+            endPoint = vertices[minPath].back();
+        }
+
+        for (int i = 0; i < vertices.size(); i++) {
+            std::vector<OsciPoint> reorderedVertex;
+            int index = order[i];
+            for (int j = 0; j < vertices[index].size(); j++) {
+                reorderedVertex.push_back(vertices[index][j]);
+            }
+            reorderedVertices.push_back(reorderedVertex);
+        }
+    }
+    return reorderedVertices;
+}
 
 std::vector<Line> LineArtParser::generateFrame(juce::Array <juce::var> objects, double focalLength)
 {
@@ -124,55 +367,16 @@ std::vector<Line> LineArtParser::generateFrame(juce::Array <juce::var> objects, 
             allMatrices[i].push_back(value);
         }
 
-        std::vector<std::vector<OsciPoint>> reorderedVertices;
-
-        if (vertices.size() > 0 && matrix.size() == 16) {
-            std::vector<bool> visited = std::vector<bool>(vertices.size(), false);
-            std::vector<int> order = std::vector<int>(vertices.size(), 0);
-            visited[0] = true;
-
-            auto endPoint = vertices[0].back();
-
-            for (int i = 1; i < vertices.size(); i++) {
-                int minPath = 0;
-                double minDistance = 9999999;
-                for (int j = 0; j < vertices.size(); j++) {
-                    if (!visited[j]) {
-                        auto startPoint = vertices[j][0];
-
-                        double diffX = endPoint.x - startPoint.x;
-                        double diffY = endPoint.y - startPoint.y;
-                        double diffZ = endPoint.z - startPoint.z;
-
-                        double distance = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
-                        if (distance < minDistance) {
-                            minPath = j;
-                            minDistance = distance;
-                        }
-                    }
-                }
-                visited[minPath] = true;
-                order[i] = minPath;
-                endPoint = vertices[minPath].back();
-            }
-
-            for (int i = 0; i < vertices.size(); i++) {
-                std::vector<OsciPoint> reorderedVertex;
-                int index = order[i];
-                for (int j = 0; j < vertices[index].size(); j++) {
-                    reorderedVertex.push_back(vertices[index][j]);
-                }
-                reorderedVertices.push_back(reorderedVertex);
-            }
-        }
-
-        allVertices.push_back(reorderedVertices);
+        allVertices.push_back(reorderVertices(vertices));
     }
+    return assembleFrame(allVertices, allMatrices, focalLength);
+}
 
+std::vector<Line> LineArtParser::assembleFrame(std::vector<std::vector<std::vector<OsciPoint>>> allVertices, std::vector<std::vector<double>> allMatrices, double focalLength) {
     // generate a frame from the vertices and matrix
     std::vector<Line> frame;
 
-    for (int i = 0; i < objects.size(); i++) {
+    for (int i = 0; i < allVertices.size(); i++) {
         for (int j = 0; j < allVertices[i].size(); j++) {
             for (int k = 0; k < allVertices[i][j].size() - 1; k++) {
                 auto start = allVertices[i][j][k];
