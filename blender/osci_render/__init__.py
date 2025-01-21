@@ -134,22 +134,27 @@ def append_matrix(object_info, obj):
 def get_frame_info():
     frame_info = {"objects": []}    
     if (bpy.app.version[0] > 4) or (bpy.app.version[0] == 4 and bpy.app.version[1] >= 3):
-        for obj in bpy.data.objects:
-            if obj.visible_get() and obj.type == 'GREASEPENCIL':                
-                object_info = {"name": obj.name}
-                strokes = obj.data.layers.active.frames.data.current_frame().drawing.strokes
-                object_info["vertices"] = []
-                for stroke in strokes:
-                    object_info["vertices"].append([{
-                        "x": vert.position.x,
-                        "y": vert.position.y,
-                        "z": vert.position.z,
-                    } for vert in stroke.points])
-                frame_info["objects"].append(append_matrix(object_info, obj))
+        for object in bpy.data.objects:
+            if object.visible_get() and object.type == 'GREASEPENCIL':
+                dg =  bpy.context.evaluated_depsgraph_get()
+                obj = object.evaluated_get(dg)
+                object_info = {"name": object.name}
+                for layer in obj.data.layers:
+                    strokes = layer.frames.data.current_frame().drawing.strokes
+                    object_info["vertices"] = []
+                    for stroke in strokes:
+                        object_info["vertices"].append([{
+                            "x": vert.position.x,
+                            "y": vert.position.y,
+                            "z": vert.position.z,
+                        } for vert in stroke.points])
+                    frame_info["objects"].append(append_matrix(object_info, object))
     else:
-        for obj in bpy.data.objects: 
-            if obj.visible_get() and obj.type == 'GPENCIL':
-                object_info = {"name": obj.name}
+        for object in bpy.data.objects: 
+            if object.visible_get() and object.type == 'GPENCIL':
+                dg = bpy.context.evaluated_depsgraph_get()
+                obj = object.evaluated_get(dg)
+                object_info = {"name": object.name}
                 strokes = obj.data.layers.active.frames.data.active_frame.strokes
                 object_info["vertices"] = []
                 for stroke in strokes:
@@ -208,8 +213,10 @@ def get_frame_info_binary():
     frame_info.extend(("OBJECTS ").encode("utf8"))
     
     if (bpy.app.version[0] > 4) or (bpy.app.version[0] == 4 and bpy.app.version[1] >= 3):
-        for obj in bpy.data.objects:
-            if obj.visible_get() and obj.type == 'GREASEPENCIL':
+        for object in bpy.data.objects:
+            if object.visible_get() and object.type == 'GREASEPENCIL':
+                dg =  bpy.context.evaluated_depsgraph_get()
+                obj = object.evaluated_get(dg)
                 frame_info.extend(("OBJECT  ").encode("utf8"))
                 
                 # matrix
@@ -246,8 +253,10 @@ def get_frame_info_binary():
                 # OBJECT
                 frame_info.extend(("DONE    ").encode("utf8"))
     else:
-        for obj in bpy.data.objects: 
-            if obj.visible_get() and obj.type == 'GPENCIL':
+        for object in bpy.data.objects: 
+            if object.visible_get() and obj.type == 'GPENCIL':
+                dg =  bpy.context.evaluated_depsgraph_get()
+                obj = object.evaluated_get(dg)
                 frame_info.extend(("OBJECT  ").encode("utf8"))
                 
                 # matrix
