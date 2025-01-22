@@ -17,6 +17,7 @@ import socket
 import json
 import atexit
 import struct
+import base64
 from bpy.props import StringProperty
 from bpy.app.handlers import persistent
 from bpy_extras.io_utils import ImportHelper
@@ -125,53 +126,7 @@ def close_osci_render():
         except socket.error as exp:
             sock = None
 
-
-def append_matrix(object_info, obj):
-    camera_space = bpy.context.scene.camera.matrix_world.inverted() @ obj.matrix_world
-    object_info["matrix"] = [camera_space[i][j] for i in range(4) for j in range(4)]
-    return object_info
-
-def get_frame_info():
-    frame_info = {"objects": []}    
-    if (bpy.app.version[0] > 4) or (bpy.app.version[0] == 4 and bpy.app.version[1] >= 3):
-        for object in bpy.data.objects:
-            if object.visible_get() and object.type == 'GREASEPENCIL':
-                dg =  bpy.context.evaluated_depsgraph_get()
-                obj = object.evaluated_get(dg)
-                object_info = {"name": object.name}
-                for layer in obj.data.layers:
-                    strokes = layer.frames.data.current_frame().drawing.strokes
-                    object_info["vertices"] = []
-                    for stroke in strokes:
-                        object_info["vertices"].append([{
-                            "x": vert.position.x,
-                            "y": vert.position.y,
-                            "z": vert.position.z,
-                        } for vert in stroke.points])
-                    frame_info["objects"].append(append_matrix(object_info, object))
-    else:
-        for object in bpy.data.objects: 
-            if object.visible_get() and object.type == 'GPENCIL':
-                dg = bpy.context.evaluated_depsgraph_get()
-                obj = object.evaluated_get(dg)
-                object_info = {"name": object.name}
-                strokes = obj.data.layers.active.frames.data.active_frame.strokes
-                object_info["vertices"] = []
-                for stroke in strokes:
-                    object_info["vertices"].append([{
-                        "x": vert.co[0],
-                        "y": vert.co[1],
-                        "z": vert.co[2],
-                    } for vert in stroke.points])
-                frame_info["objects"].append(append_matrix(object_info, obj))
-    
-    frame_info["focalLength"] = -0.05 * bpy.data.cameras[0].lens
-
-    return frame_info
-
-@persistent
-def save_scene_to_file(scene, file_path):
-    return_frame = scene.frame_current
+def get_gpla_file_allframes(scene):
     bin = bytearray()
     
     # header
@@ -193,6 +148,37 @@ def save_scene_to_file(scene, file_path):
         bin.extend(get_frame_info_binary())
     
     bin.extend(("END GPLA").encode("utf8"))
+    
+    return bin
+    
+def get_gpla_file(scene):
+    bin = bytearray()
+    
+    # header
+    bin.extend(("GPLA    ").encode("utf8"))
+    bin.extend(GPLA_MAJOR.to_bytes(8, "little"))
+    bin.extend(GPLA_MINOR.to_bytes(8, "little"))
+    bin.extend(GPLA_PATCH.to_bytes(8, "little"))
+    
+    # file info
+    bin.extend(("FILE    ").encode("utf8"))
+    bin.extend(("fCount  ").encode("utf8"))
+    bin.extend((scene.frame_end - scene.frame_start + 1).to_bytes(8, "little"))
+    bin.extend(("fRate   ").encode("utf8"))
+    bin.extend(scene.render.fps.to_bytes(8, "little"))
+    bin.extend(("DONE    ").encode("utf8"))
+    
+    bin.extend(get_frame_info_binary())
+    
+    bin.extend(("END GPLA").encode("utf8"))
+    
+    return bin
+    
+@persistent
+def save_scene_to_file(scene, file_path):
+    return_frame = scene.frame_current
+    
+    bin = get_gpla_file_allframes(scene)
     
     if file_path is not None:
         with open(file_path, "wb") as f:
@@ -308,11 +294,9 @@ def send_scene_to_osci_render(scene):
     global sock
 
     if sock is not None:
-        frame_info = get_frame_info()
-
-        json_str = json.dumps(frame_info, separators=(',', ':')) + '\n'
+        bin = get_gpla_file(scene)
         try:
-            sock.sendall(json_str.encode('utf-8'))
+            sock.sendall(base64.b64encode(bytes(bin)) + "\n".encode("utf8"))
         except socket.error as exp:
             sock = None
 

@@ -2,14 +2,18 @@
 
 
 LineArtParser::LineArtParser(juce::String json) {
-    parseJsonFrames(json);
+    frames.clear();
+    numFrames = 0;
+    frames = parseJsonFrames(json);
+    numFrames = frames.size();
 }
 
 LineArtParser::LineArtParser(char* data, int dataLength) {
-    parseBinaryFrames(data, dataLength);
-    if (numFrames == 0) {
-        parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
-    }
+    frames.clear();
+    numFrames = 0;
+    frames = parseBinaryFrames(data, dataLength);
+    numFrames = frames.size();
+    if (numFrames == 0) frames = epicFail();
 }
 
 LineArtParser::~LineArtParser() {
@@ -26,11 +30,16 @@ void LineArtParser::makeChars(int64_t data, char* chars) {
     }
 }
 
-void LineArtParser::parseBinaryFrames(char* bytes, int bytesLength) {
-    frames.clear();
-    numFrames = 0;
+std::vector<std::vector<Line>> LineArtParser::epicFail() {
+    return parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
+}
+
+std::vector<std::vector<Line>> LineArtParser::parseBinaryFrames(char* bytes, int bytesLength) {
     int64_t* data = (int64_t*)bytes;
-    int dataLength = bytesLength / 4;
+    int dataLength = bytesLength / 8;
+    std::vector<std::vector<Line>> tFrames;
+
+    if (dataLength < 4) return epicFail();
 
     int index = 0;
     int64_t rawData = data[index];
@@ -39,31 +48,37 @@ void LineArtParser::parseBinaryFrames(char* bytes, int bytesLength) {
     char tag[9] = "        ";
     makeChars(rawData, tag);
 
-    if (strcmp(tag, "GPLA    ") != 0) return;
+    if (strcmp(tag, "GPLA    ") != 0) return epicFail();
 
     // Major
+    if (index >= dataLength) return epicFail();
     rawData = data[index];
     index++;
     // Minor
+    if (index >= dataLength) return epicFail();
     rawData = data[index];
     index++;
     // Patch
+    if (index >= dataLength) return epicFail();
     rawData = data[index];
     index++;
 
+    if (index >= dataLength) return epicFail();
     rawData = data[index];
     index++;
     makeChars(rawData, tag);
-    if (strcmp(tag, "FILE    ") != 0) return;
+    if (strcmp(tag, "FILE    ") != 0) return epicFail();
 
     int reportedNumFrames = 0;
     int frameRate = 0;
 
+    if (index >= dataLength) return epicFail();
     rawData = data[index];
     index++;
     makeChars(rawData, tag);
 
     while (strcmp(tag, "DONE    ") != 0) {
+        if (index >= dataLength) return epicFail();
         rawData = data[index];
         index++;
 
@@ -73,24 +88,29 @@ void LineArtParser::parseBinaryFrames(char* bytes, int bytesLength) {
             frameRate = rawData;
         }
 
+        if (index >= dataLength) return epicFail();
         rawData = data[index];
         index++;
         makeChars(rawData, tag);
     }
 
+    if (index >= dataLength) return epicFail();
     rawData = data[index];
     index++;
     makeChars(rawData, tag);
     
     while (strcmp(tag, "END GPLA") != 0) {
         if (strcmp(tag, "FRAME   ") == 0) {
-            std::vector<std::vector<double>> allMatrices;
-            std::vector<std::vector<std::vector<OsciPoint>>> allVertices;
-            double focalLength;
+            if (index >= dataLength) return epicFail();
             rawData = data[index];
             index++;
             makeChars(rawData, tag);
+
+            double focalLength;
+            std::vector<std::vector<double>> allMatrices;
+            std::vector<std::vector<std::vector<OsciPoint>>> allVertices;
             while (strcmp(tag, "OBJECTS ") != 0) {
+                if (index >= dataLength) return epicFail();
                 rawData = data[index];
                 index++;
 
@@ -98,11 +118,13 @@ void LineArtParser::parseBinaryFrames(char* bytes, int bytesLength) {
                     focalLength = makeDouble(rawData);
                 }
 
+                if (index >= dataLength) return epicFail();
                 rawData = data[index];
                 index++;
                 makeChars(rawData, tag);
             }
 
+            if (index >= dataLength) return epicFail();
             rawData = data[index];
             index++;
             makeChars(rawData, tag);
@@ -111,6 +133,7 @@ void LineArtParser::parseBinaryFrames(char* bytes, int bytesLength) {
                 if (strcmp(tag, "OBJECT  ") == 0) {
                     std::vector<std::vector<OsciPoint>> vertices;
                     std::vector<double> matrix;
+                    if (index >= dataLength) return epicFail();
                     int strokeNum = 0;
                     rawData = data[index];
                     index++;
@@ -119,13 +142,16 @@ void LineArtParser::parseBinaryFrames(char* bytes, int bytesLength) {
                         if (strcmp(tag, "MATRIX  ") == 0) {
                             matrix.clear();
                             for (int i = 0; i < 16; i++) {
+                                if (index >= dataLength) return epicFail();
                                 rawData = data[index];
                                 index++;
                                 matrix.push_back(makeDouble(rawData));
                             }
+                            if (index >= dataLength) return epicFail();
                             rawData = data[index];
                             index++;
                         } else if (strcmp(tag, "STROKES ") == 0) {
+                            if (index >= dataLength) return epicFail();
                             rawData = data[index];
                             index++;
                             makeChars(rawData, tag);
@@ -133,6 +159,7 @@ void LineArtParser::parseBinaryFrames(char* bytes, int bytesLength) {
                             while (strcmp(tag, "DONE    ") != 0) {
                                 if (strcmp(tag, "STROKE  ") == 0) {
                                     vertices.push_back(std::vector<OsciPoint>());
+                                    if (index >= dataLength) return epicFail();
                                     rawData = data[index];
                                     index++;
                                     makeChars(rawData, tag);
@@ -140,6 +167,7 @@ void LineArtParser::parseBinaryFrames(char* bytes, int bytesLength) {
                                     int vertexCount = 0;
                                     while (strcmp(tag, "DONE    ") != 0) {
                                         if (strcmp(tag, "vertexCt") == 0) {
+                                            if (index >= dataLength) return epicFail();
                                             rawData = data[index];
                                             index++;
                                             vertexCount = rawData;
@@ -149,6 +177,7 @@ void LineArtParser::parseBinaryFrames(char* bytes, int bytesLength) {
                                             double y = 0;
                                             double z = 0;
                                             for (int i = 0; i < vertexCount; i++) {
+                                                if (index + 2 >= dataLength) return epicFail();
                                                 rawData = data[index];
                                                 index++;
                                                 x = makeDouble(rawData);
@@ -163,26 +192,31 @@ void LineArtParser::parseBinaryFrames(char* bytes, int bytesLength) {
 
                                                 vertices[strokeNum].push_back(OsciPoint(x, y, z));
                                             }
+                                            if (index >= dataLength) return epicFail();
                                             rawData = data[index];
                                             index++;
                                             makeChars(rawData, tag);
                                             while (strcmp(tag, "DONE    ") != 0) {
+                                                if (index >= dataLength) return epicFail();
                                                 rawData = data[index];
                                                 index++;
                                                 makeChars(rawData, tag);
                                             }
                                         }
+                                        if (index >= dataLength) return epicFail();
                                         rawData = data[index];
                                         index++;
                                         makeChars(rawData, tag);
                                     }
                                     strokeNum++;
                                 }
+                                if (index >= dataLength) return epicFail();
                                 rawData = data[index];
                                 index++;
                                 makeChars(rawData, tag);
                             }
                         }
+                        if (index >= dataLength) return epicFail();
                         rawData = data[index];
                         index++;
                         makeChars(rawData, tag);
@@ -192,25 +226,24 @@ void LineArtParser::parseBinaryFrames(char* bytes, int bytesLength) {
                     vertices.clear();
                     matrix.clear();
                 }
+                if (index >= dataLength) return epicFail();
                 rawData = data[index];
                 index++;
                 makeChars(rawData, tag);
             }
-            
-            frames.push_back(assembleFrame(allVertices, allMatrices, focalLength));
+            std::vector<Line> frame = assembleFrame(allVertices, allMatrices, focalLength);
+            tFrames.push_back(frame);
         }
-
+        if (index >= dataLength) return epicFail();
         rawData = data[index];
         index++;
         makeChars(rawData, tag);
     }
-    numFrames = frames.size();
-    return;
+    return tFrames;
 }
 
-void LineArtParser::parseJsonFrames(juce::String jsonStr) {
-    frames.clear();
-    numFrames = 0;
+std::vector<std::vector<Line>> LineArtParser::parseJsonFrames(juce::String jsonStr) {
+    std::vector<std::vector<Line>> frames;
 
     // format of json is:
     // {
@@ -243,19 +276,13 @@ void LineArtParser::parseJsonFrames(juce::String jsonStr) {
     auto json = juce::JSON::parse(jsonStr);
 
     // If json parse failed, stop and parse default fallback instead
-    if (json.isVoid()) {
-        parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
-        return;
-    }
+    if (json.isVoid()) return epicFail();
 
     auto jsonFrames = *json.getProperty("frames", juce::Array<juce::var>()).getArray();
-    numFrames = jsonFrames.size();
+    int numFrames = jsonFrames.size();
 
     // If json does not contain any frames, stop and parse no-frames fallback instead
-    if (numFrames == 0) {
-        parseJsonFrames(juce::String(BinaryData::noframes_gpla, BinaryData::noframes_gplaSize));
-        return;
-    }
+    if (numFrames == 0) return parseJsonFrames(juce::String(BinaryData::noframes_gpla, BinaryData::noframes_gplaSize));
 
     bool hasValidFrames = false;
 
@@ -275,10 +302,7 @@ void LineArtParser::parseJsonFrames(juce::String jsonStr) {
     }
 
     // If no frames were valid, stop and parse invalid fallback instead
-    if (!hasValidFrames) {
-        parseJsonFrames(juce::String(BinaryData::invalid_gpla, BinaryData::invalid_gplaSize));
-        return;
-    }
+    if (!hasValidFrames) return parseJsonFrames(juce::String(BinaryData::invalid_gpla, BinaryData::invalid_gplaSize));
 }
 
 void LineArtParser::setFrame(int fNum) {
