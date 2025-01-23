@@ -215,23 +215,25 @@ def get_frame_info_binary():
                 
                 # strokes
                 frame_info.extend(("STROKES ").encode("utf8"))
-                strokes = obj.data.layers.active.frames.data.current_frame().drawing.strokes
-                for stroke in strokes:
-                    frame_info.extend(("STROKE  ").encode("utf8"))
+                layers = obj.data.layers
+                for layer in layers:
+                    strokes = layer.frames.data.current_frame().drawing.strokes
+                    for stroke in strokes:
+                        frame_info.extend(("STROKE  ").encode("utf8"))
                     
-                    frame_info.extend(("vertexCt").encode("utf8"))
-                    frame_info.extend(len(stroke.points).to_bytes(8, "little"))
+                        frame_info.extend(("vertexCt").encode("utf8"))
+                        frame_info.extend(len(stroke.points).to_bytes(8, "little"))
                     
-                    frame_info.extend(("VERTICES").encode("utf8"))
-                    for vert in stroke.points:
-                        frame_info.extend(struct.pack("d", vert.position.x))
-                        frame_info.extend(struct.pack("d", vert.position.y))
-                        frame_info.extend(struct.pack("d", vert.position.z))
-                    # VERTICES
-                    frame_info.extend(("DONE    ").encode("utf8"))
+                        frame_info.extend(("VERTICES").encode("utf8"))
+                        for vert in stroke.points:
+                            frame_info.extend(struct.pack("d", vert.position.x))
+                            frame_info.extend(struct.pack("d", vert.position.y))
+                            frame_info.extend(struct.pack("d", vert.position.z))
+                        # VERTICES
+                        frame_info.extend(("DONE    ").encode("utf8"))
                 
-                    # STROKE
-                    frame_info.extend(("DONE    ").encode("utf8"))
+                        # STROKE
+                        frame_info.extend(("DONE    ").encode("utf8"))
                 
                 # STROKES
                 frame_info.extend(("DONE    ").encode("utf8"))
@@ -256,23 +258,25 @@ def get_frame_info_binary():
                 
                 # strokes
                 frame_info.extend(("STROKES ").encode("utf8"))
-                strokes = obj.data.layers.active.frames.data.active_frame.strokes
-                for stroke in strokes:
-                    frame_info.extend(("STROKE  ").encode("utf8"))
+                layers = obj.data.layers
+                for layer in layers:
+                    strokes = layer.frames.data.active_frame.strokes
+                    for stroke in strokes:
+                        frame_info.extend(("STROKE  ").encode("utf8"))
+                        
+                        frame_info.extend(("vertexCt").encode("utf8"))
+                        frame_info.extend(len(stroke.points).to_bytes(8, "little"))
+                        
+                        frame_info.extend(("VERTICES").encode("utf8"))
+                        for vert in stroke.points:
+                            frame_info.extend(struct.pack("d", vert.co[0]))
+                            frame_info.extend(struct.pack("d", vert.co[1]))
+                            frame_info.extend(struct.pack("d", vert.co[2]))
+                        # VERTICES
+                        frame_info.extend(("DONE    ").encode("utf8"))
                     
-                    frame_info.extend(("vertexCt").encode("utf8"))
-                    frame_info.extend(len(stroke.points).to_bytes(8, "little"))
-                    
-                    frame_info.extend(("VERTICES").encode("utf8"))
-                    for vert in stroke.points:
-                        frame_info.extend(struct.pack("d", vert.co[0]))
-                        frame_info.extend(struct.pack("d", vert.co[1]))
-                        frame_info.extend(struct.pack("d", vert.co[2]))
-                    # VERTICES
-                    frame_info.extend(("DONE    ").encode("utf8"))
-                
-                    # STROKE
-                    frame_info.extend(("DONE    ").encode("utf8"))
+                        # STROKE
+                        frame_info.extend(("DONE    ").encode("utf8"))
                 
                 # STROKES
                 frame_info.extend(("DONE    ").encode("utf8"))
