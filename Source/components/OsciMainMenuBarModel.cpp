@@ -32,7 +32,7 @@ OsciMainMenuBarModel::OsciMainMenuBarModel(OscirenderAudioProcessor& p, Oscirend
             "BUS ERROR Collective, for providing the source code for the Hilligoss encoder\n"
             "Jean Perbet (@jeanprbt) for the osci-render macOS icon\n"
             "All the community, for suggesting features and reporting issues!"
-        , &audioProcessor.objectServerPort);
+        );
         options.content.setOwned(about);
         options.content->setSize(500, 270);
         options.dialogTitle = "About";

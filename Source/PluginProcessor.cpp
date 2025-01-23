@@ -179,11 +179,6 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     synth.addSound(defaultSound);
 
     addAllParameters();
-
-    if (objectServerPort == 0) {
-        objectServerPort = juce::Random::getSystemRandom().nextInt(juce::Range<int>(51600, 51700));
-        objectServer.reload();
-    }
 }
 
 OscirenderAudioProcessor::~OscirenderAudioProcessor() {
@@ -405,10 +400,6 @@ void OscirenderAudioProcessor::setObjectServerRendering(bool enabled) {
         juce::MessageManagerLock lock;
         fileChangeBroadcaster.sendChangeMessage();
     }
-}
-
-void OscirenderAudioProcessor::setObjectServerPort(int port) {
-    objectServerPort = port;
 }
 
 void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
@@ -669,8 +660,6 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
     }
     xml->setAttribute("currentFile", currentFile);
 
-    xml->setAttribute("objectServerPort", objectServerPort);
-
     recordingParameters.save(xml.get());
 
     copyXmlToBinary(*xml, destData);
@@ -698,10 +687,6 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
 
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
-
-        // If a port is saved, use that one, otherwise choose a random port
-        objectServerPort = xml->getIntAttribute("objectServerPort", juce::Random::getSystemRandom().nextInt(juce::Range<int>(51600, 51700)));
-        objectServer.reload();
 
         auto effectsXml = xml->getChildByName("effects");
         if (effectsXml != nullptr) {
