@@ -10,6 +10,9 @@ public:
     ~ObjectServer();
 
     void run() override;
+    void reload();
+
+    int port = 51677;
 
 private:
     OscirenderAudioProcessor& audioProcessor;

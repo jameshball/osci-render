@@ -23,7 +23,6 @@ from bpy.app.handlers import persistent
 from bpy_extras.io_utils import ImportHelper
 
 HOST = "localhost"
-PORT = 51677
 
 sock = None
 
@@ -45,6 +44,7 @@ class OBJECT_PT_osci_render_settings(bpy.types.Panel):
 
     def draw(self, context):
         global sock
+        self.layout.prop(context.scene, "osciport")
         if sock is None:
             self.layout.operator("render.osci_render_connect", text="Connect to osci-render instance")
         else:
@@ -58,6 +58,7 @@ class osci_render_connect(bpy.types.Operator):
 
     def execute(self, context):
         global sock
+        PORT = context.scene.osciport
         if sock is None:
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -203,41 +204,42 @@ def get_frame_info_binary():
             if object.visible_get() and object.type == 'GREASEPENCIL':
                 dg =  bpy.context.evaluated_depsgraph_get()
                 obj = object.evaluated_get(dg)
-                frame_info.extend(("OBJECT  ").encode("utf8"))
-                
-                # matrix
-                frame_info.extend(("MATRIX  ").encode("utf8"))
-                camera_space = bpy.context.scene.camera.matrix_world.inverted() @ obj.matrix_world
-                for i in range(4):
-                    for j in range(4):
-                        frame_info.extend(struct.pack("d", camera_space[i][j]))
-                frame_info.extend(("DONE    ").encode("utf8"))
-                
-                # strokes
-                frame_info.extend(("STROKES ").encode("utf8"))
-                strokes = obj.data.layers.active.frames.data.current_frame().drawing.strokes
-                for stroke in strokes:
-                    frame_info.extend(("STROKE  ").encode("utf8"))
+                if obj.data.layers.active is not None:
+                    frame_info.extend(("OBJECT  ").encode("utf8"))
                     
-                    frame_info.extend(("vertexCt").encode("utf8"))
-                    frame_info.extend(len(stroke.points).to_bytes(8, "little"))
+                    # matrix
+                    frame_info.extend(("MATRIX  ").encode("utf8"))
+                    camera_space = bpy.context.scene.camera.matrix_world.inverted() @ obj.matrix_world
+                    for i in range(4):
+                        for j in range(4):
+                            frame_info.extend(struct.pack("d", camera_space[i][j]))
+                    frame_info.extend(("DONE    ").encode("utf8"))
                     
-                    frame_info.extend(("VERTICES").encode("utf8"))
-                    for vert in stroke.points:
-                        frame_info.extend(struct.pack("d", vert.position.x))
-                        frame_info.extend(struct.pack("d", vert.position.y))
-                        frame_info.extend(struct.pack("d", vert.position.z))
-                    # VERTICES
+                    # strokes
+                    frame_info.extend(("STROKES ").encode("utf8"))
+                    strokes = obj.data.layers.active.frames.data.current_frame().drawing.strokes
+                    for stroke in strokes:
+                        frame_info.extend(("STROKE  ").encode("utf8"))
+                        
+                        frame_info.extend(("vertexCt").encode("utf8"))
+                        frame_info.extend(len(stroke.points).to_bytes(8, "little"))
+                        
+                        frame_info.extend(("VERTICES").encode("utf8"))
+                        for vert in stroke.points:
+                            frame_info.extend(struct.pack("d", vert.position.x))
+                            frame_info.extend(struct.pack("d", vert.position.y))
+                            frame_info.extend(struct.pack("d", vert.position.z))
+                        # VERTICES
+                        frame_info.extend(("DONE    ").encode("utf8"))
+                    
+                        # STROKE
+                        frame_info.extend(("DONE    ").encode("utf8"))
+                    
+                    # STROKES
                     frame_info.extend(("DONE    ").encode("utf8"))
-                
-                    # STROKE
+                    
+                    # OBJECT
                     frame_info.extend(("DONE    ").encode("utf8"))
-                
-                # STROKES
-                frame_info.extend(("DONE    ").encode("utf8"))
-                
-                # OBJECT
-                frame_info.extend(("DONE    ").encode("utf8"))
     else:
         for object in bpy.data.objects: 
             if object.visible_get() and obj.type == 'GPENCIL':
@@ -305,6 +307,7 @@ operations = [OBJECT_PT_osci_render_settings, osci_render_connect, osci_render_c
 
 
 def register():
+    bpy.types.Scene.osciport = bpy.props.IntProperty(name="osci-render port",description="Port to use when connecting to osci-render (default 51677)",min=1,max=65535,default=51677)
     bpy.app.handlers.frame_change_pre.append(send_scene_to_osci_render)
     bpy.app.handlers.depsgraph_update_post.append(send_scene_to_osci_render)
     atexit.register(close_osci_render)
@@ -313,6 +316,7 @@ def register():
 
 
 def unregister():
+    del bpy.types.Scene.osciport
     bpy.app.handlers.frame_change_pre.remove(send_scene_to_osci_render)
     bpy.app.handlers.depsgraph_update_post.remove(send_scene_to_osci_render)
     atexit.unregister(close_osci_render)
@@ -322,3 +326,4 @@ def unregister():
 
 if __name__ == "__main__":
     register()
+    

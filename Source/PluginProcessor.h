@@ -204,6 +204,8 @@ public:
     juce::String getFileId(int index);
 	std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
     void setObjectServerRendering(bool enabled);
+    void setObjectServerPort(int port);
+    int objectServerPort = 0;
     void addErrorListener(ErrorListener* listener);
     void removeErrorListener(ErrorListener* listener);
     void notifyErrorListeners(int lineNumber, juce::String id, juce::String error);

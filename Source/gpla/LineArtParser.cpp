@@ -303,6 +303,8 @@ std::vector<std::vector<Line>> LineArtParser::parseJsonFrames(juce::String jsonS
 
     // If no frames were valid, stop and parse invalid fallback instead
     if (!hasValidFrames) return parseJsonFrames(juce::String(BinaryData::invalid_gpla, BinaryData::invalid_gplaSize));
+
+    return frames;
 }
 
 void LineArtParser::setFrame(int fNum) {
