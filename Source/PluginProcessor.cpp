@@ -179,6 +179,11 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     synth.addSound(defaultSound);
 
     addAllParameters();
+
+    if (objectServerPort == 0) {
+        objectServerPort = 51677;
+        objectServer.reload();
+    }
 }
 
 OscirenderAudioProcessor::~OscirenderAudioProcessor() {
@@ -400,6 +405,11 @@ void OscirenderAudioProcessor::setObjectServerRendering(bool enabled) {
         juce::MessageManagerLock lock;
         fileChangeBroadcaster.sendChangeMessage();
     }
+}
+
+void OscirenderAudioProcessor::setObjectServerPort(int port) {
+    objectServerPort = port;
+    objectServer.reload();
 }
 
 void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
@@ -660,6 +670,8 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
     }
     xml->setAttribute("currentFile", currentFile);
 
+    xml->setAttribute("objectServerPort", objectServerPort);
+
     recordingParameters.save(xml.get());
 
     copyXmlToBinary(*xml, destData);
@@ -775,6 +787,9 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
             }
         }
         changeCurrentFile(xml->getIntAttribute("currentFile", -1));
+
+        objectServerPort = xml->getIntAttribute("objectServerPort", juce::Random::getSystemRandom().nextInt(juce::Range<int>(51600, 51700)));
+        objectServer.reload();
 
         recordingParameters.load(xml.get());
 

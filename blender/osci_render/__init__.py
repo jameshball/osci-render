@@ -44,6 +44,7 @@ class OBJECT_PT_osci_render_settings(bpy.types.Panel):
         layout = self.layout
 
     def draw(self, context):
+        self.layout.prop(context.scene, "oscirenderPort")
         global sock
         if sock is None:
             self.layout.operator("render.osci_render_connect", text="Connect to osci-render instance")
@@ -62,7 +63,7 @@ class osci_render_connect(bpy.types.Operator):
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.settimeout(1)
-                sock.connect((HOST, PORT))
+                sock.connect((HOST, context.scene.oscirenderPort))
                 send_scene_to_osci_render(bpy.context.scene)
             except socket.error as exp:
                 sock = None
@@ -309,6 +310,7 @@ operations = [OBJECT_PT_osci_render_settings, osci_render_connect, osci_render_c
 
 
 def register():
+    bpy.types.Scene.oscirenderPort = bpy.props.IntProperty(name="osci-render port",description="The port through which osci-render will connect",min=51600,max=51699,default=51677)
     bpy.app.handlers.frame_change_pre.append(send_scene_to_osci_render)
     bpy.app.handlers.depsgraph_update_post.append(send_scene_to_osci_render)
     atexit.register(close_osci_render)
@@ -317,6 +319,7 @@ def register():
 
 
 def unregister():
+    del bpy.types.Object.oscirenderPort
     bpy.app.handlers.frame_change_pre.remove(send_scene_to_osci_render)
     bpy.app.handlers.depsgraph_update_post.remove(send_scene_to_osci_render)
     atexit.unregister(close_osci_render)

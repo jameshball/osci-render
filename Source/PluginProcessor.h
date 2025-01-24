@@ -187,6 +187,8 @@ public:
     
     std::function<void()> haltRecording;
 
+    int objectServerPort = 0;
+
     void addLuaSlider();
     void updateEffectPrecedence();
     void updateFileBlock(int index, std::shared_ptr<juce::MemoryBlock> block);
@@ -204,6 +206,7 @@ public:
     juce::String getFileId(int index);
 	std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
     void setObjectServerRendering(bool enabled);
+    void setObjectServerPort(int port);
     void addErrorListener(ErrorListener* listener);
     void removeErrorListener(ErrorListener* listener);
     void notifyErrorListeners(int lineNumber, juce::String id, juce::String error);
