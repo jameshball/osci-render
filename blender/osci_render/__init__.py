@@ -35,7 +35,7 @@ GPLA_PATCH = 0
 
 class OBJECT_PT_osci_render_settings(bpy.types.Panel):
     bl_idname = "OBJECT_PT_osci_render_settings"
-    bl_label = "DEVELOPMENT osci-render settings"
+    bl_label = "osci-render settings"
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = "render"
