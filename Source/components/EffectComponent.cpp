@@ -17,7 +17,11 @@ EffectComponent::EffectComponent(Effect& effect, int index) : effect(effect), in
 
     slider.setSliderStyle(juce::Slider::LinearHorizontal);
     slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, TEXT_BOX_WIDTH, slider.getTextBoxHeight());
-    slider.setNumDecimalPlacesToDisplay(4);
+    if (effect.parameters[index]->step == 1.0) {
+        slider.setNumDecimalPlacesToDisplay(0);
+    } else {
+        slider.setNumDecimalPlacesToDisplay(4);
+    }
 
     lfoSlider.setSliderStyle(juce::Slider::LinearHorizontal);
     lfoSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, TEXT_BOX_WIDTH, lfoSlider.getTextBoxHeight());

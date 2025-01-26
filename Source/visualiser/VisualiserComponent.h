@@ -82,7 +82,6 @@ private:
     CommonAudioProcessor& audioProcessor;
 
     float intensity;
-    const double FRAME_RATE = 60.0;
     
     bool visualiserOnly;
     AudioPlayerComponent audioPlayer{audioProcessor};
@@ -194,6 +193,8 @@ private:
     std::vector<float> fullScreenQuad;
     
     GLuint frameBuffer = 0;
+
+    double currentFrameRate = 60.0;
     Texture lineTexture;
     Texture blur1Texture;
     Texture blur2Texture;
@@ -252,7 +253,8 @@ private:
     void initialiseSharedTexture();
     void closeSharedTexture();
 #endif
-    Texture makeTexture(int width, int height);
+    Texture makeTexture(int width, int height, GLuint textureID = 0);
+    void setResolution(int width);
     void setupArrays(int num_points);
     void setupTextures();
     void drawLineTexture(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints);
