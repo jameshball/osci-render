@@ -43,6 +43,7 @@ void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesiser
 
 // TODO this is the slowest part of the program - any way to improve this would help!
 void ShapeVoice::incrementShapeDrawing() {
+    if (frame.size() <= 0) return;
     double length = currentShape < frame.size() ? frame[currentShape]->len : 0.0;
     frameDrawn += lengthIncrement;
     shapeDrawn += lengthIncrement;

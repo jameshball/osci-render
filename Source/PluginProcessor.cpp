@@ -316,7 +316,6 @@ void OscirenderAudioProcessor::openFile(int index) {
 	if (index < 0 || index >= fileBlocks.size()) {
 		return;
 	}
-    juce::SpinLock::ScopedLockType lock(fontLock);
     parsers[index]->parse(juce::String(fileIds[index]), fileNames[index].fromLastOccurrenceOf(".", true, false), std::make_unique<juce::MemoryInputStream>(*fileBlocks[index], false), font);
     changeCurrentFile(index);
 }
@@ -744,7 +743,6 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
             auto family = fontXml->getStringAttribute("family");
             auto bold = fontXml->getBoolAttribute("bold");
             auto italic = fontXml->getBoolAttribute("italic");
-            juce::SpinLock::ScopedLockType lock(fontLock);
             font = juce::Font(family, 1.0, (bold ? juce::Font::bold : 0) | (italic ? juce::Font::italic : 0));
         }
 
