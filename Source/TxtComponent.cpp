@@ -17,14 +17,7 @@ TxtComponent::TxtComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 	auto updateFont = [this]() {
 		juce::SpinLock::ScopedLockType lock1(audioProcessor.parsersLock);
 		juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
-		{
-			juce::SpinLock::ScopedLockType lock3(audioProcessor.fontLock);
-			audioProcessor.font.setTypefaceName(installedFonts[font.getSelectedItemIndex()]);
-			audioProcessor.font.setBold(bold.getToggleState());
-			audioProcessor.font.setItalic(italic.getToggleState());
-		}
-		
-		audioProcessor.openFile(audioProcessor.currentFile);
+        audioProcessor.font = juce::Font(installedFonts[font.getSelectedItemIndex()], 1.0, (bold.getToggleState() ? juce::Font::bold : 0) | (italic.getToggleState() ? juce::Font::italic : 0));
     };
 
 	font.onChange = updateFont;
@@ -41,7 +34,6 @@ void TxtComponent::resized() {
 }
 
 void TxtComponent::update() {
-	juce::SpinLock::ScopedLockType lock(audioProcessor.fontLock);
     juce::String defaultFont = audioProcessor.font.getTypefaceName();
     int index = installedFonts.indexOf(defaultFont);
 	if (index == -1) {
