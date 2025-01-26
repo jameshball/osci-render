@@ -6,6 +6,8 @@
 RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
 #if SOSCI_FEATURES
     addAndMakeVisible(quality);
+    addAndMakeVisible(resolution);
+    addAndMakeVisible(frameRate);
     addAndMakeVisible(losslessVideo);
     addAndMakeVisible(recordAudio);
     addAndMakeVisible(recordVideo);
@@ -16,6 +18,11 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
     
     quality.setSliderOnValueChange();
     quality.setRangeEnabled(false);
+    resolution.setSliderOnValueChange();
+    resolution.setRangeEnabled(false);
+    frameRate.setSliderOnValueChange();
+    frameRate.setRangeEnabled(false);
+    
     recordAudio.onClick = [this] {
         if (!recordAudio.getToggleState() && !recordVideo.getToggleState()) {
             recordVideo.setToggleState(true, juce::NotificationType::sendNotification);
@@ -66,6 +73,8 @@ void RecordingSettings::resized() {
 #if SOSCI_FEATURES
     losslessVideo.setBounds(area.removeFromTop(rowHeight));
     quality.setBounds(area.removeFromTop(rowHeight).expanded(6, 0));
+    resolution.setBounds(area.removeFromTop(rowHeight).expanded(6, 0));
+    frameRate.setBounds(area.removeFromTop(rowHeight).expanded(6, 0));
     recordAudio.setBounds(area.removeFromTop(rowHeight));
     recordVideo.setBounds(area.removeFromTop(rowHeight));
     auto row = area.removeFromTop(rowHeight);

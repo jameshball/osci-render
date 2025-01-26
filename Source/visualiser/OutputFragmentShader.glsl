@@ -58,7 +58,7 @@ void main() {
     if (uRealScreen > 0.5) {
         vec4 reflection = texture2D(uTexture4, vTexCoord);
         vec4 screenGlow = texture2D(uTexture5, vTexCoord);
-        scatter += max4(screenGlow * reflection * max(1.0 - uAmbient, 0.0), vec4(0.0));
+        scatter += max4(screenGlow * reflection * max(1.0 - 0.5 * uAmbient, 0.0), vec4(0.0));
     }
     
     float light = line.r + uGlow * 1.5 * screen.g * screen.g * tightGlow.r;

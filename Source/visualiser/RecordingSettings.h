@@ -13,6 +13,10 @@ public:
     RecordingParameters() {
         qualityParameter.disableLfo();
         qualityParameter.disableSidechain();
+        resolution.disableLfo();
+        resolution.disableSidechain();
+        frameRate.disableLfo();
+        frameRate.disableSidechain();
     }
     
 private:
@@ -36,6 +40,22 @@ public:
 
     BooleanParameter recordAudio = BooleanParameter("Record Audio", "recordAudio", VERSION_HINT, true, "Record audio along with the video.");
     BooleanParameter recordVideo = BooleanParameter("Record Video", "recordVideo", VERSION_HINT, sosciFeatures, "Record video output of the visualiser.");
+    
+    EffectParameter resolution = EffectParameter(
+        "Resolution",
+        "The resolution of the recorded video. This only changes when not recording.",
+        "resolution",
+        VERSION_HINT, 1024, 128, 2048, 1.0
+    );
+    Effect resolutionEffect = Effect(&resolution);
+    
+    EffectParameter frameRate = EffectParameter(
+        "Frame Rate",
+        "The frame rate of the recorded video. This only changes when not recording.",
+        "frameRate",
+        VERSION_HINT, 60.0, 10, 240, 0.01
+    );
+    Effect frameRateEffect = Effect(&frameRate);
 
     juce::String compressionPreset = "fast";
 
@@ -49,6 +69,12 @@ public:
         
         auto qualityXml = settingsXml->createNewChildElement("quality");
         qualityEffect.save(qualityXml);
+        
+        auto resolutionXml = settingsXml->createNewChildElement("resolution");
+        resolutionEffect.save(resolutionXml);
+        
+        auto frameRateXml = settingsXml->createNewChildElement("frameRate");
+        frameRateEffect.save(frameRateXml);
     }
 
     // opt to not change any values if not found
@@ -71,6 +97,12 @@ public:
             }
             if (auto* qualityXml = settingsXml->getChildByName("quality")) {
                 qualityEffect.load(qualityXml);
+            }
+            if (auto* resolutionXml = settingsXml->getChildByName("resolution")) {
+                resolutionEffect.load(resolutionXml);
+            }
+            if (auto* frameRateXml = settingsXml->getChildByName("frameRate")) {
+                frameRateEffect.load(frameRateXml);
             }
         }
     }
@@ -95,6 +127,14 @@ public:
         // not supported by all media players)
         return 50 * (1.0 - quality) + 1;
     }
+    
+    int getVideoToolboxQuality() {
+        if (parameters.losslessVideo.getBoolValue()) {
+            return 100;
+        }
+        double quality = juce::jlimit(0.0, 1.0, parameters.qualityEffect.getValue());
+        return 100 * quality;
+    }
 
     bool recordingVideo() {
         return parameters.recordVideo.getBoolValue();
@@ -114,11 +154,21 @@ public:
         }
         return parameters.customSharedTextureServerName;
     }
+    
+    int getResolution() {
+        return parameters.resolution.getValueUnnormalised();
+    }
+    
+    double getFrameRate() {
+        return parameters.frameRate.getValueUnnormalised();
+    }
 
     RecordingParameters& parameters;
 
 private:
     EffectComponent quality{parameters.qualityEffect};
+    EffectComponent resolution{parameters.resolutionEffect};
+    EffectComponent frameRate{parameters.frameRateEffect};
 
     jux::SwitchButton losslessVideo{&parameters.losslessVideo};
     jux::SwitchButton recordAudio{&parameters.recordAudio};

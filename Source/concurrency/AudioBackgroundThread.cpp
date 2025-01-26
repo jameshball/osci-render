@@ -15,18 +15,15 @@ AudioBackgroundThread::~AudioBackgroundThread() {
 }
 
 void AudioBackgroundThread::prepare(double sampleRate, int samplesPerBlock) {
-    if (isThreadRunning()) {
-        stop();
-    }
+    bool threadShouldBeRunning = shouldBeRunning;
+    setShouldBeRunning(false);
     
     isPrepared = false;
     int requestedDataSize = prepareTask(sampleRate, samplesPerBlock);
     consumer = std::make_unique<BufferConsumer>(requestedDataSize);
     isPrepared = true;
     
-    if (shouldBeRunning) {
-        start();
-    }
+    setShouldBeRunning(threadShouldBeRunning);
 }
 
 void AudioBackgroundThread::setShouldBeRunning(bool shouldBeRunning, std::function<void()> stopCallback) {

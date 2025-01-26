@@ -82,7 +82,6 @@ private:
     CommonAudioProcessor& audioProcessor;
 
     float intensity;
-    const double FRAME_RATE = 60.0;
     
     bool visualiserOnly;
     AudioPlayerComponent audioPlayer{audioProcessor};
@@ -194,6 +193,8 @@ private:
     std::vector<float> fullScreenQuad;
     
     GLuint frameBuffer = 0;
+
+    double currentFrameRate = 60.0;
     Texture lineTexture;
     Texture blur1Texture;
     Texture blur2Texture;
@@ -209,12 +210,12 @@ private:
     juce::Image emptyScreenImage = juce::ImageFileFormat::loadFrom(BinaryData::empty_jpg, BinaryData::empty_jpgSize);
     
 #if SOSCI_FEATURES
-    juce::Image oscilloscopeImage = juce::ImageFileFormat::loadFrom(BinaryData::real_jpg, BinaryData::real_jpgSize);
-    juce::Image vectorDisplayImage = juce::ImageFileFormat::loadFrom(BinaryData::vector_display_jpg, BinaryData::vector_display_jpgSize);
+    juce::Image oscilloscopeImage = juce::ImageFileFormat::loadFrom(BinaryData::real_png, BinaryData::real_pngSize);
+    juce::Image vectorDisplayImage = juce::ImageFileFormat::loadFrom(BinaryData::vector_display_png, BinaryData::vector_display_pngSize);
     
     juce::Image emptyReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::no_reflection_jpg, BinaryData::no_reflection_jpgSize);
-    juce::Image oscilloscopeReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::real_reflection_jpg, BinaryData::real_reflection_jpgSize);
-    juce::Image vectorDisplayReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::vector_display_reflection_jpg, BinaryData::vector_display_reflection_jpgSize);
+    juce::Image oscilloscopeReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::real_reflection_png, BinaryData::real_reflection_pngSize);
+    juce::Image vectorDisplayReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::vector_display_reflection_png, BinaryData::vector_display_reflection_pngSize);
     
     OsciPoint REAL_SCREEN_OFFSET = { 0.02, -0.15 };
     OsciPoint REAL_SCREEN_SCALE = { 0.6 };
@@ -252,7 +253,8 @@ private:
     void initialiseSharedTexture();
     void closeSharedTexture();
 #endif
-    Texture makeTexture(int width, int height);
+    Texture makeTexture(int width, int height, GLuint textureID = 0);
+    void setResolution(int width);
     void setupArrays(int num_points);
     void setupTextures();
     void drawLineTexture(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints);

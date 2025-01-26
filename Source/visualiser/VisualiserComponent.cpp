@@ -284,7 +284,7 @@ int VisualiserComponent::prepareTask(double sampleRate, int bufferSize) {
 
     audioRecorder.setSampleRate(sampleRate);
     
-    int desiredBufferSize = sampleRate / FRAME_RATE;
+    int desiredBufferSize = sampleRate / recordingSettings.getFrameRate();
     
     return desiredBufferSize;
 }
@@ -411,7 +411,7 @@ void VisualiserComponent::setRecording(bool recording) {
             tempVideoFile = std::make_unique<juce::TemporaryFile>(".mp4");
             juce::String resolution = std::to_string(renderTexture.width) + "x" + std::to_string(renderTexture.height);
             juce::String cmd = "\"" + ffmpegFile.getFullPathName() + "\"" +
-                " -r " + juce::String(FRAME_RATE) +
+                " -r " + juce::String(recordingSettings.getFrameRate()) +
                 " -f rawvideo" +
                 " -pix_fmt rgba" +
                 " -s " + resolution +
@@ -421,6 +421,14 @@ void VisualiserComponent::setRecording(bool recording) {
                 " -y" +
                 " -pix_fmt yuv420p" +
                 " -crf " + juce::String(recordingSettings.getCRF()) +
+#if JUCE_MAC
+    #if JUCE_ARM
+                // use software encoding on Apple Silicon
+                " -c:v hevc_videotoolbox" +
+                " -q:v " + juce::String(recordingSettings.getVideoToolboxQuality()) +
+                " -tag:v hvc1" +
+    #endif
+#endif
                 " -vf vflip" +
                 " \"" + tempVideoFile->getFile().getFullPathName() + "\"";
 
@@ -717,6 +725,19 @@ void VisualiserComponent::renderOpenGL() {
         // we have a new buffer to render
         if (sampleBufferCount != prevSampleBufferCount) {
             prevSampleBufferCount = sampleBufferCount;
+            
+            if (!record.getToggleState()) {
+                // don't change resolution or framerate if recording
+                if (recordingSettings.getResolution() != renderTexture.width) {
+                    setResolution(recordingSettings.getResolution());
+                }
+                if (recordingSettings.getFrameRate() != currentFrameRate) {
+                    currentFrameRate = recordingSettings.getFrameRate();
+                    prepare(sampleRate, -1);
+                    setupArrays(RESAMPLE_RATIO * sampleRate / recordingSettings.getFrameRate());
+                }
+            }
+            
             juce::CriticalSection::ScopedLockType lock(samplesLock);
             
             if (settings.parameters.upsamplingEnabled->getBoolValue()) {
@@ -746,7 +767,7 @@ void VisualiserComponent::renderOpenGL() {
             }
             
             renderingSemaphore.release();
-            stopwatch.addTime(juce::RelativeTime::seconds(1.0 / FRAME_RATE));
+            stopwatch.addTime(juce::RelativeTime::seconds(1.0 / recordingSettings.getFrameRate()));
         }
         
         // render texture to screen
@@ -821,12 +842,12 @@ void VisualiserComponent::setupTextures() {
     glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
 
     // Create textures
-    lineTexture = makeTexture(1024, 1024);
+    lineTexture = makeTexture(recordingSettings.getResolution(), recordingSettings.getResolution());
     blur1Texture = makeTexture(512, 512);
     blur2Texture = makeTexture(512, 512);
     blur3Texture = makeTexture(128, 128);
     blur4Texture = makeTexture(128, 128);
-    renderTexture = makeTexture(1024, 1024);
+    renderTexture = makeTexture(recordingSettings.getResolution(), recordingSettings.getResolution());
     
     screenOpenGLTexture.loadImage(emptyScreenImage);
     screenTexture = { screenOpenGLTexture.getTextureID(), screenTextureImage.getWidth(), screenTextureImage.getHeight() };
@@ -839,11 +860,13 @@ void VisualiserComponent::setupTextures() {
     glBindFramebuffer(GL_FRAMEBUFFER, 0); // Unbind
 }
 
-Texture VisualiserComponent::makeTexture(int width, int height) {
+Texture VisualiserComponent::makeTexture(int width, int height, GLuint textureID) {
     using namespace juce::gl;
     
-    GLuint textureID;
-    glGenTextures(1, &textureID);
+    // replace existing texture if it exists, otherwise create new texture
+    if (textureID == 0) {
+        glGenTextures(1, &textureID);
+    }
     glBindTexture(GL_TEXTURE_2D, textureID);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
 
@@ -860,10 +883,20 @@ Texture VisualiserComponent::makeTexture(int width, int height) {
     return { textureID, width, height };
 }
 
+void VisualiserComponent::setResolution(int width) {
+    using namespace juce::gl;
+    
+    lineTexture = makeTexture(width, width, lineTexture.id);
+    renderTexture = makeTexture(width, width, renderTexture.id);
+}
+
 void VisualiserComponent::drawLineTexture(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints) {
     using namespace juce::gl;
     
-    fadeAmount = juce::jmin(1.0, std::pow(0.5, settings.getPersistence()) * 0.4);
+    double persistence = std::pow(0.5, settings.getPersistence()) * 0.4;
+    persistence *= 60.0 / recordingSettings.getFrameRate();
+    fadeAmount = juce::jmin(1.0, persistence);
+    
     activateTargetTexture(lineTexture);
     fade();
     drawLine(xPoints, yPoints, zPoints);
@@ -1072,7 +1105,7 @@ void VisualiserComponent::drawCRT() {
 
     activateTargetTexture(blur1Texture);
     setShader(texturedShader.get());
-    texturedShader->setUniform("uResizeForCanvas", lineTexture.width / 1024.0f);
+    texturedShader->setUniform("uResizeForCanvas", lineTexture.width / (float) recordingSettings.getResolution());
     drawTexture({lineTexture});
 
     //horizontal blur 512x512
@@ -1131,7 +1164,7 @@ void VisualiserComponent::drawCRT() {
     outputShader->setUniform("uFishEye", screenOverlay == ScreenOverlay::VectorDisplay ? VECTOR_DISPLAY_FISH_EYE : 0.0f);
     outputShader->setUniform("uRealScreen", settings.parameters.screenOverlay->isRealisticDisplay() ? 1.0f : 0.0f);
 #endif
-    outputShader->setUniform("uResizeForCanvas", lineTexture.width / 1024.0f);
+    outputShader->setUniform("uResizeForCanvas", lineTexture.width / (float) recordingSettings.getResolution());
     juce::Colour colour = juce::Colour::fromHSV(settings.getHue() / 360.0f, 1.0, 1.0, 1.0);
     outputShader->setUniform("uColour", colour.getFloatRed(), colour.getFloatGreen(), colour.getFloatBlue());
     drawTexture({
@@ -1250,7 +1283,7 @@ Texture VisualiserComponent::createScreenTexture() {
         glVertexAttribPointer(glGetAttribLocation(simpleShader->getProgramID(), "vertexPosition"), 2, GL_FLOAT, GL_FALSE, 0, nullptr);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         simpleShader->setUniform("colour", 0.01f, 0.05f, 0.01f, 1.0f);
-        glLineWidth(2.0f);
+        glLineWidth(4.0f);
         glDrawArrays(GL_LINES, 0, data.size() / 2);
         glBindTexture(GL_TEXTURE_2D, targetTexture.value().id);
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
@@ -1306,7 +1339,7 @@ void VisualiserComponent::renderScope(const std::vector<float>& xPoints, const s
     
     if (sampleRate != oldSampleRate || scratchVertices.empty()) {
         oldSampleRate = sampleRate;
-        setupArrays(RESAMPLE_RATIO * sampleRate / FRAME_RATE);
+        setupArrays(RESAMPLE_RATIO * sampleRate / recordingSettings.getFrameRate());
     }
     intensity = settings.getIntensity() * (41000.0f / sampleRate);
 
