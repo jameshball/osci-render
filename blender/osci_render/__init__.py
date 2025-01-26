@@ -249,7 +249,7 @@ def get_frame_info_binary():
                 
                 # matrix
                 frame_info.extend(("MATRIX  ").encode("utf8"))
-                camera_space = bpy.context.scene.camera.matrix_world.inverted() @ object.matrix_world
+                camera_space = bpy.context.scene.camera.matrix_world.inverted() @ obj.matrix_world
                 for i in range(4):
                     for j in range(4):
                         frame_info.extend(struct.pack("d", camera_space[i][j]))
@@ -258,7 +258,7 @@ def get_frame_info_binary():
                 
                 # strokes
                 frame_info.extend(("STROKES ").encode("utf8"))
-                layers = object.data.layers
+                layers = obj.data.layers
                 for layer in layers:
                     strokes = layer.frames.data.active_frame.strokes
                     for stroke in strokes:
