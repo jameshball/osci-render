@@ -37,7 +37,7 @@ jobs:
         shell: bash
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Binaries
           path: bin
@@ -128,7 +128,7 @@ jobs:
         run: spctl -a -vvv -t install "bin/${{ matrix.project }}-${{ matrix.version }}.pkg"
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Binaries
           path: bin
@@ -178,7 +178,7 @@ jobs:
         run: mv "packaging/build/${{ matrix.project }}.exe" "bin/${{ matrix.project }}-${{ matrix.version }}.exe"
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Binaries
           path: bin
