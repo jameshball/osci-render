@@ -54,6 +54,17 @@ EffectComponent::EffectComponent(Effect& effect, int index) : effect(effect), in
 
 EffectComponent::EffectComponent(Effect& effect) : EffectComponent(effect, 0) {}
 
+void EffectComponent::setSliderValueIfChanged(FloatParameter* parameter, juce::Slider& slider) {
+    juce::String newSliderValue = juce::String(parameter->getValueUnnormalised(), 3);
+    juce::String oldSliderValue = juce::String((float) slider.getValue(), 3);
+    
+    // only set the slider value if the parameter value is different so that we prefer the more
+    // precise slider value.
+    if (newSliderValue != oldSliderValue) {
+        slider.setValue(parameter->getValueUnnormalised(), juce::dontSendNotification);
+    }
+}
+
 void EffectComponent::setupComponent() {
     EffectParameter* parameter = effect.parameters[index];
 
@@ -64,7 +75,7 @@ void EffectComponent::setupComponent() {
     label.setInterceptsMouseClicks(false, false);
 
     slider.setRange(parameter->min, parameter->max, parameter->step);
-    slider.setValue(parameter->getValueUnnormalised(), juce::dontSendNotification);
+    setSliderValueIfChanged(parameter, slider);
     slider.setDoubleClickReturnValue(true, parameter->defaultValue);
 
     lfoEnabled = parameter->lfo != nullptr && parameter->lfoRate != nullptr;
@@ -86,6 +97,7 @@ void EffectComponent::setupComponent() {
         };
 
         lfoSlider.setRange(parameter->lfoRate->min, parameter->lfoRate->max, parameter->lfoRate->step);
+        setSliderValueIfChanged(parameter->lfoRate, lfoSlider);
         lfoSlider.setValue(parameter->lfoRate->getValueUnnormalised(), juce::dontSendNotification);
         lfoSlider.setSkewFactorFromMidPoint(parameter->lfoRate->min + 0.1 * (parameter->lfoRate->max - parameter->lfoRate->min));
         lfoSlider.setDoubleClickReturnValue(true, 1.0);

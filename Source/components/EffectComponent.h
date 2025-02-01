@@ -86,6 +86,7 @@ private:
     const int TEXT_WIDTH = 120;
     const int SMALL_TEXT_WIDTH = 60;
 
+    void setSliderValueIfChanged(FloatParameter* parameter, juce::Slider& slider);
     void setupComponent();
     bool lfoEnabled = true;
     bool sidechainEnabled = true;

@@ -110,9 +110,6 @@
               file="Source/audio/PerspectiveEffect.cpp"/>
         <FILE id="h0dMim" name="PerspectiveEffect.h" compile="0" resource="0"
               file="Source/audio/PerspectiveEffect.h"/>
-        <FILE id="t2bsR8" name="PitchDetector.cpp" compile="1" resource="0"
-              file="Source/audio/PitchDetector.cpp"/>
-        <FILE id="rQC2gX" name="PitchDetector.h" compile="0" resource="0" file="Source/audio/PitchDetector.h"/>
         <FILE id="t5g8pf" name="PublicSynthesiser.h" compile="0" resource="0"
               file="Source/audio/PublicSynthesiser.h"/>
         <FILE id="Q5kjpU" name="SampleRateManager.h" compile="0" resource="0"

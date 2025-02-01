@@ -143,7 +143,7 @@ void CommonPluginEditor::saveProjectAs() {
 void CommonPluginEditor::updateTitle() {
     juce::String title = appName;
     if (!audioProcessor.currentProjectFile.isEmpty()) {
-        appName += " - " + audioProcessor.currentProjectFile;
+        title += " - " + audioProcessor.currentProjectFile;
     }
     getTopLevelComponent()->setName(title);
 }

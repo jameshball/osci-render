@@ -185,7 +185,7 @@ private:
     std::vector<float> smoothedXSamples;
     std::vector<float> smoothedYSamples;
     std::vector<float> smoothedZSamples;
-    int sampleBufferCount = 0;
+    std::atomic<int> sampleBufferCount = 0;
     int prevSampleBufferCount = 0;
     long lastTriggerPosition = 0;
     
