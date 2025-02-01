@@ -174,7 +174,6 @@ void VisualiserComponent::mouseDoubleClick(const juce::MouseEvent& event) {
     }
 }
 
-__attribute__((no_sanitize("thread")))
 void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
     {
         juce::CriticalSection::ScopedLockType lock(samplesLock);
