@@ -189,6 +189,21 @@ void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
         ySamples.clear();
         zSamples.clear();
         
+        auto applyEffects = [&](OsciPoint point) {
+            for (auto& effect : settings.parameters.audioEffects) {
+                point = effect->apply(0, point);
+            }
+#if SOSCI_FEATURES
+            if (settings.isFlippedHorizontal()) {
+                point.x = -point.x;
+            }
+            if (settings.isFlippedVertical()) {
+                point.y = -point.y;
+            }
+#endif
+            return point;
+        };
+        
         if (settings.isSweepEnabled()) {
             double sweepIncrement = getSweepIncrement();
             long samplesPerSweep = sampleRate * settings.getSweepSeconds();
@@ -196,14 +211,12 @@ void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
             double triggerValue = settings.getTriggerValue();
             bool belowTrigger = false;
             
-            for (auto& point : points) {
-                OsciPoint smoothPoint = settings.parameters.smoothEffect->apply(0, point);
-                
+            for (const OsciPoint& point : points) {
                 long samplePosition = sampleCount - lastTriggerPosition;
                 double startPoint = 1.135;
                 double sweep = samplePosition * sweepIncrement * 2 * startPoint - startPoint;
                 
-                double value = smoothPoint.x;
+                double value = point.x;
                 
                 if (sweep > startPoint && belowTrigger && value >= triggerValue) {
                     lastTriggerPosition = sampleCount;
@@ -211,25 +224,19 @@ void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
                 
                 belowTrigger = value < triggerValue;
                 
-                xSamples.push_back(sweep);
-                ySamples.push_back(value);
+                OsciPoint sweepPoint = {sweep, value, 1};
+                sweepPoint = applyEffects(sweepPoint);
+                
+                xSamples.push_back(sweepPoint.x);
+                ySamples.push_back(sweepPoint.y);
                 zSamples.push_back(1);
                 
                 sampleCount++;
             }
         } else {
-            for (OsciPoint point : points) {
-                for (auto& effect : settings.parameters.audioEffects) {
-                    point = effect->apply(0, point);
-                }
-#if SOSCI_FEATURES
-                if (settings.isFlippedHorizontal()) {
-                    point.x = -point.x;
-                }
-                if (settings.isFlippedVertical()) {
-                    point.y = -point.y;
-                }
-#endif
+            for (const OsciPoint& rawPoint : points) {
+                OsciPoint point = applyEffects(rawPoint);
+                
                 xSamples.push_back(point.x);
                 ySamples.push_back(point.y);
                 zSamples.push_back(point.z);

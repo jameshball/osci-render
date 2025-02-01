@@ -86,7 +86,8 @@ bool SosciPluginEditor::isInterestedInFileDrag(const juce::StringArray& files) {
         file.hasFileExtension("mp3") ||
         file.hasFileExtension("aiff") ||
         file.hasFileExtension("flac") ||
-        file.hasFileExtension("ogg");
+        file.hasFileExtension("ogg") ||
+        file.hasFileExtension("sosci");
 }
 
 void SosciPluginEditor::filesDropped(const juce::StringArray& files, int x, int y) {
@@ -94,7 +95,12 @@ void SosciPluginEditor::filesDropped(const juce::StringArray& files, int x, int 
         return;
     }
     juce::File file(files[0]);
-    audioProcessor.loadAudioFile(file);
+    
+    if (file.hasFileExtension("sosci")) {
+        openProject(file);
+    } else {
+        audioProcessor.loadAudioFile(file);
+    }
 }
 
 void SosciPluginEditor::visualiserFullScreenChanged() {
