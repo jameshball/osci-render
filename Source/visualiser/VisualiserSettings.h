@@ -417,7 +417,9 @@ class SettingsWindow : public juce::DialogWindow {
 public:
     SettingsWindow(juce::String name, juce::Component& component) : juce::DialogWindow(name, Colours::darker, true, true), component(component) {
         setContentComponent(&viewport);
-        setResizable(false, false);
+        centreWithSize(550, 400);
+        setResizeLimits(getWidth(), 300, getWidth(), 1080);
+        setResizable(true, false);
         viewport.setColour(juce::ScrollBar::trackColourId, juce::Colours::white);
         viewport.setViewedComponent(&component, false);
         viewport.setScrollBarsShown(true, false, true, false);

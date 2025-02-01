@@ -11,7 +11,7 @@
 #include "visualiser/VisualiserSettings.h"
 #include "CommonPluginEditor.h"
 
-class OscirenderAudioProcessorEditor : public CommonPluginEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener {
+class OscirenderAudioProcessorEditor : public CommonPluginEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener, public juce::FileDragAndDropTarget {
 public:
     OscirenderAudioProcessorEditor(OscirenderAudioProcessor&);
     ~OscirenderAudioProcessorEditor() override;
@@ -28,6 +28,8 @@ public:
     void changeListenerCallback(juce::ChangeBroadcaster* source) override;
     void toggleLayout(juce::StretchableLayoutManager& layout, double prefSize);
     void openVisualiserSettings();
+    bool isInterestedInFileDrag(const juce::StringArray& files) override;
+    void filesDropped(const juce::StringArray& files, int x, int y) override;
 
     void editCustomFunction(bool enabled);
 

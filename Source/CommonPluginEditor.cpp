@@ -95,22 +95,25 @@ bool CommonPluginEditor::keyPressed(const juce::KeyPress& key) {
     return false;
 }
 
+void CommonPluginEditor::openProject(const juce::File& file) {
+    if (file != juce::File()) {
+        auto data = juce::MemoryBlock();
+        if (file.loadFileAsData(data)) {
+            audioProcessor.setStateInformation(data.getData(), data.getSize());
+        }
+        audioProcessor.currentProjectFile = file.getFullPathName();
+        audioProcessor.lastOpenedDirectory = file.getParentDirectory();
+        updateTitle();
+    }
+}
+
 void CommonPluginEditor::openProject() {
     chooser = std::make_unique<juce::FileChooser>("Load " + appName + " Project", audioProcessor.lastOpenedDirectory, "*." + projectFileType);
     auto flags = juce::FileBrowserComponent::openMode |
         juce::FileBrowserComponent::canSelectFiles;
 
     chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
-        auto file = chooser.getResult();
-        if (file != juce::File()) {
-            auto data = juce::MemoryBlock();
-            if (file.loadFileAsData(data)) {
-                audioProcessor.setStateInformation(data.getData(), data.getSize());
-            }
-            audioProcessor.currentProjectFile = file.getFullPathName();
-            audioProcessor.lastOpenedDirectory = file.getParentDirectory();
-            updateTitle();
-        }
+        openProject(chooser.getResult());
     });
 }
 

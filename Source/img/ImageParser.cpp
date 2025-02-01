@@ -102,6 +102,9 @@ void ImageParser::resetPosition() {
 
 float ImageParser::getPixelValue(int x, int y, bool invert) {
     int index = (height - y - 1) * width + x;
+    if (index < 0 || index >= frames[frameIndex].size()) {
+        return 0;
+    }
     float pixel = frames[frameIndex][index] / (float) std::numeric_limits<uint8_t>::max();
     // never traverse transparent pixels
     if (invert && pixel > 0) {

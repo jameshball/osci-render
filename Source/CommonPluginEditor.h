@@ -15,6 +15,7 @@ public:
     ~CommonPluginEditor() override;
 
     void initialiseMenuBar(juce::MenuBarModel& menuBarModel);
+    void openProject(const juce::File& file);
     void openProject();
     void saveProject();
     void saveProjectAs();

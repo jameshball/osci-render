@@ -79,7 +79,6 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
         visualiserSettingsWindow.setVisible(false);
     };
 
-    visualiserSettingsWindow.centreWithSize(550, 400);
 #if JUCE_WINDOWS
     // if not standalone, use native title bar for compatibility with DAWs
     visualiserSettingsWindow.setUsingNativeTitleBar(processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone);
@@ -95,6 +94,43 @@ OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
     juce::MessageManagerLock lock;
     audioProcessor.broadcaster.removeChangeListener(this);
     audioProcessor.fileChangeBroadcaster.removeChangeListener(this);
+}
+
+bool OscirenderAudioProcessorEditor::isInterestedInFileDrag(const juce::StringArray& files) {
+    if (files.size() != 1) {
+        return false;
+    }
+    juce::File file(files[0]);
+    return
+        file.hasFileExtension("wav") ||
+        file.hasFileExtension("aiff") ||
+        file.hasFileExtension("osci") ||
+        file.hasFileExtension("txt") ||
+        file.hasFileExtension("lua") ||
+        file.hasFileExtension("svg") ||
+        file.hasFileExtension("obj") ||
+        file.hasFileExtension("gif") ||
+        file.hasFileExtension("png") ||
+        file.hasFileExtension("jpg") ||
+        file.hasFileExtension("gpla");
+}
+
+void OscirenderAudioProcessorEditor::filesDropped(const juce::StringArray& files, int x, int y) {
+    if (files.size() != 1) {
+        return;
+    }
+    juce::File file(files[0]);
+    
+    if (file.hasFileExtension("osci")) {
+        openProject(file);
+    } else {
+        juce::SpinLock::ScopedLockType lock1(audioProcessor.parsersLock);
+        juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
+        
+        audioProcessor.addFile(file);
+        addCodeEditor(audioProcessor.getCurrentFileIndex());
+        fileUpdated(audioProcessor.getCurrentFileName());
+    }
 }
 
 bool OscirenderAudioProcessorEditor::isBinaryFile(juce::String name) {
