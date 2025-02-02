@@ -1176,9 +1176,17 @@ void VisualiserComponent::drawCRT() {
 #if SOSCI_FEATURES
     outputShader->setUniform("uScreenSaturation", (float) settings.getScreenSaturation());
     outputShader->setUniform("uHueShift", (float) settings.getScreenHue() / 360.0f);
+<<<<<<< Updated upstream
 #else
     outputShader->setUniform("uScreenSaturation", 1.0f);
     outputShader->setUniform("uHueShift", 0.0f);
+=======
+    outputShader->setUniform("uOverexposure", (float) settings.getOverexposure());
+#else
+    outputShader->setUniform("uScreenSaturation", 1.0f);
+    outputShader->setUniform("uHueShift", 0.0f);
+    outputShader->setUniform("uOverexposure", 0.5f);
+>>>>>>> Stashed changes
 #endif
     outputShader->setUniform("uNoise", (float) settings.getNoise());
     outputShader->setUniform("uRandom", juce::Random::getSystemRandom().nextFloat());
