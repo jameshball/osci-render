@@ -9,6 +9,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <any>
 #include "concurrency/AudioBackgroundThread.h"
 #include "concurrency/AudioBackgroundThreadManager.h"
 #include "audio/SampleRateManager.h"
@@ -59,6 +60,9 @@ public:
     void stopAudioFile();
     void addAudioPlayerListener(AudioPlayerListener* listener);
     void removeAudioPlayerListener(AudioPlayerListener* listener);
+    std::any getProperty(const std::string& key);
+    std::any getProperty(const std::string& key, std::any defaultValue);
+    void setProperty(const std::string& key, std::any value);
 
     juce::SpinLock audioPlayerListenersLock;
     std::vector<AudioPlayerListener*> audioPlayerListeners;
@@ -122,6 +126,12 @@ protected:
     BooleanParameter* getBooleanParameter(juce::String id);
     FloatParameter* getFloatParameter(juce::String id);
     IntParameter* getIntParameter(juce::String id);
+    
+    void saveProperties(juce::XmlElement& xml);
+    void loadProperties(juce::XmlElement& xml);
+    
+    juce::SpinLock propertiesLock;
+    std::unordered_map<std::string, std::any> properties;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CommonAudioProcessor)

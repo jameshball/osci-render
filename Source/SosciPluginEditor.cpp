@@ -50,6 +50,7 @@ void SosciPluginEditor::paint(juce::Graphics& g) {
 }
 
 void SosciPluginEditor::resized() {
+    CommonPluginEditor::resized();
     auto area = getLocalBounds();
 
     if (audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {

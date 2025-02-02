@@ -119,9 +119,7 @@ public:
             "Afterglow",
             "Controls how quickly the image disappears after glowing brightly. Closely related to persistence.",
             "afterglow",
-            VERSION_HINT, 1.5, 0.0, 5.0
-<<<<<<< Updated upstream
-=======
+            VERSION_HINT, 1.0, 0.0, 10.0
         )
     );
     std::shared_ptr<Effect> overexposureEffect = std::make_shared<Effect>(
@@ -130,7 +128,6 @@ public:
             "Controls at which point the line becomes overexposed and clips, turning white.",
             "overexposure",
             VERSION_HINT, 0.5, 0.0, 1.0
->>>>>>> Stashed changes
         )
     );
     std::shared_ptr<StereoEffect> stereoEffectApplication = std::make_shared<StereoEffect>();
@@ -286,10 +283,7 @@ public:
         afterglowEffect,
         screenSaturationEffect,
         screenHueEffect,
-<<<<<<< Updated upstream
-=======
         overexposureEffect,
->>>>>>> Stashed changes
 #endif
     };
     std::vector<std::shared_ptr<Effect>> audioEffects = {
@@ -464,10 +458,7 @@ private:
             std::make_shared<EffectComponent>(*parameters.glowEffect),
 #if SOSCI_FEATURES
             std::make_shared<EffectComponent>(*parameters.afterglowEffect),
-<<<<<<< Updated upstream
-=======
             std::make_shared<EffectComponent>(*parameters.overexposureEffect),
->>>>>>> Stashed changes
 #else
             std::make_shared<EffectComponent>(*parameters.ambientEffect),
 #endif
