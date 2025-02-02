@@ -4,15 +4,10 @@
 
 
 VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels) : parameters(p), numChannels(numChannels) {
-    addAndMakeVisible(intensity);
-	addAndMakeVisible(persistence);
-    addAndMakeVisible(hue);
-    addAndMakeVisible(lineSaturation);
-    addAndMakeVisible(focus);
-    addAndMakeVisible(noise);
-    addAndMakeVisible(glow);
-    addAndMakeVisible(ambient);
-    addAndMakeVisible(smooth);
+    addAndMakeVisible(lineColour);
+    addAndMakeVisible(lightEffects);
+    addAndMakeVisible(videoEffects);
+    addAndMakeVisible(lineEffects);
     addAndMakeVisible(sweepMs);
     addAndMakeVisible(triggerValue);
     addAndMakeVisible(upsamplingToggle);
@@ -20,13 +15,8 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
     addAndMakeVisible(screenOverlayLabel);
     addAndMakeVisible(screenOverlay);
 #if SOSCI_FEATURES
-    addAndMakeVisible(afterglow);
-    addAndMakeVisible(screenSaturation);
-    addAndMakeVisible(stereo);
-    addAndMakeVisible(xOffset);
-    addAndMakeVisible(yOffset);
-    addAndMakeVisible(xScale);
-    addAndMakeVisible(yScale);
+    addAndMakeVisible(positionSize);
+    addAndMakeVisible(screenColour);
     addAndMakeVisible(flipVerticalToggle);
     addAndMakeVisible(flipHorizontalToggle);
 #endif
@@ -39,15 +29,6 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
         parameters.screenOverlay->setUnnormalisedValueNotifyingHost(screenOverlay.getSelectedId());
     };
     
-    intensity.setSliderOnValueChange();
-    persistence.setSliderOnValueChange();
-    hue.setSliderOnValueChange();
-    lineSaturation.setSliderOnValueChange();
-    focus.setSliderOnValueChange();
-    noise.setSliderOnValueChange();
-    glow.setSliderOnValueChange();
-    ambient.setSliderOnValueChange();
-    smooth.setSliderOnValueChange();
     sweepMs.setSliderOnValueChange();
     triggerValue.setSliderOnValueChange();
     
@@ -61,16 +42,6 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
         triggerValue.setEnabled(sweepToggle.getToggleState());
         resized();
     };
-
-#if SOSCI_FEATURES
-    afterglow.setSliderOnValueChange();
-    screenSaturation.setSliderOnValueChange();
-    stereo.setSliderOnValueChange();
-    xOffset.setSliderOnValueChange();
-    yOffset.setSliderOnValueChange();
-    xScale.setSliderOnValueChange();
-    yScale.setSliderOnValueChange();
-#endif
 
     parameters.screenOverlay->addListener(this);
 }
@@ -92,32 +63,29 @@ void VisualiserSettings::resized() {
     screenOverlayLabel.setBounds(screenOverlayArea.removeFromLeft(120));
     screenOverlay.setBounds(screenOverlayArea.removeFromRight(180));
     
-    intensity.setBounds(area.removeFromTop(rowHeight));
-    persistence.setBounds(area.removeFromTop(rowHeight));
+    lineColour.setBounds(area.removeFromTop(lineColour.getHeight()));
 #if SOSCI_FEATURES
-    afterglow.setBounds(area.removeFromTop(rowHeight));
+    area.removeFromTop(10);
+    screenColour.setBounds(area.removeFromTop(screenColour.getHeight()));
 #endif
-    hue.setBounds(area.removeFromTop(rowHeight));
-    lineSaturation.setBounds(area.removeFromTop(rowHeight));
-#if SOSCI_FEATURES
-    screenSaturation.setBounds(area.removeFromTop(rowHeight));
-#endif
-    focus.setBounds(area.removeFromTop(rowHeight));
-    noise.setBounds(area.removeFromTop(rowHeight));
-    glow.setBounds(area.removeFromTop(rowHeight));
-    ambient.setBounds(area.removeFromTop(rowHeight));
-    smooth.setBounds(area.removeFromTop(rowHeight));
+    area.removeFromTop(10);
+    lightEffects.setBounds(area.removeFromTop(lightEffects.getHeight()));
+    area.removeFromTop(10);
+    videoEffects.setBounds(area.removeFromTop(videoEffects.getHeight()));
+    area.removeFromTop(10);
+    lineEffects.setBounds(area.removeFromTop(lineEffects.getHeight()));
     
 #if SOSCI_FEATURES
-    stereo.setBounds(area.removeFromTop(rowHeight));
-    xScale.setBounds(area.removeFromTop(rowHeight));
-    yScale.setBounds(area.removeFromTop(rowHeight));
-    xOffset.setBounds(area.removeFromTop(rowHeight));
-    yOffset.setBounds(area.removeFromTop(rowHeight));
+    area.removeFromTop(10);
+    positionSize.setBounds(area.removeFromTop(positionSize.getHeight()));
+    area.removeFromTop(10);
     flipVerticalToggle.setBounds(area.removeFromTop(rowHeight));
     flipHorizontalToggle.setBounds(area.removeFromTop(rowHeight));
 #endif
 
+#if !SOSCI_FEATURES
+    area.removeFromTop(10);
+#endif
     upsamplingToggle.setBounds(area.removeFromTop(rowHeight));
     sweepToggle.setBounds(area.removeFromTop(rowHeight));
     sweepMs.setBounds(area.removeFromTop(rowHeight));

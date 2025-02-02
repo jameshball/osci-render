@@ -1175,8 +1175,10 @@ void VisualiserComponent::drawCRT() {
     outputShader->setUniform("uLineSaturation", (float) settings.getLineSaturation());
 #if SOSCI_FEATURES
     outputShader->setUniform("uScreenSaturation", (float) settings.getScreenSaturation());
+    outputShader->setUniform("uHueShift", (float) settings.getScreenHue() / 360.0f);
 #else
     outputShader->setUniform("uScreenSaturation", 1.0f);
+    outputShader->setUniform("uHueShift", 0.0f);
 #endif
     outputShader->setUniform("uNoise", (float) settings.getNoise());
     outputShader->setUniform("uRandom", juce::Random::getSystemRandom().nextFloat());

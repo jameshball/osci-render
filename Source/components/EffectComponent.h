@@ -78,13 +78,15 @@ public:
         LabelledTextBox min{"Min"};
         LabelledTextBox max{"Max"};
     };
+    
+    std::function<void()> updateToggleState;
 
 private:
     const int TEXT_BOX_WIDTH = 70;
     const int SMALL_TEXT_BOX_WIDTH = 50;
 
     const int TEXT_WIDTH = 120;
-    const int SMALL_TEXT_WIDTH = 60;
+    const int SMALL_TEXT_WIDTH = 90;
 
     void setSliderValueIfChanged(FloatParameter* parameter, juce::Slider& slider);
     void setupComponent();

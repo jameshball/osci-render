@@ -69,6 +69,10 @@ void EffectComponent::setupComponent() {
     EffectParameter* parameter = effect.parameters[index];
 
     setEnabled(effect.enabled == nullptr || effect.enabled->getBoolValue());
+    
+    if (updateToggleState != nullptr) {
+        updateToggleState();
+    }
 
     setTooltip(parameter->description);
     label.setText(parameter->name, juce::dontSendNotification);

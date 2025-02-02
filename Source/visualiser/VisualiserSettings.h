@@ -106,12 +106,20 @@ public:
             VERSION_HINT, 1.0, 0.0, 5.0
         )
     );
+    std::shared_ptr<Effect> screenHueEffect = std::make_shared<Effect>(
+        new EffectParameter(
+            "Screen Hue",
+            "Controls the hue shift of the oscilloscope screen.",
+            "screenHue",
+            VERSION_HINT, 0, 0, 359, 1
+        )
+    );
     std::shared_ptr<Effect> afterglowEffect = std::make_shared<Effect>(
         new EffectParameter(
             "Afterglow",
             "Controls how quickly the image disappears after glowing brightly. Closely related to persistence.",
             "afterglow",
-            VERSION_HINT, 2.0, 0.0, 5.0
+            VERSION_HINT, 1.5, 0.0, 5.0
         )
     );
     std::shared_ptr<StereoEffect> stereoEffectApplication = std::make_shared<StereoEffect>();
@@ -172,15 +180,15 @@ public:
     );
     std::shared_ptr<Effect> hueEffect = std::make_shared<Effect>(
         new EffectParameter(
-            "Hue",
-            "Controls the hue/colour of the oscilloscope display.",
+            "Line Hue",
+            "Controls the hue of the beam of the oscilloscope.",
             "hue",
             VERSION_HINT, 125, 0, 359, 1
         )
     );
     std::shared_ptr<Effect> intensityEffect = std::make_shared<Effect>(
         new EffectParameter(
-            "Intensity",
+            "Line Intensity",
             "Controls how bright the electron beam of the oscilloscope is.",
             "intensity",
             VERSION_HINT, 5.0, 0.0, 10.0
@@ -266,6 +274,7 @@ public:
 #if SOSCI_FEATURES
         afterglowEffect,
         screenSaturationEffect,
+        screenHueEffect,
 #endif
     };
     std::vector<std::shared_ptr<Effect>> audioEffects = {
@@ -288,6 +297,37 @@ public:
     std::vector<IntParameter*> integers = {
         screenOverlay,
     };
+};
+
+class GroupedSettings : public juce::GroupComponent {
+public:
+    GroupedSettings(std::vector<std::shared_ptr<EffectComponent>> effects, juce::String label) : effects(effects), juce::GroupComponent(label, label) {
+        for (auto effect : effects) {
+            addAndMakeVisible(effect.get());
+            effect->setSliderOnValueChange();
+        }
+        
+        setColour(groupComponentBackgroundColourId, Colours::veryDark.withMultipliedBrightness(3.0));
+    }
+    
+    void resized() override {
+        auto area = getLocalBounds();
+        area.removeFromTop(35);
+        double rowHeight = 30;
+        
+        for (auto effect : effects) {
+            effect->setBounds(area.removeFromTop(rowHeight));
+        }
+    }
+    
+    int getHeight() {
+        return 40 + effects.size() * 30;
+    }
+
+private:
+    std::vector<std::shared_ptr<EffectComponent>> effects;
+    
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GroupedSettings)
 };
 
 class VisualiserSettings : public juce::Component, public juce::AudioProcessorParameter::Listener {
@@ -319,6 +359,10 @@ public:
 #if SOSCI_FEATURES
     double getScreenSaturation() {
         return parameters.screenSaturationEffect->getActualValue();
+    }
+    
+    double getScreenHue() {
+        return parameters.screenHueEffect->getActualValue();
     }
     
     double getAfterglow() {
@@ -374,15 +418,57 @@ public:
     int numChannels;
 
 private:
-    EffectComponent intensity{*parameters.intensityEffect};
-    EffectComponent persistence{*parameters.persistenceEffect};
-    EffectComponent hue{*parameters.hueEffect};
-    EffectComponent lineSaturation{*parameters.lineSaturationEffect};
-    EffectComponent focus{*parameters.focusEffect};
-    EffectComponent noise{*parameters.noiseEffect};
-    EffectComponent glow{*parameters.glowEffect};
-    EffectComponent ambient{*parameters.ambientEffect};
-    EffectComponent smooth{*parameters.smoothEffect};
+    GroupedSettings lineColour{
+        std::vector<std::shared_ptr<EffectComponent>>{
+            std::make_shared<EffectComponent>(*parameters.hueEffect),
+            std::make_shared<EffectComponent>(*parameters.lineSaturationEffect),
+            std::make_shared<EffectComponent>(*parameters.intensityEffect),
+        },
+        "Line Colour"
+    };
+    
+#if SOSCI_FEATURES
+    GroupedSettings screenColour{
+        std::vector<std::shared_ptr<EffectComponent>>{
+            std::make_shared<EffectComponent>(*parameters.screenHueEffect),
+            std::make_shared<EffectComponent>(*parameters.screenSaturationEffect),
+            std::make_shared<EffectComponent>(*parameters.ambientEffect),
+        },
+        "Screen Colour"
+    };
+#endif
+    
+    GroupedSettings lightEffects{
+        std::vector<std::shared_ptr<EffectComponent>>{
+            std::make_shared<EffectComponent>(*parameters.persistenceEffect),
+            std::make_shared<EffectComponent>(*parameters.focusEffect),
+            std::make_shared<EffectComponent>(*parameters.glowEffect),
+#if SOSCI_FEATURES
+            std::make_shared<EffectComponent>(*parameters.afterglowEffect),
+#else
+            std::make_shared<EffectComponent>(*parameters.ambientEffect),
+#endif
+        },
+        "Light Effects"
+    };
+    
+    GroupedSettings videoEffects{
+        std::vector<std::shared_ptr<EffectComponent>>{
+            std::make_shared<EffectComponent>(*parameters.noiseEffect),
+        },
+        "Video Effects"
+    };
+    
+    GroupedSettings lineEffects{
+        std::vector<std::shared_ptr<EffectComponent>>{
+            std::make_shared<EffectComponent>(*parameters.smoothEffect),
+#if SOSCI_FEATURES
+            std::make_shared<EffectComponent>(*parameters.stereoEffect),
+#endif
+        },
+        "Line Effects"
+    };
+    
     EffectComponent sweepMs{*parameters.sweepMsEffect};
     EffectComponent triggerValue{*parameters.triggerValueEffect};
     
@@ -393,13 +479,15 @@ private:
     jux::SwitchButton sweepToggle{parameters.sweepEnabled};
 
 #if SOSCI_FEATURES
-    EffectComponent screenSaturation{*parameters.screenSaturationEffect};
-    EffectComponent afterglow{*parameters.afterglowEffect};
-    EffectComponent stereo{*parameters.stereoEffect};
-    EffectComponent xScale{*parameters.scaleEffect, 0};
-    EffectComponent yScale{*parameters.scaleEffect, 1};
-    EffectComponent xOffset{*parameters.offsetEffect, 0};
-    EffectComponent yOffset{*parameters.offsetEffect, 1};
+    GroupedSettings positionSize{
+        std::vector<std::shared_ptr<EffectComponent>>{
+            std::make_shared<EffectComponent>(*parameters.scaleEffect, 0),
+            std::make_shared<EffectComponent>(*parameters.scaleEffect, 1),
+            std::make_shared<EffectComponent>(*parameters.offsetEffect, 0),
+            std::make_shared<EffectComponent>(*parameters.offsetEffect, 1),
+        },
+        "Line Position & Scale"
+    };
 
     jux::SwitchButton flipVerticalToggle{parameters.flipVertical};
     jux::SwitchButton flipHorizontalToggle{parameters.flipHorizontal};
@@ -433,7 +521,7 @@ class SettingsWindow : public juce::DialogWindow {
 public:
     SettingsWindow(juce::String name, juce::Component& component) : juce::DialogWindow(name, Colours::darker, true, true), component(component) {
         setContentComponent(&viewport);
-        centreWithSize(550, 400);
+        centreWithSize(550, 500);
         setResizeLimits(getWidth(), 300, getWidth(), 1080);
         setResizable(true, false);
         viewport.setColour(juce::ScrollBar::trackColourId, juce::Colours::white);

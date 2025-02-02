@@ -28,6 +28,13 @@ effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
 			}
             repaint();
 		};
+        effectComponent->updateToggleState = [this, i, weakEffectComponent] {
+            if (auto effectComponent = weakEffectComponent.lock()) {
+                selected.setToggleState(effectComponent->effect.enabled == nullptr || effectComponent->effect.enabled->getValue(), juce::dontSendNotification);
+                list.setEnabled(selected.getToggleState());
+            }
+            repaint();
+        };
 
 		auto component = createComponent(parameters[i]);
 		if (component != nullptr) {
