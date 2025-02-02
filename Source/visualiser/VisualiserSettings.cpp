@@ -20,6 +20,7 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
     addAndMakeVisible(screenOverlayLabel);
     addAndMakeVisible(screenOverlay);
 #if SOSCI_FEATURES
+    addAndMakeVisible(afterglow);
     addAndMakeVisible(screenSaturation);
     addAndMakeVisible(stereo);
     addAndMakeVisible(xOffset);
@@ -62,6 +63,7 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
     };
 
 #if SOSCI_FEATURES
+    afterglow.setSliderOnValueChange();
     screenSaturation.setSliderOnValueChange();
     stereo.setSliderOnValueChange();
     xOffset.setSliderOnValueChange();
@@ -92,6 +94,9 @@ void VisualiserSettings::resized() {
     
     intensity.setBounds(area.removeFromTop(rowHeight));
     persistence.setBounds(area.removeFromTop(rowHeight));
+#if SOSCI_FEATURES
+    afterglow.setBounds(area.removeFromTop(rowHeight));
+#endif
     hue.setBounds(area.removeFromTop(rowHeight));
     lineSaturation.setBounds(area.removeFromTop(rowHeight));
 #if SOSCI_FEATURES

@@ -4,7 +4,7 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginCharacteristicsValue="pluginWantsMidiIn"
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
-              version="2.4.5.2" companyName="James H Ball" companyWebsite="https://osci-render.com"
+              version="2.4.6.0" companyName="James H Ball" companyWebsite="https://osci-render.com"
               companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;SOSCI_FEATURES=1"
               pluginAUMainType="'aumf'">
   <MAINGROUP id="j5Ge2T" name="osci-render">
@@ -616,6 +616,10 @@
               file="Source/UGen/ugen_JuceUtility.h"/>
       </GROUP>
       <GROUP id="{16A8DC64-BA02-898D-4DBA-AA3DDF6F9297}" name="visualiser">
+        <FILE id="DkDKBX" name="AfterglowFragmentShader.glsl" compile="0" resource="0"
+              file="Source/visualiser/AfterglowFragmentShader.glsl"/>
+        <FILE id="eM1kV3" name="AfterglowVertexShader.glsl" compile="0" resource="0"
+              file="Source/visualiser/AfterglowVertexShader.glsl"/>
         <FILE id="kfMvdQ" name="BlurFragmentShader.glsl" compile="0" resource="0"
               file="Source/visualiser/BlurFragmentShader.glsl" xcodeResource="0"/>
         <FILE id="c59gvD" name="BlurVertexShader.glsl" compile="0" resource="0"

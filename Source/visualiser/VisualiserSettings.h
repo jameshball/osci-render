@@ -106,6 +106,14 @@ public:
             VERSION_HINT, 1.0, 0.0, 5.0
         )
     );
+    std::shared_ptr<Effect> afterglowEffect = std::make_shared<Effect>(
+        new EffectParameter(
+            "Afterglow",
+            "Controls how quickly the image disappears after glowing brightly. Closely related to persistence.",
+            "afterglow",
+            VERSION_HINT, 2.0, 0.0, 5.0
+        )
+    );
     std::shared_ptr<StereoEffect> stereoEffectApplication = std::make_shared<StereoEffect>();
     std::shared_ptr<Effect> stereoEffect = std::make_shared<Effect>(
         stereoEffectApplication,
@@ -255,11 +263,14 @@ public:
         ambientEffect,
         sweepMsEffect,
         triggerValueEffect,
+#if SOSCI_FEATURES
+        afterglowEffect,
+        screenSaturationEffect,
+#endif
     };
     std::vector<std::shared_ptr<Effect>> audioEffects = {
         smoothEffect,
 #if SOSCI_FEATURES
-        screenSaturationEffect,
         stereoEffect,
         scaleEffect,
         offsetEffect,
@@ -308,6 +319,10 @@ public:
 #if SOSCI_FEATURES
     double getScreenSaturation() {
         return parameters.screenSaturationEffect->getActualValue();
+    }
+    
+    double getAfterglow() {
+        return parameters.afterglowEffect->getActualValue();
     }
 
     bool isFlippedVertical() {
@@ -379,6 +394,7 @@ private:
 
 #if SOSCI_FEATURES
     EffectComponent screenSaturation{*parameters.screenSaturationEffect};
+    EffectComponent afterglow{*parameters.afterglowEffect};
     EffectComponent stereo{*parameters.stereoEffect};
     EffectComponent xScale{*parameters.scaleEffect, 0};
     EffectComponent yScale{*parameters.scaleEffect, 1};

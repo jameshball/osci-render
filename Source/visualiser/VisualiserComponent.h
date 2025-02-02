@@ -228,6 +228,7 @@ private:
     Texture reflectionTexture;
     
     std::unique_ptr<juce::OpenGLShaderProgram> glowShader;
+    std::unique_ptr<juce::OpenGLShaderProgram> afterglowShader;
 #endif
     
     std::unique_ptr<juce::OpenGLShaderProgram> simpleShader;

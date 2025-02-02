@@ -2,6 +2,8 @@
 #include "VisualiserComponent.h"
 #include "../CommonPluginProcessor.h"
 
+#include "AfterglowFragmentShader.glsl"
+#include "AfterglowVertexShader.glsl"
 #include "BlurFragmentShader.glsl"
 #include "BlurVertexShader.glsl"
 #include "WideBlurFragmentShader.glsl"
@@ -674,6 +676,11 @@ void VisualiserComponent::newOpenGLContextCreated() {
     glowShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(glowVertexShader));
     glowShader->addFragmentShader(glowFragmentShader);
     glowShader->link();
+    
+    afterglowShader = std::make_unique<juce::OpenGLShaderProgram>(openGLContext);
+    afterglowShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(afterglowVertexShader));
+    afterglowShader->addFragmentShader(afterglowFragmentShader);
+    afterglowShader->link();
 #endif
     
     glGenBuffers(1, &vertexBuffer);
@@ -706,6 +713,7 @@ void VisualiserComponent::openGLContextClosing() {
     glDeleteTextures(1, &glowTexture.id);
     reflectionOpenGLTexture.release();
     glowShader.reset();
+    afterglowShader.reset();
 #endif
     
     simpleShader.reset();
@@ -1093,6 +1101,13 @@ void VisualiserComponent::fade() {
     
     setNormalBlending();
     
+#if SOSCI_FEATURES
+    setShader(afterglowShader.get());
+    afterglowShader->setUniform("fadeAmount", fadeAmount);
+    afterglowShader->setUniform("afterglowAmount", (float) settings.getAfterglow());
+    afterglowShader->setUniform("uResizeForCanvas", lineTexture.width / (float) recordingSettings.getResolution());
+    drawTexture({lineTexture});
+#else
     simpleShader->use();
     glEnableVertexAttribArray(glGetAttribLocation(simpleShader->getProgramID(), "vertexPosition"));
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
@@ -1103,6 +1118,7 @@ void VisualiserComponent::fade() {
     simpleShader->setUniform("colour", 0.0f, 0.0f, 0.0f, fadeAmount);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glDisableVertexAttribArray(glGetAttribLocation(simpleShader->getProgramID(), "vertexPosition"));
+#endif
 }
 
 void VisualiserComponent::drawCRT() {
