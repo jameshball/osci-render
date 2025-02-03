@@ -3,7 +3,6 @@
 AboutComponent::AboutComponent(const void *image, size_t imageSize, juce::String sectionText, int port) {
     addAndMakeVisible(logoComponent);
     addAndMakeVisible(text);
-    addAndMakeVisible(portText);
 
     logo = juce::ImageFileFormat::loadFrom(image, imageSize);
     
@@ -18,15 +17,19 @@ AboutComponent::AboutComponent(const void *image, size_t imageSize, juce::String
     text.setJustification(juce::Justification(juce::Justification::centred));
     text.setText(sectionText);
 
-    // TODO: Integrate this better
-    portText.setMultiLine(false);
-    portText.setReadOnly(true);
-    portText.setInterceptsMouseClicks(false, false);
-    portText.setOpaque(false);
-    portText.setColour(juce::TextEditor::backgroundColourId, juce::Colours::transparentBlack);
-    portText.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
-    portText.setJustification(juce::Justification(juce::Justification::centred));
-    portText.setText(juce::String("Blender Port: ") + juce::String(port));
+    if (port > 0) {
+        addAndMakeVisible(portText);
+        
+        // TODO: Integrate this better
+        portText.setMultiLine(false);
+        portText.setReadOnly(true);
+        portText.setInterceptsMouseClicks(false, false);
+        portText.setOpaque(false);
+        portText.setColour(juce::TextEditor::backgroundColourId, juce::Colours::transparentBlack);
+        portText.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
+        portText.setJustification(juce::Justification(juce::Justification::centred));
+        portText.setText(juce::String("Blender Port: ") + juce::String(port));
+    }
 }
 
 void AboutComponent::resized() {
