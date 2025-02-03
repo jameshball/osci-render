@@ -4,10 +4,9 @@
 
 class AboutComponent : public juce::Component {
 public:
-    AboutComponent(const void *image, size_t imageSize, juce::String sectionText, int* port);
+    AboutComponent(const void *image, size_t imageSize, juce::String sectionText, int port);
 
     void resized() override;
-    void updatePortText(int* port);
 
 private:
     juce::Image logo;

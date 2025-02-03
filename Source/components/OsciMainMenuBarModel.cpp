@@ -32,7 +32,7 @@ OsciMainMenuBarModel::OsciMainMenuBarModel(OscirenderAudioProcessor& p, Oscirend
             "BUS ERROR Collective, for providing the source code for the Hilligoss encoder\n"
             "Jean Perbet (@jeanprbt) for the osci-render macOS icon\n"
             "All the community, for suggesting features and reporting issues!",
-            &audioProcessor.objectServerPort);
+            std::any_cast<int>(audioProcessor.getProperty("objectServerPort")));
         options.content.setOwned(about);
         options.content->setSize(500, 270);
         options.dialogTitle = "About";
@@ -48,9 +48,9 @@ OsciMainMenuBarModel::OsciMainMenuBarModel(OscirenderAudioProcessor& p, Oscirend
 
         juce::DialogWindow* dw = options.launchAsync();
     });
-    addMenuItem(1, "Randomize Port", [this] {
+    addMenuItem(1, "Randomize Blender Port", [this] {
         audioProcessor.setObjectServerPort(juce::Random::getSystemRandom().nextInt(juce::Range<int>(51600, 51700)));
-        });
+    });
 
 #if !SOSCI_FEATURES
     addMenuItem(1, "Purchase osci-render premium!", [this] {

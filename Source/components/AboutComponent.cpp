@@ -1,6 +1,6 @@
 #include "AboutComponent.h"
 
-AboutComponent::AboutComponent(const void *image, size_t imageSize, juce::String sectionText, int* port) {
+AboutComponent::AboutComponent(const void *image, size_t imageSize, juce::String sectionText, int port) {
     addAndMakeVisible(logoComponent);
     addAndMakeVisible(text);
     addAndMakeVisible(portText);
@@ -26,11 +26,7 @@ AboutComponent::AboutComponent(const void *image, size_t imageSize, juce::String
     portText.setColour(juce::TextEditor::backgroundColourId, juce::Colours::transparentBlack);
     portText.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
     portText.setJustification(juce::Justification(juce::Justification::centred));
-    portText.setText(juce::String("Blender Port: ") + ((port != nullptr) ? juce::String(*port) : juce::String("<error>")));
-}
-
-void AboutComponent::updatePortText(int* port) {
-    portText.setText(juce::String("Blender Port: ") + ((port != nullptr) ? juce::String(*port) : juce::String("<error>")));
+    portText.setText(juce::String("Blender Port: ") + juce::String(port));
 }
 
 void AboutComponent::resized() {

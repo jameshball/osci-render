@@ -184,8 +184,6 @@ public:
     
     std::function<void()> haltRecording;
 
-    int objectServerPort = 0;
-
     void addLuaSlider();
     void updateEffectPrecedence();
     void updateFileBlock(int index, std::shared_ptr<juce::MemoryBlock> block);
