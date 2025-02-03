@@ -10,8 +10,14 @@ ObjectServer::~ObjectServer() {
     stopThread(1000);
 }
 
+void ObjectServer::reload() {
+    stopThread(1000);
+    startThread();
+}
+
 void ObjectServer::run() {
-    if (socket.createListener(51677, "127.0.0.1")) {
+    port = std::any_cast<int>(audioProcessor.getProperty("objectServerPort", 51677));
+    if (socket.createListener(port, "127.0.0.1")) {
         // preallocating a large buffer to avoid allocations in the loop
         std::unique_ptr<char[]> message{ new char[10 * 1024 * 1024] };
 

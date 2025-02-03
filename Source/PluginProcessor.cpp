@@ -406,6 +406,11 @@ void OscirenderAudioProcessor::setObjectServerRendering(bool enabled) {
     }
 }
 
+void OscirenderAudioProcessor::setObjectServerPort(int port) {
+    setProperty("objectServerPort", port);
+    objectServer.reload();
+}
+
 void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
     juce::ScopedNoDenormals noDenormals;
     // Audio info variables
@@ -784,6 +789,7 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         recordingParameters.load(xml.get());
         
         loadProperties(*xml);
+        objectServer.reload();
 
         broadcaster.sendChangeMessage();
         prevMidiEnabled = !midiEnabled->getBoolValue();
