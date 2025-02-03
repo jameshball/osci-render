@@ -17,7 +17,11 @@ EffectComponent::EffectComponent(Effect& effect, int index) : effect(effect), in
 
     slider.setSliderStyle(juce::Slider::LinearHorizontal);
     slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, TEXT_BOX_WIDTH, slider.getTextBoxHeight());
-    slider.setNumDecimalPlacesToDisplay(4);
+    if (effect.parameters[index]->step == 1.0) {
+        slider.setNumDecimalPlacesToDisplay(0);
+    } else {
+        slider.setNumDecimalPlacesToDisplay(4);
+    }
 
     lfoSlider.setSliderStyle(juce::Slider::LinearHorizontal);
     lfoSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, TEXT_BOX_WIDTH, lfoSlider.getTextBoxHeight());
@@ -50,17 +54,32 @@ EffectComponent::EffectComponent(Effect& effect, int index) : effect(effect), in
 
 EffectComponent::EffectComponent(Effect& effect) : EffectComponent(effect, 0) {}
 
+void EffectComponent::setSliderValueIfChanged(FloatParameter* parameter, juce::Slider& slider) {
+    juce::String newSliderValue = juce::String(parameter->getValueUnnormalised(), 3);
+    juce::String oldSliderValue = juce::String((float) slider.getValue(), 3);
+    
+    // only set the slider value if the parameter value is different so that we prefer the more
+    // precise slider value.
+    if (newSliderValue != oldSliderValue) {
+        slider.setValue(parameter->getValueUnnormalised(), juce::dontSendNotification);
+    }
+}
+
 void EffectComponent::setupComponent() {
     EffectParameter* parameter = effect.parameters[index];
 
     setEnabled(effect.enabled == nullptr || effect.enabled->getBoolValue());
+    
+    if (updateToggleState != nullptr) {
+        updateToggleState();
+    }
 
     setTooltip(parameter->description);
     label.setText(parameter->name, juce::dontSendNotification);
     label.setInterceptsMouseClicks(false, false);
 
     slider.setRange(parameter->min, parameter->max, parameter->step);
-    slider.setValue(parameter->getValueUnnormalised(), juce::dontSendNotification);
+    setSliderValueIfChanged(parameter, slider);
     slider.setDoubleClickReturnValue(true, parameter->defaultValue);
 
     lfoEnabled = parameter->lfo != nullptr && parameter->lfoRate != nullptr;
@@ -82,6 +101,7 @@ void EffectComponent::setupComponent() {
         };
 
         lfoSlider.setRange(parameter->lfoRate->min, parameter->lfoRate->max, parameter->lfoRate->step);
+        setSliderValueIfChanged(parameter->lfoRate, lfoSlider);
         lfoSlider.setValue(parameter->lfoRate->getValueUnnormalised(), juce::dontSendNotification);
         lfoSlider.setSkewFactorFromMidPoint(parameter->lfoRate->min + 0.1 * (parameter->lfoRate->max - parameter->lfoRate->min));
         lfoSlider.setDoubleClickReturnValue(true, 1.0);

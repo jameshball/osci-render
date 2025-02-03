@@ -21,7 +21,6 @@
 #include "audio/SampleRateManager.h"
 #include <numbers>
 #include "audio/DelayEffect.h"
-#include "audio/PitchDetector.h"
 #include "audio/WobbleEffect.h"
 #include "audio/PerspectiveEffect.h"
 #include "obj/ObjectServer.h"
@@ -111,7 +110,7 @@ public:
     
     BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false, "Enable MIDI input for the synth. If disabled, the synth will play a constant tone, as controlled by the frequency slider.");
     BooleanParameter* inputEnabled = new BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false, "Enable to use input audio, instead of the generated audio.");
-    std::atomic<float> frequency = 220.0f;
+    std::atomic<double> frequency = 220.0;
     
     juce::SpinLock parsersLock;
     std::vector<std::shared_ptr<FileParser>> parsers;
@@ -177,10 +176,8 @@ public:
 
     double animationTime = 0.f;
     
-    PitchDetector pitchDetector{*this};
-    std::shared_ptr<WobbleEffect> wobbleEffect = std::make_shared<WobbleEffect>(pitchDetector);
+    std::shared_ptr<WobbleEffect> wobbleEffect = std::make_shared<WobbleEffect>(*this);
 
-    juce::SpinLock fontLock;
     juce::Font font = juce::Font(juce::Font::getDefaultSansSerifFontName(), 1.0f, juce::Font::plain);
 
     ShapeSound::Ptr objectServerSound = new ShapeSound();
@@ -212,7 +209,7 @@ public:
     void notifyErrorListeners(int lineNumber, juce::String id, juce::String error);
 private:
     
-    bool prevMidiEnabled = !midiEnabled->getBoolValue();
+    std::atomic<bool> prevMidiEnabled = !midiEnabled->getBoolValue();
 
     juce::SpinLock audioThreadCallbackLock;
     std::function<void(const juce::AudioBuffer<float>&)> audioThreadCallback;

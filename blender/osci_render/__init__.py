@@ -243,7 +243,7 @@ def get_frame_info_binary():
                 frame_info.extend(("DONE    ").encode("utf8"))
     else:
         for object in bpy.data.objects: 
-            if object.visible_get() and obj.type == 'GPENCIL':
+            if object.visible_get() and object.type == 'GPENCIL':
                 dg =  bpy.context.evaluated_depsgraph_get()
                 obj = object.evaluated_get(dg)
                 frame_info.extend(("OBJECT  ").encode("utf8"))
@@ -253,7 +253,7 @@ def get_frame_info_binary():
                 camera_space = bpy.context.scene.camera.matrix_world.inverted() @ obj.matrix_world
                 for i in range(4):
                     for j in range(4):
-                        frame_info.extend(camera_space[i][j].to_bytes(8, "little"))
+                        frame_info.extend(struct.pack("d", camera_space[i][j]))
                 # MATRIX
                 frame_info.extend(("DONE    ").encode("utf8"))
                 

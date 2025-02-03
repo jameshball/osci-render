@@ -2,8 +2,7 @@
 #include "PluginEditor.h"
 #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
 
-OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p)
-	: CommonPluginEditor(p, "osci-render", "osci", 1100, 750), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white) {
+OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p) : CommonPluginEditor(p, "osci-render", "osci", 1100, 750), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white) {
 #if !SOSCI_FEATURES
     addAndMakeVisible(upgradeButton);
     upgradeButton.onClick = [this] {
@@ -28,16 +27,9 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 
     addAndMakeVisible(collapseButton);
 	collapseButton.onClick = [this] {
-        {
-            juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
-            int originalIndex = audioProcessor.getCurrentFileIndex();
-            int index = editingCustomFunction ? 0 : audioProcessor.getCurrentFileIndex() + 1;
-            if (originalIndex != -1 || editingCustomFunction) {
-                codeEditors[index]->setVisible(!codeEditors[index]->isVisible());
-                updateCodeEditor(!editingCustomFunction && isBinaryFile(audioProcessor.getCurrentFileName()));
-            }
-        }
+        setCodeEditorVisible(std::nullopt);
 	};
+    
 	juce::Path path;
     path.addTriangle(0.0f, 0.5f, 1.0f, 1.0f, 1.0f, 0.0f);
 	collapseButton.setShape(path, false, true, true);
@@ -55,17 +47,20 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
         audioProcessor.fileChangeBroadcaster.addChangeListener(this);
         audioProcessor.broadcaster.addChangeListener(this);
     }
+    
+    double codeEditorLayoutPreferredSize = std::any_cast<double>(audioProcessor.getProperty("codeEditorLayoutPreferredSize", -0.7));
+    double luaLayoutPreferredSize = std::any_cast<double>(audioProcessor.getProperty("luaLayoutPreferredSize", -0.7));
 
-    layout.setItemLayout(0, -0.3, -1.0, -0.7);
+    layout.setItemLayout(0, -0.3, -1.0, codeEditorLayoutPreferredSize);
     layout.setItemLayout(1, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE);
-    layout.setItemLayout(2, -0.0, -1.0, -0.3);
+    layout.setItemLayout(2, -0.0, -1.0, -(1.0 + codeEditorLayoutPreferredSize));
 
     addAndMakeVisible(settings);
     addAndMakeVisible(resizerBar);
 
-    luaLayout.setItemLayout(0, -0.3, -1.0, -0.7);
+    luaLayout.setItemLayout(0, -0.3, -1.0, luaLayoutPreferredSize);
     luaLayout.setItemLayout(1, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE);
-    luaLayout.setItemLayout(2, -0.1, -1.0, -0.3);
+    luaLayout.setItemLayout(2, -0.1, -1.0, -(1.0 + luaLayoutPreferredSize));
 
     addAndMakeVisible(lua);
     addAndMakeVisible(luaResizerBar);
@@ -79,7 +74,6 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
         visualiserSettingsWindow.setVisible(false);
     };
 
-    visualiserSettingsWindow.centreWithSize(550, 400);
 #if JUCE_WINDOWS
     // if not standalone, use native title bar for compatibility with DAWs
     visualiserSettingsWindow.setUsingNativeTitleBar(processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone);
@@ -97,6 +91,53 @@ OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
     audioProcessor.fileChangeBroadcaster.removeChangeListener(this);
 }
 
+void OscirenderAudioProcessorEditor::setCodeEditorVisible(std::optional<bool> visible) {
+    juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+    int originalIndex = audioProcessor.getCurrentFileIndex();
+    int index = editingCustomFunction ? 0 : audioProcessor.getCurrentFileIndex() + 1;
+    if (originalIndex != -1 || editingCustomFunction) {
+        codeEditors[index]->setVisible(visible.has_value() ? visible.value() : !codeEditors[index]->isVisible());
+        updateCodeEditor(!editingCustomFunction && isBinaryFile(audioProcessor.getCurrentFileName()));
+    }
+}
+
+bool OscirenderAudioProcessorEditor::isInterestedInFileDrag(const juce::StringArray& files) {
+    if (files.size() != 1) {
+        return false;
+    }
+    juce::File file(files[0]);
+    return
+        file.hasFileExtension("wav") ||
+        file.hasFileExtension("aiff") ||
+        file.hasFileExtension("osci") ||
+        file.hasFileExtension("txt") ||
+        file.hasFileExtension("lua") ||
+        file.hasFileExtension("svg") ||
+        file.hasFileExtension("obj") ||
+        file.hasFileExtension("gif") ||
+        file.hasFileExtension("png") ||
+        file.hasFileExtension("jpg") ||
+        file.hasFileExtension("gpla");
+}
+
+void OscirenderAudioProcessorEditor::filesDropped(const juce::StringArray& files, int x, int y) {
+    if (files.size() != 1) {
+        return;
+    }
+    juce::File file(files[0]);
+    
+    if (file.hasFileExtension("osci")) {
+        openProject(file);
+    } else {
+        juce::SpinLock::ScopedLockType lock1(audioProcessor.parsersLock);
+        juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
+        
+        audioProcessor.addFile(file);
+        addCodeEditor(audioProcessor.getCurrentFileIndex());
+        fileUpdated(audioProcessor.getCurrentFileName());
+    }
+}
+
 bool OscirenderAudioProcessorEditor::isBinaryFile(juce::String name) {
     return name.endsWith(".gpla") || name.endsWith(".gif") || name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".wav") || name.endsWith(".aiff");
 }
@@ -110,7 +151,8 @@ void OscirenderAudioProcessorEditor::initialiseCodeEditors() {
     for (int i = 0; i < audioProcessor.numFiles(); i++) {
         addCodeEditor(i);
     }
-    fileUpdated(audioProcessor.getCurrentFileName());
+    bool codeEditorVisible = std::any_cast<bool>(audioProcessor.getProperty("codeEditorVisible", false));
+    fileUpdated(audioProcessor.getCurrentFileName(), codeEditorVisible);
 }
 
 void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
@@ -118,6 +160,8 @@ void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
 }
 
 void OscirenderAudioProcessorEditor::resized() {
+    CommonPluginEditor::resized();
+    
     auto area = getLocalBounds();
 
     if (audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
@@ -218,6 +262,10 @@ void OscirenderAudioProcessorEditor::resized() {
     }
 
     settings.setBounds(area);
+    
+    audioProcessor.setProperty("codeEditorLayoutPreferredSize", layout.getItemCurrentRelativeSize(0));
+    audioProcessor.setProperty("luaLayoutPreferredSize", luaLayout.getItemCurrentRelativeSize(0));
+    
     repaint();
 }
 
@@ -299,6 +347,9 @@ void OscirenderAudioProcessorEditor::updateCodeEditor(bool binaryFile, bool shou
             updatingDocumentsWithParserLock = false;
         }
     }
+    
+    audioProcessor.setProperty("codeEditorVisible", visible);
+    
     triggerAsyncUpdate();
 }
 
@@ -335,7 +386,7 @@ void OscirenderAudioProcessorEditor::toggleLayout(juce::StretchableLayoutManager
     layout.getItemLayout(2, minSize, maxSize, preferredSize);
     layout.getItemLayout(0, otherMinSize, otherMaxSize, otherPreferredSize);
 
-    if (preferredSize == CLOSED_PREF_SIZE) {
+    if (layout.getItemCurrentAbsoluteSize(2) <= CLOSED_PREF_SIZE) {
         double otherPrefSize = -(1 + prefSize);
         if (prefSize > 0) {
             otherPrefSize = -1.0;

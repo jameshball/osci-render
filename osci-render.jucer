@@ -4,7 +4,7 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginCharacteristicsValue="pluginWantsMidiIn"
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
-              version="2.4.3.3" companyName="James H Ball" companyWebsite="https://osci-render.com"
+              version="2.4.8.0" companyName="James H Ball" companyWebsite="https://osci-render.com"
               companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;SOSCI_FEATURES=1"
               pluginAUMainType="'aumf'">
   <MAINGROUP id="j5Ge2T" name="osci-render">
@@ -37,13 +37,13 @@
         <FILE id="RgmiPU" name="no_reflection.jpg" compile="0" resource="1"
               file="Resources/oscilloscope/no_reflection.jpg"/>
         <FILE id="dNtZYs" name="noise.jpg" compile="0" resource="1" file="Resources/oscilloscope/noise.jpg"/>
-        <FILE id="FyEDbA" name="real.jpg" compile="0" resource="1" file="Resources/oscilloscope/real.jpg"/>
-        <FILE id="v8E6y9" name="real_reflection.jpg" compile="0" resource="1"
-              file="Resources/oscilloscope/real_reflection.jpg"/>
-        <FILE id="QrCP4w" name="vector_display.jpg" compile="0" resource="1"
-              file="Resources/oscilloscope/vector_display.jpg"/>
-        <FILE id="s3VNsJ" name="vector_display_reflection.jpg" compile="0"
-              resource="1" file="Resources/oscilloscope/vector_display_reflection.jpg"/>
+        <FILE id="ZeLdkV" name="real.png" compile="0" resource="1" file="Resources/oscilloscope/real.png"/>
+        <FILE id="LRgixi" name="real_reflection.png" compile="0" resource="1"
+              file="Resources/oscilloscope/real_reflection.png"/>
+        <FILE id="arGLS1" name="vector_display.png" compile="0" resource="1"
+              file="Resources/oscilloscope/vector_display.png"/>
+        <FILE id="a6URcP" name="vector_display_reflection.png" compile="0"
+              resource="1" file="Resources/oscilloscope/vector_display_reflection.png"/>
       </GROUP>
       <GROUP id="{82BCD6F1-A8BF-F30B-5587-81EE70168883}" name="svg">
         <FILE id="rl17ZK" name="cog.svg" compile="0" resource="1" file="Resources/svg/cog.svg"/>
@@ -110,9 +110,6 @@
               file="Source/audio/PerspectiveEffect.cpp"/>
         <FILE id="h0dMim" name="PerspectiveEffect.h" compile="0" resource="0"
               file="Source/audio/PerspectiveEffect.h"/>
-        <FILE id="t2bsR8" name="PitchDetector.cpp" compile="1" resource="0"
-              file="Source/audio/PitchDetector.cpp"/>
-        <FILE id="rQC2gX" name="PitchDetector.h" compile="0" resource="0" file="Source/audio/PitchDetector.h"/>
         <FILE id="t5g8pf" name="PublicSynthesiser.h" compile="0" resource="0"
               file="Source/audio/PublicSynthesiser.h"/>
         <FILE id="Q5kjpU" name="SampleRateManager.h" compile="0" resource="0"
@@ -619,6 +616,10 @@
               file="Source/UGen/ugen_JuceUtility.h"/>
       </GROUP>
       <GROUP id="{16A8DC64-BA02-898D-4DBA-AA3DDF6F9297}" name="visualiser">
+        <FILE id="DkDKBX" name="AfterglowFragmentShader.glsl" compile="0" resource="0"
+              file="Source/visualiser/AfterglowFragmentShader.glsl"/>
+        <FILE id="eM1kV3" name="AfterglowVertexShader.glsl" compile="0" resource="0"
+              file="Source/visualiser/AfterglowVertexShader.glsl"/>
         <FILE id="kfMvdQ" name="BlurFragmentShader.glsl" compile="0" resource="0"
               file="Source/visualiser/BlurFragmentShader.glsl" xcodeResource="0"/>
         <FILE id="c59gvD" name="BlurVertexShader.glsl" compile="0" resource="0"

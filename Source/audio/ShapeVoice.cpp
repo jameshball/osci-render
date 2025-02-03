@@ -83,7 +83,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     if (audioProcessor.midiEnabled->getBoolValue()) {
         actualFrequency = frequency * pitchWheelAdjustment;
     } else {
-        actualFrequency = audioProcessor.frequency;
+        actualFrequency = audioProcessor.frequency.load();
     }
 
     for (auto sample = startSample; sample < startSample + numSamples; ++sample) {
@@ -168,12 +168,16 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         }
 
         if (!renderingSample && frameDrawn >= drawnFrameLength) {
+            double currentShapeLength = 0;
+            if (currentShape < frame.size()) {
+                currentShapeLength = frame[currentShape]->len;
+            }
             if (sound.load() != nullptr && currentlyPlaying) {
                 frameLength = sound.load()->updateFrame(frame);
             }
             frameDrawn -= drawnFrameLength;
             if (traceEnabled) {
-                shapeDrawn = juce::jlimit(0.0, frame[currentShape]->len, frameDrawn);
+                shapeDrawn = juce::jlimit(0.0, currentShapeLength, frameDrawn);
             }
             currentShape = 0;
 

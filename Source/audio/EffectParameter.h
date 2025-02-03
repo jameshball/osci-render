@@ -11,8 +11,10 @@ public:
 	std::atomic<float> min = 0.0;
 	std::atomic<float> max = 0.0;
 	std::atomic<float> step = 0.0;
+    
+    std::atomic<float> defaultValue = 0.0;
 
-    FloatParameter(juce::String name, juce::String id, int versionHint, float value, float min, float max, float step = 0.69, juce::String label = "") : juce::AudioProcessorParameterWithID(juce::ParameterID(id, versionHint), name), step(step), value(value), label(label) {
+    FloatParameter(juce::String name, juce::String id, int versionHint, float value, float min, float max, float step = 0.69, juce::String label = "") : juce::AudioProcessorParameterWithID(juce::ParameterID(id, versionHint), name), step(step), value(value), label(label), defaultValue(value) {
 		// need to initialise here because of naming conflicts on Windows
 		this->min = min;
 		this->max = max;
@@ -65,7 +67,7 @@ public:
 	}
 
 	float getDefaultValue() const override {
-		return 0.0f;
+        return getNormalisedValue(defaultValue.load());
 	}
 
 	int getNumSteps() const override {
@@ -139,8 +141,10 @@ class IntParameter : public juce::AudioProcessorParameterWithID {
 public:
 	std::atomic<int> min = 0;
 	std::atomic<int> max = 10;
+    
+    std::atomic<int> defaultValue = 0;
 
-    IntParameter(juce::String name, juce::String id, int versionHint, int value, int min, int max) : AudioProcessorParameterWithID(juce::ParameterID(id, versionHint), name), value(value) {
+    IntParameter(juce::String name, juce::String id, int versionHint, int value, int min, int max) : AudioProcessorParameterWithID(juce::ParameterID(id, versionHint), name), value(value), defaultValue(value) {
 		// need to initialise here because of naming conflicts on Windows
 		this->min = min;
 		this->max = max;
@@ -192,7 +196,7 @@ public:
 	}
 
 	float getDefaultValue() const override {
-		return 0;
+        return getNormalisedValue(defaultValue.load());
 	}
 
 	int getNumSteps() const override {
@@ -335,8 +339,6 @@ public:
 	FloatParameter* lfoRate = new FloatParameter(name + " LFO Rate", paramID + "LfoRate", getVersionHint(), 1.0f, 0.0f, 10000.0f, 0.001f, "Hz");
 	BooleanParameter* sidechain = new BooleanParameter(name + " Sidechain Enabled", paramID + "Sidechain", getVersionHint(), false, "Toggles " + name + " Sidechain.");
 	std::atomic<float> phase = 0.0f;
-    // this is what the value will get reset to on double-click.
-    std::atomic<float> defaultValue;
 	juce::String description;
 
 	std::vector<juce::AudioProcessorParameter*> getParameters() {
@@ -405,5 +407,5 @@ public:
 		}
     }
 
-	EffectParameter(juce::String name, juce::String description, juce::String id, int versionHint, float value, float min, float max, float step = 0.0001, double smoothValueChange = SMOOTHING_SPEED_CONSTANT) : FloatParameter(name, id, versionHint, value, min, max, step), smoothValueChange(smoothValueChange), description(description) {}
+    EffectParameter(juce::String name, juce::String description, juce::String id, int versionHint, float value, float min, float max, float step = 0.0001, double smoothValueChange = SMOOTHING_SPEED_CONSTANT) : FloatParameter(name, id, versionHint, value, min, max, step), smoothValueChange(smoothValueChange), description(description) {}
 };

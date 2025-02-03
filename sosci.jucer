@@ -3,7 +3,7 @@
 <JUCERPROJECT id="HH2E72" name="sosci" projectType="audioplug" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginManufacturer="jameshball"
               aaxIdentifier="sh.ball.sosci" cppLanguageStandard="20" projectLineFeed="&#10;"
-              headerPath="./include" version="1.0.3.3" companyName="James H Ball"
+              headerPath="./include" version="1.1.2.0" companyName="James H Ball"
               companyWebsite="https://osci-render.com" companyEmail="james@ball.sh"
               defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;SOSCI_FEATURES=1"
               pluginManufacturerCode="Jhba" pluginCode="Sosc" pluginAUMainType="'aufx'">
@@ -32,13 +32,13 @@
         <FILE id="ZgcesA" name="no_reflection.jpg" compile="0" resource="1"
               file="Resources/oscilloscope/no_reflection.jpg"/>
         <FILE id="dNtZYs" name="noise.jpg" compile="0" resource="1" file="Resources/oscilloscope/noise.jpg"/>
-        <FILE id="xxXx4Q" name="real.jpg" compile="0" resource="1" file="Resources/oscilloscope/real.jpg"/>
-        <FILE id="nuEXXn" name="real_reflection.jpg" compile="0" resource="1"
-              file="Resources/oscilloscope/real_reflection.jpg"/>
-        <FILE id="bdQp0Q" name="vector_display.jpg" compile="0" resource="1"
-              file="Resources/oscilloscope/vector_display.jpg"/>
-        <FILE id="XojumY" name="vector_display_reflection.jpg" compile="0"
-              resource="1" file="Resources/oscilloscope/vector_display_reflection.jpg"/>
+        <FILE id="LAmlcm" name="real.png" compile="0" resource="1" file="Resources/oscilloscope/real.png"/>
+        <FILE id="FKUOID" name="real_reflection.png" compile="0" resource="1"
+              file="Resources/oscilloscope/real_reflection.png"/>
+        <FILE id="P9kYdq" name="vector_display.png" compile="0" resource="1"
+              file="Resources/oscilloscope/vector_display.png"/>
+        <FILE id="IiqBke" name="vector_display_reflection.png" compile="0"
+              resource="1" file="Resources/oscilloscope/vector_display_reflection.png"/>
       </GROUP>
       <GROUP id="{08DE8F94-4A00-7C71-4AF3-4C34C821A5DF}" name="sosci">
         <FILE id="jtOYDo" name="clean.sosci" compile="0" resource="1" file="Resources/sosci/clean.sosci"/>
@@ -167,6 +167,10 @@
         <FILE id="NmptSY" name="Shape.h" compile="0" resource="0" file="Source/shape/Shape.h"/>
       </GROUP>
       <GROUP id="{04ACA01B-2ADE-8356-BF1E-32942E0F3CFA}" name="visualiser">
+        <FILE id="O444rE" name="AfterglowFragmentShader.glsl" compile="0" resource="0"
+              file="Source/visualiser/AfterglowFragmentShader.glsl"/>
+        <FILE id="kG6Zku" name="AfterglowVertexShader.glsl" compile="0" resource="0"
+              file="Source/visualiser/AfterglowVertexShader.glsl"/>
         <FILE id="Y4j91J" name="BlurFragmentShader.glsl" compile="0" resource="0"
               file="Source/visualiser/BlurFragmentShader.glsl"/>
         <FILE id="Fimn0E" name="BlurVertexShader.glsl" compile="0" resource="0"

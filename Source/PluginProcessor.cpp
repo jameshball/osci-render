@@ -103,10 +103,15 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
         std::make_shared<SmoothEffect>(),
         new EffectParameter("Smoothing", "This works as a low-pass frequency filter that removes high frequencies, making the image look smoother, and audio sound less harsh.", "smoothing", VERSION_HINT, 0.75, 0.0, 1.0)
     ));
-    toggleableEffects.push_back(std::make_shared<Effect>(
+    std::shared_ptr<Effect> wobble = std::make_shared<Effect>(
         wobbleEffect,
-        new EffectParameter("Wobble", "Adds a sine wave of the prominent frequency in the audio currently playing. The sine wave's frequency is slightly offset to create a subtle 'wobble' in the image. Increasing the slider increases the strength of the wobble.", "wobble", VERSION_HINT, 0.3, 0.0, 1.0)
-    ));
+        std::vector<EffectParameter*>{
+            new EffectParameter("Wobble Amount", "Adds a sine wave of the prominent frequency in the audio currently playing. The sine wave's frequency is slightly offset to create a subtle 'wobble' in the image. Increasing the slider increases the strength of the wobble.", "wobble", VERSION_HINT, 0.3, 0.0, 1.0),
+            new EffectParameter("Wobble Phase", "Controls the phase of the wobble.", "wobblePhase", VERSION_HINT, 0.0, -1.0, 1.0),
+        }
+    );
+    wobble->getParameter("wobblePhase")->lfo->setUnnormalisedValueNotifyingHost((int) LfoType::Sawtooth);
+    toggleableEffects.push_back(wobble);
     toggleableEffects.push_back(std::make_shared<Effect>(
         delayEffect,
         std::vector<EffectParameter*>{
@@ -321,7 +326,6 @@ void OscirenderAudioProcessor::openFile(int index) {
 	if (index < 0 || index >= fileBlocks.size()) {
 		return;
 	}
-    juce::SpinLock::ScopedLockType lock(fontLock);
     parsers[index]->parse(juce::String(fileIds[index]), fileNames[index].fromLastOccurrenceOf(".", true, false), std::make_unique<juce::MemoryInputStream>(*fileBlocks[index], false), font);
     changeCurrentFile(index);
 }
@@ -673,6 +677,8 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
     xml->setAttribute("objectServerPort", objectServerPort);
 
     recordingParameters.save(xml.get());
+    
+    saveProperties(*xml);
 
     copyXmlToBinary(*xml, destData);
 }
@@ -756,7 +762,6 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
             auto family = fontXml->getStringAttribute("family");
             auto bold = fontXml->getBoolAttribute("bold");
             auto italic = fontXml->getBoolAttribute("italic");
-            juce::SpinLock::ScopedLockType lock(fontLock);
             font = juce::Font(family, 1.0, (bold ? juce::Font::bold : 0) | (italic ? juce::Font::italic : 0));
         }
 
@@ -792,6 +797,8 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         objectServer.reload();
 
         recordingParameters.load(xml.get());
+        
+        loadProperties(*xml);
 
         broadcaster.sendChangeMessage();
         prevMidiEnabled = !midiEnabled->getBoolValue();

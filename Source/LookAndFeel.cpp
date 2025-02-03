@@ -28,6 +28,7 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     setColour(juce::TextButton::buttonOnColourId, Colours::darker);
     setColour(juce::AlertWindow::outlineColourId, Colours::darker);
     setColour(juce::AlertWindow::backgroundColourId, Colours::darker);
+    setColour(juce::ColourSelector::backgroundColourId, Colours::darker);
 
     // combo box
     setColour(juce::ComboBox::backgroundColourId, Colours::veryDark);
