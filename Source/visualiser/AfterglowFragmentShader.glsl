@@ -12,7 +12,9 @@ float hypTan(float x) {
 
 void main() {
     vec4 line = texture2D(uTexture0, vTexCoord);
-    float fade = fadeAmount * hypTan(min(line.r / afterglowAmount, 10.0));
+    float x = min(line.r / afterglowAmount, 10.0);
+    float minFade = 0.1 * (1.0 - clamp(afterglowAmount / 10.0, 0.0, 1.0));
+    float fade = fadeAmount * ((1.0 - minFade) * hypTan(x) + minFade);
     fade = clamp(fade, 0.0, fadeAmount);
     
     gl_FragColor = vec4(0.0, 0.0, 0.0, fade);

@@ -225,3 +225,79 @@ void CommonAudioProcessor::removeAudioPlayerListener(AudioPlayerListener* listen
     juce::SpinLock::ScopedLockType lock(audioPlayerListenersLock);
     audioPlayerListeners.erase(std::remove(audioPlayerListeners.begin(), audioPlayerListeners.end(), listener), audioPlayerListeners.end());
 }
+
+std::any CommonAudioProcessor::getProperty(const std::string& key) {
+    juce::SpinLock::ScopedLockType lock(propertiesLock);
+    return properties[key];
+}
+
+std::any CommonAudioProcessor::getProperty(const std::string& key, std::any defaultValue) {
+    juce::SpinLock::ScopedLockType lock(propertiesLock);
+    auto it = properties.find(key);
+    if (it == properties.end()) {
+        properties[key] = defaultValue;
+        return defaultValue;
+    }
+    return it->second;
+}
+
+void CommonAudioProcessor::setProperty(const std::string& key, std::any value) {
+    juce::SpinLock::ScopedLockType lock(propertiesLock);
+    properties[key] = value;
+}
+
+void CommonAudioProcessor::saveProperties(juce::XmlElement& xml) {
+    juce::SpinLock::ScopedLockType lock(propertiesLock);
+    
+    auto propertiesXml = xml.createNewChildElement("properties");
+    
+    for (auto& property : properties) {
+        auto element = propertiesXml->createNewChildElement("property");
+        element->setAttribute("key", property.first);
+        if (std::any_cast<int>(&property.second) != nullptr) {
+            element->setAttribute("type", "int");
+            element->setAttribute("value", std::any_cast<int>(property.second));
+        } else if (std::any_cast<float>(&property.second) != nullptr) {
+            element->setAttribute("type", "float");
+            element->setAttribute("value", std::any_cast<float>(property.second));
+        } else if (std::any_cast<double>(&property.second) != nullptr) {
+            element->setAttribute("type", "double");
+            element->setAttribute("value", std::any_cast<double>(property.second));
+        } else if (std::any_cast<bool>(&property.second) != nullptr) {
+            element->setAttribute("type", "bool");
+            element->setAttribute("value", std::any_cast<bool>(property.second));
+        } else if (std::any_cast<juce::String>(&property.second) != nullptr) {
+            element->setAttribute("type", "string");
+            element->setAttribute("value", std::any_cast<juce::String>(property.second));
+        } else {
+            jassertfalse;
+        }
+    }
+}
+
+void CommonAudioProcessor::loadProperties(juce::XmlElement& xml) {
+    juce::SpinLock::ScopedLockType lock(propertiesLock);
+    
+    auto propertiesXml = xml.getChildByName("properties");
+    
+    if (propertiesXml != nullptr) {
+        for (auto property : propertiesXml->getChildIterator()) {
+            auto key = property->getStringAttribute("key").toStdString();
+            auto type = property->getStringAttribute("type");
+            
+            if (type == "int") {
+                properties[key] = property->getIntAttribute("value");
+            } else if (type == "float") {
+                properties[key] = property->getDoubleAttribute("value");
+            } else if (type == "double") {
+                properties[key] = property->getDoubleAttribute("value");
+            } else if (type == "bool") {
+                properties[key] = property->getBoolAttribute("value");
+            } else if (type == "string") {
+                properties[key] = property->getStringAttribute("value");
+            } else {
+                jassertfalse;
+            }
+        }
+    }
+}

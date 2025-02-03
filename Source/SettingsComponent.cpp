@@ -10,14 +10,17 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     addAndMakeVisible(midi);
     addChildComponent(txt);
     addChildComponent(frame);
+    
+    double midiLayoutPreferredSize = std::any_cast<double>(audioProcessor.getProperty("midiLayoutPreferredSize", pluginEditor.CLOSED_PREF_SIZE));
+    double mainLayoutPreferredSize = std::any_cast<double>(audioProcessor.getProperty("mainLayoutPreferredSize", -0.4));
 
-    midiLayout.setItemLayout(0, -0.1, -1.0, -1.0);
+    midiLayout.setItemLayout(0, -0.1, -1.0, -(1.0 + midiLayoutPreferredSize));
     midiLayout.setItemLayout(1, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE);
-    midiLayout.setItemLayout(2, pluginEditor.CLOSED_PREF_SIZE, -0.9, pluginEditor.CLOSED_PREF_SIZE);
-
-    mainLayout.setItemLayout(0, -0.1, -0.9, -0.4);
+    midiLayout.setItemLayout(2, pluginEditor.CLOSED_PREF_SIZE, -0.9, midiLayoutPreferredSize);
+    
+    mainLayout.setItemLayout(0, -0.1, -0.9, mainLayoutPreferredSize);
     mainLayout.setItemLayout(1, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE);
-    mainLayout.setItemLayout(2, -0.1, -0.9, -0.6);
+    mainLayout.setItemLayout(2, -0.1, -0.9, -(1.0 + mainLayoutPreferredSize));
 }
 
 
@@ -59,6 +62,9 @@ void SettingsComponent::resized() {
     }
 
     effects.setBounds(dummyBounds);
+    
+    audioProcessor.setProperty("midiLayoutPreferredSize", midiLayout.getItemCurrentRelativeSize(2));
+    audioProcessor.setProperty("mainLayoutPreferredSize", mainLayout.getItemCurrentRelativeSize(0));
 
     repaint();
 }

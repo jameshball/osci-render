@@ -2,7 +2,7 @@
 #include "CommonPluginEditor.h"
 #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
 
-CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String appName, juce::String projectFileType, int width, int height)
+CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String appName, juce::String projectFileType, int defaultWidth, int defaultHeight)
 	: AudioProcessorEditor(&p), audioProcessor(p), appName(appName), projectFileType(projectFileType)
 {
     if (!applicationFolder.exists()) {
@@ -37,6 +37,9 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     }
     
     addAndMakeVisible(visualiser);
+    
+    int width = std::any_cast<int>(audioProcessor.getProperty("appWidth", defaultWidth));
+    int height = std::any_cast<int>(audioProcessor.getProperty("appHeight", defaultHeight));
 
     visualiserSettings.setLookAndFeel(&getLookAndFeel());
     visualiserSettings.setSize(550, VISUALISER_SETTINGS_HEIGHT);
@@ -63,6 +66,11 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
 #if SOSCI_FEATURES
     sharedTextureManager.initGL();
 #endif
+}
+
+void CommonPluginEditor::resized() {
+    audioProcessor.setProperty("appWidth", getWidth());
+    audioProcessor.setProperty("appHeight", getHeight());
 }
 
 void CommonPluginEditor::initialiseMenuBar(juce::MenuBarModel& menuBarModel) {

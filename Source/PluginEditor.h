@@ -78,6 +78,7 @@ public:
 	void codeDocumentTextDeleted(int startIndex, int endIndex) override;
     void updateCodeDocument();
     void updateCodeEditor(bool binaryFile, bool shouldOpenEditor = false);
+    void setCodeEditorVisible(std::optional<bool> visible);
 
     bool keyPressed(const juce::KeyPress& key) override;
     void mouseDown(const juce::MouseEvent& event) override;

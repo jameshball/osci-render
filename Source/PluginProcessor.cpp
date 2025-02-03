@@ -665,6 +665,8 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
     xml->setAttribute("currentFile", currentFile);
 
     recordingParameters.save(xml.get());
+    
+    saveProperties(*xml);
 
     copyXmlToBinary(*xml, destData);
 }
@@ -780,6 +782,8 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         changeCurrentFile(xml->getIntAttribute("currentFile", -1));
 
         recordingParameters.load(xml.get());
+        
+        loadProperties(*xml);
 
         broadcaster.sendChangeMessage();
         prevMidiEnabled = !midiEnabled->getBoolValue();

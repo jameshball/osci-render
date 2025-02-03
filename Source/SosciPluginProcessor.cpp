@@ -122,6 +122,8 @@ void SosciAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
     }
 
     recordingParameters.save(xml.get());
+    
+    saveProperties(*xml);
 
     copyXmlToBinary(*xml, destData);
 }
@@ -182,6 +184,8 @@ void SosciAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
         }
 
         recordingParameters.load(xml.get());
+        
+        loadProperties(*xml);
     }
 }
 

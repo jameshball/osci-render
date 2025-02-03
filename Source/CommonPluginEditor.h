@@ -23,6 +23,7 @@ public:
     void openAudioSettings();
     void openRecordingSettings();
     void resetToDefault();
+    void resized() override;
 
 private:
     CommonAudioProcessor& audioProcessor;

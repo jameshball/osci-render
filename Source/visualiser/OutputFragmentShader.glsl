@@ -7,6 +7,7 @@ uniform sampler2D uTexture3; //screen
 uniform sampler2D uTexture4; //reflection
 uniform sampler2D uTexture5; //screen glow
 uniform float uExposure;
+uniform float uOverexposure;
 uniform float uLineSaturation;
 uniform float uScreenSaturation;
 uniform float uNoise;
@@ -76,7 +77,7 @@ void main() {
     light += uGlow * 0.3 * scatter.g * (2.0 + 1.0 * screen.g + 0.5 * screen.r);
     float tlight = 1.0-pow(2.0, -uExposure*light);
     float tlight2 = tlight * tlight * tlight;
-    gl_FragColor.rgb = mix(uColour, vec3(1.0), 0.3+tlight2*tlight2*0.5) * tlight;
+    gl_FragColor.rgb = mix(uColour, vec3(1.0), 0.3+tlight2*tlight2*uOverexposure) * tlight;
     gl_FragColor.rgb = desaturate(gl_FragColor.rgb, 1.0 - uLineSaturation);
     if (uRealScreen > 0.5) {
         // this isn't how light works, but it looks cool
