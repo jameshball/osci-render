@@ -21,6 +21,7 @@ private:
     void findWhite(double thresholdPow, bool invert);
     bool isOverThreshold(double pixel, double thresholdValue);
 	int jumpFrequency();
+    void handleError(juce::String message);
 
 	OscirenderAudioProcessor& audioProcessor;
 	juce::Random rng;

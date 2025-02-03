@@ -41,8 +41,7 @@ void FileParser::parse(juce::String fileId, juce::String extension, std::unique_
 		}
 		if (isBinary) {
 			gpla = std::make_shared<LineArtParser>(gplaData, bytesRead);
-		}
-		else {
+		} else {
 			stream->setPosition(0);
 			gpla = std::make_shared<LineArtParser>(stream->readEntireStreamAsString());
 		}
@@ -50,9 +49,13 @@ void FileParser::parse(juce::String fileId, juce::String extension, std::unique_
 		juce::MemoryBlock buffer{};
 		int bytesRead = stream->readIntoMemoryBlock(buffer);
 		img = std::make_shared<ImageParser>(audioProcessor, extension, buffer);
-	} else if (extension == ".wav" || extension == ".aiff") {
+	} else if (extension == ".wav" || extension == ".aiff" || extension == ".flac" || extension == ".ogg" || extension == ".mp3") {
 		wav = std::make_shared<WavParser>(audioProcessor);
-		wav->parse(std::move(stream));
+        if (!wav->parse(std::move(stream))) {
+            juce::MessageManager::callAsync([this] {
+                juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::AlertIconType::WarningIcon, "Error", "The audio file could not be loaded.");
+            });
+        }
 	}
 
 	isAnimatable = gpla != nullptr || (img != nullptr && extension == ".gif");

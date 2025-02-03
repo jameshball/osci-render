@@ -10,9 +10,9 @@ OsciMainMenuBarModel::OsciMainMenuBarModel(OscirenderAudioProcessor& p, Oscirend
         addTopLevelMenu("Audio");
     }
 
-    addMenuItem(0, "Open", [this] { editor.openProject(); });
-    addMenuItem(0, "Save", [this] { editor.saveProject(); });
-    addMenuItem(0, "Save As", [this] { editor.saveProjectAs(); });
+    addMenuItem(0, "Open Project", [this] { editor.openProject(); });
+    addMenuItem(0, "Save Project", [this] { editor.saveProject(); });
+    addMenuItem(0, "Save Project As", [this] { editor.saveProjectAs(); });
     if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
         addMenuItem(0, "Create New Project", [this] { editor.resetToDefault(); });
     }

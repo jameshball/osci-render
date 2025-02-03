@@ -109,6 +109,9 @@ bool OscirenderAudioProcessorEditor::isInterestedInFileDrag(const juce::StringAr
     return
         file.hasFileExtension("wav") ||
         file.hasFileExtension("aiff") ||
+        file.hasFileExtension("ogg") ||
+        file.hasFileExtension("flac") ||
+        file.hasFileExtension("mp3") ||
         file.hasFileExtension("osci") ||
         file.hasFileExtension("txt") ||
         file.hasFileExtension("lua") ||
@@ -139,7 +142,8 @@ void OscirenderAudioProcessorEditor::filesDropped(const juce::StringArray& files
 }
 
 bool OscirenderAudioProcessorEditor::isBinaryFile(juce::String name) {
-    return name.endsWith(".gpla") || name.endsWith(".gif") || name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".wav") || name.endsWith(".aiff");
+    name = name.toLowerCase();
+    return name.endsWith(".gpla") || name.endsWith(".gif") || name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".wav") || name.endsWith(".aiff") || name.endsWith(".ogg") || name.endsWith(".mp3") || name.endsWith(".flac");
 }
 
 // parsersLock must be held
