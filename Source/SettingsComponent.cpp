@@ -63,8 +63,10 @@ void SettingsComponent::resized() {
 
     effects.setBounds(dummyBounds);
     
-    audioProcessor.setProperty("midiLayoutPreferredSize", midiLayout.getItemCurrentRelativeSize(2));
-    audioProcessor.setProperty("mainLayoutPreferredSize", mainLayout.getItemCurrentRelativeSize(0));
+    if (isVisible() && getWidth() > 0 && getHeight() > 0) {
+        audioProcessor.setProperty("midiLayoutPreferredSize", midiLayout.getItemCurrentRelativeSize(2));
+        audioProcessor.setProperty("mainLayoutPreferredSize", mainLayout.getItemCurrentRelativeSize(0));
+    }
 
     repaint();
 }
