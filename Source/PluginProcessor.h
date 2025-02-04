@@ -21,7 +21,6 @@
 #include "audio/SampleRateManager.h"
 #include <numbers>
 #include "audio/DelayEffect.h"
-#include "audio/PitchDetector.h"
 #include "audio/WobbleEffect.h"
 #include "audio/PerspectiveEffect.h"
 #include "obj/ObjectServer.h"
@@ -68,25 +67,25 @@ public:
             "Frequency",
             "Controls how many times per second the image is drawn, thereby controlling the pitch of the sound. Lower frequencies result in more-accurately drawn images, but more flickering, and vice versa.",
             "frequency",
-            VERSION_HINT, 220.0, 0.0, 12000.0
+            VERSION_HINT, 220.0, 0.0, 4200.0
         )
     );
     
-    std::shared_ptr<Effect> traceMax = std::make_shared<Effect>(
-        new EffectParameter(
-            "Trace max",
-            "Defines the maximum proportion of the image that is drawn before skipping to the next frame. This has the effect of 'tracing' out the image from a single dot when animated. By default, we draw until the end of the frame, so this value is 1.0.",
-            "traceMax",
-            VERSION_HINT, 0.75, 0.0, 1.0
-        )
-    );
-    std::shared_ptr<Effect> traceMin = std::make_shared<Effect>(
-        new EffectParameter(
-            "Trace min",
-            "Defines the proportion of the image that drawing starts from. This has the effect of 'tracing' out the image from a single dot when animated. By default, we start drawing from the beginning of the frame, so this value is 0.0.",
-            "traceMin",
-            VERSION_HINT, 0.25, 0.0, 1.0
-        )
+    std::shared_ptr<Effect> trace = std::make_shared<Effect>(
+        std::vector<EffectParameter*>{
+            new EffectParameter(
+                "Trace Start",
+                "Defines how far into the frame the drawing is started at. This has the effect of 'tracing' out the image from a single dot when animated. By default, we start drawing from the beginning of the frame, so this value is 0.0.",
+                "traceStart",
+                VERSION_HINT, 0.0, 0.0, 1.0, 0.001, 0.001
+            ),
+            new EffectParameter(
+                "Trace Length",
+                "Defines how much of the frame is drawn per cycle. This has the effect of 'tracing' out the image from a single dot when animated. By default, we draw the whole frame, corresponding to a value of 1.0.",
+                "traceLength",
+                VERSION_HINT, 1.0, 0.0, 1.0, 0.001, 0.001
+            ),
+        }
     );
 
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
@@ -111,7 +110,7 @@ public:
     
     BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false, "Enable MIDI input for the synth. If disabled, the synth will play a constant tone, as controlled by the frequency slider.");
     BooleanParameter* inputEnabled = new BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false, "Enable to use input audio, instead of the generated audio.");
-    std::atomic<float> frequency = 220.0f;
+    std::atomic<double> frequency = 220.0;
     
     juce::SpinLock parsersLock;
     std::vector<std::shared_ptr<FileParser>> parsers;
@@ -177,10 +176,8 @@ public:
 
     double animationTime = 0.f;
     
-    PitchDetector pitchDetector{*this};
-    std::shared_ptr<WobbleEffect> wobbleEffect = std::make_shared<WobbleEffect>(pitchDetector);
+    std::shared_ptr<WobbleEffect> wobbleEffect = std::make_shared<WobbleEffect>(*this);
 
-    juce::SpinLock fontLock;
     juce::Font font = juce::Font(juce::Font::getDefaultSansSerifFontName(), 1.0f, juce::Font::plain);
 
     ShapeSound::Ptr objectServerSound = new ShapeSound();
@@ -204,12 +201,13 @@ public:
     juce::String getFileId(int index);
 	std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
     void setObjectServerRendering(bool enabled);
+    void setObjectServerPort(int port);
     void addErrorListener(ErrorListener* listener);
     void removeErrorListener(ErrorListener* listener);
     void notifyErrorListeners(int lineNumber, juce::String id, juce::String error);
 private:
     
-    bool prevMidiEnabled = !midiEnabled->getBoolValue();
+    std::atomic<bool> prevMidiEnabled = !midiEnabled->getBoolValue();
 
     juce::SpinLock audioThreadCallbackLock;
     std::function<void(const juce::AudioBuffer<float>&)> audioThreadCallback;

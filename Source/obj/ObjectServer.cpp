@@ -10,8 +10,14 @@ ObjectServer::~ObjectServer() {
     stopThread(1000);
 }
 
+void ObjectServer::reload() {
+    stopThread(1000);
+    startThread();
+}
+
 void ObjectServer::run() {
-    if (socket.createListener(51677, "127.0.0.1")) {
+    port = std::any_cast<int>(audioProcessor.getProperty("objectServerPort", 51677));
+    if (socket.createListener(port, "127.0.0.1")) {
         // preallocating a large buffer to avoid allocations in the loop
         std::unique_ptr<char[]> message{ new char[10 * 1024 * 1024] };
 
@@ -25,6 +31,7 @@ void ObjectServer::run() {
                     while (!threadShouldExit() && connection->isConnected()) {
                         if (connection->waitUntilReady(true, 200) == 1) {
                             int i = 0;
+                            std::vector<Line> frameContainer;
 
                             // read until we get a newline
                             while (!threadShouldExit()) {
@@ -52,36 +59,55 @@ void ObjectServer::run() {
                                 break;
                             }
 
-                            // format of json is:
-                            // {
-                            //   "objects": [
-                            //     {
-                            //       "name": "Line Art",
-                            //       "vertices": [
-                            //         [
-                            //           {
-                            //             "x": double value,
-                            //             "y": double value,
-                            //             "z": double value
-                            //           },
-                            //           ...
-                            //         ],
-                            //         ...
-                            //       ],
-                            //       "matrix": [
-                            //         16 double values
-                            //       ]
-                            //     }
-                            //   ],
-                            //   "focalLength": double value
-                            // }
+                            if (strncmp(message.get(), "R1BMQSAg", 8) == 0) {
+                                juce::MemoryOutputStream binStream;
+                                juce::String messageString = message.get();
+                                if (juce::Base64::convertFromBase64(binStream, messageString)) {
+                                    std::vector< std::vector<Line>> receivedFrames;
+                                    int bytesRead = binStream.getDataSize();
+                                    if (bytesRead < 8) return;
+                                    char* gplaData = (char*)binStream.getData();
+                                    receivedFrames = LineArtParser::parseBinaryFrames(gplaData, bytesRead);
+                                    if (receivedFrames.size() <= 0) continue;
+                                    frameContainer = receivedFrames[0];
+                                }
+                                else {
+                                    continue;
+                                }
+                            }
+                            else {
 
-                            auto json = juce::JSON::parse(message.get());
+                                // format of json is:
+                                // {
+                                //   "objects": [
+                                //     {
+                                //       "name": "Line Art",
+                                //       "vertices": [
+                                //         [
+                                //           {
+                                //             "x": double value,
+                                //             "y": double value,
+                                //             "z": double value
+                                //           },
+                                //           ...
+                                //         ],
+                                //         ...
+                                //       ],
+                                //       "matrix": [
+                                //         16 double values
+                                //       ]
+                                //     }
+                                //   ],
+                                //   "focalLength": double value
+                                // }
 
-                            juce::Array<juce::var> objects = *json.getProperty("objects", juce::Array<juce::var>()).getArray();
-                            double focalLength = json.getProperty("focalLength", 1);
+                                auto json = juce::JSON::parse(message.get());
 
-                            std::vector<Line> frameContainer = LineArtParser::generateFrame(objects, focalLength);
+                                juce::Array<juce::var> objects = *json.getProperty("objects", juce::Array<juce::var>()).getArray();
+                                double focalLength = json.getProperty("focalLength", 1);
+
+                                frameContainer = LineArtParser::generateFrame(objects, focalLength);
+                            }
 
                             std::vector<std::unique_ptr<Shape>> frame;
 

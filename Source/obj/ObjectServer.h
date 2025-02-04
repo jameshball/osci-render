@@ -10,9 +10,11 @@ public:
     ~ObjectServer();
 
     void run() override;
+    void reload();
 
 private:
     OscirenderAudioProcessor& audioProcessor;
 
+    int port = 51677;
     juce::StreamingSocket socket;
 };

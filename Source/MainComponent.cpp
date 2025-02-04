@@ -17,9 +17,8 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 		chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
 			juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
 			bool fileAdded = false;
-			for (auto& url : chooser.getURLResults()) {
-				if (url.isLocalFile()) {
-					juce::File file = url.getLocalFile();
+			for (auto& file : chooser.getResults()) {
+				if (file != juce::File()) {
                     audioProcessor.lastOpenedDirectory = file.getParentDirectory();
 					audioProcessor.addFile(file);
 					pluginEditor.addCodeEditor(audioProcessor.getCurrentFileIndex());

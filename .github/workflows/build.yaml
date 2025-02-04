@@ -37,9 +37,9 @@ jobs:
         shell: bash
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: Binaries
+          name: "${{ matrix.project }}-${{ matrix.version }}-linux"
           path: bin
           retention-days: 7
   build-macos:
@@ -128,9 +128,9 @@ jobs:
         run: spctl -a -vvv -t install "bin/${{ matrix.project }}-${{ matrix.version }}.pkg"
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: Binaries
+          name: "${{ matrix.project }}-${{ matrix.version }}-macos"
           path: bin
           retention-days: 7
   build-windows:
@@ -178,8 +178,8 @@ jobs:
         run: mv "packaging/build/${{ matrix.project }}.exe" "bin/${{ matrix.project }}-${{ matrix.version }}.exe"
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: Binaries
+          name: "${{ matrix.project }}-${{ matrix.version }}-windows"
           path: bin
           retention-days: 7

@@ -69,7 +69,10 @@ void Effect::animateValues(double volume) {
 				actualValues[i] = ((float)rand() / RAND_MAX) * (maxValue - minValue) + minValue;
 				break;
 			default:
-				double weight = parameter->smoothValueChange ? 0.0005 : 1.0;
+                double weight = 1.0;
+                if (parameter->smoothValueChange < 1.0 && parameter->smoothValueChange > SMOOTHING_SPEED_MIN) {
+                    weight = parameter->smoothValueChange.load() * 192000 / sampleRate;
+                }
 				double newValue;
 				if (parameter->sidechain != nullptr && parameter->sidechain->getBoolValue()) {
 					newValue = volume * (maxValue - minValue) + minValue;
