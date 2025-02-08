@@ -239,6 +239,14 @@ void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
             for (const OsciPoint& rawPoint : points) {
                 OsciPoint point = applyEffects(rawPoint);
                 
+#if SOSCI_FEATURES
+                if (settings.isGoniometer()) {
+                    // x and y go to a diagonal currently, so we need to scale them down, and rotate them
+                    point.scale(1.0 / std::sqrt(2.0), 1.0 / std::sqrt(2.0), 1.0);
+                    point.rotate(0, 0, juce::MathConstants<double>::pi / 4);
+                }
+#endif
+                
                 xSamples.push_back(point.x);
                 ySamples.push_back(point.y);
                 zSamples.push_back(point.z);

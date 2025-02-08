@@ -52,9 +52,9 @@ public:
 #endif
 
 #if SOSCI_FEATURES
-    int VISUALISER_SETTINGS_HEIGHT = 1100;
+    int VISUALISER_SETTINGS_HEIGHT = 1150;
 #else
-    int VISUALISER_SETTINGS_HEIGHT = 700;
+    int VISUALISER_SETTINGS_HEIGHT = 750;
 #endif
 
     VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.visualiserParameters, 3);

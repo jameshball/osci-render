@@ -97,6 +97,7 @@ public:
 #if SOSCI_FEATURES
     BooleanParameter* flipVertical = new BooleanParameter("Flip Vertical", "flipVertical", VERSION_HINT, false, "Flips the visualiser vertically.");
     BooleanParameter* flipHorizontal = new BooleanParameter("Flip Horizontal", "flipHorizontal", VERSION_HINT, false, "Flips the visualiser horizontally.");
+    BooleanParameter* goniometer = new BooleanParameter("Goniometer", "goniometer", VERSION_HINT, false, "Rotates the visualiser to replicate a goniometer display to show the phase relationship between two channels.");
 
     std::shared_ptr<Effect> screenSaturationEffect = std::make_shared<Effect>(
         new EffectParameter(
@@ -301,6 +302,7 @@ public:
 #if SOSCI_FEATURES
         flipVertical,
         flipHorizontal,
+        goniometer,
 #endif
     };
     std::vector<IntParameter*> integers = {
@@ -388,6 +390,10 @@ public:
 
     bool isFlippedHorizontal() {
         return parameters.flipHorizontal->getBoolValue();
+    }
+    
+    bool isGoniometer() {
+        return parameters.goniometer->getBoolValue();
     }
 #endif
     
@@ -505,6 +511,7 @@ private:
 
     jux::SwitchButton flipVerticalToggle{parameters.flipVertical};
     jux::SwitchButton flipHorizontalToggle{parameters.flipHorizontal};
+    jux::SwitchButton goniometerToggle{parameters.goniometer};
 #endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserSettings)

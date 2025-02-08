@@ -216,7 +216,7 @@ OsciPoint ImageParser::getSample() {
             scanX += increment;
             if (scanX >= 1) {
                 scanX = -1;
-                scanY -= audioProcessor.imageStride->getActualValue() / 100;
+                scanY -= scanIncrement;
             }
             if (scanY < -1) {
                 double offset = ((scanCount % 15) / 15.0) * scanIncrement;
