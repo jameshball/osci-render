@@ -22,6 +22,8 @@ private:
     bool isOverThreshold(double pixel, double thresholdValue);
 	int jumpFrequency();
     void handleError(juce::String message);
+    
+    const juce::String ALGORITHM = "HILLIGOSS";
 
 	OscirenderAudioProcessor& audioProcessor;
 	juce::Random rng;
@@ -31,4 +33,9 @@ private:
 	int currentX, currentY;
 	int width, height;
 	int count = 0;
+    
+    // experiments
+    double scanX = -1;
+    double scanY = 1;
+    int scanCount = 0;
 };

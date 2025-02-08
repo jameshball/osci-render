@@ -25,8 +25,8 @@ void main () {
     
     vec2 aStartPos = aStart.xy;
     vec2 aEndPos = aEnd.xy;
-    float aStartBrightness = aStart.z;
-    float aEndBrightness = aEnd.z;
+    float aStartBrightness = clamp(aStart.z, 0.0, 1.0);
+    float aEndBrightness = clamp(aEnd.z, 0.0, 1.0);
     
     // `dir` vector is storing the normalized difference
     // between end and start

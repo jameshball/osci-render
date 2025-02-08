@@ -181,20 +181,52 @@ void ImageParser::findNearestNeighbour(int searchRadius, float thresholdPow, int
 }
 
 OsciPoint ImageParser::getSample() {
-    if (count % jumpFrequency() == 0) {
-        resetPosition();
+    if (ALGORITHM == "HILLIGOSS") {
+        if (count % jumpFrequency() == 0) {
+            resetPosition();
+        }
+        
+        if (count % 10 * jumpFrequency() == 0) {
+            std::fill(visited.begin(), visited.end(), false);
+        }
+        
+        float thresholdPow = audioProcessor.imageThreshold->getActualValue() * 10 + 1;
+        
+        findNearestNeighbour(10, thresholdPow, audioProcessor.imageStride->getActualValue(), audioProcessor.invertImage->getValue());
+        float maxDim = juce::jmax(width, height);
+        count++;
+        float widthDiff = (maxDim - width) / 2;
+        float heightDiff = (maxDim - height) / 2;
+        return OsciPoint(2 * (currentX + widthDiff) / maxDim - 1, 2 * (currentY + heightDiff) / maxDim - 1);
+    } else {
+        double scanIncrement = audioProcessor.imageStride->getActualValue() / 100;
+        
+        double pixel = 0;
+        int maxIterations = 10000;
+        while (pixel <= audioProcessor.imageThreshold->getActualValue() && maxIterations > 0) {
+            int x = (int) ((scanX + 1) * width / 2);
+            int y = (int) ((scanY + 1) * height / 2);
+            pixel = getPixelValue(x, y, audioProcessor.invertImage->getValue());
+            
+            double increment = 0.01;
+            if (pixel > audioProcessor.imageThreshold->getActualValue()) {
+                increment = (1 - tanh(4 * pixel)) * 0.3;
+            }
+            
+            scanX += increment;
+            if (scanX >= 1) {
+                scanX = -1;
+                scanY -= audioProcessor.imageStride->getActualValue() / 100;
+            }
+            if (scanY < -1) {
+                double offset = ((scanCount % 15) / 15.0) * scanIncrement;
+                scanY = 1 - offset;
+                scanCount++;
+            }
+            
+            maxIterations--;
+        }
+        
+        return OsciPoint(scanX, scanY);
     }
-    
-    if (count % 10 * jumpFrequency() == 0) {
-        std::fill(visited.begin(), visited.end(), false);
-    }
-
-    float thresholdPow = audioProcessor.imageThreshold->getActualValue() * 10 + 1;
-
-    findNearestNeighbour(10, thresholdPow, audioProcessor.imageStride->getActualValue(), audioProcessor.invertImage->getValue());
-    float maxDim = juce::jmax(width, height);
-    count++;
-    float widthDiff = (maxDim - width) / 2;
-    float heightDiff = (maxDim - height) / 2;
-    return OsciPoint(2 * (currentX + widthDiff) / maxDim - 1, 2 * (currentY + heightDiff) / maxDim - 1);
 }
