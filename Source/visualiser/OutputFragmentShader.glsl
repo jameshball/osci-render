@@ -65,7 +65,7 @@ void main() {
     // r components have grid; g components do not.
     vec4 screen = texture2D(uTexture3, vTexCoord);
     vec4 tightGlow = texture2D(uTexture1, linePos);
-    vec4 scatter = texture2D(uTexture2, linePos) + (1.0 - uRealScreen) * max(uAmbient - 0.35, 0.0);
+    vec4 scatter = texture2D(uTexture2, linePos);
     
     if (uRealScreen > 0.5) {
         vec4 reflection = texture2D(uTexture4, vTexCoord);
@@ -73,8 +73,14 @@ void main() {
         scatter += max4(screenGlow * reflection * max(1.0 - 0.5 * uAmbient, 0.0), vec4(0.0));
     }
     
-    float light = line.r + uGlow * 1.5 * screen.g * screen.g * tightGlow.r;
-    light += uGlow * 0.3 * scatter.g * (2.0 + 1.0 * screen.g + 0.5 * screen.r);
+    // making the range of the glow slider more useful
+    float glow = 1.05 * pow(uGlow, 1.5);
+    float light = line.r + glow * 1.5 * screen.g * screen.g * tightGlow.r;
+    float scatterScalar = 0.3 * (2.0 + 1.0 * screen.g + 0.5 * screen.r);
+    light += glow * scatter.g * scatterScalar;
+    // add ambient light to graticule
+    light += (1.0 - uRealScreen) * max(uAmbient - 0.35, 0.0) * scatterScalar;
+    
     float tlight = 1.0-pow(2.0, -uExposure*light);
     float tlight2 = tlight * tlight * tlight;
     gl_FragColor.rgb = mix(uColour, vec3(1.0), 0.3+tlight2*tlight2*uOverexposure) * tlight;

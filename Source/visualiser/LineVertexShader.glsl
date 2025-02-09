@@ -7,6 +7,7 @@ uniform float uSize;
 uniform float uNEdges;
 uniform float uFadeAmount;
 uniform float uIntensity;
+uniform float uShutterLength;
 uniform float uGain;
 attribute vec3 aStart, aEnd;
 attribute float aIdx;
@@ -56,17 +57,20 @@ void main () {
         uvl.w = aStartBrightness;
     }
     // `side` corresponds to shift to the "right" or "left"
-    float side = (mod(idx, 2.0)-0.5)*2.0;
+    float side = (mod(idx, 2.0) - 0.5) * 2.0;
     uvl.y = side * vSize;
     
-    uvl.w *= intensity * mix(1.0-uFadeAmount, 1.0, floor(aIdx / 4.0 + 0.5)/uNEdges);
+    float intensityScale = floor(aIdx / 4.0 + 0.5)/uNEdges;
+    float avgIntensityScale = floor((uNEdges / 2.0) / 4.0 + 0.5)/uNEdges;
+    float shutterLength = clamp(uShutterLength, 0.0, 1.0);
+    float adjustedIntensity = mix(intensityScale, avgIntensityScale, shutterLength);
+    float intensityFade = mix(1.0 - uFadeAmount, 1.0, adjustedIntensity);
+    
+    uvl.w *= intensity * intensityFade;
                              
     vec4 pos = vec4((current+(tang*dir+norm*side)*vSize)*uInvert,0.0,1.0);
     gl_Position = pos;
-    vTexCoord = 0.5*pos.xy+0.5;
-    //float seed = floor(aIdx/4.0);
-    //seed = mod(sin(seed*seed), 7.0);
-    //if (mod(seed/2.0, 1.0)<0.5) gl_Position = vec4(10.0);
+    vTexCoord = 0.5 * pos.xy + 0.5;
 }
 
 )";

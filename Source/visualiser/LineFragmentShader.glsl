@@ -9,7 +9,6 @@ uniform float uSize;
 uniform float uIntensity;
 uniform vec2 uOffset;
 uniform vec2 uScale;
-uniform float uScreenOverlay;
 uniform float uFishEye;
 uniform sampler2D uScreen;
 varying float vSize;

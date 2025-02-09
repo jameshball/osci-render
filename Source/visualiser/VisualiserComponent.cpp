@@ -1091,8 +1091,11 @@ void VisualiserComponent::drawLine(const std::vector<float>& xPoints, const std:
     setOffsetAndScale(lineShader.get());
     
 #if SOSCI_FEATURES
-    lineShader->setUniform("uScreenOverlay", (GLfloat) screenOverlay);
     lineShader->setUniform("uFishEye", screenOverlay == ScreenOverlay::VectorDisplay ? VECTOR_DISPLAY_FISH_EYE : 0.0f);
+    lineShader->setUniform("uShutterLength", (GLfloat) settings.getShutterLength());
+#else
+    lineShader->setUniform("uFishEye", 0.0f);
+    lineShader->setUniform("uShutterLength", 0.0f);
 #endif
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vertexIndexBuffer);

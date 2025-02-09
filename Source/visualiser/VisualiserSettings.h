@@ -11,6 +11,7 @@
 #include "../audio/StereoEffect.h"
 
 enum class ScreenOverlay : int {
+    INVALID = -1,
     Empty = 1,
     Graticule = 2,
     Smudged = 3,
@@ -177,6 +178,14 @@ public:
             VERSION_HINT, 0.0, -1.0, 1.0
         ),
     });
+    std::shared_ptr<Effect> shutterLengthEffect = std::make_shared<Effect>(
+        new EffectParameter(
+            "Shutter Length",
+            "Controls the percentage of time the camera shutter is open over a frame. This can be beneficial when the drawing frequency and frame rate are in sync.",
+            "shutterLength",
+            VERSION_HINT, 0.0, 0.0, 1.0
+        )
+    );
 #endif
 
     std::shared_ptr<Effect> persistenceEffect = std::make_shared<Effect>(
@@ -285,6 +294,7 @@ public:
         screenSaturationEffect,
         screenHueEffect,
         overexposureEffect,
+        shutterLengthEffect,
 #endif
     };
     std::vector<std::shared_ptr<Effect>> audioEffects = {
@@ -395,6 +405,10 @@ public:
     bool isGoniometer() {
         return parameters.goniometer->getBoolValue();
     }
+    
+    double getShutterLength() {
+        return parameters.shutterLengthEffect->getActualValue();
+    }
 #endif
     
     double getFocus() {
@@ -465,6 +479,7 @@ private:
 #if SOSCI_FEATURES
             std::make_shared<EffectComponent>(*parameters.afterglowEffect),
             std::make_shared<EffectComponent>(*parameters.overexposureEffect),
+            std::make_shared<EffectComponent>(*parameters.shutterLengthEffect),
 #else
             std::make_shared<EffectComponent>(*parameters.ambientEffect),
 #endif
