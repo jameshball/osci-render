@@ -4,8 +4,8 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginCharacteristicsValue="pluginWantsMidiIn"
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
-              version="2.4.10.0" companyName="James H Ball" companyWebsite="https://osci-render.com"
-              companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;SOSCI_FEATURES=1"
+              version="2.4.10.1" companyName="James H Ball" companyWebsite="https://osci-render.com"
+              companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;SOSCI_FEATURES=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1"
               pluginAUMainType="'aumf'">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
@@ -673,6 +673,10 @@
             file="Source/CommonPluginProcessor.cpp"/>
       <FILE id="PGeV6d" name="CommonPluginProcessor.h" compile="0" resource="0"
             file="Source/CommonPluginProcessor.h"/>
+      <FILE id="TPGMru" name="CustomStandalone.cpp" compile="1" resource="0"
+            file="Source/CustomStandalone.cpp"/>
+      <FILE id="J0sbNw" name="CustomStandaloneFilterWindow.h" compile="0"
+            resource="0" file="Source/CustomStandaloneFilterWindow.h"/>
       <FILE id="I44EdJ" name="EffectsComponent.cpp" compile="1" resource="0"
             file="Source/EffectsComponent.cpp"/>
       <FILE id="qxxNX3" name="EffectsComponent.h" compile="0" resource="0"

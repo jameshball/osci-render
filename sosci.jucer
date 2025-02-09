@@ -3,9 +3,9 @@
 <JUCERPROJECT id="HH2E72" name="sosci" projectType="audioplug" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginManufacturer="jameshball"
               aaxIdentifier="sh.ball.sosci" cppLanguageStandard="20" projectLineFeed="&#10;"
-              headerPath="./include" version="1.1.4.0" companyName="James H Ball"
+              headerPath="./include" version="1.1.4.1" companyName="James H Ball"
               companyWebsite="https://osci-render.com" companyEmail="james@ball.sh"
-              defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;SOSCI_FEATURES=1"
+              defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;SOSCI_FEATURES=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1"
               pluginManufacturerCode="Jhba" pluginCode="Sosc" pluginAUMainType="'aufx'">
   <MAINGROUP id="j5Ge2T" name="sosci">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
@@ -76,6 +76,10 @@
       </GROUP>
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <FILE id="fqqP0r" name="CustomStandalone.cpp" compile="1" resource="0"
+            file="Source/CustomStandalone.cpp"/>
+      <FILE id="TFmWW0" name="CustomStandaloneFilterWindow.h" compile="0"
+            resource="0" file="Source/CustomStandaloneFilterWindow.h"/>
       <GROUP id="{C63A0AA5-8550-16AC-EE89-C05416216534}" name="wav">
         <FILE id="jxAiTf" name="WavParser.cpp" compile="1" resource="0" file="Source/wav/WavParser.cpp"/>
         <FILE id="Q6iTsL" name="WavParser.h" compile="0" resource="0" file="Source/wav/WavParser.h"/>

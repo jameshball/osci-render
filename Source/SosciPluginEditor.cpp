@@ -1,6 +1,6 @@
 #include "SosciPluginProcessor.h"
 #include "SosciPluginEditor.h"
-#include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
+#include "CustomStandaloneFilterWindow.h"
 
 SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p) : CommonPluginEditor(p, "sosci", "sosci", 1180, 750), audioProcessor(p) {
     initialiseMenuBar(model);
