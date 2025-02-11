@@ -20,6 +20,7 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
     addAndMakeVisible(flipVerticalToggle);
     addAndMakeVisible(flipHorizontalToggle);
     addAndMakeVisible(goniometerToggle);
+    addAndMakeVisible(shutterSyncToggle);
 #endif
     
     for (int i = 1; i <= parameters.screenOverlay->max; i++) {
@@ -83,6 +84,7 @@ void VisualiserSettings::resized() {
     flipVerticalToggle.setBounds(area.removeFromTop(rowHeight));
     flipHorizontalToggle.setBounds(area.removeFromTop(rowHeight));
     goniometerToggle.setBounds(area.removeFromTop(rowHeight));
+    shutterSyncToggle.setBounds(area.removeFromTop(rowHeight));
 #endif
 
 #if !SOSCI_FEATURES

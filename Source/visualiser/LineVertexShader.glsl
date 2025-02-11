@@ -7,7 +7,7 @@ uniform float uSize;
 uniform float uNEdges;
 uniform float uFadeAmount;
 uniform float uIntensity;
-uniform float uShutterLength;
+uniform bool uShutterSync;
 uniform float uGain;
 attribute vec3 aStart, aEnd;
 attribute float aIdx;
@@ -61,10 +61,12 @@ void main () {
     uvl.y = side * vSize;
     
     float intensityScale = floor(aIdx / 4.0 + 0.5)/uNEdges;
-    float avgIntensityScale = floor((uNEdges / 2.0) / 4.0 + 0.5)/uNEdges;
-    float shutterLength = clamp(uShutterLength, 0.0, 1.0);
-    float adjustedIntensity = mix(intensityScale, avgIntensityScale, shutterLength);
-    float intensityFade = mix(1.0 - uFadeAmount, 1.0, adjustedIntensity);
+    
+    if (uShutterSync) {
+        float avgIntensityScale = floor(uNEdges / 4.0 + 0.5)/uNEdges;
+        intensityScale = avgIntensityScale;
+    }
+    float intensityFade = mix(1.0 - uFadeAmount, 1.0, intensityScale);
     
     uvl.w *= intensity * intensityFade;
                              

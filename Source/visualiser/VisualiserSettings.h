@@ -99,6 +99,7 @@ public:
     BooleanParameter* flipVertical = new BooleanParameter("Flip Vertical", "flipVertical", VERSION_HINT, false, "Flips the visualiser vertically.");
     BooleanParameter* flipHorizontal = new BooleanParameter("Flip Horizontal", "flipHorizontal", VERSION_HINT, false, "Flips the visualiser horizontally.");
     BooleanParameter* goniometer = new BooleanParameter("Goniometer", "goniometer", VERSION_HINT, false, "Rotates the visualiser to replicate a goniometer display to show the phase relationship between two channels.");
+    BooleanParameter* shutterSync = new BooleanParameter("Shutter Sync", "shutterSync", VERSION_HINT, false, "Controls whether the camera's shutter speed is in sync with framerate. This makes the brightness of a single frame constant. This can be beneficial when the drawing frequency and frame rate are in sync.");
 
     std::shared_ptr<Effect> screenSaturationEffect = std::make_shared<Effect>(
         new EffectParameter(
@@ -178,14 +179,6 @@ public:
             VERSION_HINT, 0.0, -1.0, 1.0
         ),
     });
-    std::shared_ptr<Effect> shutterLengthEffect = std::make_shared<Effect>(
-        new EffectParameter(
-            "Shutter Length",
-            "Controls the percentage of time the camera shutter is open over a frame. This can be beneficial when the drawing frequency and frame rate are in sync.",
-            "shutterLength",
-            VERSION_HINT, 0.0, 0.0, 1.0
-        )
-    );
 #endif
 
     std::shared_ptr<Effect> persistenceEffect = std::make_shared<Effect>(
@@ -294,7 +287,6 @@ public:
         screenSaturationEffect,
         screenHueEffect,
         overexposureEffect,
-        shutterLengthEffect,
 #endif
     };
     std::vector<std::shared_ptr<Effect>> audioEffects = {
@@ -313,6 +305,7 @@ public:
         flipVertical,
         flipHorizontal,
         goniometer,
+        shutterSync,
 #endif
     };
     std::vector<IntParameter*> integers = {
@@ -406,8 +399,8 @@ public:
         return parameters.goniometer->getBoolValue();
     }
     
-    double getShutterLength() {
-        return parameters.shutterLengthEffect->getActualValue();
+    bool getShutterSync() {
+        return parameters.shutterSync->getBoolValue();
     }
 #endif
     
@@ -479,7 +472,6 @@ private:
 #if SOSCI_FEATURES
             std::make_shared<EffectComponent>(*parameters.afterglowEffect),
             std::make_shared<EffectComponent>(*parameters.overexposureEffect),
-            std::make_shared<EffectComponent>(*parameters.shutterLengthEffect),
 #else
             std::make_shared<EffectComponent>(*parameters.ambientEffect),
 #endif
@@ -527,6 +519,7 @@ private:
     jux::SwitchButton flipVerticalToggle{parameters.flipVertical};
     jux::SwitchButton flipHorizontalToggle{parameters.flipHorizontal};
     jux::SwitchButton goniometerToggle{parameters.goniometer};
+    jux::SwitchButton shutterSyncToggle{parameters.shutterSync};
 #endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserSettings)

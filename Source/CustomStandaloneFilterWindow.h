@@ -902,6 +902,25 @@ public:
 
     std::unique_ptr<StandalonePluginHolder> pluginHolder;
 
+    void handleCommandLine(const String& commandLine)
+    {
+        if (commandLine.isNotEmpty())
+        {
+            handleOpenFile(commandLine);
+        }
+    }
+
+    void handleOpenFile(const String& fileName)
+    {
+        if (auto* processor = getAudioProcessor())
+        {
+//            if (processor->openProjectCallback)
+//            {
+//                processor->openProjectCallback(File(fileName));
+//            }
+        }
+    }
+
 private:
     void updateContent()
     {

@@ -86,7 +86,14 @@ public:
     const String getApplicationName() override              { return CharPointer_UTF8 (JucePlugin_Name); }
     const String getApplicationVersion() override           { return JucePlugin_VersionString; }
     bool moreThanOneInstanceAllowed() override              { return true; }
-    void anotherInstanceStarted (const String&) override    {}
+    void anotherInstanceStarted (const String& commandLine) override
+    {
+        if (mainWindow != nullptr)
+        {
+            mainWindow->toFront(true);
+            mainWindow->handleCommandLine(commandLine);
+        }
+    }
 
     virtual StandaloneFilterWindow* createWindow()
     {
@@ -128,7 +135,7 @@ public:
     }
 
     //==============================================================================
-    void initialise (const String&) override
+    void initialise (const String& commandLine) override
     {
         mainWindow = rawToUniquePtr (createWindow());
 
@@ -143,6 +150,7 @@ public:
         else
         {
             pluginHolder = createPluginHolder();
+            mainWindow->handleCommandLine(commandLine);
         }
     }
 
