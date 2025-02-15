@@ -155,7 +155,15 @@ void CommonPluginEditor::updateTitle() {
     if (!audioProcessor.currentProjectFile.isEmpty()) {
         title += " - " + audioProcessor.currentProjectFile;
     }
+    if (currentFileName.isNotEmpty()) {
+        title += " - " + currentFileName;
+    }
     getTopLevelComponent()->setName(title);
+}
+
+void CommonPluginEditor::fileUpdated(juce::String fileName) {
+    currentFileName = fileName;
+    updateTitle();
 }
 
 void CommonPluginEditor::openAudioSettings() {

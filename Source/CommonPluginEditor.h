@@ -20,6 +20,7 @@ public:
     void saveProject();
     void saveProjectAs();
     void updateTitle();
+    void fileUpdated(juce::String fileName);
     void openAudioSettings();
     void openRecordingSettings();
     void resetToDefault();
@@ -46,6 +47,7 @@ public:
 
     juce::String appName;
     juce::String projectFileType;
+    juce::String currentFileName;
     
 #if SOSCI_FEATURES
     SharedTextureManager sharedTextureManager;

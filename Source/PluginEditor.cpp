@@ -359,6 +359,7 @@ void OscirenderAudioProcessorEditor::updateCodeEditor(bool binaryFile, bool shou
 
 // parsersLock MUST be locked before calling this function
 void OscirenderAudioProcessorEditor::fileUpdated(juce::String fileName, bool shouldOpenEditor) {
+    CommonPluginEditor::fileUpdated(fileName);
     settings.fileUpdated(fileName);
     updateCodeEditor(isBinaryFile(fileName), shouldOpenEditor);
 }
