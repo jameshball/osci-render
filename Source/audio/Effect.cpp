@@ -36,10 +36,16 @@ void Effect::animateValues(double volume) {
 		auto parameter = parameters[i];
 		float minValue = parameter->min;
 		float maxValue = parameter->max;
-		bool lfoEnabled = parameter->lfo != nullptr && parameter->lfo->getValueUnnormalised() != (int)LfoType::Static;
+        bool lfoEnabled = parameter->isLfoEnabled() && parameter->lfo->getValueUnnormalised() != (int)LfoType::Static;
 		float phase = lfoEnabled ? nextPhase(parameter) : 0.0;
 		float percentage = phase / (2 * std::numbers::pi);
 		LfoType type = lfoEnabled ? (LfoType)(int)parameter->lfo->getValueUnnormalised() : LfoType::Static;
+        
+        if (lfoEnabled) {
+            double originalMin = minValue;
+            minValue = originalMin + (parameter->lfoStartPercent->getValueUnnormalised() / 100.0) * (maxValue - originalMin);
+            maxValue = originalMin + (parameter->lfoEndPercent->getValueUnnormalised() / 100.0) * (maxValue - originalMin);
+        }
 
 		switch (type) {
 			case LfoType::Sine:
