@@ -37,6 +37,8 @@ public:
             addAndMakeVisible(lfoEndLabel);
             addAndMakeVisible(lfoStartSlider);
             addAndMakeVisible(lfoEndSlider);
+            addAndMakeVisible(smoothValueChangeLabel);
+            addAndMakeVisible(smoothValueChangeSlider);
             
             EffectParameter* parameter = parent->effect.parameters[parent->index];
             
@@ -86,6 +88,16 @@ public:
             lfoEndSlider.onValueChange = [this, parameter]() {
                 parameter->lfoEndPercent->setUnnormalisedValueNotifyingHost(lfoEndSlider.getValue());
             };
+            
+            smoothValueChangeLabel.setText("Smooth Value Change Speed", juce::dontSendNotification);
+            smoothValueChangeLabel.setJustificationType(juce::Justification::centred);
+            smoothValueChangeLabel.setFont(juce::Font(14.0f, juce::Font::bold));
+
+            smoothValueChangeSlider.setRange(0.01, 1.0, 0.0001);
+            smoothValueChangeSlider.setValue(parameter->smoothValueChange, juce::dontSendNotification);
+            smoothValueChangeSlider.onValueChange = [this, parameter]() {
+                parameter->smoothValueChange = smoothValueChangeSlider.getValue();
+            };
 
             popupLabel.setText(parameter->name + " Range", juce::dontSendNotification);
             popupLabel.setJustificationType(juce::Justification::centred);
@@ -101,6 +113,8 @@ public:
             lfoStartSlider.setBounds(bounds.removeFromTop(40));
             lfoEndLabel.setBounds(bounds.removeFromTop(20));
             lfoEndSlider.setBounds(bounds.removeFromTop(40));
+            smoothValueChangeLabel.setBounds(bounds.removeFromTop(20));
+            smoothValueChangeSlider.setBounds(bounds.removeFromTop(40));
         }
         
     private:
@@ -111,6 +125,8 @@ public:
         juce::Label lfoEndLabel;
         juce::Slider lfoStartSlider;
         juce::Slider lfoEndSlider;
+        juce::Label smoothValueChangeLabel;
+        juce::Slider smoothValueChangeSlider;
     };
     
     std::function<void()> updateToggleState;

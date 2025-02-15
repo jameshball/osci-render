@@ -61,6 +61,8 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     setResizeLimits(250, 250, 999999, 999999);
 
     tooltipDropShadow.setOwner(&tooltipWindow);
+    
+    updateTitle();
 
 #if SOSCI_FEATURES
     sharedTextureManager.initGL();
@@ -179,5 +181,6 @@ void CommonPluginEditor::resetToDefault() {
     juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
     if (window != nullptr) {
         window->resetToDefaultState();
+        window->setName(ProjectInfo::projectName);
     }
 }

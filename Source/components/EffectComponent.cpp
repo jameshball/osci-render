@@ -45,7 +45,7 @@ EffectComponent::EffectComponent(Effect& effect, int index) : effect(effect), in
     settingsButton.onClick = [this] {
         auto settings = std::make_unique<EffectSettingsComponent>(this);
         settings->setLookAndFeel(&getLookAndFeel());
-        settings->setSize(200, 220);
+        settings->setSize(200, 290);
         auto& myBox = juce::CallOutBox::launchAsynchronously(std::move(settings), settingsButton.getScreenBounds(), nullptr);
     };
 

@@ -3,8 +3,8 @@
 #include <JuceHeader.h>
 #include "BooleanParameter.h"
 
-#define SMOOTHING_SPEED_CONSTANT 0.0003
-#define SMOOTHING_SPEED_MIN 0.0001
+#define SMOOTHING_SPEED_CONSTANT 0.3
+#define SMOOTHING_SPEED_MIN 0.00001
 
 class FloatParameter : public juce::AudioProcessorParameterWithID {
 public:
@@ -383,6 +383,7 @@ public:
 
 	void save(juce::XmlElement* xml) {
 		FloatParameter::save(xml);
+		xml->setAttribute("smoothValueChange", smoothValueChange.load());
 
 		if (lfoEnabled) {
 			auto lfoXml = xml->createNewChildElement("lfo");
@@ -402,6 +403,11 @@ public:
 
 	void load(juce::XmlElement* xml) {
         FloatParameter::load(xml);
+		if (xml->hasAttribute("smoothValueChange")) {
+			smoothValueChange = xml->getDoubleAttribute("smoothValueChange");
+        } else {
+            smoothValueChange = SMOOTHING_SPEED_CONSTANT;
+        }
 
 		if (lfoEnabled) {
 			auto lfoXml = xml->getChildByName("lfo");
