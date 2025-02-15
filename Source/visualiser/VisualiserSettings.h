@@ -11,6 +11,7 @@
 #include "../audio/StereoEffect.h"
 
 enum class ScreenOverlay : int {
+    INVALID = -1,
     Empty = 1,
     Graticule = 2,
     Smudged = 3,
@@ -97,6 +98,8 @@ public:
 #if SOSCI_FEATURES
     BooleanParameter* flipVertical = new BooleanParameter("Flip Vertical", "flipVertical", VERSION_HINT, false, "Flips the visualiser vertically.");
     BooleanParameter* flipHorizontal = new BooleanParameter("Flip Horizontal", "flipHorizontal", VERSION_HINT, false, "Flips the visualiser horizontally.");
+    BooleanParameter* goniometer = new BooleanParameter("Goniometer", "goniometer", VERSION_HINT, false, "Rotates the visualiser to replicate a goniometer display to show the phase relationship between two channels.");
+    BooleanParameter* shutterSync = new BooleanParameter("Shutter Sync", "shutterSync", VERSION_HINT, false, "Controls whether the camera's shutter speed is in sync with framerate. This makes the brightness of a single frame constant. This can be beneficial when the drawing frequency and frame rate are in sync.");
 
     std::shared_ptr<Effect> screenSaturationEffect = std::make_shared<Effect>(
         new EffectParameter(
@@ -301,6 +304,8 @@ public:
 #if SOSCI_FEATURES
         flipVertical,
         flipHorizontal,
+        goniometer,
+        shutterSync,
 #endif
     };
     std::vector<IntParameter*> integers = {
@@ -388,6 +393,14 @@ public:
 
     bool isFlippedHorizontal() {
         return parameters.flipHorizontal->getBoolValue();
+    }
+    
+    bool isGoniometer() {
+        return parameters.goniometer->getBoolValue();
+    }
+    
+    bool getShutterSync() {
+        return parameters.shutterSync->getBoolValue();
     }
 #endif
     
@@ -505,6 +518,8 @@ private:
 
     jux::SwitchButton flipVerticalToggle{parameters.flipVertical};
     jux::SwitchButton flipHorizontalToggle{parameters.flipHorizontal};
+    jux::SwitchButton goniometerToggle{parameters.goniometer};
+    jux::SwitchButton shutterSyncToggle{parameters.shutterSync};
 #endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserSettings)

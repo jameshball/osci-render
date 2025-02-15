@@ -240,7 +240,7 @@ private:
     juce::OpenGLShaderProgram* currentShader;
     
     float fadeAmount;
-    ScreenOverlay screenOverlay = ScreenOverlay::MAX;
+    ScreenOverlay screenOverlay = ScreenOverlay::INVALID;
     
     const double RESAMPLE_RATIO = 6.0;
     double sampleRate = -1;

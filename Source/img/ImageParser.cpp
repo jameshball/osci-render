@@ -12,6 +12,9 @@ ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, ju
         if (output.openedOk()) {
             output.write(image.getData(), image.getSize());
             output.flush();
+        } else {
+            handleError("The image could not be loaded.");
+            return;
         }
     }
     
@@ -43,44 +46,62 @@ ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, ju
             }
 
             gd_close_gif(gif);
+        } else {
+            handleError("The image could not be loaded. Please try optimising the GIF with https://ezgif.com/optimize.");
+            return;
         }
     } else {
         juce::Image image = juce::ImageFileFormat::loadFrom(file);
-        image.desaturate();
-        
-        width = image.getWidth();
-        height = image.getHeight();
-        int frameSize = width * height;
-        
-        visited = std::vector<bool>(frameSize, false);
-        frames.emplace_back(std::vector<uint8_t>(frameSize));
-        
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height; y++) {
-                juce::Colour pixel = image.getPixelAt(x, y);
-                int index = y * width + x;
-                // RGB should be equal since we have desaturated
-                int value = pixel.getRed();
-                // value of 0 is reserved for transparent pixels
-                frames[0][index] = pixel.isTransparent() ? 0 : juce::jmax(1, value);
+        if (image.isValid()) {
+            image.desaturate();
+            
+            width = image.getWidth();
+            height = image.getHeight();
+            int frameSize = width * height;
+            
+            visited = std::vector<bool>(frameSize, false);
+            frames.emplace_back(std::vector<uint8_t>(frameSize));
+            
+            for (int x = 0; x < width; x++) {
+                for (int y = 0; y < height; y++) {
+                    juce::Colour pixel = image.getPixelAt(x, y);
+                    int index = y * width + x;
+                    // RGB should be equal since we have desaturated
+                    int value = pixel.getRed();
+                    // value of 0 is reserved for transparent pixels
+                    frames[0][index] = pixel.isTransparent() ? 0 : juce::jmax(1, value);
+                }
             }
+        } else {
+            handleError("The image could not be loaded.");
+            return;
         }
     }
     
     if (frames.size() == 0) {
-        juce::MessageManager::callAsync([this] {
-            juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::AlertIconType::WarningIcon, "Invalid GIF", "The image could not be loaded. Please try optimising the GIF with https://ezgif.com/optimize.");
-        });
-        
-        width = 1;
-        height = 1;
-        frames.emplace_back(std::vector<uint8_t>(1));
+        if (extension.equalsIgnoreCase(".gif")) {
+            handleError("The image could not be loaded. Please try optimising the GIF with https://ezgif.com/optimize.");
+        } else {
+            handleError("The image could not be loaded.");
+        }
+        return;
     }
 
     setFrame(0);
 }
 
 ImageParser::~ImageParser() {}
+
+void ImageParser::handleError(juce::String message) {
+    juce::MessageManager::callAsync([this, message] {
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::AlertIconType::WarningIcon, "Error", message);
+    });
+    
+    width = 1;
+    height = 1;
+    frames.emplace_back(std::vector<uint8_t>(1));
+    setFrame(0);
+}
 
 void ImageParser::setFrame(int index) {
     // Ensure that the frame number is within the bounds of the number of frames
@@ -160,20 +181,52 @@ void ImageParser::findNearestNeighbour(int searchRadius, float thresholdPow, int
 }
 
 OsciPoint ImageParser::getSample() {
-    if (count % jumpFrequency() == 0) {
-        resetPosition();
+    if (ALGORITHM == "HILLIGOSS") {
+        if (count % jumpFrequency() == 0) {
+            resetPosition();
+        }
+        
+        if (count % 10 * jumpFrequency() == 0) {
+            std::fill(visited.begin(), visited.end(), false);
+        }
+        
+        float thresholdPow = audioProcessor.imageThreshold->getActualValue() * 10 + 1;
+        
+        findNearestNeighbour(10, thresholdPow, audioProcessor.imageStride->getActualValue(), audioProcessor.invertImage->getValue());
+        float maxDim = juce::jmax(width, height);
+        count++;
+        float widthDiff = (maxDim - width) / 2;
+        float heightDiff = (maxDim - height) / 2;
+        return OsciPoint(2 * (currentX + widthDiff) / maxDim - 1, 2 * (currentY + heightDiff) / maxDim - 1);
+    } else {
+        double scanIncrement = audioProcessor.imageStride->getActualValue() / 100;
+        
+        double pixel = 0;
+        int maxIterations = 10000;
+        while (pixel <= audioProcessor.imageThreshold->getActualValue() && maxIterations > 0) {
+            int x = (int) ((scanX + 1) * width / 2);
+            int y = (int) ((scanY + 1) * height / 2);
+            pixel = getPixelValue(x, y, audioProcessor.invertImage->getValue());
+            
+            double increment = 0.01;
+            if (pixel > audioProcessor.imageThreshold->getActualValue()) {
+                increment = (1 - tanh(4 * pixel)) * 0.3;
+            }
+            
+            scanX += increment;
+            if (scanX >= 1) {
+                scanX = -1;
+                scanY -= scanIncrement;
+            }
+            if (scanY < -1) {
+                double offset = ((scanCount % 15) / 15.0) * scanIncrement;
+                scanY = 1 - offset;
+                scanCount++;
+            }
+            
+            maxIterations--;
+        }
+        
+        return OsciPoint(scanX, scanY);
     }
-    
-    if (count % 10 * jumpFrequency() == 0) {
-        std::fill(visited.begin(), visited.end(), false);
-    }
-
-    float thresholdPow = audioProcessor.imageThreshold->getActualValue() * 10 + 1;
-
-    findNearestNeighbour(10, thresholdPow, audioProcessor.imageStride->getActualValue(), audioProcessor.invertImage->getValue());
-    float maxDim = juce::jmax(width, height);
-    count++;
-    float widthDiff = (maxDim - width) / 2;
-    float heightDiff = (maxDim - height) / 2;
-    return OsciPoint(2 * (currentX + widthDiff) / maxDim - 1, 2 * (currentY + heightDiff) / maxDim - 1);
 }

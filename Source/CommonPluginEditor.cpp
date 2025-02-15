@@ -1,6 +1,6 @@
 #include "CommonPluginProcessor.h"
 #include "CommonPluginEditor.h"
-#include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
+#include "CustomStandaloneFilterWindow.h"
 
 CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String appName, juce::String projectFileType, int defaultWidth, int defaultHeight)
 	: AudioProcessorEditor(&p), audioProcessor(p), appName(appName), projectFileType(projectFileType)

@@ -192,7 +192,9 @@ void EffectComponent::parameterGestureChanged(int parameterIndex, bool gestureIs
 
 void EffectComponent::handleAsyncUpdate() {
     setupComponent();
-    getParentComponent()->repaint();
+    if (auto* parent = getParentComponent()) {
+        parent->repaint();
+    }
 }
 
 void EffectComponent::setRangeEnabled(bool enabled) {

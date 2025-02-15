@@ -23,17 +23,6 @@ eval "$RESAVE_COMMAND"
 if [ "$OS" = "mac" ]; then
   cd "$ROOT/Builds/$PLUGIN/MacOSX"
   xcodebuild -configuration Release || exit 1
-
-  cp -R "$ROOT/Builds/$PLUGIN/MacOSX/build/Release/$PLUGIN.app" "$ROOT/ci/bin/$OUTPUT_NAME.app"
-  cp -R ~/Library/Audio/Plug-Ins/VST3/$PLUGIN.vst3 "$ROOT/ci/bin/$OUTPUT_NAME.vst3"
-  cp -R ~/Library/Audio/Plug-Ins/Components/$PLUGIN.component "$ROOT/ci/bin/$OUTPUT_NAME.component"
-
-  cd "$ROOT/ci/bin"
-  
-  zip -r ${OUTPUT_NAME}-mac.vst3.zip $OUTPUT_NAME.vst3
-  zip -r ${OUTPUT_NAME}-mac.component.zip $OUTPUT_NAME.component
-  zip -r ${OUTPUT_NAME}-mac.app.zip $OUTPUT_NAME.app
-  cp ${OUTPUT_NAME}*.zip "$ROOT/bin"
 fi
 
 # Build linux version
@@ -41,13 +30,13 @@ if [ "$OS" = "linux" ]; then
   cd "$ROOT/Builds/$PLUGIN/LinuxMakefile"
   make CONFIG=Release
 
-  cp -r ./build/$PLUGIN.vst3 "$ROOT/ci/bin/$OUTPUT_NAME.vst3"
-  cp -r ./build/$PLUGIN "$ROOT/ci/bin/$OUTPUT_NAME"
+  cp -r ./build/$PLUGIN.vst3 "$ROOT/ci/bin/$PLUGIN.vst3"
+  cp -r ./build/$PLUGIN "$ROOT/ci/bin/$PLUGIN"
 
   cd "$ROOT/ci/bin"
 
-  zip -r ${OUTPUT_NAME}-linux-vst3.zip $OUTPUT_NAME.vst3
-  zip -r ${OUTPUT_NAME}-linux.zip $OUTPUT_NAME
+  zip -r ${OUTPUT_NAME}-linux-vst3.zip $PLUGIN.vst3
+  zip -r ${OUTPUT_NAME}-linux.zip $PLUGIN
   cp ${OUTPUT_NAME}*.zip "$ROOT/bin"
 fi
 
@@ -60,10 +49,7 @@ if [ "$OS" = "win" ]; then
 
   cd "$ROOT/Builds/$PLUGIN/VisualStudio2022"
   "$MSBUILD_EXE" "$PLUGIN.sln" "//p:VisualStudioVersion=16.0" "//m" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64" "//restore" "//p:RestorePackagesConfig=true"
-  cd "$ROOT/ci/bin"
-  cp "$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Release/Standalone Plugin/$PLUGIN.exe" "$ROOT/bin/$OUTPUT_NAME-win.exe"
-  cp "$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Release/Standalone Plugin/$PLUGIN.pdb" "$ROOT/bin/$OUTPUT_NAME-win.pdb"
-  cp -r "$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Release/VST3/$PLUGIN.vst3/Contents/x86_64-win/$PLUGIN.vst3" "$ROOT/bin/$OUTPUT_NAME-win.vst3"
+  cp "$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Release/Standalone Plugin/$PLUGIN.pdb" "$ROOT/bin/$OUTPUT_NAME.pdb"
 fi
 
 cd "$ROOT"

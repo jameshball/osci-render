@@ -22,6 +22,10 @@ SvgParser::SvgParser(juce::String svgFile) {
         }
     }
     
+    juce::MessageManager::callAsync([this] {
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::AlertIconType::WarningIcon, "Error", "The SVG could not be loaded.");
+    });
+    
     // draw an X to indicate an error.
     shapes.push_back(std::make_unique<Line>(-0.5, -0.5, 0.5, 0.5));
     shapes.push_back(std::make_unique<Line>(-0.5, 0.5, 0.5, -0.5));
