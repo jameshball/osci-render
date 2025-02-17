@@ -22,7 +22,6 @@ public:
 	using Ptr = juce::ReferenceCountedObjectPtr<ShapeSound>;
 
 private:
-	
 	BlockingQueue frames{10};
 	std::unique_ptr<FrameProducer> producer;
 	double frameLength = 0.0;

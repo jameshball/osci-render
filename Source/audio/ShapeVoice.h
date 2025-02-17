@@ -12,14 +12,16 @@ public:
 	void startNote(int midiNoteNumber, float velocity, juce::SynthesiserSound* sound, int currentPitchWheelPosition) override;
     void updateSound(juce::SynthesiserSound* sound);
 	void renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int startSample, int numSamples) override;
+	void setExternalAudio(juce::AudioSampleBuffer buf);
+	void clearExternalAudio();
 	void stopNote(float velocity, bool allowTailOff) override;
 	void pitchWheelMoved(int newPitchWheelValue) override;
 	void controllerMoved(int controllerNumber, int newControllerValue) override;
 
-
 	void incrementShapeDrawing();
 	double getFrequency();
 
+	bool renderingSample = false;
 private:
 	const double MIN_TRACE = 0.005;
 	const double MIN_LENGTH_INCREMENT = 0.000001;
@@ -50,6 +52,8 @@ private:
 	double releaseTime = 0.0;
 	double endTime = 99999999;
 	bool waitingForRelease = false;
+
+	juce::AudioSampleBuffer externalAudio;
 
 	void noteStopped();
 };
