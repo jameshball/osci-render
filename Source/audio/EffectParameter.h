@@ -448,7 +448,7 @@ public:
         return lfoEnabled;
     }
 
-    EffectParameter(juce::String name, juce::String description, juce::String id, int versionHint, float value, float min, float max, float step = 0.0001, double smoothValueChange = SMOOTHING_SPEED_CONSTANT) : FloatParameter(name, id, versionHint, value, min, max, step), smoothValueChange(smoothValueChange), description(description) {}
+    EffectParameter(juce::String name, juce::String description, juce::String id, int versionHint, float value, float min, float max, float step = 0.0001) : FloatParameter(name, id, versionHint, value, min, max, step), description(description) {}
     
 private:
     bool lfoEnabled = true;

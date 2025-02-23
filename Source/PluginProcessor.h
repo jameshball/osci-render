@@ -77,13 +77,13 @@ public:
                 "Trace Start",
                 "Defines how far into the frame the drawing is started at. This has the effect of 'tracing' out the image from a single dot when animated. By default, we start drawing from the beginning of the frame, so this value is 0.0.",
                 "traceStart",
-                VERSION_HINT, 0.0, 0.0, 1.0, 0.001, 0.001
+                VERSION_HINT, 0.0, 0.0, 1.0, 0.001
             ),
             new EffectParameter(
                 "Trace Length",
                 "Defines how much of the frame is drawn per cycle. This has the effect of 'tracing' out the image from a single dot when animated. By default, we draw the whole frame, corresponding to a value of 1.0.",
                 "traceLength",
-                VERSION_HINT, 1.0, 0.0, 1.0, 0.001, 0.001
+                VERSION_HINT, 1.0, 0.0, 1.0, 0.001
             ),
         }
     );
@@ -170,7 +170,7 @@ public:
             "Image Stride",
             "Controls the spacing between pixels when drawing an image. Larger values mean more of the image can be drawn, but at a lower fidelity.",
             "imageStride",
-            VERSION_HINT, 4, 1, 50, 1, false
+            VERSION_HINT, 4, 1, 50, 1
         )
     );
 

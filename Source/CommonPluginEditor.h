@@ -61,7 +61,7 @@ public:
 
     VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.visualiserParameters, 3);
     RecordingSettings recordingSettings = RecordingSettings(audioProcessor.recordingParameters);
-    SettingsWindow recordingSettingsWindow = SettingsWindow("Recording Settings", recordingSettings, 300, 320, 300, 320);
+    SettingsWindow recordingSettingsWindow = SettingsWindow("Recording Settings", recordingSettings, 330, 320, 330, 320);
     VisualiserComponent visualiser{
         audioProcessor,
 #if SOSCI_FEATURES

@@ -885,7 +885,7 @@ void VisualiserComponent::setupTextures() {
 
 Texture VisualiserComponent::makeTexture(int width, int height, GLuint textureID) {
     using namespace juce::gl;
-    
+
     // replace existing texture if it exists, otherwise create new texture
     if (textureID == 0) {
         glGenTextures(1, &textureID);
@@ -900,17 +900,28 @@ Texture VisualiserComponent::makeTexture(int width, int height, GLuint textureID
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
     float borderColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
     glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
-    
+
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureID, 0);
+    glViewport(0, 0, width, height);
+
+    // Clear it once so we don't see uninitialized pixels
+    glClearColor(0, 0, 0, 0);
+    glClear(GL_COLOR_BUFFER_BIT);
+
     glBindTexture(GL_TEXTURE_2D, 0); // Unbind
-    
+
     return { textureID, width, height };
 }
 
 void VisualiserComponent::setResolution(int width) {
     using namespace juce::gl;
-    
+
+    glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+
     lineTexture = makeTexture(width, width, lineTexture.id);
     renderTexture = makeTexture(width, width, renderTexture.id);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0); // Unbind
 }
 
 void VisualiserComponent::drawLineTexture(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints) {
