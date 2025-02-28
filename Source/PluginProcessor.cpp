@@ -495,6 +495,13 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     } else {
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
+        for (int i = 0; i < synth.getNumVoices(); i++) {
+            ShapeVoice* voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
+            if (voice->renderingSample) {
+                voice->setExternalAudio(inputBuffer);
+            }
+            else voice->clearExternalAudio();
+        }
         synth.renderNextBlock(outputBuffer3d, midiMessages, 0, buffer.getNumSamples());
         for (int i = 0; i < synth.getNumVoices(); i++) {
             auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
