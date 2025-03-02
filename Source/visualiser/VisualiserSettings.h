@@ -548,10 +548,10 @@ private:
 
 class SettingsWindow : public juce::DialogWindow {
 public:
-    SettingsWindow(juce::String name, juce::Component& component) : juce::DialogWindow(name, Colours::darker, true, true), component(component) {
+    SettingsWindow(juce::String name, juce::Component& component, int windowWidth, int windowHeight, int componentWidth, int componentHeight) : juce::DialogWindow(name, Colours::darker, true, true), component(component) {
         setContentComponent(&viewport);
-        centreWithSize(550, 500);
-        setResizeLimits(getWidth(), 300, getWidth(), 1080);
+        centreWithSize(windowWidth, windowHeight);
+        setResizeLimits(windowWidth, windowHeight, componentWidth, componentHeight);
         setResizable(true, false);
         viewport.setColour(juce::ScrollBar::trackColourId, juce::Colours::white);
         viewport.setViewedComponent(&component, false);

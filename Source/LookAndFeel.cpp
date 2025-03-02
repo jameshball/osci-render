@@ -396,7 +396,7 @@ void OscirenderLookAndFeel::drawCallOutBoxBackground(juce::CallOutBox& box, juce
     g.setColour(juce::Colours::black);
     g.drawImageAt(cachedImage, 0, 0);
 
-    g.setColour(Colours::dark);
+    g.setColour(Colours::darker);
     g.fillPath(path);
 
     g.setColour(juce::Colours::black);

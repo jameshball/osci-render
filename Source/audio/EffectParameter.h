@@ -3,8 +3,8 @@
 #include <JuceHeader.h>
 #include "BooleanParameter.h"
 
-#define SMOOTHING_SPEED_CONSTANT 0.0003
-#define SMOOTHING_SPEED_MIN 0.0001
+#define SMOOTHING_SPEED_CONSTANT 0.3
+#define SMOOTHING_SPEED_MIN 0.00001
 
 class FloatParameter : public juce::AudioProcessorParameterWithID {
 public:
@@ -337,6 +337,8 @@ public:
 	std::atomic<double> smoothValueChange = SMOOTHING_SPEED_CONSTANT;
 	LfoTypeParameter* lfo = new LfoTypeParameter(name + " LFO", paramID + "Lfo", getVersionHint(), 1);
 	FloatParameter* lfoRate = new FloatParameter(name + " LFO Rate", paramID + "LfoRate", getVersionHint(), 1.0f, 0.0f, 10000.0f, 0.001f, "Hz");
+    FloatParameter* lfoStartPercent = new FloatParameter(name + " LFO Start", paramID + "LfoStart", getVersionHint(), 0.0f, 0.0f, 100.0f, 0.0001f, "%");
+    FloatParameter* lfoEndPercent = new FloatParameter(name + " LFO End", paramID + "LfoEnd", getVersionHint(), 100.0f, 0.0f, 100.0f, 0.0001f, "%");
 	BooleanParameter* sidechain = new BooleanParameter(name + " Sidechain Enabled", paramID + "Sidechain", getVersionHint(), false, "Toggles " + name + " Sidechain.");
 	std::atomic<float> phase = 0.0f;
 	juce::String description;
@@ -350,6 +352,12 @@ public:
 		if (lfoRate != nullptr) {
 			parameters.push_back(lfoRate);
 		}
+        if (lfoStartPercent != nullptr) {
+            parameters.push_back(lfoStartPercent);
+        }
+        if (lfoEndPercent != nullptr) {
+            parameters.push_back(lfoEndPercent);
+        }
 		if (sidechain != nullptr) {
 			parameters.push_back(sidechain);
 		}
@@ -357,10 +365,15 @@ public:
     }
 
 	void disableLfo() {
+        lfoEnabled = false;
 		delete lfo;
 		delete lfoRate;
+        delete lfoStartPercent;
+        delete lfoEndPercent;
 		lfo = nullptr;
 		lfoRate = nullptr;
+        lfoStartPercent = nullptr;
+        lfoEndPercent = nullptr;
 	}
 
 	void disableSidechain() {
@@ -370,11 +383,16 @@ public:
 
 	void save(juce::XmlElement* xml) {
 		FloatParameter::save(xml);
+		xml->setAttribute("smoothValueChange", smoothValueChange.load());
 
-		if (lfo != nullptr && lfoRate != nullptr) {
+		if (lfoEnabled) {
 			auto lfoXml = xml->createNewChildElement("lfo");
 			lfo->save(lfoXml);
 			lfoRate->save(lfoXml);
+            auto lfoStartXml = xml->createNewChildElement("lfoStart");
+            lfoStartPercent->save(lfoStartXml);
+            auto lfoEndXml = xml->createNewChildElement("lfoEnd");
+            lfoEndPercent->save(lfoEndXml);
 		}
 
 		if (sidechain != nullptr) {
@@ -385,8 +403,13 @@ public:
 
 	void load(juce::XmlElement* xml) {
         FloatParameter::load(xml);
+		if (xml->hasAttribute("smoothValueChange")) {
+			smoothValueChange = xml->getDoubleAttribute("smoothValueChange");
+        } else {
+            smoothValueChange = SMOOTHING_SPEED_CONSTANT;
+        }
 
-		if (lfo != nullptr && lfoRate != nullptr) {
+		if (lfoEnabled) {
 			auto lfoXml = xml->getChildByName("lfo");
 			if (lfoXml != nullptr) {
 				lfo->load(lfoXml);
@@ -395,6 +418,20 @@ public:
 				lfo->setValueNotifyingHost(lfo->getValueForText("Static"));
 				lfoRate->setUnnormalisedValueNotifyingHost(1.0f);
 			}
+            
+            auto lfoStartXml = xml->getChildByName("lfoStart");
+            if (lfoStartXml != nullptr) {
+                lfoStartPercent->load(lfoStartXml);
+            } else {
+                lfoStartPercent->setUnnormalisedValueNotifyingHost(0.0f);
+            }
+            
+            auto lfoEndXml = xml->getChildByName("lfoEnd");
+            if (lfoEndXml != nullptr) {
+                lfoEndPercent->load(lfoEndXml);
+            } else {
+                lfoEndPercent->setUnnormalisedValueNotifyingHost(100.0f);
+            }
 		}
 
 		if (sidechain != nullptr) {
@@ -406,6 +443,13 @@ public:
 			}
 		}
     }
+    
+    bool isLfoEnabled() {
+        return lfoEnabled;
+    }
 
-    EffectParameter(juce::String name, juce::String description, juce::String id, int versionHint, float value, float min, float max, float step = 0.0001, double smoothValueChange = SMOOTHING_SPEED_CONSTANT) : FloatParameter(name, id, versionHint, value, min, max, step), smoothValueChange(smoothValueChange), description(description) {}
+    EffectParameter(juce::String name, juce::String description, juce::String id, int versionHint, float value, float min, float max, float step = 0.0001) : FloatParameter(name, id, versionHint, value, min, max, step), description(description) {}
+    
+private:
+    bool lfoEnabled = true;
 };
