@@ -20,6 +20,7 @@ public:
     void saveProject();
     void saveProjectAs();
     void updateTitle();
+    void fileUpdated(juce::String fileName);
     void openAudioSettings();
     void openRecordingSettings();
     void resetToDefault();
@@ -46,20 +47,21 @@ public:
 
     juce::String appName;
     juce::String projectFileType;
+    juce::String currentFileName;
     
 #if SOSCI_FEATURES
     SharedTextureManager sharedTextureManager;
 #endif
 
 #if SOSCI_FEATURES
-    int VISUALISER_SETTINGS_HEIGHT = 1250;
+    int VISUALISER_SETTINGS_HEIGHT = 1200;
 #else
-    int VISUALISER_SETTINGS_HEIGHT = 800;
+    int VISUALISER_SETTINGS_HEIGHT = 700;
 #endif
 
     VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.visualiserParameters, 3);
     RecordingSettings recordingSettings = RecordingSettings(audioProcessor.recordingParameters);
-    SettingsWindow recordingSettingsWindow = SettingsWindow("Recording Settings", recordingSettings);
+    SettingsWindow recordingSettingsWindow = SettingsWindow("Recording Settings", recordingSettings, 330, 320, 330, 320);
     VisualiserComponent visualiser{
         audioProcessor,
 #if SOSCI_FEATURES

@@ -27,12 +27,18 @@ public:
     int index = 0;
     juce::ComboBox lfo;
     
-    class EffectRangeComponent : public juce::Component {
+    class EffectSettingsComponent : public juce::Component {
     public:
-        EffectRangeComponent(EffectComponent* parent) {
+        EffectSettingsComponent(EffectComponent* parent) {
             addAndMakeVisible(popupLabel);
             addAndMakeVisible(min);
             addAndMakeVisible(max);
+            addAndMakeVisible(lfoStartLabel);
+            addAndMakeVisible(lfoEndLabel);
+            addAndMakeVisible(lfoStartSlider);
+            addAndMakeVisible(lfoEndSlider);
+            addAndMakeVisible(smoothValueChangeLabel);
+            addAndMakeVisible(smoothValueChangeSlider);
             
             EffectParameter* parameter = parent->effect.parameters[parent->index];
             
@@ -61,6 +67,38 @@ public:
                 parent->slider.setRange(parameter->min, parameter->max, parameter->step);
             };
 
+            lfoStartLabel.setText("LFO Start", juce::dontSendNotification);
+            lfoStartLabel.setJustificationType(juce::Justification::centred);
+            lfoStartLabel.setFont(juce::Font(14.0f, juce::Font::bold));
+
+            lfoEndLabel.setText("LFO End", juce::dontSendNotification);
+            lfoEndLabel.setJustificationType(juce::Justification::centred);
+            lfoEndLabel.setFont(juce::Font(14.0f, juce::Font::bold));
+
+            lfoStartSlider.setRange(parameter->lfoStartPercent->min, parameter->lfoStartPercent->max, parameter->lfoStartPercent->step);
+            lfoStartSlider.setValue(parameter->lfoStartPercent->getValueUnnormalised(), juce::dontSendNotification);
+            lfoStartSlider.setTextValueSuffix("%");
+            lfoStartSlider.onValueChange = [this, parameter]() {
+                parameter->lfoStartPercent->setUnnormalisedValueNotifyingHost(lfoStartSlider.getValue());
+            };
+
+            lfoEndSlider.setRange(parameter->lfoEndPercent->min, parameter->lfoEndPercent->max, parameter->lfoEndPercent->step);
+            lfoEndSlider.setValue(parameter->lfoEndPercent->getValueUnnormalised(), juce::dontSendNotification);
+            lfoEndSlider.setTextValueSuffix("%");
+            lfoEndSlider.onValueChange = [this, parameter]() {
+                parameter->lfoEndPercent->setUnnormalisedValueNotifyingHost(lfoEndSlider.getValue());
+            };
+            
+            smoothValueChangeLabel.setText("Smooth Value Change Speed", juce::dontSendNotification);
+            smoothValueChangeLabel.setJustificationType(juce::Justification::centred);
+            smoothValueChangeLabel.setFont(juce::Font(14.0f, juce::Font::bold));
+
+            smoothValueChangeSlider.setRange(0.01, 1.0, 0.0001);
+            smoothValueChangeSlider.setValue(parameter->smoothValueChange, juce::dontSendNotification);
+            smoothValueChangeSlider.onValueChange = [this, parameter]() {
+                parameter->smoothValueChange = smoothValueChangeSlider.getValue();
+            };
+
             popupLabel.setText(parameter->name + " Range", juce::dontSendNotification);
             popupLabel.setJustificationType(juce::Justification::centred);
             popupLabel.setFont(juce::Font(14.0f, juce::Font::bold));
@@ -71,12 +109,24 @@ public:
             popupLabel.setBounds(bounds.removeFromTop(30));
             min.setBounds(bounds.removeFromTop(40));
             max.setBounds(bounds.removeFromTop(40));
+            lfoStartLabel.setBounds(bounds.removeFromTop(20));
+            lfoStartSlider.setBounds(bounds.removeFromTop(40));
+            lfoEndLabel.setBounds(bounds.removeFromTop(20));
+            lfoEndSlider.setBounds(bounds.removeFromTop(40));
+            smoothValueChangeLabel.setBounds(bounds.removeFromTop(20));
+            smoothValueChangeSlider.setBounds(bounds.removeFromTop(40));
         }
         
     private:
         juce::Label popupLabel;
         LabelledTextBox min{"Min"};
         LabelledTextBox max{"Max"};
+        juce::Label lfoStartLabel;
+        juce::Label lfoEndLabel;
+        juce::Slider lfoStartSlider;
+        juce::Slider lfoEndSlider;
+        juce::Label smoothValueChangeLabel;
+        juce::Slider smoothValueChangeSlider;
     };
     
     std::function<void()> updateToggleState;
@@ -98,7 +148,7 @@ private:
 
     juce::Label label;
 
-    SvgButton rangeButton = { "rangeButton", BinaryData::range_svg, juce::Colours::white };
+    SvgButton settingsButton = { "settingsButton", BinaryData::cog_svg, juce::Colours::white };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EffectComponent)
 };

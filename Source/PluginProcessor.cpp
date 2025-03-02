@@ -226,7 +226,7 @@ void OscirenderAudioProcessor::addLuaSlider() {
             "Lua Slider " + sliderName,
             "Controls the value of the Lua variable called slider_" + sliderName.toLowerCase() + ".",
             "lua" + sliderName,
-            VERSION_HINT, 0.0, 0.0, 1.0, 0.001, false
+            VERSION_HINT, 0.0, 0.0, 1.0
         )
     ));
 }

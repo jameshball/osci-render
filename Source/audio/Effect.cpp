@@ -36,10 +36,16 @@ void Effect::animateValues(double volume) {
 		auto parameter = parameters[i];
 		float minValue = parameter->min;
 		float maxValue = parameter->max;
-		bool lfoEnabled = parameter->lfo != nullptr && parameter->lfo->getValueUnnormalised() != (int)LfoType::Static;
+        bool lfoEnabled = parameter->isLfoEnabled() && parameter->lfo->getValueUnnormalised() != (int)LfoType::Static;
 		float phase = lfoEnabled ? nextPhase(parameter) : 0.0;
 		float percentage = phase / (2 * std::numbers::pi);
 		LfoType type = lfoEnabled ? (LfoType)(int)parameter->lfo->getValueUnnormalised() : LfoType::Static;
+        
+        if (lfoEnabled) {
+            double originalMin = minValue;
+            minValue = originalMin + (parameter->lfoStartPercent->getValueUnnormalised() / 100.0) * (maxValue - originalMin);
+            maxValue = originalMin + (parameter->lfoEndPercent->getValueUnnormalised() / 100.0) * (maxValue - originalMin);
+        }
 
 		switch (type) {
 			case LfoType::Sine:
@@ -69,17 +75,20 @@ void Effect::animateValues(double volume) {
 				actualValues[i] = ((float)rand() / RAND_MAX) * (maxValue - minValue) + minValue;
 				break;
 			default:
-                double weight = 1.0;
-                if (parameter->smoothValueChange < 1.0 && parameter->smoothValueChange > SMOOTHING_SPEED_MIN) {
-                    weight = parameter->smoothValueChange.load() * 192000 / sampleRate;
-                }
+                double smoothValueChange = juce::jlimit(SMOOTHING_SPEED_MIN, 1.0, parameter->smoothValueChange.load());
+                smoothValueChange /= 1000;
+                double weight = smoothValueChange * 192000 / sampleRate;
 				double newValue;
 				if (parameter->sidechain != nullptr && parameter->sidechain->getBoolValue()) {
 					newValue = volume * (maxValue - minValue) + minValue;
 				} else {
                     newValue = parameter->getValueUnnormalised();
                 }
-				actualValues[i] = (1.0 - weight) * actualValues[i] + weight * newValue;
+                if (parameter->smoothValueChange.load() >= 1.0) {
+                    actualValues[i] = newValue;
+                } else {
+                    actualValues[i] = (1.0 - weight) * actualValues[i] + weight * newValue;
+                }
 				break;
 		}
 	}

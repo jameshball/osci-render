@@ -46,8 +46,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     visualiserSettings.setColour(juce::ResizableWindow::backgroundColourId, Colours::dark);
 
     recordingSettings.setLookAndFeel(&getLookAndFeel());
-    recordingSettings.setSize(350, 280);
-    recordingSettingsWindow.centreWithSize(350, 320);
+    recordingSettings.setSize(300, 280);
 #if JUCE_WINDOWS
     // if not standalone, use native title bar for compatibility with DAWs
     recordingSettingsWindow.setUsingNativeTitleBar(processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone);
@@ -62,6 +61,8 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     setResizeLimits(250, 250, 999999, 999999);
 
     tooltipDropShadow.setOwner(&tooltipWindow);
+    
+    updateTitle();
 
 #if SOSCI_FEATURES
     sharedTextureManager.initGL();
@@ -156,7 +157,15 @@ void CommonPluginEditor::updateTitle() {
     if (!audioProcessor.currentProjectFile.isEmpty()) {
         title += " - " + audioProcessor.currentProjectFile;
     }
+    if (currentFileName.isNotEmpty()) {
+        title += " - " + currentFileName;
+    }
     getTopLevelComponent()->setName(title);
+}
+
+void CommonPluginEditor::fileUpdated(juce::String fileName) {
+    currentFileName = fileName;
+    updateTitle();
 }
 
 void CommonPluginEditor::openAudioSettings() {
@@ -172,5 +181,6 @@ void CommonPluginEditor::resetToDefault() {
     juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
     if (window != nullptr) {
         window->resetToDefaultState();
+        window->setName(ProjectInfo::projectName);
     }
 }

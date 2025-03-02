@@ -6,7 +6,7 @@ EffectComponent::EffectComponent(Effect& effect, int index) : effect(effect), in
     addChildComponent(lfoSlider);
     addAndMakeVisible(lfo);
     addAndMakeVisible(label);
-    addAndMakeVisible(rangeButton);
+    addAndMakeVisible(settingsButton);
 
     sidechainEnabled = effect.parameters[index]->sidechain != nullptr;
     if (sidechainEnabled) {
@@ -40,12 +40,13 @@ EffectComponent::EffectComponent(Effect& effect, int index) : effect(effect), in
     lfo.addItem("Reverse Sawtooth", static_cast<int>(LfoType::ReverseSawtooth));
     lfo.addItem("Noise", static_cast<int>(LfoType::Noise));
 
-    rangeButton.setTooltip("Click to change the range of the slider.");
+    settingsButton.setTooltip("Click to change the slider settings, including range.");
 
-    rangeButton.onClick = [this] {
-        auto range = std::make_unique<EffectRangeComponent>(this);
-        range->setSize(200, 110);
-        auto& myBox = juce::CallOutBox::launchAsynchronously(std::move(range), rangeButton.getScreenBounds(), nullptr);
+    settingsButton.onClick = [this] {
+        auto settings = std::make_unique<EffectSettingsComponent>(this);
+        settings->setLookAndFeel(&getLookAndFeel());
+        settings->setSize(200, 290);
+        auto& myBox = juce::CallOutBox::launchAsynchronously(std::move(settings), settingsButton.getScreenBounds(), nullptr);
     };
 
     effect.addListener(index, this);
@@ -152,6 +153,10 @@ void EffectComponent::resized() {
     if (sidechainEnabled) {
         sidechainButton->setBounds(bounds.removeFromRight(20));
     }
+    
+    if (settingsButton.isVisible()) {
+        settingsButton.setBounds(bounds.removeFromRight(20));
+    }
 
     bool drawingSmall = bounds.getWidth() < 3.5 * TEXT_WIDTH;
 
@@ -159,10 +164,8 @@ void EffectComponent::resized() {
         lfo.setBounds(bounds.removeFromRight(drawingSmall ? 70 : 100).reduced(0, 5));
     }
 
-    if (rangeButton.isVisible()) {
-        rangeButton.setBounds(bounds.removeFromRight(20));
-    }   
-
+    bounds.removeFromRight(2);
+    
     bounds.removeFromLeft(5);
 
     label.setBounds(bounds.removeFromLeft(drawingSmall ? SMALL_TEXT_WIDTH : TEXT_WIDTH));
@@ -198,7 +201,7 @@ void EffectComponent::handleAsyncUpdate() {
 }
 
 void EffectComponent::setRangeEnabled(bool enabled) {
-    rangeButton.setVisible(enabled);
+    settingsButton.setVisible(enabled);
 }
 
 void EffectComponent::setComponent(std::shared_ptr<juce::Component> component) {

@@ -7,6 +7,8 @@ ci/sign.sh
 
 .DS_Store
 
+.vscode
+
 *.pkg
 *.psd
 *.xcf
