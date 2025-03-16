@@ -33,6 +33,9 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
         juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
         if (standalone != nullptr) {
             standalone->getMuteInputValue().setValue(false);
+            standalone->commandLineCallback = [this](const juce::String& commandLine) {
+                handleCommandLine(commandLine);
+            };
         }
     }
     
@@ -67,6 +70,31 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
 #if SOSCI_FEATURES
     sharedTextureManager.initGL();
 #endif
+}
+
+void CommonPluginEditor::handleCommandLine(const juce::String& commandLine) {
+    if (commandLine.trim().isNotEmpty()) {
+        // Split the command line into tokens, using space as delimiter
+        // and handling quoted arguments as one token.
+        juce::StringArray tokens = juce::StringArray::fromTokens(commandLine, " ", "\"");
+        
+        if (tokens.size() > 0) {
+            // Use the first token as the file path and trim any extra whitespace.
+            juce::String filePath = tokens[0].trim();
+            filePath = filePath.unquoted();
+            juce::File file = juce::File::createFileWithoutCheckingPath(filePath);
+            
+            if (file.existsAsFile()) {
+                if (file.getFileExtension().toLowerCase() == "." + projectFileType.toLowerCase()) {
+                    openProject(file);
+                } else {
+                    juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon, "Invalid Command Line", "Invalid file type: " + file.getFullPathName());
+                }
+            } else {
+                juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon, "Invalid Command Line", "File not found: " + filePath);
+            }
+        }
+    }
 }
 
 void CommonPluginEditor::resized() {

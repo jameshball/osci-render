@@ -91,11 +91,14 @@ public:
         if (mainWindow != nullptr)
         {
             mainWindow->toFront(true);
-            mainWindow->handleCommandLine(commandLine);
+            
+            if (mainWindow->pluginHolder != nullptr && mainWindow->pluginHolder->commandLineCallback != nullptr) {
+                mainWindow->pluginHolder->commandLineCallback(commandLine);
+            }
         }
     }
 
-    virtual StandaloneFilterWindow* createWindow()
+    virtual StandaloneFilterWindow* createWindow(const String& commandLine)
     {
         if (Desktop::getInstance().getDisplays().displays.isEmpty())
         {
@@ -106,10 +109,10 @@ public:
 
         return new StandaloneFilterWindow (getApplicationName(),
                                            LookAndFeel::getDefaultLookAndFeel().findColour (ResizableWindow::backgroundColourId),
-                                           createPluginHolder());
+                                           createPluginHolder(commandLine));
     }
 
-    virtual std::unique_ptr<StandalonePluginHolder> createPluginHolder()
+    virtual std::unique_ptr<StandalonePluginHolder> createPluginHolder(const String& commandLine)
     {
         constexpr auto autoOpenMidiDevices =
        #if (JUCE_ANDROID || JUCE_IOS) && ! JUCE_DONT_AUTO_OPEN_MIDI_DEVICES_ON_MOBILE
@@ -127,6 +130,7 @@ public:
        #endif
 
         return std::make_unique<StandalonePluginHolder> (appProperties.getUserSettings(),
+                                                         commandLine,
                                                          false,
                                                          String{},
                                                          nullptr,
@@ -137,7 +141,7 @@ public:
     //==============================================================================
     void initialise (const String& commandLine) override
     {
-        mainWindow = rawToUniquePtr (createWindow());
+        mainWindow = rawToUniquePtr(createWindow(commandLine));
 
         if (mainWindow != nullptr)
         {
@@ -149,8 +153,7 @@ public:
         }
         else
         {
-            pluginHolder = createPluginHolder();
-            mainWindow->handleCommandLine(commandLine);
+            pluginHolder = createPluginHolder(commandLine);
         }
     }
 

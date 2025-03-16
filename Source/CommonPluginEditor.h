@@ -14,6 +14,7 @@ public:
     CommonPluginEditor(CommonAudioProcessor&, juce::String appName, juce::String projectFileType, int width, int height);
     ~CommonPluginEditor() override;
 
+    void handleCommandLine(const juce::String& commandLine);
     void initialiseMenuBar(juce::MenuBarModel& menuBarModel);
     void openProject(const juce::File& file);
     void openProject();
