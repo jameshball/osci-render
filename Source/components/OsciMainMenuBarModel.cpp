@@ -52,16 +52,6 @@ OsciMainMenuBarModel::OsciMainMenuBarModel(OscirenderAudioProcessor& p, Oscirend
         audioProcessor.setObjectServerPort(juce::Random::getSystemRandom().nextInt(juce::Range<int>(51600, 51700)));
     });
 
-#if !SOSCI_FEATURES
-    addMenuItem(1, "Purchase osci-render premium!", [this] {
-        juce::URL("https://osci-render.com/sosci").launchInDefaultBrowser();
-    });
-#endif
-
-    addMenuItem(2, "Settings...", [this] {
-        editor.openRecordingSettings();
-    });
-
     if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
         addMenuItem(3, "Settings...", [this] {
             editor.openAudioSettings();

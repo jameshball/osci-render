@@ -8,8 +8,6 @@
 
 #pragma once
 
-#define VERSION_HINT 2
-
 #include <JuceHeader.h>
 #include "shape/Shape.h"
 #include "concurrency/AudioBackgroundThread.h"

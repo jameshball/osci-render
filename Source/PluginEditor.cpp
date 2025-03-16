@@ -64,22 +64,6 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 
     addAndMakeVisible(lua);
     addAndMakeVisible(luaResizerBar);
-    addAndMakeVisible(visualiser);
-
-    visualiser.openSettings = [this] {
-        openVisualiserSettings();
-    };
-
-    visualiser.closeSettings = [this] {
-        visualiserSettingsWindow.setVisible(false);
-    };
-
-#if JUCE_WINDOWS
-    // if not standalone, use native title bar for compatibility with DAWs
-    visualiserSettingsWindow.setUsingNativeTitleBar(processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone);
-#elif JUCE_MAC
-    visualiserSettingsWindow.setUsingNativeTitleBar(true);
-#endif
 
     initialiseMenuBar(model);
 }
@@ -167,11 +151,6 @@ void OscirenderAudioProcessorEditor::resized() {
     CommonPluginEditor::resized();
     
     auto area = getLocalBounds();
-
-    if (audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
-        visualiser.setBounds(area);
-        return;
-    }
 
     if (!usingNativeMenuBar) {
         auto topBar = area.removeFromTop(25);
@@ -500,9 +479,4 @@ void OscirenderAudioProcessorEditor::mouseMove(const juce::MouseEvent& event) {
     } else {
         setMouseCursor(juce::MouseCursor::NormalCursor);
     }
-}
-
-void OscirenderAudioProcessorEditor::openVisualiserSettings() {
-    visualiserSettingsWindow.setVisible(true);
-    visualiserSettingsWindow.toFront(true);
 }

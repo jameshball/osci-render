@@ -17,24 +17,6 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
      : AudioProcessor(busesProperties)
 #endif
 {
-    // locking isn't necessary here because we are in the constructor
-
-    for (auto effect : visualiserParameters.effects) {
-        permanentEffects.push_back(effect);
-        effects.push_back(effect);
-    }
-    
-    for (auto effect : visualiserParameters.audioEffects) {
-        effects.push_back(effect);
-    }
-        
-    for (auto parameter : visualiserParameters.booleans) {
-        booleanParameters.push_back(parameter);
-    }
-    
-    for (auto parameter : visualiserParameters.integers) {
-        intParameters.push_back(parameter);
-    }
 
     permanentEffects.push_back(volumeEffect);
     permanentEffects.push_back(thresholdEffect);

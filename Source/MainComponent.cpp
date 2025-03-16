@@ -122,33 +122,9 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 	fileName.onReturnKey = [this] {
 		createFile.triggerClick();
 	};
-
-	BooleanParameter* visualiserFullScreen = audioProcessor.visualiserParameters.visualiserFullScreen;
-    pluginEditor.visualiser.setFullScreen(visualiserFullScreen->getBoolValue());
-
-    addAndMakeVisible(pluginEditor.visualiser);
-	pluginEditor.visualiser.setFullScreenCallback([this, visualiserFullScreen](FullScreenMode mode) {
-		if (mode == FullScreenMode::TOGGLE) {
-			visualiserFullScreen->setBoolValueNotifyingHost(!visualiserFullScreen->getBoolValue());
-		} else if (mode == FullScreenMode::FULL_SCREEN) {
-			visualiserFullScreen->setBoolValueNotifyingHost(true);
-		} else if (mode == FullScreenMode::MAIN_COMPONENT) {
-			visualiserFullScreen->setBoolValueNotifyingHost(false);
-        }
-        
-        pluginEditor.visualiser.setFullScreen(visualiserFullScreen->getBoolValue());
-		
-		pluginEditor.resized();
-		pluginEditor.repaint();
-		resized();
-		repaint();
-    });
-
-	visualiserFullScreen->addListener(this);
 }
 
 MainComponent::~MainComponent() {
-	audioProcessor.visualiserParameters.visualiserFullScreen->removeListener(this);
 }
 
 void MainComponent::updateFileLabel() {
@@ -221,19 +197,4 @@ void MainComponent::resized() {
 	fileType.setBounds(row.removeFromLeft(buttonWidth / 2));
 	row.removeFromLeft(rowPadding);
 	createFile.setBounds(row.removeFromLeft(buttonWidth));
-
-	bounds.removeFromTop(padding);
-	bounds.expand(10, 0);
-	if (!audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
-		auto minDim = juce::jmin(bounds.getWidth(), bounds.getHeight());
-        juce::Point<int> localTopLeft = {bounds.getX(), bounds.getY()};
-        juce::Point<int> topLeft = pluginEditor.getLocalPoint(this, localTopLeft);
-        auto shiftedBounds = bounds;
-        shiftedBounds.setX(topLeft.getX());
-        shiftedBounds.setY(topLeft.getY());
-        //if (minDim < 35) {
-        //    minDim = 35;
-        //}
-		pluginEditor.visualiser.setBounds(shiftedBounds.withSizeKeepingCentre(minDim - 25, minDim));
-	}
 }

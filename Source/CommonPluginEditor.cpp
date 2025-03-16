@@ -36,23 +36,8 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
         }
     }
     
-    addAndMakeVisible(visualiser);
-    
     int width = std::any_cast<int>(audioProcessor.getProperty("appWidth", defaultWidth));
     int height = std::any_cast<int>(audioProcessor.getProperty("appHeight", defaultHeight));
-
-    visualiserSettings.setLookAndFeel(&getLookAndFeel());
-    visualiserSettings.setSize(550, VISUALISER_SETTINGS_HEIGHT);
-    visualiserSettings.setColour(juce::ResizableWindow::backgroundColourId, Colours::dark);
-
-    recordingSettings.setLookAndFeel(&getLookAndFeel());
-    recordingSettings.setSize(300, 280);
-#if JUCE_WINDOWS
-    // if not standalone, use native title bar for compatibility with DAWs
-    recordingSettingsWindow.setUsingNativeTitleBar(processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone);
-#elif JUCE_MAC
-    recordingSettingsWindow.setUsingNativeTitleBar(true);
-#endif
     
     menuBar.toFront(true);
 
@@ -63,10 +48,6 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     tooltipDropShadow.setOwner(&tooltipWindow);
     
     updateTitle();
-
-#if SOSCI_FEATURES
-    sharedTextureManager.initGL();
-#endif
 }
 
 void CommonPluginEditor::resized() {
@@ -171,10 +152,6 @@ void CommonPluginEditor::fileUpdated(juce::String fileName) {
 void CommonPluginEditor::openAudioSettings() {
     juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
     standalone->showAudioSettingsDialog();
-}
-
-void CommonPluginEditor::openRecordingSettings() {
-    recordingSettingsWindow.setVisible(true);
 }
 
 void CommonPluginEditor::resetToDefault() {

@@ -8,13 +8,19 @@
 
 #pragma once
 
+#define VERSION_HINT 2
+
 #include <JuceHeader.h>
 #include <any>
 #include "concurrency/AudioBackgroundThread.h"
 #include "concurrency/AudioBackgroundThreadManager.h"
 #include "audio/SampleRateManager.h"
-#include "visualiser/VisualiserSettings.h"
-#include "visualiser/RecordingSettings.h"
+#include "components/EffectComponent.h"
+#include "components/SvgButton.h"
+#include "LookAndFeel.h"
+#include "components/SwitchButton.h"
+#include "audio/SmoothEffect.h"
+#include "audio/StereoEffect.h"
 #include "audio/Effect.h"
 #include "wav/WavParser.h"
 
@@ -99,8 +105,6 @@ public:
 
     std::atomic<double> currentSampleRate = 0.0;
     juce::SpinLock effectsLock;
-    VisualiserParameters visualiserParameters;
-    RecordingParameters recordingParameters;
     
     AudioBackgroundThreadManager threadManager;
     std::function<void()> haltRecording;

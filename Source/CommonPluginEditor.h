@@ -2,9 +2,7 @@
 
 #include <JuceHeader.h>
 #include "CommonPluginProcessor.h"
-#include "visualiser/VisualiserComponent.h"
 #include "LookAndFeel.h"
-#include "visualiser/VisualiserSettings.h"
 #include "components/SosciMainMenuBarModel.h"
 #include "components/SvgButton.h"
 #include "components/VolumeComponent.h"
@@ -22,7 +20,6 @@ public:
     void updateTitle();
     void fileUpdated(juce::String fileName);
     void openAudioSettings();
-    void openRecordingSettings();
     void resetToDefault();
     void resized() override;
 
@@ -35,44 +32,12 @@ private:
         .getChildFile("Application Support")
 #endif
         .getChildFile("osci-render");
-
-    juce::String ffmpegFileName =
-#if JUCE_WINDOWS
-        "ffmpeg.exe";
-#else
-        "ffmpeg";
-#endif
 public:
     OscirenderLookAndFeel lookAndFeel;
 
     juce::String appName;
     juce::String projectFileType;
     juce::String currentFileName;
-    
-#if SOSCI_FEATURES
-    SharedTextureManager sharedTextureManager;
-#endif
-
-#if SOSCI_FEATURES
-    int VISUALISER_SETTINGS_HEIGHT = 1200;
-#else
-    int VISUALISER_SETTINGS_HEIGHT = 700;
-#endif
-
-    VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.visualiserParameters, 3);
-    RecordingSettings recordingSettings = RecordingSettings(audioProcessor.recordingParameters);
-    SettingsWindow recordingSettingsWindow = SettingsWindow("Recording Settings", recordingSettings, 330, 320, 330, 320);
-    VisualiserComponent visualiser{
-        audioProcessor,
-#if SOSCI_FEATURES
-        sharedTextureManager,
-#endif
-        applicationFolder.getChildFile(ffmpegFileName),
-        visualiserSettings,
-        recordingSettings,
-        nullptr,
-        appName == "sosci"
-    };
 
     VolumeComponent volume{audioProcessor};
 
