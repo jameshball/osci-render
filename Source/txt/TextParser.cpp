@@ -13,8 +13,19 @@ TextParser::~TextParser() {
 void TextParser::parse(juce::String text, juce::Font font) {
     lastFont = font;
     
+    // Apply formatting markers if the font is bold or italic
+    juce::String formattedText = text;
+    
+    if (font.isBold()) {
+        formattedText = "*" + formattedText + "*";
+    }
+    
+    if (font.isItalic()) {
+        formattedText = "_" + formattedText + "_";
+    }
+    
     // Parse the text with formatting
-    attributedString = parseFormattedText(text, font);
+    attributedString = parseFormattedText(formattedText, font);
     
     // Create a TextLayout from the AttributedString
     juce::TextLayout layout;
