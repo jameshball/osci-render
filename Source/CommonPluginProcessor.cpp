@@ -17,6 +17,20 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
      : AudioProcessor(busesProperties)
 #endif
 {
+    // Initialize the global settings with the plugin name
+    juce::PropertiesFile::Options options;
+    options.applicationName = JucePlugin_Name + juce::String("_globals");
+    options.filenameSuffix = ".settings";
+    options.osxLibrarySubFolder = "Application Support";
+    
+    #if JUCE_LINUX || JUCE_BSD
+    options.folderName = "~/.config";
+    #else
+    options.folderName = "";
+    #endif
+    
+    globalSettings = std::make_unique<juce::PropertiesFile>(options);
+    
     // locking isn't necessary here because we are in the constructor
 
     for (auto effect : visualiserParameters.effects) {
@@ -35,6 +49,9 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
     for (auto parameter : visualiserParameters.integers) {
         intParameters.push_back(parameter);
     }
+
+    muteParameter = new BooleanParameter("Mute", "mute", VERSION_HINT, false, "Mute audio output");
+    booleanParameters.push_back(muteParameter);
 
     permanentEffects.push_back(volumeEffect);
     permanentEffects.push_back(thresholdEffect);
@@ -67,7 +84,10 @@ void CommonAudioProcessor::addAllParameters() {
     }
 }
 
-CommonAudioProcessor::~CommonAudioProcessor() {}
+CommonAudioProcessor::~CommonAudioProcessor() 
+{
+    saveGlobalSettings();
+}
 
 const juce::String CommonAudioProcessor::getName() const {
     return JucePlugin_Name;
@@ -300,4 +320,42 @@ void CommonAudioProcessor::loadProperties(juce::XmlElement& xml) {
             }
         }
     }
+}
+
+bool CommonAudioProcessor::getGlobalBoolValue(const juce::String& keyName, bool defaultValue) const
+{
+    return globalSettings != nullptr ? globalSettings->getBoolValue(keyName, defaultValue) : defaultValue;
+}
+
+int CommonAudioProcessor::getGlobalIntValue(const juce::String& keyName, int defaultValue) const
+{
+    return globalSettings != nullptr ? globalSettings->getIntValue(keyName, defaultValue) : defaultValue;
+}
+
+double CommonAudioProcessor::getGlobalDoubleValue(const juce::String& keyName, double defaultValue) const
+{
+    return globalSettings != nullptr ? globalSettings->getDoubleValue(keyName, defaultValue) : defaultValue;
+}
+
+juce::String CommonAudioProcessor::getGlobalStringValue(const juce::String& keyName, const juce::String& defaultValue) const
+{
+    return globalSettings != nullptr ? globalSettings->getValue(keyName, defaultValue) : defaultValue;
+}
+
+void CommonAudioProcessor::setGlobalValue(const juce::String& keyName, const juce::var& value)
+{
+    if (globalSettings != nullptr)
+        globalSettings->setValue(keyName, value);
+}
+
+void CommonAudioProcessor::removeGlobalValue(const juce::String& keyName)
+{
+    if (globalSettings != nullptr)
+        globalSettings->removeValue(keyName);
+}
+
+void CommonAudioProcessor::saveGlobalSettings()
+{
+    if (globalSettings != nullptr)
+        globalSettings->saveIfNeeded();
 }

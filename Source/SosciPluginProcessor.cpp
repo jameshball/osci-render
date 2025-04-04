@@ -69,6 +69,12 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             point.x = juce::jmax(-threshold, juce::jmin(threshold.load(), point.x));
             point.y = juce::jmax(-threshold, juce::jmin(threshold.load(), point.y));
 
+            // Apply mute if active
+            if (muteParameter->getBoolValue()) {
+                point.x = 0.0;
+                point.y = 0.0;
+            }
+
             // this is the point that the volume component will draw (i.e. post scale/clipping)
             threadManager.write(point, "VolumeComponent");
         }

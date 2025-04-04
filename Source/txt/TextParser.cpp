@@ -36,7 +36,7 @@ void TextParser::parse(juce::String text, juce::Font font) {
 
     juce::String displayText = attributedString.getText();
     // remove all whitespace
-    displayText = displayText.replaceCharacters(" \t\n\r", "");
+    displayText = displayText.removeCharacters(" \t\n\r");
     int index = 0;
     
     // Iterate through all lines and all runs in each line
@@ -50,6 +50,9 @@ void TextParser::parse(juce::String text, juce::Font font) {
             juce::GlyphArrangement glyphs;
             
             for (int k = 0; k < run->glyphs.size(); ++k) {
+                if (index >= displayText.length()) {
+                    break;
+                }
                 juce::juce_wchar character = displayText[index];
                 juce::TextLayout::Glyph glyph = run->glyphs.getUnchecked(k);
                 juce::PositionedGlyph positionedGlyph = juce::PositionedGlyph(

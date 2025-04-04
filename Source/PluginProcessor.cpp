@@ -612,14 +612,20 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         x = juce::jmax(-threshold, juce::jmin(threshold.load(), x));
         y = juce::jmax(-threshold, juce::jmin(threshold.load(), y));
         
+        threadManager.write(OsciPoint(x, y, 1));
+        
+        // Apply mute if active
+        if (muteParameter->getBoolValue()) {
+            x = 0.0;
+            y = 0.0;
+        }
+        
         if (totalNumOutputChannels >= 2) {
 			channelData[0][sample] = x;
 			channelData[1][sample] = y;
 		} else if (totalNumOutputChannels == 1) {
             channelData[0][sample] = x;
         }
-        
-        threadManager.write(OsciPoint(x, y, 1));
 
         if (isPlaying) {
             playTimeSeconds += sTimeSec;
