@@ -13,6 +13,8 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
     addAndMakeVisible(recordVideo);
     addAndMakeVisible(compressionPreset);
     addAndMakeVisible(compressionPresetLabel);
+    addAndMakeVisible(videoCodecSelector);
+    addAndMakeVisible(videoCodecLabel);
     addAndMakeVisible(customSharedTextureOutputLabel);
     addAndMakeVisible(customSharedTextureOutputEditor);
     
@@ -43,6 +45,19 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
     compressionPreset.addItemList(parameters.compressionPresets, 1);
     compressionPreset.setSelectedId(parameters.compressionPresets.indexOf(parameters.compressionPreset) + 1);
     compressionPresetLabel.setTooltip("The compression preset to use when recording video. Slower presets will produce smaller files at the expense of encoding time.");
+    
+    // Setup the codec selector
+    videoCodecSelector.addItem("H.264", static_cast<int>(VideoCodec::H264) + 1);
+    videoCodecSelector.addItem("H.265/HEVC", static_cast<int>(VideoCodec::H265) + 1);
+    videoCodecSelector.addItem("VP9", static_cast<int>(VideoCodec::VP9) + 1);
+#if JUCE_MAC
+    videoCodecSelector.addItem("ProRes", static_cast<int>(VideoCodec::ProRes) + 1);
+#endif
+    videoCodecSelector.setSelectedId(static_cast<int>(parameters.videoCodec) + 1);
+    videoCodecSelector.onChange = [this] {
+        parameters.videoCodec = static_cast<VideoCodec>(videoCodecSelector.getSelectedId() - 1);
+    };
+    videoCodecLabel.setTooltip("The video codec to use when recording. Different codecs offer different trade-offs between quality, file size, and compatibility.");
     
     customSharedTextureOutputLabel.setTooltip("Custom name for when creating a new Syphon/Spout server. WARNING: You should not use the same name when running multiple servers at once!.");
     customSharedTextureOutputEditor.setText(parameters.customSharedTextureServerName);
@@ -77,9 +92,15 @@ void RecordingSettings::resized() {
     frameRate.setBounds(area.removeFromTop(rowHeight).expanded(6, 0));
     recordAudio.setBounds(area.removeFromTop(rowHeight));
     recordVideo.setBounds(area.removeFromTop(rowHeight));
+    
     auto row = area.removeFromTop(rowHeight);
     compressionPresetLabel.setBounds(row.removeFromLeft(170));
     compressionPreset.setBounds(row.removeFromRight(100));
+    
+    area.removeFromTop(5);
+    row = area.removeFromTop(rowHeight);
+    videoCodecLabel.setBounds(row.removeFromLeft(170));
+    videoCodecSelector.setBounds(row.removeFromRight(100));
     
     area.removeFromTop(5);
     row = area.removeFromTop(rowHeight);

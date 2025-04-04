@@ -425,7 +425,11 @@ void VisualiserComponent::setRecording(bool recording) {
                 record.setToggleState(false, juce::NotificationType::dontSendNotification);
                 return;
             }
-            tempVideoFile = std::make_unique<juce::TemporaryFile>(".mp4");
+            
+            // Get the appropriate file extension based on codec
+            juce::String fileExtension = recordingSettings.getFileExtensionForCodec();
+            tempVideoFile = std::make_unique<juce::TemporaryFile>("." + fileExtension);
+            
             juce::String resolution = std::to_string(renderTexture.width) + "x" + std::to_string(renderTexture.height);
             juce::String cmd = "\"" + ffmpegFile.getFullPathName() + "\"" +
                 " -r " + juce::String(recordingSettings.getFrameRate()) +
@@ -436,18 +440,39 @@ void VisualiserComponent::setRecording(bool recording) {
                 " -threads 4" +
                 " -preset " + recordingSettings.getCompressionPreset() +
                 " -y" +
-                " -pix_fmt yuv420p" +
-                " -crf " + juce::String(recordingSettings.getCRF()) +
-#if JUCE_MAC
-    #if JUCE_ARM
-                // use software encoding on Apple Silicon
-                " -c:v hevc_videotoolbox" +
-                " -q:v " + juce::String(recordingSettings.getVideoToolboxQuality()) +
-                " -tag:v hvc1" +
-    #endif
+                " -pix_fmt yuv420p";
+            
+            // Apply codec-specific parameters
+            VideoCodec codec = recordingSettings.getVideoCodec();
+            if (codec == VideoCodec::H264) {
+                cmd += " -c:v libx264";
+                cmd += " -crf " + juce::String(recordingSettings.getCRF());
+            }
+            else if (codec == VideoCodec::H265) {
+                cmd += " -c:v libx265";
+                cmd += " -crf " + juce::String(recordingSettings.getCRF());
+#if JUCE_MAC && JUCE_ARM
+                // use hardware encoding on Apple Silicon
+                cmd += " -c:v hevc_videotoolbox";
+                cmd += " -q:v " + juce::String(recordingSettings.getVideoToolboxQuality());
+                cmd += " -tag:v hvc1";
 #endif
-                " -vf vflip" +
-                " \"" + tempVideoFile->getFile().getFullPathName() + "\"";
+            }
+            else if (codec == VideoCodec::VP9) {
+                cmd += " -c:v libvpx-vp9";
+                cmd += " -b:v 0";
+                cmd += " -crf " + juce::String(recordingSettings.getCRF());
+                cmd += " -deadline good -cpu-used 2";
+            }
+#if JUCE_MAC
+            else if (codec == VideoCodec::ProRes) {
+                cmd += " -c:v prores";
+                cmd += " -profile:v 3"; // ProRes 422 HQ
+            }
+#endif
+            
+            cmd += " -vf vflip";
+            cmd += " \"" + tempVideoFile->getFile().getFullPathName() + "\"";
 
             ffmpegProcess.start(cmd);
             framePixels.resize(renderTexture.width * renderTexture.height * 4);
@@ -472,7 +497,7 @@ void VisualiserComponent::setRecording(bool recording) {
         recordingAudio = false;
         recordingVideo = false;
 
-        juce::String extension = wasRecordingVideo ? "mp4" : "wav";
+        juce::String extension = wasRecordingVideo ? recordingSettings.getFileExtensionForCodec() : "wav";
         if (wasRecordingAudio) {
             audioRecorder.stop();
         }
