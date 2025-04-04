@@ -1,7 +1,7 @@
 #include "SvgParser.h"
 #include "../shape/Line.h"
 #include "../shape/QuadraticBezierCurve.h"
-
+#include "../shape/CubicBezierCurve.h"  // Add missing include
 
 SvgParser::SvgParser(juce::String svgFile) {
 	auto doc = juce::XmlDocument::parse(svgFile);
@@ -11,12 +11,11 @@ SvgParser::SvgParser(juce::String svgFile) {
         if (composite != nullptr) {
             auto contentArea = composite->getContentArea();
             auto path = svg->getOutlineAsPath();
-            // apply transform to path to get the content area in the bounds -1 to 1
+            // Apply translation to center the path
             path.applyTransform(juce::AffineTransform::translation(-contentArea.getX(), -contentArea.getY()));
-            path.applyTransform(juce::AffineTransform::scale(2 / contentArea.getWidth(), 2 / contentArea.getHeight()));
-            path.applyTransform(juce::AffineTransform::translation(-1, -1));
-
-            pathToShapes(path, shapes);
+            
+            // Instead of separate scaling for width and height, just get the path as is
+            pathToShapes(path, shapes, true); // Enable normalization
             Shape::removeOutOfBounds(shapes);
             return;
         }
@@ -33,7 +32,7 @@ SvgParser::SvgParser(juce::String svgFile) {
 
 SvgParser::~SvgParser() {}
 
-void SvgParser::pathToShapes(juce::Path& path, std::vector<std::unique_ptr<Shape>>& shapes) {
+void SvgParser::pathToShapes(juce::Path& path, std::vector<std::unique_ptr<Shape>>& shapes, bool normalise) {
 	juce::Path::Iterator pathIterator(path);
 	double x = 0;
 	double y = 0;
@@ -70,6 +69,45 @@ void SvgParser::pathToShapes(juce::Path& path, std::vector<std::unique_ptr<Shape
 			x = startX;
 			y = startY;
 			break;
+		}
+	}
+	
+	// Normalize shapes if requested and if there are shapes to normalize
+	if (normalise && !shapes.empty()) {
+		// Find the bounding box of all shapes
+		double minX = std::numeric_limits<double>::max();
+		double minY = std::numeric_limits<double>::max();
+		double maxX = std::numeric_limits<double>::lowest();
+		double maxY = std::numeric_limits<double>::lowest();
+		
+		for (const auto& shape : shapes) {
+			auto start = shape->nextVector(0);
+			minX = std::min(minX, start.x);
+			minY = std::min(minY, start.y);
+			maxX = std::max(maxX, start.x);
+			maxY = std::max(maxY, start.y);
+
+			auto end = shape->nextVector(1);
+			minX = std::min(minX, end.x);
+			minY = std::min(minY, end.y);
+			maxX = std::max(maxX, end.x);
+			maxY = std::max(maxY, end.y);
+		}
+		
+		// Calculate center of all shapes
+		double centerX = (minX + maxX) / 2.0;
+		double centerY = (minY + maxY) / 2.0;
+		
+		// Calculate uniform scale factor based on the maximum dimension
+		double width = maxX - minX;
+		double height = maxY - minY;
+		double scaleFactor = 1.8 / std::max(width, height); // Scale to fit within -1 to 1
+		
+		// Apply translation and scaling to all shapes
+		for (auto& shape : shapes) {
+			// First center, then scale
+			shape->translate(-centerX, -centerY, 0);
+			shape->scale(scaleFactor, scaleFactor, 1);
 		}
 	}
 }

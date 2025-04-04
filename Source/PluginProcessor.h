@@ -178,7 +178,8 @@ public:
     
     std::shared_ptr<WobbleEffect> wobbleEffect = std::make_shared<WobbleEffect>(*this);
 
-    juce::Font font = juce::Font(juce::Font::getDefaultSansSerifFontName(), 1.0f, juce::Font::plain);
+    const double FONT_SIZE = 1.0f;
+    juce::Font font = juce::Font(juce::Font::getDefaultSansSerifFontName(), FONT_SIZE, juce::Font::plain);
 
     ShapeSound::Ptr objectServerSound = new ShapeSound();
     

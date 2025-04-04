@@ -447,8 +447,7 @@ void VisualiserComponent::setRecording(bool recording) {
             if (codec == VideoCodec::H264) {
                 cmd += " -c:v libx264";
                 cmd += " -crf " + juce::String(recordingSettings.getCRF());
-            }
-            else if (codec == VideoCodec::H265) {
+            } else if (codec == VideoCodec::H265) {
                 cmd += " -c:v libx265";
                 cmd += " -crf " + juce::String(recordingSettings.getCRF());
 #if JUCE_MAC && JUCE_ARM
@@ -457,8 +456,7 @@ void VisualiserComponent::setRecording(bool recording) {
                 cmd += " -q:v " + juce::String(recordingSettings.getVideoToolboxQuality());
                 cmd += " -tag:v hvc1";
 #endif
-            }
-            else if (codec == VideoCodec::VP9) {
+            } else if (codec == VideoCodec::VP9) {
                 cmd += " -c:v libvpx-vp9";
                 cmd += " -b:v 0";
                 cmd += " -crf " + juce::String(recordingSettings.getCRF());

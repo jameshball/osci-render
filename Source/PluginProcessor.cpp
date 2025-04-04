@@ -781,7 +781,7 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
             auto family = fontXml->getStringAttribute("family");
             auto bold = fontXml->getBoolAttribute("bold");
             auto italic = fontXml->getBoolAttribute("italic");
-            font = juce::Font(family, 1.0, (bold ? juce::Font::bold : 0) | (italic ? juce::Font::italic : 0));
+            font = juce::Font(family, FONT_SIZE, (bold ? juce::Font::bold : 0) | (italic ? juce::Font::italic : 0));
         }
 
         // close all files
