@@ -34,6 +34,8 @@ public:
     void editCustomFunction(bool enabled);
 
 private:
+    void registerFileRemovedCallback();
+
     OscirenderAudioProcessor& audioProcessor;
 public:
 

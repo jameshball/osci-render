@@ -184,6 +184,9 @@ public:
     
     std::function<void()> haltRecording;
 
+    // Add a callback to notify the editor when a file is removed
+    std::function<void(int)> fileRemovedCallback;
+
     void addLuaSlider();
     void updateEffectPrecedence();
     void updateFileBlock(int index, std::shared_ptr<juce::MemoryBlock> block);
@@ -205,6 +208,13 @@ public:
     void addErrorListener(ErrorListener* listener);
     void removeErrorListener(ErrorListener* listener);
     void notifyErrorListeners(int lineNumber, juce::String id, juce::String error);
+
+    // Setter for the callback
+    void setFileRemovedCallback(std::function<void(int)> callback);
+
+    // Added declaration for the new `removeParser` method.
+    void removeParser(FileParser* parser);
+
 private:
     
     std::atomic<bool> prevMidiEnabled = !midiEnabled->getBoolValue();

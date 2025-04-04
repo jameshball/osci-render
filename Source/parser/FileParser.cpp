@@ -4,9 +4,10 @@
 #include <numbers>
 #include "../PluginProcessor.h"
 
-FileParser::FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce::String, juce::String)> errorCallback) : errorCallback(errorCallback), audioProcessor(p) {}
+FileParser::FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce::String, juce::String)> errorCallback) 
+    : errorCallback(errorCallback), audioProcessor(p) {}
 
-void FileParser::parse(juce::String fileId, juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font font) {
+void FileParser::parse(juce::String fileId, juce::String fileName, juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font font) {
 	juce::SpinLock::ScopedLockType scope(lock);
 
 	if (extension == ".lua" && lua != nullptr && lua->isFunctionValid()) {
@@ -22,7 +23,54 @@ void FileParser::parse(juce::String fileId, juce::String extension, std::unique_
 	wav = nullptr;
 	
 	if (extension == ".obj") {
-		object = std::make_shared<WorldObject>(stream->readEntireStreamAsString().toStdString());
+		// Check file size before parsing
+		const int64_t fileSize = stream->getTotalLength();
+		const int64_t oneMB = 1024 * 1024; // 1MB in bytes
+		
+		// Save the file content to avoid losing it after the async operation
+		juce::String objContent = stream->readEntireStreamAsString();
+		
+		if (fileSize > oneMB) {
+			// For large files, show an async warning dialog
+			const double fileSizeMB = fileSize / (1024.0 * 1024.0);
+			
+			juce::MessageManager::callAsync([this, objContent, fileSizeMB, fileName]() {
+				juce::String message = juce::String::formatted(
+					"The OBJ file '%s' you're trying to open is %.2f MB in size, which may cause performance issues. "
+					"Would you like to continue loading it?", fileName.toRawUTF8(), fileSizeMB);
+				
+				// Show async dialog with callbacks for user response
+				juce::AlertWindow::showOkCancelBox(
+					juce::AlertWindow::WarningIcon,
+					"Large OBJ File",
+					message,
+					"Continue",
+					"Cancel",
+					nullptr,
+					juce::ModalCallbackFunction::create([this, objContent](int result) {
+						if (result == 1) { // 1 = OK button pressed
+							juce::SpinLock::ScopedLockType scope(lock);
+							// User chose to continue, load the file
+							object = std::make_shared<WorldObject>(objContent.toStdString());
+						} else {
+							// User canceled, fully close this file parser
+							juce::SpinLock::ScopedLockType scope(lock);
+							disable(); // Mark this parser as inactive
+							
+							// Notify the processor to remove this parser
+							juce::MessageManager::callAsync([this] {
+								juce::SpinLock::ScopedLockType lock1(audioProcessor.parsersLock);
+								juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
+								audioProcessor.removeParser(this);
+							});
+						}
+					})
+				);
+			});
+		} else {
+			// For small files, load immediately
+			object = std::make_shared<WorldObject>(objContent.toStdString());
+		}
 	} else if (extension == ".svg") {
 		svg = std::make_shared<SvgParser>(stream->readEntireStreamAsString());
 	} else if (extension == ".txt") {
@@ -52,8 +100,10 @@ void FileParser::parse(juce::String fileId, juce::String extension, std::unique_
 	} else if (extension == ".wav" || extension == ".aiff" || extension == ".flac" || extension == ".ogg" || extension == ".mp3") {
 		wav = std::make_shared<WavParser>(audioProcessor);
         if (!wav->parse(std::move(stream))) {
-            juce::MessageManager::callAsync([this] {
-                juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::AlertIconType::WarningIcon, "Error", "The audio file could not be loaded.");
+            juce::MessageManager::callAsync([this, fileName] {
+                juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::AlertIconType::WarningIcon, 
+                    "Error Loading " + fileName, 
+                    "The audio file '" + fileName + "' could not be loaded.");
             });
         }
 	}
