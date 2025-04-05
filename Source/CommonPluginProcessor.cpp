@@ -86,6 +86,7 @@ void CommonAudioProcessor::addAllParameters() {
 
 CommonAudioProcessor::~CommonAudioProcessor() 
 {
+    setGlobalValue("endTime", juce::Time::getCurrentTime().toISO8601(true));
     saveGlobalSettings();
 }
 

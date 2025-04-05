@@ -709,6 +709,37 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
 }
 
 void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
+    // check that the previous end time is later than the start time.
+    // if not, the program did not close properly.
+    juce::String startTime = getGlobalStringValue("startTime");
+    juce::String endTime = getGlobalStringValue("endTime");
+
+    if (startTime.isNotEmpty() && endTime.isNotEmpty()) {
+        juce::Time start = juce::Time::fromISO8601(startTime);
+        juce::Time end = juce::Time::fromISO8601(endTime);
+        
+        if ((start > end || end == juce::Time()) && juce::MessageManager::getInstance()->isThisTheMessageThread()) {
+            juce::String message = "It appears that " + juce::String(ProjectInfo::projectName) + " did not close properly during your last session. This may indicate a problem with your project or session.";
+            
+            // Use a synchronous dialog to ensure user makes a choice before proceeding
+            bool userPressedReset = juce::AlertWindow::showOkCancelBox(
+                juce::AlertWindow::WarningIcon,
+                "Possible Crash Detected",
+                message + "\n\nDo you want to reset to a new project, or continue loading your previous session?",
+                "Reset to New Project",
+                "Continue",
+                nullptr,
+                nullptr
+            );
+            
+            if (userPressedReset) {
+                return;
+            }
+        }
+    }
+    
+    setGlobalValue("startTime", juce::Time::getCurrentTime().toISO8601(true));
+    
     std::unique_ptr<juce::XmlElement> xml;
 
     const uint32_t magicXmlNumber = 0x21324356;
