@@ -5,7 +5,9 @@
 EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), itemData(p, editor), listBoxModel(listBox, itemData) {
 	setText("Audio Effects");
 
+#if !defined(MIDI_ALWAYS_ENABLED) || (MIDI_ALWAYS_ENABLED == 0)
     addAndMakeVisible(frequency);
+#endif
 
     frequency.slider.setSkewFactorFromMidPoint(500.0);
     frequency.slider.setTextValueSuffix("Hz");
