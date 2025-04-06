@@ -49,12 +49,6 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
     listBox.setModel(&listBoxModel);
     addAndMakeVisible(listBox);
 
-    // Add preset buttons and set up callbacks
-    addAndMakeVisible(loadPresetButton);
-    addAndMakeVisible(savePresetButton);
-    loadPresetButton.onClick = [this] { loadPresetClicked(); };
-    savePresetButton.onClick = [this] { savePresetClicked(); };
-
     setTextLabelPosition(juce::Justification::centred);
 }
 
@@ -67,12 +61,6 @@ void EffectsComponent::resized() {
     auto area = getLocalBounds();
     auto titleBar = area.removeFromTop(30);
     titleBar.removeFromLeft(100);
-
-    // Position preset buttons near the top
-    // auto topArea = area.removeFromTop(25);
-    // Position the preset buttons below the title bar on the right
-    savePresetButton.setBounds(titleBar.removeFromRight(50));
-    loadPresetButton.setBounds(titleBar.removeFromRight(50 + 5)); // Add 5px spacing
     
 	randomiseButton.setBounds(titleBar.removeFromLeft(20));
     area = area.reduced(20);
@@ -85,43 +73,4 @@ void EffectsComponent::resized() {
 void EffectsComponent::changeListenerCallback(juce::ChangeBroadcaster* source) {
     itemData.resetData();
     listBox.updateContent();
-}
-
-// Add implementations for button handlers
-void EffectsComponent::loadPresetClicked()
-{
-    presetChooser = std::make_unique<juce::FileChooser>("Load OsciPreset",
-                                                      juce::File::getSpecialLocation(juce::File::userDocumentsDirectory),
-                                                      "*.ospreset");
-    auto chooserFlags = juce::FileBrowserComponent::openMode |
-                       juce::FileBrowserComponent::canSelectFiles;
-
-    presetChooser->launchAsync(chooserFlags, [this](const juce::FileChooser& fc)
-    {
-        auto file = fc.getResult();
-        if (file != juce::File{})
-            audioProcessor.loadPreset(file);
-    });
-}
-
-void EffectsComponent::savePresetClicked()
-{
-    presetChooser = std::make_unique<juce::FileChooser>("Save OsciPreset",
-                                                     juce::File::getSpecialLocation(juce::File::userDocumentsDirectory),
-                                                     "*.ospreset");
-    auto chooserFlags = juce::FileBrowserComponent::saveMode |
-                       juce::FileBrowserComponent::canSelectFiles;
-
-    presetChooser->launchAsync(chooserFlags, [this](const juce::FileChooser& fc)
-    {
-        auto file = fc.getResult();
-        if (file != juce::File{})
-        {
-            // Ensure the file has the correct extension
-            if (!file.hasFileExtension(".ospreset"))
-                file = file.withFileExtension(".ospreset");
-                
-            audioProcessor.savePreset(file);
-        }
-    });
 }

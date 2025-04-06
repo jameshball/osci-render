@@ -10,6 +10,8 @@
 #include "components/LuaConsole.h"
 #include "visualiser/VisualiserSettings.h"
 #include "CommonPluginEditor.h"
+#include "MainComponent.h"
+#include "PresetComponent.h"
 
 class OscirenderAudioProcessorEditor : public CommonPluginEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener, public juce::FileDragAndDropTarget {
 public:
@@ -83,6 +85,9 @@ public:
     bool keyPressed(const juce::KeyPress& key) override;
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseMove(const juce::MouseEvent& event) override;
+
+    PresetComponent presetComponent;
+    MainComponent mainComponent;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OscirenderAudioProcessorEditor)
 };

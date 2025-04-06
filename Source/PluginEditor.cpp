@@ -2,7 +2,7 @@
 #include "PluginEditor.h"
 #include "CustomStandaloneFilterWindow.h"
 
-OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p) : CommonPluginEditor(p, "osci-render", "osci", 1100, 750), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white) {
+OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p) : CommonPluginEditor(p, "osci-render", "osci", 1100, 750), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white), presetComponent(p), mainComponent(p, *this) {
 #if !SOSCI_FEATURES
     addAndMakeVisible(upgradeButton);
     upgradeButton.onClick = [this] {
@@ -82,6 +82,9 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 #endif
 
     initialiseMenuBar(model);
+
+    addAndMakeVisible(presetComponent);
+    addAndMakeVisible(mainComponent);
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
@@ -170,7 +173,22 @@ void OscirenderAudioProcessorEditor::resized() {
 
     if (audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
         visualiser.setBounds(area);
+        presetComponent.setVisible(false);
+        settings.setVisible(false);
+        resizerBar.setVisible(false);
+        luaResizerBar.setVisible(false);
+        lua.setVisible(false);
+        console.setVisible(false);
+        collapseButton.setVisible(false);
+        setCodeEditorVisible(false);
+        if (!usingNativeMenuBar) menuBar.setVisible(false);
+        volume.setVisible(false);
         return;
+    } else {
+        presetComponent.setVisible(true);
+        settings.setVisible(true);
+        if (!usingNativeMenuBar) menuBar.setVisible(true);
+        volume.setVisible(true);
     }
 
     if (!usingNativeMenuBar) {
@@ -186,8 +204,11 @@ void OscirenderAudioProcessorEditor::resized() {
     auto volumeArea = area.removeFromLeft(30);
     volume.setBounds(volumeArea.withSizeKeepingCentre(volumeArea.getWidth(), juce::jmin(volumeArea.getHeight(), 300)));
     area.removeFromLeft(3);
-    bool editorVisible = false;
 
+    auto presetHeight = 160;
+    presetComponent.setBounds(area.removeFromTop(presetHeight));
+
+    bool editorVisible = false;
     {
         juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
 
@@ -208,9 +229,7 @@ void OscirenderAudioProcessorEditor::resized() {
 
                 juce::Component* columns[] = { &dummy, &resizerBar, &dummy2 };
                  
-                // offsetting the y position by -1 and the height by +1 is a hack to fix a bug where the code editor
-                // doesn't draw up to the edges of the menu bar above.
-                layout.layOutComponents(columns, 3, area.getX(), area.getY() - 1, area.getWidth(), area.getHeight() + 1, false, true);
+                layout.layOutComponents(columns, 3, area.getX(), area.getY() -1 , area.getWidth(), area.getHeight() + 1, false, true);
                 auto dummyBounds = dummy.getBounds();
                 collapseButton.setBounds(dummyBounds.removeFromRight(20));
                 area = dummyBounds;
@@ -245,14 +264,18 @@ void OscirenderAudioProcessorEditor::resized() {
 
         collapseButton.setVisible(ableToEditFile);
 
-        if (index < codeEditors.size()) {
-            codeEditors[index]->setVisible(fileOpen);
+        if (!fileOpen) {
+            if (index < codeEditors.size()) codeEditors[index]->setVisible(false);
+            resizerBar.setVisible(false);
+            console.setVisible(false);
+            luaResizerBar.setVisible(false);
+            lua.setVisible(false);
+        } else {
+            resizerBar.setVisible(true);
+            console.setVisible(luaFileOpen);
+            luaResizerBar.setVisible(luaFileOpen);
+            lua.setVisible(luaFileOpen);
         }
-        resizerBar.setVisible(fileOpen);
-
-        console.setVisible(luaFileOpen);
-        luaResizerBar.setVisible(luaFileOpen);
-        lua.setVisible(luaFileOpen);
     }
 
     if (editorVisible) {
@@ -269,8 +292,6 @@ void OscirenderAudioProcessorEditor::resized() {
     
     audioProcessor.setProperty("codeEditorLayoutPreferredSize", layout.getItemCurrentRelativeSize(0));
     audioProcessor.setProperty("luaLayoutPreferredSize", luaLayout.getItemCurrentRelativeSize(0));
-    
-    repaint();
 }
 
 void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
@@ -297,9 +318,7 @@ void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
     codeDocuments.insert(codeDocuments.begin() + index, codeDocument);
     codeEditors.insert(codeEditors.begin() + index, editor);
     addChildComponent(*editor);
-    // I need to disable accessibility otherwise it doesn't work! Appears to be a JUCE issue, very annoying!
     editor->setAccessible(false);
-    // listen for changes to the code editor
     codeDocument->addListener(this);
     editor->getEditor().setColourScheme(colourScheme);
 }
@@ -313,7 +332,6 @@ void OscirenderAudioProcessorEditor::removeCodeEditor(int index) {
 
 // parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessorEditor::updateCodeEditor(bool binaryFile, bool shouldOpenEditor) {
-    // check if any code editors are visible
     bool visible = shouldOpenEditor;
     if (!visible) {
         for (int i = 0; i < codeEditors.size(); i++) {
@@ -338,10 +356,6 @@ void OscirenderAudioProcessorEditor::updateCodeEditor(bool binaryFile, bool shou
                 codeEditors[i]->setVisible(false);
             }
             codeEditors[index]->setVisible(true);
-            // used so that codeDocumentTextInserted and codeDocumentTextDeleted know whether the parserLock
-            // is held by the message thread or not. We hold the lock in this function, but not when the
-            // code document is updated by the user editing text. Since both functions are called by the
-            // message thread, this is safe.
             updatingDocumentsWithParserLock = true;
             if (index == 0) {
                 codeEditors[index]->getEditor().loadContent(audioProcessor.customEffect->getCode());
@@ -380,8 +394,8 @@ void OscirenderAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcas
         repaint();
     } else if (source == &audioProcessor.fileChangeBroadcaster) {
         juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
-        // triggered when the audioProcessor changes the current file (e.g. to Blender)
         settings.fileUpdated(audioProcessor.getCurrentFileName());
+        mainComponent.updateFileLabel();
     }
 }
 

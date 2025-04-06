@@ -31,6 +31,14 @@
 #include "CommonPluginProcessor.h"
 #include "MidiAlwaysEnabled.h"
 
+// Define a struct to hold scene metadata
+struct SceneMetadata {
+    juce::String author;
+    juce::String collection;
+    juce::String presetName;
+    juce::String notes;
+};
+
 //==============================================================================
 /**
 */
@@ -207,8 +215,8 @@ public:
     void removeErrorListener(ErrorListener* listener);
     void notifyErrorListeners(int lineNumber, juce::String id, juce::String error);
 
-    void savePreset(juce::File file);
-    void loadPreset(juce::File file);
+    void saveScene(juce::File file, const juce::String& author, const juce::String& collection, const juce::String& presetName, const juce::String& notes);
+    SceneMetadata loadScene(juce::File file);
 private:
     
     std::atomic<bool> prevMidiEnabled = isMidiAlwaysEnabled() || !midiEnabled->getBoolValue();

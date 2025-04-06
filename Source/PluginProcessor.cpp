@@ -850,30 +850,36 @@ void OscirenderAudioProcessor::envelopeChanged(EnvelopeComponent* changedEnvelop
     }
 }
 
-void OscirenderAudioProcessor::savePreset(juce::File file) {
-    juce::SpinLock::ScopedLockType lock(effectsLock); // Lock to safely access effects & parameters
+// Rename and add metadata parameters
+void OscirenderAudioProcessor::saveScene(juce::File file, const juce::String& author, const juce::String& collection, const juce::String& presetName, const juce::String& notes) {
+    // Lock required resources (effects and potentially parsers/files)
+    juce::SpinLock::ScopedLockType lockEffects(effectsLock); 
+    juce::SpinLock::ScopedLockType lockParsers(parsersLock);
 
-    std::unique_ptr<juce::XmlElement> xml = std::make_unique<juce::XmlElement>("OsciPreset");
-    xml->setAttribute("version", ProjectInfo::versionString); // Use the project version
+    std::unique_ptr<juce::XmlElement> xml = std::make_unique<juce::XmlElement>("OsciScene"); // Root element name changed
+    xml->setAttribute("version", ProjectInfo::versionString);
 
-    // --- Save Effects ---
+    // --- Save Metadata ---
+    xml->setAttribute("author", author);
+    xml->setAttribute("collection", collection);
+    xml->setAttribute("presetName", presetName);
+    // Use a child element for potentially longer notes
+    auto* notesXml = xml->createNewChildElement("Notes");
+    notesXml->addTextElement(notes);
+
+    // --- Save Effects (same as before) ---
     auto effectsXml = xml->createNewChildElement("Effects");
-    // Save toggleable effects (includes state like enabled, parameter values, LFOs)
     for (auto& effect : toggleableEffects) {
         effect->save(effectsXml->createNewChildElement("Effect"));
     }
-    // Save permanent effects (e.g., frequency parameter)
     for (auto& effect : permanentEffects) {
-        // Only save effects relevant to sound generation/preset? Or save all for consistency?
-        // Let's save all permanent ones for now, mirroring getStateInformation.
          effect->save(effectsXml->createNewChildElement("Effect"));
     }
-    // Save Lua slider effects
     for (auto& effect : luaEffects) {
         effect->save(effectsXml->createNewChildElement("Effect"));
     }
 
-    // --- Save ADSR Parameters ---
+    // --- Save ADSR Parameters (same as before) ---
     auto adsrXml = xml->createNewChildElement("ADSR");
     attackTime->save(adsrXml->createNewChildElement("Parameter"));
     attackLevel->save(adsrXml->createNewChildElement("Parameter"));
@@ -884,106 +890,149 @@ void OscirenderAudioProcessor::savePreset(juce::File file) {
     releaseTime->save(adsrXml->createNewChildElement("Parameter"));
     releaseShape->save(adsrXml->createNewChildElement("Parameter"));
 
-    // --- Save Synth Parameters ---
+    // --- Save Synth Parameters (same as before) ---
     auto synthParamsXml = xml->createNewChildElement("SynthParameters");
-    voices->save(synthParamsXml->createNewChildElement("Parameter")); // Save number of voices
+    voices->save(synthParamsXml->createNewChildElement("Parameter"));
 
-    // --- Save Lua Code ---
+    // --- Save Lua Code (same as before) ---
     auto customFunctionXml = xml->createNewChildElement("CustomFunction");
     customFunctionXml->addTextElement(juce::Base64::toBase64(customEffect->getCode()));
 
-    // --- Write to File ---
-    if (!xml->writeToFile(file, {})) {
-        // Handle error - maybe log it or show an alert?
-        DBG("Error writing preset file: " + file.getFullPathName());
-        // For now, just log an error message in debug builds.
-        // In a real application, you might want to show a juce::AlertWindow.
+    // --- Save Current Visual File Info ---
+    xml->setAttribute("currentFileIndex", currentFile.load());
+    if (currentFile.load() >= 0 && currentFile.load() < fileNames.size()) {
+        auto currentFileXml = xml->createNewChildElement("CurrentVisualFile");
+        currentFileXml->setAttribute("name", fileNames[currentFile.load()]);
+        auto base64 = fileBlocks[currentFile.load()]->toBase64Encoding();
+        currentFileXml->addTextElement(base64);
+    }
+    
+    // --- Save other relevant parameters (e.g., Main Settings, 3D Settings) ---
+    // Example: Saving perspective parameters
+    auto perspectiveParamsXml = xml->createNewChildElement("PerspectiveParameters");
+    perspective->parameters[0]->save(perspectiveParamsXml->createNewChildElement("Parameter")); // Strength
+    perspective->parameters[1]->save(perspectiveParamsXml->createNewChildElement("Parameter")); // Focal Length
+    
+    // Example: Saving animation parameters
+    auto animParamsXml = xml->createNewChildElement("AnimationParameters");
+    animateFrames->save(animParamsXml->createNewChildElement("Parameter"));
+    animationSyncBPM->save(animParamsXml->createNewChildElement("Parameter"));
+    animationRate->save(animParamsXml->createNewChildElement("Parameter"));
+    animationOffset->save(animParamsXml->createNewChildElement("Parameter"));
+
+    // Add saving for other parameter groups as needed...
+
+    // --- Write to File (Ensure .osscene extension) ---
+    juce::File sceneFile = file;
+    if (!sceneFile.hasFileExtension(".osscene"))
+        sceneFile = sceneFile.withFileExtension(".osscene");
+
+    if (!xml->writeToFile(sceneFile, {})) {
+        DBG("Error writing scene file: " + sceneFile.getFullPathName());
     }
 }
 
-void OscirenderAudioProcessor::loadPreset(juce::File file) {
+// Change return type and populate/return SceneMetadata struct
+SceneMetadata OscirenderAudioProcessor::loadScene(juce::File file) {
+    // Keep existing preset loading logic for now
+    // TODO: Expand this to load the full scene state (visual file, metadata, other params)
     std::unique_ptr<juce::XmlElement> xml = juce::XmlDocument::parse(file);
+    
+    SceneMetadata loadedMetadata; // Create struct instance
 
     if (xml == nullptr) {
-        DBG("Error parsing preset file: " + file.getFullPathName());
-        // Optionally show an AlertWindow here
-        return;
+        DBG("Error parsing scene file: " + file.getFullPathName());
+        // Return empty metadata on error
+        return loadedMetadata; 
     }
 
-    if (!xml->hasTagName("OsciPreset")) {
-        DBG("Invalid preset file format: " + file.getFullPathName());
-        // Optionally show an AlertWindow here
-        return;
+    // Check for OsciScene or fallback to OsciPreset for backward compatibility?
+    if (!xml->hasTagName("OsciScene") && !xml->hasTagName("OsciPreset")) { 
+        DBG("Invalid scene/preset file format: " + file.getFullPathName());
+        // Return empty metadata on error
+        return loadedMetadata;
+    }
+    bool isSceneFile = xml->hasTagName("OsciScene");
+
+    juce::SpinLock::ScopedLockType lockEffects(effectsLock);
+    juce::SpinLock::ScopedLockType lockParsers(parsersLock);
+
+    // --- Load Metadata (if it's a scene file) and populate struct ---
+    if (isSceneFile) {
+        loadedMetadata.author = xml->getStringAttribute("author", "");
+        loadedMetadata.collection = xml->getStringAttribute("collection", "");
+        loadedMetadata.presetName = xml->getStringAttribute("presetName", "");
+        auto* notesXml = xml->getChildByName("Notes");
+        if (notesXml != nullptr) {
+            loadedMetadata.notes = notesXml->getAllSubText();
+        }
+        // Log statements can be removed if desired
+        DBG("Loading Scene Metadata:");
+        DBG("  Author: " + loadedMetadata.author);
+        DBG("  Collection: " + loadedMetadata.collection);
+        DBG("  Preset Name: " + loadedMetadata.presetName);
+        DBG("  Notes: " + loadedMetadata.notes);
     }
 
-    // Lock effects/parameters while loading
-    juce::SpinLock::ScopedLockType lock(effectsLock);
-
-    // --- Load Effects ---
+    // --- Load Effects --- 
     auto effectsXml = xml->getChildByName("Effects");
     if (effectsXml != nullptr) {
-        // Iterate through all saved Effect elements
         for (auto* effectXml : effectsXml->getChildIterator()) {
             if (effectXml->hasTagName("Effect")) {
-                // Find the matching effect in our processor's lists by ID
                 auto effectId = effectXml->getStringAttribute("id");
-                auto effect = getEffect(effectId); // Assuming getEffect searches all relevant lists (toggleable, permanent, lua)
+                auto effect = getEffect(effectId); 
                 if (effect != nullptr) {
                     effect->load(effectXml);
                 } else {
-                    DBG("Preset loading: Could not find effect with ID: " + effectId);
+                    DBG("Scene loading: Could not find effect with ID: " + effectId);
                 }
             }
         }
-        updateEffectPrecedence(); // Re-sort toggleable effects based on loaded precedence
+        updateEffectPrecedence(); 
     }
 
-    // --- Load ADSR Parameters ---
+    // --- Load ADSR Parameters --- 
     auto adsrXml = xml->getChildByName("ADSR");
     if (adsrXml != nullptr) {
         for (auto* parameterXml : adsrXml->getChildIterator()) {
              if (parameterXml->hasTagName("Parameter")) {
                  auto paramId = parameterXml->getStringAttribute("id");
-                 auto parameter = getFloatParameter(paramId); // Assumes ADSR params are FloatParameters
+                 auto parameter = getFloatParameter(paramId); 
                  if (parameter != nullptr) {
                      parameter->load(parameterXml);
                  } else {
-                     DBG("Preset loading: Could not find ADSR parameter with ID: " + paramId);
+                     DBG("Scene loading: Could not find ADSR parameter with ID: " + paramId);
                  }
              }
         }
-        // Update the internal adsrEnv object after loading parameters
         adsrEnv = Env::adsr(
             attackTime->getValueUnnormalised(),
             decayTime->getValueUnnormalised(),
             sustainLevel->getValueUnnormalised(),
             releaseTime->getValueUnnormalised(),
-            attackLevel->getValueUnnormalised(), // Assuming attackLevel corresponds to env's 'peakLevel'
+            attackLevel->getValueUnnormalised(), 
             std::vector<EnvCurve>{ attackShape->getValueUnnormalised(), decayShape->getValueUnnormalised(), releaseShape->getValueUnnormalised() }
         );
     }
 
-    // --- Load Synth Parameters ---
+    // --- Load Synth Parameters --- 
     auto synthParamsXml = xml->getChildByName("SynthParameters");
     if (synthParamsXml != nullptr) {
         for (auto* parameterXml : synthParamsXml->getChildIterator()) {
              if (parameterXml->hasTagName("Parameter")) {
                  auto paramId = parameterXml->getStringAttribute("id");
-                 // Check if it's the 'voices' parameter
                  if (paramId == voices->getParameterID()) {
                      voices->load(parameterXml);
-                     // Trigger parameterValueChanged to update synth voices
                      parameterValueChanged(voices->getParameterIndex(), voices->getValue());
-                 }
-                  // Add checks for other synth parameters if needed
+                 } 
                  else {
-                     DBG("Preset loading: Could not find Synth parameter with ID: " + paramId);
+                     DBG("Scene loading: Could not find Synth parameter with ID: " + paramId);
                  }
              }
         }
     }
 
-    // --- Load Lua Code ---
+    // --- Load Lua Code --- 
     auto customFunctionXml = xml->getChildByName("CustomFunction");
     if (customFunctionXml != nullptr) {
         auto base64Code = customFunctionXml->getAllSubText();
@@ -991,14 +1040,93 @@ void OscirenderAudioProcessor::loadPreset(juce::File file) {
         if (juce::Base64::convertFromBase64(stream, base64Code)) {
             customEffect->updateCode(stream.toString());
         } else {
-             DBG("Preset loading: Failed to decode Base64 Lua code.");
+             DBG("Scene loading: Failed to decode Base64 Lua code.");
         }
     }
 
-    // --- Notify UI/Listeners ---
-    // Use MessageManagerLock as sendChangeMessage needs to be called from the message thread
+    // --- Load Current Visual File Info (if it's a scene file) ---
+    if (isSceneFile) {
+        int loadedFileIndex = xml->getIntAttribute("currentFileIndex", -1);
+        auto* currentFileXml = xml->getChildByName("CurrentVisualFile");
+        if (currentFileXml != nullptr && loadedFileIndex != -1) {
+            auto fileName = currentFileXml->getStringAttribute("name");
+            auto base64Data = currentFileXml->getAllSubText();
+            std::shared_ptr<juce::MemoryBlock> fileBlock = std::make_shared<juce::MemoryBlock>();
+            if (fileBlock->fromBase64Encoding(base64Data)) {
+                 // Need to find if this file already exists or add it
+                 // This requires more careful handling to avoid duplicates 
+                 // and potentially clearing existing files first.
+                 // For now, let's just try adding it. If it needs replacing,
+                 // the logic gets more complex.
+                 
+                 // A simpler approach might be to clear all existing files first?
+                 // Clear existing files (Careful! This deletes user's loaded files)
+                 // int numFiles = fileBlocks.size();
+                 // for (int i = numFiles - 1; i >= 0; --i) {
+                 //     removeFile(i);
+                 // }
+                 // Then add the saved file:
+                 // addFile(fileName, fileBlock);
+                 // changeCurrentFile(0); // Assuming it becomes the first file
+
+                 DBG("Scene loading: Visual file found - Name: " + fileName + ", Index: " + juce::String(loadedFileIndex));
+                 DBG("Scene loading: TODO - Implement proper visual file loading logic (clearing/adding/selecting)");
+            } else {
+                DBG("Scene loading: Failed to decode Base64 visual file data.");
+            }
+        } else if (loadedFileIndex == -1) {
+             // If scene saved with no visual file selected, clear current file?
+             // changeCurrentFile(-1); 
+             DBG("Scene loading: TODO - Implement logic for loading scene with no visual file selected.");
+        }
+    }
+    
+    // --- Load other parameters (if it's a scene file) ---
+    if (isSceneFile) {
+        // Example: Loading perspective parameters
+        auto perspectiveParamsXml = xml->getChildByName("PerspectiveParameters");
+        if (perspectiveParamsXml != nullptr) {
+            for (auto* parameterXml : perspectiveParamsXml->getChildIterator()) {
+                if (parameterXml->hasTagName("Parameter")) {
+                    auto paramId = parameterXml->getStringAttribute("id");
+                    auto parameter = getFloatParameter(paramId); // Assuming perspective params are float
+                    if (parameter != nullptr) {
+                        parameter->load(parameterXml);
+                    } else {
+                        DBG("Scene loading: Could not find Perspective parameter with ID: " + paramId);
+                    }
+                }
+            }
+        }
+        
+        // Example: Loading animation parameters
+        auto animParamsXml = xml->getChildByName("AnimationParameters");
+        if (animParamsXml != nullptr) {
+            for (auto* parameterXml : animParamsXml->getChildIterator()) {
+                if (parameterXml->hasTagName("Parameter")) {
+                    auto paramId = parameterXml->getStringAttribute("id");
+                    // Need to check boolean and float params separately
+                    auto boolParam = getBooleanParameter(paramId);
+                    auto floatParam = getFloatParameter(paramId);
+                    if (boolParam != nullptr) {
+                        boolParam->load(parameterXml);
+                    } else if (floatParam != nullptr) {
+                        floatParam->load(parameterXml);
+                    } else {
+                        DBG("Scene loading: Could not find Animation parameter with ID: " + paramId);
+                    }
+                }
+            }
+        }
+        // Add loading for other parameter groups as needed...
+    }
+
+    // --- Notify UI/Listeners --- 
     juce::MessageManagerLock mmlock;
     broadcaster.sendChangeMessage();
+    
+    // Return the populated metadata struct
+    return loadedMetadata;
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {

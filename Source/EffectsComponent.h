@@ -33,12 +33,14 @@ private:
 	
 	EffectComponent frequency = EffectComponent(*audioProcessor.frequencyEffect, false);
 
-	juce::TextButton loadPresetButton { "Load" };
-	juce::TextButton savePresetButton { "Save" };
-	std::unique_ptr<juce::FileChooser> presetChooser;
+	// Remove preset buttons and chooser
+	// juce::TextButton loadPresetButton { "Load" };
+	// juce::TextButton savePresetButton { "Save" };
+	// std::unique_ptr<juce::FileChooser> presetChooser;
 
-	void loadPresetClicked();
-	void savePresetClicked();
+	// Remove preset click handlers
+	// void loadPresetClicked();
+	// void savePresetClicked();
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EffectsComponent)
 };
