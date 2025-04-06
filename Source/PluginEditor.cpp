@@ -227,8 +227,10 @@ void OscirenderAudioProcessorEditor::resized() {
                 juce::Component* columns[] = { &dummy, &resizerBar, &dummy2 };
                  
                 auto settingsBounds = settings.getBounds();
-                layout.layOutComponents(columns, 3, settingsBounds.getX(), settingsBounds.getY() -1 , settingsBounds.getWidth(), settingsBounds.getHeight() + 1, false, true);
+                layout.layOutComponents(columns, 3, settingsBounds.getX(), settingsBounds.getY() - 1, settingsBounds.getWidth(), settingsBounds.getHeight() + 1, false, true);
+
                 auto dummyBounds = dummy.getBounds();
+                settings.setBounds(dummyBounds);
                 collapseButton.setBounds(dummyBounds.removeFromRight(20));
 
                 auto dummy2Bounds = dummy2.getBounds();
@@ -285,8 +287,6 @@ void OscirenderAudioProcessorEditor::resized() {
         collapseButton.setShape(path, false, true, true);
     }
 
-    settings.setBounds(area);
-    
     audioProcessor.setProperty("codeEditorLayoutPreferredSize", layout.getItemCurrentRelativeSize(0));
     audioProcessor.setProperty("luaLayoutPreferredSize", luaLayout.getItemCurrentRelativeSize(0));
 }
