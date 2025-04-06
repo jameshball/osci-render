@@ -1,15 +1,8 @@
 #include "EffectsComponent.h"
 #include "audio/BitCrushEffect.h"
 #include "PluginEditor.h"
-#include "PluginProcessor.h"
-#include "LookAndFeel.h"
 
-EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) 
-    : juce::GroupComponent("", "Audio Effects"), 
-      audioProcessor(p), 
-      itemData(p, editor),
-      listBoxModel(listBox, itemData)
-{
+EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), itemData(p, editor), listBoxModel(listBox, itemData) {
 	setText("Audio Effects");
 
     addAndMakeVisible(frequency);
@@ -46,8 +39,6 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
 
     listBox.setModel(&listBoxModel);
     addAndMakeVisible(listBox);
-
-    setTextLabelPosition(juce::Justification::centred);
 }
 
 EffectsComponent::~EffectsComponent() {
