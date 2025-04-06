@@ -7,7 +7,7 @@
 class OscirenderAudioProcessorEditor;
 
 /*
-    Component for handling scene loading, saving, and metadata.
+    Component for handling preset loading, saving, and metadata.
 */
 class PresetComponent  : public juce::GroupComponent
 {
@@ -17,7 +17,7 @@ public:
 
     void resized() override;
 
-    // Method to update text fields after loading a scene
+    // Method to update text fields after loading a preset
     void updateMetadataFields(const juce::String& author, const juce::String& collection, const juce::String& presetName, const juce::String& notes, const juce::StringArray& tags);
 
 private:
@@ -39,15 +39,15 @@ private:
     juce::TextEditor tagsEditor;
 
     // Load/Save Buttons
-    juce::TextButton loadSceneButton { "Load Scene" };
-    juce::TextButton saveSceneButton { "Save Scene" };
+    juce::TextButton loadPresetButton { "Load Preset" };
+    juce::TextButton savePresetButton { "Save Preset" };
 
     // File Chooser
-    std::unique_ptr<juce::FileChooser> sceneChooser;
+    std::unique_ptr<juce::FileChooser> presetChooser;
 
     // Button Handlers
-    void loadSceneClicked();
-    void saveSceneClicked();
+    void loadPresetClicked();
+    void savePresetClicked();
 
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PresetComponent)

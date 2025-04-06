@@ -30,8 +30,8 @@
 #include "audio/DashedLineEffect.h"
 #include "CommonPluginProcessor.h"
 
-// Define a struct to hold scene metadata
-struct SceneMetadata {
+// Define a struct to hold preset metadata
+struct PresetMetadata {
     juce::String author;
     juce::String collection;
     juce::String presetName;
@@ -215,8 +215,8 @@ public:
     void removeErrorListener(ErrorListener* listener);
     void notifyErrorListeners(int lineNumber, juce::String id, juce::String error);
 
-    void saveScene(juce::File file, const juce::String& author, const juce::String& collection, const juce::String& presetName, const juce::String& notes, const juce::String& tagsCsv);
-    SceneMetadata loadScene(juce::File file);
+    void savePreset(juce::File file, const juce::String& author, const juce::String& collection, const juce::String& presetName, const juce::String& notes, const juce::String& tagsCsv);
+    PresetMetadata loadPreset(juce::File file);
 private:
     
     std::atomic<bool> prevMidiEnabled = !midiEnabled->getBoolValue();

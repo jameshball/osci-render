@@ -9,7 +9,7 @@ PresetComponent::PresetComponent(OscirenderAudioProcessor& p, OscirenderAudioPro
     // Setup Labels
     authorLabel.setText("Author:", juce::dontSendNotification);
     collectionLabel.setText("Collection:", juce::dontSendNotification);
-    presetNameLabel.setText("Scene Name:", juce::dontSendNotification);
+    presetNameLabel.setText("Preset Name:", juce::dontSendNotification);
     notesLabel.setText("Notes:", juce::dontSendNotification);
     tagsLabel.setText("Tags (CSV):", juce::dontSendNotification);
 
@@ -33,12 +33,12 @@ PresetComponent::PresetComponent(OscirenderAudioProcessor& p, OscirenderAudioPro
     addAndMakeVisible(notesEditor);
     addAndMakeVisible(tagsLabel);
     addAndMakeVisible(tagsEditor);
-    addAndMakeVisible(loadSceneButton);
-    addAndMakeVisible(saveSceneButton);
+    addAndMakeVisible(loadPresetButton);
+    addAndMakeVisible(savePresetButton);
 
     // Setup button callbacks
-    loadSceneButton.onClick = [this] { loadSceneClicked(); };
-    saveSceneButton.onClick = [this] { saveSceneClicked(); };
+    loadPresetButton.onClick = [this] { loadPresetClicked(); };
+    savePresetButton.onClick = [this] { savePresetClicked(); };
 }
 
 PresetComponent::~PresetComponent() {}
@@ -55,8 +55,8 @@ void PresetComponent::resized()
 
     auto topRow = bounds.removeFromTop(25);
     auto loadButtonBounds = topRow.removeFromLeft(100);
-    loadSceneButton.setBounds(loadButtonBounds);
-    saveSceneButton.setBounds(loadButtonBounds.translated(loadButtonBounds.getWidth() + 5, 0));
+    loadPresetButton.setBounds(loadButtonBounds);
+    savePresetButton.setBounds(loadButtonBounds.translated(loadButtonBounds.getWidth() + 5, 0));
 
     bounds.removeFromTop(10);
 
@@ -99,41 +99,41 @@ void PresetComponent::resized()
     notesEditor.setBounds(bounds); 
 }
 
-void PresetComponent::loadSceneClicked()
+void PresetComponent::loadPresetClicked()
 {
-    sceneChooser = std::make_unique<juce::FileChooser>("Load OsciScene File",
+    presetChooser = std::make_unique<juce::FileChooser>("Load OsciPreset File",
                                                       juce::File::getSpecialLocation(juce::File::userDocumentsDirectory),
-                                                      "*.osscene"); // Use new extension
+                                                      "*.ospreset"); // Use new extension
     auto chooserFlags = juce::FileBrowserComponent::openMode |
                        juce::FileBrowserComponent::canSelectFiles;
 
-    sceneChooser->launchAsync(chooserFlags, [safeThis = juce::Component::SafePointer(this)](const juce::FileChooser& fc)
+    presetChooser->launchAsync(chooserFlags, [safeThis = juce::Component::SafePointer(this)](const juce::FileChooser& fc)
     {
         if (safeThis == nullptr) return;
         
         auto file = fc.getResult();
         if (file != juce::File{})
         {
-            SceneMetadata loadedData = safeThis->processor.loadScene(file);
+            PresetMetadata loadedData = safeThis->processor.loadPreset(file);
             
             safeThis->updateMetadataFields(loadedData.author, loadedData.collection, loadedData.presetName, loadedData.notes, loadedData.tags);
 
-            DBG("PresetComponent: Updated metadata fields after loading scene.");
+            DBG("PresetComponent: Updated metadata fields after loading preset.");
         }
     });
 }
 
-void PresetComponent::saveSceneClicked()
+void PresetComponent::savePresetClicked()
 {
-    sceneChooser = std::make_unique<juce::FileChooser>("Save OsciScene File",
+    presetChooser = std::make_unique<juce::FileChooser>("Save OsciPreset File",
                                                      juce::File::getSpecialLocation(juce::File::userDocumentsDirectory),
-                                                     "*.osscene", // Use new extension
+                                                     "*.ospreset", // Use new extension
                                                      true);
 
     auto chooserFlags = juce::FileBrowserComponent::saveMode |
                        juce::FileBrowserComponent::canSelectFiles;
 
-    sceneChooser->launchAsync(chooserFlags, [safeThis = juce::Component::SafePointer(this)](const juce::FileChooser& fc)
+    presetChooser->launchAsync(chooserFlags, [safeThis = juce::Component::SafePointer(this)](const juce::FileChooser& fc)
     {
         if (safeThis == nullptr) return;
         
@@ -146,7 +146,7 @@ void PresetComponent::saveSceneClicked()
             auto notes = safeThis->notesEditor.getText();
             auto tagsCsv = safeThis->tagsEditor.getText();
 
-            safeThis->processor.saveScene(file, author, collection, presetName, notes, tagsCsv);
+            safeThis->processor.savePreset(file, author, collection, presetName, notes, tagsCsv);
         }
     });
 }

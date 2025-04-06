@@ -849,12 +849,12 @@ void OscirenderAudioProcessor::envelopeChanged(EnvelopeComponent* changedEnvelop
     }
 }
 
-void OscirenderAudioProcessor::saveScene(juce::File file, const juce::String& author, const juce::String& collection, const juce::String& presetName, const juce::String& notes, const juce::String& tagsCsv) {
+void OscirenderAudioProcessor::savePreset(juce::File file, const juce::String& author, const juce::String& collection, const juce::String& presetName, const juce::String& notes, const juce::String& tagsCsv) {
     // Lock required resources (effects and potentially parsers/files)
     juce::SpinLock::ScopedLockType lockEffects(effectsLock); 
     juce::SpinLock::ScopedLockType lockParsers(parsersLock);
 
-    std::unique_ptr<juce::XmlElement> xml = std::make_unique<juce::XmlElement>("OsciScene"); // Root element name changed
+    std::unique_ptr<juce::XmlElement> xml = std::make_unique<juce::XmlElement>("OsciPreset");
     xml->setAttribute("version", ProjectInfo::versionString);
 
     // metadata
@@ -926,34 +926,33 @@ void OscirenderAudioProcessor::saveScene(juce::File file, const juce::String& au
     auto imageParamsXml = xml->createNewChildElement("ImageParameters");
     invertImage->save(imageParamsXml->createNewChildElement("Parameter"));
 
-    // --- Write to .osscene file ---
-    juce::File sceneFile = file;
-    if (!sceneFile.hasFileExtension(".osscene"))
-        sceneFile = sceneFile.withFileExtension(".osscene");
+    // --- Write to .ospreset file ---
+    juce::File presetFile = file;
+    if (!presetFile.hasFileExtension(".ospreset"))
+        presetFile = presetFile.withFileExtension(".ospreset");
 
-    if (!xml->writeToFile(sceneFile, {})) {
-        DBG("Error writing scene file: " + sceneFile.getFullPathName());
+    if (!xml->writeToFile(presetFile, {})) {
+        DBG("Error writing preset file: " + presetFile.getFullPathName());
     }
 }
 
-SceneMetadata OscirenderAudioProcessor::loadScene(juce::File file) {
-    // Keep existing preset loading logic for now
+PresetMetadata OscirenderAudioProcessor::loadPreset(juce::File file) {
     std::unique_ptr<juce::XmlElement> xml = juce::XmlDocument::parse(file);
 
-    SceneMetadata loadedMetadata;
+    PresetMetadata loadedMetadata;
 
     if (xml == nullptr) {
-        DBG("Error parsing scene file: " + file.getFullPathName());
+        DBG("Error parsing preset file: " + file.getFullPathName());
         return loadedMetadata; 
     }
 
-    // Check for OsciScene for backward compatibility?
-    if (!xml->hasTagName("OsciScene")) { 
-        DBG("Invalid scene/preset file format: " + file.getFullPathName());
+    // Check for OsciPreset for backward compatibility?
+    if (!xml->hasTagName("OsciPreset")) { 
+        DBG("Invalid preset file format: " + file.getFullPathName());
         // Return empty metadata on error
         return loadedMetadata;
     }
-    bool isSceneFile = xml->hasTagName("OsciScene");
+    bool isPresetFile = xml->hasTagName("OsciPreset");
 
     juce::SpinLock::ScopedLockType lockEffects(effectsLock);
     juce::SpinLock::ScopedLockType lockParsers(parsersLock);
@@ -989,7 +988,7 @@ SceneMetadata OscirenderAudioProcessor::loadScene(juce::File file) {
                 if (effect != nullptr) {
                     effect->load(effectXml);
                 } else {
-                    DBG("Scene loading: Could not find effect with ID: " + effectId);
+                    DBG("Preset loading: Could not find effect with ID: " + effectId);
                 }
             }
         }
@@ -1006,7 +1005,7 @@ SceneMetadata OscirenderAudioProcessor::loadScene(juce::File file) {
                  if (parameter != nullptr) {
                      parameter->load(parameterXml);
                  } else {
-                     DBG("Scene loading: Could not find ADSR parameter with ID: " + paramId);
+                     DBG("Preset loading: Could not find ADSR parameter with ID: " + paramId);
                  }
              }
         }
@@ -1031,7 +1030,7 @@ SceneMetadata OscirenderAudioProcessor::loadScene(juce::File file) {
                      parameterValueChanged(voices->getParameterIndex(), voices->getValue());
                  } 
                  else {
-                     DBG("Scene loading: Could not find Synth parameter with ID: " + paramId);
+                     DBG("Preset loading: Could not find Synth parameter with ID: " + paramId);
                  }
              }
         }
@@ -1045,12 +1044,12 @@ SceneMetadata OscirenderAudioProcessor::loadScene(juce::File file) {
         if (juce::Base64::convertFromBase64(stream, base64Code)) {
             customEffect->updateCode(stream.toString());
         } else {
-             DBG("Scene loading: Failed to decode Base64 Lua code.");
+             DBG("Preset loading: Failed to decode Base64 Lua code.");
         }
     }
 
     // visual(?) files
-    if (isSceneFile) {
+    if (isPresetFile) {
         int loadedFileIndex = xml->getIntAttribute("currentFileIndex", -1);
         
         // clear existing files first
@@ -1059,7 +1058,7 @@ SceneMetadata OscirenderAudioProcessor::loadScene(juce::File file) {
             removeFile(i); 
         }
 
-        // load the files saved in the scene
+        // load the files saved in the preset
         auto* visualFilesXml = xml->getChildByName("VisualFiles");
         if (visualFilesXml != nullptr) {
             for (auto* fileXml : visualFilesXml->getChildIterator()) {
@@ -1069,16 +1068,16 @@ SceneMetadata OscirenderAudioProcessor::loadScene(juce::File file) {
                 if (fileBlock->fromBase64Encoding(base64Data)) {
                      // Add the decoded file data. This also calls openFile/changeCurrentFile.
                      addFile(fileName, fileBlock);
-                     DBG("Scene loading: Added visual file: " + fileName);
+                     DBG("Preset loading: Added visual file: " + fileName);
                 } else {
-                    DBG("Scene loading: Failed to decode Base64 visual file data.");
+                    DBG("Preset loading: Failed to decode Base64 visual file data.");
                     changeCurrentFile(-1);
                 }
             }
         } else {
-             // If scene saved with no visual files, ensure no file selected
+             // If preset saved with no visual files, ensure no file selected
              changeCurrentFile(-1); 
-             DBG("Scene loading: No visual files loaded from scene.");
+             DBG("Preset loading: No visual files loaded from preset.");
         }
     }
     
@@ -1092,7 +1091,7 @@ SceneMetadata OscirenderAudioProcessor::loadScene(juce::File file) {
                 if (parameter != nullptr) {
                     parameter->load(parameterXml);
                 } else {
-                    DBG("Scene loading: Could not find Perspective parameter with ID: " + paramId);
+                    DBG("Preset loading: Could not find Perspective parameter with ID: " + paramId);
                 }
             }
         }
@@ -1107,7 +1106,7 @@ SceneMetadata OscirenderAudioProcessor::loadScene(juce::File file) {
                 if (paramId == invertImage->getParameterID()) {
                     invertImage->load(parameterXml);
                 } else {
-                    DBG("Scene loading: Could not find Image parameter with ID: " + paramId);
+                    DBG("Preset loading: Could not find Image parameter with ID: " + paramId);
                 }
             }
         }
