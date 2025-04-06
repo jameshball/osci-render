@@ -203,6 +203,12 @@
         <FILE id="MWkfTv" name="VolumeComponent.h" compile="0" resource="0"
               file="Source/components/VolumeComponent.h"/>
       </GROUP>
+      <GROUP id="{PRESET_COMPONENT_PLACEHOLDER}" name="PresetComponent">
+        <FILE id="PrStCpH" name="PresetComponent.h" compile="0" resource="0"
+              file="Source/PresetComponent.h"/>
+        <FILE id="PrStCpC" name="PresetComponent.cpp" compile="1" resource="0"
+              file="Source/PresetComponent.cpp"/>
+      </GROUP>
       <GROUP id="{9F5970A9-8094-E7F3-7AC1-812AE5589B9F}" name="concurrency">
         <FILE id="PcRInQ" name="AudioBackgroundThread.cpp" compile="1" resource="0"
               file="Source/concurrency/AudioBackgroundThread.cpp"/>
