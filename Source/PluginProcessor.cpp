@@ -1070,37 +1070,31 @@ SceneMetadata OscirenderAudioProcessor::loadScene(juce::File file) {
     // --- Load Current Visual File Info (if it's a scene file) ---
     if (isSceneFile) {
         int loadedFileIndex = xml->getIntAttribute("currentFileIndex", -1);
+        
+        // --- Clear existing files first --- 
+        int numFiles = fileBlocks.size();
+        for (int i = numFiles - 1; i >= 0; --i) {
+            removeFile(i); 
+        }
+
+        // --- Load the file saved in the scene --- 
         auto* currentFileXml = xml->getChildByName("CurrentVisualFile");
         if (currentFileXml != nullptr && loadedFileIndex != -1) {
             auto fileName = currentFileXml->getStringAttribute("name");
             auto base64Data = currentFileXml->getAllSubText();
             std::shared_ptr<juce::MemoryBlock> fileBlock = std::make_shared<juce::MemoryBlock>();
             if (fileBlock->fromBase64Encoding(base64Data)) {
-                 // Need to find if this file already exists or add it
-                 // This requires more careful handling to avoid duplicates 
-                 // and potentially clearing existing files first.
-                 // For now, let's just try adding it. If it needs replacing,
-                 // the logic gets more complex.
-                 
-                 // A simpler approach might be to clear all existing files first?
-                 // Clear existing files (Careful! This deletes user's loaded files)
-                 // int numFiles = fileBlocks.size();
-                 // for (int i = numFiles - 1; i >= 0; --i) {
-                 //     removeFile(i);
-                 // }
-                 // Then add the saved file:
-                 // addFile(fileName, fileBlock);
-                 // changeCurrentFile(0); // Assuming it becomes the first file
-
-                 DBG("Scene loading: Visual file found - Name: " + fileName + ", Index: " + juce::String(loadedFileIndex));
-                 DBG("Scene loading: TODO - Implement proper visual file loading logic (clearing/adding/selecting)");
+                 // Add the decoded file data. This also calls openFile/changeCurrentFile.
+                 addFile(fileName, fileBlock);
+                 DBG("Scene loading: Added visual file: " + fileName);
             } else {
                 DBG("Scene loading: Failed to decode Base64 visual file data.");
+                changeCurrentFile(-1);
             }
-        } else if (loadedFileIndex == -1) {
-             // If scene saved with no visual file selected, clear current file?
-             // changeCurrentFile(-1); 
-             DBG("Scene loading: TODO - Implement logic for loading scene with no visual file selected.");
+        } else {
+             // If scene saved with no visual file or index was -1, ensure no file selected
+             changeCurrentFile(-1); 
+             DBG("Scene loading: No visual file loaded from scene.");
         }
     }
     
