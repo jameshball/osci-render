@@ -2,7 +2,7 @@
 #include "PluginEditor.h"
 #include "CustomStandaloneFilterWindow.h"
 
-OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p) : CommonPluginEditor(p, "osci-render", "osci", 1100, 750), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white), presetComponent(p), mainComponent(p, *this) {
+OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p) : CommonPluginEditor(p, "osci-render", "osci", 1100, 750), audioProcessor(p), settings(p, *this), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white) {
 #if !SOSCI_FEATURES
     addAndMakeVisible(upgradeButton);
     upgradeButton.onClick = [this] {
@@ -82,9 +82,6 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 #endif
 
     initialiseMenuBar(model);
-
-    addAndMakeVisible(presetComponent);
-    addAndMakeVisible(mainComponent);
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
@@ -173,7 +170,6 @@ void OscirenderAudioProcessorEditor::resized() {
 
     if (audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
         visualiser.setBounds(area);
-        presetComponent.setVisible(false);
         settings.setVisible(false);
         resizerBar.setVisible(false);
         luaResizerBar.setVisible(false);
@@ -185,7 +181,6 @@ void OscirenderAudioProcessorEditor::resized() {
         volume.setVisible(false);
         return;
     } else {
-        presetComponent.setVisible(true);
         settings.setVisible(true);
         if (!usingNativeMenuBar) menuBar.setVisible(true);
         volume.setVisible(true);
@@ -205,8 +200,10 @@ void OscirenderAudioProcessorEditor::resized() {
     volume.setBounds(volumeArea.withSizeKeepingCentre(volumeArea.getWidth(), juce::jmin(volumeArea.getHeight(), 300)));
     area.removeFromLeft(3);
 
-    auto presetHeight = 160;
-    presetComponent.setBounds(area.removeFromTop(presetHeight));
+    settings.setBounds(area);
+    
+    audioProcessor.setProperty("codeEditorLayoutPreferredSize", layout.getItemCurrentRelativeSize(0));
+    audioProcessor.setProperty("luaLayoutPreferredSize", luaLayout.getItemCurrentRelativeSize(0));
 
     bool editorVisible = false;
     {
@@ -229,10 +226,10 @@ void OscirenderAudioProcessorEditor::resized() {
 
                 juce::Component* columns[] = { &dummy, &resizerBar, &dummy2 };
                  
-                layout.layOutComponents(columns, 3, area.getX(), area.getY() -1 , area.getWidth(), area.getHeight() + 1, false, true);
+                auto settingsBounds = settings.getBounds();
+                layout.layOutComponents(columns, 3, settingsBounds.getX(), settingsBounds.getY() -1 , settingsBounds.getWidth(), settingsBounds.getHeight() + 1, false, true);
                 auto dummyBounds = dummy.getBounds();
                 collapseButton.setBounds(dummyBounds.removeFromRight(20));
-                area = dummyBounds;
 
                 auto dummy2Bounds = dummy2.getBounds();
                 dummy2Bounds.removeFromBottom(5);
@@ -258,7 +255,7 @@ void OscirenderAudioProcessorEditor::resized() {
 
                 fileOpen = true;
             } else {
-                collapseButton.setBounds(area.removeFromRight(20));
+                collapseButton.setBounds(settings.getBounds().removeFromRight(20));
             }
         }
 
@@ -395,7 +392,6 @@ void OscirenderAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcas
     } else if (source == &audioProcessor.fileChangeBroadcaster) {
         juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
         settings.fileUpdated(audioProcessor.getCurrentFileName());
-        mainComponent.updateFileLabel();
     }
 }
 
@@ -502,14 +498,14 @@ bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
 }
 
 void OscirenderAudioProcessorEditor::mouseDown(const juce::MouseEvent& e) {
-    if (console.getBoundsInParent().removeFromTop(30).contains(e.getPosition())) {
+    if (console.getBoundsInParent().removeFromTop(CLOSED_PREF_SIZE).contains(e.getPosition())) {
         console.setConsoleOpen(!console.getConsoleOpen());
         resized();
     }
 }
 
 void OscirenderAudioProcessorEditor::mouseMove(const juce::MouseEvent& event) {
-    if (console.getBoundsInParent().removeFromTop(30).contains(event.getPosition())) {
+    if (console.getBoundsInParent().removeFromTop(CLOSED_PREF_SIZE).contains(event.getPosition())) {
         setMouseCursor(juce::MouseCursor::PointingHandCursor);
     } else {
         setMouseCursor(juce::MouseCursor::NormalCursor);

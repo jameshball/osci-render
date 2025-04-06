@@ -3,16 +3,18 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h" // Include processor header
 
+// Forward declare the editor class
+class OscirenderAudioProcessorEditor;
+
 /*
     Component for handling scene loading, saving, and metadata.
 */
-class PresetComponent  : public juce::Component
+class PresetComponent  : public juce::GroupComponent
 {
 public:
-    PresetComponent(OscirenderAudioProcessor& processor);
+    PresetComponent(OscirenderAudioProcessor& processor, OscirenderAudioProcessorEditor& editor);
     ~PresetComponent() override;
 
-    void paint (juce::Graphics&) override;
     void resized() override;
 
     // Method to update text fields after loading a scene
@@ -20,6 +22,7 @@ public:
 
 private:
     OscirenderAudioProcessor& processor; // Reference to the processor
+    OscirenderAudioProcessorEditor& pluginEditor; // Add reference to the editor
 
     // Metadata Labels and TextEditors
     juce::Label authorLabel;

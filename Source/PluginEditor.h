@@ -86,8 +86,5 @@ public:
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseMove(const juce::MouseEvent& event) override;
 
-    PresetComponent presetComponent;
-    MainComponent mainComponent;
-
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OscirenderAudioProcessorEditor)
 };

@@ -1,9 +1,11 @@
 #include "PresetComponent.h"
-#include "PluginProcessor.h" // Include processor again if needed (usually just in .h)
+#include "PluginProcessor.h"
+#include "PluginEditor.h"
 
-//==============================================================================
-PresetComponent::PresetComponent(OscirenderAudioProcessor& p) : processor(p)
+PresetComponent::PresetComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : processor(p), pluginEditor(editor)
 {
+    setText("Preset");
+
     // Setup Labels
     authorLabel.setText("Author:", juce::dontSendNotification);
     collectionLabel.setText("Collection:", juce::dontSendNotification);
@@ -37,70 +39,63 @@ PresetComponent::PresetComponent(OscirenderAudioProcessor& p) : processor(p)
     // Setup button callbacks
     loadSceneButton.onClick = [this] { loadSceneClicked(); };
     saveSceneButton.onClick = [this] { saveSceneClicked(); };
-
-    // TODO: Need a way to get initial/loaded metadata to populate fields.
-    // Maybe processor needs getter methods or PresetComponent becomes a ChangeListener?
 }
 
-PresetComponent::~PresetComponent()
-{
-    // Destructor logic if needed
-}
-
-void PresetComponent::paint (juce::Graphics& g)
-{
-    // Optional: Add background painting or borders
-    // g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
-    // g.setColour (juce::Colours::grey);
-    // g.drawRect (getLocalBounds(), 1);
-}
+PresetComponent::~PresetComponent() {}
 
 void PresetComponent::resized()
 {
-    auto bounds = getLocalBounds().reduced(10); // Add some padding
+    // Only layout internal components if height is sufficient (i.e., not collapsed)
+    if (getHeight() <= 30)
+        return; 
+
+    auto bounds = getLocalBounds().withTrimmedTop(20).reduced(10);
+
+    bounds.removeFromTop(5);
 
     auto topRow = bounds.removeFromTop(25);
-    loadSceneButton.setBounds(topRow.removeFromLeft(100));
-    saveSceneButton.setBounds(topRow.removeFromLeft(100).translated(105, 0));
+    auto loadButtonBounds = topRow.removeFromLeft(100);
+    loadSceneButton.setBounds(loadButtonBounds);
+    saveSceneButton.setBounds(loadButtonBounds.translated(loadButtonBounds.getWidth() + 5, 0));
 
-    bounds.removeFromTop(10); // Spacing
+    bounds.removeFromTop(10);
 
     auto metadataRowHeight = 25;
     auto labelWidth = 80;
-    auto editorWidth = bounds.getWidth() - labelWidth - 5; // 5px spacing
+    auto editorWidth = bounds.getWidth() - labelWidth - 5;
 
     auto nameRow = bounds.removeFromTop(metadataRowHeight);
     presetNameLabel.setBounds(nameRow.removeFromLeft(labelWidth));
     presetNameEditor.setBounds(nameRow.withX(nameRow.getX() + 5).withWidth(editorWidth));
 
-    bounds.removeFromTop(5); // Spacing
+    bounds.removeFromTop(5);
 
     auto authorRow = bounds.removeFromTop(metadataRowHeight);
     authorLabel.setBounds(authorRow.removeFromLeft(labelWidth));
     authorEditor.setBounds(authorRow.withX(authorRow.getX() + 5).withWidth(editorWidth));
 
-    bounds.removeFromTop(5); // Spacing
+    bounds.removeFromTop(5);
 
     auto collectionRow = bounds.removeFromTop(metadataRowHeight);
     collectionLabel.setBounds(collectionRow.removeFromLeft(labelWidth));
     collectionEditor.setBounds(collectionRow.withX(collectionRow.getX() + 5).withWidth(editorWidth));
 
-    bounds.removeFromTop(5); // Spacing
+    bounds.removeFromTop(5);
     
     // Add row for Tags
     auto tagsRow = bounds.removeFromTop(metadataRowHeight);
     tagsLabel.setBounds(tagsRow.removeFromLeft(labelWidth));
     tagsEditor.setBounds(tagsRow.withX(tagsRow.getX() + 5).withWidth(editorWidth));
 
-    bounds.removeFromTop(5); // Spacing
+    bounds.removeFromTop(5);
 
-    // Position Notes Label (takes up one row)
+    // Position Notes Label (single row)
     auto notesLabelRow = bounds.removeFromTop(metadataRowHeight); 
     notesLabel.setBounds(notesLabelRow.removeFromLeft(labelWidth));
-    notesLabel.setJustificationType(juce::Justification::centredLeft); // Align label like others
+    notesLabel.setJustificationType(juce::Justification::centredLeft);
     
     // Notes editor takes remaining space below the label
-    bounds.removeFromTop(5); // Spacing below label
+    bounds.removeFromTop(5);
     notesEditor.setBounds(bounds); 
 }
 
@@ -112,22 +107,17 @@ void PresetComponent::loadSceneClicked()
     auto chooserFlags = juce::FileBrowserComponent::openMode |
                        juce::FileBrowserComponent::canSelectFiles;
 
-    // Use SafePointer to capture 'this' safely for the async callback
     sceneChooser->launchAsync(chooserFlags, [safeThis = juce::Component::SafePointer(this)](const juce::FileChooser& fc)
     {
-        // Check if the component still exists when the callback executes
         if (safeThis == nullptr) return;
         
         auto file = fc.getResult();
         if (file != juce::File{})
         {
-            // Call loadScene and capture the returned metadata
             SceneMetadata loadedData = safeThis->processor.loadScene(file);
             
-            // Update the text fields using the returned metadata
             safeThis->updateMetadataFields(loadedData.author, loadedData.collection, loadedData.presetName, loadedData.notes, loadedData.tags);
 
-            // The DBG message is no longer a TODO
             DBG("PresetComponent: Updated metadata fields after loading scene.");
         }
     });
@@ -138,29 +128,24 @@ void PresetComponent::saveSceneClicked()
     sceneChooser = std::make_unique<juce::FileChooser>("Save OsciScene File",
                                                      juce::File::getSpecialLocation(juce::File::userDocumentsDirectory),
                                                      "*.osscene", // Use new extension
-                                                     true); // useNativeBox = true
+                                                     true);
 
     auto chooserFlags = juce::FileBrowserComponent::saveMode |
                        juce::FileBrowserComponent::canSelectFiles;
 
-    // Use SafePointer to capture 'this' safely for the async callback
     sceneChooser->launchAsync(chooserFlags, [safeThis = juce::Component::SafePointer(this)](const juce::FileChooser& fc)
     {
-        // Check if the component still exists when the callback executes
         if (safeThis == nullptr) return;
         
         auto file = fc.getResult();
         if (file != juce::File{})
         {
-            // Get metadata from TextEditors
             auto author = safeThis->authorEditor.getText();
             auto collection = safeThis->collectionEditor.getText();
             auto presetName = safeThis->presetNameEditor.getText();
             auto notes = safeThis->notesEditor.getText();
-            // Get tags (as comma-separated string)
             auto tagsCsv = safeThis->tagsEditor.getText();
 
-            // Call the processor's save function (needs updated signature)
             safeThis->processor.saveScene(file, author, collection, presetName, notes, tagsCsv);
         }
     });

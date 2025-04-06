@@ -6,6 +6,7 @@
 #include "FrameSettingsComponent.h"
 #include "LuaComponent.h"
 #include "PerspectiveComponent.h"
+#include "PresetComponent.h"
 #include "TxtComponent.h"
 #include "EffectsComponent.h"
 #include "MidiComponent.h"
@@ -25,12 +26,17 @@ private:
 	OscirenderAudioProcessor& audioProcessor;
 	OscirenderAudioProcessorEditor& pluginEditor;
 
+	// Add state for preset collapsibility
+	bool presetCollapsed = false;
+
+	// Section Components
 	MainComponent main{audioProcessor, pluginEditor};
 	PerspectiveComponent perspective{audioProcessor, pluginEditor};
 	TxtComponent txt{audioProcessor, pluginEditor};
 	FrameSettingsComponent frame{ audioProcessor, pluginEditor };
 	EffectsComponent effects{audioProcessor, pluginEditor};
 	MidiComponent midi{audioProcessor, pluginEditor};
+	PresetComponent preset{audioProcessor, pluginEditor};
 
 	juce::StretchableLayoutManager midiLayout;
 	juce::StretchableLayoutResizerBar midiResizerBar{&midiLayout, 1, false};

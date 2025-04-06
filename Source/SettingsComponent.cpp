@@ -2,6 +2,7 @@
 #include "PluginEditor.h"
 
 SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
+    addAndMakeVisible(preset);
     addAndMakeVisible(effects);
     addAndMakeVisible(main);
     addAndMakeVisible(perspective);
@@ -10,6 +11,8 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     addAndMakeVisible(midi);
     addChildComponent(txt);
     addChildComponent(frame);
+    addChildComponent(mainResizerBar);
+    addChildComponent(midiResizerBar);
     
     double midiLayoutPreferredSize = std::any_cast<double>(audioProcessor.getProperty("midiLayoutPreferredSize", pluginEditor.CLOSED_PREF_SIZE));
     double mainLayoutPreferredSize = std::any_cast<double>(audioProcessor.getProperty("mainLayoutPreferredSize", -0.4));
@@ -42,8 +45,15 @@ void SettingsComponent::resized() {
     mainLayout.layOutComponents(columns, 3, dummy.getX(), dummy.getY(), dummy.getWidth(), dummy.getHeight(), false, true);
 
     auto bounds = dummy2.getBounds();
-    perspective.setBounds(bounds.removeFromBottom(120));
-    bounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
+    
+    auto presetHeight = presetCollapsed ? pluginEditor.CLOSED_PREF_SIZE : 280;
+    preset.setBounds(bounds.removeFromTop(presetHeight));
+    bounds.removeFromTop(5);
+
+    auto perspectiveHeight = 120;
+    perspective.setBounds(bounds.removeFromBottom(perspectiveHeight));
+    bounds.removeFromBottom(5);
+
     main.setBounds(bounds);
 
     juce::Component* effectSettings = nullptr;
@@ -96,21 +106,26 @@ void SettingsComponent::update() {
 }
 
 void SettingsComponent::mouseMove(const juce::MouseEvent& event) {
-    for (int i = 0; i < 1; i++) {
-        if (toggleComponents[i]->getBounds().removeFromTop(pluginEditor.CLOSED_PREF_SIZE).contains(event.getPosition())) {
-            setMouseCursor(juce::MouseCursor::PointingHandCursor);
-            return;
-        }
+    bool pointingHand = false;
+    if (preset.isVisible() && preset.getBounds().removeFromTop(pluginEditor.CLOSED_PREF_SIZE).contains(event.getPosition())) {
+        pointingHand = true;
+    } else if (midi.isVisible() && midi.getBounds().removeFromTop(pluginEditor.CLOSED_PREF_SIZE).contains(event.getPosition())) {
+        pointingHand = true;
     }
-    setMouseCursor(juce::MouseCursor::NormalCursor);
+    
+    setMouseCursor(pointingHand ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
 }
 
 void SettingsComponent::mouseDown(const juce::MouseEvent& event) {
-    for (int i = 0; i < 1; i++) {
-        if (toggleComponents[i]->getBounds().removeFromTop(pluginEditor.CLOSED_PREF_SIZE).contains(event.getPosition())) {
-            pluginEditor.toggleLayout(*toggleLayouts[i], prefSizes[i]);
-            resized();
-            return;
-        }
+    if (preset.getBounds().removeFromTop(pluginEditor.CLOSED_PREF_SIZE).contains(event.getPosition())) {
+        presetCollapsed = !presetCollapsed;
+        resized();
+        return;
+    }
+
+    if (midi.isVisible() && midi.getBounds().removeFromTop(pluginEditor.CLOSED_PREF_SIZE).contains(event.getPosition())) {
+        pluginEditor.toggleLayout(midiLayout, 300);
+        resized();
+        return;
     }
 }
