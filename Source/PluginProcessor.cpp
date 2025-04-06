@@ -850,7 +850,6 @@ void OscirenderAudioProcessor::envelopeChanged(EnvelopeComponent* changedEnvelop
     }
 }
 
-// Rename and add metadata parameters
 void OscirenderAudioProcessor::saveScene(juce::File file, const juce::String& author, const juce::String& collection, const juce::String& presetName, const juce::String& notes, const juce::String& tagsCsv) {
     // Lock required resources (effects and potentially parsers/files)
     juce::SpinLock::ScopedLockType lockEffects(effectsLock); 
@@ -859,7 +858,7 @@ void OscirenderAudioProcessor::saveScene(juce::File file, const juce::String& au
     std::unique_ptr<juce::XmlElement> xml = std::make_unique<juce::XmlElement>("OsciScene"); // Root element name changed
     xml->setAttribute("version", ProjectInfo::versionString);
 
-    // --- Save Metadata ---
+    // metadata
     xml->setAttribute("author", author);
     xml->setAttribute("collection", collection);
     xml->setAttribute("presetName", presetName);
@@ -867,7 +866,7 @@ void OscirenderAudioProcessor::saveScene(juce::File file, const juce::String& au
     auto* notesXml = xml->createNewChildElement("Notes");
     notesXml->addTextElement(notes);
 
-    // --- Save Tags ---
+    // tags
     auto* tagsXml = xml->createNewChildElement("Tags");
     juce::StringArray tagsArray = juce::StringArray::fromTokens(tagsCsv, ",", "");
     tagsArray.trim(); // Remove whitespace from tags
@@ -877,7 +876,7 @@ void OscirenderAudioProcessor::saveScene(juce::File file, const juce::String& au
         tagsXml->createNewChildElement("Tag")->addTextElement(tag);
     }
 
-    // --- Save Effects (same as before) ---
+    // effects
     auto effectsXml = xml->createNewChildElement("Effects");
     for (auto& effect : toggleableEffects) {
         effect->save(effectsXml->createNewChildElement("Effect"));
@@ -889,7 +888,7 @@ void OscirenderAudioProcessor::saveScene(juce::File file, const juce::String& au
         effect->save(effectsXml->createNewChildElement("Effect"));
     }
 
-    // --- Save ADSR Parameters (same as before) ---
+    // adsr
     auto adsrXml = xml->createNewChildElement("ADSR");
     attackTime->save(adsrXml->createNewChildElement("Parameter"));
     attackLevel->save(adsrXml->createNewChildElement("Parameter"));
@@ -900,15 +899,15 @@ void OscirenderAudioProcessor::saveScene(juce::File file, const juce::String& au
     releaseTime->save(adsrXml->createNewChildElement("Parameter"));
     releaseShape->save(adsrXml->createNewChildElement("Parameter"));
 
-    // --- Save Synth Parameters (same as before) ---
+    // synth
     auto synthParamsXml = xml->createNewChildElement("SynthParameters");
     voices->save(synthParamsXml->createNewChildElement("Parameter"));
 
-    // --- Save Lua Code (same as before) ---
+    // lua
     auto customFunctionXml = xml->createNewChildElement("CustomFunction");
     customFunctionXml->addTextElement(juce::Base64::toBase64(customEffect->getCode()));
 
-    // --- Save All Visual File Info --- 
+    // visual(?) files
     auto* visualFilesXml = xml->createNewChildElement("VisualFiles");
     visualFilesXml->setAttribute("currentFileIndex", currentFile.load()); // Save selected index here
     for (int i = 0; i < fileBlocks.size(); ++i)
@@ -919,22 +918,16 @@ void OscirenderAudioProcessor::saveScene(juce::File file, const juce::String& au
         fileXml->addTextElement(base64);
     }
     
-    // --- Save other relevant parameters (e.g., Main Settings, 3D Settings) ---
-    // Example: Saving perspective parameters
+    // perspective
     auto perspectiveParamsXml = xml->createNewChildElement("PerspectiveParameters");
     perspective->parameters[0]->save(perspectiveParamsXml->createNewChildElement("Parameter")); // Strength
     perspective->parameters[1]->save(perspectiveParamsXml->createNewChildElement("Parameter")); // Focal Length
-    
-    // Example: Saving animation parameters
-    auto animParamsXml = xml->createNewChildElement("AnimationParameters");
-    animateFrames->save(animParamsXml->createNewChildElement("Parameter"));
-    animationSyncBPM->save(animParamsXml->createNewChildElement("Parameter"));
-    animationRate->save(animParamsXml->createNewChildElement("Parameter"));
-    animationOffset->save(animParamsXml->createNewChildElement("Parameter"));
 
-    // Add saving for other parameter groups as needed...
+    // image
+    auto imageParamsXml = xml->createNewChildElement("ImageParameters");
+    invertImage->save(imageParamsXml->createNewChildElement("Parameter"));
 
-    // --- Write to File (Ensure .osscene extension) ---
+    // --- Write to .osscene file ---
     juce::File sceneFile = file;
     if (!sceneFile.hasFileExtension(".osscene"))
         sceneFile = sceneFile.withFileExtension(".osscene");
@@ -944,22 +937,19 @@ void OscirenderAudioProcessor::saveScene(juce::File file, const juce::String& au
     }
 }
 
-// Change return type and populate/return SceneMetadata struct
 SceneMetadata OscirenderAudioProcessor::loadScene(juce::File file) {
     // Keep existing preset loading logic for now
-    // TODO: Expand this to load the full scene state (visual file, metadata, other params)
     std::unique_ptr<juce::XmlElement> xml = juce::XmlDocument::parse(file);
-    
-    SceneMetadata loadedMetadata; // Create struct instance
+
+    SceneMetadata loadedMetadata;
 
     if (xml == nullptr) {
         DBG("Error parsing scene file: " + file.getFullPathName());
-        // Return empty metadata on error
         return loadedMetadata; 
     }
 
-    // Check for OsciScene or fallback to OsciPreset for backward compatibility?
-    if (!xml->hasTagName("OsciScene") && !xml->hasTagName("OsciPreset")) { 
+    // Check for OsciScene for backward compatibility?
+    if (!xml->hasTagName("OsciScene")) { 
         DBG("Invalid scene/preset file format: " + file.getFullPathName());
         // Return empty metadata on error
         return loadedMetadata;
@@ -969,37 +959,28 @@ SceneMetadata OscirenderAudioProcessor::loadScene(juce::File file) {
     juce::SpinLock::ScopedLockType lockEffects(effectsLock);
     juce::SpinLock::ScopedLockType lockParsers(parsersLock);
 
-    // --- Load Metadata (if it's a scene file) and populate struct ---
-    if (isSceneFile) {
-        loadedMetadata.author = xml->getStringAttribute("author", "");
-        loadedMetadata.collection = xml->getStringAttribute("collection", "");
-        loadedMetadata.presetName = xml->getStringAttribute("presetName", "");
-        auto* notesXml = xml->getChildByName("Notes");
-        if (notesXml != nullptr) {
-            loadedMetadata.notes = notesXml->getAllSubText();
-        }
-        // --- Load Tags ---
-        auto* tagsXml = xml->getChildByName("Tags");
-        if (tagsXml != nullptr)
+    // metadata
+    loadedMetadata.author = xml->getStringAttribute("author", "");
+    loadedMetadata.collection = xml->getStringAttribute("collection", "");
+    loadedMetadata.presetName = xml->getStringAttribute("presetName", "");
+    auto* notesXml = xml->getChildByName("Notes");
+    if (notesXml != nullptr) {
+        loadedMetadata.notes = notesXml->getAllSubText();
+    }
+    // tags
+    auto* tagsXml = xml->getChildByName("Tags");
+    if (tagsXml != nullptr)
+    {
+        for (auto* tagXml : tagsXml->getChildIterator())
         {
-            for (auto* tagXml : tagsXml->getChildIterator())
-            {
-                if (tagXml->hasTagName("Tag"))
+            if (tagXml->hasTagName("Tag"))
                 {
                     loadedMetadata.tags.add(tagXml->getAllSubText());
                 }
-            }
         }
-        // Log statements can be removed if desired
-        DBG("Loading Scene Metadata:");
-        DBG("  Author: " + loadedMetadata.author);
-        DBG("  Collection: " + loadedMetadata.collection);
-        DBG("  Preset Name: " + loadedMetadata.presetName);
-        DBG("  Notes: " + loadedMetadata.notes);
-        DBG("  Tags: " + loadedMetadata.tags.joinIntoString(", ")); // Log loaded tags
     }
 
-    // --- Load Effects --- 
+    // effects
     auto effectsXml = xml->getChildByName("Effects");
     if (effectsXml != nullptr) {
         for (auto* effectXml : effectsXml->getChildIterator()) {
@@ -1016,7 +997,7 @@ SceneMetadata OscirenderAudioProcessor::loadScene(juce::File file) {
         updateEffectPrecedence(); 
     }
 
-    // --- Load ADSR Parameters --- 
+    // adsr
     auto adsrXml = xml->getChildByName("ADSR");
     if (adsrXml != nullptr) {
         for (auto* parameterXml : adsrXml->getChildIterator()) {
@@ -1040,7 +1021,7 @@ SceneMetadata OscirenderAudioProcessor::loadScene(juce::File file) {
         );
     }
 
-    // --- Load Synth Parameters --- 
+    // synth
     auto synthParamsXml = xml->getChildByName("SynthParameters");
     if (synthParamsXml != nullptr) {
         for (auto* parameterXml : synthParamsXml->getChildIterator()) {
@@ -1057,7 +1038,7 @@ SceneMetadata OscirenderAudioProcessor::loadScene(juce::File file) {
         }
     }
 
-    // --- Load Lua Code --- 
+    // lua
     auto customFunctionXml = xml->getChildByName("CustomFunction");
     if (customFunctionXml != nullptr) {
         auto base64Code = customFunctionXml->getAllSubText();
@@ -1069,17 +1050,17 @@ SceneMetadata OscirenderAudioProcessor::loadScene(juce::File file) {
         }
     }
 
-    // --- Load All Visual File Info ---
+    // visual(?) files
     if (isSceneFile) {
         int loadedFileIndex = xml->getIntAttribute("currentFileIndex", -1);
         
-        // --- Clear existing files first --- 
+        // clear existing files first
         int numFiles = fileBlocks.size();
         for (int i = numFiles - 1; i >= 0; --i) {
             removeFile(i); 
         }
 
-        // --- Load the files saved in the scene --- 
+        // load the files saved in the scene
         auto* visualFilesXml = xml->getChildByName("VisualFiles");
         if (visualFilesXml != nullptr) {
             for (auto* fileXml : visualFilesXml->getChildIterator()) {
@@ -1102,51 +1083,42 @@ SceneMetadata OscirenderAudioProcessor::loadScene(juce::File file) {
         }
     }
     
-    // --- Load other parameters (if it's a scene file) ---
-    if (isSceneFile) {
-        // Example: Loading perspective parameters
-        auto perspectiveParamsXml = xml->getChildByName("PerspectiveParameters");
-        if (perspectiveParamsXml != nullptr) {
-            for (auto* parameterXml : perspectiveParamsXml->getChildIterator()) {
-                if (parameterXml->hasTagName("Parameter")) {
-                    auto paramId = parameterXml->getStringAttribute("id");
-                    auto parameter = getFloatParameter(paramId); // Assuming perspective params are float
-                    if (parameter != nullptr) {
-                        parameter->load(parameterXml);
-                    } else {
-                        DBG("Scene loading: Could not find Perspective parameter with ID: " + paramId);
-                    }
+    // perspective
+    auto perspectiveParamsXml = xml->getChildByName("PerspectiveParameters");
+    if (perspectiveParamsXml != nullptr) {
+        for (auto* parameterXml : perspectiveParamsXml->getChildIterator()) {
+            if (parameterXml->hasTagName("Parameter")) {
+                auto paramId = parameterXml->getStringAttribute("id");
+                auto parameter = getFloatParameter(paramId); // Assuming perspective params are float
+                if (parameter != nullptr) {
+                    parameter->load(parameterXml);
+                } else {
+                    DBG("Scene loading: Could not find Perspective parameter with ID: " + paramId);
                 }
             }
         }
-        
-        // Example: Loading animation parameters
-        auto animParamsXml = xml->getChildByName("AnimationParameters");
-        if (animParamsXml != nullptr) {
-            for (auto* parameterXml : animParamsXml->getChildIterator()) {
-                if (parameterXml->hasTagName("Parameter")) {
-                    auto paramId = parameterXml->getStringAttribute("id");
-                    // Need to check boolean and float params separately
-                    auto boolParam = getBooleanParameter(paramId);
-                    auto floatParam = getFloatParameter(paramId);
-                    if (boolParam != nullptr) {
-                        boolParam->load(parameterXml);
-                    } else if (floatParam != nullptr) {
-                        floatParam->load(parameterXml);
-                    } else {
-                        DBG("Scene loading: Could not find Animation parameter with ID: " + paramId);
-                    }
-                }
-            }
-        }
-        // Add loading for other parameter groups as needed...
     }
 
-    // --- Notify UI/Listeners --- 
+    // Load Image Parameters
+    auto imageParamsXml = xml->getChildByName("ImageParameters");
+    if (imageParamsXml != nullptr) {
+            for (auto* parameterXml : imageParamsXml->getChildIterator()) {
+            if (parameterXml->hasTagName("Parameter")) {
+                auto paramId = parameterXml->getStringAttribute("id");
+                if (paramId == invertImage->getParameterID()) {
+                    invertImage->load(parameterXml);
+                } else {
+                    DBG("Scene loading: Could not find Image parameter with ID: " + paramId);
+                }
+            }
+        }
+    }
+
+    // notify ui/listeners
     juce::MessageManagerLock mmlock;
     broadcaster.sendChangeMessage();
     
-    // Return the populated metadata struct
+    // return the populated metadata struct
     return loadedMetadata;
 }
 
