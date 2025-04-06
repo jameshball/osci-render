@@ -16,7 +16,7 @@ public:
     void resized() override;
 
     // Method to update text fields after loading a scene
-    void updateMetadataFields(const juce::String& author, const juce::String& collection, const juce::String& presetName, const juce::String& notes);
+    void updateMetadataFields(const juce::String& author, const juce::String& collection, const juce::String& presetName, const juce::String& notes, const juce::StringArray& tags);
 
 private:
     OscirenderAudioProcessor& processor; // Reference to the processor
@@ -30,6 +30,10 @@ private:
     juce::TextEditor presetNameEditor;
     juce::Label notesLabel;
     juce::TextEditor notesEditor; // Multi-line for notes
+
+    // Add Tags UI
+    juce::Label tagsLabel;
+    juce::TextEditor tagsEditor;
 
     // Load/Save Buttons
     juce::TextButton loadSceneButton { "Load Scene" };

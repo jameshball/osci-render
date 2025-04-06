@@ -851,7 +851,7 @@ void OscirenderAudioProcessor::envelopeChanged(EnvelopeComponent* changedEnvelop
 }
 
 // Rename and add metadata parameters
-void OscirenderAudioProcessor::saveScene(juce::File file, const juce::String& author, const juce::String& collection, const juce::String& presetName, const juce::String& notes) {
+void OscirenderAudioProcessor::saveScene(juce::File file, const juce::String& author, const juce::String& collection, const juce::String& presetName, const juce::String& notes, const juce::String& tagsCsv) {
     // Lock required resources (effects and potentially parsers/files)
     juce::SpinLock::ScopedLockType lockEffects(effectsLock); 
     juce::SpinLock::ScopedLockType lockParsers(parsersLock);
@@ -866,6 +866,16 @@ void OscirenderAudioProcessor::saveScene(juce::File file, const juce::String& au
     // Use a child element for potentially longer notes
     auto* notesXml = xml->createNewChildElement("Notes");
     notesXml->addTextElement(notes);
+
+    // --- Save Tags ---
+    auto* tagsXml = xml->createNewChildElement("Tags");
+    juce::StringArray tagsArray = juce::StringArray::fromTokens(tagsCsv, ",", "");
+    tagsArray.trim(); // Remove whitespace from tags
+    tagsArray.removeEmptyStrings();
+    for (const auto& tag : tagsArray)
+    {
+        tagsXml->createNewChildElement("Tag")->addTextElement(tag);
+    }
 
     // --- Save Effects (same as before) ---
     auto effectsXml = xml->createNewChildElement("Effects");
@@ -966,12 +976,25 @@ SceneMetadata OscirenderAudioProcessor::loadScene(juce::File file) {
         if (notesXml != nullptr) {
             loadedMetadata.notes = notesXml->getAllSubText();
         }
+        // --- Load Tags ---
+        auto* tagsXml = xml->getChildByName("Tags");
+        if (tagsXml != nullptr)
+        {
+            for (auto* tagXml : tagsXml->getChildIterator())
+            {
+                if (tagXml->hasTagName("Tag"))
+                {
+                    loadedMetadata.tags.add(tagXml->getAllSubText());
+                }
+            }
+        }
         // Log statements can be removed if desired
         DBG("Loading Scene Metadata:");
         DBG("  Author: " + loadedMetadata.author);
         DBG("  Collection: " + loadedMetadata.collection);
         DBG("  Preset Name: " + loadedMetadata.presetName);
         DBG("  Notes: " + loadedMetadata.notes);
+        DBG("  Tags: " + loadedMetadata.tags.joinIntoString(", ")); // Log loaded tags
     }
 
     // --- Load Effects --- 

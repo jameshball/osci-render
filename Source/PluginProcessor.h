@@ -37,6 +37,7 @@ struct SceneMetadata {
     juce::String collection;
     juce::String presetName;
     juce::String notes;
+    juce::StringArray tags;
 };
 
 //==============================================================================
@@ -215,7 +216,7 @@ public:
     void removeErrorListener(ErrorListener* listener);
     void notifyErrorListeners(int lineNumber, juce::String id, juce::String error);
 
-    void saveScene(juce::File file, const juce::String& author, const juce::String& collection, const juce::String& presetName, const juce::String& notes);
+    void saveScene(juce::File file, const juce::String& author, const juce::String& collection, const juce::String& presetName, const juce::String& notes, const juce::String& tagsCsv);
     SceneMetadata loadScene(juce::File file);
 private:
     

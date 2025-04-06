@@ -9,6 +9,7 @@ PresetComponent::PresetComponent(OscirenderAudioProcessor& p) : processor(p)
     collectionLabel.setText("Collection:", juce::dontSendNotification);
     presetNameLabel.setText("Scene Name:", juce::dontSendNotification);
     notesLabel.setText("Notes:", juce::dontSendNotification);
+    tagsLabel.setText("Tags (CSV):", juce::dontSendNotification);
 
     // Setup TextEditors
     presetNameEditor.setJustification(juce::Justification::centredLeft);
@@ -16,6 +17,8 @@ PresetComponent::PresetComponent(OscirenderAudioProcessor& p) : processor(p)
     collectionEditor.setJustification(juce::Justification::centredLeft);
     notesEditor.setMultiLine(true);
     notesEditor.setReturnKeyStartsNewLine(true);
+    tagsEditor.setJustification(juce::Justification::centredLeft);
+    tagsEditor.setTooltip("Enter tags separated by commas");
 
     // Make components visible
     addAndMakeVisible(authorLabel);
@@ -26,6 +29,8 @@ PresetComponent::PresetComponent(OscirenderAudioProcessor& p) : processor(p)
     addAndMakeVisible(presetNameEditor);
     addAndMakeVisible(notesLabel);
     addAndMakeVisible(notesEditor);
+    addAndMakeVisible(tagsLabel);
+    addAndMakeVisible(tagsEditor);
     addAndMakeVisible(loadSceneButton);
     addAndMakeVisible(saveSceneButton);
 
@@ -81,11 +86,22 @@ void PresetComponent::resized()
     collectionEditor.setBounds(collectionRow.withX(collectionRow.getX() + 5).withWidth(editorWidth));
 
     bounds.removeFromTop(5); // Spacing
+    
+    // Add row for Tags
+    auto tagsRow = bounds.removeFromTop(metadataRowHeight);
+    tagsLabel.setBounds(tagsRow.removeFromLeft(labelWidth));
+    tagsEditor.setBounds(tagsRow.withX(tagsRow.getX() + 5).withWidth(editorWidth));
 
-    notesLabel.setBounds(bounds.removeFromTop(metadataRowHeight)); // Label takes full width temporarily
-    notesLabel.setJustificationType(juce::Justification::topLeft); // Align label top-left
     bounds.removeFromTop(5); // Spacing
-    notesEditor.setBounds(bounds); // Notes editor takes remaining space
+
+    // Position Notes Label (takes up one row)
+    auto notesLabelRow = bounds.removeFromTop(metadataRowHeight); 
+    notesLabel.setBounds(notesLabelRow.removeFromLeft(labelWidth));
+    notesLabel.setJustificationType(juce::Justification::centredLeft); // Align label like others
+    
+    // Notes editor takes remaining space below the label
+    bounds.removeFromTop(5); // Spacing below label
+    notesEditor.setBounds(bounds); 
 }
 
 void PresetComponent::loadSceneClicked()
@@ -105,7 +121,7 @@ void PresetComponent::loadSceneClicked()
             SceneMetadata loadedData = processor.loadScene(file);
             
             // Update the text fields using the returned metadata
-            updateMetadataFields(loadedData.author, loadedData.collection, loadedData.presetName, loadedData.notes);
+            updateMetadataFields(loadedData.author, loadedData.collection, loadedData.presetName, loadedData.notes, loadedData.tags);
 
             // The DBG message is no longer a TODO
             DBG("PresetComponent: Updated metadata fields after loading scene.");
@@ -133,18 +149,22 @@ void PresetComponent::saveSceneClicked()
             auto collection = collectionEditor.getText();
             auto presetName = presetNameEditor.getText();
             auto notes = notesEditor.getText();
+            // Get tags (as comma-separated string)
+            auto tagsCsv = tagsEditor.getText();
 
-            // Call the processor's save function
-            processor.saveScene(file, author, collection, presetName, notes);
+            // Call the processor's save function (needs updated signature)
+            processor.saveScene(file, author, collection, presetName, notes, tagsCsv);
         }
     });
 }
 
 // Method implementation to update text fields
-void PresetComponent::updateMetadataFields(const juce::String& author, const juce::String& collection, const juce::String& presetName, const juce::String& notes)
+void PresetComponent::updateMetadataFields(const juce::String& author, const juce::String& collection, const juce::String& presetName, const juce::String& notes, const juce::StringArray& tags)
 {
     authorEditor.setText(author, juce::dontSendNotification);
     collectionEditor.setText(collection, juce::dontSendNotification);
     presetNameEditor.setText(presetName, juce::dontSendNotification);
     notesEditor.setText(notes, juce::dontSendNotification);
+    // Join tags into comma-separated string for display
+    tagsEditor.setText(tags.joinIntoString(","), juce::dontSendNotification);
 }
