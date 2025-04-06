@@ -11,8 +11,6 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     addAndMakeVisible(midi);
     addChildComponent(txt);
     addChildComponent(frame);
-    addChildComponent(mainResizerBar);
-    addChildComponent(midiResizerBar);
     
     double midiLayoutPreferredSize = std::any_cast<double>(audioProcessor.getProperty("midiLayoutPreferredSize", pluginEditor.CLOSED_PREF_SIZE));
     double mainLayoutPreferredSize = std::any_cast<double>(audioProcessor.getProperty("mainLayoutPreferredSize", -0.4));

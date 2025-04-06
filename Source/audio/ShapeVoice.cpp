@@ -35,7 +35,6 @@ void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesiser
             }
             endTime += times[i];
         }
-
         if (audioProcessor.midiEnabled->getBoolValue()) {
             frequency = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber);
         }

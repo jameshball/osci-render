@@ -170,20 +170,7 @@ void OscirenderAudioProcessorEditor::resized() {
 
     if (audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
         visualiser.setBounds(area);
-        settings.setVisible(false);
-        resizerBar.setVisible(false);
-        luaResizerBar.setVisible(false);
-        lua.setVisible(false);
-        console.setVisible(false);
-        collapseButton.setVisible(false);
-        setCodeEditorVisible(false);
-        if (!usingNativeMenuBar) menuBar.setVisible(false);
-        volume.setVisible(false);
         return;
-    } else {
-        settings.setVisible(true);
-        if (!usingNativeMenuBar) menuBar.setVisible(true);
-        volume.setVisible(true);
     }
 
     if (!usingNativeMenuBar) {
@@ -199,13 +186,8 @@ void OscirenderAudioProcessorEditor::resized() {
     auto volumeArea = area.removeFromLeft(30);
     volume.setBounds(volumeArea.withSizeKeepingCentre(volumeArea.getWidth(), juce::jmin(volumeArea.getHeight(), 300)));
     area.removeFromLeft(3);
-
-    settings.setBounds(area);
-    
-    audioProcessor.setProperty("codeEditorLayoutPreferredSize", layout.getItemCurrentRelativeSize(0));
-    audioProcessor.setProperty("luaLayoutPreferredSize", luaLayout.getItemCurrentRelativeSize(0));
-
     bool editorVisible = false;
+
     {
         juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
 
@@ -226,12 +208,12 @@ void OscirenderAudioProcessorEditor::resized() {
 
                 juce::Component* columns[] = { &dummy, &resizerBar, &dummy2 };
                  
-                auto settingsBounds = settings.getBounds();
-                layout.layOutComponents(columns, 3, settingsBounds.getX(), settingsBounds.getY() - 1, settingsBounds.getWidth(), settingsBounds.getHeight() + 1, false, true);
-
+                // offsetting the y position by -1 and the height by +1 is a hack to fix a bug where the code editor
+                // doesn't draw up to the edges of the menu bar above.
+                layout.layOutComponents(columns, 3, area.getX(), area.getY() - 1, area.getWidth(), area.getHeight() + 1, false, true);
                 auto dummyBounds = dummy.getBounds();
-                settings.setBounds(dummyBounds);
                 collapseButton.setBounds(dummyBounds.removeFromRight(20));
+                area = dummyBounds;
 
                 auto dummy2Bounds = dummy2.getBounds();
                 dummy2Bounds.removeFromBottom(5);
@@ -257,24 +239,20 @@ void OscirenderAudioProcessorEditor::resized() {
 
                 fileOpen = true;
             } else {
-                collapseButton.setBounds(settings.getBounds().removeFromRight(20));
+                collapseButton.setBounds(area.removeFromRight(20));
             }
         }
 
         collapseButton.setVisible(ableToEditFile);
 
-        if (!fileOpen) {
-            if (index < codeEditors.size()) codeEditors[index]->setVisible(false);
-            resizerBar.setVisible(false);
-            console.setVisible(false);
-            luaResizerBar.setVisible(false);
-            lua.setVisible(false);
-        } else {
-            resizerBar.setVisible(true);
-            console.setVisible(luaFileOpen);
-            luaResizerBar.setVisible(luaFileOpen);
-            lua.setVisible(luaFileOpen);
+        if (index < codeEditors.size()) {
+            codeEditors[index]->setVisible(fileOpen);
         }
+        resizerBar.setVisible(fileOpen);
+
+        console.setVisible(luaFileOpen);
+        luaResizerBar.setVisible(luaFileOpen);
+        lua.setVisible(luaFileOpen);
     }
 
     if (editorVisible) {
@@ -287,8 +265,12 @@ void OscirenderAudioProcessorEditor::resized() {
         collapseButton.setShape(path, false, true, true);
     }
 
+    settings.setBounds(area);
+    
     audioProcessor.setProperty("codeEditorLayoutPreferredSize", layout.getItemCurrentRelativeSize(0));
     audioProcessor.setProperty("luaLayoutPreferredSize", luaLayout.getItemCurrentRelativeSize(0));
+    
+    repaint();
 }
 
 void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
@@ -399,7 +381,6 @@ void OscirenderAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcas
     } else if (source == &audioProcessor.fileChangeBroadcaster) {
         juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
         // triggered when the audioProcessor changes the current file (e.g. to Blender)
-        
         settings.fileUpdated(audioProcessor.getCurrentFileName());
     }
 }
@@ -507,14 +488,14 @@ bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
 }
 
 void OscirenderAudioProcessorEditor::mouseDown(const juce::MouseEvent& e) {
-    if (console.getBoundsInParent().removeFromTop(CLOSED_PREF_SIZE).contains(e.getPosition())) {
+    if (console.getBoundsInParent().removeFromTop(30).contains(e.getPosition())) {
         console.setConsoleOpen(!console.getConsoleOpen());
         resized();
     }
 }
 
 void OscirenderAudioProcessorEditor::mouseMove(const juce::MouseEvent& event) {
-    if (console.getBoundsInParent().removeFromTop(CLOSED_PREF_SIZE).contains(event.getPosition())) {
+    if (console.getBoundsInParent().removeFromTop(30).contains(event.getPosition())) {
         setMouseCursor(juce::MouseCursor::PointingHandCursor);
     } else {
         setMouseCursor(juce::MouseCursor::NormalCursor);
