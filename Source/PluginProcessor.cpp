@@ -452,7 +452,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     bool usingInput = inputEnabled->getBoolValue();
 
     bool usingMidi = midiEnabled->getBoolValue();
-    if (!midiEnabled->getBoolValue()) {
+    if (!usingMidi) {
         midiMessages.clear();
     }
     

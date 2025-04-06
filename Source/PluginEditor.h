@@ -10,8 +10,6 @@
 #include "components/LuaConsole.h"
 #include "visualiser/VisualiserSettings.h"
 #include "CommonPluginEditor.h"
-#include "MainComponent.h"
-#include "PresetComponent.h"
 
 class OscirenderAudioProcessorEditor : public CommonPluginEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener, public juce::FileDragAndDropTarget {
 public:

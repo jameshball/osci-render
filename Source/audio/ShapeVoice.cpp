@@ -81,8 +81,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
 
     int numChannels = outputBuffer.getNumChannels();
 
-    bool usingMidi = audioProcessor.midiEnabled->getBoolValue();
-    if (usingMidi) {
+    if (audioProcessor.midiEnabled->getBoolValue()) {
         actualFrequency = frequency * pitchWheelAdjustment;
     } else {
         actualFrequency = audioProcessor.frequency.load();
@@ -135,7 +134,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             break;
         }
 
-        double gain = usingMidi ? adsr.lookup(time) : 1.0;
+        double gain = audioProcessor.midiEnabled->getBoolValue() ? adsr.lookup(time) : 1.0;
         gain *= velocity;
 
         if (numChannels >= 3) {

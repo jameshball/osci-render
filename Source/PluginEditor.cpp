@@ -315,7 +315,9 @@ void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
     codeDocuments.insert(codeDocuments.begin() + index, codeDocument);
     codeEditors.insert(codeEditors.begin() + index, editor);
     addChildComponent(*editor);
+    // I need to disable accessibility otherwise it doesn't work! Appears to be a JUCE issue, very annoying!
     editor->setAccessible(false);
+    // listen for changes to the code editor
     codeDocument->addListener(this);
     editor->getEditor().setColourScheme(colourScheme);
 }
@@ -329,6 +331,7 @@ void OscirenderAudioProcessorEditor::removeCodeEditor(int index) {
 
 // parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessorEditor::updateCodeEditor(bool binaryFile, bool shouldOpenEditor) {
+    // check if any code editors are visible
     bool visible = shouldOpenEditor;
     if (!visible) {
         for (int i = 0; i < codeEditors.size(); i++) {
@@ -353,6 +356,10 @@ void OscirenderAudioProcessorEditor::updateCodeEditor(bool binaryFile, bool shou
                 codeEditors[i]->setVisible(false);
             }
             codeEditors[index]->setVisible(true);
+            // used so that codeDocumentTextInserted and codeDocumentTextDeleted know whether the parserLock
+            // is held by the message thread or not. We hold the lock in this function, but not when the
+            // code document is updated by the user editing text. Since both functions are called by the
+            // message thread, this is safe.
             updatingDocumentsWithParserLock = true;
             if (index == 0) {
                 codeEditors[index]->getEditor().loadContent(audioProcessor.customEffect->getCode());
@@ -391,6 +398,8 @@ void OscirenderAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcas
         repaint();
     } else if (source == &audioProcessor.fileChangeBroadcaster) {
         juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+        // triggered when the audioProcessor changes the current file (e.g. to Blender)
+        
         settings.fileUpdated(audioProcessor.getCurrentFileName());
     }
 }

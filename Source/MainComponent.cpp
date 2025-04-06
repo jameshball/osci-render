@@ -52,6 +52,7 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 	inputEnabled.onClick = [this] {
 		audioProcessor.inputEnabled->setBoolValueNotifyingHost(!audioProcessor.inputEnabled->getBoolValue());
 	};
+
 	addAndMakeVisible(fileLabel);
 	fileLabel.setJustificationType(juce::Justification::centred);
 	updateFileLabel();
