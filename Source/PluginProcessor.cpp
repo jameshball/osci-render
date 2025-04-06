@@ -850,6 +850,157 @@ void OscirenderAudioProcessor::envelopeChanged(EnvelopeComponent* changedEnvelop
     }
 }
 
+void OscirenderAudioProcessor::savePreset(juce::File file) {
+    juce::SpinLock::ScopedLockType lock(effectsLock); // Lock to safely access effects & parameters
+
+    std::unique_ptr<juce::XmlElement> xml = std::make_unique<juce::XmlElement>("OsciPreset");
+    xml->setAttribute("version", ProjectInfo::versionString); // Use the project version
+
+    // --- Save Effects ---
+    auto effectsXml = xml->createNewChildElement("Effects");
+    // Save toggleable effects (includes state like enabled, parameter values, LFOs)
+    for (auto& effect : toggleableEffects) {
+        effect->save(effectsXml->createNewChildElement("Effect"));
+    }
+    // Save permanent effects (e.g., frequency parameter)
+    for (auto& effect : permanentEffects) {
+        // Only save effects relevant to sound generation/preset? Or save all for consistency?
+        // Let's save all permanent ones for now, mirroring getStateInformation.
+         effect->save(effectsXml->createNewChildElement("Effect"));
+    }
+    // Save Lua slider effects
+    for (auto& effect : luaEffects) {
+        effect->save(effectsXml->createNewChildElement("Effect"));
+    }
+
+    // --- Save ADSR Parameters ---
+    auto adsrXml = xml->createNewChildElement("ADSR");
+    attackTime->save(adsrXml->createNewChildElement("Parameter"));
+    attackLevel->save(adsrXml->createNewChildElement("Parameter"));
+    attackShape->save(adsrXml->createNewChildElement("Parameter"));
+    decayTime->save(adsrXml->createNewChildElement("Parameter"));
+    decayShape->save(adsrXml->createNewChildElement("Parameter"));
+    sustainLevel->save(adsrXml->createNewChildElement("Parameter"));
+    releaseTime->save(adsrXml->createNewChildElement("Parameter"));
+    releaseShape->save(adsrXml->createNewChildElement("Parameter"));
+
+    // --- Save Synth Parameters ---
+    auto synthParamsXml = xml->createNewChildElement("SynthParameters");
+    voices->save(synthParamsXml->createNewChildElement("Parameter")); // Save number of voices
+
+    // --- Save Lua Code ---
+    auto customFunctionXml = xml->createNewChildElement("CustomFunction");
+    customFunctionXml->addTextElement(juce::Base64::toBase64(customEffect->getCode()));
+
+    // --- Write to File ---
+    if (!xml->writeToFile(file, {})) {
+        // Handle error - maybe log it or show an alert?
+        DBG("Error writing preset file: " + file.getFullPathName());
+        // For now, just log an error message in debug builds.
+        // In a real application, you might want to show a juce::AlertWindow.
+    }
+}
+
+void OscirenderAudioProcessor::loadPreset(juce::File file) {
+    std::unique_ptr<juce::XmlElement> xml = juce::XmlDocument::parse(file);
+
+    if (xml == nullptr) {
+        DBG("Error parsing preset file: " + file.getFullPathName());
+        // Optionally show an AlertWindow here
+        return;
+    }
+
+    if (!xml->hasTagName("OsciPreset")) {
+        DBG("Invalid preset file format: " + file.getFullPathName());
+        // Optionally show an AlertWindow here
+        return;
+    }
+
+    // Lock effects/parameters while loading
+    juce::SpinLock::ScopedLockType lock(effectsLock);
+
+    // --- Load Effects ---
+    auto effectsXml = xml->getChildByName("Effects");
+    if (effectsXml != nullptr) {
+        // Iterate through all saved Effect elements
+        for (auto* effectXml : effectsXml->getChildIterator()) {
+            if (effectXml->hasTagName("Effect")) {
+                // Find the matching effect in our processor's lists by ID
+                auto effectId = effectXml->getStringAttribute("id");
+                auto effect = getEffect(effectId); // Assuming getEffect searches all relevant lists (toggleable, permanent, lua)
+                if (effect != nullptr) {
+                    effect->load(effectXml);
+                } else {
+                    DBG("Preset loading: Could not find effect with ID: " + effectId);
+                }
+            }
+        }
+        updateEffectPrecedence(); // Re-sort toggleable effects based on loaded precedence
+    }
+
+    // --- Load ADSR Parameters ---
+    auto adsrXml = xml->getChildByName("ADSR");
+    if (adsrXml != nullptr) {
+        for (auto* parameterXml : adsrXml->getChildIterator()) {
+             if (parameterXml->hasTagName("Parameter")) {
+                 auto paramId = parameterXml->getStringAttribute("id");
+                 auto parameter = getFloatParameter(paramId); // Assumes ADSR params are FloatParameters
+                 if (parameter != nullptr) {
+                     parameter->load(parameterXml);
+                 } else {
+                     DBG("Preset loading: Could not find ADSR parameter with ID: " + paramId);
+                 }
+             }
+        }
+        // Update the internal adsrEnv object after loading parameters
+        adsrEnv = Env::adsr(
+            attackTime->getValueUnnormalised(),
+            decayTime->getValueUnnormalised(),
+            sustainLevel->getValueUnnormalised(),
+            releaseTime->getValueUnnormalised(),
+            attackLevel->getValueUnnormalised(), // Assuming attackLevel corresponds to env's 'peakLevel'
+            std::vector<EnvCurve>{ attackShape->getValueUnnormalised(), decayShape->getValueUnnormalised(), releaseShape->getValueUnnormalised() }
+        );
+    }
+
+    // --- Load Synth Parameters ---
+    auto synthParamsXml = xml->getChildByName("SynthParameters");
+    if (synthParamsXml != nullptr) {
+        for (auto* parameterXml : synthParamsXml->getChildIterator()) {
+             if (parameterXml->hasTagName("Parameter")) {
+                 auto paramId = parameterXml->getStringAttribute("id");
+                 // Check if it's the 'voices' parameter
+                 if (paramId == voices->getParameterID()) {
+                     voices->load(parameterXml);
+                     // Trigger parameterValueChanged to update synth voices
+                     parameterValueChanged(voices->getParameterIndex(), voices->getValue());
+                 }
+                  // Add checks for other synth parameters if needed
+                 else {
+                     DBG("Preset loading: Could not find Synth parameter with ID: " + paramId);
+                 }
+             }
+        }
+    }
+
+    // --- Load Lua Code ---
+    auto customFunctionXml = xml->getChildByName("CustomFunction");
+    if (customFunctionXml != nullptr) {
+        auto base64Code = customFunctionXml->getAllSubText();
+        juce::MemoryOutputStream stream;
+        if (juce::Base64::convertFromBase64(stream, base64Code)) {
+            customEffect->updateCode(stream.toString());
+        } else {
+             DBG("Preset loading: Failed to decode Base64 Lua code.");
+        }
+    }
+
+    // --- Notify UI/Listeners ---
+    // Use MessageManagerLock as sendChangeMessage needs to be called from the message thread
+    juce::MessageManagerLock mmlock;
+    broadcaster.sendChangeMessage();
+}
+
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {
     return new OscirenderAudioProcessor();
 }

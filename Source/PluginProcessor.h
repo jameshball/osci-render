@@ -206,6 +206,9 @@ public:
     void addErrorListener(ErrorListener* listener);
     void removeErrorListener(ErrorListener* listener);
     void notifyErrorListeners(int lineNumber, juce::String id, juce::String error);
+
+    void savePreset(juce::File file);
+    void loadPreset(juce::File file);
 private:
     
     std::atomic<bool> prevMidiEnabled = isMidiAlwaysEnabled() || !midiEnabled->getBoolValue();
