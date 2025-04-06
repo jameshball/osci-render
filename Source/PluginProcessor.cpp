@@ -16,7 +16,6 @@
 #include "audio/BitCrushEffect.h"
 #include "audio/BulgeEffect.h"
 #include "audio/EffectParameter.h"
-#include "MidiAlwaysEnabled.h"
 
 //==============================================================================
 OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(2), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
@@ -452,8 +451,8 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
     bool usingInput = inputEnabled->getBoolValue();
 
-    bool usingMidi = isMidiAlwaysEnabled() || midiEnabled->getBoolValue();
-    if (!usingMidi) {
+    bool usingMidi = midiEnabled->getBoolValue();
+    if (!midiEnabled->getBoolValue()) {
         midiMessages.clear();
     }
     
@@ -470,7 +469,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         retriggerMidi = false;
     }
     
-    prevMidiEnabled = isMidiAlwaysEnabled() || usingMidi;
+    prevMidiEnabled = usingMidi;
 
     const double EPSILON = 0.00001;
 

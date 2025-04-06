@@ -1,6 +1,5 @@
 #include "ShapeVoice.h"
 #include "../PluginProcessor.h"
-#include "../MidiAlwaysEnabled.h"
 
 ShapeVoice::ShapeVoice(OscirenderAudioProcessor& p) : audioProcessor(p) {
     actualTraceStart = audioProcessor.trace->getValue(0);
@@ -37,8 +36,7 @@ void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesiser
             endTime += times[i];
         }
 
-        bool usingMidi = isMidiAlwaysEnabled() || audioProcessor.midiEnabled->getBoolValue();
-        if (usingMidi) {
+        if (audioProcessor.midiEnabled->getBoolValue()) {
             frequency = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber);
         }
     }
@@ -83,7 +81,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
 
     int numChannels = outputBuffer.getNumChannels();
 
-    bool usingMidi = isMidiAlwaysEnabled() || audioProcessor.midiEnabled->getBoolValue();
+    bool usingMidi = audioProcessor.midiEnabled->getBoolValue();
     if (usingMidi) {
         actualFrequency = frequency * pitchWheelAdjustment;
     } else {

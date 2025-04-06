@@ -29,7 +29,6 @@
 #include "audio/CustomEffect.h"
 #include "audio/DashedLineEffect.h"
 #include "CommonPluginProcessor.h"
-#include "MidiAlwaysEnabled.h"
 
 // Define a struct to hold scene metadata
 struct SceneMetadata {
@@ -220,7 +219,7 @@ public:
     SceneMetadata loadScene(juce::File file);
 private:
     
-    std::atomic<bool> prevMidiEnabled = isMidiAlwaysEnabled() || !midiEnabled->getBoolValue();
+    std::atomic<bool> prevMidiEnabled = !midiEnabled->getBoolValue();
 
     juce::SpinLock audioThreadCallbackLock;
     std::function<void(const juce::AudioBuffer<float>&)> audioThreadCallback;

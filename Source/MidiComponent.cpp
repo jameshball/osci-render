@@ -1,13 +1,10 @@
 #include "MidiComponent.h"
 #include "PluginEditor.h"
-#include "MidiAlwaysEnabled.h"
 
 MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
     setText("MIDI Settings");
 
-    if (!isMidiAlwaysEnabled()) {
-        addAndMakeVisible(midiToggle);
-    }
+    addAndMakeVisible(midiToggle);
     addAndMakeVisible(voicesSlider);
     addAndMakeVisible(voicesLabel);
     addAndMakeVisible(keyboard);

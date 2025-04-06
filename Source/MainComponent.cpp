@@ -2,7 +2,6 @@
 #include "parser/FileParser.h"
 #include "parser/FrameProducer.h"
 #include "PluginEditor.h"
-#include "MidiAlwaysEnabled.h"
 
 MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
 	setText("Main Settings");
@@ -49,12 +48,10 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 
 	closeFileButton.setTooltip("Close the currently open file.");
 
-#if !defined(MIDI_ALWAYS_ENABLED) || (MIDI_ALWAYS_ENABLED == 0)
 	addAndMakeVisible(inputEnabled);
 	inputEnabled.onClick = [this] {
 		audioProcessor.inputEnabled->setBoolValueNotifyingHost(!audioProcessor.inputEnabled->getBoolValue());
 	};
-#endif
 	addAndMakeVisible(fileLabel);
 	fileLabel.setJustificationType(juce::Justification::centred);
 	updateFileLabel();
