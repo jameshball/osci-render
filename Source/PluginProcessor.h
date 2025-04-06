@@ -29,6 +29,7 @@
 #include "audio/CustomEffect.h"
 #include "audio/DashedLineEffect.h"
 #include "CommonPluginProcessor.h"
+#include "MidiAlwaysEnabled.h"
 
 //==============================================================================
 /**
@@ -207,7 +208,7 @@ public:
     void notifyErrorListeners(int lineNumber, juce::String id, juce::String error);
 private:
     
-    std::atomic<bool> prevMidiEnabled = !midiEnabled->getBoolValue();
+    std::atomic<bool> prevMidiEnabled = isMidiAlwaysEnabled() || !midiEnabled->getBoolValue();
 
     juce::SpinLock audioThreadCallbackLock;
     std::function<void(const juce::AudioBuffer<float>&)> audioThreadCallback;

@@ -1,5 +1,6 @@
 #include "ShapeVoice.h"
 #include "../PluginProcessor.h"
+#include "../MidiAlwaysEnabled.h"
 
 ShapeVoice::ShapeVoice(OscirenderAudioProcessor& p) : audioProcessor(p) {
     actualTraceStart = audioProcessor.trace->getValue(0);
@@ -35,7 +36,9 @@ void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesiser
             }
             endTime += times[i];
         }
-        if (audioProcessor.midiEnabled->getBoolValue()) {
+
+        bool usingMidi = isMidiAlwaysEnabled() || audioProcessor.midiEnabled->getBoolValue();
+        if (usingMidi) {
             frequency = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber);
         }
     }
@@ -80,7 +83,8 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
 
     int numChannels = outputBuffer.getNumChannels();
 
-    if (audioProcessor.midiEnabled->getBoolValue()) {
+    bool usingMidi = isMidiAlwaysEnabled() || audioProcessor.midiEnabled->getBoolValue();
+    if (usingMidi) {
         actualFrequency = frequency * pitchWheelAdjustment;
     } else {
         actualFrequency = audioProcessor.frequency.load();
@@ -133,7 +137,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             break;
         }
 
-        double gain = audioProcessor.midiEnabled->getBoolValue() ? adsr.lookup(time) : 1.0;
+        double gain = usingMidi ? adsr.lookup(time) : 1.0;
         gain *= velocity;
 
         if (numChannels >= 3) {

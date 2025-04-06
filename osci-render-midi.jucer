@@ -5,7 +5,7 @@
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirendermidi"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
               version="2.4.11.0" companyName="James H Ball" companyWebsite="https://osci-render.com"
-              companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;SOSCI_FEATURES=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;MIDI_ALWAYS_ENABLED=0"
+              companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;SOSCI_FEATURES=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;MIDI_ALWAYS_ENABLED=1"
               pluginAUMainType="'aumi'" pluginCode="Oscm" pluginManufacturerCode="Jhba"
               pluginVST3Category="Instrument,Synth">
   <MAINGROUP id="j5Ge2T" name="osci-render-midi">
