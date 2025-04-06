@@ -112,16 +112,20 @@ void PresetComponent::loadSceneClicked()
     auto chooserFlags = juce::FileBrowserComponent::openMode |
                        juce::FileBrowserComponent::canSelectFiles;
 
-    sceneChooser->launchAsync(chooserFlags, [this](const juce::FileChooser& fc)
+    // Use SafePointer to capture 'this' safely for the async callback
+    sceneChooser->launchAsync(chooserFlags, [safeThis = juce::Component::SafePointer(this)](const juce::FileChooser& fc)
     {
+        // Check if the component still exists when the callback executes
+        if (safeThis == nullptr) return;
+        
         auto file = fc.getResult();
         if (file != juce::File{})
         {
             // Call loadScene and capture the returned metadata
-            SceneMetadata loadedData = processor.loadScene(file);
+            SceneMetadata loadedData = safeThis->processor.loadScene(file);
             
             // Update the text fields using the returned metadata
-            updateMetadataFields(loadedData.author, loadedData.collection, loadedData.presetName, loadedData.notes, loadedData.tags);
+            safeThis->updateMetadataFields(loadedData.author, loadedData.collection, loadedData.presetName, loadedData.notes, loadedData.tags);
 
             // The DBG message is no longer a TODO
             DBG("PresetComponent: Updated metadata fields after loading scene.");
@@ -139,21 +143,25 @@ void PresetComponent::saveSceneClicked()
     auto chooserFlags = juce::FileBrowserComponent::saveMode |
                        juce::FileBrowserComponent::canSelectFiles;
 
-    sceneChooser->launchAsync(chooserFlags, [this](const juce::FileChooser& fc)
+    // Use SafePointer to capture 'this' safely for the async callback
+    sceneChooser->launchAsync(chooserFlags, [safeThis = juce::Component::SafePointer(this)](const juce::FileChooser& fc)
     {
+        // Check if the component still exists when the callback executes
+        if (safeThis == nullptr) return;
+        
         auto file = fc.getResult();
         if (file != juce::File{})
         {
             // Get metadata from TextEditors
-            auto author = authorEditor.getText();
-            auto collection = collectionEditor.getText();
-            auto presetName = presetNameEditor.getText();
-            auto notes = notesEditor.getText();
+            auto author = safeThis->authorEditor.getText();
+            auto collection = safeThis->collectionEditor.getText();
+            auto presetName = safeThis->presetNameEditor.getText();
+            auto notes = safeThis->notesEditor.getText();
             // Get tags (as comma-separated string)
-            auto tagsCsv = tagsEditor.getText();
+            auto tagsCsv = safeThis->tagsEditor.getText();
 
             // Call the processor's save function (needs updated signature)
-            processor.saveScene(file, author, collection, presetName, notes, tagsCsv);
+            safeThis->processor.saveScene(file, author, collection, presetName, notes, tagsCsv);
         }
     });
 }
