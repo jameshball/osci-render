@@ -908,13 +908,15 @@ void OscirenderAudioProcessor::saveScene(juce::File file, const juce::String& au
     auto customFunctionXml = xml->createNewChildElement("CustomFunction");
     customFunctionXml->addTextElement(juce::Base64::toBase64(customEffect->getCode()));
 
-    // --- Save Current Visual File Info ---
-    xml->setAttribute("currentFileIndex", currentFile.load());
-    if (currentFile.load() >= 0 && currentFile.load() < fileNames.size()) {
-        auto currentFileXml = xml->createNewChildElement("CurrentVisualFile");
-        currentFileXml->setAttribute("name", fileNames[currentFile.load()]);
-        auto base64 = fileBlocks[currentFile.load()]->toBase64Encoding();
-        currentFileXml->addTextElement(base64);
+    // --- Save All Visual File Info --- 
+    auto* visualFilesXml = xml->createNewChildElement("VisualFiles");
+    visualFilesXml->setAttribute("currentFileIndex", currentFile.load()); // Save selected index here
+    for (int i = 0; i < fileBlocks.size(); ++i)
+    {
+        auto* fileXml = visualFilesXml->createNewChildElement("VisualFile");
+        fileXml->setAttribute("name", fileNames[i]);
+        auto base64 = fileBlocks[i]->toBase64Encoding();
+        fileXml->addTextElement(base64);
     }
     
     // --- Save other relevant parameters (e.g., Main Settings, 3D Settings) ---
@@ -1067,7 +1069,7 @@ SceneMetadata OscirenderAudioProcessor::loadScene(juce::File file) {
         }
     }
 
-    // --- Load Current Visual File Info (if it's a scene file) ---
+    // --- Load All Visual File Info ---
     if (isSceneFile) {
         int loadedFileIndex = xml->getIntAttribute("currentFileIndex", -1);
         
@@ -1077,24 +1079,26 @@ SceneMetadata OscirenderAudioProcessor::loadScene(juce::File file) {
             removeFile(i); 
         }
 
-        // --- Load the file saved in the scene --- 
-        auto* currentFileXml = xml->getChildByName("CurrentVisualFile");
-        if (currentFileXml != nullptr && loadedFileIndex != -1) {
-            auto fileName = currentFileXml->getStringAttribute("name");
-            auto base64Data = currentFileXml->getAllSubText();
-            std::shared_ptr<juce::MemoryBlock> fileBlock = std::make_shared<juce::MemoryBlock>();
-            if (fileBlock->fromBase64Encoding(base64Data)) {
-                 // Add the decoded file data. This also calls openFile/changeCurrentFile.
-                 addFile(fileName, fileBlock);
-                 DBG("Scene loading: Added visual file: " + fileName);
-            } else {
-                DBG("Scene loading: Failed to decode Base64 visual file data.");
-                changeCurrentFile(-1);
+        // --- Load the files saved in the scene --- 
+        auto* visualFilesXml = xml->getChildByName("VisualFiles");
+        if (visualFilesXml != nullptr) {
+            for (auto* fileXml : visualFilesXml->getChildIterator()) {
+                auto fileName = fileXml->getStringAttribute("name");
+                auto base64Data = fileXml->getAllSubText();
+                std::shared_ptr<juce::MemoryBlock> fileBlock = std::make_shared<juce::MemoryBlock>();
+                if (fileBlock->fromBase64Encoding(base64Data)) {
+                     // Add the decoded file data. This also calls openFile/changeCurrentFile.
+                     addFile(fileName, fileBlock);
+                     DBG("Scene loading: Added visual file: " + fileName);
+                } else {
+                    DBG("Scene loading: Failed to decode Base64 visual file data.");
+                    changeCurrentFile(-1);
+                }
             }
         } else {
-             // If scene saved with no visual file or index was -1, ensure no file selected
+             // If scene saved with no visual files, ensure no file selected
              changeCurrentFile(-1); 
-             DBG("Scene loading: No visual file loaded from scene.");
+             DBG("Scene loading: No visual files loaded from scene.");
         }
     }
     
