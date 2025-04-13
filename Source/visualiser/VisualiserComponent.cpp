@@ -244,6 +244,9 @@ void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
                     // x and y go to a diagonal currently, so we need to scale them down, and rotate them
                     point.scale(1.0 / std::sqrt(2.0), 1.0 / std::sqrt(2.0), 1.0);
                     point.rotate(0, 0, juce::MathConstants<double>::pi / 4);
+                    // after scaling and rotation, the left channel deflects the goniometer to the right,
+                    // so it must also be mirrored horizontally
+                    point.scale(-1.0, 1.0);
                 }
 #endif
                 
