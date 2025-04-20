@@ -74,6 +74,9 @@ public:
     void removeGlobalValue(const juce::String& keyName);
     void saveGlobalSettings();
     
+    bool hasSetSessionStartTime = false;
+    bool programCrashedAndUserWantsToReset();
+    
     juce::SpinLock audioPlayerListenersLock;
     std::vector<AudioPlayerListener*> audioPlayerListeners;
 

@@ -135,6 +135,10 @@ void SosciAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
 }
 
 void SosciAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
+    if (juce::JUCEApplicationBase::isStandaloneApp() && programCrashedAndUserWantsToReset()) {
+        return;
+    }
+
     std::unique_ptr<juce::XmlElement> xml;
 
     const uint32_t magicXmlNumber = 0x21324356;
