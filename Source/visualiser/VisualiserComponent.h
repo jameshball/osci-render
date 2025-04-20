@@ -60,7 +60,7 @@ public:
     int prepareTask(double sampleRate, int samplesPerBlock) override;
     void runTask(const std::vector<OsciPoint>& points) override;
     void stopTask() override;
-    void setPaused(bool paused);
+    void setPaused(bool paused, bool affectAudio = true);
     void mouseDrag(const juce::MouseEvent& event) override;
     void mouseMove(const juce::MouseEvent& event) override;
     void mouseDown(const juce::MouseEvent& event) override;
@@ -292,11 +292,13 @@ public:
     }
     
     void closeButtonPressed() override {
+        // local copy of parent so that we can safely delete the child
+        VisualiserComponent* parent = this->parent;
         parent->setPaused(wasPaused);
         parent->child = nullptr;
+        parent->popout.reset();
         parent->childUpdated();
         parent->resized();
-        parent->popout.reset();
     }
 
 private:

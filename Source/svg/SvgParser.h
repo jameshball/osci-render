@@ -8,7 +8,7 @@ public:
 	SvgParser(juce::String svgFile);
 	~SvgParser();
 
-	static void pathToShapes(juce::Path& path, std::vector<std::unique_ptr<Shape>>& shapes);
+	static void pathToShapes(juce::Path& path, std::vector<std::unique_ptr<Shape>>& shapes, bool normalise = false);
 
 	std::vector<std::unique_ptr<Shape>> draw();
 private:

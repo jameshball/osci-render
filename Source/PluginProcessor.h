@@ -178,11 +178,15 @@ public:
     
     std::shared_ptr<WobbleEffect> wobbleEffect = std::make_shared<WobbleEffect>(*this);
 
-    juce::Font font = juce::Font(juce::Font::getDefaultSansSerifFontName(), 1.0f, juce::Font::plain);
+    const double FONT_SIZE = 1.0f;
+    juce::Font font = juce::Font(juce::Font::getDefaultSansSerifFontName(), FONT_SIZE, juce::Font::plain);
 
     ShapeSound::Ptr objectServerSound = new ShapeSound();
     
     std::function<void()> haltRecording;
+
+    // Add a callback to notify the editor when a file is removed
+    std::function<void(int)> fileRemovedCallback;
 
     void addLuaSlider();
     void updateEffectPrecedence();
@@ -205,6 +209,13 @@ public:
     void addErrorListener(ErrorListener* listener);
     void removeErrorListener(ErrorListener* listener);
     void notifyErrorListeners(int lineNumber, juce::String id, juce::String error);
+
+    // Setter for the callback
+    void setFileRemovedCallback(std::function<void(int)> callback);
+
+    // Added declaration for the new `removeParser` method.
+    void removeParser(FileParser* parser);
+
 private:
     
     std::atomic<bool> prevMidiEnabled = !midiEnabled->getBoolValue();

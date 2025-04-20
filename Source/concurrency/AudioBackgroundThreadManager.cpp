@@ -25,7 +25,7 @@ void AudioBackgroundThreadManager::write(const OsciPoint& point) {
 void AudioBackgroundThreadManager::write(const OsciPoint& point, juce::String name) {
     juce::SpinLock::ScopedLockType scope(lock);
     for (auto& thread : threads) {
-        if (thread->getThreadName() == name) {
+        if (thread->getThreadName().contains(name)) {
             thread->write(point);
         }
     }

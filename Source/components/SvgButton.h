@@ -4,7 +4,7 @@
 
 class SvgButton : public juce::DrawableButton, public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater {
  public:
-    SvgButton(juce::String name, juce::String svg, juce::Colour colour, juce::Colour colourOn, BooleanParameter* toggle = nullptr) : juce::DrawableButton(name, juce::DrawableButton::ButtonStyle::ImageFitted), toggle(toggle) {
+    SvgButton(juce::String name, juce::String svg, juce::Colour colour, juce::Colour colourOn, BooleanParameter* toggle = nullptr, juce::String toggledSvg = "") : juce::DrawableButton(name, juce::DrawableButton::ButtonStyle::ImageFitted), toggle(toggle) {
         auto doc = juce::XmlDocument::parse(svg);
         
         changeSvgColour(doc.get(), colour);
@@ -16,14 +16,27 @@ class SvgButton : public juce::DrawableButton, public juce::AudioProcessorParame
 		changeSvgColour(doc.get(), colour.withBrightness(0.3f));
 		disabledImage = juce::Drawable::createFromSVG(*doc);
         
-        changeSvgColour(doc.get(), colourOn);
-        normalImageOn = juce::Drawable::createFromSVG(*doc);
-		changeSvgColour(doc.get(), colourOn.withBrightness(0.7f));
-		overImageOn = juce::Drawable::createFromSVG(*doc);
-		changeSvgColour(doc.get(), colourOn.withBrightness(0.5f));
-		downImageOn = juce::Drawable::createFromSVG(*doc);
-		changeSvgColour(doc.get(), colourOn.withBrightness(0.3f));
-		disabledImageOn = juce::Drawable::createFromSVG(*doc);
+        // If a toggled SVG is provided, use it for the "on" state images
+        if (toggledSvg.isNotEmpty()) {
+            auto toggledDoc = juce::XmlDocument::parse(toggledSvg);
+            changeSvgColour(toggledDoc.get(), colourOn);
+            normalImageOn = juce::Drawable::createFromSVG(*toggledDoc);
+            changeSvgColour(toggledDoc.get(), colourOn.withBrightness(0.7f));
+            overImageOn = juce::Drawable::createFromSVG(*toggledDoc);
+            changeSvgColour(toggledDoc.get(), colourOn.withBrightness(0.5f));
+            downImageOn = juce::Drawable::createFromSVG(*toggledDoc);
+            changeSvgColour(toggledDoc.get(), colourOn.withBrightness(0.3f));
+            disabledImageOn = juce::Drawable::createFromSVG(*toggledDoc);
+        } else {
+            changeSvgColour(doc.get(), colourOn);
+            normalImageOn = juce::Drawable::createFromSVG(*doc);
+            changeSvgColour(doc.get(), colourOn.withBrightness(0.7f));
+            overImageOn = juce::Drawable::createFromSVG(*doc);
+            changeSvgColour(doc.get(), colourOn.withBrightness(0.5f));
+            downImageOn = juce::Drawable::createFromSVG(*doc);
+            changeSvgColour(doc.get(), colourOn.withBrightness(0.3f));
+            disabledImageOn = juce::Drawable::createFromSVG(*doc);
+        }
         
         basePath = normalImage->getOutlineAsPath();
 

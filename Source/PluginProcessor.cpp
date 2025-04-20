@@ -293,6 +293,11 @@ void OscirenderAudioProcessor::addFile(juce::String fileName, std::shared_ptr<ju
     openFile(fileBlocks.size() - 1);
 }
 
+// Setter for the callback
+void OscirenderAudioProcessor::setFileRemovedCallback(std::function<void(int)> callback) {
+    fileRemovedCallback = std::move(callback);
+}
+
 // parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessor::removeFile(int index) {
 	if (index < 0 || index >= fileBlocks.size()) {
@@ -303,11 +308,32 @@ void OscirenderAudioProcessor::removeFile(int index) {
     fileIds.erase(fileIds.begin() + index);
     parsers.erase(parsers.begin() + index);
     sounds.erase(sounds.begin() + index);
+
     auto newFileIndex = index;
     if (newFileIndex >= fileBlocks.size()) {
         newFileIndex = fileBlocks.size() - 1;
     }
     changeCurrentFile(newFileIndex);
+
+    // Notify the editor about the file removal
+    if (fileRemovedCallback) {
+        fileRemovedCallback(index);
+    }
+}
+
+// parsersLock AND effectsLock must be locked before calling this function
+void OscirenderAudioProcessor::removeParser(FileParser* parser) {
+    int parserIndex = -1;
+    for (int i = 0; i < parsers.size(); i++) {
+        if (parsers[i].get() == parser) {
+            parserIndex = i;
+            break;
+        }
+    }
+
+    if (parserIndex >= 0) {
+        removeFile(parserIndex);
+    }
 }
 
 int OscirenderAudioProcessor::numFiles() {
@@ -321,7 +347,7 @@ void OscirenderAudioProcessor::openFile(int index) {
 	if (index < 0 || index >= fileBlocks.size()) {
 		return;
 	}
-    parsers[index]->parse(juce::String(fileIds[index]), fileNames[index].fromLastOccurrenceOf(".", true, false).toLowerCase(), std::make_unique<juce::MemoryInputStream>(*fileBlocks[index], false), font);
+    parsers[index]->parse(juce::String(fileIds[index]), fileNames[index], fileNames[index].fromLastOccurrenceOf(".", true, false).toLowerCase(), std::make_unique<juce::MemoryInputStream>(*fileBlocks[index], false), font);
     changeCurrentFile(index);
 }
 
@@ -586,14 +612,20 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         x = juce::jmax(-threshold, juce::jmin(threshold.load(), x));
         y = juce::jmax(-threshold, juce::jmin(threshold.load(), y));
         
+        threadManager.write(OsciPoint(x, y, 1));
+        
+        // Apply mute if active
+        if (muteParameter->getBoolValue()) {
+            x = 0.0;
+            y = 0.0;
+        }
+        
         if (totalNumOutputChannels >= 2) {
 			channelData[0][sample] = x;
 			channelData[1][sample] = y;
 		} else if (totalNumOutputChannels == 1) {
             channelData[0][sample] = x;
         }
-        
-        threadManager.write(OsciPoint(x, y, 1));
 
         if (isPlaying) {
             playTimeSeconds += sTimeSec;
@@ -677,6 +709,10 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
 }
 
 void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
+    if (juce::JUCEApplicationBase::isStandaloneApp() && programCrashedAndUserWantsToReset()) {
+        return;
+    }
+    
     std::unique_ptr<juce::XmlElement> xml;
 
     const uint32_t magicXmlNumber = 0x21324356;
@@ -755,7 +791,7 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
             auto family = fontXml->getStringAttribute("family");
             auto bold = fontXml->getBoolAttribute("bold");
             auto italic = fontXml->getBoolAttribute("italic");
-            font = juce::Font(family, 1.0, (bold ? juce::Font::bold : 0) | (italic ? juce::Font::italic : 0));
+            font = juce::Font(family, FONT_SIZE, (bold ? juce::Font::bold : 0) | (italic ? juce::Font::italic : 0));
         }
 
         // close all files

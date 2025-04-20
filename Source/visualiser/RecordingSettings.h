@@ -8,6 +8,16 @@
 
 #define VERSION_HINT 2
 
+// Define codec options
+enum class VideoCodec {
+    H264,
+    H265,
+    VP9,
+#if JUCE_MAC
+    ProRes,
+#endif
+};
+
 class RecordingParameters {
 public:
     RecordingParameters() {
@@ -58,6 +68,7 @@ public:
     Effect frameRateEffect = Effect(&frameRate);
 
     juce::String compressionPreset = "fast";
+    VideoCodec videoCodec = VideoCodec::H264;
 
     void save(juce::XmlElement* xml) {
         auto settingsXml = xml->createNewChildElement("recordingSettings");
@@ -66,6 +77,7 @@ public:
         recordVideo.save(settingsXml->createNewChildElement("recordVideo"));
         settingsXml->setAttribute("compressionPreset", compressionPreset);
         settingsXml->setAttribute("customSharedTextureServerName", customSharedTextureServerName);
+        settingsXml->setAttribute("videoCodec", static_cast<int>(videoCodec));
         
         auto qualityXml = settingsXml->createNewChildElement("quality");
         qualityEffect.save(qualityXml);
@@ -94,6 +106,10 @@ public:
             }
             if (settingsXml->hasAttribute("customSharedTextureServerName")) {
                 customSharedTextureServerName = settingsXml->getStringAttribute("customSharedTextureServerName");
+            }
+            if (settingsXml->hasAttribute("videoCodec")) {
+                int codecValue = settingsXml->getIntAttribute("videoCodec", 0);
+                videoCodec = static_cast<VideoCodec>(codecValue);
             }
             if (auto* qualityXml = settingsXml->getChildByName("quality")) {
                 qualityEffect.load(qualityXml);
@@ -163,6 +179,24 @@ public:
         return parameters.frameRate.getValueUnnormalised();
     }
 
+    VideoCodec getVideoCodec() {
+        return parameters.videoCodec;
+    }
+
+    juce::String getFileExtensionForCodec() {
+        switch (parameters.videoCodec) {
+#if JUCE_MAC
+            case VideoCodec::ProRes:
+                return "mov";
+#endif
+            case VideoCodec::H264:
+            case VideoCodec::H265:
+            case VideoCodec::VP9:
+            default:
+                return "mp4";
+        }
+    }
+
     RecordingParameters& parameters;
 
 private:
@@ -181,6 +215,9 @@ private:
 
     juce::Label compressionPresetLabel{"Compression Speed", "Compression Speed"};
     juce::ComboBox compressionPreset;
+    
+    juce::Label videoCodecLabel{"Video Codec", "Video Codec"};
+    juce::ComboBox videoCodecSelector;
     
     juce::Label customSharedTextureOutputLabel{"Custom Syphon/Spout Name", "Custom Syphon/Spout Name"};
     juce::TextEditor customSharedTextureOutputEditor{"customSharedTextureOutputEditor"};

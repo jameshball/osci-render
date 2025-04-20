@@ -80,7 +80,7 @@ VisualiserComponent::VisualiserComponent(
         addAndMakeVisible(fullScreenButton);
         fullScreenButton.setTooltip("Toggles fullscreen mode.");
     }
-    if (child == nullptr && parent == nullptr && !visualiserOnly) {
+    if (child == nullptr && parent == nullptr) {
         addAndMakeVisible(popOutButton);
         popOutButton.setTooltip("Opens the oscilloscope in a new window.");
     }
@@ -243,7 +243,7 @@ void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
                 if (settings.isGoniometer()) {
                     // x and y go to a diagonal currently, so we need to scale them down, and rotate them
                     point.scale(1.0 / std::sqrt(2.0), 1.0 / std::sqrt(2.0), 1.0);
-                    point.rotate(0, 0, juce::MathConstants<double>::pi / 4);
+                    point.rotate(0, 0, -juce::MathConstants<double>::pi / 4);
                 }
 #endif
                 
@@ -315,11 +315,13 @@ double VisualiserComponent::getSweepIncrement() {
     return 1.0 / (sampleRate * settings.getSweepSeconds());
 }
 
-void VisualiserComponent::setPaused(bool paused) {
+void VisualiserComponent::setPaused(bool paused, bool affectAudio) {
     active = !paused;
     setShouldBeRunning(active);
     renderingSemaphore.release();
-    audioPlayer.setPaused(paused);
+    if (affectAudio) {
+        audioPlayer.setPaused(paused);
+    }
     repaint();
 }
 
@@ -334,7 +336,8 @@ void VisualiserComponent::mouseMove(const juce::MouseEvent& event) {
     hideButtonRow = false;
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
     
-    if (fullScreen) {
+    // Treat both fullScreen mode and pop-out mode (parent != nullptr) as needing auto-hide controls
+    if (fullScreen || parent != nullptr) {
         if (!getScreenBounds().removeFromBottom(25).contains(event.getScreenX(), event.getScreenY()) && !event.mods.isLeftButtonDown()) {
             lastMouseX = event.getScreenX();
             lastMouseY = event.getScreenY();
@@ -348,7 +351,8 @@ void VisualiserComponent::mouseMove(const juce::MouseEvent& event) {
             juce::Timer::callAfterDelay(1000, [this, weakRef, newTimerId, pos, parent]() {
                 if (weakRef) {
                     if (parent == nullptr || parent->child == this) {
-                        if (timerId == newTimerId && fullScreen) {
+                        // Check both fullscreen or pop-out mode
+                        if (timerId == newTimerId && (fullScreen || this->parent != nullptr)) {
                             hideButtonRow = true;
                             setMouseCursor(juce::MouseCursor::NoCursor);
                             resized();
@@ -425,7 +429,11 @@ void VisualiserComponent::setRecording(bool recording) {
                 record.setToggleState(false, juce::NotificationType::dontSendNotification);
                 return;
             }
-            tempVideoFile = std::make_unique<juce::TemporaryFile>(".mp4");
+            
+            // Get the appropriate file extension based on codec
+            juce::String fileExtension = recordingSettings.getFileExtensionForCodec();
+            tempVideoFile = std::make_unique<juce::TemporaryFile>("." + fileExtension);
+            
             juce::String resolution = std::to_string(renderTexture.width) + "x" + std::to_string(renderTexture.height);
             juce::String cmd = "\"" + ffmpegFile.getFullPathName() + "\"" +
                 " -r " + juce::String(recordingSettings.getFrameRate()) +
@@ -436,18 +444,37 @@ void VisualiserComponent::setRecording(bool recording) {
                 " -threads 4" +
                 " -preset " + recordingSettings.getCompressionPreset() +
                 " -y" +
-                " -pix_fmt yuv420p" +
-                " -crf " + juce::String(recordingSettings.getCRF()) +
-#if JUCE_MAC
-    #if JUCE_ARM
-                // use software encoding on Apple Silicon
-                " -c:v hevc_videotoolbox" +
-                " -q:v " + juce::String(recordingSettings.getVideoToolboxQuality()) +
-                " -tag:v hvc1" +
-    #endif
+                " -pix_fmt yuv420p";
+            
+            // Apply codec-specific parameters
+            VideoCodec codec = recordingSettings.getVideoCodec();
+            if (codec == VideoCodec::H264) {
+                cmd += " -c:v libx264";
+                cmd += " -crf " + juce::String(recordingSettings.getCRF());
+            } else if (codec == VideoCodec::H265) {
+                cmd += " -c:v libx265";
+                cmd += " -crf " + juce::String(recordingSettings.getCRF());
+#if JUCE_MAC && JUCE_ARM
+                // use hardware encoding on Apple Silicon
+                cmd += " -c:v hevc_videotoolbox";
+                cmd += " -q:v " + juce::String(recordingSettings.getVideoToolboxQuality());
+                cmd += " -tag:v hvc1";
 #endif
-                " -vf vflip" +
-                " \"" + tempVideoFile->getFile().getFullPathName() + "\"";
+            } else if (codec == VideoCodec::VP9) {
+                cmd += " -c:v libvpx-vp9";
+                cmd += " -b:v 0";
+                cmd += " -crf " + juce::String(recordingSettings.getCRF());
+                cmd += " -deadline good -cpu-used 2";
+            }
+#if JUCE_MAC
+            else if (codec == VideoCodec::ProRes) {
+                cmd += " -c:v prores";
+                cmd += " -profile:v 3"; // ProRes 422 HQ
+            }
+#endif
+            
+            cmd += " -vf vflip";
+            cmd += " \"" + tempVideoFile->getFile().getFullPathName() + "\"";
 
             ffmpegProcess.start(cmd);
             framePixels.resize(renderTexture.width * renderTexture.height * 4);
@@ -472,7 +499,7 @@ void VisualiserComponent::setRecording(bool recording) {
         recordingAudio = false;
         recordingVideo = false;
 
-        juce::String extension = wasRecordingVideo ? "mp4" : "wav";
+        juce::String extension = wasRecordingVideo ? recordingSettings.getFileExtensionForCodec() : "wav";
         if (wasRecordingAudio) {
             audioRecorder.stop();
         }
@@ -522,7 +549,8 @@ void VisualiserComponent::setRecording(bool recording) {
 
 void VisualiserComponent::resized() {
     auto area = getLocalBounds();
-    if (fullScreen && hideButtonRow) {
+    // Apply hideButtonRow logic to both fullscreen and pop-out modes
+    if ((fullScreen || parent != nullptr) && hideButtonRow) {
         buttonRow = area.removeFromBottom(0);
     } else {
         buttonRow = area.removeFromBottom(25);
@@ -531,7 +559,7 @@ void VisualiserComponent::resized() {
     if (parent == nullptr) {
         fullScreenButton.setBounds(buttons.removeFromRight(30));
     }
-    if (child == nullptr && parent == nullptr && !visualiserOnly) {
+    if (child == nullptr && parent == nullptr) {
         popOutButton.setBounds(buttons.removeFromRight(30));
     }
     if (openSettings != nullptr) {
@@ -540,12 +568,15 @@ void VisualiserComponent::resized() {
     } else {
         settingsButton.setVisible(false);
     }
-    if (visualiserOnly && juce::JUCEApplication::isStandaloneApp()) {
+    
+    if (visualiserOnly && juce::JUCEApplication::isStandaloneApp() && child == nullptr) {
         audioInputButton.setBounds(buttons.removeFromRight(30));
     }
+    
 #if SOSCI_FEATURES
     sharedTextureButton.setBounds(buttons.removeFromRight(30));
 #endif
+    
     record.setBounds(buttons.removeFromRight(25));
     if (record.getToggleState()) {
         stopwatch.setVisible(true);
@@ -553,14 +584,20 @@ void VisualiserComponent::resized() {
     } else {
         stopwatch.setVisible(false);
     }
+    
 #if SOSCI_FEATURES
     if (child == nullptr && downloading) {
         auto bounds = buttons.removeFromRight(160);
         ffmpegDownloader.setBounds(bounds.withSizeKeepingCentre(bounds.getWidth() - 10, bounds.getHeight() - 10));
     }
 #endif
+    
     buttons.removeFromRight(10); // padding
-    audioPlayer.setBounds(buttons);
+    
+    if (child == nullptr) {
+        audioPlayer.setBounds(buttons);
+    }
+    
     viewportArea = area;
     viewportChanged(viewportArea);
 }
@@ -580,21 +617,23 @@ void VisualiserComponent::popoutWindow() {
         ffmpegFile,
         settings,
         recordingSettings,
-        this
+        this,
+        visualiserOnly
     );
     visualiser->settings.setLookAndFeel(&getLookAndFeel());
     visualiser->openSettings = openSettings;
     visualiser->closeSettings = closeSettings;
+    // Pop-out visualiser is created with parent set to this component
     child = visualiser;
     childUpdated();
-    visualiser->setSize(300, 325);
+    visualiser->setSize(350, 350);
     popout = std::make_unique<VisualiserWindow>("Software Oscilloscope", this);
     popout->setContentOwned(visualiser, true);
     popout->setUsingNativeTitleBar(true);
     popout->setResizable(true, false);
     popout->setVisible(true);
-    popout->centreWithSize(300, 325);
-    setPaused(true);
+    popout->centreWithSize(350, 350);
+    setPaused(true, false);
     resized();
 }
 
@@ -604,12 +643,14 @@ void VisualiserComponent::childUpdated() {
     ffmpegDownloader.setVisible(child == nullptr);
 #endif
     record.setVisible(child == nullptr);
+    audioPlayer.setVisible(child == nullptr);
     if (child != nullptr) {
         audioProcessor.haltRecording = [this] {
             setRecording(false);
             child->setRecording(false);
         };
     } else {
+        audioPlayer.setup();
         audioProcessor.haltRecording = [this] {
             setRecording(false);
         };

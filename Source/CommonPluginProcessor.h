@@ -4,6 +4,7 @@
     This file contains the basic framework code for a JUCE plugin processor.
 
   ==============================================================================
+
 */
 
 #pragma once
@@ -63,12 +64,25 @@ public:
     std::any getProperty(const std::string& key);
     std::any getProperty(const std::string& key, std::any defaultValue);
     void setProperty(const std::string& key, std::any value);
-
+    
+    // Global settings methods
+    bool getGlobalBoolValue(const juce::String& keyName, bool defaultValue = false) const;
+    int getGlobalIntValue(const juce::String& keyName, int defaultValue = 0) const;
+    double getGlobalDoubleValue(const juce::String& keyName, double defaultValue = 0.0) const;
+    juce::String getGlobalStringValue(const juce::String& keyName, const juce::String& defaultValue = "") const;
+    void setGlobalValue(const juce::String& keyName, const juce::var& value);
+    void removeGlobalValue(const juce::String& keyName);
+    void saveGlobalSettings();
+    
+    bool hasSetSessionStartTime = false;
+    bool programCrashedAndUserWantsToReset();
+    
     juce::SpinLock audioPlayerListenersLock;
     std::vector<AudioPlayerListener*> audioPlayerListeners;
 
     std::atomic<double> volume = 1.0;
     std::atomic<double> threshold = 1.0;
+    BooleanParameter* muteParameter = nullptr;
 
     std::shared_ptr<Effect> volumeEffect = std::make_shared<Effect>(
         [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
@@ -132,6 +146,9 @@ protected:
     
     juce::SpinLock propertiesLock;
     std::unordered_map<std::string, std::any> properties;
+    
+    // Global settings that persist across plugin instances
+    std::unique_ptr<juce::PropertiesFile> globalSettings;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CommonAudioProcessor)

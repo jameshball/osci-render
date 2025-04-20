@@ -2,7 +2,20 @@
 #include "PluginEditor.h"
 #include "CustomStandaloneFilterWindow.h"
 
+void OscirenderAudioProcessorEditor::registerFileRemovedCallback() {
+    audioProcessor.setFileRemovedCallback([this](int index) {
+        removeCodeEditor(index);
+        fileUpdated(audioProcessor.getCurrentFileName());
+        juce::MessageManager::callAsync([this] {
+            resized();
+        });
+    });
+}
+
 OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p) : CommonPluginEditor(p, "osci-render", "osci", 1100, 750), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white) {
+    // Register the file removal callback
+    registerFileRemovedCallback();
+
 #if !SOSCI_FEATURES
     addAndMakeVisible(upgradeButton);
     upgradeButton.onClick = [this] {
@@ -85,6 +98,9 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
+    // Clear the file removal callback
+    audioProcessor.setFileRemovedCallback(nullptr);
+
     menuBar.setModel(nullptr);
     juce::MessageManagerLock lock;
     audioProcessor.broadcaster.removeChangeListener(this);

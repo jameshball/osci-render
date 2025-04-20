@@ -4,6 +4,7 @@
 #include "../CommonPluginProcessor.h"
 #include "../LookAndFeel.h"
 #include "../concurrency/AudioBackgroundThread.h"
+#include "SvgButton.h"
 
 class ThumbRadiusLookAndFeel : public OscirenderLookAndFeel {
 public:
@@ -88,7 +89,7 @@ private:
     ThresholdLookAndFeel thresholdLookAndFeel{7};
 	juce::Slider thresholdSlider;
 
-    std::unique_ptr<juce::Drawable> volumeIcon;
+    SvgButton volumeButton = SvgButton("VolumeButton", BinaryData::volume_svg, juce::Colours::white, juce::Colours::red, audioProcessor.muteParameter, BinaryData::mute_svg);
     std::unique_ptr<juce::Drawable> thresholdIcon;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VolumeComponent)

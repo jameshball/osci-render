@@ -69,6 +69,12 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             point.x = juce::jmax(-threshold, juce::jmin(threshold.load(), point.x));
             point.y = juce::jmax(-threshold, juce::jmin(threshold.load(), point.y));
 
+            // Apply mute if active
+            if (muteParameter->getBoolValue()) {
+                point.x = 0.0;
+                point.y = 0.0;
+            }
+
             // this is the point that the volume component will draw (i.e. post scale/clipping)
             threadManager.write(point, "VolumeComponent");
         }
@@ -129,6 +135,10 @@ void SosciAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
 }
 
 void SosciAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
+    if (juce::JUCEApplicationBase::isStandaloneApp() && programCrashedAndUserWantsToReset()) {
+        return;
+    }
+
     std::unique_ptr<juce::XmlElement> xml;
 
     const uint32_t magicXmlNumber = 0x21324356;

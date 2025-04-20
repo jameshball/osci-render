@@ -15,7 +15,7 @@ class FileParser {
 public:
 	FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce::String, juce::String)> errorCallback = nullptr);
 
-	void parse(juce::String fileName, juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font font);
+	void parse(juce::String fileId, juce::String fileName, juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font font);
 	std::vector<std::unique_ptr<Shape>> nextFrame();
 	OsciPoint nextSample(lua_State*& L, LuaVariables& vars);
 	void closeLua(lua_State*& L);
@@ -39,7 +39,6 @@ private:
 
 	bool active = true;
 	bool sampleSource = false;
-
 	juce::SpinLock lock;
 
 	std::shared_ptr<WorldObject> object;

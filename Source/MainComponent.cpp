@@ -41,9 +41,7 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 		if (index == -1) {
 			return;
 		}
-		pluginEditor.removeCodeEditor(audioProcessor.getCurrentFileIndex());
 		audioProcessor.removeFile(audioProcessor.getCurrentFileIndex());
-		pluginEditor.fileUpdated(audioProcessor.getCurrentFileName());
 	};
 
 	closeFileButton.setTooltip("Close the currently open file.");
