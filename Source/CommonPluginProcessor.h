@@ -124,7 +124,10 @@ public:
     // shouldn't be accessed by audio thread, but needs to persist when GUI is closed
     // so should only be accessed by message thread
     juce::String currentProjectFile;
-    juce::File lastOpenedDirectory = juce::File::getSpecialLocation(juce::File::userHomeDirectory);
+    
+    // Methods to get/set the last opened directory as a global setting
+    juce::File getLastOpenedDirectory();
+    void setLastOpenedDirectory(const juce::File& directory);
 
 protected:
     

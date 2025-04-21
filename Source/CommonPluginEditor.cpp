@@ -139,13 +139,13 @@ void CommonPluginEditor::openProject(const juce::File& file) {
             audioProcessor.setStateInformation(data.getData(), data.getSize());
         }
         audioProcessor.currentProjectFile = file.getFullPathName();
-        audioProcessor.lastOpenedDirectory = file.getParentDirectory();
+        audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
         updateTitle();
     }
 }
 
 void CommonPluginEditor::openProject() {
-    chooser = std::make_unique<juce::FileChooser>("Load " + appName + " Project", audioProcessor.lastOpenedDirectory, "*." + projectFileType);
+    chooser = std::make_unique<juce::FileChooser>("Load " + appName + " Project", audioProcessor.getLastOpenedDirectory(), "*." + projectFileType);
     auto flags = juce::FileBrowserComponent::openMode |
         juce::FileBrowserComponent::canSelectFiles;
 
@@ -168,12 +168,13 @@ void CommonPluginEditor::saveProject() {
 }
 
 void CommonPluginEditor::saveProjectAs() {
-    chooser = std::make_unique<juce::FileChooser>("Save " + appName + " Project", audioProcessor.lastOpenedDirectory, "*." + projectFileType);
+    chooser = std::make_unique<juce::FileChooser>("Save " + appName + " Project", audioProcessor.getLastOpenedDirectory(), "*." + projectFileType);
     auto flags = juce::FileBrowserComponent::saveMode;
 
     chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
         auto file = chooser.getResult();
         if (file != juce::File()) {
+            audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
             audioProcessor.currentProjectFile = file.getFullPathName();
             saveProject();
         }

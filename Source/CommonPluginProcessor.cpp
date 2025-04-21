@@ -361,6 +361,28 @@ void CommonAudioProcessor::saveGlobalSettings()
         globalSettings->saveIfNeeded();
 }
 
+juce::File CommonAudioProcessor::getLastOpenedDirectory()
+{
+    juce::String savedDir = getGlobalStringValue("lastOpenedDirectory");
+    if (savedDir.isEmpty())
+        return juce::File::getSpecialLocation(juce::File::userHomeDirectory);
+    
+    juce::File dir(savedDir);
+    if (dir.exists() && dir.isDirectory())
+        return dir;
+    
+    return juce::File::getSpecialLocation(juce::File::userHomeDirectory);
+}
+
+void CommonAudioProcessor::setLastOpenedDirectory(const juce::File& directory)
+{
+    if (directory.exists() && directory.isDirectory())
+    {
+        setGlobalValue("lastOpenedDirectory", directory.getFullPathName());
+        saveGlobalSettings();
+    }
+}
+
 bool CommonAudioProcessor::programCrashedAndUserWantsToReset() {
     bool userWantsToReset = false;
     

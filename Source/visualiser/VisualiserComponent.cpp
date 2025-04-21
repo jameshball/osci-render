@@ -510,7 +510,7 @@ void VisualiserComponent::setRecording(bool recording) {
         audioRecorder.stop();
         juce::String extension = "wav";
 #endif
-        chooser = std::make_unique<juce::FileChooser>("Save recording", audioProcessor.lastOpenedDirectory, "*." + extension);
+        chooser = std::make_unique<juce::FileChooser>("Save recording", audioProcessor.getLastOpenedDirectory(), "*." + extension);
         auto flags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting;
 
 #if SOSCI_FEATURES
@@ -525,7 +525,7 @@ void VisualiserComponent::setRecording(bool recording) {
                 } else if (wasRecordingVideo) {
                     tempVideoFile->getFile().copyFileTo(file);
                 }
-                audioProcessor.lastOpenedDirectory = file.getParentDirectory();
+                audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
             }
         });
 #else
@@ -533,7 +533,7 @@ void VisualiserComponent::setRecording(bool recording) {
             auto file = chooser.getResult();
             if (file != juce::File()) {
                 tempAudioFile->getFile().copyFileTo(file);
-                audioProcessor.lastOpenedDirectory = file.getParentDirectory();
+                audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
             }
         });
 #endif
