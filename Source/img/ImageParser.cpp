@@ -1,10 +1,12 @@
 #include "ImageParser.h"
 #include "gifdec.h"
 #include "../PluginProcessor.h"
+#include "../CommonPluginEditor.h"
 
 ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, juce::MemoryBlock image) : audioProcessor(p) {
-    juce::TemporaryFile temp{".gif"};
-    juce::File file = temp.getFile();
+    // Set up the temporary file
+    temp = std::make_unique<juce::TemporaryFile>();
+    juce::File file = temp->getFile();
 
     {
         juce::FileOutputStream output(file);
@@ -13,74 +15,24 @@ ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, ju
             output.write(image.getData(), image.getSize());
             output.flush();
         } else {
-            handleError("The image could not be loaded.");
+            handleError("The file could not be loaded.");
             return;
         }
     }
     
     if (extension.equalsIgnoreCase(".gif")) {
-        juce::String fileName = file.getFullPathName();
-        gd_GIF *gif = gd_open_gif(fileName.toRawUTF8());
-
-        if (gif != nullptr) {
-            width = gif->width;
-            height = gif->height;
-            int frameSize = width * height;
-            std::vector<uint8_t> tempBuffer = std::vector<uint8_t>(frameSize * 3);
-            visited = std::vector<bool>(frameSize, false);
-
-            int i = 0;
-            while (gd_get_frame(gif) > 0) {
-                gd_render_frame(gif, tempBuffer.data());
-
-                frames.emplace_back(std::vector<uint8_t>(frameSize));
-
-                uint8_t *pixels = tempBuffer.data();
-                for (int j = 0; j < tempBuffer.size(); j += 3) {
-                    uint8_t avg = (pixels[j] + pixels[j + 1] + pixels[j + 2]) / 3;
-                    // value of 0 is reserved for transparent pixels
-                    frames[i][j / 3] = juce::jmax(1, (int) avg);
-                }
-
-                i++;
-            }
-
-            gd_close_gif(gif);
-        } else {
-            handleError("The image could not be loaded. Please try optimising the GIF with https://ezgif.com/optimize.");
-            return;
-        }
+        processGifFile(file);
+    } else if (isVideoFile(extension)) {
+        processVideoFile(file);
     } else {
-        juce::Image image = juce::ImageFileFormat::loadFrom(file);
-        if (image.isValid()) {
-            image.desaturate();
-            
-            width = image.getWidth();
-            height = image.getHeight();
-            int frameSize = width * height;
-            
-            visited = std::vector<bool>(frameSize, false);
-            frames.emplace_back(std::vector<uint8_t>(frameSize));
-            
-            for (int x = 0; x < width; x++) {
-                for (int y = 0; y < height; y++) {
-                    juce::Colour pixel = image.getPixelAt(x, y);
-                    int index = y * width + x;
-                    // RGB should be equal since we have desaturated
-                    int value = pixel.getRed();
-                    // value of 0 is reserved for transparent pixels
-                    frames[0][index] = pixel.isTransparent() ? 0 : juce::jmax(1, value);
-                }
-            }
-        } else {
-            handleError("The image could not be loaded.");
-            return;
-        }
+        processImageFile(file);
     }
     
     if (frames.size() == 0) {
         if (extension.equalsIgnoreCase(".gif")) {
             handleError("The image could not be loaded. Please try optimising the GIF with https://ezgif.com/optimize.");
+        } else if (isVideoFile(extension)) {
+            handleError("The video could not be loaded. Please check that ffmpeg is installed.");
         } else {
             handleError("The image could not be loaded.");
         }
@@ -90,7 +42,202 @@ ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, ju
     setFrame(0);
 }
 
-ImageParser::~ImageParser() {}
+bool ImageParser::isVideoFile(const juce::String& extension) const {
+    return extension.equalsIgnoreCase(".mp4") || extension.equalsIgnoreCase(".mov");
+}
+
+void ImageParser::processGifFile(juce::File& file) {
+    juce::String fileName = file.getFullPathName();
+    gd_GIF *gif = gd_open_gif(fileName.toRawUTF8());
+
+    if (gif != nullptr) {
+        width = gif->width;
+        height = gif->height;
+        int frameSize = width * height;
+        std::vector<uint8_t> tempBuffer = std::vector<uint8_t>(frameSize * 3);
+        visited = std::vector<bool>(frameSize, false);
+
+        int i = 0;
+        while (gd_get_frame(gif) > 0) {
+            gd_render_frame(gif, tempBuffer.data());
+
+            frames.emplace_back(std::vector<uint8_t>(frameSize));
+
+            uint8_t *pixels = tempBuffer.data();
+            for (int j = 0; j < tempBuffer.size(); j += 3) {
+                uint8_t avg = (pixels[j] + pixels[j + 1] + pixels[j + 2]) / 3;
+                // value of 0 is reserved for transparent pixels
+                frames[i][j / 3] = juce::jmax(1, (int) avg);
+            }
+
+            i++;
+        }
+
+        gd_close_gif(gif);
+    } else {
+        handleError("The GIF could not be loaded. Please try optimising the GIF with https://ezgif.com/optimize.");
+    }
+}
+
+void ImageParser::processImageFile(juce::File& file) {
+    juce::Image image = juce::ImageFileFormat::loadFrom(file);
+    if (image.isValid()) {
+        image.desaturate();
+        
+        width = image.getWidth();
+        height = image.getHeight();
+        int frameSize = width * height;
+        
+        visited = std::vector<bool>(frameSize, false);
+        frames.emplace_back(std::vector<uint8_t>(frameSize));
+        
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                juce::Colour pixel = image.getPixelAt(x, y);
+                int index = y * width + x;
+                // RGB should be equal since we have desaturated
+                int value = pixel.getRed();
+                // value of 0 is reserved for transparent pixels
+                frames[0][index] = pixel.isTransparent() ? 0 : juce::jmax(1, value);
+            }
+        }
+    } else {
+        handleError("The image could not be loaded.");
+    }
+}
+
+void ImageParser::processVideoFile(juce::File& file) {
+    // Set video processing flag
+    isVideo = true;
+    
+    // assert on the message thread
+    if (!juce::MessageManager::getInstance()->isThisTheMessageThread()) {
+        handleError("Could not process video file - not on the message thread.");
+        return;
+    }
+    
+    // Try to get ffmpeg 
+    juce::File ffmpegFile = audioProcessor.getFFmpegFile();
+    
+    if (ffmpegFile.exists()) {
+        // FFmpeg exists, continue with video processing
+        if (!loadAllVideoFrames(file, ffmpegFile)) {
+            handleError("Could not read video frames. Please ensure the video file is valid.");
+        }
+    } else {
+        // Ask user to download ffmpeg
+        audioProcessor.ensureFFmpegExists(nullptr, [this, file]() {
+            // This will be called once ffmpeg is successfully downloaded
+            juce::File ffmpegFile = audioProcessor.getFFmpegFile();
+            if (!loadAllVideoFrames(file, ffmpegFile)) {
+                handleError("Could not read video frames after downloading ffmpeg. Please ensure the video file is valid.");
+            } else {
+                // Successfully loaded frames after downloading ffmpeg
+                if (frames.size() > 0) {
+                    setFrame(0);
+                }
+            }
+        });
+    }
+}
+
+bool ImageParser::loadAllVideoFrames(const juce::File& file, const juce::File& ffmpegFile) {
+    juce::String altCmd = "\"" + ffmpegFile.getFullPathName() + "\" -i \"" + file.getFullPathName() +
+                   "\" -hide_banner 2>&1";
+    
+    ffmpegProcess.start(altCmd);
+    
+    char altBuf[2048];
+    memset(altBuf, 0, sizeof(altBuf));
+    size_t altSize = ffmpegProcess.read(altBuf, sizeof(altBuf) - 1);
+    ffmpegProcess.close();
+    
+    if (altSize > 0) {
+        juce::String output(altBuf, altSize);
+        
+        // Look for resolution in format "1920x1080"
+        std::regex resolutionRegex(R"((\d{2,5})x(\d{2,5}))");
+        std::smatch match;
+        std::string stdOut = output.toStdString();
+
+        if (std::regex_search(stdOut, match, resolutionRegex) && match.size() == 3)
+        {
+            width = std::stoi(match[1].str());
+            height = std::stoi(match[2].str());
+        }
+    }
+    
+    // If still no dimensions, use defaults
+    if (width <= 0 || height <= 0) {
+        width = 640;
+        height = 360;
+    }
+    
+    // Now prepare for frame reading
+    int frameSize = width * height;
+    videoFrameSize = frameSize;
+    visited = std::vector<bool>(frameSize, false);
+    frameBuffer.resize(frameSize);
+    
+    // Clear any existing frames
+    frames.clear();
+    
+    // Cap the number of frames to prevent excessive memory usage
+    const int MAX_FRAMES = 10000;
+    
+    // Start ffmpeg process to read frames
+    juce::String cmd = "\"" + ffmpegFile.getFullPathName() + "\" -i \"" + file.getFullPathName() + 
+                  "\" -f rawvideo -pix_fmt gray -v error -stats pipe:1";
+    
+    ffmpegProcess.start(cmd);
+    
+    if (!ffmpegProcess.isRunning()) {
+        return false;
+    }
+    
+    // Read all frames into memory
+    int framesRead = 0;
+    
+    // Flag to indicate which frames to save (first, middle, last)
+    bool shouldSaveFrame = false;
+    
+    // Create debug directory in user documents
+    juce::File debugDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("osci-render-debug");
+    if (!debugDir.exists()) {
+        debugDir.createDirectory();
+    }
+    
+    while (framesRead < MAX_FRAMES) {
+        size_t bytesRead = ffmpegProcess.read(frameBuffer.data(), frameBuffer.size());
+        
+        if (bytesRead != frameBuffer.size()) {
+            break; // End of video or error
+        }
+        
+        // Create a new frame
+        frames.emplace_back(std::vector<uint8_t>(videoFrameSize));
+        
+        // Copy data to the current frame
+        for (int i = 0; i < videoFrameSize; i++) {
+            // value of 0 is reserved for transparent pixels
+            frames.back()[i] = juce::jmax(1, (int)frameBuffer[i]);
+        }
+        
+        framesRead++;
+    }
+    
+    // Close the ffmpeg process
+    ffmpegProcess.close();
+    
+    // Return true if we successfully loaded at least one frame
+    return frames.size() > 0;
+}
+
+ImageParser::~ImageParser() {
+    if (ffmpegProcess.isRunning()) {
+        ffmpegProcess.close();
+    }
+}
 
 void ImageParser::handleError(juce::String message) {
     juce::MessageManager::callAsync([this, message] {
@@ -106,7 +253,9 @@ void ImageParser::handleError(juce::String message) {
 void ImageParser::setFrame(int index) {
     // Ensure that the frame number is within the bounds of the number of frames
     // This weird modulo trick is to handle negative numbers
-    frameIndex = (frames.size() + (index % frames.size())) % frames.size();
+    index = (frames.size() + (index % frames.size())) % frames.size();
+    
+    frameIndex = index;
     resetPosition();
     std::fill(visited.begin(), visited.end(), false);
 }
@@ -123,7 +272,7 @@ void ImageParser::resetPosition() {
 
 float ImageParser::getPixelValue(int x, int y, bool invert) {
     int index = (height - y - 1) * width + x;
-    if (index < 0 || index >= frames[frameIndex].size()) {
+    if (index < 0 || frames.size() <= 0 || index >= frames[frameIndex].size()) {
         return 0;
     }
     float pixel = frames[frameIndex][index] / (float) std::numeric_limits<uint8_t>::max();

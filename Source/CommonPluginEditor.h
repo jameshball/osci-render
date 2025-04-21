@@ -8,6 +8,7 @@
 #include "components/SosciMainMenuBarModel.h"
 #include "components/SvgButton.h"
 #include "components/VolumeComponent.h"
+#include "components/DownloaderComponent.h"
 
 class CommonPluginEditor : public juce::AudioProcessorEditor {
 public:
@@ -30,19 +31,6 @@ public:
 private:
     CommonAudioProcessor& audioProcessor;
     bool fullScreen = false;
-    
-    juce::File applicationFolder = juce::File::getSpecialLocation(juce::File::SpecialLocationType::userApplicationDataDirectory)
-#if JUCE_MAC
-        .getChildFile("Application Support")
-#endif
-        .getChildFile("osci-render");
-
-    juce::String ffmpegFileName =
-#if JUCE_WINDOWS
-        "ffmpeg.exe";
-#else
-        "ffmpeg";
-#endif
 public:
     OscirenderLookAndFeel lookAndFeel;
 
@@ -51,6 +39,7 @@ public:
     juce::String currentFileName;
     
 #if SOSCI_FEATURES
+    DownloaderComponent ffmpegDownloader;
     SharedTextureManager sharedTextureManager;
 #endif
 
@@ -65,10 +54,11 @@ public:
     SettingsWindow recordingSettingsWindow = SettingsWindow("Recording Settings", recordingSettings, 330, 350, 330, 350);
     VisualiserComponent visualiser{
         audioProcessor,
+        *this,
 #if SOSCI_FEATURES
         sharedTextureManager,
 #endif
-        applicationFolder.getChildFile(ffmpegFileName),
+        audioProcessor.applicationFolder.getChildFile(audioProcessor.ffmpegFileName),
         visualiserSettings,
         recordingSettings,
         nullptr,

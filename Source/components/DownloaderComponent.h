@@ -21,14 +21,16 @@ private:
 
 class DownloaderComponent : public juce::Component, public juce::Thread, public juce::URL::DownloadTaskListener {
 public:
-    DownloaderComponent(juce::URL url, juce::File file);
+    DownloaderComponent();
 
+    void setup(juce::URL url, juce::File file);
     void download();
     void run() override;
     void threadComplete();
     void resized() override;
     void finished(juce::URL::DownloadTask* task, bool success) override;
     void progress(juce::URL::DownloadTask* task, juce::int64 bytesDownloaded, juce::int64 totalLength) override;
+    bool isDownloading() const { return task != nullptr && !task->isFinished(); }
     
     std::function<void()> onSuccessfulDownload;
 

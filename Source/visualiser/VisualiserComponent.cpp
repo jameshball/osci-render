@@ -1,6 +1,7 @@
 #include "../LookAndFeel.h"
 #include "VisualiserComponent.h"
 #include "../CommonPluginProcessor.h"
+#include "../CommonPluginEditor.h"
 
 #include "AfterglowFragmentShader.glsl"
 #include "AfterglowVertexShader.glsl"
@@ -21,6 +22,7 @@
 
 VisualiserComponent::VisualiserComponent(
     CommonAudioProcessor& processor,
+    CommonPluginEditor& pluginEditor,
 #if SOSCI_FEATURES
     SharedTextureManager& sharedTextureManager,
 #endif
@@ -38,22 +40,10 @@ VisualiserComponent::VisualiserComponent(
     recordingSettings(recordingSettings),
     visualiserOnly(visualiserOnly),
     AudioBackgroundThread("VisualiserComponent" + juce::String(parent != nullptr ? " Child" : ""), processor.threadManager),
-    parent(parent) {
+    parent(parent),
+    editor(pluginEditor) {
 #if SOSCI_FEATURES
-    addAndMakeVisible(ffmpegDownloader);
-    
-    ffmpegDownloader.onSuccessfulDownload = [this] {
-        juce::MessageManager::callAsync([this] {
-            record.setEnabled(true);
-            juce::Timer::callAfterDelay(3000, [this] {
-                juce::MessageManager::callAsync([this] {
-                    ffmpegDownloader.setVisible(false);
-                    downloading = false;
-                    resized();
-                });
-            });
-        });
-    };
+    addAndMakeVisible(editor.ffmpegDownloader);
 #endif
     
     audioProcessor.haltRecording = [this] {
@@ -407,25 +397,26 @@ void VisualiserComponent::setRecording(bool recording) {
         }
 
         if (recordingVideo) {
-            if (!ffmpegFile.exists()) {
-                // ask the user if they want to download ffmpeg
-                juce::MessageBoxOptions options = juce::MessageBoxOptions()
-                    .withTitle("Recording requires FFmpeg")
-                    .withMessage("FFmpeg is required to record video to .mp4.\n\nWould you like to download it now?")
-                    .withButton("Yes")
-                    .withButton("No")
-                    .withIconType(juce::AlertWindow::QuestionIcon)
-                    .withAssociatedComponent(this);
-
-                juce::AlertWindow::showAsync(options, [this](int result) {
-                    if (result == 1) {
-                        record.setEnabled(false);
-                        ffmpegDownloader.download();
-                        ffmpegDownloader.setVisible(true);
-                        downloading = true;
-                        resized();
-                    }
+            auto onDownloadSuccess = [this] {
+                juce::MessageManager::callAsync([this] {
+                    record.setEnabled(true);
+                    juce::Timer::callAfterDelay(3000, [this] {
+                        juce::MessageManager::callAsync([this] {
+                            editor.ffmpegDownloader.setVisible(false);
+                            downloading = false;
+                            resized();
+                        });
                     });
+                });
+            };
+            auto onDownloadStart = [this] {
+                juce::MessageManager::callAsync([this] {
+                    record.setEnabled(false);
+                    downloading = true;
+                    resized();
+                });
+            };
+            if (!audioProcessor.ensureFFmpegExists(onDownloadStart, onDownloadSuccess)) {
                 record.setToggleState(false, juce::NotificationType::dontSendNotification);
                 return;
             }
@@ -588,7 +579,7 @@ void VisualiserComponent::resized() {
 #if SOSCI_FEATURES
     if (child == nullptr && downloading) {
         auto bounds = buttons.removeFromRight(160);
-        ffmpegDownloader.setBounds(bounds.withSizeKeepingCentre(bounds.getWidth() - 10, bounds.getHeight() - 10));
+        editor.ffmpegDownloader.setBounds(bounds.withSizeKeepingCentre(bounds.getWidth() - 10, bounds.getHeight() - 10));
     }
 #endif
     
@@ -611,6 +602,7 @@ void VisualiserComponent::popoutWindow() {
     setRecording(false);
     auto visualiser = new VisualiserComponent(
         audioProcessor,
+        editor,
 #if SOSCI_FEATURES
         sharedTextureManager,
 #endif
@@ -640,7 +632,7 @@ void VisualiserComponent::popoutWindow() {
 void VisualiserComponent::childUpdated() {
     popOutButton.setVisible(child == nullptr);
 #if SOSCI_FEATURES
-    ffmpegDownloader.setVisible(child == nullptr);
+    editor.ffmpegDownloader.setVisible(child == nullptr);
 #endif
     record.setVisible(child == nullptr);
     audioPlayer.setVisible(child == nullptr);

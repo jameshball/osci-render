@@ -32,11 +32,13 @@ struct Texture {
 };
 
 class CommonAudioProcessor;
+class CommonPluginEditor;
 class VisualiserWindow;
 class VisualiserComponent : public juce::Component, public AudioBackgroundThread, public juce::MouseListener, public juce::OpenGLRenderer, public juce::AsyncUpdater {
 public:
     VisualiserComponent(
         CommonAudioProcessor& processor,
+        CommonPluginEditor& editor,
 #if SOSCI_FEATURES
         SharedTextureManager& sharedTextureManager,
 #endif
@@ -80,6 +82,7 @@ public:
 
 private:
     CommonAudioProcessor& audioProcessor;
+    CommonPluginEditor& editor;
 
     float intensity;
     
@@ -117,37 +120,6 @@ private:
     std::vector<unsigned char> framePixels;
     WriteProcess ffmpegProcess;
     std::unique_ptr<juce::TemporaryFile> tempVideoFile;
-    
-    juce::String ffmpegURL = juce::String("https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/") +
-#if JUCE_WINDOWS
-    #if JUCE_64BIT
-        "ffmpeg-win32-x64"
-    #elif JUCE_32BIT
-        "ffmpeg-win32-ia32"
-    #endif
-#elif JUCE_MAC
-    #if JUCE_ARM
-        "ffmpeg-darwin-arm64"
-    #elif JUCE_INTEL
-        "ffmpeg-darwin-x64"
-    #endif
-#elif JUCE_LINUX
-    #if JUCE_ARM
-        #if JUCE_64BIT
-            "ffmpeg-linux-arm64"
-        #elif JUCE_32BIT
-            "ffmpeg-linux-arm"
-        #endif
-    #elif JUCE_INTEL
-        #if JUCE_64BIT
-            "ffmpeg-linux-x64"
-        #elif JUCE_32BIT
-            "ffmpeg-linux-ia32"
-        #endif
-    #endif
-#endif
-    + ".gz";
-    DownloaderComponent ffmpegDownloader{ffmpegURL, ffmpegFile};
 #endif
     
     StopwatchComponent stopwatch;

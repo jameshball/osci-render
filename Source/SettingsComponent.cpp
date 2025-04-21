@@ -75,14 +75,14 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
     juce::String extension = fileName.fromLastOccurrenceOf(".", true, false).toLowerCase();
     txt.setVisible(false);
     frame.setVisible(false);
-    bool isImage =  extension == ".gif" || extension == ".png" || extension == ".jpg" || extension == ".jpeg";
+    bool isImage =  extension == ".gif" || extension == ".png" || extension == ".jpg" || extension == ".jpeg" || extension == ".mov" || extension == ".mp4";
     if (fileName.isEmpty() || audioProcessor.objectServerRendering) {
         // do nothing
     } else if (extension == ".txt") {
         txt.setVisible(true);
     } else if (extension == ".gpla" || isImage) {
         frame.setVisible(true);
-        frame.setAnimated(extension == ".gpla" || extension == ".gif");
+        frame.setAnimated(extension == ".gpla" || extension == ".gif" || extension == ".mov" || extension == ".mp4");
         frame.setImage(isImage);
         frame.resized();
     }

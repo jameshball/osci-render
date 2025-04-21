@@ -10,7 +10,7 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
     fileButton.setButtonText("Choose File(s)");
     
 	fileButton.onClick = [this] {
-		chooser = std::make_unique<juce::FileChooser>("Open", audioProcessor.getLastOpenedDirectory(), "*.obj;*.svg;*.lua;*.txt;*.gpla;*.gif;*.png;*.jpg;*.jpeg;*.wav;*.aiff;*.ogg;*.flac;*.mp3");
+		chooser = std::make_unique<juce::FileChooser>("Open", audioProcessor.getLastOpenedDirectory(), "*.obj;*.svg;*.lua;*.txt;*.gpla;*.gif;*.png;*.jpg;*.jpeg;*.wav;*.aiff;*.ogg;*.flac;*.mp3;*.mp4;*.mov");
 		auto flags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectMultipleItems |
             juce::FileBrowserComponent::canSelectFiles;
 

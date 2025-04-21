@@ -93,7 +93,7 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 			stream->setPosition(0);
 			gpla = std::make_shared<LineArtParser>(stream->readEntireStreamAsString());
 		}
-	} else if (extension == ".gif" || extension == ".png" || extension == ".jpg" || extension == ".jpeg") {
+	} else if (extension == ".gif" || extension == ".png" || extension == ".jpg" || extension == ".jpeg" || extension == ".mp4" || extension == ".mov") {
 		juce::MemoryBlock buffer{};
 		int bytesRead = stream->readIntoMemoryBlock(buffer);
 		img = std::make_shared<ImageParser>(audioProcessor, extension, buffer);
@@ -108,7 +108,7 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
         }
 	}
 
-	isAnimatable = gpla != nullptr || (img != nullptr && extension == ".gif");
+	isAnimatable = gpla != nullptr || (img != nullptr && (extension == ".gif" || extension == ".mp4" || extension == ".mov"));
 	sampleSource = lua != nullptr || img != nullptr || wav != nullptr;
 }
 

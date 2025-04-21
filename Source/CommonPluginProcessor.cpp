@@ -17,6 +17,10 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
      : AudioProcessor(busesProperties)
 #endif
 {
+    if (!applicationFolder.exists()) {
+        applicationFolder.createDirectory();
+    }
+
     // Initialize the global settings with the plugin name
     juce::PropertiesFile::Options options;
     options.applicationName = JucePlugin_Name + juce::String("_globals");
@@ -422,4 +426,86 @@ bool CommonAudioProcessor::programCrashedAndUserWantsToReset() {
     }
     
     return userWantsToReset;
+}
+
+juce::String CommonAudioProcessor::getFFmpegURL() {
+    juce::String ffmpegURL = juce::String("https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/") +
+#if JUCE_WINDOWS
+    #if JUCE_64BIT
+        "ffmpeg-win32-x64"
+    #elif JUCE_32BIT
+        "ffmpeg-win32-ia32"
+    #endif
+#elif JUCE_MAC
+    #if JUCE_ARM
+        "ffmpeg-darwin-arm64"
+    #elif JUCE_INTEL
+        "ffmpeg-darwin-x64"
+    #endif
+#elif JUCE_LINUX
+    #if JUCE_ARM
+        #if JUCE_64BIT
+            "ffmpeg-linux-arm64"
+        #elif JUCE_32BIT
+            "ffmpeg-linux-arm"
+        #endif
+    #elif JUCE_INTEL
+        #if JUCE_64BIT
+            "ffmpeg-linux-x64"
+        #elif JUCE_32BIT
+            "ffmpeg-linux-ia32"
+        #endif
+    #endif
+#endif
+    + ".gz";
+    
+    return ffmpegURL;
+}
+
+bool CommonAudioProcessor::ensureFFmpegExists(std::function<void()> onStart, std::function<void()> onSuccess) {
+    juce::File ffmpegFile = getFFmpegFile();
+    
+    if (ffmpegFile.exists()) {
+        // FFmpeg already exists
+        if (onSuccess != nullptr) {
+            onSuccess();
+        }
+        return true;
+    }
+
+    auto editor = dynamic_cast<CommonPluginEditor*>(getActiveEditor());
+    if (editor == nullptr) {
+        return false; // Editor not found
+    }
+    
+    juce::String url = getFFmpegURL();
+    editor->ffmpegDownloader.setup(url, ffmpegFile);
+    
+    editor->ffmpegDownloader.onSuccessfulDownload = [this, onSuccess]() {
+        if (onSuccess != nullptr) {
+            juce::MessageManager::callAsync(onSuccess);
+        }
+    };
+
+    // Ask the user if they want to download ffmpeg
+    juce::MessageBoxOptions options = juce::MessageBoxOptions()
+        .withTitle("FFmpeg Required")
+        .withMessage("FFmpeg is required to process video files.\n\nWould you like to download it now?")
+        .withButton("Yes")
+        .withButton("No")
+        .withIconType(juce::AlertWindow::QuestionIcon)
+        .withAssociatedComponent(editor);
+
+    juce::AlertWindow::showAsync(options, [this, onStart, editor](int result) {
+        if (result == 1) {  // Yes
+            editor->ffmpegDownloader.setVisible(true);
+            editor->ffmpegDownloader.download();
+            if (onStart != nullptr) {
+                onStart();
+            }
+            editor->resized();
+        }
+    });
+    
+    return false;
 }

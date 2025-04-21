@@ -65,6 +65,15 @@ public:
     std::any getProperty(const std::string& key, std::any defaultValue);
     void setProperty(const std::string& key, std::any value);
     
+    // Get the ffmpeg binary file
+    juce::File getFFmpegFile() const { return applicationFolder.getChildFile(ffmpegFileName); }
+    
+    // Check if ffmpeg exists, if not download it
+    bool ensureFFmpegExists(std::function<void()> onStart = nullptr, std::function<void()> onSuccess = nullptr);
+    
+    // A static method to get the appropriate ffmpeg URL based on platform
+    static juce::String getFFmpegURL();
+    
     // Global settings methods
     bool getGlobalBoolValue(const juce::String& keyName, bool defaultValue = false) const;
     int getGlobalIntValue(const juce::String& keyName, int defaultValue = 0) const;
@@ -128,6 +137,19 @@ public:
     // Methods to get/set the last opened directory as a global setting
     juce::File getLastOpenedDirectory();
     void setLastOpenedDirectory(const juce::File& directory);
+
+    juce::File applicationFolder = juce::File::getSpecialLocation(juce::File::SpecialLocationType::userApplicationDataDirectory)
+#if JUCE_MAC
+        .getChildFile("Application Support")
+#endif
+        .getChildFile("osci-render");
+    
+    juce::String ffmpegFileName =
+#if JUCE_WINDOWS
+        "ffmpeg.exe";
+#else
+        "ffmpeg";
+#endif
 
 protected:
     
