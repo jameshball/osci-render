@@ -35,7 +35,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
         }
     }
     
-    addAndMakeVisible(visualiser);
+    addChildComponent(visualiser);
     
     int width = std::any_cast<int>(audioProcessor.getProperty("appWidth", defaultWidth));
     int height = std::any_cast<int>(audioProcessor.getProperty("appHeight", defaultHeight));

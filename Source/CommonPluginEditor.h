@@ -9,6 +9,7 @@
 #include "components/SvgButton.h"
 #include "components/VolumeComponent.h"
 #include "components/DownloaderComponent.h"
+#include "components/LicenseRegistrationComponent.h"
 
 class CommonPluginEditor : public juce::AudioProcessorEditor {
 public:
@@ -68,11 +69,12 @@ public:
     VolumeComponent volume{audioProcessor};
 
     std::unique_ptr<juce::FileChooser> chooser;
-    juce::MenuBarComponent menuBar;
-
-    juce::TooltipWindow tooltipWindow{nullptr, 0};
+    juce::MenuBarComponent menuBar;    juce::TooltipWindow tooltipWindow{nullptr, 0};
     juce::DropShadower tooltipDropShadow{juce::DropShadow(juce::Colours::black.withAlpha(0.5f), 6, {0,0})};
 
+    LicenseRegistrationComponent licenseRegistration {audioProcessor, [this](bool success) {
+        visualiser.setVisible(success);
+    }};
     bool usingNativeMenuBar = false;
 
 #if JUCE_LINUX

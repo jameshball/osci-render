@@ -77,7 +77,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 
     addAndMakeVisible(lua);
     addAndMakeVisible(luaResizerBar);
-    addAndMakeVisible(visualiser);
+    addChildComponent(visualiser);
 
     visualiser.openSettings = [this] {
         openVisualiserSettings();
@@ -95,6 +95,9 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 #endif
 
     initialiseMenuBar(model);
+    
+    addAndMakeVisible(licenseRegistration);
+    licenseRegistration.toFront(true);
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
@@ -183,6 +186,8 @@ void OscirenderAudioProcessorEditor::resized() {
     CommonPluginEditor::resized();
     
     auto area = getLocalBounds();
+    
+    licenseRegistration.setBounds(area);
 
     if (audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
         visualiser.setBounds(area);

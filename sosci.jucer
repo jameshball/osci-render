@@ -134,6 +134,10 @@
               file="Source/components/EffectComponent.cpp"/>
         <FILE id="u4UCwb" name="EffectComponent.h" compile="0" resource="0"
               file="Source/components/EffectComponent.h"/>
+        <FILE id="GPZ9q4" name="LicenseRegistrationComponent.cpp" compile="1"
+              resource="0" file="Source/components/LicenseRegistrationComponent.cpp"/>
+        <FILE id="JcXyLX" name="LicenseRegistrationComponent.h" compile="0"
+              resource="0" file="Source/components/LicenseRegistrationComponent.h"/>
         <FILE id="ka6rAh" name="MainMenuBarModel.cpp" compile="1" resource="0"
               file="Source/components/MainMenuBarModel.cpp"/>
         <FILE id="t6oUhv" name="MainMenuBarModel.h" compile="0" resource="0"

@@ -184,6 +184,10 @@
               file="Source/components/ErrorCodeEditorComponent.h"/>
         <FILE id="L9DIT2" name="LabelledTextBox.h" compile="0" resource="0"
               file="Source/components/LabelledTextBox.h"/>
+        <FILE id="mp7cFK" name="LicenseRegistrationComponent.cpp" compile="1"
+              resource="0" file="Source/components/LicenseRegistrationComponent.cpp"/>
+        <FILE id="eW7t3h" name="LicenseRegistrationComponent.h" compile="0"
+              resource="0" file="Source/components/LicenseRegistrationComponent.h"/>
         <FILE id="tpNWJ3" name="LuaConsole.cpp" compile="1" resource="0" file="Source/components/LuaConsole.cpp"/>
         <FILE id="e3ZteP" name="LuaConsole.h" compile="0" resource="0" file="Source/components/LuaConsole.h"/>
         <FILE id="qIxm1z" name="LuaListComponent.cpp" compile="1" resource="0"
