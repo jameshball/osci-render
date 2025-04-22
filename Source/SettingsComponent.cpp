@@ -30,6 +30,10 @@ void SettingsComponent::resized() {
     area.removeFromRight(5);
     area.removeFromTop(5);
     area.removeFromBottom(5);
+    
+    if (area.getWidth() <= 0 || area.getHeight() <= 0) {
+        return;
+    }
 
     juce::Component dummy;
     juce::Component dummy2;
@@ -57,7 +61,7 @@ void SettingsComponent::resized() {
     auto dummyBounds = dummy.getBounds();
 
     if (effectSettings != nullptr) {
-        effectSettings->setBounds(dummyBounds.removeFromBottom(150));
+        effectSettings->setBounds(dummyBounds.removeFromBottom(160));
         dummyBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
     }
 

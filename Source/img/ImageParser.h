@@ -16,6 +16,8 @@ public:
 
 	void setFrame(int index);
 	OsciPoint getSample();
+	int getNumFrames() { return frames.size(); }
+	int getCurrentFrame() const { return frameIndex; }
 
 private:
 	void findNearestNeighbour(int searchRadius, float thresholdPow, int stride, bool invert);
@@ -47,7 +49,7 @@ private:
     // Video processing fields
     ReadProcess ffmpegProcess;
     bool isVideo = false;
-    std::unique_ptr<juce::TemporaryFile> temp;
+    juce::TemporaryFile temp;
     std::vector<uint8_t> frameBuffer;
     int videoFrameSize = 0;
     

@@ -155,6 +155,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     booleanParameters.push_back(midiEnabled);
     booleanParameters.push_back(inputEnabled);
     booleanParameters.push_back(animateFrames);
+    booleanParameters.push_back(loopAnimation);
     booleanParameters.push_back(animationSyncBPM);
     booleanParameters.push_back(invertImage);
 
@@ -537,26 +538,26 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     
     
 	for (int sample = 0; sample < buffer.getNumSamples(); ++sample) {
-
         // Update frame animation
-        if (animateFrames->getValue()) {
-            if (animationSyncBPM->getValue()) {
-                animationTime = playTimeBeats;
+        if (animateFrames->getBoolValue()) {
+            if (juce::JUCEApplicationBase::isStandaloneApp()) {
+                animationFrame = animationFrame + sTimeSec * animationRate->getValueUnnormalised();
+            } else if (animationSyncBPM->getValue()) {
+                animationFrame = playTimeBeats * animationRate->getValueUnnormalised() + animationOffset->getValueUnnormalised();
             } else {
-                animationTime = playTimeSeconds;
+                animationFrame = playTimeSeconds * animationRate->getValueUnnormalised() + animationOffset->getValueUnnormalised();
             }
 
             juce::SpinLock::ScopedLockType lock1(parsersLock);
             juce::SpinLock::ScopedLockType lock2(effectsLock);
             if (currentFile >= 0 && sounds[currentFile]->parser->isAnimatable) {
-                int animFrame = (int)(animationTime * animationRate->getValueUnnormalised() + animationOffset->getValueUnnormalised());
-                auto lineArt = sounds[currentFile]->parser->getLineArt();
-                auto img = sounds[currentFile]->parser->getImg();
-                if (lineArt != nullptr) {
-                    lineArt->setFrame(animFrame);
-                } else if (img != nullptr) {
-                    img->setFrame(animFrame);
+                int totalFrames = sounds[currentFile]->parser->getNumFrames();
+                if (loopAnimation->getBoolValue()) {
+                    animationFrame = std::fmod(animationFrame, totalFrames);
+                } else {
+                    animationFrame = juce::jlimit(0.0, (double) totalFrames - 1, animationFrame.load());
                 }
+                sounds[currentFile]->parser->setFrame(animationFrame);
             }
         }
 

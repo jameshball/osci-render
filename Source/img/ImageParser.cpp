@@ -4,9 +4,7 @@
 #include "../CommonPluginEditor.h"
 
 ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, juce::MemoryBlock image) : audioProcessor(p) {
-    // Set up the temporary file
-    temp = std::make_unique<juce::TemporaryFile>();
-    juce::File file = temp->getFile();
+    juce::File file = temp.getFile();
 
     {
         juce::FileOutputStream output(file);
@@ -142,18 +140,17 @@ void ImageParser::processVideoFile(juce::File& file) {
 }
 
 bool ImageParser::loadAllVideoFrames(const juce::File& file, const juce::File& ffmpegFile) {
-    juce::String altCmd = "\"" + ffmpegFile.getFullPathName() + "\" -i \"" + file.getFullPathName() +
-                   "\" -hide_banner 2>&1";
+    juce::String cmd = "\"" + ffmpegFile.getFullPathName() + "\" -i \"" + file.getFullPathName() + "\" -hide_banner 2>&1";
     
-    ffmpegProcess.start(altCmd);
+    ffmpegProcess.start(cmd);
     
-    char altBuf[2048];
-    memset(altBuf, 0, sizeof(altBuf));
-    size_t altSize = ffmpegProcess.read(altBuf, sizeof(altBuf) - 1);
+    char buf[2048];
+    memset(buf, 0, sizeof(buf));
+    size_t size = ffmpegProcess.read(buf, sizeof(buf) - 1);
     ffmpegProcess.close();
     
-    if (altSize > 0) {
-        juce::String output(altBuf, altSize);
+    if (size > 0) {
+        juce::String output(buf, size);
         
         // Look for resolution in format "1920x1080"
         std::regex resolutionRegex(R"((\d{2,5})x(\d{2,5}))");
@@ -167,10 +164,23 @@ bool ImageParser::loadAllVideoFrames(const juce::File& file, const juce::File& f
         }
     }
     
-    // If still no dimensions, use defaults
+    // If still no dimensions or dimensions are too large, use reasonable defaults
     if (width <= 0 || height <= 0) {
-        width = 640;
-        height = 360;
+        width = 320;
+        height = 240;
+    } else {
+        // Downscale large videos to improve performance
+        const int MAX_DIMENSION = 512;
+        if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+            float aspectRatio = static_cast<float>(width) / height;
+            if (width > height) {
+                width = MAX_DIMENSION;
+                height = static_cast<int>(width / aspectRatio);
+            } else {
+                height = MAX_DIMENSION;
+                width = static_cast<int>(height * aspectRatio);
+            }
+        }
     }
     
     // Now prepare for frame reading
@@ -185,27 +195,35 @@ bool ImageParser::loadAllVideoFrames(const juce::File& file, const juce::File& f
     // Cap the number of frames to prevent excessive memory usage
     const int MAX_FRAMES = 10000;
     
-    // Start ffmpeg process to read frames
-    juce::String cmd = "\"" + ffmpegFile.getFullPathName() + "\" -i \"" + file.getFullPathName() + 
-                  "\" -f rawvideo -pix_fmt gray -v error -stats pipe:1";
+    // Determine available hardware acceleration options
+#if JUCE_MAC
+   // Try to use videotoolbox on macOS
+   juce::String hwAccel = " -hwaccel videotoolbox";
+#elif JUCE_WINDOWS
+   // Try to use DXVA2 on Windows
+   juce::String hwAccel = " -hwaccel dxva2";
+#else
+    juce::String hwAccel = "";
+#endif
+    
+    // Start ffmpeg process to read frames with optimizations:
+    // - Use hardware acceleration if available
+    // - Lower resolution with scale filter
+    // - Use multiple threads for faster processing
+    // - Use gray colorspace directly to avoid extra conversion
+    cmd = "\"" + ffmpegFile.getFullPathName() + "\"" +
+        hwAccel +
+        " -i \"" + file.getFullPathName() + "\"" +
+        " -threads 8" +                                  // Use 8 threads for processing
+        " -vf \"scale=" + juce::String(width) + ":" + juce::String(height) + "\"" + // Scale to target size
+        " -f rawvideo -pix_fmt gray" +                   // Output format
+        " -v error" +                                    // Only show errors
+        " pipe:1";                                       // Output to stdout
     
     ffmpegProcess.start(cmd);
     
-    if (!ffmpegProcess.isRunning()) {
-        return false;
-    }
-    
     // Read all frames into memory
     int framesRead = 0;
-    
-    // Flag to indicate which frames to save (first, middle, last)
-    bool shouldSaveFrame = false;
-    
-    // Create debug directory in user documents
-    juce::File debugDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("osci-render-debug");
-    if (!debugDir.exists()) {
-        debugDir.createDirectory();
-    }
     
     while (framesRead < MAX_FRAMES) {
         size_t bytesRead = ffmpegProcess.read(frameBuffer.data(), frameBuffer.size());

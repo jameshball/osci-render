@@ -152,12 +152,6 @@ OsciPoint FileParser::nextSample(lua_State*& L, LuaVariables& vars) {
 	return OsciPoint();
 }
 
-void FileParser::closeLua(lua_State*& L) {
-	if (lua != nullptr) {
-		lua->close(L);
-    }
-}
-
 bool FileParser::isSample() {
 	return sampleSource;
 }
@@ -200,4 +194,30 @@ std::shared_ptr<ImageParser> FileParser::getImg() {
 
 std::shared_ptr<WavParser> FileParser::getWav() {
     return wav;
+}
+
+int FileParser::getNumFrames() {
+    if (gpla != nullptr) {
+        return gpla->numFrames;
+    } else if (img != nullptr) {
+        return img->getNumFrames();
+    }
+    return 1; // Default to 1 frame for non-animatable content
+}
+
+int FileParser::getCurrentFrame() {
+    if (gpla != nullptr) {
+        return gpla->frameNumber;
+    } else if (img != nullptr) {
+        return img->getCurrentFrame();
+    }
+    return 0; // Default to frame 0 for non-animatable content
+}
+
+void FileParser::setFrame(int frame) {
+    if (gpla != nullptr) {
+        gpla->setFrame(frame);
+    } else if (img != nullptr) {
+        img->setFrame(frame);
+    }
 }

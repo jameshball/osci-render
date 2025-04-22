@@ -18,12 +18,16 @@ public:
 	void parse(juce::String fileId, juce::String fileName, juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font font);
 	std::vector<std::unique_ptr<Shape>> nextFrame();
 	OsciPoint nextSample(lua_State*& L, LuaVariables& vars);
-	void closeLua(lua_State*& L);
+
 	bool isSample();
 	bool isActive();
 	void disable();
 	void enable();
-
+    
+    int getNumFrames();
+    int getCurrentFrame();
+    void setFrame(int frame);
+	
 	std::shared_ptr<WorldObject> getObject();
 	std::shared_ptr<SvgParser> getSvg();
 	std::shared_ptr<TextParser> getText();

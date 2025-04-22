@@ -152,6 +152,10 @@
               file="Source/components/AboutComponent.cpp"/>
         <FILE id="vDlOTn" name="AboutComponent.h" compile="0" resource="0"
               file="Source/components/AboutComponent.h"/>
+        <FILE id="AAXWW6" name="AnimationTimelineComponent.cpp" compile="1"
+              resource="0" file="Source/components/AnimationTimelineComponent.cpp"/>
+        <FILE id="ppzO8J" name="AnimationTimelineComponent.h" compile="0" resource="0"
+              file="Source/components/AnimationTimelineComponent.h"/>
         <FILE id="xxiMAy" name="AudioPlayerComponent.cpp" compile="1" resource="0"
               file="Source/components/AudioPlayerComponent.cpp"/>
         <FILE id="DSvDMv" name="AudioPlayerComponent.h" compile="0" resource="0"
@@ -218,6 +222,7 @@
               file="Source/concurrency/BufferConsumer.h"/>
         <FILE id="L9aCHY" name="readerwritercircularbuffer.h" compile="0" resource="0"
               file="Source/concurrency/readerwritercircularbuffer.h"/>
+        <FILE id="noScYw" name="ReadProcess.h" compile="0" resource="0" file="Source/concurrency/ReadProcess.h"/>
         <FILE id="aat2Je" name="WriteProcess.h" compile="0" resource="0" file="Source/concurrency/WriteProcess.h"/>
       </GROUP>
       <GROUP id="{A3E24187-62A5-AB8D-8837-14043B89A640}" name="gpla">

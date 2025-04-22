@@ -148,6 +148,7 @@ public:
     IntParameter* voices = new IntParameter("Voices", "voices", VERSION_HINT, 4, 1, 16);
 
     BooleanParameter* animateFrames = new BooleanParameter("Animate", "animateFrames", VERSION_HINT, true, "Enables animation for files that have multiple frames, such as GIFs or Line Art.");
+    BooleanParameter* loopAnimation = new BooleanParameter("Loop Animation", "loopAnimation", VERSION_HINT, true, "Loops the animation. If disabled, the animation will stop at the last frame.");
     BooleanParameter* animationSyncBPM = new BooleanParameter("Sync To BPM", "animationSyncBPM", VERSION_HINT, false, "Synchronises the animation's framerate with the BPM of your DAW.");
     FloatParameter* animationRate = new FloatParameter("Animation Rate", "animationRate", VERSION_HINT, 30, -1000, 1000);
     FloatParameter* animationOffset = new FloatParameter("Animation Offset", "animationOffset", VERSION_HINT, 0, -10000, 10000);
@@ -174,7 +175,7 @@ public:
         )
     );
 
-    double animationTime = 0.f;
+    std::atomic<double> animationFrame = 0.f;
     
     std::shared_ptr<WobbleEffect> wobbleEffect = std::make_shared<WobbleEffect>(*this);
 
