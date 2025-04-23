@@ -20,6 +20,8 @@
 OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(2), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
     // locking isn't necessary here because we are in the constructor
 
+    addonHost.scanAndLoad(applicationFolder.getChildFile("addons"));
+
     toggleableEffects.push_back(std::make_shared<osci::Effect>(
         std::make_shared<BitCrushEffect>(),
         new osci::EffectParameter("Bit Crush", "Limits the resolution of points drawn to the screen, making the object look pixelated, and making the audio sound more 'digital' and distorted.", "bitCrush", VERSION_HINT, 0.6, 0.0, 1.0)
