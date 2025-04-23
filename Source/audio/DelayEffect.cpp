@@ -4,7 +4,7 @@ DelayEffect::DelayEffect() {}
 
 DelayEffect::~DelayEffect() {}
 
-OsciPoint DelayEffect::apply(int index, OsciPoint vector, const std::vector<std::atomic<double>>& values, double sampleRate) {
+osci::Point DelayEffect::apply(int index, osci::Point vector, const std::vector<std::atomic<double>>& values, double sampleRate) {
     double decay = values[0];
     double decayLength = values[1];
 	int delayBufferLength = (int)(sampleRate * decayLength);
@@ -22,8 +22,8 @@ OsciPoint DelayEffect::apply(int index, OsciPoint vector, const std::vector<std:
         }
     }
 
-    OsciPoint echo = delayBuffer[position];
-    vector = OsciPoint(
+    osci::Point echo = delayBuffer[position];
+    vector = osci::Point(
         vector.x + echo.x * decay,
         vector.y + echo.y * decay,
         vector.z + echo.z * decay

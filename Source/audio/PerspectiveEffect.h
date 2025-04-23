@@ -1,15 +1,13 @@
 #pragma once
-#include "EffectApplication.h"
-#include "../shape/OsciPoint.h"
-#include "../audio/Effect.h"
+#include <JuceHeader.h>
 #include "../obj/Camera.h"
 
-class PerspectiveEffect : public EffectApplication {
+class PerspectiveEffect : public osci::EffectApplication {
 public:
 	PerspectiveEffect();
 	~PerspectiveEffect();
 
-	OsciPoint apply(int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) override;
+	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override;
 
 private:
 

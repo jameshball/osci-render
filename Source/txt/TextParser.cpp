@@ -81,7 +81,7 @@ void TextParser::parse(juce::String text, juce::Font font) {
     }
 
     // Convert path to shapes
-    shapes = std::vector<std::unique_ptr<Shape>>();
+    shapes = std::vector<std::unique_ptr<osci::Shape>>();
     SvgParser::pathToShapes(textPath, shapes, true);
 }
 
@@ -235,14 +235,14 @@ void TextParser::processFormattedTextBody(const juce::String& text, juce::Attrib
     }
 }
 
-std::vector<std::unique_ptr<Shape>> TextParser::draw() {
+std::vector<std::unique_ptr<osci::Shape>> TextParser::draw() {
     // reparse text if font changes
     if (audioProcessor.font != lastFont) {
         parse(text, audioProcessor.font);
     }
     
     // clone with deep copy
-    std::vector<std::unique_ptr<Shape>> tempShapes;
+    std::vector<std::unique_ptr<osci::Shape>> tempShapes;
     
     for (auto& shape : shapes) {
         tempShapes.push_back(shape->clone());

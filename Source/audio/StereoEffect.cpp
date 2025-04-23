@@ -4,7 +4,7 @@ StereoEffect::StereoEffect() {}
 
 StereoEffect::~StereoEffect() {}
 
-OsciPoint StereoEffect::apply(int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+osci::Point StereoEffect::apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
     if (this->sampleRate != sampleRate) {
         this->sampleRate = sampleRate;
         initialiseBuffer(sampleRate);
@@ -25,7 +25,7 @@ OsciPoint StereoEffect::apply(int index, OsciPoint input, const std::vector<std:
         readHead += buffer.size();
     }
     
-    return OsciPoint(input.x, buffer[readHead].y, input.z);
+    return osci::Point(input.x, buffer[readHead].y, input.z);
 }
 
 void StereoEffect::initialiseBuffer(double sampleRate) {

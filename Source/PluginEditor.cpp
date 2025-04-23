@@ -96,7 +96,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 
     initialiseMenuBar(model);
     
-    addAndMakeVisible(licenseRegistration);
+    addChildComponent(licenseRegistration);
     licenseRegistration.toFront(true);
 }
 
@@ -184,7 +184,7 @@ void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
 
 void OscirenderAudioProcessorEditor::resized() {
     CommonPluginEditor::resized();
-    
+     
     auto area = getLocalBounds();
     
     licenseRegistration.setBounds(area);

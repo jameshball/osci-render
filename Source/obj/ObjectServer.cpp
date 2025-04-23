@@ -1,6 +1,6 @@
 #include "ObjectServer.h"
 #include "../PluginProcessor.h"
-#include "../shape/Line.h"
+
 
 ObjectServer::ObjectServer(OscirenderAudioProcessor& p) : audioProcessor(p), juce::Thread("Object Server") {
     startThread();
@@ -31,7 +31,7 @@ void ObjectServer::run() {
                     while (!threadShouldExit() && connection->isConnected()) {
                         if (connection->waitUntilReady(true, 200) == 1) {
                             int i = 0;
-                            std::vector<Line> frameContainer;
+                            std::vector<osci::Line> frameContainer;
 
                             // read until we get a newline
                             while (!threadShouldExit()) {
@@ -63,7 +63,7 @@ void ObjectServer::run() {
                                 juce::MemoryOutputStream binStream;
                                 juce::String messageString = message.get();
                                 if (juce::Base64::convertFromBase64(binStream, messageString)) {
-                                    std::vector< std::vector<Line>> receivedFrames;
+                                    std::vector<std::vector<osci::Line>> receivedFrames;
                                     int bytesRead = binStream.getDataSize();
                                     if (bytesRead < 8) return;
                                     char* gplaData = (char*)binStream.getData();
@@ -109,11 +109,11 @@ void ObjectServer::run() {
                                 frameContainer = LineArtParser::generateFrame(objects, focalLength);
                             }
 
-                            std::vector<std::unique_ptr<Shape>> frame;
+                            std::vector<std::unique_ptr<osci::Shape>> frame;
 
                             for (int i = 0; i < frameContainer.size(); i++) {
-                                Line l = frameContainer[i];
-                                frame.push_back(std::make_unique<Line>(l.x1, l.y1, l.x2, l.y2));
+                                osci::Line l = frameContainer[i];
+                                frame.push_back(std::make_unique<osci::Line>(l.x1, l.y1, l.x2, l.y2));
                             }
 
                             audioProcessor.objectServerSound->addFrame(frame, false);

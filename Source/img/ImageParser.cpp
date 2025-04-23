@@ -347,7 +347,7 @@ void ImageParser::findNearestNeighbour(int searchRadius, float thresholdPow, int
     findWhite(thresholdPow, invert);
 }
 
-OsciPoint ImageParser::getSample() {
+osci::Point ImageParser::getSample() {
     if (ALGORITHM == "HILLIGOSS") {
         if (count % jumpFrequency() == 0) {
             resetPosition();
@@ -364,7 +364,7 @@ OsciPoint ImageParser::getSample() {
         count++;
         float widthDiff = (maxDim - width) / 2;
         float heightDiff = (maxDim - height) / 2;
-        return OsciPoint(2 * (currentX + widthDiff) / maxDim - 1, 2 * (currentY + heightDiff) / maxDim - 1);
+        return osci::Point(2 * (currentX + widthDiff) / maxDim - 1, 2 * (currentY + heightDiff) / maxDim - 1);
     } else {
         double scanIncrement = audioProcessor.imageStride->getActualValue() / 100;
         
@@ -394,6 +394,6 @@ OsciPoint ImageParser::getSample() {
             maxIterations--;
         }
         
-        return OsciPoint(scanX, scanY);
+        return osci::Point(scanX, scanY);
     }
 }

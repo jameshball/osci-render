@@ -28,8 +28,7 @@
 
 #pragma once
 
-#include "JuceHeader.h"
-#include "../audio/BooleanParameter.h"
+#include <JuceHeader.h>
 
 namespace jux
 {
@@ -58,7 +57,7 @@ public:
         switchCircle.setInterceptsMouseClicks (false, false);
     }
     
-    SwitchButton(BooleanParameter* parameter) : SwitchButton(parameter->name, false) {
+    SwitchButton(osci::BooleanParameter* parameter) : SwitchButton(parameter->name, false) {
         this->parameter = parameter;
         setToggleState(parameter->getBoolValue(), juce::NotificationType::dontSendNotification);
         parameter->addListener(this);
@@ -176,7 +175,7 @@ private:
 
     bool prevToggleState = false;
     
-    BooleanParameter* parameter = nullptr;
+    osci::BooleanParameter* parameter = nullptr;
     
     JUCE_DECLARE_WEAK_REFERENCEABLE(SwitchButton)
 };

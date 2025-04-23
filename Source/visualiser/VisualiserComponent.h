@@ -60,7 +60,7 @@ public:
     void resized() override;
     void paint(juce::Graphics& g) override;
     int prepareTask(double sampleRate, int samplesPerBlock) override;
-    void runTask(const std::vector<OsciPoint>& points) override;
+    void runTask(const std::vector<osci::Point>& points) override;
     void stopTask() override;
     void setPaused(bool paused, bool affectAudio = true);
     void mouseDrag(const juce::MouseEvent& event) override;
@@ -189,11 +189,11 @@ private:
     juce::Image oscilloscopeReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::real_reflection_png, BinaryData::real_reflection_pngSize);
     juce::Image vectorDisplayReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::vector_display_reflection_png, BinaryData::vector_display_reflection_pngSize);
     
-    OsciPoint REAL_SCREEN_OFFSET = { 0.02, -0.15 };
-    OsciPoint REAL_SCREEN_SCALE = { 0.6 };
+    osci::Point REAL_SCREEN_OFFSET = { 0.02, -0.15 };
+    osci::Point REAL_SCREEN_SCALE = { 0.6 };
     
-    OsciPoint VECTOR_DISPLAY_OFFSET = { 0.075, -0.045 };
-    OsciPoint VECTOR_DISPLAY_SCALE = { 0.6 };
+    osci::Point VECTOR_DISPLAY_OFFSET = { 0.075, -0.045 };
+    osci::Point VECTOR_DISPLAY_SCALE = { 0.6 };
     float VECTOR_DISPLAY_FISH_EYE = 0.5;
     
     juce::OpenGLTexture reflectionOpenGLTexture;

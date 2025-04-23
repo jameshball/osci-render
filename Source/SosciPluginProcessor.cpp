@@ -1,6 +1,5 @@
 #include "SosciPluginProcessor.h"
 #include "SosciPluginEditor.h"
-#include "audio/EffectParameter.h"
 
 SosciAudioProcessor::SosciAudioProcessor() : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(4), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
     // demo audio file on standalone only
@@ -30,7 +29,7 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     bool readingFromWav = wavParser.isInitialised();
     
 	for (int sample = 0; sample < input.getNumSamples(); ++sample) {
-        OsciPoint point;
+        osci::Point point;
         
         if (readingFromWav) {
             point = wavParser.getSample();

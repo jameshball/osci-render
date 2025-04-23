@@ -4,7 +4,7 @@ VectorCancellingEffect::VectorCancellingEffect() {}
 
 VectorCancellingEffect::~VectorCancellingEffect() {}
 
-OsciPoint VectorCancellingEffect::apply(int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+osci::Point VectorCancellingEffect::apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
     double value = values[0];
     if (value < 0.001) {
 		return input;

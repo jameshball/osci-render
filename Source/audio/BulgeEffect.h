@@ -1,11 +1,10 @@
 #pragma once
-#include "EffectApplication.h"
-#include "../shape/OsciPoint.h"
+#include <JuceHeader.h>
 
-class BulgeEffect : public EffectApplication {
+class BulgeEffect : public osci::EffectApplication {
 public:
 	BulgeEffect();
 	~BulgeEffect();
 
-	OsciPoint apply(int index, OsciPoint input, const std::vector<std::atomic<double>>&, double sampleRate) override;
+	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>&, double sampleRate) override;
 };

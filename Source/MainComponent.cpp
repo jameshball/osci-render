@@ -121,7 +121,7 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 		createFile.triggerClick();
 	};
 
-	BooleanParameter* visualiserFullScreen = audioProcessor.visualiserParameters.visualiserFullScreen;
+	osci::BooleanParameter* visualiserFullScreen = audioProcessor.visualiserParameters.visualiserFullScreen;
     pluginEditor.visualiser.setFullScreen(visualiserFullScreen->getBoolValue());
 
     addChildComponent(pluginEditor.visualiser);

@@ -1,10 +1,9 @@
 #pragma once
 #include <JuceHeader.h>
-#include "../audio/BooleanParameter.h"
 
 class SvgButton : public juce::DrawableButton, public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater {
  public:
-    SvgButton(juce::String name, juce::String svg, juce::Colour colour, juce::Colour colourOn, BooleanParameter* toggle = nullptr, juce::String toggledSvg = "") : juce::DrawableButton(name, juce::DrawableButton::ButtonStyle::ImageFitted), toggle(toggle) {
+    SvgButton(juce::String name, juce::String svg, juce::Colour colour, juce::Colour colourOn, osci::BooleanParameter* toggle = nullptr, juce::String toggledSvg = "") : juce::DrawableButton(name, juce::DrawableButton::ButtonStyle::ImageFitted), toggle(toggle) {
         auto doc = juce::XmlDocument::parse(svg);
         
         changeSvgColour(doc.get(), colour);
@@ -132,7 +131,7 @@ private:
 	std::unique_ptr<juce::Drawable> downImageOn;
     std::unique_ptr<juce::Drawable> disabledImageOn;
 
-    BooleanParameter* toggle;
+    osci::BooleanParameter* toggle;
     
     juce::VBlankAnimatorUpdater updater{this};
     float colourFade = 0.0;

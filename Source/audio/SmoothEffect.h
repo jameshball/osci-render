@@ -1,13 +1,12 @@
 #pragma once
-#include "EffectApplication.h"
-#include "../shape/OsciPoint.h"
+#include <JuceHeader.h>
 
-class SmoothEffect : public EffectApplication {
+class SmoothEffect : public osci::EffectApplication {
 public:
 	SmoothEffect();
 	~SmoothEffect();
 
-	OsciPoint apply(int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) override;
+	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override;
 private:
-	OsciPoint avg;
+	osci::Point avg;
 };

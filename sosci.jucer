@@ -98,16 +98,6 @@
       </GROUP>
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
         <FILE id="UVcqLN" name="AudioRecorder.h" compile="0" resource="0" file="Source/audio/AudioRecorder.h"/>
-        <FILE id="S5ChqG" name="BooleanParameter.h" compile="0" resource="0"
-              file="Source/audio/BooleanParameter.h"/>
-        <FILE id="mP5lpY" name="Effect.cpp" compile="1" resource="0" file="Source/audio/Effect.cpp"/>
-        <FILE id="LKeNnY" name="Effect.h" compile="0" resource="0" file="Source/audio/Effect.h"/>
-        <FILE id="ca2VrC" name="EffectApplication.cpp" compile="1" resource="0"
-              file="Source/audio/EffectApplication.cpp"/>
-        <FILE id="MIYJ9y" name="EffectApplication.h" compile="0" resource="0"
-              file="Source/audio/EffectApplication.h"/>
-        <FILE id="aE0RtD" name="EffectParameter.h" compile="0" resource="0"
-              file="Source/audio/EffectParameter.h"/>
         <FILE id="aziWU2" name="SampleRateManager.h" compile="0" resource="0"
               file="Source/audio/SampleRateManager.h"/>
         <FILE id="vj5mRC" name="SmoothEffect.cpp" compile="1" resource="0"
@@ -168,12 +158,6 @@
         <FILE id="WQ2W15" name="BufferConsumer.h" compile="0" resource="0"
               file="Source/concurrency/BufferConsumer.h"/>
         <FILE id="ALHDU9" name="WriteProcess.h" compile="0" resource="0" file="Source/concurrency/WriteProcess.h"/>
-      </GROUP>
-      <GROUP id="{92CEA658-C82C-9CEB-15EB-945EF6B6B5C8}" name="shape">
-        <FILE id="VdK1eT" name="OsciPoint.cpp" compile="1" resource="0" file="Source/shape/OsciPoint.cpp"/>
-        <FILE id="rjbwYE" name="OsciPoint.h" compile="0" resource="0" file="Source/shape/OsciPoint.h"/>
-        <FILE id="G5fbub" name="Shape.cpp" compile="1" resource="0" file="Source/shape/Shape.cpp"/>
-        <FILE id="NmptSY" name="Shape.h" compile="0" resource="0" file="Source/shape/Shape.h"/>
       </GROUP>
       <GROUP id="{04ACA01B-2ADE-8356-BF1E-32942E0F3CFA}" name="visualiser">
         <FILE id="O444rE" name="AfterglowFragmentShader.glsl" compile="0" resource="0"
@@ -263,6 +247,7 @@
         <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
+        <MODULEPATH id="osci_render_core" path="modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/sosci/VisualStudio2022" smallIcon="KigaoN"
@@ -297,6 +282,7 @@
         <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
+        <MODULEPATH id="osci_render_core" path="modules"/>
       </MODULEPATHS>
     </VS2022>
     <XCODE_MAC targetFolder="Builds/sosci/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak"
@@ -339,6 +325,7 @@
         <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
+        <MODULEPATH id="osci_render_core" path="modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
   </EXPORTFORMATS>
@@ -370,5 +357,6 @@
     <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_sharedtexture" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>
 </JUCERPROJECT>

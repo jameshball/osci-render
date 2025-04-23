@@ -2,7 +2,7 @@
 
 <JUCERPROJECT id="Dt5Xh7" name="osci-render-test" projectType="consoleapp"
               useAppConfig="0" addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1"
-              defines="MOODYCAMEL_ATOMICOPS=1">
+              defines="MOODYCAMEL_ATOMICOPS=1" cppLanguageStandard="20">
   <MAINGROUP id="ztPpnM" name="osci-render-test">
     <GROUP id="{4373FA2A-1E20-AAA6-40E0-740C13D88B75}" name="Source">
       <GROUP id="{6D2F76BF-0825-85C1-CE15-B08BF1AA1218}" name="concurrency">
@@ -118,21 +118,19 @@
         <FILE id="V3Q6n2" name="Frustum.cpp" compile="1" resource="0" file="Source/obj/Frustum.cpp"/>
         <FILE id="m9wauB" name="Frustum.h" compile="0" resource="0" file="Source/obj/Frustum.h"/>
       </GROUP>
-      <GROUP id="{4C47E086-E440-AB0D-BB6E-B419AEBA3583}" name="shape">
-        <FILE id="rGoWAa" name="Line.cpp" compile="1" resource="0" file="Source/shape/Line.cpp"/>
-        <FILE id="Q4nxsV" name="Line.h" compile="0" resource="0" file="Source/shape/Line.h"/>
-        <FILE id="HZzR9I" name="OsciPoint.cpp" compile="1" resource="0" file="Source/shape/OsciPoint.cpp"/>
-        <FILE id="XRWdZW" name="OsciPoint.h" compile="0" resource="0" file="Source/shape/OsciPoint.h"/>
-        <FILE id="Fb0uH1" name="Shape.cpp" compile="1" resource="0" file="Source/shape/Shape.cpp"/>
-        <FILE id="PGbdTP" name="Shape.h" compile="0" resource="0" file="Source/shape/Shape.h"/>
-      </GROUP>
       <FILE id="bQ1rDR" name="TestMain.cpp" compile="1" resource="0" file="Source/TestMain.cpp"/>
     </GROUP>
   </MAINGROUP>
   <MODULES>
+    <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_processors" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_events" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_graphics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1"/>
   <EXPORTFORMATS>
@@ -145,6 +143,12 @@
         <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
+        <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="juce_audio_processors" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_extra" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_basics" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_graphics" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_basics" path="../JUCE/modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/Test/VisualStudio2022">
@@ -156,6 +160,12 @@
         <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
+        <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="juce_audio_processors" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_extra" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_basics" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_graphics" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_basics" path="../JUCE/modules"/>
       </MODULEPATHS>
     </VS2022>
     <XCODE_MAC targetFolder="Builds/Test/MacOSX">
@@ -167,6 +177,12 @@
         <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
+        <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="juce_audio_processors" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_extra" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_basics" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_graphics" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_basics" path="../JUCE/modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
   </EXPORTFORMATS>

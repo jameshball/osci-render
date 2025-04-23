@@ -39,33 +39,33 @@ private:
     
 public:
 
-    EffectParameter qualityParameter = EffectParameter(
+    osci::EffectParameter qualityParameter = osci::EffectParameter(
         "Video Quality",
         "Controls the quality of the recording video. 0 is the worst possible quality, and 1 is almost lossless.",
         "brightness",
         VERSION_HINT, 0.7, 0.0, 1.0
     );
-    BooleanParameter losslessVideo = BooleanParameter("Lossless Video", "losslessVideo", VERSION_HINT, false, "Record video in a lossless format. WARNING: This is not supported by all media players.");
-    Effect qualityEffect = Effect(&qualityParameter);
+    osci::BooleanParameter losslessVideo = osci::BooleanParameter("Lossless Video", "losslessVideo", VERSION_HINT, false, "Record video in a lossless format. WARNING: This is not supported by all media players.");
+    osci::Effect qualityEffect = osci::Effect(&qualityParameter);
 
-    BooleanParameter recordAudio = BooleanParameter("Record Audio", "recordAudio", VERSION_HINT, true, "Record audio along with the video.");
-    BooleanParameter recordVideo = BooleanParameter("Record Video", "recordVideo", VERSION_HINT, sosciFeatures, "Record video output of the visualiser.");
+    osci::BooleanParameter recordAudio = osci::BooleanParameter("Record Audio", "recordAudio", VERSION_HINT, true, "Record audio along with the video.");
+    osci::BooleanParameter recordVideo = osci::BooleanParameter("Record Video", "recordVideo", VERSION_HINT, sosciFeatures, "Record video output of the visualiser.");
     
-    EffectParameter resolution = EffectParameter(
+    osci::EffectParameter resolution = osci::EffectParameter(
         "Resolution",
         "The resolution of the recorded video. This only changes when not recording.",
         "resolution",
         VERSION_HINT, 1024, 128, 2048, 1.0
     );
-    Effect resolutionEffect = Effect(&resolution);
+    osci::Effect resolutionEffect = osci::Effect(&resolution);
     
-    EffectParameter frameRate = EffectParameter(
+    osci::EffectParameter frameRate = osci::EffectParameter(
         "Frame Rate",
         "The frame rate of the recorded video. This only changes when not recording.",
         "frameRate",
         VERSION_HINT, 60.0, 10, 240, 0.01
     );
-    Effect frameRateEffect = Effect(&frameRate);
+    osci::Effect frameRateEffect = osci::Effect(&frameRate);
 
     juce::String compressionPreset = "fast";
     VideoCodec videoCodec = VideoCodec::H264;

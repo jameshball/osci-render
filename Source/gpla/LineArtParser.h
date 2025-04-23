@@ -1,9 +1,6 @@
 #pragma once
-#include "../shape/OsciPoint.h"
 #include <JuceHeader.h>
-#include "../shape/Shape.h"
 #include "../svg/SvgParser.h"
-#include "../shape/Line.h"
 
 class LineArtParser {
 public:
@@ -12,21 +9,21 @@ public:
 	~LineArtParser();
 
 	void setFrame(int fNum);
-	std::vector<std::unique_ptr<Shape>> draw();
+	std::vector<std::unique_ptr<osci::Shape>> draw();
 
-	static std::vector<std::vector<Line>> parseJsonFrames(juce::String jsonStr);
-	static std::vector<std::vector<Line>> parseBinaryFrames(char* data, int dataLength);
+	static std::vector<std::vector<osci::Line>> parseJsonFrames(juce::String jsonStr);
+	static std::vector<std::vector<osci::Line>> parseBinaryFrames(char* data, int dataLength);
 
-	static std::vector<Line> generateFrame(juce::Array < juce::var> objects, double focalLength);
+	static std::vector<osci::Line> generateFrame(juce::Array < juce::var> objects, double focalLength);
 
 	int numFrames = 0;
 	int frameNumber = 0;
 private:
-	static std::vector<std::vector<Line>> epicFail();
+	static std::vector<std::vector<osci::Line>> epicFail();
 	static double makeDouble(int64_t data);
 	static void makeChars(int64_t data, char* chars);
-	static std::vector<std::vector<OsciPoint>> reorderVertices(std::vector<std::vector<OsciPoint>> vertices);
-	static std::vector<Line> assembleFrame(std::vector<std::vector<std::vector<OsciPoint>>> allVertices, std::vector<std::vector<double>> allMatrices, double focalLength);
-	std::vector<std::vector<Line>> frames;
+	static std::vector<std::vector<osci::Point>> reorderVertices(std::vector<std::vector<osci::Point>> vertices);
+	static std::vector<osci::Line> assembleFrame(std::vector<std::vector<std::vector<osci::Point>>> allVertices, std::vector<std::vector<double>> allMatrices, double focalLength);
+	std::vector<std::vector<osci::Line>> frames;
 	
 };

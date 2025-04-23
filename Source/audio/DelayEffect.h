@@ -1,17 +1,16 @@
 #pragma once
-#include "EffectApplication.h"
-#include "../shape/OsciPoint.h"
+#include <JuceHeader.h>
 
-class DelayEffect : public EffectApplication {
+class DelayEffect : public osci::EffectApplication {
 public:
 	DelayEffect();
 	~DelayEffect();
 
-	OsciPoint apply(int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) override;
+	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override;
 
 private:
 	const static int MAX_DELAY = 192000 * 10;
-	std::vector<OsciPoint> delayBuffer = std::vector<OsciPoint>(MAX_DELAY);
+	std::vector<osci::Point> delayBuffer = std::vector<osci::Point>(MAX_DELAY);
 	int head = 0;
 	int position = 0;
 	int samplesSinceLastDelay = 0;

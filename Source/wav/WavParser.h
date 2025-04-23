@@ -1,5 +1,4 @@
 #pragma once
-#include "../shape/OsciPoint.h"
 #include <JuceHeader.h>
 
 class CommonAudioProcessor;
@@ -8,7 +7,7 @@ public:
     WavParser(CommonAudioProcessor& p);
 	~WavParser();
 
-	OsciPoint getSample();
+	osci::Point getSample();
 
 	void setProgress(double progress);
 	void setPaused(bool paused);

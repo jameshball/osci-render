@@ -4,7 +4,7 @@ DistortEffect::DistortEffect(bool vertical) : vertical(vertical) {}
 
 DistortEffect::~DistortEffect() {}
 
-OsciPoint DistortEffect::apply(int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+osci::Point DistortEffect::apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
 	double value = values[0];
 	int vertical = (int)this->vertical;
 	if (index % 2 == 0) {

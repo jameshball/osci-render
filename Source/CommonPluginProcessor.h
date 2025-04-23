@@ -16,7 +16,6 @@
 #include "audio/SampleRateManager.h"
 #include "visualiser/VisualiserSettings.h"
 #include "visualiser/RecordingSettings.h"
-#include "audio/Effect.h"
 #include "wav/WavParser.h"
 
 
@@ -94,13 +93,13 @@ public:
 
     std::atomic<double> volume = 1.0;
     std::atomic<double> threshold = 1.0;
-    BooleanParameter* muteParameter = nullptr;
+    osci::BooleanParameter* muteParameter = nullptr;
 
-    std::shared_ptr<Effect> volumeEffect = std::make_shared<Effect>(
-        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+    std::shared_ptr<osci::Effect> volumeEffect = std::make_shared<osci::Effect>(
+        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             volume = values[0].load();
             return input;
-        }, new EffectParameter(
+        }, new osci::EffectParameter(
             "Volume",
             "Controls the volume of the output audio.",
             "volume",
@@ -108,11 +107,11 @@ public:
         )
     );
 
-    std::shared_ptr<Effect> thresholdEffect = std::make_shared<Effect>(
-        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+    std::shared_ptr<osci::Effect> thresholdEffect = std::make_shared<osci::Effect>(
+        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             threshold = values[0].load();
             return input;
-        }, new EffectParameter(
+        }, new osci::EffectParameter(
             "Threshold",
             "Clips the audio to a maximum value. Applying a harsher threshold results in a more distorted sound.",
             "threshold",
@@ -158,16 +157,16 @@ protected:
     
     bool brightnessEnabled = false;
     
-    std::vector<BooleanParameter*> booleanParameters;
-    std::vector<FloatParameter*> floatParameters;
-    std::vector<IntParameter*> intParameters;
-    std::vector<std::shared_ptr<Effect>> effects;
-    std::vector<std::shared_ptr<Effect>> permanentEffects;
+    std::vector<osci::BooleanParameter*> booleanParameters;
+    std::vector<osci::FloatParameter*> floatParameters;
+    std::vector<osci::IntParameter*> intParameters;
+    std::vector<std::shared_ptr<osci::Effect>> effects;
+    std::vector<std::shared_ptr<osci::Effect>> permanentEffects;
 
-    std::shared_ptr<Effect> getEffect(juce::String id);
-    BooleanParameter* getBooleanParameter(juce::String id);
-    FloatParameter* getFloatParameter(juce::String id);
-    IntParameter* getIntParameter(juce::String id);
+    std::shared_ptr<osci::Effect> getEffect(juce::String id);
+    osci::BooleanParameter* getBooleanParameter(juce::String id);
+    osci::FloatParameter* getFloatParameter(juce::String id);
+    osci::IntParameter* getIntParameter(juce::String id);
     
     void saveProperties(juce::XmlElement& xml);
     void loadProperties(juce::XmlElement& xml);

@@ -83,8 +83,6 @@
               file="Source/audio/BitCrushEffect.cpp"/>
         <FILE id="Bc8UeW" name="BitCrushEffect.h" compile="0" resource="0"
               file="Source/audio/BitCrushEffect.h"/>
-        <FILE id="S5ChqG" name="BooleanParameter.h" compile="0" resource="0"
-              file="Source/audio/BooleanParameter.h"/>
         <FILE id="ATOFA9" name="BulgeEffect.cpp" compile="1" resource="0" file="Source/audio/BulgeEffect.cpp"/>
         <FILE id="lOXxYe" name="BulgeEffect.h" compile="0" resource="0" file="Source/audio/BulgeEffect.h"/>
         <FILE id="uvMCNC" name="CustomEffect.cpp" compile="1" resource="0"
@@ -99,14 +97,6 @@
         <FILE id="DiIoN4" name="DistortEffect.cpp" compile="1" resource="0"
               file="Source/audio/DistortEffect.cpp"/>
         <FILE id="ux2dO2" name="DistortEffect.h" compile="0" resource="0" file="Source/audio/DistortEffect.h"/>
-        <FILE id="mP5lpY" name="Effect.cpp" compile="1" resource="0" file="Source/audio/Effect.cpp"/>
-        <FILE id="LKeNnY" name="Effect.h" compile="0" resource="0" file="Source/audio/Effect.h"/>
-        <FILE id="ca2VrC" name="EffectApplication.cpp" compile="1" resource="0"
-              file="Source/audio/EffectApplication.cpp"/>
-        <FILE id="MIYJ9y" name="EffectApplication.h" compile="0" resource="0"
-              file="Source/audio/EffectApplication.h"/>
-        <FILE id="aE0RtD" name="EffectParameter.h" compile="0" resource="0"
-              file="Source/audio/EffectParameter.h"/>
         <FILE id="QBWW9w" name="PerspectiveEffect.cpp" compile="1" resource="0"
               file="Source/audio/PerspectiveEffect.cpp"/>
         <FILE id="h0dMim" name="PerspectiveEffect.h" compile="0" resource="0"
@@ -585,24 +575,6 @@
         <FILE id="JEcNPP" name="FrameProducer.h" compile="0" resource="0" file="Source/parser/FrameProducer.h"/>
         <FILE id="hCrVUD" name="FrameSource.h" compile="0" resource="0" file="Source/parser/FrameSource.h"/>
       </GROUP>
-      <GROUP id="{92CEA658-C82C-9CEB-15EB-945EF6B6B5C8}" name="shape">
-        <FILE id="XkKRyp" name="OsciPoint.cpp" compile="1" resource="0" file="Source/shape/OsciPoint.cpp"/>
-        <FILE id="AnooP3" name="OsciPoint.h" compile="0" resource="0" file="Source/shape/OsciPoint.h"/>
-        <FILE id="iglTFG" name="CircleArc.cpp" compile="1" resource="0" file="Source/shape/CircleArc.cpp"/>
-        <FILE id="T3S8Sg" name="CircleArc.h" compile="0" resource="0" file="Source/shape/CircleArc.h"/>
-        <FILE id="G5fbub" name="Shape.cpp" compile="1" resource="0" file="Source/shape/Shape.cpp"/>
-        <FILE id="Dbvew2" name="CubicBezierCurve.cpp" compile="1" resource="0"
-              file="Source/shape/CubicBezierCurve.cpp"/>
-        <FILE id="pMyu9y" name="CubicBezierCurve.h" compile="0" resource="0"
-              file="Source/shape/CubicBezierCurve.h"/>
-        <FILE id="bGS2Fh" name="QuadraticBezierCurve.cpp" compile="1" resource="0"
-              file="Source/shape/QuadraticBezierCurve.cpp"/>
-        <FILE id="kdWF0N" name="QuadraticBezierCurve.h" compile="0" resource="0"
-              file="Source/shape/QuadraticBezierCurve.h"/>
-        <FILE id="W19EPg" name="Line.cpp" compile="1" resource="0" file="Source/shape/Line.cpp"/>
-        <FILE id="i1A2s1" name="Line.h" compile="0" resource="0" file="Source/shape/Line.h"/>
-        <FILE id="NmptSY" name="Shape.h" compile="0" resource="0" file="Source/shape/Shape.h"/>
-      </GROUP>
       <GROUP id="{56A27063-1FE7-31C3-8263-98389240A8CB}" name="svg">
         <FILE id="cTec1H" name="SvgParser.cpp" compile="1" resource="0" file="Source/svg/SvgParser.cpp"/>
         <FILE id="gvkrDH" name="SvgParser.h" compile="0" resource="0" file="Source/svg/SvgParser.h"/>
@@ -695,8 +667,6 @@
             file="Source/FrameSettingsComponent.cpp"/>
       <FILE id="lzBNS1" name="FrameSettingsComponent.h" compile="0" resource="0"
             file="Source/FrameSettingsComponent.h"/>
-      <FILE id="uyOdTl" name="LegacyProject.cpp" compile="1" resource="0"
-            file="Source/LegacyProject.cpp"/>
       <FILE id="d2zFqF" name="LookAndFeel.cpp" compile="1" resource="0" file="Source/LookAndFeel.cpp"/>
       <FILE id="TJDqWs" name="LookAndFeel.h" compile="0" resource="0" file="Source/LookAndFeel.h"/>
       <FILE id="X26RjJ" name="LuaComponent.cpp" compile="1" resource="0"
@@ -763,6 +733,7 @@
         <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
+        <MODULEPATH id="osci_render_core" path="modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/osci-render/VisualStudio2022" smallIcon="pSc1mq"
@@ -798,6 +769,7 @@
         <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
+        <MODULEPATH id="osci_render_core" path="modules"/>
       </MODULEPATHS>
     </VS2022>
     <XCODE_MAC targetFolder="Builds/osci-render/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak"
@@ -840,6 +812,7 @@
         <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
+        <MODULEPATH id="osci_render_core" path="modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
   </EXPORTFORMATS>
@@ -871,5 +844,6 @@
     <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_sharedtexture" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>
 </JUCERPROJECT>

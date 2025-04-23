@@ -166,7 +166,7 @@ void VisualiserComponent::mouseDoubleClick(const juce::MouseEvent& event) {
     }
 }
 
-void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
+void VisualiserComponent::runTask(const std::vector<osci::Point>& points) {
     {
         juce::CriticalSection::ScopedLockType lock(samplesLock);
         
@@ -181,7 +181,7 @@ void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
         ySamples.clear();
         zSamples.clear();
         
-        auto applyEffects = [&](OsciPoint point) {
+        auto applyEffects = [&](osci::Point point) {
             for (auto& effect : settings.parameters.audioEffects) {
                 point = effect->apply(0, point);
             }
@@ -203,7 +203,7 @@ void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
             double triggerValue = settings.getTriggerValue();
             bool belowTrigger = false;
             
-            for (const OsciPoint& point : points) {
+            for (const osci::Point& point : points) {
                 long samplePosition = sampleCount - lastTriggerPosition;
                 double startPoint = 1.135;
                 double sweep = samplePosition * sweepIncrement * 2 * startPoint - startPoint;
@@ -216,7 +216,7 @@ void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
                 
                 belowTrigger = value < triggerValue;
                 
-                OsciPoint sweepPoint = {sweep, value, 1};
+                osci::Point sweepPoint = {sweep, value, 1};
                 sweepPoint = applyEffects(sweepPoint);
                 
                 xSamples.push_back(sweepPoint.x);
@@ -226,8 +226,8 @@ void VisualiserComponent::runTask(const std::vector<OsciPoint>& points) {
                 sampleCount++;
             }
         } else {
-            for (const OsciPoint& rawPoint : points) {
-                OsciPoint point = applyEffects(rawPoint);
+            for (const osci::Point& rawPoint : points) {
+                osci::Point point = applyEffects(rawPoint);
                 
 #if SOSCI_FEATURES
                 if (settings.isGoniometer()) {
@@ -1262,8 +1262,8 @@ void VisualiserComponent::drawCRT() {
 }
 
 void VisualiserComponent::setOffsetAndScale(juce::OpenGLShaderProgram* shader) {
-    OsciPoint offset;
-    OsciPoint scale = { 1.0f };
+    osci::Point offset;
+    osci::Point scale = { 1.0f };
 #if SOSCI_FEATURES
     if (settings.getScreenOverlay() == ScreenOverlay::Real) {
         offset = REAL_SCREEN_OFFSET;

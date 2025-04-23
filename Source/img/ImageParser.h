@@ -1,9 +1,6 @@
 #pragma once
-#include "../shape/OsciPoint.h"
 #include <JuceHeader.h>
-#include "../shape/Shape.h"
 #include "../svg/SvgParser.h"
-#include "../shape/Line.h"
 #include "../concurrency/ReadProcess.h"
 
 class OscirenderAudioProcessor;
@@ -15,7 +12,7 @@ public:
 	~ImageParser();
 
 	void setFrame(int index);
-	OsciPoint getSample();
+	osci::Point getSample();
 	int getNumFrames() { return frames.size(); }
 	int getCurrentFrame() const { return frameIndex; }
 

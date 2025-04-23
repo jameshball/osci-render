@@ -5,6 +5,17 @@ LicenseRegistrationComponent::LicenseRegistrationComponent(CommonAudioProcessor&
 {
     setupComponents();
     
+    auto showComponent = [this] {
+        // If validated within the last week, show immediately
+        juce::WeakReference<LicenseRegistrationComponent> weakThis(this);
+        juce::MessageManager::callAsync([weakThis]() {
+            if (auto* strongThis = weakThis.get()) {
+                strongThis->setVisible(true);
+            }
+        });
+        audioProcessor.licenseVerified = false;
+    };
+    
     audioProcessor.reloadGlobalSettings();
     auto savedKey = audioProcessor.getGlobalStringValue("license_key");
     if (savedKey.isNotEmpty())
@@ -21,21 +32,13 @@ LicenseRegistrationComponent::LicenseRegistrationComponent(CommonAudioProcessor&
             
             if (lastValidationTime > weekAgo)
             {
-                // If validated within the last week, hide immediately
-                juce::WeakReference<LicenseRegistrationComponent> weakThis(this);
-                juce::MessageManager::callAsync([weakThis]() {
-                    if (auto* strongThis = weakThis.get()) {
-                        strongThis->setVisible(false);
-                    }
-                });
-                
                 if (onLicenseVerified != nullptr) {
                     onLicenseVerified(true);
                 }
                 
                 audioProcessor.licenseVerified = true;
             } else {
-                audioProcessor.licenseVerified = false;
+                showComponent();
             }
             
             if (lastValidationTime < hourAgo) {
@@ -47,7 +50,7 @@ LicenseRegistrationComponent::LicenseRegistrationComponent(CommonAudioProcessor&
             startTimer(1000 * 60 * 60);
         }
     } else {
-        audioProcessor.licenseVerified = false;
+        showComponent();
     }
 }
 

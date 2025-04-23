@@ -4,7 +4,7 @@
 #include <condition_variable>
 #include <queue>
 
-typedef std::vector<std::unique_ptr<Shape>> Frame;
+typedef std::vector<std::unique_ptr<osci::Shape>> Frame;
 class BlockingQueue {
     std::vector<Frame> content;
     std::atomic<int> size = 0;

@@ -15,119 +15,118 @@
 #include "audio/SmoothEffect.h"
 #include "audio/BitCrushEffect.h"
 #include "audio/BulgeEffect.h"
-#include "audio/EffectParameter.h"
 
 //==============================================================================
 OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(2), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
     // locking isn't necessary here because we are in the constructor
 
-    toggleableEffects.push_back(std::make_shared<Effect>(
+    toggleableEffects.push_back(std::make_shared<osci::Effect>(
         std::make_shared<BitCrushEffect>(),
-        new EffectParameter("Bit Crush", "Limits the resolution of points drawn to the screen, making the object look pixelated, and making the audio sound more 'digital' and distorted.", "bitCrush", VERSION_HINT, 0.6, 0.0, 1.0)
+        new osci::EffectParameter("Bit Crush", "Limits the resolution of points drawn to the screen, making the object look pixelated, and making the audio sound more 'digital' and distorted.", "bitCrush", VERSION_HINT, 0.6, 0.0, 1.0)
     ));
-    toggleableEffects.push_back(std::make_shared<Effect>(
+    toggleableEffects.push_back(std::make_shared<osci::Effect>(
         std::make_shared<BulgeEffect>(),
-        new EffectParameter("Bulge", "Applies a bulge that makes the centre of the image larger, and squishes the edges of the image. This applies a distortion to the audio.", "bulge", VERSION_HINT, 0.5, 0.0, 1.0)
+        new osci::EffectParameter("Bulge", "Applies a bulge that makes the centre of the image larger, and squishes the edges of the image. This applies a distortion to the audio.", "bulge", VERSION_HINT, 0.5, 0.0, 1.0)
     ));
-    toggleableEffects.push_back(std::make_shared<Effect>(
+    toggleableEffects.push_back(std::make_shared<osci::Effect>(
         std::make_shared<VectorCancellingEffect>(),
-        new EffectParameter("Vector Cancelling", "Inverts the audio and image every few samples to 'cancel out' the audio, making the audio quiet, and distorting the image.", "vectorCancelling", VERSION_HINT, 0.1111111, 0.0, 1.0)
+        new osci::EffectParameter("Vector Cancelling", "Inverts the audio and image every few samples to 'cancel out' the audio, making the audio quiet, and distorting the image.", "vectorCancelling", VERSION_HINT, 0.1111111, 0.0, 1.0)
     ));
-	toggleableEffects.push_back(std::make_shared<Effect>(
-        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
-            return input * OsciPoint(values[0], values[1], values[2]);
-		}, std::vector<EffectParameter*>{
-		    new EffectParameter("Scale X", "Scales the object in the horizontal direction.", "scaleX", VERSION_HINT, 1.0, -5.0, 5.0),
-			new EffectParameter("Scale Y", "Scales the object in the vertical direction.", "scaleY", VERSION_HINT, 1.0, -5.0, 5.0),
-			new EffectParameter("Scale Z", "Scales the depth of the object.", "scaleZ", VERSION_HINT, 1.0, -5.0, 5.0),
+	toggleableEffects.push_back(std::make_shared<osci::Effect>(
+        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+            return input * osci::Point(values[0], values[1], values[2]);
+		}, std::vector<osci::EffectParameter*>{
+		    new osci::EffectParameter("Scale X", "Scales the object in the horizontal direction.", "scaleX", VERSION_HINT, 1.0, -5.0, 5.0),
+			new osci::EffectParameter("Scale Y", "Scales the object in the vertical direction.", "scaleY", VERSION_HINT, 1.0, -5.0, 5.0),
+			new osci::EffectParameter("Scale Z", "Scales the depth of the object.", "scaleZ", VERSION_HINT, 1.0, -5.0, 5.0),
 	    }
 	));
-    toggleableEffects.push_back(std::make_shared<Effect>(
-        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+    toggleableEffects.push_back(std::make_shared<osci::Effect>(
+        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
 			int flip = index % 2 == 0 ? 1 : -1;
-			OsciPoint jitter = OsciPoint(flip * values[0], flip * values[1], flip * values[2]);
+			osci::Point jitter = osci::Point(flip * values[0], flip * values[1], flip * values[2]);
 			return input + jitter;
-        }, std::vector<EffectParameter*>{
-            new EffectParameter("Distort X", "Distorts the image in the horizontal direction by jittering the audio sample being drawn.", "distortX", VERSION_HINT, 0.0, 0.0, 1.0),
-            new EffectParameter("Distort Y", "Distorts the image in the vertical direction by jittering the audio sample being drawn.", "distortY", VERSION_HINT, 0.0, 0.0, 1.0),
-            new EffectParameter("Distort Z", "Distorts the depth of the image by jittering the audio sample being drawn.", "distortZ", VERSION_HINT, 0.1, 0.0, 1.0),
+        }, std::vector<osci::EffectParameter*>{
+            new osci::EffectParameter("Distort X", "Distorts the image in the horizontal direction by jittering the audio sample being drawn.", "distortX", VERSION_HINT, 0.0, 0.0, 1.0),
+            new osci::EffectParameter("Distort Y", "Distorts the image in the vertical direction by jittering the audio sample being drawn.", "distortY", VERSION_HINT, 0.0, 0.0, 1.0),
+            new osci::EffectParameter("Distort Z", "Distorts the depth of the image by jittering the audio sample being drawn.", "distortZ", VERSION_HINT, 0.1, 0.0, 1.0),
 	    }
     ));
-    auto rippleEffect = std::make_shared<Effect>(
-        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+    auto rippleEffect = std::make_shared<osci::Effect>(
+        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             double phase = values[1] * std::numbers::pi;
             double distance = 100 * values[2] * (input.x * input.x + input.y * input.y);
             input.z += values[0] * std::sin(phase + distance);
             return input;
-        }, std::vector<EffectParameter*>{
-            new EffectParameter("Ripple Depth", "Controls how large the ripples applied to the image are.", "rippleDepth", VERSION_HINT, 0.2, 0.0, 1.0),
-            new EffectParameter("Ripple Phase", "Controls the position of the ripple. Animate this to see a moving ripple effect.", "ripplePhase", VERSION_HINT, 0.0, -1.0, 1.0),
-            new EffectParameter("Ripple Amount", "Controls how many ripples are applied to the image.", "rippleAmount", VERSION_HINT, 0.1, 0.0, 1.0),
+        }, std::vector<osci::EffectParameter*>{
+            new osci::EffectParameter("Ripple Depth", "Controls how large the ripples applied to the image are.", "rippleDepth", VERSION_HINT, 0.2, 0.0, 1.0),
+            new osci::EffectParameter("Ripple Phase", "Controls the position of the ripple. Animate this to see a moving ripple effect.", "ripplePhase", VERSION_HINT, 0.0, -1.0, 1.0),
+            new osci::EffectParameter("Ripple Amount", "Controls how many ripples are applied to the image.", "rippleAmount", VERSION_HINT, 0.1, 0.0, 1.0),
         }
     );
-    rippleEffect->getParameter("ripplePhase")->lfo->setUnnormalisedValueNotifyingHost((int) LfoType::Sawtooth);
+    rippleEffect->getParameter("ripplePhase")->lfo->setUnnormalisedValueNotifyingHost((int) osci::LfoType::Sawtooth);
     toggleableEffects.push_back(rippleEffect);
-    auto rotateEffect = std::make_shared<Effect>(
-        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+    auto rotateEffect = std::make_shared<osci::Effect>(
+        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             input.rotate(values[0] * std::numbers::pi, values[1] * std::numbers::pi, values[2] * std::numbers::pi);
             return input;
-        }, std::vector<EffectParameter*>{
-            new EffectParameter("Rotate X", "Controls the rotation of the object in the X axis.", "rotateX", VERSION_HINT, 0.0, -1.0, 1.0),
-            new EffectParameter("Rotate Y", "Controls the rotation of the object in the Y axis.", "rotateY", VERSION_HINT, 0.0, -1.0, 1.0),
-            new EffectParameter("Rotate Z", "Controls the rotation of the object in the Z axis.", "rotateZ", VERSION_HINT, 0.0, -1.0, 1.0),
+        }, std::vector<osci::EffectParameter*>{
+            new osci::EffectParameter("Rotate X", "Controls the rotation of the object in the X axis.", "rotateX", VERSION_HINT, 0.0, -1.0, 1.0),
+            new osci::EffectParameter("Rotate Y", "Controls the rotation of the object in the Y axis.", "rotateY", VERSION_HINT, 0.0, -1.0, 1.0),
+            new osci::EffectParameter("Rotate Z", "Controls the rotation of the object in the Z axis.", "rotateZ", VERSION_HINT, 0.0, -1.0, 1.0),
         }
     );
-	rotateEffect->getParameter("rotateY")->lfo->setUnnormalisedValueNotifyingHost((int) LfoType::Sawtooth);
+	rotateEffect->getParameter("rotateY")->lfo->setUnnormalisedValueNotifyingHost((int) osci::LfoType::Sawtooth);
     rotateEffect->getParameter("rotateY")->lfoRate->setUnnormalisedValueNotifyingHost(0.2);
     toggleableEffects.push_back(rotateEffect);
-    toggleableEffects.push_back(std::make_shared<Effect>(
-        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
-            return input + OsciPoint(values[0], values[1], values[2]);
-        }, std::vector<EffectParameter*>{
-            new EffectParameter("Translate X", "Moves the object horizontally.", "translateX", VERSION_HINT, 0.0, -1.0, 1.0),
-            new EffectParameter("Translate Y", "Moves the object vertically.", "translateY", VERSION_HINT, 0.0, -1.0, 1.0),
-			new EffectParameter("Translate Z", "Moves the object away from the camera.", "translateZ", VERSION_HINT, 0.0, -1.0, 1.0),
+    toggleableEffects.push_back(std::make_shared<osci::Effect>(
+        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+            return input + osci::Point(values[0], values[1], values[2]);
+        }, std::vector<osci::EffectParameter*>{
+            new osci::EffectParameter("Translate X", "Moves the object horizontally.", "translateX", VERSION_HINT, 0.0, -1.0, 1.0),
+            new osci::EffectParameter("Translate Y", "Moves the object vertically.", "translateY", VERSION_HINT, 0.0, -1.0, 1.0),
+			new osci::EffectParameter("Translate Z", "Moves the object away from the camera.", "translateZ", VERSION_HINT, 0.0, -1.0, 1.0),
         }
     ));
-    toggleableEffects.push_back(std::make_shared<Effect>(
-        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+    toggleableEffects.push_back(std::make_shared<osci::Effect>(
+        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             double length = 10 * values[0] * input.magnitude();
             double newX = input.x * std::cos(length) - input.y * std::sin(length);
             double newY = input.x * std::sin(length) + input.y * std::cos(length);
-            return OsciPoint(newX, newY, input.z);
-        }, std::vector<EffectParameter*>{
-            new EffectParameter("Swirl", "Swirls the image in a spiral pattern.", "swirl", VERSION_HINT, 0.3, -1.0, 1.0),
+            return osci::Point(newX, newY, input.z);
+        }, std::vector<osci::EffectParameter*>{
+            new osci::EffectParameter("Swirl", "Swirls the image in a spiral pattern.", "swirl", VERSION_HINT, 0.3, -1.0, 1.0),
         }
     ));
-    toggleableEffects.push_back(std::make_shared<Effect>(
+    toggleableEffects.push_back(std::make_shared<osci::Effect>(
         std::make_shared<SmoothEffect>(),
-        new EffectParameter("Smoothing", "This works as a low-pass frequency filter that removes high frequencies, making the image look smoother, and audio sound less harsh.", "smoothing", VERSION_HINT, 0.75, 0.0, 1.0)
+        new osci::EffectParameter("Smoothing", "This works as a low-pass frequency filter that removes high frequencies, making the image look smoother, and audio sound less harsh.", "smoothing", VERSION_HINT, 0.75, 0.0, 1.0)
     ));
-    std::shared_ptr<Effect> wobble = std::make_shared<Effect>(
+    std::shared_ptr<osci::Effect> wobble = std::make_shared<osci::Effect>(
         wobbleEffect,
-        std::vector<EffectParameter*>{
-            new EffectParameter("Wobble Amount", "Adds a sine wave of the prominent frequency in the audio currently playing. The sine wave's frequency is slightly offset to create a subtle 'wobble' in the image. Increasing the slider increases the strength of the wobble.", "wobble", VERSION_HINT, 0.3, 0.0, 1.0),
-            new EffectParameter("Wobble Phase", "Controls the phase of the wobble.", "wobblePhase", VERSION_HINT, 0.0, -1.0, 1.0),
+        std::vector<osci::EffectParameter*>{
+            new osci::EffectParameter("Wobble Amount", "Adds a sine wave of the prominent frequency in the audio currently playing. The sine wave's frequency is slightly offset to create a subtle 'wobble' in the image. Increasing the slider increases the strength of the wobble.", "wobble", VERSION_HINT, 0.3, 0.0, 1.0),
+            new osci::EffectParameter("Wobble Phase", "Controls the phase of the wobble.", "wobblePhase", VERSION_HINT, 0.0, -1.0, 1.0),
         }
     );
-    wobble->getParameter("wobblePhase")->lfo->setUnnormalisedValueNotifyingHost((int) LfoType::Sawtooth);
+    wobble->getParameter("wobblePhase")->lfo->setUnnormalisedValueNotifyingHost((int) osci::LfoType::Sawtooth);
     toggleableEffects.push_back(wobble);
-    toggleableEffects.push_back(std::make_shared<Effect>(
+    toggleableEffects.push_back(std::make_shared<osci::Effect>(
         delayEffect,
-        std::vector<EffectParameter*>{
-            new EffectParameter("Delay Decay", "Adds repetitions, delays, or echos to the audio. This slider controls the volume of the echo.", "delayDecay", VERSION_HINT, 0.4, 0.0, 1.0),
-            new EffectParameter("Delay Length", "Controls the time in seconds between echos.", "delayLength", VERSION_HINT, 0.5, 0.0, 1.0)
+        std::vector<osci::EffectParameter*>{
+            new osci::EffectParameter("Delay Decay", "Adds repetitions, delays, or echos to the audio. This slider controls the volume of the echo.", "delayDecay", VERSION_HINT, 0.4, 0.0, 1.0),
+            new osci::EffectParameter("Delay Length", "Controls the time in seconds between echos.", "delayLength", VERSION_HINT, 0.5, 0.0, 1.0)
         }
     ));
-    toggleableEffects.push_back(std::make_shared<Effect>(
+    toggleableEffects.push_back(std::make_shared<osci::Effect>(
         dashedLineEffect,
-        std::vector<EffectParameter*>{
-            new EffectParameter("Dash Length", "Controls the length of the dashed line.", "dashLength", VERSION_HINT, 0.2, 0.0, 1.0),
+        std::vector<osci::EffectParameter*>{
+            new osci::EffectParameter("Dash Length", "Controls the length of the dashed line.", "dashLength", VERSION_HINT, 0.2, 0.0, 1.0),
         }
     ));
     toggleableEffects.push_back(custom);
     toggleableEffects.push_back(trace);
-    trace->getParameter("traceLength")->lfo->setUnnormalisedValueNotifyingHost((int) LfoType::Sawtooth);
+    trace->getParameter("traceLength")->lfo->setUnnormalisedValueNotifyingHost((int) osci::LfoType::Sawtooth);
 
     for (int i = 0; i < toggleableEffects.size(); i++) {
         auto effect = toggleableEffects[i];
@@ -137,7 +136,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
         effect->setPrecedence(i);
     }
 
-    std::vector<std::shared_ptr<Effect>> osciPermanentEffects;
+    std::vector<std::shared_ptr<osci::Effect>> osciPermanentEffects;
     osciPermanentEffects.push_back(perspective);
     osciPermanentEffects.push_back(frequencyEffect);
     osciPermanentEffects.push_back(imageThreshold);
@@ -219,11 +218,11 @@ void OscirenderAudioProcessor::addLuaSlider() {
         sliderNum = (sliderNum - mod) / 26;
     }
 
-    luaEffects.push_back(std::make_shared<Effect>(
-        [this, sliderIndex](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+    luaEffects.push_back(std::make_shared<osci::Effect>(
+        [this, sliderIndex](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             luaValues[sliderIndex].store(values[0]);
             return input;
-        }, new EffectParameter(
+        }, new osci::EffectParameter(
             "Lua Slider " + sliderName,
             "Controls the value of the Lua variable called slider_" + sliderName.toLowerCase() + ".",
             "lua" + sliderName,
@@ -244,7 +243,7 @@ void OscirenderAudioProcessor::removeErrorListener(ErrorListener* listener) {
 
 // effectsLock MUST be held when calling this
 void OscirenderAudioProcessor::updateEffectPrecedence() {
-    auto sortFunc = [](std::shared_ptr<Effect> a, std::shared_ptr<Effect> b) {
+    auto sortFunc = [](std::shared_ptr<osci::Effect> a, std::shared_ptr<osci::Effect> b) {
         return a->getPrecedence() < b->getPrecedence();
     };
     std::sort(toggleableEffects.begin(), toggleableEffects.end(), sortFunc);
@@ -580,7 +579,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         currentVolume = std::sqrt(squaredVolume);
         currentVolume = juce::jlimit(0.0, 1.0, currentVolume);
 
-        OsciPoint channels = { outputBuffer3d.getSample(0, sample), outputBuffer3d.getSample(1, sample), outputBuffer3d.getSample(2, sample) };
+        osci::Point channels = { outputBuffer3d.getSample(0, sample), outputBuffer3d.getSample(1, sample), outputBuffer3d.getSample(2, sample) };
 
         {
             juce::SpinLock::ScopedLockType lock1(parsersLock);
@@ -613,7 +612,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         x = juce::jmax(-threshold, juce::jmin(threshold.load(), x));
         y = juce::jmax(-threshold, juce::jmin(threshold.load(), y));
         
-        threadManager.write(OsciPoint(x, y, 1));
+        threadManager.write(osci::Point(x, y, 1));
         
         // Apply mute if active
         if (muteParameter->getBoolValue() || !licenseVerified) {
@@ -728,7 +727,7 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
     if (xml.get() != nullptr && xml->hasTagName("project")) {
         auto versionXml = xml->getChildByName("version");
         if (versionXml != nullptr && versionXml->getAllSubText().startsWith("v1.")) {
-            openLegacyProject(xml.get());
+            // this is an old version of osci-render, ignore it
             return;
         }
         auto version = xml->hasAttribute("version") ? xml->getStringAttribute("version") : "2.0.0";
@@ -858,7 +857,7 @@ void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float n
 
 void OscirenderAudioProcessor::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
 
-void updateIfApproxEqual(FloatParameter* parameter, float newValue) {
+void updateIfApproxEqual(osci::FloatParameter* parameter, float newValue) {
     if (std::abs(parameter->getValueUnnormalised() - newValue) > 0.0001) {
         parameter->setUnnormalisedValueNotifyingHost(newValue);
     }

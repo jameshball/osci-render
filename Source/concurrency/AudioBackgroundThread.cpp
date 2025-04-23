@@ -43,7 +43,7 @@ void AudioBackgroundThread::setShouldBeRunning(bool shouldBeRunning, std::functi
     }
 }
 
-void AudioBackgroundThread::write(const OsciPoint& point) {
+void AudioBackgroundThread::write(const osci::Point& point) {
     if (isPrepared && isThreadRunning()) {
         consumer->write(point);
     }

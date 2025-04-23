@@ -1,7 +1,7 @@
 #pragma once
 
+#include <JuceHeader.h>
 #include "FrameSource.h"
-#include "../shape/Shape.h"
 #include "../obj/WorldObject.h"
 #include "../svg/SvgParser.h"
 #include "../txt/TextParser.h"
@@ -16,8 +16,8 @@ public:
 	FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce::String, juce::String)> errorCallback = nullptr);
 
 	void parse(juce::String fileId, juce::String fileName, juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font font);
-	std::vector<std::unique_ptr<Shape>> nextFrame();
-	OsciPoint nextSample(lua_State*& L, LuaVariables& vars);
+	std::vector<std::unique_ptr<osci::Shape>> nextFrame();
+	osci::Point nextSample(lua_State*& L, LuaVariables& vars);
 
 	bool isSample();
 	bool isActive();

@@ -211,15 +211,15 @@ WorldObject::WorldObject(const std::string& obj_string) {
                 double y2 = vs[vertex * 3 + 1];
                 double z2 = vs[vertex * 3 + 2];
 
-                edges.push_back(Line(x1, y1, z1, x2, y2, z2));
+                edges.push_back(osci::Line(x1, y1, z1, x2, y2, z2));
             }
             prevVertex = vertex;
         }
     }
 }
 
-std::vector<std::unique_ptr<Shape>> WorldObject::draw() {
-    std::vector<std::unique_ptr<Shape>> shapes;
+std::vector<std::unique_ptr<osci::Shape>> WorldObject::draw() {
+    std::vector<std::unique_ptr<osci::Shape>> shapes;
 
     for (auto& edge : edges) {
         shapes.push_back(edge.clone());

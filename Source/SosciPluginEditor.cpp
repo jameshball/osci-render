@@ -9,7 +9,7 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p) : CommonPluginEdito
     }
     addAndMakeVisible(visualiserSettingsWrapper);
 
-    BooleanParameter* visualiserFullScreen = audioProcessor.visualiserParameters.visualiserFullScreen;
+    osci::BooleanParameter* visualiserFullScreen = audioProcessor.visualiserParameters.visualiserFullScreen;
     visualiserFullScreenChanged();
 
     visualiser.setFullScreenCallback([this, visualiserFullScreen](FullScreenMode mode) {
@@ -33,6 +33,9 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p) : CommonPluginEdito
         manager.addChangeListener(this);
         currentInputDevice = getInputDeviceName();
     }
+    
+    addChildComponent(licenseRegistration);
+    licenseRegistration.toFront(true);
 }
 
 SosciPluginEditor::~SosciPluginEditor() {
@@ -52,6 +55,8 @@ void SosciPluginEditor::paint(juce::Graphics& g) {
 void SosciPluginEditor::resized() {
     CommonPluginEditor::resized();
     auto area = getLocalBounds();
+    
+    licenseRegistration.setBounds(area);
 
     if (audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
         visualiser.setBounds(area);

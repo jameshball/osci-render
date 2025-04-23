@@ -8,7 +8,6 @@
 
 #include "CommonPluginProcessor.h"
 #include "CommonPluginEditor.h"
-#include "audio/EffectParameter.h"
 #include "components/AudioPlayerComponent.h"
 
 //==============================================================================
@@ -54,7 +53,7 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
         intParameters.push_back(parameter);
     }
 
-    muteParameter = new BooleanParameter("Mute", "mute", VERSION_HINT, false, "Mute audio output");
+    muteParameter = new osci::BooleanParameter("Mute", "mute", VERSION_HINT, false, "Mute audio output");
     booleanParameters.push_back(muteParameter);
 
     permanentEffects.push_back(volumeEffect);
@@ -164,7 +163,7 @@ bool CommonAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) co
 }
 
 // effectsLock should be held when calling this
-std::shared_ptr<Effect> CommonAudioProcessor::getEffect(juce::String id) {
+std::shared_ptr<osci::Effect> CommonAudioProcessor::getEffect(juce::String id) {
     for (auto& effect : effects) {
         if (effect->getId() == id) {
             return effect;
@@ -174,7 +173,7 @@ std::shared_ptr<Effect> CommonAudioProcessor::getEffect(juce::String id) {
 }
 
 // effectsLock should be held when calling this
-BooleanParameter* CommonAudioProcessor::getBooleanParameter(juce::String id) {
+osci::BooleanParameter* CommonAudioProcessor::getBooleanParameter(juce::String id) {
     for (auto& parameter : booleanParameters) {
         if (parameter->paramID == id) {
             return parameter;
@@ -184,7 +183,7 @@ BooleanParameter* CommonAudioProcessor::getBooleanParameter(juce::String id) {
 }
 
 // effectsLock should be held when calling this
-FloatParameter* CommonAudioProcessor::getFloatParameter(juce::String id) {
+osci::FloatParameter* CommonAudioProcessor::getFloatParameter(juce::String id) {
     for (auto& parameter : floatParameters) {
         if (parameter->paramID == id) {
             return parameter;
@@ -194,7 +193,7 @@ FloatParameter* CommonAudioProcessor::getFloatParameter(juce::String id) {
 }
 
 // effectsLock should be held when calling this
-IntParameter* CommonAudioProcessor::getIntParameter(juce::String id) {
+osci::IntParameter* CommonAudioProcessor::getIntParameter(juce::String id) {
     for (auto& parameter : intParameters) {
         if (parameter->paramID == id) {
             return parameter;

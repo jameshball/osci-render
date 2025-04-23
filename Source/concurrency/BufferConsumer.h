@@ -1,7 +1,6 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "../shape/OsciPoint.h"
 #include <mutex>
 #include <condition_variable>
 #include "readerwritercircularbuffer.h"
@@ -49,7 +48,7 @@ public:
         returnBuffer.resize(size);
         buffer1.resize(size);
         buffer2.resize(size);
-        queue = std::make_unique<moodycamel::BlockingReaderWriterCircularBuffer<OsciPoint>>(2 * size);
+        queue = std::make_unique<moodycamel::BlockingReaderWriterCircularBuffer<osci::Point>>(2 * size);
     }
 
     ~BufferConsumer() {}
@@ -75,10 +74,10 @@ public:
     // make sure that everything waiting on it stops waiting.
     void forceNotify() {
         sema.release();
-        queue->try_enqueue(OsciPoint());
+        queue->try_enqueue(osci::Point());
     }
 
-    void write(OsciPoint point) {
+    void write(osci::Point point) {
         if (blockOnWrite) {
             queue->wait_enqueue(point);
         } else {
@@ -95,7 +94,7 @@ public:
         }
     }
 
-    std::vector<OsciPoint>& getBuffer() {
+    std::vector<osci::Point>& getBuffer() {
         if (blockOnWrite) {
             return returnBuffer;
         } else {
@@ -110,7 +109,7 @@ public:
         if (blockOnWrite) {
             sema.release();
         } else {
-            OsciPoint item;
+            osci::Point item;
             // We dequeue an item so that the audio thread is unblocked
             // if it's trying to wait until the queue is no longer full.
             queue->try_dequeue(item);
@@ -121,13 +120,13 @@ public:
     }
 
 private:
-    std::unique_ptr<moodycamel::BlockingReaderWriterCircularBuffer<OsciPoint>> queue;
-    std::vector<OsciPoint> returnBuffer;
-    std::vector<OsciPoint> buffer1;
-    std::vector<OsciPoint> buffer2;
+    std::unique_ptr<moodycamel::BlockingReaderWriterCircularBuffer<osci::Point>> queue;
+    std::vector<osci::Point> returnBuffer;
+    std::vector<osci::Point> buffer1;
+    std::vector<osci::Point> buffer2;
     juce::SpinLock bufferLock;
     std::atomic<bool> blockOnWrite = false;
-    std::vector<OsciPoint>* buffer = &buffer1;
+    std::vector<osci::Point>* buffer = &buffer1;
     Semaphore sema{0};
     int offset = 0;
 };

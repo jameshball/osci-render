@@ -1,7 +1,6 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "../shape/OsciPoint.h"
 #include "BufferConsumer.h"
 
 class AudioBackgroundThreadManager;
@@ -12,7 +11,7 @@ public:
     
     void prepare(double sampleRate, int samplesPerBlock);
     void setShouldBeRunning(bool shouldBeRunning, std::function<void()> stopCallback = nullptr);
-    void write(const OsciPoint& point);
+    void write(const osci::Point& point);
     void setBlockOnAudioThread(bool block);
     
 private:
@@ -30,6 +29,6 @@ private:
 protected:
     
     virtual int prepareTask(double sampleRate, int samplesPerBlock) = 0;
-    virtual void runTask(const std::vector<OsciPoint>& points) = 0;
+    virtual void runTask(const std::vector<osci::Point>& points) = 0;
     virtual void stopTask() = 0;
 };

@@ -67,7 +67,7 @@ public:
     void paint(juce::Graphics&) override;
     void handleAsyncUpdate() override;
     int prepareTask(double sampleRate, int bufferSize) override;
-    void runTask(const std::vector<OsciPoint>& points) override;
+    void runTask(const std::vector<osci::Point>& points) override;
     void stopTask() override;
 	void resized() override;
 

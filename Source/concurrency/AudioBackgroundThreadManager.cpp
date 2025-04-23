@@ -15,14 +15,14 @@ void AudioBackgroundThreadManager::unregisterThread(AudioBackgroundThread* threa
     threads.erase(std::remove(threads.begin(), threads.end(), thread), threads.end());
 }
 
-void AudioBackgroundThreadManager::write(const OsciPoint& point) {
+void AudioBackgroundThreadManager::write(const osci::Point& point) {
     juce::SpinLock::ScopedLockType scope(lock);
     for (auto& thread : threads) {
         thread->write(point);
     }
 }
 
-void AudioBackgroundThreadManager::write(const OsciPoint& point, juce::String name) {
+void AudioBackgroundThreadManager::write(const osci::Point& point, juce::String name) {
     juce::SpinLock::ScopedLockType scope(lock);
     for (auto& thread : threads) {
         if (thread->getThreadName().contains(name)) {

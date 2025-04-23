@@ -92,7 +92,7 @@ void VolumeComponent::handleAsyncUpdate() {
     thresholdSlider.setValue(audioProcessor.thresholdEffect->getValue(), juce::NotificationType::dontSendNotification);
 }
 
-void VolumeComponent::runTask(const std::vector<OsciPoint>& buffer) {
+void VolumeComponent::runTask(const std::vector<osci::Point>& buffer) {
     float leftVolume = 0;
     float rightVolume = 0;
 

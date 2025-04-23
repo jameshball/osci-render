@@ -121,7 +121,7 @@ public:
     
     void run() override {
         for (int i = 0; i < 1024 * 100; i++) {
-            consumer.write(OsciPoint(counter++));
+            consumer.write(osci::Point(counter++));
         }
     }
 

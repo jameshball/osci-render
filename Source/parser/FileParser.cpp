@@ -1,6 +1,4 @@
 #include "FileParser.h"
-#include "../shape/Line.h"
-#include "../shape/CircleArc.h"
 #include <numbers>
 #include "../PluginProcessor.h"
 
@@ -112,7 +110,7 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 	sampleSource = lua != nullptr || img != nullptr || wav != nullptr;
 }
 
-std::vector<std::unique_ptr<Shape>> FileParser::nextFrame() {
+std::vector<std::unique_ptr<osci::Shape>> FileParser::nextFrame() {
 	juce::SpinLock::ScopedLockType scope(lock);
 
 	if (object != nullptr) {
@@ -124,24 +122,24 @@ std::vector<std::unique_ptr<Shape>> FileParser::nextFrame() {
 	} else if (gpla != nullptr) {
 		return gpla->draw();
 	}
-	auto tempShapes = std::vector<std::unique_ptr<Shape>>();
+	auto tempShapes = std::vector<std::unique_ptr<osci::Shape>>();
 	// return a square
-	tempShapes.push_back(std::make_unique<Line>(OsciPoint(-0.5, -0.5, 0), OsciPoint(0.5, -0.5, 0)));
-	tempShapes.push_back(std::make_unique<Line>(OsciPoint(0.5, -0.5, 0), OsciPoint(0.5, 0.5, 0)));
-	tempShapes.push_back(std::make_unique<Line>(OsciPoint(0.5, 0.5, 0), OsciPoint(-0.5, 0.5, 0)));
-	tempShapes.push_back(std::make_unique<Line>(OsciPoint(-0.5, 0.5, 0), OsciPoint(-0.5, -0.5, 0)));
+	tempShapes.push_back(std::make_unique<osci::Line>(osci::Point(-0.5, -0.5, 0), osci::Point(0.5, -0.5, 0)));
+	tempShapes.push_back(std::make_unique<osci::Line>(osci::Point(0.5, -0.5, 0), osci::Point(0.5, 0.5, 0)));
+	tempShapes.push_back(std::make_unique<osci::Line>(osci::Point(0.5, 0.5, 0), osci::Point(-0.5, 0.5, 0)));
+	tempShapes.push_back(std::make_unique<osci::Line>(osci::Point(-0.5, 0.5, 0), osci::Point(-0.5, -0.5, 0)));
 	return tempShapes;
 }
 
-OsciPoint FileParser::nextSample(lua_State*& L, LuaVariables& vars) {
+osci::Point FileParser::nextSample(lua_State*& L, LuaVariables& vars) {
 	juce::SpinLock::ScopedLockType scope(lock);
 
 	if (lua != nullptr) {
 		auto values = lua->run(L, vars);
 		if (values.size() == 2) {
-			return OsciPoint(values[0], values[1], 0);
+			return osci::Point(values[0], values[1], 0);
 		} else if (values.size() > 2) {
-			return OsciPoint(values[0], values[1], values[2]);
+			return osci::Point(values[0], values[1], values[2]);
 		}
 	} else if (img != nullptr) {
 		return img->getSample();
@@ -149,7 +147,7 @@ OsciPoint FileParser::nextSample(lua_State*& L, LuaVariables& vars) {
         return wav->getSample();
     }
 
-	return OsciPoint();
+	return osci::Point();
 }
 
 bool FileParser::isSample() {

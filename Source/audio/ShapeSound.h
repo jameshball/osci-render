@@ -14,8 +14,8 @@ public:
 
 	bool appliesToNote(int note) override;
 	bool appliesToChannel(int channel) override;
-	void addFrame(std::vector<std::unique_ptr<Shape>>& frame, bool force = true) override;
-	double updateFrame(std::vector<std::unique_ptr<Shape>>& frame);
+	void addFrame(std::vector<std::unique_ptr<osci::Shape>>& frame, bool force = true) override;
+	double updateFrame(std::vector<std::unique_ptr<osci::Shape>>& frame);
 
 	std::shared_ptr<FileParser> parser;
 
