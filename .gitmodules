@@ -4,3 +4,6 @@
 [submodule "modules/juce_sharedtexture"]
 	path = modules/juce_sharedtexture
 	url = git@github.com:jameshball/juce_sharedtexture.git
+[submodule "modules/osci_render_addon"]
+	path = modules/osci_render_core
+	url = git@github.com:jameshball/osci_render_core.git
