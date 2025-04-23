@@ -365,6 +365,12 @@ void CommonAudioProcessor::saveGlobalSettings()
         globalSettings->saveIfNeeded();
 }
 
+void CommonAudioProcessor::reloadGlobalSettings()
+{
+    if (globalSettings != nullptr)
+        globalSettings->reload();
+}
+
 juce::File CommonAudioProcessor::getLastOpenedDirectory()
 {
     juce::String savedDir = getGlobalStringValue("lastOpenedDirectory");

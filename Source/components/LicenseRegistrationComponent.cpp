@@ -5,15 +5,49 @@ LicenseRegistrationComponent::LicenseRegistrationComponent(CommonAudioProcessor&
 {
     setupComponents();
     
-    // If we have a saved license, validate it in the background
-    if (validateSavedLicense())
+    audioProcessor.reloadGlobalSettings();
+    auto savedKey = audioProcessor.getGlobalStringValue("license_key");
+    if (savedKey.isNotEmpty())
     {
-        // Use Timer to ensure component is properly initialized before hiding
-        juce::MessageManager::callAsync([this]() {
-            setVisible(false);
-        });
-        // Start periodic checks every hour
-        startTimer(1000 * 60 * 60);
+        // Pre-populate the license key field
+        licenseKeyEditor.setText(savedKey, false);
+        
+        auto lastValidated = audioProcessor.getGlobalStringValue("license_last_validated");
+        if (lastValidated.isNotEmpty())
+        {
+            auto lastValidationTime = juce::Time::fromISO8601(lastValidated);
+            auto weekAgo = juce::Time::getCurrentTime() - juce::RelativeTime::weeks(1);
+            auto hourAgo = juce::Time::getCurrentTime() - juce::RelativeTime::hours(1);
+            
+            if (lastValidationTime > weekAgo)
+            {
+                // If validated within the last week, hide immediately
+                juce::WeakReference<LicenseRegistrationComponent> weakThis(this);
+                juce::MessageManager::callAsync([weakThis]() {
+                    if (auto* strongThis = weakThis.get()) {
+                        strongThis->setVisible(false);
+                    }
+                });
+                
+                if (onLicenseVerified != nullptr) {
+                    onLicenseVerified(true);
+                }
+                
+                audioProcessor.licenseVerified = true;
+            } else {
+                audioProcessor.licenseVerified = false;
+            }
+            
+            if (lastValidationTime < hourAgo) {
+                // Validate the license key in the background
+                validateSavedLicense();
+            }
+            
+            // Start periodic checks every hour
+            startTimer(1000 * 60 * 60);
+        }
+    } else {
+        audioProcessor.licenseVerified = false;
     }
 }
 
@@ -35,11 +69,21 @@ void LicenseRegistrationComponent::setupComponents()
     addAndMakeVisible(instructionsLabel);
     
     licenseKeyEditor.setTextToShowWhenEmpty("XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX", juce::Colours::grey);
-    licenseKeyEditor.setInputRestrictions(35, "0123456789ABCDEF-"); // Only allow hex digits and hyphens
+    licenseKeyEditor.setInputRestrictions(35, "0123456789ABCDEFabcdef-"); // Allow both upper and lowercase hex digits and hyphens
     licenseKeyEditor.onReturnKey = [this] { verifyButton.triggerClick(); };
     licenseKeyEditor.setFont(juce::Font(24.0f));
+    licenseKeyEditor.onTextChange = [this] {
+        auto currentText = licenseKeyEditor.getText();
+        auto upperText = currentText.toUpperCase();
+        if (currentText != upperText)
+        {
+            auto cursorPos = licenseKeyEditor.getCaretPosition();
+            licenseKeyEditor.setText(upperText, false);
+            licenseKeyEditor.setCaretPosition(cursorPos);
+        }
+    };
     addAndMakeVisible(licenseKeyEditor);
-    
+
     verifyButton.setButtonText("Verify License");
     verifyButton.onClick = [this] {
         if (!isVerifying)
@@ -71,7 +115,8 @@ void LicenseRegistrationComponent::resized()
     licenseKeyEditor.setBounds(row.reduced(50, 0));
     bounds.removeFromTop(20);
     
-    verifyButton.setBounds(bounds.removeFromTop(40).withSizeKeepingCentre(120, 40));
+    auto buttonBounds = bounds.removeFromTop(40);
+    verifyButton.setBounds(buttonBounds.withSizeKeepingCentre(120, 40));
 }
 
 void LicenseRegistrationComponent::verifyLicense(const juce::String& licenseKey, bool showErrorDialog)
@@ -81,6 +126,7 @@ void LicenseRegistrationComponent::verifyLicense(const juce::String& licenseKey,
         
     isVerifying = true;
     verifyButton.setEnabled(false);
+    verifyButton.setVisible(false);
     
     juce::URL url("https://api.osci-render.com/api/verify-license");
     
@@ -117,10 +163,17 @@ void LicenseRegistrationComponent::verifyLicense(const juce::String& licenseKey,
                     audioProcessor.setGlobalValue("license_key", licenseKey);
                     audioProcessor.setGlobalValue("license_last_validated", juce::Time::getCurrentTime().toISO8601(true));
                     audioProcessor.saveGlobalSettings();
+
+                    audioProcessor.licenseVerified = true;
                     
                     successfullyVerified = true;
                     
-                    setVisible(false);
+                    juce::WeakReference<LicenseRegistrationComponent> weakThis(this);
+                    juce::MessageManager::callAsync([weakThis]() {
+                        if (auto* strongThis = weakThis.get()) {
+                            strongThis->setVisible(false);
+                        }
+                    });
                     startTimer(1000 * 60 * 60); // Check every hour
                 }
                 else if (showErrorDialog)
@@ -149,6 +202,7 @@ void LicenseRegistrationComponent::verifyLicense(const juce::String& licenseKey,
     
     isVerifying = false;
     verifyButton.setEnabled(true);
+    verifyButton.setVisible(true);
     
     if (onLicenseVerified != nullptr) {
         onLicenseVerified(successfullyVerified);
@@ -177,6 +231,7 @@ void LicenseRegistrationComponent::clearLicense()
     audioProcessor.removeGlobalValue("license_last_validated");
     audioProcessor.saveGlobalSettings();
     setVisible(true);
+    audioProcessor.licenseVerified = false;
 }
 
 void LicenseRegistrationComponent::timerCallback()

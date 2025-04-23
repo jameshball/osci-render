@@ -69,7 +69,8 @@ public:
     VolumeComponent volume{audioProcessor};
 
     std::unique_ptr<juce::FileChooser> chooser;
-    juce::MenuBarComponent menuBar;    juce::TooltipWindow tooltipWindow{nullptr, 0};
+    juce::MenuBarComponent menuBar;
+    juce::SharedResourcePointer<juce::TooltipWindow> tooltipWindow;
     juce::DropShadower tooltipDropShadow{juce::DropShadow(juce::Colours::black.withAlpha(0.5f), 6, {0,0})};
 
     LicenseRegistrationComponent licenseRegistration {audioProcessor, [this](bool success) {

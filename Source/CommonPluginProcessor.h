@@ -82,9 +82,12 @@ public:
     void setGlobalValue(const juce::String& keyName, const juce::var& value);
     void removeGlobalValue(const juce::String& keyName);
     void saveGlobalSettings();
+    void reloadGlobalSettings();
     
     bool hasSetSessionStartTime = false;
     bool programCrashedAndUserWantsToReset();
+
+    std::atomic<bool> licenseVerified = true;
     
     juce::SpinLock audioPlayerListenersLock;
     std::vector<AudioPlayerListener*> audioPlayerListeners;

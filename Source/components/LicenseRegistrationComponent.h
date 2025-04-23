@@ -34,4 +34,5 @@ private:
     std::function<void(bool)> onLicenseVerified;
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LicenseRegistrationComponent)
+    JUCE_DECLARE_WEAK_REFERENCEABLE(LicenseRegistrationComponent)
 };
