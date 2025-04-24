@@ -6,7 +6,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 #if !SOSCI_FEATURES
     addAndMakeVisible(upgradeButton);
     upgradeButton.onClick = [this] {
-        juce::URL("https://osci-render.com/sosci").launchInDefaultBrowser();
+        juce::URL("https://osci-render.com/#purchase").launchInDefaultBrowser();
     };
     upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor);
     upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark);
