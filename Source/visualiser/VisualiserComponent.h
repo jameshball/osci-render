@@ -37,7 +37,7 @@ public:
     VisualiserComponent(
         CommonAudioProcessor& processor,
         CommonPluginEditor& editor,
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
         SharedTextureManager& sharedTextureManager,
 #endif
         juce::File ffmpegFile,
@@ -92,7 +92,7 @@ private:
     SvgButton settingsButton{ "settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white };
     SvgButton audioInputButton{ "audioInput", BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red };
     
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     SvgButton sharedTextureButton{ "sharedTexture", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red };
     SharedTextureManager& sharedTextureManager;
     SharedTextureSender* sharedTextureSender = nullptr;
@@ -110,7 +110,7 @@ private:
     juce::File ffmpegFile;
     bool recordingAudio = true;
     
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     bool recordingVideo = true;
     bool downloading = false;
     
@@ -179,7 +179,7 @@ private:
     juce::Image screenTextureImage = juce::ImageFileFormat::loadFrom(BinaryData::noise_jpg, BinaryData::noise_jpgSize);
     juce::Image emptyScreenImage = juce::ImageFileFormat::loadFrom(BinaryData::empty_jpg, BinaryData::empty_jpgSize);
     
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     juce::Image oscilloscopeImage = juce::ImageFileFormat::loadFrom(BinaryData::real_png, BinaryData::real_pngSize);
     juce::Image vectorDisplayImage = juce::ImageFileFormat::loadFrom(BinaryData::vector_display_png, BinaryData::vector_display_pngSize);
     
@@ -220,7 +220,7 @@ private:
     chowdsp::ResamplingTypes::LanczosResampler<2048, 8> zResampler;
 
     void setOffsetAndScale(juce::OpenGLShaderProgram* shader);
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     void initialiseSharedTexture();
     void closeSharedTexture();
 #endif

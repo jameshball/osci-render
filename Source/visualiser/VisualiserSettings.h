@@ -16,7 +16,7 @@ enum class ScreenOverlay : int {
     Graticule = 2,
     Smudged = 3,
     SmudgedGraticule = 4,
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     Real = 5,
     VectorDisplay = 6,
     MAX = 6,
@@ -39,7 +39,7 @@ public:
                 return "Smudged";
             case ScreenOverlay::SmudgedGraticule:
                 return "Smudged Graticule";
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
             case ScreenOverlay::Real:
                 return "Real Oscilloscope";
             case ScreenOverlay::VectorDisplay:
@@ -60,7 +60,7 @@ public:
             unnormalisedValue = (int)ScreenOverlay::Smudged;
         } else if (text == "Smudged Graticule") {
             unnormalisedValue = (int)ScreenOverlay::SmudgedGraticule;
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
         } else if (text == "Real Oscilloscope") {
             unnormalisedValue = (int)ScreenOverlay::Real;
         } else if (text == "Vector Display") {
@@ -80,7 +80,7 @@ public:
         setValueNotifyingHost(getValueForText(xml->getStringAttribute("screenOverlay")));
     }
     
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     bool isRealisticDisplay() {
         ScreenOverlay type = (ScreenOverlay)(int)getValueUnnormalised();
         return type == ScreenOverlay::Real || type == ScreenOverlay::VectorDisplay;
@@ -95,7 +95,7 @@ public:
     osci::BooleanParameter* sweepEnabled = new osci::BooleanParameter("Sweep", "sweepEnabled", VERSION_HINT, false, "Plots the audio signal over time, sweeping from left to right");
     osci::BooleanParameter* visualiserFullScreen = new osci::BooleanParameter("Visualiser Fullscreen", "visualiserFullScreen", VERSION_HINT, false, "Makes the software visualiser fullscreen.");
 
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     osci::BooleanParameter* flipVertical = new osci::BooleanParameter("Flip Vertical", "flipVertical", VERSION_HINT, false, "Flips the visualiser vertically.");
     osci::BooleanParameter* flipHorizontal = new osci::BooleanParameter("Flip Horizontal", "flipHorizontal", VERSION_HINT, false, "Flips the visualiser horizontally.");
     osci::BooleanParameter* goniometer = new osci::BooleanParameter("Goniometer", "goniometer", VERSION_HINT, false, "Rotates the visualiser to replicate a goniometer display to show the phase relationship between two channels.");
@@ -282,7 +282,7 @@ public:
         ambientEffect,
         sweepMsEffect,
         triggerValueEffect,
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
         afterglowEffect,
         screenSaturationEffect,
         screenHueEffect,
@@ -291,7 +291,7 @@ public:
     };
     std::vector<std::shared_ptr<osci::Effect>> audioEffects = {
         smoothEffect,
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
         stereoEffect,
         scaleEffect,
         offsetEffect,
@@ -301,7 +301,7 @@ public:
         upsamplingEnabled,
         visualiserFullScreen,
         sweepEnabled,
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
         flipVertical,
         flipHorizontal,
         goniometer,
@@ -370,7 +370,7 @@ public:
         return parameters.lineSaturationEffect->getActualValue();
     }
 
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     double getScreenSaturation() {
         return parameters.screenSaturationEffect->getActualValue();
     }
@@ -453,7 +453,7 @@ private:
         "Line Colour"
     };
     
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     GroupedSettings screenColour{
         std::vector<std::shared_ptr<EffectComponent>>{
             std::make_shared<EffectComponent>(*parameters.screenHueEffect),
@@ -469,7 +469,7 @@ private:
             std::make_shared<EffectComponent>(*parameters.persistenceEffect),
             std::make_shared<EffectComponent>(*parameters.focusEffect),
             std::make_shared<EffectComponent>(*parameters.glowEffect),
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
             std::make_shared<EffectComponent>(*parameters.afterglowEffect),
             std::make_shared<EffectComponent>(*parameters.overexposureEffect),
 #else
@@ -489,7 +489,7 @@ private:
     GroupedSettings lineEffects{
         std::vector<std::shared_ptr<EffectComponent>>{
             std::make_shared<EffectComponent>(*parameters.smoothEffect),
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
             std::make_shared<EffectComponent>(*parameters.stereoEffect),
 #endif
         },
@@ -505,7 +505,7 @@ private:
     jux::SwitchButton upsamplingToggle{parameters.upsamplingEnabled};
     jux::SwitchButton sweepToggle{parameters.sweepEnabled};
 
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     GroupedSettings positionSize{
         std::vector<std::shared_ptr<EffectComponent>>{
             std::make_shared<EffectComponent>(*parameters.scaleEffect, 0),

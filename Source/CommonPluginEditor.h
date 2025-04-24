@@ -9,7 +9,10 @@
 #include "components/SvgButton.h"
 #include "components/VolumeComponent.h"
 #include "components/DownloaderComponent.h"
-#include "components/LicenseRegistrationComponent.h"
+
+#if OSCI_PREMIUM
+    #include "components/LicenseRegistrationComponent.h"
+#endif
 
 class CommonPluginEditor : public juce::AudioProcessorEditor {
 public:
@@ -39,12 +42,12 @@ public:
     juce::String projectFileType;
     juce::String currentFileName;
     
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     DownloaderComponent ffmpegDownloader;
     SharedTextureManager sharedTextureManager;
 #endif
 
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     int VISUALISER_SETTINGS_HEIGHT = 1200;
 #else
     int VISUALISER_SETTINGS_HEIGHT = 700;
@@ -56,7 +59,7 @@ public:
     VisualiserComponent visualiser{
         audioProcessor,
         *this,
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
         sharedTextureManager,
 #endif
         audioProcessor.applicationFolder.getChildFile(audioProcessor.ffmpegFileName),
@@ -73,9 +76,11 @@ public:
     juce::SharedResourcePointer<juce::TooltipWindow> tooltipWindow;
     juce::DropShadower tooltipDropShadow{juce::DropShadow(juce::Colours::black.withAlpha(0.5f), 6, {0,0})};
 
+#if OSCI_PREMIUM
     LicenseRegistrationComponent licenseRegistration {audioProcessor, [this](bool success) {
         visualiser.setVisible(success);
     }};
+#endif
     bool usingNativeMenuBar = false;
 
 #if JUCE_LINUX

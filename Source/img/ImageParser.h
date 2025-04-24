@@ -26,9 +26,11 @@ private:
     void handleError(juce::String message);
     void processGifFile(juce::File& file);
     void processImageFile(juce::File& file);
+#if OSCI_PREMIUM
     void processVideoFile(juce::File& file);
     bool loadAllVideoFrames(const juce::File& file, const juce::File& ffmpegFile);
     bool isVideoFile(const juce::String& extension) const;
+#endif
     
     const juce::String ALGORITHM = "HILLIGOSS";
 
@@ -42,12 +44,15 @@ private:
     int height = -1;
 	int count = 0;
     
+    juce::TemporaryFile temp;
+    
+#if OSCI_PREMIUM
     // Video processing fields
     osci::ReadProcess ffmpegProcess;
     bool isVideo = false;
-    juce::TemporaryFile temp;
     std::vector<uint8_t> frameBuffer;
     int videoFrameSize = 0;
+#endif
     
     // experiments
     double scanX = -1;

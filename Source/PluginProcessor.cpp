@@ -506,10 +506,16 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
     juce::AudioBuffer<float> outputBuffer3d = juce::AudioBuffer<float>(3, buffer.getNumSamples());
     outputBuffer3d.clear();
-
-    if (usingInput && totalNumInputChannels >= 2) {
-        for (auto channel = 0; channel < juce::jmin(2, totalNumInputChannels); channel++) {
-            outputBuffer3d.copyFrom(channel, 0, inputBuffer, channel, 0, buffer.getNumSamples());
+    
+    if (usingInput && totalNumInputChannels >= 1) {
+        if (totalNumInputChannels >= 2) {
+            for (auto channel = 0; channel < juce::jmin(2, totalNumInputChannels); channel++) {
+                outputBuffer3d.copyFrom(channel, 0, inputBuffer, channel, 0, buffer.getNumSamples());
+            }
+        } else {
+            // For mono input, copy the single channel to both left and right
+            outputBuffer3d.copyFrom(0, 0, inputBuffer, 0, 0, buffer.getNumSamples());
+            outputBuffer3d.copyFrom(1, 0, inputBuffer, 0, 0, buffer.getNumSamples());
         }
 
         // handle all midi messages
@@ -534,7 +540,6 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     midiMessages.clear();
     
     auto* channelData = buffer.getArrayOfWritePointers();
-    
     
 	for (int sample = 0; sample < buffer.getNumSamples(); ++sample) {
         // Update frame animation

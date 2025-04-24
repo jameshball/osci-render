@@ -64,8 +64,10 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     
     updateTitle();
 
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     sharedTextureManager.initGL();
+#else
+    visualiser.setVisible(true);
 #endif
 }
 

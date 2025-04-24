@@ -62,6 +62,7 @@ public:
     std::any getProperty(const std::string& key, std::any defaultValue);
     void setProperty(const std::string& key, std::any value);
     
+#if OSCI_PREMIUM
     // Get the ffmpeg binary file
     juce::File getFFmpegFile() const { return applicationFolder.getChildFile(ffmpegFileName); }
     
@@ -70,6 +71,7 @@ public:
     
     // A static method to get the appropriate ffmpeg URL based on platform
     static juce::String getFFmpegURL();
+#endif
     
     // Global settings methods
     bool getGlobalBoolValue(const juce::String& keyName, bool defaultValue = false) const;

@@ -20,28 +20,32 @@ ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, ju
     
     if (extension.equalsIgnoreCase(".gif")) {
         processGifFile(file);
-    } else if (isVideoFile(extension)) {
+    }
+#if OSCI_PREMIUM
+    else if (isVideoFile(extension)) {
         processVideoFile(file);
-    } else {
+    }
+#endif
+    else {
         processImageFile(file);
     }
     
     if (frames.size() == 0) {
         if (extension.equalsIgnoreCase(".gif")) {
             handleError("The image could not be loaded. Please try optimising the GIF with https://ezgif.com/optimize.");
-        } else if (isVideoFile(extension)) {
+        }
+#if OSCI_PREMIUM
+        else if (isVideoFile(extension)) {
             handleError("The video could not be loaded. Please check that ffmpeg is installed.");
-        } else {
+        }
+#endif
+        else {
             handleError("The image could not be loaded.");
         }
         return;
     }
 
     setFrame(0);
-}
-
-bool ImageParser::isVideoFile(const juce::String& extension) const {
-    return extension.equalsIgnoreCase(".mp4") || extension.equalsIgnoreCase(".mov");
 }
 
 void ImageParser::processGifFile(juce::File& file) {
@@ -102,6 +106,11 @@ void ImageParser::processImageFile(juce::File& file) {
     } else {
         handleError("The image could not be loaded.");
     }
+}
+
+#if OSCI_PREMIUM
+bool ImageParser::isVideoFile(const juce::String& extension) const {
+    return extension.equalsIgnoreCase(".mp4") || extension.equalsIgnoreCase(".mov");
 }
 
 void ImageParser::processVideoFile(juce::File& file) {
@@ -250,11 +259,14 @@ bool ImageParser::loadAllVideoFrames(const juce::File& file, const juce::File& f
     // Return true if we successfully loaded at least one frame
     return frames.size() > 0;
 }
+#endif
 
 ImageParser::~ImageParser() {
+#if OSCI_PREMIUM
     if (ffmpegProcess.isRunning()) {
         ffmpegProcess.close();
     }
+#endif
 }
 
 void ImageParser::handleError(juce::String message) {

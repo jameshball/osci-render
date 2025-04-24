@@ -16,7 +16,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     // Register the file removal callback
     registerFileRemovedCallback();
 
-#if !SOSCI_FEATURES
+#if !OSCI_PREMIUM
     addAndMakeVisible(upgradeButton);
     upgradeButton.onClick = [this] {
         juce::URL("https://osci-render.com/sosci").launchInDefaultBrowser();
@@ -95,9 +95,11 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 #endif
 
     initialiseMenuBar(model);
-    
+
+#if OSCI_PREMIUM
     addChildComponent(licenseRegistration);
     licenseRegistration.toFront(true);
+#endif
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
@@ -187,7 +189,9 @@ void OscirenderAudioProcessorEditor::resized() {
      
     auto area = getLocalBounds();
     
+#if OSCI_PREMIUM
     licenseRegistration.setBounds(area);
+#endif
 
     if (audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
         visualiser.setBounds(area);
@@ -197,7 +201,7 @@ void OscirenderAudioProcessorEditor::resized() {
     if (!usingNativeMenuBar) {
         auto topBar = area.removeFromTop(25);
         menuBar.setBounds(topBar);
-#if !SOSCI_FEATURES
+#if !OSCI_PREMIUM
         upgradeButton.setBounds(topBar.removeFromRight(150).reduced(2, 2));
 #endif
     }

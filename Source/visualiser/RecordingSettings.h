@@ -31,7 +31,7 @@ public:
     
 private:
 
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     const bool sosciFeatures = true;
 #else
     const bool sosciFeatures = false;
@@ -208,7 +208,7 @@ private:
     jux::SwitchButton recordAudio{&parameters.recordAudio};
     jux::SwitchButton recordVideo{&parameters.recordVideo};
     
-#if !SOSCI_FEATURES
+#if !OSCI_PREMIUM
     juce::TextEditor recordVideoWarning{"recordVideoWarning"};
     juce::HyperlinkButton sosciLink{"Purchase here", juce::URL("https://osci-render.com/sosci")};
 #endif

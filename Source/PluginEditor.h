@@ -46,7 +46,7 @@ public:
 
     SettingsComponent settings{audioProcessor, *this};
     
-#if !SOSCI_FEATURES
+#if !OSCI_PREMIUM
     juce::TextButton upgradeButton{"Upgrade to premium!"};
 #endif
 

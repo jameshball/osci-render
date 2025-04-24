@@ -433,6 +433,7 @@ bool CommonAudioProcessor::programCrashedAndUserWantsToReset() {
     return userWantsToReset;
 }
 
+#if OSCI_PREMIUM
 juce::String CommonAudioProcessor::getFFmpegURL() {
     juce::String ffmpegURL = juce::String("https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/") +
 #if JUCE_WINDOWS
@@ -514,3 +515,4 @@ bool CommonAudioProcessor::ensureFFmpegExists(std::function<void()> onStart, std
     
     return false;
 }
+#endif

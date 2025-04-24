@@ -62,7 +62,7 @@ SosciMainMenuBarModel::SosciMainMenuBarModel(SosciPluginEditor& e, SosciAudioPro
         juce::DialogWindow::LaunchOptions options;
         AboutComponent* about = new AboutComponent(BinaryData::sosci_logo_png, BinaryData::sosci_logo_pngSize,
             juce::String(ProjectInfo::projectName) + " by " + ProjectInfo::companyName + "\n"
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
             "Thank you for purchasing sosci!\n"
 #else
             "Free version\n"

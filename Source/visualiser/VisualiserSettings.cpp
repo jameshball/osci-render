@@ -14,7 +14,7 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
     addAndMakeVisible(sweepToggle);
     addAndMakeVisible(screenOverlayLabel);
     addAndMakeVisible(screenOverlay);
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     addAndMakeVisible(positionSize);
     addAndMakeVisible(screenColour);
     addAndMakeVisible(flipVerticalToggle);
@@ -66,7 +66,7 @@ void VisualiserSettings::resized() {
     screenOverlay.setBounds(screenOverlayArea.removeFromRight(180));
     
     lineColour.setBounds(area.removeFromTop(lineColour.getHeight()));
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     area.removeFromTop(10);
     screenColour.setBounds(area.removeFromTop(screenColour.getHeight()));
 #endif
@@ -77,7 +77,7 @@ void VisualiserSettings::resized() {
     area.removeFromTop(10);
     lineEffects.setBounds(area.removeFromTop(lineEffects.getHeight()));
     
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     area.removeFromTop(10);
     positionSize.setBounds(area.removeFromTop(positionSize.getHeight()));
     area.removeFromTop(10);
@@ -87,7 +87,7 @@ void VisualiserSettings::resized() {
     shutterSyncToggle.setBounds(area.removeFromTop(rowHeight));
 #endif
 
-#if !SOSCI_FEATURES
+#if !OSCI_PREMIUM
     area.removeFromTop(10);
 #endif
     upsamplingToggle.setBounds(area.removeFromTop(rowHeight));
