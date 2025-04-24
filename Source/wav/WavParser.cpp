@@ -77,11 +77,6 @@ osci::Point WavParser::getSample() {
         counter = 0;
         afSource->setNextReadPosition(0);
     }
-    if (counter % currentSampleRate == 0) {
-        if (onProgress != nullptr) {
-            onProgress((double)currentSample / totalSamples);
-        }
-    }
     
     if (audioBuffer.getNumChannels() == 1) {
         return osci::Point(audioBuffer.getSample(0, 0), audioBuffer.getSample(0, 0), 1.0);

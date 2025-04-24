@@ -183,6 +183,12 @@
         <FILE id="QQzSwh" name="SliderTextBox.h" compile="0" resource="0" file="Source/components/SliderTextBox.h"/>
         <FILE id="QrDKRZ" name="SvgButton.h" compile="0" resource="0" file="Source/components/SvgButton.h"/>
         <FILE id="qzfstC" name="SwitchButton.h" compile="0" resource="0" file="Source/components/SwitchButton.h"/>
+        <FILE id="WfUlLH" name="TimelineComponent.cpp" compile="1" resource="0"
+              file="Source/components/TimelineComponent.cpp"/>
+        <FILE id="fsckjw" name="TimelineComponent.h" compile="0" resource="0"
+              file="Source/components/TimelineComponent.h"/>
+        <FILE id="t9xeSp" name="TimelineLookAndFeel.h" compile="0" resource="0"
+              file="Source/components/TimelineLookAndFeel.h"/>
         <FILE id="icFMpl" name="VListBox.cpp" compile="1" resource="0" file="Source/components/VListBox.cpp"/>
         <FILE id="mvp8je" name="VListBox.h" compile="0" resource="0" file="Source/components/VListBox.h"/>
         <FILE id="s8EVcE" name="VolumeComponent.cpp" compile="1" resource="0"

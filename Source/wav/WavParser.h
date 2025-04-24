@@ -17,8 +17,9 @@ public:
 	bool parse(std::unique_ptr<juce::InputStream> stream);
 	void close();
 	bool isInitialised();
-
-	std::function<void(double)> onProgress;
+    
+    std::atomic<double> currentSample = 0;
+    std::atomic<long> totalSamples;
 
 private:
 	void setSampleRate(double sampleRate);
@@ -28,9 +29,7 @@ private:
 	std::atomic<bool> looping = true;
 	std::unique_ptr<juce::ResamplingAudioSource> source = nullptr;
 	juce::AudioBuffer<float> audioBuffer;
-	std::atomic<long> totalSamples;
 	std::atomic<long> counter = 0;
-    std::atomic<double> currentSample = 0;
 	std::atomic<bool> paused = false;
 	int fileSampleRate;
 	int currentSampleRate;

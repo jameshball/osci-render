@@ -16,8 +16,11 @@
 #include "visualiser/RecordingSettings.h"
 #include "wav/WavParser.h"
 
+class AudioPlayerListener {
+public:
+    virtual void parserChanged() = 0;
+};
 
-class AudioPlayerListener;
 class CommonAudioProcessor  : public juce::AudioProcessor, public SampleRateManager
                             #if JucePlugin_Enable_ARA
                              , public juce::AudioProcessorARAExtension
