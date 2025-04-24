@@ -11,8 +11,6 @@
 
 #include <JuceHeader.h>
 #include <any>
-#include "concurrency/AudioBackgroundThread.h"
-#include "concurrency/AudioBackgroundThreadManager.h"
 #include "audio/SampleRateManager.h"
 #include "visualiser/VisualiserSettings.h"
 #include "visualiser/RecordingSettings.h"
@@ -127,7 +125,7 @@ public:
     VisualiserParameters visualiserParameters;
     RecordingParameters recordingParameters;
     
-    AudioBackgroundThreadManager threadManager;
+    osci::AudioBackgroundThreadManager threadManager;
     std::function<void()> haltRecording;
     
     std::atomic<bool> forceDisableBrightnessInput = false;

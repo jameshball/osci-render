@@ -5,21 +5,6 @@
               defines="MOODYCAMEL_ATOMICOPS=1" cppLanguageStandard="20">
   <MAINGROUP id="ztPpnM" name="osci-render-test">
     <GROUP id="{4373FA2A-1E20-AAA6-40E0-740C13D88B75}" name="Source">
-      <GROUP id="{6D2F76BF-0825-85C1-CE15-B08BF1AA1218}" name="concurrency">
-        <FILE id="QdcNi7" name="atomicops.h" compile="0" resource="0" file="Source/concurrency/atomicops.h"/>
-        <FILE id="iTTsXj" name="AudioBackgroundThread.cpp" compile="1" resource="0"
-              file="Source/concurrency/AudioBackgroundThread.cpp"/>
-        <FILE id="kyWcaF" name="AudioBackgroundThread.h" compile="0" resource="0"
-              file="Source/concurrency/AudioBackgroundThread.h"/>
-        <FILE id="kfeXov" name="AudioBackgroundThreadManager.cpp" compile="1"
-              resource="0" file="Source/concurrency/AudioBackgroundThreadManager.cpp"/>
-        <FILE id="TZuY5S" name="AudioBackgroundThreadManager.h" compile="0"
-              resource="0" file="Source/concurrency/AudioBackgroundThreadManager.h"/>
-        <FILE id="nqi7hn" name="BufferConsumer.h" compile="0" resource="0"
-              file="Source/concurrency/BufferConsumer.h"/>
-        <FILE id="fTCFX5" name="readerwritercircularbuffer.h" compile="0" resource="0"
-              file="Source/concurrency/readerwritercircularbuffer.h"/>
-      </GROUP>
       <GROUP id="{DB7C86A4-CC9B-5846-B0C3-6EB553450542}" name="mathter">
         <GROUP id="{3743CC14-52E9-72AB-1A61-DA053869B50F}" name="Common">
           <FILE id="aQA6tH" name="Approx.hpp" compile="0" resource="0" file="Source/mathter/Common/Approx.hpp"/>

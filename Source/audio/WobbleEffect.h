@@ -7,7 +7,7 @@ public:
 	WobbleEffect(OscirenderAudioProcessor& p);
 	~WobbleEffect();
 
-	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override;
+    osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override;
 
 private:
     OscirenderAudioProcessor& audioProcessor;

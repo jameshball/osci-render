@@ -39,7 +39,7 @@ VisualiserComponent::VisualiserComponent(
     settings(settings),
     recordingSettings(recordingSettings),
     visualiserOnly(visualiserOnly),
-    AudioBackgroundThread("VisualiserComponent" + juce::String(parent != nullptr ? " Child" : ""), processor.threadManager),
+    osci::AudioBackgroundThread("VisualiserComponent" + juce::String(parent != nullptr ? " Child" : ""), processor.threadManager),
     parent(parent),
     editor(pluginEditor) {
 #if SOSCI_FEATURES

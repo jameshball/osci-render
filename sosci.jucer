@@ -100,11 +100,7 @@
         <FILE id="UVcqLN" name="AudioRecorder.h" compile="0" resource="0" file="Source/audio/AudioRecorder.h"/>
         <FILE id="aziWU2" name="SampleRateManager.h" compile="0" resource="0"
               file="Source/audio/SampleRateManager.h"/>
-        <FILE id="vj5mRC" name="SmoothEffect.cpp" compile="1" resource="0"
-              file="Source/audio/SmoothEffect.cpp"/>
         <FILE id="GSnwBW" name="SmoothEffect.h" compile="0" resource="0" file="Source/audio/SmoothEffect.h"/>
-        <FILE id="Iq5LKp" name="StereoEffect.cpp" compile="1" resource="0"
-              file="Source/audio/StereoEffect.cpp"/>
         <FILE id="jq3EXV" name="StereoEffect.h" compile="0" resource="0" file="Source/audio/StereoEffect.h"/>
       </GROUP>
       <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
@@ -144,20 +140,6 @@
               file="Source/components/VolumeComponent.cpp"/>
         <FILE id="qwpGcH" name="VolumeComponent.h" compile="0" resource="0"
               file="Source/components/VolumeComponent.h"/>
-      </GROUP>
-      <GROUP id="{9F5970A9-8094-E7F3-7AC1-812AE5589B9F}" name="concurrency">
-        <FILE id="wAUzPb" name="AudioBackgroundThread.cpp" compile="1" resource="0"
-              file="Source/concurrency/AudioBackgroundThread.cpp"/>
-        <FILE id="WeTiu9" name="AudioBackgroundThread.h" compile="0" resource="0"
-              file="Source/concurrency/AudioBackgroundThread.h"/>
-        <FILE id="I5aijs" name="AudioBackgroundThreadManager.cpp" compile="1"
-              resource="0" file="Source/concurrency/AudioBackgroundThreadManager.cpp"/>
-        <FILE id="BEXsvz" name="AudioBackgroundThreadManager.h" compile="0"
-              resource="0" file="Source/concurrency/AudioBackgroundThreadManager.h"/>
-        <FILE id="F5kUMH" name="BlockingQueue.h" compile="0" resource="0" file="Source/concurrency/BlockingQueue.h"/>
-        <FILE id="WQ2W15" name="BufferConsumer.h" compile="0" resource="0"
-              file="Source/concurrency/BufferConsumer.h"/>
-        <FILE id="ALHDU9" name="WriteProcess.h" compile="0" resource="0" file="Source/concurrency/WriteProcess.h"/>
       </GROUP>
       <GROUP id="{04ACA01B-2ADE-8356-BF1E-32942E0F3CFA}" name="visualiser">
         <FILE id="O444rE" name="AfterglowFragmentShader.glsl" compile="0" resource="0"

@@ -3,14 +3,12 @@
 #include <algorithm>
 #include <JuceHeader.h>
 #include "../LookAndFeel.h"
-#include "../concurrency/AudioBackgroundThread.h"
 #include "../components/SvgButton.h"
 #include "VisualiserSettings.h"
 #include "RecordingSettings.h"
 #include "../components/StopwatchComponent.h"
 #include "../img/qoixx.hpp"
 #include "../components/DownloaderComponent.h"
-#include "../concurrency/WriteProcess.h"
 #include "../audio/AudioRecorder.h"
 #include "../wav/WavParser.h"
 #include "../components/AudioPlayerComponent.h"
@@ -34,7 +32,7 @@ struct Texture {
 class CommonAudioProcessor;
 class CommonPluginEditor;
 class VisualiserWindow;
-class VisualiserComponent : public juce::Component, public AudioBackgroundThread, public juce::MouseListener, public juce::OpenGLRenderer, public juce::AsyncUpdater {
+class VisualiserComponent : public juce::Component, public osci::AudioBackgroundThread, public juce::MouseListener, public juce::OpenGLRenderer, public juce::AsyncUpdater {
 public:
     VisualiserComponent(
         CommonAudioProcessor& processor,
@@ -118,7 +116,7 @@ private:
     
     long numFrames = 0;
     std::vector<unsigned char> framePixels;
-    WriteProcess ffmpegProcess;
+    osci::WriteProcess ffmpegProcess;
     std::unique_ptr<juce::TemporaryFile> tempVideoFile;
 #endif
     
@@ -129,7 +127,7 @@ private:
     std::unique_ptr<juce::TemporaryFile> tempAudioFile;
     AudioRecorder audioRecorder;
     
-    Semaphore renderingSemaphore{0};
+    osci::Semaphore renderingSemaphore{0};
     
     void popoutWindow();
     

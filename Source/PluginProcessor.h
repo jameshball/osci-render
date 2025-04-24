@@ -11,8 +11,6 @@
 #define VERSION_HINT 2
 
 #include <JuceHeader.h>
-#include "concurrency/AudioBackgroundThread.h"
-#include "concurrency/AudioBackgroundThreadManager.h"
 #include "audio/ShapeSound.h"
 #include "audio/ShapeVoice.h"
 #include "audio/PublicSynthesiser.h"
@@ -262,8 +260,6 @@ private:
     const double MIN_LENGTH_INCREMENT = 0.000001;
 
     juce::AudioPlayHead* playHead;
-    
-    osci::AddOnHost addonHost;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OscirenderAudioProcessor)

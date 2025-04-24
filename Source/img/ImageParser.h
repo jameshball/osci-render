@@ -1,7 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
 #include "../svg/SvgParser.h"
-#include "../concurrency/ReadProcess.h"
 
 class OscirenderAudioProcessor;
 class CommonPluginEditor;
@@ -44,7 +43,7 @@ private:
 	int count = 0;
     
     // Video processing fields
-    ReadProcess ffmpegProcess;
+    osci::ReadProcess ffmpegProcess;
     bool isVideo = false;
     juce::TemporaryFile temp;
     std::vector<uint8_t> frameBuffer;

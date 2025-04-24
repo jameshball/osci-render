@@ -1,7 +1,7 @@
 #include "VolumeComponent.h"
 
 VolumeComponent::VolumeComponent(CommonAudioProcessor& p) 
-    : AudioBackgroundThread("VolumeComponent", p.threadManager), 
+    : osci::AudioBackgroundThread("VolumeComponent", p.threadManager), 
       audioProcessor(p)
 {
     setOpaque(false);

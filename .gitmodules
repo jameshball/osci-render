@@ -10,3 +10,6 @@
 [submodule "modules/osci_render_core"]
 	path = modules/osci_render_core
 	url = git@github.com:jameshball/osci_render_core.git
+[submodule "Source/lua/lua"]
+	path = Source/lua/lua
+	url = git@github.com:lua/lua.git

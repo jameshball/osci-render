@@ -3,7 +3,6 @@
 #include "../parser/FileParser.h"
 #include "../parser/FrameProducer.h"
 #include "../parser/FrameConsumer.h"
-#include "../concurrency/BlockingQueue.h"
 
 class OscirenderAudioProcessor;
 class ShapeSound : public juce::SynthesiserSound, public FrameConsumer {
@@ -23,7 +22,7 @@ public:
 
 private:
 	
-	BlockingQueue frames{10};
+	osci::BlockingQueue frames{10};
 	std::unique_ptr<FrameProducer> producer;
 	double frameLength = 0.0;
 };

@@ -3,7 +3,6 @@
 #include <JuceHeader.h>
 #include "../CommonPluginProcessor.h"
 #include "../LookAndFeel.h"
-#include "../concurrency/AudioBackgroundThread.h"
 #include "SvgButton.h"
 
 class ThumbRadiusLookAndFeel : public OscirenderLookAndFeel {
@@ -60,7 +59,7 @@ public:
     }
 };
 
-class VolumeComponent : public juce::Component, public juce::AsyncUpdater, public AudioBackgroundThread {
+class VolumeComponent : public juce::Component, public juce::AsyncUpdater, public osci::AudioBackgroundThread {
 public:
 	VolumeComponent(CommonAudioProcessor& p);
 
