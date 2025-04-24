@@ -50,7 +50,7 @@ public:
         g.strokePath(valueTrack, { trackWidth, juce::PathStrokeType::curved, juce::PathStrokeType::rounded });
 
         // Draw thumb
-        auto thumbWidth = getSliderThumbRadius(slider);
+        auto thumbWidth = 10;
         g.setColour(slider.findColour(juce::Slider::thumbColourId));
         
         // Draw a more modern rectangular thumb with rounded corners

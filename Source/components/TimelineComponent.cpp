@@ -11,9 +11,6 @@ TimelineComponent::TimelineComponent()
     slider.setColour(juce::Slider::ColourIds::trackColourId, juce::Colours::white.withAlpha(0.8f));
     slider.setColour(juce::Slider::ColourIds::backgroundColourId, juce::Colours::white.withAlpha(0.2f));
     slider.setColour(juce::Slider::ColourIds::thumbColourId, juce::Colours::white);
-
-    // Add tooltips
-    slider.setTooltip("Drag to seek through the timeline");
     
     addChildComponent(playButton);
     addChildComponent(pauseButton);
@@ -24,7 +21,7 @@ TimelineComponent::TimelineComponent()
     playButton.setTooltip("Play");
     pauseButton.setTooltip("Pause");
     stopButton.setTooltip("Stop");
-    repeatButton.setTooltip("Toggle repeat mode");
+    repeatButton.setTooltip("Loop");
 
     slider.setMouseDragSensitivity(150); // Make slider more responsive
     

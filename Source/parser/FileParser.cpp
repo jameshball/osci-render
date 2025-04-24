@@ -5,6 +5,47 @@
 FileParser::FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce::String, juce::String)> errorCallback) 
     : errorCallback(errorCallback), audioProcessor(p) {}
 
+// Helper function to show file size warning
+void FileParser::showFileSizeWarning(juce::String fileName, int64_t totalBytes, int64_t mbLimit,
+	juce::String fileType, std::function<void()> callback) {
+
+	if (totalBytes <= mbLimit * 1024 * 1024) {
+		callback();
+		return;
+	}
+
+	const double fileSizeMB = totalBytes / (1024.0 * 1024.0);
+	juce::String message = juce::String::formatted(
+		"The %s file '%s' you're trying to open is %.2f MB in size, and may time a long time to open. "
+		"Would you like to continue loading it?", fileType.toRawUTF8(), fileName.toRawUTF8(), fileSizeMB);
+	
+	juce::MessageManager::callAsync([this, message, callback]() {
+		juce::AlertWindow::showOkCancelBox(
+			juce::AlertWindow::WarningIcon,
+			"Large File",
+			message,
+			"Continue",
+			"Cancel",
+			nullptr,
+			juce::ModalCallbackFunction::create([this, callback](int result) {
+				juce::SpinLock::ScopedLockType scope(lock);
+				if (result == 1) { // 1 = OK button pressed
+					callback();
+				} else {
+					disable(); // Mark this parser as inactive
+					
+					// Notify the processor to remove this parser
+					juce::MessageManager::callAsync([this] {
+						juce::SpinLock::ScopedLockType lock1(audioProcessor.parsersLock);
+						juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
+						audioProcessor.removeParser(this);
+					});
+				}
+			})
+		);
+	});
+}
+
 void FileParser::parse(juce::String fileId, juce::String fileName, juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font font) {
 	juce::SpinLock::ScopedLockType scope(lock);
 
@@ -21,54 +62,13 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 	wav = nullptr;
 	
 	if (extension == ".obj") {
-		// Check file size before parsing
 		const int64_t fileSize = stream->getTotalLength();
-		const int64_t oneMB = 1024 * 1024; // 1MB in bytes
-		
-		// Save the file content to avoid losing it after the async operation
 		juce::String objContent = stream->readEntireStreamAsString();
-		
-		if (fileSize > oneMB) {
-			// For large files, show an async warning dialog
-			const double fileSizeMB = fileSize / (1024.0 * 1024.0);
-			
-			juce::MessageManager::callAsync([this, objContent, fileSizeMB, fileName]() {
-				juce::String message = juce::String::formatted(
-					"The OBJ file '%s' you're trying to open is %.2f MB in size, which may cause performance issues. "
-					"Would you like to continue loading it?", fileName.toRawUTF8(), fileSizeMB);
-				
-				// Show async dialog with callbacks for user response
-				juce::AlertWindow::showOkCancelBox(
-					juce::AlertWindow::WarningIcon,
-					"Large OBJ File",
-					message,
-					"Continue",
-					"Cancel",
-					nullptr,
-					juce::ModalCallbackFunction::create([this, objContent](int result) {
-						if (result == 1) { // 1 = OK button pressed
-							juce::SpinLock::ScopedLockType scope(lock);
-							// User chose to continue, load the file
-							object = std::make_shared<WorldObject>(objContent.toStdString());
-						} else {
-							// User canceled, fully close this file parser
-							juce::SpinLock::ScopedLockType scope(lock);
-							disable(); // Mark this parser as inactive
-							
-							// Notify the processor to remove this parser
-							juce::MessageManager::callAsync([this] {
-								juce::SpinLock::ScopedLockType lock1(audioProcessor.parsersLock);
-								juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
-								audioProcessor.removeParser(this);
-							});
-						}
-					})
-				);
-			});
-		} else {
-			// For small files, load immediately
+		showFileSizeWarning(fileName, fileSize, 1, "OBJ", [this, objContent]() {
 			object = std::make_shared<WorldObject>(objContent.toStdString());
-		}
+            isAnimatable = false;
+            sampleSource = false;
+		});
 	} else if (extension == ".svg") {
 		svg = std::make_shared<SvgParser>(stream->readEntireStreamAsString());
 	} else if (extension == ".txt") {
@@ -94,16 +94,23 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 	} else if (extension == ".gif" || extension == ".png" || extension == ".jpg" || extension == ".jpeg" || extension == ".mp4" || extension == ".mov") {
 		juce::MemoryBlock buffer{};
 		int bytesRead = stream->readIntoMemoryBlock(buffer);
-		img = std::make_shared<ImageParser>(audioProcessor, extension, buffer);
+
+		showFileSizeWarning(fileName, bytesRead, 20, (extension == ".mp4" || extension == ".mov") ? "video" : "image",
+			[this, buffer, extension]() {
+				img = std::make_shared<ImageParser>(audioProcessor, extension, buffer);
+                isAnimatable = extension == ".gif" || extension == ".mp4" || extension == ".mov";
+                sampleSource = true;
+			}
+		);
 	} else if (extension == ".wav" || extension == ".aiff" || extension == ".flac" || extension == ".ogg" || extension == ".mp3") {
 		wav = std::make_shared<WavParser>(audioProcessor);
-        if (!wav->parse(std::move(stream))) {
-            juce::MessageManager::callAsync([this, fileName] {
-                juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::AlertIconType::WarningIcon, 
-                    "Error Loading " + fileName, 
-                    "The audio file '" + fileName + "' could not be loaded.");
-            });
-        }
+		if (!wav->parse(std::move(stream))) {
+			juce::MessageManager::callAsync([this, fileName] {
+				juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::AlertIconType::WarningIcon,
+					"Error Loading " + fileName,
+					"The audio file '" + fileName + "' could not be loaded.");
+			});
+		}
 	}
 
 	isAnimatable = gpla != nullptr || (img != nullptr && (extension == ".gif" || extension == ".mp4" || extension == ".mov"));
@@ -111,83 +118,83 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 }
 
 std::vector<std::unique_ptr<osci::Shape>> FileParser::nextFrame() {
-	juce::SpinLock::ScopedLockType scope(lock);
+    juce::SpinLock::ScopedLockType scope(lock);
 
-	if (object != nullptr) {
-		return object->draw();
-	} else if (svg != nullptr) {
-		return svg->draw();
-	} else if (text != nullptr) {
-		return text->draw();
-	} else if (gpla != nullptr) {
-		return gpla->draw();
-	}
-	auto tempShapes = std::vector<std::unique_ptr<osci::Shape>>();
-	// return a square
-	tempShapes.push_back(std::make_unique<osci::Line>(osci::Point(-0.5, -0.5, 0), osci::Point(0.5, -0.5, 0)));
-	tempShapes.push_back(std::make_unique<osci::Line>(osci::Point(0.5, -0.5, 0), osci::Point(0.5, 0.5, 0)));
-	tempShapes.push_back(std::make_unique<osci::Line>(osci::Point(0.5, 0.5, 0), osci::Point(-0.5, 0.5, 0)));
-	tempShapes.push_back(std::make_unique<osci::Line>(osci::Point(-0.5, 0.5, 0), osci::Point(-0.5, -0.5, 0)));
-	return tempShapes;
+    if (object != nullptr) {
+        return object->draw();
+    } else if (svg != nullptr) {
+        return svg->draw();
+    } else if (text != nullptr) {
+        return text->draw();
+    } else if (gpla != nullptr) {
+        return gpla->draw();
+    }
+    auto tempShapes = std::vector<std::unique_ptr<osci::Shape>>();
+    // return a square
+    tempShapes.push_back(std::make_unique<osci::Line>(osci::Point(-0.5, -0.5, 0), osci::Point(0.5, -0.5, 0)));
+    tempShapes.push_back(std::make_unique<osci::Line>(osci::Point(0.5, -0.5, 0), osci::Point(0.5, 0.5, 0)));
+    tempShapes.push_back(std::make_unique<osci::Line>(osci::Point(0.5, 0.5, 0), osci::Point(-0.5, 0.5, 0)));
+    tempShapes.push_back(std::make_unique<osci::Line>(osci::Point(-0.5, 0.5, 0), osci::Point(-0.5, -0.5, 0)));
+    return tempShapes;
 }
 
 osci::Point FileParser::nextSample(lua_State*& L, LuaVariables& vars) {
-	juce::SpinLock::ScopedLockType scope(lock);
+    juce::SpinLock::ScopedLockType scope(lock);
 
-	if (lua != nullptr) {
-		auto values = lua->run(L, vars);
-		if (values.size() == 2) {
-			return osci::Point(values[0], values[1], 0);
-		} else if (values.size() > 2) {
-			return osci::Point(values[0], values[1], values[2]);
-		}
-	} else if (img != nullptr) {
-		return img->getSample();
-	} else if (wav != nullptr) {
+    if (lua != nullptr) {
+        auto values = lua->run(L, vars);
+        if (values.size() == 2) {
+            return osci::Point(values[0], values[1], 0);
+        } else if (values.size() > 2) {
+            return osci::Point(values[0], values[1], values[2]);
+        }
+    } else if (img != nullptr) {
+        return img->getSample();
+    } else if (wav != nullptr) {
         return wav->getSample();
     }
 
-	return osci::Point();
+    return osci::Point();
 }
 
 bool FileParser::isSample() {
-	return sampleSource;
+    return sampleSource;
 }
 
 bool FileParser::isActive() {
-	return active;
+    return active;
 }
 
 void FileParser::disable() {
-	active = false;
+    active = false;
 }
 
 void FileParser::enable() {
-	active = true;
+    active = true;
 }
 
 std::shared_ptr<WorldObject> FileParser::getObject() {
-	return object;
+    return object;
 }
 
 std::shared_ptr<SvgParser> FileParser::getSvg() {
-	return svg;
+    return svg;
 }
 
 std::shared_ptr<TextParser> FileParser::getText() {
-	return text;
+    return text;
 }
 
 std::shared_ptr<LineArtParser> FileParser::getLineArt() {
-	return gpla;
+    return gpla;
 }
 
 std::shared_ptr<LuaParser> FileParser::getLua() {
-	return lua;
+    return lua;
 }
 
 std::shared_ptr<ImageParser> FileParser::getImg() {
-	return img;
+    return img;
 }
 
 std::shared_ptr<WavParser> FileParser::getWav() {

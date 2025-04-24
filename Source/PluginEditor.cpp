@@ -127,21 +127,10 @@ bool OscirenderAudioProcessorEditor::isInterestedInFileDrag(const juce::StringAr
         return false;
     }
     juce::File file(files[0]);
-    return
-        file.hasFileExtension("wav") ||
-        file.hasFileExtension("aiff") ||
-        file.hasFileExtension("ogg") ||
-        file.hasFileExtension("flac") ||
-        file.hasFileExtension("mp3") ||
-        file.hasFileExtension("osci") ||
-        file.hasFileExtension("txt") ||
-        file.hasFileExtension("lua") ||
-        file.hasFileExtension("svg") ||
-        file.hasFileExtension("obj") ||
-        file.hasFileExtension("gif") ||
-        file.hasFileExtension("png") ||
-        file.hasFileExtension("jpg") ||
-        file.hasFileExtension("gpla");
+    juce::String ext = file.getFileExtension().toLowerCase();
+    if (std::find(audioProcessor.FILE_EXTENSIONS.begin(), audioProcessor.FILE_EXTENSIONS.end(), ext) != audioProcessor.FILE_EXTENSIONS.end()) {
+        return true;
+    }
 }
 
 void OscirenderAudioProcessorEditor::filesDropped(const juce::StringArray& files, int x, int y) {
@@ -164,7 +153,18 @@ void OscirenderAudioProcessorEditor::filesDropped(const juce::StringArray& files
 
 bool OscirenderAudioProcessorEditor::isBinaryFile(juce::String name) {
     name = name.toLowerCase();
-    return name.endsWith(".gpla") || name.endsWith(".gif") || name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".wav") || name.endsWith(".aiff") || name.endsWith(".ogg") || name.endsWith(".mp3") || name.endsWith(".flac");
+    return name.endsWith(".gpla")
+        || name.endsWith(".gif")
+        || name.endsWith(".png")
+        || name.endsWith(".jpg")
+        || name.endsWith(".jpeg")
+        || name.endsWith(".wav")
+        || name.endsWith(".aiff")
+        || name.endsWith(".ogg")
+        || name.endsWith(".mp3")
+        || name.endsWith(".flac")
+        || name.endsWith(".mp4")
+        || name.endsWith(".mov");
 }
 
 // parsersLock must be held

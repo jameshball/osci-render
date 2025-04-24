@@ -39,6 +39,9 @@ public:
 	bool isAnimatable = false;
 
 private:
+	void showFileSizeWarning(juce::String fileName, int64_t totalBytes, int64_t mbLimit, 
+		juce::String fileType, std::function<void()> callback);
+
 	OscirenderAudioProcessor& audioProcessor;
 
 	bool active = true;

@@ -26,32 +26,29 @@ public:
         float kx = (float) x + (float) width * 0.5f;
         float ky = sliderPos;
 
-        auto outlineThickness = slider.isEnabled() ? 0.8f : 0.3f;
         auto sliderRadius = (float) getSliderThumbRadius(slider);
         auto diameter = sliderRadius * 2.0f;
-        auto halfThickness = outlineThickness * 0.5f;
 
         auto isDownOrDragging = slider.isEnabled() && (slider.isMouseOverOrDragging() || slider.isMouseButtonDown());
 
-        auto knobColour = slider.findColour(juce::Slider::thumbColourId)
-            .withMultipliedSaturation((slider.hasKeyboardFocus (false) || isDownOrDragging) ? 1.3f : 0.9f)
-            .withMultipliedAlpha(slider.isEnabled() ? 1.0f : 0.7f);
-
         y = (int) (ky - sliderRadius);
 
-        // draw triangle that points left
+        // Create a simple arrow path inspired by the SVG
         juce::Path p;
-        p.addTriangle(
-            x + diameter, y,
-            x + diameter, y + diameter,
-            x, ky
-        );
+        float arrowWidth = diameter;
+        float arrowHeight = diameter;
+        
+        // Start at the point of the arrow
+        p.startNewSubPath(x, y + arrowHeight * 0.5f);
+        // Draw line to top-right corner
+        p.lineTo(x + arrowWidth, y);
+        // Draw line to bottom-right corner
+        p.lineTo(x + arrowWidth, y + arrowHeight);
+        // Close the path back to the point
+        p.closeSubPath();
 
-        g.setColour(knobColour);
+        g.setColour(juce::Colours::white.withAlpha(isDownOrDragging ? 1.0f : 0.9f));
         g.fillPath(p);
-
-        g.setColour(slider.findColour(sliderThumbOutlineColourId));
-        g.strokePath(p, juce::PathStrokeType(outlineThickness));
     }
 
     void drawLinearSlider(juce::Graphics& g, int x, int y, int width, int height, float sliderPos, float minSliderPos, float maxSliderPos, const juce::Slider::SliderStyle style, juce::Slider& slider) override {
@@ -74,22 +71,23 @@ private:
     CommonAudioProcessor& audioProcessor;
     
     const int DEFAULT_SAMPLE_RATE = 192000;
-    const double BUFFER_DURATION_SECS = 0.02;
+    const double BUFFER_DURATION_SECS = 1.0/60.0;
     
     int sampleRate = DEFAULT_SAMPLE_RATE;
 
 	std::atomic<float> leftVolume = 0;
 	std::atomic<float> rightVolume = 0;
-	std::atomic<float> avgLeftVolume = 0;
-	std::atomic<float> avgRightVolume = 0;
 	
-    ThumbRadiusLookAndFeel thumbRadiusLookAndFeel{20};
+    ThumbRadiusLookAndFeel thumbRadiusLookAndFeel{12};
     juce::Slider volumeSlider;
     ThresholdLookAndFeel thresholdLookAndFeel{7};
 	juce::Slider thresholdSlider;
 
     SvgButton volumeButton = SvgButton("VolumeButton", BinaryData::volume_svg, juce::Colours::white, juce::Colours::red, audioProcessor.muteParameter, BinaryData::mute_svg);
-    std::unique_ptr<juce::Drawable> thresholdIcon;
+
+    // Animation smoothing
+    juce::SmoothedValue<float> leftVolumeSmoothed;
+    juce::SmoothedValue<float> rightVolumeSmoothed;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VolumeComponent)
 };

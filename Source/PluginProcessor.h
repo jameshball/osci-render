@@ -213,6 +213,27 @@ public:
     // Added declaration for the new `removeParser` method.
     void removeParser(FileParser* parser);
 
+    const std::vector<juce::String> FILE_EXTENSIONS = {
+        "obj",
+        "svg",
+        "lua",
+        "txt",
+        "gpla",
+        "gif",
+        "png",
+        "jpg",
+        "jpeg",
+        "wav",
+        "aiff",
+        "ogg",
+        "flac",
+        "mp3",
+#if OSCI_PREMIUM
+        "mp4",
+        "mov",
+#endif
+    };
+
 private:
     
     std::atomic<bool> prevMidiEnabled = !midiEnabled->getBoolValue();

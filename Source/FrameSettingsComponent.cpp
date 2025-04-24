@@ -67,6 +67,10 @@ void FrameSettingsComponent::resized() {
 
     auto firstColumn = area.removeFromLeft(220);
     
+    if (juce::JUCEApplicationBase::isStandaloneApp()) {
+        timeline.setVisible(animated);
+    }
+    
     if (animated) {
         if (juce::JUCEApplicationBase::isStandaloneApp()) {
             timeline.setBounds(timelineArea);
