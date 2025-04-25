@@ -34,11 +34,6 @@ void TextParser::parse(juce::String text, juce::Font font) {
     juce::TextLayout layout;
     layout.createLayout(attributedString, 64.0f);
 
-    juce::String displayText = attributedString.getText();
-    // remove all whitespace
-    displayText = displayText.removeCharacters(" \t\n\r");
-    int index = 0;
-    
     // Iterate through all lines and all runs in each line
     for (int i = 0; i < layout.getNumLines(); ++i) {
         const juce::TextLayout::Line& line = layout.getLine(i);
@@ -49,23 +44,21 @@ void TextParser::parse(juce::String text, juce::Font font) {
             // Create a GlyphArrangement for this run
             juce::GlyphArrangement glyphs;
             
+            // Process each glyph in the run
             for (int k = 0; k < run->glyphs.size(); ++k) {
-                if (index >= displayText.length()) {
-                    break;
-                }
-                juce::juce_wchar character = displayText[index];
                 juce::TextLayout::Glyph glyph = run->glyphs.getUnchecked(k);
+                
+                // Create positioned glyph using the glyph's metrics
                 juce::PositionedGlyph positionedGlyph = juce::PositionedGlyph(
                     run->font,
-                    character,
+                    glyph.glyphCode,  // Use the glyph code directly
                     glyph.glyphCode,
                     line.lineOrigin.x + glyph.anchor.x - 1,
                     line.lineOrigin.y + glyph.anchor.y - 1,
                     glyph.width,
-                    juce::CharacterFunctions::isWhitespace(character)
+                    false  // Don't assume it's whitespace based on character
                 );
                 glyphs.addGlyph(positionedGlyph);
-                index++;
             }
             
             // Add glyphs to the path
