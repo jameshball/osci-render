@@ -10,10 +10,6 @@
 #include "components/VolumeComponent.h"
 #include "components/DownloaderComponent.h"
 
-#if OSCI_PREMIUM
-    #include "components/LicenseRegistrationComponent.h"
-#endif
-
 class CommonPluginEditor : public juce::AudioProcessorEditor {
 public:
     CommonPluginEditor(CommonAudioProcessor&, juce::String appName, juce::String projectFileType, int width, int height);
@@ -76,11 +72,6 @@ public:
     juce::SharedResourcePointer<juce::TooltipWindow> tooltipWindow;
     juce::DropShadower tooltipDropShadow{juce::DropShadow(juce::Colours::black.withAlpha(0.5f), 6, {0,0})};
 
-#if OSCI_PREMIUM
-    LicenseRegistrationComponent licenseRegistration {audioProcessor, [this](bool success) {
-        visualiser.setVisible(success);
-    }};
-#endif
     bool usingNativeMenuBar = false;
 
 #if JUCE_LINUX

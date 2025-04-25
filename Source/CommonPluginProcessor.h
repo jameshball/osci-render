@@ -88,8 +88,6 @@ public:
     
     bool hasSetSessionStartTime = false;
     bool programCrashedAndUserWantsToReset();
-
-    std::atomic<bool> licenseVerified = true;
     
     juce::SpinLock audioPlayerListenersLock;
     std::vector<AudioPlayerListener*> audioPlayerListeners;

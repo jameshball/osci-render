@@ -16,7 +16,9 @@ FrameSettingsComponent::FrameSettingsComponent(OscirenderAudioProcessor& p, Osci
         offsetLabel.setTooltip("Offsets the animation's start point by a specified number of frames.");
     } else {
         audioProcessor.animationSyncBPM->setValueNotifyingHost(false);
+#if OSCI_PREMIUM
         addAndMakeVisible(timeline);
+#endif
     }
 	addAndMakeVisible(rateLabel);
 	addAndMakeVisible(rateBox);
@@ -60,20 +62,26 @@ void FrameSettingsComponent::resized() {
 	auto area = getLocalBounds().withTrimmedTop(20).reduced(20);
     double rowHeight = 20;
 
+#if OSCI_PREMIUM
     auto timelineArea = juce::JUCEApplicationBase::isStandaloneApp() ? area.removeFromBottom(30) : juce::Rectangle<int>();
+#endif
     
     auto toggleBounds = juce::JUCEApplicationBase::isStandaloneApp() ? juce::Rectangle<int>() : area.removeFromTop(rowHeight);
     auto toggleWidth = juce::jmin(area.getWidth() / 3, 150);
 
     auto firstColumn = area.removeFromLeft(220);
     
+#if OSCI_PREMIUM
     if (juce::JUCEApplicationBase::isStandaloneApp()) {
         timeline.setVisible(animated);
     }
+#endif
     
     if (animated) {
         if (juce::JUCEApplicationBase::isStandaloneApp()) {
+#if OSCI_PREMIUM
             timeline.setBounds(timelineArea);
+#endif
         } else {
             animate.setBounds(toggleBounds.removeFromLeft(toggleWidth));
             sync.setBounds(toggleBounds.removeFromLeft(toggleWidth));

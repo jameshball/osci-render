@@ -33,7 +33,9 @@ private:
     juce::Label offsetLabel{ "Offset","Offset" };
     DoubleTextBox rateBox{ audioProcessor.animationRate->min, audioProcessor.animationRate->max };
     DoubleTextBox offsetBox{ audioProcessor.animationOffset->min, audioProcessor.animationRate->max };
+#if OSCI_PREMIUM
     AnimationTimelineComponent timeline{audioProcessor};
+#endif
 
     jux::SwitchButton invertImage{audioProcessor.invertImage};
     EffectComponent threshold{*audioProcessor.imageThreshold};

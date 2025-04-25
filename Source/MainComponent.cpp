@@ -128,7 +128,7 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 	osci::BooleanParameter* visualiserFullScreen = audioProcessor.visualiserParameters.visualiserFullScreen;
     pluginEditor.visualiser.setFullScreen(visualiserFullScreen->getBoolValue());
 
-    addChildComponent(pluginEditor.visualiser);
+    addAndMakeVisible(pluginEditor.visualiser);
 	pluginEditor.visualiser.setFullScreenCallback([this, visualiserFullScreen](FullScreenMode mode) {
 		if (mode == FullScreenMode::TOGGLE) {
 			visualiserFullScreen->setBoolValueNotifyingHost(!visualiserFullScreen->getBoolValue());

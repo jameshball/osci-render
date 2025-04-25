@@ -13,6 +13,9 @@ TextParser::~TextParser() {
 void TextParser::parse(juce::String text, juce::Font font) {
     lastFont = font;
     
+    juce::Path textPath;
+
+#if OSCI_PREMIUM
     // Apply formatting markers if the font is bold or italic
     juce::String formattedText = text;
     
@@ -30,9 +33,6 @@ void TextParser::parse(juce::String text, juce::Font font) {
     // Create a TextLayout from the AttributedString
     juce::TextLayout layout;
     layout.createLayout(attributedString, 64.0f);
-    
-    // Create a path from the TextLayout
-    juce::Path textPath;
 
     juce::String displayText = attributedString.getText();
     // remove all whitespace
@@ -75,10 +75,13 @@ void TextParser::parse(juce::String text, juce::Font font) {
     
     // If the layout has no text, fallback to original method
     if (textPath.isEmpty()) {
+#endif
         juce::GlyphArrangement glyphs;
         glyphs.addFittedText(font, text, -2, -2, 4, 4, juce::Justification::centred, 2);
         glyphs.createPath(textPath);
+#if OSCI_PREMIUM
     }
+#endif
 
     // Convert path to shapes
     shapes = std::vector<std::unique_ptr<osci::Shape>>();

@@ -35,7 +35,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
         }
     }
     
-    addChildComponent(visualiser);
+    addAndMakeVisible(visualiser);
     
     int width = std::any_cast<int>(audioProcessor.getProperty("appWidth", defaultWidth));
     int height = std::any_cast<int>(audioProcessor.getProperty("appHeight", defaultHeight));
@@ -66,8 +66,6 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
 
 #if OSCI_PREMIUM
     sharedTextureManager.initGL();
-#else
-    visualiser.setVisible(true);
 #endif
 }
 

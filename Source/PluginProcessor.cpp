@@ -620,7 +620,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         threadManager.write(osci::Point(x, y, 1));
         
         // Apply mute if active
-        if (muteParameter->getBoolValue() || !licenseVerified) {
+        if (muteParameter->getBoolValue()) {
             x = 0.0;
             y = 0.0;
         }

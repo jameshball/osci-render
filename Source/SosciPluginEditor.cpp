@@ -33,11 +33,6 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p) : CommonPluginEdito
         manager.addChangeListener(this);
         currentInputDevice = getInputDeviceName();
     }
-    
-#if OSCI_PREMIUM
-    addChildComponent(licenseRegistration);
-    licenseRegistration.toFront(true);
-#endif
 }
 
 SosciPluginEditor::~SosciPluginEditor() {
@@ -57,10 +52,6 @@ void SosciPluginEditor::paint(juce::Graphics& g) {
 void SosciPluginEditor::resized() {
     CommonPluginEditor::resized();
     auto area = getLocalBounds();
-    
-#if OSCI_PREMIUM
-    licenseRegistration.setBounds(area);
-#endif
 
     if (audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
         visualiser.setBounds(area);
