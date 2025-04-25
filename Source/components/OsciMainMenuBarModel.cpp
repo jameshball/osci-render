@@ -54,7 +54,7 @@ OsciMainMenuBarModel::OsciMainMenuBarModel(OscirenderAudioProcessor& p, Oscirend
 
 #if !OSCI_PREMIUM
     addMenuItem(1, "Purchase osci-render premium!", [this] {
-        juce::URL("https://osci-render.com/sosci").launchInDefaultBrowser();
+        juce::URL("https://osci-render.com/#purchase").launchInDefaultBrowser();
     });
 #endif
 

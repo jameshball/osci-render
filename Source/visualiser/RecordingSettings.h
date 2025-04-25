@@ -210,7 +210,7 @@ private:
     
 #if !OSCI_PREMIUM
     juce::TextEditor recordVideoWarning{"recordVideoWarning"};
-    juce::HyperlinkButton sosciLink{"Purchase here", juce::URL("https://osci-render.com/sosci")};
+    juce::HyperlinkButton sosciLink{"Purchase here", juce::URL("https://osci-render.com/#purchase")};
 #endif
 
     juce::Label compressionPresetLabel{"Compression Speed", "Compression Speed"};
