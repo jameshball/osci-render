@@ -62,6 +62,7 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
     effects.push_back(thresholdEffect);
 
     wavParser.setLooping(false);
+    startHeartbeat();
 }
 
 void CommonAudioProcessor::addAllParameters() {
@@ -87,10 +88,31 @@ void CommonAudioProcessor::addAllParameters() {
     }
 }
 
+
+void CommonAudioProcessor::startHeartbeat() {
+    if (!heartbeatActive) {
+        startTimer(2000); // 2 seconds
+        heartbeatActive = true;
+    }
+}
+
+void CommonAudioProcessor::stopHeartbeat() {
+    if (heartbeatActive) {
+        stopTimer();
+        heartbeatActive = false;
+    }
+}
+
+void CommonAudioProcessor::timerCallback() {
+    setGlobalValue("lastHeartbeatTime", juce::Time::getCurrentTime().toISO8601(true));
+    saveGlobalSettings();
+}
+
 CommonAudioProcessor::~CommonAudioProcessor() 
 {
     setGlobalValue("endTime", juce::Time::getCurrentTime().toISO8601(true));
     saveGlobalSettings();
+    stopHeartbeat();
 }
 
 const juce::String CommonAudioProcessor::getName() const {
@@ -394,21 +416,18 @@ void CommonAudioProcessor::setLastOpenedDirectory(const juce::File& directory)
 
 bool CommonAudioProcessor::programCrashedAndUserWantsToReset() {
     bool userWantsToReset = false;
-    
     if (!hasSetSessionStartTime) {
-        // check that the previous end time is later than the start time.
-        // if not, the program did not close properly.
         juce::String startTime = getGlobalStringValue("startTime");
         juce::String endTime = getGlobalStringValue("endTime");
-        
+        juce::String lastHeartbeat = getGlobalStringValue("lastHeartbeatTime");
+        juce::Time start = juce::Time::fromISO8601(startTime);
+        juce::Time end = juce::Time::fromISO8601(endTime);
+        juce::Time heartbeat = juce::Time::fromISO8601(lastHeartbeat);
+        juce::Time now = juce::Time::getCurrentTime();
+        bool heartbeatStale = (now.toMilliseconds() - heartbeat.toMilliseconds()) > 3000;
         if ((startTime.isNotEmpty() && endTime.isNotEmpty()) || (startTime.isNotEmpty() && endTime.isEmpty())) {
-            juce::Time start = juce::Time::fromISO8601(startTime);
-            juce::Time end = juce::Time::fromISO8601(endTime);
-            
-            if ((start > end || end == juce::Time()) && juce::MessageManager::getInstance()->isThisTheMessageThread()) {
+            if (((start > end || end == juce::Time()) && heartbeatStale) && juce::MessageManager::getInstance()->isThisTheMessageThread()) {
                 juce::String message = "It appears that " + juce::String(ProjectInfo::projectName) + " did not close properly during your last session. This may indicate a problem with your project or session.";
-                
-                // Use a synchronous dialog to ensure user makes a choice before proceeding
                 bool userPressedReset = juce::AlertWindow::showOkCancelBox(
                     juce::AlertWindow::WarningIcon,
                     "Possible Crash Detected",
@@ -418,18 +437,15 @@ bool CommonAudioProcessor::programCrashedAndUserWantsToReset() {
                     nullptr,
                     nullptr
                 );
-                
                 if (userPressedReset) {
                     userWantsToReset = true;
                 }
             }
         }
-        
         setGlobalValue("startTime", juce::Time::getCurrentTime().toISO8601(true));
         saveGlobalSettings();
         hasSetSessionStartTime = true;
     }
-    
     return userWantsToReset;
 }
 

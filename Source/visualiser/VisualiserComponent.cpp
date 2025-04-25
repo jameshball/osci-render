@@ -122,7 +122,8 @@ VisualiserComponent::VisualiserComponent(
         };
     }
 
-    addAndMakeVisible(audioPlayer);
+    addChildComponent(audioPlayer);
+    audioPlayer.setVisible(visualiserOnly);
     audioPlayer.addMouseListener(static_cast<juce::Component*>(this), true);
 
     openGLContext.setRenderer(this);

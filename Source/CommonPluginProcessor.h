@@ -21,7 +21,7 @@ public:
     virtual void parserChanged() = 0;
 };
 
-class CommonAudioProcessor  : public juce::AudioProcessor, public SampleRateManager
+class CommonAudioProcessor  : public juce::AudioProcessor, public SampleRateManager, public juce::Timer
                             #if JucePlugin_Enable_ARA
                              , public juce::AudioProcessorARAExtension
                             #endif
@@ -180,4 +180,11 @@ protected:
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CommonAudioProcessor)
+
+private:
+    void startHeartbeat();
+    void stopHeartbeat();
+    void timerCallback() override;
+
+    bool heartbeatActive = false;
 };
