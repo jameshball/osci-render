@@ -72,8 +72,13 @@ double TimelineComponent::getValue() const
 
 void TimelineComponent::setPlaying(bool shouldBePlaying)
 {
-    playButton.setVisible(!shouldBePlaying);
-    pauseButton.setVisible(shouldBePlaying);
+    if (isActive != nullptr && !isActive()) {
+        playButton.setVisible(false);
+        pauseButton.setVisible(false);
+    } else {
+        playButton.setVisible(!shouldBePlaying);
+        pauseButton.setVisible(shouldBePlaying);
+    }
 }
 
 bool TimelineComponent::isPlaying() const

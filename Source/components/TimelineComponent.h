@@ -17,6 +17,7 @@ public:
     std::function<void()> onPause;
     std::function<void()> onStop;
     std::function<void(bool)> onRepeatChanged;
+    std::function<bool(void)> isActive;
 
     // Public interface
     void setValue(double value, juce::NotificationType notification);

@@ -27,6 +27,10 @@ AudioPlayerComponent::AudioPlayerComponent(CommonAudioProcessor& processor)
     onRepeatChanged = [this](bool shouldRepeat) {
         audioProcessor.wavParser.setLooping(shouldRepeat);
     };
+    
+    isActive = [this]() {
+        return audioProcessor.wavParser.isInitialised();
+    };
 
     playButton.setTooltip("Play audio file");
     pauseButton.setTooltip("Pause audio file");
