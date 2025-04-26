@@ -21,11 +21,14 @@ public:
         only the number of permissions and number of available permissions **/
     Semaphore(const Semaphore& s) : num_permissions(s.num_permissions), avail(s.avail) { }
 
-    void acquire() {
+    bool acquire(std::chrono::milliseconds timeout = std::chrono::milliseconds(200)) {
         std::unique_lock<std::mutex> lk(m);
-        cv.wait(lk, [this] { return avail > 0; });
-        avail--;
+        bool result = cv.wait_for(lk, timeout, [this] { return avail > 0; });
+        if (result) {
+            avail--;
+        }
         lk.unlock();
+        return result;
     }
 
     void release() {
@@ -61,13 +64,15 @@ public:
     // PRODUCER
     // enqueue point
     
-    void waitUntilFull() {
+    bool waitUntilFull() {
         if (blockOnWrite) {
+            bool writtenSuccessfully = true;
             for (int i = 0; i < returnBuffer.size() && blockOnWrite; i++) {
-                queue->wait_dequeue(returnBuffer[i]);
+                writtenSuccessfully = writtenSuccessfully && queue->wait_dequeue_timed(returnBuffer[i], 1000000);
             }
+            return writtenSuccessfully;
         } else {
-            sema.acquire();
+            return sema.acquire();
         }
     }
     
