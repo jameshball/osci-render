@@ -86,5 +86,10 @@ public:
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseMove(const juce::MouseEvent& event) override;
 
+    // Syphon/Spout input dialog
+    void openSyphonInputDialog();
+    void onSyphonInputSelected(const juce::String& server, const juce::String& app);
+    void onSyphonInputDisconnected();
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OscirenderAudioProcessorEditor)
 };

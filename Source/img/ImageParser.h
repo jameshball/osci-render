@@ -7,8 +7,13 @@ class CommonPluginEditor;
 
 class ImageParser {
 public:
-	ImageParser(OscirenderAudioProcessor& p, juce::String fileName, juce::MemoryBlock image);
-	~ImageParser();
+    ImageParser(OscirenderAudioProcessor& p, juce::String fileName, juce::MemoryBlock image);
+    // Constructor for live Syphon/Spout input
+    ImageParser(OscirenderAudioProcessor& p);
+    ~ImageParser();
+    
+    // Update the live frame (for Syphon/Spout)
+    void updateLiveFrame(const juce::Image& newImage);
 
 	void setFrame(int index);
 	osci::Point getSample();
@@ -58,4 +63,9 @@ private:
     double scanX = -1;
     double scanY = 1;
     int scanCount = 0;
+
+    // Live image support
+    juce::SpinLock liveImageLock;
+    bool usingLiveImage = false;
+    juce::Image liveImage;
 };

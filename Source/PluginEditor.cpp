@@ -1,6 +1,9 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "CustomStandaloneFilterWindow.h"
+#include "components/SyphonInputSelectorComponent.h"
+#include "../modules/juce_sharedtexture/SharedTexture.h"
+#include <memory>
 
 void OscirenderAudioProcessorEditor::registerFileRemovedCallback() {
     audioProcessor.setFileRemovedCallback([this](int index) {
@@ -521,4 +524,39 @@ void OscirenderAudioProcessorEditor::mouseMove(const juce::MouseEvent& event) {
 void OscirenderAudioProcessorEditor::openVisualiserSettings() {
     visualiserSettingsWindow.setVisible(true);
     visualiserSettingsWindow.toFront(true);
+}
+
+void OscirenderAudioProcessorEditor::openSyphonInputDialog() {
+#if JUCE_MAC || JUCE_WINDOWS
+    SyphonInputSelectorComponent* selector = nullptr;
+    {
+        juce::SpinLock::ScopedLockType lock(audioProcessor.syphonLock);
+        selector = new SyphonInputSelectorComponent(
+            sharedTextureManager,
+            [this](const juce::String& server, const juce::String& app) { onSyphonInputSelected(server, app); },
+            [this]() { onSyphonInputDisconnected(); },
+            audioProcessor.isSyphonInputActive(),
+            audioProcessor.getSyphonSourceName()
+        );
+    }
+    juce::DialogWindow::LaunchOptions options;
+    options.content.setOwned(selector);
+    options.content->setSize(350, 120);
+    options.dialogTitle = "Select Syphon/Spout Input";
+    options.dialogBackgroundColour = juce::Colours::darkgrey;
+    options.escapeKeyTriggersCloseButton = true;
+    options.useNativeTitleBar = true;
+    options.resizable = false;
+    options.launchAsync();
+#endif
+}
+
+void OscirenderAudioProcessorEditor::onSyphonInputSelected(const juce::String& server, const juce::String& app) {
+    juce::SpinLock::ScopedLockType lock(audioProcessor.syphonLock);
+    audioProcessor.connectSyphonInput(server, app);
+}
+
+void OscirenderAudioProcessorEditor::onSyphonInputDisconnected() {
+    juce::SpinLock::ScopedLockType lock(audioProcessor.syphonLock);
+    audioProcessor.disconnectSyphonInput();
 }

@@ -16,6 +16,12 @@
 #include "audio/BitCrushEffect.h"
 #include "audio/BulgeEffect.h"
 
+#if JUCE_MAC || JUCE_WINDOWS
+    #include "SyphonFrameGrabber.h"
+    #include "img/ImageParser.h"
+    #include "../modules/juce_sharedtexture/SharedTexture.h"
+#endif
+
 //==============================================================================
 OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(2), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
     // locking isn't necessary here because we are in the constructor
@@ -507,32 +513,41 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     juce::AudioBuffer<float> outputBuffer3d = juce::AudioBuffer<float>(3, buffer.getNumSamples());
     outputBuffer3d.clear();
     
-    if (usingInput && totalNumInputChannels >= 1) {
-        if (totalNumInputChannels >= 2) {
-            for (auto channel = 0; channel < juce::jmin(2, totalNumInputChannels); channel++) {
-                outputBuffer3d.copyFrom(channel, 0, inputBuffer, channel, 0, buffer.getNumSamples());
+    {
+        juce::SpinLock::ScopedLockType sLock(syphonLock);
+        if (isSyphonInputActive()) {
+            for (int sample = 0; sample < outputBuffer3d.getNumSamples(); sample++) {
+                osci::Point point = syphonImageParser.getSample();
+                outputBuffer3d.setSample(0, sample, point.x);
+                outputBuffer3d.setSample(1, sample, point.y);
             }
-        } else {
-            // For mono input, copy the single channel to both left and right
-            outputBuffer3d.copyFrom(0, 0, inputBuffer, 0, 0, buffer.getNumSamples());
-            outputBuffer3d.copyFrom(1, 0, inputBuffer, 0, 0, buffer.getNumSamples());
-        }
+        } else if (usingInput && totalNumInputChannels >= 1) {
+            if (totalNumInputChannels >= 2) {
+                for (auto channel = 0; channel < juce::jmin(2, totalNumInputChannels); channel++) {
+                    outputBuffer3d.copyFrom(channel, 0, inputBuffer, channel, 0, buffer.getNumSamples());
+                }
+            } else {
+                // For mono input, copy the single channel to both left and right
+                outputBuffer3d.copyFrom(0, 0, inputBuffer, 0, 0, buffer.getNumSamples());
+                outputBuffer3d.copyFrom(1, 0, inputBuffer, 0, 0, buffer.getNumSamples());
+            }
 
-        // handle all midi messages
-        auto midiIterator = midiMessages.cbegin();
-        std::for_each(midiIterator,
-            midiMessages.cend(),
-            [&] (const juce::MidiMessageMetadata& meta) { synth.publicHandleMidiEvent(meta.getMessage()); }
-        );
-    } else {
-        juce::SpinLock::ScopedLockType lock1(parsersLock);
-        juce::SpinLock::ScopedLockType lock2(effectsLock);
-        synth.renderNextBlock(outputBuffer3d, midiMessages, 0, buffer.getNumSamples());
-        for (int i = 0; i < synth.getNumVoices(); i++) {
-            auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
-            if (voice->isVoiceActive()) {
-                customEffect->frequency = voice->getFrequency();
-                break;
+            // handle all midi messages
+            auto midiIterator = midiMessages.cbegin();
+            std::for_each(midiIterator,
+                midiMessages.cend(),
+                [&] (const juce::MidiMessageMetadata& meta) { synth.publicHandleMidiEvent(meta.getMessage()); }
+            );
+        } else {
+            juce::SpinLock::ScopedLockType lock1(parsersLock);
+            juce::SpinLock::ScopedLockType lock2(effectsLock);
+            synth.renderNextBlock(outputBuffer3d, midiMessages, 0, buffer.getNumSamples());
+            for (int i = 0; i < synth.getNumVoices(); i++) {
+                auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
+                if (voice->isVoiceActive()) {
+                    customEffect->frequency = voice->getFrequency();
+                    break;
+                }
             }
         }
     }
@@ -542,7 +557,6 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     auto* channelData = buffer.getArrayOfWritePointers();
     
 	for (int sample = 0; sample < buffer.getNumSamples(); ++sample) {
-        // Update frame animation
         if (animateFrames->getBoolValue()) {
             if (juce::JUCEApplicationBase::isStandaloneApp()) {
                 animationFrame = animationFrame + sTimeSec * animationRate->getValueUnnormalised();
@@ -889,6 +903,49 @@ void OscirenderAudioProcessor::envelopeChanged(EnvelopeComponent* changedEnvelop
         updateIfApproxEqual(releaseShape, curves[2].getCurve());
     }
 }
+
+#if JUCE_MAC || JUCE_WINDOWS
+// Syphon/Spout input management
+
+// syphonLock must be held when calling this function
+bool OscirenderAudioProcessor::isSyphonInputActive() const {
+    return syphonFrameGrabber != nullptr && syphonFrameGrabber->isActive();
+}
+
+// syphonLock must be held when calling this function
+bool OscirenderAudioProcessor::isSyphonInputStarted() const {
+    return syphonFrameGrabber != nullptr;
+}
+
+// syphonLock must be held when calling this function
+void OscirenderAudioProcessor::connectSyphonInput(const juce::String& server, const juce::String& app) {
+    auto editor = dynamic_cast<OscirenderAudioProcessorEditor*>(getActiveEditor());
+    if (!syphonFrameGrabber && editor) {
+        syphonFrameGrabber = std::make_unique<SyphonFrameGrabber>(editor->sharedTextureManager, server, app, syphonImageParser);
+        {
+            juce::MessageManagerLock lock;
+            fileChangeBroadcaster.sendChangeMessage();
+        }
+    }
+}
+
+// syphonLock must be held when calling this function
+void OscirenderAudioProcessor::disconnectSyphonInput() {
+    syphonFrameGrabber.reset();
+    {
+        juce::MessageManagerLock lock;
+        fileChangeBroadcaster.sendChangeMessage();
+    }
+}
+
+// syphonLock must be held when calling this function
+juce::String OscirenderAudioProcessor::getSyphonSourceName() const {
+    if (syphonFrameGrabber) {
+        return syphonFrameGrabber->getSourceName();
+    }
+    return "";
+}
+#endif
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {
     return new OscirenderAudioProcessor();

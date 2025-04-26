@@ -25,6 +25,11 @@
 #include "audio/CustomEffect.h"
 #include "audio/DashedLineEffect.h"
 #include "CommonPluginProcessor.h"
+#include "SyphonFrameGrabber.h"
+
+#if JUCE_MAC || JUCE_WINDOWS
+    #include "../modules/juce_sharedtexture/SharedTexture.h"
+#endif
 
 //==============================================================================
 /**
@@ -281,6 +286,21 @@ private:
     const double MIN_LENGTH_INCREMENT = 0.000001;
 
     juce::AudioPlayHead* playHead;
+
+
+#if JUCE_MAC || JUCE_WINDOWS
+public:
+    bool isSyphonInputActive() const;
+    bool isSyphonInputStarted() const;
+    void connectSyphonInput(const juce::String& server, const juce::String& app);
+    void disconnectSyphonInput();
+    juce::String getSyphonSourceName() const;
+
+    juce::SpinLock syphonLock;
+private:
+    ImageParser syphonImageParser = ImageParser(*this);
+    std::unique_ptr<SyphonFrameGrabber> syphonFrameGrabber;
+#endif
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OscirenderAudioProcessor)

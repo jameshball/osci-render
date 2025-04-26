@@ -62,9 +62,25 @@ OsciMainMenuBarModel::OsciMainMenuBarModel(OscirenderAudioProcessor& p, Oscirend
         editor.openRecordingSettings();
     });
 
+    // Add Syphon/Spout input menu item under Recording
+    addMenuItem(2, audioProcessor.isSyphonInputActive() ? "Disconnect Syphon/Spout Input" : "Select Syphon/Spout Input...", [this] {
+        if (audioProcessor.isSyphonInputActive())
+            disconnectSyphonInput();
+        else
+            openSyphonInputDialog();
+    });
+
     if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
         addMenuItem(3, "Settings...", [this] {
             editor.openAudioSettings();
         });
     }
+}
+
+void OsciMainMenuBarModel::openSyphonInputDialog() {
+    editor.openSyphonInputDialog();
+}
+
+void OsciMainMenuBarModel::disconnectSyphonInput() {
+    audioProcessor.disconnectSyphonInput();
 }

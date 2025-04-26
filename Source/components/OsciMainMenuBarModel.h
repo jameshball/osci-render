@@ -9,6 +9,8 @@ class OscirenderAudioProcessor;
 class OsciMainMenuBarModel : public MainMenuBarModel {
 public:
     OsciMainMenuBarModel(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor);
+    void openSyphonInputDialog();
+    void disconnectSyphonInput();
 
 private:
     OscirenderAudioProcessor& audioProcessor;

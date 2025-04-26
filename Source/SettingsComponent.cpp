@@ -79,8 +79,8 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
     juce::String extension = fileName.fromLastOccurrenceOf(".", true, false).toLowerCase();
     txt.setVisible(false);
     frame.setVisible(false);
-    bool isImage =  extension == ".gif" || extension == ".png" || extension == ".jpg" || extension == ".jpeg" || extension == ".mov" || extension == ".mp4";
-    if (fileName.isEmpty() || audioProcessor.objectServerRendering) {
+    bool isImage =  extension == ".gif" || extension == ".png" || extension == ".jpg" || extension == ".jpeg" || extension == ".mov" || extension == ".mp4" || audioProcessor.isSyphonInputStarted();
+    if ((fileName.isEmpty() && !audioProcessor.isSyphonInputStarted()) || audioProcessor.objectServerRendering) {
         // do nothing
     } else if (extension == ".txt") {
         txt.setVisible(true);

@@ -157,13 +157,18 @@ void MainComponent::updateFileLabel() {
 	showLeftArrow = audioProcessor.getCurrentFileIndex() > 0;
 	showRightArrow = audioProcessor.getCurrentFileIndex() < audioProcessor.numFiles() - 1;
 	
-	if (audioProcessor.objectServerRendering) {
-		fileLabel.setText("Rendering from Blender", juce::dontSendNotification);
-	} else if (audioProcessor.getCurrentFileIndex() == -1) {
-		fileLabel.setText("No file open", juce::dontSendNotification);
-	} else {
-		fileLabel.setText(audioProcessor.getCurrentFileName(), juce::dontSendNotification);
-	}
+    {
+        juce::SpinLock::ScopedLockType lock(audioProcessor.syphonLock);
+        if (audioProcessor.objectServerRendering) {
+            fileLabel.setText("Rendering from Blender", juce::dontSendNotification);
+        } else if (audioProcessor.isSyphonInputActive()) {
+            fileLabel.setText(audioProcessor.getSyphonSourceName(), juce::dontSendNotification);
+        } else if (audioProcessor.getCurrentFileIndex() == -1) {
+            fileLabel.setText("No file open", juce::dontSendNotification);
+        } else {
+            fileLabel.setText(audioProcessor.getCurrentFileName(), juce::dontSendNotification);
+        }
+    }
 
 	resized();
 }

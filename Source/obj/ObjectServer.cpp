@@ -120,7 +120,6 @@ void ObjectServer::run() {
                         }
                     }
                 }
-
             }
         }
     }

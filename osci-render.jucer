@@ -179,6 +179,8 @@
         <FILE id="QQzSwh" name="SliderTextBox.h" compile="0" resource="0" file="Source/components/SliderTextBox.h"/>
         <FILE id="QrDKRZ" name="SvgButton.h" compile="0" resource="0" file="Source/components/SvgButton.h"/>
         <FILE id="qzfstC" name="SwitchButton.h" compile="0" resource="0" file="Source/components/SwitchButton.h"/>
+        <FILE id="rA7fII" name="SyphonInputSelectorComponent.h" compile="0"
+              resource="0" file="Source/components/SyphonInputSelectorComponent.h"/>
         <FILE id="WfUlLH" name="TimelineComponent.cpp" compile="1" resource="0"
               file="Source/components/TimelineComponent.cpp"/>
         <FILE id="fsckjw" name="TimelineComponent.h" compile="0" resource="0"
@@ -642,6 +644,8 @@
             file="Source/FrameSettingsComponent.cpp"/>
       <FILE id="lzBNS1" name="FrameSettingsComponent.h" compile="0" resource="0"
             file="Source/FrameSettingsComponent.h"/>
+      <FILE id="nfoWJk" name="InvisibleOpenGLContextComponent.h" compile="0"
+            resource="0" file="Source/InvisibleOpenGLContextComponent.h"/>
       <FILE id="d2zFqF" name="LookAndFeel.cpp" compile="1" resource="0" file="Source/LookAndFeel.cpp"/>
       <FILE id="TJDqWs" name="LookAndFeel.h" compile="0" resource="0" file="Source/LookAndFeel.h"/>
       <FILE id="X26RjJ" name="LuaComponent.cpp" compile="1" resource="0"
@@ -669,6 +673,8 @@
             file="Source/SettingsComponent.cpp"/>
       <FILE id="Vlmozi" name="SettingsComponent.h" compile="0" resource="0"
             file="Source/SettingsComponent.h"/>
+      <FILE id="jyHVpz" name="SyphonFrameGrabber.h" compile="0" resource="0"
+            file="Source/SyphonFrameGrabber.h"/>
       <FILE id="UxZu4n" name="TxtComponent.cpp" compile="1" resource="0"
             file="Source/TxtComponent.cpp"/>
       <FILE id="kxPbsL" name="TxtComponent.h" compile="0" resource="0" file="Source/TxtComponent.h"/>
