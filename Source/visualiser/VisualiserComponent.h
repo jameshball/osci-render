@@ -1,17 +1,20 @@
 #pragma once
 
-#include <algorithm>
 #include <JuceHeader.h>
+
+#include <algorithm>
+
 #include "../LookAndFeel.h"
-#include "../components/SvgButton.h"
-#include "VisualiserSettings.h"
-#include "RecordingSettings.h"
-#include "../components/StopwatchComponent.h"
-#include "../img/qoixx.hpp"
-#include "../components/DownloaderComponent.h"
 #include "../audio/AudioRecorder.h"
-#include "../wav/WavParser.h"
 #include "../components/AudioPlayerComponent.h"
+#include "../components/DownloaderComponent.h"
+#include "../components/StopwatchComponent.h"
+#include "../components/SvgButton.h"
+#include "../img/qoixx.hpp"
+#include "../video/FFmpegEncoderManager.h"
+#include "../wav/WavParser.h"
+#include "RecordingSettings.h"
+#include "VisualiserSettings.h"
 
 #define FILE_RENDER_DUMMY 0
 #define FILE_RENDER_PNG 1
@@ -44,8 +47,7 @@ public:
         VisualiserSettings& settings,
         RecordingSettings& recordingSettings,
         VisualiserComponent* parent = nullptr,
-        bool visualiserOnly = false
-    );
+        bool visualiserOnly = false);
     ~VisualiserComponent() override;
 
     std::function<void()> openSettings;
@@ -75,7 +77,7 @@ public:
     VisualiserComponent* parent = nullptr;
     VisualiserComponent* child = nullptr;
     std::unique_ptr<VisualiserWindow> popout = nullptr;
-    
+
     std::atomic<bool> active = true;
 
 private:
@@ -83,17 +85,17 @@ private:
     CommonPluginEditor& editor;
 
     float intensity;
-    
+
     bool visualiserOnly;
     AudioPlayerComponent audioPlayer{audioProcessor};
-    
-    SvgButton fullScreenButton{ "fullScreen", BinaryData::fullscreen_svg, juce::Colours::white, juce::Colours::white };
-    SvgButton popOutButton{ "popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::white };
-    SvgButton settingsButton{ "settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white };
-    SvgButton audioInputButton{ "audioInput", BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red };
-    
+
+    SvgButton fullScreenButton{"fullScreen", BinaryData::fullscreen_svg, juce::Colours::white, juce::Colours::white};
+    SvgButton popOutButton{"popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::white};
+    SvgButton settingsButton{"settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white};
+    SvgButton audioInputButton{"audioInput", BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red};
+
 #if OSCI_PREMIUM
-    SvgButton sharedTextureButton{ "sharedTexture", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red };
+    SvgButton sharedTextureButton{"sharedTexture", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red};
     SharedTextureManager& sharedTextureManager;
     SharedTextureSender* sharedTextureSender = nullptr;
 #endif
@@ -109,37 +111,38 @@ private:
     RecordingSettings& recordingSettings;
     juce::File ffmpegFile;
     bool recordingAudio = true;
-    
+
 #if OSCI_PREMIUM
     bool recordingVideo = true;
     bool downloading = false;
-    
+
     long numFrames = 0;
     std::vector<unsigned char> framePixels;
     osci::WriteProcess ffmpegProcess;
     std::unique_ptr<juce::TemporaryFile> tempVideoFile;
+    FFmpegEncoderManager ffmpegEncoderManager;
 #endif
-    
+
     StopwatchComponent stopwatch;
     SvgButton record{"Record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f)};
-    
+
     std::unique_ptr<juce::FileChooser> chooser;
     std::unique_ptr<juce::TemporaryFile> tempAudioFile;
     AudioRecorder audioRecorder;
-    
+
     osci::Semaphore renderingSemaphore{0};
-    
+
     void popoutWindow();
-    
+
     // OPENGL
-    
+
     juce::OpenGLContext openGLContext;
-    
+
     juce::Rectangle<int> buttonRow;
     juce::Rectangle<int> viewportArea;
-    
+
     float renderScale = 1.0f;
-    
+
     GLuint quadIndexBuffer = 0;
     GLuint vertexIndexBuffer = 0;
     GLuint vertexBuffer = 0;
@@ -158,10 +161,10 @@ private:
     std::atomic<int> sampleBufferCount = 0;
     int prevSampleBufferCount = 0;
     long lastTriggerPosition = 0;
-    
+
     std::vector<float> scratchVertices;
     std::vector<float> fullScreenQuad;
-    
+
     GLuint frameBuffer = 0;
 
     double currentFrameRate = 60.0;
@@ -175,32 +178,32 @@ private:
     Texture screenTexture;
     juce::OpenGLTexture screenOpenGLTexture;
     std::optional<Texture> targetTexture = std::nullopt;
-    
+
     juce::Image screenTextureImage = juce::ImageFileFormat::loadFrom(BinaryData::noise_jpg, BinaryData::noise_jpgSize);
     juce::Image emptyScreenImage = juce::ImageFileFormat::loadFrom(BinaryData::empty_jpg, BinaryData::empty_jpgSize);
-    
+
 #if OSCI_PREMIUM
     juce::Image oscilloscopeImage = juce::ImageFileFormat::loadFrom(BinaryData::real_png, BinaryData::real_pngSize);
     juce::Image vectorDisplayImage = juce::ImageFileFormat::loadFrom(BinaryData::vector_display_png, BinaryData::vector_display_pngSize);
-    
+
     juce::Image emptyReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::no_reflection_jpg, BinaryData::no_reflection_jpgSize);
     juce::Image oscilloscopeReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::real_reflection_png, BinaryData::real_reflection_pngSize);
     juce::Image vectorDisplayReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::vector_display_reflection_png, BinaryData::vector_display_reflection_pngSize);
-    
-    osci::Point REAL_SCREEN_OFFSET = { 0.02, -0.15 };
-    osci::Point REAL_SCREEN_SCALE = { 0.6 };
-    
-    osci::Point VECTOR_DISPLAY_OFFSET = { 0.075, -0.045 };
-    osci::Point VECTOR_DISPLAY_SCALE = { 0.6 };
+
+    osci::Point REAL_SCREEN_OFFSET = {0.02, -0.15};
+    osci::Point REAL_SCREEN_SCALE = {0.6};
+
+    osci::Point VECTOR_DISPLAY_OFFSET = {0.075, -0.045};
+    osci::Point VECTOR_DISPLAY_SCALE = {0.6};
     float VECTOR_DISPLAY_FISH_EYE = 0.5;
-    
+
     juce::OpenGLTexture reflectionOpenGLTexture;
     Texture reflectionTexture;
-    
+
     std::unique_ptr<juce::OpenGLShaderProgram> glowShader;
     std::unique_ptr<juce::OpenGLShaderProgram> afterglowShader;
 #endif
-    
+
     std::unique_ptr<juce::OpenGLShaderProgram> simpleShader;
     std::unique_ptr<juce::OpenGLShaderProgram> texturedShader;
     std::unique_ptr<juce::OpenGLShaderProgram> blurShader;
@@ -208,10 +211,10 @@ private:
     std::unique_ptr<juce::OpenGLShaderProgram> lineShader;
     std::unique_ptr<juce::OpenGLShaderProgram> outputShader;
     juce::OpenGLShaderProgram* currentShader;
-    
+
     float fadeAmount;
     ScreenOverlay screenOverlay = ScreenOverlay::INVALID;
-    
+
     const double RESAMPLE_RATIO = 6.0;
     double sampleRate = -1;
     double oldSampleRate = -1;
@@ -243,7 +246,7 @@ private:
     void viewportChanged(juce::Rectangle<int> area);
 
     void renderScope(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints);
-    
+
     double getSweepIncrement();
 
     Texture createScreenTexture();
@@ -260,7 +263,7 @@ public:
     VisualiserWindow(juce::String name, VisualiserComponent* parent) : parent(parent), wasPaused(!parent->active), juce::DocumentWindow(name, juce::Colours::black, juce::DocumentWindow::TitleBarButtons::allButtons) {
         setAlwaysOnTop(true);
     }
-    
+
     void closeButtonPressed() override {
         // local copy of parent so that we can safely delete the child
         VisualiserComponent* parent = this->parent;

@@ -1,14 +1,12 @@
-#include "../LookAndFeel.h"
 #include "VisualiserComponent.h"
-#include "../CommonPluginProcessor.h"
-#include "../CommonPluginEditor.h"
 
+#include "../CommonPluginEditor.h"
+#include "../CommonPluginProcessor.h"
+#include "../LookAndFeel.h"
 #include "AfterglowFragmentShader.glsl"
 #include "AfterglowVertexShader.glsl"
 #include "BlurFragmentShader.glsl"
 #include "BlurVertexShader.glsl"
-#include "WideBlurFragmentShader.glsl"
-#include "WideBlurVertexShader.glsl"
 #include "GlowFragmentShader.glsl"
 #include "GlowVertexShader.glsl"
 #include "LineFragmentShader.glsl"
@@ -19,37 +17,39 @@
 #include "SimpleVertexShader.glsl"
 #include "TexturedFragmentShader.glsl"
 #include "TexturedVertexShader.glsl"
+#include "WideBlurFragmentShader.glsl"
+#include "WideBlurVertexShader.glsl"
 
 VisualiserComponent::VisualiserComponent(
-    CommonAudioProcessor& processor,
-    CommonPluginEditor& pluginEditor,
+    CommonAudioProcessor &processor,
+    CommonPluginEditor &pluginEditor,
 #if OSCI_PREMIUM
-    SharedTextureManager& sharedTextureManager,
+    SharedTextureManager &sharedTextureManager,
 #endif
     juce::File ffmpegFile,
-    VisualiserSettings& settings,
-    RecordingSettings& recordingSettings,
-    VisualiserComponent* parent,
-    bool visualiserOnly
-) : audioProcessor(processor),
-    ffmpegFile(ffmpegFile),
+    VisualiserSettings &settings,
+    RecordingSettings &recordingSettings,
+    VisualiserComponent *parent,
+    bool visualiserOnly) : audioProcessor(processor),
+                           ffmpegFile(ffmpegFile),
 #if OSCI_PREMIUM
-    sharedTextureManager(sharedTextureManager),
+                           sharedTextureManager(sharedTextureManager),
+                           ffmpegEncoderManager(ffmpegFile),
 #endif
-    settings(settings),
-    recordingSettings(recordingSettings),
-    visualiserOnly(visualiserOnly),
-    osci::AudioBackgroundThread("VisualiserComponent" + juce::String(parent != nullptr ? " Child" : ""), processor.threadManager),
-    parent(parent),
-    editor(pluginEditor) {
+                           settings(settings),
+                           recordingSettings(recordingSettings),
+                           visualiserOnly(visualiserOnly),
+                           osci::AudioBackgroundThread("VisualiserComponent" + juce::String(parent != nullptr ? " Child" : ""), processor.threadManager),
+                           parent(parent),
+                           editor(pluginEditor) {
 #if OSCI_PREMIUM
     addAndMakeVisible(editor.ffmpegDownloader);
 #endif
-    
+
     audioProcessor.haltRecording = [this] {
         setRecording(false);
     };
-    
+
     addAndMakeVisible(record);
 #if OSCI_PREMIUM
     record.setTooltip("Toggles recording of the oscilloscope's visuals and audio.");
@@ -60,12 +60,12 @@ VisualiserComponent::VisualiserComponent(
     record.onClick = [this] {
         setRecording(record.getToggleState());
     };
-    
+
     addAndMakeVisible(stopwatch);
-    
+
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
     setWantsKeyboardFocus(true);
-    
+
     if (parent == nullptr) {
         addAndMakeVisible(fullScreenButton);
         fullScreenButton.setTooltip("Toggles fullscreen mode.");
@@ -82,27 +82,25 @@ VisualiserComponent::VisualiserComponent(
     sharedTextureButton.setTooltip("Toggles sending the oscilloscope's visuals to a Syphon/Spout receiver.");
     sharedTextureButton.onClick = [this] {
         if (sharedTextureSender != nullptr) {
-            openGLContext.executeOnGLThread([this](juce::OpenGLContext& context) {
-                closeSharedTexture();
-            }, false);
+            openGLContext.executeOnGLThread([this](juce::OpenGLContext &context) { closeSharedTexture(); },
+                                            false);
         } else {
-            openGLContext.executeOnGLThread([this](juce::OpenGLContext& context) {
-                initialiseSharedTexture();
-            }, false);
+            openGLContext.executeOnGLThread([this](juce::OpenGLContext &context) { initialiseSharedTexture(); },
+                                            false);
         }
     };
 #endif
-    
+
     fullScreenButton.onClick = [this]() {
         enableFullScreen();
     };
-    
+
     settingsButton.onClick = [this]() {
         if (openSettings != nullptr) {
             openSettings();
         }
     };
-    
+
     popOutButton.onClick = [this]() {
         popoutWindow();
     };
@@ -113,9 +111,7 @@ VisualiserComponent::VisualiserComponent(
         audioInputButton.setClickingTogglesState(false);
         audioInputButton.setToggleState(!audioPlayer.isInitialised(), juce::NotificationType::dontSendNotification);
         audioPlayer.onParserChanged = [this] {
-            juce::MessageManager::callAsync([this] {
-                audioInputButton.setToggleState(!audioPlayer.isInitialised(), juce::NotificationType::dontSendNotification);
-            });
+            juce::MessageManager::callAsync([this] { audioInputButton.setToggleState(!audioPlayer.isInitialised(), juce::NotificationType::dontSendNotification); });
         };
         audioInputButton.onClick = [this] {
             audioProcessor.stopAudioFile();
@@ -124,7 +120,7 @@ VisualiserComponent::VisualiserComponent(
 
     addChildComponent(audioPlayer);
     audioPlayer.setVisible(visualiserOnly);
-    audioPlayer.addMouseListener(static_cast<juce::Component*>(this), true);
+    audioPlayer.addMouseListener(static_cast<juce::Component *>(this), true);
 
     openGLContext.setRenderer(this);
     openGLContext.attachTo(*this);
@@ -138,19 +134,17 @@ VisualiserComponent::~VisualiserComponent() {
         audioProcessor.haltRecording = nullptr;
     }
     openGLContext.detach();
-    setShouldBeRunning(false, [this] {
-        renderingSemaphore.release();
-    });
+    setShouldBeRunning(false, [this] { renderingSemaphore.release(); });
 }
 
 void VisualiserComponent::setFullScreen(bool fullScreen) {
     this->fullScreen = fullScreen;
     hideButtonRow = false;
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
-    
+
     // Release renderingSemaphore to prevent deadlocks during layout changes
     renderingSemaphore.release();
-    
+
     resized();
 }
 
@@ -165,29 +159,29 @@ void VisualiserComponent::enableFullScreen() {
     grabKeyboardFocus();
 }
 
-void VisualiserComponent::mouseDoubleClick(const juce::MouseEvent& event) {
+void VisualiserComponent::mouseDoubleClick(const juce::MouseEvent &event) {
     if (event.originalComponent == this) {
         enableFullScreen();
     }
 }
 
-void VisualiserComponent::runTask(const std::vector<osci::Point>& points) {
+void VisualiserComponent::runTask(const std::vector<osci::Point> &points) {
     {
         juce::CriticalSection::ScopedLockType lock(samplesLock);
-        
+
         // copy the points before applying effects
         audioOutputBuffer.setSize(2, points.size(), false, true, true);
         for (int i = 0; i < points.size(); ++i) {
             audioOutputBuffer.setSample(0, i, points[i].x);
             audioOutputBuffer.setSample(1, i, points[i].y);
         }
-        
+
         xSamples.clear();
         ySamples.clear();
         zSamples.clear();
-        
+
         auto applyEffects = [&](osci::Point point) {
-            for (auto& effect : settings.parameters.audioEffects) {
+            for (auto &effect : settings.parameters.audioEffects) {
                 point = effect->apply(0, point);
             }
 #if OSCI_PREMIUM
@@ -200,40 +194,40 @@ void VisualiserComponent::runTask(const std::vector<osci::Point>& points) {
 #endif
             return point;
         };
-        
+
         if (settings.isSweepEnabled()) {
             double sweepIncrement = getSweepIncrement();
             long samplesPerSweep = sampleRate * settings.getSweepSeconds();
-            
+
             double triggerValue = settings.getTriggerValue();
             bool belowTrigger = false;
-            
-            for (const osci::Point& point : points) {
+
+            for (const osci::Point &point : points) {
                 long samplePosition = sampleCount - lastTriggerPosition;
                 double startPoint = 1.135;
                 double sweep = samplePosition * sweepIncrement * 2 * startPoint - startPoint;
-                
+
                 double value = point.x;
-                
+
                 if (sweep > startPoint && belowTrigger && value >= triggerValue) {
                     lastTriggerPosition = sampleCount;
                 }
-                
+
                 belowTrigger = value < triggerValue;
-                
+
                 osci::Point sweepPoint = {sweep, value, 1};
                 sweepPoint = applyEffects(sweepPoint);
-                
+
                 xSamples.push_back(sweepPoint.x);
                 ySamples.push_back(sweepPoint.y);
                 zSamples.push_back(1);
-                
+
                 sampleCount++;
             }
         } else {
-            for (const osci::Point& rawPoint : points) {
+            for (const osci::Point &rawPoint : points) {
                 osci::Point point = applyEffects(rawPoint);
-                
+
 #if OSCI_PREMIUM
                 if (settings.isGoniometer()) {
                     // x and y go to a diagonal currently, so we need to scale them down, and rotate them
@@ -241,23 +235,23 @@ void VisualiserComponent::runTask(const std::vector<osci::Point>& points) {
                     point.rotate(0, 0, -juce::MathConstants<double>::pi / 4);
                 }
 #endif
-                
+
                 xSamples.push_back(point.x);
                 ySamples.push_back(point.y);
                 zSamples.push_back(point.z);
             }
         }
-        
+
         sampleBufferCount++;
-        
+
         if (settings.parameters.upsamplingEnabled->getBoolValue()) {
             int newResampledSize = xSamples.size() * RESAMPLE_RATIO;
-            
+
             smoothedXSamples.resize(newResampledSize);
             smoothedYSamples.resize(newResampledSize);
             smoothedZSamples.resize(newResampledSize);
             smoothedZSamples.resize(newResampledSize);
-            
+
             if (settings.isSweepEnabled()) {
                 // interpolate between sweep values to avoid any artifacts from quickly going from one sweep to the next
                 for (int i = 0; i < newResampledSize; ++i) {
@@ -266,7 +260,7 @@ void VisualiserComponent::runTask(const std::vector<osci::Point>& points) {
                         double thisSample = xSamples[index];
                         double nextSample = xSamples[index + 1];
                         if (nextSample > thisSample) {
-                            smoothedXSamples[i] = xSamples[index] + (i % (int) RESAMPLE_RATIO) * (nextSample - thisSample) / RESAMPLE_RATIO;
+                            smoothedXSamples[i] = xSamples[index] + (i % (int)RESAMPLE_RATIO) * (nextSample - thisSample) / RESAMPLE_RATIO;
                         } else {
                             smoothedXSamples[i] = xSamples[index];
                         }
@@ -281,7 +275,7 @@ void VisualiserComponent::runTask(const std::vector<osci::Point>& points) {
             zResampler.process(zSamples.data(), smoothedZSamples.data(), zSamples.size());
         }
     }
-    
+
     // this just triggers a repaint
     triggerAsyncUpdate();
     // wait for rendering on the OpenGLRenderer thread to complete
@@ -298,9 +292,9 @@ int VisualiserComponent::prepareTask(double sampleRate, int bufferSize) {
     zResampler.prepare(sampleRate, RESAMPLE_RATIO);
 
     audioRecorder.setSampleRate(sampleRate);
-    
+
     int desiredBufferSize = sampleRate / recordingSettings.getFrameRate();
-    
+
     return desiredBufferSize;
 }
 
@@ -323,28 +317,28 @@ void VisualiserComponent::setPaused(bool paused, bool affectAudio) {
     repaint();
 }
 
-void VisualiserComponent::mouseDrag(const juce::MouseEvent& event) {
+void VisualiserComponent::mouseDrag(const juce::MouseEvent &event) {
     timerId = -1;
 }
 
-void VisualiserComponent::mouseMove(const juce::MouseEvent& event) {
+void VisualiserComponent::mouseMove(const juce::MouseEvent &event) {
     if (event.getScreenX() == lastMouseX && event.getScreenY() == lastMouseY) {
         return;
     }
     hideButtonRow = false;
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
-    
+
     // Treat both fullScreen mode and pop-out mode (parent != nullptr) as needing auto-hide controls
     if (fullScreen || parent != nullptr) {
         if (!getScreenBounds().removeFromBottom(25).contains(event.getScreenX(), event.getScreenY()) && !event.mods.isLeftButtonDown()) {
             lastMouseX = event.getScreenX();
             lastMouseY = event.getScreenY();
-            
+
             int newTimerId = juce::Random::getSystemRandom().nextInt();
             timerId = newTimerId;
             auto pos = event.getScreenPosition();
             auto parent = this->parent;
-            
+
             juce::WeakReference<VisualiserComponent> weakRef = this;
             juce::Timer::callAfterDelay(1000, [this, weakRef, newTimerId, pos, parent]() {
                 if (weakRef) {
@@ -356,14 +350,13 @@ void VisualiserComponent::mouseMove(const juce::MouseEvent& event) {
                             resized();
                         }
                     }
-                }
-            });
+                } });
         }
         resized();
     }
 }
 
-void VisualiserComponent::mouseDown(const juce::MouseEvent& event) {
+void VisualiserComponent::mouseDown(const juce::MouseEvent &event) {
     if (event.originalComponent == this) {
         if (event.mods.isLeftButtonDown() && child == nullptr && !record.getToggleState()) {
             setPaused(active);
@@ -371,7 +364,7 @@ void VisualiserComponent::mouseDown(const juce::MouseEvent& event) {
     }
 }
 
-bool VisualiserComponent::keyPressed(const juce::KeyPress& key) {
+bool VisualiserComponent::keyPressed(const juce::KeyPress &key) {
     if (key.isKeyCode(juce::KeyPress::escapeKey)) {
         if (fullScreenCallback) {
             fullScreenCallback(FullScreenMode::MAIN_COMPONENT);
@@ -388,7 +381,7 @@ bool VisualiserComponent::keyPressed(const juce::KeyPress& key) {
 void VisualiserComponent::setRecording(bool recording) {
     stopwatch.stop();
     stopwatch.reset();
-    
+
 #if OSCI_PREMIUM
     bool stillRecording = ffmpegProcess.isRunning() || audioRecorder.isRecording();
 #else
@@ -417,66 +410,33 @@ void VisualiserComponent::setRecording(bool recording) {
                             downloading = false;
                             resized();
                         });
-                    });
-                });
+                    }); });
             };
             auto onDownloadStart = [this] {
                 juce::MessageManager::callAsync([this] {
                     record.setEnabled(false);
                     downloading = true;
-                    resized();
-                });
+                    resized(); });
             };
             if (!audioProcessor.ensureFFmpegExists(onDownloadStart, onDownloadSuccess)) {
                 record.setToggleState(false, juce::NotificationType::dontSendNotification);
                 return;
             }
-            
+
             // Get the appropriate file extension based on codec
             juce::String fileExtension = recordingSettings.getFileExtensionForCodec();
             tempVideoFile = std::make_unique<juce::TemporaryFile>("." + fileExtension);
-            
-            juce::String resolution = std::to_string(renderTexture.width) + "x" + std::to_string(renderTexture.height);
-            juce::String cmd = "\"" + ffmpegFile.getFullPathName() + "\"" +
-                " -r " + juce::String(recordingSettings.getFrameRate()) +
-                " -f rawvideo" +
-                " -pix_fmt rgba" +
-                " -s " + resolution +
-                " -i -" +
-                " -threads 4" +
-                " -preset " + recordingSettings.getCompressionPreset() +
-                " -y" +
-                " -pix_fmt yuv420p";
-            
-            // Apply codec-specific parameters
+
             VideoCodec codec = recordingSettings.getVideoCodec();
-            if (codec == VideoCodec::H264) {
-                cmd += " -c:v libx264";
-                cmd += " -crf " + juce::String(recordingSettings.getCRF());
-            } else if (codec == VideoCodec::H265) {
-                cmd += " -c:v libx265";
-                cmd += " -crf " + juce::String(recordingSettings.getCRF());
-#if JUCE_MAC && JUCE_ARM
-                // use hardware encoding on Apple Silicon
-                cmd += " -c:v hevc_videotoolbox";
-                cmd += " -q:v " + juce::String(recordingSettings.getVideoToolboxQuality());
-                cmd += " -tag:v hvc1";
-#endif
-            } else if (codec == VideoCodec::VP9) {
-                cmd += " -c:v libvpx-vp9";
-                cmd += " -b:v 0";
-                cmd += " -crf " + juce::String(recordingSettings.getCRF());
-                cmd += " -deadline good -cpu-used 2";
-            }
-#if JUCE_MAC
-            else if (codec == VideoCodec::ProRes) {
-                cmd += " -c:v prores";
-                cmd += " -profile:v 3"; // ProRes 422 HQ
-            }
-#endif
-            
-            cmd += " -vf vflip";
-            cmd += " \"" + tempVideoFile->getFile().getFullPathName() + "\"";
+            juce::String cmd = ffmpegEncoderManager.buildVideoEncodingCommand(
+                codec,
+                recordingSettings.getCRF(),
+                recordingSettings.getVideoToolboxQuality(),
+                renderTexture.width,
+                renderTexture.height,
+                recordingSettings.getFrameRate(),
+                recordingSettings.getCompressionPreset(),
+                tempVideoFile->getFile());
 
             ffmpegProcess.start(cmd);
             framePixels.resize(renderTexture.width * renderTexture.height * 4);
@@ -516,7 +476,7 @@ void VisualiserComponent::setRecording(bool recording) {
         auto flags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting;
 
 #if OSCI_PREMIUM
-        chooser->launchAsync(flags, [this, wasRecordingAudio, wasRecordingVideo](const juce::FileChooser& chooser) {
+        chooser->launchAsync(flags, [this, wasRecordingAudio, wasRecordingVideo](const juce::FileChooser &chooser) {
             auto file = chooser.getResult();
             if (file != juce::File()) {
                 if (wasRecordingAudio && wasRecordingVideo) {
@@ -528,19 +488,17 @@ void VisualiserComponent::setRecording(bool recording) {
                     tempVideoFile->getFile().copyFileTo(file);
                 }
                 audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
-            }
-        });
+            } });
 #else
-        chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
+        chooser->launchAsync(flags, [this](const juce::FileChooser &chooser) {
             auto file = chooser.getResult();
             if (file != juce::File()) {
                 tempAudioFile->getFile().copyFileTo(file);
                 audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
-            }
-        });
+            } });
 #endif
     }
-    
+
     setBlockOnAudioThread(recording);
 #if OSCI_PREMIUM
     numFrames = 0;
@@ -570,15 +528,15 @@ void VisualiserComponent::resized() {
     } else {
         settingsButton.setVisible(false);
     }
-    
+
     if (visualiserOnly && juce::JUCEApplication::isStandaloneApp() && child == nullptr) {
         audioInputButton.setBounds(buttons.removeFromRight(30));
     }
-    
+
 #if OSCI_PREMIUM
     sharedTextureButton.setBounds(buttons.removeFromRight(30));
 #endif
-    
+
     record.setBounds(buttons.removeFromRight(25));
     if (record.getToggleState()) {
         stopwatch.setVisible(true);
@@ -586,20 +544,20 @@ void VisualiserComponent::resized() {
     } else {
         stopwatch.setVisible(false);
     }
-    
+
 #if OSCI_PREMIUM
     if (child == nullptr && downloading) {
         auto bounds = buttons.removeFromRight(160);
         editor.ffmpegDownloader.setBounds(bounds.withSizeKeepingCentre(bounds.getWidth() - 10, bounds.getHeight() - 10));
     }
 #endif
-    
+
     buttons.removeFromRight(10); // padding
-    
+
     if (child == nullptr) {
         audioPlayer.setBounds(buttons);
     }
-    
+
     viewportArea = area;
     viewportChanged(viewportArea);
 }
@@ -611,10 +569,10 @@ void VisualiserComponent::popoutWindow() {
     }
 #endif
     setRecording(false);
-    
+
     // Release renderingSemaphore to prevent deadlock when creating a child visualizer
     renderingSemaphore.release();
-    
+
     auto visualiser = new VisualiserComponent(
         audioProcessor,
         editor,
@@ -625,8 +583,7 @@ void VisualiserComponent::popoutWindow() {
         settings,
         recordingSettings,
         this,
-        visualiserOnly
-    );
+        visualiserOnly);
     visualiser->settings.setLookAndFeel(&getLookAndFeel());
     visualiser->openSettings = openSettings;
     visualiser->closeSettings = closeSettings;
@@ -671,8 +628,7 @@ void VisualiserComponent::initialiseSharedTexture() {
     sharedTextureSender->setSharedTextureId(renderTexture.id);
     sharedTextureSender->setDrawFunction([this] {
         setShader(texturedShader.get());
-        drawTexture({renderTexture});
-    });
+        drawTexture({renderTexture}); });
 }
 
 void VisualiserComponent::closeSharedTexture() {
@@ -680,43 +636,42 @@ void VisualiserComponent::closeSharedTexture() {
         sharedTextureManager.removeSender(sharedTextureSender);
         sharedTextureSender = nullptr;
     }
-
 }
 #endif
 
 void VisualiserComponent::newOpenGLContextCreated() {
     using namespace juce::gl;
-    
+
     juce::CriticalSection::ScopedLockType lock(samplesLock);
-    
+
     glColorMask(true, true, true, true);
 
     viewportChanged(viewportArea);
     glEnable(GL_BLEND);
     glBlendEquation(GL_FUNC_ADD);
-    
-    fullScreenQuad = { -1.0f, 1.0f, 1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, -1.0f, -1.0f, -1.0f };
-    
+
+    fullScreenQuad = {-1.0f, 1.0f, 1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, -1.0f, -1.0f, -1.0f};
+
     simpleShader = std::make_unique<juce::OpenGLShaderProgram>(openGLContext);
     simpleShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(simpleVertexShader));
     simpleShader->addFragmentShader(simpleFragmentShader);
     simpleShader->link();
-    
+
     lineShader = std::make_unique<juce::OpenGLShaderProgram>(openGLContext);
     lineShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(lineVertexShader));
     lineShader->addFragmentShader(lineFragmentShader);
     lineShader->link();
-    
+
     outputShader = std::make_unique<juce::OpenGLShaderProgram>(openGLContext);
     outputShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(outputVertexShader));
     outputShader->addFragmentShader(outputFragmentShader);
     outputShader->link();
-    
+
     texturedShader = std::make_unique<juce::OpenGLShaderProgram>(openGLContext);
     texturedShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(texturedVertexShader));
     texturedShader->addFragmentShader(texturedFragmentShader);
     texturedShader->link();
-    
+
     blurShader = std::make_unique<juce::OpenGLShaderProgram>(openGLContext);
     blurShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(blurVertexShader));
     blurShader->addFragmentShader(blurFragmentShader);
@@ -726,29 +681,29 @@ void VisualiserComponent::newOpenGLContextCreated() {
     wideBlurShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(wideBlurVertexShader));
     wideBlurShader->addFragmentShader(wideBlurFragmentShader);
     wideBlurShader->link();
-    
+
 #if OSCI_PREMIUM
     glowShader = std::make_unique<juce::OpenGLShaderProgram>(openGLContext);
     glowShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(glowVertexShader));
     glowShader->addFragmentShader(glowFragmentShader);
     glowShader->link();
-    
+
     afterglowShader = std::make_unique<juce::OpenGLShaderProgram>(openGLContext);
     afterglowShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(afterglowVertexShader));
     afterglowShader->addFragmentShader(afterglowFragmentShader);
     afterglowShader->link();
 #endif
-    
+
     glGenBuffers(1, &vertexBuffer);
     glGenBuffers(1, &quadIndexBuffer);
     glGenBuffers(1, &vertexIndexBuffer);
-    
+
     setupTextures();
 }
 
 void VisualiserComponent::openGLContextClosing() {
     using namespace juce::gl;
-    
+
 #if OSCI_PREMIUM
     closeSharedTexture();
 #endif
@@ -764,14 +719,14 @@ void VisualiserComponent::openGLContextClosing() {
     glDeleteTextures(1, &blur4Texture.id);
     glDeleteTextures(1, &renderTexture.id);
     screenOpenGLTexture.release();
-    
+
 #if OSCI_PREMIUM
     glDeleteTextures(1, &glowTexture.id);
     reflectionOpenGLTexture.release();
     glowShader.reset();
     afterglowShader.reset();
 #endif
-    
+
     simpleShader.reset();
     texturedShader.reset();
     blurShader.reset();
@@ -789,14 +744,14 @@ void VisualiserComponent::handleAsyncUpdate() {
 
 void VisualiserComponent::renderOpenGL() {
     using namespace juce::gl;
-    
+
     if (openGLContext.isActive()) {
         juce::OpenGLHelpers::clear(juce::Colours::black);
-        
+
         // we have a new buffer to render
         if (sampleBufferCount != prevSampleBufferCount) {
             prevSampleBufferCount = sampleBufferCount;
-            
+
             if (!record.getToggleState()) {
                 // don't change resolution or framerate if recording
                 if (recordingSettings.getResolution() != renderTexture.width) {
@@ -808,9 +763,9 @@ void VisualiserComponent::renderOpenGL() {
                     setupArrays(RESAMPLE_RATIO * sampleRate / recordingSettings.getFrameRate());
                 }
             }
-            
+
             juce::CriticalSection::ScopedLockType lock(samplesLock);
-            
+
             if (settings.parameters.upsamplingEnabled->getBoolValue()) {
                 renderScope(smoothedXSamples, smoothedYSamples, smoothedZSamples);
             } else {
@@ -822,7 +777,7 @@ void VisualiserComponent::renderOpenGL() {
                 sharedTextureSender->renderGL();
             }
 #endif
-            
+
             if (record.getToggleState()) {
 #if OSCI_PREMIUM
                 if (recordingVideo) {
@@ -836,11 +791,11 @@ void VisualiserComponent::renderOpenGL() {
                     audioRecorder.audioThreadCallback(audioOutputBuffer);
                 }
             }
-            
+
             renderingSemaphore.release();
             stopwatch.addTime(juce::RelativeTime::seconds(1.0 / recordingSettings.getFrameRate()));
         }
-        
+
         // render texture to screen
         activateTargetTexture(std::nullopt);
         setShader(texturedShader.get());
@@ -854,25 +809,25 @@ void VisualiserComponent::viewportChanged(juce::Rectangle<int> area) {
     if (openGLContext.isAttached()) {
         float realWidth = area.getWidth() * renderScale;
         float realHeight = area.getHeight() * renderScale;
-        
+
         float xOffset = getWidth() * renderScale - realWidth;
         float yOffset = getHeight() * renderScale - realHeight;
-        
+
         float minDim = juce::jmin(realWidth, realHeight);
         float x = (realWidth - minDim) / 2 + area.getX() * renderScale + xOffset;
         float y = (realHeight - minDim) / 2 - area.getY() * renderScale + yOffset;
-        
+
         glViewport(juce::roundToInt(x), juce::roundToInt(y), juce::roundToInt(minDim), juce::roundToInt(minDim));
     }
 }
 
 void VisualiserComponent::setupArrays(int nPoints) {
     using namespace juce::gl;
-    
+
     if (nPoints == 0) {
         return;
     }
-    
+
     nEdges = nPoints - 1;
 
     std::vector<float> indices(4 * nEdges);
@@ -883,7 +838,7 @@ void VisualiserComponent::setupArrays(int nPoints) {
     glBindBuffer(GL_ARRAY_BUFFER, quadIndexBuffer);
     glBufferData(GL_ARRAY_BUFFER, indices.size() * sizeof(float), indices.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0); // Unbind
-    
+
     int len = nEdges * 2 * 3;
     std::vector<uint32_t> vertexIndices(len);
 
@@ -907,7 +862,7 @@ void VisualiserComponent::setupArrays(int nPoints) {
 
 void VisualiserComponent::setupTextures() {
     using namespace juce::gl;
-    
+
     // Create the framebuffer
     glGenFramebuffers(1, &frameBuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
@@ -919,10 +874,10 @@ void VisualiserComponent::setupTextures() {
     blur3Texture = makeTexture(128, 128);
     blur4Texture = makeTexture(128, 128);
     renderTexture = makeTexture(recordingSettings.getResolution(), recordingSettings.getResolution());
-    
+
     screenOpenGLTexture.loadImage(emptyScreenImage);
-    screenTexture = { screenOpenGLTexture.getTextureID(), screenTextureImage.getWidth(), screenTextureImage.getHeight() };
-    
+    screenTexture = {screenOpenGLTexture.getTextureID(), screenTextureImage.getWidth(), screenTextureImage.getHeight()};
+
 #if OSCI_PREMIUM
     glowTexture = makeTexture(512, 512);
     reflectionTexture = createReflectionTexture();
@@ -946,7 +901,7 @@ Texture VisualiserComponent::makeTexture(int width, int height, GLuint textureID
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    float borderColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
+    float borderColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
     glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureID, 0);
@@ -958,7 +913,7 @@ Texture VisualiserComponent::makeTexture(int width, int height, GLuint textureID
 
     glBindTexture(GL_TEXTURE_2D, 0); // Unbind
 
-    return { textureID, width, height };
+    return {textureID, width, height};
 }
 
 void VisualiserComponent::setResolution(int width) {
@@ -975,45 +930,45 @@ void VisualiserComponent::setResolution(int width) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0); // Unbind
 }
 
-void VisualiserComponent::drawLineTexture(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints) {
+void VisualiserComponent::drawLineTexture(const std::vector<float> &xPoints, const std::vector<float> &yPoints, const std::vector<float> &zPoints) {
     using namespace juce::gl;
-    
+
     double persistence = std::pow(0.5, settings.getPersistence()) * 0.4;
     persistence *= 60.0 / recordingSettings.getFrameRate();
     fadeAmount = juce::jmin(1.0, persistence);
-    
+
     activateTargetTexture(lineTexture);
     fade();
     drawLine(xPoints, yPoints, zPoints);
     glBindTexture(GL_TEXTURE_2D, targetTexture.value().id);
 }
 
-void VisualiserComponent::saveTextureToPNG(Texture texture, const juce::File& file) {
+void VisualiserComponent::saveTextureToPNG(Texture texture, const juce::File &file) {
     using namespace juce::gl;
     GLuint textureID = texture.id;
     int width = texture.width;
     int height = texture.height;
-    
+
     // Bind the texture to read its data
     glBindTexture(GL_TEXTURE_2D, textureID);
     std::vector<unsigned char> pixels = std::vector<unsigned char>(width * height * 4);
     // Read the pixels from the texture
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
 
-    juce::Image image = juce::Image (juce::Image::PixelFormat::ARGB, width, height, true);
+    juce::Image image = juce::Image(juce::Image::PixelFormat::ARGB, width, height, true);
     juce::Image::BitmapData bitmapData(image, juce::Image::BitmapData::writeOnly);
 
     // Copy the pixel data to the JUCE image (and swap R and B channels)
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
-            int srcIndex = (y * width + x) * 4; // RGBA format
+            int srcIndex = (y * width + x) * 4;     // RGBA format
             juce::uint8 r = (pixels)[srcIndex];     // Red
             juce::uint8 g = (pixels)[srcIndex + 1]; // Green
             juce::uint8 b = (pixels)[srcIndex + 2]; // Blue
             juce::uint8 a = (pixels)[srcIndex + 3]; // Alpha
 
             // This method uses colors in RGBA
-            bitmapData.setPixelColour(x, height-y-1, juce::Colour(r, g, b, a));
+            bitmapData.setPixelColour(x, height - y - 1, juce::Colour(r, g, b, a));
         }
     }
 
@@ -1029,7 +984,7 @@ void VisualiserComponent::saveTextureToPNG(Texture texture, const juce::File& fi
     }
 }
 
-void VisualiserComponent::saveTextureToQOI(Texture texture, const juce::File& file) {
+void VisualiserComponent::saveTextureToQOI(Texture texture, const juce::File &file) {
     using namespace juce::gl;
     GLuint textureID = texture.id;
     int width = texture.width;
@@ -1041,14 +996,14 @@ void VisualiserComponent::saveTextureToQOI(Texture texture, const juce::File& fi
     // Read the pixels from the texture
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
 
-    const qoixx::qoi::desc imageFormat{ .width = (uint32_t) width, .height = (uint32_t) height, .channels = 4, .colorspace = qoixx::qoi::colorspace::srgb };
+    const qoixx::qoi::desc imageFormat{.width = (uint32_t)width, .height = (uint32_t)height, .channels = 4, .colorspace = qoixx::qoi::colorspace::srgb};
     std::vector<unsigned char> binaryData = qoixx::qoi::encode<std::vector<unsigned char>>(pixels, imageFormat);
     file.replaceWithData(binaryData.data(), binaryData.size());
 }
 
 void VisualiserComponent::activateTargetTexture(std::optional<Texture> texture) {
     using namespace juce::gl;
-    
+
     if (texture.has_value()) {
         glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture.value().id, 0);
@@ -1060,14 +1015,14 @@ void VisualiserComponent::activateTargetTexture(std::optional<Texture> texture) 
     targetTexture = texture;
 }
 
-void VisualiserComponent::setShader(juce::OpenGLShaderProgram* program) {
+void VisualiserComponent::setShader(juce::OpenGLShaderProgram *program) {
     currentShader = program;
     program->use();
 }
 
 void VisualiserComponent::drawTexture(std::vector<std::optional<Texture>> textures) {
     using namespace juce::gl;
-    
+
     glEnableVertexAttribArray(glGetAttribLocation(currentShader->getProgramID(), "aPos"));
 
     for (int i = 0; i < textures.size(); ++i) {
@@ -1093,29 +1048,30 @@ void VisualiserComponent::drawTexture(std::vector<std::optional<Texture>> textur
 
 void VisualiserComponent::setAdditiveBlending() {
     using namespace juce::gl;
-    
+
     glBlendFunc(GL_ONE, GL_ONE);
 }
 
 void VisualiserComponent::setNormalBlending() {
     using namespace juce::gl;
-    
+
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
-void VisualiserComponent::drawLine(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints) {
+void VisualiserComponent::drawLine(const std::vector<float> &xPoints, const std::vector<float> &yPoints, const std::vector<float> &zPoints) {
     using namespace juce::gl;
-    
+
     setAdditiveBlending();
-    
+
     int nPoints = xPoints.size();
 
     // Without this, there's an access violation that seems to occur only on some systems
-    if (scratchVertices.size() != nPoints * 12) scratchVertices.resize(nPoints * 12);
-    
+    if (scratchVertices.size() != nPoints * 12)
+        scratchVertices.resize(nPoints * 12);
+
     for (int i = 0; i < nPoints; ++i) {
         int p = i * 12;
-        scratchVertices[p]     = scratchVertices[p + 3] = scratchVertices[p + 6] = scratchVertices[p + 9]  = xPoints[i];
+        scratchVertices[p] = scratchVertices[p + 3] = scratchVertices[p + 6] = scratchVertices[p + 9] = xPoints[i];
         scratchVertices[p + 1] = scratchVertices[p + 4] = scratchVertices[p + 7] = scratchVertices[p + 10] = yPoints[i];
         scratchVertices[p + 2] = scratchVertices[p + 5] = scratchVertices[p + 8] = scratchVertices[p + 11] = zPoints[i];
     }
@@ -1131,27 +1087,27 @@ void VisualiserComponent::drawLine(const std::vector<float>& xPoints, const std:
 
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
     glVertexAttribPointer(glGetAttribLocation(lineShader->getProgramID(), "aStart"), 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glVertexAttribPointer(glGetAttribLocation(lineShader->getProgramID(), "aEnd"), 3, GL_FLOAT, GL_FALSE, 0, (void*)(12 * sizeof(float)));
+    glVertexAttribPointer(glGetAttribLocation(lineShader->getProgramID(), "aEnd"), 3, GL_FLOAT, GL_FALSE, 0, (void *)(12 * sizeof(float)));
     glBindBuffer(GL_ARRAY_BUFFER, quadIndexBuffer);
     glVertexAttribPointer(glGetAttribLocation(lineShader->getProgramID(), "aIdx"), 1, GL_FLOAT, GL_FALSE, 0, 0);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, screenTexture.id);
     lineShader->setUniform("uScreen", 0);
-    lineShader->setUniform("uSize", (GLfloat) settings.getFocus());
+    lineShader->setUniform("uSize", (GLfloat)settings.getFocus());
     lineShader->setUniform("uGain", 450.0f / 512.0f);
     lineShader->setUniform("uInvert", 1.0f);
 
     if (settings.getUpsamplingEnabled()) {
         lineShader->setUniform("uIntensity", intensity);
     } else {
-        lineShader->setUniform("uIntensity", (GLfloat) (intensity * RESAMPLE_RATIO * 1.5));
+        lineShader->setUniform("uIntensity", (GLfloat)(intensity * RESAMPLE_RATIO * 1.5));
     }
-    
+
     lineShader->setUniform("uFadeAmount", fadeAmount);
-    lineShader->setUniform("uNEdges", (GLfloat) nEdges);
+    lineShader->setUniform("uNEdges", (GLfloat)nEdges);
     setOffsetAndScale(lineShader.get());
-    
+
 #if OSCI_PREMIUM
     lineShader->setUniform("uFishEye", screenOverlay == ScreenOverlay::VectorDisplay ? VECTOR_DISPLAY_FISH_EYE : 0.0f);
     lineShader->setUniform("uShutterSync", settings.getShutterSync());
@@ -1171,14 +1127,14 @@ void VisualiserComponent::drawLine(const std::vector<float>& xPoints, const std:
 
 void VisualiserComponent::fade() {
     using namespace juce::gl;
-    
+
     setNormalBlending();
-    
+
 #if OSCI_PREMIUM
     setShader(afterglowShader.get());
     afterglowShader->setUniform("fadeAmount", fadeAmount);
-    afterglowShader->setUniform("afterglowAmount", (float) settings.getAfterglow());
-    afterglowShader->setUniform("uResizeForCanvas", lineTexture.width / (float) recordingSettings.getResolution());
+    afterglowShader->setUniform("afterglowAmount", (float)settings.getAfterglow());
+    afterglowShader->setUniform("uResizeForCanvas", lineTexture.width / (float)recordingSettings.getResolution());
     drawTexture({lineTexture});
 #else
     simpleShader->use();
@@ -1187,7 +1143,7 @@ void VisualiserComponent::fade() {
     glBufferData(GL_ARRAY_BUFFER, sizeof(float) * fullScreenQuad.size(), fullScreenQuad.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(glGetAttribLocation(simpleShader->getProgramID(), "vertexPosition"), 2, GL_FLOAT, GL_FALSE, 0, 0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-    
+
     simpleShader->setUniform("colour", 0.0f, 0.0f, 0.0f, fadeAmount);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glDisableVertexAttribArray(glGetAttribLocation(simpleShader->getProgramID(), "vertexPosition"));
@@ -1196,42 +1152,42 @@ void VisualiserComponent::fade() {
 
 void VisualiserComponent::drawCRT() {
     using namespace juce::gl;
-    
+
     setNormalBlending();
 
     activateTargetTexture(blur1Texture);
     setShader(texturedShader.get());
-    texturedShader->setUniform("uResizeForCanvas", lineTexture.width / (float) recordingSettings.getResolution());
+    texturedShader->setUniform("uResizeForCanvas", lineTexture.width / (float)recordingSettings.getResolution());
     drawTexture({lineTexture});
 
-    //horizontal blur 512x512
+    // horizontal blur 512x512
     activateTargetTexture(blur2Texture);
     setShader(blurShader.get());
     blurShader->setUniform("uOffset", 1.0f / 512.0f, 0.0f);
     drawTexture({blur1Texture});
 
-    //vertical blur 512x512
+    // vertical blur 512x512
     activateTargetTexture(blur1Texture);
     blurShader->setUniform("uOffset", 0.0f, 1.0f / 512.0f);
     drawTexture({blur2Texture});
 
-    //preserve blur1 for later
+    // preserve blur1 for later
     activateTargetTexture(blur3Texture);
     setShader(texturedShader.get());
     texturedShader->setUniform("uResizeForCanvas", 1.0f);
     drawTexture({blur1Texture});
 
-    //horizontal blur 128x128
+    // horizontal blur 128x128
     activateTargetTexture(blur4Texture);
     setShader(wideBlurShader.get());
     wideBlurShader->setUniform("uOffset", 1.0f / 128.0f, 0.0f);
     drawTexture({blur3Texture});
 
-    //vertical blur 128x128
+    // vertical blur 128x128
     activateTargetTexture(blur3Texture);
     wideBlurShader->setUniform("uOffset", 0.0f, 1.0f / 128.0f);
     drawTexture({blur4Texture});
-    
+
 #if OSCI_PREMIUM
     if (settings.parameters.screenOverlay->isRealisticDisplay()) {
         // create glow texture
@@ -1245,26 +1201,26 @@ void VisualiserComponent::drawCRT() {
     activateTargetTexture(renderTexture);
     setShader(outputShader.get());
     outputShader->setUniform("uExposure", 0.25f);
-    outputShader->setUniform("uLineSaturation", (float) settings.getLineSaturation());
+    outputShader->setUniform("uLineSaturation", (float)settings.getLineSaturation());
 #if OSCI_PREMIUM
-    outputShader->setUniform("uScreenSaturation", (float) settings.getScreenSaturation());
-    outputShader->setUniform("uHueShift", (float) settings.getScreenHue() / 360.0f);
-    outputShader->setUniform("uOverexposure", (float) settings.getOverexposure());
+    outputShader->setUniform("uScreenSaturation", (float)settings.getScreenSaturation());
+    outputShader->setUniform("uHueShift", (float)settings.getScreenHue() / 360.0f);
+    outputShader->setUniform("uOverexposure", (float)settings.getOverexposure());
 #else
     outputShader->setUniform("uScreenSaturation", 1.0f);
     outputShader->setUniform("uHueShift", 0.0f);
     outputShader->setUniform("uOverexposure", 0.5f);
 #endif
-    outputShader->setUniform("uNoise", (float) settings.getNoise());
+    outputShader->setUniform("uNoise", (float)settings.getNoise());
     outputShader->setUniform("uRandom", juce::Random::getSystemRandom().nextFloat());
-    outputShader->setUniform("uGlow", (float) settings.getGlow());
-    outputShader->setUniform("uAmbient", (float) settings.getAmbient());
+    outputShader->setUniform("uGlow", (float)settings.getGlow());
+    outputShader->setUniform("uAmbient", (float)settings.getAmbient());
     setOffsetAndScale(outputShader.get());
 #if OSCI_PREMIUM
     outputShader->setUniform("uFishEye", screenOverlay == ScreenOverlay::VectorDisplay ? VECTOR_DISPLAY_FISH_EYE : 0.0f);
     outputShader->setUniform("uRealScreen", settings.parameters.screenOverlay->isRealisticDisplay() ? 1.0f : 0.0f);
 #endif
-    outputShader->setUniform("uResizeForCanvas", lineTexture.width / (float) recordingSettings.getResolution());
+    outputShader->setUniform("uResizeForCanvas", lineTexture.width / (float)recordingSettings.getResolution());
     juce::Colour colour = juce::Colour::fromHSV(settings.getHue() / 360.0f, 1.0, 1.0, 1.0);
     outputShader->setUniform("uColour", colour.getFloatRed(), colour.getFloatGreen(), colour.getFloatBlue());
     drawTexture({
@@ -1279,9 +1235,9 @@ void VisualiserComponent::drawCRT() {
     });
 }
 
-void VisualiserComponent::setOffsetAndScale(juce::OpenGLShaderProgram* shader) {
+void VisualiserComponent::setOffsetAndScale(juce::OpenGLShaderProgram *shader) {
     osci::Point offset;
-    osci::Point scale = { 1.0f };
+    osci::Point scale = {1.0f};
 #if OSCI_PREMIUM
     if (settings.getScreenOverlay() == ScreenOverlay::Real) {
         offset = REAL_SCREEN_OFFSET;
@@ -1291,14 +1247,14 @@ void VisualiserComponent::setOffsetAndScale(juce::OpenGLShaderProgram* shader) {
         scale = VECTOR_DISPLAY_SCALE;
     }
 #endif
-    shader->setUniform("uOffset", (float) offset.x, (float) offset.y);
-    shader->setUniform("uScale", (float) scale.x, (float) scale.y);
+    shader->setUniform("uOffset", (float)offset.x, (float)offset.y);
+    shader->setUniform("uScale", (float)scale.x, (float)scale.y);
 }
 
 #if OSCI_PREMIUM
 Texture VisualiserComponent::createReflectionTexture() {
     using namespace juce::gl;
-    
+
     if (settings.getScreenOverlay() == ScreenOverlay::VectorDisplay) {
         reflectionOpenGLTexture.loadImage(vectorDisplayReflectionImage);
     } else if (settings.getScreenOverlay() == ScreenOverlay::Real) {
@@ -1306,16 +1262,16 @@ Texture VisualiserComponent::createReflectionTexture() {
     } else {
         reflectionOpenGLTexture.loadImage(emptyReflectionImage);
     }
-    
-    Texture texture = { reflectionOpenGLTexture.getTextureID(), reflectionOpenGLTexture.getWidth(), reflectionOpenGLTexture.getHeight() };
-    
+
+    Texture texture = {reflectionOpenGLTexture.getTextureID(), reflectionOpenGLTexture.getWidth(), reflectionOpenGLTexture.getHeight()};
+
     return texture;
 }
 #endif
 
 Texture VisualiserComponent::createScreenTexture() {
     using namespace juce::gl;
-    
+
     if (screenOverlay == ScreenOverlay::Smudged || screenOverlay == ScreenOverlay::SmudgedGraticule) {
         screenOpenGLTexture.loadImage(screenTextureImage);
 #if OSCI_PREMIUM
@@ -1328,8 +1284,8 @@ Texture VisualiserComponent::createScreenTexture() {
         screenOpenGLTexture.loadImage(emptyScreenImage);
     }
     checkGLErrors(__FILE__, __LINE__);
-    Texture texture = { screenOpenGLTexture.getTextureID(), screenTextureImage.getWidth(), screenTextureImage.getHeight() };
-    
+    Texture texture = {screenOpenGLTexture.getTextureID(), screenTextureImage.getWidth(), screenTextureImage.getHeight()};
+
     if (screenOverlay == ScreenOverlay::Graticule || screenOverlay == ScreenOverlay::SmudgedGraticule) {
         activateTargetTexture(texture);
         checkGLErrors(__FILE__, __LINE__);
@@ -1338,18 +1294,18 @@ Texture VisualiserComponent::createScreenTexture() {
         setShader(simpleShader.get());
         checkGLErrors(__FILE__, __LINE__);
         glColorMask(true, false, false, true);
-        
+
         std::vector<float> data;
-        
+
         int step = 45;
-        
+
         for (int i = 0; i < 11; i++) {
             float s = i * step;
-            
+
             // Inserting at the beginning of the vector (equivalent to splice(0,0,...))
             data.insert(data.begin(), {0, s, 10.0f * step, s});
             data.insert(data.begin(), {s, 0, s, 10.0f * step});
-            
+
             if (i != 0 && i != 10) {
                 for (int j = 0; j < 51; j++) {
                     float t = j * step / 5;
@@ -1363,20 +1319,21 @@ Texture VisualiserComponent::createScreenTexture() {
                 }
             }
         }
-        
+
         for (int j = 0; j < 51; j++) {
             float t = j * step / 5;
-            if (static_cast<int>(t) % 5 == 0) continue;
-            
+            if (static_cast<int>(t) % 5 == 0)
+                continue;
+
             data.insert(data.begin(), {t - 2, 2.5f * step, t + 2, 2.5f * step});
             data.insert(data.begin(), {t - 2, 7.5f * step, t + 2, 7.5f * step});
         }
-        
+
         // Normalize the data
         for (size_t i = 0; i < data.size(); i++) {
             data[i] = (data[i] + 31.0f) / 256.0f - 1;
         }
-        
+
         glEnableVertexAttribArray(glGetAttribLocation(simpleShader->getProgramID(), "vertexPosition"));
         glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
         glBufferData(GL_ARRAY_BUFFER, sizeof(float) * data.size(), data.data(), GL_STATIC_DRAW);
@@ -1388,39 +1345,54 @@ Texture VisualiserComponent::createScreenTexture() {
         glBindTexture(GL_TEXTURE_2D, targetTexture.value().id);
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     }
-    
+
     return texture;
 }
 
 void VisualiserComponent::checkGLErrors(juce::String file, int line) {
     using namespace juce::gl;
-    
+
     GLenum error;
     while ((error = glGetError()) != GL_NO_ERROR) {
         juce::String errorMessage;
         switch (error) {
-            case GL_INVALID_ENUM:      errorMessage = "GL_INVALID_ENUM"; break;
-            case GL_INVALID_VALUE:     errorMessage = "GL_INVALID_VALUE"; break;
-            case GL_INVALID_OPERATION: errorMessage = "GL_INVALID_OPERATION"; break;
-            case GL_STACK_OVERFLOW:    errorMessage = "GL_STACK_OVERFLOW"; break;
-            case GL_STACK_UNDERFLOW:   errorMessage = "GL_STACK_UNDERFLOW"; break;
-            case GL_OUT_OF_MEMORY:     errorMessage = "GL_OUT_OF_MEMORY"; break;
-            case GL_INVALID_FRAMEBUFFER_OPERATION: errorMessage = "GL_INVALID_FRAMEBUFFER_OPERATION"; break;
-            default: errorMessage = "Unknown OpenGL error"; break;
+            case GL_INVALID_ENUM:
+                errorMessage = "GL_INVALID_ENUM";
+                break;
+            case GL_INVALID_VALUE:
+                errorMessage = "GL_INVALID_VALUE";
+                break;
+            case GL_INVALID_OPERATION:
+                errorMessage = "GL_INVALID_OPERATION";
+                break;
+            case GL_STACK_OVERFLOW:
+                errorMessage = "GL_STACK_OVERFLOW";
+                break;
+            case GL_STACK_UNDERFLOW:
+                errorMessage = "GL_STACK_UNDERFLOW";
+                break;
+            case GL_OUT_OF_MEMORY:
+                errorMessage = "GL_OUT_OF_MEMORY";
+                break;
+            case GL_INVALID_FRAMEBUFFER_OPERATION:
+                errorMessage = "GL_INVALID_FRAMEBUFFER_OPERATION";
+                break;
+            default:
+                errorMessage = "Unknown OpenGL error";
+                break;
         }
         DBG("OpenGL error at " + file + ":" + juce::String(line) + " - " + errorMessage);
     }
 }
 
-
-void VisualiserComponent::paint(juce::Graphics& g) {
+void VisualiserComponent::paint(juce::Graphics &g) {
     g.setColour(Colours::veryDark);
     g.fillRect(buttonRow);
     if (!active) {
         // draw a translucent overlay
         g.setColour(juce::Colours::black.withAlpha(0.5f));
         g.fillRect(viewportArea);
-        
+
         g.setColour(juce::Colours::white);
         g.setFont(30.0f);
         juce::String text = child == nullptr ? "Paused" : "Open in another window";
@@ -1428,7 +1400,7 @@ void VisualiserComponent::paint(juce::Graphics& g) {
     }
 }
 
-void VisualiserComponent::renderScope(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints) {
+void VisualiserComponent::renderScope(const std::vector<float> &xPoints, const std::vector<float> &yPoints, const std::vector<float> &zPoints) {
     if (screenOverlay != settings.getScreenOverlay()) {
         screenOverlay = settings.getScreenOverlay();
 #if OSCI_PREMIUM
@@ -1436,7 +1408,7 @@ void VisualiserComponent::renderScope(const std::vector<float>& xPoints, const s
 #endif
         screenTexture = createScreenTexture();
     }
-    
+
     if (sampleRate != oldSampleRate || scratchVertices.empty()) {
         oldSampleRate = sampleRate;
         setupArrays(RESAMPLE_RATIO * sampleRate / recordingSettings.getFrameRate());

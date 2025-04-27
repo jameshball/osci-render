@@ -1,13 +1,12 @@
 #pragma once
 #include <JuceHeader.h>
+
 #include "InvisibleOpenGLContextComponent.h"
 
-class SyphonFrameGrabber : private juce::Thread, public juce::Component
-{
+class SyphonFrameGrabber : private juce::Thread, public juce::Component {
 public:
     SyphonFrameGrabber(SharedTextureManager& manager, juce::String server, juce::String app, ImageParser& parser, int pollMs = 16)
-        : juce::Thread("SyphonFrameGrabber"), pollIntervalMs(pollMs), manager(manager), parser(parser)
-    {
+        : juce::Thread("SyphonFrameGrabber"), pollIntervalMs(pollMs), manager(manager), parser(parser) {
         // Create the invisible OpenGL context component
         glContextComponent = std::make_unique<InvisibleOpenGLContextComponent>();
         receiver = manager.addReceiver(server, app);
@@ -45,13 +44,11 @@ public:
         }
     }
 
-    bool isActive() const
-    {
+    bool isActive() const {
         return receiver != nullptr && receiver->isInit && receiver->enabled;
     }
 
-    juce::String getSourceName() const
-    {
+    juce::String getSourceName() const {
         if (receiver) {
             return receiver->sharingName + " (" + receiver->sharingAppName + ")";
         }
@@ -64,6 +61,6 @@ private:
     SharedTextureReceiver* receiver = nullptr;
     ImageParser& parser;
     std::unique_ptr<InvisibleOpenGLContextComponent> glContextComponent;
-    
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SyphonFrameGrabber)
 };

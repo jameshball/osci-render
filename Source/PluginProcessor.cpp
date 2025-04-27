@@ -7,19 +7,18 @@
 */
 
 #include "PluginProcessor.h"
+
 #include "PluginEditor.h"
-#include "parser/FileParser.h"
-#include "parser/FrameProducer.h"
-#include "audio/VectorCancellingEffect.h"
-#include "audio/DistortEffect.h"
-#include "audio/SmoothEffect.h"
 #include "audio/BitCrushEffect.h"
 #include "audio/BulgeEffect.h"
+#include "audio/DistortEffect.h"
+#include "audio/SmoothEffect.h"
+#include "audio/VectorCancellingEffect.h"
+#include "parser/FileParser.h"
+#include "parser/FrameProducer.h"
 
-#if JUCE_MAC || JUCE_WINDOWS
-    #include "SyphonFrameGrabber.h"
-    #include "img/ImageParser.h"
-    #include "../modules/juce_sharedtexture/SharedTexture.h"
+#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
+#include "img/ImageParser.h"
 #endif
 
 //==============================================================================
@@ -28,111 +27,103 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
 
     toggleableEffects.push_back(std::make_shared<osci::Effect>(
         std::make_shared<BitCrushEffect>(),
-        new osci::EffectParameter("Bit Crush", "Limits the resolution of points drawn to the screen, making the object look pixelated, and making the audio sound more 'digital' and distorted.", "bitCrush", VERSION_HINT, 0.6, 0.0, 1.0)
-    ));
+        new osci::EffectParameter("Bit Crush", "Limits the resolution of points drawn to the screen, making the object look pixelated, and making the audio sound more 'digital' and distorted.", "bitCrush", VERSION_HINT, 0.6, 0.0, 1.0)));
     toggleableEffects.push_back(std::make_shared<osci::Effect>(
         std::make_shared<BulgeEffect>(),
-        new osci::EffectParameter("Bulge", "Applies a bulge that makes the centre of the image larger, and squishes the edges of the image. This applies a distortion to the audio.", "bulge", VERSION_HINT, 0.5, 0.0, 1.0)
-    ));
+        new osci::EffectParameter("Bulge", "Applies a bulge that makes the centre of the image larger, and squishes the edges of the image. This applies a distortion to the audio.", "bulge", VERSION_HINT, 0.5, 0.0, 1.0)));
     toggleableEffects.push_back(std::make_shared<osci::Effect>(
         std::make_shared<VectorCancellingEffect>(),
-        new osci::EffectParameter("Vector Cancelling", "Inverts the audio and image every few samples to 'cancel out' the audio, making the audio quiet, and distorting the image.", "vectorCancelling", VERSION_HINT, 0.1111111, 0.0, 1.0)
-    ));
-	toggleableEffects.push_back(std::make_shared<osci::Effect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
-            return input * osci::Point(values[0], values[1], values[2]);
-		}, std::vector<osci::EffectParameter*>{
-		    new osci::EffectParameter("Scale X", "Scales the object in the horizontal direction.", "scaleX", VERSION_HINT, 1.0, -5.0, 5.0),
-			new osci::EffectParameter("Scale Y", "Scales the object in the vertical direction.", "scaleY", VERSION_HINT, 1.0, -5.0, 5.0),
-			new osci::EffectParameter("Scale Z", "Scales the depth of the object.", "scaleZ", VERSION_HINT, 1.0, -5.0, 5.0),
-	    }
-	));
+        new osci::EffectParameter("Vector Cancelling", "Inverts the audio and image every few samples to 'cancel out' the audio, making the audio quiet, and distorting the image.", "vectorCancelling", VERSION_HINT, 0.1111111, 0.0, 1.0)));
     toggleableEffects.push_back(std::make_shared<osci::Effect>(
         [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
-			int flip = index % 2 == 0 ? 1 : -1;
-			osci::Point jitter = osci::Point(flip * values[0], flip * values[1], flip * values[2]);
-			return input + jitter;
-        }, std::vector<osci::EffectParameter*>{
+            return input * osci::Point(values[0], values[1], values[2]);
+        },
+        std::vector<osci::EffectParameter*>{
+            new osci::EffectParameter("Scale X", "Scales the object in the horizontal direction.", "scaleX", VERSION_HINT, 1.0, -5.0, 5.0),
+            new osci::EffectParameter("Scale Y", "Scales the object in the vertical direction.", "scaleY", VERSION_HINT, 1.0, -5.0, 5.0),
+            new osci::EffectParameter("Scale Z", "Scales the depth of the object.", "scaleZ", VERSION_HINT, 1.0, -5.0, 5.0),
+        }));
+    toggleableEffects.push_back(std::make_shared<osci::Effect>(
+        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+            int flip = index % 2 == 0 ? 1 : -1;
+            osci::Point jitter = osci::Point(flip * values[0], flip * values[1], flip * values[2]);
+            return input + jitter;
+        },
+        std::vector<osci::EffectParameter*>{
             new osci::EffectParameter("Distort X", "Distorts the image in the horizontal direction by jittering the audio sample being drawn.", "distortX", VERSION_HINT, 0.0, 0.0, 1.0),
             new osci::EffectParameter("Distort Y", "Distorts the image in the vertical direction by jittering the audio sample being drawn.", "distortY", VERSION_HINT, 0.0, 0.0, 1.0),
             new osci::EffectParameter("Distort Z", "Distorts the depth of the image by jittering the audio sample being drawn.", "distortZ", VERSION_HINT, 0.1, 0.0, 1.0),
-	    }
-    ));
+        }));
     auto rippleEffect = std::make_shared<osci::Effect>(
         [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             double phase = values[1] * std::numbers::pi;
             double distance = 100 * values[2] * (input.x * input.x + input.y * input.y);
             input.z += values[0] * std::sin(phase + distance);
             return input;
-        }, std::vector<osci::EffectParameter*>{
+        },
+        std::vector<osci::EffectParameter*>{
             new osci::EffectParameter("Ripple Depth", "Controls how large the ripples applied to the image are.", "rippleDepth", VERSION_HINT, 0.2, 0.0, 1.0),
             new osci::EffectParameter("Ripple Phase", "Controls the position of the ripple. Animate this to see a moving ripple effect.", "ripplePhase", VERSION_HINT, 0.0, -1.0, 1.0),
             new osci::EffectParameter("Ripple Amount", "Controls how many ripples are applied to the image.", "rippleAmount", VERSION_HINT, 0.1, 0.0, 1.0),
-        }
-    );
-    rippleEffect->getParameter("ripplePhase")->lfo->setUnnormalisedValueNotifyingHost((int) osci::LfoType::Sawtooth);
+        });
+    rippleEffect->getParameter("ripplePhase")->lfo->setUnnormalisedValueNotifyingHost((int)osci::LfoType::Sawtooth);
     toggleableEffects.push_back(rippleEffect);
     auto rotateEffect = std::make_shared<osci::Effect>(
         [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             input.rotate(values[0] * std::numbers::pi, values[1] * std::numbers::pi, values[2] * std::numbers::pi);
             return input;
-        }, std::vector<osci::EffectParameter*>{
+        },
+        std::vector<osci::EffectParameter*>{
             new osci::EffectParameter("Rotate X", "Controls the rotation of the object in the X axis.", "rotateX", VERSION_HINT, 0.0, -1.0, 1.0),
             new osci::EffectParameter("Rotate Y", "Controls the rotation of the object in the Y axis.", "rotateY", VERSION_HINT, 0.0, -1.0, 1.0),
             new osci::EffectParameter("Rotate Z", "Controls the rotation of the object in the Z axis.", "rotateZ", VERSION_HINT, 0.0, -1.0, 1.0),
-        }
-    );
-	rotateEffect->getParameter("rotateY")->lfo->setUnnormalisedValueNotifyingHost((int) osci::LfoType::Sawtooth);
+        });
+    rotateEffect->getParameter("rotateY")->lfo->setUnnormalisedValueNotifyingHost((int)osci::LfoType::Sawtooth);
     rotateEffect->getParameter("rotateY")->lfoRate->setUnnormalisedValueNotifyingHost(0.2);
     toggleableEffects.push_back(rotateEffect);
     toggleableEffects.push_back(std::make_shared<osci::Effect>(
         [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             return input + osci::Point(values[0], values[1], values[2]);
-        }, std::vector<osci::EffectParameter*>{
+        },
+        std::vector<osci::EffectParameter*>{
             new osci::EffectParameter("Translate X", "Moves the object horizontally.", "translateX", VERSION_HINT, 0.0, -1.0, 1.0),
             new osci::EffectParameter("Translate Y", "Moves the object vertically.", "translateY", VERSION_HINT, 0.0, -1.0, 1.0),
-			new osci::EffectParameter("Translate Z", "Moves the object away from the camera.", "translateZ", VERSION_HINT, 0.0, -1.0, 1.0),
-        }
-    ));
+            new osci::EffectParameter("Translate Z", "Moves the object away from the camera.", "translateZ", VERSION_HINT, 0.0, -1.0, 1.0),
+        }));
     toggleableEffects.push_back(std::make_shared<osci::Effect>(
         [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             double length = 10 * values[0] * input.magnitude();
             double newX = input.x * std::cos(length) - input.y * std::sin(length);
             double newY = input.x * std::sin(length) + input.y * std::cos(length);
             return osci::Point(newX, newY, input.z);
-        }, std::vector<osci::EffectParameter*>{
+        },
+        std::vector<osci::EffectParameter*>{
             new osci::EffectParameter("Swirl", "Swirls the image in a spiral pattern.", "swirl", VERSION_HINT, 0.3, -1.0, 1.0),
-        }
-    ));
+        }));
     toggleableEffects.push_back(std::make_shared<osci::Effect>(
         std::make_shared<SmoothEffect>(),
-        new osci::EffectParameter("Smoothing", "This works as a low-pass frequency filter that removes high frequencies, making the image look smoother, and audio sound less harsh.", "smoothing", VERSION_HINT, 0.75, 0.0, 1.0)
-    ));
+        new osci::EffectParameter("Smoothing", "This works as a low-pass frequency filter that removes high frequencies, making the image look smoother, and audio sound less harsh.", "smoothing", VERSION_HINT, 0.75, 0.0, 1.0)));
     std::shared_ptr<osci::Effect> wobble = std::make_shared<osci::Effect>(
         wobbleEffect,
         std::vector<osci::EffectParameter*>{
             new osci::EffectParameter("Wobble Amount", "Adds a sine wave of the prominent frequency in the audio currently playing. The sine wave's frequency is slightly offset to create a subtle 'wobble' in the image. Increasing the slider increases the strength of the wobble.", "wobble", VERSION_HINT, 0.3, 0.0, 1.0),
             new osci::EffectParameter("Wobble Phase", "Controls the phase of the wobble.", "wobblePhase", VERSION_HINT, 0.0, -1.0, 1.0),
-        }
-    );
-    wobble->getParameter("wobblePhase")->lfo->setUnnormalisedValueNotifyingHost((int) osci::LfoType::Sawtooth);
+        });
+    wobble->getParameter("wobblePhase")->lfo->setUnnormalisedValueNotifyingHost((int)osci::LfoType::Sawtooth);
     toggleableEffects.push_back(wobble);
     toggleableEffects.push_back(std::make_shared<osci::Effect>(
         delayEffect,
         std::vector<osci::EffectParameter*>{
             new osci::EffectParameter("Delay Decay", "Adds repetitions, delays, or echos to the audio. This slider controls the volume of the echo.", "delayDecay", VERSION_HINT, 0.4, 0.0, 1.0),
-            new osci::EffectParameter("Delay Length", "Controls the time in seconds between echos.", "delayLength", VERSION_HINT, 0.5, 0.0, 1.0)
-        }
-    ));
+            new osci::EffectParameter("Delay Length", "Controls the time in seconds between echos.", "delayLength", VERSION_HINT, 0.5, 0.0, 1.0)}));
     toggleableEffects.push_back(std::make_shared<osci::Effect>(
         dashedLineEffect,
         std::vector<osci::EffectParameter*>{
             new osci::EffectParameter("Dash Length", "Controls the length of the dashed line.", "dashLength", VERSION_HINT, 0.2, 0.0, 1.0),
-        }
-    ));
+        }));
     toggleableEffects.push_back(custom);
     toggleableEffects.push_back(trace);
-    trace->getParameter("traceLength")->lfo->setUnnormalisedValueNotifyingHost((int) osci::LfoType::Sawtooth);
+    trace->getParameter("traceLength")->lfo->setUnnormalisedValueNotifyingHost((int)osci::LfoType::Sawtooth);
 
     for (int i = 0; i < toggleableEffects.size(); i++) {
         auto effect = toggleableEffects[i];
@@ -186,7 +177,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     for (int i = 0; i < luaEffects.size(); i++) {
         luaEffects[i]->parameters[0]->addListener(this);
     }
-        
+
     synth.addSound(defaultSound);
 
     addAllParameters();
@@ -228,13 +219,12 @@ void OscirenderAudioProcessor::addLuaSlider() {
         [this, sliderIndex](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             luaValues[sliderIndex].store(values[0]);
             return input;
-        }, new osci::EffectParameter(
+        },
+        new osci::EffectParameter(
             "Lua Slider " + sliderName,
             "Controls the value of the Lua variable called slider_" + sliderName.toLowerCase() + ".",
             "lua" + sliderName,
-            VERSION_HINT, 0.0, 0.0, 1.0
-        )
-    ));
+            VERSION_HINT, 0.0, 0.0, 1.0)));
 }
 
 void OscirenderAudioProcessor::addErrorListener(ErrorListener* listener) {
@@ -258,10 +248,10 @@ void OscirenderAudioProcessor::updateEffectPrecedence() {
 // parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessor::updateFileBlock(int index, std::shared_ptr<juce::MemoryBlock> block) {
     if (index < 0 || index >= fileBlocks.size()) {
-		return;
-	}
-	fileBlocks[index] = block;
-	openFile(index);
+        return;
+    }
+    fileBlocks[index] = block;
+    openFile(index);
 }
 
 // parsersLock AND effectsLock must be locked before calling this function
@@ -269,7 +259,7 @@ void OscirenderAudioProcessor::addFile(juce::File file) {
     fileBlocks.push_back(std::make_shared<juce::MemoryBlock>());
     fileNames.push_back(file.getFileName());
     fileIds.push_back(currentFileId++);
-	parsers.push_back(std::make_shared<FileParser>(*this, errorCallback));
+    parsers.push_back(std::make_shared<FileParser>(*this, errorCallback));
     sounds.push_back(new ShapeSound(*this, parsers.back()));
     file.createInputStream()->readIntoMemoryBlock(*fileBlocks.back());
 
@@ -306,9 +296,9 @@ void OscirenderAudioProcessor::setFileRemovedCallback(std::function<void(int)> c
 
 // parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessor::removeFile(int index) {
-	if (index < 0 || index >= fileBlocks.size()) {
-		return;
-	}
+    if (index < 0 || index >= fileBlocks.size()) {
+        return;
+    }
     fileBlocks.erase(fileBlocks.begin() + index);
     fileNames.erase(fileNames.begin() + index);
     fileIds.erase(fileIds.begin() + index);
@@ -350,9 +340,9 @@ int OscirenderAudioProcessor::numFiles() {
 // it will reparse any existing files, so it is safer.
 // parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessor::openFile(int index) {
-	if (index < 0 || index >= fileBlocks.size()) {
-		return;
-	}
+    if (index < 0 || index >= fileBlocks.size()) {
+        return;
+    }
     parsers[index]->parse(juce::String(fileIds[index]), fileNames[index], fileNames[index].fromLastOccurrenceOf(".", true, false).toLowerCase(), std::make_unique<juce::MemoryInputStream>(*fileBlocks[index], false), font);
     changeCurrentFile(index);
 }
@@ -365,9 +355,9 @@ void OscirenderAudioProcessor::changeCurrentFile(int index) {
         currentFile = -1;
         changeSound(defaultSound);
     }
-	if (index < 0 || index >= fileBlocks.size()) {
-		return;
-	}
+    if (index < 0 || index >= fileBlocks.size()) {
+        return;
+    }
     currentFile = index;
     changeSound(sounds[index]);
 }
@@ -402,7 +392,7 @@ std::shared_ptr<FileParser> OscirenderAudioProcessor::getCurrentFileParser() {
 
 juce::String OscirenderAudioProcessor::getCurrentFileName() {
     if (objectServerRendering || currentFile == -1) {
-		return "";
+        return "";
     } else {
         return fileNames[currentFile];
     }
@@ -446,7 +436,7 @@ void OscirenderAudioProcessor::setObjectServerPort(int port) {
 void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
     juce::ScopedNoDenormals noDenormals;
     // Audio info variables
-    int totalNumInputChannels  = getTotalNumInputChannels();
+    int totalNumInputChannels = getTotalNumInputChannels();
     int totalNumOutputChannels = getTotalNumOutputChannels();
     double sampleRate = getSampleRate();
 
@@ -473,7 +463,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     // TODO: To make this more resilient to changing BPMs, we should change how this is calculated
     // or use another property of the AudioPlayHead::PositionInfo
     double playTimeBeats = bpm * playTimeSeconds / 60;
-    
+
     // Calculated time per sample in seconds and beats
     double sTimeSec = 1.f / sampleRate;
     double sTimeBeats = bpm * sTimeSec / 60;
@@ -487,20 +477,20 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     if (!usingMidi) {
         midiMessages.clear();
     }
-    
+
     // if midi enabled has changed state
     if (prevMidiEnabled != usingMidi) {
         for (int i = 1; i <= 16; i++) {
             midiMessages.addEvent(juce::MidiMessage::allNotesOff(i), i);
         }
     }
-    
+
     // if midi has just been disabled or we need to retrigger
     if (!usingMidi && (retriggerMidi || prevMidiEnabled)) {
         midiMessages.addEvent(juce::MidiMessage::noteOn(1, 60, 1.0f), 17);
         retriggerMidi = false;
     }
-    
+
     prevMidiEnabled = usingMidi;
 
     const double EPSILON = 0.00001;
@@ -512,8 +502,9 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
     juce::AudioBuffer<float> outputBuffer3d = juce::AudioBuffer<float>(3, buffer.getNumSamples());
     outputBuffer3d.clear();
-    
+
     {
+#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
         juce::SpinLock::ScopedLockType sLock(syphonLock);
         if (isSyphonInputActive()) {
             for (int sample = 0; sample < outputBuffer3d.getNumSamples(); sample++) {
@@ -521,7 +512,9 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
                 outputBuffer3d.setSample(0, sample, point.x);
                 outputBuffer3d.setSample(1, sample, point.y);
             }
-        } else if (usingInput && totalNumInputChannels >= 1) {
+        } else
+#endif
+        if (usingInput && totalNumInputChannels >= 1) {
             if (totalNumInputChannels >= 2) {
                 for (auto channel = 0; channel < juce::jmin(2, totalNumInputChannels); channel++) {
                     outputBuffer3d.copyFrom(channel, 0, inputBuffer, channel, 0, buffer.getNumSamples());
@@ -535,9 +528,10 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             // handle all midi messages
             auto midiIterator = midiMessages.cbegin();
             std::for_each(midiIterator,
-                midiMessages.cend(),
-                [&] (const juce::MidiMessageMetadata& meta) { synth.publicHandleMidiEvent(meta.getMessage()); }
-            );
+                          midiMessages.cend(),
+                          [&](const juce::MidiMessageMetadata& meta) {
+                              synth.publicHandleMidiEvent(meta.getMessage());
+                          });
         } else {
             juce::SpinLock::ScopedLockType lock1(parsersLock);
             juce::SpinLock::ScopedLockType lock2(effectsLock);
@@ -551,12 +545,12 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             }
         }
     }
-    
+
     midiMessages.clear();
-    
+
     auto* channelData = buffer.getArrayOfWritePointers();
-    
-	for (int sample = 0; sample < buffer.getNumSamples(); ++sample) {
+
+    for (int sample = 0; sample < buffer.getNumSamples(); ++sample) {
         if (animateFrames->getBoolValue()) {
             if (juce::JUCEApplicationBase::isStandaloneApp()) {
                 animationFrame = animationFrame + sTimeSec * animationRate->getValueUnnormalised();
@@ -573,7 +567,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
                 if (loopAnimation->getBoolValue()) {
                     animationFrame = std::fmod(animationFrame, totalFrames);
                 } else {
-                    animationFrame = juce::jlimit(0.0, (double) totalFrames - 1, animationFrame.load());
+                    animationFrame = juce::jlimit(0.0, (double)totalFrames - 1, animationFrame.load());
                 }
                 sounds[currentFile]->parser->setFrame(animationFrame);
             }
@@ -598,7 +592,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         currentVolume = std::sqrt(squaredVolume);
         currentVolume = juce::jlimit(0.0, 1.0, currentVolume);
 
-        osci::Point channels = { outputBuffer3d.getSample(0, sample), outputBuffer3d.getSample(1, sample), outputBuffer3d.getSample(2, sample) };
+        osci::Point channels = {outputBuffer3d.getSample(0, sample), outputBuffer3d.getSample(1, sample), outputBuffer3d.getSample(2, sample)};
 
         {
             juce::SpinLock::ScopedLockType lock1(parsersLock);
@@ -621,8 +615,8 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             }
         }
 
-		double x = channels.x;
-		double y = channels.y;
+        double x = channels.x;
+        double y = channels.y;
 
         x *= volume;
         y *= volume;
@@ -630,19 +624,19 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         // clip
         x = juce::jmax(-threshold, juce::jmin(threshold.load(), x));
         y = juce::jmax(-threshold, juce::jmin(threshold.load(), y));
-        
+
         threadManager.write(osci::Point(x, y, 1));
-        
+
         // Apply mute if active
         if (muteParameter->getBoolValue()) {
             x = 0.0;
             y = 0.0;
         }
-        
+
         if (totalNumOutputChannels >= 2) {
-			channelData[0][sample] = x;
-			channelData[1][sample] = y;
-		} else if (totalNumOutputChannels == 1) {
+            channelData[0][sample] = x;
+            channelData[1][sample] = y;
+        } else if (totalNumOutputChannels == 1) {
             channelData[0][sample] = x;
         }
 
@@ -650,7 +644,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             playTimeSeconds += sTimeSec;
             playTimeBeats += sTimeBeats;
         }
-	}
+    }
 
     // used for any callback that must guarantee all audio is recieved (e.g. when recording to a file)
     juce::SpinLock::ScopedLockType lock(audioThreadCallbackLock);
@@ -669,11 +663,11 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
     // we need to stop recording the visualiser when saving the state, otherwise
     // there are issues. This is the only place we can do this because there is
     // no callback when closing the standalone app except for this.
-    
+
     if (haltRecording != nullptr && juce::JUCEApplicationBase::isStandaloneApp()) {
         haltRecording();
     }
-    
+
     juce::SpinLock::ScopedLockType lock1(parsersLock);
     juce::SpinLock::ScopedLockType lock2(effectsLock);
 
@@ -711,7 +705,7 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
     fontXml->setAttribute("italic", font.isItalic());
 
     auto filesXml = xml->createNewChildElement("files");
-    
+
     for (int i = 0; i < fileBlocks.size(); i++) {
         auto fileXml = filesXml->createNewChildElement("file");
         fileXml->setAttribute("name", fileNames[i]);
@@ -721,7 +715,7 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
     xml->setAttribute("currentFile", currentFile);
 
     recordingParameters.save(xml.get());
-    
+
     saveProperties(*xml);
 
     copyXmlToBinary(*xml, destData);
@@ -731,7 +725,7 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
     if (juce::JUCEApplicationBase::isStandaloneApp() && programCrashedAndUserWantsToReset()) {
         return;
     }
-    
+
     std::unique_ptr<juce::XmlElement> xml;
 
     const uint32_t magicXmlNumber = 0x21324356;
@@ -835,14 +829,14 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
                     fileBlock = std::make_shared<juce::MemoryBlock>();
                     fileBlock->fromBase64Encoding(text);
                 }
-                
+
                 addFile(fileName, fileBlock);
             }
         }
         changeCurrentFile(xml->getIntAttribute("currentFile", -1));
 
         recordingParameters.load(xml.get());
-        
+
         loadProperties(*xml);
         objectServer.reload();
 
@@ -904,7 +898,7 @@ void OscirenderAudioProcessor::envelopeChanged(EnvelopeComponent* changedEnvelop
     }
 }
 
-#if JUCE_MAC || JUCE_WINDOWS
+#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
 // Syphon/Spout input management
 
 // syphonLock must be held when calling this function

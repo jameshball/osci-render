@@ -158,12 +158,15 @@ void MainComponent::updateFileLabel() {
 	showRightArrow = audioProcessor.getCurrentFileIndex() < audioProcessor.numFiles() - 1;
 	
     {
+#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
         juce::SpinLock::ScopedLockType lock(audioProcessor.syphonLock);
-        if (audioProcessor.objectServerRendering) {
-            fileLabel.setText("Rendering from Blender", juce::dontSendNotification);
-        } else if (audioProcessor.isSyphonInputActive()) {
+        if (audioProcessor.isSyphonInputActive()) {
             fileLabel.setText(audioProcessor.getSyphonSourceName(), juce::dontSendNotification);
-        } else if (audioProcessor.getCurrentFileIndex() == -1) {
+        } else
+#endif
+		if (audioProcessor.objectServerRendering) {
+			fileLabel.setText("Rendering from Blender", juce::dontSendNotification);
+		}else if (audioProcessor.getCurrentFileIndex() == -1) {
             fileLabel.setText("No file open", juce::dontSendNotification);
         } else {
             fileLabel.setText(audioProcessor.getCurrentFileName(), juce::dontSendNotification);

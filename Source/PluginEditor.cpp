@@ -526,8 +526,8 @@ void OscirenderAudioProcessorEditor::openVisualiserSettings() {
     visualiserSettingsWindow.toFront(true);
 }
 
+#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
 void OscirenderAudioProcessorEditor::openSyphonInputDialog() {
-#if JUCE_MAC || JUCE_WINDOWS
     SyphonInputSelectorComponent* selector = nullptr;
     {
         juce::SpinLock::ScopedLockType lock(audioProcessor.syphonLock);
@@ -548,7 +548,6 @@ void OscirenderAudioProcessorEditor::openSyphonInputDialog() {
     options.useNativeTitleBar = true;
     options.resizable = false;
     options.launchAsync();
-#endif
 }
 
 void OscirenderAudioProcessorEditor::onSyphonInputSelected(const juce::String& server, const juce::String& app) {
@@ -560,3 +559,4 @@ void OscirenderAudioProcessorEditor::onSyphonInputDisconnected() {
     juce::SpinLock::ScopedLockType lock(audioProcessor.syphonLock);
     audioProcessor.disconnectSyphonInput();
 }
+#endif

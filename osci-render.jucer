@@ -574,6 +574,16 @@
         <FILE id="mC1tUv" name="ugen_JuceUtility.h" compile="0" resource="0"
               file="Source/UGen/ugen_JuceUtility.h"/>
       </GROUP>
+      <GROUP id="{0F62E77C-5385-0C56-69A1-3C8866A6E6E3}" name="video">
+        <FILE id="DniMew" name="FFmpegEncoderManager.cpp" compile="1" resource="0"
+              file="Source/video/FFmpegEncoderManager.cpp"/>
+        <FILE id="t2oI5O" name="FFmpegEncoderManager.h" compile="0" resource="0"
+              file="Source/video/FFmpegEncoderManager.h"/>
+        <FILE id="xEIRCs" name="InvisibleOpenGLContextComponent.h" compile="0"
+              resource="0" file="Source/video/InvisibleOpenGLContextComponent.h"/>
+        <FILE id="OyC3qj" name="SyphonFrameGrabber.h" compile="0" resource="0"
+              file="Source/video/SyphonFrameGrabber.h"/>
+      </GROUP>
       <GROUP id="{16A8DC64-BA02-898D-4DBA-AA3DDF6F9297}" name="visualiser">
         <FILE id="DkDKBX" name="AfterglowFragmentShader.glsl" compile="0" resource="0"
               file="Source/visualiser/AfterglowFragmentShader.glsl"/>
@@ -644,8 +654,6 @@
             file="Source/FrameSettingsComponent.cpp"/>
       <FILE id="lzBNS1" name="FrameSettingsComponent.h" compile="0" resource="0"
             file="Source/FrameSettingsComponent.h"/>
-      <FILE id="nfoWJk" name="InvisibleOpenGLContextComponent.h" compile="0"
-            resource="0" file="Source/InvisibleOpenGLContextComponent.h"/>
       <FILE id="d2zFqF" name="LookAndFeel.cpp" compile="1" resource="0" file="Source/LookAndFeel.cpp"/>
       <FILE id="TJDqWs" name="LookAndFeel.h" compile="0" resource="0" file="Source/LookAndFeel.h"/>
       <FILE id="X26RjJ" name="LuaComponent.cpp" compile="1" resource="0"
@@ -673,8 +681,6 @@
             file="Source/SettingsComponent.cpp"/>
       <FILE id="Vlmozi" name="SettingsComponent.h" compile="0" resource="0"
             file="Source/SettingsComponent.h"/>
-      <FILE id="jyHVpz" name="SyphonFrameGrabber.h" compile="0" resource="0"
-            file="Source/SyphonFrameGrabber.h"/>
       <FILE id="UxZu4n" name="TxtComponent.cpp" compile="1" resource="0"
             file="Source/TxtComponent.cpp"/>
       <FILE id="kxPbsL" name="TxtComponent.h" compile="0" resource="0" file="Source/TxtComponent.h"/>
