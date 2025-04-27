@@ -2,7 +2,10 @@
 
 <JUCERPROJECT id="Dt5Xh7" name="osci-render-test" projectType="consoleapp"
               useAppConfig="0" addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1"
-              defines="MOODYCAMEL_ATOMICOPS=1" cppLanguageStandard="20">
+              cppLanguageStandard="20" projectLineFeed="&#10;" companyName="James H Ball"
+              companyWebsite="https://osci-render.com" companyEmail="james@ball.sh"
+              defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1"
+              headerPath="./include">
   <MAINGROUP id="ztPpnM" name="osci-render-test">
     <GROUP id="{4373FA2A-1E20-AAA6-40E0-740C13D88B75}" name="Source">
       <GROUP id="{DB7C86A4-CC9B-5846-B0C3-6EB553450542}" name="mathter">
