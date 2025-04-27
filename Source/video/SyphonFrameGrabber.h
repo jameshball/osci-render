@@ -9,10 +9,23 @@ public:
         : juce::Thread("SyphonFrameGrabber"), pollIntervalMs(pollMs), manager(manager), parser(parser) {
         // Create the invisible OpenGL context component
         glContextComponent = std::make_unique<InvisibleOpenGLContextComponent>();
+        
+        // Make sure the context is properly initialized before creating the receiver
+        glContextComponent->getContext().makeActive();
+        
+        // Create the receiver after the context is active
         receiver = manager.addReceiver(server, app);
         if (receiver) {
             receiver->setUseCPUImage(true); // for pixel access
+            
+            // Initialize the receiver with the active GL context
+            receiver->initGL();
         }
+        
+        // Release the context
+        glContextComponent->getContext().deactivateCurrentContext();
+        
+        // Start the thread after everything is set up
         startThread();
     }
 
@@ -28,12 +41,15 @@ public:
     void run() override {
         while (!threadShouldExit()) {
             {
+                bool activated = false;
                 if (glContextComponent) {
-                    glContextComponent->getContext().makeActive();
+                    activated = glContextComponent->getContext().makeActive();
                 }
-                receiver->renderGL();
-                if (glContextComponent) {
-                    glContextComponent->getContext().deactivateCurrentContext();
+                if (juce::OpenGLContext::getCurrentContext() != nullptr) {
+                    receiver->renderGL();
+                }
+                if (activated && glContextComponent) {
+                    juce::OpenGLContext::deactivateCurrentContext();
                 }
                 if (isActive() && receiver->isConnected) {
                     juce::Image image = receiver->getImage();
@@ -61,6 +77,7 @@ private:
     SharedTextureReceiver* receiver = nullptr;
     ImageParser& parser;
     std::unique_ptr<InvisibleOpenGLContextComponent> glContextComponent;
+    juce::CriticalSection openGLLock; // To protect OpenGL context operations
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SyphonFrameGrabber)
 };

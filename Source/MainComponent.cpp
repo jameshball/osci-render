@@ -6,6 +6,8 @@
 MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
 	setText("Main Settings");
 
+	addAndMakeVisible(editor.volume);
+
     addAndMakeVisible(fileButton);
     fileButton.setButtonText("Choose File(s)");
     
@@ -233,7 +235,11 @@ void MainComponent::resized() {
 	createFile.setBounds(row.removeFromLeft(buttonWidth));
 
 	bounds.removeFromTop(padding);
-	bounds.expand(10, 0);
+	bounds.expand(15, 0);
+
+	auto volumeArea = bounds.removeFromLeft(30);
+	pluginEditor.volume.setBounds(volumeArea.withSizeKeepingCentre(volumeArea.getWidth(), juce::jmin(volumeArea.getHeight(), 300)));
+	
 	if (!audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
 		auto minDim = juce::jmin(bounds.getWidth(), bounds.getHeight());
         juce::Point<int> localTopLeft = {bounds.getX(), bounds.getY()};
@@ -241,9 +247,6 @@ void MainComponent::resized() {
         auto shiftedBounds = bounds;
         shiftedBounds.setX(topLeft.getX());
         shiftedBounds.setY(topLeft.getY());
-        //if (minDim < 35) {
-        //    minDim = 35;
-        //}
-		pluginEditor.visualiser.setBounds(shiftedBounds.withSizeKeepingCentre(minDim - 25, minDim));
+		pluginEditor.visualiser.setBounds(shiftedBounds.withSizeKeepingCentre(minDim, minDim + 25).reduced(10));
 	}
 }

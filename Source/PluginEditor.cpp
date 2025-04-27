@@ -27,8 +27,6 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor);
     upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark);
 #endif
-        
-    addAndMakeVisible(volume);
     
     addAndMakeVisible(console);
     console.setConsoleOpen(false);
@@ -200,11 +198,6 @@ void OscirenderAudioProcessorEditor::resized() {
 #endif
     }
     
-    area.removeFromTop(2);
-    area.removeFromLeft(3);
-    auto volumeArea = area.removeFromLeft(30);
-    volume.setBounds(volumeArea.withSizeKeepingCentre(volumeArea.getWidth(), juce::jmin(volumeArea.getHeight(), 300)));
-    area.removeFromLeft(3);
     bool editorVisible = false;
 
     {
