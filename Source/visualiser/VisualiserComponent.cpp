@@ -147,6 +147,10 @@ void VisualiserComponent::setFullScreen(bool fullScreen) {
     this->fullScreen = fullScreen;
     hideButtonRow = false;
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    
+    // Release renderingSemaphore to prevent deadlocks during layout changes
+    renderingSemaphore.release();
+    
     resized();
 }
 
@@ -281,7 +285,10 @@ void VisualiserComponent::runTask(const std::vector<osci::Point>& points) {
     // this just triggers a repaint
     triggerAsyncUpdate();
     // wait for rendering on the OpenGLRenderer thread to complete
-    renderingSemaphore.acquire();
+    if (!renderingSemaphore.acquire()) {
+        // If acquire times out, log a message or handle it as appropriate
+        juce::Logger::writeToLog("Rendering semaphore acquisition timed out");
+    }
 }
 
 int VisualiserComponent::prepareTask(double sampleRate, int bufferSize) {
@@ -387,6 +394,9 @@ void VisualiserComponent::setRecording(bool recording) {
 #else
     bool stillRecording = audioRecorder.isRecording();
 #endif
+
+    // Release renderingSemaphore to prevent deadlock
+    renderingSemaphore.release();
 
     if (recording) {
 #if OSCI_PREMIUM
@@ -601,6 +611,10 @@ void VisualiserComponent::popoutWindow() {
     }
 #endif
     setRecording(false);
+    
+    // Release renderingSemaphore to prevent deadlock when creating a child visualizer
+    renderingSemaphore.release();
+    
     auto visualiser = new VisualiserComponent(
         audioProcessor,
         editor,
@@ -949,6 +963,9 @@ Texture VisualiserComponent::makeTexture(int width, int height, GLuint textureID
 
 void VisualiserComponent::setResolution(int width) {
     using namespace juce::gl;
+
+    // Release semaphore to prevent deadlocks during texture rebuilding
+    renderingSemaphore.release();
 
     glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
 
