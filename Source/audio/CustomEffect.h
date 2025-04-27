@@ -1,10 +1,8 @@
 #pragma once
-#include "EffectApplication.h"
-#include "../shape/OsciPoint.h"
-#include "../audio/Effect.h"
+#include <JuceHeader.h>
 #include "../lua/LuaParser.h"
 
-class CustomEffect : public EffectApplication {
+class CustomEffect : public osci::EffectApplication {
 public:
 	CustomEffect(std::function<void(int, juce::String, juce::String)> errorCallback, std::atomic<double>* luaValues);
 	~CustomEffect();
@@ -13,7 +11,7 @@ public:
 	static const juce::String UNIQUE_ID;
 	static const juce::String FILE_NAME;
 
-	OsciPoint apply(int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) override;
+	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override;
 	void updateCode(const juce::String& newCode);
 
 	juce::String getCode();

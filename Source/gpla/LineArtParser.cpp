@@ -30,14 +30,14 @@ void LineArtParser::makeChars(int64_t data, char* chars) {
     }
 }
 
-std::vector<std::vector<Line>> LineArtParser::epicFail() {
+std::vector<std::vector<osci::Line>> LineArtParser::epicFail() {
     return parseJsonFrames(juce::String(BinaryData::fallback_gpla, BinaryData::fallback_gplaSize));
 }
 
-std::vector<std::vector<Line>> LineArtParser::parseBinaryFrames(char* bytes, int bytesLength) {
+std::vector<std::vector<osci::Line>> LineArtParser::parseBinaryFrames(char* bytes, int bytesLength) {
     int64_t* data = (int64_t*)bytes;
     int dataLength = bytesLength / 8;
-    std::vector<std::vector<Line>> tFrames;
+    std::vector<std::vector<osci::Line>> tFrames;
 
     if (dataLength < 4) return epicFail();
 
@@ -108,7 +108,7 @@ std::vector<std::vector<Line>> LineArtParser::parseBinaryFrames(char* bytes, int
 
             double focalLength;
             std::vector<std::vector<double>> allMatrices;
-            std::vector<std::vector<std::vector<OsciPoint>>> allVertices;
+            std::vector<std::vector<std::vector<osci::Point>>> allVertices;
             while (strcmp(tag, "OBJECTS ") != 0) {
                 if (index >= dataLength) return epicFail();
                 rawData = data[index];
@@ -131,7 +131,7 @@ std::vector<std::vector<Line>> LineArtParser::parseBinaryFrames(char* bytes, int
             
             while (strcmp(tag, "DONE    ") != 0) {
                 if (strcmp(tag, "OBJECT  ") == 0) {
-                    std::vector<std::vector<OsciPoint>> vertices;
+                    std::vector<std::vector<osci::Point>> vertices;
                     std::vector<double> matrix;
                     if (index >= dataLength) return epicFail();
                     int strokeNum = 0;
@@ -158,7 +158,7 @@ std::vector<std::vector<Line>> LineArtParser::parseBinaryFrames(char* bytes, int
 
                             while (strcmp(tag, "DONE    ") != 0) {
                                 if (strcmp(tag, "STROKE  ") == 0) {
-                                    vertices.push_back(std::vector<OsciPoint>());
+                                    vertices.push_back(std::vector<osci::Point>());
                                     if (index >= dataLength) return epicFail();
                                     rawData = data[index];
                                     index++;
@@ -190,7 +190,7 @@ std::vector<std::vector<Line>> LineArtParser::parseBinaryFrames(char* bytes, int
                                                 index++;
                                                 z = makeDouble(rawData);
 
-                                                vertices[strokeNum].push_back(OsciPoint(x, y, z));
+                                                vertices[strokeNum].push_back(osci::Point(x, y, z));
                                             }
                                             if (index >= dataLength) return epicFail();
                                             rawData = data[index];
@@ -231,7 +231,7 @@ std::vector<std::vector<Line>> LineArtParser::parseBinaryFrames(char* bytes, int
                 index++;
                 makeChars(rawData, tag);
             }
-            std::vector<Line> frame = assembleFrame(allVertices, allMatrices, focalLength);
+            std::vector<osci::Line> frame = assembleFrame(allVertices, allMatrices, focalLength);
             tFrames.push_back(frame);
         }
         if (index >= dataLength) return epicFail();
@@ -242,8 +242,8 @@ std::vector<std::vector<Line>> LineArtParser::parseBinaryFrames(char* bytes, int
     return tFrames;
 }
 
-std::vector<std::vector<Line>> LineArtParser::parseJsonFrames(juce::String jsonStr) {
-    std::vector<std::vector<Line>> frames;
+std::vector<std::vector<osci::Line>> LineArtParser::parseJsonFrames(juce::String jsonStr) {
+    std::vector<std::vector<osci::Line>> frames;
 
     // format of json is:
     // {
@@ -293,7 +293,7 @@ std::vector<std::vector<Line>> LineArtParser::parseJsonFrames(juce::String jsonS
         // Ensure that there actually are objects and that the focal length is defined
         if (objects.size() > 0 && !focalLengthVar.isVoid()) {
             double focalLength = focalLengthVar;
-            std::vector<Line> frame = generateFrame(objects, focalLength);
+            std::vector<osci::Line> frame = generateFrame(objects, focalLength);
             if (frame.size() > 0) {
                 hasValidFrames = true;
             }
@@ -313,17 +313,17 @@ void LineArtParser::setFrame(int fNum) {
     frameNumber = (numFrames + (fNum % numFrames)) % numFrames;
 }
 
-std::vector<std::unique_ptr<Shape>> LineArtParser::draw() {
-	std::vector<std::unique_ptr<Shape>> tempShapes;
+std::vector<std::unique_ptr<osci::Shape>> LineArtParser::draw() {
+	std::vector<std::unique_ptr<osci::Shape>> tempShapes;
 	
-	for (Line shape : frames[frameNumber]) {
+	for (osci::Line shape : frames[frameNumber]) {
 		tempShapes.push_back(shape.clone());
 	}
     return tempShapes;
 }
 
-std::vector<std::vector<OsciPoint>> LineArtParser::reorderVertices(std::vector<std::vector<OsciPoint>> vertices) {
-    std::vector<std::vector<OsciPoint>> reorderedVertices;
+std::vector<std::vector<osci::Point>> LineArtParser::reorderVertices(std::vector<std::vector<osci::Point>> vertices) {
+    std::vector<std::vector<osci::Point>> reorderedVertices;
 
     if (vertices.size() > 0) {
         std::vector<bool> visited = std::vector<bool>(vertices.size(), false);
@@ -356,7 +356,7 @@ std::vector<std::vector<OsciPoint>> LineArtParser::reorderVertices(std::vector<s
         }
 
         for (int i = 0; i < vertices.size(); i++) {
-            std::vector<OsciPoint> reorderedVertex;
+            std::vector<osci::Point> reorderedVertex;
             int index = order[i];
             for (int j = 0; j < vertices[index].size(); j++) {
                 reorderedVertex.push_back(vertices[index][j]);
@@ -367,23 +367,23 @@ std::vector<std::vector<OsciPoint>> LineArtParser::reorderVertices(std::vector<s
     return reorderedVertices;
 }
 
-std::vector<Line> LineArtParser::generateFrame(juce::Array <juce::var> objects, double focalLength)
+std::vector<osci::Line> LineArtParser::generateFrame(juce::Array <juce::var> objects, double focalLength)
 {
     std::vector<std::vector<double>> allMatrices;
-    std::vector<std::vector<std::vector<OsciPoint>>> allVertices;
+    std::vector<std::vector<std::vector<osci::Point>>> allVertices;
 
     for (int i = 0; i < objects.size(); i++) {
         auto verticesArray = *objects[i].getProperty("vertices", juce::Array<juce::var>()).getArray();
-        std::vector<std::vector<OsciPoint>> vertices;
+        std::vector<std::vector<osci::Point>> vertices;
 
         for (auto& vertexArrayVar : verticesArray) {
-            vertices.push_back(std::vector<OsciPoint>());
+            vertices.push_back(std::vector<osci::Point>());
             auto& vertexArray = *vertexArrayVar.getArray();
             for (auto& vertex : vertexArray) {
                 double x = vertex.getProperty("x", 0);
                 double y = vertex.getProperty("y", 0);
                 double z = vertex.getProperty("z", 0);
-                vertices[vertices.size() - 1].push_back(OsciPoint(x, y, z));
+                vertices[vertices.size() - 1].push_back(osci::Point(x, y, z));
             }
         }
         auto matrix = *objects[i].getProperty("matrix", juce::Array<juce::var>()).getArray();
@@ -398,9 +398,9 @@ std::vector<Line> LineArtParser::generateFrame(juce::Array <juce::var> objects, 
     return assembleFrame(allVertices, allMatrices, focalLength);
 }
 
-std::vector<Line> LineArtParser::assembleFrame(std::vector<std::vector<std::vector<OsciPoint>>> allVertices, std::vector<std::vector<double>> allMatrices, double focalLength) {
+std::vector<osci::Line> LineArtParser::assembleFrame(std::vector<std::vector<std::vector<osci::Point>>> allVertices, std::vector<std::vector<double>> allMatrices, double focalLength) {
     // generate a frame from the vertices and matrix
-    std::vector<Line> frame;
+    std::vector<osci::Line> frame;
 
     for (int i = 0; i < allVertices.size(); i++) {
         for (int j = 0; j < allVertices[i].size(); j++) {
@@ -427,7 +427,7 @@ std::vector<Line> LineArtParser::assembleFrame(std::vector<std::vector<std::vect
                     double x2 = rotatedX2 * focalLength / rotatedZ2;
                     double y2 = rotatedY2 * focalLength / rotatedZ2;
 
-                    frame.push_back(Line(x, y, x2, y2));
+                    frame.push_back(osci::Line(x, y, x2, y2));
                 }
             }
         }

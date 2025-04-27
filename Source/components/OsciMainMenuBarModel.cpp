@@ -21,7 +21,7 @@ OsciMainMenuBarModel::OsciMainMenuBarModel(OscirenderAudioProcessor& p, Oscirend
         juce::DialogWindow::LaunchOptions options;
         AboutComponent* about = new AboutComponent(BinaryData::logo_png, BinaryData::logo_pngSize,
             juce::String(ProjectInfo::projectName) + " by " + ProjectInfo::companyName + "\n"
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
             "Thank you for purchasing osci-render premium!\n"
 #else
             "Free version\n"
@@ -52,9 +52,9 @@ OsciMainMenuBarModel::OsciMainMenuBarModel(OscirenderAudioProcessor& p, Oscirend
         audioProcessor.setObjectServerPort(juce::Random::getSystemRandom().nextInt(juce::Range<int>(51600, 51700)));
     });
 
-#if !SOSCI_FEATURES
+#if !OSCI_PREMIUM
     addMenuItem(1, "Purchase osci-render premium!", [this] {
-        juce::URL("https://osci-render.com/sosci").launchInDefaultBrowser();
+        juce::URL("https://osci-render.com/#purchase").launchInDefaultBrowser();
     });
 #endif
 
@@ -62,9 +62,25 @@ OsciMainMenuBarModel::OsciMainMenuBarModel(OscirenderAudioProcessor& p, Oscirend
         editor.openRecordingSettings();
     });
 
+    // Add Syphon/Spout input menu item under Recording
+    addMenuItem(2, audioProcessor.isSyphonInputActive() ? "Disconnect Syphon/Spout Input" : "Select Syphon/Spout Input...", [this] {
+        if (audioProcessor.isSyphonInputActive())
+            disconnectSyphonInput();
+        else
+            openSyphonInputDialog();
+    });
+
     if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
         addMenuItem(3, "Settings...", [this] {
             editor.openAudioSettings();
         });
     }
+}
+
+void OsciMainMenuBarModel::openSyphonInputDialog() {
+    editor.openSyphonInputDialog();
+}
+
+void OsciMainMenuBarModel::disconnectSyphonInput() {
+    audioProcessor.disconnectSyphonInput();
 }

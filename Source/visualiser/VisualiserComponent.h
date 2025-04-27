@@ -3,14 +3,12 @@
 #include <algorithm>
 #include <JuceHeader.h>
 #include "../LookAndFeel.h"
-#include "../concurrency/AudioBackgroundThread.h"
 #include "../components/SvgButton.h"
 #include "VisualiserSettings.h"
 #include "RecordingSettings.h"
 #include "../components/StopwatchComponent.h"
 #include "../img/qoixx.hpp"
 #include "../components/DownloaderComponent.h"
-#include "../concurrency/WriteProcess.h"
 #include "../audio/AudioRecorder.h"
 #include "../wav/WavParser.h"
 #include "../components/AudioPlayerComponent.h"
@@ -32,12 +30,14 @@ struct Texture {
 };
 
 class CommonAudioProcessor;
+class CommonPluginEditor;
 class VisualiserWindow;
-class VisualiserComponent : public juce::Component, public AudioBackgroundThread, public juce::MouseListener, public juce::OpenGLRenderer, public juce::AsyncUpdater {
+class VisualiserComponent : public juce::Component, public osci::AudioBackgroundThread, public juce::MouseListener, public juce::OpenGLRenderer, public juce::AsyncUpdater {
 public:
     VisualiserComponent(
         CommonAudioProcessor& processor,
-#if SOSCI_FEATURES
+        CommonPluginEditor& editor,
+#if OSCI_PREMIUM
         SharedTextureManager& sharedTextureManager,
 #endif
         juce::File ffmpegFile,
@@ -58,7 +58,7 @@ public:
     void resized() override;
     void paint(juce::Graphics& g) override;
     int prepareTask(double sampleRate, int samplesPerBlock) override;
-    void runTask(const std::vector<OsciPoint>& points) override;
+    void runTask(const std::vector<osci::Point>& points) override;
     void stopTask() override;
     void setPaused(bool paused, bool affectAudio = true);
     void mouseDrag(const juce::MouseEvent& event) override;
@@ -80,6 +80,7 @@ public:
 
 private:
     CommonAudioProcessor& audioProcessor;
+    CommonPluginEditor& editor;
 
     float intensity;
     
@@ -91,7 +92,7 @@ private:
     SvgButton settingsButton{ "settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white };
     SvgButton audioInputButton{ "audioInput", BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red };
     
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     SvgButton sharedTextureButton{ "sharedTexture", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red };
     SharedTextureManager& sharedTextureManager;
     SharedTextureSender* sharedTextureSender = nullptr;
@@ -109,45 +110,14 @@ private:
     juce::File ffmpegFile;
     bool recordingAudio = true;
     
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     bool recordingVideo = true;
     bool downloading = false;
     
     long numFrames = 0;
     std::vector<unsigned char> framePixels;
-    WriteProcess ffmpegProcess;
+    osci::WriteProcess ffmpegProcess;
     std::unique_ptr<juce::TemporaryFile> tempVideoFile;
-    
-    juce::String ffmpegURL = juce::String("https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/") +
-#if JUCE_WINDOWS
-    #if JUCE_64BIT
-        "ffmpeg-win32-x64"
-    #elif JUCE_32BIT
-        "ffmpeg-win32-ia32"
-    #endif
-#elif JUCE_MAC
-    #if JUCE_ARM
-        "ffmpeg-darwin-arm64"
-    #elif JUCE_INTEL
-        "ffmpeg-darwin-x64"
-    #endif
-#elif JUCE_LINUX
-    #if JUCE_ARM
-        #if JUCE_64BIT
-            "ffmpeg-linux-arm64"
-        #elif JUCE_32BIT
-            "ffmpeg-linux-arm"
-        #endif
-    #elif JUCE_INTEL
-        #if JUCE_64BIT
-            "ffmpeg-linux-x64"
-        #elif JUCE_32BIT
-            "ffmpeg-linux-ia32"
-        #endif
-    #endif
-#endif
-    + ".gz";
-    DownloaderComponent ffmpegDownloader{ffmpegURL, ffmpegFile};
 #endif
     
     StopwatchComponent stopwatch;
@@ -157,7 +127,7 @@ private:
     std::unique_ptr<juce::TemporaryFile> tempAudioFile;
     AudioRecorder audioRecorder;
     
-    Semaphore renderingSemaphore{0};
+    osci::Semaphore renderingSemaphore{0};
     
     void popoutWindow();
     
@@ -209,7 +179,7 @@ private:
     juce::Image screenTextureImage = juce::ImageFileFormat::loadFrom(BinaryData::noise_jpg, BinaryData::noise_jpgSize);
     juce::Image emptyScreenImage = juce::ImageFileFormat::loadFrom(BinaryData::empty_jpg, BinaryData::empty_jpgSize);
     
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     juce::Image oscilloscopeImage = juce::ImageFileFormat::loadFrom(BinaryData::real_png, BinaryData::real_pngSize);
     juce::Image vectorDisplayImage = juce::ImageFileFormat::loadFrom(BinaryData::vector_display_png, BinaryData::vector_display_pngSize);
     
@@ -217,11 +187,11 @@ private:
     juce::Image oscilloscopeReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::real_reflection_png, BinaryData::real_reflection_pngSize);
     juce::Image vectorDisplayReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::vector_display_reflection_png, BinaryData::vector_display_reflection_pngSize);
     
-    OsciPoint REAL_SCREEN_OFFSET = { 0.02, -0.15 };
-    OsciPoint REAL_SCREEN_SCALE = { 0.6 };
+    osci::Point REAL_SCREEN_OFFSET = { 0.02, -0.15 };
+    osci::Point REAL_SCREEN_SCALE = { 0.6 };
     
-    OsciPoint VECTOR_DISPLAY_OFFSET = { 0.075, -0.045 };
-    OsciPoint VECTOR_DISPLAY_SCALE = { 0.6 };
+    osci::Point VECTOR_DISPLAY_OFFSET = { 0.075, -0.045 };
+    osci::Point VECTOR_DISPLAY_SCALE = { 0.6 };
     float VECTOR_DISPLAY_FISH_EYE = 0.5;
     
     juce::OpenGLTexture reflectionOpenGLTexture;
@@ -250,7 +220,7 @@ private:
     chowdsp::ResamplingTypes::LanczosResampler<2048, 8> zResampler;
 
     void setOffsetAndScale(juce::OpenGLShaderProgram* shader);
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     void initialiseSharedTexture();
     void closeSharedTexture();
 #endif

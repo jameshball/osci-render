@@ -30,6 +30,10 @@ void SettingsComponent::resized() {
     area.removeFromRight(5);
     area.removeFromTop(5);
     area.removeFromBottom(5);
+    
+    if (area.getWidth() <= 0 || area.getHeight() <= 0) {
+        return;
+    }
 
     juce::Component dummy;
     juce::Component dummy2;
@@ -57,7 +61,7 @@ void SettingsComponent::resized() {
     auto dummyBounds = dummy.getBounds();
 
     if (effectSettings != nullptr) {
-        effectSettings->setBounds(dummyBounds.removeFromBottom(150));
+        effectSettings->setBounds(dummyBounds.removeFromBottom(160));
         dummyBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
     }
 
@@ -75,14 +79,14 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
     juce::String extension = fileName.fromLastOccurrenceOf(".", true, false).toLowerCase();
     txt.setVisible(false);
     frame.setVisible(false);
-    bool isImage =  extension == ".gif" || extension == ".png" || extension == ".jpg" || extension == ".jpeg";
-    if (fileName.isEmpty() || audioProcessor.objectServerRendering) {
+    bool isImage =  extension == ".gif" || extension == ".png" || extension == ".jpg" || extension == ".jpeg" || extension == ".mov" || extension == ".mp4" || audioProcessor.isSyphonInputStarted();
+    if ((fileName.isEmpty() && !audioProcessor.isSyphonInputStarted()) || audioProcessor.objectServerRendering) {
         // do nothing
     } else if (extension == ".txt") {
         txt.setVisible(true);
     } else if (extension == ".gpla" || isImage) {
         frame.setVisible(true);
-        frame.setAnimated(extension == ".gpla" || extension == ".gif");
+        frame.setAnimated(extension == ".gpla" || extension == ".gif" || extension == ".mov" || extension == ".mp4");
         frame.setImage(isImage);
         frame.resized();
     }

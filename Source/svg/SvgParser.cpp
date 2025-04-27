@@ -1,7 +1,4 @@
 #include "SvgParser.h"
-#include "../shape/Line.h"
-#include "../shape/QuadraticBezierCurve.h"
-#include "../shape/CubicBezierCurve.h"  // Add missing include
 
 SvgParser::SvgParser(juce::String svgFile) {
 	auto doc = juce::XmlDocument::parse(svgFile);
@@ -16,7 +13,7 @@ SvgParser::SvgParser(juce::String svgFile) {
             
             // Instead of separate scaling for width and height, just get the path as is
             pathToShapes(path, shapes, true); // Enable normalization
-            Shape::removeOutOfBounds(shapes);
+            osci::Shape::removeOutOfBounds(shapes);
             return;
         }
     }
@@ -26,13 +23,13 @@ SvgParser::SvgParser(juce::String svgFile) {
     });
     
     // draw an X to indicate an error.
-    shapes.push_back(std::make_unique<Line>(-0.5, -0.5, 0.5, 0.5));
-    shapes.push_back(std::make_unique<Line>(-0.5, 0.5, 0.5, -0.5));
+    shapes.push_back(std::make_unique<osci::Line>(-0.5, -0.5, 0.5, 0.5));
+    shapes.push_back(std::make_unique<osci::Line>(-0.5, 0.5, 0.5, -0.5));
 }
 
 SvgParser::~SvgParser() {}
 
-void SvgParser::pathToShapes(juce::Path& path, std::vector<std::unique_ptr<Shape>>& shapes, bool normalise) {
+void SvgParser::pathToShapes(juce::Path& path, std::vector<std::unique_ptr<osci::Shape>>& shapes, bool normalise) {
 	juce::Path::Iterator pathIterator(path);
 	double x = 0;
 	double y = 0;
@@ -50,22 +47,22 @@ void SvgParser::pathToShapes(juce::Path& path, std::vector<std::unique_ptr<Shape
 			startY = y;
 			break;
 		case juce::Path::Iterator::PathElementType::lineTo:
-			shapes.push_back(std::make_unique<Line>(x, -y, pathIterator.x1, -pathIterator.y1));
+			shapes.push_back(std::make_unique<osci::Line>(x, -y, pathIterator.x1, -pathIterator.y1));
 			x = pathIterator.x1;
 			y = pathIterator.y1;
 			break;
 		case juce::Path::Iterator::PathElementType::quadraticTo:
-			shapes.push_back(std::make_unique<QuadraticBezierCurve>(x, -y, pathIterator.x1, -pathIterator.y1, pathIterator.x2, -pathIterator.y2));
+			shapes.push_back(std::make_unique<osci::QuadraticBezierCurve>(x, -y, pathIterator.x1, -pathIterator.y1, pathIterator.x2, -pathIterator.y2));
 			x = pathIterator.x2;
 			y = pathIterator.y2;
 			break;
 		case juce::Path::Iterator::PathElementType::cubicTo:
-			shapes.push_back(std::make_unique<CubicBezierCurve>(x, -y, pathIterator.x1, -pathIterator.y1, pathIterator.x2, -pathIterator.y2, pathIterator.x3, -pathIterator.y3));
+			shapes.push_back(std::make_unique<osci::CubicBezierCurve>(x, -y, pathIterator.x1, -pathIterator.y1, pathIterator.x2, -pathIterator.y2, pathIterator.x3, -pathIterator.y3));
 			x = pathIterator.x3;
 			y = pathIterator.y3;
 			break;
 		case juce::Path::Iterator::PathElementType::closePath:
-			shapes.push_back(std::make_unique<Line>(x, -y, startX, -startY));
+			shapes.push_back(std::make_unique<osci::Line>(x, -y, startX, -startY));
 			x = startX;
 			y = startY;
 			break;
@@ -112,9 +109,9 @@ void SvgParser::pathToShapes(juce::Path& path, std::vector<std::unique_ptr<Shape
 	}
 }
 
-std::vector<std::unique_ptr<Shape>> SvgParser::draw() {
+std::vector<std::unique_ptr<osci::Shape>> SvgParser::draw() {
 	// clone with deep copy
-	std::vector<std::unique_ptr<Shape>> tempShapes = std::vector<std::unique_ptr<Shape>>();
+	std::vector<std::unique_ptr<osci::Shape>> tempShapes = std::vector<std::unique_ptr<osci::Shape>>();
 	
 	for (auto& shape : shapes) {
 		tempShapes.push_back(shape->clone());

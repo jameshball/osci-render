@@ -1,11 +1,16 @@
 #include "VolumeComponent.h"
 
 VolumeComponent::VolumeComponent(CommonAudioProcessor& p) 
-    : AudioBackgroundThread("VolumeComponent", p.threadManager), 
+    : osci::AudioBackgroundThread("VolumeComponent", p.threadManager), 
       audioProcessor(p)
 {
     setOpaque(false);
     setShouldBeRunning(true);
+
+    leftVolumeSmoothed.reset(10);  // Reset with 5 steps for smooth animation
+    rightVolumeSmoothed.reset(10);
+    leftVolumeSmoothed.setCurrentAndTargetValue(0.0f);
+    rightVolumeSmoothed.setCurrentAndTargetValue(0.0f);
 
     addAndMakeVisible(volumeSlider);
     volumeSlider.setSliderStyle(juce::Slider::SliderStyle::LinearVertical);
@@ -18,7 +23,7 @@ VolumeComponent::VolumeComponent(CommonAudioProcessor& p)
     volumeSlider.setValue(volumeParam->getValueUnnormalised());
     volumeSlider.setDoubleClickReturnValue(true, 1.0);
     volumeSlider.setLookAndFeel(&thumbRadiusLookAndFeel);
-    volumeSlider.setColour(juce::Slider::ColourIds::thumbColourId, juce::Colours::black);
+    volumeSlider.setColour(juce::Slider::ColourIds::thumbColourId, juce::Colours::white);
 
     addAndMakeVisible(thresholdSlider);
     thresholdSlider.setSliderStyle(juce::Slider::SliderStyle::LinearVertical);
@@ -45,45 +50,83 @@ VolumeComponent::VolumeComponent(CommonAudioProcessor& p)
     volumeButton.onClick = [this] {
         audioProcessor.muteParameter->setBoolValueNotifyingHost(!audioProcessor.muteParameter->getBoolValue());
     };
-
-    auto doc = juce::XmlDocument::parse(BinaryData::threshold_svg);
-    thresholdIcon = juce::Drawable::createFromSVG(*doc);
-
-    addAndMakeVisible(*thresholdIcon);
 }
 
 void VolumeComponent::paint(juce::Graphics& g) {
+    g.setColour(juce::Colours::transparentBlack);
+    g.fillAll();
+
     auto r = getLocalBounds().toFloat();
     r.removeFromTop(20);
     r.removeFromRight(r.getWidth() / 2);
     r.removeFromTop(volumeSlider.getLookAndFeel().getSliderThumbRadius(volumeSlider));
     r.removeFromBottom(volumeSlider.getLookAndFeel().getSliderThumbRadius(volumeSlider));
 
-    g.setColour(juce::Colours::white);
-    g.fillRect(r);
-
     auto channelHeight = r.getHeight();
     auto leftVolumeHeight = channelHeight * leftVolume;
     auto rightVolumeHeight = channelHeight * rightVolume;
+
+    auto overallRect = r;
 
     auto leftRect = r.removeFromLeft(r.getWidth() / 2);
     auto rightRect = r;
     auto leftRegion = leftRect;
     auto rightRegion = rightRect;
 
-    g.setGradientFill(juce::ColourGradient(juce::Colour(0xff00ff00), 0, leftRect.getBottom(), juce::Colours::red, 0, leftRect.getY(), false));
-    g.fillRect(leftRect.removeFromBottom(leftVolumeHeight));
+    g.setColour(juce::Colours::white.withAlpha(0.1f));
+    g.drawRoundedRectangle(overallRect, 4.0f, 1.0f);
 
-    g.setGradientFill(juce::ColourGradient(juce::Colour(0xff00ff00), 0, rightRect.getBottom(), juce::Colours::red, 0, rightRect.getY(), false));
-    g.fillRect(rightRect.removeFromBottom(rightVolumeHeight));
+    // Enable anti-aliasing for smoother rendering
+    g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
 
-    auto barWidth = 5.0f;
+    auto drawVolumeMeter = [&](juce::Rectangle<float>& rect, float volume) {
+        auto meterRect = rect.removeFromBottom(volume * channelHeight);
+        auto gradient = juce::ColourGradient(
+            juce::Colour(0xff00ff00),  // Green
+            0, overallRect.getBottom(),
+            juce::Colour(0xffff0000),  // Red
+            0, overallRect.getY(),
+            false);
+        gradient.addColour(0.3, juce::Colour(0xffffe600));  // Yellow in the middle
+        g.setGradientFill(gradient);
+        // Draw rounded meter
+        g.saveState();
+        g.reduceClipRegion(meterRect.toNearestInt());
+        g.fillRoundedRectangle(meterRect.reduced(1.0f), 2.0f);
+        g.restoreState();
+    };
 
-    g.setColour(juce::Colours::black);
-    g.fillRect(leftRegion.getX(), leftRegion.getBottom() - (avgLeftVolume * channelHeight) - barWidth / 2, leftRegion.getWidth(), barWidth);
-    g.fillRect(rightRegion.getX(), rightRegion.getBottom() - (avgRightVolume * channelHeight) - barWidth / 2, rightRegion.getWidth(), barWidth);
+    drawVolumeMeter(leftRect, leftVolume);
+    drawVolumeMeter(rightRect, rightVolume);
 
-    g.fillRect(leftRegion.getX(), rightRegion.getBottom() - (thresholdSlider.getValue() * channelHeight) - barWidth / 2, leftRegion.getWidth() + rightRegion.getWidth(), barWidth);
+    // Draw smooth volume indicators
+    auto drawSmoothIndicator = [&](const juce::Rectangle<float>& region, float value) {
+        if (value > 0.0f) {  // Only draw indicator if volume is greater than 0
+            auto y = region.getBottom() - (value * channelHeight);
+            auto indicatorHeight = 3.0f;
+            auto indicatorRect = juce::Rectangle<float>(
+                region.getX(), y - indicatorHeight / 2,
+                region.getWidth(), indicatorHeight);
+                
+            g.setColour(juce::Colours::white.withAlpha(0.8f));
+            g.fillRoundedRectangle(indicatorRect, 1.5f);
+        }
+    };
+
+    drawSmoothIndicator(leftRegion, leftVolumeSmoothed.getNextValue());
+    drawSmoothIndicator(rightRegion, rightVolumeSmoothed.getNextValue());
+
+    // Draw threshold line with modern style
+    auto thresholdY = rightRegion.getBottom() - (thresholdSlider.getValue() * channelHeight);
+    auto thresholdRect = juce::Rectangle<float>(
+        leftRegion.getX(),
+        thresholdY - 1.5f,
+        leftRegion.getWidth() + rightRegion.getWidth(),
+        3.0f
+    );
+    
+    g.setColour(juce::Colours::white.withAlpha(0.7f));
+    g.fillRoundedRectangle(thresholdRect, 1.5f);
 }
 
 void VolumeComponent::handleAsyncUpdate() {
@@ -92,7 +135,7 @@ void VolumeComponent::handleAsyncUpdate() {
     thresholdSlider.setValue(audioProcessor.thresholdEffect->getValue(), juce::NotificationType::dontSendNotification);
 }
 
-void VolumeComponent::runTask(const std::vector<OsciPoint>& buffer) {
+void VolumeComponent::runTask(const std::vector<osci::Point>& buffer) {
     float leftVolume = 0;
     float rightVolume = 0;
 
@@ -108,12 +151,12 @@ void VolumeComponent::runTask(const std::vector<OsciPoint>& buffer) {
         leftVolume = 0;
         rightVolume = 0;
     }
-
+    
     this->leftVolume = leftVolume;
     this->rightVolume = rightVolume;
 
-    avgLeftVolume = (avgLeftVolume * 0.95) + (leftVolume * 0.05);
-    avgRightVolume = (avgRightVolume * 0.95) + (rightVolume * 0.05);
+    leftVolumeSmoothed.setTargetValue(leftVolume);
+    rightVolumeSmoothed.setTargetValue(rightVolume);
     
     triggerAsyncUpdate();
 }
@@ -128,11 +171,8 @@ void VolumeComponent::resized() {
     auto r = getLocalBounds();
 
     auto iconRow = r.removeFromTop(20);
-    auto volumeRect = iconRow.removeFromLeft(iconRow.getWidth() / 2);
-    volumeButton.setBounds(volumeRect.expanded(3));
-    thresholdIcon->setTransformToFit(iconRow.reduced(2).toFloat(), juce::RectanglePlacement::centred);
+    volumeButton.setBounds(iconRow);
     
     volumeSlider.setBounds(r.removeFromLeft(r.getWidth() / 2));
-    auto radius = volumeSlider.getLookAndFeel().getSliderThumbRadius(volumeSlider);
-    thresholdSlider.setBounds(r.reduced(0, radius / 2));
+    thresholdSlider.setBounds(r.reduced(0, 5.0));
 }

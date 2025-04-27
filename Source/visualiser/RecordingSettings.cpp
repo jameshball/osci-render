@@ -4,7 +4,7 @@
 
 
 RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     addAndMakeVisible(quality);
     addAndMakeVisible(resolution);
     addAndMakeVisible(frameRate);
@@ -85,7 +85,7 @@ void RecordingSettings::resized() {
 	auto area = getLocalBounds().reduced(20);
     double rowHeight = 30;
     
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     losslessVideo.setBounds(area.removeFromTop(rowHeight));
     quality.setBounds(area.removeFromTop(rowHeight).expanded(6, 0));
     resolution.setBounds(area.removeFromTop(rowHeight).expanded(6, 0));

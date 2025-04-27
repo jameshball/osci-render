@@ -2,9 +2,9 @@
 
 #include <vector>
 #include <memory>
-#include "../shape/Shape.h"
+#include <JuceHeader.h>
 
 class FrameConsumer {
 public:
-	virtual void addFrame(std::vector<std::unique_ptr<Shape>>& frame, bool force = true) = 0;
+	virtual void addFrame(std::vector<std::unique_ptr<osci::Shape>>& frame, bool force = true) = 0;
 };

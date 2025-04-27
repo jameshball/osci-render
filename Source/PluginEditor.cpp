@@ -1,6 +1,9 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "CustomStandaloneFilterWindow.h"
+#include "components/SyphonInputSelectorComponent.h"
+#include "../modules/juce_sharedtexture/SharedTexture.h"
+#include <memory>
 
 void OscirenderAudioProcessorEditor::registerFileRemovedCallback() {
     audioProcessor.setFileRemovedCallback([this](int index) {
@@ -16,10 +19,10 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     // Register the file removal callback
     registerFileRemovedCallback();
 
-#if !SOSCI_FEATURES
+#if !OSCI_PREMIUM
     addAndMakeVisible(upgradeButton);
     upgradeButton.onClick = [this] {
-        juce::URL("https://osci-render.com/sosci").launchInDefaultBrowser();
+        juce::URL("https://osci-render.com/#purchase").launchInDefaultBrowser();
     };
     upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor);
     upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark);
@@ -122,21 +125,10 @@ bool OscirenderAudioProcessorEditor::isInterestedInFileDrag(const juce::StringAr
         return false;
     }
     juce::File file(files[0]);
-    return
-        file.hasFileExtension("wav") ||
-        file.hasFileExtension("aiff") ||
-        file.hasFileExtension("ogg") ||
-        file.hasFileExtension("flac") ||
-        file.hasFileExtension("mp3") ||
-        file.hasFileExtension("osci") ||
-        file.hasFileExtension("txt") ||
-        file.hasFileExtension("lua") ||
-        file.hasFileExtension("svg") ||
-        file.hasFileExtension("obj") ||
-        file.hasFileExtension("gif") ||
-        file.hasFileExtension("png") ||
-        file.hasFileExtension("jpg") ||
-        file.hasFileExtension("gpla");
+    juce::String ext = file.getFileExtension().toLowerCase();
+    if (std::find(audioProcessor.FILE_EXTENSIONS.begin(), audioProcessor.FILE_EXTENSIONS.end(), ext) != audioProcessor.FILE_EXTENSIONS.end()) {
+        return true;
+    }
 }
 
 void OscirenderAudioProcessorEditor::filesDropped(const juce::StringArray& files, int x, int y) {
@@ -159,7 +151,18 @@ void OscirenderAudioProcessorEditor::filesDropped(const juce::StringArray& files
 
 bool OscirenderAudioProcessorEditor::isBinaryFile(juce::String name) {
     name = name.toLowerCase();
-    return name.endsWith(".gpla") || name.endsWith(".gif") || name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".wav") || name.endsWith(".aiff") || name.endsWith(".ogg") || name.endsWith(".mp3") || name.endsWith(".flac");
+    return name.endsWith(".gpla")
+        || name.endsWith(".gif")
+        || name.endsWith(".png")
+        || name.endsWith(".jpg")
+        || name.endsWith(".jpeg")
+        || name.endsWith(".wav")
+        || name.endsWith(".aiff")
+        || name.endsWith(".ogg")
+        || name.endsWith(".mp3")
+        || name.endsWith(".flac")
+        || name.endsWith(".mp4")
+        || name.endsWith(".mov");
 }
 
 // parsersLock must be held
@@ -181,7 +184,7 @@ void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
 
 void OscirenderAudioProcessorEditor::resized() {
     CommonPluginEditor::resized();
-    
+     
     auto area = getLocalBounds();
 
     if (audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
@@ -192,7 +195,7 @@ void OscirenderAudioProcessorEditor::resized() {
     if (!usingNativeMenuBar) {
         auto topBar = area.removeFromTop(25);
         menuBar.setBounds(topBar);
-#if !SOSCI_FEATURES
+#if !OSCI_PREMIUM
         upgradeButton.setBounds(topBar.removeFromRight(150).reduced(2, 2));
 #endif
     }
@@ -521,4 +524,39 @@ void OscirenderAudioProcessorEditor::mouseMove(const juce::MouseEvent& event) {
 void OscirenderAudioProcessorEditor::openVisualiserSettings() {
     visualiserSettingsWindow.setVisible(true);
     visualiserSettingsWindow.toFront(true);
+}
+
+void OscirenderAudioProcessorEditor::openSyphonInputDialog() {
+#if JUCE_MAC || JUCE_WINDOWS
+    SyphonInputSelectorComponent* selector = nullptr;
+    {
+        juce::SpinLock::ScopedLockType lock(audioProcessor.syphonLock);
+        selector = new SyphonInputSelectorComponent(
+            sharedTextureManager,
+            [this](const juce::String& server, const juce::String& app) { onSyphonInputSelected(server, app); },
+            [this]() { onSyphonInputDisconnected(); },
+            audioProcessor.isSyphonInputActive(),
+            audioProcessor.getSyphonSourceName()
+        );
+    }
+    juce::DialogWindow::LaunchOptions options;
+    options.content.setOwned(selector);
+    options.content->setSize(350, 120);
+    options.dialogTitle = "Select Syphon/Spout Input";
+    options.dialogBackgroundColour = juce::Colours::darkgrey;
+    options.escapeKeyTriggersCloseButton = true;
+    options.useNativeTitleBar = true;
+    options.resizable = false;
+    options.launchAsync();
+#endif
+}
+
+void OscirenderAudioProcessorEditor::onSyphonInputSelected(const juce::String& server, const juce::String& app) {
+    juce::SpinLock::ScopedLockType lock(audioProcessor.syphonLock);
+    audioProcessor.connectSyphonInput(server, app);
+}
+
+void OscirenderAudioProcessorEditor::onSyphonInputDisconnected() {
+    juce::SpinLock::ScopedLockType lock(audioProcessor.syphonLock);
+    audioProcessor.disconnectSyphonInput();
 }

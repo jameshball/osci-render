@@ -8,7 +8,6 @@
 
 #include "CommonPluginProcessor.h"
 #include "CommonPluginEditor.h"
-#include "audio/EffectParameter.h"
 #include "components/AudioPlayerComponent.h"
 
 //==============================================================================
@@ -17,6 +16,10 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
      : AudioProcessor(busesProperties)
 #endif
 {
+    if (!applicationFolder.exists()) {
+        applicationFolder.createDirectory();
+    }
+
     // Initialize the global settings with the plugin name
     juce::PropertiesFile::Options options;
     options.applicationName = JucePlugin_Name + juce::String("_globals");
@@ -50,7 +53,7 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
         intParameters.push_back(parameter);
     }
 
-    muteParameter = new BooleanParameter("Mute", "mute", VERSION_HINT, false, "Mute audio output");
+    muteParameter = new osci::BooleanParameter("Mute", "mute", VERSION_HINT, false, "Mute audio output");
     booleanParameters.push_back(muteParameter);
 
     permanentEffects.push_back(volumeEffect);
@@ -59,6 +62,7 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
     effects.push_back(thresholdEffect);
 
     wavParser.setLooping(false);
+    startHeartbeat();
 }
 
 void CommonAudioProcessor::addAllParameters() {
@@ -84,10 +88,31 @@ void CommonAudioProcessor::addAllParameters() {
     }
 }
 
+
+void CommonAudioProcessor::startHeartbeat() {
+    if (!heartbeatActive) {
+        startTimer(2000); // 2 seconds
+        heartbeatActive = true;
+    }
+}
+
+void CommonAudioProcessor::stopHeartbeat() {
+    if (heartbeatActive) {
+        stopTimer();
+        heartbeatActive = false;
+    }
+}
+
+void CommonAudioProcessor::timerCallback() {
+    setGlobalValue("lastHeartbeatTime", juce::Time::getCurrentTime().toISO8601(true));
+    saveGlobalSettings();
+}
+
 CommonAudioProcessor::~CommonAudioProcessor() 
 {
     setGlobalValue("endTime", juce::Time::getCurrentTime().toISO8601(true));
     saveGlobalSettings();
+    stopHeartbeat();
 }
 
 const juce::String CommonAudioProcessor::getName() const {
@@ -160,7 +185,7 @@ bool CommonAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) co
 }
 
 // effectsLock should be held when calling this
-std::shared_ptr<Effect> CommonAudioProcessor::getEffect(juce::String id) {
+std::shared_ptr<osci::Effect> CommonAudioProcessor::getEffect(juce::String id) {
     for (auto& effect : effects) {
         if (effect->getId() == id) {
             return effect;
@@ -170,7 +195,7 @@ std::shared_ptr<Effect> CommonAudioProcessor::getEffect(juce::String id) {
 }
 
 // effectsLock should be held when calling this
-BooleanParameter* CommonAudioProcessor::getBooleanParameter(juce::String id) {
+osci::BooleanParameter* CommonAudioProcessor::getBooleanParameter(juce::String id) {
     for (auto& parameter : booleanParameters) {
         if (parameter->paramID == id) {
             return parameter;
@@ -180,7 +205,7 @@ BooleanParameter* CommonAudioProcessor::getBooleanParameter(juce::String id) {
 }
 
 // effectsLock should be held when calling this
-FloatParameter* CommonAudioProcessor::getFloatParameter(juce::String id) {
+osci::FloatParameter* CommonAudioProcessor::getFloatParameter(juce::String id) {
     for (auto& parameter : floatParameters) {
         if (parameter->paramID == id) {
             return parameter;
@@ -190,7 +215,7 @@ FloatParameter* CommonAudioProcessor::getFloatParameter(juce::String id) {
 }
 
 // effectsLock should be held when calling this
-IntParameter* CommonAudioProcessor::getIntParameter(juce::String id) {
+osci::IntParameter* CommonAudioProcessor::getIntParameter(juce::String id) {
     for (auto& parameter : intParameters) {
         if (parameter->paramID == id) {
             return parameter;
@@ -361,23 +386,48 @@ void CommonAudioProcessor::saveGlobalSettings()
         globalSettings->saveIfNeeded();
 }
 
+void CommonAudioProcessor::reloadGlobalSettings()
+{
+    if (globalSettings != nullptr)
+        globalSettings->reload();
+}
+
+juce::File CommonAudioProcessor::getLastOpenedDirectory()
+{
+    juce::String savedDir = getGlobalStringValue("lastOpenedDirectory");
+    if (savedDir.isEmpty())
+        return juce::File::getSpecialLocation(juce::File::userHomeDirectory);
+    
+    juce::File dir(savedDir);
+    if (dir.exists() && dir.isDirectory())
+        return dir;
+    
+    return juce::File::getSpecialLocation(juce::File::userHomeDirectory);
+}
+
+void CommonAudioProcessor::setLastOpenedDirectory(const juce::File& directory)
+{
+    if (directory.exists() && directory.isDirectory())
+    {
+        setGlobalValue("lastOpenedDirectory", directory.getFullPathName());
+        saveGlobalSettings();
+    }
+}
+
 bool CommonAudioProcessor::programCrashedAndUserWantsToReset() {
     bool userWantsToReset = false;
-    
     if (!hasSetSessionStartTime) {
-        // check that the previous end time is later than the start time.
-        // if not, the program did not close properly.
         juce::String startTime = getGlobalStringValue("startTime");
         juce::String endTime = getGlobalStringValue("endTime");
-        
+        juce::String lastHeartbeat = getGlobalStringValue("lastHeartbeatTime");
+        juce::Time start = juce::Time::fromISO8601(startTime);
+        juce::Time end = juce::Time::fromISO8601(endTime);
+        juce::Time heartbeat = juce::Time::fromISO8601(lastHeartbeat);
+        juce::Time now = juce::Time::getCurrentTime();
+        bool heartbeatStale = (now.toMilliseconds() - heartbeat.toMilliseconds()) > 3000;
         if ((startTime.isNotEmpty() && endTime.isNotEmpty()) || (startTime.isNotEmpty() && endTime.isEmpty())) {
-            juce::Time start = juce::Time::fromISO8601(startTime);
-            juce::Time end = juce::Time::fromISO8601(endTime);
-            
-            if ((start > end || end == juce::Time()) && juce::MessageManager::getInstance()->isThisTheMessageThread()) {
+            if (((start > end || end == juce::Time()) && heartbeatStale) && juce::MessageManager::getInstance()->isThisTheMessageThread()) {
                 juce::String message = "It appears that " + juce::String(ProjectInfo::projectName) + " did not close properly during your last session. This may indicate a problem with your project or session.";
-                
-                // Use a synchronous dialog to ensure user makes a choice before proceeding
                 bool userPressedReset = juce::AlertWindow::showOkCancelBox(
                     juce::AlertWindow::WarningIcon,
                     "Possible Crash Detected",
@@ -387,17 +437,98 @@ bool CommonAudioProcessor::programCrashedAndUserWantsToReset() {
                     nullptr,
                     nullptr
                 );
-                
                 if (userPressedReset) {
                     userWantsToReset = true;
                 }
             }
         }
-        
         setGlobalValue("startTime", juce::Time::getCurrentTime().toISO8601(true));
         saveGlobalSettings();
         hasSetSessionStartTime = true;
     }
-    
     return userWantsToReset;
 }
+
+#if OSCI_PREMIUM
+juce::String CommonAudioProcessor::getFFmpegURL() {
+    juce::String ffmpegURL = juce::String("https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/") +
+#if JUCE_WINDOWS
+    #if JUCE_64BIT
+        "ffmpeg-win32-x64"
+    #elif JUCE_32BIT
+        "ffmpeg-win32-ia32"
+    #endif
+#elif JUCE_MAC
+    #if JUCE_ARM
+        "ffmpeg-darwin-arm64"
+    #elif JUCE_INTEL
+        "ffmpeg-darwin-x64"
+    #endif
+#elif JUCE_LINUX
+    #if JUCE_ARM
+        #if JUCE_64BIT
+            "ffmpeg-linux-arm64"
+        #elif JUCE_32BIT
+            "ffmpeg-linux-arm"
+        #endif
+    #elif JUCE_INTEL
+        #if JUCE_64BIT
+            "ffmpeg-linux-x64"
+        #elif JUCE_32BIT
+            "ffmpeg-linux-ia32"
+        #endif
+    #endif
+#endif
+    + ".gz";
+    
+    return ffmpegURL;
+}
+
+bool CommonAudioProcessor::ensureFFmpegExists(std::function<void()> onStart, std::function<void()> onSuccess) {
+    juce::File ffmpegFile = getFFmpegFile();
+    
+    if (ffmpegFile.exists()) {
+        // FFmpeg already exists
+        if (onSuccess != nullptr) {
+            onSuccess();
+        }
+        return true;
+    }
+
+    auto editor = dynamic_cast<CommonPluginEditor*>(getActiveEditor());
+    if (editor == nullptr) {
+        return false; // Editor not found
+    }
+    
+    juce::String url = getFFmpegURL();
+    editor->ffmpegDownloader.setup(url, ffmpegFile);
+    
+    editor->ffmpegDownloader.onSuccessfulDownload = [this, onSuccess]() {
+        if (onSuccess != nullptr) {
+            juce::MessageManager::callAsync(onSuccess);
+        }
+    };
+
+    // Ask the user if they want to download ffmpeg
+    juce::MessageBoxOptions options = juce::MessageBoxOptions()
+        .withTitle("FFmpeg Required")
+        .withMessage("FFmpeg is required to process video files.\n\nWould you like to download it now?")
+        .withButton("Yes")
+        .withButton("No")
+        .withIconType(juce::AlertWindow::QuestionIcon)
+        .withAssociatedComponent(editor);
+
+    juce::AlertWindow::showAsync(options, [this, onStart, editor](int result) {
+        if (result == 1) {  // Yes
+            editor->ffmpegDownloader.setVisible(true);
+            editor->ffmpegDownloader.download();
+            if (onStart != nullptr) {
+                onStart();
+            }
+            editor->resized();
+        }
+    });
+    
+    return false;
+}
+#endif

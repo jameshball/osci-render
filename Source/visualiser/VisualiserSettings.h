@@ -16,7 +16,7 @@ enum class ScreenOverlay : int {
     Graticule = 2,
     Smudged = 3,
     SmudgedGraticule = 4,
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     Real = 5,
     VectorDisplay = 6,
     MAX = 6,
@@ -25,9 +25,9 @@ enum class ScreenOverlay : int {
 #endif
 };
 
-class ScreenOverlayParameter : public IntParameter {
+class ScreenOverlayParameter : public osci::IntParameter {
 public:
-    ScreenOverlayParameter(juce::String name, juce::String id, int versionHint, ScreenOverlay value) : IntParameter(name, id, versionHint, (int) value, 1, (int)ScreenOverlay::MAX) {}
+    ScreenOverlayParameter(juce::String name, juce::String id, int versionHint, ScreenOverlay value) : osci::IntParameter(name, id, versionHint, (int) value, 1, (int)ScreenOverlay::MAX) {}
 
     juce::String getText(float value, int maximumStringLength = 100) const override {
         switch ((ScreenOverlay)(int)getUnnormalisedValue(value)) {
@@ -39,7 +39,7 @@ public:
                 return "Smudged";
             case ScreenOverlay::SmudgedGraticule:
                 return "Smudged Graticule";
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
             case ScreenOverlay::Real:
                 return "Real Oscilloscope";
             case ScreenOverlay::VectorDisplay:
@@ -60,7 +60,7 @@ public:
             unnormalisedValue = (int)ScreenOverlay::Smudged;
         } else if (text == "Smudged Graticule") {
             unnormalisedValue = (int)ScreenOverlay::SmudgedGraticule;
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
         } else if (text == "Real Oscilloscope") {
             unnormalisedValue = (int)ScreenOverlay::Real;
         } else if (text == "Vector Display") {
@@ -80,7 +80,7 @@ public:
         setValueNotifyingHost(getValueForText(xml->getStringAttribute("screenOverlay")));
     }
     
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     bool isRealisticDisplay() {
         ScreenOverlay type = (ScreenOverlay)(int)getValueUnnormalised();
         return type == ScreenOverlay::Real || type == ScreenOverlay::VectorDisplay;
@@ -91,42 +91,42 @@ public:
 class VisualiserParameters {
 public:
     ScreenOverlayParameter* screenOverlay = new ScreenOverlayParameter("Screen Overlay", "screenOverlay", VERSION_HINT, ScreenOverlay::SmudgedGraticule);
-    BooleanParameter* upsamplingEnabled = new BooleanParameter("Upsample Audio", "upsamplingEnabled", VERSION_HINT, true, "Upsamples the audio before visualising it to make it appear more realistic, at the expense of performance.");
-    BooleanParameter* sweepEnabled = new BooleanParameter("Sweep", "sweepEnabled", VERSION_HINT, false, "Plots the audio signal over time, sweeping from left to right");
-    BooleanParameter* visualiserFullScreen = new BooleanParameter("Visualiser Fullscreen", "visualiserFullScreen", VERSION_HINT, false, "Makes the software visualiser fullscreen.");
+    osci::BooleanParameter* upsamplingEnabled = new osci::BooleanParameter("Upsample Audio", "upsamplingEnabled", VERSION_HINT, true, "Upsamples the audio before visualising it to make it appear more realistic, at the expense of performance.");
+    osci::BooleanParameter* sweepEnabled = new osci::BooleanParameter("Sweep", "sweepEnabled", VERSION_HINT, false, "Plots the audio signal over time, sweeping from left to right");
+    osci::BooleanParameter* visualiserFullScreen = new osci::BooleanParameter("Visualiser Fullscreen", "visualiserFullScreen", VERSION_HINT, false, "Makes the software visualiser fullscreen.");
 
-#if SOSCI_FEATURES
-    BooleanParameter* flipVertical = new BooleanParameter("Flip Vertical", "flipVertical", VERSION_HINT, false, "Flips the visualiser vertically.");
-    BooleanParameter* flipHorizontal = new BooleanParameter("Flip Horizontal", "flipHorizontal", VERSION_HINT, false, "Flips the visualiser horizontally.");
-    BooleanParameter* goniometer = new BooleanParameter("Goniometer", "goniometer", VERSION_HINT, false, "Rotates the visualiser to replicate a goniometer display to show the phase relationship between two channels.");
-    BooleanParameter* shutterSync = new BooleanParameter("Shutter Sync", "shutterSync", VERSION_HINT, false, "Controls whether the camera's shutter speed is in sync with framerate. This makes the brightness of a single frame constant. This can be beneficial when the drawing frequency and frame rate are in sync.");
+#if OSCI_PREMIUM
+    osci::BooleanParameter* flipVertical = new osci::BooleanParameter("Flip Vertical", "flipVertical", VERSION_HINT, false, "Flips the visualiser vertically.");
+    osci::BooleanParameter* flipHorizontal = new osci::BooleanParameter("Flip Horizontal", "flipHorizontal", VERSION_HINT, false, "Flips the visualiser horizontally.");
+    osci::BooleanParameter* goniometer = new osci::BooleanParameter("Goniometer", "goniometer", VERSION_HINT, false, "Rotates the visualiser to replicate a goniometer display to show the phase relationship between two channels.");
+    osci::BooleanParameter* shutterSync = new osci::BooleanParameter("Shutter Sync", "shutterSync", VERSION_HINT, false, "Controls whether the camera's shutter speed is in sync with framerate. This makes the brightness of a single frame constant. This can be beneficial when the drawing frequency and frame rate are in sync.");
 
-    std::shared_ptr<Effect> screenSaturationEffect = std::make_shared<Effect>(
-        new EffectParameter(
+    std::shared_ptr<osci::Effect> screenSaturationEffect = std::make_shared<osci::Effect>(
+        new osci::EffectParameter(
             "Screen Saturation",
             "Controls how saturated the colours are on the oscilloscope screen.",
             "screenSaturation",
             VERSION_HINT, 1.0, 0.0, 5.0
         )
     );
-    std::shared_ptr<Effect> screenHueEffect = std::make_shared<Effect>(
-        new EffectParameter(
+    std::shared_ptr<osci::Effect> screenHueEffect = std::make_shared<osci::Effect>(
+        new osci::EffectParameter(
             "Screen Hue",
             "Controls the hue shift of the oscilloscope screen.",
             "screenHue",
             VERSION_HINT, 0, 0, 359, 1
         )
     );
-    std::shared_ptr<Effect> afterglowEffect = std::make_shared<Effect>(
-        new EffectParameter(
+    std::shared_ptr<osci::Effect> afterglowEffect = std::make_shared<osci::Effect>(
+        new osci::EffectParameter(
             "Afterglow",
             "Controls how quickly the image disappears after glowing brightly. Closely related to persistence.",
             "afterglow",
             VERSION_HINT, 1.0, 0.0, 10.0
         )
     );
-    std::shared_ptr<Effect> overexposureEffect = std::make_shared<Effect>(
-        new EffectParameter(
+    std::shared_ptr<osci::Effect> overexposureEffect = std::make_shared<osci::Effect>(
+        new osci::EffectParameter(
             "Overexposure",
             "Controls at which point the line becomes overexposed and clips, turning white.",
             "overexposure",
@@ -134,45 +134,45 @@ public:
         )
     );
     std::shared_ptr<StereoEffect> stereoEffectApplication = std::make_shared<StereoEffect>();
-    std::shared_ptr<Effect> stereoEffect = std::make_shared<Effect>(
+    std::shared_ptr<osci::Effect> stereoEffect = std::make_shared<osci::Effect>(
         stereoEffectApplication,
-        new EffectParameter(
+        new osci::EffectParameter(
             "Stereo",
             "Turns mono audio that is uninteresting to visualise into stereo audio that is interesting to visualise.",
             "stereo",
             VERSION_HINT, 0.0, 0.0, 1.0
         )
     );
-    std::shared_ptr<Effect> scaleEffect = std::make_shared<Effect>(
-        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+    std::shared_ptr<osci::Effect> scaleEffect = std::make_shared<osci::Effect>(
+        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             input.scale(values[0].load(), values[1].load(), 1.0);
             return input;
-        }, std::vector<EffectParameter*>{
-        new EffectParameter(
+        }, std::vector<osci::EffectParameter*>{
+        new osci::EffectParameter(
             "X Scale",
             "Controls the horizontal scale of the oscilloscope display.",
             "xScale",
             VERSION_HINT, 1.0, -3.0, 3.0
         ),
-            new EffectParameter(
+            new osci::EffectParameter(
                 "Y Scale",
                 "Controls the vertical scale of the oscilloscope display.",
                 "yScale",
                 VERSION_HINT, 1.0, -3.0, 3.0
             ),
     });
-    std::shared_ptr<Effect> offsetEffect = std::make_shared<Effect>(
-        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+    std::shared_ptr<osci::Effect> offsetEffect = std::make_shared<osci::Effect>(
+        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             input.translate(values[0].load(), values[1].load(), 0.0);
             return input;
-        }, std::vector<EffectParameter*>{
-        new EffectParameter(
+        }, std::vector<osci::EffectParameter*>{
+        new osci::EffectParameter(
             "X Offset",
             "Controls the horizontal position offset of the oscilloscope display.",
             "xOffset",
             VERSION_HINT, 0.0, -1.0, 1.0
         ),
-        new EffectParameter(
+        new osci::EffectParameter(
             "Y Offset",
             "Controls the vertical position offset of the oscilloscope display.",
             "yOffset",
@@ -181,89 +181,89 @@ public:
     });
 #endif
 
-    std::shared_ptr<Effect> persistenceEffect = std::make_shared<Effect>(
-        new EffectParameter(
+    std::shared_ptr<osci::Effect> persistenceEffect = std::make_shared<osci::Effect>(
+        new osci::EffectParameter(
             "Persistence",
             "Controls how long the light glows for on the oscilloscope display.",
             "persistence",
             VERSION_HINT, 0.5, 0, 6.0
         )
     );
-    std::shared_ptr<Effect> hueEffect = std::make_shared<Effect>(
-        new EffectParameter(
+    std::shared_ptr<osci::Effect> hueEffect = std::make_shared<osci::Effect>(
+        new osci::EffectParameter(
             "Line Hue",
             "Controls the hue of the beam of the oscilloscope.",
             "hue",
             VERSION_HINT, 125, 0, 359, 1
         )
     );
-    std::shared_ptr<Effect> intensityEffect = std::make_shared<Effect>(
-        new EffectParameter(
+    std::shared_ptr<osci::Effect> intensityEffect = std::make_shared<osci::Effect>(
+        new osci::EffectParameter(
             "Line Intensity",
             "Controls how bright the electron beam of the oscilloscope is.",
             "intensity",
             VERSION_HINT, 5.0, 0.0, 10.0
         )
     );
-    std::shared_ptr<Effect> lineSaturationEffect = std::make_shared<Effect>(
-        new EffectParameter(
+    std::shared_ptr<osci::Effect> lineSaturationEffect = std::make_shared<osci::Effect>(
+        new osci::EffectParameter(
             "Line Saturation",
             "Controls how saturated the colours are on the oscilloscope lines.",
             "lineSaturation",
             VERSION_HINT, 1.0, 0.0, 5.0
         )
     );
-    std::shared_ptr<Effect> focusEffect = std::make_shared<Effect>(
-        new EffectParameter(
+    std::shared_ptr<osci::Effect> focusEffect = std::make_shared<osci::Effect>(
+        new osci::EffectParameter(
             "Focus",
             "Controls how focused the electron beam of the oscilloscope is.",
             "focus",
             VERSION_HINT, 1.0, 0.3, 10.0
         )
     );
-    std::shared_ptr<Effect> noiseEffect = std::make_shared<Effect>(
-        new EffectParameter(
+    std::shared_ptr<osci::Effect> noiseEffect = std::make_shared<osci::Effect>(
+        new osci::EffectParameter(
             "Noise",
             "Controls how much noise/grain is added to the oscilloscope display.",
             "noise",
             VERSION_HINT, 0.0, 0.0, 1.0
         )
     );
-    std::shared_ptr<Effect> glowEffect = std::make_shared<Effect>(
-        new EffectParameter(
+    std::shared_ptr<osci::Effect> glowEffect = std::make_shared<osci::Effect>(
+        new osci::EffectParameter(
             "Glow",
             "Controls how much the light glows on the oscilloscope display.",
             "glow",
             VERSION_HINT, 0.3, 0.0, 1.0
         )
     );
-    std::shared_ptr<Effect> ambientEffect = std::make_shared<Effect>(
-        new EffectParameter(
+    std::shared_ptr<osci::Effect> ambientEffect = std::make_shared<osci::Effect>(
+        new osci::EffectParameter(
             "Ambient Light",
             "Controls how much ambient light is added to the oscilloscope display.",
             "ambient",
             VERSION_HINT, 0.7, 0.0, 5.0
         )
     );
-    std::shared_ptr<Effect> smoothEffect = std::make_shared<Effect>(
+    std::shared_ptr<osci::Effect> smoothEffect = std::make_shared<osci::Effect>(
         std::make_shared<SmoothEffect>(),
-        new EffectParameter(
+        new osci::EffectParameter(
             "Smoothing",
             "This works as a low-pass frequency filter, effectively reducing the sample rate of the audio being visualised.",
             "visualiserSmoothing",
             VERSION_HINT, 0, 0.0, 1.0
         )
     );
-    std::shared_ptr<Effect> sweepMsEffect = std::make_shared<Effect>(
-        new EffectParameter(
+    std::shared_ptr<osci::Effect> sweepMsEffect = std::make_shared<osci::Effect>(
+        new osci::EffectParameter(
             "Sweep (ms)",
             "The number of milliseconds it takes for the oscilloscope to sweep from left to right.",
             "sweepMs",
             VERSION_HINT, 10.0, 0.0, 1000.0
         )
     );
-    std::shared_ptr<Effect> triggerValueEffect = std::make_shared<Effect>(
-        new EffectParameter(
+    std::shared_ptr<osci::Effect> triggerValueEffect = std::make_shared<osci::Effect>(
+        new osci::EffectParameter(
             "Trigger Value",
             "The trigger value sets the signal level that starts waveform capture to display a stable waveform.",
             "triggerValue",
@@ -271,7 +271,7 @@ public:
         )
     );
     
-    std::vector<std::shared_ptr<Effect>> effects = {
+    std::vector<std::shared_ptr<osci::Effect>> effects = {
         persistenceEffect,
         hueEffect,
         intensityEffect,
@@ -282,33 +282,33 @@ public:
         ambientEffect,
         sweepMsEffect,
         triggerValueEffect,
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
         afterglowEffect,
         screenSaturationEffect,
         screenHueEffect,
         overexposureEffect,
 #endif
     };
-    std::vector<std::shared_ptr<Effect>> audioEffects = {
+    std::vector<std::shared_ptr<osci::Effect>> audioEffects = {
         smoothEffect,
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
         stereoEffect,
         scaleEffect,
         offsetEffect,
 #endif
     };
-    std::vector<BooleanParameter*> booleans = {
+    std::vector<osci::BooleanParameter*> booleans = {
         upsamplingEnabled,
         visualiserFullScreen,
         sweepEnabled,
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
         flipVertical,
         flipHorizontal,
         goniometer,
         shutterSync,
 #endif
     };
-    std::vector<IntParameter*> integers = {
+    std::vector<osci::IntParameter*> integers = {
         screenOverlay,
     };
 };
@@ -370,7 +370,7 @@ public:
         return parameters.lineSaturationEffect->getActualValue();
     }
 
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     double getScreenSaturation() {
         return parameters.screenSaturationEffect->getActualValue();
     }
@@ -453,7 +453,7 @@ private:
         "Line Colour"
     };
     
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     GroupedSettings screenColour{
         std::vector<std::shared_ptr<EffectComponent>>{
             std::make_shared<EffectComponent>(*parameters.screenHueEffect),
@@ -469,7 +469,7 @@ private:
             std::make_shared<EffectComponent>(*parameters.persistenceEffect),
             std::make_shared<EffectComponent>(*parameters.focusEffect),
             std::make_shared<EffectComponent>(*parameters.glowEffect),
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
             std::make_shared<EffectComponent>(*parameters.afterglowEffect),
             std::make_shared<EffectComponent>(*parameters.overexposureEffect),
 #else
@@ -489,7 +489,7 @@ private:
     GroupedSettings lineEffects{
         std::vector<std::shared_ptr<EffectComponent>>{
             std::make_shared<EffectComponent>(*parameters.smoothEffect),
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
             std::make_shared<EffectComponent>(*parameters.stereoEffect),
 #endif
         },
@@ -505,7 +505,7 @@ private:
     jux::SwitchButton upsamplingToggle{parameters.upsamplingEnabled};
     jux::SwitchButton sweepToggle{parameters.sweepEnabled};
 
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     GroupedSettings positionSize{
         std::vector<std::shared_ptr<EffectComponent>>{
             std::make_shared<EffectComponent>(*parameters.scaleEffect, 0),

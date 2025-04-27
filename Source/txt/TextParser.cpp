@@ -13,6 +13,9 @@ TextParser::~TextParser() {
 void TextParser::parse(juce::String text, juce::Font font) {
     lastFont = font;
     
+    juce::Path textPath;
+
+#if OSCI_PREMIUM
     // Apply formatting markers if the font is bold or italic
     juce::String formattedText = text;
     
@@ -30,15 +33,7 @@ void TextParser::parse(juce::String text, juce::Font font) {
     // Create a TextLayout from the AttributedString
     juce::TextLayout layout;
     layout.createLayout(attributedString, 64.0f);
-    
-    // Create a path from the TextLayout
-    juce::Path textPath;
 
-    juce::String displayText = attributedString.getText();
-    // remove all whitespace
-    displayText = displayText.removeCharacters(" \t\n\r");
-    int index = 0;
-    
     // Iterate through all lines and all runs in each line
     for (int i = 0; i < layout.getNumLines(); ++i) {
         const juce::TextLayout::Line& line = layout.getLine(i);
@@ -49,23 +44,21 @@ void TextParser::parse(juce::String text, juce::Font font) {
             // Create a GlyphArrangement for this run
             juce::GlyphArrangement glyphs;
             
+            // Process each glyph in the run
             for (int k = 0; k < run->glyphs.size(); ++k) {
-                if (index >= displayText.length()) {
-                    break;
-                }
-                juce::juce_wchar character = displayText[index];
                 juce::TextLayout::Glyph glyph = run->glyphs.getUnchecked(k);
+                
+                // Create positioned glyph using the glyph's metrics
                 juce::PositionedGlyph positionedGlyph = juce::PositionedGlyph(
                     run->font,
-                    character,
+                    glyph.glyphCode,  // Use the glyph code directly
                     glyph.glyphCode,
                     line.lineOrigin.x + glyph.anchor.x - 1,
                     line.lineOrigin.y + glyph.anchor.y - 1,
                     glyph.width,
-                    juce::CharacterFunctions::isWhitespace(character)
+                    false  // Don't assume it's whitespace based on character
                 );
                 glyphs.addGlyph(positionedGlyph);
-                index++;
             }
             
             // Add glyphs to the path
@@ -75,13 +68,16 @@ void TextParser::parse(juce::String text, juce::Font font) {
     
     // If the layout has no text, fallback to original method
     if (textPath.isEmpty()) {
+#endif
         juce::GlyphArrangement glyphs;
         glyphs.addFittedText(font, text, -2, -2, 4, 4, juce::Justification::centred, 2);
         glyphs.createPath(textPath);
+#if OSCI_PREMIUM
     }
+#endif
 
     // Convert path to shapes
-    shapes = std::vector<std::unique_ptr<Shape>>();
+    shapes = std::vector<std::unique_ptr<osci::Shape>>();
     SvgParser::pathToShapes(textPath, shapes, true);
 }
 
@@ -235,14 +231,14 @@ void TextParser::processFormattedTextBody(const juce::String& text, juce::Attrib
     }
 }
 
-std::vector<std::unique_ptr<Shape>> TextParser::draw() {
+std::vector<std::unique_ptr<osci::Shape>> TextParser::draw() {
     // reparse text if font changes
     if (audioProcessor.font != lastFont) {
         parse(text, audioProcessor.font);
     }
     
     // clone with deep copy
-    std::vector<std::unique_ptr<Shape>> tempShapes;
+    std::vector<std::unique_ptr<osci::Shape>> tempShapes;
     
     for (auto& shape : shapes) {
         tempShapes.push_back(shape->clone());

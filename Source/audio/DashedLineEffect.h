@@ -1,17 +1,34 @@
 #pragma once
-#include "EffectApplication.h"
-#include "../shape/OsciPoint.h"
+#include <JuceHeader.h>
 
-class DashedLineEffect : public EffectApplication {
+class DashedLineEffect : public osci::EffectApplication {
 public:
-	DashedLineEffect();
-	~DashedLineEffect();
+	osci::Point apply(int index, osci::Point vector, const std::vector<std::atomic<double>>& values, double sampleRate) override {
+		// dash length in seconds
+		double dashLength = values[0] / 400;
+		int dashLengthSamples = (int)(dashLength * sampleRate);
+		dashLengthSamples = juce::jmin(dashLengthSamples, MAX_BUFFER);
+		
+		if (dashIndex >= dashLengthSamples) {
+			dashIndex = 0;
+			bufferIndex = 0;
+		}
 
-	OsciPoint apply(int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) override;
+		buffer[bufferIndex] = vector;
+		bufferIndex++;
+		
+		vector = buffer[dashIndex];
+		
+		if (index % 2 == 0) {
+			dashIndex++;
+		}
+		
+		return vector;
+	}
 
 private:
 	const static int MAX_BUFFER = 192000;
-	std::vector<OsciPoint> buffer = std::vector<OsciPoint>(MAX_BUFFER);
+	std::vector<osci::Point> buffer = std::vector<osci::Point>(MAX_BUFFER);
 	int dashIndex = 0;
 	int bufferIndex = 0;
 };

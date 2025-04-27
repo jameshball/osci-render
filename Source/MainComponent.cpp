@@ -10,7 +10,11 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
     fileButton.setButtonText("Choose File(s)");
     
 	fileButton.onClick = [this] {
-		chooser = std::make_unique<juce::FileChooser>("Open", audioProcessor.lastOpenedDirectory, "*.obj;*.svg;*.lua;*.txt;*.gpla;*.gif;*.png;*.jpg;*.jpeg;*.wav;*.aiff;*.ogg;*.flac;*.mp3");
+		juce::String fileFormats;
+		for (auto& ext : audioProcessor.FILE_EXTENSIONS) {
+			fileFormats += "*." + ext + ";";
+		}
+		chooser = std::make_unique<juce::FileChooser>("Open", audioProcessor.getLastOpenedDirectory(), fileFormats);
 		auto flags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectMultipleItems |
             juce::FileBrowserComponent::canSelectFiles;
 
@@ -19,7 +23,7 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 			bool fileAdded = false;
 			for (auto& file : chooser.getResults()) {
 				if (file != juce::File()) {
-                    audioProcessor.lastOpenedDirectory = file.getParentDirectory();
+                    audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
 					audioProcessor.addFile(file);
 					pluginEditor.addCodeEditor(audioProcessor.getCurrentFileIndex());
 					fileAdded = true;
@@ -121,7 +125,7 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 		createFile.triggerClick();
 	};
 
-	BooleanParameter* visualiserFullScreen = audioProcessor.visualiserParameters.visualiserFullScreen;
+	osci::BooleanParameter* visualiserFullScreen = audioProcessor.visualiserParameters.visualiserFullScreen;
     pluginEditor.visualiser.setFullScreen(visualiserFullScreen->getBoolValue());
 
     addAndMakeVisible(pluginEditor.visualiser);
@@ -153,13 +157,18 @@ void MainComponent::updateFileLabel() {
 	showLeftArrow = audioProcessor.getCurrentFileIndex() > 0;
 	showRightArrow = audioProcessor.getCurrentFileIndex() < audioProcessor.numFiles() - 1;
 	
-	if (audioProcessor.objectServerRendering) {
-		fileLabel.setText("Rendering from Blender", juce::dontSendNotification);
-	} else if (audioProcessor.getCurrentFileIndex() == -1) {
-		fileLabel.setText("No file open", juce::dontSendNotification);
-	} else {
-		fileLabel.setText(audioProcessor.getCurrentFileName(), juce::dontSendNotification);
-	}
+    {
+        juce::SpinLock::ScopedLockType lock(audioProcessor.syphonLock);
+        if (audioProcessor.objectServerRendering) {
+            fileLabel.setText("Rendering from Blender", juce::dontSendNotification);
+        } else if (audioProcessor.isSyphonInputActive()) {
+            fileLabel.setText(audioProcessor.getSyphonSourceName(), juce::dontSendNotification);
+        } else if (audioProcessor.getCurrentFileIndex() == -1) {
+            fileLabel.setText("No file open", juce::dontSendNotification);
+        } else {
+            fileLabel.setText(audioProcessor.getCurrentFileName(), juce::dontSendNotification);
+        }
+    }
 
 	resized();
 }
