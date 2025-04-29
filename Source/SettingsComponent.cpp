@@ -75,6 +75,7 @@ void SettingsComponent::resized() {
     repaint();
 }
 
+// syphonLock must be held when calling this function
 void SettingsComponent::fileUpdated(juce::String fileName) {
     juce::String extension = fileName.fromLastOccurrenceOf(".", true, false).toLowerCase();
     txt.setVisible(false);

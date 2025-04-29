@@ -21,7 +21,8 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
             juce::FileBrowserComponent::canSelectFiles;
 
 		chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
-			juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+			juce::SpinLock::ScopedLockType syphonLock(audioProcessor.syphonLock);
+			juce::SpinLock::ScopedLockType parsersLock(audioProcessor.parsersLock);
 			bool fileAdded = false;
 			for (auto& file : chooser.getResults()) {
 				if (file != juce::File()) {
@@ -63,6 +64,7 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 
 	addAndMakeVisible(leftArrow);
 	leftArrow.onClick = [this] {
+		juce::SpinLock::ScopedLockType lock(audioProcessor.syphonLock);
 		juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
 		juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
 
@@ -77,6 +79,7 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 	
 	addAndMakeVisible(rightArrow);
 	rightArrow.onClick = [this] {
+		juce::SpinLock::ScopedLockType lock(audioProcessor.syphonLock);
 		juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
 		juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
 
@@ -100,7 +103,8 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 	addAndMakeVisible(createFile);
 
 	createFile.onClick = [this] {
-		juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+		juce::SpinLock::ScopedLockType syphonLock(audioProcessor.syphonLock);
+		juce::SpinLock::ScopedLockType parsersLock(audioProcessor.parsersLock);
 		auto fileNameText = fileName.getText();
 		auto fileTypeText = fileType.getText();
 		auto fileName = fileNameText + fileTypeText;
@@ -155,13 +159,13 @@ MainComponent::~MainComponent() {
 	audioProcessor.visualiserParameters.visualiserFullScreen->removeListener(this);
 }
 
+// syphonLock must be held when calling this function
 void MainComponent::updateFileLabel() {
 	showLeftArrow = audioProcessor.getCurrentFileIndex() > 0;
 	showRightArrow = audioProcessor.getCurrentFileIndex() < audioProcessor.numFiles() - 1;
 	
     {
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-        juce::SpinLock::ScopedLockType lock(audioProcessor.syphonLock);
         if (audioProcessor.isSyphonInputActive()) {
             fileLabel.setText(audioProcessor.getSyphonSourceName(), juce::dontSendNotification);
         } else

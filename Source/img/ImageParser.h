@@ -1,5 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
+
 #include "../svg/SvgParser.h"
 
 class OscirenderAudioProcessor;
@@ -11,23 +12,23 @@ public:
     // Constructor for live Syphon/Spout input
     ImageParser(OscirenderAudioProcessor& p);
     ~ImageParser();
-    
+
     // Update the live frame (for Syphon/Spout)
     void updateLiveFrame(const juce::Image& newImage);
 
-	void setFrame(int index);
-	osci::Point getSample();
-	int getNumFrames() { return frames.size(); }
-	int getCurrentFrame() const { return frameIndex; }
+    void setFrame(int index);
+    osci::Point getSample();
+    int getNumFrames() { return frames.size(); }
+    int getCurrentFrame() const { return frameIndex; }
 
 private:
-	void findNearestNeighbour(int searchRadius, float thresholdPow, int stride, bool invert);
-	void resetPosition();
+    void findNearestNeighbour(int searchRadius, float thresholdPow, int stride, bool invert);
+    void resetPosition();
     float getPixelValue(int x, int y, bool invert);
     int getPixelIndex(int x, int y);
     void findWhite(double thresholdPow, bool invert);
     bool isOverThreshold(double pixel, double thresholdValue);
-	int jumpFrequency();
+    int jumpFrequency();
     void handleError(juce::String message);
     void processGifFile(juce::File& file);
     void processImageFile(juce::File& file);
@@ -36,29 +37,29 @@ private:
     bool loadAllVideoFrames(const juce::File& file, const juce::File& ffmpegFile);
     bool isVideoFile(const juce::String& extension) const;
 #endif
-    
+
     const juce::String ALGORITHM = "HILLIGOSS";
 
-	OscirenderAudioProcessor& audioProcessor;
-	juce::Random rng;
-	int frameIndex = 0;
-	std::vector<std::vector<uint8_t>> frames;
-	std::vector<bool> visited;
-	int currentX, currentY;
+    OscirenderAudioProcessor& audioProcessor;
+    juce::Random rng;
+    int frameIndex = 0;
+    std::vector<std::vector<uint8_t>> frames;
+    std::vector<bool> visited;
+    int currentX, currentY;
     int width = -1;
     int height = -1;
-	int count = 0;
-    
+    int count = 0;
+
     juce::TemporaryFile temp;
-    
+
 #if OSCI_PREMIUM
     // Video processing fields
-    osci::ReadProcess ffmpegProcess;
+    juce::ChildProcess ffmpegProcess;
     bool isVideo = false;
     std::vector<uint8_t> frameBuffer;
     int videoFrameSize = 0;
 #endif
-    
+
     // experiments
     double scanX = -1;
     double scanY = 1;

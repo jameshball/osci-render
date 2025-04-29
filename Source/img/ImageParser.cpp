@@ -171,15 +171,9 @@ bool ImageParser::loadAllVideoFrames(const juce::File& file, const juce::File& f
     juce::String cmd = "\"" + ffmpegFile.getFullPathName() + "\" -i \"" + file.getFullPathName() + "\" -hide_banner 2>&1";
     
     ffmpegProcess.start(cmd);
+    juce::String output = ffmpegProcess.readAllProcessOutput();
     
-    char buf[2048];
-    memset(buf, 0, sizeof(buf));
-    size_t size = ffmpegProcess.read(buf, sizeof(buf) - 1);
-    ffmpegProcess.close();
-    
-    if (size > 0) {
-        juce::String output(buf, size);
-        
+    if (output.isNotEmpty()) {
         // Look for resolution in format "1920x1080"
         std::regex resolutionRegex(R"((\d{2,5})x(\d{2,5}))");
         std::smatch match;
@@ -254,7 +248,7 @@ bool ImageParser::loadAllVideoFrames(const juce::File& file, const juce::File& f
     int framesRead = 0;
     
     while (framesRead < MAX_FRAMES) {
-        size_t bytesRead = ffmpegProcess.read(frameBuffer.data(), frameBuffer.size());
+        size_t bytesRead = ffmpegProcess.readProcessOutput(frameBuffer.data(), frameBuffer.size());
         
         if (bytesRead != frameBuffer.size()) {
             break; // End of video or error
@@ -273,7 +267,7 @@ bool ImageParser::loadAllVideoFrames(const juce::File& file, const juce::File& f
     }
     
     // Close the ffmpeg process
-    ffmpegProcess.close();
+    ffmpegProcess.kill();
     
     // Return true if we successfully loaded at least one frame
     return frames.size() > 0;
@@ -283,7 +277,7 @@ bool ImageParser::loadAllVideoFrames(const juce::File& file, const juce::File& f
 ImageParser::~ImageParser() {
 #if OSCI_PREMIUM
     if (ffmpegProcess.isRunning()) {
-        ffmpegProcess.close();
+        ffmpegProcess.kill();
     }
 #endif
 }
