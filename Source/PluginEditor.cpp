@@ -54,7 +54,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     colourScheme = lookAndFeel.getDefaultColourScheme();
 
     {
-#if OSCI_PREMIUM
+#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
         juce::SpinLock::ScopedLockType syphonLock(audioProcessor.syphonLock);
 #endif
         juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
@@ -143,7 +143,7 @@ void OscirenderAudioProcessorEditor::filesDropped(const juce::StringArray& files
     if (file.hasFileExtension("osci")) {
         openProject(file);
     } else {
-#if OSCI_PREMIUM
+#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
         juce::SpinLock::ScopedLockType syphonLock(audioProcessor.syphonLock);
 #endif
         juce::SpinLock::ScopedLockType parsersLock(audioProcessor.parsersLock);
@@ -379,7 +379,7 @@ void OscirenderAudioProcessorEditor::handleAsyncUpdate() {
 void OscirenderAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcaster* source) {
     if (source == &audioProcessor.broadcaster) {
         {
-#if OSCI_PREMIUM
+#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
             juce::SpinLock::ScopedLockType syphonLock(audioProcessor.syphonLock);
 #endif
             juce::SpinLock::ScopedLockType parsersLock(audioProcessor.parsersLock);
@@ -389,7 +389,7 @@ void OscirenderAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcas
         resized();
         repaint();
     } else if (source == &audioProcessor.fileChangeBroadcaster) {
-#if OSCI_PREMIUM
+#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
         juce::SpinLock::ScopedLockType syphonLock(audioProcessor.syphonLock);
 #endif
         juce::SpinLock::ScopedLockType parsersLock(audioProcessor.parsersLock);
@@ -462,7 +462,7 @@ void OscirenderAudioProcessorEditor::updateCodeDocument() {
 bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
     bool consumeKey = false;
     {
-#if OSCI_PREMIUM
+#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
         juce::SpinLock::ScopedLockType lock(audioProcessor.syphonLock);
 #endif
         juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
