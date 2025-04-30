@@ -168,9 +168,18 @@ void ImageParser::processVideoFile(juce::File& file) {
 }
 
 bool ImageParser::loadAllVideoFrames(const juce::File& file, const juce::File& ffmpegFile) {
-    juce::String cmd = "\"" + ffmpegFile.getFullPathName() + "\" -i \"" + file.getFullPathName() + "\" -hide_banner 2>&1";
-    
-    ffmpegProcess.start(cmd);
+    // Use StringArray for arguments to handle quoting reliably
+    juce::StringArray metadataCommand;
+    metadataCommand.add(ffmpegFile.getFullPathName());
+    metadataCommand.add("-i");
+    metadataCommand.add(file.getFullPathName());
+    metadataCommand.add("-hide_banner");
+
+    if (!ffmpegProcess.start(metadataCommand))
+    {
+        handleError("Failed to start ffmpeg process for metadata.");
+        return false;
+    }
     juce::String output = ffmpegProcess.readAllProcessOutput();
     
     if (output.isNotEmpty()) {
@@ -220,30 +229,42 @@ bool ImageParser::loadAllVideoFrames(const juce::File& file, const juce::File& f
     // Determine available hardware acceleration options
 #if JUCE_MAC
    // Try to use videotoolbox on macOS
-   juce::String hwAccel = " -hwaccel videotoolbox";
+   juce::String hwAccel = "videotoolbox";
 #elif JUCE_WINDOWS
    // Try to use DXVA2 on Windows
-   juce::String hwAccel = " -hwaccel dxva2";
+   juce::String hwAccel = "dxva2";
 #else
     juce::String hwAccel = "";
 #endif
-    
-    // Start ffmpeg process to read frames with optimizations:
-    // - Use hardware acceleration if available
-    // - Lower resolution with scale filter
-    // - Use multiple threads for faster processing
-    // - Use gray colorspace directly to avoid extra conversion
-    cmd = "\"" + ffmpegFile.getFullPathName() + "\"" +
-        hwAccel +
-        " -i \"" + file.getFullPathName() + "\"" +
-        " -threads 8" +                                  // Use 8 threads for processing
-        " -vf \"scale=" + juce::String(width) + ":" + juce::String(height) + "\"" + // Scale to target size
-        " -f rawvideo -pix_fmt gray" +                   // Output format
-        " -v error" +                                    // Only show errors
-        " pipe:1";                                       // Output to stdout
-    
-    ffmpegProcess.start(cmd);
-    
+
+    // Start ffmpeg process to read frames using StringArray
+    juce::StringArray frameReadCommand;
+    frameReadCommand.add(ffmpegFile.getFullPathName());
+    if (hwAccel.isNotEmpty())
+    {
+        frameReadCommand.add("-hwaccel");
+        frameReadCommand.add(hwAccel);
+    }
+    frameReadCommand.add("-i");
+    frameReadCommand.add(file.getFullPathName());
+    frameReadCommand.add("-threads");
+    frameReadCommand.add("8");
+    frameReadCommand.add("-vf");
+    frameReadCommand.add("scale=" + juce::String(width) + ":" + juce::String(height));
+    frameReadCommand.add("-f");
+    frameReadCommand.add("rawvideo");
+    frameReadCommand.add("-pix_fmt");
+    frameReadCommand.add("gray");
+    frameReadCommand.add("-v");
+    frameReadCommand.add("error");
+    frameReadCommand.add("pipe:1");
+
+    if (!ffmpegProcess.start(frameReadCommand))
+    {
+        handleError("Failed to start ffmpeg process for frame reading.");
+        return false;
+    }
+
     // Read all frames into memory
     int framesRead = 0;
     

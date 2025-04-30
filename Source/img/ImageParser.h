@@ -50,7 +50,7 @@ private:
     int height = -1;
     int count = 0;
 
-    juce::TemporaryFile temp;
+    juce::TemporaryFile temp{".temp"};
 
 #if OSCI_PREMIUM
     // Video processing fields
