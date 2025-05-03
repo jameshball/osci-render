@@ -101,6 +101,8 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
+    audioProcessor.syphonInputActive = false;
+
     // Clear the file removal callback
     audioProcessor.setFileRemovedCallback(nullptr);
 
@@ -516,7 +518,6 @@ void OscirenderAudioProcessorEditor::openSyphonInputDialog() {
             sharedTextureManager,
             [this](const juce::String& server, const juce::String& app) { connectSyphonInput(server, app); },
             [this]() { disconnectSyphonInput(); },
-            syphonFrameGrabber && syphonFrameGrabber->isActive(),
             getSyphonSourceName());
     }
     juce::DialogWindow::LaunchOptions options;
@@ -535,6 +536,8 @@ void OscirenderAudioProcessorEditor::connectSyphonInput(const juce::String& serv
     if (!syphonFrameGrabber) {
         syphonFrameGrabber = std::make_unique<SyphonFrameGrabber>(sharedTextureManager, server, app, audioProcessor.syphonImageParser);
         audioProcessor.syphonInputActive = true;
+        model.resetMenuItems();
+        model.menuItemsChanged();
         {
             juce::MessageManagerLock lock;
             audioProcessor.fileChangeBroadcaster.sendChangeMessage();
@@ -549,6 +552,8 @@ void OscirenderAudioProcessorEditor::disconnectSyphonInput() {
     }
     audioProcessor.syphonInputActive = false;
     syphonFrameGrabber.reset();
+    model.resetMenuItems();
+    model.menuItemsChanged();
     {
         juce::MessageManagerLock lock;
         audioProcessor.fileChangeBroadcaster.sendChangeMessage();

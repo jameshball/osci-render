@@ -70,7 +70,11 @@ public:
 
     juce::String getSourceName() const {
         if (receiver) {
-            return receiver->sharingName + " (" + receiver->sharingAppName + ")";
+            auto name = receiver->sharingName;
+            if (receiver->sharingAppName.isNotEmpty()) {
+                name += " (" + receiver->sharingAppName + ")";
+            }
+            return name;
         }
         return "";
     }

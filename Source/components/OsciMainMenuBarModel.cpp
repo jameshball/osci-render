@@ -1,11 +1,18 @@
 #include "OsciMainMenuBarModel.h"
+
 #include "../PluginEditor.h"
 #include "../PluginProcessor.h"
 
 OsciMainMenuBarModel::OsciMainMenuBarModel(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& e) : audioProcessor(p), editor(e) {
+    resetMenuItems();
+}
+
+void OsciMainMenuBarModel::resetMenuItems() {
+    MainMenuBarModel::resetMenuItems();
+
     addTopLevelMenu("File");
     addTopLevelMenu("About");
-    addTopLevelMenu("Recording");
+    addTopLevelMenu("Video");
     if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
         addTopLevelMenu("Audio");
     }
@@ -20,19 +27,22 @@ OsciMainMenuBarModel::OsciMainMenuBarModel(OscirenderAudioProcessor& p, Oscirend
     addMenuItem(1, "About osci-render", [this] {
         juce::DialogWindow::LaunchOptions options;
         AboutComponent* about = new AboutComponent(BinaryData::logo_png, BinaryData::logo_pngSize,
-            juce::String(ProjectInfo::projectName) + " by " + ProjectInfo::companyName + "\n"
+                                                   juce::String(ProjectInfo::projectName) + " by " + ProjectInfo::companyName +
+                                                       "\n"
 #if OSCI_PREMIUM
-            "Thank you for purchasing osci-render premium!\n"
+                                                       "Thank you for purchasing osci-render premium!\n"
 #else
             "Free version\n"
 #endif
-            "Version " + ProjectInfo::versionString + "\n\n"
-            "A huge thank you to:\n"
-            "DJ_Level_3, for contributing several features to osci-render\n"
-            "BUS ERROR Collective, for providing the source code for the Hilligoss encoder\n"
-            "Jean Perbet (@jeanprbt) for the osci-render macOS icon\n"
-            "All the community, for suggesting features and reporting issues!",
-            std::any_cast<int>(audioProcessor.getProperty("objectServerPort")));
+                                                       "Version " +
+                                                       ProjectInfo::versionString +
+                                                       "\n\n"
+                                                       "A huge thank you to:\n"
+                                                       "DJ_Level_3, for contributing several features to osci-render\n"
+                                                       "BUS ERROR Collective, for providing the source code for the Hilligoss encoder\n"
+                                                       "Jean Perbet (@jeanprbt) for the osci-render macOS icon\n"
+                                                       "All the community, for suggesting features and reporting issues!",
+                                                   std::any_cast<int>(audioProcessor.getProperty("objectServerPort")));
         options.content.setOwned(about);
         options.content->setSize(500, 270);
         options.dialogTitle = "About";
