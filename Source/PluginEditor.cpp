@@ -101,7 +101,9 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
+#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
     audioProcessor.syphonInputActive = false;
+#endif
 
     // Clear the file removal callback
     audioProcessor.setFileRemovedCallback(nullptr);
