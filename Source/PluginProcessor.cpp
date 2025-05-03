@@ -505,8 +505,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
     {
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-        juce::SpinLock::ScopedLockType sLock(syphonLock);
-        if (isSyphonInputActive()) {
+        if (syphonInputActive) {
             for (int sample = 0; sample < outputBuffer3d.getNumSamples(); sample++) {
                 osci::Point point = syphonImageParser.getSample();
                 outputBuffer3d.setSample(0, sample, point.x);
@@ -514,7 +513,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             }
         } else
 #endif
-        if (usingInput && totalNumInputChannels >= 1) {
+            if (usingInput && totalNumInputChannels >= 1) {
             if (totalNumInputChannels >= 2) {
                 for (auto channel = 0; channel < juce::jmin(2, totalNumInputChannels); channel++) {
                     outputBuffer3d.copyFrom(channel, 0, inputBuffer, channel, 0, buffer.getNumSamples());
@@ -897,49 +896,6 @@ void OscirenderAudioProcessor::envelopeChanged(EnvelopeComponent* changedEnvelop
         updateIfApproxEqual(releaseShape, curves[2].getCurve());
     }
 }
-
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-// Syphon/Spout input management
-
-// syphonLock must be held when calling this function
-bool OscirenderAudioProcessor::isSyphonInputActive() const {
-    return syphonFrameGrabber != nullptr && syphonFrameGrabber->isActive();
-}
-
-// syphonLock must be held when calling this function
-bool OscirenderAudioProcessor::isSyphonInputStarted() const {
-    return syphonFrameGrabber != nullptr;
-}
-
-// syphonLock must be held when calling this function
-void OscirenderAudioProcessor::connectSyphonInput(const juce::String& server, const juce::String& app) {
-    auto editor = dynamic_cast<OscirenderAudioProcessorEditor*>(getActiveEditor());
-    if (!syphonFrameGrabber && editor) {
-        syphonFrameGrabber = std::make_unique<SyphonFrameGrabber>(editor->sharedTextureManager, server, app, syphonImageParser);
-        {
-            juce::MessageManagerLock lock;
-            fileChangeBroadcaster.sendChangeMessage();
-        }
-    }
-}
-
-// syphonLock must be held when calling this function
-void OscirenderAudioProcessor::disconnectSyphonInput() {
-    syphonFrameGrabber.reset();
-    {
-        juce::MessageManagerLock lock;
-        fileChangeBroadcaster.sendChangeMessage();
-    }
-}
-
-// syphonLock must be held when calling this function
-juce::String OscirenderAudioProcessor::getSyphonSourceName() const {
-    if (syphonFrameGrabber) {
-        return syphonFrameGrabber->getSourceName();
-    }
-    return "";
-}
-#endif
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {
     return new OscirenderAudioProcessor();

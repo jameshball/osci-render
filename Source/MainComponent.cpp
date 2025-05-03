@@ -22,9 +22,6 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
                      juce::FileBrowserComponent::canSelectFiles;
 
         chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-            juce::SpinLock::ScopedLockType syphonLock(audioProcessor.syphonLock);
-#endif
             juce::SpinLock::ScopedLockType parsersLock(audioProcessor.parsersLock);
             bool fileAdded = false;
             for (auto& file : chooser.getResults()) {
@@ -66,9 +63,6 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 
     addAndMakeVisible(leftArrow);
     leftArrow.onClick = [this] {
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-        juce::SpinLock::ScopedLockType lock(audioProcessor.syphonLock);
-#endif
         juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
         juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
 
@@ -83,9 +77,6 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 
     addAndMakeVisible(rightArrow);
     rightArrow.onClick = [this] {
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-        juce::SpinLock::ScopedLockType lock(audioProcessor.syphonLock);
-#endif
         juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
         juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
 
@@ -108,9 +99,6 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
     addAndMakeVisible(createFile);
 
     createFile.onClick = [this] {
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-        juce::SpinLock::ScopedLockType syphonLock(audioProcessor.syphonLock);
-#endif
         juce::SpinLock::ScopedLockType parsersLock(audioProcessor.parsersLock);
         auto fileNameText = fileName.getText();
         auto fileTypeText = fileType.getText();
@@ -173,8 +161,8 @@ void MainComponent::updateFileLabel() {
 
     {
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-        if (audioProcessor.isSyphonInputActive()) {
-            fileLabel.setText(audioProcessor.getSyphonSourceName(), juce::dontSendNotification);
+        if (audioProcessor.syphonInputActive) {
+            fileLabel.setText(pluginEditor.getSyphonSourceName(), juce::dontSendNotification);
         } else
 #endif
             if (audioProcessor.objectServerRendering) {

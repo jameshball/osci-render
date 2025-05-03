@@ -5,7 +5,7 @@
 
 class SyphonFrameGrabber : private juce::Thread, public juce::Component {
 public:
-    SyphonFrameGrabber(SharedTextureManager& manager, juce::String server, juce::String app, ImageParser& parser, int pollMs = 16)
+    SyphonFrameGrabber(SharedTextureManager& manager, juce::String server, juce::String app, ImageParser& parser, int pollMs = 8)
         : juce::Thread("SyphonFrameGrabber"), pollIntervalMs(pollMs), manager(manager), parser(parser) {
         // Create the invisible OpenGL context component
         glContextComponent = std::make_unique<InvisibleOpenGLContextComponent>();
@@ -30,6 +30,8 @@ public:
     }
 
     ~SyphonFrameGrabber() override {
+        juce::CriticalSection::ScopedLockType lock(openGLLock);
+
         stopThread(500);
         if (receiver) {
             manager.removeReceiver(receiver);
@@ -41,6 +43,8 @@ public:
     void run() override {
         while (!threadShouldExit()) {
             {
+                juce::CriticalSection::ScopedLockType lock(openGLLock);
+
                 bool activated = false;
                 if (glContextComponent) {
                     activated = glContextComponent->getContext().makeActive();

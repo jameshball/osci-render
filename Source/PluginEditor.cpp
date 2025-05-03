@@ -54,9 +54,6 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     colourScheme = lookAndFeel.getDefaultColourScheme();
 
     {
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-        juce::SpinLock::ScopedLockType syphonLock(audioProcessor.syphonLock);
-#endif
         juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
         initialiseCodeEditors();
     }
@@ -143,9 +140,6 @@ void OscirenderAudioProcessorEditor::filesDropped(const juce::StringArray& files
     if (file.hasFileExtension("osci")) {
         openProject(file);
     } else {
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-        juce::SpinLock::ScopedLockType syphonLock(audioProcessor.syphonLock);
-#endif
         juce::SpinLock::ScopedLockType parsersLock(audioProcessor.parsersLock);
         juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
 
@@ -379,9 +373,6 @@ void OscirenderAudioProcessorEditor::handleAsyncUpdate() {
 void OscirenderAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcaster* source) {
     if (source == &audioProcessor.broadcaster) {
         {
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-            juce::SpinLock::ScopedLockType syphonLock(audioProcessor.syphonLock);
-#endif
             juce::SpinLock::ScopedLockType parsersLock(audioProcessor.parsersLock);
             initialiseCodeEditors();
             settings.update();
@@ -389,9 +380,6 @@ void OscirenderAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcas
         resized();
         repaint();
     } else if (source == &audioProcessor.fileChangeBroadcaster) {
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-        juce::SpinLock::ScopedLockType syphonLock(audioProcessor.syphonLock);
-#endif
         juce::SpinLock::ScopedLockType parsersLock(audioProcessor.parsersLock);
         // triggered when the audioProcessor changes the current file (e.g. to Blender)
         settings.fileUpdated(audioProcessor.getCurrentFileName());
@@ -462,9 +450,6 @@ void OscirenderAudioProcessorEditor::updateCodeDocument() {
 bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
     bool consumeKey = false;
     {
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-        juce::SpinLock::ScopedLockType lock(audioProcessor.syphonLock);
-#endif
         juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
         juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
 
@@ -527,13 +512,12 @@ void OscirenderAudioProcessorEditor::openVisualiserSettings() {
 void OscirenderAudioProcessorEditor::openSyphonInputDialog() {
     SyphonInputSelectorComponent* selector = nullptr;
     {
-        juce::SpinLock::ScopedLockType lock(audioProcessor.syphonLock);
         selector = new SyphonInputSelectorComponent(
             sharedTextureManager,
-            [this](const juce::String& server, const juce::String& app) { onSyphonInputSelected(server, app); },
-            [this]() { onSyphonInputDisconnected(); },
-            audioProcessor.isSyphonInputActive(),
-            audioProcessor.getSyphonSourceName());
+            [this](const juce::String& server, const juce::String& app) { connectSyphonInput(server, app); },
+            [this]() { disconnectSyphonInput(); },
+            syphonFrameGrabber && syphonFrameGrabber->isActive(),
+            getSyphonSourceName());
     }
     juce::DialogWindow::LaunchOptions options;
     options.content.setOwned(selector);
@@ -546,13 +530,36 @@ void OscirenderAudioProcessorEditor::openSyphonInputDialog() {
     options.launchAsync();
 }
 
-void OscirenderAudioProcessorEditor::onSyphonInputSelected(const juce::String& server, const juce::String& app) {
-    juce::SpinLock::ScopedLockType lock(audioProcessor.syphonLock);
-    audioProcessor.connectSyphonInput(server, app);
+void OscirenderAudioProcessorEditor::connectSyphonInput(const juce::String& server, const juce::String& app) {
+    juce::SpinLock::ScopedLockType lock(syphonLock);
+    if (!syphonFrameGrabber) {
+        syphonFrameGrabber = std::make_unique<SyphonFrameGrabber>(sharedTextureManager, server, app, audioProcessor.syphonImageParser);
+        audioProcessor.syphonInputActive = true;
+        {
+            juce::MessageManagerLock lock;
+            audioProcessor.fileChangeBroadcaster.sendChangeMessage();
+        }
+    }
 }
 
-void OscirenderAudioProcessorEditor::onSyphonInputDisconnected() {
-    juce::SpinLock::ScopedLockType lock(audioProcessor.syphonLock);
-    audioProcessor.disconnectSyphonInput();
+void OscirenderAudioProcessorEditor::disconnectSyphonInput() {
+    juce::SpinLock::ScopedLockType lock(syphonLock);
+    if (!syphonFrameGrabber) {
+        return;
+    }
+    audioProcessor.syphonInputActive = false;
+    syphonFrameGrabber.reset();
+    {
+        juce::MessageManagerLock lock;
+        audioProcessor.fileChangeBroadcaster.sendChangeMessage();
+    }
+}
+
+juce::String OscirenderAudioProcessorEditor::getSyphonSourceName() const {
+    juce::SpinLock::ScopedLockType lock(syphonLock);
+    if (syphonFrameGrabber) {
+        return syphonFrameGrabber->getSourceName();
+    }
+    return "";
 }
 #endif

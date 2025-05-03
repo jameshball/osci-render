@@ -282,18 +282,11 @@ private:
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
 public:
-    bool isSyphonInputActive() const;
-    bool isSyphonInputStarted() const;
-    void connectSyphonInput(const juce::String& server, const juce::String& app);
-    void disconnectSyphonInput();
-    juce::String getSyphonSourceName() const;
+    std::atomic<bool> syphonInputActive = false;
 
-    juce::SpinLock syphonLock;
-
-private:
     ImageParser syphonImageParser = ImageParser(*this);
-    std::unique_ptr<SyphonFrameGrabber> syphonFrameGrabber;
 #endif
+
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OscirenderAudioProcessor)

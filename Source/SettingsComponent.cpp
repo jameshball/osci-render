@@ -84,7 +84,7 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
     // Check if the file is an image based on extension or Syphon/Spout input
     bool isSyphonActive = false;
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-    isSyphonActive = audioProcessor.isSyphonInputStarted();
+    isSyphonActive = audioProcessor.syphonInputActive;
 #endif
 
     bool isImage = isSyphonActive ||

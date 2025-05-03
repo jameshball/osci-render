@@ -64,11 +64,12 @@ OsciMainMenuBarModel::OsciMainMenuBarModel(OscirenderAudioProcessor& p, Oscirend
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
     // Add Syphon/Spout input menu item under Recording
-    addMenuItem(2, audioProcessor.isSyphonInputActive() ? "Disconnect Syphon/Spout Input" : "Select Syphon/Spout Input...", [this] {
-        if (audioProcessor.isSyphonInputActive())
-            disconnectSyphonInput();
-        else
+    addMenuItem(2, audioProcessor.syphonInputActive ? "Disconnect Syphon/Spout Input" : "Select Syphon/Spout Input...", [this] {
+        if (audioProcessor.syphonInputActive) {
+            editor.disconnectSyphonInput();
+        } else {
             openSyphonInputDialog();
+        }
     });
 #endif
 
@@ -82,9 +83,5 @@ OsciMainMenuBarModel::OsciMainMenuBarModel(OscirenderAudioProcessor& p, Oscirend
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
 void OsciMainMenuBarModel::openSyphonInputDialog() {
     editor.openSyphonInputDialog();
-}
-
-void OsciMainMenuBarModel::disconnectSyphonInput() {
-    audioProcessor.disconnectSyphonInput();
 }
 #endif
