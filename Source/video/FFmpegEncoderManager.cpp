@@ -85,16 +85,19 @@ juce::String FFmpegEncoderManager::getBestEncoderForCodec(VideoCodec codec) {
             priorityList = &h264Encoders; // Default to H.264
     }
 
-    // Find the highest priority encoder that is available
+    // Find the highest priority encoder that is available and actually works
     for (const auto& encoderName : *priorityList) {
         for (const auto& encoder : encoders) {
             if (encoder.name == encoderName && encoder.isSupported) {
-                return encoderName;
+                // Test if the encoder actually works before selecting it
+                if (testEncoderWorks(encoderName)) {
+                    return encoderName;
+                }
             }
         }
     }
 
-    // Return default software encoder if no hardware encoder is available
+    // Return default software encoder if no hardware encoder is available or working
     switch (codec) {
         case VideoCodec::H264:
             return "libx264";
@@ -341,3 +344,48 @@ juce::String FFmpegEncoderManager::buildProResEncodingCommand(
     return cmd;
 }
 #endif
+
+bool FFmpegEncoderManager::testEncoderWorks(const juce::String& encoderName) {
+    juce::ChildProcess process;
+    juce::StringArray command;
+
+    // Build a test command that will quickly verify if an encoder works
+    // -v error: Only show errors
+    // -f lavfi -i nullsrc: Generate a null input source
+    // -t 1: Only encode 1 second
+    // -c:v [encoderName]: Use the specified encoder
+    // -f null -: Output to null device
+    command.add(ffmpegExecutable.getFullPathName());
+    command.add("-v");
+    command.add("error");
+    command.add("-f");
+    command.add("lavfi");
+    command.add("-i");
+    command.add("nullsrc=s=640x360:r=30");
+    command.add("-t");
+    command.add("1");
+    command.add("-c:v");
+    command.add(encoderName);
+    command.add("-f");
+    command.add("null");
+    command.add("-");
+
+    // Start the process
+    bool started = process.start(command, juce::ChildProcess::wantStdErr);
+
+    if (!started)
+        return false;
+
+    // Wait for the process to finish with a timeout
+    if (!process.waitForProcessToFinish(5000)) { // 5 seconds timeout
+        process.kill();
+        return false;
+    }
+
+    // Check exit code - 0 means success
+    int exitCode = process.getExitCode();
+    juce::String errorOutput = process.readAllProcessOutput();
+
+    // If exit code is 0 and there's no error output, the encoder works
+    return exitCode == 0 && errorOutput.isEmpty();
+}

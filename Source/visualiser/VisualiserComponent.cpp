@@ -438,7 +438,10 @@ void VisualiserComponent::setRecording(bool recording) {
                 recordingSettings.getCompressionPreset(),
                 tempVideoFile->getFile());
 
-            ffmpegProcess.start(cmd);
+            if (!ffmpegProcess.start(cmd)) {
+                record.setToggleState(false, juce::NotificationType::dontSendNotification);
+                return;
+            }
             framePixels.resize(renderTexture.width * renderTexture.height * 4);
         }
 
@@ -784,7 +787,16 @@ void VisualiserComponent::renderOpenGL() {
                     // draw frame to ffmpeg
                     glBindTexture(GL_TEXTURE_2D, renderTexture.id);
                     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, framePixels.data());
-                    ffmpegProcess.write(framePixels.data(), 4 * renderTexture.width * renderTexture.height);
+                    if (ffmpegProcess.write(framePixels.data(), 4 * renderTexture.width * renderTexture.height, 3000) == 0) {
+                        record.setToggleState(false, juce::NotificationType::dontSendNotification);
+
+                        juce::MessageManager::callAsync([this] {
+                            juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
+                                "Recording Error",
+                                "An error occurred while writing the video frame to the ffmpeg process. Recording has been stopped.",
+                                "OK");
+                        });
+                    }
                 }
 #endif
                 if (recordingAudio) {

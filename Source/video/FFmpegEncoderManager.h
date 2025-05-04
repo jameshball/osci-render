@@ -33,6 +33,9 @@ public:
     // Check if a hardware encoder is available
     bool isHardwareEncoderAvailable(const juce::String& encoderName);
 
+    // Test if an encoder actually works by running a command
+    bool testEncoderWorks(const juce::String& encoderName);
+
     // Get the best encoder for a given codec
     juce::String getBestEncoderForCodec(VideoCodec codec);
 
