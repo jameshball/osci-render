@@ -57,8 +57,8 @@ juce::String FFmpegEncoderManager::getBestEncoderForCodec(VideoCodec codec) {
     auto encoders = getAvailableEncodersForCodec(codec);
 
     // Define priority lists for each codec type
-    juce::StringArray h264Encoders = {"h264_nvenc", "h264_amf", "h264_qsv", "h264_videotoolbox", "libx264"};
-    juce::StringArray h265Encoders = {"hevc_nvenc", "hevc_amf", "hevc_qsv", "hevc_videotoolbox", "libx265"};
+    juce::StringArray h264Encoders = {"h264_nvenc", "h264_amf", "h264_videotoolbox", "libx264"};
+    juce::StringArray h265Encoders = {"hevc_nvenc", "hevc_amf", "hevc_videotoolbox", "libx265"};
     juce::StringArray vp9Encoders = {"libvpx-vp9"};
 #if JUCE_MAC
     juce::StringArray proResEncoders = {"prores_ks", "prores"};
@@ -151,8 +151,7 @@ void FFmpegEncoderManager::parseEncoderList(const juce::String& output) {
         EncoderDetails encoder;
         encoder.name = name;
         encoder.description = description;
-        encoder.isHardwareAccelerated = name.contains("nvenc") || name.contains("amf") ||
-                                        name.contains("qsv") || name.contains("videotoolbox");
+        encoder.isHardwareAccelerated = name.contains("nvenc") || name.contains("amf") || name.contains("videotoolbox");
         encoder.isSupported = flags.contains("V"); // Video encoder
 
         // Add encoder to appropriate codec list
@@ -223,10 +222,6 @@ juce::String FFmpegEncoderManager::addH264EncoderSettings(
         cmd += " -rc cqp";
         cmd += " -qp_i " + juce::String(crf);
         cmd += " -qp_p " + juce::String(crf);
-    } else if (encoderName == "h264_qsv") {
-        cmd += " -c:v h264_qsv";
-        cmd += " -global_quality " + juce::String(crf);
-        cmd += " -preset " + compressionPreset;
     } else if (encoderName == "h264_videotoolbox") {
         cmd += " -c:v h264_videotoolbox";
         cmd += " -q " + juce::String(crf);
@@ -258,10 +253,6 @@ juce::String FFmpegEncoderManager::addH265EncoderSettings(
         cmd += " -rc cqp";
         cmd += " -qp_i " + juce::String(crf);
         cmd += " -qp_p " + juce::String(crf);
-    } else if (encoderName == "hevc_qsv") {
-        cmd += " -c:v hevc_qsv";
-        cmd += " -global_quality " + juce::String(crf);
-        cmd += " -preset " + compressionPreset;
     } else if (encoderName == "hevc_videotoolbox") {
         cmd += " -c:v hevc_videotoolbox";
         cmd += " -q:v " + juce::String(videoToolboxQuality);
