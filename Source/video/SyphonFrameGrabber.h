@@ -3,64 +3,56 @@
 
 #include "InvisibleOpenGLContextComponent.h"
 
-class SyphonFrameGrabber : private juce::Thread, public juce::Component {
+class SyphonFrameGrabber : public juce::Component, public juce::OpenGLRenderer {
 public:
-    SyphonFrameGrabber(SharedTextureManager& manager, juce::String server, juce::String app, ImageParser& parser, int pollMs = 8)
-        : juce::Thread("SyphonFrameGrabber"), pollIntervalMs(pollMs), manager(manager), parser(parser) {
-        // Create the invisible OpenGL context component
-        glContextComponent = std::make_unique<InvisibleOpenGLContextComponent>();
-        
-        // Make sure the context is properly initialized before creating the receiver
-        glContextComponent->getContext().makeActive();
-        
-        // Create the receiver after the context is active
-        receiver = manager.addReceiver(server, app);
-        if (receiver) {
-            receiver->setUseCPUImage(true); // for pixel access
-            
-            // Initialize the receiver with the active GL context
-            receiver->initGL();
-        }
-        
-        // Release the context
-        glContextComponent->getContext().deactivateCurrentContext();
-        
-        // Start the thread after everything is set up
-        startThread();
+    SyphonFrameGrabber(SharedTextureManager& manager, juce::String server, juce::String app, ImageParser& parser)
+        : manager(manager), parser(parser) {
+        // Create the invisible component that hosts our OpenGL context
+        openGLComponent = std::make_unique<InvisibleOpenGLContextComponent>(this);
+
+        // Store the server/app info for initializing the receiver
+        serverName = server;
+        appName = app;
     }
 
     ~SyphonFrameGrabber() override {
-        juce::CriticalSection::ScopedLockType lock(openGLLock);
+        // The InvisibleOpenGLContextComponent will detach the context in its destructor
+        openGLComponent = nullptr;
 
-        stopThread(500);
+        // Clean up the receiver if needed
         if (receiver) {
             manager.removeReceiver(receiver);
             receiver = nullptr;
         }
-        glContextComponent.reset();
     }
 
-    void run() override {
-        while (!threadShouldExit()) {
-            {
-                juce::CriticalSection::ScopedLockType lock(openGLLock);
+    // OpenGLRenderer interface implementation
+    void newOpenGLContextCreated() override {
+        // Create the receiver in the GL context creation callback
+        receiver = manager.addReceiver(serverName, appName);
+        if (receiver) {
+            receiver->setUseCPUImage(true); // for pixel access
+            receiver->initGL();
+        }
+    }
 
-                bool activated = false;
-                if (glContextComponent) {
-                    activated = glContextComponent->getContext().makeActive();
-                }
-                if (juce::OpenGLContext::getCurrentContext() != nullptr) {
-                    receiver->renderGL();
-                }
-                if (activated && glContextComponent) {
-                    juce::OpenGLContext::deactivateCurrentContext();
-                }
-                if (isActive() && receiver->isConnected) {
-                    juce::Image image = receiver->getImage();
-                    parser.updateLiveFrame(image);
-                }
+    void renderOpenGL() override {
+        // This is called on the OpenGL thread at the frequency set by the context
+        if (receiver) {
+            receiver->renderGL();
+
+            if (isActive() && receiver->isConnected) {
+                juce::Image image = receiver->getImage();
+                parser.updateLiveFrame(image);
             }
-            wait(pollIntervalMs);
+        }
+    }
+
+    void openGLContextClosing() override {
+        // Clean up in the context closing callback
+        if (receiver) {
+            manager.removeReceiver(receiver);
+            receiver = nullptr;
         }
     }
 
@@ -80,12 +72,12 @@ public:
     }
 
 private:
-    int pollIntervalMs;
     SharedTextureManager& manager;
     SharedTextureReceiver* receiver = nullptr;
     ImageParser& parser;
-    std::unique_ptr<InvisibleOpenGLContextComponent> glContextComponent;
-    juce::CriticalSection openGLLock; // To protect OpenGL context operations
+    std::unique_ptr<InvisibleOpenGLContextComponent> openGLComponent;
+    juce::String serverName;
+    juce::String appName;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SyphonFrameGrabber)
 };
