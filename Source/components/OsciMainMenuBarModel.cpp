@@ -68,7 +68,7 @@ void OsciMainMenuBarModel::resetMenuItems() {
     });
 #endif
 
-    addMenuItem(2, "Settings...", [this] {
+    addMenuItem(2, "Recording Settings...", [this] {
         editor.openRecordingSettings();
     });
 

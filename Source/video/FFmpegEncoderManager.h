@@ -20,7 +20,6 @@ public:
     juce::String buildVideoEncodingCommand(
         VideoCodec codec,
         int crf,
-        int videoToolboxQuality,
         int width,
         int height,
         double frameRate,
@@ -64,15 +63,20 @@ private:
         juce::String cmd,
         const juce::String& encoderName,
         int crf,
-        const juce::String& compressionPreset);
+        const juce::String& compressionPreset,
+        int width,
+        int height,
+        double frameRate);
 
     // H.265 encoder settings helper
     juce::String addH265EncoderSettings(
         juce::String cmd,
         const juce::String& encoderName,
         int crf,
-        int videoToolboxQuality,
-        const juce::String& compressionPreset);
+        const juce::String& compressionPreset,
+        int width,
+        int height,
+        double frameRate);
 
     // Build H.264 encoding command
     juce::String buildH264EncodingCommand(
@@ -86,7 +90,6 @@ private:
     // Build H.265 encoding command
     juce::String buildH265EncodingCommand(
         int crf,
-        int videoToolboxQuality,
         int width,
         int height,
         double frameRate,
@@ -110,6 +113,9 @@ private:
         double frameRate,
         const juce::File& outputFile);
 #endif
+
+    // Estimate bitrate for videotoolbox encoders based on resolution, frame rate, and CRF
+    int estimateBitrateForVideotoolbox(int width, int height, double frameRate, int crfValue);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FFmpegEncoderManager)
 };

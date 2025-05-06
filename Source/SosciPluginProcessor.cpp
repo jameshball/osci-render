@@ -59,7 +59,7 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         }
 
         // this is the point that the visualiser will draw
-        threadManager.write(point, "VisualiserComponent");
+        threadManager.write(point, "VisualiserRenderer");
 
         if (juce::JUCEApplication::isStandaloneApp()) {
             point.scale(volume, volume, 1.0);

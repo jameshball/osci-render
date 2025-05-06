@@ -1,4 +1,5 @@
 #include "FFmpegEncoderManager.h"
+#include <cmath>
 
 FFmpegEncoderManager::FFmpegEncoderManager(juce::File& ffmpegExecutable)
     : ffmpegExecutable(ffmpegExecutable) {
@@ -8,7 +9,6 @@ FFmpegEncoderManager::FFmpegEncoderManager(juce::File& ffmpegExecutable)
 juce::String FFmpegEncoderManager::buildVideoEncodingCommand(
     VideoCodec codec,
     int crf,
-    int videoToolboxQuality,
     int width,
     int height,
     double frameRate,
@@ -18,7 +18,7 @@ juce::String FFmpegEncoderManager::buildVideoEncodingCommand(
         case VideoCodec::H264:
             return buildH264EncodingCommand(crf, width, height, frameRate, compressionPreset, outputFile);
         case VideoCodec::H265:
-            return buildH265EncodingCommand(crf, videoToolboxQuality, width, height, frameRate, compressionPreset, outputFile);
+            return buildH265EncodingCommand(crf, width, height, frameRate, compressionPreset, outputFile);
         case VideoCodec::VP9:
             return buildVP9EncodingCommand(crf, width, height, frameRate, compressionPreset, outputFile);
 #if JUCE_MAC
@@ -29,6 +29,34 @@ juce::String FFmpegEncoderManager::buildVideoEncodingCommand(
             // Default to H.264 if unknown codec
             return buildH264EncodingCommand(crf, width, height, frameRate, compressionPreset, outputFile);
     }
+}
+
+int FFmpegEncoderManager::estimateBitrateForVideotoolbox(int width, int height, double frameRate, int crfValue) {
+    // Heuristic to estimate bitrate from CRF, resolution, and frame rate.
+    // CRF values typically range from 0 (lossless) to 51 (worst quality).
+    // A common default/good quality is around 18-28. We use 23 as a reference.
+    // Lower CRF means higher quality and thus higher bitrate.
+    // Formula: bitrate = bitsPerPixelAtRefCrf * pixels_per_second * 2^((ref_crf - crf) / 6)
+
+    double bitsPerPixelAtRefCrf = 0.1; // Adjust this factor based on desired quality baseline
+    double referenceCrf = 23.0;
+
+    double crfTerm = static_cast<double>(crfValue);
+    // Ensure frameRate is not zero to avoid division by zero or extremely low bitrates
+    if (frameRate <= 0.0) frameRate = 30.0; // Default to 30 fps if invalid
+
+    double bitrateMultiplier = std::pow(2.0, (referenceCrf - crfTerm) / 6.0);
+
+    long long calculatedBitrate = static_cast<long long>(
+        bitsPerPixelAtRefCrf * static_cast<double>(width) * static_cast<double>(height) * frameRate * bitrateMultiplier
+    );
+
+    // Clamp bitrate to a reasonable range, e.g., 250 kbps to 100 Mbps
+    // FFmpeg -b:v expects bits per second.
+    int minBitrate = 250000;    // 250 kbps
+    int maxBitrate = 100000000; // 100 Mbps
+
+    return juce::jlimit(minBitrate, maxBitrate, static_cast<int>(calculatedBitrate));
 }
 
 juce::Array<FFmpegEncoderManager::EncoderDetails> FFmpegEncoderManager::getAvailableEncodersForCodec(VideoCodec codec) {
@@ -208,7 +236,11 @@ juce::String FFmpegEncoderManager::addH264EncoderSettings(
     juce::String cmd,
     const juce::String& encoderName,
     int crf,
-    const juce::String& compressionPreset) {
+    const juce::String& compressionPreset,
+    int width,
+    int height,
+    double frameRate)
+{
     if (encoderName == "h264_nvenc") {
         cmd += " -c:v h264_nvenc";
         cmd += " -preset p7";
@@ -223,8 +255,9 @@ juce::String FFmpegEncoderManager::addH264EncoderSettings(
         cmd += " -qp_i " + juce::String(crf);
         cmd += " -qp_p " + juce::String(crf);
     } else if (encoderName == "h264_videotoolbox") {
+        int estimatedBitrate = estimateBitrateForVideotoolbox(width, height, frameRate, crf);
         cmd += " -c:v h264_videotoolbox";
-        cmd += " -q " + juce::String(crf);
+        cmd += " -b:v " + juce::String(estimatedBitrate);
     } else { // libx264 (software)
         cmd += " -c:v libx264";
         cmd += " -preset " + compressionPreset;
@@ -238,8 +271,11 @@ juce::String FFmpegEncoderManager::addH265EncoderSettings(
     juce::String cmd,
     const juce::String& encoderName,
     int crf,
-    int videoToolboxQuality,
-    const juce::String& compressionPreset) {
+    const juce::String& compressionPreset,
+    int width,
+    int height,
+    double frameRate)
+{
     if (encoderName == "hevc_nvenc") {
         cmd += " -c:v hevc_nvenc";
         cmd += " -preset p7";
@@ -254,8 +290,9 @@ juce::String FFmpegEncoderManager::addH265EncoderSettings(
         cmd += " -qp_i " + juce::String(crf);
         cmd += " -qp_p " + juce::String(crf);
     } else if (encoderName == "hevc_videotoolbox") {
+        int estimatedBitrate = estimateBitrateForVideotoolbox(width, height, frameRate, crf); // Use crf for estimation
         cmd += " -c:v hevc_videotoolbox";
-        cmd += " -q:v " + juce::String(videoToolboxQuality);
+        cmd += " -b:v " + juce::String(estimatedBitrate);
         cmd += " -tag:v hvc1";
     } else { // libx265 (software)
         cmd += " -c:v libx265";
@@ -276,7 +313,8 @@ juce::String FFmpegEncoderManager::buildH264EncodingCommand(
     juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, outputFile);
     juce::String bestEncoder = getBestEncoderForCodec(VideoCodec::H264);
 
-    cmd = addH264EncoderSettings(cmd, bestEncoder, crf, compressionPreset);
+    // Pass width, height, and frameRate to addH264EncoderSettings
+    cmd = addH264EncoderSettings(cmd, bestEncoder, crf, compressionPreset, width, height, frameRate);
     cmd += " \"" + outputFile.getFullPathName() + "\"";
 
     return cmd;
@@ -284,7 +322,6 @@ juce::String FFmpegEncoderManager::buildH264EncodingCommand(
 
 juce::String FFmpegEncoderManager::buildH265EncodingCommand(
     int crf,
-    int videoToolboxQuality,
     int width,
     int height,
     double frameRate,
@@ -293,7 +330,7 @@ juce::String FFmpegEncoderManager::buildH265EncodingCommand(
     juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, outputFile);
     juce::String bestEncoder = getBestEncoderForCodec(VideoCodec::H265);
 
-    cmd = addH265EncoderSettings(cmd, bestEncoder, crf, videoToolboxQuality, compressionPreset);
+    cmd = addH265EncoderSettings(cmd, bestEncoder, crf, compressionPreset, width, height, frameRate);
     cmd += " \"" + outputFile.getFullPathName() + "\"";
 
     return cmd;
