@@ -1,6 +1,5 @@
 #include "TextParser.h"
 #include "../svg/SvgParser.h"
-#include "../PluginProcessor.h"
 
 
 TextParser::TextParser(juce::String text, juce::Font& font) : text(text), font(font) {

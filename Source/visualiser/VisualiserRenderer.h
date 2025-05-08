@@ -4,7 +4,7 @@
 
 #include <algorithm>
 
-#include "VisualiserSettings.h"
+#include "VisualiserParameters.h"
 
 struct Texture {
     GLuint id;

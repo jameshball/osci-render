@@ -2,7 +2,7 @@
 
 #include <JuceHeader.h>
 #include <any>
-#include "visualiser/VisualiserSettings.h"
+#include "visualiser/VisualiserParameters.h"
 #include "audio/BitCrushEffect.h"
 #include "audio/AutoGainControlEffect.h"
 #include "txt/TextParser.h"

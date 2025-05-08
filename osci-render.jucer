@@ -621,6 +621,8 @@
               file="Source/visualiser/VisualiserComponent.cpp"/>
         <FILE id="frfxSR" name="VisualiserComponent.h" compile="0" resource="0"
               file="Source/visualiser/VisualiserComponent.h"/>
+        <FILE id="MwblOp" name="VisualiserParameters.h" compile="0" resource="0"
+              file="Source/visualiser/VisualiserParameters.h"/>
         <FILE id="zN66Ve" name="VisualiserRenderer.cpp" compile="1" resource="0"
               file="Source/visualiser/VisualiserRenderer.cpp"/>
         <FILE id="fPgwyr" name="VisualiserRenderer.h" compile="0" resource="0"

@@ -72,7 +72,7 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 	} else if (extension == ".svg") {
 		svg = std::make_shared<SvgParser>(stream->readEntireStreamAsString());
 	} else if (extension == ".txt") {
-		text = std::make_shared<TextParser>(audioProcessor, stream->readEntireStreamAsString(), font);
+        text = std::make_shared<TextParser>(stream->readEntireStreamAsString(), audioProcessor.font);
 	} else if (extension == ".lua") {
 		lua = std::make_shared<LuaParser>(fileId, stream->readEntireStreamAsString(), errorCallback, fallbackLuaScript);
 	} else if (extension == ".gpla") {

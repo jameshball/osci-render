@@ -5,7 +5,7 @@
               aaxIdentifier="sh.ball.osci-bitcrush" cppLanguageStandard="20"
               projectLineFeed="&#10;" headerPath="./include" version="1.0.0.0"
               companyName="James H Ball" companyWebsite="https://osci-render.com"
-              companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=0"
+              companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1"
               pluginManufacturerCode="Jhba" pluginCode="Bitc" pluginAUMainType="'aufx'"
               pluginFormats="buildAU,buildVST3">
   <MAINGROUP id="j5Ge2T" name="osci-bitcrush">
@@ -133,14 +133,12 @@
               file="Source/visualiser/TexturedFragmentShader.glsl"/>
         <FILE id="EW75fo" name="TexturedVertexShader.glsl" compile="0" resource="0"
               file="Source/visualiser/TexturedVertexShader.glsl"/>
+        <FILE id="ox2Zqq" name="VisualiserParameters.h" compile="0" resource="0"
+              file="Source/visualiser/VisualiserParameters.h"/>
         <FILE id="ZlNZVD" name="VisualiserRenderer.cpp" compile="1" resource="0"
               file="Source/visualiser/VisualiserRenderer.cpp"/>
         <FILE id="TpzEdc" name="VisualiserRenderer.h" compile="0" resource="0"
               file="Source/visualiser/VisualiserRenderer.h"/>
-        <FILE id="wdZb9U" name="VisualiserSettings.cpp" compile="1" resource="0"
-              file="Source/visualiser/VisualiserSettings.cpp"/>
-        <FILE id="v3pCdC" name="VisualiserSettings.h" compile="0" resource="0"
-              file="Source/visualiser/VisualiserSettings.h"/>
       </GROUP>
       <FILE id="pSNQax" name="EffectPluginEditor.cpp" compile="1" resource="0"
             file="Source/EffectPluginEditor.cpp"/>

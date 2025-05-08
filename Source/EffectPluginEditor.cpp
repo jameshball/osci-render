@@ -12,6 +12,8 @@ EffectPluginEditor::EffectPluginEditor(EffectAudioProcessor& p)
     setLookAndFeel(&lookAndFeel);
     
     audioProcessor.visualiserParameters.ambientEffect->setValue(0);
+    audioProcessor.visualiserParameters.shutterSync->setBoolValue(true);
+    audioProcessor.visualiserParameters.upsamplingEnabled->setBoolValue(false);
     
     addAndMakeVisible(visualiser);
     addAndMakeVisible(titleVisualiser);
