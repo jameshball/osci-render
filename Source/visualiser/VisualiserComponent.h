@@ -68,6 +68,7 @@ private:
     CommonAudioProcessor& audioProcessor;
     CommonPluginEditor& editor;
 
+    VisualiserSettings& settings;
     RecordingSettings& recordingSettings;
 
     bool visualiserOnly;

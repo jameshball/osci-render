@@ -14,7 +14,8 @@ VisualiserComponent::VisualiserComponent(
     VisualiserSettings &settings,
     RecordingSettings &recordingSettings,
     VisualiserComponent *parent,
-    bool visualiserOnly) : VisualiserRenderer(settings, processor.threadManager),
+    bool visualiserOnly) : VisualiserRenderer(settings.parameters, processor.threadManager),
+                           settings(settings),
                            audioProcessor(processor),
                            ffmpegFile(ffmpegFile),
 #if OSCI_PREMIUM

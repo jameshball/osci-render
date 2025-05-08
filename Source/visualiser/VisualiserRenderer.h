@@ -16,10 +16,11 @@ class VisualiserWindow;
 class VisualiserRenderer : public juce::Component, public osci::AudioBackgroundThread, public juce::OpenGLRenderer, public juce::AsyncUpdater {
 public:
     VisualiserRenderer(
-        VisualiserSettings &settings,
+        VisualiserParameters &parameters,
         osci::AudioBackgroundThreadManager &threadManager,
         int resolution = 1024,
-        double frameRate = 60.0f
+        double frameRate = 60.0f,
+        juce::String threadName = ""
     );
     ~VisualiserRenderer() override;
 
@@ -39,17 +40,24 @@ public:
     Texture getRenderTexture() const { return renderTexture; }
 
     void getFrame(std::vector<unsigned char>& frame);
-    void drawFrame();
-
-    juce::Rectangle<int> getViewportArea() const { return viewportArea; }
+    void drawFrame();    juce::Rectangle<int> getViewportArea() const { return viewportArea; }
     void setViewportArea(juce::Rectangle<int> area) {
         viewportArea = area;
         viewportChanged(viewportArea);
     }
+    
+    // Set a crop rectangle for the renderTexture when drawing to screen
+    // If not set, the entire texture will be displayed in a square
+    void setCropRectangle(std::optional<juce::Rectangle<float>> cropRect) {
+        cropRectangle = cropRect;
+        viewportChanged(viewportArea);
+    }
+    
+    std::optional<juce::Rectangle<float>> getCropRectangle() const { return cropRectangle; }
 
 protected:
     juce::OpenGLContext openGLContext;
-    VisualiserSettings& settings;
+    VisualiserParameters &parameters;
 
     osci::Semaphore renderingSemaphore{0};
 
@@ -57,8 +65,8 @@ protected:
     std::function<void()> postRenderCallback = nullptr;
 
     juce::AudioBuffer<float> audioOutputBuffer;
-private:
-    juce::Rectangle<int> viewportArea;
+private:    juce::Rectangle<int> viewportArea;
+    std::optional<juce::Rectangle<float>> cropRectangle;
 
     float renderScale = 1.0f;
 

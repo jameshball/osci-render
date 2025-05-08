@@ -3,15 +3,15 @@
 #include "../PluginProcessor.h"
 
 
-TextParser::TextParser(OscirenderAudioProcessor &p, juce::String text, juce::Font font) : audioProcessor(p), text(text) {
-    parse(text, font);
+TextParser::TextParser(juce::String text, juce::Font& font) : text(text), font(font) {
+    parse(text);
 }
 
 TextParser::~TextParser() {
 }
 
-void TextParser::parse(juce::String text, juce::Font font) {
-    lastFont = font;
+void TextParser::parse(juce::String text) {
+    currentFont = font;
     
     juce::Path textPath;
 
@@ -19,16 +19,16 @@ void TextParser::parse(juce::String text, juce::Font font) {
     // Apply formatting markers if the font is bold or italic
     juce::String formattedText = text;
     
-    if (font.isBold()) {
+    if (currentFont.isBold()) {
         formattedText = "*" + formattedText + "*";
     }
     
-    if (font.isItalic()) {
+    if (currentFont.isItalic()) {
         formattedText = "_" + formattedText + "_";
     }
     
     // Parse the text with formatting
-    attributedString = parseFormattedText(formattedText, font);
+    attributedString = parseFormattedText(formattedText, currentFont);
     
     // Create a TextLayout from the AttributedString
     juce::TextLayout layout;
@@ -70,7 +70,7 @@ void TextParser::parse(juce::String text, juce::Font font) {
     if (textPath.isEmpty()) {
 #endif
         juce::GlyphArrangement glyphs;
-        glyphs.addFittedText(font, text, -2, -2, 4, 4, juce::Justification::centred, 2);
+        glyphs.addFittedText(currentFont, text, -2, -2, 4, 4, juce::Justification::centred, 2);
         glyphs.createPath(textPath);
 #if OSCI_PREMIUM
     }
@@ -233,8 +233,9 @@ void TextParser::processFormattedTextBody(const juce::String& text, juce::Attrib
 
 std::vector<std::unique_ptr<osci::Shape>> TextParser::draw() {
     // reparse text if font changes
-    if (audioProcessor.font != lastFont) {
-        parse(text, audioProcessor.font);
+    if (font != currentFont) {
+        currentFont = font;
+        parse(text);
     }
     
     // clone with deep copy

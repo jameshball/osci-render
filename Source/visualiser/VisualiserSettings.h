@@ -90,6 +90,93 @@ public:
 
 class VisualiserParameters {
 public:
+
+    double getIntensity() {
+        return intensityEffect->getActualValue() / 100;
+    }
+    
+    double getPersistence() {
+        return persistenceEffect->getActualValue() - 1.33;
+    }
+    
+    double getHue() {
+        return hueEffect->getActualValue();
+    }
+    
+    double getLineSaturation() {
+        return lineSaturationEffect->getActualValue();
+    }
+
+#if OSCI_PREMIUM
+    double getScreenSaturation() {
+        return screenSaturationEffect->getActualValue();
+    }
+    
+    double getScreenHue() {
+        return screenHueEffect->getActualValue();
+    }
+    
+    double getAfterglow() {
+        return afterglowEffect->getActualValue();
+    }
+    
+    double getOverexposure() {
+        return overexposureEffect->getActualValue();
+    }
+
+    bool isFlippedVertical() {
+        return flipVertical->getBoolValue();
+    }
+
+    bool isFlippedHorizontal() {
+        return flipHorizontal->getBoolValue();
+    }
+    
+    bool isGoniometer() {
+        return goniometer->getBoolValue();
+    }
+    
+    bool getShutterSync() {
+        return shutterSync->getBoolValue();
+    }
+#endif
+    
+    double getFocus() {
+        return focusEffect->getActualValue() / 100;
+    }
+    
+    double getNoise() {
+        return noiseEffect->getActualValue() / 5;
+    }
+    
+    double getGlow() {
+        return glowEffect->getActualValue() * 3;
+    }
+    
+    double getAmbient() {
+        return ambientEffect->getActualValue();
+    }
+    
+    ScreenOverlay getScreenOverlay() {
+        return (ScreenOverlay)screenOverlay->getValueUnnormalised();
+    }
+    
+    bool getUpsamplingEnabled() {
+        return upsamplingEnabled->getBoolValue();
+    }
+    
+    bool isSweepEnabled() {
+        return sweepEnabled->getBoolValue();
+    }
+    
+    double getSweepSeconds() {
+        return sweepMsEffect->getActualValue() / 1000.0;
+    }
+    
+    double getTriggerValue() {
+        return triggerValueEffect->getActualValue();
+    }
+
     ScreenOverlayParameter* screenOverlay = new ScreenOverlayParameter("Screen Overlay", "screenOverlay", VERSION_HINT, ScreenOverlay::SmudgedGraticule);
     osci::BooleanParameter* upsamplingEnabled = new osci::BooleanParameter("Upsample Audio", "upsamplingEnabled", VERSION_HINT, true, "Upsamples the audio before visualising it to make it appear more realistic, at the expense of performance.");
     osci::BooleanParameter* sweepEnabled = new osci::BooleanParameter("Sweep", "sweepEnabled", VERSION_HINT, false, "Plots the audio signal over time, sweeping from left to right");
@@ -353,92 +440,6 @@ public:
     void resized() override;
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
-    
-    double getIntensity() {
-        return parameters.intensityEffect->getActualValue() / 100;
-    }
-    
-    double getPersistence() {
-        return parameters.persistenceEffect->getActualValue() - 1.33;
-    }
-    
-    double getHue() {
-        return parameters.hueEffect->getActualValue();
-    }
-    
-    double getLineSaturation() {
-        return parameters.lineSaturationEffect->getActualValue();
-    }
-
-#if OSCI_PREMIUM
-    double getScreenSaturation() {
-        return parameters.screenSaturationEffect->getActualValue();
-    }
-    
-    double getScreenHue() {
-        return parameters.screenHueEffect->getActualValue();
-    }
-    
-    double getAfterglow() {
-        return parameters.afterglowEffect->getActualValue();
-    }
-    
-    double getOverexposure() {
-        return parameters.overexposureEffect->getActualValue();
-    }
-
-    bool isFlippedVertical() {
-        return parameters.flipVertical->getBoolValue();
-    }
-
-    bool isFlippedHorizontal() {
-        return parameters.flipHorizontal->getBoolValue();
-    }
-    
-    bool isGoniometer() {
-        return parameters.goniometer->getBoolValue();
-    }
-    
-    bool getShutterSync() {
-        return parameters.shutterSync->getBoolValue();
-    }
-#endif
-    
-    double getFocus() {
-        return parameters.focusEffect->getActualValue() / 100;
-    }
-    
-    double getNoise() {
-        return parameters.noiseEffect->getActualValue() / 5;
-    }
-    
-    double getGlow() {
-        return parameters.glowEffect->getActualValue() * 3;
-    }
-    
-    double getAmbient() {
-        return parameters.ambientEffect->getActualValue();
-    }
-    
-    ScreenOverlay getScreenOverlay() {
-        return (ScreenOverlay)parameters.screenOverlay->getValueUnnormalised();
-    }
-    
-    bool getUpsamplingEnabled() {
-        return parameters.upsamplingEnabled->getBoolValue();
-    }
-    
-    bool isSweepEnabled() {
-        return parameters.sweepEnabled->getBoolValue();
-    }
-    
-    double getSweepSeconds() {
-        return parameters.sweepMsEffect->getActualValue() / 1000.0;
-    }
-    
-    double getTriggerValue() {
-        return parameters.triggerValueEffect->getActualValue();
-    }
 
     VisualiserParameters& parameters;
     int numChannels;

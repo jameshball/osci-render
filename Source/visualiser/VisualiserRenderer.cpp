@@ -18,12 +18,13 @@
 #include "WideBlurVertexShader.glsl"
 
 VisualiserRenderer::VisualiserRenderer(
-    VisualiserSettings &settings,
+    VisualiserParameters &parameters,
     osci::AudioBackgroundThreadManager &threadManager,
     int resolution,
-    double frameRate
-) : settings(settings),
-    osci::AudioBackgroundThread("VisualiserRenderer", threadManager),
+    double frameRate,
+    juce::String threadName
+) : parameters(parameters),
+    osci::AudioBackgroundThread("VisualiserRenderer" + threadName, threadManager),
     resolution(resolution),
     frameRate(frameRate)
 {
@@ -53,25 +54,25 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
         zSamples.clear();
 
         auto applyEffects = [&](osci::Point point) {
-            for (auto &effect : settings.parameters.audioEffects) {
+            for (auto &effect : parameters.audioEffects) {
                 point = effect->apply(0, point);
             }
 #if OSCI_PREMIUM
-            if (settings.isFlippedHorizontal()) {
+            if (parameters.isFlippedHorizontal()) {
                 point.x = -point.x;
             }
-            if (settings.isFlippedVertical()) {
+            if (parameters.isFlippedVertical()) {
                 point.y = -point.y;
             }
 #endif
             return point;
         };
 
-        if (settings.isSweepEnabled()) {
+        if (parameters.isSweepEnabled()) {
             double sweepIncrement = getSweepIncrement();
-            long samplesPerSweep = sampleRate * settings.getSweepSeconds();
+            long samplesPerSweep = sampleRate * parameters.getSweepSeconds();
 
-            double triggerValue = settings.getTriggerValue();
+            double triggerValue = parameters.getTriggerValue();
             bool belowTrigger = false;
 
             for (const osci::Point &point : points) {
@@ -101,7 +102,7 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
                 osci::Point point = applyEffects(rawPoint);
 
 #if OSCI_PREMIUM
-                if (settings.isGoniometer()) {
+                if (parameters.isGoniometer()) {
                     // x and y go to a diagonal currently, so we need to scale them down, and rotate them
                     point.scale(1.0 / std::sqrt(2.0), 1.0 / std::sqrt(2.0), 1.0);
                     point.rotate(0, 0, -juce::MathConstants<double>::pi / 4);
@@ -116,7 +117,7 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
 
         sampleBufferCount++;
 
-        if (settings.parameters.upsamplingEnabled->getBoolValue()) {
+        if (parameters.upsamplingEnabled->getBoolValue()) {
             int newResampledSize = xSamples.size() * RESAMPLE_RATIO;
 
             smoothedXSamples.resize(newResampledSize);
@@ -124,7 +125,7 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
             smoothedZSamples.resize(newResampledSize);
             smoothedZSamples.resize(newResampledSize);
 
-            if (settings.isSweepEnabled()) {
+            if (parameters.isSweepEnabled()) {
                 // interpolate between sweep values to avoid any artifacts from quickly going from one sweep to the next
                 for (int i = 0; i < newResampledSize; ++i) {
                     int index = i / RESAMPLE_RATIO;
@@ -173,7 +174,7 @@ void VisualiserRenderer::stopTask() {
 }
 
 double VisualiserRenderer::getSweepIncrement() {
-    return 1.0 / (sampleRate * settings.getSweepSeconds());
+    return 1.0 / (sampleRate * parameters.getSweepSeconds());
 }
 
 void VisualiserRenderer::resized() {
@@ -192,6 +193,7 @@ void VisualiserRenderer::getFrame(std::vector<unsigned char>& frame) {
 void VisualiserRenderer::drawFrame() {
     using namespace juce::gl;
 
+    // The crop rectangle will be applied in drawTexture if it's set
     setShader(texturedShader.get());
     drawTexture({renderTexture});
 }
@@ -222,12 +224,15 @@ void VisualiserRenderer::newOpenGLContextCreated() {
     outputShader = std::make_unique<juce::OpenGLShaderProgram>(openGLContext);
     outputShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(outputVertexShader));
     outputShader->addFragmentShader(outputFragmentShader);
-    outputShader->link();
-
-    texturedShader = std::make_unique<juce::OpenGLShaderProgram>(openGLContext);
+    outputShader->link();    texturedShader = std::make_unique<juce::OpenGLShaderProgram>(openGLContext);
     texturedShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(texturedVertexShader));
     texturedShader->addFragmentShader(texturedFragmentShader);
     texturedShader->link();
+    
+    // Initialize crop rectangle uniforms with default values
+    texturedShader->use();
+    texturedShader->setUniform("uCropEnabled", 0.0f);
+    texturedShader->setUniform("uCropRect", 0.0f, 0.0f, 1.0f, 1.0f);
 
     blurShader = std::make_unique<juce::OpenGLShaderProgram>(openGLContext);
     blurShader->addVertexShader(juce::OpenGLHelpers::translateVertexShaderToV3(blurVertexShader));
@@ -311,7 +316,7 @@ void VisualiserRenderer::renderOpenGL() {
 
             juce::CriticalSection::ScopedLockType lock(samplesLock);
 
-            if (settings.parameters.upsamplingEnabled->getBoolValue()) {
+            if (parameters.upsamplingEnabled->getBoolValue()) {
                 renderScope(smoothedXSamples, smoothedYSamples, smoothedZSamples);
             } else {
                 renderScope(xSamples, ySamples, zSamples);
@@ -341,11 +346,23 @@ void VisualiserRenderer::viewportChanged(juce::Rectangle<int> area) {
         float xOffset = getWidth() * renderScale - realWidth;
         float yOffset = getHeight() * renderScale - realHeight;
 
-        float minDim = juce::jmin(realWidth, realHeight);
-        float x = (realWidth - minDim) / 2 + area.getX() * renderScale + xOffset;
-        float y = (realHeight - minDim) / 2 - area.getY() * renderScale + yOffset;
+        if (cropRectangle.has_value()) {
+            // When crop rectangle is provided, use the full viewport area
+            // The crop rectangle will be applied in drawTexture() via texture coordinates
+            float x = area.getX() * renderScale + xOffset;
+            float y = area.getY() * renderScale + yOffset;
+            
+            glViewport(juce::roundToInt(x), juce::roundToInt(y), 
+                       juce::roundToInt(realWidth), juce::roundToInt(realHeight));
+        } else {
+            // Original square viewport calculation
+            float minDim = juce::jmin(realWidth, realHeight);
+            float x = (realWidth - minDim) / 2 + area.getX() * renderScale + xOffset;
+            float y = (realHeight - minDim) / 2 - area.getY() * renderScale + yOffset;
 
-        glViewport(juce::roundToInt(x), juce::roundToInt(y), juce::roundToInt(minDim), juce::roundToInt(minDim));
+            glViewport(juce::roundToInt(x), juce::roundToInt(y), 
+                       juce::roundToInt(minDim), juce::roundToInt(minDim));
+        }
     }
 }
 
@@ -475,7 +492,7 @@ void VisualiserRenderer::setFrameRate(double frameRate) {
 void VisualiserRenderer::drawLineTexture(const std::vector<float> &xPoints, const std::vector<float> &yPoints, const std::vector<float> &zPoints) {
     using namespace juce::gl;
 
-    double persistence = std::pow(0.5, settings.getPersistence()) * 0.4;
+    double persistence = std::pow(0.5, parameters.getPersistence()) * 0.4;
     persistence *= 60.0 / frameRate;
     fadeAmount = juce::jmin(1.0, persistence);
 
@@ -558,6 +575,28 @@ void VisualiserRenderer::drawTexture(std::vector<std::optional<Texture>> texture
         }
     }
 
+    // Check if we need to apply texture coordinate transformation for cropping
+    // Only do this when displaying to screen (no target texture) and a crop rectangle is set
+    if (!targetTexture.has_value() && cropRectangle.has_value() && !textures.empty() && textures[0].has_value()) {
+        // Create quad with adjusted texture coordinates for cropping
+        std::vector<float> croppedQuad = fullScreenQuad;
+        
+        // For simplified calculation, assume we're working with the first texture
+        const auto& crop = cropRectangle.value();
+        
+        // Apply texture coordinate transformations to match the crop rectangle
+        // This transforms the quad's texture coordinates to sample only the cropped region
+        currentShader->setUniform("uCropEnabled", 1.0f);
+        currentShader->setUniform("uCropRect", 
+                                 crop.getX(), 
+                                 crop.getY(), 
+                                 crop.getWidth(), 
+                                 crop.getHeight());
+    } else {
+        // No cropping, use standard coordinates
+        currentShader->setUniform("uCropEnabled", 0.0f);
+    }
+
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(float) * fullScreenQuad.size(), fullScreenQuad.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(glGetAttribLocation(currentShader->getProgramID(), "aPos"), 2, GL_FLOAT, GL_FALSE, 0, 0);
@@ -619,12 +658,12 @@ void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, screenTexture.id);
     lineShader->setUniform("uScreen", 0);
-    lineShader->setUniform("uSize", (GLfloat)settings.getFocus());
+    lineShader->setUniform("uSize", (GLfloat)parameters.getFocus());
     lineShader->setUniform("uGain", 450.0f / 512.0f);
     lineShader->setUniform("uInvert", 1.0f);
 
-    float intensity = settings.getIntensity() * (41000.0f / sampleRate);
-    if (settings.getUpsamplingEnabled()) {
+    float intensity = parameters.getIntensity() * (41000.0f / sampleRate);
+    if (parameters.getUpsamplingEnabled()) {
         lineShader->setUniform("uIntensity", intensity);
     } else {
         lineShader->setUniform("uIntensity", (GLfloat)(intensity * RESAMPLE_RATIO * 1.5));
@@ -636,7 +675,7 @@ void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::
 
 #if OSCI_PREMIUM
     lineShader->setUniform("uFishEye", screenOverlay == ScreenOverlay::VectorDisplay ? VECTOR_DISPLAY_FISH_EYE : 0.0f);
-    lineShader->setUniform("uShutterSync", settings.getShutterSync());
+    lineShader->setUniform("uShutterSync", parameters.getShutterSync());
 #else
     lineShader->setUniform("uFishEye", 0.0f);
     lineShader->setUniform("uShutterSync", false);
@@ -659,7 +698,7 @@ void VisualiserRenderer::fade() {
 #if OSCI_PREMIUM
     setShader(afterglowShader.get());
     afterglowShader->setUniform("fadeAmount", fadeAmount);
-    afterglowShader->setUniform("afterglowAmount", (float)settings.getAfterglow());
+    afterglowShader->setUniform("afterglowAmount", (float)parameters.getAfterglow());
     afterglowShader->setUniform("uResizeForCanvas", lineTexture.width / renderTexture.width);
     drawTexture({lineTexture});
 #else
@@ -721,7 +760,7 @@ void VisualiserRenderer::drawCRT() {
     checkGLErrors(__FILE__, __LINE__);
 
 #if OSCI_PREMIUM
-    if (settings.parameters.screenOverlay->isRealisticDisplay()) {
+    if (parameters.screenOverlay->isRealisticDisplay()) {
         // create glow texture
         activateTargetTexture(glowTexture);
         setShader(glowShader.get());
@@ -734,27 +773,27 @@ void VisualiserRenderer::drawCRT() {
     activateTargetTexture(renderTexture);
     setShader(outputShader.get());
     outputShader->setUniform("uExposure", 0.25f);
-    outputShader->setUniform("uLineSaturation", (float)settings.getLineSaturation());
+    outputShader->setUniform("uLineSaturation", (float)parameters.getLineSaturation());
 #if OSCI_PREMIUM
-    outputShader->setUniform("uScreenSaturation", (float)settings.getScreenSaturation());
-    outputShader->setUniform("uHueShift", (float)settings.getScreenHue() / 360.0f);
-    outputShader->setUniform("uOverexposure", (float)settings.getOverexposure());
+    outputShader->setUniform("uScreenSaturation", (float)parameters.getScreenSaturation());
+    outputShader->setUniform("uHueShift", (float)parameters.getScreenHue() / 360.0f);
+    outputShader->setUniform("uOverexposure", (float)parameters.getOverexposure());
 #else
     outputShader->setUniform("uScreenSaturation", 1.0f);
     outputShader->setUniform("uHueShift", 0.0f);
     outputShader->setUniform("uOverexposure", 0.5f);
 #endif
-    outputShader->setUniform("uNoise", (float)settings.getNoise());
+    outputShader->setUniform("uNoise", (float)parameters.getNoise());
     outputShader->setUniform("uRandom", juce::Random::getSystemRandom().nextFloat());
-    outputShader->setUniform("uGlow", (float)settings.getGlow());
-    outputShader->setUniform("uAmbient", (float)settings.getAmbient());
+    outputShader->setUniform("uGlow", (float)parameters.getGlow());
+    outputShader->setUniform("uAmbient", (float)parameters.getAmbient());
     setOffsetAndScale(outputShader.get());
 #if OSCI_PREMIUM
     outputShader->setUniform("uFishEye", screenOverlay == ScreenOverlay::VectorDisplay ? VECTOR_DISPLAY_FISH_EYE : 0.0f);
-    outputShader->setUniform("uRealScreen", settings.parameters.screenOverlay->isRealisticDisplay() ? 1.0f : 0.0f);
+    outputShader->setUniform("uRealScreen", parameters.screenOverlay->isRealisticDisplay() ? 1.0f : 0.0f);
 #endif
     outputShader->setUniform("uResizeForCanvas", lineTexture.width / (float) renderTexture.width);
-    juce::Colour colour = juce::Colour::fromHSV(settings.getHue() / 360.0f, 1.0, 1.0, 1.0);
+    juce::Colour colour = juce::Colour::fromHSV(parameters.getHue() / 360.0f, 1.0, 1.0, 1.0);
     outputShader->setUniform("uColour", colour.getFloatRed(), colour.getFloatGreen(), colour.getFloatBlue());
     drawTexture({
         lineTexture,
@@ -773,10 +812,10 @@ void VisualiserRenderer::setOffsetAndScale(juce::OpenGLShaderProgram *shader) {
     osci::Point offset;
     osci::Point scale = {1.0f};
 #if OSCI_PREMIUM
-    if (settings.getScreenOverlay() == ScreenOverlay::Real) {
+    if (parameters.getScreenOverlay() == ScreenOverlay::Real) {
         offset = REAL_SCREEN_OFFSET;
         scale = REAL_SCREEN_SCALE;
-    } else if (settings.getScreenOverlay() == ScreenOverlay::VectorDisplay) {
+    } else if (parameters.getScreenOverlay() == ScreenOverlay::VectorDisplay) {
         offset = VECTOR_DISPLAY_OFFSET;
         scale = VECTOR_DISPLAY_SCALE;
     }
@@ -789,9 +828,9 @@ void VisualiserRenderer::setOffsetAndScale(juce::OpenGLShaderProgram *shader) {
 Texture VisualiserRenderer::createReflectionTexture() {
     using namespace juce::gl;
 
-    if (settings.getScreenOverlay() == ScreenOverlay::VectorDisplay) {
+    if (parameters.getScreenOverlay() == ScreenOverlay::VectorDisplay) {
         reflectionOpenGLTexture.loadImage(vectorDisplayReflectionImage);
-    } else if (settings.getScreenOverlay() == ScreenOverlay::Real) {
+    } else if (parameters.getScreenOverlay() == ScreenOverlay::Real) {
         reflectionOpenGLTexture.loadImage(oscilloscopeReflectionImage);
     } else {
         reflectionOpenGLTexture.loadImage(emptyReflectionImage);
@@ -920,8 +959,8 @@ void VisualiserRenderer::checkGLErrors(juce::String file, int line) {
 }
 
 void VisualiserRenderer::renderScope(const std::vector<float> &xPoints, const std::vector<float> &yPoints, const std::vector<float> &zPoints) {
-    if (screenOverlay != settings.getScreenOverlay()) {
-        screenOverlay = settings.getScreenOverlay();
+    if (screenOverlay != parameters.getScreenOverlay()) {
+        screenOverlay = parameters.getScreenOverlay();
 #if OSCI_PREMIUM
         reflectionTexture = createReflectionTexture();
 #endif
