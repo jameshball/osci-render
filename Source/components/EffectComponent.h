@@ -1,13 +1,12 @@
 #pragma once
 #include <JuceHeader.h>
-#include "../audio/Effect.h"
 #include "LabelledTextBox.h"
 #include "SvgButton.h"
 
 class EffectComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater, public juce::SettableTooltipClient {
 public:
-    EffectComponent(Effect& effect, int index);
-    EffectComponent(Effect& effect);
+    EffectComponent(osci::Effect& effect, int index);
+    EffectComponent(osci::Effect& effect);
     ~EffectComponent();
 
     void resized() override;
@@ -23,7 +22,7 @@ public:
 
     juce::Slider slider;
     juce::Slider lfoSlider;
-    Effect& effect;
+    osci::Effect& effect;
     int index = 0;
     juce::ComboBox lfo;
     
@@ -40,7 +39,7 @@ public:
             addAndMakeVisible(smoothValueChangeLabel);
             addAndMakeVisible(smoothValueChangeSlider);
             
-            EffectParameter* parameter = parent->effect.parameters[parent->index];
+            osci::EffectParameter* parameter = parent->effect.parameters[parent->index];
             
             min.textBox.setValue(parameter->min, juce::dontSendNotification);
             max.textBox.setValue(parameter->max, juce::dontSendNotification);
@@ -138,7 +137,7 @@ private:
     const int TEXT_WIDTH = 120;
     const int SMALL_TEXT_WIDTH = 90;
 
-    void setSliderValueIfChanged(FloatParameter* parameter, juce::Slider& slider);
+    void setSliderValueIfChanged(osci::FloatParameter* parameter, juce::Slider& slider);
     void setupComponent();
     bool lfoEnabled = true;
     bool sidechainEnabled = true;

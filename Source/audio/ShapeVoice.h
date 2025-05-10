@@ -27,7 +27,7 @@ private:
 	const double MIN_LENGTH_INCREMENT = 0.000001;
 
 	OscirenderAudioProcessor& audioProcessor;
-	std::vector<std::unique_ptr<Shape>> frame;
+	std::vector<std::unique_ptr<osci::Shape>> frame;
 	std::atomic<ShapeSound*> sound = nullptr;
 	double actualTraceStart;
 	double actualTraceLength;

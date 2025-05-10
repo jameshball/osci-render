@@ -1,5 +1,5 @@
 #define MyAppName "sosci"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.1.6.1"
 #define MyAppPublisher "James H Ball"
 #define MyAppURL "https://osci-render.com/sosci"
 #define MyAppExeName "sosci.exe"

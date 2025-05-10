@@ -1,13 +1,12 @@
 #pragma once
 #include <JuceHeader.h>
 #include "../PluginProcessor.h"
-#include "../audio/Effect.h"
 #include "EffectComponent.h"
 
 class LuaListComponent : public juce::Component
 {
 public:
-    LuaListComponent(OscirenderAudioProcessor& p, Effect& effect);
+    LuaListComponent(OscirenderAudioProcessor& p, osci::Effect& effect);
     ~LuaListComponent();
 
     void resized() override;

@@ -8,6 +8,16 @@
 
 #define VERSION_HINT 2
 
+// Define codec options
+enum class VideoCodec {
+    H264,
+    H265,
+    VP9,
+#if JUCE_MAC
+    ProRes,
+#endif
+};
+
 class RecordingParameters {
 public:
     RecordingParameters() {
@@ -21,7 +31,7 @@ public:
     
 private:
 
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     const bool sosciFeatures = true;
 #else
     const bool sosciFeatures = false;
@@ -29,35 +39,36 @@ private:
     
 public:
 
-    EffectParameter qualityParameter = EffectParameter(
+    osci::EffectParameter qualityParameter = osci::EffectParameter(
         "Video Quality",
         "Controls the quality of the recording video. 0 is the worst possible quality, and 1 is almost lossless.",
         "brightness",
         VERSION_HINT, 0.7, 0.0, 1.0
     );
-    BooleanParameter losslessVideo = BooleanParameter("Lossless Video", "losslessVideo", VERSION_HINT, false, "Record video in a lossless format. WARNING: This is not supported by all media players.");
-    Effect qualityEffect = Effect(&qualityParameter);
+    osci::BooleanParameter losslessVideo = osci::BooleanParameter("Lossless Video", "losslessVideo", VERSION_HINT, false, "Record video in a lossless format. WARNING: This is not supported by all media players.");
+    osci::Effect qualityEffect = osci::Effect(&qualityParameter);
 
-    BooleanParameter recordAudio = BooleanParameter("Record Audio", "recordAudio", VERSION_HINT, true, "Record audio along with the video.");
-    BooleanParameter recordVideo = BooleanParameter("Record Video", "recordVideo", VERSION_HINT, sosciFeatures, "Record video output of the visualiser.");
+    osci::BooleanParameter recordAudio = osci::BooleanParameter("Record Audio", "recordAudio", VERSION_HINT, true, "Record audio along with the video.");
+    osci::BooleanParameter recordVideo = osci::BooleanParameter("Record Video", "recordVideo", VERSION_HINT, sosciFeatures, "Record video output of the visualiser.");
     
-    EffectParameter resolution = EffectParameter(
+    osci::EffectParameter resolution = osci::EffectParameter(
         "Resolution",
         "The resolution of the recorded video. This only changes when not recording.",
         "resolution",
         VERSION_HINT, 1024, 128, 2048, 1.0
     );
-    Effect resolutionEffect = Effect(&resolution);
+    osci::Effect resolutionEffect = osci::Effect(&resolution);
     
-    EffectParameter frameRate = EffectParameter(
+    osci::EffectParameter frameRate = osci::EffectParameter(
         "Frame Rate",
         "The frame rate of the recorded video. This only changes when not recording.",
         "frameRate",
         VERSION_HINT, 60.0, 10, 240, 0.01
     );
-    Effect frameRateEffect = Effect(&frameRate);
+    osci::Effect frameRateEffect = osci::Effect(&frameRate);
 
     juce::String compressionPreset = "fast";
+    VideoCodec videoCodec = VideoCodec::H264;
 
     void save(juce::XmlElement* xml) {
         auto settingsXml = xml->createNewChildElement("recordingSettings");
@@ -66,6 +77,7 @@ public:
         recordVideo.save(settingsXml->createNewChildElement("recordVideo"));
         settingsXml->setAttribute("compressionPreset", compressionPreset);
         settingsXml->setAttribute("customSharedTextureServerName", customSharedTextureServerName);
+        settingsXml->setAttribute("videoCodec", static_cast<int>(videoCodec));
         
         auto qualityXml = settingsXml->createNewChildElement("quality");
         qualityEffect.save(qualityXml);
@@ -94,6 +106,10 @@ public:
             }
             if (settingsXml->hasAttribute("customSharedTextureServerName")) {
                 customSharedTextureServerName = settingsXml->getStringAttribute("customSharedTextureServerName");
+            }
+            if (settingsXml->hasAttribute("videoCodec")) {
+                int codecValue = settingsXml->getIntAttribute("videoCodec", 0);
+                videoCodec = static_cast<VideoCodec>(codecValue);
             }
             if (auto* qualityXml = settingsXml->getChildByName("quality")) {
                 qualityEffect.load(qualityXml);
@@ -127,14 +143,6 @@ public:
         // not supported by all media players)
         return 50 * (1.0 - quality) + 1;
     }
-    
-    int getVideoToolboxQuality() {
-        if (parameters.losslessVideo.getBoolValue()) {
-            return 100;
-        }
-        double quality = juce::jlimit(0.0, 1.0, parameters.qualityEffect.getValue());
-        return 100 * quality;
-    }
 
     bool recordingVideo() {
         return parameters.recordVideo.getBoolValue();
@@ -163,6 +171,24 @@ public:
         return parameters.frameRate.getValueUnnormalised();
     }
 
+    VideoCodec getVideoCodec() {
+        return parameters.videoCodec;
+    }
+
+    juce::String getFileExtensionForCodec() {
+        switch (parameters.videoCodec) {
+#if JUCE_MAC
+            case VideoCodec::ProRes:
+                return "mov";
+#endif
+            case VideoCodec::H264:
+            case VideoCodec::H265:
+            case VideoCodec::VP9:
+            default:
+                return "mp4";
+        }
+    }
+
     RecordingParameters& parameters;
 
 private:
@@ -174,13 +200,16 @@ private:
     jux::SwitchButton recordAudio{&parameters.recordAudio};
     jux::SwitchButton recordVideo{&parameters.recordVideo};
     
-#if !SOSCI_FEATURES
+#if !OSCI_PREMIUM
     juce::TextEditor recordVideoWarning{"recordVideoWarning"};
-    juce::HyperlinkButton sosciLink{"Purchase here", juce::URL("https://osci-render.com/sosci")};
+    juce::HyperlinkButton sosciLink{"Purchase here", juce::URL("https://osci-render.com/#purchase")};
 #endif
 
     juce::Label compressionPresetLabel{"Compression Speed", "Compression Speed"};
     juce::ComboBox compressionPreset;
+    
+    juce::Label videoCodecLabel{"Video Codec", "Video Codec"};
+    juce::ComboBox videoCodecSelector;
     
     juce::Label customSharedTextureOutputLabel{"Custom Syphon/Spout Name", "Custom Syphon/Spout Name"};
     juce::TextEditor customSharedTextureOutputEditor{"customSharedTextureOutputEditor"};

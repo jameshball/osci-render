@@ -47,7 +47,7 @@ namespace juce
 
     The object will create your processor using the same createPluginFilter()
     function that the other plugin wrappers use, and will run it through the
-    computer's audio/MIDI devices using AudioDeviceManager and AudioProcessorPlayer.
+    computer's audio/MIDI devices using AudioDeviceManager and AudioProcessorPlayer. 
 
     @tags{Audio}
 */
@@ -76,6 +76,7 @@ public:
         In all instances, the settingsToUse will take precedence over the "preferred" options if not null.
     */
     StandalonePluginHolder (PropertySet* settingsToUse,
+                            const String& commandLine,
                             bool takeOwnershipOfSettings = true,
                             const String& preferredDefaultDeviceName = String(),
                             const AudioDeviceManager::AudioDeviceSetup* preferredSetupOptions = nullptr,
@@ -88,6 +89,7 @@ public:
                             )
 
         : settings (settingsToUse, takeOwnershipOfSettings),
+          commandLine (commandLine),
           channelConfiguration (channels),
           autoOpenMidiDevices (shouldAutoOpenMidiDevices)
     {
@@ -426,6 +428,9 @@ public:
     AudioDeviceManager deviceManager;
     AudioProcessorPlayer player;
     Array<PluginInOuts> channelConfiguration;
+    
+    const String commandLine;
+    std::function<void(const juce::String&)> commandLineCallback;
 
     // avoid feedback loop by default
     bool processorHasPotentialFeedbackLoop = true;
@@ -824,6 +829,7 @@ public:
         : StandaloneFilterWindow (title,
                                   backgroundColour,
                                   std::make_unique<StandalonePluginHolder> (settingsToUse,
+                                                                            "",
                                                                             takeOwnershipOfSettings,
                                                                             preferredDefaultDeviceName,
                                                                             preferredSetupOptions,
@@ -901,25 +907,6 @@ public:
     virtual StandalonePluginHolder* getPluginHolder()    { return pluginHolder.get(); }
 
     std::unique_ptr<StandalonePluginHolder> pluginHolder;
-
-    void handleCommandLine(const String& commandLine)
-    {
-        if (commandLine.isNotEmpty())
-        {
-            handleOpenFile(commandLine);
-        }
-    }
-
-    void handleOpenFile(const String& fileName)
-    {
-        if (auto* processor = getAudioProcessor())
-        {
-//            if (processor->openProjectCallback)
-//            {
-//                processor->openProjectCallback(File(fileName));
-//            }
-        }
-    }
 
 private:
     void updateContent()

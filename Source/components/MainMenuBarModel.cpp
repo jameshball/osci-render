@@ -21,7 +21,7 @@ juce::StringArray MainMenuBarModel::getMenuBarNames() {
 
 juce::PopupMenu MainMenuBarModel::getMenuForIndex(int topLevelMenuIndex, const juce::String& menuName) {
     juce::PopupMenu menu;
-    
+
     if (customMenuLogic) {
         customMenuLogic(menu, topLevelMenuIndex);
     }
@@ -41,3 +41,8 @@ void MainMenuBarModel::menuItemSelected(int menuItemID, int topLevelMenuIndex) {
 }
 
 void MainMenuBarModel::menuBarActivated(bool isActive) {}
+
+void MainMenuBarModel::resetMenuItems() {
+    topLevelMenuNames.clear();
+    menuItems.clear();
+}

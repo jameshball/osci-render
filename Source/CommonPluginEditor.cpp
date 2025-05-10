@@ -5,10 +5,6 @@
 CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String appName, juce::String projectFileType, int defaultWidth, int defaultHeight)
 	: AudioProcessorEditor(&p), audioProcessor(p), appName(appName), projectFileType(projectFileType)
 {
-    if (!applicationFolder.exists()) {
-        applicationFolder.createDirectory();
-    }
-    
 #if JUCE_LINUX
     // use OpenGL on Linux for much better performance. The default on Mac is CoreGraphics, and on Window is Direct2D which is much faster.
     openGlContext.attachTo(*getTopLevelComponent());
@@ -33,6 +29,9 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
         juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
         if (standalone != nullptr) {
             standalone->getMuteInputValue().setValue(false);
+            standalone->commandLineCallback = [this](const juce::String& commandLine) {
+                handleCommandLine(commandLine);
+            };
         }
     }
     
@@ -60,13 +59,39 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     setResizable(true, true);
     setResizeLimits(250, 250, 999999, 999999);
 
-    tooltipDropShadow.setOwner(&tooltipWindow);
+    tooltipDropShadow.setOwner(&tooltipWindow.get());
+    tooltipWindow->setMillisecondsBeforeTipAppears(0);
     
     updateTitle();
 
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     sharedTextureManager.initGL();
 #endif
+}
+
+void CommonPluginEditor::handleCommandLine(const juce::String& commandLine) {
+    if (commandLine.trim().isNotEmpty()) {
+        // Split the command line into tokens, using space as delimiter
+        // and handling quoted arguments as one token.
+        juce::StringArray tokens = juce::StringArray::fromTokens(commandLine, " ", "\"");
+        
+        if (tokens.size() > 0) {
+            // Use the first token as the file path and trim any extra whitespace.
+            juce::String filePath = tokens[0].trim();
+            filePath = filePath.unquoted();
+            juce::File file = juce::File::createFileWithoutCheckingPath(filePath);
+            
+            if (file.existsAsFile()) {
+                if (file.getFileExtension().toLowerCase() == "." + projectFileType.toLowerCase()) {
+                    openProject(file);
+                } else {
+                    juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon, "Invalid Command Line", "Invalid file type: " + file.getFullPathName());
+                }
+            } else {
+                juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon, "Invalid Command Line", "File not found: " + filePath);
+            }
+        }
+    }
 }
 
 void CommonPluginEditor::resized() {
@@ -111,13 +136,13 @@ void CommonPluginEditor::openProject(const juce::File& file) {
             audioProcessor.setStateInformation(data.getData(), data.getSize());
         }
         audioProcessor.currentProjectFile = file.getFullPathName();
-        audioProcessor.lastOpenedDirectory = file.getParentDirectory();
+        audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
         updateTitle();
     }
 }
 
 void CommonPluginEditor::openProject() {
-    chooser = std::make_unique<juce::FileChooser>("Load " + appName + " Project", audioProcessor.lastOpenedDirectory, "*." + projectFileType);
+    chooser = std::make_unique<juce::FileChooser>("Load " + appName + " Project", audioProcessor.getLastOpenedDirectory(), "*." + projectFileType);
     auto flags = juce::FileBrowserComponent::openMode |
         juce::FileBrowserComponent::canSelectFiles;
 
@@ -140,12 +165,13 @@ void CommonPluginEditor::saveProject() {
 }
 
 void CommonPluginEditor::saveProjectAs() {
-    chooser = std::make_unique<juce::FileChooser>("Save " + appName + " Project", audioProcessor.lastOpenedDirectory, "*." + projectFileType);
+    chooser = std::make_unique<juce::FileChooser>("Save " + appName + " Project", audioProcessor.getLastOpenedDirectory(), "*." + projectFileType);
     auto flags = juce::FileBrowserComponent::saveMode;
 
     chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
         auto file = chooser.getResult();
         if (file != juce::File()) {
+            audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
             audioProcessor.currentProjectFile = file.getFullPathName();
             saveProject();
         }

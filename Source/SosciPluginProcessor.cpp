@@ -1,6 +1,5 @@
 #include "SosciPluginProcessor.h"
 #include "SosciPluginEditor.h"
-#include "audio/EffectParameter.h"
 
 SosciAudioProcessor::SosciAudioProcessor() : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(4), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
     // demo audio file on standalone only
@@ -30,7 +29,7 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     bool readingFromWav = wavParser.isInitialised();
     
 	for (int sample = 0; sample < input.getNumSamples(); ++sample) {
-        OsciPoint point;
+        osci::Point point;
         
         if (readingFromWav) {
             point = wavParser.getSample();
@@ -60,7 +59,7 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         }
 
         // this is the point that the visualiser will draw
-        threadManager.write(point, "VisualiserComponent");
+        threadManager.write(point, "VisualiserRenderer");
 
         if (juce::JUCEApplication::isStandaloneApp()) {
             point.scale(volume, volume, 1.0);
@@ -68,6 +67,12 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             // clip
             point.x = juce::jmax(-threshold, juce::jmin(threshold.load(), point.x));
             point.y = juce::jmax(-threshold, juce::jmin(threshold.load(), point.y));
+
+            // Apply mute if active
+            if (muteParameter->getBoolValue()) {
+                point.x = 0.0;
+                point.y = 0.0;
+            }
 
             // this is the point that the volume component will draw (i.e. post scale/clipping)
             threadManager.write(point, "VolumeComponent");
@@ -129,6 +134,10 @@ void SosciAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
 }
 
 void SosciAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
+    if (juce::JUCEApplicationBase::isStandaloneApp() && programCrashedAndUserWantsToReset()) {
+        return;
+    }
+
     std::unique_ptr<juce::XmlElement> xml;
 
     const uint32_t magicXmlNumber = 0x21324356;

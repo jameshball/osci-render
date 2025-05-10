@@ -17,7 +17,7 @@ TxtComponent::TxtComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 	auto updateFont = [this]() {
 		juce::SpinLock::ScopedLockType lock1(audioProcessor.parsersLock);
 		juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
-        audioProcessor.font = juce::Font(installedFonts[font.getSelectedItemIndex()], 1.0, (bold.getToggleState() ? juce::Font::bold : 0) | (italic.getToggleState() ? juce::Font::italic : 0));
+        audioProcessor.font = juce::Font(installedFonts[font.getSelectedItemIndex()], audioProcessor.FONT_SIZE, (bold.getToggleState() ? juce::Font::bold : 0) | (italic.getToggleState() ? juce::Font::italic : 0));
     };
 
 	font.onChange = updateFont;

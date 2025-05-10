@@ -8,12 +8,14 @@
 #include "components/SosciMainMenuBarModel.h"
 #include "components/SvgButton.h"
 #include "components/VolumeComponent.h"
+#include "components/DownloaderComponent.h"
 
 class CommonPluginEditor : public juce::AudioProcessorEditor {
 public:
     CommonPluginEditor(CommonAudioProcessor&, juce::String appName, juce::String projectFileType, int width, int height);
     ~CommonPluginEditor() override;
 
+    void handleCommandLine(const juce::String& commandLine);
     void initialiseMenuBar(juce::MenuBarModel& menuBarModel);
     void openProject(const juce::File& file);
     void openProject();
@@ -29,19 +31,6 @@ public:
 private:
     CommonAudioProcessor& audioProcessor;
     bool fullScreen = false;
-    
-    juce::File applicationFolder = juce::File::getSpecialLocation(juce::File::SpecialLocationType::userApplicationDataDirectory)
-#if JUCE_MAC
-        .getChildFile("Application Support")
-#endif
-        .getChildFile("osci-render");
-
-    juce::String ffmpegFileName =
-#if JUCE_WINDOWS
-        "ffmpeg.exe";
-#else
-        "ffmpeg";
-#endif
 public:
     OscirenderLookAndFeel lookAndFeel;
 
@@ -49,11 +38,12 @@ public:
     juce::String projectFileType;
     juce::String currentFileName;
     
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
+    DownloaderComponent ffmpegDownloader;
     SharedTextureManager sharedTextureManager;
 #endif
 
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     int VISUALISER_SETTINGS_HEIGHT = 1200;
 #else
     int VISUALISER_SETTINGS_HEIGHT = 700;
@@ -61,13 +51,14 @@ public:
 
     VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.visualiserParameters, 3);
     RecordingSettings recordingSettings = RecordingSettings(audioProcessor.recordingParameters);
-    SettingsWindow recordingSettingsWindow = SettingsWindow("Recording Settings", recordingSettings, 300, 320, 300, 320);
+    SettingsWindow recordingSettingsWindow = SettingsWindow("Recording Settings", recordingSettings, 330, 350, 330, 350);
     VisualiserComponent visualiser{
         audioProcessor,
-#if SOSCI_FEATURES
+        *this,
+#if OSCI_PREMIUM
         sharedTextureManager,
 #endif
-        applicationFolder.getChildFile(ffmpegFileName),
+        audioProcessor.applicationFolder.getChildFile(audioProcessor.ffmpegFileName),
         visualiserSettings,
         recordingSettings,
         nullptr,
@@ -78,8 +69,7 @@ public:
 
     std::unique_ptr<juce::FileChooser> chooser;
     juce::MenuBarComponent menuBar;
-
-    juce::TooltipWindow tooltipWindow{nullptr, 0};
+    juce::SharedResourcePointer<juce::TooltipWindow> tooltipWindow;
     juce::DropShadower tooltipDropShadow{juce::DropShadow(juce::Colours::black.withAlpha(0.5f), 6, {0,0})};
 
     bool usingNativeMenuBar = false;
