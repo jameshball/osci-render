@@ -51,7 +51,7 @@ public:
 
     VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.visualiserParameters, 3);
     RecordingSettings recordingSettings = RecordingSettings(audioProcessor.recordingParameters);
-    SettingsWindow recordingSettingsWindow = SettingsWindow("Recording Settings", recordingSettings, 330, 350, 330, 350);
+    SettingsWindow recordingSettingsWindow = SettingsWindow("Recording Settings", recordingSettings, 330, 360, 330, 360);
     VisualiserComponent visualiser{
         audioProcessor,
         *this,
