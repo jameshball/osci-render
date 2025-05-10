@@ -55,6 +55,9 @@ struct LuaVariables {
 	double x = 0;
 	double y = 0;
 	double z = 0;
+	
+	double extX = 0;
+	double extY = 0;
 };
 
 struct lua_State;

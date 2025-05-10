@@ -442,6 +442,9 @@ void LuaParser::setGlobalVariables(lua_State*& L, LuaVariables& vars) {
 		setGlobalVariable(L, "y", vars.y);
 		setGlobalVariable(L, "z", vars.z);
     }
+
+    setGlobalVariable(L, "extX", vars.extX);
+    setGlobalVariable(L, "extY", vars.extY);
 }
 
 void LuaParser::incrementVars(LuaVariables& vars) {

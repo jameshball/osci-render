@@ -503,44 +503,48 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     juce::AudioBuffer<float> outputBuffer3d = juce::AudioBuffer<float>(3, buffer.getNumSamples());
     outputBuffer3d.clear();
 
-    {
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-        if (syphonInputActive) {
-            for (int sample = 0; sample < outputBuffer3d.getNumSamples(); sample++) {
-                osci::Point point = syphonImageParser.getSample();
-                outputBuffer3d.setSample(0, sample, point.x);
-                outputBuffer3d.setSample(1, sample, point.y);
-            }
-        } else
+    if (syphonInputActive) {
+        for (int sample = 0; sample < outputBuffer3d.getNumSamples(); sample++) {
+            osci::Point point = syphonImageParser.getSample();
+            outputBuffer3d.setSample(0, sample, point.x);
+            outputBuffer3d.setSample(1, sample, point.y);
+        }
+    } else
 #endif
-            if (usingInput && totalNumInputChannels >= 1) {
-            if (totalNumInputChannels >= 2) {
-                for (auto channel = 0; channel < juce::jmin(2, totalNumInputChannels); channel++) {
-                    outputBuffer3d.copyFrom(channel, 0, inputBuffer, channel, 0, buffer.getNumSamples());
-                }
-            } else {
-                // For mono input, copy the single channel to both left and right
-                outputBuffer3d.copyFrom(0, 0, inputBuffer, 0, 0, buffer.getNumSamples());
-                outputBuffer3d.copyFrom(1, 0, inputBuffer, 0, 0, buffer.getNumSamples());
+    if (usingInput && totalNumInputChannels >= 1) {
+        if (totalNumInputChannels >= 2) {
+            for (auto channel = 0; channel < juce::jmin(2, totalNumInputChannels); channel++) {
+                outputBuffer3d.copyFrom(channel, 0, inputBuffer, channel, 0, buffer.getNumSamples());
             }
-
-            // handle all midi messages
-            auto midiIterator = midiMessages.cbegin();
-            std::for_each(midiIterator,
-                          midiMessages.cend(),
-                          [&](const juce::MidiMessageMetadata& meta) {
-                              synth.publicHandleMidiEvent(meta.getMessage());
-                          });
         } else {
-            juce::SpinLock::ScopedLockType lock1(parsersLock);
-            juce::SpinLock::ScopedLockType lock2(effectsLock);
-            synth.renderNextBlock(outputBuffer3d, midiMessages, 0, buffer.getNumSamples());
-            for (int i = 0; i < synth.getNumVoices(); i++) {
-                auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
-                if (voice->isVoiceActive()) {
-                    customEffect->frequency = voice->getFrequency();
-                    break;
-                }
+            // For mono input, copy the single channel to both left and right
+            outputBuffer3d.copyFrom(0, 0, inputBuffer, 0, 0, buffer.getNumSamples());
+            outputBuffer3d.copyFrom(1, 0, inputBuffer, 0, 0, buffer.getNumSamples());
+        }
+
+        // handle all midi messages
+        auto midiIterator = midiMessages.cbegin();
+        std::for_each(midiIterator,
+            midiMessages.cend(),
+            [&] (const juce::MidiMessageMetadata& meta) { synth.publicHandleMidiEvent(meta.getMessage()); }
+        );
+    } else {
+        juce::SpinLock::ScopedLockType lock1(parsersLock);
+        juce::SpinLock::ScopedLockType lock2(effectsLock);
+        for (int i = 0; i < synth.getNumVoices(); i++) {
+            ShapeVoice* voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
+            if (voice->renderingSample) {
+                voice->setExternalAudio(inputBuffer);
+            }
+            else voice->clearExternalAudio();
+        }
+        synth.renderNextBlock(outputBuffer3d, midiMessages, 0, buffer.getNumSamples());
+        for (int i = 0; i < synth.getNumVoices(); i++) {
+            auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
+            if (voice->isVoiceActive()) {
+                customEffect->frequency = voice->getFrequency();
+                break;
             }
         }
     }
