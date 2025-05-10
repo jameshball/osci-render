@@ -17,19 +17,30 @@ EffectPluginEditor::EffectPluginEditor(EffectAudioProcessor& p)
     
     addAndMakeVisible(visualiser);
     addAndMakeVisible(titleVisualiser);
-    addAndMakeVisible(bitCrush);
+    addAndMakeVisible(sliderVisualiser);
     
     titleVisualiser.setCropRectangle(juce::Rectangle<float>(-0.1f, 0.35f, 1.2f, 0.3f));
+      // Configure the slider visualiser component
+    sliderVisualiser.onValueChange([this]() {
+        audioProcessor.bitCrush->parameters[0]->setUnnormalisedValueNotifyingHost(sliderVisualiser.getValue());
+    });
     
-    bitCrush.slider.onValueChange = [this] {
-        audioProcessor.bitCrush->parameters[0]->setUnnormalisedValueNotifyingHost(bitCrush.slider.getValue());
-    };
+    // Set the label for the slider
+    sliderVisualiser.setLabel("bit crush");
 
     setSize(600, 200);
     setResizable(false, false);
 
     tooltipDropShadow.setOwner(&tooltipWindow.get());
     tooltipWindow->setMillisecondsBeforeTipAppears(0);
+    
+    audioProcessor.bitCrush->addListener(0, this);
+}
+
+EffectPluginEditor::~EffectPluginEditor() {
+    audioProcessor.bitCrush->removeListener(0, this);
+    setLookAndFeel(nullptr);
+    juce::Desktop::getInstance().setDefaultLookAndFeel(nullptr);
 }
 
 void EffectPluginEditor::resized() {
@@ -40,10 +51,18 @@ void EffectPluginEditor::resized() {
     auto titleBounds = bounds.removeFromTop(100);
     titleVisualiser.setBounds(titleBounds);
     
-    bitCrush.setBounds(bounds);
+    // Set bounds for sliderVisualiser
+    sliderVisualiser.setBounds(bounds);
 }
 
-EffectPluginEditor::~EffectPluginEditor() {
-    setLookAndFeel(nullptr);
-    juce::Desktop::getInstance().setDefaultLookAndFeel(nullptr);
+void EffectPluginEditor::parameterValueChanged(int parameterIndex, float newValue) {
+    if (parameterIndex == 0) {
+        juce::MessageManager::getInstance()->callAsync([this, newValue]() {
+            sliderVisualiser.setValue(newValue);
+            // Update visualizer directly as setValue doesn't always trigger onChange
+            sliderVisualiser.updateVisualiser();
+        });
+    }
 }
+
+void EffectPluginEditor::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}

@@ -81,6 +81,10 @@
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
         <FILE id="fwEcan" name="AutoGainControlEffect.h" compile="0" resource="0"
               file="Source/audio/AutoGainControlEffect.h"/>
+        <FILE id="m3ONmD" name="ShapeVectorRenderer.cpp" compile="1" resource="0"
+              file="Source/audio/ShapeVectorRenderer.cpp"/>
+        <FILE id="EEZHBS" name="ShapeVectorRenderer.h" compile="0" resource="0"
+              file="Source/audio/ShapeVectorRenderer.h"/>
         <FILE id="GSnwBW" name="SmoothEffect.h" compile="0" resource="0" file="Source/audio/SmoothEffect.h"/>
         <FILE id="jq3EXV" name="StereoEffect.h" compile="0" resource="0" file="Source/audio/StereoEffect.h"/>
       </GROUP>
@@ -93,6 +97,10 @@
               file="Source/components/MainMenuBarModel.cpp"/>
         <FILE id="t6oUhv" name="MainMenuBarModel.h" compile="0" resource="0"
               file="Source/components/MainMenuBarModel.h"/>
+        <FILE id="i4SGze" name="SliderVisualiserComponent.cpp" compile="1"
+              resource="0" file="Source/components/SliderVisualiserComponent.cpp"/>
+        <FILE id="vRJQLf" name="SliderVisualiserComponent.h" compile="0" resource="0"
+              file="Source/components/SliderVisualiserComponent.h"/>
         <FILE id="f2kkHV" name="SvgButton.h" compile="0" resource="0" file="Source/components/SvgButton.h"/>
         <FILE id="qzfstC" name="SwitchButton.h" compile="0" resource="0" file="Source/components/SwitchButton.h"/>
       </GROUP>

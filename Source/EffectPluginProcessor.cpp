@@ -26,8 +26,11 @@ EffectAudioProcessor::EffectAudioProcessor()
         }
     }
     
-    titleShapes = titleParser.draw();
-    titleShapesLength = osci::Shape::totalLength(titleShapes);
+    // Initialize title shapes
+    juce::Font titleFont = juce::Font(1.0f, juce::Font::bold);
+    TextParser titleParser{"bit crush", titleFont};
+    auto titleShapes = titleParser.draw();
+    titleRenderer.setShapes(std::move(titleShapes));
 }
 
 const juce::String EffectAudioProcessor::getName() const {
@@ -86,6 +89,7 @@ void EffectAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     }
     
     currentSampleRate = sampleRate;
+    titleRenderer.setSampleRate(sampleRate);
     
     threadManager.prepare(sampleRate, samplesPerBlock);
 }
@@ -126,56 +130,25 @@ void EffectAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
         if (output.getNumChannels() > 1) {
             outputArray[1][sample] = point.y;
         }
+          // handle the title drawing
+        osci::Point titlePoint = titleRenderer.nextVector();
         
-        // handle the title drawing
-        
-        osci::Point titlePoint = { 0.0, 0.0, 1.0f };
-        if (currentTitleShape < titleShapes.size()) {
-            auto& shape = titleShapes[currentTitleShape];
-            double length = shape->length();
-            double drawingProgress = length == 0.0 ? 1 : titleShapeDrawn / length;
-            titlePoint = shape->nextVector(drawingProgress);
-            titlePoint.z = 1.0f;
-            
-            // apply bit crush without animating values, as this has already been done
-            titlePoint = bitCrush->apply(sample, titlePoint, 0.0, false);
-        }
-        
+        // apply bit crush without animating values, as this has already been done
+        titlePoint = bitCrush->apply(sample, titlePoint, 0.0, false);
+
         threadManager.write(titlePoint, "VisualiserRendererTitle");
-        
-        incrementTitleShapeDrawing();
-        
-        if (titleFrameDrawn >= titleShapesLength) {
-            double currentShapeLength = 0;
-            if (currentTitleShape < titleShapes.size()) {
-                currentShapeLength = titleShapes[currentTitleShape]->len;
-            }
-            titleFrameDrawn -= titleShapesLength;
-            currentTitleShape = 0;
+
+        osci::Point sliderPoint;
+        {
+            juce::SpinLock::ScopedLockType lock(sliderLock);
+            sliderPoint = sliderRenderer.nextVector();
         }
+
+        threadManager.write(sliderPoint, "VisualiserRendererSlider");
 	}
 }
 
-void EffectAudioProcessor::incrementTitleShapeDrawing() {
-    if (titleShapes.size() <= 0) return;
-    double length = currentTitleShape < titleShapes.size() ? titleShapes[currentTitleShape]->len : 0.0;
-    double FREQUENCY = 60.0;
-    double lengthIncrement = titleShapesLength / (currentSampleRate / FREQUENCY);
-    titleFrameDrawn += lengthIncrement;
-    titleShapeDrawn += lengthIncrement;
 
-    // Need to skip all shapes that the lengthIncrement draws over.
-    // This is especially an issue when there are lots of small lines being
-    // drawn.
-    while (titleShapeDrawn > length) {
-        titleShapeDrawn -= length;
-        currentTitleShape++;
-        if (currentTitleShape >= titleShapes.size()) {
-            currentTitleShape = 0;
-        }
-        length = titleShapes[currentTitleShape]->len;
-    }
-}
 
 void EffectAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
     std::unique_ptr<juce::XmlElement> xml = std::make_unique<juce::XmlElement>("project");
