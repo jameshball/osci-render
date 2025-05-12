@@ -87,7 +87,9 @@ public:
 class VisualiserParameters {
 public:
     VisualiserParameters() {
+#if OSCI_PREMIUM
         scaleEffect->markLockable(true);
+#endif
     }
 
     double getIntensity() {
