@@ -11,10 +11,6 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
     frequency.slider.setTextValueSuffix("Hz");
     frequency.slider.setValue(audioProcessor.frequencyEffect->getValue(), juce::dontSendNotification);
 
-    frequency.slider.onValueChange = [this] {
-        audioProcessor.frequencyEffect->parameters[0]->setUnnormalisedValueNotifyingHost(frequency.slider.getValue());
-    };
-
     /*addBtn.setButtonText("Add Item...");
     addBtn.onClick = [this]()
     {

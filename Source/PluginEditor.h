@@ -54,7 +54,7 @@ public:
     juce::ComponentAnimator codeEditorAnimator;
     LuaComponent lua{audioProcessor, *this};
 
-    SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings", visualiserSettings, 550, 500, 550, VISUALISER_SETTINGS_HEIGHT);
+    SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings", visualiserSettings, 550, 500, 1500, VISUALISER_SETTINGS_HEIGHT);
 
     LuaConsole console;
 

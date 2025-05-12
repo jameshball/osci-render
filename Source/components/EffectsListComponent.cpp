@@ -12,11 +12,6 @@ effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
 		// using weak_ptr to avoid circular reference and memory leak
 		std::weak_ptr<EffectComponent> weakEffectComponent = effectComponent;
 		effectComponent->slider.setValue(parameters[i]->getValueUnnormalised(), juce::dontSendNotification);
-		effectComponent->slider.onValueChange = [this, i, weakEffectComponent] {
-			if (auto effectComponent = weakEffectComponent.lock()) {
-				this->effect.setValue(i, effectComponent->slider.getValue());
-			}
-		};
 		
 		list.setEnabled(selected.getToggleState());
 		selected.onClick = [this, weakEffectComponent] {

@@ -3,12 +3,13 @@
 #define VERSION_HINT 2
 
 #include <JuceHeader.h>
-#include "../components/EffectComponent.h"
-#include "../components/SvgButton.h"
+
 #include "../LookAndFeel.h"
-#include "../components/SwitchButton.h"
 #include "../audio/SmoothEffect.h"
 #include "../audio/StereoEffect.h"
+#include "../components/EffectComponent.h"
+#include "../components/SvgButton.h"
+#include "../components/SwitchButton.h"
 #include "VisualiserParameters.h"
 
 class GroupedSettings : public juce::GroupComponent {
@@ -16,29 +17,28 @@ public:
     GroupedSettings(std::vector<std::shared_ptr<EffectComponent>> effects, juce::String label) : effects(effects), juce::GroupComponent(label, label) {
         for (auto effect : effects) {
             addAndMakeVisible(effect.get());
-            effect->setSliderOnValueChange();
         }
-        
+
         setColour(groupComponentBackgroundColourId, Colours::veryDark.withMultipliedBrightness(3.0));
     }
-    
+
     void resized() override {
         auto area = getLocalBounds();
         area.removeFromTop(35);
         double rowHeight = 30;
-        
+
         for (auto effect : effects) {
             effect->setBounds(area.removeFromTop(rowHeight));
         }
     }
-    
+
     int getHeight() {
         return 40 + effects.size() * 30;
     }
 
 private:
     std::vector<std::shared_ptr<EffectComponent>> effects;
-    
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GroupedSettings)
 };
 
@@ -62,9 +62,8 @@ private:
             std::make_shared<EffectComponent>(*parameters.lineSaturationEffect),
             std::make_shared<EffectComponent>(*parameters.intensityEffect),
         },
-        "Line Colour"
-    };
-    
+        "Line Colour"};
+
 #if OSCI_PREMIUM
     GroupedSettings screenColour{
         std::vector<std::shared_ptr<EffectComponent>>{
@@ -72,10 +71,9 @@ private:
             std::make_shared<EffectComponent>(*parameters.screenSaturationEffect),
             std::make_shared<EffectComponent>(*parameters.ambientEffect),
         },
-        "Screen Colour"
-    };
+        "Screen Colour"};
 #endif
-    
+
     GroupedSettings lightEffects{
         std::vector<std::shared_ptr<EffectComponent>>{
             std::make_shared<EffectComponent>(*parameters.persistenceEffect),
@@ -88,16 +86,14 @@ private:
             std::make_shared<EffectComponent>(*parameters.ambientEffect),
 #endif
         },
-        "Light Effects"
-    };
-    
+        "Light Effects"};
+
     GroupedSettings videoEffects{
         std::vector<std::shared_ptr<EffectComponent>>{
             std::make_shared<EffectComponent>(*parameters.noiseEffect),
         },
-        "Video Effects"
-    };
-    
+        "Video Effects"};
+
     GroupedSettings lineEffects{
         std::vector<std::shared_ptr<EffectComponent>>{
             std::make_shared<EffectComponent>(*parameters.smoothEffect),
@@ -105,28 +101,31 @@ private:
             std::make_shared<EffectComponent>(*parameters.stereoEffect),
 #endif
         },
-        "Line Effects"
-    };
-    
+        "Line Effects"};
+
     EffectComponent sweepMs{*parameters.sweepMsEffect};
     EffectComponent triggerValue{*parameters.triggerValueEffect};
-    
+
     juce::Label screenOverlayLabel{"Screen Overlay", "Screen Overlay"};
     juce::ComboBox screenOverlay;
-    
+
     jux::SwitchButton upsamplingToggle{parameters.upsamplingEnabled};
     jux::SwitchButton sweepToggle{parameters.sweepEnabled};
 
 #if OSCI_PREMIUM
-    GroupedSettings positionSize{
+    GroupedSettings scale{
         std::vector<std::shared_ptr<EffectComponent>>{
             std::make_shared<EffectComponent>(*parameters.scaleEffect, 0),
             std::make_shared<EffectComponent>(*parameters.scaleEffect, 1),
+        },
+        "Image Scale"};
+    
+    GroupedSettings position{
+        std::vector<std::shared_ptr<EffectComponent>>{
             std::make_shared<EffectComponent>(*parameters.offsetEffect, 0),
             std::make_shared<EffectComponent>(*parameters.offsetEffect, 1),
         },
-        "Line Position & Scale"
-    };
+        "Image Position"};
 
     jux::SwitchButton flipVerticalToggle{parameters.flipVertical};
     jux::SwitchButton flipHorizontalToggle{parameters.flipHorizontal};
@@ -160,7 +159,7 @@ private:
 
 class SettingsWindow : public juce::DialogWindow {
 public:
-    SettingsWindow(juce::String name, juce::Component& component, int windowWidth, int windowHeight, int componentWidth, int componentHeight) : juce::DialogWindow(name, Colours::darker, true, true), component(component) {
+    SettingsWindow(juce::String name, juce::Component& component, int windowWidth, int windowHeight, int componentWidth, int componentHeight) : juce::DialogWindow(name, Colours::darker, true, true), component(component), componentHeight(componentHeight) {
         setContentComponent(&viewport);
         centreWithSize(windowWidth, windowHeight);
         setResizeLimits(windowWidth, windowHeight, componentWidth, componentHeight);
@@ -175,7 +174,14 @@ public:
         setVisible(false);
     }
 
+    void resized() override {
+        DialogWindow::resized();
+        // Update the component width to match the viewport width while maintaining its height
+        component.setSize(viewport.getWidth(), componentHeight);
+    }
+
 private:
     juce::Viewport viewport;
     juce::Component& component;
+    int componentHeight;
 };

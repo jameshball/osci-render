@@ -46,14 +46,6 @@ FrameSettingsComponent::FrameSettingsComponent(OscirenderAudioProcessor& p, Osci
     animate.onClick = [this]() {
         audioProcessor.animateFrames->setValue(animate.getToggleState());
     };
-
-	threshold.slider.onValueChange = [this]() {
-        audioProcessor.imageThreshold->setValue(threshold.slider.getValue());
-    };
-
-	stride.slider.onValueChange = [this]() {
-        audioProcessor.imageStride->setValue(stride.slider.getValue());
-    };
     
 	audioProcessor.animationRate->addListener(this);
 	audioProcessor.animationOffset->addListener(this);

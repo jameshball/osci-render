@@ -86,6 +86,9 @@ public:
 
 class VisualiserParameters {
 public:
+    VisualiserParameters() {
+        scaleEffect->markLockable(true);
+    }
 
     double getIntensity() {
         return intensityEffect->getActualValue() / 100;

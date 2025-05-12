@@ -15,7 +15,8 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
     addAndMakeVisible(screenOverlayLabel);
     addAndMakeVisible(screenOverlay);
 #if OSCI_PREMIUM
-    addAndMakeVisible(positionSize);
+    addAndMakeVisible(scale);
+    addAndMakeVisible(position);
     addAndMakeVisible(screenColour);
     addAndMakeVisible(flipVerticalToggle);
     addAndMakeVisible(flipHorizontalToggle);
@@ -30,9 +31,6 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
     screenOverlay.onChange = [this] {
         parameters.screenOverlay->setUnnormalisedValueNotifyingHost(screenOverlay.getSelectedId());
     };
-    
-    sweepMs.setSliderOnValueChange();
-    triggerValue.setSliderOnValueChange();
     
     sweepMs.setEnabled(sweepToggle.getToggleState());
     triggerValue.setEnabled(sweepToggle.getToggleState());
@@ -79,7 +77,9 @@ void VisualiserSettings::resized() {
     
 #if OSCI_PREMIUM
     area.removeFromTop(10);
-    positionSize.setBounds(area.removeFromTop(positionSize.getHeight()));
+    scale.setBounds(area.removeFromTop(scale.getHeight()));
+    area.removeFromTop(10);
+    position.setBounds(area.removeFromTop(position.getHeight()));
     area.removeFromTop(10);
     flipVerticalToggle.setBounds(area.removeFromTop(rowHeight));
     flipHorizontalToggle.setBounds(area.removeFromTop(rowHeight));

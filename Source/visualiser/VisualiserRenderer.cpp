@@ -203,6 +203,10 @@ void VisualiserRenderer::newOpenGLContextCreated() {
 
     juce::CriticalSection::ScopedLockType lock(samplesLock);
 
+#if JUCE_WINDOWS && JUCE_DEBUG
+    glDisable(GL_DEBUG_OUTPUT);
+#endif
+
     glColorMask(true, true, true, true);
 
     viewportChanged(viewportArea);

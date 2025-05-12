@@ -7,9 +7,6 @@ PerspectiveComponent::PerspectiveComponent(OscirenderAudioProcessor& p, Oscirend
 
 	addAndMakeVisible(perspective);
 	addAndMakeVisible(focalLength);
-
-	perspective.setSliderOnValueChange();
-	focalLength.setSliderOnValueChange();
 }
 
 PerspectiveComponent::~PerspectiveComponent() {}

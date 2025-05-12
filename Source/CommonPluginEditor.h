@@ -44,7 +44,7 @@ public:
 #endif
 
 #if OSCI_PREMIUM
-    int VISUALISER_SETTINGS_HEIGHT = 1200;
+    int VISUALISER_SETTINGS_HEIGHT = 1230;
 #else
     int VISUALISER_SETTINGS_HEIGHT = 700;
 #endif

@@ -34,16 +34,19 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     toggleableEffects.push_back(std::make_shared<osci::Effect>(
         std::make_shared<VectorCancellingEffect>(),
         new osci::EffectParameter("Vector Cancelling", "Inverts the audio and image every few samples to 'cancel out' the audio, making the audio quiet, and distorting the image.", "vectorCancelling", VERSION_HINT, 0.1111111, 0.0, 1.0)));
-    toggleableEffects.push_back(std::make_shared<osci::Effect>(
+    auto scaleEffect = std::make_shared<osci::Effect>(
         [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             return input * osci::Point(values[0], values[1], values[2]);
         },
         std::vector<osci::EffectParameter*>{
-            new osci::EffectParameter("Scale X", "Scales the object in the horizontal direction.", "scaleX", VERSION_HINT, 1.0, -5.0, 5.0),
-            new osci::EffectParameter("Scale Y", "Scales the object in the vertical direction.", "scaleY", VERSION_HINT, 1.0, -5.0, 5.0),
-            new osci::EffectParameter("Scale Z", "Scales the depth of the object.", "scaleZ", VERSION_HINT, 1.0, -5.0, 5.0),
-        }));
-    toggleableEffects.push_back(std::make_shared<osci::Effect>(
+        new osci::EffectParameter("Scale X", "Scales the object in the horizontal direction.", "scaleX", VERSION_HINT, 1.0, -3.0, 3.0),
+            new osci::EffectParameter("Scale Y", "Scales the object in the vertical direction.", "scaleY", VERSION_HINT, 1.0, -3.0, 3.0),
+            new osci::EffectParameter("Scale Z", "Scales the depth of the object.", "scaleZ", VERSION_HINT, 1.0, -3.0, 3.0),
+    });
+    scaleEffect->markLockable(true);
+    booleanParameters.push_back(scaleEffect->linked);
+    toggleableEffects.push_back(scaleEffect);
+    auto distortEffect = std::make_shared<osci::Effect>(
         [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             int flip = index % 2 == 0 ? 1 : -1;
             osci::Point jitter = osci::Point(flip * values[0], flip * values[1], flip * values[2]);
@@ -53,7 +56,10 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
             new osci::EffectParameter("Distort X", "Distorts the image in the horizontal direction by jittering the audio sample being drawn.", "distortX", VERSION_HINT, 0.0, 0.0, 1.0),
             new osci::EffectParameter("Distort Y", "Distorts the image in the vertical direction by jittering the audio sample being drawn.", "distortY", VERSION_HINT, 0.0, 0.0, 1.0),
             new osci::EffectParameter("Distort Z", "Distorts the depth of the image by jittering the audio sample being drawn.", "distortZ", VERSION_HINT, 0.1, 0.0, 1.0),
-        }));
+        });
+    distortEffect->markLockable(false);
+    booleanParameters.push_back(distortEffect->linked);
+    toggleableEffects.push_back(distortEffect);
     auto rippleEffect = std::make_shared<osci::Effect>(
         [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             double phase = values[1] * std::numbers::pi;
