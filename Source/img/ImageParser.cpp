@@ -338,7 +338,12 @@ float ImageParser::getPixelValue(int x, int y, bool invert) {
     if (usingLiveImage) {
         if (liveImage.isValid()) {
             if (x < 0 || x >= width || y < 0 || y >= height) return 0;
+#if JUCE_MAC
+            juce::Colour pixel = liveImage.getPixelAt(x, y);
+#else
             juce::Colour pixel = liveImage.getPixelAt(x, height - y - 1);
+#endif
+            
             float value = pixel.getBrightness();
             if (invert && value > 0) value = 1.0f - value;
             return value;
