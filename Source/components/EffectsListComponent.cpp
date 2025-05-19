@@ -3,7 +3,7 @@
 #include "../PluginEditor.h"
 #include "../LookAndFeel.h"
 
-EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectListBoxItemData& data, int rn, Effect& effect) : DraggableListBoxItem(lb, data, rn),
+EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectListBoxItemData& data, int rn, osci::Effect& effect) : DraggableListBoxItem(lb, data, rn),
 effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
     auto parameters = effect.parameters;
 	for (int i = 0; i < parameters.size(); i++) {
@@ -12,11 +12,6 @@ effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
 		// using weak_ptr to avoid circular reference and memory leak
 		std::weak_ptr<EffectComponent> weakEffectComponent = effectComponent;
 		effectComponent->slider.setValue(parameters[i]->getValueUnnormalised(), juce::dontSendNotification);
-		effectComponent->slider.onValueChange = [this, i, weakEffectComponent] {
-			if (auto effectComponent = weakEffectComponent.lock()) {
-				this->effect.setValue(i, effectComponent->slider.getValue());
-			}
-		};
 		
 		list.setEnabled(selected.getToggleState());
 		selected.onClick = [this, weakEffectComponent] {
@@ -100,7 +95,7 @@ void EffectsListComponent::resized() {
 	list.setBounds(area);
 }
 
-std::shared_ptr<juce::Component> EffectsListComponent::createComponent(EffectParameter* parameter) {
+std::shared_ptr<juce::Component> EffectsListComponent::createComponent(osci::EffectParameter* parameter) {
 	if (parameter->paramID == "customEffectStrength") {
 		std::shared_ptr<SvgButton> button = std::make_shared<SvgButton>(parameter->name, BinaryData::pencil_svg, juce::Colours::white, juce::Colours::red);
 		std::weak_ptr<SvgButton> weakButton = button;

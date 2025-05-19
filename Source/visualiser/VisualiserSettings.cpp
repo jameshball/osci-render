@@ -14,8 +14,9 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
     addAndMakeVisible(sweepToggle);
     addAndMakeVisible(screenOverlayLabel);
     addAndMakeVisible(screenOverlay);
-#if SOSCI_FEATURES
-    addAndMakeVisible(positionSize);
+#if OSCI_PREMIUM
+    addAndMakeVisible(scale);
+    addAndMakeVisible(position);
     addAndMakeVisible(screenColour);
     addAndMakeVisible(flipVerticalToggle);
     addAndMakeVisible(flipHorizontalToggle);
@@ -30,9 +31,6 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
     screenOverlay.onChange = [this] {
         parameters.screenOverlay->setUnnormalisedValueNotifyingHost(screenOverlay.getSelectedId());
     };
-    
-    sweepMs.setSliderOnValueChange();
-    triggerValue.setSliderOnValueChange();
     
     sweepMs.setEnabled(sweepToggle.getToggleState());
     triggerValue.setEnabled(sweepToggle.getToggleState());
@@ -66,7 +64,7 @@ void VisualiserSettings::resized() {
     screenOverlay.setBounds(screenOverlayArea.removeFromRight(180));
     
     lineColour.setBounds(area.removeFromTop(lineColour.getHeight()));
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     area.removeFromTop(10);
     screenColour.setBounds(area.removeFromTop(screenColour.getHeight()));
 #endif
@@ -77,9 +75,11 @@ void VisualiserSettings::resized() {
     area.removeFromTop(10);
     lineEffects.setBounds(area.removeFromTop(lineEffects.getHeight()));
     
-#if SOSCI_FEATURES
+#if OSCI_PREMIUM
     area.removeFromTop(10);
-    positionSize.setBounds(area.removeFromTop(positionSize.getHeight()));
+    scale.setBounds(area.removeFromTop(scale.getHeight()));
+    area.removeFromTop(10);
+    position.setBounds(area.removeFromTop(position.getHeight()));
     area.removeFromTop(10);
     flipVerticalToggle.setBounds(area.removeFromTop(rowHeight));
     flipHorizontalToggle.setBounds(area.removeFromTop(rowHeight));
@@ -87,7 +87,7 @@ void VisualiserSettings::resized() {
     shutterSyncToggle.setBounds(area.removeFromTop(rowHeight));
 #endif
 
-#if !SOSCI_FEATURES
+#if !OSCI_PREMIUM
     area.removeFromTop(10);
 #endif
     upsamplingToggle.setBounds(area.removeFromTop(rowHeight));

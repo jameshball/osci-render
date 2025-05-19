@@ -56,9 +56,9 @@ void WavParser::setSampleRate(double sampleRate) {
     currentSampleRate = sampleRate;
 }
 
-OsciPoint WavParser::getSample() {
+osci::Point WavParser::getSample() {
     if (!initialised || paused) {
-        return OsciPoint();
+        return osci::Point();
     }
 
     if (currentSampleRate != audioProcessor.currentSampleRate) {
@@ -77,20 +77,15 @@ OsciPoint WavParser::getSample() {
         counter = 0;
         afSource->setNextReadPosition(0);
     }
-    if (counter % currentSampleRate == 0) {
-        if (onProgress != nullptr) {
-            onProgress((double)currentSample / totalSamples);
-        }
-    }
     
     if (audioBuffer.getNumChannels() == 1) {
-        return OsciPoint(audioBuffer.getSample(0, 0), audioBuffer.getSample(0, 0), 1.0);
+        return osci::Point(audioBuffer.getSample(0, 0), audioBuffer.getSample(0, 0), 1.0);
     } else if (audioBuffer.getNumChannels() == 2) {
-        return OsciPoint(audioBuffer.getSample(0, 0), audioBuffer.getSample(1, 0), 1.0);
+        return osci::Point(audioBuffer.getSample(0, 0), audioBuffer.getSample(1, 0), 1.0);
     } else if (audioBuffer.getNumChannels() >= 3) {
-        return OsciPoint(audioBuffer.getSample(0, 0), audioBuffer.getSample(1, 0), audioBuffer.getSample(2, 0));
+        return osci::Point(audioBuffer.getSample(0, 0), audioBuffer.getSample(1, 0), audioBuffer.getSample(2, 0));
     } else {
-        return OsciPoint();
+        return osci::Point();
     }
 }
 

@@ -2,7 +2,6 @@
 #include <JuceHeader.h>
 #include <regex>
 #include <numbers>
-#include "../shape/Shape.h"
 
 class ErrorListener {
 public:

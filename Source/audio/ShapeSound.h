@@ -3,7 +3,6 @@
 #include "../parser/FileParser.h"
 #include "../parser/FrameProducer.h"
 #include "../parser/FrameConsumer.h"
-#include "../concurrency/BlockingQueue.h"
 
 class OscirenderAudioProcessor;
 class ShapeSound : public juce::SynthesiserSound, public FrameConsumer {
@@ -14,8 +13,8 @@ public:
 
 	bool appliesToNote(int note) override;
 	bool appliesToChannel(int channel) override;
-	void addFrame(std::vector<std::unique_ptr<Shape>>& frame, bool force = true) override;
-	double updateFrame(std::vector<std::unique_ptr<Shape>>& frame);
+	void addFrame(std::vector<std::unique_ptr<osci::Shape>>& frame, bool force = true) override;
+	double updateFrame(std::vector<std::unique_ptr<osci::Shape>>& frame);
 
 	std::shared_ptr<FileParser> parser;
 
@@ -23,7 +22,7 @@ public:
 
 private:
 	
-	BlockingQueue frames{10};
+	osci::BlockingQueue frames{10};
 	std::unique_ptr<FrameProducer> producer;
 	double frameLength = 0.0;
 };

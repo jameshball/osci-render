@@ -1,7 +1,8 @@
 #include "EffectComponent.h"
+
 #include "../LookAndFeel.h"
 
-EffectComponent::EffectComponent(Effect& effect, int index) : effect(effect), index(index) {
+EffectComponent::EffectComponent(osci::Effect& effect, int index) : effect(effect), index(index) {
     addAndMakeVisible(slider);
     addChildComponent(lfoSlider);
     addAndMakeVisible(lfo);
@@ -13,6 +14,16 @@ EffectComponent::EffectComponent(Effect& effect, int index) : effect(effect), in
         sidechainButton = std::make_unique<SvgButton>(effect.parameters[index]->name, BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red, effect.parameters[index]->sidechain);
         sidechainButton->setTooltip("When enabled, the volume of the input audio controls the value of the slider, acting like a sidechain effect.");
         addAndMakeVisible(*sidechainButton);
+    }
+
+    if (effect.linked != nullptr && index == 0) {
+        linkButton.setTooltip("When enabled, parameters are linked and changes to one parameter will affect all parameters.");
+        linkButton.onClick = [this]() {
+            if (this->effect.linked != nullptr) {
+                this->effect.linked->setBoolValueNotifyingHost(!this->effect.linked->getBoolValue());
+            }
+        };
+        addAndMakeVisible(linkButton);
     }
 
     slider.setSliderStyle(juce::Slider::LinearHorizontal);
@@ -31,14 +42,14 @@ EffectComponent::EffectComponent(Effect& effect, int index) : effect(effect), in
 
     label.setFont(juce::Font(14.0f));
 
-    lfo.addItem("Static", static_cast<int>(LfoType::Static));
-    lfo.addItem("Sine", static_cast<int>(LfoType::Sine));
-    lfo.addItem("Square", static_cast<int>(LfoType::Square));
-    lfo.addItem("Seesaw", static_cast<int>(LfoType::Seesaw));
-    lfo.addItem("Triangle", static_cast<int>(LfoType::Triangle));
-    lfo.addItem("Sawtooth", static_cast<int>(LfoType::Sawtooth));
-    lfo.addItem("Reverse Sawtooth", static_cast<int>(LfoType::ReverseSawtooth));
-    lfo.addItem("Noise", static_cast<int>(LfoType::Noise));
+    lfo.addItem("Static", static_cast<int>(osci::LfoType::Static));
+    lfo.addItem("Sine", static_cast<int>(osci::LfoType::Sine));
+    lfo.addItem("Square", static_cast<int>(osci::LfoType::Square));
+    lfo.addItem("Seesaw", static_cast<int>(osci::LfoType::Seesaw));
+    lfo.addItem("Triangle", static_cast<int>(osci::LfoType::Triangle));
+    lfo.addItem("Sawtooth", static_cast<int>(osci::LfoType::Sawtooth));
+    lfo.addItem("Reverse Sawtooth", static_cast<int>(osci::LfoType::ReverseSawtooth));
+    lfo.addItem("Noise", static_cast<int>(osci::LfoType::Noise));
 
     settingsButton.setTooltip("Click to change the slider settings, including range.");
 
@@ -53,12 +64,12 @@ EffectComponent::EffectComponent(Effect& effect, int index) : effect(effect), in
     setupComponent();
 }
 
-EffectComponent::EffectComponent(Effect& effect) : EffectComponent(effect, 0) {}
+EffectComponent::EffectComponent(osci::Effect& effect) : EffectComponent(effect, 0) {}
 
-void EffectComponent::setSliderValueIfChanged(FloatParameter* parameter, juce::Slider& slider) {
+void EffectComponent::setSliderValueIfChanged(osci::FloatParameter* parameter, juce::Slider& slider) {
     juce::String newSliderValue = juce::String(parameter->getValueUnnormalised(), 3);
-    juce::String oldSliderValue = juce::String((float) slider.getValue(), 3);
-    
+    juce::String oldSliderValue = juce::String((float)slider.getValue(), 3);
+
     // only set the slider value if the parameter value is different so that we prefer the more
     // precise slider value.
     if (newSliderValue != oldSliderValue) {
@@ -67,10 +78,20 @@ void EffectComponent::setSliderValueIfChanged(FloatParameter* parameter, juce::S
 }
 
 void EffectComponent::setupComponent() {
-    EffectParameter* parameter = effect.parameters[index];
+    osci::EffectParameter* parameter = effect.parameters[index];
 
     setEnabled(effect.enabled == nullptr || effect.enabled->getBoolValue());
-    
+
+    if (effect.linked != nullptr && index == 0) {
+        linkButton.setToggleState(effect.linked->getBoolValue(), juce::dontSendNotification);
+
+        if (effect.linked->getBoolValue()) {
+            for (int i = 1; i < effect.parameters.size(); i++) {
+                effect.setValue(i, effect.parameters[0]->getValueUnnormalised());
+            }
+        }
+    }
+
     if (updateToggleState != nullptr) {
         updateToggleState();
     }
@@ -83,6 +104,20 @@ void EffectComponent::setupComponent() {
     setSliderValueIfChanged(parameter, slider);
     slider.setDoubleClickReturnValue(true, parameter->defaultValue);
 
+    // Set the new slider value change handler
+    slider.onValueChange = [this] {
+        // Update the effect parameter with this slider's value
+        effect.setValue(index, slider.getValue());
+
+        if (effect.linked != nullptr && effect.linked->getBoolValue()) {
+            for (int i = 0; i < effect.parameters.size(); i++) {
+                if (i != index) {
+                    effect.setValue(i, slider.getValue());
+                }
+            }
+        }
+    };
+
     lfoEnabled = parameter->lfo != nullptr && parameter->lfoRate != nullptr;
     if (lfoEnabled) {
         lfo.setSelectedId(parameter->lfo->getValueUnnormalised(), juce::dontSendNotification);
@@ -91,7 +126,7 @@ void EffectComponent::setupComponent() {
             if (lfo.getSelectedId() != 0) {
                 effect.parameters[index]->lfo->setUnnormalisedValueNotifyingHost(lfo.getSelectedId());
 
-                if (lfo.getSelectedId() == static_cast<int>(LfoType::Static)) {
+                if (lfo.getSelectedId() == static_cast<int>(osci::LfoType::Static)) {
                     lfoSlider.setVisible(false);
                     slider.setVisible(true);
                 } else {
@@ -107,7 +142,7 @@ void EffectComponent::setupComponent() {
         lfoSlider.setSkewFactorFromMidPoint(parameter->lfoRate->min + 0.1 * (parameter->lfoRate->max - parameter->lfoRate->min));
         lfoSlider.setDoubleClickReturnValue(true, 1.0);
 
-        if (lfo.getSelectedId() == static_cast<int>(LfoType::Static)) {
+        if (lfo.getSelectedId() == static_cast<int>(osci::LfoType::Static)) {
             lfoSlider.setVisible(false);
             slider.setVisible(true);
         } else {
@@ -125,7 +160,6 @@ void EffectComponent::setupComponent() {
             effect.parameters[index]->sidechain->setBoolValueNotifyingHost(!effect.parameters[index]->sidechain->getBoolValue());
         };
     }
-    
 
     if (sidechainEnabled && effect.parameters[index]->sidechain->getBoolValue()) {
         slider.setEnabled(false);
@@ -138,7 +172,6 @@ void EffectComponent::setupComponent() {
     }
 }
 
-
 EffectComponent::~EffectComponent() {
     effect.removeListener(index, this);
 }
@@ -146,14 +179,17 @@ EffectComponent::~EffectComponent() {
 void EffectComponent::resized() {
     auto bounds = getLocalBounds();
     auto componentBounds = bounds.removeFromRight(25);
-    if (component != nullptr) {
+
+    if (effect.linked != nullptr) {
+        linkButton.setBounds(componentBounds);
+    } else if (component != nullptr) {
         component->setBounds(componentBounds);
     }
 
     if (sidechainEnabled) {
         sidechainButton->setBounds(bounds.removeFromRight(20));
     }
-    
+
     if (settingsButton.isVisible()) {
         settingsButton.setBounds(bounds.removeFromRight(20));
     }
@@ -165,7 +201,7 @@ void EffectComponent::resized() {
     }
 
     bounds.removeFromRight(2);
-    
+
     bounds.removeFromLeft(5);
 
     label.setBounds(bounds.removeFromLeft(drawingSmall ? SMALL_TEXT_WIDTH : TEXT_WIDTH));
@@ -205,12 +241,6 @@ void EffectComponent::setRangeEnabled(bool enabled) {
 }
 
 void EffectComponent::setComponent(std::shared_ptr<juce::Component> component) {
-	this->component = component;
+    this->component = component;
     addAndMakeVisible(component.get());
-}
-
-void EffectComponent::setSliderOnValueChange() {
-    slider.onValueChange = [this] {
-        effect.setValue(index, slider.getValue());
-    };
 }

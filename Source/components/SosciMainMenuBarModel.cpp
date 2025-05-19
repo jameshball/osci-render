@@ -1,34 +1,35 @@
 #include "SosciMainMenuBarModel.h"
+
 #include "../SosciPluginEditor.h"
 #include "../SosciPluginProcessor.h"
 
 SosciMainMenuBarModel::SosciMainMenuBarModel(SosciPluginEditor& e, SosciAudioProcessor& p) : editor(e), processor(p) {
     addTopLevelMenu("File");
     addTopLevelMenu("About");
-    addTopLevelMenu("Recording");
+    addTopLevelMenu("Video");
     addTopLevelMenu("Audio");
-    
-    std::vector<std::tuple<juce::String, const void *, int>> examples = {
+
+    std::vector<std::tuple<juce::String, const void*, int>> examples = {
         {"default.sosci", BinaryData::default_sosci, BinaryData::default_sosciSize},
         {"clean.sosci", BinaryData::clean_sosci, BinaryData::clean_sosciSize},
         {"vector_display.sosci", BinaryData::vector_display_sosci, BinaryData::vector_display_sosciSize},
         {"real_oscilloscope.sosci", BinaryData::real_oscilloscope_sosci, BinaryData::real_oscilloscope_sosciSize},
         {"rainbow.sosci", BinaryData::rainbow_sosci, BinaryData::rainbow_sosciSize},
     };
-    
+
     // This is a hack - ideally I would improve the MainMenuBarModel class to allow for submenus
     customMenuLogic = [this, examples](juce::PopupMenu& menu, int topLevelMenuIndex) {
         if (topLevelMenuIndex == 0) {
             juce::PopupMenu submenu;
-            
+
             for (int i = 0; i < examples.size(); i++) {
                 submenu.addItem(SUBMENU_ID + i, std::get<0>(examples[i]));
             }
-            
+
             menu.addSubMenu("Examples", submenu);
         }
     };
-    
+
     customMenuSelectedLogic = [this, examples](int menuItemID, int topLevelMenuIndex) {
         if (topLevelMenuIndex == 0) {
             if (menuItemID >= SUBMENU_ID) {
@@ -41,13 +42,13 @@ SosciMainMenuBarModel::SosciMainMenuBarModel(SosciPluginEditor& e, SosciAudioPro
     };
 
     addMenuItem(0, "Open Audio File", [&]() {
-        fileChooser = std::make_unique<juce::FileChooser>("Open Audio File", processor.lastOpenedDirectory, "*.wav;*.aiff;*.flac;*.ogg;*.mp3");
+        fileChooser = std::make_unique<juce::FileChooser>("Open Audio File", processor.getLastOpenedDirectory(), "*.wav;*.aiff;*.flac;*.ogg;*.mp3");
         auto flags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
         fileChooser->launchAsync(flags, [&](const juce::FileChooser& chooser) {
             auto file = chooser.getResult();
             if (file != juce::File()) {
                 processor.loadAudioFile(file);
-                processor.lastOpenedDirectory = file.getParentDirectory();
+                processor.setLastOpenedDirectory(file.getParentDirectory());
             }
         });
     });
@@ -61,19 +62,21 @@ SosciMainMenuBarModel::SosciMainMenuBarModel(SosciPluginEditor& e, SosciAudioPro
     addMenuItem(1, "About sosci", [&]() {
         juce::DialogWindow::LaunchOptions options;
         AboutComponent* about = new AboutComponent(BinaryData::sosci_logo_png, BinaryData::sosci_logo_pngSize,
-            juce::String(ProjectInfo::projectName) + " by " + ProjectInfo::companyName + "\n"
-#if SOSCI_FEATURES
-            "Thank you for purchasing sosci!\n"
+                                                   juce::String(ProjectInfo::projectName) + " by " + ProjectInfo::companyName +
+                                                       "\n"
+#if OSCI_PREMIUM
+                                                       "Thank you for purchasing sosci!\n"
 #else
             "Free version\n"
 #endif
-            "Version " + ProjectInfo::versionString + "\n\n"
-            "A huge thank you to:\n"
-            "Neil Thapen, for allowing me to adapt the brilliant dood.al/oscilloscope\n"
-            "Kevin Kripper, for guiding much of the features and development of sosci\n"
-            "DJ_Level_3, for testing throughout and helping add features\n"
-            "All the community, for suggesting features and reporting issues!"
-        );
+                                                       "Version " +
+                                                       ProjectInfo::versionString +
+                                                       "\n\n"
+                                                       "A huge thank you to:\n"
+                                                       "Neil Thapen, for allowing me to adapt the brilliant dood.al/oscilloscope\n"
+                                                       "Kevin Kripper, for guiding much of the features and development of sosci\n"
+                                                       "DJ_Level_3, for testing throughout and helping add features\n"
+                                                       "All the community, for suggesting features and reporting issues!");
         options.content.setOwned(about);
         options.content->setSize(500, 270);
         options.dialogTitle = "About";
@@ -89,7 +92,7 @@ SosciMainMenuBarModel::SosciMainMenuBarModel(SosciPluginEditor& e, SosciAudioPro
 
         juce::DialogWindow* dw = options.launchAsync();
     });
-    
+
     addMenuItem(2, "Settings...", [this] {
         editor.openRecordingSettings();
     });

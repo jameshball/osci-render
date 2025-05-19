@@ -11,39 +11,43 @@
 #define VERSION_HINT 2
 
 #include <JuceHeader.h>
-#include "shape/Shape.h"
-#include "concurrency/AudioBackgroundThread.h"
-#include "concurrency/AudioBackgroundThreadManager.h"
-#include "audio/Effect.h"
-#include "audio/ShapeSound.h"
-#include "audio/ShapeVoice.h"
-#include "audio/PublicSynthesiser.h"
-#include "audio/SampleRateManager.h"
+
 #include <numbers>
-#include "audio/DelayEffect.h"
-#include "audio/WobbleEffect.h"
-#include "audio/PerspectiveEffect.h"
-#include "obj/ObjectServer.h"
+
+#include "CommonPluginProcessor.h"
 #include "UGen/Env.h"
 #include "UGen/ugen_JuceEnvelopeComponent.h"
 #include "audio/CustomEffect.h"
 #include "audio/DashedLineEffect.h"
-#include "CommonPluginProcessor.h"
+#include "audio/DelayEffect.h"
+#include "audio/PerspectiveEffect.h"
+#include "audio/PublicSynthesiser.h"
+#include "audio/SampleRateManager.h"
+#include "audio/ShapeSound.h"
+#include "audio/ShapeVoice.h"
+#include "audio/WobbleEffect.h"
+#include "obj/ObjectServer.h"
+
+#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
+#include "../modules/juce_sharedtexture/SharedTexture.h"
+#include "video/SyphonFrameGrabber.h"
+#endif
 
 //==============================================================================
 /**
-*/
-class OscirenderAudioProcessor  : public CommonAudioProcessor, juce::AudioProcessorParameter::Listener, public EnvelopeComponentListener
-                            #if JucePlugin_Enable_ARA
-                             , public juce::AudioProcessorARAExtension
-                            #endif
+ */
+class OscirenderAudioProcessor : public CommonAudioProcessor, juce::AudioProcessorParameter::Listener, public EnvelopeComponentListener
+#if JucePlugin_Enable_ARA
+    ,
+                                 public juce::AudioProcessorARAExtension
+#endif
 {
 public:
     OscirenderAudioProcessor();
     ~OscirenderAudioProcessor() override;
 
-    void prepareToPlay (double sampleRate, int samplesPerBlock) override;
-    void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+    void prepareToPlay(double sampleRate, int samplesPerBlock) override;
+    void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
     juce::AudioProcessorEditor* createEditor() override;
 
@@ -55,38 +59,34 @@ public:
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void envelopeChanged(EnvelopeComponent* changedEnvelope) override;
 
-	std::vector<std::shared_ptr<Effect>> toggleableEffects;
-    std::vector<std::shared_ptr<Effect>> luaEffects;
-    std::atomic<double> luaValues[26] = { 0.0 };
+    std::vector<std::shared_ptr<osci::Effect>> toggleableEffects;
+    std::vector<std::shared_ptr<osci::Effect>> luaEffects;
+    std::atomic<double> luaValues[26] = {0.0};
 
-    std::shared_ptr<Effect> frequencyEffect = std::make_shared<Effect>(
-        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+    std::shared_ptr<osci::Effect> frequencyEffect = std::make_shared<osci::Effect>(
+        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             frequency = values[0].load();
             return input;
-        }, new EffectParameter(
+        },
+        new osci::EffectParameter(
             "Frequency",
             "Controls how many times per second the image is drawn, thereby controlling the pitch of the sound. Lower frequencies result in more-accurately drawn images, but more flickering, and vice versa.",
             "frequency",
-            VERSION_HINT, 220.0, 0.0, 4200.0
-        )
-    );
-    
-    std::shared_ptr<Effect> trace = std::make_shared<Effect>(
-        std::vector<EffectParameter*>{
-            new EffectParameter(
+            VERSION_HINT, 220.0, 0.0, 4200.0));
+
+    std::shared_ptr<osci::Effect> trace = std::make_shared<osci::Effect>(
+        std::vector<osci::EffectParameter*>{
+            new osci::EffectParameter(
                 "Trace Start",
                 "Defines how far into the frame the drawing is started at. This has the effect of 'tracing' out the image from a single dot when animated. By default, we start drawing from the beginning of the frame, so this value is 0.0.",
                 "traceStart",
-                VERSION_HINT, 0.0, 0.0, 1.0, 0.001
-            ),
-            new EffectParameter(
+                VERSION_HINT, 0.0, 0.0, 1.0, 0.001),
+            new osci::EffectParameter(
                 "Trace Length",
                 "Defines how much of the frame is drawn per cycle. This has the effect of 'tracing' out the image from a single dot when animated. By default, we draw the whole frame, corresponding to a value of 1.0.",
                 "traceLength",
-                VERSION_HINT, 1.0, 0.0, 1.0, 0.001
-            ),
-        }
-    );
+                VERSION_HINT, 1.0, 0.0, 1.0, 0.001),
+        });
 
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
 
@@ -94,24 +94,22 @@ public:
 
     std::function<void(int, juce::String, juce::String)> errorCallback = [this](int lineNum, juce::String fileName, juce::String error) { notifyErrorListeners(lineNum, fileName, error); };
     std::shared_ptr<CustomEffect> customEffect = std::make_shared<CustomEffect>(errorCallback, luaValues);
-    std::shared_ptr<Effect> custom = std::make_shared<Effect>(
+    std::shared_ptr<osci::Effect> custom = std::make_shared<osci::Effect>(
         customEffect,
-        new EffectParameter("Lua Effect", "Controls the strength of the custom Lua effect applied. You can write your own custom effect using Lua by pressing the edit button on the right.", "customEffectStrength", VERSION_HINT, 1.0, 0.0, 1.0)
-    );
+        new osci::EffectParameter("Lua Effect", "Controls the strength of the custom Lua effect applied. You can write your own custom effect using Lua by pressing the edit button on the right.", "customEffectStrength", VERSION_HINT, 1.0, 0.0, 1.0));
 
     std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>();
-    std::shared_ptr<Effect> perspective = std::make_shared<Effect>(
+    std::shared_ptr<osci::Effect> perspective = std::make_shared<osci::Effect>(
         perspectiveEffect,
-        std::vector<EffectParameter*>{
-            new EffectParameter("Perspective", "Controls the strength of the 3D perspective projection.", "perspectiveStrength", VERSION_HINT, 1.0, 0.0, 1.0),
-            new EffectParameter("Focal Length", "Controls the focal length of the 3D perspective effect. A higher focal length makes the image look more flat, and a lower focal length makes the image look more 3D.", "perspectiveFocalLength", VERSION_HINT, 2.0, 0.0, 10.0),
-        }
-    );
-    
-    BooleanParameter* midiEnabled = new BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false, "Enable MIDI input for the synth. If disabled, the synth will play a constant tone, as controlled by the frequency slider.");
-    BooleanParameter* inputEnabled = new BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false, "Enable to use input audio, instead of the generated audio.");
+        std::vector<osci::EffectParameter*>{
+            new osci::EffectParameter("Perspective", "Controls the strength of the 3D perspective projection.", "perspectiveStrength", VERSION_HINT, 1.0, 0.0, 1.0),
+            new osci::EffectParameter("Focal Length", "Controls the focal length of the 3D perspective effect. A higher focal length makes the image look more flat, and a lower focal length makes the image look more 3D.", "perspectiveFocalLength", VERSION_HINT, 2.0, 0.0, 10.0),
+        });
+
+    osci::BooleanParameter* midiEnabled = new osci::BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false, "Enable MIDI input for the synth. If disabled, the synth will play a constant tone, as controlled by the frequency slider.");
+    osci::BooleanParameter* inputEnabled = new osci::BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false, "Enable to use input audio, instead of the generated audio.");
     std::atomic<double> frequency = 220.0;
-    
+
     juce::SpinLock parsersLock;
     std::vector<std::shared_ptr<FileParser>> parsers;
     std::vector<ShapeSound::Ptr> sounds;
@@ -125,14 +123,14 @@ public:
     std::atomic<bool> objectServerRendering = false;
     juce::ChangeBroadcaster fileChangeBroadcaster;
 
-    FloatParameter* attackTime = new FloatParameter("Attack Time", "attackTime", VERSION_HINT, 0.005, 0.0, 1.0);
-    FloatParameter* attackLevel = new FloatParameter("Attack Level", "attackLevel", VERSION_HINT, 1.0, 0.0, 1.0);
-    FloatParameter* decayTime = new FloatParameter("Decay Time", "decayTime", VERSION_HINT, 0.095, 0.0, 1.0);
-    FloatParameter* sustainLevel = new FloatParameter("Sustain Level", "sustainLevel", VERSION_HINT, 0.6, 0.0, 1.0);
-    FloatParameter* releaseTime = new FloatParameter("Release Time", "releaseTime", VERSION_HINT, 0.4, 0.0, 1.0);
-    FloatParameter* attackShape = new FloatParameter("Attack Shape", "attackShape", VERSION_HINT, 5, -50, 50);
-    FloatParameter* decayShape = new FloatParameter("Decay Shape", "decayShape", VERSION_HINT, -20, -50, 50);
-    FloatParameter* releaseShape = new FloatParameter("Release Shape", "releaseShape", VERSION_HINT, -5,-50, 50);
+    osci::FloatParameter* attackTime = new osci::FloatParameter("Attack Time", "attackTime", VERSION_HINT, 0.005, 0.0, 1.0);
+    osci::FloatParameter* attackLevel = new osci::FloatParameter("Attack Level", "attackLevel", VERSION_HINT, 1.0, 0.0, 1.0);
+    osci::FloatParameter* decayTime = new osci::FloatParameter("Decay Time", "decayTime", VERSION_HINT, 0.095, 0.0, 1.0);
+    osci::FloatParameter* sustainLevel = new osci::FloatParameter("Sustain Level", "sustainLevel", VERSION_HINT, 0.6, 0.0, 1.0);
+    osci::FloatParameter* releaseTime = new osci::FloatParameter("Release Time", "releaseTime", VERSION_HINT, 0.4, 0.0, 1.0);
+    osci::FloatParameter* attackShape = new osci::FloatParameter("Attack Shape", "attackShape", VERSION_HINT, 5, -50, 50);
+    osci::FloatParameter* decayShape = new osci::FloatParameter("Decay osci::Shape", "decayShape", VERSION_HINT, -20, -50, 50);
+    osci::FloatParameter* releaseShape = new osci::FloatParameter("Release Shape", "releaseShape", VERSION_HINT, -5, -50, 50);
 
     Env adsrEnv = Env::adsr(
         attackTime->getValueUnnormalised(),
@@ -140,49 +138,51 @@ public:
         sustainLevel->getValueUnnormalised(),
         releaseTime->getValueUnnormalised(),
         1.0,
-        std::vector<EnvCurve>{ attackShape->getValueUnnormalised(), decayShape->getValueUnnormalised(), releaseShape->getValueUnnormalised() }
-    );
+        std::vector<EnvCurve>{attackShape->getValueUnnormalised(), decayShape->getValueUnnormalised(), releaseShape->getValueUnnormalised()});
 
     juce::MidiKeyboardState keyboardState;
 
-    IntParameter* voices = new IntParameter("Voices", "voices", VERSION_HINT, 4, 1, 16);
+    osci::IntParameter* voices = new osci::IntParameter("Voices", "voices", VERSION_HINT, 4, 1, 16);
 
-    BooleanParameter* animateFrames = new BooleanParameter("Animate", "animateFrames", VERSION_HINT, true, "Enables animation for files that have multiple frames, such as GIFs or Line Art.");
-    BooleanParameter* animationSyncBPM = new BooleanParameter("Sync To BPM", "animationSyncBPM", VERSION_HINT, false, "Synchronises the animation's framerate with the BPM of your DAW.");
-    FloatParameter* animationRate = new FloatParameter("Animation Rate", "animationRate", VERSION_HINT, 30, -1000, 1000);
-    FloatParameter* animationOffset = new FloatParameter("Animation Offset", "animationOffset", VERSION_HINT, 0, -10000, 10000);
+    osci::BooleanParameter* animateFrames = new osci::BooleanParameter("Animate", "animateFrames", VERSION_HINT, true, "Enables animation for files that have multiple frames, such as GIFs or Line Art.");
+    osci::BooleanParameter* loopAnimation = new osci::BooleanParameter("Loop Animation", "loopAnimation", VERSION_HINT, true, "Loops the animation. If disabled, the animation will stop at the last frame.");
+    osci::BooleanParameter* animationSyncBPM = new osci::BooleanParameter("Sync To BPM", "animationSyncBPM", VERSION_HINT, false, "Synchronises the animation's framerate with the BPM of your DAW.");
+    osci::FloatParameter* animationRate = new osci::FloatParameter("Animation Rate", "animationRate", VERSION_HINT, 30, -1000, 1000);
+    osci::FloatParameter* animationOffset = new osci::FloatParameter("Animation Offset", "animationOffset", VERSION_HINT, 0, -10000, 10000);
 
-    BooleanParameter* invertImage = new BooleanParameter("Invert Image", "invertImage", VERSION_HINT, false, "Inverts the image so that dark pixels become light, and vice versa.");
-    std::shared_ptr<Effect> imageThreshold = std::make_shared<Effect>(
-        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+    osci::BooleanParameter* invertImage = new osci::BooleanParameter("Invert Image", "invertImage", VERSION_HINT, false, "Inverts the image so that dark pixels become light, and vice versa.");
+    std::shared_ptr<osci::Effect> imageThreshold = std::make_shared<osci::Effect>(
+        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             return input;
-        }, new EffectParameter(
+        },
+        new osci::EffectParameter(
             "Image Threshold",
             "Controls the probability of visiting a dark pixel versus a light pixel. Darker pixels are less likely to be visited, so turning the threshold to a lower value makes it more likely to visit dark pixels.",
             "imageThreshold",
-            VERSION_HINT, 0.5, 0, 1
-        )
-    );
-    std::shared_ptr<Effect> imageStride = std::make_shared<Effect>(
-        [this](int index, OsciPoint input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+            VERSION_HINT, 0.5, 0, 1));
+    std::shared_ptr<osci::Effect> imageStride = std::make_shared<osci::Effect>(
+        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             return input;
-        }, new EffectParameter(
+        },
+        new osci::EffectParameter(
             "Image Stride",
             "Controls the spacing between pixels when drawing an image. Larger values mean more of the image can be drawn, but at a lower fidelity.",
             "imageStride",
-            VERSION_HINT, 4, 1, 50, 1
-        )
-    );
+            VERSION_HINT, 4, 1, 50, 1));
 
-    double animationTime = 0.f;
-    
+    std::atomic<double> animationFrame = 0.f;
+
     std::shared_ptr<WobbleEffect> wobbleEffect = std::make_shared<WobbleEffect>(*this);
 
-    juce::Font font = juce::Font(juce::Font::getDefaultSansSerifFontName(), 1.0f, juce::Font::plain);
+    const double FONT_SIZE = 1.0f;
+    juce::Font font = juce::Font(juce::Font::getDefaultSansSerifFontName(), FONT_SIZE, juce::Font::plain);
 
     ShapeSound::Ptr objectServerSound = new ShapeSound();
-    
+
     std::function<void()> haltRecording;
+
+    // Add a callback to notify the editor when a file is removed
+    std::function<void(int)> fileRemovedCallback;
 
     void addLuaSlider();
     void updateEffectPrecedence();
@@ -196,17 +196,44 @@ public:
     void openFile(int index);
     int getCurrentFileIndex();
     std::shared_ptr<FileParser> getCurrentFileParser();
-	juce::String getCurrentFileName();
+    juce::String getCurrentFileName();
     juce::String getFileName(int index);
     juce::String getFileId(int index);
-	std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
+    std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
     void setObjectServerRendering(bool enabled);
     void setObjectServerPort(int port);
     void addErrorListener(ErrorListener* listener);
     void removeErrorListener(ErrorListener* listener);
     void notifyErrorListeners(int lineNumber, juce::String id, juce::String error);
+
+    // Setter for the callback
+    void setFileRemovedCallback(std::function<void(int)> callback);
+
+    // Added declaration for the new `removeParser` method.
+    void removeParser(FileParser* parser);
+
+    const std::vector<juce::String> FILE_EXTENSIONS = {
+        "obj",
+        "svg",
+        "lua",
+        "txt",
+        "gpla",
+        "gif",
+        "png",
+        "jpg",
+        "jpeg",
+        "wav",
+        "aiff",
+        "ogg",
+        "flac",
+        "mp3",
+#if OSCI_PREMIUM
+        "mp4",
+        "mov",
+#endif
+    };
+
 private:
-    
     std::atomic<bool> prevMidiEnabled = !midiEnabled->getBoolValue();
 
     juce::SpinLock audioThreadCallbackLock;
@@ -228,9 +255,8 @@ private:
     double squaredVolume = 0;
     double currentVolume = 0;
 
-    void openLegacyProject(const juce::XmlElement* xml);
-    std::pair<std::shared_ptr<Effect>, EffectParameter*> effectFromLegacyId(const juce::String& id, bool updatePrecedence = false);
-    LfoType lfoTypeFromLegacyAnimationType(const juce::String& type);
+    std::pair<std::shared_ptr<osci::Effect>, osci::EffectParameter*> effectFromLegacyId(const juce::String& id, bool updatePrecedence = false);
+    osci::LfoType lfoTypeFromLegacyAnimationType(const juce::String& type);
     double valueFromLegacy(double value, const juce::String& id);
     void changeSound(ShapeSound::Ptr sound);
 
@@ -238,7 +264,7 @@ private:
         std::istringstream parser(input.toStdString());
         parser >> result[0];
         for (int idx = 1; idx < 3; idx++) {
-            parser.get(); //Skip period
+            parser.get(); // Skip period
             parser >> result[idx];
         }
     }
@@ -254,6 +280,14 @@ private:
 
     juce::AudioPlayHead* playHead;
 
+#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
+public:
+    std::atomic<bool> syphonInputActive = false;
+
+    ImageParser syphonImageParser = ImageParser(*this);
+#endif
+
+
     //==============================================================================
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OscirenderAudioProcessor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OscirenderAudioProcessor)
 };

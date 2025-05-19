@@ -4,23 +4,30 @@
 FrameSettingsComponent::FrameSettingsComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
 	setText("Frame Settings");
 
-	addAndMakeVisible(animate);
-	addAndMakeVisible(sync);
+    if (!juce::JUCEApplicationBase::isStandaloneApp()) {
+        addAndMakeVisible(animate);
+	    addAndMakeVisible(sync);
+        addAndMakeVisible(offsetLabel);
+	    addAndMakeVisible(offsetBox);
+
+        offsetLabel.setText("Start Frame", juce::dontSendNotification);
+	    offsetBox.setJustification(juce::Justification::left);
+
+        offsetLabel.setTooltip("Offsets the animation's start point by a specified number of frames.");
+    } else {
+        audioProcessor.animationSyncBPM->setValueNotifyingHost(false);
+#if OSCI_PREMIUM
+        addAndMakeVisible(timeline);
+#endif
+    }
 	addAndMakeVisible(rateLabel);
 	addAndMakeVisible(rateBox);
-	addAndMakeVisible(offsetLabel);
-	addAndMakeVisible(offsetBox);
 	addAndMakeVisible(invertImage);
 	addAndMakeVisible(threshold);
 	addAndMakeVisible(stride);
 
-	offsetLabel.setTooltip("Offsets the animation's start point by a specified number of frames.");
-
 	rateLabel.setText("Frames per Second", juce::dontSendNotification);
 	rateBox.setJustification(juce::Justification::left);
-
-	offsetLabel.setText("Start Frame", juce::dontSendNotification);
-	offsetBox.setJustification(juce::Justification::left);
 	
 	update();
 
@@ -29,22 +36,24 @@ FrameSettingsComponent::FrameSettingsComponent(OscirenderAudioProcessor& p, Osci
 		audioProcessor.animationOffset->setUnnormalisedValueNotifyingHost(offsetBox.getValue());
 	};
 
+    rateBox.onReturnKey = updateAnimation;
 	rateBox.onFocusLost = updateAnimation;
+    
 	offsetBox.onFocusLost = updateAnimation;
+    offsetBox.onReturnKey = updateAnimation;
 
-	threshold.slider.onValueChange = [this]() {
-        audioProcessor.imageThreshold->setValue(threshold.slider.getValue());
+    animate.setClickingTogglesState(true);
+    animate.onClick = [this]() {
+        audioProcessor.animateFrames->setValue(animate.getToggleState());
     };
-
-	stride.slider.onValueChange = [this]() {
-        audioProcessor.imageStride->setValue(stride.slider.getValue());
-    };
-
+    
 	audioProcessor.animationRate->addListener(this);
 	audioProcessor.animationOffset->addListener(this);
+    audioProcessor.animationSyncBPM->addListener(this);
 }
 
 FrameSettingsComponent::~FrameSettingsComponent() {
+    audioProcessor.animationSyncBPM->removeListener(this);
 	audioProcessor.animationOffset->removeListener(this);
 	audioProcessor.animationRate->removeListener(this);
 }
@@ -52,16 +61,33 @@ FrameSettingsComponent::~FrameSettingsComponent() {
 void FrameSettingsComponent::resized() {
 	auto area = getLocalBounds().withTrimmedTop(20).reduced(20);
     double rowHeight = 20;
+
+#if OSCI_PREMIUM
+    auto timelineArea = juce::JUCEApplicationBase::isStandaloneApp() ? area.removeFromBottom(30) : juce::Rectangle<int>();
+#endif
     
-    auto toggleBounds = area.removeFromTop(rowHeight);
+    auto toggleBounds = juce::JUCEApplicationBase::isStandaloneApp() ? juce::Rectangle<int>() : area.removeFromTop(rowHeight);
     auto toggleWidth = juce::jmin(area.getWidth() / 3, 150);
+
+    auto firstColumn = area.removeFromLeft(220);
+    
+#if OSCI_PREMIUM
+    if (juce::JUCEApplicationBase::isStandaloneApp()) {
+        timeline.setVisible(animated);
+    }
+#endif
     
     if (animated) {
-        animate.setBounds(toggleBounds.removeFromLeft(toggleWidth));
-        sync.setBounds(toggleBounds.removeFromLeft(toggleWidth));
+        if (juce::JUCEApplicationBase::isStandaloneApp()) {
+#if OSCI_PREMIUM
+            timeline.setBounds(timelineArea);
+#endif
+        } else {
+            animate.setBounds(toggleBounds.removeFromLeft(toggleWidth));
+            sync.setBounds(toggleBounds.removeFromLeft(toggleWidth));
+        }
         
         double rowSpace = 10;
-        auto firstColumn = area.removeFromLeft(220);
         
         firstColumn.removeFromTop(rowSpace);
 
@@ -70,13 +96,19 @@ void FrameSettingsComponent::resized() {
         rateBox.setBounds(animateBounds.removeFromLeft(60));
         firstColumn.removeFromTop(rowSpace);
 
-        animateBounds = firstColumn.removeFromTop(rowHeight);
-        offsetLabel.setBounds(animateBounds.removeFromLeft(140));
-        offsetBox.setBounds(animateBounds.removeFromLeft(60));
+        if (!juce::JUCEApplicationBase::isStandaloneApp()) {
+            animateBounds = firstColumn.removeFromTop(rowHeight);
+            offsetLabel.setBounds(animateBounds.removeFromLeft(140));
+            offsetBox.setBounds(animateBounds.removeFromLeft(60));
+        }
     }
 
     if (image) {
-        invertImage.setBounds(toggleBounds.removeFromLeft(toggleWidth));
+        if (juce::JUCEApplicationBase::isStandaloneApp()) {
+            invertImage.setBounds(firstColumn.removeFromTop(rowHeight));
+        } else {
+            invertImage.setBounds(toggleBounds.removeFromLeft(toggleWidth));
+        }
         
         auto secondColumn = area;
         secondColumn.removeFromTop(5);

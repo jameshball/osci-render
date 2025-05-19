@@ -1,7 +1,6 @@
 #include <JuceHeader.h>
 #include "obj/Camera.h"
 #include "mathter/Common/Approx.hpp"
-#include "concurrency/BufferConsumer.h"
 
 class FrustumTest : public juce::UnitTest {
 public:
@@ -117,22 +116,22 @@ public:
 
 class ProducerThread : public juce::Thread {
 public:
-    ProducerThread(BufferConsumer& consumer) : juce::Thread("Producer Thread"), consumer(consumer) {}
+    ProducerThread(osci::BufferConsumer& consumer) : juce::Thread("Producer Thread"), consumer(consumer) {}
     
     void run() override {
         for (int i = 0; i < 1024 * 100; i++) {
-            consumer.write(OsciPoint(counter++));
+            consumer.write(osci::Point(counter++));
         }
     }
 
 private:
-    BufferConsumer& consumer;
+    osci::BufferConsumer& consumer;
     int counter = 0;
 };
 
 class ConsumerThread : public juce::Thread {
 public:
-    ConsumerThread(BufferConsumer& consumer) : juce::Thread("Consumer Thread"), consumer(consumer) {}
+    ConsumerThread(osci::BufferConsumer& consumer) : juce::Thread("Consumer Thread"), consumer(consumer) {}
     
     void run() override {
         for (int i = 0; i < 100; i++) {
@@ -155,7 +154,7 @@ public:
     }
 
 private:
-    BufferConsumer& consumer;
+    osci::BufferConsumer& consumer;
     std::vector<double> values;
 };
 
@@ -166,7 +165,7 @@ public:
     void runTest() override {
         beginTest("All data received");
         
-        BufferConsumer consumer(1024);
+        osci::BufferConsumer consumer(1024);
         ProducerThread producer(consumer);
         ConsumerThread consumerThread(consumer);
         

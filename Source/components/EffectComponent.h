@@ -1,13 +1,13 @@
 #pragma once
 #include <JuceHeader.h>
-#include "../audio/Effect.h"
+
 #include "LabelledTextBox.h"
 #include "SvgButton.h"
 
 class EffectComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater, public juce::SettableTooltipClient {
 public:
-    EffectComponent(Effect& effect, int index);
-    EffectComponent(Effect& effect);
+    EffectComponent(osci::Effect& effect, int index);
+    EffectComponent(osci::Effect& effect);
     ~EffectComponent();
 
     void resized() override;
@@ -19,14 +19,13 @@ public:
     void setRangeEnabled(bool enabled);
 
     void setComponent(std::shared_ptr<juce::Component> component);
-    void setSliderOnValueChange();
 
     juce::Slider slider;
     juce::Slider lfoSlider;
-    Effect& effect;
+    osci::Effect& effect;
     int index = 0;
     juce::ComboBox lfo;
-    
+
     class EffectSettingsComponent : public juce::Component {
     public:
         EffectSettingsComponent(EffectComponent* parent) {
@@ -39,9 +38,9 @@ public:
             addAndMakeVisible(lfoEndSlider);
             addAndMakeVisible(smoothValueChangeLabel);
             addAndMakeVisible(smoothValueChangeSlider);
-            
-            EffectParameter* parameter = parent->effect.parameters[parent->index];
-            
+
+            osci::EffectParameter* parameter = parent->effect.parameters[parent->index];
+
             min.textBox.setValue(parameter->min, juce::dontSendNotification);
             max.textBox.setValue(parameter->max, juce::dontSendNotification);
 
@@ -88,7 +87,7 @@ public:
             lfoEndSlider.onValueChange = [this, parameter]() {
                 parameter->lfoEndPercent->setUnnormalisedValueNotifyingHost(lfoEndSlider.getValue());
             };
-            
+
             smoothValueChangeLabel.setText("Smooth Value Change Speed", juce::dontSendNotification);
             smoothValueChangeLabel.setJustificationType(juce::Justification::centred);
             smoothValueChangeLabel.setFont(juce::Font(14.0f, juce::Font::bold));
@@ -103,7 +102,7 @@ public:
             popupLabel.setJustificationType(juce::Justification::centred);
             popupLabel.setFont(juce::Font(14.0f, juce::Font::bold));
         }
-        
+
         void resized() override {
             auto bounds = getLocalBounds();
             popupLabel.setBounds(bounds.removeFromTop(30));
@@ -116,7 +115,7 @@ public:
             smoothValueChangeLabel.setBounds(bounds.removeFromTop(20));
             smoothValueChangeSlider.setBounds(bounds.removeFromTop(40));
         }
-        
+
     private:
         juce::Label popupLabel;
         LabelledTextBox min{"Min"};
@@ -128,7 +127,7 @@ public:
         juce::Label smoothValueChangeLabel;
         juce::Slider smoothValueChangeSlider;
     };
-    
+
     std::function<void()> updateToggleState;
 
 private:
@@ -138,7 +137,7 @@ private:
     const int TEXT_WIDTH = 120;
     const int SMALL_TEXT_WIDTH = 90;
 
-    void setSliderValueIfChanged(FloatParameter* parameter, juce::Slider& slider);
+    void setSliderValueIfChanged(osci::FloatParameter* parameter, juce::Slider& slider);
     void setupComponent();
     bool lfoEnabled = true;
     bool sidechainEnabled = true;
@@ -146,9 +145,17 @@ private:
 
     std::unique_ptr<SvgButton> sidechainButton;
 
+    SvgButton linkButton = SvgButton(effect.parameters[index]->name + " Link",
+        BinaryData::link_svg,
+        juce::Colours::white,
+        juce::Colours::red,
+        nullptr,
+        BinaryData::link_svg
+    );
+
     juce::Label label;
 
-    SvgButton settingsButton = { "settingsButton", BinaryData::cog_svg, juce::Colours::white };
+    SvgButton settingsButton = {"settingsButton", BinaryData::cog_svg, juce::Colours::white};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EffectComponent)
 };

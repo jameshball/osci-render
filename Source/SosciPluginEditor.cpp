@@ -9,7 +9,7 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p) : CommonPluginEdito
     }
     addAndMakeVisible(visualiserSettingsWrapper);
 
-    BooleanParameter* visualiserFullScreen = audioProcessor.visualiserParameters.visualiserFullScreen;
+    osci::BooleanParameter* visualiserFullScreen = audioProcessor.visualiserParameters.visualiserFullScreen;
     visualiserFullScreenChanged();
 
     visualiser.setFullScreenCallback([this, visualiserFullScreen](FullScreenMode mode) {
@@ -59,8 +59,8 @@ void SosciPluginEditor::resized() {
         menuBar.setBounds(area.removeFromTop(25));
 
         if (juce::JUCEApplication::isStandaloneApp()) {
-            auto volumeArea = area.removeFromLeft(30);
-            volume.setBounds(volumeArea.withSizeKeepingCentre(volumeArea.getWidth(), juce::jmin(volumeArea.getHeight(), 300)));
+            auto volumeArea = area.removeFromLeft(35);
+            volume.setBounds(volumeArea.withSizeKeepingCentre(30, juce::jmin(volumeArea.getHeight(), 300)));
         }
 
         auto settingsArea = area.removeFromRight(juce::jmax(juce::jmin(0.4 * getWidth(), 550.0), 350.0));

@@ -5,13 +5,13 @@ VERSION="$2"
 
 OUTPUT_NAME="$PLUGIN-$VERSION"
 
-# If we are on the free version, we need to disable the build flag SOSCI_FEATURES
+# If we are on the free version, we need to disable the build flag OSCI_PREMIUM
 if [ "$VERSION" = "free" ]; then
-  # Edit the jucer file to disable the SOSCI_FEATURES flag
+  # Edit the jucer file to disable the OSCI_PREMIUM flag
   if [ "$OS" = "mac" ]; then
-    sed -i '' 's/SOSCI_FEATURES=1/SOSCI_FEATURES=0/' "$ROOT/$PLUGIN.jucer"
+    sed -i '' 's/OSCI_PREMIUM=1/OSCI_PREMIUM=0/' "$ROOT/$PLUGIN.jucer"
   else
-    sed -i 's/SOSCI_FEATURES=1/SOSCI_FEATURES=0/' "$ROOT/$PLUGIN.jucer"
+    sed -i 's/OSCI_PREMIUM=1/OSCI_PREMIUM=0/' "$ROOT/$PLUGIN.jucer"
   fi
 fi
 

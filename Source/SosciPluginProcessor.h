@@ -10,11 +10,8 @@
 
 #include <JuceHeader.h>
 #include "CommonPluginProcessor.h"
-#include "concurrency/AudioBackgroundThread.h"
-#include "concurrency/AudioBackgroundThreadManager.h"
 #include "audio/SampleRateManager.h"
 #include "visualiser/VisualiserSettings.h"
-#include "audio/Effect.h"
 #include "wav/WavParser.h"
 
 //==============================================================================

@@ -1,8 +1,13 @@
 #include "DownloaderComponent.h"
 
-DownloaderComponent::DownloaderComponent(juce::URL url, juce::File file) : juce::Thread("DownloaderComponent"), url(url), file(file) {
+DownloaderComponent::DownloaderComponent() : juce::Thread("DownloaderComponent") {
     addChildComponent(progressBar);
     addChildComponent(successLabel);
+}
+
+void DownloaderComponent::setup(juce::URL url, juce::File file) {
+    this->url = url;
+    this->file = file;
     
     successLabel.setText(file.getFileName() + " downloaded!", juce::dontSendNotification);
     
