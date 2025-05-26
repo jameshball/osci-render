@@ -203,9 +203,10 @@ def get_frame_info_binary():
                 # matrix
                 frame_info.extend(("OBJECT  MATRIX  ").encode("utf8"))
                 camera_space = bpy.context.scene.camera.matrix_world.inverted() @ obj.matrix_world
-                for i in range(4):
-                    for j in range(4):
-                        frame_info.extend(struct.pack("d", camera_space[i][j]))
+                frame_info.extend(struct.pack("16d", camera_space[0][0], camera_space[0][1], camera_space[0][2], camera_space[0][3],
+                                             camera_space[1][0], camera_space[1][1], camera_space[1][2], camera_space[1][3],
+                                             camera_space[2][0], camera_space[2][1], camera_space[2][2], camera_space[2][3],
+                                             camera_space[3][0], camera_space[3][1], camera_space[3][2], camera_space[3][3]))
                 # strokes
                 frame_info.extend(("DONE    STROKES ").encode("utf8"))
                 layers = obj.data.layers
@@ -217,9 +218,7 @@ def get_frame_info_binary():
                     
                         frame_info.extend(("VERTICES").encode("utf8"))
                         for vert in stroke.points:
-                            frame_info.extend(struct.pack("d", vert.position.x))
-                            frame_info.extend(struct.pack("d", vert.position.y))
-                            frame_info.extend(struct.pack("d", vert.position.z))
+                            frame_info.extend(struct.pack("3d", vert.position.x, vert.position.y, vert.position.z))
                         # VERTICES, STROKE
                         frame_info.extend(("DONE    DONE    ").encode("utf8"))
                 
@@ -233,9 +232,10 @@ def get_frame_info_binary():
                 # matrix
                 frame_info.extend(("OBJECT  MATRIX  ").encode("utf8"))
                 camera_space = bpy.context.scene.camera.matrix_world.inverted() @ obj.matrix_world
-                for i in range(4):
-                    for j in range(4):
-                        frame_info.extend(struct.pack("d", camera_space[i][j]))
+                frame_info.extend(struct.pack("16d", camera_space[0][0], camera_space[0][1], camera_space[0][2], camera_space[0][3],
+                                             camera_space[1][0], camera_space[1][1], camera_space[1][2], camera_space[1][3],
+                                             camera_space[2][0], camera_space[2][1], camera_space[2][2], camera_space[2][3],
+                                             camera_space[3][0], camera_space[3][1], camera_space[3][2], camera_space[3][3]))
                 # MATRIX
                 # strokes
                 frame_info.extend(("DONE    STROKES ").encode("utf8"))
@@ -248,9 +248,7 @@ def get_frame_info_binary():
                         
                         frame_info.extend(("VERTICES").encode("utf8"))
                         for vert in stroke.points:
-                            frame_info.extend(struct.pack("d", vert.co[0]))
-                            frame_info.extend(struct.pack("d", vert.co[1]))
-                            frame_info.extend(struct.pack("d", vert.co[2]))
+                            frame_info.extend(struct.pack("3d", vert.co[0], vert.co[1], vert.co[2]))
                         # VERTICES, STROKE
                         frame_info.extend(("DONE    DONE    ").encode("utf8"))
                 
