@@ -30,7 +30,6 @@ VisualiserRenderer::VisualiserRenderer(
 {
     openGLContext.setRenderer(this);
     openGLContext.attachTo(*this);
-    setShouldBeRunning(true);
 }
 
 VisualiserRenderer::~VisualiserRenderer() {

@@ -43,6 +43,17 @@ public:
                     activeWriter = threadedWriter.get();
                 }
             }
+        } else {
+            // Error: Invalid sample rate
+            juce::AlertWindow::showMessageBoxAsync(
+                juce::AlertWindow::WarningIcon,
+                "Recording Error",
+                "Cannot start recording: Invalid sample rate (" + juce::String(sampleRate) + "). Sample rate must be greater than 0.",
+                "OK"
+            );
+            stop();
+            stopCallback();
+            return;
         }
     }
 
@@ -91,7 +102,7 @@ private:
     juce::int64 nextSampleNum = 0;
 
     double recordingLength = 99999999999.0;
-    double sampleRate = 192000;
+    double sampleRate = -1;
 
     juce::CriticalSection writerLock;
     std::atomic<juce::AudioFormatWriter::ThreadedWriter*> activeWriter { nullptr };
