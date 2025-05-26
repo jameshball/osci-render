@@ -26,6 +26,8 @@ VisualiserComponent::VisualiserComponent(
                            visualiserOnly(visualiserOnly),
                            parent(parent),
                            editor(pluginEditor) {
+    setShouldBeRunning(true);
+
 #if OSCI_PREMIUM
     addAndMakeVisible(editor.ffmpegDownloader);
 #endif

@@ -89,6 +89,7 @@ public:
     VisualiserParameters() {
 #if OSCI_PREMIUM
         scaleEffect->markLockable(true);
+        booleans.push_back(scaleEffect->linked);
 #endif
     }
 
