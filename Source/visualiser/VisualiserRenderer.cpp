@@ -30,7 +30,6 @@ VisualiserRenderer::VisualiserRenderer(
 {
     openGLContext.setRenderer(this);
     openGLContext.attachTo(*this);
-    setShouldBeRunning(true);
 }
 
 VisualiserRenderer::~VisualiserRenderer() {
@@ -202,6 +201,10 @@ void VisualiserRenderer::newOpenGLContextCreated() {
     using namespace juce::gl;
 
     juce::CriticalSection::ScopedLockType lock(samplesLock);
+
+#if JUCE_WINDOWS && JUCE_DEBUG
+    glDisable(GL_DEBUG_OUTPUT);
+#endif
 
     glColorMask(true, true, true, true);
 

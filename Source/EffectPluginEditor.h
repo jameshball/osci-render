@@ -5,13 +5,16 @@
 #include "visualiser/VisualiserRenderer.h"
 #include "LookAndFeel.h"
 #include "components/EffectComponent.h"
+#include "components/SliderVisualiserComponent.h"
 
-class EffectPluginEditor : public juce::AudioProcessorEditor {
+class EffectPluginEditor : public juce::AudioProcessorEditor, public juce::AudioProcessorParameter::Listener {
 public:
     EffectPluginEditor(EffectAudioProcessor&);
     ~EffectPluginEditor() override;
 
     void resized() override;
+    void parameterValueChanged(int parameterIndex, float newValue) override;
+    void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
 
 private:
     EffectAudioProcessor& audioProcessor;
@@ -35,10 +38,12 @@ public:
         "Title"
     };
 
+    SliderVisualiserComponent sliderVisualiser{
+        audioProcessor
+    };
+
     juce::SharedResourcePointer<juce::TooltipWindow> tooltipWindow;
     juce::DropShadower tooltipDropShadow{juce::DropShadow(juce::Colours::black.withAlpha(0.5f), 6, {0,0})};
-
-    EffectComponent bitCrush{*audioProcessor.bitCrush};
 
 #if JUCE_LINUX
     juce::OpenGLContext openGlContext;

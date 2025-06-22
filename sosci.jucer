@@ -3,7 +3,7 @@
 <JUCERPROJECT id="HH2E72" name="sosci" projectType="audioplug" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginManufacturer="jameshball"
               aaxIdentifier="sh.ball.sosci" cppLanguageStandard="20" projectLineFeed="&#10;"
-              headerPath="./include" version="1.1.6.2" companyName="James H Ball"
+              headerPath="./include" version="1.1.7.1" companyName="James H Ball"
               companyWebsite="https://osci-render.com" companyEmail="james@ball.sh"
               defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1"
               pluginManufacturerCode="Jhba" pluginCode="Sosc" pluginAUMainType="'aufx'">
@@ -57,6 +57,7 @@
               file="Resources/svg/fixed_rotate.svg"/>
         <FILE id="WIkl6l" name="fullscreen.svg" compile="0" resource="1" file="Resources/svg/fullscreen.svg"/>
         <FILE id="n1esUp" name="left_arrow.svg" compile="0" resource="1" file="Resources/svg/left_arrow.svg"/>
+        <FILE id="Q2mSgZ" name="link.svg" compile="0" resource="1" file="Resources/svg/link.svg"/>
         <FILE id="PxYKbt" name="microphone.svg" compile="0" resource="1" file="Resources/svg/microphone.svg"/>
         <FILE id="WoY9r2" name="mute.svg" compile="0" resource="1" file="Resources/svg/mute.svg"/>
         <FILE id="hJHxFY" name="open_in_new.svg" compile="0" resource="1" file="Resources/svg/open_in_new.svg"/>

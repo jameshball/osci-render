@@ -18,11 +18,8 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
     addAndMakeVisible(customSharedTextureOutputLabel);
     addAndMakeVisible(customSharedTextureOutputEditor);
     
-    quality.setSliderOnValueChange();
     quality.setRangeEnabled(false);
-    resolution.setSliderOnValueChange();
     resolution.setRangeEnabled(false);
-    frameRate.setSliderOnValueChange();
     frameRate.setRangeEnabled(false);
     
     recordAudio.onClick = [this] {

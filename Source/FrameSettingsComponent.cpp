@@ -36,15 +36,15 @@ FrameSettingsComponent::FrameSettingsComponent(OscirenderAudioProcessor& p, Osci
 		audioProcessor.animationOffset->setUnnormalisedValueNotifyingHost(offsetBox.getValue());
 	};
 
+    rateBox.onReturnKey = updateAnimation;
 	rateBox.onFocusLost = updateAnimation;
+    
 	offsetBox.onFocusLost = updateAnimation;
+    offsetBox.onReturnKey = updateAnimation;
 
-	threshold.slider.onValueChange = [this]() {
-        audioProcessor.imageThreshold->setValue(threshold.slider.getValue());
-    };
-
-	stride.slider.onValueChange = [this]() {
-        audioProcessor.imageStride->setValue(stride.slider.getValue());
+    animate.setClickingTogglesState(true);
+    animate.onClick = [this]() {
+        audioProcessor.animateFrames->setValue(animate.getToggleState());
     };
     
 	audioProcessor.animationRate->addListener(this);

@@ -6,6 +6,7 @@
 #include "audio/BitCrushEffect.h"
 #include "audio/AutoGainControlEffect.h"
 #include "txt/TextParser.h"
+#include "audio/ShapeVectorRenderer.h"
 
 class EffectAudioProcessor  : public juce::AudioProcessor
                             #if JucePlugin_Enable_ARA
@@ -56,6 +57,9 @@ public:
     VisualiserParameters visualiserParameters;
     
     osci::AudioBackgroundThreadManager threadManager;
+    
+    juce::SpinLock sliderLock;
+    ShapeVectorRenderer sliderRenderer;
 
 protected:
     
@@ -64,16 +68,7 @@ protected:
 private:
     double currentSampleRate = 44100.0;
     
-    // variables for the title
-    juce::Font titleFont = juce::Font(1.0f, juce::Font::bold);
-    TextParser titleParser{"bit crush", titleFont};
-    std::vector<std::unique_ptr<osci::Shape>> titleShapes;
-    double titleShapesLength = 0.0;
-    int currentTitleShape = 0;
-    double titleShapeDrawn = 0.0;
-    double titleFrameDrawn = 0.0;
-    
-    void incrementTitleShapeDrawing();
+    ShapeVectorRenderer titleRenderer;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (EffectAudioProcessor)

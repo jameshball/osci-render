@@ -8,6 +8,7 @@ public:
 		setMultiLine(false);
 		setJustification(juce::Justification::centred);
 		setFont(juce::Font(15.0f, juce::Font::plain));
+		setSelectAllWhenFocused(true);
 		onTextChange = [this]() {
 			setText(getText(), false);
 		};

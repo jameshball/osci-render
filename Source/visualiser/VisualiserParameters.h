@@ -86,6 +86,12 @@ public:
 
 class VisualiserParameters {
 public:
+    VisualiserParameters() {
+#if OSCI_PREMIUM
+        scaleEffect->markLockable(true);
+        booleans.push_back(scaleEffect->linked);
+#endif
+    }
 
     double getIntensity() {
         return intensityEffect->getActualValue() / 100;
