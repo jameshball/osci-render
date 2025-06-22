@@ -84,8 +84,12 @@ void ShapeVoice::updateSound(juce::SynthesiserSound* sound) {
 
 // Expects 2 or more channes each with 1 or more samples in input buffer, will use empty buffer if this is the case
 void ShapeVoice::setExternalAudio(juce::AudioSampleBuffer buf) {
-    if (buf.getNumChannels() < 2 || buf.getNumSamples() < 1) clearExternalAudio();
-    else externalAudio = buf;
+    if (buf.getNumChannels() < 2 || buf.getNumSamples() < 1) {
+        clearExternalAudio();
+    }
+    else {
+        externalAudio = buf;
+    }
 }
 
 void ShapeVoice::clearExternalAudio() {
