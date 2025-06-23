@@ -213,23 +213,23 @@ public:
     void removeParser(FileParser* parser);
 
     const std::vector<juce::String> FILE_EXTENSIONS = {
-        "obj",
-        "svg",
-        "lua",
-        "txt",
-        "gpla",
-        "gif",
-        "png",
-        "jpg",
-        "jpeg",
-        "wav",
-        "aiff",
-        "ogg",
-        "flac",
-        "mp3",
+        ".obj",
+        ".svg",
+        ".lua",
+        ".txt",
+        ".gpla",
+        ".gif",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".wav",
+        ".aiff",
+        ".ogg",
+        ".flac",
+        ".mp3",
 #if OSCI_PREMIUM
-        "mp4",
-        "mov",
+        ".mp4",
+        ".mov",
 #endif
     };
 
