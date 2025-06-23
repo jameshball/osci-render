@@ -82,8 +82,8 @@ void ShapeVoice::updateSound(juce::SynthesiserSound* sound) {
     }
 }
 
-// Expects 2 or more channes each with 1 or more samples in input buffer, will use empty buffer if this is the case
-void ShapeVoice::setExternalAudio(juce::AudioSampleBuffer buf) {
+// Expects 2 or more channels each with 1 or more samples in input buffer, will use empty buffer if this is the case
+void ShapeVoice::setExternalAudio(juce::AudioSampleBuffer& buf) {
     if (buf.getNumChannels() < 2 || buf.getNumSamples() < 1) {
         clearExternalAudio();
     }
@@ -93,6 +93,7 @@ void ShapeVoice::setExternalAudio(juce::AudioSampleBuffer buf) {
 }
 
 void ShapeVoice::clearExternalAudio() {
+    externalAudio = juce::AudioSampleBuffer{ 2,1 };
     externalAudio.clear();
     externalAudio.setSize(2, 1, false, true);
 }
@@ -128,8 +129,13 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             if (renderingSample) {
                 vars.sampleRate = audioProcessor.currentSampleRate;
                 vars.frequency = actualFrequency;
-                vars.extX = externalAudio.getSample(0, sample % externalAudio.getNumSamples());
-                vars.extY = externalAudio.getSample(1, sample % externalAudio.getNumSamples());
+                if (externalAudio.getNumSamples() >= 1 && externalAudio.getNumChannels() >= 2) {
+                    vars.ext_x = (externalAudio).getSample(0, sample % (externalAudio).getNumSamples());
+                    vars.ext_y = (externalAudio).getSample(1, sample % (externalAudio).getNumSamples());
+                } else {
+                    vars.ext_x = 0;
+                    vars.ext_y = 0;
+                }
                 std::copy(std::begin(audioProcessor.luaValues), std::end(audioProcessor.luaValues), std::begin(vars.sliders));
 
                 channels = parser->nextSample(L, vars);
