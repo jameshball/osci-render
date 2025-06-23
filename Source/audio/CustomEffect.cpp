@@ -29,6 +29,9 @@ osci::Point CustomEffect::apply(int index, osci::Point input, const std::vector<
 			vars.x = x;
 			vars.y = y;
 			vars.z = z;
+			vars.ext_x = extInput.x;
+			vars.ext_y = extInput.y;
+
 
 			std::copy(luaValues, luaValues + 26, std::begin(vars.sliders));
 

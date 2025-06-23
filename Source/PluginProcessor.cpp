@@ -609,6 +609,9 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             if (volume > EPSILON) {
                 for (auto& effect : toggleableEffects) {
                     if (effect->enabled->getValue()) {
+                        if (effect->getId() == custom->getId()) {
+                            effect->setExternalInput(osci::Point{ left, right });
+                        }
                         channels = effect->apply(sample, channels, currentVolume);
                     }
                 }
