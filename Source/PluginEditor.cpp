@@ -133,6 +133,7 @@ bool OscirenderAudioProcessorEditor::isInterestedInFileDrag(const juce::StringAr
     if (std::find(audioProcessor.FILE_EXTENSIONS.begin(), audioProcessor.FILE_EXTENSIONS.end(), ext) != audioProcessor.FILE_EXTENSIONS.end()) {
         return true;
     }
+    return false;
 }
 
 void OscirenderAudioProcessorEditor::filesDropped(const juce::StringArray& files, int x, int y) {
