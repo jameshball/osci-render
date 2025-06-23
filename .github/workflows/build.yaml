@@ -2,6 +2,7 @@ name: Build
 on:
   push:
     branches:
+      - main
       - develop
   workflow_dispatch:
 jobs:

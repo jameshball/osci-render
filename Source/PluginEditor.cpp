@@ -130,10 +130,8 @@ bool OscirenderAudioProcessorEditor::isInterestedInFileDrag(const juce::StringAr
     }
     juce::File file(files[0]);
     juce::String ext = file.getFileExtension().toLowerCase();
-    if (std::find(audioProcessor.FILE_EXTENSIONS.begin(), audioProcessor.FILE_EXTENSIONS.end(), ext) != audioProcessor.FILE_EXTENSIONS.end()) {
-        return true;
-    }
-    return false;
+    ext = ext.substring(1); // Remove the dot
+    return std::find(audioProcessor.FILE_EXTENSIONS.begin(), audioProcessor.FILE_EXTENSIONS.end(), ext) != audioProcessor.FILE_EXTENSIONS.end();
 }
 
 void OscirenderAudioProcessorEditor::filesDropped(const juce::StringArray& files, int x, int y) {
