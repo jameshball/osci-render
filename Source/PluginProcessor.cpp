@@ -173,7 +173,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     floatParameters.push_back(animationOffset);
 
     for (int i = 0; i < voices->getValueUnnormalised(); i++) {
-        synth.addVoice(new ShapeVoice(*this));
+        synth.addVoice(new ShapeVoice(*this, inputBuffer));
     }
 
     intParameters.push_back(voices);
@@ -501,7 +501,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
     const double EPSILON = 0.00001;
 
-    juce::AudioBuffer<float> inputBuffer = juce::AudioBuffer<float>(totalNumInputChannels, buffer.getNumSamples());
+    inputBuffer = juce::AudioBuffer<float>(totalNumInputChannels, buffer.getNumSamples());
     for (auto channel = 0; channel < totalNumInputChannels; channel++) {
         inputBuffer.copyFrom(channel, 0, buffer, channel, 0, buffer.getNumSamples());
     }
@@ -538,13 +538,6 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     } else {
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
-        for (int i = 0; i < synth.getNumVoices(); i++) {
-            ShapeVoice* voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
-            if (voice->renderingSample) {
-                voice->setExternalAudio(inputBuffer);
-            }
-            else voice->clearExternalAudio();
-        }
         synth.renderNextBlock(outputBuffer3d, midiMessages, 0, buffer.getNumSamples());
         for (int i = 0; i < synth.getNumVoices(); i++) {
             auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
@@ -869,7 +862,7 @@ void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float n
         if (numVoices != synth.getNumVoices()) {
             if (numVoices > synth.getNumVoices()) {
                 for (int i = synth.getNumVoices(); i < numVoices; i++) {
-                    synth.addVoice(new ShapeVoice(*this));
+                    synth.addVoice(new ShapeVoice(*this, inputBuffer));
                 }
             } else {
                 for (int i = synth.getNumVoices() - 1; i >= numVoices; i--) {

@@ -6,14 +6,12 @@
 class OscirenderAudioProcessor;
 class ShapeVoice : public juce::SynthesiserVoice {
 public:
-	ShapeVoice(OscirenderAudioProcessor& p);
+	ShapeVoice(OscirenderAudioProcessor& p, juce::AudioSampleBuffer& externalAudio);
 
 	bool canPlaySound(juce::SynthesiserSound* sound) override;
 	void startNote(int midiNoteNumber, float velocity, juce::SynthesiserSound* sound, int currentPitchWheelPosition) override;
     void updateSound(juce::SynthesiserSound* sound);
 	void renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int startSample, int numSamples) override;
-	void setExternalAudio(juce::AudioSampleBuffer& buf);
-	void clearExternalAudio();
 	void stopNote(float velocity, bool allowTailOff) override;
 	void pitchWheelMoved(int newPitchWheelValue) override;
 	void controllerMoved(int controllerNumber, int newControllerValue) override;
@@ -53,7 +51,7 @@ private:
 	double endTime = 99999999;
 	bool waitingForRelease = false;
 
-	juce::AudioSampleBuffer externalAudio;
+	juce::AudioSampleBuffer& externalAudio;
 
 	void noteStopped();
 };

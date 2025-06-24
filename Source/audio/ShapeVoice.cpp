@@ -1,8 +1,7 @@
 #include "ShapeVoice.h"
 #include "../PluginProcessor.h"
 
-ShapeVoice::ShapeVoice(OscirenderAudioProcessor& p) : audioProcessor(p) {
-    clearExternalAudio();
+ShapeVoice::ShapeVoice(OscirenderAudioProcessor& p, juce::AudioSampleBuffer& externalAudio) : audioProcessor(p), externalAudio(externalAudio) {
     actualTraceStart = audioProcessor.trace->getValue(0);
     actualTraceLength = audioProcessor.trace->getValue(1);
 }
@@ -82,22 +81,6 @@ void ShapeVoice::updateSound(juce::SynthesiserSound* sound) {
     }
 }
 
-// Expects 2 or more channels each with 1 or more samples in input buffer, will use empty buffer if this is the case
-void ShapeVoice::setExternalAudio(juce::AudioSampleBuffer& buf) {
-    if (buf.getNumChannels() < 2 || buf.getNumSamples() < 1) {
-        clearExternalAudio();
-    }
-    else {
-        externalAudio = buf;
-    }
-}
-
-void ShapeVoice::clearExternalAudio() {
-    externalAudio = juce::AudioSampleBuffer{ 2,1 };
-    externalAudio.clear();
-    externalAudio.setSize(2, 1, false, true);
-}
-
 void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int startSample, int numSamples) {
     juce::ScopedNoDenormals noDenormals;
 
@@ -129,12 +112,18 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             if (renderingSample) {
                 vars.sampleRate = audioProcessor.currentSampleRate;
                 vars.frequency = actualFrequency;
-                if (externalAudio.getNumSamples() >= 1 && externalAudio.getNumChannels() >= 2) {
-                    vars.ext_x = (externalAudio).getSample(0, sample % (externalAudio).getNumSamples());
-                    vars.ext_y = (externalAudio).getSample(1, sample % (externalAudio).getNumSamples());
-                } else {
-                    vars.ext_x = 0;
-                    vars.ext_y = 0;
+                vars.ext_x = 0;
+                vars.ext_y = 0;
+                
+                if (externalAudio.getNumSamples() >= 1) {
+                    double sampleIndex = sample % externalAudio.getNumSamples();
+                    int numChannels = externalAudio.getNumChannels();
+                    if (numChannels >= 1) {
+                        vars.ext_x = externalAudio.getSample(0, sampleIndex);
+                    }
+                    if (numChannels >= 2) {
+                        vars.ext_y = externalAudio.getSample(1, sampleIndex);
+                    }
                 }
                 std::copy(std::begin(audioProcessor.luaValues), std::end(audioProcessor.luaValues), std::begin(vars.sliders));
 
