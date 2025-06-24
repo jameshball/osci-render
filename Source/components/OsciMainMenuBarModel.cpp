@@ -60,7 +60,11 @@ void OsciMainMenuBarModel::resetMenuItems() {
     });
     addMenuItem(1, "Randomize Blender Port", [this] {
         audioProcessor.setObjectServerPort(juce::Random::getSystemRandom().nextInt(juce::Range<int>(51600, 51700)));
-    });
+        });
+    addMenuItem(1, audioProcessor.acceptsAllKeys ? "Disable Special Keys" : "Enable Special Keys", [this] {
+        audioProcessor.setAcceptKeys(!audioProcessor.acceptsAllKeys);
+        resetMenuItems();
+        });
 
 #if !OSCI_PREMIUM
     addMenuItem(1, "Purchase osci-render premium!", [this] {

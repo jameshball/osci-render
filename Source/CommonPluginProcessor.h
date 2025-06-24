@@ -153,6 +153,10 @@ public:
 #else
         "ffmpeg";
 #endif
+    bool acceptsAllKeys;
+    void setAcceptKeys(bool shouldAcceptKeys) {
+        acceptsAllKeys = shouldAcceptKeys;
+    }
 
 protected:
     

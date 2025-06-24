@@ -16,6 +16,8 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
      : AudioProcessor(busesProperties)
 #endif
 {
+    acceptsAllKeys = juce::JUCEApplicationBase::isStandaloneApp();
+
     if (!applicationFolder.exists()) {
         applicationFolder.createDirectory();
     }
