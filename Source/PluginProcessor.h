@@ -234,6 +234,8 @@ public:
     };
 
 private:
+    juce::AudioBuffer<float> inputBuffer;
+
     std::atomic<bool> prevMidiEnabled = !midiEnabled->getBoolValue();
 
     juce::SpinLock audioThreadCallbackLock;
