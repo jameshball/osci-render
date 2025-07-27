@@ -3,7 +3,7 @@
 #include "CustomStandaloneFilterWindow.h"
 
 CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String appName, juce::String projectFileType, int defaultWidth, int defaultHeight)
-	: AudioProcessorEditor(&p), audioProcessor(p), appName(appName), projectFileType(projectFileType)
+    : AudioProcessorEditor(&p), audioProcessor(p), appName(appName), projectFileType(projectFileType)
 {
 #if JUCE_LINUX
     // use OpenGL on Linux for much better performance. The default on Mac is CoreGraphics, and on Window is Direct2D which is much faster.

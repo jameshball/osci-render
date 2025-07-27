@@ -49,7 +49,7 @@ Name: "deletefiles"; Description: "Remove any existing settings (Clean installat
 Source: "..\Builds\sosci\VisualStudio2022\x64\Release\Standalone Plugin\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\Builds\sosci\VisualStudio2022\x64\Release\VST3\{#MyAppVstName}\Contents\x86_64-win\{#MyAppVstName}"; DestDir: "{cf}\VST3"; Flags: ignoreversion
 Source: "..\External\spout\SpoutLibrary.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\External\spout\SpoutLibrary.dll"; DestDir: "{sys}"
+Source: "..\External\spout\SpoutLibrary.dll"; DestDir: "{sys}"; Flags: ignoreversion
 
 [InstallDelete]
 Type: files; Name: {userappdata}\{#MyAppName}\{#MyAppName}.settings; Tasks: deletefiles

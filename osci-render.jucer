@@ -86,14 +86,12 @@
         <FILE id="uvMCNC" name="CustomEffect.cpp" compile="1" resource="0"
               file="Source/audio/CustomEffect.cpp"/>
         <FILE id="qFZDUh" name="CustomEffect.h" compile="0" resource="0" file="Source/audio/CustomEffect.h"/>
-        <FILE id="JtasnQ" name="DashedLineEffect.cpp" compile="1" resource="0"
-              file="Source/audio/DashedLineEffect.cpp"/>
         <FILE id="I7B78q" name="DashedLineEffect.h" compile="0" resource="0"
               file="Source/audio/DashedLineEffect.h"/>
         <FILE id="kpI9pv" name="DelayEffect.h" compile="0" resource="0" file="Source/audio/DelayEffect.h"/>
         <FILE id="ux2dO2" name="DistortEffect.h" compile="0" resource="0" file="Source/audio/DistortEffect.h"/>
-        <FILE id="QBWW9w" name="PerspectiveEffect.cpp" compile="1" resource="0"
-              file="Source/audio/PerspectiveEffect.cpp"/>
+        <FILE id="SWC0tN" name="MultiplexEffect.h" compile="0" resource="0"
+              file="Source/audio/MultiplexEffect.h"/>
         <FILE id="h0dMim" name="PerspectiveEffect.h" compile="0" resource="0"
               file="Source/audio/PerspectiveEffect.h"/>
         <FILE id="t5g8pf" name="PublicSynthesiser.h" compile="0" resource="0"

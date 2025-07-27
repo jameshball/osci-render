@@ -12,6 +12,7 @@
 #include "audio/BitCrushEffect.h"
 #include "audio/BulgeEffect.h"
 #include "audio/DistortEffect.h"
+#include "audio/MultiplexEffect.h"
 #include "audio/SmoothEffect.h"
 #include "audio/VectorCancellingEffect.h"
 #include "parser/FileParser.h"
@@ -31,6 +32,19 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     toggleableEffects.push_back(std::make_shared<osci::Effect>(
         std::make_shared<BulgeEffect>(),
         new osci::EffectParameter("Bulge", "Applies a bulge that makes the centre of the image larger, and squishes the edges of the image. This applies a distortion to the audio.", "bulge", VERSION_HINT, 0.5, 0.0, 1.0)));
+    auto multiplexEffect = std::make_shared<osci::Effect>(
+        std::make_shared<MultiplexEffect>(),
+        std::vector<osci::EffectParameter*>{
+            new osci::EffectParameter("Multiplex Grid X", "Controls the horizontal grid size for the multiplex effect.", "multiplexGridX", VERSION_HINT, 1.0, 1.0, 8.0),
+            new osci::EffectParameter("Multiplex Grid Y", "Controls the vertical grid size for the multiplex effect.", "multiplexGridY", VERSION_HINT, 1.0, 1.0, 8.0),
+            new osci::EffectParameter("Multiplex Grid Z", "Controls the depth grid size for the multiplex effect.", "multiplexGridZ", VERSION_HINT, 1.0, 1.0, 8.0),
+            new osci::EffectParameter("Multiplex Smooth", "Controls the smoothness of transitions between grid sizes.", "multiplexSmooth", VERSION_HINT, 1.0, 0.0, 1.0),
+            new osci::EffectParameter("Grid Phase", "Controls the current phase of the grid animation.", "gridPhase", VERSION_HINT, 0.0, -1.0, 1.0),
+        });
+    // Set up the Grid Phase parameter with sawtooth LFO at 100Hz
+    multiplexEffect->getParameter("gridPhase")->lfo->setUnnormalisedValueNotifyingHost((int)osci::LfoType::Sawtooth);
+    multiplexEffect->getParameter("gridPhase")->lfoRate->setUnnormalisedValueNotifyingHost(100.0);
+    toggleableEffects.push_back(multiplexEffect);
     toggleableEffects.push_back(std::make_shared<osci::Effect>(
         std::make_shared<VectorCancellingEffect>(),
         new osci::EffectParameter("Vector Cancelling", "Inverts the audio and image every few samples to 'cancel out' the audio, making the audio quiet, and distorting the image.", "vectorCancelling", VERSION_HINT, 0.1111111, 0.0, 1.0)));
