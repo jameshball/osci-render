@@ -42,6 +42,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
             new osci::EffectParameter("Multiplex Phase", "Controls the current phase of the multiplex grid animation.", "gridPhase", VERSION_HINT, 0.0, 0.0, 1.0),
             new osci::EffectParameter("Multiplex Delay", "Controls the delay of the audio samples used in the multiplex effect.", "gridDelay", VERSION_HINT, 0.0, 0.0, 1.0),
         });
+    multiplexEffect->setName("Multiplex");
     // Set up the Grid Phase parameter with sawtooth LFO at 100Hz
     multiplexEffect->getParameter("gridPhase")->lfo->setUnnormalisedValueNotifyingHost((int)osci::LfoType::Sawtooth);
     multiplexEffect->getParameter("gridPhase")->lfoRate->setUnnormalisedValueNotifyingHost(100.0);
@@ -58,6 +59,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
             new osci::EffectParameter("Scale Y", "Scales the object in the vertical direction.", "scaleY", VERSION_HINT, 1.0, -3.0, 3.0),
             new osci::EffectParameter("Scale Z", "Scales the depth of the object.", "scaleZ", VERSION_HINT, 1.0, -3.0, 3.0),
     });
+    scaleEffect->setName("Scale");
     scaleEffect->markLockable(true);
     booleanParameters.push_back(scaleEffect->linked);
     toggleableEffects.push_back(scaleEffect);
@@ -72,6 +74,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
             new osci::EffectParameter("Distort Y", "Distorts the image in the vertical direction by jittering the audio sample being drawn.", "distortY", VERSION_HINT, 0.0, 0.0, 1.0),
             new osci::EffectParameter("Distort Z", "Distorts the depth of the image by jittering the audio sample being drawn.", "distortZ", VERSION_HINT, 0.1, 0.0, 1.0),
         });
+    distortEffect->setName("Distort");
     distortEffect->markLockable(false);
     booleanParameters.push_back(distortEffect->linked);
     toggleableEffects.push_back(distortEffect);
@@ -87,6 +90,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
             new osci::EffectParameter("Ripple Phase", "Controls the position of the ripple. Animate this to see a moving ripple effect.", "ripplePhase", VERSION_HINT, 0.0, -1.0, 1.0),
             new osci::EffectParameter("Ripple Amount", "Controls how many ripples are applied to the image.", "rippleAmount", VERSION_HINT, 0.1, 0.0, 1.0),
         });
+    rippleEffect->setName("Ripple");
     rippleEffect->getParameter("ripplePhase")->lfo->setUnnormalisedValueNotifyingHost((int)osci::LfoType::Sawtooth);
     toggleableEffects.push_back(rippleEffect);
     auto rotateEffect = std::make_shared<osci::Effect>(
@@ -99,10 +103,11 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
             new osci::EffectParameter("Rotate Y", "Controls the rotation of the object in the Y axis.", "rotateY", VERSION_HINT, 0.0, -1.0, 1.0),
             new osci::EffectParameter("Rotate Z", "Controls the rotation of the object in the Z axis.", "rotateZ", VERSION_HINT, 0.0, -1.0, 1.0),
         });
+    rotateEffect->setName("Rotate");
     rotateEffect->getParameter("rotateY")->lfo->setUnnormalisedValueNotifyingHost((int)osci::LfoType::Sawtooth);
     rotateEffect->getParameter("rotateY")->lfoRate->setUnnormalisedValueNotifyingHost(0.2);
     toggleableEffects.push_back(rotateEffect);
-    toggleableEffects.push_back(std::make_shared<osci::Effect>(
+    auto translateEffect = std::make_shared<osci::Effect>(
         [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             return input + osci::Point(values[0], values[1], values[2]);
         },
@@ -110,7 +115,9 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
             new osci::EffectParameter("Translate X", "Moves the object horizontally.", "translateX", VERSION_HINT, 0.0, -1.0, 1.0),
             new osci::EffectParameter("Translate Y", "Moves the object vertically.", "translateY", VERSION_HINT, 0.0, -1.0, 1.0),
             new osci::EffectParameter("Translate Z", "Moves the object away from the camera.", "translateZ", VERSION_HINT, 0.0, -1.0, 1.0),
-        }));
+        });
+    translateEffect->setName("Translate");
+    toggleableEffects.push_back(translateEffect);
     toggleableEffects.push_back(std::make_shared<osci::Effect>(
         [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             double length = 10 * values[0] * input.magnitude();
@@ -130,18 +137,24 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
             new osci::EffectParameter("Wobble Amount", "Adds a sine wave of the prominent frequency in the audio currently playing. The sine wave's frequency is slightly offset to create a subtle 'wobble' in the image. Increasing the slider increases the strength of the wobble.", "wobble", VERSION_HINT, 0.3, 0.0, 1.0),
             new osci::EffectParameter("Wobble Phase", "Controls the phase of the wobble.", "wobblePhase", VERSION_HINT, 0.0, -1.0, 1.0),
         });
+    wobble->setName("Wobble");
     wobble->getParameter("wobblePhase")->lfo->setUnnormalisedValueNotifyingHost((int)osci::LfoType::Sawtooth);
     toggleableEffects.push_back(wobble);
-    toggleableEffects.push_back(std::make_shared<osci::Effect>(
+    auto delay = std::make_shared<osci::Effect>(
         delayEffect,
         std::vector<osci::EffectParameter*>{
             new osci::EffectParameter("Delay Decay", "Adds repetitions, delays, or echos to the audio. This slider controls the volume of the echo.", "delayDecay", VERSION_HINT, 0.4, 0.0, 1.0),
-            new osci::EffectParameter("Delay Length", "Controls the time in seconds between echos.", "delayLength", VERSION_HINT, 0.5, 0.0, 1.0)}));
-    toggleableEffects.push_back(std::make_shared<osci::Effect>(
+            new osci::EffectParameter("Delay Length", "Controls the time in seconds between echos.", "delayLength", VERSION_HINT, 0.5, 0.0, 1.0)
+        });
+    delay->setName("Delay");
+    toggleableEffects.push_back(delay);
+    auto dashEffect = std::make_shared<osci::Effect>(
         dashedLineEffect,
         std::vector<osci::EffectParameter*>{
             new osci::EffectParameter("Dash Length", "Controls the length of the dashed line.", "dashLength", VERSION_HINT, 0.2, 0.0, 1.0),
-        }));
+        });
+    dashEffect->setName("Dash");
+    toggleableEffects.push_back(dashEffect);
     toggleableEffects.push_back(custom);
     toggleableEffects.push_back(trace);
     trace->getParameter("traceLength")->lfo->setUnnormalisedValueNotifyingHost((int)osci::LfoType::Sawtooth);

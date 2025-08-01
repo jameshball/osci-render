@@ -157,6 +157,14 @@
               file="Source/components/EffectsListComponent.cpp"/>
         <FILE id="dcLchL" name="EffectsListComponent.h" compile="0" resource="0"
               file="Source/components/EffectsListComponent.h"/>
+        <FILE id="xQQo5D" name="EffectTypeGridComponent.cpp" compile="1" resource="0"
+              file="Source/components/EffectTypeGridComponent.cpp"/>
+        <FILE id="Fb2Qci" name="EffectTypeGridComponent.h" compile="0" resource="0"
+              file="Source/components/EffectTypeGridComponent.h"/>
+        <FILE id="PPK1iQ" name="EffectTypeItemComponent.cpp" compile="1" resource="0"
+              file="Source/components/EffectTypeItemComponent.cpp"/>
+        <FILE id="kGAfsx" name="EffectTypeItemComponent.h" compile="0" resource="0"
+              file="Source/components/EffectTypeItemComponent.h"/>
         <FILE id="aEprcE" name="ErrorCodeEditorComponent.h" compile="0" resource="0"
               file="Source/components/ErrorCodeEditorComponent.h"/>
         <FILE id="L9DIT2" name="LabelledTextBox.h" compile="0" resource="0"

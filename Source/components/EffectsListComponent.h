@@ -5,6 +5,7 @@
 #include "EffectComponent.h"
 #include "ComponentList.h"
 #include "SwitchButton.h"
+#include "EffectTypeGridComponent.h"
 #include <random>
 
 // Application-specific data container
@@ -22,9 +23,9 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
     void randomise() {
         juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
         
-		for (int i = 0; i < data.size(); i++) {
-			auto effect = data[i];
-			auto id = effect->getId().toLowerCase();
+        for (int i = 0; i < data.size(); i++) {
+            auto effect = data[i];
+            auto id = effect->getId().toLowerCase();
             
             if (id.contains("scale") || id.contains("translate") || id.contains("trace")) {
                 continue;
@@ -42,19 +43,19 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
                     }
                 }
             }
-			effect->enabled->setValueNotifyingHost(juce::Random::getSystemRandom().nextFloat() > 0.7);
-		}
+            effect->enabled->setValueNotifyingHost(juce::Random::getSystemRandom().nextFloat() > 0.7);
+        }
 
         // shuffle precedence
         std::random_device rd;
         std::mt19937 g(rd());
-		std::shuffle(data.begin(), data.end(), g);
+        std::shuffle(data.begin(), data.end(), g);
 
-		for (int i = 0; i < data.size(); i++) {
-			data[i]->setPrecedence(i);
-		}
+        for (int i = 0; i < data.size(); i++) {
+            data[i]->setPrecedence(i);
+        }
 
-		audioProcessor.updateEffectPrecedence();
+        audioProcessor.updateEffectPrecedence();
     }
 
     void resetData() {
@@ -68,12 +69,12 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
     }
 
     int getNumItems() override {
-        return data.size();
+        return data.size() + 1;
     }
 
     // CURRENTLY NOT USED
     void deleteItem(int indexOfItemToDelete) override {
-		// data.erase(data.begin() + indexOfItemToDelete);
+        // data.erase(data.begin() + indexOfItemToDelete);
     }
 
     // CURRENTLY NOT USED
@@ -81,10 +82,10 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
         // data.push_back(juce::String("Yahoo"));
     }
 
-	void moveBefore(int indexOfItemToMove, int indexOfItemToPlaceBefore) override {
+    void moveBefore(int indexOfItemToMove, int indexOfItemToPlaceBefore) override {
         juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
 
-		auto effect = data[indexOfItemToMove];
+        auto effect = data[indexOfItemToMove];
 
         if (indexOfItemToMove < indexOfItemToPlaceBefore) {
             move(data, indexOfItemToMove, indexOfItemToPlaceBefore - 1);
@@ -92,12 +93,12 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
             move(data, indexOfItemToMove, indexOfItemToPlaceBefore);
         }
         
-		for (int i = 0; i < data.size(); i++) {
-			data[i]->setPrecedence(i);
-		}
+        for (int i = 0; i < data.size(); i++) {
+            data[i]->setPrecedence(i);
+        }
 
         audioProcessor.updateEffectPrecedence();
-	}
+    }
 
     void moveAfter(int indexOfItemToMove, int indexOfItemToPlaceAfter) override {
         juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
