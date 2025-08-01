@@ -5,13 +5,22 @@
 class MultiplexEffect : public osci::EffectApplication {
 public:
     osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
-        jassert(values.size() >= 5);
+        jassert(values.size() >= 6);
         
         double gridX = values[0].load();
         double gridY = values[1].load();
         double gridZ = values[2].load();
         double interpolation = values[3].load();
         double phase = values[4].load();
+        double gridDelay = values[5].load();
+        
+        head++;
+        
+        if (head >= buffer.size()) {
+            head = 0;
+        }
+
+        buffer[head] = input;
         
         osci::Point grid = osci::Point(gridX, gridY, gridZ);
         osci::Point gridFloor = osci::Point(std::floor(gridX), std::floor(gridY), std::floor(gridZ));
@@ -22,11 +31,18 @@ public:
         
         double totalPositions = gridFloor.x * gridFloor.y * gridFloor.z;
         double position = phase * totalPositions;
+        double delayPosition = static_cast<int>(position) / totalPositions;
+        
+        int delayedIndex = head - static_cast<int>(delayPosition * gridDelay * sampleRate);
+        if (delayedIndex < 0) {
+            delayedIndex += buffer.size();
+        }
+        osci::Point delayedInput = buffer[delayedIndex % buffer.size()];
         
         osci::Point nextGrid = gridFloor + 1.0;
         
-        osci::Point current = multiplex(input, position, gridFloor);
-        osci::Point next = multiplex(input, position, nextGrid);
+        osci::Point current = multiplex(delayedInput, position, gridFloor);
+        osci::Point next = multiplex(delayedInput, position, nextGrid);
         
         // Calculate interpolation factors
         osci::Point gridDiff = grid - gridFloor;
@@ -62,4 +78,8 @@ private:
         
         return point;
     }
+    
+    const static int MAX_DELAY = 192000 * 10;
+    std::vector<osci::Point> buffer = std::vector<osci::Point>(MAX_DELAY);
+    int head = 0;
 };

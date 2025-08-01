@@ -35,11 +35,12 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     auto multiplexEffect = std::make_shared<osci::Effect>(
         std::make_shared<MultiplexEffect>(),
         std::vector<osci::EffectParameter*>{
-            new osci::EffectParameter("Multiplex Grid X", "Controls the horizontal grid size for the multiplex effect.", "multiplexGridX", VERSION_HINT, 1.0, 1.0, 8.0),
-            new osci::EffectParameter("Multiplex Grid Y", "Controls the vertical grid size for the multiplex effect.", "multiplexGridY", VERSION_HINT, 1.0, 1.0, 8.0),
-            new osci::EffectParameter("Multiplex Grid Z", "Controls the depth grid size for the multiplex effect.", "multiplexGridZ", VERSION_HINT, 1.0, 1.0, 8.0),
-            new osci::EffectParameter("Multiplex Smooth", "Controls the smoothness of transitions between grid sizes.", "multiplexSmooth", VERSION_HINT, 1.0, 0.0, 1.0),
-            new osci::EffectParameter("Grid Phase", "Controls the current phase of the grid animation.", "gridPhase", VERSION_HINT, 0.0, -1.0, 1.0),
+            new osci::EffectParameter("Multiplex X", "Controls the horizontal grid size for the multiplex effect.", "multiplexGridX", VERSION_HINT, 1.0, 1.0, 8.0),
+            new osci::EffectParameter("Multiplex Y", "Controls the vertical grid size for the multiplex effect.", "multiplexGridY", VERSION_HINT, 1.0, 1.0, 8.0),
+            new osci::EffectParameter("Multiplex Z", "Controls the depth grid size for the multiplex effect.", "multiplexGridZ", VERSION_HINT, 1.0, 1.0, 8.0),
+            new osci::EffectParameter("Multiplex Smooth", "Controls the smoothness of transitions between grid sizes.", "multiplexSmooth", VERSION_HINT, 0.0, 0.0, 1.0),
+            new osci::EffectParameter("Multiplex Phase", "Controls the current phase of the multiplex grid animation.", "gridPhase", VERSION_HINT, 0.0, 0.0, 1.0),
+            new osci::EffectParameter("Multiplex Delay", "Controls the delay of the audio samples used in the multiplex effect.", "gridDelay", VERSION_HINT, 0.0, 0.0, 1.0),
         });
     // Set up the Grid Phase parameter with sawtooth LFO at 100Hz
     multiplexEffect->getParameter("gridPhase")->lfo->setUnnormalisedValueNotifyingHost((int)osci::LfoType::Sawtooth);
