@@ -66,6 +66,7 @@
         <FILE id="n79IAy" name="record.svg" compile="0" resource="1" file="Resources/svg/record.svg"/>
         <FILE id="vOGcgi" name="repeat.svg" compile="0" resource="1" file="Resources/svg/repeat.svg"/>
         <FILE id="OaqZb1" name="right_arrow.svg" compile="0" resource="1" file="Resources/svg/right_arrow.svg"/>
+        <FILE id="Gxscyd" name="rotate.svg" compile="0" resource="1" file="Resources/svg/rotate.svg"/>
         <FILE id="yiDo4s" name="spout.svg" compile="0" resource="1" file="Resources/svg/spout.svg"/>
         <FILE id="EOWhGi" name="stop.svg" compile="0" resource="1" file="Resources/svg/stop.svg"/>
         <FILE id="rXjNlx" name="threshold.svg" compile="0" resource="1" file="Resources/svg/threshold.svg"/>
@@ -167,6 +168,10 @@
               file="Source/components/EffectTypeItemComponent.h"/>
         <FILE id="aEprcE" name="ErrorCodeEditorComponent.h" compile="0" resource="0"
               file="Source/components/ErrorCodeEditorComponent.h"/>
+        <FILE id="SYA32K" name="HoverAnimationMixin.cpp" compile="1" resource="0"
+              file="Source/components/HoverAnimationMixin.cpp"/>
+        <FILE id="JyPgec" name="HoverAnimationMixin.h" compile="0" resource="0"
+              file="Source/components/HoverAnimationMixin.h"/>
         <FILE id="L9DIT2" name="LabelledTextBox.h" compile="0" resource="0"
               file="Source/components/LabelledTextBox.h"/>
         <FILE id="tpNWJ3" name="LuaConsole.cpp" compile="1" resource="0" file="Source/components/LuaConsole.cpp"/>

@@ -2,7 +2,6 @@
 #include "SvgButton.h"
 #include "../PluginEditor.h"
 #include "../LookAndFeel.h"
-#include "EffectTypeGridComponent.h"
 
 EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectListBoxItemData& data, int rn, osci::Effect& effect) : DraggableListBoxItem(lb, data, rn),
 effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
@@ -115,15 +114,6 @@ std::shared_ptr<juce::Component> EffectsListComponent::createComponent(osci::Eff
 
 int EffectsListBoxModel::getRowHeight(int row) {
     auto data = (AudioEffectListBoxItemData&)modelData;
-    if (row == data.getNumItems() - 1) {
-        // Effect type grid row - calculate dynamic height based on layout
-        // Get the available width from the listbox
-        int availableWidth = listBox.getWidth() - 20; // Account for scrollbar and margins
-        
-        // Create a temporary grid component to calculate required height
-        EffectTypeGridComponent tempGrid(data.audioProcessor);
-        return tempGrid.calculateRequiredHeight(availableWidth);
-    }
     return data.getEffect(row)->parameters.size() * EffectsListComponent::ROW_HEIGHT + EffectsListComponent::PADDING;
 }
 
@@ -134,25 +124,11 @@ bool EffectsListBoxModel::hasVariableHeightRows() const {
 juce::Component* EffectsListBoxModel::refreshComponentForRow(int rowNumber, bool isRowSelected, juce::Component *existingComponentToUpdate) {
     auto data = (AudioEffectListBoxItemData&)modelData;
     
-    if (juce::isPositiveAndBelow(rowNumber, data.getNumItems() - 1)) {
+    if (juce::isPositiveAndBelow(rowNumber, data.getNumItems())) {
         // Regular effect component
         std::unique_ptr<EffectsListComponent> item(dynamic_cast<EffectsListComponent*>(existingComponentToUpdate));
         item = std::make_unique<EffectsListComponent>(listBox, data, rowNumber, *data.getEffect(rowNumber));
         return item.release();
-    } else if (rowNumber == data.getNumItems() - 1) {
-        // Create the effect type grid component
-        std::unique_ptr<EffectTypeGridComponent> gridComponent(dynamic_cast<EffectTypeGridComponent*>(existingComponentToUpdate));
-        if (gridComponent == nullptr) {
-            gridComponent = std::make_unique<EffectTypeGridComponent>(data.audioProcessor);
-            
-            // Set up callback for when an effect is selected
-            gridComponent->onEffectSelected = [&data](const juce::String& effectId) {
-                // TODO: Implement adding new effect instance based on effectId
-                // This would need to be implemented based on how effects are created in the system
-                DBG("Effect selected: " + effectId);
-            };
-        }
-        return gridComponent.release();
     }
     
     return nullptr;

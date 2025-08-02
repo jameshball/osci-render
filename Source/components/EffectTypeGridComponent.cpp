@@ -5,8 +5,7 @@ EffectTypeGridComponent::EffectTypeGridComponent(OscirenderAudioProcessor& proce
     : audioProcessor(processor)
 {
     setupEffectItems();
-    setSize(400, 200); // Default size, will be resized by parent
-    setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    setSize(400, 200);
 }
 
 EffectTypeGridComponent::~EffectTypeGridComponent() = default;
@@ -24,7 +23,7 @@ void EffectTypeGridComponent::setupEffectItems()
         juce::String effectName = effect->getName();
         
         // Create new item component
-        auto* item = new EffectTypeItemComponent(effectName, effect->getId());
+        auto* item = new EffectTypeItemComponent(effectName, effect->getIcon(), effect->getId());
         
         // Set up callback to forward effect selection
         item->onEffectSelected = [this](const juce::String& effectId) {

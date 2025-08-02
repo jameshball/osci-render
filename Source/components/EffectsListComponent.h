@@ -5,7 +5,6 @@
 #include "EffectComponent.h"
 #include "ComponentList.h"
 #include "SwitchButton.h"
-#include "EffectTypeGridComponent.h"
 #include <random>
 
 // Application-specific data container
@@ -69,7 +68,7 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
     }
 
     int getNumItems() override {
-        return data.size() + 1;
+        return data.size();
     }
 
     // CURRENTLY NOT USED

@@ -1,53 +1,34 @@
 #include "EffectTypeItemComponent.h"
 
-EffectTypeItemComponent::EffectTypeItemComponent(const juce::String& name, const juce::String& id)
+EffectTypeItemComponent::EffectTypeItemComponent(const juce::String& name, const juce::String& icon, const juce::String& id)
     : effectName(name), effectId(id),
-      hoverAnimator(juce::ValueAnimatorBuilder{}
-          .withEasing(juce::Easings::createEaseOut())
-          .withDurationMs(200)
-          .withValueChangedCallback([this](auto value) {
-              animationProgress = static_cast<float>(value);
-              repaint();
-          })
-          .build()),
-      unhoverAnimator(juce::ValueAnimatorBuilder{}
-          .withEasing(juce::Easings::createEaseOut())
-          .withDurationMs(200)
-          .withValueChangedCallback([this](auto value) {
-              animationProgress = 1.0f - static_cast<float>(value);
-              repaint();
-          })
-          .build())
+      hoverAnimation(std::make_unique<HoverAnimationMixin>(this))
 {
-    setupAnimators();
+    juce::String iconSvg = icon;
+    if (icon.isEmpty()) {
+        // Default icon if none is provided
+        iconSvg = juce::String::createStringFromData(BinaryData::rotate_svg, BinaryData::rotate_svgSize);
+    }
+    iconButton = std::make_unique<SvgButton>(
+        "effectIcon",
+        iconSvg,
+        juce::Colours::white.withAlpha(0.7f)
+    );
+    
+    // Make the icon non-interactive since this is just a visual element
+    iconButton->setInterceptsMouseClicks(false, false);
+    addAndMakeVisible(*iconButton);
 }
 
 EffectTypeItemComponent::~EffectTypeItemComponent() = default;
-
-void EffectTypeItemComponent::setupAnimators()
-{
-    animatorUpdater.addAnimator(hoverAnimator);
-    animatorUpdater.addAnimator(unhoverAnimator);
-}
-
-void EffectTypeItemComponent::animateHover(bool isHovering)
-{
-    if (isHovering)
-    {
-        unhoverAnimator.complete();
-        hoverAnimator.start();
-    }
-    else
-    {
-        hoverAnimator.complete();
-        unhoverAnimator.start();
-    }
-}
 
 void EffectTypeItemComponent::paint(juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat().reduced(10);
     
+    // Get animation progress from the hover animation mixin
+    auto animationProgress = hoverAnimation->getAnimationProgress();
+     
     // Apply upward shift based on animation progress
     auto yOffset = -animationProgress * HOVER_LIFT_AMOUNT;
     bounds = bounds.translated(0, yOffset);
@@ -66,8 +47,8 @@ void EffectTypeItemComponent::paint(juce::Graphics& g)
     }
     
     // Draw background with rounded corners - interpolate between normal and hover colors
-    juce::Colour normalBgColour = juce::Colour::fromRGB(25, 25, 25);
-    juce::Colour hoverBgColour = juce::Colour::fromRGB(40, 40, 40);
+    juce::Colour normalBgColour = Colours::veryDark;
+    juce::Colour hoverBgColour = normalBgColour.brighter(0.05f);
     juce::Colour bgColour = normalBgColour.interpolatedWith(hoverBgColour, animationProgress);
         
     g.setColour(bgColour);
@@ -78,43 +59,55 @@ void EffectTypeItemComponent::paint(juce::Graphics& g)
     g.setColour(outlineColour.withAlpha(0.9f));
     g.drawRoundedRectangle(bounds.toFloat(), CORNER_RADIUS, 1.0f);
     
-    // Create areas for text (left) and icon (right)
+    // Create text area - now accounting for icon space on the left
     auto textArea = bounds.reduced(8, 4);
-    auto iconArea = textArea.removeFromRight(20); // Reserve 20px for icon on right
-    textArea = textArea.withTrimmedRight(4); // Add small gap between text and icon
+    textArea.removeFromLeft(28); // Remove space for icon (24px + 4px gap)
     
     g.setColour(juce::Colours::white);
     g.setFont(juce::FontOptions(16.0f, juce::Font::plain));
     g.drawText(effectName, textArea, juce::Justification::centred, true);
+}
+
+void EffectTypeItemComponent::resized()
+{
+    auto bounds = getLocalBounds().reduced(10);
     
-    // Draw placeholder icon (simple circle with "+" symbol)
-    g.setColour(juce::Colours::white.withAlpha(0.7f));
-    auto iconSize = juce::jmin(iconArea.getWidth(), iconArea.getHeight()) - 4;
-    auto iconBounds = iconArea.withSizeKeepingCentre(iconSize, iconSize);
-    g.drawEllipse(iconBounds.toFloat(), 1.5f);
+    // Reserve space for the icon on the left
+    auto iconArea = bounds.removeFromLeft(60); // 24px for icon
+    iconArea = iconArea.withSizeKeepingCentre(40, 40); // Make icon 20x20px
+
+    iconButton->setBounds(iconArea);
     
-    // Draw "+" symbol in the circle
-    auto centerX = iconBounds.getCentreX();
-    auto centerY = iconBounds.getCentreY();
-    auto halfSize = iconSize * 0.25f;
-    g.drawLine(centerX - halfSize, centerY, centerX + halfSize, centerY, 2.0f);
-    g.drawLine(centerX, centerY - halfSize, centerX, centerY + halfSize, 2.0f);
+    // Get animation progress and calculate Y offset
+    auto animationProgress = hoverAnimation->getAnimationProgress();
+    auto yOffset = -animationProgress * HOVER_LIFT_AMOUNT;
+    
+    iconButton->setTransform(juce::AffineTransform::translation(0, yOffset));
 }
 
 void EffectTypeItemComponent::mouseEnter(const juce::MouseEvent& event)
 {
-    isHovered = true;
-    animateHover(true);
+    hoverAnimation->handleMouseEnter();
 }
 
 void EffectTypeItemComponent::mouseExit(const juce::MouseEvent& event)
 {
-    isHovered = false;
-    animateHover(false);
+    hoverAnimation->handleMouseExit();
 }
 
 void EffectTypeItemComponent::mouseDown(const juce::MouseEvent& event)
 {
     if (onEffectSelected)
         onEffectSelected(effectId);
+    hoverAnimation->handleMouseDown();
+}
+
+void EffectTypeItemComponent::mouseUp(const juce::MouseEvent& event)
+{
+    hoverAnimation->handleMouseUp(event.getPosition(), getLocalBounds());
+}
+
+void EffectTypeItemComponent::mouseMove(const juce::MouseEvent& event) {
+    setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    juce::Desktop::getInstance().getMainMouseSource().forceMouseCursorUpdate();
 }

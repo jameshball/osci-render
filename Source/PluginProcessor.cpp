@@ -104,6 +104,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
             new osci::EffectParameter("Rotate Z", "Controls the rotation of the object in the Z axis.", "rotateZ", VERSION_HINT, 0.0, -1.0, 1.0),
         });
     rotateEffect->setName("Rotate");
+    rotateEffect->setIcon(BinaryData::rotate_svg);
     rotateEffect->getParameter("rotateY")->lfo->setUnnormalisedValueNotifyingHost((int)osci::LfoType::Sawtooth);
     rotateEffect->getParameter("rotateY")->lfoRate->setUnnormalisedValueNotifyingHost(0.2);
     toggleableEffects.push_back(rotateEffect);
