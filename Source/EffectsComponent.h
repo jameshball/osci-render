@@ -6,6 +6,7 @@
 #include "PluginProcessor.h"
 #include "components/DraggableListBox.h"
 #include "components/EffectsListComponent.h"
+#include "components/EffectTypeGridComponent.h"
 
 class OscirenderAudioProcessorEditor;
 class EffectsComponent : public juce::GroupComponent, public juce::ChangeListener {
@@ -26,6 +27,8 @@ private:
 	AudioEffectListBoxItemData itemData;
 	EffectsListBoxModel listBoxModel;
 	DraggableListBox listBox;
+	std::unique_ptr<EffectTypeGridComponent> grid;
+	bool showingGrid = true; // show grid by default
 	
 	EffectComponent frequency = EffectComponent(*audioProcessor.frequencyEffect, false);
 

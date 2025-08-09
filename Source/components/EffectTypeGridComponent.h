@@ -14,11 +14,13 @@ public:
 
     int calculateRequiredHeight(int availableWidth) const;
     std::function<void(const juce::String& effectId)> onEffectSelected;
+    std::function<void()> onCanceled; // optional cancel handler
 
 private:
     OscirenderAudioProcessor& audioProcessor;
     juce::OwnedArray<EffectTypeItemComponent> effectItems;
     juce::FlexBox flexBox;
+    juce::TextButton cancelButton { "Cancel" };
     
     static constexpr int ITEM_HEIGHT = 80;
     static constexpr int MIN_ITEM_WIDTH = 180;

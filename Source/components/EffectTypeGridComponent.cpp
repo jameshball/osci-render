@@ -6,6 +6,10 @@ EffectTypeGridComponent::EffectTypeGridComponent(OscirenderAudioProcessor& proce
 {
     setupEffectItems();
     setSize(400, 200);
+    addAndMakeVisible(cancelButton);
+    cancelButton.onClick = [this]() {
+        if (onCanceled) onCanceled();
+    };
 }
 
 EffectTypeGridComponent::~EffectTypeGridComponent() = default;
@@ -44,6 +48,8 @@ void EffectTypeGridComponent::paint(juce::Graphics& g)
 void EffectTypeGridComponent::resized()
 {
     auto bounds = getLocalBounds();
+    auto topBar = bounds.removeFromTop(30);
+    cancelButton.setBounds(topBar.removeFromRight(80).reduced(4));
     
     // Create FlexBox for responsive grid layout
     flexBox = juce::FlexBox();

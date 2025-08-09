@@ -33,8 +33,55 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
         audioProcessor.broadcaster.addChangeListener(this);
     }
 
+    // Wire list model to notify when user wants to add
+    itemData.onAddNewEffectRequested = [this]() {
+        showingGrid = true;
+        if (grid)
+            grid->setVisible(true);
+        listBox.setVisible(false);
+        resized();
+        repaint();
+    };
+
+    // Start with grid visible by default
+    showingGrid = true;
+    grid = std::make_unique<EffectTypeGridComponent>(audioProcessor);
+    grid->onEffectSelected = [this](const juce::String& effectId) {
+        DBG("Effect selected from grid: " + effectId);
+        // Mark the chosen effect as selected and enabled (no instance creation for now)
+        {
+            juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+            for (auto& eff : audioProcessor.toggleableEffects) {
+                if (eff->getId() == effectId) {
+                    eff->markSelectable(true);
+                    break;
+                }
+            }
+        }
+        // Refresh list content
+        itemData.resetData();
+        listBox.updateContent();
+        showingGrid = false;
+        listBox.setVisible(true);
+        if (grid)
+            grid->setVisible(false);
+        resized();
+        repaint();
+    };
+    grid->onCanceled = [this]() {
+        // If canceled while default grid, just show list
+        showingGrid = false;
+        listBox.setVisible(true);
+        if (grid)
+            grid->setVisible(false);
+        resized();
+        repaint();
+    };
+
     listBox.setModel(&listBoxModel);
     addAndMakeVisible(listBox);
+    addAndMakeVisible(*grid);
+    listBox.setVisible(false); // grid shown first
 }
 
 EffectsComponent::~EffectsComponent() {
@@ -52,7 +99,12 @@ void EffectsComponent::resized() {
     frequency.setBounds(area.removeFromTop(30));
 
     area.removeFromTop(6);
-    listBox.setBounds(area);
+    if (showingGrid) {
+        if (grid)
+            grid->setBounds(area);
+    } else {
+        listBox.setBounds(area);
+    }
 }
 
 void EffectsComponent::changeListenerCallback(juce::ChangeBroadcaster* source) {

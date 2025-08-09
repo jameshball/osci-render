@@ -162,6 +162,9 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
 
     for (int i = 0; i < toggleableEffects.size(); i++) {
         auto effect = toggleableEffects[i];
+        effect->markSelectable(false);
+        booleanParameters.push_back(effect->selected);
+        effect->selected->setValueNotifyingHost(false);
         effect->markEnableable(false);
         booleanParameters.push_back(effect->enabled);
         effect->enabled->setValueNotifyingHost(false);
@@ -630,7 +633,9 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             juce::SpinLock::ScopedLockType lock2(effectsLock);
             if (volume > EPSILON) {
                 for (auto& effect : toggleableEffects) {
-                    if (effect->enabled->getValue()) {
+                    bool isEnabled = effect->enabled != nullptr && effect->enabled->getValue();
+                    bool isSelected = effect->selected == nullptr ? true : effect->selected->getBoolValue();
+                    if (isEnabled && isSelected) {
                         if (effect->getId() == custom->getId()) {
                             effect->setExternalInput(osci::Point{ left, right });
                         }

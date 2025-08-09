@@ -1,8 +1,7 @@
 #include "EffectTypeItemComponent.h"
 
 EffectTypeItemComponent::EffectTypeItemComponent(const juce::String& name, const juce::String& icon, const juce::String& id)
-    : effectName(name), effectId(id),
-      hoverAnimation(std::make_unique<HoverAnimationMixin>(this))
+    : effectName(name), effectId(id)
 {
     juce::String iconSvg = icon;
     if (icon.isEmpty()) {
@@ -26,8 +25,8 @@ void EffectTypeItemComponent::paint(juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat().reduced(10);
     
-    // Get animation progress from the hover animation mixin
-    auto animationProgress = hoverAnimation->getAnimationProgress();
+    // Get animation progress from inherited HoverAnimationMixin
+    auto animationProgress = getAnimationProgress();
      
     // Apply upward shift based on animation progress
     auto yOffset = -animationProgress * HOVER_LIFT_AMOUNT;
@@ -40,10 +39,11 @@ void EffectTypeItemComponent::paint(juce::Graphics& g)
         shadow.radius = 15 * animationProgress;
         shadow.offset = juce::Point<int>(0, 4);
         
-        juce::Path shadowPath;
-        shadowPath.addRoundedRectangle(bounds.toFloat(), CORNER_RADIUS);
-        shadow.drawForPath(g, shadowPath);
-        
+        if (shadow.radius > 0) {
+            juce::Path shadowPath;
+            shadowPath.addRoundedRectangle(bounds.toFloat(), CORNER_RADIUS);
+            shadow.drawForPath(g, shadowPath);
+        }
     }
     
     // Draw background with rounded corners - interpolate between normal and hover colors
@@ -79,32 +79,19 @@ void EffectTypeItemComponent::resized()
     iconButton->setBounds(iconArea);
     
     // Get animation progress and calculate Y offset
-    auto animationProgress = hoverAnimation->getAnimationProgress();
+    auto animationProgress = getAnimationProgress();
     auto yOffset = -animationProgress * HOVER_LIFT_AMOUNT;
     
     iconButton->setTransform(juce::AffineTransform::translation(0, yOffset));
 }
 
-void EffectTypeItemComponent::mouseEnter(const juce::MouseEvent& event)
-{
-    hoverAnimation->handleMouseEnter();
-}
-
-void EffectTypeItemComponent::mouseExit(const juce::MouseEvent& event)
-{
-    hoverAnimation->handleMouseExit();
-}
-
 void EffectTypeItemComponent::mouseDown(const juce::MouseEvent& event)
 {
-    if (onEffectSelected)
+    // Extend base behavior to keep hover press animation
+    HoverAnimationMixin::mouseDown(event);
+    if (onEffectSelected) {
         onEffectSelected(effectId);
-    hoverAnimation->handleMouseDown();
-}
-
-void EffectTypeItemComponent::mouseUp(const juce::MouseEvent& event)
-{
-    hoverAnimation->handleMouseUp(event.getPosition(), getLocalBounds());
+    }
 }
 
 void EffectTypeItemComponent::mouseMove(const juce::MouseEvent& event) {

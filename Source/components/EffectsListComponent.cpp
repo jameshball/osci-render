@@ -114,6 +114,10 @@ std::shared_ptr<juce::Component> EffectsListComponent::createComponent(osci::Eff
 
 int EffectsListBoxModel::getRowHeight(int row) {
     auto data = (AudioEffectListBoxItemData&)modelData;
+    if (row == data.getNumItems() - 1) {
+        // Last row is the "Add new effect" button
+        return 44; // a tidy button height
+    }
     return data.getEffect(row)->parameters.size() * EffectsListComponent::ROW_HEIGHT + EffectsListComponent::PADDING;
 }
 
@@ -124,11 +128,24 @@ bool EffectsListBoxModel::hasVariableHeightRows() const {
 juce::Component* EffectsListBoxModel::refreshComponentForRow(int rowNumber, bool isRowSelected, juce::Component *existingComponentToUpdate) {
     auto data = (AudioEffectListBoxItemData&)modelData;
     
-    if (juce::isPositiveAndBelow(rowNumber, data.getNumItems())) {
+    if (juce::isPositiveAndBelow(rowNumber, data.getNumItems() - 1)) {
         // Regular effect component
         std::unique_ptr<EffectsListComponent> item(dynamic_cast<EffectsListComponent*>(existingComponentToUpdate));
-        item = std::make_unique<EffectsListComponent>(listBox, data, rowNumber, *data.getEffect(rowNumber));
+        item = std::make_unique<EffectsListComponent>(listBox, (AudioEffectListBoxItemData&)modelData, rowNumber, *data.getEffect(rowNumber));
         return item.release();
+    } else if (rowNumber == data.getNumItems() - 1) {
+        // Last row becomes an "Add new effect" button
+        auto* btn = dynamic_cast<juce::TextButton*>(existingComponentToUpdate);
+        if (btn == nullptr)
+            btn = new juce::TextButton("+ Add new effect");
+
+        btn->setButtonText("+ Add new effect");
+        auto onAdd = data.onAddNewEffectRequested; // copy to avoid dangling reference
+        btn->onClick = [onAdd]() mutable {
+            if (onAdd)
+                onAdd();
+        };
+        return btn;
     }
     
     return nullptr;

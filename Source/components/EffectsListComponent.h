@@ -5,6 +5,7 @@
 #include "EffectComponent.h"
 #include "ComponentList.h"
 #include "SwitchButton.h"
+#include "EffectTypeGridComponent.h"
 #include <random>
 
 // Application-specific data container
@@ -14,6 +15,7 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
     std::vector<std::shared_ptr<osci::Effect>> data;
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& editor;
+    std::function<void()> onAddNewEffectRequested; // callback hooked by parent to open the grid
 
     AudioEffectListBoxItemData(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), editor(editor) {
         resetData();
@@ -21,11 +23,31 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
 
     void randomise() {
         juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-        
-        for (int i = 0; i < data.size(); i++) {
-            auto effect = data[i];
+        // Decide how many effects to select (1..5 or up to available)
+        int total = (int) audioProcessor.toggleableEffects.size();
+        int maxPick = juce::jmin(5, total);
+        int numPick = juce::jmax(1, juce::Random::getSystemRandom().nextInt({1, maxPick + 1}));
+
+        // Build indices [0..total)
+        std::vector<int> indices(total);
+        std::iota(indices.begin(), indices.end(), 0);
+        std::random_device rd;
+        std::mt19937 g(rd());
+        std::shuffle(indices.begin(), indices.end(), g);
+
+        // First, deselect and disable all
+        for (auto& effect : audioProcessor.toggleableEffects) {
+            effect->markSelectable(false);
+            effect->markEnableable(false);
+        }
+
+        // Pick numPick to select & enable, and randomise params
+        for (int k = 0; k < numPick && k < indices.size(); ++k) {
+            auto& effect = audioProcessor.toggleableEffects[indices[k]];
+            effect->markSelectable(true);
+            effect->markEnableable(true);
+
             auto id = effect->getId().toLowerCase();
-            
             if (id.contains("scale") || id.contains("translate") || id.contains("trace")) {
                 continue;
             }
@@ -35,25 +57,22 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
                 if (parameter->lfo != nullptr) {
                     parameter->lfo->setUnnormalisedValueNotifyingHost((int) osci::LfoType::Static);
                     parameter->lfoRate->setUnnormalisedValueNotifyingHost(1);
-                    
                     if (juce::Random::getSystemRandom().nextFloat() > 0.8) {
                         parameter->lfo->setUnnormalisedValueNotifyingHost((int)(juce::Random::getSystemRandom().nextFloat() * (int) osci::LfoType::Noise));
                         parameter->lfoRate->setValueNotifyingHost(juce::Random::getSystemRandom().nextFloat() * 0.1);
                     }
                 }
             }
-            effect->enabled->setValueNotifyingHost(juce::Random::getSystemRandom().nextFloat() > 0.7);
         }
 
-        // shuffle precedence
-        std::random_device rd;
-        std::mt19937 g(rd());
+        // Refresh local data with only selected effects
+        resetData();
+        
+        // shuffle precedence of the selected subset
         std::shuffle(data.begin(), data.end(), g);
-
         for (int i = 0; i < data.size(); i++) {
             data[i]->setPrecedence(i);
         }
-
         audioProcessor.updateEffectPrecedence();
     }
 
@@ -63,12 +82,16 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
         for (int i = 0; i < audioProcessor.toggleableEffects.size(); i++) {
             auto effect = audioProcessor.toggleableEffects[i];
             effect->setValue(effect->getValue());
-            data.push_back(effect);
+            // Ensure 'selected' exists and defaults to true for older projects
+            effect->markSelectable(effect->selected == nullptr ? true : effect->selected->getBoolValue());
+            if (effect->selected == nullptr || effect->selected->getBoolValue()) {
+                data.push_back(effect);
+            }
         }
     }
 
     int getNumItems() override {
-        return data.size();
+        return data.size() + 1;
     }
 
     // CURRENTLY NOT USED

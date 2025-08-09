@@ -1,17 +1,14 @@
 #include "HoverAnimationMixin.h"
 
-HoverAnimationMixin::HoverAnimationMixin(juce::Component* targetComponent)
-    : component(targetComponent),
-      animatorUpdater(targetComponent),
+HoverAnimationMixin::HoverAnimationMixin()
+    : animatorUpdater(this),
       hoverAnimator(juce::ValueAnimatorBuilder{}
           .withEasing(getEasingFunction())
           .withDurationMs(getHoverAnimationDurationMs())
           .withValueChangedCallback([this](auto value) {
               animationProgress = static_cast<float>(value);
-              if (component != nullptr) {
-                  component->repaint();
-                  component->resized();
-              }
+              repaint();
+              resized();
           })
           .build()),
       unhoverAnimator(juce::ValueAnimatorBuilder{}
@@ -19,10 +16,8 @@ HoverAnimationMixin::HoverAnimationMixin(juce::Component* targetComponent)
           .withDurationMs(getHoverAnimationDurationMs())
           .withValueChangedCallback([this](auto value) {
               animationProgress = 1.0f - static_cast<float>(value);
-              if (component != nullptr) {
-                  component->repaint();
-                  component->resized();
-              }
+              repaint();
+              resized();
           })
           .build())
 {
@@ -49,27 +44,27 @@ void HoverAnimationMixin::animateHover(bool isHovering)
     }
 }
 
-void HoverAnimationMixin::handleMouseEnter()
+void HoverAnimationMixin::mouseEnter(const juce::MouseEvent&)
 {
     isHovered = true;
     animateHover(true);
 }
 
-void HoverAnimationMixin::handleMouseExit()
+void HoverAnimationMixin::mouseExit(const juce::MouseEvent&)
 {
     isHovered = false;
     // Fixed logic to prevent getting stuck in hovered state
     animateHover(false);
 }
 
-void HoverAnimationMixin::handleMouseDown()
+void HoverAnimationMixin::mouseDown(const juce::MouseEvent&)
 {
     animateHover(false);
 }
 
-void HoverAnimationMixin::handleMouseUp(const juce::Point<int>& mousePosition, const juce::Rectangle<int>& componentBounds)
+void HoverAnimationMixin::mouseUp(const juce::MouseEvent& event)
 {
     // Only animate hover if the mouse is still within the component bounds
-    if (componentBounds.contains(mousePosition))
+    if (getLocalBounds().contains(event.getEventRelativeTo(this).getPosition()))
         animateHover(true);
 }

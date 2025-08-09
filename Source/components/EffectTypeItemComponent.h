@@ -4,7 +4,7 @@
 #include "HoverAnimationMixin.h"
 #include "SvgButton.h"
 
-class EffectTypeItemComponent : public juce::Component
+class EffectTypeItemComponent : public HoverAnimationMixin
 {
 public:
     EffectTypeItemComponent(const juce::String& name, const juce::String& icon, const juce::String& id);
@@ -12,10 +12,7 @@ public:
 
     void paint(juce::Graphics& g) override;
     void resized() override;
-    void mouseEnter(const juce::MouseEvent& event) override;
-    void mouseExit(const juce::MouseEvent& event) override;
     void mouseDown(const juce::MouseEvent& event) override;
-    void mouseUp(const juce::MouseEvent& event) override;
     void mouseMove(const juce::MouseEvent& event) override;
 
     const juce::String& getEffectId() const { return effectId; }
@@ -26,9 +23,6 @@ public:
 private:
     juce::String effectName;
     juce::String effectId;
-    
-    // Hover animation functionality
-    std::unique_ptr<HoverAnimationMixin> hoverAnimation;
     
     // Icon for the effect
     std::unique_ptr<SvgButton> iconButton;
