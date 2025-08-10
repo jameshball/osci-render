@@ -1,6 +1,8 @@
 #include "EffectTypeGridComponent.h"
 #include "../LookAndFeel.h"
 #include <unordered_set>
+#include <algorithm>
+#include <numeric>
 
 EffectTypeGridComponent::EffectTypeGridComponent(OscirenderAudioProcessor& processor)
     : audioProcessor(processor)
@@ -31,14 +33,28 @@ void EffectTypeGridComponent::setupEffectItems()
     
     // Get effect types directly from the audio processor's toggleableEffects
     juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-    for (const auto& effect : audioProcessor.toggleableEffects)
+    const int n = (int) audioProcessor.toggleableEffects.size();
+    std::vector<int> order(n);
+    std::iota(order.begin(), order.end(), 0);
+    std::sort(order.begin(), order.end(), [this](int a, int b) {
+        auto ea = audioProcessor.toggleableEffects[a];
+        auto eb = audioProcessor.toggleableEffects[b];
+        const int cmp = ea->getName().compareIgnoreCase(eb->getName());
+        if (cmp != 0)
+            return cmp < 0; // ascending alphabetical, case-insensitive
+        // Stable tie-breaker to ensure deterministic layout
+        return ea->getId().compare(eb->getId()) < 0;
+    });
+
+    for (int idx : order)
     {
-        // Extract effect name from the effect ID or first parameter name
+        auto effect = audioProcessor.toggleableEffects[idx];
+        // Extract effect name from the effect
         juce::String effectName = effect->getName();
-        
+
         // Create new item component
         auto* item = new EffectTypeItemComponent(effectName, effect->getIcon(), effect->getId());
-        
+
         // Set up callback to forward effect selection
         item->onEffectSelected = [this](const juce::String& effectId) {
             if (onEffectSelected)
@@ -53,9 +69,9 @@ void EffectTypeGridComponent::setupEffectItems()
             juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
             audioProcessor.clearPreviewEffect();
         };
-        
-    effectItems.add(item);
-    content.addAndMakeVisible(item);
+
+        effectItems.add(item);
+        content.addAndMakeVisible(item);
     }
 }
 

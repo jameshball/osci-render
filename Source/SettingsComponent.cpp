@@ -13,7 +13,7 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     addChildComponent(frame);
 
     double midiLayoutPreferredSize = std::any_cast<double>(audioProcessor.getProperty("midiLayoutPreferredSize", pluginEditor.CLOSED_PREF_SIZE));
-    double mainLayoutPreferredSize = std::any_cast<double>(audioProcessor.getProperty("mainLayoutPreferredSize", -0.4));
+    double mainLayoutPreferredSize = std::any_cast<double>(audioProcessor.getProperty("mainLayoutPreferredSize", -0.5));
 
     midiLayout.setItemLayout(0, -0.1, -1.0, -(1.0 + midiLayoutPreferredSize));
     midiLayout.setItemLayout(1, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE);
@@ -46,8 +46,6 @@ void SettingsComponent::resized() {
     mainLayout.layOutComponents(columns, 3, dummy.getX(), dummy.getY(), dummy.getWidth(), dummy.getHeight(), false, true);
 
     auto bounds = dummy2.getBounds();
-    perspective.setBounds(bounds.removeFromBottom(120));
-    bounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
     main.setBounds(bounds);
 
     juce::Component* effectSettings = nullptr;
@@ -64,6 +62,9 @@ void SettingsComponent::resized() {
         effectSettings->setBounds(dummyBounds.removeFromBottom(160));
         dummyBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
     }
+
+    perspective.setBounds(dummyBounds.removeFromBottom(120));
+    dummyBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
 
     effects.setBounds(dummyBounds);
 
