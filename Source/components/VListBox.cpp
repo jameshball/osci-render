@@ -393,7 +393,7 @@ int VListBoxModel::getRowForPosition (int yPos)
             return r;
     }
 
-    return numRows;
+    return numRows - 1;
 }
 
 int VListBoxModel::getPositionForRow (int rowNumber)

@@ -5,16 +5,8 @@ DraggableListBoxItemData::~DraggableListBoxItemData() {};
 
 void DraggableListBoxItem::paint(juce::Graphics& g)
 {
-    if (insertAfter)
-    {
-        g.setColour(juce::Colour(0xff00ff00));
-        g.fillRect(0, getHeight() - 4, getWidth(), 4);
-    }
-    else if (insertBefore)
-    {
-        g.setColour(juce::Colour(0xff00ff00));
-        g.fillRect(0, 0, getWidth(), 4);
-    }
+    // Per-item insertion lines are suppressed in favour of a single overlay drawn by DraggableListBox.
+    juce::ignoreUnused(g);
 }
 
 void DraggableListBoxItem::mouseEnter(const juce::MouseEvent&)
@@ -32,7 +24,10 @@ void DraggableListBoxItem::mouseDrag(const juce::MouseEvent&)
 {
     if (juce::DragAndDropContainer* container = juce::DragAndDropContainer::findParentDragContainerFor(this))
     {
-        container->startDragging("DraggableListBoxItem", this);
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty("type", juce::var("DraggableListBoxItem"));
+    obj->setProperty("row", juce::var(rowNum));
+    container->startDragging(juce::var(obj), this);
     }
 }
 
@@ -62,30 +57,58 @@ void DraggableListBoxItem::itemDragEnter(const SourceDetails& dragSourceDetails)
 {
     updateInsertLines(dragSourceDetails);
     updateAutoScroll(dragSourceDetails);
+    // Update the global overlay on the parent list box
+    auto ptGlobal = localPointToGlobal(dragSourceDetails.localPosition);
+    auto ptInLB = listBox.getLocalPoint(nullptr, ptGlobal);
+    listBox.updateDropIndicatorAt(ptInLB);
 }
 
 void DraggableListBoxItem::itemDragMove(const SourceDetails& dragSourceDetails)
 {
     updateInsertLines(dragSourceDetails);
     updateAutoScroll(dragSourceDetails);
+    auto ptGlobal = localPointToGlobal(dragSourceDetails.localPosition);
+    auto ptInLB = listBox.getLocalPoint(nullptr, ptGlobal);
+    listBox.updateDropIndicatorAt(ptInLB);
 }
 
 void DraggableListBoxItem::itemDragExit(const SourceDetails& /*dragSourceDetails*/)
 {
     hideInsertLines();
     stopAutoScroll();
+    listBox.clearDropIndicator();
 }
 
 void DraggableListBoxItem::itemDropped(const juce::DragAndDropTarget::SourceDetails &dragSourceDetails)
 {
     hideInsertLines();
     stopAutoScroll();
+    listBox.clearDropIndicator();
     if (DraggableListBoxItem* item = dynamic_cast<DraggableListBoxItem*>(dragSourceDetails.sourceComponent.get()))
     {
-        if (dragSourceDetails.localPosition.y < getHeight() / 2)
-            modelData.moveBefore(item->rowNum, rowNum);
-        else
-            modelData.moveAfter(item->rowNum, rowNum);
+        if (auto* vp = listBox.getViewport())
+        {
+            // Compute the global insertion index using the list box, not the item local midpoint
+            auto ptInThis = dragSourceDetails.localPosition;
+            auto ptGlobal = localPointToGlobal(ptInThis);
+            auto ptInLB = listBox.getLocalPoint(nullptr, ptGlobal);
+            int insertIndex = listBox.getInsertionIndexForPosition(ptInLB.x, ptInLB.y);
+            insertIndex = juce::jlimit(0, modelData.getNumItems(), insertIndex);
+
+            // If dragging an item that appears before the insertion point and we're moving it down,
+            // account for the removal shifting indices.
+            const int fromIndex = item->rowNum;
+            int toIndex = insertIndex;
+            if (toIndex > fromIndex) toIndex -= 1;
+
+            if (toIndex < 0) toIndex = 0;
+            if (toIndex >= modelData.getNumItems())
+                modelData.moveAfter(fromIndex, modelData.getNumItems() - 1);
+            else if (toIndex <= 0)
+                modelData.moveBefore(fromIndex, 0);
+            else
+                modelData.moveBefore(fromIndex, toIndex);
+        }
         listBox.updateContent();
     }
 }
@@ -164,7 +187,114 @@ void DraggableListBoxItem::timerCallback()
         {
             vp->setViewPosition(current.x, newY);
         }
+
+    // Update the global drop indicator position based on current mouse position (even if the mouse isn't moving)
+    auto screenPos = juce::Desktop::getInstance().getMainMouseSource().getScreenPosition();
+    auto posInLB = listBox.getLocalPoint(nullptr, screenPos.toInt());
+    listBox.updateDropIndicatorAt(posInLB);
     }
+}
+
+// ===================== DraggableListBox overlay indicator =====================
+
+void DraggableListBox::updateDropIndicator(const SourceDetails& details)
+{
+    // localPosition is already in this component's coordinate space
+    const auto pt = details.localPosition;
+    int index = getInsertionIndexForPosition(pt.x, pt.y);
+    if (index < 0) index = 0; // allow showing at very top (over header spacer)
+    dropInsertIndex = index;
+    showDropIndicator = true;
+    repaint();
+}
+
+void DraggableListBox::clearDropIndicator()
+{
+    showDropIndicator = false;
+    dropInsertIndex = -1;
+    repaint();
+}
+
+void DraggableListBox::updateDropIndicatorAt(const juce::Point<int>& listLocalPos)
+{
+    int index = getInsertionIndexForPosition(listLocalPos.x, listLocalPos.y);
+    if (index < 0) index = 0; // allow showing at very top (over header spacer)
+    dropInsertIndex = index;
+    showDropIndicator = true;
+    repaint();
+}
+
+void DraggableListBox::paintOverChildren(juce::Graphics& g)
+{
+    VListBox::paintOverChildren(g);
+    if (!showDropIndicator) return;
+
+    const int numRows = getModel() != nullptr ? getModel()->getNumRows() : 0;
+    if (dropInsertIndex < 0 || dropInsertIndex > numRows) return;
+
+    auto* vp = getViewport();
+    if (vp == nullptr) return;
+
+    // Determine the y position between rows to draw the indicator line
+    int y = 0;
+    if (dropInsertIndex == 0)
+    {
+        // Top of first row (below header)
+        if (numRows > 0)
+            y = getRowPosition(0, true).getY();
+        else
+            y = 0;
+    }
+    else if (dropInsertIndex >= numRows)
+    {
+        auto lastRowBounds = getRowPosition(numRows - 1, true);
+        y = lastRowBounds.getBottom();
+    }
+    else
+    {
+        auto prevBounds = getRowPosition(dropInsertIndex - 1, true);
+        y = prevBounds.getBottom();
+    }
+
+    // Draw a prominent indicator spanning the visible row width
+    const int x = 0;
+    const int w = getVisibleRowWidth();
+    const int thickness = 3;
+    const juce::Colour colour = juce::Colours::lime.withAlpha(0.9f);
+
+    const float yOffset = -2.5f; // Offset to center the line visually
+
+    g.setColour(colour);
+    g.fillRoundedRectangle(x, y - thickness / 2 + yOffset, w, thickness, 2.0f);
+}
+
+void DraggableListBox::itemDropped(const SourceDetails& details)
+{
+    // Background drop: compute insertion index and use model to move
+    int insertIndex = -1;
+    // localPosition is already relative to this list
+    insertIndex = getInsertionIndexForPosition(details.localPosition.x, details.localPosition.y);
+    if (insertIndex < 0) insertIndex = 0; // clamp to top when over header spacer
+
+    if (auto* m = dynamic_cast<DraggableListBoxModel*>(getModel()))
+    {
+        int fromIndex = -1;
+        const juce::var& desc = details.description;
+        if (desc.isObject())
+        {
+            auto* obj = desc.getDynamicObject();
+            if (obj != nullptr)
+            {
+                auto v = obj->getProperty("row");
+                if (v.isInt()) fromIndex = (int)v;
+            }
+        }
+
+        if (fromIndex >= 0 && insertIndex >= 0)
+            m->moveByInsertIndex(fromIndex, insertIndex);
+    }
+
+    clearDropIndicator();
 }
 
 juce::Component* DraggableListBoxModel::refreshComponentForRow(int rowNumber, bool isRowSelected, juce::Component *existingComponentToUpdate)

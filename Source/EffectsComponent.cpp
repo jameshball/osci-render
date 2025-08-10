@@ -93,6 +93,12 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
 
     listBox.setModel(&listBoxModel);
     addAndMakeVisible(listBox);
+    // Add a small top spacer so the drop indicator can be visible above the first row
+    {
+        auto spacer = std::make_unique<juce::Component>();
+        spacer->setSize(1, LIST_SPACER); // top padding
+        listBox.setHeaderComponent(std::move(spacer));
+    }
     // Setup scroll fade mixin
     initScrollFade(*this);
     attachToListBox(listBox);
@@ -140,10 +146,9 @@ void EffectsComponent::resized() {
         auto addBtnHeight = 44;
         auto listArea = area;
         auto buttonArea = listArea.removeFromBottom(addBtnHeight);
-        listArea.removeFromTop(6);
         listBox.setBounds(listArea);
         // Layout bottom fade overlay; visible if list is scrollable
-        layoutScrollFade(listArea, true, 48);
+        layoutScrollFade(listArea.withTrimmedTop(LIST_SPACER), true, 48);
         if (addEffectButton) {
             addEffectButton->setVisible(true);
             addEffectButton->setBounds(buttonArea.reduced(0, 4));
@@ -156,5 +161,5 @@ void EffectsComponent::changeListenerCallback(juce::ChangeBroadcaster* source) {
     listBox.updateContent();
     // Re-layout scroll fades after content changes
     if (! showingGrid)
-        layoutScrollFade(listBox.getBounds(), true, 48);
+        layoutScrollFade(listBox.getBounds().withTrimmedTop(LIST_SPACER), true, 48);
 }
