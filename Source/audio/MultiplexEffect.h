@@ -7,9 +7,9 @@ public:
     osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
         jassert(values.size() >= 6);
         
-        double gridX = values[0].load();
-        double gridY = values[1].load();
-        double gridZ = values[2].load();
+        double gridX = values[0].load() + 0.0001;
+        double gridY = values[1].load() + 0.0001;
+        double gridZ = values[2].load() + 0.0001;
         double interpolation = values[3].load();
         double phase = values[4].load();
         double gridDelay = values[5].load();
@@ -49,6 +49,23 @@ public:
         osci::Point interpolationFactor = gridDiff * interpolation;
         
         return (1.0 - interpolationFactor) * current + interpolationFactor * next;
+    }
+
+    std::shared_ptr<osci::Effect> build() const override {
+        auto eff = std::make_shared<osci::Effect>(
+            std::make_shared<MultiplexEffect>(),
+            std::vector<osci::EffectParameter*>{
+                new osci::EffectParameter("Multiplex X", "Controls the horizontal grid size for the multiplex effect.", "multiplexGridX", VERSION_HINT, 2.0, 1.0, 8.0),
+                new osci::EffectParameter("Multiplex Y", "Controls the vertical grid size for the multiplex effect.", "multiplexGridY", VERSION_HINT, 2.0, 1.0, 8.0),
+                new osci::EffectParameter("Multiplex Z", "Controls the depth grid size for the multiplex effect.", "multiplexGridZ", VERSION_HINT, 1.0, 1.0, 8.0),
+                new osci::EffectParameter("Multiplex Smooth", "Controls the smoothness of transitions between grid sizes.", "multiplexSmooth", VERSION_HINT, 0.0, 0.0, 1.0),
+                new osci::EffectParameter("Multiplex Phase", "Controls the current phase of the multiplex grid animation.", "gridPhase", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001f, osci::LfoType::Sawtooth, 55.0f),
+                new osci::EffectParameter("Multiplex Delay", "Controls the delay of the audio samples used in the multiplex effect.", "gridDelay", VERSION_HINT, 0.0, 0.0, 1.0),
+            }
+        );
+        eff->setName("Multiplex");
+        eff->setIcon(BinaryData::multiplex_svg);
+        return eff;
     }
 
 private:

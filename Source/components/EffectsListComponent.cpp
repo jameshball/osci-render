@@ -53,6 +53,8 @@ effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
             juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
             if (this->effect.enabled) this->effect.enabled->setValueNotifyingHost(false);
             if (this->effect.selected) this->effect.selected->setValueNotifyingHost(false);
+            // Reset all parameters/flags for this effect back to defaults on removal
+            this->effect.resetToDefault();
         }
         // Defer model reset and outer list refresh to avoid re-entrancy on current row
         juce::MessageManager::callAsync([this]() {

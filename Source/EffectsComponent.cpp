@@ -2,7 +2,8 @@
 #include "audio/BitCrushEffect.h"
 #include "PluginEditor.h"
 
-EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), itemData(p, editor), listBoxModel(listBox, itemData) {
+EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor)
+    : audioProcessor(p), itemData(p, editor), listBoxModel(listBox, itemData), grid(p) {
 	setText("Audio Effects");
 
     addAndMakeVisible(frequency);
@@ -28,10 +29,8 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
     // Wire list model to notify when user wants to add
     itemData.onAddNewEffectRequested = [this]() {
         showingGrid = true;
-        if (grid) {
-            grid->setVisible(true);
-            grid->refreshDisabledStates();
-        }
+        grid.setVisible(true);
+        grid.refreshDisabledStates();
         listBox.setVisible(false);
         resized();
         repaint();
@@ -47,8 +46,7 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
         }
     }
     showingGrid = !anySelected;
-    grid = std::make_unique<EffectTypeGridComponent>(audioProcessor);
-    grid->onEffectSelected = [this](const juce::String& effectId) {
+    grid.onEffectSelected = [this](const juce::String& effectId) {
         {
             juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
             // Mark the chosen effect as selected and enabled, and move it to the end
@@ -76,17 +74,15 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
         listBox.updateContent();
         showingGrid = false;
         listBox.setVisible(true);
-        if (grid)
-            grid->setVisible(false);
+        grid.setVisible(false);
         resized();
         repaint();
     };
-    grid->onCanceled = [this]() {
+    grid.onCanceled = [this]() {
         // If canceled while default grid, just show list
         showingGrid = false;
         listBox.setVisible(true);
-        if (grid)
-            grid->setVisible(false);
+        grid.setVisible(false);
         resized();
         repaint();
     };
@@ -102,20 +98,19 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
     // Setup scroll fade mixin
     initScrollFade(*this);
     attachToListBox(listBox);
-    // Create a dedicated "+ Add new effect" button below the list
-    addEffectButton = std::make_unique<juce::TextButton>("+ Add new effect");
-    addEffectButton->onClick = [this]() {
+    // Wire "+ Add new effect" button below the list
+    addEffectButton.onClick = [this]() {
         if (itemData.onAddNewEffectRequested) itemData.onAddNewEffectRequested();
     };
-    addAndMakeVisible(*addEffectButton);
-    addAndMakeVisible(*grid);
+    addAndMakeVisible(addEffectButton);
+    addAndMakeVisible(grid);
     // Keep disabled states in sync whenever grid is shown
     if (showingGrid) {
-        grid->setVisible(true);
-        grid->refreshDisabledStates();
+        grid.setVisible(true);
+        grid.refreshDisabledStates();
         listBox.setVisible(false);
     } else {
-        grid->setVisible(false);
+        grid.setVisible(false);
         listBox.setVisible(true);
     }
 }
@@ -136,9 +131,8 @@ void EffectsComponent::resized() {
 
     area.removeFromTop(6);
     if (showingGrid) {
-        if (grid)
-            grid->setBounds(area);
-        if (addEffectButton) addEffectButton->setVisible(false);
+        grid.setBounds(area);
+        addEffectButton.setVisible(false);
         // Hide fade when grid is shown
         setScrollFadeVisible(false);
     } else {
@@ -149,10 +143,8 @@ void EffectsComponent::resized() {
         listBox.setBounds(listArea);
         // Layout bottom fade overlay; visible if list is scrollable
         layoutScrollFade(listArea.withTrimmedTop(LIST_SPACER), true, 48);
-        if (addEffectButton) {
-            addEffectButton->setVisible(true);
-            addEffectButton->setBounds(buttonArea.reduced(0, 4));
-        }
+        addEffectButton.setVisible(true);
+        addEffectButton.setBounds(buttonArea.reduced(0, 4));
     }
 }
 

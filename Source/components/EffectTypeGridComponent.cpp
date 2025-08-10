@@ -44,6 +44,15 @@ void EffectTypeGridComponent::setupEffectItems()
             if (onEffectSelected)
                 onEffectSelected(effectId);
         };
+        // Hover preview: request temporary preview of this effect while hovered
+        item->onHoverStart = [this](const juce::String& effectId) {
+            juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+            audioProcessor.setPreviewEffectId(effectId);
+        };
+        item->onHoverEnd = [this]() {
+            juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+            audioProcessor.clearPreviewEffect();
+        };
         
     effectItems.add(item);
     content.addAndMakeVisible(item);
@@ -94,20 +103,56 @@ void EffectTypeGridComponent::resized()
     flexBox.justifyContent = juce::FlexBox::JustifyContent::spaceBetween;
     flexBox.alignContent = juce::FlexBox::AlignContent::flexStart;
     flexBox.flexDirection = juce::FlexBox::Direction::row;
-    
-    // Add each effect item as a FlexItem with flex-grow to fill available space
-    for (auto* item : effectItems)
+
+    // Determine fixed per-item width for this viewport width
+    const int viewW = contentArea.getWidth();
+    const int viewH = contentArea.getHeight();
+    const int itemsPerRow = juce::jmax(1, viewW / MIN_ITEM_WIDTH);
+    const int fixedItemWidth = (itemsPerRow > 0 ? viewW / itemsPerRow : viewW);
+
+    // Add each effect item with a fixed width, and pad the final row with placeholders so it's centered
+    const int total = effectItems.size();
+    const int fullRows = (itemsPerRow > 0 ? total / itemsPerRow : 0);
+    const int remainder = (itemsPerRow > 0 ? total % itemsPerRow : 0);
+
+    auto addItemFlex = [&](juce::Component* c)
     {
-        flexBox.items.add(juce::FlexItem(*item)
-                         .withMinWidth(MIN_ITEM_WIDTH)
-                         .withHeight(ITEM_HEIGHT)
-                         .withFlex(1.0f)  // Allow items to grow to fill available space
-                         .withMargin(juce::FlexItem::Margin(0)));
+        flexBox.items.add(juce::FlexItem(*c)
+                              .withMinWidth((float) fixedItemWidth)
+                              .withMaxWidth((float) fixedItemWidth)
+                              .withHeight((float) ITEM_HEIGHT)
+                              .withFlex(1.0f) // keep existing flex behaviour; fixed max width holds size
+                              .withMargin(juce::FlexItem::Margin(0)));
+    };
+
+    auto addPlaceholder = [&]()
+    {
+        // Placeholder occupies a slot visually but has no component; ensures last row is centered
+        juce::FlexItem placeholder((float) fixedItemWidth, (float) ITEM_HEIGHT);
+        placeholder.flexGrow = 1.0f; // match item flex for consistent spacing
+        placeholder.margin = juce::FlexItem::Margin(0);
+        flexBox.items.add(std::move(placeholder));
+    };
+
+    int index = 0;
+    // Add complete rows
+    for (int r = 0; r < fullRows; ++r)
+        for (int c = 0; c < itemsPerRow; ++c)
+            addItemFlex(effectItems.getUnchecked(index++));
+
+    // Add last row centered with balanced placeholders
+    if (remainder > 0)
+    {
+        const int missing = itemsPerRow - remainder;
+        const int leftPad = missing / 2;
+        const int rightPad = missing - leftPad;
+
+        for (int i = 0; i < leftPad; ++i) addPlaceholder();
+        for (int i = 0; i < remainder; ++i) addItemFlex(effectItems.getUnchecked(index++));
+        for (int i = 0; i < rightPad; ++i) addPlaceholder();
     }
 
     // Compute required content height
-    const int viewW = contentArea.getWidth();
-    const int viewH = contentArea.getHeight();
     const int requiredHeight = calculateRequiredHeight(viewW);
 
     // If content is shorter than viewport, make content at least as tall as viewport

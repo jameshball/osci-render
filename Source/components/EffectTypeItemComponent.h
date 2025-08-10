@@ -14,11 +14,15 @@ public:
     void resized() override;
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseMove(const juce::MouseEvent& event) override;
+    void mouseEnter(const juce::MouseEvent& event) override;
+    void mouseExit(const juce::MouseEvent& event) override;
 
     const juce::String& getEffectId() const { return effectId; }
     const juce::String& getEffectName() const { return effectName; }
 
     std::function<void(const juce::String& effectId)> onEffectSelected;
+    std::function<void(const juce::String& effectId)> onHoverStart;
+    std::function<void()> onHoverEnd;
 
 private:
     juce::String effectName;

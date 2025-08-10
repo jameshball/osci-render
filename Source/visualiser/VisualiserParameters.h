@@ -222,16 +222,7 @@ public:
             VERSION_HINT, 0.5, 0.0, 1.0
         )
     );
-    std::shared_ptr<StereoEffect> stereoEffectApplication = std::make_shared<StereoEffect>();
-    std::shared_ptr<osci::Effect> stereoEffect = std::make_shared<osci::Effect>(
-        stereoEffectApplication,
-        new osci::EffectParameter(
-            "Stereo",
-            "Turns mono audio that is uninteresting to visualise into stereo audio that is interesting to visualise.",
-            "stereo",
-            VERSION_HINT, 0.0, 0.0, 1.0
-        )
-    );
+    std::shared_ptr<osci::Effect> stereoEffect = StereoEffect().build();
     std::shared_ptr<osci::Effect> scaleEffect = std::make_shared<osci::Effect>(
         [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             input.scale(values[0].load(), values[1].load(), 1.0);
@@ -243,12 +234,12 @@ public:
             "xScale",
             VERSION_HINT, 1.0, -3.0, 3.0
         ),
-            new osci::EffectParameter(
-                "Y Scale",
-                "Controls the vertical scale of the oscilloscope display.",
-                "yScale",
-                VERSION_HINT, 1.0, -3.0, 3.0
-            ),
+        new osci::EffectParameter(
+            "Y Scale",
+            "Controls the vertical scale of the oscilloscope display.",
+            "yScale",
+            VERSION_HINT, 1.0, -3.0, 3.0
+        ),
     });
     std::shared_ptr<osci::Effect> offsetEffect = std::make_shared<osci::Effect>(
         [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
@@ -334,15 +325,7 @@ public:
             VERSION_HINT, 0.7, 0.0, 5.0
         )
     );
-    std::shared_ptr<osci::Effect> smoothEffect = std::make_shared<osci::Effect>(
-        std::make_shared<SmoothEffect>(),
-        new osci::EffectParameter(
-            "Smoothing",
-            "This works as a low-pass frequency filter, effectively reducing the sample rate of the audio being visualised.",
-            "visualiserSmoothing",
-            VERSION_HINT, 0, 0.0, 1.0
-        )
-    );
+    std::shared_ptr<osci::Effect> smoothEffect = SmoothEffect("visualiser", 0.0f).build();
     std::shared_ptr<osci::Effect> sweepMsEffect = std::make_shared<osci::Effect>(
         new osci::EffectParameter(
             "Sweep (ms)",

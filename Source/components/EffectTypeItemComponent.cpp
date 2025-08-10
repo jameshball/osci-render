@@ -96,6 +96,8 @@ void EffectTypeItemComponent::mouseDown(const juce::MouseEvent& event)
     if (! isEnabled()) return;
     // Extend base behavior to keep hover press animation
     HoverAnimationMixin::mouseDown(event);
+    // Ensure any hover preview is cleared before permanently selecting/enabling the effect
+    if (onHoverEnd) onHoverEnd();
     if (onEffectSelected) {
         onEffectSelected(effectId);
     }
@@ -104,4 +106,18 @@ void EffectTypeItemComponent::mouseDown(const juce::MouseEvent& event)
 void EffectTypeItemComponent::mouseMove(const juce::MouseEvent& event) {
     setMouseCursor(isEnabled() ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
     juce::Desktop::getInstance().getMainMouseSource().forceMouseCursorUpdate();
+}
+
+void EffectTypeItemComponent::mouseEnter(const juce::MouseEvent& event)
+{
+    HoverAnimationMixin::mouseEnter(event);
+    if (isEnabled() && onHoverStart)
+        onHoverStart(effectId);
+}
+
+void EffectTypeItemComponent::mouseExit(const juce::MouseEvent& event)
+{
+    HoverAnimationMixin::mouseExit(event);
+    if (onHoverEnd)
+        onHoverEnd();
 }

@@ -28,8 +28,8 @@ private:
 	AudioEffectListBoxItemData itemData;
 	EffectsListBoxModel listBoxModel;
 	DraggableListBox listBox;
-	std::unique_ptr<juce::TextButton> addEffectButton; // Separate button under the list
-	std::unique_ptr<EffectTypeGridComponent> grid;
+	juce::TextButton addEffectButton { "+ Add new effect" }; // Separate button under the list
+	EffectTypeGridComponent grid { audioProcessor };
 	bool showingGrid = true; // show grid by default
 
 	const int LIST_SPACER = 4; // Space above the list to show drop indicator

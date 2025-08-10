@@ -26,6 +26,18 @@ public:
 		return vector;
 	}
 
+	std::shared_ptr<osci::Effect> build() const override {
+		auto eff = std::make_shared<osci::Effect>(
+			std::make_shared<DashedLineEffect>(),
+			std::vector<osci::EffectParameter*>{
+				new osci::EffectParameter("Dash Length", "Controls the length of the dashed line.", "dashLength", VERSION_HINT, 0.3, 0.0, 1.0),
+			}
+		);
+		eff->setName("Dash");
+		eff->setIcon(BinaryData::dash_svg);
+		return eff;
+	}
+
 private:
 	const static int MAX_BUFFER = 192000;
 	std::vector<osci::Point> buffer = std::vector<osci::Point>(MAX_BUFFER);
