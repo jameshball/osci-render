@@ -6,6 +6,7 @@
 #include "ComponentList.h"
 #include "SwitchButton.h"
 #include "EffectTypeGridComponent.h"
+#include "SvgButton.h"
 #include <random>
 
 // Application-specific data container
@@ -91,7 +92,8 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
     }
 
     int getNumItems() override {
-        return data.size() + 1;
+    // Only the effects themselves are rows; the "+ Add new effect" button is a separate control below the list
+    return (int) data.size();
     }
 
     // CURRENTLY NOT USED
@@ -173,6 +175,7 @@ public:
     void resized() override;
     
     static const int LEFT_BAR_WIDTH = 50;
+    static const int RIGHT_BAR_WIDTH = 15; // space for close button
     static const int ROW_HEIGHT = 30;
     static const int PADDING = 4;
 
@@ -180,7 +183,8 @@ protected:
     osci::Effect& effect;
     ComponentListModel listModel;
     juce::ListBox list;
-    jux::SwitchButton selected = { effect.enabled };
+    jux::SwitchButton enabled = { effect.enabled };
+    SvgButton closeButton = SvgButton("closeEffect", juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize), juce::Colours::white, juce::Colours::white);
 private:
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& editor;

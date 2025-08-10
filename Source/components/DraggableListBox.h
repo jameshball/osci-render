@@ -18,14 +18,14 @@ struct DraggableListBoxItemData
     virtual void addItemAtEnd() {};
 };
 
-// DraggableListBox is basically just a ListBox, that inherits from DragAndDropContainer.
+// DraggableListBox is basically just a VListBox, that inherits from DragAndDropContainer.
 // Declare your list box using this type.
-class DraggableListBox : public juce::jc::ListBox, public juce::DragAndDropContainer
+class DraggableListBox : public VListBox, public juce::DragAndDropContainer
 {
 };
 
 // Everything below this point should be generic.
-class DraggableListBoxItem : public juce::Component, public juce::DragAndDropTarget
+class DraggableListBoxItem : public juce::Component, public juce::DragAndDropTarget, public juce::Timer
 {
 public:
     DraggableListBoxItem(DraggableListBox& lb, DraggableListBoxItemData& data, int rn)
@@ -49,6 +49,9 @@ public:
 protected:
     void updateInsertLines(const SourceDetails &dragSourceDetails);
     void hideInsertLines();
+    void updateAutoScroll(const SourceDetails& dragSourceDetails);
+    void stopAutoScroll();
+    void timerCallback() override;
 
     int rowNum;
     DraggableListBoxItemData& modelData;
@@ -57,9 +60,13 @@ protected:
     juce::MouseCursor savedCursor;
     bool insertAfter = false;
     bool insertBefore = false;
+
+    // Auto-scroll state while dragging near viewport edges
+    double scrollPixelsPerTick = 0.0; // positive = scroll down, negative = up
+    bool autoScrollActive = false;
 };
 
-class DraggableListBoxModel : public juce::jc::ListBoxModel
+class DraggableListBoxModel : public VListBoxModel
 {
 public:
     DraggableListBoxModel(DraggableListBox& lb, DraggableListBoxItemData& md)

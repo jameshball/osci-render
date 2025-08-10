@@ -6,10 +6,11 @@
 #include "PluginProcessor.h"
 #include "components/DraggableListBox.h"
 #include "components/EffectsListComponent.h"
+#include "components/ScrollFadeMixin.h"
 #include "components/EffectTypeGridComponent.h"
 
 class OscirenderAudioProcessorEditor;
-class EffectsComponent : public juce::GroupComponent, public juce::ChangeListener {
+class EffectsComponent : public juce::GroupComponent, public juce::ChangeListener, private ScrollFadeMixin {
 public:
 	EffectsComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
 	~EffectsComponent() override;
@@ -27,6 +28,7 @@ private:
 	AudioEffectListBoxItemData itemData;
 	EffectsListBoxModel listBoxModel;
 	DraggableListBox listBox;
+	std::unique_ptr<juce::TextButton> addEffectButton; // Separate button under the list
 	std::unique_ptr<EffectTypeGridComponent> grid;
 	bool showingGrid = true; // show grid by default
 	

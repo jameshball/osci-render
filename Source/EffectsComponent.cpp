@@ -11,14 +11,6 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
     frequency.slider.setTextValueSuffix("Hz");
     frequency.slider.setValue(audioProcessor.frequencyEffect->getValue(), juce::dontSendNotification);
 
-    /*addBtn.setButtonText("Add Item...");
-    addBtn.onClick = [this]()
-    {
-        itemData.data.push_back(juce::String("Item " + juce::String(1 + itemData.getNumItems())));
-        listBox.updateContent();
-    };
-    addAndMakeVisible(addBtn);*/
-
     addAndMakeVisible(randomiseButton);
 
 	randomiseButton.setTooltip("Randomise all effect parameter values, randomise which effects are enabled, and randomise their order.");
@@ -36,29 +28,50 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
     // Wire list model to notify when user wants to add
     itemData.onAddNewEffectRequested = [this]() {
         showingGrid = true;
-        if (grid)
+        if (grid) {
             grid->setVisible(true);
+            grid->refreshDisabledStates();
+        }
         listBox.setVisible(false);
         resized();
         repaint();
     };
 
-    // Start with grid visible by default
-    showingGrid = true;
+    // Decide initial view: show grid only if there are no selected effects
+    bool anySelected = false;
+    {
+        juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+        for (const auto& eff : audioProcessor.toggleableEffects) {
+            const bool isSelected = (eff->selected == nullptr) ? true : eff->selected->getBoolValue();
+            if (isSelected) { anySelected = true; break; }
+        }
+    }
+    showingGrid = !anySelected;
     grid = std::make_unique<EffectTypeGridComponent>(audioProcessor);
     grid->onEffectSelected = [this](const juce::String& effectId) {
-        DBG("Effect selected from grid: " + effectId);
-        // Mark the chosen effect as selected and enabled (no instance creation for now)
         {
             juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+            // Mark the chosen effect as selected and enabled, and move it to the end
+            std::shared_ptr<osci::Effect> chosen;
             for (auto& eff : audioProcessor.toggleableEffects) {
                 if (eff->getId() == effectId) {
-                    eff->markSelectable(true);
+                    eff->selected->setBoolValueNotifyingHost(true);
+                    eff->enabled->setBoolValueNotifyingHost(true);
+                    chosen = eff;
                     break;
                 }
             }
+            // Place chosen effect at the end of the visible (selected) list and update precedence
+            if (chosen != nullptr) {
+                int idx = 0;
+                for (auto& e : itemData.data) {
+                    if (e != chosen) e->setPrecedence(idx++);
+                }
+                chosen->setPrecedence(idx++);
+                audioProcessor.updateEffectPrecedence();
+            }
         }
-        // Refresh list content
+        // Refresh list content to include newly selected
         itemData.resetData();
         listBox.updateContent();
         showingGrid = false;
@@ -80,8 +93,25 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
 
     listBox.setModel(&listBoxModel);
     addAndMakeVisible(listBox);
+    // Setup scroll fade mixin
+    initScrollFade(*this);
+    attachToListBox(listBox);
+    // Create a dedicated "+ Add new effect" button below the list
+    addEffectButton = std::make_unique<juce::TextButton>("+ Add new effect");
+    addEffectButton->onClick = [this]() {
+        if (itemData.onAddNewEffectRequested) itemData.onAddNewEffectRequested();
+    };
+    addAndMakeVisible(*addEffectButton);
     addAndMakeVisible(*grid);
-    listBox.setVisible(false); // grid shown first
+    // Keep disabled states in sync whenever grid is shown
+    if (showingGrid) {
+        grid->setVisible(true);
+        grid->refreshDisabledStates();
+        listBox.setVisible(false);
+    } else {
+        grid->setVisible(false);
+        listBox.setVisible(true);
+    }
 }
 
 EffectsComponent::~EffectsComponent() {
@@ -102,12 +132,29 @@ void EffectsComponent::resized() {
     if (showingGrid) {
         if (grid)
             grid->setBounds(area);
+        if (addEffectButton) addEffectButton->setVisible(false);
+        // Hide fade when grid is shown
+        setScrollFadeVisible(false);
     } else {
-        listBox.setBounds(area);
+        // Reserve space at bottom for the add button
+        auto addBtnHeight = 44;
+        auto listArea = area;
+        auto buttonArea = listArea.removeFromBottom(addBtnHeight);
+        listArea.removeFromTop(6);
+        listBox.setBounds(listArea);
+        // Layout bottom fade overlay; visible if list is scrollable
+        layoutScrollFade(listArea, true, 48);
+        if (addEffectButton) {
+            addEffectButton->setVisible(true);
+            addEffectButton->setBounds(buttonArea.reduced(0, 4));
+        }
     }
 }
 
 void EffectsComponent::changeListenerCallback(juce::ChangeBroadcaster* source) {
     itemData.resetData();
     listBox.updateContent();
+    // Re-layout scroll fades after content changes
+    if (! showingGrid)
+        layoutScrollFade(listBox.getBounds(), true, 48);
 }

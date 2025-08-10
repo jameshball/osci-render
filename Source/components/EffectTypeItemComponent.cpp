@@ -25,8 +25,8 @@ void EffectTypeItemComponent::paint(juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat().reduced(10);
     
-    // Get animation progress from inherited HoverAnimationMixin
-    auto animationProgress = getAnimationProgress();
+    // Get animation progress from inherited HoverAnimationMixin (disabled => no hover)
+    auto animationProgress = isEnabled() ? getAnimationProgress() : 0.0f;
      
     // Apply upward shift based on animation progress
     auto yOffset = -animationProgress * HOVER_LIFT_AMOUNT;
@@ -66,6 +66,12 @@ void EffectTypeItemComponent::paint(juce::Graphics& g)
     g.setColour(juce::Colours::white);
     g.setFont(juce::FontOptions(16.0f, juce::Font::plain));
     g.drawText(effectName, textArea, juce::Justification::centred, true);
+
+    // If disabled, draw a dark transparent overlay over the rounded rect to simplify visuals
+    if (! isEnabled()) {
+        g.setColour(juce::Colours::black.withAlpha(0.35f));
+        g.fillRoundedRectangle(bounds.toFloat(), CORNER_RADIUS);
+    }
 }
 
 void EffectTypeItemComponent::resized()
@@ -79,7 +85,7 @@ void EffectTypeItemComponent::resized()
     iconButton->setBounds(iconArea);
     
     // Get animation progress and calculate Y offset
-    auto animationProgress = getAnimationProgress();
+    auto animationProgress = isEnabled() ? getAnimationProgress() : 0.0f;
     auto yOffset = -animationProgress * HOVER_LIFT_AMOUNT;
     
     iconButton->setTransform(juce::AffineTransform::translation(0, yOffset));
@@ -87,6 +93,7 @@ void EffectTypeItemComponent::resized()
 
 void EffectTypeItemComponent::mouseDown(const juce::MouseEvent& event)
 {
+    if (! isEnabled()) return;
     // Extend base behavior to keep hover press animation
     HoverAnimationMixin::mouseDown(event);
     if (onEffectSelected) {
@@ -95,6 +102,6 @@ void EffectTypeItemComponent::mouseDown(const juce::MouseEvent& event)
 }
 
 void EffectTypeItemComponent::mouseMove(const juce::MouseEvent& event) {
-    setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    setMouseCursor(isEnabled() ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
     juce::Desktop::getInstance().getMainMouseSource().forceMouseCursorUpdate();
 }

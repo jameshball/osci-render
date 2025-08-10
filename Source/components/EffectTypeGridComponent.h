@@ -2,8 +2,9 @@
 #include <JuceHeader.h>
 #include "../PluginProcessor.h"
 #include "EffectTypeItemComponent.h"
+#include "ScrollFadeMixin.h"
 
-class EffectTypeGridComponent : public juce::Component
+class EffectTypeGridComponent : public juce::Component, private ScrollFadeMixin
 {
 public:
     EffectTypeGridComponent(OscirenderAudioProcessor& processor);
@@ -15,9 +16,12 @@ public:
     int calculateRequiredHeight(int availableWidth) const;
     std::function<void(const juce::String& effectId)> onEffectSelected;
     std::function<void()> onCanceled; // optional cancel handler
+    void refreshDisabledStates(); // grey-out items that are already selected
 
 private:
     OscirenderAudioProcessor& audioProcessor;
+    juce::Viewport viewport; // scroll container
+    juce::Component content; // holds the grid items
     juce::OwnedArray<EffectTypeItemComponent> effectItems;
     juce::FlexBox flexBox;
     juce::TextButton cancelButton { "Cancel" };
