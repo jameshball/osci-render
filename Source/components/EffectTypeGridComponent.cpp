@@ -62,12 +62,16 @@ void EffectTypeGridComponent::setupEffectItems()
         };
         // Hover preview: request temporary preview of this effect while hovered
         item->onHoverStart = [this](const juce::String& effectId) {
-            juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-            audioProcessor.setPreviewEffectId(effectId);
+            if (audioProcessor.getGlobalBoolValue("previewEffectOnHover", true)) {
+                juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+                audioProcessor.setPreviewEffectId(effectId);
+            }
         };
         item->onHoverEnd = [this]() {
-            juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-            audioProcessor.clearPreviewEffect();
+            if (audioProcessor.getGlobalBoolValue("previewEffectOnHover", true)) {
+                juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+                audioProcessor.clearPreviewEffect();
+            }
         };
 
         effectItems.add(item);

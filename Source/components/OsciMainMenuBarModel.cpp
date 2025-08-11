@@ -10,12 +10,13 @@ OsciMainMenuBarModel::OsciMainMenuBarModel(OscirenderAudioProcessor& p, Oscirend
 void OsciMainMenuBarModel::resetMenuItems() {
     MainMenuBarModel::resetMenuItems();
 
-    addTopLevelMenu("File");
-    addTopLevelMenu("About");
-    addTopLevelMenu("Video");
+    addTopLevelMenu("File");      // index 0
+    addTopLevelMenu("About");     // index 1
+    addTopLevelMenu("Video");     // index 2
     if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-        addTopLevelMenu("Audio");
+        addTopLevelMenu("Audio"); // index 3 (only if standalone)
     }
+    addTopLevelMenu("Interface"); // index 3 (if not standalone) or 4 (if standalone)
 
     addMenuItem(0, "Open Project", [this] { editor.openProject(); });
     addMenuItem(0, "Save Project", [this] { editor.saveProject(); });
@@ -88,6 +89,20 @@ void OsciMainMenuBarModel::resetMenuItems() {
             editor.openAudioSettings();
         });
     }
+
+    // Interface menu index depends on whether Audio menu exists
+    int interfaceMenuIndex = (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) ? 4 : 3;
+    addToggleMenuItem(interfaceMenuIndex, "Preview effect on hover", [this] {
+        bool current = audioProcessor.getGlobalBoolValue("previewEffectOnHover", true);
+        bool newValue = ! current;
+        audioProcessor.setGlobalValue("previewEffectOnHover", newValue);
+        audioProcessor.saveGlobalSettings();
+        if (! newValue) {
+            juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+            audioProcessor.clearPreviewEffect();
+        }
+        resetMenuItems(); // update tick state
+    }, [this] { return audioProcessor.getGlobalBoolValue("previewEffectOnHover", true); });
 }
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
