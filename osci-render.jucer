@@ -110,6 +110,10 @@
         <FILE id="ux2dO2" name="DistortEffect.h" compile="0" resource="0" file="Source/audio/DistortEffect.h"/>
         <FILE id="SWC0tN" name="MultiplexEffect.h" compile="0" resource="0"
               file="Source/audio/MultiplexEffect.h"/>
+        <FILE id="kAlEiD" name="KaleidoscopeEffect.h" compile="0" resource="0"
+              file="Source/audio/KaleidoscopeEffect.h"/>
+        <FILE id="bNcEfx" name="PhysicsBounceEffect.h" compile="0" resource="0"
+              file="Source/audio/PhysicsBounceEffect.h"/>
         <FILE id="h0dMim" name="PerspectiveEffect.h" compile="0" resource="0"
               file="Source/audio/PerspectiveEffect.h"/>
         <FILE id="t5g8pf" name="PublicSynthesiser.h" compile="0" resource="0"

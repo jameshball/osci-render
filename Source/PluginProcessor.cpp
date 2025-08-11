@@ -12,6 +12,7 @@
 #include "audio/BitCrushEffect.h"
 #include "audio/BulgeEffect.h"
 #include "audio/DistortEffect.h"
+#include "audio/KaleidoscopeEffect.h"
 #include "audio/MultiplexEffect.h"
 #include "audio/SmoothEffect.h"
 #include "audio/VectorCancellingEffect.h"
@@ -20,6 +21,7 @@
 #include "audio/TranslateEffect.h"
 #include "audio/RippleEffect.h"
 #include "audio/SwirlEffect.h"
+#include "audio/PhysicsBounceEffect.h"
 #include "parser/FileParser.h"
 #include "parser/FrameProducer.h"
 
@@ -35,6 +37,8 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
 
     toggleableEffects.push_back(BulgeEffect().build());
     toggleableEffects.push_back(MultiplexEffect().build());
+    toggleableEffects.push_back(KaleidoscopeEffect().build());
+    toggleableEffects.push_back(PhysicsBounceEffect().build());
     toggleableEffects.push_back(VectorCancellingEffect().build());
     {
         auto scaleEffect = ScaleEffectApp().build();

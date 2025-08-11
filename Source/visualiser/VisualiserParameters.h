@@ -322,7 +322,7 @@ public:
             "Ambient Light",
             "Controls how much ambient light is added to the oscilloscope display.",
             "ambient",
-            VERSION_HINT, 0.7, 0.0, 5.0
+            VERSION_HINT, 0.0, 0.0, 5.0
         )
     );
     std::shared_ptr<osci::Effect> smoothEffect = SmoothEffect("visualiser", 0.0f).build();
