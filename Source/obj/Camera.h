@@ -12,7 +12,7 @@ public:
 	void setPosition(Vec3& position);
 	Vec3 toCameraSpace(Vec3& point);
 	Vec3 toWorldSpace(Vec3& point);
-	void setFocalLength(double focalLength);
+	void setFov(double fov);
 	Vec3 project(Vec3& p);
 	Frustum getFrustum();
 private:
