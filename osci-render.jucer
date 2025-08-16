@@ -104,10 +104,9 @@
         <FILE id="WId4vx" name="ShapeVoice.h" compile="0" resource="0" file="Source/audio/ShapeVoice.h"/>
         <FILE id="Vwjht7" name="SmoothEffect.h" compile="0" resource="0" file="Source/audio/SmoothEffect.h"/>
         <FILE id="WACNMe" name="StereoEffect.h" compile="0" resource="0" file="Source/audio/StereoEffect.h"/>
+        <FILE id="RsHWPN" name="TwistEffect.h" compile="0" resource="0" file="Source/audio/TwistEffect.h"/>
         <FILE id="Be21D0" name="VectorCancellingEffect.h" compile="0" resource="0"
               file="Source/audio/VectorCancellingEffect.h"/>
-        <FILE id="VHRytO" name="WobbleEffect.cpp" compile="1" resource="0"
-              file="Source/audio/WobbleEffect.cpp"/>
         <FILE id="sgdTlo" name="WobbleEffect.h" compile="0" resource="0" file="Source/audio/WobbleEffect.h"/>
       </GROUP>
       <GROUP id="{2A41BAF3-5E83-B018-5668-39D89ABFA00C}" name="chinese_postman">

@@ -9,16 +9,13 @@ using Vec3 = mathter::Vector<float, 3, false>;
 
 class Frustum {
 public:
-	float ratio, nearDistance, farDistance, width, height, tang, focalLength;
+	float ratio, nearDistance, farDistance, width, height, tang, fov, focalLength;
 
-	Frustum(float focalLength, float ratio, float nearDistance, float farDistance) {
-        setCameraInternals(focalLength, ratio, nearDistance, farDistance);
+	Frustum(float fov, float ratio, float nearDistance, float farDistance) {
+        setCameraInternals(fov, ratio, nearDistance, farDistance);
     }
 	~Frustum() {};
 
-	void setCameraInternals(float focalLength, float ratio, float nearD, float farD);
+	void setCameraInternals(float fov, float ratio, float nearD, float farD);
 	void clipToFrustum(Vec3 &p);
-	float getFocalLength() {
-        return focalLength;
-    }
 };

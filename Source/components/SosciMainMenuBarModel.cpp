@@ -4,6 +4,10 @@
 #include "../SosciPluginProcessor.h"
 
 SosciMainMenuBarModel::SosciMainMenuBarModel(SosciPluginEditor& e, SosciAudioProcessor& p) : editor(e), processor(p) {
+    resetMenuItems();
+}
+
+void SosciMainMenuBarModel::resetMenuItems() {
     addTopLevelMenu("File");
     addTopLevelMenu("About");
     addTopLevelMenu("Video");
@@ -92,6 +96,10 @@ SosciMainMenuBarModel::SosciMainMenuBarModel(SosciPluginEditor& e, SosciAudioPro
 
         juce::DialogWindow* dw = options.launchAsync();
     });
+    addMenuItem(1, processor.getAcceptsKeys() ? "Disable Special Keys" : "Enable Special Keys", [this] {
+        processor.setAcceptsKeys(!processor.getAcceptsKeys());
+        resetMenuItems();
+        });
 
     addMenuItem(2, "Settings...", [this] {
         editor.openRecordingSettings();
