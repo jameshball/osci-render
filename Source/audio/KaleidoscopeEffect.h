@@ -33,18 +33,18 @@ public:
         double partialScale = (currentSegmentIndex == fullSegments && fractionalPart > 1e-9) ? fractionalPart : 1.0;
         double wedgeAngle = baseWedgeAngle * partialScale;
 
-    // Normalize theta to [0,1) for compression
-    double thetaNorm = (theta + juce::MathConstants<double>::pi) / juce::MathConstants<double>::twoPi; // 0..1
+        // Normalize theta to [0,1) for compression
+        double thetaNorm = (theta + juce::MathConstants<double>::pi) / juce::MathConstants<double>::twoPi; // 0..1
 
-    // Offset for this segment: each preceding full segment occupies baseWedgeAngle
+        // Offset for this segment: each preceding full segment occupies baseWedgeAngle
         double segmentOffset = 0.0;
         if (currentSegmentIndex < fullSegments) {
             segmentOffset = currentSegmentIndex * baseWedgeAngle;
         } else { // partial segment
             segmentOffset = fullSegments * baseWedgeAngle;
         }
-    // Map entire original angle range into [segmentOffset, segmentOffset + wedgeAngle) so edges line up exactly.
-    double finalTheta = segmentOffset + thetaNorm * wedgeAngle - juce::MathConstants<double>::pi; // constant 180° rotation
+        // Map entire original angle range into [segmentOffset, segmentOffset + wedgeAngle) so edges line up exactly.
+        double finalTheta = segmentOffset + thetaNorm * wedgeAngle - juce::MathConstants<double>::pi; // constant 180° rotation
 
         double newX = r * std::cos(finalTheta);
         double newY = r * std::sin(finalTheta);
@@ -82,8 +82,7 @@ public:
             }
         );
         eff->setName("Kaleidoscope");
-        // Reuse an existing icon for now (repeat). A dedicated kaleidoscope icon can be added later.
-        eff->setIcon(BinaryData::repeat_svg);
+        eff->setIcon(BinaryData::kaleidoscope_svg);
         return eff;
     }
 };

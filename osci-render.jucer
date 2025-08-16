@@ -47,6 +47,7 @@
       </GROUP>
       <GROUP id="{82BCD6F1-A8BF-F30B-5587-81EE70168883}" name="svg">
         <FILE id="laB1fX" name="bit-crush.svg" compile="0" resource="1" file="Resources/svg/bit-crush.svg"/>
+        <FILE id="Rs9Xr6" name="bounce.svg" compile="0" resource="1" file="Resources/svg/bounce.svg"/>
         <FILE id="rQlbqP" name="bulge.svg" compile="0" resource="1" file="Resources/svg/bulge.svg"/>
         <FILE id="jYG5GY" name="close.svg" compile="0" resource="1" file="Resources/svg/close.svg"/>
         <FILE id="rl17ZK" name="cog.svg" compile="0" resource="1" file="Resources/svg/cog.svg"/>
@@ -58,6 +59,8 @@
         <FILE id="YwkQpy" name="fixed_rotate.svg" compile="0" resource="1"
               file="Resources/svg/fixed_rotate.svg"/>
         <FILE id="WIkl6l" name="fullscreen.svg" compile="0" resource="1" file="Resources/svg/fullscreen.svg"/>
+        <FILE id="AVhjBP" name="kaleidoscope.svg" compile="0" resource="1"
+              file="Resources/svg/kaleidoscope.svg"/>
         <FILE id="n1esUp" name="left_arrow.svg" compile="0" resource="1" file="Resources/svg/left_arrow.svg"/>
         <FILE id="WdfE7J" name="link.svg" compile="0" resource="1" file="Resources/svg/link.svg"/>
         <FILE id="rGSPBN" name="lua.svg" compile="0" resource="1" file="Resources/svg/lua.svg"/>

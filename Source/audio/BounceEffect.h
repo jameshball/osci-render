@@ -48,7 +48,7 @@ public:
             }
         );
         eff->setName("Bounce");
-        eff->setIcon(BinaryData::random_svg);
+        eff->setIcon(BinaryData::bounce_svg);
         return eff;
     }
 
