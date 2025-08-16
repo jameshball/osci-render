@@ -44,7 +44,7 @@ public:
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter("Bounce Size", "Size (scale) of the bouncing object.", "bounceSize", VERSION_HINT, 0.3, 0.05, 1.0),
                 new osci::EffectParameter("Bounce Speed", "Speed of motion.", "bounceSpeed", VERSION_HINT, 5.0, 0.0, 10.0),
-                new osci::EffectParameter("Bounce Angle", "Direction of travel (0..1 -> 0..360°).", "bounceAngle", VERSION_HINT, 0.16, 0.0, 1.0),
+                new osci::EffectParameter("Bounce Angle", juce::String(juce::CharPointer_UTF8("Direction of travel (0..1 -> 0..360°).")), "bounceAngle", VERSION_HINT, 0.16, 0.0, 1.0),
             }
         );
         eff->setName("Bounce");

@@ -102,7 +102,13 @@ void OsciMainMenuBarModel::resetMenuItems() {
             audioProcessor.clearPreviewEffect();
         }
         resetMenuItems(); // update tick state
-    }, [this] { return audioProcessor.getGlobalBoolValue("previewEffectOnHover", true); });
+        }, [this] { return audioProcessor.getGlobalBoolValue("previewEffectOnHover", true);
+    });
+
+    addToggleMenuItem(interfaceMenuIndex, "Listen for Special Keys", [this] {
+        audioProcessor.setAcceptsKeys(! audioProcessor.getAcceptsKeys());
+        resetMenuItems();
+    }, [this] { return audioProcessor.getAcceptsKeys(); });
 }
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM

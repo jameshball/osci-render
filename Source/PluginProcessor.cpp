@@ -11,10 +11,13 @@
 #include "PluginEditor.h"
 #include "audio/BitCrushEffect.h"
 #include "audio/BulgeEffect.h"
+#include "audio/TwistEffect.h"
 #include "audio/DistortEffect.h"
 #include "audio/KaleidoscopeEffect.h"
 #include "audio/MultiplexEffect.h"
 #include "audio/SmoothEffect.h"
+#include "audio/WobbleEffect.h"
+#include "audio/DashedLineEffect.h"
 #include "audio/VectorCancellingEffect.h"
 #include "audio/ScaleEffect.h"
 #include "audio/RotateEffect.h"
@@ -34,41 +37,28 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     // locking isn't necessary here because we are in the constructor
 
     toggleableEffects.push_back(BitCrushEffect().build());
-
     toggleableEffects.push_back(BulgeEffect().build());
     toggleableEffects.push_back(MultiplexEffect().build());
     toggleableEffects.push_back(KaleidoscopeEffect().build());
     toggleableEffects.push_back(BounceEffect().build());
     toggleableEffects.push_back(VectorCancellingEffect().build());
-    {
-        auto scaleEffect = ScaleEffectApp().build();
-        booleanParameters.push_back(scaleEffect->linked);
-        toggleableEffects.push_back(scaleEffect);
-    }
-    {
-        auto distortEffect = DistortEffect().build();
-        booleanParameters.push_back(distortEffect->linked);
-        toggleableEffects.push_back(distortEffect);
-    }
     toggleableEffects.push_back(RippleEffectApp().build());
     toggleableEffects.push_back(RotateEffectApp().build());
     toggleableEffects.push_back(TranslateEffectApp().build());
     toggleableEffects.push_back(SwirlEffectApp().build());
-
     toggleableEffects.push_back(SmoothEffect().build());
-    {
-        auto wobble = std::make_shared<osci::Effect>(
-            wobbleEffect,
-            std::vector<osci::EffectParameter*>{
-                new osci::EffectParameter("Wobble Amount", "Adds a sine wave of the prominent frequency in the audio currently playing. The sine wave's frequency is slightly offset to create a subtle 'wobble' in the image. Increasing the slider increases the strength of the wobble.", "wobble", VERSION_HINT, 0.3, 0.0, 1.0),
-                new osci::EffectParameter("Wobble Phase", "Controls the phase of the wobble.", "wobblePhase", VERSION_HINT, 0.0, -1.0, 1.0, 0.0001f, osci::LfoType::Sawtooth, 1.0f),
-            });
-        wobble->setName("Wobble");
-        wobble->setIcon(BinaryData::wobble_svg);
-        toggleableEffects.push_back(wobble);
-    }
+    toggleableEffects.push_back(WobbleEffect(*this).build());
     toggleableEffects.push_back(DelayEffect().build());
-    toggleableEffects.push_back(DashedLineEffect().build());
+    toggleableEffects.push_back(DashedLineEffect(*this).build());
+    toggleableEffects.push_back(TwistEffect().build());
+
+    auto scaleEffect = ScaleEffectApp().build();
+    booleanParameters.push_back(scaleEffect->linked);
+    toggleableEffects.push_back(scaleEffect);
+
+    auto distortEffect = DistortEffect().build();
+    booleanParameters.push_back(distortEffect->linked);
+    toggleableEffects.push_back(distortEffect);
 
     custom->setIcon(BinaryData::lua_svg);
     toggleableEffects.push_back(custom);

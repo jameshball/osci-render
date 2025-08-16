@@ -11,7 +11,7 @@ public:
 		weight *= 0.95;
 		double strength = 10;
 		weight = std::log(strength * weight + 1) / std::log(strength + 1);
-		// TODO: This doesn't consider the sample rate!
+		weight = std::pow(weight, 48000 / sampleRate);
 		avg = weight * avg + (1 - weight) * input;
 		
 		return avg;
@@ -29,5 +29,5 @@ public:
 private:
 	osci::Point avg;
     juce::String idPrefix;
-    float smoothingDefault = 0.75f;
+    float smoothingDefault = 0.5f;
 };

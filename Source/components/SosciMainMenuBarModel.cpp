@@ -4,6 +4,10 @@
 #include "../SosciPluginProcessor.h"
 
 SosciMainMenuBarModel::SosciMainMenuBarModel(SosciPluginEditor& e, SosciAudioProcessor& p) : editor(e), processor(p) {
+    resetMenuItems();
+}
+
+void SosciMainMenuBarModel::resetMenuItems() {
     addTopLevelMenu("File");
     addTopLevelMenu("About");
     addTopLevelMenu("Video");
@@ -105,4 +109,11 @@ SosciMainMenuBarModel::SosciMainMenuBarModel(SosciPluginEditor& e, SosciAudioPro
     if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
         addMenuItem(3, "Settings...", [&]() { editor.openAudioSettings(); });
     }
+
+    // Interface menu index depends on whether Audio menu exists
+    int interfaceMenuIndex = (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) ? 4 : 3;
+    addToggleMenuItem(interfaceMenuIndex, "Listen for Special Keys", [this] {
+        processor.setAcceptsKeys(! processor.getAcceptsKeys());
+        resetMenuItems();
+    }, [this] { return processor.getAcceptsKeys(); });
 }
