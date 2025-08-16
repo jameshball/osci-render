@@ -1,11 +1,11 @@
-// PhysicsBounceEffect.h (Simplified DVD-style 2D bounce)
+// BounceEffect.h (Simplified DVD-style 2D bounce)
 // Scales the original shape, then translates it within [-1,1] x [-1,1] using
 // constant-velocity motion that bounces off the edges. Z coordinate is unchanged.
 #pragma once
 
 #include <JuceHeader.h>
 
-class PhysicsBounceEffect : public osci::EffectApplication {
+class BounceEffect : public osci::EffectApplication {
 public:
     osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
         // values[0] = size (0.05..1.0)
@@ -40,11 +40,11 @@ public:
 
     std::shared_ptr<osci::Effect> build() const override {
         auto eff = std::make_shared<osci::Effect>(
-            std::make_shared<PhysicsBounceEffect>(),
+            std::make_shared<BounceEffect>(),
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter("Bounce Size", "Size (scale) of the bouncing object.", "bounceSize", VERSION_HINT, 0.3, 0.05, 1.0),
-                new osci::EffectParameter("Bounce Speed", "Speed of motion.", "bounceSpeed", VERSION_HINT, 0.6, 0.0, 2.0),
-                new osci::EffectParameter("Bounce Angle", "Direction of travel (0..1 -> 0..360°).", "bounceAngle", VERSION_HINT, 0.125, 0.0, 1.0, 0.0001f, osci::LfoType::Sawtooth, 0.05f),
+                new osci::EffectParameter("Bounce Speed", "Speed of motion.", "bounceSpeed", VERSION_HINT, 5.0, 0.0, 10.0),
+                new osci::EffectParameter("Bounce Angle", "Direction of travel (0..1 -> 0..360°).", "bounceAngle", VERSION_HINT, 0.16, 0.0, 1.0),
             }
         );
         eff->setName("Bounce");

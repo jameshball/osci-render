@@ -11,7 +11,7 @@ public:
     osci::Point apply(int /*index*/, osci::Point input, const std::vector<std::atomic<double>>& values, double /*sampleRate*/) override {
         // values[0] = segments (can be fractional)
         // values[1] = phase (0-1) selecting which segment is currently being drawn
-        double segments = juce::jlimit(1.0, 256.0, values[0].load());
+        double segments = juce::jmax(values[0].load(), 1.0); // ensure at least 1 segment
         double phase = values.size() > 1 ? values[1].load() : 0.0;
 
         // Polar conversion
@@ -60,9 +60,12 @@ public:
                     "Controls how many times the image is rotationally repeated around the centre. Fractional values smoothly morph the repetition.",
                     "kaleidoscopeSegments",
                     VERSION_HINT,
-                    6.0,  // default
+                    3.0,  // default
                     1.0,  // min
-                    32.0  // max
+                    10.0,  // max
+                    0.0001f, // step
+                    osci::LfoType::Sine,
+                    0.25f    // LFO frequency (Hz) – slow, visible rotation
                 ),
                 new osci::EffectParameter(
                     "Kaleidoscope Phase",
@@ -74,7 +77,7 @@ public:
                     1.0,   // max
                     0.0001f, // step
                     osci::LfoType::Sawtooth,
-                    0.5f    // LFO frequency (Hz) – slow, visible rotation
+                    55.0f    // LFO frequency (Hz) – slow, visible rotation
                 ),
             }
         );
