@@ -47,10 +47,11 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     toggleableEffects.push_back(TranslateEffectApp().build());
     toggleableEffects.push_back(SwirlEffectApp().build());
     toggleableEffects.push_back(SmoothEffect().build());
-    toggleableEffects.push_back(WobbleEffect(*this).build());
+    toggleableEffects.push_back(TwistEffect().build());
     toggleableEffects.push_back(DelayEffect().build());
     toggleableEffects.push_back(DashedLineEffect(*this).build());
-    toggleableEffects.push_back(TwistEffect().build());
+    toggleableEffects.push_back(TraceEffect(*this).build());
+    toggleableEffects.push_back(WobbleEffect(*this).build());
 
     auto scaleEffect = ScaleEffectApp().build();
     booleanParameters.push_back(scaleEffect->linked);
@@ -62,11 +63,6 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
 
     custom->setIcon(BinaryData::lua_svg);
     toggleableEffects.push_back(custom);
-
-    trace->setName("Trace");
-    trace->setIcon(BinaryData::trace_svg);
-    toggleableEffects.push_back(trace);
-    // LFO default for traceLength will be encoded in its constructor defaults (see header)
 
     for (int i = 0; i < toggleableEffects.size(); i++) {
         auto effect = toggleableEffects[i];

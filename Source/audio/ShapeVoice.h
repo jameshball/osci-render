@@ -21,14 +21,11 @@ public:
 
 	bool renderingSample = false;
 private:
-	const double MIN_TRACE = 0.005;
 	const double MIN_LENGTH_INCREMENT = 0.000001;
 
 	OscirenderAudioProcessor& audioProcessor;
 	std::vector<std::unique_ptr<osci::Shape>> frame;
 	std::atomic<ShapeSound*> sound = nullptr;
-	double actualTraceStart;
-	double actualTraceLength;
 
 	double frameLength = 0.0;
 	int currentShape = 0;

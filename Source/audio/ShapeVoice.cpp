@@ -1,10 +1,7 @@
 #include "ShapeVoice.h"
 #include "../PluginProcessor.h"
 
-ShapeVoice::ShapeVoice(OscirenderAudioProcessor& p, juce::AudioSampleBuffer& externalAudio) : audioProcessor(p), externalAudio(externalAudio) {
-    actualTraceStart = audioProcessor.trace->getValue(0);
-    actualTraceLength = audioProcessor.trace->getValue(1);
-}
+ShapeVoice::ShapeVoice(OscirenderAudioProcessor& p, juce::AudioSampleBuffer& externalAudio) : audioProcessor(p), externalAudio(externalAudio) {}
 
 bool ShapeVoice::canPlaySound(juce::SynthesiserSound* sound) {
     return dynamic_cast<ShapeSound*> (sound) != nullptr;
@@ -93,14 +90,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     }
 
     for (auto sample = startSample; sample < startSample + numSamples; ++sample) {
-        bool traceEnabled = audioProcessor.trace->enabled->getBoolValue()
-            || (audioProcessor.previewEffect && audioProcessor.previewEffect == audioProcessor.trace);
-
-        // update length increment
-        double traceLen = traceEnabled ? actualTraceLength : 1.0;
-        double traceMin = traceEnabled ? actualTraceStart : 0.0;
-        double proportionalLength = std::max(0.001, traceLen) * frameLength;
-        lengthIncrement = juce::jmax(proportionalLength / (audioProcessor.currentSampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
+        lengthIncrement = juce::jmax(frameLength / (audioProcessor.currentSampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
 
         osci::Point channels;
         double x = 0.0;
@@ -164,27 +154,11 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             outputBuffer.addSample(0, sample, x * gain);
         }
 
-        double traceStartValue = audioProcessor.trace->getActualValue(0);
-        double traceLengthValue = audioProcessor.trace->getActualValue(1);
-        traceLengthValue = traceEnabled ? traceLengthValue : 1.0;
-        traceStartValue = traceEnabled ? traceStartValue : 0.0;
-        actualTraceLength = std::max(0.01, traceLengthValue);
-        actualTraceStart = traceStartValue;
-        if (actualTraceStart < 0) {
-            actualTraceStart = 0;
-        }
-
         if (!renderingSample) {
             incrementShapeDrawing();
         }
 
-        double drawnFrameLength = frameLength;
-        bool willLoopOver = false;
-        if (traceEnabled) {
-            drawnFrameLength *= actualTraceLength + actualTraceStart;
-        }
-
-        if (!renderingSample && frameDrawn >= drawnFrameLength) {
+        if (!renderingSample && frameDrawn >= frameLength) {
             double currentShapeLength = 0;
             if (currentShape < frame.size()) {
                 currentShapeLength = frame[currentShape]->len;
@@ -192,22 +166,9 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             if (sound.load() != nullptr && currentlyPlaying) {
                 frameLength = sound.load()->updateFrame(frame);
             }
-            frameDrawn -= drawnFrameLength;
-            if (traceEnabled) {
-                shapeDrawn = juce::jlimit(0.0, currentShapeLength, frameDrawn);
-            }
+            double prevFrameLength = frameLength;
+            frameDrawn -= prevFrameLength;
             currentShape = 0;
-
-            // TODO: updateFrame already iterates over all the shapes,
-            // so we can improve performance by calculating frameDrawn
-            // and shapeDrawn directly. frameDrawn is simply actualTraceStart * frameLength
-            // but shapeDrawn is the amount of the current shape that has been drawn so
-            // we need to iterate over all the shapes to calculate it.
-            if (traceEnabled) {
-                while (frameDrawn < actualTraceStart * frameLength) {
-                    incrementShapeDrawing();
-                }
-            }
         }
     }
 }

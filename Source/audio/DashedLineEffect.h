@@ -16,8 +16,8 @@ public:
 			dashCount = juce::jmax(1.0, values[i++].load()); // Dashes per cycle
 		}
 
-		double dashCoverage = juce::jlimit(0.0, 1.0, values[i++].load());
 		double dashOffset = values[i++];
+		double dashCoverage = juce::jlimit(0.0, 1.0, values[i++].load());
         
 		double dashLengthSamples = (sampleRate / audioProcessor.frequency) / dashCount;
 		double dashPhase = framePhase * dashCount - dashOffset;
@@ -47,8 +47,8 @@ public:
 			std::make_shared<DashedLineEffect>(audioProcessor),
 			std::vector<osci::EffectParameter*>{
 				new osci::EffectParameter("Dash Count", "Controls the number of dashed lines in the drawing.", "dashCount", VERSION_HINT, 16.0, 1.0, 32.0),
-				new osci::EffectParameter("Dash Width", "Controls how much each dash unit is drawn.", "dashWidth", VERSION_HINT, 0.5, 0.0, 1.0),
 				new osci::EffectParameter("Dash Offset", "Offsets the location of the dashed lines.", "dashOffset", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001f, osci::LfoType::Sawtooth, 1.0f),
+				new osci::EffectParameter("Dash Width", "Controls how much each dash unit is drawn.", "dashWidth", VERSION_HINT, 0.5, 0.0, 1.0),
 			}
 		);
 		eff->setName("Dash");
@@ -56,10 +56,39 @@ public:
 		return eff;
 	}
 
-private:
+protected:
 	OscirenderAudioProcessor &audioProcessor;
+private:
 	const static int MAX_BUFFER = 192000;
 	std::vector<osci::Point> buffer = std::vector<osci::Point>(MAX_BUFFER);
 	int bufferIndex = 0;
 	double framePhase = 0.0; // [0, 1]
+};
+
+class TraceEffect : public DashedLineEffect {
+public:
+	TraceEffect(OscirenderAudioProcessor& p) : DashedLineEffect(p) {}
+
+	std::shared_ptr<osci::Effect> build() const override {
+		auto eff = std::make_shared<osci::Effect>(
+			std::make_shared<TraceEffect>(audioProcessor),
+			std::vector<osci::EffectParameter*>{
+				new osci::EffectParameter(
+					"Trace Start",
+					"Defines how far into the frame the drawing is started at. This has the effect of 'tracing' out the image from a single dot when animated. By default, we start drawing from the beginning of the frame, so this value is 0.0.",
+					"traceStart",
+					VERSION_HINT, 0.0, 0.0, 1.0, 0.001
+				),
+				new osci::EffectParameter(
+					"Trace Length",
+					"Defines how much of the frame is drawn per cycle. This has the effect of 'tracing' out the image from a single dot when animated. By default, we draw the whole frame, corresponding to a value of 1.0.",
+					"traceLength",
+					VERSION_HINT, 1.0, 0.0, 1.0, 0.001, osci::LfoType::Sawtooth
+				)
+			}
+		);
+		eff->setName("Trace");
+		eff->setIcon(BinaryData::trace_svg);
+		return eff;
+	}
 };
