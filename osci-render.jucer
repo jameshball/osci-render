@@ -6,7 +6,7 @@
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
               version="2.5.1.1" companyName="James H Ball" companyWebsite="https://osci-render.com"
               companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1"
-              pluginAUMainType="'aumf'" postExportShellCommandPosix="cd %%1%%; .\luajit_linux_macos.sh ">
+              pluginAUMainType="'aumf'" postExportShellCommandPosix="%%1%%/luajit_linux_macos.sh ">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
       <GROUP id="{8930EC48-30FD-646B-9DC5-0861171F8B2E}" name="fonts">
@@ -628,12 +628,12 @@
                JUCE_WEB_BROWSER="0"/>
   <EXPORTFORMATS>
     <LINUX_MAKE targetFolder="Builds/osci-render/LinuxMakefile" smallIcon="pSc1mq"
-                bigIcon="pSc1mq" externalLibraries="lua51">
+                bigIcon="pSc1mq" externalLibraries="luajit">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" headerPath="..\..\..\modules\LuaJIT\src"
-                       libraryPath="..\..\..\modules\LuaJIT\src"/>
-        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render" headerPath="..\..\..\modules\LuaJIT\src"
-                       libraryPath="..\..\..\modules\LuaJIT\src"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" headerPath="../../../modules/LuaJIT/src"
+                       libraryPath="../../../modules/LuaJIT/src"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render" headerPath="../../../modules/LuaJIT/src"
+                       libraryPath="../../../modules/LuaJIT/src"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
@@ -709,17 +709,17 @@
                microphonePermissionNeeded="1" frameworkSearchPaths="/Library/Frameworks"
                extraCustomFrameworks="/Library/Frameworks/Syphon.framework"
                hardenedRuntime="1" hardenedRuntimeOptions="com.apple.security.cs.disable-library-validation,com.apple.security.device.audio-input"
-               iosDevelopmentTeamID="D86A3M3H2L" externalLibraries="lua51">
+               iosDevelopmentTeamID="D86A3M3H2L" externalLibraries="luajit">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"
-                       headerPath="..\..\..\modules\LuaJIT\src" libraryPath="..\..\..\modules\LuaJIT\src"/>
+                       headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"/>
         <CONFIGURATION name="Release" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO,OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"
-                       headerPath="..\..\..\modules\LuaJIT\src" libraryPath="..\..\..\modules\LuaJIT\src"/>
+                       headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"/>
         <CONFIGURATION name="Release (Development)" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"
-                       headerPath="..\..\..\modules\LuaJIT\src" libraryPath="..\..\..\modules\LuaJIT\src"/>
+                       headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
