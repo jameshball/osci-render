@@ -1,6 +1,6 @@
 #include "Camera.h"
 
-Camera::Camera() : frustum(1, 1, 0.1, 100) {
+Camera::Camera() : frustum(1, 1, 0.001, 100) {
     viewMatrix = mathter::Identity();
 }
 
@@ -18,8 +18,8 @@ Vec3 Camera::toWorldSpace(Vec3& point) {
     return mathter::Inverse(viewMatrix) * point;
 }
 
-void Camera::setFocalLength(double focalLength) {
-    frustum.setCameraInternals(focalLength, frustum.ratio, frustum.nearDistance, frustum.farDistance);
+void Camera::setFov(double fov) {
+    frustum.setCameraInternals(fov, frustum.ratio, frustum.nearDistance, frustum.farDistance);
 }
 
 Vec3 Camera::project(Vec3& pWorld) {
@@ -27,10 +27,10 @@ Vec3 Camera::project(Vec3& pWorld) {
 
     frustum.clipToFrustum(p);
 
-    double start = p.x * frustum.focalLength / p.z;
-    double end = p.y * frustum.focalLength / p.z;
+    float x = p.x * frustum.focalLength / p.z;
+    float y = p.y * frustum.focalLength / p.z;
 
-    return Vec3(start, end, 0);
+    return Vec3(x, y, 0);
 }
 
 Frustum Camera::getFrustum() {

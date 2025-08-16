@@ -16,6 +16,7 @@
 #include "audio/MultiplexEffect.h"
 #include "audio/SmoothEffect.h"
 #include "audio/WobbleEffect.h"
+#include "audio/DashedLineEffect.h"
 #include "audio/VectorCancellingEffect.h"
 #include "parser/FileParser.h"
 #include "parser/FrameProducer.h"
@@ -144,11 +145,16 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
         std::vector<osci::EffectParameter*>{
             new osci::EffectParameter("Delay Decay", "Adds repetitions, delays, or echos to the audio. This slider controls the volume of the echo.", "delayDecay", VERSION_HINT, 0.4, 0.0, 1.0),
             new osci::EffectParameter("Delay Length", "Controls the time in seconds between echos.", "delayLength", VERSION_HINT, 0.5, 0.0, 1.0)}));
-    toggleableEffects.push_back(std::make_shared<osci::Effect>(
-        dashedLineEffect,
+    auto dashedLineEffect = std::make_shared<osci::Effect>(
+        std::make_shared<DashedLineEffect>(*this),
         std::vector<osci::EffectParameter*>{
-            new osci::EffectParameter("Dash Length", "Controls the length of the dashed line.", "dashLength", VERSION_HINT, 0.2, 0.0, 1.0),
-        }));
+            new osci::EffectParameter("Dash Count", "Controls the number of dashed lines in the drawing.", "dashCount", VERSION_HINT, 16.0, 1.0, 32.0),
+            new osci::EffectParameter("Dash Coverage", "Controls the fraction of each dash unit that is drawn.", "dashCoverage", VERSION_HINT, 0.5, 0.0, 1.0),
+            new osci::EffectParameter("Dash Offset", "Offsets the location of the dashed lines.", "dashOffset", VERSION_HINT, 0.0, 0.0, 1.0),
+    });
+    dashedLineEffect->getParameter("dashOffset")->lfo->setUnnormalisedValueNotifyingHost((int)osci::LfoType::Sawtooth);
+    dashedLineEffect->getParameter("dashOffset")->lfoRate->setUnnormalisedValueNotifyingHost(1.0);
+    toggleableEffects.push_back(dashedLineEffect);
     toggleableEffects.push_back(custom);
     toggleableEffects.push_back(trace);
     trace->getParameter("traceLength")->lfo->setUnnormalisedValueNotifyingHost((int)osci::LfoType::Sawtooth);

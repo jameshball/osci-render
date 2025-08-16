@@ -16,6 +16,7 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
      : AudioProcessor(busesProperties)
 #endif
 {
+
     if (!applicationFolder.exists()) {
         applicationFolder.createDirectory();
     }
