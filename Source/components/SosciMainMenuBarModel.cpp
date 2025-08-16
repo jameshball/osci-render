@@ -96,8 +96,8 @@ void SosciMainMenuBarModel::resetMenuItems() {
 
         juce::DialogWindow* dw = options.launchAsync();
     });
-    addMenuItem(1, processor.getGlobalBoolValue("acceptsAllKeys", juce::JUCEApplicationBase::isStandaloneApp()) ? "Disable Special Keys" : "Enable Special Keys", [this] {
-        processor.setAcceptKeys(!processor.getGlobalBoolValue("acceptsAllKeys", juce::JUCEApplicationBase::isStandaloneApp()));
+    addMenuItem(1, processor.getAcceptsKeys() ? "Disable Special Keys" : "Enable Special Keys", [this] {
+        processor.setAcceptsKeys(!processor.getAcceptsKeys());
         resetMenuItems();
         });
 
