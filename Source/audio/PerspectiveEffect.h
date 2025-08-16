@@ -25,6 +25,17 @@ public:
 		);
 	}
 
+	std::shared_ptr<osci::Effect> build() const override {
+		auto eff = std::make_shared<osci::Effect>(
+			std::make_shared<PerspectiveEffect>(),
+			std::vector<osci::EffectParameter*>{
+				new osci::EffectParameter("Perspective", "Controls the strength of the 3D perspective projection.", "perspectiveStrength", VERSION_HINT, 1.0, 0.0, 1.0),
+				new osci::EffectParameter("Focal Length", "Controls the focal length of the 3D perspective effect. A higher focal length makes the image look more flat, and a lower focal length makes the image look more 3D.", "perspectiveFocalLength", VERSION_HINT, 2.0, 0.0, 10.0),
+			}
+		);
+		return eff;
+	}
+
 private:
 	
 	Camera camera;

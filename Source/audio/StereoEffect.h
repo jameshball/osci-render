@@ -27,6 +27,18 @@ public:
 		return osci::Point(input.x, buffer[readHead].y, input.z);
 	}
 
+	std::shared_ptr<osci::Effect> build() const override {
+		return std::make_shared<osci::Effect>(
+			std::make_shared<StereoEffect>(),
+			new osci::EffectParameter(
+				"Stereo",
+				"Turns mono audio that is uninteresting to visualise into stereo audio that is interesting to visualise.",
+				"stereo",
+				VERSION_HINT, 0.0, 0.0, 1.0
+			)
+		);
+	}
+
 private:
 
 	void initialiseBuffer(double sampleRate) {

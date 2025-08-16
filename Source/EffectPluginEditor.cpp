@@ -32,7 +32,7 @@ EffectPluginEditor::EffectPluginEditor(EffectAudioProcessor& p)
     setResizable(false, false);
 
     tooltipDropShadow.setOwner(&tooltipWindow.get());
-    tooltipWindow->setMillisecondsBeforeTipAppears(0);
+    tooltipWindow->setMillisecondsBeforeTipAppears(100);
     
     audioProcessor.bitCrush->addListener(0, this);
 }

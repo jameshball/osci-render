@@ -13,4 +13,12 @@ public:
 
 		return osci::Point(rn * cos(theta), rn * sin(theta), input.z);
 	}
+
+	std::shared_ptr<osci::Effect> build() const override {
+		auto eff = std::make_shared<osci::Effect>(
+			std::make_shared<BulgeEffect>(),
+			new osci::EffectParameter("Bulge", "Applies a bulge that makes the centre of the image larger, and squishes the edges of the image. This applies a distortion to the audio.", "bulge", VERSION_HINT, 0.5, 0.0, 1.0));
+		eff->setIcon(BinaryData::bulge_svg);
+		return eff;
+	}
 };

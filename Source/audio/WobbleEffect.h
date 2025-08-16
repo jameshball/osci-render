@@ -14,6 +14,18 @@ public:
         return input + delta;
     }
 
+	std::shared_ptr<osci::Effect> build() const override {
+        auto wobble = std::make_shared<osci::Effect>(
+            std::make_shared<WobbleEffect>(audioProcessor),
+            std::vector<osci::EffectParameter*>{
+                new osci::EffectParameter("Wobble Amount", "Adds a sine wave of the prominent frequency in the audio currently playing. The sine wave's frequency is slightly offset to create a subtle 'wobble' in the image. Increasing the slider increases the strength of the wobble.", "wobble", VERSION_HINT, 0.3, 0.0, 1.0),
+                new osci::EffectParameter("Wobble Phase", "Controls the phase of the wobble.", "wobblePhase", VERSION_HINT, 0.0, -1.0, 1.0, 0.0001f, osci::LfoType::Sawtooth, 1.0f),
+            });
+        wobble->setName("Wobble");
+        wobble->setIcon(BinaryData::wobble_svg);
+		return wobble;
+	}
+
 private:
     OscirenderAudioProcessor& audioProcessor;
 	double smoothedFrequency = 0;

@@ -46,15 +46,26 @@
               resource="1" file="Resources/oscilloscope/vector_display_reflection.png"/>
       </GROUP>
       <GROUP id="{82BCD6F1-A8BF-F30B-5587-81EE70168883}" name="svg">
+        <FILE id="laB1fX" name="bit-crush.svg" compile="0" resource="1" file="Resources/svg/bit-crush.svg"/>
+        <FILE id="Rs9Xr6" name="bounce.svg" compile="0" resource="1" file="Resources/svg/bounce.svg"/>
+        <FILE id="rQlbqP" name="bulge.svg" compile="0" resource="1" file="Resources/svg/bulge.svg"/>
+        <FILE id="jYG5GY" name="close.svg" compile="0" resource="1" file="Resources/svg/close.svg"/>
         <FILE id="rl17ZK" name="cog.svg" compile="0" resource="1" file="Resources/svg/cog.svg"/>
+        <FILE id="toeDbG" name="dash.svg" compile="0" resource="1" file="Resources/svg/dash.svg"/>
+        <FILE id="bH7fkX" name="delay.svg" compile="0" resource="1" file="Resources/svg/delay.svg"/>
         <FILE id="sDajXu" name="delete.svg" compile="0" resource="1" file="Resources/svg/delete.svg"/>
         <FILE id="IqXIZW" name="demo.svg" compile="0" resource="1" file="Resources/svg/demo.svg"/>
+        <FILE id="ATrDxb" name="distort.svg" compile="0" resource="1" file="Resources/svg/distort.svg"/>
         <FILE id="YwkQpy" name="fixed_rotate.svg" compile="0" resource="1"
               file="Resources/svg/fixed_rotate.svg"/>
         <FILE id="WIkl6l" name="fullscreen.svg" compile="0" resource="1" file="Resources/svg/fullscreen.svg"/>
+        <FILE id="AVhjBP" name="kaleidoscope.svg" compile="0" resource="1"
+              file="Resources/svg/kaleidoscope.svg"/>
         <FILE id="n1esUp" name="left_arrow.svg" compile="0" resource="1" file="Resources/svg/left_arrow.svg"/>
         <FILE id="WdfE7J" name="link.svg" compile="0" resource="1" file="Resources/svg/link.svg"/>
+        <FILE id="rGSPBN" name="lua.svg" compile="0" resource="1" file="Resources/svg/lua.svg"/>
         <FILE id="PxYKbt" name="microphone.svg" compile="0" resource="1" file="Resources/svg/microphone.svg"/>
+        <FILE id="YuYfcJ" name="multiplex.svg" compile="0" resource="1" file="Resources/svg/multiplex.svg"/>
         <FILE id="eGMxwy" name="mute.svg" compile="0" resource="1" file="Resources/svg/mute.svg"/>
         <FILE id="hJHxFY" name="open_in_new.svg" compile="0" resource="1" file="Resources/svg/open_in_new.svg"/>
         <FILE id="pSc1mq" name="osci.svg" compile="0" resource="1" file="Resources/svg/osci.svg"/>
@@ -66,11 +77,22 @@
         <FILE id="n79IAy" name="record.svg" compile="0" resource="1" file="Resources/svg/record.svg"/>
         <FILE id="vOGcgi" name="repeat.svg" compile="0" resource="1" file="Resources/svg/repeat.svg"/>
         <FILE id="OaqZb1" name="right_arrow.svg" compile="0" resource="1" file="Resources/svg/right_arrow.svg"/>
+        <FILE id="Knzo1H" name="ripple.svg" compile="0" resource="1" file="Resources/svg/ripple.svg"/>
+        <FILE id="Gxscyd" name="rotate.svg" compile="0" resource="1" file="Resources/svg/rotate.svg"/>
+        <FILE id="cUDYOM" name="scale.svg" compile="0" resource="1" file="Resources/svg/scale.svg"/>
+        <FILE id="ZPUNcg" name="smoothing.svg" compile="0" resource="1" file="Resources/svg/smoothing.svg"/>
         <FILE id="yiDo4s" name="spout.svg" compile="0" resource="1" file="Resources/svg/spout.svg"/>
         <FILE id="EOWhGi" name="stop.svg" compile="0" resource="1" file="Resources/svg/stop.svg"/>
+        <FILE id="Z3yYJU" name="swirl.svg" compile="0" resource="1" file="Resources/svg/swirl.svg"/>
         <FILE id="rXjNlx" name="threshold.svg" compile="0" resource="1" file="Resources/svg/threshold.svg"/>
         <FILE id="rFYmV8" name="timer.svg" compile="0" resource="1" file="Resources/svg/timer.svg"/>
+        <FILE id="ESR7bv" name="trace.svg" compile="0" resource="1" file="Resources/svg/trace.svg"/>
+        <FILE id="ID1vTS" name="translate.svg" compile="0" resource="1" file="Resources/svg/translate.svg"/>
+        <FILE id="Sw4WWb" name="twist.svg" compile="0" resource="1" file="Resources/svg/twist.svg"/>
+        <FILE id="praXUY" name="vector-cancelling.svg" compile="0" resource="1"
+              file="Resources/svg/vector-cancelling.svg"/>
         <FILE id="qC6QiP" name="volume.svg" compile="0" resource="1" file="Resources/svg/volume.svg"/>
+        <FILE id="SkgUSk" name="wobble.svg" compile="0" resource="1" file="Resources/svg/wobble.svg"/>
       </GROUP>
       <GROUP id="{F8A3D32C-4187-9A2F-5D78-040259957E9B}" name="text">
         <FILE id="N9Q6Zg" name="greek.txt" compile="0" resource="1" file="Resources/text/greek.txt"/>
@@ -92,18 +114,27 @@
         <FILE id="ux2dO2" name="DistortEffect.h" compile="0" resource="0" file="Source/audio/DistortEffect.h"/>
         <FILE id="SWC0tN" name="MultiplexEffect.h" compile="0" resource="0"
               file="Source/audio/MultiplexEffect.h"/>
+        <FILE id="kAlEiD" name="KaleidoscopeEffect.h" compile="0" resource="0"
+              file="Source/audio/KaleidoscopeEffect.h"/>
+        <FILE id="bNcEfx" name="BounceEffect.h" compile="0" resource="0" file="Source/audio/BounceEffect.h"/>
         <FILE id="h0dMim" name="PerspectiveEffect.h" compile="0" resource="0"
               file="Source/audio/PerspectiveEffect.h"/>
         <FILE id="t5g8pf" name="PublicSynthesiser.h" compile="0" resource="0"
               file="Source/audio/PublicSynthesiser.h"/>
+        <FILE id="L01ZLi" name="RippleEffect.h" compile="0" resource="0" file="Source/audio/RippleEffect.h"/>
+        <FILE id="bXcQHc" name="RotateEffect.h" compile="0" resource="0" file="Source/audio/RotateEffect.h"/>
         <FILE id="Q5kjpU" name="SampleRateManager.h" compile="0" resource="0"
               file="Source/audio/SampleRateManager.h"/>
+        <FILE id="Cffx3f" name="ScaleEffect.h" compile="0" resource="0" file="Source/audio/ScaleEffect.h"/>
         <FILE id="dBaZAV" name="ShapeSound.cpp" compile="1" resource="0" file="Source/audio/ShapeSound.cpp"/>
         <FILE id="VKBirB" name="ShapeSound.h" compile="0" resource="0" file="Source/audio/ShapeSound.h"/>
         <FILE id="UcPZ09" name="ShapeVoice.cpp" compile="1" resource="0" file="Source/audio/ShapeVoice.cpp"/>
         <FILE id="WId4vx" name="ShapeVoice.h" compile="0" resource="0" file="Source/audio/ShapeVoice.h"/>
         <FILE id="Vwjht7" name="SmoothEffect.h" compile="0" resource="0" file="Source/audio/SmoothEffect.h"/>
         <FILE id="WACNMe" name="StereoEffect.h" compile="0" resource="0" file="Source/audio/StereoEffect.h"/>
+        <FILE id="yiIupB" name="SwirlEffect.h" compile="0" resource="0" file="Source/audio/SwirlEffect.h"/>
+        <FILE id="qZkeZC" name="TranslateEffect.h" compile="0" resource="0"
+              file="Source/audio/TranslateEffect.h"/>
         <FILE id="RsHWPN" name="TwistEffect.h" compile="0" resource="0" file="Source/audio/TwistEffect.h"/>
         <FILE id="Be21D0" name="VectorCancellingEffect.h" compile="0" resource="0"
               file="Source/audio/VectorCancellingEffect.h"/>
@@ -156,8 +187,20 @@
               file="Source/components/EffectsListComponent.cpp"/>
         <FILE id="dcLchL" name="EffectsListComponent.h" compile="0" resource="0"
               file="Source/components/EffectsListComponent.h"/>
+        <FILE id="xQQo5D" name="EffectTypeGridComponent.cpp" compile="1" resource="0"
+              file="Source/components/EffectTypeGridComponent.cpp"/>
+        <FILE id="Fb2Qci" name="EffectTypeGridComponent.h" compile="0" resource="0"
+              file="Source/components/EffectTypeGridComponent.h"/>
+        <FILE id="PPK1iQ" name="EffectTypeItemComponent.cpp" compile="1" resource="0"
+              file="Source/components/EffectTypeItemComponent.cpp"/>
+        <FILE id="kGAfsx" name="EffectTypeItemComponent.h" compile="0" resource="0"
+              file="Source/components/EffectTypeItemComponent.h"/>
         <FILE id="aEprcE" name="ErrorCodeEditorComponent.h" compile="0" resource="0"
               file="Source/components/ErrorCodeEditorComponent.h"/>
+        <FILE id="SYA32K" name="HoverAnimationMixin.cpp" compile="1" resource="0"
+              file="Source/components/HoverAnimationMixin.cpp"/>
+        <FILE id="JyPgec" name="HoverAnimationMixin.h" compile="0" resource="0"
+              file="Source/components/HoverAnimationMixin.h"/>
         <FILE id="L9DIT2" name="LabelledTextBox.h" compile="0" resource="0"
               file="Source/components/LabelledTextBox.h"/>
         <FILE id="tpNWJ3" name="LuaConsole.cpp" compile="1" resource="0" file="Source/components/LuaConsole.cpp"/>
@@ -725,6 +768,7 @@
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="chowdsp_gui" path="modules/chowdsp_utils/modules/gui"/>
       </MODULEPATHS>
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/osci-render/VisualStudio2022" smallIcon="pSc1mq"
@@ -761,6 +805,7 @@
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="chowdsp_gui" path="modules/chowdsp_utils/modules/gui"/>
       </MODULEPATHS>
     </VS2022>
     <XCODE_MAC targetFolder="Builds/osci-render/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak"
@@ -769,14 +814,13 @@
                microphonePermissionNeeded="1" frameworkSearchPaths="/Library/Frameworks"
                extraCustomFrameworks="/Library/Frameworks/Syphon.framework"
                hardenedRuntime="1" hardenedRuntimeOptions="com.apple.security.cs.disable-library-validation,com.apple.security.device.audio-input"
-               iosDevelopmentTeamID="D86A3M3H2L">
+               userNotes="D86A3M3H2L">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
         <CONFIGURATION name="Release" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO,OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
-        <CONFIGURATION name="Release (Development)" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
-                       codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
+        <CONFIGURATION name="Release (Development)" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
@@ -804,6 +848,7 @@
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="chowdsp_gui" path="modules/chowdsp_utils/modules/gui"/>
       </MODULEPATHS>
     </XCODE_MAC>
   </EXPORTFORMATS>
@@ -816,6 +861,7 @@
             useGlobalPath="0"/>
     <MODULE id="chowdsp_dsp_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="chowdsp_filters" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="chowdsp_gui" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="chowdsp_math" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="chowdsp_simd" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="juce_animation" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>

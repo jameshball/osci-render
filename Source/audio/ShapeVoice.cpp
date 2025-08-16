@@ -93,7 +93,8 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     }
 
     for (auto sample = startSample; sample < startSample + numSamples; ++sample) {
-        bool traceEnabled = audioProcessor.trace->enabled->getBoolValue();
+        bool traceEnabled = audioProcessor.trace->enabled->getBoolValue()
+            || (audioProcessor.previewEffect && audioProcessor.previewEffect == audioProcessor.trace);
 
         // update length increment
         double traceLen = traceEnabled ? actualTraceLength : 1.0;

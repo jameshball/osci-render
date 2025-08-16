@@ -8,8 +8,6 @@
 
 #pragma once
 
-#define VERSION_HINT 2
-
 #include <JuceHeader.h>
 
 #include <numbers>
@@ -59,6 +57,8 @@ public:
 
     std::vector<std::shared_ptr<osci::Effect>> toggleableEffects;
     std::vector<std::shared_ptr<osci::Effect>> luaEffects;
+    // Temporary preview effect applied while hovering effects in the grid (guarded by effectsLock)
+    std::shared_ptr<osci::Effect> previewEffect;
     std::atomic<double> luaValues[26] = {0.0};
 
     std::shared_ptr<osci::Effect> frequencyEffect = std::make_shared<osci::Effect>(
@@ -83,7 +83,7 @@ public:
                 "Trace Length",
                 "Defines how much of the frame is drawn per cycle. This has the effect of 'tracing' out the image from a single dot when animated. By default, we draw the whole frame, corresponding to a value of 1.0.",
                 "traceLength",
-                VERSION_HINT, 1.0, 0.0, 1.0, 0.001),
+                VERSION_HINT, 1.0, 0.0, 1.0, 0.001, osci::LfoType::Sawtooth),
         });
 
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
@@ -199,6 +199,10 @@ public:
     void addErrorListener(ErrorListener* listener);
     void removeErrorListener(ErrorListener* listener);
     void notifyErrorListeners(int lineNumber, juce::String id, juce::String error);
+
+    // Preview API: set/clear a temporary effect by ID for hover auditioning
+    void setPreviewEffectId(const juce::String& effectId);
+    void clearPreviewEffect();
 
     // Setter for the callback
     void setFileRemovedCallback(std::function<void(int)> callback);

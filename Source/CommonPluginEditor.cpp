@@ -60,7 +60,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     setResizeLimits(250, 250, 999999, 999999);
 
     tooltipDropShadow.setOwner(&tooltipWindow.get());
-    tooltipWindow->setMillisecondsBeforeTipAppears(0);
+    tooltipWindow->setMillisecondsBeforeTipAppears(100);
     
     updateTitle();
 

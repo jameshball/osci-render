@@ -96,10 +96,6 @@ void SosciMainMenuBarModel::resetMenuItems() {
 
         juce::DialogWindow* dw = options.launchAsync();
     });
-    addMenuItem(1, processor.getAcceptsKeys() ? "Disable Special Keys" : "Enable Special Keys", [this] {
-        processor.setAcceptsKeys(!processor.getAcceptsKeys());
-        resetMenuItems();
-        });
 
     addMenuItem(2, "Settings...", [this] {
         editor.openRecordingSettings();
@@ -113,4 +109,11 @@ void SosciMainMenuBarModel::resetMenuItems() {
     if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
         addMenuItem(3, "Settings...", [&]() { editor.openAudioSettings(); });
     }
+
+    // Interface menu index depends on whether Audio menu exists
+    int interfaceMenuIndex = (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) ? 4 : 3;
+    addToggleMenuItem(interfaceMenuIndex, "Listen for Special Keys", [this] {
+        processor.setAcceptsKeys(! processor.getAcceptsKeys());
+        resetMenuItems();
+    }, [this] { return processor.getAcceptsKeys(); });
 }
