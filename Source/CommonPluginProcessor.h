@@ -153,8 +153,11 @@ public:
 #else
         "ffmpeg";
 #endif
-    void setAcceptKeys(bool shouldAcceptKeys) {
+    void setAcceptsKeys(bool shouldAcceptKeys) {
         setGlobalValue("acceptsAllKeys", shouldAcceptKeys);
+    }
+    bool getAcceptsKeys() {
+        return getGlobalBoolValue("acceptsAllKeys", juce::JUCEApplicationBase::isStandaloneApp());
     }
 
 protected:

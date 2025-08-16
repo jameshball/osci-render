@@ -61,8 +61,8 @@ void OsciMainMenuBarModel::resetMenuItems() {
     addMenuItem(1, "Randomize Blender Port", [this] {
         audioProcessor.setObjectServerPort(juce::Random::getSystemRandom().nextInt(juce::Range<int>(51600, 51700)));
         });
-    addMenuItem(1, audioProcessor.getGlobalBoolValue("acceptsAllKeys", juce::JUCEApplicationBase::isStandaloneApp()) ? "Disable Special Keys" : "Enable Special Keys", [this] {
-        audioProcessor.setAcceptKeys(!audioProcessor.getGlobalBoolValue("acceptsAllKeys", juce::JUCEApplicationBase::isStandaloneApp()));
+    addMenuItem(1, audioProcessor.getAcceptsKeys() ? "Disable Special Keys" : "Enable Special Keys", [this] {
+        audioProcessor.setAcceptsKeys(!audioProcessor.getAcceptsKeys());
         resetMenuItems();
         });
 

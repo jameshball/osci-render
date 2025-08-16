@@ -113,7 +113,7 @@ CommonPluginEditor::~CommonPluginEditor() {
 
 bool CommonPluginEditor::keyPressed(const juce::KeyPress& key) {
     // If we're not accepting special keys, end early
-    if (audioProcessor.getGlobalBoolValue("acceptsAllKeys", juce::JUCEApplicationBase::isStandaloneApp()) == false) return false;
+    if (!audioProcessor.getAcceptsKeys()) return false;
 
     if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'S') {
         saveProjectAs();

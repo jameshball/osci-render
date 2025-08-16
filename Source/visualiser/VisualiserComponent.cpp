@@ -255,7 +255,7 @@ void VisualiserComponent::mouseDown(const juce::MouseEvent &event) {
 
 bool VisualiserComponent::keyPressed(const juce::KeyPress &key) {
     // If we're not accepting special keys, end early
-    if (audioProcessor.getGlobalBoolValue("acceptsAllKeys", juce::JUCEApplicationBase::isStandaloneApp()) == false) return false;
+    if (!audioProcessor.getAcceptsKeys()) return false;
 
     if (key.isKeyCode(juce::KeyPress::escapeKey)) {
         if (fullScreenCallback) {
