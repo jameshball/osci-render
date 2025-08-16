@@ -103,7 +103,7 @@ public:
         perspectiveEffect,
         std::vector<osci::EffectParameter*>{
             new osci::EffectParameter("Perspective", "Controls the strength of the 3D perspective projection.", "perspectiveStrength", VERSION_HINT, 1.0, 0.0, 1.0),
-            new osci::EffectParameter("Focal Length", "Controls the focal length of the 3D perspective effect. A higher focal length makes the image look more flat, and a lower focal length makes the image look more 3D.", "perspectiveFocalLength", VERSION_HINT, 2.0, 0.0, 10.0),
+            new osci::EffectParameter("FOV", "Controls the camera's field of view in degrees. A lower field of view makes the image look more flat, and a higher field of view makes the image look more 3D.", "perspectiveFov", VERSION_HINT, 50.0, 5.0, 130.0),
         });
 
     osci::BooleanParameter* midiEnabled = new osci::BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false, "Enable MIDI input for the synth. If disabled, the synth will play a constant tone, as controlled by the frequency slider.");

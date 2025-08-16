@@ -2,16 +2,16 @@
 
 #include "Frustum.h"
 
-void Frustum::setCameraInternals(float focalLength, float ratio, float nearDistance, float farDistance) {
+void Frustum::setCameraInternals(float fov, float ratio, float nearDistance, float farDistance) {
 	// store the information
-	this->focalLength = focalLength;
+	this->fov = fov;
 	this->ratio = ratio;
 	this->nearDistance = nearDistance;
 	this->farDistance = farDistance;
 
 	// compute width and height of the near section
-	float fov = 2 * std::atan(1 / focalLength);
-	tang = (float) std::tan(fov * 0.5);
+	tang = std::tan(fov * 0.5f);
+	focalLength = 1.0f / tang;
 	height = nearDistance * tang;
 	width = height * ratio;
 }
