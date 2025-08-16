@@ -1,8 +1,8 @@
 #include "LuaParser.h"
 
 // If you haven't compiled LuaJIT yet, this will fail, and you'll get a ton of syntax errors in a few Lua-related files!
-// On Windows and MacOS, this will be done automatically as a pre-build step when you compile SharedCode.
-// On Linux, you'll have to run the shell script "luajit_linux.sh" in the root of the Git repository.
+// On all platforms, this should be done automatically when you run the export.
+// If not, use the luajit_win.bat or luajit_linux_macos.sh scripts in the git root from the dev environment.
 #include <lua.hpp>
 
 std::function<void(const std::string&)> LuaParser::onPrint;
