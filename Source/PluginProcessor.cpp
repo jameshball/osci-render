@@ -11,9 +11,11 @@
 #include "PluginEditor.h"
 #include "audio/BitCrushEffect.h"
 #include "audio/BulgeEffect.h"
+#include "audio/TwistEffect.h"
 #include "audio/DistortEffect.h"
 #include "audio/MultiplexEffect.h"
 #include "audio/SmoothEffect.h"
+#include "audio/WobbleEffect.h"
 #include "audio/DashedLineEffect.h"
 #include "audio/VectorCancellingEffect.h"
 #include "parser/FileParser.h"
@@ -123,10 +125,15 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
             new osci::EffectParameter("Swirl", "Swirls the image in a spiral pattern.", "swirl", VERSION_HINT, 0.3, -1.0, 1.0),
         }));
     toggleableEffects.push_back(std::make_shared<osci::Effect>(
+        std::make_shared<TwistEffect>(),
+        std::vector<osci::EffectParameter *>{
+        new osci::EffectParameter("Twist", "Twists the image in a corkscrew pattern.", "twist", VERSION_HINT, 0.5, -1.0, 1.0),
+    }));
+    toggleableEffects.push_back(std::make_shared<osci::Effect>(
         std::make_shared<SmoothEffect>(),
         new osci::EffectParameter("Smoothing", "This works as a low-pass frequency filter that removes high frequencies, making the image look smoother, and audio sound less harsh.", "smoothing", VERSION_HINT, 0.75, 0.0, 1.0)));
     std::shared_ptr<osci::Effect> wobble = std::make_shared<osci::Effect>(
-        wobbleEffect,
+        std::make_shared<WobbleEffect>(*this),
         std::vector<osci::EffectParameter*>{
             new osci::EffectParameter("Wobble Amount", "Adds a sine wave of the prominent frequency in the audio currently playing. The sine wave's frequency is slightly offset to create a subtle 'wobble' in the image. Increasing the slider increases the strength of the wobble.", "wobble", VERSION_HINT, 0.3, 0.0, 1.0),
             new osci::EffectParameter("Wobble Phase", "Controls the phase of the wobble.", "wobblePhase", VERSION_HINT, 0.0, -1.0, 1.0),

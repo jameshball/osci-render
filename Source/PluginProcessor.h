@@ -24,7 +24,6 @@
 #include "audio/SampleRateManager.h"
 #include "audio/ShapeSound.h"
 #include "audio/ShapeVoice.h"
-#include "audio/WobbleEffect.h"
 #include "obj/ObjectServer.h"
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
@@ -168,8 +167,6 @@ public:
             VERSION_HINT, 4, 1, 50, 1));
 
     std::atomic<double> animationFrame = 0.f;
-
-    std::shared_ptr<WobbleEffect> wobbleEffect = std::make_shared<WobbleEffect>(*this);
 
     const double FONT_SIZE = 1.0f;
     juce::Font font = juce::Font(juce::Font::getDefaultSansSerifFontName(), FONT_SIZE, juce::Font::plain);
