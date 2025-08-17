@@ -52,7 +52,7 @@ if [ "$OS" = "win" ]; then
   echo "$(cygpath -w "$DEVCMD_BAT")"
   echo "$(cygpath -w "$SHELL")"
   
-  eval "$($(cygpath "$COMSPEC") /c$(cygpath -w $ROOT/ci/vcvars_export.bat) $(cygpath -w "$DEVCMD_BAT") $(cygpath -w "$SHELL"))"
+  eval "$($(cygpath "$COMSPEC") /c"$(cygpath -w $ROOT/ci/vcvars_export.bat)" "$(cygpath -w "$DEVCMD_BAT")" "$(cygpath -w "$SHELL")")"
   
   MSBUILD_EXE=$("$VS_WHERE" -latest -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\MSBuild.exe")
   echo $MSBUILD_EXE
