@@ -47,9 +47,9 @@ if [ "$OS" = "win" ]; then
   VS_PATH=$("$VS_WHERE" -latest -property installationPath)
   DEVCMD_BAT="$(cygpath -u "$(echo $VS_PATH | sed 's/\\/\\\\/g')")/Common7/Tools/vsdevcmd.bat"
   
-  echo "$(cygpath "$COMSPEC") /c$(cygpath -w "$ROOT/ci/vcvars_export.bat") $(cygpath -w "$DEVCMD_BAT") $(cygpath -w "$SHELL")"
+  echo "$(cygpath "$COMSPEC") /c$(cygpath -w "$ROOT/ci/vcvars_export.bat") \"$(cygpath -w "$DEVCMD_BAT")\" \"$(cygpath -w "$SHELL"\")"
   
-  eval "$($(cygpath "$COMSPEC") /c$(cygpath -w "$ROOT/ci/vcvars_export.bat") $(cygpath -w "$DEVCMD_BAT") $(cygpath -w "$SHELL"))"
+  eval "$($(cygpath "$COMSPEC") /c$(cygpath -w "$ROOT/ci/vcvars_export.bat") \"$(cygpath -w "$DEVCMD_BAT")\" \"$(cygpath -w "$SHELL")\")"
   
   MSBUILD_EXE=$("$VS_WHERE" -latest -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\MSBuild.exe")
   echo $MSBUILD_EXE
