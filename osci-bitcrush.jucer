@@ -51,14 +51,23 @@
               file="Resources/sosci/vector_display.sosci"/>
       </GROUP>
       <GROUP id="{82BCD6F1-A8BF-F30B-5587-81EE70168883}" name="svg">
+        <FILE id="FIXHhD" name="bit-crush.svg" compile="0" resource="1" file="Resources/svg/bit-crush.svg"/>
+        <FILE id="eAm6Vd" name="bulge.svg" compile="0" resource="1" file="Resources/svg/bulge.svg"/>
+        <FILE id="gqROYg" name="close.svg" compile="0" resource="1" file="Resources/svg/close.svg"/>
         <FILE id="rl17ZK" name="cog.svg" compile="0" resource="1" file="Resources/svg/cog.svg"/>
+        <FILE id="bMtE0O" name="dash.svg" compile="0" resource="1" file="Resources/svg/dash.svg"/>
+        <FILE id="GmHXfS" name="delay.svg" compile="0" resource="1" file="Resources/svg/delay.svg"/>
         <FILE id="sDajXu" name="delete.svg" compile="0" resource="1" file="Resources/svg/delete.svg"/>
         <FILE id="IqXIZW" name="demo.svg" compile="0" resource="1" file="Resources/svg/demo.svg"/>
+        <FILE id="jhZqJb" name="distort.svg" compile="0" resource="1" file="Resources/svg/distort.svg"/>
         <FILE id="YwkQpy" name="fixed_rotate.svg" compile="0" resource="1"
               file="Resources/svg/fixed_rotate.svg"/>
         <FILE id="WIkl6l" name="fullscreen.svg" compile="0" resource="1" file="Resources/svg/fullscreen.svg"/>
         <FILE id="n1esUp" name="left_arrow.svg" compile="0" resource="1" file="Resources/svg/left_arrow.svg"/>
+        <FILE id="lVwGO7" name="link.svg" compile="0" resource="1" file="Resources/svg/link.svg"/>
+        <FILE id="LujqKC" name="lua.svg" compile="0" resource="1" file="Resources/svg/lua.svg"/>
         <FILE id="PxYKbt" name="microphone.svg" compile="0" resource="1" file="Resources/svg/microphone.svg"/>
+        <FILE id="apDx43" name="multiplex.svg" compile="0" resource="1" file="Resources/svg/multiplex.svg"/>
         <FILE id="WoY9r2" name="mute.svg" compile="0" resource="1" file="Resources/svg/mute.svg"/>
         <FILE id="hJHxFY" name="open_in_new.svg" compile="0" resource="1" file="Resources/svg/open_in_new.svg"/>
         <FILE id="pSc1mq" name="osci.svg" compile="0" resource="1" file="Resources/svg/osci.svg"/>
@@ -70,11 +79,21 @@
         <FILE id="n79IAy" name="record.svg" compile="0" resource="1" file="Resources/svg/record.svg"/>
         <FILE id="WDxwSi" name="repeat.svg" compile="0" resource="1" file="Resources/svg/repeat.svg"/>
         <FILE id="OaqZb1" name="right_arrow.svg" compile="0" resource="1" file="Resources/svg/right_arrow.svg"/>
+        <FILE id="HF5Lko" name="ripple.svg" compile="0" resource="1" file="Resources/svg/ripple.svg"/>
+        <FILE id="g91LQf" name="rotate.svg" compile="0" resource="1" file="Resources/svg/rotate.svg"/>
+        <FILE id="mplh74" name="scale.svg" compile="0" resource="1" file="Resources/svg/scale.svg"/>
+        <FILE id="vQyuyd" name="smoothing.svg" compile="0" resource="1" file="Resources/svg/smoothing.svg"/>
         <FILE id="z3A7FT" name="spout.svg" compile="0" resource="1" file="Resources/svg/spout.svg"/>
         <FILE id="wD6mre" name="stop.svg" compile="0" resource="1" file="Resources/svg/stop.svg"/>
+        <FILE id="OBmfqb" name="swirl.svg" compile="0" resource="1" file="Resources/svg/swirl.svg"/>
         <FILE id="rXjNlx" name="threshold.svg" compile="0" resource="1" file="Resources/svg/threshold.svg"/>
         <FILE id="rFYmV8" name="timer.svg" compile="0" resource="1" file="Resources/svg/timer.svg"/>
+        <FILE id="E16zAj" name="trace.svg" compile="0" resource="1" file="Resources/svg/trace.svg"/>
+        <FILE id="zQOV5n" name="translate.svg" compile="0" resource="1" file="Resources/svg/translate.svg"/>
+        <FILE id="pZPfFZ" name="vector-cancelling.svg" compile="0" resource="1"
+              file="Resources/svg/vector-cancelling.svg"/>
         <FILE id="qC6QiP" name="volume.svg" compile="0" resource="1" file="Resources/svg/volume.svg"/>
+        <FILE id="EUejM5" name="wobble.svg" compile="0" resource="1" file="Resources/svg/wobble.svg"/>
       </GROUP>
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">

@@ -25,6 +25,17 @@ public:
 		);
 	}
 
+	std::shared_ptr<osci::Effect> build() const override {
+		auto eff = std::make_shared<osci::Effect>(
+			std::make_shared<PerspectiveEffect>(),
+			std::vector<osci::EffectParameter*>{
+				new osci::EffectParameter("Perspective", "Controls the strength of the 3D perspective projection.", "perspectiveStrength", VERSION_HINT, 1.0, 0.0, 1.0),
+				new osci::EffectParameter("FOV", "Controls the camera's field of view in degrees. A lower field of view makes the image look more flat, and a higher field of view makes the image look more 3D.", "perspectiveFov", VERSION_HINT, 50.0, 5.0, 130.0),
+			}
+		);
+		return eff;
+	}
+
 private:
 	
 	Camera camera;

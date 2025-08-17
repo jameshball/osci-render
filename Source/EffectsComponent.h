@@ -6,9 +6,11 @@
 #include "PluginProcessor.h"
 #include "components/DraggableListBox.h"
 #include "components/EffectsListComponent.h"
+#include "components/ScrollFadeMixin.h"
+#include "components/EffectTypeGridComponent.h"
 
 class OscirenderAudioProcessorEditor;
-class EffectsComponent : public juce::GroupComponent, public juce::ChangeListener {
+class EffectsComponent : public juce::GroupComponent, public juce::ChangeListener, private ScrollFadeMixin {
 public:
 	EffectsComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
 	~EffectsComponent() override;
@@ -26,6 +28,11 @@ private:
 	AudioEffectListBoxItemData itemData;
 	EffectsListBoxModel listBoxModel;
 	DraggableListBox listBox;
+	juce::TextButton addEffectButton { "+ Add new effect" }; // Separate button under the list
+	EffectTypeGridComponent grid { audioProcessor };
+	bool showingGrid = true; // show grid by default
+
+	const int LIST_SPACER = 4; // Space above the list to show drop indicator
 	
 	EffectComponent frequency = EffectComponent(*audioProcessor.frequencyEffect, false);
 

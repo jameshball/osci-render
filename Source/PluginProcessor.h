@@ -8,8 +8,6 @@
 
 #pragma once
 
-#define VERSION_HINT 2
-
 #include <JuceHeader.h>
 
 #include <numbers>
@@ -59,6 +57,8 @@ public:
 
     std::vector<std::shared_ptr<osci::Effect>> toggleableEffects;
     std::vector<std::shared_ptr<osci::Effect>> luaEffects;
+    // Temporary preview effect applied while hovering effects in the grid (guarded by effectsLock)
+    std::shared_ptr<osci::Effect> previewEffect;
     std::atomic<double> luaValues[26] = {0.0};
 
     std::shared_ptr<osci::Effect> frequencyEffect = std::make_shared<osci::Effect>(
@@ -72,20 +72,6 @@ public:
             "frequency",
             VERSION_HINT, 220.0, 0.0, 4200.0));
 
-    std::shared_ptr<osci::Effect> trace = std::make_shared<osci::Effect>(
-        std::vector<osci::EffectParameter*>{
-            new osci::EffectParameter(
-                "Trace Start",
-                "Defines how far into the frame the drawing is started at. This has the effect of 'tracing' out the image from a single dot when animated. By default, we start drawing from the beginning of the frame, so this value is 0.0.",
-                "traceStart",
-                VERSION_HINT, 0.0, 0.0, 1.0, 0.001),
-            new osci::EffectParameter(
-                "Trace Length",
-                "Defines how much of the frame is drawn per cycle. This has the effect of 'tracing' out the image from a single dot when animated. By default, we draw the whole frame, corresponding to a value of 1.0.",
-                "traceLength",
-                VERSION_HINT, 1.0, 0.0, 1.0, 0.001),
-        });
-
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
 
     std::function<void(int, juce::String, juce::String)> errorCallback = [this](int lineNum, juce::String fileName, juce::String error) { notifyErrorListeners(lineNum, fileName, error); };
@@ -94,13 +80,7 @@ public:
         customEffect,
         new osci::EffectParameter("Lua Effect", "Controls the strength of the custom Lua effect applied. You can write your own custom effect using Lua by pressing the edit button on the right.", "customEffectStrength", VERSION_HINT, 1.0, 0.0, 1.0));
 
-    std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>();
-    std::shared_ptr<osci::Effect> perspective = std::make_shared<osci::Effect>(
-        perspectiveEffect,
-        std::vector<osci::EffectParameter*>{
-            new osci::EffectParameter("Perspective", "Controls the strength of the 3D perspective projection.", "perspectiveStrength", VERSION_HINT, 1.0, 0.0, 1.0),
-            new osci::EffectParameter("FOV", "Controls the camera's field of view in degrees. A lower field of view makes the image look more flat, and a higher field of view makes the image look more 3D.", "perspectiveFov", VERSION_HINT, 50.0, 5.0, 130.0),
-        });
+    std::shared_ptr<osci::Effect> perspective = PerspectiveEffect().build();
 
     osci::BooleanParameter* midiEnabled = new osci::BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false, "Enable MIDI input for the synth. If disabled, the synth will play a constant tone, as controlled by the frequency slider.");
     osci::BooleanParameter* inputEnabled = new osci::BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false, "Enable to use input audio, instead of the generated audio.");
@@ -199,6 +179,10 @@ public:
     void addErrorListener(ErrorListener* listener);
     void removeErrorListener(ErrorListener* listener);
     void notifyErrorListeners(int lineNumber, juce::String id, juce::String error);
+
+    // Preview API: set/clear a temporary effect by ID for hover auditioning
+    void setPreviewEffectId(const juce::String& effectId);
+    void clearPreviewEffect();
 
     // Setter for the callback
     void setFileRemovedCallback(std::function<void(int)> callback);

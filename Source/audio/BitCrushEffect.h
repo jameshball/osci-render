@@ -15,4 +15,12 @@ public:
 		double dequant = 1.0f / quant;
 		return osci::Point(dequant * (int)(input.x * quant), dequant * (int)(input.y * quant), dequant * (int)(input.z * quant));
 	}
+
+	std::shared_ptr<osci::Effect> build() const override {
+		auto eff = std::make_shared<osci::Effect>(
+			std::make_shared<BitCrushEffect>(),
+			new osci::EffectParameter("Bit Crush", "Limits the resolution of points drawn to the screen, making the object look pixelated, and making the audio sound more 'digital' and distorted.", "bitCrush", VERSION_HINT, 0.7, 0.0, 1.0));
+		eff->setIcon(BinaryData::bitcrush_svg);
+		return eff;
+	}
 };
