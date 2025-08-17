@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Run this if you're on Linux or macOS and you haven't already built LuaJIT.
 # If you don't, osci-render won't compile.
