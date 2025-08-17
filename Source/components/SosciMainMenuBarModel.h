@@ -10,6 +10,8 @@ class SosciMainMenuBarModel : public MainMenuBarModel {
 public:
     SosciMainMenuBarModel(SosciPluginEditor& editor, SosciAudioProcessor& processor);
 
+    void resetMenuItems();
+
     SosciPluginEditor& editor;
     SosciAudioProcessor& processor;
     
