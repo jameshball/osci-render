@@ -16,8 +16,8 @@ if [ "$VERSION" = "free" ]; then
 fi
 
 # Resave jucer file
-#RESAVE_COMMAND="$PROJUCER_PATH --resave '$ROOT/$PLUGIN.jucer'"
-#eval "$RESAVE_COMMAND"
+RESAVE_COMMAND="$PROJUCER_PATH --resave '$ROOT/$PLUGIN.jucer'"
+eval "$RESAVE_COMMAND"
 
 # Build mac version
 if [ "$OS" = "mac" ]; then
