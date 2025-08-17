@@ -716,7 +716,8 @@
         <CONFIGURATION isDebug="0" name="Release" targetName="osci-render" alwaysGenerateDebugSymbols="1"
                        debugInformationFormat="ProgramDatabase" winWarningLevel="2"
                        libraryPath="..\..\..\modules\LuaJIT\src" headerPath="..\..\..\modules\LuaJIT\src"
-                       prebuildCommand="..\..\..\luajit_win.bat"/>
+                       prebuildCommand="..\..\..\luajit_win.bat" enablePluginBinaryCopyStep="0"
+                       postbuildCommand="ls .\x64\Release\VST3"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
