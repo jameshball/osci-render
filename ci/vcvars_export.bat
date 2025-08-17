@@ -1,3 +1,6 @@
 @echo off
-call %1 > nul
-"%2" -c "export -p"
+
+set "VSPATH=C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe -latest -property installationPath"
+
+call "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat" > nul
+"%1" -c "export -p"
