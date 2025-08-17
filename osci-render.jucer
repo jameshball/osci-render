@@ -197,6 +197,13 @@
               file="Source/components/EffectTypeItemComponent.h"/>
         <FILE id="aEprcE" name="ErrorCodeEditorComponent.h" compile="0" resource="0"
               file="Source/components/ErrorCodeEditorComponent.h"/>
+        <FILE id="sqD2Zy" name="GridComponent.cpp" compile="1" resource="0"
+              file="Source/components/GridComponent.cpp"/>
+        <FILE id="QRwdXD" name="GridComponent.h" compile="0" resource="0" file="Source/components/GridComponent.h"/>
+        <FILE id="Dfsnmg" name="GridItemComponent.cpp" compile="1" resource="0"
+              file="Source/components/GridItemComponent.cpp"/>
+        <FILE id="MwZoTt" name="GridItemComponent.h" compile="0" resource="0"
+              file="Source/components/GridItemComponent.h"/>
         <FILE id="SYA32K" name="HoverAnimationMixin.cpp" compile="1" resource="0"
               file="Source/components/HoverAnimationMixin.cpp"/>
         <FILE id="JyPgec" name="HoverAnimationMixin.h" compile="0" resource="0"
