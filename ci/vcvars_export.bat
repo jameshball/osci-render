@@ -1,6 +1,8 @@
 @echo off
 
-set "VSPATH=C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe -latest -property installationPath"
+set VSWHERE="C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere"
 
-call "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat" > nul
+for /f "tokens=*" %%i in ('%VSWHERE% -latest -property installationPath') do set VSWHERE2=%%i
+
+call "%VSWHERE2%\Common7\Tools\VsDevCmd.bat" > nul
 "%1" -c "export -p"
