@@ -15,7 +15,7 @@ goto finish_luajit
 
 :error_luajit
 
-timeout /T 10
+timeout 10
 
 :finish_luajit
 @echo on
