@@ -45,9 +45,10 @@ if [ "$OS" = "win" ]; then
   VS_WHERE="C:/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
   
   VS_PATH=$("$VS_WHERE" -latest -property installationPath)
-  DEVCMD_BAT="$(cygpath -u "$(echo $VS_PATH | sed 's/\\/\\\\/g')")/Common7/Tools/vcvars64.bat"
+  DEVCMD_BAT="$(cygpath -u "$(echo $VS_PATH | sed 's/\\/\\\\/g')")/VC/Auxiliary/Build/vcvars64.bat"
   
-  DEVCMD="$(cygpath "$COMSPEC") /c$(cygpath -w "$ROOT/ci/vcvars_export.bat") \"$(cygpath -w "$DEVCMD_BAT")\" \"$(cygpath -w "$SHELL")\""
+  DEVCMD="$(cygpath "$COMSPEC") /C$(cygpath -w "$ROOT/ci/vcvars_export.bat") \"$(cygpath -w "$DEVCMD_BAT")\" \"$(
+      cygpath -w "$SHELL")\""
   echo $DEVCMD
   
   eval "$($(echo $DEVCMD))"
