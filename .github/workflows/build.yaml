@@ -165,8 +165,8 @@ jobs:
         run: |
           export OS="win"
           source ./ci/setup-env.sh
-          source ./ci/test.sh
           source ./ci/build.sh "${{ matrix.project }}" "${{ matrix.version }}"
+          source ./ci/test.sh
         shell: bash
       
       - name: Compile .ISS to .EXE Installer
