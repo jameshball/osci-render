@@ -44,6 +44,11 @@ fi
 if [ "$OS" = "win" ]; then
   VS_WHERE="C:/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
   
+  VS_PATH=$("$VS_WHERE" -latest -property installationPath)
+  DEVCMD_BAT="$VS_PATH\Common7\Tools\vsdevcmd.bat"
+  
+  eval "$($(cygpath "$COMSPEC") /cvcvars_export "$DEVCMD_BAT" "$(cygpath -w "$SHELL")")"
+  
   MSBUILD_EXE=$("$VS_WHERE" -latest -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\MSBuild.exe")
   echo $MSBUILD_EXE
 
