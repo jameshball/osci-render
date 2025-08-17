@@ -8,9 +8,6 @@ cd "$DIR/modules/LuaJIT/src" || exit 1
 if [[ "$OSTYPE" == "darwin"* ]]; then
   echo "Building LuaJIT universal binary (x86_64 + arm64)..."
   
-  # Clean old builds
-  make clean
-  
   # Build x86_64
   make -j$(sysctl -n hw.logicalcpu) \
     BUILDMODE=static \
@@ -38,5 +35,5 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
   
 else
   echo "Building LuaJIT for Linux..."
-  make -j$(nproc) BUILDMODE=static
+  make -j$(nproc) BUILDMODE=static XCFLAGS="-fPIC"
 fi
