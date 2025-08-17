@@ -46,7 +46,7 @@ if [ "$OS" = "win" ]; then
   
   VS_PATH=$("$VS_WHERE" -latest -property installationPath)
   DEVCMD_BAT="$(cygpath -u $VS_PATH)/Common7/Tools/vsdevcmd.bat"
-  echo DEVCMD_BAT
+  echo $DEVCMD_BAT
   
   eval "$($(cygpath "$COMSPEC") /c$(cygpath -w $ROOT/ci/vcvars_export.bat) $(cygpath -w "$DEVCMD_BAT") "$(cygpath -w "$SHELL")")"
   
