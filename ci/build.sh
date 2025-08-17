@@ -48,7 +48,7 @@ if [ "$OS" = "win" ]; then
   DEVCMD_BAT="$(cygpath -u "$(echo $VS_PATH | sed 's/\\/\\\\/g')")/Common7/Tools/vsdevcmd.bat"
   
   DEVCMD="$(cygpath "$COMSPEC") /c$(cygpath -w "$ROOT/ci/vcvars_export.bat") \"$(cygpath -w "$DEVCMD_BAT")\" \"$(cygpath -w "$SHELL"\")"
-  echo DEVCMD
+  echo $DEVCMD
   
   eval "$($DEVCMD)"
   
