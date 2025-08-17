@@ -46,7 +46,7 @@ if [ "$OS" = "win" ]; then
   
   eval "$($(cygpath "$COMSPEC") /c$(cygpath -w "$ROOT/ci/vcvars_export.bat"))"
   
-  MSBUILD_EXE=$("$VS_WHERE" -latest -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\MSBuild.exe")
+  MSBUILD_EXE=$("$VS_WHERE" -latest -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\amd64\MSBuild.exe")
   echo $MSBUILD_EXE
 
   cd "$ROOT/Builds/$PLUGIN/VisualStudio2022"
