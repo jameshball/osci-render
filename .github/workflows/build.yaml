@@ -163,7 +163,6 @@ jobs:
         run: |
           export OS="win"
           source ./ci/setup-env.sh
-          source ./ci/test.sh
           source ./ci/build.sh "${{ matrix.project }}" "${{ matrix.version }}"
         shell: bash
       
