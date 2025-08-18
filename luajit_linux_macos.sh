@@ -5,6 +5,8 @@
 
 cd "$DIR/modules/LuaJIT/src" || exit 1
 
+echo "Building LuaJIT for $OSTYPE..."
+
 if [[ "$OSTYPE" == *"darwin"* ]]; then
   echo "Building LuaJIT universal binary (x86_64 + arm64)..."
   
@@ -37,6 +39,5 @@ if [[ "$OSTYPE" == *"darwin"* ]]; then
   echo "Universal libluajit.a created."
   
 else
-  echo "Building LuaJIT for Linux..."
   make -j$(nproc) BUILDMODE=static XCFLAGS="-fPIC"
 fi
