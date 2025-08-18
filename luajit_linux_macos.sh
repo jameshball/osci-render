@@ -5,9 +5,7 @@
 
 cd "$DIR/modules/LuaJIT/src" || exit 1
 
-echo "Building LuaJIT for $OSTYPE..."
-
-if [[ "$OSTYPE" == *"darwin"* ]]; then
+if [[ "$OSTYPE" == "darwin"* ]]; then
   echo "Building LuaJIT universal binary (x86_64 + arm64)..."
   
   make clean
