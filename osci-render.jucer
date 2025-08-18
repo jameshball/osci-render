@@ -6,7 +6,7 @@
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
               version="2.6.0.0" companyName="James H Ball" companyWebsite="https://osci-render.com"
               companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1"
-              pluginAUMainType="'aumf'">
+              pluginAUMainType="'aumf'" postExportShellCommandPosix="echo &quot;Building LuaJIT for $OSTYPE...&quot; &amp;&amp; DIR=%%1%% %%1%%/luajit_linux_macos.sh ">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
       <GROUP id="{8930EC48-30FD-646B-9DC5-0861171F8B2E}" name="fonts">
@@ -414,73 +414,6 @@
               file="Source/ixwebsocket/IXWebSocketVersion.h"/>
       </GROUP>
       <GROUP id="{90BFF2D8-C8EE-510F-7993-421FDEEFA277}" name="lua">
-        <GROUP id="{48ED0B9A-609D-7DBC-26B7-D100F7245749}" name="lua">
-          <FILE id="reW6LF" name="lapi.c" compile="1" resource="0" file="Source/lua/lua/lapi.c"/>
-          <FILE id="y6wTEu" name="lapi.h" compile="0" resource="0" file="Source/lua/lua/lapi.h"/>
-          <FILE id="fbjV69" name="lauxlib.c" compile="1" resource="0" file="Source/lua/lua/lauxlib.c"/>
-          <FILE id="xeR3L4" name="lauxlib.h" compile="0" resource="0" file="Source/lua/lua/lauxlib.h"/>
-          <FILE id="tyfIH6" name="lbaselib.c" compile="1" resource="0" file="Source/lua/lua/lbaselib.c"/>
-          <FILE id="DaKxGG" name="lcode.c" compile="1" resource="0" file="Source/lua/lua/lcode.c"/>
-          <FILE id="lheIiL" name="lcode.h" compile="0" resource="0" file="Source/lua/lua/lcode.h"/>
-          <FILE id="UEhwiT" name="lcorolib.c" compile="1" resource="0" file="Source/lua/lua/lcorolib.c"/>
-          <FILE id="OPy1EB" name="lctype.c" compile="1" resource="0" file="Source/lua/lua/lctype.c"/>
-          <FILE id="fryrEr" name="lctype.h" compile="0" resource="0" file="Source/lua/lua/lctype.h"/>
-          <FILE id="bHUPPW" name="ldblib.c" compile="1" resource="0" file="Source/lua/lua/ldblib.c"/>
-          <FILE id="XlYtBV" name="ldebug.c" compile="1" resource="0" file="Source/lua/lua/ldebug.c"/>
-          <FILE id="vAb8NE" name="ldebug.h" compile="0" resource="0" file="Source/lua/lua/ldebug.h"/>
-          <FILE id="rD9LiE" name="ldo.c" compile="1" resource="0" file="Source/lua/lua/ldo.c"/>
-          <FILE id="gEaRAH" name="ldo.h" compile="0" resource="0" file="Source/lua/lua/ldo.h"/>
-          <FILE id="WJkF05" name="ldump.c" compile="1" resource="0" file="Source/lua/lua/ldump.c"/>
-          <FILE id="DgPsbd" name="lfunc.c" compile="1" resource="0" file="Source/lua/lua/lfunc.c"/>
-          <FILE id="znxihn" name="lfunc.h" compile="0" resource="0" file="Source/lua/lua/lfunc.h"/>
-          <FILE id="xGDelH" name="lgc.c" compile="1" resource="0" file="Source/lua/lua/lgc.c"/>
-          <FILE id="vxmneh" name="lgc.h" compile="0" resource="0" file="Source/lua/lua/lgc.h"/>
-          <FILE id="GMI2lH" name="linit.c" compile="1" resource="0" file="Source/lua/lua/linit.c"/>
-          <FILE id="bXgGvu" name="liolib.c" compile="1" resource="0" file="Source/lua/lua/liolib.c"/>
-          <FILE id="JYZsRj" name="ljumptab.h" compile="0" resource="0" file="Source/lua/lua/ljumptab.h"/>
-          <FILE id="MPzwjd" name="llex.c" compile="1" resource="0" file="Source/lua/lua/llex.c"/>
-          <FILE id="ZlS9jV" name="llex.h" compile="0" resource="0" file="Source/lua/lua/llex.h"/>
-          <FILE id="xxSacr" name="llimits.h" compile="0" resource="0" file="Source/lua/lua/llimits.h"/>
-          <FILE id="yZ9gsY" name="lmathlib.c" compile="1" resource="0" file="Source/lua/lua/lmathlib.c"/>
-          <FILE id="vepfiL" name="lmem.c" compile="1" resource="0" file="Source/lua/lua/lmem.c"/>
-          <FILE id="ogXP1X" name="lmem.h" compile="0" resource="0" file="Source/lua/lua/lmem.h"/>
-          <FILE id="hdpbrZ" name="loadlib.c" compile="1" resource="0" file="Source/lua/lua/loadlib.c"/>
-          <FILE id="Ae13uk" name="lobject.c" compile="1" resource="0" file="Source/lua/lua/lobject.c"/>
-          <FILE id="yVQOFR" name="lobject.h" compile="0" resource="0" file="Source/lua/lua/lobject.h"/>
-          <FILE id="Yjl2jU" name="lopcodes.c" compile="1" resource="0" file="Source/lua/lua/lopcodes.c"/>
-          <FILE id="WrOMUG" name="lopcodes.h" compile="0" resource="0" file="Source/lua/lua/lopcodes.h"/>
-          <FILE id="Mcf4k0" name="lopnames.h" compile="0" resource="0" file="Source/lua/lua/lopnames.h"/>
-          <FILE id="IxVaWn" name="loslib.c" compile="1" resource="0" file="Source/lua/lua/loslib.c"/>
-          <FILE id="PT6prM" name="lparser.c" compile="1" resource="0" file="Source/lua/lua/lparser.c"/>
-          <FILE id="glxbom" name="lparser.h" compile="0" resource="0" file="Source/lua/lua/lparser.h"/>
-          <FILE id="mhS3hR" name="lprefix.h" compile="0" resource="0" file="Source/lua/lua/lprefix.h"/>
-          <FILE id="QUU8pb" name="lstate.c" compile="1" resource="0" file="Source/lua/lua/lstate.c"/>
-          <FILE id="nLiPGo" name="lstate.h" compile="0" resource="0" file="Source/lua/lua/lstate.h"/>
-          <FILE id="ACSLBM" name="lstring.c" compile="1" resource="0" file="Source/lua/lua/lstring.c"/>
-          <FILE id="mfaeJ4" name="lstring.h" compile="0" resource="0" file="Source/lua/lua/lstring.h"/>
-          <FILE id="qUaJcc" name="lstrlib.c" compile="1" resource="0" file="Source/lua/lua/lstrlib.c"/>
-          <FILE id="H79BnO" name="ltable.c" compile="1" resource="0" file="Source/lua/lua/ltable.c"/>
-          <FILE id="QWr3bh" name="ltable.h" compile="0" resource="0" file="Source/lua/lua/ltable.h"/>
-          <FILE id="C6dr1W" name="ltablib.c" compile="1" resource="0" file="Source/lua/lua/ltablib.c"/>
-          <FILE id="Dqa8zj" name="ltests.c" compile="1" resource="0" file="Source/lua/lua/ltests.c"/>
-          <FILE id="PSAt8D" name="ltests.h" compile="0" resource="0" file="Source/lua/lua/ltests.h"/>
-          <FILE id="wlxeWJ" name="ltm.c" compile="1" resource="0" file="Source/lua/lua/ltm.c"/>
-          <FILE id="WrmVGh" name="ltm.h" compile="0" resource="0" file="Source/lua/lua/ltm.h"/>
-          <FILE id="tNTcX7" name="lua.c" compile="1" resource="0" file="Source/lua/lua/lua.c"/>
-          <FILE id="VNMXFl" name="lua.h" compile="0" resource="0" file="Source/lua/lua/lua.h"/>
-          <FILE id="Bxx6Ju" name="luaconf.h" compile="0" resource="0" file="Source/lua/lua/luaconf.h"/>
-          <FILE id="uyv67S" name="lualib.h" compile="0" resource="0" file="Source/lua/lua/lualib.h"/>
-          <FILE id="mSI25W" name="lundump.c" compile="1" resource="0" file="Source/lua/lua/lundump.c"/>
-          <FILE id="wzaUVI" name="lundump.h" compile="0" resource="0" file="Source/lua/lua/lundump.h"/>
-          <FILE id="ImkHXE" name="lutf8lib.c" compile="1" resource="0" file="Source/lua/lua/lutf8lib.c"/>
-          <FILE id="IWMeha" name="lvm.c" compile="1" resource="0" file="Source/lua/lua/lvm.c"/>
-          <FILE id="maQFOJ" name="lvm.h" compile="0" resource="0" file="Source/lua/lua/lvm.h"/>
-          <FILE id="JIpgrH" name="lzio.c" compile="1" resource="0" file="Source/lua/lua/lzio.c"/>
-          <FILE id="bm8hWL" name="lzio.h" compile="0" resource="0" file="Source/lua/lua/lzio.h"/>
-          <FILE id="uiz8kq" name="onelua.c" compile="1" resource="0" file="Source/lua/lua/onelua.c"/>
-        </GROUP>
-        <FILE id="abPiYS" name="luaimport.cpp" compile="1" resource="0" file="Source/lua/luaimport.cpp"/>
-        <FILE id="Q0Kb3f" name="luaimport.h" compile="0" resource="0" file="Source/lua/luaimport.h"/>
         <FILE id="WKSBg8" name="LuaParser.cpp" compile="1" resource="0" file="Source/lua/LuaParser.cpp"/>
         <FILE id="E4ORpe" name="LuaParser.h" compile="0" resource="0" file="Source/lua/LuaParser.h"/>
       </GROUP>
@@ -744,10 +677,12 @@
                JUCE_WEB_BROWSER="0"/>
   <EXPORTFORMATS>
     <LINUX_MAKE targetFolder="Builds/osci-render/LinuxMakefile" smallIcon="pSc1mq"
-                bigIcon="pSc1mq">
+                bigIcon="pSc1mq" externalLibraries="luajit">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render"/>
-        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" headerPath="../../../modules/LuaJIT/src"
+                       libraryPath="../../../modules/LuaJIT/src"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render" headerPath="../../../modules/LuaJIT/src"
+                       libraryPath="../../../modules/LuaJIT/src"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
@@ -780,11 +715,15 @@
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/osci-render/VisualStudio2022" smallIcon="pSc1mq"
             bigIcon="pSc1mq" extraCompilerFlags="/wd4005 /wd4244 /wd4305 /wd4584"
-            extraLinkerFlags="/IGNORE:4006">
+            extraLinkerFlags="/IGNORE:4006" externalLibraries="luajit51.lib">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" winWarningLevel="2"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" winWarningLevel="2"
+                       libraryPath="..\..\..\modules\LuaJIT\src" headerPath="..\..\..\modules\LuaJIT\src"
+                       prebuildCommand="call ..\..\..\luajit_win.bat"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="osci-render" alwaysGenerateDebugSymbols="1"
-                       debugInformationFormat="ProgramDatabase" winWarningLevel="2"/>
+                       debugInformationFormat="ProgramDatabase" winWarningLevel="2"
+                       libraryPath="..\..\..\modules\LuaJIT\src" headerPath="..\..\..\modules\LuaJIT\src"
+                       prebuildCommand="call ..\..\..\luajit_win.bat" enablePluginBinaryCopyStep="0"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
@@ -820,14 +759,17 @@
                bigIcon="aZXbCi" applicationCategory="public.app-category.music"
                microphonePermissionNeeded="1" frameworkSearchPaths="/Library/Frameworks"
                extraCustomFrameworks="/Library/Frameworks/Syphon.framework"
-               hardenedRuntime="1" hardenedRuntimeOptions="com.apple.security.cs.disable-library-validation,com.apple.security.device.audio-input"
-               iosDevelopmentTeamID="D86A3M3H2L">
+               hardenedRuntime="1" hardenedRuntimeOptions="com.apple.security.cs.allow-jit,com.apple.security.cs.disable-library-validation,com.apple.security.device.audio-input"
+               externalLibraries="luajit" iosDevelopmentTeamID="D86A3M3H2L">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
+                       headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
         <CONFIGURATION name="Release" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO,OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
+                       headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
         <CONFIGURATION name="Release (Development)" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
+                       headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
