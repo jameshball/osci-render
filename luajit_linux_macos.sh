@@ -14,7 +14,7 @@ if [[ "$OSTYPE" == *"darwin"* ]]; then
     MACOSX_DEPLOYMENT_TARGET=10.13 \
     CC="clang -arch x86_64" \
     XCFLAGS="-DLUAJIT_ENABLE_GC64" \
-    || exit 1
+    || exit 2
 
   mv libluajit.a libluajit_x86_64.a
   make clean
@@ -25,7 +25,7 @@ if [[ "$OSTYPE" == *"darwin"* ]]; then
     MACOSX_DEPLOYMENT_TARGET=10.13 \
     CC="clang -arch arm64" \
     XCFLAGS="-DLUAJIT_ENABLE_GC64" \
-    || exit 1
+    || exit 3
 
   mv libluajit.a libluajit_arm64.a
   
