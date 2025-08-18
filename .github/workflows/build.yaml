@@ -67,7 +67,7 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest
-
+          
       - name: Import application certificates
         uses: apple-actions/import-codesign-certs@v3
         with:
