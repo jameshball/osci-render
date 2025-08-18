@@ -10,6 +10,7 @@
 #include "PerspectiveComponent.h"
 #include "PluginProcessor.h"
 #include "TxtComponent.h"
+#include "components/ExampleFilesGridComponent.h"
 
 class OscirenderAudioProcessorEditor;
 class SettingsComponent : public juce::Component {
@@ -21,6 +22,8 @@ public:
     void update();
     void mouseMove(const juce::MouseEvent& event) override;
     void mouseDown(const juce::MouseEvent& event) override;
+    // Show or hide the example files grid panel on the right-hand side
+    void showExamples(bool shouldShow);
 
 private:
     OscirenderAudioProcessor& audioProcessor;
@@ -32,6 +35,9 @@ private:
     FrameSettingsComponent frame{audioProcessor, pluginEditor};
     EffectsComponent effects{audioProcessor, pluginEditor};
     MidiComponent midi{audioProcessor, pluginEditor};
+    ExampleFilesGridComponent examples{audioProcessor};
+
+    bool examplesVisible = false;
 
     juce::StretchableLayoutManager midiLayout;
     juce::StretchableLayoutResizerBar midiResizerBar{&midiLayout, 1, false};

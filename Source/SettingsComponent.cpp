@@ -11,6 +11,15 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     addAndMakeVisible(midi);
     addChildComponent(txt);
     addChildComponent(frame);
+    addChildComponent(examples);
+
+    examples.onClosed = [this]() {
+        showExamples(false);
+    };
+    examples.onExampleOpened = [this](const juce::String& fileName, bool shouldOpenEditor) {
+        pluginEditor.addCodeEditor(audioProcessor.getCurrentFileIndex());
+        pluginEditor.fileUpdated(fileName, shouldOpenEditor);
+    };
 
     double midiLayoutPreferredSize = std::any_cast<double>(audioProcessor.getProperty("midiLayoutPreferredSize", pluginEditor.CLOSED_PREF_SIZE));
     double mainLayoutPreferredSize = std::any_cast<double>(audioProcessor.getProperty("mainLayoutPreferredSize", -0.5));
@@ -63,10 +72,22 @@ void SettingsComponent::resized() {
         dummyBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
     }
 
-    perspective.setBounds(dummyBounds.removeFromBottom(120));
-    dummyBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
-
-    effects.setBounds(dummyBounds);
+    if (examplesVisible) {
+        // Hide other panels while examples are visible
+        perspective.setVisible(false);
+        effects.setVisible(false);
+        txt.setVisible(false);
+        frame.setVisible(false);
+        examples.setVisible(true);
+        examples.setBounds(dummyBounds);
+    } else {
+        examples.setVisible(false);
+        perspective.setVisible(true);
+        effects.setVisible(true);
+        perspective.setBounds(dummyBounds.removeFromBottom(120));
+        dummyBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
+        effects.setBounds(dummyBounds);
+    }
 
     if (isVisible() && getWidth() > 0 && getHeight() > 0) {
         audioProcessor.setProperty("midiLayoutPreferredSize", midiLayout.getItemCurrentRelativeSize(2));
@@ -126,6 +147,11 @@ void SettingsComponent::mouseMove(const juce::MouseEvent& event) {
         }
     }
     setMouseCursor(juce::MouseCursor::NormalCursor);
+}
+
+void SettingsComponent::showExamples(bool shouldShow) {
+    examplesVisible = shouldShow;
+    resized();
 }
 
 void SettingsComponent::mouseDown(const juce::MouseEvent& event) {

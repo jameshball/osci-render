@@ -12,6 +12,12 @@ MainComponent::MainComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
     addAndMakeVisible(fileButton);
     fileButton.setButtonText("Choose File(s)");
 
+    // Show Examples panel
+    addAndMakeVisible(showExamplesButton);
+    showExamplesButton.onClick = [this] {
+        pluginEditor.settings.showExamples(true);
+    };
+
     fileButton.onClick = [this] {
         juce::String fileFormats;
         for (auto& ext : audioProcessor.FILE_EXTENSIONS) {
@@ -197,6 +203,8 @@ void MainComponent::resized() {
 
     auto row = bounds.removeFromTop(buttonHeight);
     fileButton.setBounds(row.removeFromLeft(buttonWidth));
+    row.removeFromLeft(rowPadding);
+    showExamplesButton.setBounds(row.removeFromLeft(buttonWidth));
     row.removeFromLeft(rowPadding);
     inputEnabled.setBounds(row.removeFromLeft(20));
     row.removeFromLeft(rowPadding);

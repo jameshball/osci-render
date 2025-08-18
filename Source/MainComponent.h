@@ -38,6 +38,7 @@ private:
 	juce::TextEditor fileName;
 	juce::ComboBox fileType;
 	juce::TextButton createFile{"Create File"};
+	juce::TextButton showExamplesButton{"Examples"};
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };
