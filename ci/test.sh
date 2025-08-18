@@ -36,7 +36,7 @@ if [ "$OS" = "win" ]; then
   echo $MSBUILD_EXE
 
   cd "$ROOT/Builds/Test/VisualStudio2022"
-  "$MSBUILD_EXE" "//m" "$PLUGIN.sln" "//p:MultiProcessorCompilation=true" "//p:VisualStudioVersion=16.0" "//m" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64"
+  "$MSBUILD_EXE" "//m" "$PLUGIN.sln" "//p:MultiProcessorCompilation=true" "//p:CL_MPCount=32"  "//p:VisualStudioVersion=16.0" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64"
   
   cd "x64/Release/ConsoleApp"
   echo "Running the test"
