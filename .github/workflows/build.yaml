@@ -52,6 +52,8 @@ jobs:
             version: free
           - project: osci-render
             version: premium
+          - project: sosci
+            version: premium
     steps:
       - name: Fix up git URLs
         run: echo -e '[url "https://github.com/"]\n  insteadOf = "git@github.com:"' >> ~/.gitconfig
@@ -65,11 +67,29 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest
+          
+      - name: Import application certificates
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          keychain: oscirender
+          keychain-password: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
+          p12-file-base64: ${{ secrets.APPLE_APPLICATION_CERTIFICATE }}
+          p12-password: ${{ secrets.APPLE_APPLICATION_CERTIFICATE_PASSWORD }}
+
+      - name: Import installer certificates
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          keychain: oscirender
+          keychain-password: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
+          p12-file-base64: ${{ secrets.APPLE_INSTALLER_CERTIFICATE }}
+          p12-password: ${{ secrets.APPLE_INSTALLER_CERTIFICATE_PASSWORD }}
+          create-keychain: false
 
       - name: "Run script"
         run: |
           export OS="mac"
           source ./ci/setup-env.sh
+          source ./ci/test.sh
           source ./ci/build.sh "${{ matrix.project }}" "${{ matrix.version }}"
         shell: bash
 
