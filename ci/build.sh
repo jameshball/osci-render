@@ -47,7 +47,7 @@ if [ "$OS" = "win" ]; then
   eval "$($(cygpath "$COMSPEC") /c$(cygpath -w "$ROOT/ci/vcvars_export.bat"))"
 
   cd "$ROOT/Builds/$PLUGIN/VisualStudio2022"
-  msbuild.exe "//m" "$PLUGIN.sln" "//p:VisualStudioVersion=16.0" "//p:MultiProcessorCompilation=true" "//p:CL_MPCount=16" "/p:BuildInParallel=true" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64" "//restore" "//p:RestorePackagesConfig=true"
+  msbuild.exe "//m" "$PLUGIN.sln" "//p:VisualStudioVersion=16.0" "//p:MultiProcessorCompilation=true" "//p:CL_MPCount=16" "//p:BuildInParallel=true" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64" "//restore" "//p:RestorePackagesConfig=true"
   cp "$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Release/Standalone Plugin/$PLUGIN.pdb" "$ROOT/bin/$OUTPUT_NAME.pdb"
 fi
 
