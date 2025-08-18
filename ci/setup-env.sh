@@ -31,7 +31,7 @@ fi
 
 curl -s -S -L "https://api.juce.com/api/v1/download/juce/latest/$PROJUCER_OS" -o Projucer.zip
 # curl -s -S -L "https://github.com/juce-framework/JUCE/releases/download/8.0.4/juce-8.0.4-$PROJUCER_OS.zip" -o Projucer.zip
-unzip Projucer.zip
+unzip -q Projucer.zip
 
 # Set Projucer path based on OS
 if [ "$OS" = "mac" ]; then
