@@ -22,13 +22,13 @@ eval "$RESAVE_COMMAND"
 # Build mac version
 if [ "$OS" = "mac" ]; then
   cd "$ROOT/Builds/$PLUGIN/MacOSX"
-  xcodebuild -configuration Release || exit 1
+  xcodebuild -configuration Release -parallelizeTargets -jobs $(sysctl -n hw.logicalcpu) || exit 1
 fi
 
 # Build linux version
 if [ "$OS" = "linux" ]; then
   cd "$ROOT/Builds/$PLUGIN/LinuxMakefile"
-  make CONFIG=Release
+  make -J$(nproc) CONFIG=Release
 
   cp -r ./build/$PLUGIN.vst3 "$ROOT/ci/bin/$PLUGIN.vst3"
   cp -r ./build/$PLUGIN "$ROOT/ci/bin/$PLUGIN"
@@ -47,7 +47,7 @@ if [ "$OS" = "win" ]; then
   eval "$($(cygpath "$COMSPEC") /c$(cygpath -w "$ROOT/ci/vcvars_export.bat"))"
 
   cd "$ROOT/Builds/$PLUGIN/VisualStudio2022"
-  msbuild.exe "$PLUGIN.sln" "//p:VisualStudioVersion=16.0" "//m" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64" "//restore" "//p:RestorePackagesConfig=true"
+  msbuild.exe "$PLUGIN.sln" "//p:VisualStudioVersion=16.0" "//m" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64" "//restore" "//p:RestorePackagesConfig=true" -maxcpucount
   cp "$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Release/Standalone Plugin/$PLUGIN.pdb" "$ROOT/bin/$OUTPUT_NAME.pdb"
 fi
 
