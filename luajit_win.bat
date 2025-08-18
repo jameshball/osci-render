@@ -10,12 +10,13 @@ if /I "%VSTEL_MSBuildProjectFullPath:~-18%" neq "SharedCode.vcxproj" (
 )
 
 cd ..\..\..\modules\LuaJIT\src
-.\msvcbuild.bat static
+call .\msvcbuild.bat static
+copy /b lua51.lib luajit51.lib
 goto finish_luajit
 
 :error_luajit
 
-timeout /T 10
+timeout 10
 
 :finish_luajit
 @echo on
