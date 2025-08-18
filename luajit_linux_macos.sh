@@ -8,24 +8,27 @@ cd "$DIR/modules/LuaJIT/src" || exit 1
 if [[ "$OSTYPE" == *"darwin"* ]]; then
   echo "Building LuaJIT universal binary (x86_64 + arm64)..."
   
-  # Build x86_64
+  make clean
+  
+  export MACOSX_DEPLOYMENT_TARGET=10.13
+  
+  # build x86_64
   make -j$(sysctl -n hw.logicalcpu) \
+    LUAJIT_T=luajit-x86_64 \
     BUILDMODE=static \
-    MACOSX_DEPLOYMENT_TARGET=10.13 \
-    CC="clang -arch x86_64" \
-    XCFLAGS="-DLUAJIT_ENABLE_GC64" \
-    || exit 2
-
+    CC='clang -target x86_64-apple-macos' \
+	|| exit 2
+	
   mv libluajit.a libluajit_x86_64.a
+  
   make clean
   
   # Build arm64
   make -j$(sysctl -n hw.logicalcpu) \
+    LUAJIT_T=luajit-arm64 \
     BUILDMODE=static \
-    MACOSX_DEPLOYMENT_TARGET=10.13 \
-    CC="clang -arch arm64" \
-    XCFLAGS="-DLUAJIT_ENABLE_GC64" \
-    || exit 3
+    CC='clang -target arm64-apple-macos' \
+	|| exit 3
 
   mv libluajit.a libluajit_arm64.a
   
