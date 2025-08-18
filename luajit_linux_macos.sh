@@ -3,7 +3,7 @@
 # Run this if you're on Linux or macOS and you haven't already built LuaJIT.
 # If you don't, osci-render won't compile.
 
-cd "$ROOT/modules/LuaJIT/src" || exit 1
+cd "../../../modules/LuaJIT/src" || exit 1
 
 if [[ "$OSTYPE" == *"darwin"* ]]; then
   echo "Building LuaJIT universal binary (x86_64 + arm64)..."
