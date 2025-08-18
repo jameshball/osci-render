@@ -68,23 +68,6 @@ jobs:
         with:
           xcode-version: latest
 
-      - name: Import application certificates
-        uses: apple-actions/import-codesign-certs@v3
-        with:
-          keychain: oscirender
-          keychain-password: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
-          p12-file-base64: ${{ secrets.APPLE_APPLICATION_CERTIFICATE }}
-          p12-password: ${{ secrets.APPLE_APPLICATION_CERTIFICATE_PASSWORD }}
-
-      - name: Import installer certificates
-        uses: apple-actions/import-codesign-certs@v3
-        with:
-          keychain: oscirender
-          keychain-password: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
-          p12-file-base64: ${{ secrets.APPLE_INSTALLER_CERTIFICATE }}
-          p12-password: ${{ secrets.APPLE_INSTALLER_CERTIFICATE_PASSWORD }}
-          create-keychain: false
-
       - name: "Run script"
         run: |
           export OS="mac"
