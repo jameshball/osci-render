@@ -3,9 +3,9 @@
 # Run this if you're on Linux or macOS and you haven't already built LuaJIT.
 # If you don't, osci-render won't compile.
 
-cd "$DIR/modules/LuaJIT/src" || exit 1
+cd "$ROOT/modules/LuaJIT/src" || exit 1
 
-if [[ "$OSTYPE" == "darwin"* ]]; then
+if [[ "$OSTYPE" == *"darwin"* ]]; then
   echo "Building LuaJIT universal binary (x86_64 + arm64)..."
   
   # Build x86_64
@@ -31,7 +31,7 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
   
   # Merge into fat binary
   lipo -create -output libluajit.a libluajit_x86_64.a libluajit_arm64.a
-  echo "✅ Universal libluajit.a created."
+  echo "Universal libluajit.a created."
   
 else
   echo "Building LuaJIT for Linux..."
