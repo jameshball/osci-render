@@ -20,7 +20,7 @@ fi
 # Build linux version
 if [ "$OS" = "linux" ]; then
   cd "$ROOT/Builds/Test/LinuxMakefile"
-  make -J$(nproc) CONFIG=Release
+  make -j$(nproc) CONFIG=Release
 
   cd build
   echo "Running the test"
@@ -36,7 +36,7 @@ if [ "$OS" = "win" ]; then
   echo $MSBUILD_EXE
 
   cd "$ROOT/Builds/Test/VisualStudio2022"
-  "$MSBUILD_EXE" "$PLUGIN.sln" "//p:VisualStudioVersion=16.0" "//m" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64" -maxcpucount
+  "$MSBUILD_EXE" "//m" "$PLUGIN.sln" "//p:MultiProcessorCompilation=true" "//p:VisualStudioVersion=16.0" "//m" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64"
   
   cd "x64/Release/ConsoleApp"
   echo "Running the test"

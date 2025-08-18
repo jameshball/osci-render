@@ -28,7 +28,7 @@ fi
 # Build linux version
 if [ "$OS" = "linux" ]; then
   cd "$ROOT/Builds/$PLUGIN/LinuxMakefile"
-  make -J$(nproc) CONFIG=Release
+  make -j$(nproc) CONFIG=Release
 
   cp -r ./build/$PLUGIN.vst3 "$ROOT/ci/bin/$PLUGIN.vst3"
   cp -r ./build/$PLUGIN "$ROOT/ci/bin/$PLUGIN"
@@ -47,7 +47,7 @@ if [ "$OS" = "win" ]; then
   eval "$($(cygpath "$COMSPEC") /c$(cygpath -w "$ROOT/ci/vcvars_export.bat"))"
 
   cd "$ROOT/Builds/$PLUGIN/VisualStudio2022"
-  msbuild.exe "$PLUGIN.sln" "//p:VisualStudioVersion=16.0" "//m" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64" "//restore" "//p:RestorePackagesConfig=true" -maxcpucount
+  msbuild.exe "//m" "$PLUGIN.sln" "//p:VisualStudioVersion=16.0" "//p:MultiProcessorCompilation=true" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64" "//restore" "//p:RestorePackagesConfig=true"
   cp "$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Release/Standalone Plugin/$PLUGIN.pdb" "$ROOT/bin/$OUTPUT_NAME.pdb"
 fi
 
