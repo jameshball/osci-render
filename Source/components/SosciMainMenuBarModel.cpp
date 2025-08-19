@@ -8,10 +8,13 @@ SosciMainMenuBarModel::SosciMainMenuBarModel(SosciPluginEditor& e, SosciAudioPro
 }
 
 void SosciMainMenuBarModel::resetMenuItems() {
+    MainMenuBarModel::resetMenuItems();
+
     addTopLevelMenu("File");
     addTopLevelMenu("About");
     addTopLevelMenu("Video");
     addTopLevelMenu("Audio");
+    addTopLevelMenu("Interface");
 
     std::vector<std::tuple<juce::String, const void*, int>> examples = {
         {"default.sosci", BinaryData::default_sosci, BinaryData::default_sosciSize},
@@ -111,8 +114,7 @@ void SosciMainMenuBarModel::resetMenuItems() {
     }
 
     // Interface menu index depends on whether Audio menu exists
-    int interfaceMenuIndex = (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) ? 4 : 3;
-    addToggleMenuItem(interfaceMenuIndex, "Listen for Special Keys", [this] {
+    addToggleMenuItem(4, "Listen for Special Keys", [this] {
         processor.setAcceptsKeys(! processor.getAcceptsKeys());
         resetMenuItems();
     }, [this] { return processor.getAcceptsKeys(); });
