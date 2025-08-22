@@ -10,3 +10,4 @@
 [submodule "LuaJIT"]
 	path = modules/LuaJIT
 	url = https://luajit.org/git/luajit.git
+	ignore = untracked
