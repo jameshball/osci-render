@@ -3,8 +3,10 @@
 #include <JuceHeader.h>
 #include "../PluginProcessor.h"
 #include "GridComponent.h"
+#include "SvgButton.h"
+#include "ScrollFadeViewport.h"
 
-// A grid-based browser for example files grouped by category
+// A grid-based browser for opening files: includes examples by category and a generic file chooser
 class ExampleFilesGridComponent : public juce::Component
 {
 public:
@@ -22,9 +24,19 @@ public:
 private:
     OscirenderAudioProcessor& audioProcessor;
 
-    // Top bar
-    juce::Label title { {}, "Examples" };
-    juce::TextButton closeButton { "Close" };
+    // Outer chrome and scrolling
+    juce::GroupComponent group { {}, "Open Files" };
+    ScrollFadeViewport viewport;        // Outer scroll container for entire examples panel
+    juce::Component content;        // Holds all headings + category grids
+
+    // Close icon overlayed in the group header
+    SvgButton closeButton { "closeExamples",
+        juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize),
+        juce::Colours::white, juce::Colours::white };
+
+    // Choose files button (moved from MainComponent)
+    juce::TextButton chooseFilesButton { "Choose File(s)" };
+    std::unique_ptr<juce::FileChooser> chooser;
 
     // Categories
     struct CategoryViews {
@@ -43,6 +55,8 @@ private:
     void addExample(CategoryViews& cat, const juce::String& fileName, const char* data, int size);
     void populate();
     void styleHeading(juce::Label& l);
+    void openFileChooser();
+    static bool shouldOpenEditorFor(const juce::String& fileName) { return fileName.endsWithIgnoreCase(".lua") || fileName.endsWithIgnoreCase(".txt"); }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ExampleFilesGridComponent)
 };

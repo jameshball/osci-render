@@ -2,13 +2,10 @@
 
 GridComponent::GridComponent()
 {
-    // Setup scrollable viewport and content
+    // Default: use internal viewport
     addAndMakeVisible(viewport);
     viewport.setViewedComponent(&content, false);
     viewport.setScrollBarsShown(true, false); // vertical only
-    // Setup reusable bottom fade
-    initScrollFade(*this);
-    attachToViewport(viewport);
 }
 
 GridComponent::~GridComponent() = default;
@@ -33,15 +30,31 @@ void GridComponent::paint(juce::Graphics& g)
 void GridComponent::resized()
 {
     auto bounds = getLocalBounds();
-    viewport.setBounds(bounds);
-    auto contentArea = viewport.getLocalBounds();
-    // Lock content width to viewport width to avoid horizontal scrolling
-    content.setSize(contentArea.getWidth(), content.getHeight());
+    juce::Rectangle<int> contentArea;
+    if (useInternalViewport)
+    {
+        viewport.setBounds(bounds);
+    viewport.setFadeVisible(true);
+        contentArea = viewport.getLocalBounds();
+        // Lock content width to viewport width to avoid horizontal scrolling
+        content.setSize(contentArea.getWidth(), content.getHeight());
+    }
+    else
+    {
+        // No internal viewport: lay out content directly within our bounds
+    viewport.setBounds(0, 0, 0, 0);
+    viewport.setFadeVisible(false);
+        contentArea = bounds;
+        content.setBounds(contentArea);
+        content.setSize(contentArea.getWidth(), contentArea.getHeight());
+    }
 
     // Create FlexBox for responsive grid layout within content
     flexBox = juce::FlexBox();
     flexBox.flexWrap = juce::FlexBox::Wrap::wrap;
-    flexBox.justifyContent = juce::FlexBox::JustifyContent::spaceBetween;
+    flexBox.justifyContent = useCenteringPlaceholders
+        ? juce::FlexBox::JustifyContent::spaceBetween
+        : juce::FlexBox::JustifyContent::flexStart;
     flexBox.alignContent = juce::FlexBox::AlignContent::flexStart;
     flexBox.flexDirection = juce::FlexBox::Direction::row;
 
@@ -81,34 +94,47 @@ void GridComponent::resized()
         for (int c = 0; c < itemsPerRow; ++c)
             addItemFlex(items.getUnchecked(index++));
 
-    // Add last row centered with balanced placeholders
+    // Add last row; optionally centered with placeholders or left-aligned
     if (remainder > 0)
     {
-        const int missing = itemsPerRow - remainder;
-        const int leftPad = missing / 2;
-        const int rightPad = missing - leftPad;
+        if (useCenteringPlaceholders)
+        {
+            const int missing = itemsPerRow - remainder;
+            const int leftPad = missing / 2;
+            const int rightPad = missing - leftPad;
 
-        for (int i = 0; i < leftPad; ++i) addPlaceholder();
-        for (int i = 0; i < remainder; ++i) addItemFlex(items.getUnchecked(index++));
-        for (int i = 0; i < rightPad; ++i) addPlaceholder();
+            for (int i = 0; i < leftPad; ++i) addPlaceholder();
+            for (int i = 0; i < remainder; ++i) addItemFlex(items.getUnchecked(index++));
+            for (int i = 0; i < rightPad; ++i) addPlaceholder();
+        }
+        else
+        {
+            for (int i = 0; i < remainder; ++i) addItemFlex(items.getUnchecked(index++));
+        }
     }
 
     // Compute required content height
     const int requiredHeight = calculateRequiredHeight(viewW);
 
-    // If content is shorter than viewport, make content at least as tall as viewport
+    // If content is shorter than container, fill height; otherwise, set to required height
     int yOffset = 0;
-    if (requiredHeight < viewH) {
-        content.setSize(viewW, viewH);
-        yOffset = (viewH - requiredHeight) / 2;
-    } else {
-        content.setSize(viewW, requiredHeight);
+    if (useInternalViewport)
+    {
+        const int viewH = contentArea.getHeight();
+        if (requiredHeight < viewH) {
+            content.setSize(viewW, viewH);
+            yOffset = (viewH - requiredHeight) / 2;
+        } else {
+            content.setSize(viewW, requiredHeight);
+        }
+        // Layout items within content at the computed offset
+        flexBox.performLayout(juce::Rectangle<float>(0.0f, (float) yOffset, (float) viewW, (float) requiredHeight));
     }
-    // Layout items within content at the computed offset
-    flexBox.performLayout(juce::Rectangle<float>(0.0f, (float) yOffset, (float) viewW, (float) requiredHeight));
-
-    // Layout bottom scroll fade over the viewport area
-    layoutScrollFadeIfNeeded();
+    else
+    {
+        content.setSize(viewW, requiredHeight);
+        flexBox.performLayout(juce::Rectangle<float>(0.0f, 0.0f, (float) viewW, (float) requiredHeight));
+    }
 }
 
 int GridComponent::calculateRequiredHeight(int availableWidth) const
@@ -125,7 +151,26 @@ int GridComponent::calculateRequiredHeight(int availableWidth) const
     return numRows * 80; // ITEM_HEIGHT
 }
 
-void GridComponent::layoutScrollFadeIfNeeded()
+
+void GridComponent::setUseViewport(bool shouldUseViewport)
 {
-    layoutScrollFade(viewport.getBounds(), true, 48);
+    if (useInternalViewport == shouldUseViewport)
+        return;
+
+    useInternalViewport = shouldUseViewport;
+
+    if (useInternalViewport)
+    {
+        // Reattach content to viewport and attach fade listeners
+        if (viewport.getViewedComponent() != &content)
+            viewport.setViewedComponent(&content, false);
+    }
+    else
+    {
+    // Hide viewport and lay out items directly
+        viewport.setViewedComponent(nullptr, false);
+        if (content.getParentComponent() != this)
+            addAndMakeVisible(content);
+    }
+    resized();
 }

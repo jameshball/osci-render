@@ -10,3 +10,7 @@
 [submodule "Source/lua/lua"]
 	path = Source/lua/lua
 	url = ../../lua/lua.git
+[submodule "modules/melatonin_inspector"]
+	path = modules/melatonin_inspector
+	url = https://github.com/sudara/melatonin_inspector.git
+	branch = main

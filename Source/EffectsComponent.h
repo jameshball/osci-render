@@ -6,11 +6,11 @@
 #include "PluginProcessor.h"
 #include "components/DraggableListBox.h"
 #include "components/EffectsListComponent.h"
-#include "components/ScrollFadeMixin.h"
+#include "components/ScrollFadeViewport.h"
 #include "components/EffectTypeGridComponent.h"
 
 class OscirenderAudioProcessorEditor;
-class EffectsComponent : public juce::GroupComponent, public juce::ChangeListener, private ScrollFadeMixin {
+class EffectsComponent : public juce::GroupComponent, public juce::ChangeListener {
 public:
 	EffectsComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
 	~EffectsComponent() override;

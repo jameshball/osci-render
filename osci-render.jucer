@@ -75,6 +75,7 @@
         <FILE id="f2D5tv" name="pause.svg" compile="0" resource="1" file="Resources/svg/pause.svg"/>
         <FILE id="D2AI1b" name="pencil.svg" compile="0" resource="1" file="Resources/svg/pencil.svg"/>
         <FILE id="sfWuFd" name="play.svg" compile="0" resource="1" file="Resources/svg/play.svg"/>
+        <FILE id="FJG3Ht" name="plus.svg" compile="0" resource="1" file="Resources/svg/plus.svg"/>
         <FILE id="PFc2q2" name="random.svg" compile="0" resource="1" file="Resources/svg/random.svg"/>
         <FILE id="CE6di2" name="range.svg" compile="0" resource="1" file="Resources/svg/range.svg"/>
         <FILE id="n79IAy" name="record.svg" compile="0" resource="1" file="Resources/svg/record.svg"/>
@@ -200,6 +201,10 @@
               resource="0" file="Source/components/ExampleFilesGridComponent.cpp"/>
         <FILE id="K9EITe" name="ExampleFilesGridComponent.h" compile="0" resource="0"
               file="Source/components/ExampleFilesGridComponent.h"/>
+        <FILE id="oGIcdI" name="FileControlsComponent.cpp" compile="1" resource="0"
+              file="Source/components/FileControlsComponent.cpp"/>
+        <FILE id="uo7flZ" name="FileControlsComponent.h" compile="0" resource="0"
+              file="Source/components/FileControlsComponent.h"/>
         <FILE id="sqD2Zy" name="GridComponent.cpp" compile="1" resource="0"
               file="Source/components/GridComponent.cpp"/>
         <FILE id="QRwdXD" name="GridComponent.h" compile="0" resource="0" file="Source/components/GridComponent.h"/>
@@ -716,9 +721,6 @@
       <FILE id="X26RjJ" name="LuaComponent.cpp" compile="1" resource="0"
             file="Source/LuaComponent.cpp"/>
       <FILE id="g5xRHT" name="LuaComponent.h" compile="0" resource="0" file="Source/LuaComponent.h"/>
-      <FILE id="GKBQ8j" name="MainComponent.cpp" compile="1" resource="0"
-            file="Source/MainComponent.cpp"/>
-      <FILE id="RU8fGr" name="MainComponent.h" compile="0" resource="0" file="Source/MainComponent.h"/>
       <FILE id="cFVaxu" name="MathUtil.h" compile="0" resource="0" file="Source/MathUtil.h"/>
       <FILE id="eB92KJ" name="MidiComponent.cpp" compile="1" resource="0"
             file="Source/MidiComponent.cpp"/>
@@ -779,6 +781,7 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="chowdsp_gui" path="modules/chowdsp_utils/modules/gui"/>
+        <MODULEPATH id="melatonin_inspector" path="modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/osci-render/VisualStudio2022" smallIcon="pSc1mq"
@@ -816,6 +819,7 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="chowdsp_gui" path="modules/chowdsp_utils/modules/gui"/>
+        <MODULEPATH id="melatonin_inspector" path="modules"/>
       </MODULEPATHS>
     </VS2022>
     <XCODE_MAC targetFolder="Builds/osci-render/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak"
@@ -824,14 +828,14 @@
                microphonePermissionNeeded="1" frameworkSearchPaths="/Library/Frameworks"
                extraCustomFrameworks="/Library/Frameworks/Syphon.framework"
                hardenedRuntime="1" hardenedRuntimeOptions="com.apple.security.cs.disable-library-validation,com.apple.security.device.audio-input"
-               iosDevelopmentTeamID="D86A3M3H2L">
+               userNotes="D86A3M3H2L">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
-                       codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
+                       userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
         <CONFIGURATION name="Release" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO,OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
         <CONFIGURATION name="Release (Development)" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
-                       codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
+                       userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
@@ -860,6 +864,7 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="chowdsp_gui" path="modules/chowdsp_utils/modules/gui"/>
+        <MODULEPATH id="melatonin_inspector" path="modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
   </EXPORTFORMATS>
@@ -892,6 +897,7 @@
     <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_sharedtexture" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="melatonin_inspector" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>
 </JUCERPROJECT>
