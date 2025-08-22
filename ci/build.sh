@@ -22,13 +22,13 @@ eval "$RESAVE_COMMAND"
 # Build mac version
 if [ "$OS" = "mac" ]; then
   cd "$ROOT/Builds/$PLUGIN/MacOSX"
-  xcodebuild -configuration Release || exit 1
+  xcodebuild -configuration Release -parallelizeTargets -jobs $(sysctl -n hw.logicalcpu) || exit 1
 fi
 
 # Build linux version
 if [ "$OS" = "linux" ]; then
   cd "$ROOT/Builds/$PLUGIN/LinuxMakefile"
-  make CONFIG=Release
+  make -j$(nproc) CONFIG=Release
 
   cp -r ./build/$PLUGIN.vst3 "$ROOT/ci/bin/$PLUGIN.vst3"
   cp -r ./build/$PLUGIN "$ROOT/ci/bin/$PLUGIN"
@@ -44,11 +44,10 @@ fi
 if [ "$OS" = "win" ]; then
   VS_WHERE="C:/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
   
-  MSBUILD_EXE=$("$VS_WHERE" -latest -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\MSBuild.exe")
-  echo $MSBUILD_EXE
+  eval "$($(cygpath "$COMSPEC") /c$(cygpath -w "$ROOT/ci/vcvars_export.bat"))"
 
   cd "$ROOT/Builds/$PLUGIN/VisualStudio2022"
-  "$MSBUILD_EXE" "$PLUGIN.sln" "//p:VisualStudioVersion=16.0" "//m" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64" "//restore" "//p:RestorePackagesConfig=true"
+  msbuild.exe "//m" "$PLUGIN.sln" "//p:VisualStudioVersion=16.0" "//p:MultiProcessorCompilation=true" "//p:CL_MPCount=16" "//p:BuildInParallel=true" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64" "//restore" "//p:RestorePackagesConfig=true"
   cp "$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Release/Standalone Plugin/$PLUGIN.pdb" "$ROOT/bin/$OUTPUT_NAME.pdb"
 fi
 

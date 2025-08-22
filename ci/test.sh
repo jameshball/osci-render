@@ -9,7 +9,7 @@ eval "$RESAVE_COMMAND"
 # Build mac version
 if [ "$OS" = "mac" ]; then
   cd "$ROOT/Builds/Test/MacOSX"
-  xcodebuild -configuration Release || exit 1
+  xcodebuild -configuration Release -parallelizeTargets -jobs $(sysctl -n hw.logicalcpu) || exit 1
   cd "build/Release"
   find .
   echo "Running the test"
@@ -20,7 +20,7 @@ fi
 # Build linux version
 if [ "$OS" = "linux" ]; then
   cd "$ROOT/Builds/Test/LinuxMakefile"
-  make CONFIG=Release
+  make -j$(nproc) CONFIG=Release
 
   cd build
   echo "Running the test"
@@ -36,7 +36,7 @@ if [ "$OS" = "win" ]; then
   echo $MSBUILD_EXE
 
   cd "$ROOT/Builds/Test/VisualStudio2022"
-  "$MSBUILD_EXE" "$PLUGIN.sln" "//p:VisualStudioVersion=16.0" "//m" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64"
+  "$MSBUILD_EXE" "//m" "$PLUGIN.sln" "//p:MultiProcessorCompilation=true" "//p:CL_MPCount=32"  "//p:VisualStudioVersion=16.0" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64"
   
   cd "x64/Release/ConsoleApp"
   echo "Running the test"

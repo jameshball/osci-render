@@ -7,10 +7,11 @@
 [submodule "modules/osci_render_core"]
 	path = modules/osci_render_core
 	url = ../../jameshball/osci_render_core.git
-[submodule "Source/lua/lua"]
-	path = Source/lua/lua
-	url = ../../lua/lua.git
 [submodule "modules/melatonin_inspector"]
 	path = modules/melatonin_inspector
 	url = https://github.com/sudara/melatonin_inspector.git
 	branch = main
+[submodule "LuaJIT"]
+	path = modules/LuaJIT
+	url = https://luajit.org/git/luajit.git
+	ignore = untracked
