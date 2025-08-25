@@ -58,6 +58,9 @@ FileControlsComponent::FileControlsComponent(OscirenderAudioProcessor& p, Oscire
     addAndMakeVisible(fileLabel);
     fileLabel.setJustificationType(juce::Justification::centred);
     updateFileLabel();
+
+    addAndMakeVisible(fileNumberLabel);
+    fileNumberLabel.setJustificationType(juce::Justification::right);
 }
 
 void FileControlsComponent::paint(juce::Graphics& g)
@@ -80,10 +83,11 @@ void FileControlsComponent::resized()
     inputEnabled.setBounds(bounds.removeFromLeft(icon));
     bounds.removeFromLeft(gap);
 
+    // Always remove bounds to keep label consistently positioned
+    auto leftArea = bounds.removeFromLeft(icon);
+    bounds.removeFromLeft(gap);
     if (leftArrow.isVisible()) {
-        auto leftArea = bounds.removeFromLeft(icon);
         leftArrow.setBounds(leftArea.withSizeKeepingCentre(icon, icon));
-        bounds.removeFromLeft(gap);
     }
 
     if (openFileButton.isVisible()) {
@@ -97,12 +101,17 @@ void FileControlsComponent::resized()
         bounds.removeFromRight(gap);
     }
     
+    // Always remove bounds to keep label consistently positioned
+    auto rightArea = bounds.removeFromRight(icon);
+    bounds.removeFromRight(gap);
     if (rightArrow.isVisible()) {
-        auto rightArea = bounds.removeFromRight(icon);
         rightArrow.setBounds(rightArea.withSizeKeepingCentre(icon, icon));
-        bounds.removeFromRight(gap);
     }
 
+    if (fileNumberLabel.isVisible()) {
+        fileNumberLabel.setBounds(bounds.removeFromRight(45));
+    }
+    
     fileLabel.setBounds(bounds);
 }
 
@@ -117,6 +126,7 @@ void FileControlsComponent::updateFileLabel()
     closeFileButton.setVisible(fileOpen);
     leftArrow.setVisible(showLeftArrow);
     rightArrow.setVisible(showRightArrow);
+    fileNumberLabel.setVisible(showLeftArrow || showRightArrow);
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
     if (audioProcessor.syphonInputActive) {
@@ -130,6 +140,7 @@ void FileControlsComponent::updateFileLabel()
     } else if (audioProcessor.getCurrentFileIndex() == -1) {
         fileLabel.setText("No file open", juce::dontSendNotification);
     } else {
+        fileNumberLabel.setText(" (" + juce::String(audioProcessor.getCurrentFileIndex() + 1) + "/" + juce::String(audioProcessor.numFiles()) + ")", juce::dontSendNotification); 
         fileLabel.setText(audioProcessor.getCurrentFileName(), juce::dontSendNotification);
     }
 

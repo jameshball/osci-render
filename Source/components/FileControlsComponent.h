@@ -29,6 +29,7 @@ private:
     SvgButton closeFileButton{ "closeFile",  juce::String(BinaryData::delete_svg),       juce::Colours::red };
     SvgButton openFileButton { "openFiles", juce::String(BinaryData::plus_svg), juce::Colours::white, juce::Colours::white };
     juce::Label fileLabel;
+    juce::Label fileNumberLabel;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FileControlsComponent)
 };
