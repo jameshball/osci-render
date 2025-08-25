@@ -43,11 +43,11 @@ local vertices = {
     {0.9, -0.5, 0.0},    -- 20
     
     -- Left leg
-    {-0.2, -0.4, 0.0},   -- 21
+    {-0.2, -0.3, 0.0},   -- 21
     {-0.3, -1.0, 0.0},   -- 22
     
     -- Right leg
-    {0.2, -0.4, 0.0},    -- 23
+    {0.2, -0.3, 0.0},    -- 23
     {0.3, -1.0, 0.0}     -- 24
 }
 
@@ -79,6 +79,7 @@ local edge_phase = (railroad_switch % 1)
 
 local time = step/sample_rate * ANIMATION_SPEED
 local walk_cycle = math.sin(time * 2)
+local walk_off_cycle = math.cos(time * 2)
 
 if current_edge <= NUM_EDGES then
     local v1 = vertices[edges[current_edge][1]]
@@ -87,8 +88,6 @@ if current_edge <= NUM_EDGES then
     local x = v1[1] + (v2[1] - v1[1]) * edge_phase
     local y = v1[2] + (v2[2] - v1[2]) * edge_phase
     local z = v1[3] + (v2[3] - v1[3]) * edge_phase
-    
-    y = y + math.sin(time) * 0.05
 
     if edges[current_edge][1] == 18 or edges[current_edge][1] == 19 then
         z = z + walk_cycle * 0.05
@@ -100,10 +99,12 @@ if current_edge <= NUM_EDGES then
     
     if edges[current_edge][1] == 21 then
         z = z + walk_cycle * 0.15
+        y = y + math.sin(time * 2) * 0.1
     end
 
     if edges[current_edge][1] == 23 then
         z = z - walk_cycle * 0.15
+        y = y + math.cos(time * 2) * 0.1
     end
 
     if edges[current_edge][1] <= 8 then

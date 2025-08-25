@@ -179,6 +179,10 @@ void OpenFileComponent::populate()
 {
     addExample(textCat, "helloworld.txt", "Hello World", BinaryData::helloworld_txt, BinaryData::helloworld_txtSize, BinaryData::hello_svg, BinaryData::hello_svgSize);
     addExample(textCat, "greek.txt", "Greek", BinaryData::greek_txt, BinaryData::greek_txtSize, BinaryData::greek_svg, BinaryData::greek_svgSize);
+    addExample(textCat, "osci-render.txt", "osci-render", BinaryData::oscirender_txt, BinaryData::oscirender_txtSize, BinaryData::osci_svg, BinaryData::osci_svgSize);
+    addExample(textCat, "paperclip.txt", "Paperclip", BinaryData::paperclip_txt, BinaryData::paperclip_txtSize, BinaryData::greek_svg, BinaryData::greek_svgSize);
+    addExample(textCat, "sosci.txt", "sosci", BinaryData::sosci_txt, BinaryData::sosci_txtSize, BinaryData::greek_svg, BinaryData::greek_svgSize);
+    
 
     addExample(luaCat, "spiral.lua", "Spiral", BinaryData::spiral_lua, BinaryData::spiral_luaSize, BinaryData::swirl_svg, BinaryData::swirl_svgSize);
     addExample(luaCat, "shape_generator.lua", "Shape Generator", BinaryData::shape_generator_lua, BinaryData::shape_generator_luaSize, BinaryData::shapes_svg, BinaryData::shapes_svgSize);

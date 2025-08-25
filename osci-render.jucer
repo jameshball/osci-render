@@ -158,6 +158,9 @@
       <GROUP id="{F8A3D32C-4187-9A2F-5D78-040259957E9B}" name="text">
         <FILE id="N9Q6Zg" name="greek.txt" compile="0" resource="1" file="Resources/text/greek.txt"/>
         <FILE id="OABuJy" name="helloworld.txt" compile="0" resource="1" file="Resources/text/helloworld.txt"/>
+        <FILE id="TSOWpU" name="osci-render.txt" compile="0" resource="1" file="Resources/text/osci-render.txt"/>
+        <FILE id="CmwIW6" name="paperclip.txt" compile="0" resource="1" file="Resources/text/paperclip.txt"/>
+        <FILE id="utV7e3" name="sosci.txt" compile="0" resource="1" file="Resources/text/sosci.txt"/>
       </GROUP>
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
@@ -824,17 +827,17 @@
                microphonePermissionNeeded="1" frameworkSearchPaths="/Library/Frameworks"
                extraCustomFrameworks="/Library/Frameworks/Syphon.framework"
                hardenedRuntime="1" hardenedRuntimeOptions="com.apple.security.cs.allow-jit,com.apple.security.cs.allow-unsigned-executable-memory,com.apple.security.cs.disable-library-validation,com.apple.security.device.audio-input"
-               externalLibraries="luajit" iosDevelopmentTeamID="D86A3M3H2L">
+               externalLibraries="luajit" userNotes="D86A3M3H2L">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
                        headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
-                       codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
+                       userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
         <CONFIGURATION name="Release" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO,OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
                        headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
         <CONFIGURATION name="Release (Development)" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
                        headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
-                       codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
+                       userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
