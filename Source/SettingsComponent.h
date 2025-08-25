@@ -10,7 +10,7 @@
 #include "PerspectiveComponent.h"
 #include "PluginProcessor.h"
 #include "TxtComponent.h"
-#include "components/ExampleFilesGridComponent.h"
+#include "components/OpenFileComponent.h"
 #include "components/FileControlsComponent.h"
 
 class OscirenderAudioProcessorEditor;
@@ -40,7 +40,7 @@ private:
     FrameSettingsComponent frame{audioProcessor, pluginEditor};
     EffectsComponent effects{audioProcessor, pluginEditor};
     MidiComponent midi{audioProcessor, pluginEditor};
-    ExampleFilesGridComponent examples{audioProcessor};
+    OpenFileComponent examples{audioProcessor};
 
     bool examplesVisible = false;
 

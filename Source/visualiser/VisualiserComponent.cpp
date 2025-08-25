@@ -544,7 +544,12 @@ void VisualiserComponent::openGLContextClosing() {
 }
 
 void VisualiserComponent::paint(juce::Graphics &g) {
-    g.setColour(Colours::veryDark);
+    bool colourSpecified = isColourSpecified(buttonRowColourId);
+    auto buttonRowColour = Colours::veryDark;
+    if (colourSpecified) {
+        buttonRowColour = findColour(buttonRowColourId, true);
+    }
+    g.setColour(buttonRowColour);
     g.fillRect(buttonRow);
     if (!active) {
         // draw a translucent overlay

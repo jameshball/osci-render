@@ -55,6 +55,8 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
         repaint();
     });
 
+    pluginEditor.visualiser.setColour(VisualiserComponent::buttonRowColourId, juce::Colours::black);
+
     visualiserFullScreen->addListener(this);
 }
 
@@ -220,7 +222,7 @@ void SettingsComponent::showExamples(bool shouldShow) {
     examplesVisible = shouldShow;
     resized();
     if (examplesVisible) {
-        // Force layout so the ExampleFilesGridComponent sizes its viewport/content right away
+        // Force layout so the OpenFileComponent sizes its viewport/content right away
         examples.resized();
         examples.repaint();
     }

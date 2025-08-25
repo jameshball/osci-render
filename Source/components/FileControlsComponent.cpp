@@ -5,9 +5,9 @@ FileControlsComponent::FileControlsComponent(OscirenderAudioProcessor& p, Oscire
     : audioProcessor(p), pluginEditor(editor)
 {
     // Open Files panel button
-    addAndMakeVisible(openPanelButton);
-    openPanelButton.setTooltip("Open files and examples");
-    openPanelButton.onClick = [this] {
+    addAndMakeVisible(openFileButton);
+    openFileButton.setTooltip("Open files and examples");
+    openFileButton.onClick = [this] {
         pluginEditor.settings.showExamples(true);
     };
 
@@ -86,8 +86,8 @@ void FileControlsComponent::resized()
         bounds.removeFromLeft(gap);
     }
 
-    if (openPanelButton.isVisible()) {
-        openPanelButton.setBounds(bounds.removeFromRight(icon).withSizeKeepingCentre(icon, icon));
+    if (openFileButton.isVisible()) {
+        openFileButton.setBounds(bounds.removeFromRight(icon).withSizeKeepingCentre(icon, icon));
         bounds.removeFromRight(gap);
     }
 
@@ -108,11 +108,12 @@ void FileControlsComponent::resized()
 
 void FileControlsComponent::updateFileLabel()
 {
-    bool fileOpen = audioProcessor.getCurrentFileIndex() != -1 && !audioProcessor.objectServerRendering && !audioProcessor.inputEnabled->getBoolValue();
+    bool ableToOpenFiles = !audioProcessor.objectServerRendering && !audioProcessor.inputEnabled->getBoolValue();
+    bool fileOpen = audioProcessor.getCurrentFileIndex() != -1 && ableToOpenFiles;
     bool showLeftArrow  = audioProcessor.getCurrentFileIndex() > 0 && fileOpen;
     bool showRightArrow = audioProcessor.getCurrentFileIndex() < audioProcessor.numFiles() - 1 && fileOpen;
 
-    openPanelButton.setVisible(fileOpen);
+    openFileButton.setVisible(ableToOpenFiles);
     closeFileButton.setVisible(fileOpen);
     leftArrow.setVisible(showLeftArrow);
     rightArrow.setVisible(showRightArrow);

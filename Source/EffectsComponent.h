@@ -21,14 +21,12 @@ public:
 private:
 	OscirenderAudioProcessor& audioProcessor;
 
-	// juce::TextButton addBtn;
-
 	SvgButton randomiseButton{ "randomise", juce::String(BinaryData::random_svg), Colours::accentColor };
 
 	AudioEffectListBoxItemData itemData;
 	EffectsListBoxModel listBoxModel;
 	DraggableListBox listBox;
-	juce::TextButton addEffectButton { "+ Add new effect" }; // Separate button under the list
+	juce::TextButton addEffectButton { "Add new effect" }; // Separate button under the list
 	EffectTypeGridComponent grid { audioProcessor };
 	bool showingGrid = true; // show grid by default
 
