@@ -13,9 +13,7 @@ public:
     OpenFileComponent(OscirenderAudioProcessor& processor);
     ~OpenFileComponent() override = default;
 
-    void paint(juce::Graphics& g) override;
     void resized() override;
-    void visibilityChanged() override; // reset to chooser prompt each time shown
 
     // Called when the user closes the view
     std::function<void()> onClosed;
@@ -25,15 +23,9 @@ public:
 private:
     OscirenderAudioProcessor& audioProcessor;
 
-    enum class Mode { chooserPrompt, examples };
-    Mode mode { Mode::chooserPrompt };
-
     // Start screen buttons
     juce::TextButton startImportButton { "Import a File" };
-    juce::TextButton startExamplesButton { "Browse Examples" };
-
-    void enterExamplesMode();
-    void resetToChooserPrompt();
+    juce::Label chooseExampleLabel { "chooseExampleLabel", "or choose an example below" };
 
     // Outer chrome and scrolling (examples mode)
     juce::GroupComponent group { {}, "Open Files" };
@@ -47,14 +39,14 @@ private:
 
     // Categories
     struct CategoryViews {
-        juce::Label heading;
+        juce::GroupComponent group;
         GridComponent grid;
     };
 
-    CategoryViews textCat { juce::Label({}, "Text"), GridComponent{} };
-    CategoryViews luaCat { juce::Label({}, "Lua"), GridComponent{} };
-    CategoryViews modelsCat { juce::Label({}, "3D models"), GridComponent{} };
-    CategoryViews svgsCat { juce::Label({}, "SVGs"), GridComponent{} };
+    CategoryViews textCat { juce::GroupComponent({}, "Text"), GridComponent{} };
+    CategoryViews luaCat { juce::GroupComponent({}, "Lua"), GridComponent{} };
+    CategoryViews modelsCat { juce::GroupComponent({}, "3D models"), GridComponent{} };
+    CategoryViews svgsCat { juce::GroupComponent({}, "SVGs"), GridComponent{} };
 
     // Helpers
     // Adds an example resource to a category. Optionally you may supply a custom icon SVG string & size.
@@ -67,7 +59,6 @@ private:
                     const char* iconData = nullptr,
                     int iconSize = 0);
     void populate();
-    void styleHeading(juce::Label& l);
     void openFileChooser();
     static bool shouldOpenEditorFor(const juce::String& fileName) { return fileName.endsWithIgnoreCase(".lua") || fileName.endsWithIgnoreCase(".txt"); }
 

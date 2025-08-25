@@ -9,14 +9,15 @@ OpenFileComponent::OpenFileComponent(OscirenderAudioProcessor& processor)
     group.setText("Open Files");
 
     addAndMakeVisible(startImportButton);
-    addAndMakeVisible(startExamplesButton);
     startImportButton.onClick = [this]() { openFileChooser(); };
-    startExamplesButton.onClick = [this]() { enterExamplesMode(); };
     startImportButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor);
     startImportButton.setColour(juce::TextButton::textColourOffId, juce::Colours::black);
 
-    addChildComponent(viewport);
-    addChildComponent(closeButton);
+    addAndMakeVisible(chooseExampleLabel);
+    chooseExampleLabel.setJustificationType(juce::Justification::centredTop);
+
+    addAndMakeVisible(viewport);
+    addAndMakeVisible(closeButton);
 
     viewport.setViewedComponent(&content, false);
     viewport.setScrollBarsShown(true, false);
@@ -24,8 +25,8 @@ OpenFileComponent::OpenFileComponent(OscirenderAudioProcessor& processor)
     closeButton.onClick = [this]() { if (onClosed) onClosed(); };
 
     auto addCat = [this](CategoryViews& cat) {
-        styleHeading(cat.heading);
-        content.addAndMakeVisible(cat.heading);
+        cat.group.setColour(groupComponentBackgroundColourId, Colours::darker.darker(0.2));
+        content.addAndMakeVisible(cat.group);
         content.addAndMakeVisible(cat.grid);
         cat.grid.setUseViewport(false);
         cat.grid.setUseCenteringPlaceholders(false);
@@ -38,74 +39,10 @@ OpenFileComponent::OpenFileComponent(OscirenderAudioProcessor& processor)
     populate();
 }
 
-void OpenFileComponent::resetToChooserPrompt()
-{
-    mode = Mode::chooserPrompt;
-    startImportButton.setVisible(true);
-    startExamplesButton.setVisible(true);
-    viewport.setVisible(false);
-    closeButton.setVisible(false);
-    resized();
-    repaint();
-}
-
-void OpenFileComponent::visibilityChanged()
-{
-    if (isVisible())
-        resetToChooserPrompt();
-}
-
-void OpenFileComponent::enterExamplesMode()
-{
-    mode = Mode::examples;
-    startImportButton.setVisible(false);
-    startExamplesButton.setVisible(false);
-
-    viewport.setVisible(true);
-    closeButton.setVisible(true);
-    resized();
-}
-
-void OpenFileComponent::styleHeading(juce::Label& l)
-{
-    l.setInterceptsMouseClicks(false, false);
-    l.setJustificationType(juce::Justification::left);
-    l.setFont(juce::FontOptions(16.0f, juce::Font::bold));
-}
-
-void OpenFileComponent::paint(juce::Graphics& g)
-{
-    if (mode == Mode::chooserPrompt)
-    {
-        // Group draws frame; just title & maybe subtle instructions
-        auto bounds = group.getBounds().reduced(6);
-        g.setColour(juce::Colours::white.withAlpha(0.9f));
-        g.setFont(juce::Font(18.0f, juce::Font::bold));
-        g.drawFittedText("What would you like to do?", bounds.removeFromTop(40), juce::Justification::centredTop, 1);
-    }
-}
-
 void OpenFileComponent::resized()
 {
     auto bounds = getLocalBounds();
     group.setBounds(bounds);
-
-    if (mode == Mode::chooserPrompt)
-    {
-        const int headerH = 40; // space for title text
-        auto inner = bounds.reduced(16);
-        // Layout two centered buttons
-        const int buttonW = juce::jmin(220, inner.getWidth() - 40);
-        const int buttonH = 40;
-        const int gap = 20;
-        int totalH = headerH + buttonH * 2 + gap;
-        int yOrigin = (inner.getHeight() - totalH) / 2 + inner.getY();
-        int y = yOrigin + headerH;
-        int x = inner.getCentreX() - buttonW / 2;
-        startImportButton.setBounds(x, y, buttonW, buttonH);
-        startExamplesButton.setBounds(x, y + buttonH + gap, buttonW, buttonH);
-        return;
-    }
 
     // examples mode
     const int headerH = 30;
@@ -117,6 +54,13 @@ void OpenFileComponent::resized()
     closeButton.setBounds(rightArea.withSizeKeepingCentre(closeSize, closeSize));
 
     auto inner = groupBounds; // remaining after header
+
+    const int buttonWidth = juce::jmin(220, inner.getWidth() - 20);
+    const int buttonHeight = 40;
+
+    startImportButton.setBounds(inner.removeFromTop(60).withSizeKeepingCentre(buttonWidth, buttonHeight));
+    chooseExampleLabel.setBounds(inner.removeFromTop(30));
+
     viewport.setBounds(inner);
     viewport.setFadeVisible(true);
 
@@ -124,12 +68,16 @@ void OpenFileComponent::resized()
     int y = 0;
 
     auto layCat = [&](CategoryViews& cat) {
-        auto header = juce::Rectangle<int>(contentArea.getX(), contentArea.getY() + y, contentArea.getWidth(), 24);
-        cat.heading.setBounds(header.reduced(2));
-        y += 24;
         const int gridHeight = cat.grid.calculateRequiredHeight(contentArea.getWidth());
-        cat.grid.setBounds(contentArea.getX(), contentArea.getY() + y, contentArea.getWidth(), gridHeight);
-        y += gridHeight + 8;
+        const int headerHeight = 20;
+        const int padding = 10;
+
+        auto categoryBounds = juce::Rectangle<int>(contentArea.getX(), contentArea.getY() + y, contentArea.getWidth(), gridHeight + headerHeight + 3 * padding);
+        y += categoryBounds.getHeight();
+        categoryBounds.reduce(10, padding);
+
+        cat.group.setBounds(categoryBounds);
+        cat.grid.setBounds(categoryBounds.removeFromBottom(gridHeight));    
     };
     layCat(textCat);
     layCat(luaCat);

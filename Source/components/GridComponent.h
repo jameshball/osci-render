@@ -34,7 +34,7 @@ private:
     juce::FlexBox flexBox;
 
     static constexpr int ITEM_HEIGHT = 80;
-    static constexpr int MIN_ITEM_WIDTH = 180;
+    static constexpr int MIN_ITEM_WIDTH = 200;
 
     bool useCenteringPlaceholders { true };
     bool useInternalViewport { true };
