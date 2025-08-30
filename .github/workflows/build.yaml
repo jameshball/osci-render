@@ -106,7 +106,7 @@ jobs:
         run: |
           set -euo pipefail
           mega-login "$MEGA_USERNAME" "$MEGA_PASSWORD"
-          mega-mkdir -p "${{ steps.mega_path_early.outputs.FULL_PATH }}"
+          mega-mkdir -p "${{ steps.mega_path_early.outputs.FULL_PATH }}" || echo "mega-mkdir: folder exists (Linux)"
           mega-put -c bin/* "${{ steps.mega_path_early.outputs.FULL_PATH }}/" || mega-put -c bin "${{ steps.mega_path_early.outputs.FULL_PATH }}/"
           mega-logout --keep-session || true
 
@@ -130,7 +130,7 @@ jobs:
         run: |
           set -euo pipefail
           mega-login "$MEGA_USERNAME" "$MEGA_PASSWORD"
-          mega-mkdir -p "${{ steps.mega_path_early.outputs.FULL_PATH }}"
+          mega-mkdir -p "${{ steps.mega_path_early.outputs.FULL_PATH }}" || echo "mega-mkdir: folder exists (macOS)"
           mega-put -c bin/* "${{ steps.mega_path_early.outputs.FULL_PATH }}/" || mega-put -c bin "${{ steps.mega_path_early.outputs.FULL_PATH }}/"
           mega-logout --keep-session || true
 
@@ -141,8 +141,8 @@ jobs:
         run: |
           choco install megacmd -y --no-progress
           echo "$env:LOCALAPPDATA\MEGAcmd" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          Get-ChildItem "$env:LOCALAPPDATA\MEGAcmd" | Select-Object -First 10 | Format-List || Write-Host "Listing failed"
-          mega-version || Write-Host "megacmd version command not available yet"
+          try { Get-ChildItem "$env:LOCALAPPDATA\MEGAcmd" | Select-Object -First 10 | Format-List } catch { Write-Host "Listing failed: $($_.Exception.Message)" }
+          if (Get-Command mega-version -ErrorAction SilentlyContinue) { mega-version } else { Write-Host "megacmd version command not available yet" }
 
       - name: Upload dummy binaries to MEGA (Windows TEMP)
         if: env.EARLY_MEGA_TEST == 'true' && runner.os == 'Windows'
@@ -153,7 +153,7 @@ jobs:
         run: |
           set -e
           mega-login "$env:MEGA_USERNAME" "$env:MEGA_PASSWORD"
-          mega-mkdir -p "${{ steps.mega_path_early.outputs.FULL_PATH }}"
+          try { mega-mkdir -p "${{ steps.mega_path_early.outputs.FULL_PATH }}" } catch { Write-Host "Folder may already exist (Windows): $($_.Exception.Message)" }
           # Upload individual files to avoid nesting bin directory
           Get-ChildItem bin | ForEach-Object { mega-put -c $_.FullName "${{ steps.mega_path_early.outputs.FULL_PATH }}/" }
           mega-logout --keep-session
