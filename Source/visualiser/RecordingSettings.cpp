@@ -1,6 +1,5 @@
 #include "RecordingSettings.h"
 #include "VisualiserComponent.h"
-#include "../PluginEditor.h"
 
 
 RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {

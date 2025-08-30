@@ -62,7 +62,7 @@ public:
                     VERSION_HINT,
                     3.0,  // default
                     1.0,  // min
-                    10.0,  // max
+                    5.0,  // max
                     0.0001f, // step
                     osci::LfoType::Sine,
                     0.25f    // LFO frequency (Hz) – slow, visible rotation

@@ -64,6 +64,11 @@ public:
 
     std::atomic<bool> active = true;
 
+    enum ColourIds
+    {
+        buttonRowColourId          = 0x7205900,  /**< A colour to use to fill the button row. */
+    };
+
 private:
     CommonAudioProcessor& audioProcessor;
     CommonPluginEditor& editor;

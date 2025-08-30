@@ -149,7 +149,7 @@ public:
     std::atomic<double> animationFrame = 0.f;
 
     const double FONT_SIZE = 1.0f;
-    juce::Font font = juce::Font(juce::Font::getDefaultSansSerifFontName(), FONT_SIZE, juce::Font::plain);
+    juce::Font font = juce::Font(juce::Font::getDefaultMonospacedFontName(), FONT_SIZE, juce::Font::plain);
 
     ShapeSound::Ptr objectServerSound = new ShapeSound();
 

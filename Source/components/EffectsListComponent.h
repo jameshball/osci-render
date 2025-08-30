@@ -23,44 +23,47 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
     }
 
     void randomise() {
-        juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-        // Decide how many effects to select (1..5 or up to available)
-        int total = (int) audioProcessor.toggleableEffects.size();
-        int maxPick = juce::jmin(5, total);
-        int numPick = juce::jmax(1, juce::Random::getSystemRandom().nextInt({1, maxPick + 1}));
-
-        // Build indices [0..total)
-        std::vector<int> indices(total);
-        std::iota(indices.begin(), indices.end(), 0);
         std::random_device rd;
         std::mt19937 g(rd());
-        std::shuffle(indices.begin(), indices.end(), g);
-
-        // First, deselect and disable all
-        for (auto& effect : audioProcessor.toggleableEffects) {
-            effect->markSelectable(false);
-            effect->markEnableable(false);
-        }
-
-        // Pick numPick to select & enable, and randomise params
-        for (int k = 0; k < numPick && k < indices.size(); ++k) {
-            auto& effect = audioProcessor.toggleableEffects[indices[k]];
-            effect->markSelectable(true);
-            effect->markEnableable(true);
-
-            auto id = effect->getId().toLowerCase();
-            if (id.contains("scale") || id.contains("translate") || id.contains("trace")) {
-                continue;
+        
+        {
+            juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+            // Decide how many effects to select (1..5 or up to available)
+            int total = (int) audioProcessor.toggleableEffects.size();
+            int maxPick = juce::jmin(5, total);
+            int numPick = juce::jmax(1, juce::Random::getSystemRandom().nextInt({1, maxPick + 1}));
+            
+            // Build indices [0..total)
+            std::vector<int> indices(total);
+            std::iota(indices.begin(), indices.end(), 0);
+            std::shuffle(indices.begin(), indices.end(), g);
+            
+            // First, deselect and disable all
+            for (auto& effect : audioProcessor.toggleableEffects) {
+                effect->markSelectable(false);
+                effect->markEnableable(false);
             }
-
-            for (auto& parameter : effect->parameters) {
-                parameter->setValueNotifyingHost(juce::Random::getSystemRandom().nextFloat());
-                if (parameter->lfo != nullptr) {
-                    parameter->lfo->setUnnormalisedValueNotifyingHost((int) osci::LfoType::Static);
-                    parameter->lfoRate->setUnnormalisedValueNotifyingHost(1);
-                    if (juce::Random::getSystemRandom().nextFloat() > 0.8) {
-                        parameter->lfo->setUnnormalisedValueNotifyingHost((int)(juce::Random::getSystemRandom().nextFloat() * (int) osci::LfoType::Noise));
-                        parameter->lfoRate->setValueNotifyingHost(juce::Random::getSystemRandom().nextFloat() * 0.1);
+            
+            // Pick numPick to select & enable, and randomise params
+            for (int k = 0; k < numPick && k < indices.size(); ++k) {
+                auto& effect = audioProcessor.toggleableEffects[indices[k]];
+                effect->markSelectable(true);
+                effect->markEnableable(true);
+                
+                auto id = effect->getId().toLowerCase();
+                if (id.contains("scale") || id.contains("translate") || id.contains("trace")) {
+                    continue;
+                }
+                
+                for (auto& parameter : effect->parameters) {
+                    parameter->setValueNotifyingHost(juce::Random::getSystemRandom().nextFloat());
+                    if (parameter->lfo != nullptr) {
+                        parameter->lfo->setUnnormalisedValueNotifyingHost((int) osci::LfoType::Static);
+                        parameter->lfoRate->setUnnormalisedValueNotifyingHost(1);
+                        if (juce::Random::getSystemRandom().nextFloat() > 0.8) {
+                            parameter->lfo->setUnnormalisedValueNotifyingHost((int)(juce::Random::getSystemRandom().nextFloat() * (int) osci::LfoType::Noise));
+                            parameter->lfoRate->setValueNotifyingHost(juce::Random::getSystemRandom().nextFloat() * 0.1);
+                        }
                     }
                 }
             }
@@ -69,12 +72,15 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
         // Refresh local data with only selected effects
         resetData();
         
-        // shuffle precedence of the selected subset
-        std::shuffle(data.begin(), data.end(), g);
-        for (int i = 0; i < data.size(); i++) {
-            data[i]->setPrecedence(i);
+        {
+            juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+            // shuffle precedence of the selected subset
+            std::shuffle(data.begin(), data.end(), g);
+            for (int i = 0; i < data.size(); i++) {
+                data[i]->setPrecedence(i);
+            }
+            audioProcessor.updateEffectPrecedence();
         }
-        audioProcessor.updateEffectPrecedence();
     }
 
     void resetData() {

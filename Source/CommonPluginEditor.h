@@ -10,6 +10,10 @@
 #include "components/VolumeComponent.h"
 #include "components/DownloaderComponent.h"
 
+#if DEBUG
+    #include "melatonin_inspector/melatonin_inspector.h"
+#endif
+
 class CommonPluginEditor : public juce::AudioProcessorEditor {
 public:
     CommonPluginEditor(CommonAudioProcessor&, juce::String appName, juce::String projectFileType, int width, int height);
@@ -76,6 +80,10 @@ public:
 
 #if JUCE_LINUX
     juce::OpenGLContext openGlContext;
+#endif
+
+#if DEBUG
+    melatonin::Inspector inspector { *this, false };
 #endif
 
     bool keyPressed(const juce::KeyPress& key) override;

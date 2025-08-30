@@ -95,9 +95,6 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
         spacer->setSize(1, LIST_SPACER); // top padding
         listBox.setHeaderComponent(std::move(spacer));
     }
-    // Setup scroll fade mixin
-    initScrollFade(*this);
-    attachToListBox(listBox);
     // Wire "+ Add new effect" button below the list
     addEffectButton.onClick = [this]() {
         if (itemData.onAddNewEffectRequested) itemData.onAddNewEffectRequested();
@@ -112,6 +109,7 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
     } else {
         grid.setVisible(false);
         listBox.setVisible(true);
+        listBox.updateContent();
     }
 }
 
@@ -132,17 +130,18 @@ void EffectsComponent::resized() {
     area.removeFromTop(6);
     if (showingGrid) {
         grid.setBounds(area);
+        grid.setVisible(true);
         addEffectButton.setVisible(false);
-        // Hide fade when grid is shown
-        setScrollFadeVisible(false);
+        listBox.setVisible(false);
     } else {
         // Reserve space at bottom for the add button
         auto addBtnHeight = 44;
         auto listArea = area;
         auto buttonArea = listArea.removeFromBottom(addBtnHeight);
         listBox.setBounds(listArea);
-        // Layout bottom fade overlay; visible if list is scrollable
-        layoutScrollFade(listArea.withTrimmedTop(LIST_SPACER), true, 48);
+        listBox.setVisible(true);
+        grid.setVisible(false);
+        listBox.updateContent();
         addEffectButton.setVisible(true);
         addEffectButton.setBounds(buttonArea.reduced(0, 4));
     }
@@ -151,7 +150,4 @@ void EffectsComponent::resized() {
 void EffectsComponent::changeListenerCallback(juce::ChangeBroadcaster* source) {
     itemData.resetData();
     listBox.updateContent();
-    // Re-layout scroll fades after content changes
-    if (! showingGrid)
-        layoutScrollFade(listBox.getBounds().withTrimmedTop(LIST_SPACER), true, 48);
 }

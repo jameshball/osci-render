@@ -24,6 +24,7 @@
 */
 
 #include "VListBox.h"
+#include "ScrollFadeViewport.h"
 
 class VListBox::RowComponent : public juce::Component, public TooltipClient
 {
@@ -157,16 +158,21 @@ public:
 };
 
 //==============================================================================
-class VListBox::ListViewport : public juce::Viewport
+class VListBox::ListViewport : public ScrollFadeViewport
 {
 public:
     ListViewport (VListBox& lb) : owner (lb)
     {
         setWantsKeyboardFocus (false);
 
-        auto content = new juce::Component();
-        setViewedComponent (content);
+    auto content = new juce::Component();
+    setViewedComponent(content, false);
         content->setWantsKeyboardFocus (false);
+
+    // Enable scroll fades for list views by default
+    setFadeVisible(true);
+    setSidesEnabled(true, true);
+    setFadeHeight(48);
 
         updateAllRows();
     }
@@ -212,8 +218,10 @@ public:
         return -1;
     }
 
-    void visibleAreaChanged (const juce::Rectangle<int>&) override
+    void visibleAreaChanged (const juce::Rectangle<int>& newVisibleArea) override
     {
+        // Ensure scroll-fade overlay updates
+        ScrollFadeViewport::visibleAreaChanged(newVisibleArea);
         updateVisibleArea (true);
 
         if (auto* m = owner.getModel())
@@ -346,7 +354,7 @@ public:
             }
         }
 
-        return juce::Viewport::keyPressed (key);
+    return juce::Viewport::keyPressed (key);
     }
 
 private:

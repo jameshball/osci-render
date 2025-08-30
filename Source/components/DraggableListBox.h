@@ -108,15 +108,28 @@ public:
         const int count = modelData.getNumItems();
         if (count <= 0) return;
         insertIndex = juce::jlimit(0, count, insertIndex);
-        int toIndex = insertIndex;
-        if (toIndex > fromIndex) toIndex -= 1;
+        // Dropping at the very end (after last item) should move the item to the end.
+        if (insertIndex == count)
+        {
+            if (fromIndex != count - 1 && count > 1)
+                modelData.moveAfter(fromIndex, count - 1);
+            // Nothing to do if already last.
+            listBox.updateContent();
+            return;
+        }
 
-        if (count == 1 || fromIndex == toIndex) return;
+        // No-op if user drops item back in place (before itself) or immediately after itself.
+        if (insertIndex == fromIndex || insertIndex == fromIndex + 1)
+            return;
+
+        int toIndex = insertIndex;
+        if (toIndex > fromIndex)
+            toIndex -= 1; // account for removal shifting indices when moving down
 
         if (toIndex <= 0)
             modelData.moveBefore(fromIndex, 0);
-        else if (toIndex >= count)
-            modelData.moveAfter(fromIndex, count - 1);
+        else if (toIndex >= count - 1)
+            modelData.moveAfter(fromIndex, count - 1); // treat anything past last valid index as end
         else
             modelData.moveBefore(fromIndex, toIndex);
 
