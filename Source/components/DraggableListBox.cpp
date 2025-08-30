@@ -86,30 +86,16 @@ void DraggableListBoxItem::itemDropped(const juce::DragAndDropTarget::SourceDeta
     listBox.clearDropIndicator();
     if (DraggableListBoxItem* item = dynamic_cast<DraggableListBoxItem*>(dragSourceDetails.sourceComponent.get()))
     {
-        if (auto* vp = listBox.getViewport())
+        // Determine insertion index relative to whole list (not item local space)
+        auto ptGlobal = localPointToGlobal(dragSourceDetails.localPosition);
+        auto ptInLB = listBox.getLocalPoint(nullptr, ptGlobal);
+        int insertIndex = listBox.getInsertionIndexForPosition(ptInLB.x, ptInLB.y);
+        if (insertIndex < 0) insertIndex = 0; // allow header top
+
+        if (auto* m = dynamic_cast<DraggableListBoxModel*>(listBox.getModel()))
         {
-            // Compute the global insertion index using the list box, not the item local midpoint
-            auto ptInThis = dragSourceDetails.localPosition;
-            auto ptGlobal = localPointToGlobal(ptInThis);
-            auto ptInLB = listBox.getLocalPoint(nullptr, ptGlobal);
-            int insertIndex = listBox.getInsertionIndexForPosition(ptInLB.x, ptInLB.y);
-            insertIndex = juce::jlimit(0, modelData.getNumItems(), insertIndex);
-
-            // If dragging an item that appears before the insertion point and we're moving it down,
-            // account for the removal shifting indices.
-            const int fromIndex = item->rowNum;
-            int toIndex = insertIndex;
-            if (toIndex > fromIndex) toIndex -= 1;
-
-            if (toIndex < 0) toIndex = 0;
-            if (toIndex >= modelData.getNumItems())
-                modelData.moveAfter(fromIndex, modelData.getNumItems() - 1);
-            else if (toIndex <= 0)
-                modelData.moveBefore(fromIndex, 0);
-            else
-                modelData.moveBefore(fromIndex, toIndex);
+            m->moveByInsertIndex(item->rowNum, insertIndex);
         }
-        listBox.updateContent();
     }
 }
 
