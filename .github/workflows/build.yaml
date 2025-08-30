@@ -177,13 +177,19 @@ jobs:
           mega-logout
 
       # Combined MEGA upload (Windows)
-      - name: Upload binaries to MEGA (Windows)
+      - name: Install MEGAcmd (Windows)
         if: runner.os == 'Windows'
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           choco install megacmd -y --no-progress
           echo "$env:LOCALAPPDATA\MEGAcmd" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Upload binaries to MEGA (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
           mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}"
           $dest = "/${{ matrix.project }}/${{ steps.version.outputs.version }}"
           Get-ChildItem bin -File | ForEach-Object {
