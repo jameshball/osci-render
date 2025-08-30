@@ -67,10 +67,16 @@ jobs:
             echo "::error::Missing Jucer file $JUCER_FILE" >&2
             exit 1
           fi
-          # Use Python's XML parser for portability (grep -P not available on macOS/Windows)
-          PROJECT_VERSION=$(python3 -c "import xml.etree.ElementTree as ET,sys;\nroot=ET.parse('$JUCER_FILE').getroot();\nprint(root.attrib.get('version',''))" 2>/dev/null || true)
+          # Use dedicated Python helper script for consistent extraction
+          if ! command -v python3 >/dev/null 2>&1; then
+            echo "::error::python3 not found on runner" >&2
+            exit 1
+          fi
+          chmod +x ci/extract_version.py || true
+          PROJECT_VERSION=$(python3 ci/extract_version.py "$JUCER_FILE" || true)
           if [[ -z "$PROJECT_VERSION" ]]; then
-            echo "::error::Could not parse version from $JUCER_FILE" >&2
+            echo "::group::DEBUG JUCER FILE SNIPPET"; head -n15 "$JUCER_FILE"; echo "::endgroup::"
+            echo "::error::Could not parse version from $JUCER_FILE via python" >&2
             exit 1
           fi
           BASE="/osci-render"
