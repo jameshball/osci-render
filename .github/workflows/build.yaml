@@ -170,7 +170,12 @@ jobs:
             mega-put -c $_.FullName "${{ steps.mega_path_early.outputs.FULL_PATH }}/" | ForEach-Object { $_ }
             if ($LASTEXITCODE -ne 0) { Write-Error "Upload failed for $($_.FullName)" }
           }
-          mega-logout --keep-session || Write-Warning "mega-logout returned non-zero"
+          $logoutOutput = mega-logout --keep-session 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Warning "mega-logout returned non-zero: $logoutOutput"
+          } else {
+            Write-Host "mega-logout succeeded"
+          }
 
       - name: Early exit notice (TEMP)
         if: env.EARLY_MEGA_TEST == 'true'
