@@ -436,6 +436,7 @@ void LuaParser::setGlobalVariables(lua_State*& L, LuaVariables& vars) {
 	setGlobalVariable(L, "sample_rate", vars.sampleRate);
 	setGlobalVariable(L, "frequency", vars.frequency);
 	setGlobalVariable(L, "phase", vars.phase);
+    setGlobalVariable(L, "cycle_count", vars.cycle);
 
     for (int i = 0; i < NUM_SLIDERS; i++) {
 		setGlobalVariable(L, SLIDER_NAMES[i], vars.sliders[i]);
@@ -456,6 +457,7 @@ void LuaParser::incrementVars(LuaVariables& vars) {
     vars.phase += 2 * std::numbers::pi * vars.frequency / vars.sampleRate;
     if (vars.phase > 2 * std::numbers::pi) {
         vars.phase -= 2 * std::numbers::pi;
+        vars.cycle += 1;
     }
 }
 
