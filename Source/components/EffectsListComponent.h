@@ -187,8 +187,8 @@ public:
 
 protected:
     osci::Effect& effect;
-    ComponentListModel listModel;
-    juce::ListBox list;
+    ComponentListModel listModel { ROW_HEIGHT };
+    VListBox list;
     jux::SwitchButton enabled = { effect.enabled };
     SvgButton closeButton = SvgButton("closeEffect", juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize), juce::Colours::white, juce::Colours::white);
 private:

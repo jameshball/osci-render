@@ -38,20 +38,23 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
 
     toggleableEffects.push_back(BitCrushEffect().build());
     toggleableEffects.push_back(BulgeEffect().build());
-    toggleableEffects.push_back(MultiplexEffect().build());
-    toggleableEffects.push_back(KaleidoscopeEffect().build());
-    toggleableEffects.push_back(BounceEffect().build());
     toggleableEffects.push_back(VectorCancellingEffect().build());
     toggleableEffects.push_back(RippleEffectApp().build());
     toggleableEffects.push_back(RotateEffectApp().build());
     toggleableEffects.push_back(TranslateEffectApp().build());
     toggleableEffects.push_back(SwirlEffectApp().build());
     toggleableEffects.push_back(SmoothEffect().build());
-    toggleableEffects.push_back(TwistEffect().build());
     toggleableEffects.push_back(DelayEffect().build());
     toggleableEffects.push_back(DashedLineEffect(*this).build());
     toggleableEffects.push_back(TraceEffect(*this).build());
     toggleableEffects.push_back(WobbleEffect(*this).build());
+
+#if OSCI_PREMIUM
+    toggleableEffects.push_back(MultiplexEffect(*this).build());
+    toggleableEffects.push_back(KaleidoscopeEffect(*this).build());
+    toggleableEffects.push_back(BounceEffect().build());
+    toggleableEffects.push_back(TwistEffect().build());
+#endif
 
     auto scaleEffect = ScaleEffectApp().build();
     booleanParameters.push_back(scaleEffect->linked);

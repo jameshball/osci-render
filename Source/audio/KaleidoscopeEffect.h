@@ -8,11 +8,12 @@
 
 class KaleidoscopeEffect : public osci::EffectApplication {
 public:
-    osci::Point apply(int /*index*/, osci::Point input, const std::vector<std::atomic<double>>& values, double /*sampleRate*/) override {
+    explicit KaleidoscopeEffect(OscirenderAudioProcessor &p) : audioProcessor(p) {}
+
+    osci::Point apply(int /*index*/, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
         // values[0] = segments (can be fractional)
         // values[1] = phase (0-1) selecting which segment is currently being drawn
         double segments = juce::jmax(values[0].load(), 1.0); // ensure at least 1 segment
-        double phase = values.size() > 1 ? values[1].load() : 0.0;
 
         // Polar conversion
         double r = std::sqrt(input.x * input.x + input.y * input.y);
@@ -21,6 +22,8 @@ public:
 
         int fullSegments = (int)std::floor(segments);
         double fractionalPart = segments - fullSegments; // in [0,1)
+
+        phase = nextPhase(audioProcessor.frequency / (fullSegments + 1), sampleRate) / (2.0 * std::numbers::pi);
 
         // Use 'segments' for timing so partial segment gets proportionally shorter time.
         double currentSegmentFloat = phase * segments; // [0, segments)
@@ -53,7 +56,7 @@ public:
 
     std::shared_ptr<osci::Effect> build() const override {
         auto eff = std::make_shared<osci::Effect>(
-            std::make_shared<KaleidoscopeEffect>(),
+            std::make_shared<KaleidoscopeEffect>(audioProcessor),
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter(
                     "Kaleidoscope Segments",
@@ -67,22 +70,14 @@ public:
                     osci::LfoType::Sine,
                     0.25f    // LFO frequency (Hz) – slow, visible rotation
                 ),
-                new osci::EffectParameter(
-                    "Kaleidoscope Phase",
-                    "Selects which kaleidoscope segment is currently being drawn (time-multiplexed). Animate to sweep around the circle.",
-                    "kaleidoscopePhase",
-                    VERSION_HINT,
-                    0.0,   // default
-                    0.0,   // min
-                    1.0,   // max
-                    0.0001f, // step
-                    osci::LfoType::Sawtooth,
-                    55.0f    // LFO frequency (Hz) – slow, visible rotation
-                ),
             }
         );
         eff->setName("Kaleidoscope");
         eff->setIcon(BinaryData::kaleidoscope_svg);
         return eff;
     }
+
+private:
+    OscirenderAudioProcessor &audioProcessor;
+    double phase = 0.0;
 };

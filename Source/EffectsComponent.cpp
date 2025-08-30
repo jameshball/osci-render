@@ -130,18 +130,13 @@ void EffectsComponent::resized() {
     area.removeFromTop(6);
     if (showingGrid) {
         grid.setBounds(area);
-        grid.setVisible(true);
         addEffectButton.setVisible(false);
-        listBox.setVisible(false);
     } else {
         // Reserve space at bottom for the add button
         auto addBtnHeight = 44;
         auto listArea = area;
         auto buttonArea = listArea.removeFromBottom(addBtnHeight);
         listBox.setBounds(listArea);
-        listBox.setVisible(true);
-        grid.setVisible(false);
-        listBox.updateContent();
         addEffectButton.setVisible(true);
         addEffectButton.setBounds(buttonArea.reduced(0, 4));
     }

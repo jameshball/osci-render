@@ -41,7 +41,6 @@ effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
 
     list.setColour(effectComponentBackgroundColourId, juce::Colours::transparentBlack.withAlpha(0.2f));
     list.setModel(&listModel);
-    list.setRowHeight(ROW_HEIGHT);
     list.updateContent();
     addAndMakeVisible(list);
     addAndMakeVisible(enabled);
@@ -111,11 +110,9 @@ void EffectsListComponent::paintOverChildren(juce::Graphics& g) {
     g.setColour(juce::Colours::black.withAlpha(0.3f));
     auto bounds = list.getBounds();
     bounds.removeFromBottom(PADDING);
-    juce::Path path;
-    path.addRoundedRectangle(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), OscirenderLookAndFeel::RECT_RADIUS, OscirenderLookAndFeel::RECT_RADIUS, false, true, false, true);
     
     if (!enabled.getToggleState()) {
-        g.fillPath(path);
+        g.fillRect(bounds);
     }
 }
 
@@ -127,6 +124,7 @@ void EffectsListComponent::resized() {
     closeButton.setImageTransform(juce::AffineTransform::translation(0, -2));
     leftBar.removeFromLeft(20);
     enabled.setBounds(leftBar.withSizeKeepingCentre(30, 20));
+    // TODO: this is super slow
     list.setBounds(area);
 }
 
