@@ -1,7 +1,5 @@
 #include "VisualiserSettings.h"
 #include "VisualiserComponent.h"
-#include "../PluginEditor.h"
-
 
 VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels) : parameters(p), numChannels(numChannels) {
     addAndMakeVisible(lineColour);

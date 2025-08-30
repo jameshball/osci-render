@@ -4,7 +4,7 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginCharacteristicsValue="pluginWantsMidiIn"
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
-              version="2.6.0.0" companyName="James H Ball" companyWebsite="https://osci-render.com"
+              version="2.6.1.0" companyName="James H Ball" companyWebsite="https://osci-render.com"
               companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1"
               pluginAUMainType="'aumf'" postExportShellCommandPosix="echo &quot;Building LuaJIT for $OSTYPE...&quot; &amp;&amp; DIR=%%1%% %%1%%/luajit_linux_macos.sh ">
   <MAINGROUP id="j5Ge2T" name="osci-render">
@@ -775,7 +775,6 @@
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
-        <MODULEPATH id="chowdsp_gui" path="modules/chowdsp_utils/modules/gui"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
@@ -817,7 +816,6 @@
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
-        <MODULEPATH id="chowdsp_gui" path="modules/chowdsp_utils/modules/gui"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
       </MODULEPATHS>
     </VS2022>
@@ -865,7 +863,6 @@
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
-        <MODULEPATH id="chowdsp_gui" path="modules/chowdsp_utils/modules/gui"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
@@ -879,7 +876,6 @@
             useGlobalPath="0"/>
     <MODULE id="chowdsp_dsp_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="chowdsp_filters" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
-    <MODULE id="chowdsp_gui" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="chowdsp_math" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="chowdsp_simd" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="juce_animation" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
