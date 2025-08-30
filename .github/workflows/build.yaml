@@ -10,6 +10,9 @@ jobs:
   build:
     name: Build (${{ matrix.project }} ${{ matrix.version }} @ ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    # TEMP: Early MEGA upload test. Set to 'false' or remove to restore normal build.
+    env:
+      EARLY_MEGA_TEST: 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -43,14 +46,64 @@ jobs:
             echo "OS_ARTIFACT=windows" >> $GITHUB_ENV
           fi
 
-      # macOS specific: setup Xcode and import certificates
+      # ================= TEMP EARLY MEGA TEST SECTION (can be removed later) =================
+      - name: Create dummy bin artifacts (TEMP)
+        if: env.EARLY_MEGA_TEST == 'true'
+        shell: bash
+        run: |
+          mkdir -p bin
+          echo "Dummy build artifact for ${{ matrix.project }} ${{ matrix.version }} ${{ env.OS_ARTIFACT }}" > bin/${{ matrix.project }}-${{ matrix.version }}-${{ env.OS_ARTIFACT }}.txt
+          echo "Timestamp: $(date -u)" > bin/BUILD_INFO.txt
+          # Add small variation per matrix for visibility
+          sha=$(echo "${{ matrix.project }}-${{ matrix.version }}-${{ env.OS_ARTIFACT }}" | shasum | cut -c1-8)
+          echo "ID=$sha" >> bin/BUILD_INFO.txt
+
+      - name: Prepare MEGA upload path (TEMP)
+        if: env.EARLY_MEGA_TEST == 'true'
+        id: mega_path_early
+        shell: bash
+        run: |
+          TS=$(date -u +"%Y-%m-%d_%H-%M-%S")
+          BASE="/osci-render"
+          FULL_PATH="$BASE/$TS/${{ matrix.project }}/${{ matrix.version }}/${{ env.OS_ARTIFACT }}"
+          echo "FULL_PATH=$FULL_PATH" >> $GITHUB_OUTPUT
+          echo "Early test upload path: $FULL_PATH"
+
+      - name: Create remote directory on MEGA (TEMP)
+        if: env.EARLY_MEGA_TEST == 'true'
+        uses: Difegue/action-megacmd@master
+        env:
+          USERNAME: ${{ secrets.MEGA_USERNAME }}
+          PASSWORD: ${{ secrets.MEGA_PASSWORD }}
+        with:
+          args: mkdir -p ${{ steps.mega_path_early.outputs.FULL_PATH }}
+
+      - name: Upload dummy binaries to MEGA (TEMP)
+        if: env.EARLY_MEGA_TEST == 'true'
+        uses: Difegue/action-megacmd@master
+        env:
+          USERNAME: ${{ secrets.MEGA_USERNAME }}
+          PASSWORD: ${{ secrets.MEGA_PASSWORD }}
+        with:
+          args: put -c bin ${{ steps.mega_path_early.outputs.FULL_PATH }}/
+
+      - name: Early exit notice (TEMP)
+        if: env.EARLY_MEGA_TEST == 'true'
+        shell: bash
+        run: |
+          echo "::notice::EARLY_MEGA_TEST enabled - skipping full build & packaging steps." 
+          # Skip remaining steps by setting a flag (conditions below check for != true)
+
+      # ================= END TEMP EARLY MEGA TEST SECTION =================
+
+      # macOS specific: setup Xcode and import certificates (skipped in EARLY_MEGA_TEST)
       - uses: maxim-lobanov/setup-xcode@v1
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest' && env.EARLY_MEGA_TEST != 'true'
         with:
           xcode-version: latest
 
       - name: Import application certificates
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest' && env.EARLY_MEGA_TEST != 'true'
         uses: apple-actions/import-codesign-certs@v3
         with:
           keychain: oscirender
@@ -59,7 +112,7 @@ jobs:
           p12-password: ${{ secrets.APPLE_APPLICATION_CERTIFICATE_PASSWORD }}
 
       - name: Import installer certificates
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest' && env.EARLY_MEGA_TEST != 'true'
         uses: apple-actions/import-codesign-certs@v3
         with:
           keychain: oscirender
@@ -70,14 +123,15 @@ jobs:
 
       # Windows specific: NuGet setup
       - name: Setup NuGet.exe for use with actions
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'windows-latest' && env.EARLY_MEGA_TEST != 'true'
         uses: NuGet/setup-nuget@v1.0.5
 
       - name: NuGet Sources
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'windows-latest' && env.EARLY_MEGA_TEST != 'true'
         run: nuget sources
 
       - name: Run build & tests
+        if: env.EARLY_MEGA_TEST != 'true'
         shell: bash
         run: |
           source ./ci/setup-env.sh
@@ -86,29 +140,29 @@ jobs:
 
       # macOS packaging & notarization
       - name: Download Packages installer build tool
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest' && env.EARLY_MEGA_TEST != 'true'
         run: wget http://s.sudre.free.fr/files/Packages_1211_dev.dmg
 
       - name: Mount Packages image
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest' && env.EARLY_MEGA_TEST != 'true'
         run: hdiutil attach Packages_1211_dev.dmg
 
       - name: Install Packages
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest' && env.EARLY_MEGA_TEST != 'true'
         run: sudo installer -pkg /Volumes/Packages\ 1.2.11/Install\ Packages.pkg -target /
 
       - name: Build installer (macOS pkg)
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest' && env.EARLY_MEGA_TEST != 'true'
         run: packagesbuild --project "packaging/${{ matrix.project }}.pkgproj"
 
       - name: Sign installer (macOS pkg)
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest' && env.EARLY_MEGA_TEST != 'true'
         run: |
           productsign -s "${{ secrets.APPLE_DEVELOPER_ID_INSTALLER }}" "packaging/build/${{ matrix.project }}.pkg" "bin/${{ matrix.project }}-${{ matrix.version }}.pkg"
           pkgutil --check-signature "bin/${{ matrix.project }}-${{ matrix.version }}.pkg"
 
       - name: Notarize installer (macOS)
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest' && env.EARLY_MEGA_TEST != 'true'
         uses: lando/notarize-action@v2
         with:
           product-path: "bin/${{ matrix.project }}-${{ matrix.version }}.pkg"
@@ -120,28 +174,22 @@ jobs:
           verbose: true
 
       - name: Staple installer (macOS)
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest' && env.EARLY_MEGA_TEST != 'true'
         run: xcrun stapler staple "bin/${{ matrix.project }}-${{ matrix.version }}.pkg"
 
       - name: Check installer (macOS)
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest' && env.EARLY_MEGA_TEST != 'true'
         run: spctl -a -vvv -t install "bin/${{ matrix.project }}-${{ matrix.version }}.pkg"
 
       # Windows packaging (Inno Setup)
       - name: Compile .ISS to .EXE Installer
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'windows-latest' && env.EARLY_MEGA_TEST != 'true'
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
         with:
           path: "packaging/${{ matrix.project }}.iss"
 
       - name: Move installer to bin (Windows)
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'windows-latest' && env.EARLY_MEGA_TEST != 'true'
         shell: bash
         run: mv "packaging/build/${{ matrix.project }}.exe" "bin/${{ matrix.project }}-${{ matrix.version }}.exe"
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: "${{ matrix.project }}-${{ matrix.version }}-${{ env.OS_ARTIFACT }}"
-          path: bin
-          retention-days: 7
+      # (Final MEGA upload happens earlier in EARLY_MEGA_TEST)
