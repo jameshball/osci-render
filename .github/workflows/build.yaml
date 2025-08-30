@@ -100,12 +100,9 @@ jobs:
       - name: Upload dummy binaries to MEGA (Linux TEMP)
         if: env.EARLY_MEGA_TEST == 'true' && runner.os == 'Linux'
         shell: bash
-        env:
-          MEGA_USERNAME: ${{ secrets.MEGA_USERNAME }}
-          MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
         run: |
           set -euo pipefail
-          mega-login "$MEGA_USERNAME" "$MEGA_PASSWORD"
+          mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}"
           mega-put -c bin/* "${{ steps.mega_path_early.outputs.FULL_PATH }}/" || mega-put -c bin "${{ steps.mega_path_early.outputs.FULL_PATH }}/"
           mega-logout --keep-session || true
 
@@ -123,12 +120,9 @@ jobs:
       - name: Upload dummy binaries to MEGA (macOS TEMP)
         if: env.EARLY_MEGA_TEST == 'true' && runner.os == 'macOS'
         shell: bash
-        env:
-          MEGA_USERNAME: ${{ secrets.MEGA_USERNAME }}
-          MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
         run: |
           set -euo pipefail
-          mega-login "$MEGA_USERNAME" "$MEGA_PASSWORD"
+          mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}"
           mega-put -c bin/* "${{ steps.mega_path_early.outputs.FULL_PATH }}/" || mega-put -c bin "${{ steps.mega_path_early.outputs.FULL_PATH }}/"
           mega-logout --keep-session || true
 
@@ -145,37 +139,12 @@ jobs:
       - name: Upload dummy binaries to MEGA (Windows TEMP)
         if: env.EARLY_MEGA_TEST == 'true' && runner.os == 'Windows'
         shell: powershell
-        env:
-          MEGA_USERNAME: ${{ secrets.MEGA_USERNAME }}
-          MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
         run: |
           $ErrorActionPreference = 'Stop'
-          # Trim potential CR/LF or whitespace from secrets (sometimes happens with copy/paste when setting secrets)
-          $u = ($env:MEGA_USERNAME | ForEach-Object { $_.Trim() })
-          $p = ($env:MEGA_PASSWORD | ForEach-Object { $_.Trim() })
-          if (-not $u -or -not $p) { Write-Error "MEGA credentials empty after trim" }
-          Write-Host "Attempting mega-login for user length: $($u.Length)"
-          # Use --auth-code style not available; rely on standard login but detect failure via exit code & output
-          $loginOutput = mega-login "$u" "$p" 2>&1
-          if ($LASTEXITCODE -ne 0 -or ($loginOutput -match 'Login failed')) {
-            Write-Host "mega-login output (masked):" ($loginOutput -replace [Regex]::Escape($u), '***')
-            Write-Error "mega-login failed"
-          }
-          else {
-            Write-Host "mega-login succeeded"
-          }
+          mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}"
           # Upload individual files (mega-put -c will create path if needed)
-          Get-ChildItem bin | ForEach-Object {
-            Write-Host "Uploading $_";
-            mega-put -c $_.FullName "${{ steps.mega_path_early.outputs.FULL_PATH }}/" | ForEach-Object { $_ }
-            if ($LASTEXITCODE -ne 0) { Write-Error "Upload failed for $($_.FullName)" }
-          }
-          $logoutOutput = mega-logout --keep-session 2>&1
-          if ($LASTEXITCODE -ne 0) {
-            Write-Warning "mega-logout returned non-zero: $logoutOutput"
-          } else {
-            Write-Host "mega-logout succeeded"
-          }
+          Get-ChildItem bin | ForEach-Object { mega-put -c $_.FullName "${{ steps.mega_path_early.outputs.FULL_PATH }}/" }
+          mega-logout --keep-session
 
       - name: Early exit notice (TEMP)
         if: env.EARLY_MEGA_TEST == 'true'
