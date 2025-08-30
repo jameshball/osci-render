@@ -54,39 +54,54 @@ jobs:
           mkdir -p bin
           echo "Dummy build artifact for ${{ matrix.project }} ${{ matrix.version }} ${{ env.OS_ARTIFACT }}" > bin/${{ matrix.project }}-${{ matrix.version }}-${{ env.OS_ARTIFACT }}.txt
           echo "Timestamp: $(date -u)" > bin/BUILD_INFO.txt
-          # Add small variation per matrix for visibility
-          sha=$(echo "${{ matrix.project }}-${{ matrix.version }}-${{ env.OS_ARTIFACT }}" | shasum | cut -c1-8)
-          echo "ID=$sha" >> bin/BUILD_INFO.txt
+          echo "ID=${{ matrix.project }}-${{ matrix.version }}-${{ env.OS_ARTIFACT }}" >> bin/BUILD_INFO.txt
 
       - name: Prepare MEGA upload path (TEMP)
         if: env.EARLY_MEGA_TEST == 'true'
         id: mega_path_early
         shell: bash
         run: |
-          TS=$(date -u +"%Y-%m-%d_%H-%M-%S")
+          # Extract version attribute from the project's .jucer XML file
+          JUCER_FILE="${{ matrix.project }}.jucer"
+          if [[ ! -f "$JUCER_FILE" ]]; then
+            echo "::error::Missing Jucer file $JUCER_FILE" >&2
+            exit 1
+          fi
+          PROJECT_VERSION=$(grep -Po 'version="\K[0-9]+(\.[0-9]+)*' "$JUCER_FILE" | head -n1)
+          if [[ -z "$PROJECT_VERSION" ]]; then
+            echo "::error::Could not parse version from $JUCER_FILE" >&2
+            exit 1
+          fi
           BASE="/osci-render"
-          FULL_PATH="$BASE/$TS/${{ matrix.project }}/${{ matrix.version }}/${{ env.OS_ARTIFACT }}"
+          FULL_PATH="$BASE/${{ matrix.project }}/$PROJECT_VERSION"
+          echo "PROJECT_VERSION=$PROJECT_VERSION" >> $GITHUB_OUTPUT
           echo "FULL_PATH=$FULL_PATH" >> $GITHUB_OUTPUT
-          echo "Early test upload path: $FULL_PATH"
+          echo "Early test upload path (no timestamp): $FULL_PATH"
 
-      # Linux: use existing GitHub Action (works only on Linux runners)
-      - name: Create remote directory on MEGA (Linux TEMP)
+      # Linux: install MEGAcmd via apt
+      - name: Install MEGAcmd (Linux TEMP)
         if: env.EARLY_MEGA_TEST == 'true' && runner.os == 'Linux'
-        uses: Difegue/action-megacmd@master
-        env:
-          USERNAME: ${{ secrets.MEGA_USERNAME }}
-          PASSWORD: ${{ secrets.MEGA_PASSWORD }}
-        with:
-          args: mkdir -p ${{ steps.mega_path_early.outputs.FULL_PATH }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Install MEGAcmd via direct .deb download (requested method)
+          wget https://mega.nz/linux/repo/xUbuntu_24.04/amd64/megacmd-xUbuntu_24.04_amd64.deb
+          sudo apt-get update -y
+          sudo apt install -y "$PWD/megacmd-xUbuntu_24.04_amd64.deb" || { echo "::error::Failed to install megacmd"; exit 1; }
+          mega-version || true
 
       - name: Upload dummy binaries to MEGA (Linux TEMP)
         if: env.EARLY_MEGA_TEST == 'true' && runner.os == 'Linux'
-        uses: Difegue/action-megacmd@master
+        shell: bash
         env:
-          USERNAME: ${{ secrets.MEGA_USERNAME }}
-          PASSWORD: ${{ secrets.MEGA_PASSWORD }}
-        with:
-          args: put -c bin ${{ steps.mega_path_early.outputs.FULL_PATH }}/
+          MEGA_USERNAME: ${{ secrets.MEGA_USERNAME }}
+          MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
+        run: |
+          set -euo pipefail
+          mega-login "$MEGA_USERNAME" "$MEGA_PASSWORD"
+          mega-mkdir -p "${{ steps.mega_path_early.outputs.FULL_PATH }}"
+          mega-put -c bin/* "${{ steps.mega_path_early.outputs.FULL_PATH }}/" || mega-put -c bin "${{ steps.mega_path_early.outputs.FULL_PATH }}/"
+          mega-logout --keep-session || true
 
       # macOS: install MEGAcmd via Homebrew cask and upload directly
       - name: Install MEGAcmd (macOS TEMP)
@@ -109,8 +124,7 @@ jobs:
           set -euo pipefail
           mega-login "$MEGA_USERNAME" "$MEGA_PASSWORD"
           mega-mkdir -p "${{ steps.mega_path_early.outputs.FULL_PATH }}"
-            # Use -c to allow continuation if re-run
-          mega-put -c bin "${{ steps.mega_path_early.outputs.FULL_PATH }}/"
+          mega-put -c bin/* "${{ steps.mega_path_early.outputs.FULL_PATH }}/" || mega-put -c bin "${{ steps.mega_path_early.outputs.FULL_PATH }}/"
           mega-logout --keep-session || true
 
       # Windows: install MEGAcmd via Chocolatey and upload directly
@@ -133,7 +147,8 @@ jobs:
           set -e
           mega-login "$env:MEGA_USERNAME" "$env:MEGA_PASSWORD"
           mega-mkdir -p "${{ steps.mega_path_early.outputs.FULL_PATH }}"
-          mega-put -c bin "${{ steps.mega_path_early.outputs.FULL_PATH }}/"
+          # Upload individual files to avoid nesting bin directory
+          Get-ChildItem bin | ForEach-Object { mega-put -c $_.FullName "${{ steps.mega_path_early.outputs.FULL_PATH }}/" }
           mega-logout --keep-session
 
       - name: Early exit notice (TEMP)
