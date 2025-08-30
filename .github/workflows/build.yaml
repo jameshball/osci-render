@@ -79,8 +79,8 @@ jobs:
             echo "::error::Could not parse version from $JUCER_FILE via python" >&2
             exit 1
           fi
-          BASE="/osci-render"
-          FULL_PATH="$BASE/${{ matrix.project }}/$PROJECT_VERSION"
+          # Final desired path: /<project>/<version> (e.g. /osci-render/2.6.1.0)
+          FULL_PATH="/${{ matrix.project }}/$PROJECT_VERSION"
           echo "PROJECT_VERSION=$PROJECT_VERSION" >> $GITHUB_OUTPUT
           echo "FULL_PATH=$FULL_PATH" >> $GITHUB_OUTPUT
           echo "Early test upload path (no timestamp): $FULL_PATH"
@@ -106,7 +106,6 @@ jobs:
         run: |
           set -euo pipefail
           mega-login "$MEGA_USERNAME" "$MEGA_PASSWORD"
-          mega-mkdir -p "${{ steps.mega_path_early.outputs.FULL_PATH }}" || echo "mega-mkdir: folder exists (Linux)"
           mega-put -c bin/* "${{ steps.mega_path_early.outputs.FULL_PATH }}/" || mega-put -c bin "${{ steps.mega_path_early.outputs.FULL_PATH }}/"
           mega-logout --keep-session || true
 
@@ -130,7 +129,6 @@ jobs:
         run: |
           set -euo pipefail
           mega-login "$MEGA_USERNAME" "$MEGA_PASSWORD"
-          mega-mkdir -p "${{ steps.mega_path_early.outputs.FULL_PATH }}" || echo "mega-mkdir: folder exists (macOS)"
           mega-put -c bin/* "${{ steps.mega_path_early.outputs.FULL_PATH }}/" || mega-put -c bin "${{ steps.mega_path_early.outputs.FULL_PATH }}/"
           mega-logout --keep-session || true
 
@@ -151,10 +149,9 @@ jobs:
           MEGA_USERNAME: ${{ secrets.MEGA_USERNAME }}
           MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
         run: |
-          set -e
+          $ErrorActionPreference = 'Stop'
           mega-login "$env:MEGA_USERNAME" "$env:MEGA_PASSWORD"
-          try { mega-mkdir -p "${{ steps.mega_path_early.outputs.FULL_PATH }}" } catch { Write-Host "Folder may already exist (Windows): $($_.Exception.Message)" }
-          # Upload individual files to avoid nesting bin directory
+          # Upload individual files (mega-put -c will create path if needed)
           Get-ChildItem bin | ForEach-Object { mega-put -c $_.FullName "${{ steps.mega_path_early.outputs.FULL_PATH }}/" }
           mega-logout --keep-session
 
