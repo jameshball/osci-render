@@ -86,7 +86,6 @@ StyleCopReport.xml
 *.ilk
 *.meta
 *.iobj
-*.obj
 *.pch
 *.pdb
 *.ipdb
