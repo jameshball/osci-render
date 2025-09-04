@@ -12,6 +12,7 @@
 #include "audio/BitCrushEffect.h"
 #include "audio/BulgeEffect.h"
 #include "audio/TwistEffect.h"
+#include "audio/PolygonBitCrushEffect.h"
 #include "audio/DistortEffect.h"
 #include "audio/KaleidoscopeEffect.h"
 #include "audio/MultiplexEffect.h"
@@ -54,6 +55,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     toggleableEffects.push_back(KaleidoscopeEffect(*this).build());
     toggleableEffects.push_back(BounceEffect().build());
     toggleableEffects.push_back(TwistEffect().build());
+    toggleableEffects.push_back(PolygonBitCrushEffect().build());
 #endif
 
     auto scaleEffect = ScaleEffectApp().build();
