@@ -10,7 +10,7 @@ public:
 		const double twoPi = juce::MathConstants<double>::twoPi;
 		double effectScale = juce::jlimit(0.0, 1.0, values[0].load());
 		double nSides = juce::jmax(2.0, values[1].load());
-		double bandSize = juce::jmax(1e-4, values[2].load());
+		double stripeSize = juce::jmax(1e-4, values[2].load());
 		double thetaOffset = values[3] * twoPi;
 		double rOffset = values[4];
 
@@ -23,7 +23,7 @@ public:
 			double regionTheta = std::round(theta * nSides / twoPi) / nSides * twoPi;
 			double localTheta = theta - regionTheta;
 			double dist = r * std::cos(localTheta);
-			double newDist = juce::jmax(0.0, (std::round(dist / bandSize - rOffset) + rOffset) * bandSize);
+			double newDist = juce::jmax(0.0, (std::round(dist / stripeSize - rOffset) + rOffset) * stripeSize);
 			double scale = newDist / dist;
 			output.x = scale * input.x;
 			output.y = scale * input.y;
@@ -31,7 +31,7 @@ public:
 		// Apply the same stripe quantization to abs(z)
 		if (input.z != 0) {
 			double signZ = input.z > 0 ? 1 : -1;
-			output.z = signZ * juce::jmax(0.0, (std::round(std::abs(input.z) / bandSize - rOffset) + rOffset) * bandSize);
+			output.z = signZ * juce::jmax(0.0, (std::round(std::abs(input.z) / stripeSize - rOffset) + rOffset) * stripeSize);
 		}
 		return (1 - effectScale) * input + effectScale * output;
 	}
