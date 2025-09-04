@@ -137,6 +137,7 @@
         <FILE id="cUDYOM" name="scale.svg" compile="0" resource="1" file="Resources/svg/scale.svg"/>
         <FILE id="X2NZYP" name="shapes.svg" compile="0" resource="1" file="Resources/svg/shapes.svg"/>
         <FILE id="kElsj1" name="shuttle.svg" compile="0" resource="1" file="Resources/svg/shuttle.svg"/>
+        <FILE id="GzW5ze" name="skew.svg" compile="0" resource="1" file="Resources/svg/skew.svg"/>
         <FILE id="OiOWD6" name="skull.svg" compile="0" resource="1" file="Resources/svg/skull.svg"/>
         <FILE id="ZPUNcg" name="smoothing.svg" compile="0" resource="1" file="Resources/svg/smoothing.svg"/>
         <FILE id="XxYNOy" name="snowflake.svg" compile="0" resource="1" file="Resources/svg/snowflake.svg"/>
@@ -165,6 +166,7 @@
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
+        <FILE id="tU2pQl" name="SkewEffect.h" compile="0" resource="0" file="Source/audio/SkewEffect.h"/>
         <FILE id="GbAmhn" name="SpiralBitCrushEffect.h" compile="0" resource="0"
               file="Source/audio/SpiralBitCrushEffect.h"/>
         <FILE id="HE3dFE" name="AudioRecorder.h" compile="0" resource="0" file="Source/audio/AudioRecorder.h"/>

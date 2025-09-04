@@ -9,13 +9,13 @@ public:
     explicit MultiplexEffect(OscirenderAudioProcessor &p) : audioProcessor(p) {}
 
     osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
-        jassert(values.size() >= 5);
+        jassert(values.size() == 5);
 
         double gridX = values[0].load() + 0.0001;
         double gridY = values[1].load() + 0.0001;
         double gridZ = values[2].load() + 0.0001;
         double interpolation = values[3].load();
-        double gridDelay = values[5].load();
+        double gridDelay = values[4].load();
 
         head++;
         if (head >= (int)buffer.size()) {
