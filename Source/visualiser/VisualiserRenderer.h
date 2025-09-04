@@ -73,17 +73,23 @@ private:    juce::Rectangle<int> viewportArea;
     GLuint quadIndexBuffer = 0;
     GLuint vertexIndexBuffer = 0;
     GLuint vertexBuffer = 0;
+    GLuint colorBuffer = 0; // buffer for per-vertex RGB colours
 
     int nEdges = 0;
 
     juce::CriticalSection samplesLock;
     long sampleCount = 0;
+    // XYRGB sample buffers (currently RGB derived from legacy Z brightness until full pipeline provides color)
     std::vector<float> xSamples{2};
     std::vector<float> ySamples{2};
-    std::vector<float> zSamples{2};
+    std::vector<float> rSamples{2};
+    std::vector<float> gSamples{2};
+    std::vector<float> bSamples{2};
     std::vector<float> smoothedXSamples;
     std::vector<float> smoothedYSamples;
-    std::vector<float> smoothedZSamples;
+    std::vector<float> smoothedRSamples;
+    std::vector<float> smoothedGSamples;
+    std::vector<float> smoothedBSamples;
     std::atomic<int> sampleBufferCount = 0;
     int prevSampleBufferCount = 0;
     long lastTriggerPosition = 0;
@@ -149,26 +155,32 @@ private:    juce::Rectangle<int> viewportArea;
     double oldSampleRate = -1;
     chowdsp::ResamplingTypes::LanczosResampler<2048, 8> xResampler;
     chowdsp::ResamplingTypes::LanczosResampler<2048, 8> yResampler;
-    chowdsp::ResamplingTypes::LanczosResampler<2048, 8> zResampler;
+    // Dedicated colour channel resamplers to maintain independent filter state per channel
+    chowdsp::ResamplingTypes::LanczosResampler<2048, 8> rResampler;
+    chowdsp::ResamplingTypes::LanczosResampler<2048, 8> gResampler;
+    chowdsp::ResamplingTypes::LanczosResampler<2048, 8> bResampler;
 
     void setOffsetAndScale(juce::OpenGLShaderProgram* shader);
     Texture makeTexture(int width, int height, GLuint textureID = 0);
     void setupArrays(int num_points);
     void setupTextures(int resolution);
-    void drawLineTexture(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints);
+    void drawLineTexture(const std::vector<float>& xPoints, const std::vector<float>& yPoints,
+                         const std::vector<float>& rPoints, const std::vector<float>& gPoints, const std::vector<float>& bPoints);
     void saveTextureToPNG(Texture texture, const juce::File& file);
     void activateTargetTexture(std::optional<Texture> texture);
     void setShader(juce::OpenGLShaderProgram* program);
     void drawTexture(std::vector<std::optional<Texture>> textures);
     void setAdditiveBlending();
     void setNormalBlending();
-    void drawLine(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints);
+    void drawLine(const std::vector<float>& xPoints, const std::vector<float>& yPoints,
+                  const std::vector<float>& rPoints, const std::vector<float>& gPoints, const std::vector<float>& bPoints);
     void fade();
     void drawCRT();
     void checkGLErrors(juce::String file, int line);
     void viewportChanged(juce::Rectangle<int> area);
 
-    void renderScope(const std::vector<float>& xPoints, const std::vector<float>& yPoints, const std::vector<float>& zPoints);
+    void renderScope(const std::vector<float>& xPoints, const std::vector<float>& yPoints,
+                     const std::vector<float>& rPoints, const std::vector<float>& gPoints, const std::vector<float>& bPoints);
 
     double getSweepIncrement();
 

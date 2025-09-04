@@ -10,11 +10,13 @@ uniform float uIntensity;
 uniform bool uShutterSync;
 uniform float uGain;
 attribute vec3 aStart, aEnd;
+attribute vec3 aStartColor, aEndColor;
 attribute float aIdx;
 varying vec4 uvl;
 varying vec2 vTexCoord;
 varying float vLen;
 varying float vSize;
+varying vec3 vColor;
 
 void main () {
     float tang;
@@ -50,11 +52,13 @@ void main () {
         tang = 1.0;
         uvl.x = -vSize;
         uvl.w = aEndBrightness;
+        vColor = aEndColor;
     } else {
         current = aStartPos*uGain;
         tang = -1.0;
         uvl.x = uvl.z + vSize;
         uvl.w = aStartBrightness;
+        vColor = aStartColor;
     }
     // `side` corresponds to shift to the "right" or "left"
     float side = (mod(idx, 2.0) - 0.5) * 2.0;

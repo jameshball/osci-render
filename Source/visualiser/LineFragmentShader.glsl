@@ -10,10 +10,11 @@ uniform float uIntensity;
 uniform vec2 uOffset;
 uniform vec2 uScale;
 uniform float uFishEye;
-uniform sampler2D uScreen;
+uniform sampler2D uScreen; // still sampled for focus/gain texturing, but we'll reduce its influence on colour
 varying float vSize;
 varying vec4 uvl;
 varying vec2 vTexCoord;
+varying vec3 vColor;
 
 // A standard gaussian function, used for weighting samples
 float gaussian(float x, float sigma) {
@@ -54,8 +55,12 @@ void main() {
 
     brightness *= uvl.w;
     
-    gl_FragColor = 2.0 * texture2D(uScreen, texCoord) * brightness;
-    gl_FragColor.a = 1.0;
+    vec3 screenSample = texture2D(uScreen, texCoord).rgb;
+    // Reduce screen imprint on beam colour; use it only subtly for spatial variation
+    float screenLuma = dot(screenSample, vec3(0.299, 0.587, 0.114));
+    float screenMod = mix(0.85, 1.15, clamp(screenLuma, 0.0, 1.0));
+    vec3 rgb = brightness * clamp(vColor, 0.0, 1.0) * screenMod;
+    gl_FragColor = vec4(rgb, 1.0);
 }
 
 )";

@@ -19,7 +19,7 @@ uniform float uRealScreen;
 uniform float uHueShift;
 uniform vec2 uOffset;
 uniform vec2 uScale;
-uniform vec3 uColour;
+// uColour removed; line texture already contains RGB
 varying vec2 vTexCoord;
 varying vec2 vTexCoordCanvas;
 
@@ -75,21 +75,26 @@ void main() {
     
     // making the range of the glow slider more useful
     float glow = 1.05 * pow(uGlow, 1.5);
-    float light = line.r + glow * 1.5 * screen.g * screen.g * tightGlow.r;
     float scatterScalar = 0.3 * (2.0 + 1.0 * screen.g + 0.5 * screen.r);
-    light += glow * scatter.g * scatterScalar;
-    // add ambient light to graticule
-    light += (1.0 - uRealScreen) * max(uAmbient - 0.35, 0.0) * scatterScalar;
-    
-    float tlight = 1.0-pow(2.0, -uExposure*light);
-    float tlight2 = tlight * tlight * tlight;
-    gl_FragColor.rgb = mix(uColour, vec3(1.0), 0.3+tlight2*tlight2*uOverexposure) * tlight;
-    gl_FragColor.rgb = desaturate(gl_FragColor.rgb, 1.0 - uLineSaturation);
+    vec3 bloom = glow * (1.2 * screen.g * tightGlow.rgb + scatter.rgb * scatterScalar);
+    // ambient contribution (graticule influence) - ensure zero when uAmbient == 0
+    float ambientFactor = (1.0 - uRealScreen) * max(uAmbient, 0.0);
+    bloom += ambientFactor * 0.6 * scatterScalar;
+    vec3 light = line.rgb + bloom;
+    // tone map
+    vec3 tlight = 1.0 - exp(-uExposure * light);
+    // adaptive overexposure without baseline white so background stays black
+    float luma = max(max(tlight.r, tlight.g), tlight.b);
+    float overexpAmt = uOverexposure * smoothstep(0.2, 1.0, luma);
+    vec3 overexp = mix(tlight, vec3(1.0), overexpAmt);
+    gl_FragColor.rgb = desaturate(overexp, 1.0 - uLineSaturation);
     if (uRealScreen > 0.5) {
         // this isn't how light works, but it looks cool
         float ambient = uExposure * uAmbient;
-        vec3 screen = ambient * hueShift(screen.rgb, uHueShift);
-        gl_FragColor.rgb += desaturate(screen, 1.0 - uScreenSaturation);
+        if (uAmbient > 0.0) {
+            vec3 screenCol = ambient * hueShift(screen.rgb, uHueShift);
+            gl_FragColor.rgb += desaturate(screenCol, 1.0 - uScreenSaturation);
+        }
     }
     gl_FragColor.rgb += uNoise * noise(gl_FragCoord.xy * 0.01, uRandom * 100.0);
     gl_FragColor.a = 1.0;

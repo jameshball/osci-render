@@ -17,6 +17,14 @@
 #include "WideBlurFragmentShader.glsl"
 #include "WideBlurVertexShader.glsl"
 
+// Temporary RGB test pattern & brightness scaling controls (always active until real RGB data provided)
+namespace {
+    // Scales beam intensity derived from RGB to avoid overblown image after introducing 3 channels
+    constexpr float kBrightnessScale = 0.4f; // legacy mono energy approximated when ~0.33-0.5
+    constexpr float kTestPatternSpeedHz = 220.0f; // colour cycle speed (Hz)
+    constexpr float kTestPatternIntensity = 1.0f; // peak channel value before beam/intensity scaling
+}
+
 VisualiserRenderer::VisualiserRenderer(
     VisualiserParameters &parameters,
     osci::AudioBackgroundThreadManager &threadManager,
@@ -50,7 +58,9 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
 
         xSamples.clear();
         ySamples.clear();
-        zSamples.clear();
+    rSamples.clear();
+    gSamples.clear();
+    bSamples.clear();
 
         auto applyEffects = [&](osci::Point point) {
             for (auto &effect : parameters.audioEffects) {
@@ -66,6 +76,8 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
 #endif
             return point;
         };
+
+        static double testPhase = 0.0;
 
         if (parameters.isSweepEnabled()) {
             double sweepIncrement = getSweepIncrement();
@@ -87,12 +99,21 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
 
                 belowTrigger = value < triggerValue;
 
-                osci::Point sweepPoint = {sweep, value, 1};
+                osci::Point sweepPoint = {sweep, value, 1}; // legacy: third component treated as brightness
                 sweepPoint = applyEffects(sweepPoint);
 
                 xSamples.push_back(sweepPoint.x);
                 ySamples.push_back(sweepPoint.y);
-                zSamples.push_back(1);
+
+                testPhase += kTestPatternSpeedHz * juce::MathConstants<double>::twoPi / juce::jmax(1.0, sampleRate);
+                float testR = kTestPatternIntensity * (0.5f + 0.5f * std::sin(testPhase));
+                float testG = kTestPatternIntensity * (0.5f + 0.5f * std::sin(testPhase + juce::MathConstants<double>::twoPi / 3.0));
+                float testB = kTestPatternIntensity * (0.5f + 0.5f * std::sin(testPhase + 2.0 * juce::MathConstants<double>::twoPi / 3.0));
+
+                // Unconditional test pattern colour (ignore incoming point colour)
+                rSamples.push_back(testR);
+                gSamples.push_back(testG);
+                bSamples.push_back(testB);
 
                 sampleCount++;
             }
@@ -110,7 +131,16 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
 
                 xSamples.push_back(point.x);
                 ySamples.push_back(point.y);
-                zSamples.push_back(point.z);
+
+                testPhase += kTestPatternSpeedHz * juce::MathConstants<double>::twoPi / juce::jmax(1.0, sampleRate);
+                float testR = kTestPatternIntensity * (0.5f + 0.5f * std::sin(testPhase));
+                float testG = kTestPatternIntensity * (0.5f + 0.5f * std::sin(testPhase + juce::MathConstants<double>::twoPi / 3.0));
+                float testB = kTestPatternIntensity * (0.5f + 0.5f * std::sin(testPhase + 2.0 * juce::MathConstants<double>::twoPi / 3.0));
+
+                // Unconditional test pattern colour (ignore incoming point colour)
+                rSamples.push_back(testR);
+                gSamples.push_back(testG);
+                bSamples.push_back(testB);
             }
         }
 
@@ -121,8 +151,9 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
 
             smoothedXSamples.resize(newResampledSize);
             smoothedYSamples.resize(newResampledSize);
-            smoothedZSamples.resize(newResampledSize);
-            smoothedZSamples.resize(newResampledSize);
+            smoothedRSamples.resize(newResampledSize);
+            smoothedGSamples.resize(newResampledSize);
+            smoothedBSamples.resize(newResampledSize);
 
             if (parameters.isSweepEnabled()) {
                 // interpolate between sweep values to avoid any artifacts from quickly going from one sweep to the next
@@ -144,7 +175,16 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
                 xResampler.process(xSamples.data(), smoothedXSamples.data(), xSamples.size());
             }
             yResampler.process(ySamples.data(), smoothedYSamples.data(), ySamples.size());
-            zResampler.process(zSamples.data(), smoothedZSamples.data(), zSamples.size());
+            // Legacy: replicate intensity from point.z across RGB until upstream provides distinct channels
+            // When color data available, rSamples/gSamples/bSamples will hold independent values
+            // Colour channels: independent resamplers to avoid cross-channel state pollution that caused
+            // subtle colour discontinuities when a single shared zResampler was reused sequentially.
+            // If residual banding persists, consider:
+            //  * adding slight pre-blur (lowpass) to each colour before upsampling
+            //  * or using a shared phase accumulator & polyphase kernel to guarantee alignment.
+            rResampler.process(rSamples.data(), smoothedRSamples.data(), rSamples.size());
+            gResampler.process(gSamples.data(), smoothedGSamples.data(), gSamples.size());
+            bResampler.process(bSamples.data(), smoothedBSamples.data(), bSamples.size());
         }
     }
 
@@ -161,7 +201,9 @@ int VisualiserRenderer::prepareTask(double sampleRate, int bufferSize) {
     this->sampleRate = sampleRate;
     xResampler.prepare(sampleRate, RESAMPLE_RATIO);
     yResampler.prepare(sampleRate, RESAMPLE_RATIO);
-    zResampler.prepare(sampleRate, RESAMPLE_RATIO);
+    rResampler.prepare(sampleRate, RESAMPLE_RATIO);
+    gResampler.prepare(sampleRate, RESAMPLE_RATIO);
+    bResampler.prepare(sampleRate, RESAMPLE_RATIO);
 
     int desiredBufferSize = sampleRate / frameRate;
 
@@ -260,6 +302,7 @@ void VisualiserRenderer::newOpenGLContextCreated() {
 #endif
 
     glGenBuffers(1, &vertexBuffer);
+    glGenBuffers(1, &colorBuffer);
     glGenBuffers(1, &quadIndexBuffer);
     glGenBuffers(1, &vertexIndexBuffer);
 
@@ -272,6 +315,7 @@ void VisualiserRenderer::openGLContextClosing() {
     glDeleteBuffers(1, &quadIndexBuffer);
     glDeleteBuffers(1, &vertexIndexBuffer);
     glDeleteBuffers(1, &vertexBuffer);
+    glDeleteBuffers(1, &colorBuffer);
     glDeleteFramebuffers(1, &frameBuffer);
     glDeleteTextures(1, &lineTexture.id);
     glDeleteTextures(1, &blur1Texture.id);
@@ -320,9 +364,9 @@ void VisualiserRenderer::renderOpenGL() {
             juce::CriticalSection::ScopedLockType lock(samplesLock);
 
             if (parameters.upsamplingEnabled->getBoolValue()) {
-                renderScope(smoothedXSamples, smoothedYSamples, smoothedZSamples);
+                renderScope(smoothedXSamples, smoothedYSamples, smoothedRSamples, smoothedGSamples, smoothedBSamples);
             } else {
-                renderScope(xSamples, ySamples, zSamples);
+                renderScope(xSamples, ySamples, rSamples, gSamples, bSamples);
             }
 
             if (postRenderCallback) {
@@ -492,7 +536,8 @@ void VisualiserRenderer::setFrameRate(double frameRate) {
     }
 }
 
-void VisualiserRenderer::drawLineTexture(const std::vector<float> &xPoints, const std::vector<float> &yPoints, const std::vector<float> &zPoints) {
+void VisualiserRenderer::drawLineTexture(const std::vector<float> &xPoints, const std::vector<float> &yPoints,
+                                         const std::vector<float> &rPoints, const std::vector<float> &gPoints, const std::vector<float> &bPoints) {
     using namespace juce::gl;
 
     double persistence = std::pow(0.5, parameters.getPersistence()) * 0.4;
@@ -501,7 +546,7 @@ void VisualiserRenderer::drawLineTexture(const std::vector<float> &xPoints, cons
 
     activateTargetTexture(lineTexture);
     fade();
-    drawLine(xPoints, yPoints, zPoints);
+    drawLine(xPoints, yPoints, rPoints, gPoints, bPoints);
     glBindTexture(GL_TEXTURE_2D, targetTexture.value().id);
 }
 
@@ -625,7 +670,8 @@ void VisualiserRenderer::setNormalBlending() {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
-void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::vector<float> &yPoints, const std::vector<float> &zPoints) {
+void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::vector<float> &yPoints,
+                                  const std::vector<float> &rPoints, const std::vector<float> &gPoints, const std::vector<float> &bPoints) {
     using namespace juce::gl;
 
     setAdditiveBlending();
@@ -633,30 +679,57 @@ void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::
     int nPoints = xPoints.size();
 
     // Without this, there's an access violation that seems to occur only on some systems
-    if (scratchVertices.size() != nPoints * 12)
-        scratchVertices.resize(nPoints * 12);
+    std::vector<float> positionData(nPoints * 12);
+    std::vector<float> colorData(nPoints * 12);
 
     for (int i = 0; i < nPoints; ++i) {
         int p = i * 12;
-        scratchVertices[p] = scratchVertices[p + 3] = scratchVertices[p + 6] = scratchVertices[p + 9] = xPoints[i];
-        scratchVertices[p + 1] = scratchVertices[p + 4] = scratchVertices[p + 7] = scratchVertices[p + 10] = yPoints[i];
-        scratchVertices[p + 2] = scratchVertices[p + 5] = scratchVertices[p + 8] = scratchVertices[p + 11] = zPoints[i];
+        float x = xPoints[i];
+        float y = yPoints[i];
+        float r = rPoints[i];
+        float g = gPoints[i];
+        float b = bPoints[i];
+        // Use max channel as base beam intensity but scale to compensate for multi-channel energy
+        float brightness = std::max(std::max(r, g), b) * kBrightnessScale;
+        for (int k = 0; k < 4; ++k) {
+            positionData[p + 3 * k] = x;
+            positionData[p + 3 * k + 1] = y;
+            positionData[p + 3 * k + 2] = brightness;
+            colorData[p + 3 * k] = r;
+            colorData[p + 3 * k + 1] = g;
+            colorData[p + 3 * k + 2] = b;
+        }
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, nPoints * 12 * sizeof(float), scratchVertices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, positionData.size() * sizeof(float), positionData.data(), GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    glBindBuffer(GL_ARRAY_BUFFER, colorBuffer);
+    glBufferData(GL_ARRAY_BUFFER, colorData.size() * sizeof(float), colorData.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     lineShader->use();
-    glEnableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aStart"));
-    glEnableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aEnd"));
-    glEnableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aIdx"));
+    GLint aStartLoc = glGetAttribLocation(lineShader->getProgramID(), "aStart");
+    GLint aEndLoc = glGetAttribLocation(lineShader->getProgramID(), "aEnd");
+    GLint aStartColorLoc = glGetAttribLocation(lineShader->getProgramID(), "aStartColor");
+    GLint aEndColorLoc = glGetAttribLocation(lineShader->getProgramID(), "aEndColor");
+    GLint aIdxLoc = glGetAttribLocation(lineShader->getProgramID(), "aIdx");
+
+    glEnableVertexAttribArray(aStartLoc);
+    glEnableVertexAttribArray(aEndLoc);
+    glEnableVertexAttribArray(aStartColorLoc);
+    glEnableVertexAttribArray(aEndColorLoc);
+    glEnableVertexAttribArray(aIdxLoc);
 
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-    glVertexAttribPointer(glGetAttribLocation(lineShader->getProgramID(), "aStart"), 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glVertexAttribPointer(glGetAttribLocation(lineShader->getProgramID(), "aEnd"), 3, GL_FLOAT, GL_FALSE, 0, (void *)(12 * sizeof(float)));
+    glVertexAttribPointer(aStartLoc, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(aEndLoc, 3, GL_FLOAT, GL_FALSE, 0, (void *)(12 * sizeof(float)));
+    glBindBuffer(GL_ARRAY_BUFFER, colorBuffer);
+    glVertexAttribPointer(aStartColorLoc, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(aEndColorLoc, 3, GL_FLOAT, GL_FALSE, 0, (void *)(12 * sizeof(float)));
     glBindBuffer(GL_ARRAY_BUFFER, quadIndexBuffer);
-    glVertexAttribPointer(glGetAttribLocation(lineShader->getProgramID(), "aIdx"), 1, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(aIdxLoc, 1, GL_FLOAT, GL_FALSE, 0, 0);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, screenTexture.id);
@@ -688,9 +761,11 @@ void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::
     int nEdgesThisTime = xPoints.size() - 1;
     glDrawElements(GL_TRIANGLES, nEdgesThisTime * 6, GL_UNSIGNED_INT, 0);
 
-    glDisableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aStart"));
-    glDisableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aEnd"));
-    glDisableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aIdx"));
+    glDisableVertexAttribArray(aStartLoc);
+    glDisableVertexAttribArray(aEndLoc);
+    glDisableVertexAttribArray(aStartColorLoc);
+    glDisableVertexAttribArray(aEndColorLoc);
+    glDisableVertexAttribArray(aIdxLoc);
 }
 
 void VisualiserRenderer::fade() {
@@ -775,7 +850,8 @@ void VisualiserRenderer::drawCRT() {
 
     activateTargetTexture(renderTexture);
     setShader(outputShader.get());
-    outputShader->setUniform("uExposure", 0.25f);
+    // Lower exposure slightly for RGB pipeline (previous mono calibration was higher)
+    outputShader->setUniform("uExposure", 0.18f);
     outputShader->setUniform("uLineSaturation", (float)parameters.getLineSaturation());
 #if OSCI_PREMIUM
     outputShader->setUniform("uScreenSaturation", (float)parameters.getScreenSaturation());
@@ -796,8 +872,7 @@ void VisualiserRenderer::drawCRT() {
     outputShader->setUniform("uRealScreen", parameters.screenOverlay->isRealisticDisplay() ? 1.0f : 0.0f);
 #endif
     outputShader->setUniform("uResizeForCanvas", lineTexture.width / (float) renderTexture.width);
-    juce::Colour colour = juce::Colour::fromHSV(parameters.getHue() / 360.0f, 1.0, 1.0, 1.0);
-    outputShader->setUniform("uColour", colour.getFloatRed(), colour.getFloatGreen(), colour.getFloatBlue());
+    // Colour uniform removed: line texture already encodes RGB
     drawTexture({
         lineTexture,
         blur1Texture,
@@ -961,7 +1036,8 @@ void VisualiserRenderer::checkGLErrors(juce::String file, int line) {
     }
 }
 
-void VisualiserRenderer::renderScope(const std::vector<float> &xPoints, const std::vector<float> &yPoints, const std::vector<float> &zPoints) {
+void VisualiserRenderer::renderScope(const std::vector<float> &xPoints, const std::vector<float> &yPoints,
+                                     const std::vector<float> &rPoints, const std::vector<float> &gPoints, const std::vector<float> &bPoints) {
     if (screenOverlay != parameters.getScreenOverlay()) {
         screenOverlay = parameters.getScreenOverlay();
 #if OSCI_PREMIUM
@@ -977,7 +1053,7 @@ void VisualiserRenderer::renderScope(const std::vector<float> &xPoints, const st
 
     renderScale = (float)openGLContext.getRenderingScale();
 
-    drawLineTexture(xPoints, yPoints, zPoints);
+            drawLineTexture(xPoints, yPoints, rPoints, gPoints, bPoints);
     checkGLErrors(__FILE__, __LINE__);
     drawCRT();
     checkGLErrors(__FILE__, __LINE__);
