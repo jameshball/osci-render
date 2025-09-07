@@ -11,6 +11,7 @@ uniform vec2 uOffset;
 uniform vec2 uScale;
 uniform float uFishEye;
 uniform sampler2D uScreen; // still sampled for focus/gain texturing, but we'll reduce its influence on colour
+uniform float uLineHueShift; // 0..1 hue shift for the beam colour
 varying float vSize;
 varying vec4 uvl;
 varying vec2 vTexCoord;
@@ -29,6 +30,14 @@ float erf(float x) {
     return s - s / (x * x);
 }
 
+// Rotate hue around an axis in RGB space (same method as output shader)
+vec3 hueShift(vec3 color, float shift) {
+    vec3 p = vec3(0.55735) * dot(vec3(0.55735), color);
+    vec3 u = color - p;
+    vec3 v = cross(vec3(0.55735), u);
+    return u * cos(shift * 6.2832) + v * sin(shift * 6.2832) + p;
+}
+
 void main() {
     // fish eye distortion
     vec2 uv = vTexCoord - vec2(0.5);
@@ -42,6 +51,9 @@ void main() {
     float len = uvl.z;
     vec2 xy = uvl.xy;
     float brightness;
+    // Apply hue shift immediately to the incoming colour, before any further colour operations
+    vec3 baseColor = hueShift(vColor, uLineHueShift);
+    baseColor = clamp(baseColor, 0.0, 1.0);
     
     float sigma = vSize/5.0;
     if (len < EPS) {
@@ -56,10 +68,8 @@ void main() {
     brightness *= uvl.w;
     
     vec3 screenSample = texture2D(uScreen, texCoord).rgb;
-    // Reduce screen imprint on beam colour; use it only subtly for spatial variation
-    float screenLuma = dot(screenSample, vec3(0.299, 0.587, 0.114));
-    float screenMod = mix(0.85, 1.15, clamp(screenLuma, 0.0, 1.0));
-    vec3 rgb = brightness * clamp(vColor, 0.0, 1.0) * screenMod;
+    float screenLuma = clamp(screenSample.g, 0.1, 1.0);
+    vec3 rgb = brightness * baseColor * screenLuma;
     gl_FragColor = vec4(rgb, 1.0);
 }
 

@@ -17,14 +17,6 @@
 #include "WideBlurFragmentShader.glsl"
 #include "WideBlurVertexShader.glsl"
 
-// Temporary RGB test pattern & brightness scaling controls (always active until real RGB data provided)
-namespace {
-    // Scales beam intensity derived from RGB to avoid overblown image after introducing 3 channels
-    constexpr float kBrightnessScale = 0.4f; // legacy mono energy approximated when ~0.33-0.5
-    constexpr float kTestPatternSpeedHz = 220.0f; // colour cycle speed (Hz)
-    constexpr float kTestPatternIntensity = 1.0f; // peak channel value before beam/intensity scaling
-}
-
 VisualiserRenderer::VisualiserRenderer(
     VisualiserParameters &parameters,
     osci::AudioBackgroundThreadManager &threadManager,
@@ -58,9 +50,9 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
 
         xSamples.clear();
         ySamples.clear();
-    rSamples.clear();
-    gSamples.clear();
-    bSamples.clear();
+        rSamples.clear();
+        gSamples.clear();
+        bSamples.clear();
 
         auto applyEffects = [&](osci::Point point) {
             for (auto &effect : parameters.audioEffects) {
@@ -105,15 +97,10 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
                 xSamples.push_back(sweepPoint.x);
                 ySamples.push_back(sweepPoint.y);
 
-                testPhase += kTestPatternSpeedHz * juce::MathConstants<double>::twoPi / juce::jmax(1.0, sampleRate);
-                float testR = kTestPatternIntensity * (0.5f + 0.5f * std::sin(testPhase));
-                float testG = kTestPatternIntensity * (0.5f + 0.5f * std::sin(testPhase + juce::MathConstants<double>::twoPi / 3.0));
-                float testB = kTestPatternIntensity * (0.5f + 0.5f * std::sin(testPhase + 2.0 * juce::MathConstants<double>::twoPi / 3.0));
-
                 // Unconditional test pattern colour (ignore incoming point colour)
-                rSamples.push_back(testR);
-                gSamples.push_back(testG);
-                bSamples.push_back(testB);
+                rSamples.push_back(0.0);
+                gSamples.push_back(1.0);
+                bSamples.push_back(0.0);
 
                 sampleCount++;
             }
@@ -132,15 +119,10 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
                 xSamples.push_back(point.x);
                 ySamples.push_back(point.y);
 
-                testPhase += kTestPatternSpeedHz * juce::MathConstants<double>::twoPi / juce::jmax(1.0, sampleRate);
-                float testR = kTestPatternIntensity * (0.5f + 0.5f * std::sin(testPhase));
-                float testG = kTestPatternIntensity * (0.5f + 0.5f * std::sin(testPhase + juce::MathConstants<double>::twoPi / 3.0));
-                float testB = kTestPatternIntensity * (0.5f + 0.5f * std::sin(testPhase + 2.0 * juce::MathConstants<double>::twoPi / 3.0));
-
                 // Unconditional test pattern colour (ignore incoming point colour)
-                rSamples.push_back(testR);
-                gSamples.push_back(testG);
-                bSamples.push_back(testB);
+                rSamples.push_back(1.0);
+                gSamples.push_back(0.0);
+                bSamples.push_back(0.0);
             }
         }
 
@@ -690,7 +672,7 @@ void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::
         float g = gPoints[i];
         float b = bPoints[i];
         // Use max channel as base beam intensity but scale to compensate for multi-channel energy
-        float brightness = std::max(std::max(r, g), b) * kBrightnessScale;
+        float brightness = std::max(std::max(r, g), b);
         for (int k = 0; k < 4; ++k) {
             positionData[p + 3 * k] = x;
             positionData[p + 3 * k + 1] = y;
@@ -737,6 +719,7 @@ void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::
     lineShader->setUniform("uSize", (GLfloat)parameters.getFocus());
     lineShader->setUniform("uGain", 450.0f / 512.0f);
     lineShader->setUniform("uInvert", 1.0f);
+    lineShader->setUniform("uLineHueShift", (GLfloat)(parameters.getHue() / 360.0));
 
     float intensity = parameters.getIntensity() * (41000.0f / sampleRate);
     if (parameters.getUpsamplingEnabled()) {

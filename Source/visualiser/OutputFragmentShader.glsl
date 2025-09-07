@@ -74,20 +74,24 @@ void main() {
     }
     
     // making the range of the glow slider more useful
-    float glow = 1.05 * pow(uGlow, 1.5);
+    float glow = 2.0 * pow(uGlow, 1.5);
     float scatterScalar = 0.3 * (2.0 + 1.0 * screen.g + 0.5 * screen.r);
-    vec3 bloom = glow * (1.2 * screen.g * tightGlow.rgb + scatter.rgb * scatterScalar);
+    vec3 bloom = glow * ((0.2 * screen.r + 0.7 * screen.g) * tightGlow.rgb + scatter.rgb * scatterScalar);
     // ambient contribution (graticule influence) - ensure zero when uAmbient == 0
     float ambientFactor = (1.0 - uRealScreen) * max(uAmbient, 0.0);
     bloom += ambientFactor * 0.6 * scatterScalar;
-    vec3 light = line.rgb + bloom;
+    float screenFactor = clamp(screen.r, 0.1, 1.0);
+    vec3 light = screenFactor * line.rgb + bloom;
     // tone map
     vec3 tlight = 1.0 - exp(-uExposure * light);
-    // adaptive overexposure without baseline white so background stays black
-    float luma = max(max(tlight.r, tlight.g), tlight.b);
-    float overexpAmt = uOverexposure * smoothstep(0.2, 1.0, luma);
-    vec3 overexp = mix(tlight, vec3(1.0), overexpAmt);
-    gl_FragColor.rgb = desaturate(overexp, 1.0 - uLineSaturation);
+    // Overexposure that goes to white regardless of colour, like the old single-colour shader
+    // Use a scalar brightness to drive the white clip and keep hue in a normalized base colour.
+    float s = max(max(tlight.r, tlight.g), tlight.b); // perceived brightness proxy
+    vec3 baseCol = s > 1e-6 ? (tlight / s) : vec3(0.0);
+    // Mimic old curve: 0.3 + (brightness^6) * uOverexposure, then clamp to [0,1]
+    float whiteMix = clamp(0.3 + pow(s, 6.0) * uOverexposure, 0.0, 1.0);
+    vec3 colorOut = mix(baseCol, vec3(1.0), whiteMix) * s;
+    gl_FragColor.rgb = desaturate(colorOut, 1.0 - uLineSaturation);
     if (uRealScreen > 0.5) {
         // this isn't how light works, but it looks cool
         float ambient = uExposure * uAmbient;
