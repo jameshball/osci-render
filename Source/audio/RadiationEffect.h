@@ -26,7 +26,7 @@ public:
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter("Radiation",
                                           "Creates a crepuscular ray effect by adding noise. This slider controls the size of the rays. Looks best with higher sample rates.",
-                                          "radiationAmp", VERSION_HINT, 1.0, 0.0, 1.0),
+                                          "radiationAmp", VERSION_HINT, 0.5, 0.0, 1.0),
                 new osci::EffectParameter("Radiation Bias",
                                           "Controls whether the rays appear to be radiating inward or outward.",
                                           "radiationBias", VERSION_HINT, 0.8, -1.0, 1.0)
