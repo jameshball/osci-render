@@ -34,7 +34,7 @@ dir = dir or 1
 t = t or 0
 -- This is the correct increment for t to use such
 -- that we hear the right frequency.
-increment = 2 * math.pi * frequency / sample_rate
+increment = 4 * math.pi * frequency / sample_rate
 
 -- If we get to the end of the spiral, flip the
 -- direction to go back.

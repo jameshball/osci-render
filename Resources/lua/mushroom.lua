@@ -1,7 +1,6 @@
 local LOOPS = 30
 local CAP_WIDTH = 0.35
 local STEM_WIDTH = 0.05
-local Y_SIZE = 0.02
 local HEIGHT = 2.0
 local OFFSET_Y = -1.0
 local SHROOMS = 3 -- can be 1-4
