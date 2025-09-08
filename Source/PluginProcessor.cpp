@@ -13,7 +13,7 @@
 #include "audio/BulgeEffect.h"
 #include "audio/TwistEffect.h"
 #include "audio/DistortEffect.h"
-#include "audio/KaleidoscopeEffect.h"
+#include "audio/BloomEffect.h"
 #include "audio/MultiplexEffect.h"
 #include "audio/SmoothEffect.h"
 #include "audio/WobbleEffect.h"
@@ -26,6 +26,7 @@
 #include "audio/SwirlEffect.h"
 #include "audio/BounceEffect.h"
 #include "audio/SkewEffect.h"
+#include "audio/KaleidoscopeEffect.h"
 #include "parser/FileParser.h"
 #include "parser/FrameProducer.h"
 
@@ -52,10 +53,11 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
 
 #if OSCI_PREMIUM
     toggleableEffects.push_back(MultiplexEffect(*this).build());
-    toggleableEffects.push_back(KaleidoscopeEffect(*this).build());
+    toggleableEffects.push_back(BloomEffect(*this).build());
     toggleableEffects.push_back(BounceEffect().build());
     toggleableEffects.push_back(TwistEffect().build());
     toggleableEffects.push_back(SkewEffect().build());
+    toggleableEffects.push_back(KaleidoscopeEffect(*this).build());
 #endif
 
     auto scaleEffect = ScaleEffectApp().build();

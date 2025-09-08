@@ -166,6 +166,9 @@
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
+        <FILE id="XSUjDz" name="KaleidoscopeEffect.h" compile="0" resource="0"
+              file="Source/audio/KaleidoscopeEffect.h"/>
+        <FILE id="mREEpc" name="BloomEffect.h" compile="0" resource="0" file="Source/audio/BloomEffect.h"/>
         <FILE id="tU2pQl" name="SkewEffect.h" compile="0" resource="0" file="Source/audio/SkewEffect.h"/>
         <FILE id="HE3dFE" name="AudioRecorder.h" compile="0" resource="0" file="Source/audio/AudioRecorder.h"/>
         <FILE id="Bc8UeW" name="BitCrushEffect.h" compile="0" resource="0"
@@ -180,8 +183,6 @@
         <FILE id="ux2dO2" name="DistortEffect.h" compile="0" resource="0" file="Source/audio/DistortEffect.h"/>
         <FILE id="SWC0tN" name="MultiplexEffect.h" compile="0" resource="0"
               file="Source/audio/MultiplexEffect.h"/>
-        <FILE id="kAlEiD" name="KaleidoscopeEffect.h" compile="0" resource="0"
-              file="Source/audio/KaleidoscopeEffect.h"/>
         <FILE id="bNcEfx" name="BounceEffect.h" compile="0" resource="0" file="Source/audio/BounceEffect.h"/>
         <FILE id="h0dMim" name="PerspectiveEffect.h" compile="0" resource="0"
               file="Source/audio/PerspectiveEffect.h"/>

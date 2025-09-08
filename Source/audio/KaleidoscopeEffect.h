@@ -1,76 +1,82 @@
-// KaleidoscopeEffect.h
-// Repeats and mirrors the input around the origin to create a kaleidoscope pattern.
-// The effect supports a floating point number of segments, allowing smooth morphing
-// between different symmetry counts.
 #pragma once
-
 #include <JuceHeader.h>
+#include "../PluginProcessor.h"
 
 class KaleidoscopeEffect : public osci::EffectApplication {
 public:
-    explicit KaleidoscopeEffect(OscirenderAudioProcessor &p) : audioProcessor(p) {}
+    KaleidoscopeEffect(OscirenderAudioProcessor& p) : audioProcessor(p) {}
 
-    osci::Point apply(int /*index*/, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
-        // values[0] = segments (can be fractional)
-        // values[1] = phase (0-1) selecting which segment is currently being drawn
-        double segments = juce::jmax(values[0].load(), 1.0); // ensure at least 1 segment
+    osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
+        const double twoPi = juce::MathConstants<double>::twoPi;
+        double copies = juce::jmax(1.0, values[0].load());
+        bool mirror = (bool)(values[1].load() > 0.5);
+        double spread = juce::jlimit(0.0, 1.0, values[2].load());
+        double clip = juce::jlimit(0.0, 1.0, values[3].load());
+        double angleOffset = values[4].load() * juce::MathConstants<double>::twoPi;
 
-        // Polar conversion
-        double r = std::sqrt(input.x * input.x + input.y * input.y);
-        if (r < 1e-12) return input;
-        double theta = std::atan2(input.y, input.x);
+        // Ensure values extremely close to integer don't get rounded up
+        double fractionalPart = copies - std::floor(copies);
+        double ceilCopies = fractionalPart > 1e-4 ? std::ceil(copies) : std::floor(copies);
 
-        int fullSegments = (int)std::floor(segments);
-        double fractionalPart = segments - fullSegments; // in [0,1)
+        double currentRegion = std::floor(framePhase * copies);
+        double polarity = (int)currentRegion % 2 == 0 ? 1 : -1;
 
-        phase = nextPhase(audioProcessor.frequency / (fullSegments + 1), sampleRate) / (2.0 * std::numbers::pi);
-
-        // Use 'segments' for timing so partial segment gets proportionally shorter time.
-        double currentSegmentFloat = phase * segments; // [0, segments)
-        int currentSegmentIndex = (int)std::floor(currentSegmentFloat);
-        int maxIndex = fractionalPart > 1e-9 ? fullSegments : fullSegments - 1; // include partial index if exists
-        if (currentSegmentIndex > maxIndex) currentSegmentIndex = maxIndex; // safety
-
-        // Base full wedge angle (all full wedges) and size of partial wedge
-        double baseWedgeAngle = juce::MathConstants<double>::twoPi / segments; // size of a "unit" wedge
-        double partialScale = (currentSegmentIndex == fullSegments && fractionalPart > 1e-9) ? fractionalPart : 1.0;
-        double wedgeAngle = baseWedgeAngle * partialScale;
-
-        // Normalize theta to [0,1) for compression
-        double thetaNorm = (theta + juce::MathConstants<double>::pi) / juce::MathConstants<double>::twoPi; // 0..1
-
-        // Offset for this segment: each preceding full segment occupies baseWedgeAngle
-        double segmentOffset = 0.0;
-        if (currentSegmentIndex < fullSegments) {
-            segmentOffset = currentSegmentIndex * baseWedgeAngle;
-        } else { // partial segment
-            segmentOffset = fullSegments * baseWedgeAngle;
+        // TODO try splitting midway
+        double theta = currentRegion / copies * twoPi + angleOffset;
+        double rotTheta = theta;
+        osci::Point output((1 - spread) * input.x + spread, (1 - spread) * input.y, input.z);
+        output = osci::Point(output.y, -output.x, output.z);
+        if (mirror && (int)currentRegion % 2 == 1) {
+            output.y = -output.y;
         }
-        // Map entire original angle range into [segmentOffset, segmentOffset + wedgeAngle) so edges line up exactly.
-        double finalTheta = segmentOffset + thetaNorm * wedgeAngle - juce::MathConstants<double>::pi; // constant 180° rotation
 
-        double newX = r * std::cos(finalTheta);
-        double newY = r * std::sin(finalTheta);
-        return osci::Point(newX, newY, input.z);
+        double regionSize = twoPi / copies;
+        osci::Point upperPlaneNormal(std::sin(0.5 * regionSize), -std::cos(0.5 * regionSize), 0);
+        osci::Point lowerPlaneNormal(upperPlaneNormal.x, -upperPlaneNormal.y, 0);
+        osci::Point clippedOutput = clipToPlane(output, upperPlaneNormal);
+
+        clippedOutput = clipToPlane(output, lowerPlaneNormal);
+        if (clippedOutput.x < 0) {
+            clippedOutput.x = 0;
+            clippedOutput.y = 0;
+        }
+
+        output = (1 - clip) * output + clip * clippedOutput;
+
+        //osci::Point offset(std::cos(theta), std::sin(theta), 0.0);
+
+        output.rotate(0, 0, rotTheta);
+
+        framePhase += audioProcessor.frequency / ceilCopies / sampleRate;
+        framePhase = framePhase - std::floor(framePhase);
+
+        return output;
     }
 
     std::shared_ptr<osci::Effect> build() const override {
         auto eff = std::make_shared<osci::Effect>(
             std::make_shared<KaleidoscopeEffect>(audioProcessor),
             std::vector<osci::EffectParameter*>{
-                new osci::EffectParameter(
-                    "Kaleidoscope Segments",
-                    "Controls how many times the image is rotationally repeated around the centre. Fractional values smoothly morph the repetition.",
-                    "kaleidoscopeSegments",
-                    VERSION_HINT,
-                    3.0,  // default
-                    1.0,  // min
-                    5.0,  // max
-                    0.0001f, // step
-                    osci::LfoType::Sine,
-                    0.25f    // LFO frequency (Hz) – slow, visible rotation
-                ),
-            }
+                // TODO ID strings
+                new osci::EffectParameter("Copies",
+                                          "Controls the number of copies of the input shape to draw. Splitting the shape into multiple copies creates audible harmony.",
+                                          "kaleidoscopeCopies", VERSION_HINT, 3.0, 1.0, 6.0),
+                new osci::EffectParameter("Mirror",
+                                          "Controls how much the input shape is scaled in the kaleidoscope image.",
+                                          "kaleidoscopeMirror", VERSION_HINT, 0.0, 0.0, 1.0),
+                new osci::EffectParameter("Spread",
+                                          "Controls how much the input shape is scaled in the kaleidoscope image.",
+                                          "kaleidoscopeSpread", VERSION_HINT, 0.5, 0.0, 1.0),
+                //new osci::EffectParameter("Offset",
+                //                          "Controls how much the input shape is scaled in the kaleidoscope image.",
+                //                          "harmonicDuplicatorSpread", VERSION_HINT, 0.5, 0.0, 1.0),
+                new osci::EffectParameter("Clip",
+                                          "Controls whether each copy of the shape is clipped within its own region.",
+                                          "kaleidoscopeClip", VERSION_HINT, 1.0, 0.0, 1.0),
+                new osci::EffectParameter("Angle Offset",
+                                          "Rotates the offsets between copies without rotating the input shape.",
+                                          "kaleidoscopeAngle", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 0.1)
+        }
         );
         eff->setName("Kaleidoscope");
         eff->setIcon(BinaryData::kaleidoscope_svg);
@@ -79,5 +85,15 @@ public:
 
 private:
     OscirenderAudioProcessor &audioProcessor;
-    double phase = 0.0;
+    double framePhase = 0.0; // [0, 1]
+
+    // Clips points behind the plane to the plane
+    // Leaves points in front of the plane untouched
+    osci::Point clipToPlane(osci::Point input, osci::Point planeNormal)
+    {
+        double distToPlane = input.innerProduct(planeNormal);
+        double clippedDist = std::max(0.0, distToPlane);
+        double distAdjustment = clippedDist - distToPlane;
+        return input + distAdjustment * planeNormal;
+    }
 };
