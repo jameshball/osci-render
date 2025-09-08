@@ -9,13 +9,11 @@ public:
     osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
         const double twoPi = juce::MathConstants<double>::twoPi;
         double copies = juce::jmax(1.0, values[0].load());
+        double ceilCopies = std::ceil(copies - 1e-3);
         double spread = juce::jlimit(0.0, 1.0, values[1].load());
         double angleOffset = values[2].load() * juce::MathConstants<double>::twoPi;
 
-        // Ensure values extremely close to integer don't get rounded up
-        double fractionalPart = copies - std::floor(copies);
-        double ceilCopies = fractionalPart > 1e-4 ? std::ceil(copies) : std::floor(copies);
-
+        // Offset moves each time the input shape is drawn once
         double theta = std::floor(framePhase * copies) / copies * twoPi + angleOffset;
         osci::Point offset(std::cos(theta), std::sin(theta), 0.0);
 
@@ -37,8 +35,8 @@ public:
                                           "harmonicDuplicatorSpread", VERSION_HINT, 0.4, 0.0, 1.0),
                 new osci::EffectParameter("Angle Offset",
                                           "Rotates the offsets between copies without rotating the input shape.",
-                                          "harmonicDuplicatorAngle", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 0.2)
-        }
+                                          "harmonicDuplicatorAngle", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 0.1)
+            }
         );
         eff->setName("Harmonic Duplicator");
         eff->setIcon(BinaryData::kaleidoscope_svg);
