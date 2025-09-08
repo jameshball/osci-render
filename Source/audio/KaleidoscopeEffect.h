@@ -22,18 +22,18 @@ public:
 
         int fullSegments = (int)std::floor(segments);
         double fractionalPart = segments - fullSegments; // in [0,1)
+        fullSegments = fractionalPart > 1e-4 ? fullSegments : fullSegments - 1;
 
         phase = nextPhase(audioProcessor.frequency / (fullSegments + 1), sampleRate) / (2.0 * std::numbers::pi);
 
         // Use 'segments' for timing so partial segment gets proportionally shorter time.
         double currentSegmentFloat = phase * segments; // [0, segments)
         int currentSegmentIndex = (int)std::floor(currentSegmentFloat);
-        int maxIndex = fractionalPart > 1e-9 ? fullSegments : fullSegments - 1; // include partial index if exists
-        if (currentSegmentIndex > maxIndex) currentSegmentIndex = maxIndex; // safety
+        if (currentSegmentIndex > fullSegments) currentSegmentIndex = fullSegments; // safety
 
         // Base full wedge angle (all full wedges) and size of partial wedge
         double baseWedgeAngle = juce::MathConstants<double>::twoPi / segments; // size of a "unit" wedge
-        double partialScale = (currentSegmentIndex == fullSegments && fractionalPart > 1e-9) ? fractionalPart : 1.0;
+        double partialScale = (currentSegmentIndex == fullSegments && fractionalPart > 1e-4) ? fractionalPart : 1.0;
         double wedgeAngle = baseWedgeAngle * partialScale;
 
         // Normalize theta to [0,1) for compression
