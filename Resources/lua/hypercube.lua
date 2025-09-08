@@ -46,16 +46,16 @@ local path = {
     10, 11, 12, 9, 1, 2, 3, 4
 }
 
-local NUM_EDGES = #path
+local PATH_LENGTH = #path
 
-local railroad_switch = NUM_EDGES * phase / (2 * math.pi)
+local railroad_switch = PATH_LENGTH * phase / (2 * math.pi)
 local current_vertex = math.floor(railroad_switch) + 1
-local next_vertex = current_vertex % NUM_EDGES + 1
+local next_vertex = current_vertex % PATH_LENGTH + 1
 local edge_phase = railroad_switch % 1
 
 local time = step/sample_rate * ANIMATION_SPEED
 
-if current_vertex <= NUM_EDGES then
+if current_vertex <= PATH_LENGTH then
     local v1 = vertices[path[current_vertex]]
     local v2 = vertices[path[next_vertex]]
     
