@@ -13,7 +13,7 @@
 #include "audio/BulgeEffect.h"
 #include "audio/TwistEffect.h"
 #include "audio/DistortEffect.h"
-#include "audio/BloomEffect.h"
+#include "audio/UnfoldEffect.h"
 #include "audio/MultiplexEffect.h"
 #include "audio/SmoothEffect.h"
 #include "audio/WobbleEffect.h"
@@ -55,7 +55,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
 
 #if OSCI_PREMIUM
     toggleableEffects.push_back(MultiplexEffect(*this).build());
-    toggleableEffects.push_back(BloomEffect(*this).build());
+    toggleableEffects.push_back(UnfoldEffect(*this).build());
     toggleableEffects.push_back(BounceEffect().build());
     toggleableEffects.push_back(TwistEffect().build());
     toggleableEffects.push_back(SkewEffect().build());
