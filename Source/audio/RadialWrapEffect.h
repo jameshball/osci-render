@@ -7,7 +7,7 @@ public:
         // Treat input as complex number and raise to integer power
         // Disallowing non-integer and negative exponents because of the branch cut
         double effectScale = juce::jlimit(0.0, 1.0, values[0].load());
-        double exponent = juce::jmax(1.0, std::floor(values[1].load() + 0.0001));
+        double exponent = juce::jmax(1.0, std::floor(values[1].load() + 0.001));
         double refTheta = values[2].load() * juce::MathConstants<double>::twoPi;
 
         osci::Point output(0, 0, input.z);
@@ -28,14 +28,14 @@ public:
             std::make_shared<RadialWrapEffect>(),
             std::vector<osci::EffectParameter *>{
                 new osci::EffectParameter("Radial Wrap",
-                                          "Distorts the shape by multiplying the angle and warping the length of each point.", "radialWrapEnable",
-                                          VERSION_HINT, 0.6, 0.0, 1.0),
+                                          "Distorts the shape by multiplying the angle and warping the length of each point.",
+                                          "radialWrap", VERSION_HINT, 0.6, 0.0, 1.0),
                 new osci::EffectParameter("Wrap Degree",
-                                          "The multiplier applied to each point's angle.", "radialWrapDegree",
-                                          VERSION_HINT, 2.0, 1.0, 6.0),
+                                          "The multiplier applied to each point's angle.",
+                                          "radialWrapDegree", VERSION_HINT, 2.0, 2.0, 6.0, 1.0),
                 new osci::EffectParameter("Reference Angle",
-                                          "The reference angle from which each point's angle is multiplied.", "radialWrapRefAngle",
-                                          VERSION_HINT, 0.25, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 0.2)
+                                          "The reference angle from which each point's angle is multiplied.",
+                                          "radialWrapRefAngle", VERSION_HINT, 0.25, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 0.2)
         });
         eff->setIcon(BinaryData::twist_svg);
         return eff;
