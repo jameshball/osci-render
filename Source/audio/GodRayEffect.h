@@ -1,7 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 
-class RadiationEffect : public osci::EffectApplication {
+class GodRayEffect : public osci::EffectApplication {
 public:
     osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>> &values, double sampleRate) override {
         double noiseAmp = juce::jmax(0.0, values[0].load());
@@ -22,14 +22,14 @@ public:
 
     std::shared_ptr<osci::Effect> build() const override {
         auto eff = std::make_shared<osci::Effect>(
-            std::make_shared<RadiationEffect>(),
+            std::make_shared<GodRayEffect>(),
             std::vector<osci::EffectParameter*>{
-                new osci::EffectParameter("Radiation",
-                                          "Creates a crepuscular ray effect by adding noise. This slider controls the size of the rays. Looks best with higher sample rates.",
-                                          "radiationAmp", VERSION_HINT, 0.5, 0.0, 1.0),
-                new osci::EffectParameter("Radiation Bias",
+                new osci::EffectParameter("God Rays",
+                                          "Creates a god ray effect by adding noise. This slider controls the size of the rays. Looks best with higher sample rates.",
+                                          "godRayAmp", VERSION_HINT, 0.5, 0.0, 1.0),
+                new osci::EffectParameter("God Ray Position",
                                           "Controls whether the rays appear to be radiating inward or outward.",
-                                          "radiationBias", VERSION_HINT, 0.8, -1.0, 1.0)
+                                          "godRayBias", VERSION_HINT, 0.8, -1.0, 1.0)
         });
         eff->setIcon(BinaryData::scale_svg);
         return eff;
