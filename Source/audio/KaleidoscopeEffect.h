@@ -55,8 +55,8 @@ public:
         auto eff = std::make_shared<osci::Effect>(
             std::make_shared<KaleidoscopeEffect>(audioProcessor),
             std::vector<osci::EffectParameter*>{
-                new osci::EffectParameter("Segments",
-                                          "Controls the number of segments in the kaleidoscope.",
+                new osci::EffectParameter("Radial Segments",
+                                          "Controls how many times the input shape is rotationally duplicated around the centre.",
                                           "kaleidoscopeSegments", VERSION_HINT, 6.0, 2.0, 10.0), 
                 new osci::EffectParameter("Mirror",
                                           "Mirrors every other segment like a real kaleidoscope. Best used in combination with an even number of segments.",
