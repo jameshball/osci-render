@@ -17,6 +17,7 @@
 #include "audio/MultiplexEffect.h"
 #include "audio/SmoothEffect.h"
 #include "audio/WobbleEffect.h"
+#include "audio/DuplicatorEffect.h"
 #include "audio/DashedLineEffect.h"
 #include "audio/VectorCancellingEffect.h"
 #include "audio/ScaleEffect.h"
@@ -49,6 +50,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     toggleableEffects.push_back(DashedLineEffect(*this).build());
     toggleableEffects.push_back(TraceEffect(*this).build());
     toggleableEffects.push_back(WobbleEffect(*this).build());
+    toggleableEffects.push_back(DuplicatorEffect(*this).build());
 
 #if OSCI_PREMIUM
     toggleableEffects.push_back(MultiplexEffect(*this).build());
