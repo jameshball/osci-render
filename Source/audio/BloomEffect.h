@@ -59,7 +59,7 @@ public:
             std::make_shared<BloomEffect>(audioProcessor),
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter(
-                    "Radial Segments",
+                    "Bloom Segments",
                     "Controls how many times the image is rotationally repeated around the centre. Fractional values smoothly morph the repetition.",
                     "bloomSegments",
                     VERSION_HINT,
