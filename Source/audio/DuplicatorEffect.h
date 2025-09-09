@@ -2,9 +2,9 @@
 #include <JuceHeader.h>
 #include "../PluginProcessor.h"
 
-class HarmonicDuplicatorEffect : public osci::EffectApplication {
+class DuplicatorEffect : public osci::EffectApplication {
 public:
-    HarmonicDuplicatorEffect(OscirenderAudioProcessor& p) : audioProcessor(p) {}
+    DuplicatorEffect(OscirenderAudioProcessor& p) : audioProcessor(p) {}
 
     osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
         const double twoPi = juce::MathConstants<double>::twoPi;
@@ -25,21 +25,21 @@ public:
 
     std::shared_ptr<osci::Effect> build() const override {
         auto eff = std::make_shared<osci::Effect>(
-            std::make_shared<HarmonicDuplicatorEffect>(audioProcessor),
+            std::make_shared<DuplicatorEffect>(audioProcessor),
             std::vector<osci::EffectParameter*>{
-                new osci::EffectParameter("Copies",
+                new osci::EffectParameter("Duplicator Copies",
                                           "Controls the number of copies of the input shape to draw. Splitting the shape into multiple copies creates audible harmony.",
-                                          "harmonicDuplicatorCopies", VERSION_HINT, 3.0, 1.0, 6.0),
+                                          "duplicatorCopies", VERSION_HINT, 3.0, 1.0, 6.0),
                 new osci::EffectParameter("Spread",
                                           "Controls the spread between copies of the input shape.",
-                                          "harmonicDuplicatorSpread", VERSION_HINT, 0.4, 0.0, 1.0),
+                                          "duplicatorSpread", VERSION_HINT, 0.4, 0.0, 1.0),
                 new osci::EffectParameter("Angle Offset",
                                           "Rotates the offsets between copies without rotating the input shape.",
-                                          "harmonicDuplicatorAngle", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 0.1)
+                                          "duplicatorAngle", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 0.1)
             }
         );
-        eff->setName("Harmonic Duplicator");
-        eff->setIcon(BinaryData::kaleidoscope_svg);
+        eff->setName("Duplicator");
+        eff->setIcon(BinaryData::duplicator_svg);
         return eff;
     }
 
