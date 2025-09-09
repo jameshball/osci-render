@@ -150,6 +150,7 @@
         <FILE id="ESR7bv" name="trace.svg" compile="0" resource="1" file="Resources/svg/trace.svg"/>
         <FILE id="ID1vTS" name="translate.svg" compile="0" resource="1" file="Resources/svg/translate.svg"/>
         <FILE id="Sw4WWb" name="twist.svg" compile="0" resource="1" file="Resources/svg/twist.svg"/>
+        <FILE id="Y90Viq" name="unfold.svg" compile="0" resource="1" file="Resources/svg/unfold.svg"/>
         <FILE id="praXUY" name="vector-cancelling.svg" compile="0" resource="1"
               file="Resources/svg/vector-cancelling.svg"/>
         <FILE id="qC6QiP" name="volume.svg" compile="0" resource="1" file="Resources/svg/volume.svg"/>
@@ -169,7 +170,7 @@
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
         <FILE id="XSUjDz" name="KaleidoscopeEffect.h" compile="0" resource="0"
               file="Source/audio/KaleidoscopeEffect.h"/>
-      <FILE id="mREEpc" name="UnfoldEffect.h" compile="0" resource="0" file="Source/audio/UnfoldEffect.h"/>
+        <FILE id="mREEpc" name="UnfoldEffect.h" compile="0" resource="0" file="Source/audio/UnfoldEffect.h"/>
         <FILE id="tU2pQl" name="SkewEffect.h" compile="0" resource="0" file="Source/audio/SkewEffect.h"/>
         <FILE id="yxWOsR" name="DuplicatorEffect.h" compile="0" resource="0"
               file="Source/audio/DuplicatorEffect.h"/>

@@ -72,7 +72,7 @@ public:
             }
         );
         eff->setName("Unfold");
-        eff->setIcon(BinaryData::kaleidoscope_svg);
+        eff->setIcon(BinaryData::unfold_svg);
         return eff;
     }
 
