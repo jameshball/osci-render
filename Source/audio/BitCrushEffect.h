@@ -24,7 +24,7 @@ public:
         auto eff = std::make_shared<osci::Effect>(
             std::make_shared<BitCrushEffect>(),
             std::vector<osci::EffectParameter*>{
-                new osci::EffectParameter("Bit Crush", "Limits the resolution of points drawn to the screen, making the object look pixelated, and making the audio sound more 'digital' and distorted.", "bitCrushEnable", VERSION_HINT, 0.7, 0.0, 1.0),
+                new osci::EffectParameter("Bit Crush", "Limits the resolution of points drawn to the screen, making the object look pixelated, and making the audio sound more 'digital' and distorted.", "bitCrushEnable", VERSION_HINT, 1.0, 0.0, 1.0),
                 new osci::EffectParameter("Bit Crush Strength", "Constrains the resolution which points are limited to.", "bitCrushStrength", VERSION_HINT, 0.7, 0.0, 1.0)
         });
 		eff->setIcon(BinaryData::bitcrush_svg);
