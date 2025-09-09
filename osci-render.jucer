@@ -95,6 +95,7 @@
         <FILE id="Z2xdIc" name="dodecahedron.svg" compile="0" resource="1"
               file="Resources/svg/dodecahedron.svg"/>
         <FILE id="QkDLXs" name="donut.svg" compile="0" resource="1" file="Resources/svg/donut.svg"/>
+        <FILE id="I5dGjs" name="duplicator.svg" compile="0" resource="1" file="Resources/svg/duplicator.svg"/>
         <FILE id="YwkQpy" name="fixed_rotate.svg" compile="0" resource="1"
               file="Resources/svg/fixed_rotate.svg"/>
         <FILE id="WIkl6l" name="fullscreen.svg" compile="0" resource="1" file="Resources/svg/fullscreen.svg"/>
@@ -170,6 +171,8 @@
               file="Source/audio/KaleidoscopeEffect.h"/>
         <FILE id="mREEpc" name="BloomEffect.h" compile="0" resource="0" file="Source/audio/BloomEffect.h"/>
         <FILE id="tU2pQl" name="SkewEffect.h" compile="0" resource="0" file="Source/audio/SkewEffect.h"/>
+        <FILE id="yxWOsR" name="DuplicatorEffect.h" compile="0" resource="0"
+              file="Source/audio/DuplicatorEffect.h"/>
         <FILE id="HE3dFE" name="AudioRecorder.h" compile="0" resource="0" file="Source/audio/AudioRecorder.h"/>
         <FILE id="Bc8UeW" name="BitCrushEffect.h" compile="0" resource="0"
               file="Source/audio/BitCrushEffect.h"/>

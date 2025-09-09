@@ -13,7 +13,7 @@ public:
         double spread = juce::jlimit(0.0, 1.0, values[2].load());
         double clip = juce::jlimit(0.0, 1.0, values[3].load());
         double angleOffset = values[4].load() * juce::MathConstants<double>::twoPi;
-
+      
         // To start, treat everything as if we are on the +X (theta = 0) segment
         // Rotate input shape 90 deg CW so the shape is always "upright" 
         // relative to the radius
