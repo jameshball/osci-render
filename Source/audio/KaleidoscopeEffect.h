@@ -7,29 +7,30 @@ public:
     KaleidoscopeEffect(OscirenderAudioProcessor& p) : audioProcessor(p) {}
 
     osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
-        // TODO comment
         const double twoPi = juce::MathConstants<double>::twoPi;
-        double copies = juce::jmax(2.0, values[0].load());
+        double segments = juce::jmax(1.0, values[0].load());
         bool mirror = (bool)(values[1].load() > 0.5);
         double spread = juce::jlimit(0.0, 1.0, values[2].load());
         double clip = juce::jlimit(0.0, 1.0, values[3].load());
         double angleOffset = values[4].load() * juce::MathConstants<double>::twoPi;
 
-        // Ensure values extremely close to integer don't get rounded up
-        double fractionalPart = copies - std::floor(copies);
-        double ceilCopies = fractionalPart > 1e-3 ? std::ceil(copies) : std::floor(copies);
-
-        double currentRegion = std::floor(framePhase * copies);
-        double polarity = (int)currentRegion % 2 == 0 ? 1 : -1;
-
+        // To start, treat everything as if we are on the +X (theta = 0) segment
+        // Rotate input shape 90 deg CW so the shape is always "upright" 
+        // relative to the radius
+        // Then apply spread
         input = osci::Point(input.y, -input.x, input.z);
-        osci::Point output((1 - spread) * input.x + spread, (1 - spread) * input.y, (1 - spread) * input.z);
-        if (mirror && (int)currentRegion % 2 == 1) {
+        osci::Point output = (1 - spread) * input;
+        output.x += spread;
+
+        // Mirror the y of every other segment if enabled
+        double currentSegment = std::floor(framePhase * segments);
+        if (mirror && (int)currentSegment % 2 == 1) {
             output.y = -output.y;
         }
 
-        double regionSize = twoPi / copies;
-        osci::Point upperPlaneNormal(std::sin(0.5 * regionSize), -std::cos(0.5 * regionSize), 0);
+        // Clip the shape to remain within this radial segment
+        double segmentSize = twoPi / segments; // Angular
+        osci::Point upperPlaneNormal(std::sin(0.5 * segmentSize), -std::cos(0.5 * segmentSize), 0);
         osci::Point lowerPlaneNormal(upperPlaneNormal.x, -upperPlaneNormal.y, 0);
         osci::Point clippedOutput = clipToPlane(output, upperPlaneNormal);
         clippedOutput = clipToPlane(clippedOutput, lowerPlaneNormal);
@@ -39,11 +40,12 @@ public:
         }
         output = (1 - clip) * output + clip * clippedOutput;
 
-
-        double rotTheta = (currentRegion / copies) * twoPi + angleOffset;
+        // Finally, rotate this radial segment to its actual location
+        double rotTheta = (currentSegment / segments) * twoPi + angleOffset;
         output.rotate(0, 0, rotTheta);
 
-        framePhase += audioProcessor.frequency / ceilCopies / sampleRate;
+        double freqDivisor = std::ceil(segments - 1e-3);
+        framePhase += audioProcessor.frequency / freqDivisor / sampleRate;
         framePhase = framePhase - std::floor(framePhase);
 
         return output;
@@ -53,24 +55,20 @@ public:
         auto eff = std::make_shared<osci::Effect>(
             std::make_shared<KaleidoscopeEffect>(audioProcessor),
             std::vector<osci::EffectParameter*>{
-                // TODO ID strings
-                new osci::EffectParameter("Copies",
-                                          "Controls the number of copies of the input shape to draw. Splitting the shape into multiple copies creates audible harmony.",
-                                          "kaleidoscopeCopies", VERSION_HINT, 6.0, 2.0, 10.0),
+                new osci::EffectParameter("Segments",
+                                          "Controls the number of segments in the kaleidoscope.",
+                                          "kaleidoscopeSegments", VERSION_HINT, 6.0, 2.0, 10.0), 
                 new osci::EffectParameter("Mirror",
-                                          "Controls how much the input shape is scaled in the kaleidoscope image.",
+                                          "Mirrors every other segment like a real kaleidoscope. Best used in combination with an even number of segments.",
                                           "kaleidoscopeMirror", VERSION_HINT, 1.0, 0.0, 1.0),
                 new osci::EffectParameter("Spread",
-                                          "Controls how .",
+                                          "Controls the radial spread of each segment.",
                                           "kaleidoscopeSpread", VERSION_HINT, 0.4, 0.0, 1.0),
-                //new osci::EffectParameter("Offset",
-                //                          "Controls how much the input shape is scaled in the kaleidoscope image.",
-                //                          "harmonicDuplicatorSpread", VERSION_HINT, 0.5, 0.0, 1.0),
                 new osci::EffectParameter("Clip",
-                                          "Clips each copy of the shape within its own region.",
+                                          "Clips each copy of the input shape within its own segment.",
                                           "kaleidoscopeClip", VERSION_HINT, 1.0, 0.0, 1.0),
                 new osci::EffectParameter("Angle Offset",
-                                          "Rotates the offsets between copies without rotating the input shape.",
+                                          "Rotates the kaleidoscope.",
                                           "kaleidoscopeAngle", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 0.1)
         }
         );
