@@ -9,7 +9,6 @@ public:
     osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
         const double twoPi = juce::MathConstants<double>::twoPi;
         double copies = juce::jmax(1.0, values[0].load());
-        double ceilCopies = std::ceil(copies - 1e-3);
         double spread = juce::jlimit(0.0, 1.0, values[1].load());
         double angleOffset = values[2].load() * juce::MathConstants<double>::twoPi;
 
@@ -17,7 +16,8 @@ public:
         double theta = std::floor(framePhase * copies) / copies * twoPi + angleOffset;
         osci::Point offset(std::cos(theta), std::sin(theta), 0.0);
 
-        framePhase += audioProcessor.frequency / ceilCopies / sampleRate;
+        double freqDivisor = std::ceil(copies - 1e-3);
+        framePhase += audioProcessor.frequency / freqDivisor / sampleRate;
         framePhase = framePhase - std::floor(framePhase);
 
         return (1 - spread) * input + spread * offset;
