@@ -11,20 +11,20 @@ public:
         double effectScale = juce::jlimit(0.0, 1.0, values[0].load());
         double nSides = juce::jmax(2.0, values[1].load());
         double stripeSize = juce::jmax(1e-4, values[2].load());
-        stripeSize = std::pow(stripeSize, 1.5); // Bias slightly toward smaller values
-        double thetaOffset = values[3] * twoPi;
-        double rOffset = values[4];
+        stripeSize = std::pow(0.63 * stripeSize, 1.5); // Change range and bias toward smaller values
+        double rotation = values[3] * twoPi;
+        double stripePhase = values[4];
 
         osci::Point output(0);
         if (input.x != 0 || input.y != 0) {
             // Note 90 degree rotation: Theta is treated relative to +Y rather than +X
             double r = std::hypot(input.x, input.y);
-            double theta = std::atan2(-input.x, input.y) - thetaOffset;
-            theta = MathUtil::wrapAngle(theta + pi) - pi; // Move branch cut to +/-pi after thetaOffset is applied
+            double theta = std::atan2(-input.x, input.y) - rotation;
+            theta = MathUtil::wrapAngle(theta + pi) - pi; // Move branch cut to +/-pi after angle offset is applied
             double regionCenterTheta = std::round(theta * nSides / twoPi) / nSides * twoPi;
             double localTheta = theta - regionCenterTheta;
             double dist = r * std::cos(localTheta);
-            double newDist = juce::jmax(0.0, (std::round(dist / stripeSize - rOffset) + rOffset) * stripeSize);
+            double newDist = juce::jmax(0.0, (std::round(dist / stripeSize - stripePhase) + stripePhase) * stripeSize);
             double scale = newDist / dist;
             output.x = scale * input.x;
             output.y = scale * input.y;
@@ -33,7 +33,7 @@ public:
         double absZ = std::abs(input.z);
         if (absZ > 0.0001) {
             double signZ = input.z > 0 ? 1 : -1;
-            output.z = signZ * juce::jmax(0.0, (std::round(absZ / stripeSize - rOffset) + rOffset) * stripeSize);
+            output.z = signZ * juce::jmax(0.0, (std::round(absZ / stripeSize - stripePhase) + stripePhase) * stripeSize);
         }
         return (1 - effectScale) * input + effectScale * output;
     }
@@ -42,19 +42,20 @@ public:
         auto eff = std::make_shared<osci::Effect>(
             std::make_shared<PolygonBitCrushEffect>(),
             std::vector<osci::EffectParameter*>{
-            new osci::EffectParameter("Polygon Bit Crush",
-                                      "Constrains points to a polygon pattern.",
-                                      "polygonBitCrushEnable", VERSION_HINT, 1.0, 0.0, 1.0),
+                new osci::EffectParameter("Polygon Bit Crush",
+                                          "Constrains points to a polygon pattern.",
+                                          "polygonBitCrush", VERSION_HINT, 1.0, 0.0, 1.0),
                 new osci::EffectParameter("Sides", "Controls the number of sides of the polygon pattern.",
-                                          "polygonSides", VERSION_HINT, 5.0, 3.0, 8.0),
+                                          "polygonBitCrushSides", VERSION_HINT, 5.0, 3.0, 8.0),
                 new osci::EffectParameter("Stripe Size",
                                           "Controls the spacing between the stripes of the polygon pattern.",
-                                          "polygonBandSize", VERSION_HINT, 0.15, 0.0, 0.5),
-                new osci::EffectParameter("Angle Offset", "Rotates the polygon pattern.",
-                                          "polygonAngleOffset", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 0.1),
-                new osci::EffectParameter("Radial Offset", "Offsets the stripes of the polygon pattern.",
-                                          "polygonROffset", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 2.0)
-        });
+                                          "polygonBitCrushStripeSize", VERSION_HINT, 0.5, 0.0, 1.0),
+                new osci::EffectParameter("Rotation", "Rotates the polygon pattern.",
+                                          "polygonBitCrushRotation", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 0.1),
+                new osci::EffectParameter("Stripe Phase", "Offsets the stripes of the polygon pattern.",
+                                          "polygonBitCrushStripePhase", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 2.0)
+            }
+        );
         eff->setIcon(BinaryData::diamond_svg);
         return eff;
     }

@@ -8,6 +8,7 @@ public:
 		double translatedBulge = -value + 1;
 
 		double r = std::hypot(input.x, input.y);
+        if (r == 0) return input;
 		double rn = std::pow(r, translatedBulge);
 		double scale = rn / r;
 		return osci::Point(scale * input.x, scale * input.y, input.z);
