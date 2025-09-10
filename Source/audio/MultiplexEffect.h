@@ -11,9 +11,9 @@ public:
     osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
         jassert(values.size() == 5);
 
-        double gridX = values[0].load() + 0.0001;
-        double gridY = values[1].load() + 0.0001;
-        double gridZ = values[2].load() + 0.0001;
+        double gridX = values[0].load();
+        double gridY = values[1].load();
+        double gridZ = values[2].load();
         double interpolation = values[3].load();
         double gridDelay = values[4].load();
 
@@ -24,7 +24,9 @@ public:
         buffer[head] = input;
 
         osci::Point grid = osci::Point(gridX, gridY, gridZ);
-        osci::Point gridFloor = osci::Point(std::floor(gridX), std::floor(gridY), std::floor(gridZ));
+        osci::Point gridFloor = osci::Point(std::floor(gridX + 1e-3),
+                                            std::floor(gridY + 1e-3),
+                                            std::floor(gridZ + 1e-3));
 
         gridFloor.x = std::max(gridFloor.x, 1.0);
         gridFloor.y = std::max(gridFloor.y, 1.0);
