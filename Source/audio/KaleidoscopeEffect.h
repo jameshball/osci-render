@@ -9,11 +9,10 @@ public:
     osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
         const double twoPi = juce::MathConstants<double>::twoPi;
         double segments = juce::jmax(1.0, values[0].load());
-        bool mirror = (bool)(values[1].load() > 0.5);
+        double mirror = values[1].load();
         double spread = juce::jlimit(0.0, 1.0, values[2].load());
         double clip = juce::jlimit(0.0, 1.0, values[3].load());
-        double angleOffset = values[4].load() * juce::MathConstants<double>::twoPi;
-      
+
         // To start, treat everything as if we are on the +X (theta = 0) segment
         // Rotate input shape 90 deg CW so the shape is always "upright" 
         // relative to the radius
@@ -24,12 +23,12 @@ public:
 
         // Mirror the y of every other segment if enabled
         double currentSegment = std::floor(framePhase * segments);
-        if (mirror && (int)currentSegment % 2 == 1) {
-            output.y = -output.y;
+        if ((int)currentSegment % 2 == 1) {
+            output.y *= (1 - 2 * mirror);
         }
 
         // Clip the shape to remain within this radial segment
-        double segmentSize = twoPi / segments; // Angular
+        double segmentSize = twoPi / segments; // Angular size
         osci::Point upperPlaneNormal(std::sin(0.5 * segmentSize), -std::cos(0.5 * segmentSize), 0);
         osci::Point lowerPlaneNormal(upperPlaneNormal.x, -upperPlaneNormal.y, 0);
         osci::Point clippedOutput = clipToPlane(output, upperPlaneNormal);
@@ -41,7 +40,7 @@ public:
         output = (1 - clip) * output + clip * clippedOutput;
 
         // Finally, rotate this radial segment to its actual location
-        double rotTheta = (currentSegment / segments) * twoPi + angleOffset;
+        double rotTheta = (currentSegment / segments) * twoPi;
         output.rotate(0, 0, rotTheta);
 
         double freqDivisor = std::ceil(segments - 1e-3);
@@ -55,7 +54,7 @@ public:
         auto eff = std::make_shared<osci::Effect>(
             std::make_shared<KaleidoscopeEffect>(audioProcessor),
             std::vector<osci::EffectParameter*>{
-                new osci::EffectParameter("Radial Segments",
+                new osci::EffectParameter("Kaeidoscope Segments",
                                           "Controls how many times the input shape is rotationally duplicated around the centre.",
                                           "kaleidoscopeSegments", VERSION_HINT, 6.0, 2.0, 10.0), 
                 new osci::EffectParameter("Mirror",
@@ -66,11 +65,8 @@ public:
                                           "kaleidoscopeSpread", VERSION_HINT, 0.4, 0.0, 1.0),
                 new osci::EffectParameter("Clip",
                                           "Clips each copy of the input shape within its own segment.",
-                                          "kaleidoscopeClip", VERSION_HINT, 1.0, 0.0, 1.0),
-                new osci::EffectParameter("Angle Offset",
-                                          "Rotates the kaleidoscope.",
-                                          "kaleidoscopeAngle", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 0.1)
-        }
+                                          "kaleidoscopeClip", VERSION_HINT, 1.0, 0.0, 1.0)
+            }
         );
         eff->setName("Kaleidoscope");
         eff->setIcon(BinaryData::kaleidoscope_svg);
