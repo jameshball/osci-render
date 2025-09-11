@@ -57,7 +57,7 @@ public:
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter("Spiral Bit Crush",
                                           "Constrains points to a spiral pattern.",
-                                          "spiralBitCrush", VERSION_HINT, 1.0, 0.0, 1.0),
+                                          "spiralBitCrush", VERSION_HINT, 0.4, 0.0, 1.0),
                 new osci::EffectParameter("Spiral Density",
                                           "Controls the density of the spiral pattern.",
                                           "spiralBitCrushDensity", VERSION_HINT, 13.0, 3.0, 30.0, 1.0),
@@ -66,13 +66,13 @@ public:
                                           "spiralBitCrushTwist", VERSION_HINT, 0.6, -1.0, 1.0),
                 new osci::EffectParameter("Zoom",
                                           "Zooms the spiral pattern.",
-                                          "spiralBitCrushZoom", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 0.05),
+                                          "spiralBitCrushZoom", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 0.1),
                 new osci::EffectParameter("Rotation",
                                           "Rotates the spiral pattern.",
                                           "spiralBitCrushRotation", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001, osci::LfoType::ReverseSawtooth, 0.02)
             }
         );
-		eff->setIcon(BinaryData::swirl_svg);
+		eff->setIcon(BinaryData::spiral_bitcrush_svg);
 		return eff;
 	}
 };

@@ -142,6 +142,8 @@
         <FILE id="OiOWD6" name="skull.svg" compile="0" resource="1" file="Resources/svg/skull.svg"/>
         <FILE id="ZPUNcg" name="smoothing.svg" compile="0" resource="1" file="Resources/svg/smoothing.svg"/>
         <FILE id="XxYNOy" name="snowflake.svg" compile="0" resource="1" file="Resources/svg/snowflake.svg"/>
+        <FILE id="iZMino" name="spiral_bitcrush.svg" compile="0" resource="1"
+              file="Resources/svg/spiral_bitcrush.svg"/>
         <FILE id="yiDo4s" name="spout.svg" compile="0" resource="1" file="Resources/svg/spout.svg"/>
         <FILE id="EOWhGi" name="stop.svg" compile="0" resource="1" file="Resources/svg/stop.svg"/>
         <FILE id="Z3yYJU" name="swirl.svg" compile="0" resource="1" file="Resources/svg/swirl.svg"/>
