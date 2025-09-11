@@ -56,7 +56,7 @@ public:
                                           "polygonBitCrushStripePhase", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 2.0)
             }
         );
-        eff->setIcon(BinaryData::diamond_svg);
+        eff->setIcon(BinaryData::polygon_bitcrush_svg);
         return eff;
     }
 };
