@@ -31,6 +31,7 @@ public:
                                           "Controls whether the rays appear to be radiating inward or outward.",
                                           "godRayPosition", VERSION_HINT, 0.8, -1.0, 1.0)
         });
+        eff->setName("God Ray");
         eff->setIcon(BinaryData::god_ray_svg);
         return eff;
     }
