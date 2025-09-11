@@ -24,14 +24,14 @@ public:
         auto eff = std::make_shared<osci::Effect>(
             std::make_shared<GodRayEffect>(),
             std::vector<osci::EffectParameter*>{
-                new osci::EffectParameter("God Rays",
+                new osci::EffectParameter("God Ray Strength",
                                           "Creates a god ray effect by adding noise. This slider controls the size of the rays. Looks best with higher sample rates.",
-                                          "godRayAmp", VERSION_HINT, 0.5, 0.0, 1.0),
+                                          "godRayStrength", VERSION_HINT, 0.5, 0.0, 1.0),
                 new osci::EffectParameter("God Ray Position",
                                           "Controls whether the rays appear to be radiating inward or outward.",
-                                          "godRayBias", VERSION_HINT, 0.8, -1.0, 1.0)
+                                          "godRayPosition", VERSION_HINT, 0.8, -1.0, 1.0)
         });
-        eff->setIcon(BinaryData::scale_svg);
+        eff->setIcon(BinaryData::god_ray_svg);
         return eff;
     }
 };
