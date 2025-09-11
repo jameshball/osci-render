@@ -56,7 +56,7 @@ public:
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter("Kaeidoscope Segments",
                                           "Controls how many times the input shape is rotationally duplicated around the centre.",
-                                          "kaleidoscopeSegments", VERSION_HINT, 6.0, 2.0, 10.0), 
+                                          "kaleidoscopeSegments", VERSION_HINT, 6.0, 2.002, 6.0, 0.0001, osci::LfoType::Sine, 0.25), 
                 new osci::EffectParameter("Mirror",
                                           "Mirrors every other segment like a real kaleidoscope. Best used in combination with an even number of segments.",
                                           "kaleidoscopeMirror", VERSION_HINT, 1.0, 0.0, 1.0),
