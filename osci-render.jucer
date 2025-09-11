@@ -127,6 +127,8 @@
         <FILE id="zFdUYi" name="planet.svg" compile="0" resource="1" file="Resources/svg/planet.svg"/>
         <FILE id="sfWuFd" name="play.svg" compile="0" resource="1" file="Resources/svg/play.svg"/>
         <FILE id="FJG3Ht" name="plus.svg" compile="0" resource="1" file="Resources/svg/plus.svg"/>
+        <FILE id="NVf72g" name="polygon_bitcrush.svg" compile="0" resource="1"
+              file="Resources/svg/polygon_bitcrush.svg"/>
         <FILE id="f0yiwT" name="puzzle.svg" compile="0" resource="1" file="Resources/svg/puzzle.svg"/>
         <FILE id="ElMcEN" name="pyramid.svg" compile="0" resource="1" file="Resources/svg/pyramid.svg"/>
         <FILE id="PFc2q2" name="random.svg" compile="0" resource="1" file="Resources/svg/random.svg"/>
@@ -176,6 +178,8 @@
         <FILE id="tU2pQl" name="SkewEffect.h" compile="0" resource="0" file="Source/audio/SkewEffect.h"/>
         <FILE id="yxWOsR" name="DuplicatorEffect.h" compile="0" resource="0"
               file="Source/audio/DuplicatorEffect.h"/>
+        <FILE id="GJoA2i" name="PolygonBitCrushEffect.h" compile="0" resource="0"
+              file="Source/audio/PolygonBitCrushEffect.h"/>
         <FILE id="GbAmhn" name="SpiralBitCrushEffect.h" compile="0" resource="0"
               file="Source/audio/SpiralBitCrushEffect.h"/>
         <FILE id="HE3dFE" name="AudioRecorder.h" compile="0" resource="0" file="Source/audio/AudioRecorder.h"/>
@@ -912,4 +916,3 @@
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>
 </JUCERPROJECT>
-
