@@ -95,9 +95,11 @@
         <FILE id="Z2xdIc" name="dodecahedron.svg" compile="0" resource="1"
               file="Resources/svg/dodecahedron.svg"/>
         <FILE id="QkDLXs" name="donut.svg" compile="0" resource="1" file="Resources/svg/donut.svg"/>
+        <FILE id="I5dGjs" name="duplicator.svg" compile="0" resource="1" file="Resources/svg/duplicator.svg"/>
         <FILE id="YwkQpy" name="fixed_rotate.svg" compile="0" resource="1"
               file="Resources/svg/fixed_rotate.svg"/>
         <FILE id="WIkl6l" name="fullscreen.svg" compile="0" resource="1" file="Resources/svg/fullscreen.svg"/>
+        <FILE id="ledD1o" name="god_ray.svg" compile="0" resource="1" file="Resources/svg/god_ray.svg"/>
         <FILE id="VegGHd" name="graph.svg" compile="0" resource="1" file="Resources/svg/graph.svg"/>
         <FILE id="dYYqKr" name="gravity.svg" compile="0" resource="1" file="Resources/svg/gravity.svg"/>
         <FILE id="dYl3l5" name="greek.svg" compile="0" resource="1" file="Resources/svg/greek.svg"/>
@@ -141,6 +143,8 @@
         <FILE id="OiOWD6" name="skull.svg" compile="0" resource="1" file="Resources/svg/skull.svg"/>
         <FILE id="ZPUNcg" name="smoothing.svg" compile="0" resource="1" file="Resources/svg/smoothing.svg"/>
         <FILE id="XxYNOy" name="snowflake.svg" compile="0" resource="1" file="Resources/svg/snowflake.svg"/>
+        <FILE id="iZMino" name="spiral_bitcrush.svg" compile="0" resource="1"
+              file="Resources/svg/spiral_bitcrush.svg"/>
         <FILE id="yiDo4s" name="spout.svg" compile="0" resource="1" file="Resources/svg/spout.svg"/>
         <FILE id="EOWhGi" name="stop.svg" compile="0" resource="1" file="Resources/svg/stop.svg"/>
         <FILE id="Z3yYJU" name="swirl.svg" compile="0" resource="1" file="Resources/svg/swirl.svg"/>
@@ -168,7 +172,12 @@
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
         <FILE id="jfRtxu" name="RadialWrapEffect.h" compile="0" resource="0"
               file="Source/audio/RadialWrapEffect.h"/>
+        <FILE id="de5H36" name="GodRayEffect.h" compile="0" resource="0" file="Source/audio/GodRayEffect.h"/>
         <FILE id="tU2pQl" name="SkewEffect.h" compile="0" resource="0" file="Source/audio/SkewEffect.h"/>
+        <FILE id="yxWOsR" name="DuplicatorEffect.h" compile="0" resource="0"
+              file="Source/audio/DuplicatorEffect.h"/>
+        <FILE id="GbAmhn" name="SpiralBitCrushEffect.h" compile="0" resource="0"
+              file="Source/audio/SpiralBitCrushEffect.h"/>
         <FILE id="HE3dFE" name="AudioRecorder.h" compile="0" resource="0" file="Source/audio/AudioRecorder.h"/>
         <FILE id="Bc8UeW" name="BitCrushEffect.h" compile="0" resource="0"
               file="Source/audio/BitCrushEffect.h"/>
@@ -845,7 +854,7 @@
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_audio_devices" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_audio_formats" path="../../../JUCE/modules"/>
-        <MODULEPATH id="juce_audio_plugin_client" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_plugin_client" path="../../../JfUCE/modules"/>
         <MODULEPATH id="juce_audio_processors" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_audio_utils" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
