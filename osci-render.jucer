@@ -142,6 +142,8 @@
         <FILE id="OiOWD6" name="skull.svg" compile="0" resource="1" file="Resources/svg/skull.svg"/>
         <FILE id="ZPUNcg" name="smoothing.svg" compile="0" resource="1" file="Resources/svg/smoothing.svg"/>
         <FILE id="XxYNOy" name="snowflake.svg" compile="0" resource="1" file="Resources/svg/snowflake.svg"/>
+        <FILE id="iZMino" name="spiral_bitcrush.svg" compile="0" resource="1"
+              file="Resources/svg/spiral_bitcrush.svg"/>
         <FILE id="yiDo4s" name="spout.svg" compile="0" resource="1" file="Resources/svg/spout.svg"/>
         <FILE id="EOWhGi" name="stop.svg" compile="0" resource="1" file="Resources/svg/stop.svg"/>
         <FILE id="Z3yYJU" name="swirl.svg" compile="0" resource="1" file="Resources/svg/swirl.svg"/>
@@ -170,6 +172,8 @@
         <FILE id="tU2pQl" name="SkewEffect.h" compile="0" resource="0" file="Source/audio/SkewEffect.h"/>
         <FILE id="yxWOsR" name="DuplicatorEffect.h" compile="0" resource="0"
               file="Source/audio/DuplicatorEffect.h"/>
+        <FILE id="GbAmhn" name="SpiralBitCrushEffect.h" compile="0" resource="0"
+              file="Source/audio/SpiralBitCrushEffect.h"/>
         <FILE id="HE3dFE" name="AudioRecorder.h" compile="0" resource="0" file="Source/audio/AudioRecorder.h"/>
         <FILE id="Bc8UeW" name="BitCrushEffect.h" compile="0" resource="0"
               file="Source/audio/BitCrushEffect.h"/>
