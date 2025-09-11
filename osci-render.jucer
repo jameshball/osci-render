@@ -99,6 +99,7 @@
         <FILE id="YwkQpy" name="fixed_rotate.svg" compile="0" resource="1"
               file="Resources/svg/fixed_rotate.svg"/>
         <FILE id="WIkl6l" name="fullscreen.svg" compile="0" resource="1" file="Resources/svg/fullscreen.svg"/>
+        <FILE id="ledD1o" name="god_ray.svg" compile="0" resource="1" file="Resources/svg/god_ray.svg"/>
         <FILE id="VegGHd" name="graph.svg" compile="0" resource="1" file="Resources/svg/graph.svg"/>
         <FILE id="dYYqKr" name="gravity.svg" compile="0" resource="1" file="Resources/svg/gravity.svg"/>
         <FILE id="dYl3l5" name="greek.svg" compile="0" resource="1" file="Resources/svg/greek.svg"/>
@@ -169,6 +170,7 @@
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
+        <FILE id="de5H36" name="GodRayEffect.h" compile="0" resource="0" file="Source/audio/GodRayEffect.h"/>
         <FILE id="tU2pQl" name="SkewEffect.h" compile="0" resource="0" file="Source/audio/SkewEffect.h"/>
         <FILE id="yxWOsR" name="DuplicatorEffect.h" compile="0" resource="0"
               file="Source/audio/DuplicatorEffect.h"/>

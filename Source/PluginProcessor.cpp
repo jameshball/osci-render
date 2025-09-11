@@ -28,6 +28,7 @@
 #include "audio/SwirlEffect.h"
 #include "audio/BounceEffect.h"
 #include "audio/SkewEffect.h"
+#include "audio/GodRayEffect.h"
 #include "parser/FileParser.h"
 #include "parser/FrameProducer.h"
 
@@ -59,6 +60,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     toggleableEffects.push_back(BounceEffect().build());
     toggleableEffects.push_back(TwistEffect().build());
     toggleableEffects.push_back(SkewEffect().build());
+    toggleableEffects.push_back(GodRayEffect().build());
     toggleableEffects.push_back(SpiralBitCrushEffect().build());
 #endif
 
