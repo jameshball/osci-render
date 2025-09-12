@@ -7,6 +7,7 @@ public:
     KaleidoscopeEffect(OscirenderAudioProcessor& p) : audioProcessor(p) {}
 
     osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
+        const double pi = juce::MathConstants<double>::pi;
         const double twoPi = juce::MathConstants<double>::twoPi;
         double segments = juce::jmax(1.0, values[0].load());
         double mirror = values[1].load();
@@ -31,11 +32,25 @@ public:
         double segmentSize = twoPi / segments; // Angular size
         osci::Point upperPlaneNormal(std::sin(0.5 * segmentSize), -std::cos(0.5 * segmentSize), 0);
         osci::Point lowerPlaneNormal(upperPlaneNormal.x, -upperPlaneNormal.y, 0);
-        osci::Point clippedOutput = clipToPlane(output, upperPlaneNormal);
-        clippedOutput = clipToPlane(clippedOutput, lowerPlaneNormal);
-        if (clippedOutput.x < 0) {
-            clippedOutput.x = 0;
-            clippedOutput.y = 0;
+        osci::Point clippedOutput;
+        if (segmentSize < pi) {
+            clippedOutput = clipToPlane(output, upperPlaneNormal);
+            clippedOutput = clipToPlane(clippedOutput, lowerPlaneNormal);
+            // Point could still lie left of the origin along the lower plane
+            if (clippedOutput.x < 0) {
+                clippedOutput.x = 0;
+                clippedOutput.y = 0;
+            }
+        } else {
+            // segmentSize is wider than 180 degrees
+            // If the point is clipped to both planes like above, the actual result region
+            // will be less than 180 degrees
+            // So only clip to one plane at a time
+            if (output.y > 0) {
+                clippedOutput = clipToPlane(output, upperPlaneNormal);
+            } else {
+                clippedOutput = clipToPlane(output, lowerPlaneNormal);
+            }
         }
         output = (1 - clip) * output + clip * clippedOutput;
 
@@ -56,7 +71,7 @@ public:
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter("Kaeidoscope Segments",
                                           "Controls how many times the input shape is rotationally duplicated around the centre.",
-                                          "kaleidoscopeSegments", VERSION_HINT, 6.0, 2.002, 6.0, 0.0001, osci::LfoType::Sine, 0.25), 
+                                          "kaleidoscopeSegments", VERSION_HINT, 6.0, 1.0, 6.0, 0.0001, osci::LfoType::Sine, 0.2), 
                 new osci::EffectParameter("Mirror",
                                           "Mirrors every other segment like a real kaleidoscope. Best used in combination with an even number of segments.",
                                           "kaleidoscopeMirror", VERSION_HINT, 1.0, 0.0, 1.0),
