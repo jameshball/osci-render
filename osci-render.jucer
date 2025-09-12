@@ -4,7 +4,7 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginCharacteristicsValue="pluginWantsMidiIn"
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
-              version="2.6.1.1" companyName="James H Ball" companyWebsite="https://osci-render.com"
+              version="2.6.2.0" companyName="James H Ball" companyWebsite="https://osci-render.com"
               companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1"
               pluginAUMainType="'aumf'" postExportShellCommandPosix="echo &quot;Building LuaJIT for $OSTYPE...&quot; &amp;&amp; DIR=%%1%% %%1%%/luajit_linux_macos.sh ">
   <MAINGROUP id="j5Ge2T" name="osci-render">
@@ -127,6 +127,8 @@
         <FILE id="zFdUYi" name="planet.svg" compile="0" resource="1" file="Resources/svg/planet.svg"/>
         <FILE id="sfWuFd" name="play.svg" compile="0" resource="1" file="Resources/svg/play.svg"/>
         <FILE id="FJG3Ht" name="plus.svg" compile="0" resource="1" file="Resources/svg/plus.svg"/>
+        <FILE id="NVf72g" name="polygon_bitcrush.svg" compile="0" resource="1"
+              file="Resources/svg/polygon_bitcrush.svg"/>
         <FILE id="f0yiwT" name="puzzle.svg" compile="0" resource="1" file="Resources/svg/puzzle.svg"/>
         <FILE id="ElMcEN" name="pyramid.svg" compile="0" resource="1" file="Resources/svg/pyramid.svg"/>
         <FILE id="PFc2q2" name="random.svg" compile="0" resource="1" file="Resources/svg/random.svg"/>
@@ -180,6 +182,8 @@
         <FILE id="tU2pQl" name="SkewEffect.h" compile="0" resource="0" file="Source/audio/SkewEffect.h"/>
         <FILE id="yxWOsR" name="DuplicatorEffect.h" compile="0" resource="0"
               file="Source/audio/DuplicatorEffect.h"/>
+        <FILE id="GJoA2i" name="PolygonBitCrushEffect.h" compile="0" resource="0"
+              file="Source/audio/PolygonBitCrushEffect.h"/>
         <FILE id="GbAmhn" name="SpiralBitCrushEffect.h" compile="0" resource="0"
               file="Source/audio/SpiralBitCrushEffect.h"/>
         <FILE id="HE3dFE" name="AudioRecorder.h" compile="0" resource="0" file="Source/audio/AudioRecorder.h"/>
