@@ -49,11 +49,11 @@ public:
                                           "polygonBitCrushSides", VERSION_HINT, 5.0, 3.0, 8.0),
                 new osci::EffectParameter("Stripe Size",
                                           "Controls the spacing between the stripes of the polygon pattern.",
-                                          "polygonBitCrushStripeSize", VERSION_HINT, 0.5, 0.0, 1.0),
+                                          "polygonBCStripeSize", VERSION_HINT, 0.5, 0.0, 1.0),
                 new osci::EffectParameter("Rotation", "Rotates the polygon pattern.",
-                                          "polygonBitCrushRotation", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 0.1),
+                                          "polygonBCRotation", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 0.1),
                 new osci::EffectParameter("Stripe Phase", "Offsets the stripes of the polygon pattern.",
-                                          "polygonBitCrushStripePhase", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 2.0)
+                                          "polygonBCStripePhase", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 2.0)
             }
         );
         eff->setIcon(BinaryData::polygon_bitcrush_svg);
