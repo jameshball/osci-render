@@ -12,6 +12,7 @@ uniform vec2 uScale;
 uniform float uFishEye;
 uniform sampler2D uScreen; // still sampled for focus/gain texturing, but we'll reduce its influence on colour
 uniform float uLineHueShift; // 0..1 hue shift for the beam colour
+uniform float uUseVertexColor; // 1.0 to use per-vertex RGB, 0.0 to use hue-only
 varying float vSize;
 varying vec4 uvl;
 varying vec2 vTexCoord;
@@ -51,8 +52,14 @@ void main() {
     float len = uvl.z;
     vec2 xy = uvl.xy;
     float brightness;
-    // Apply hue shift immediately to the incoming colour, before any further colour operations
-    vec3 baseColor = hueShift(vColor, uLineHueShift);
+    // Determine base color: either per-vertex RGB with hue shift, or hue-only using a fixed seed color
+    vec3 baseColor;
+    if (uUseVertexColor > 0.5) {
+        baseColor = hueShift(vColor, uLineHueShift);
+    } else {
+        // Start from a seed color and rotate hue; using a non-primary seed to cover spectrum nicely
+        baseColor = hueShift(vec3(1.0, 0.7, 0.2), uLineHueShift);
+    }
     baseColor = clamp(baseColor, 0.0, 1.0);
     
     float sigma = vSize/5.0;

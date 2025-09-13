@@ -24,7 +24,7 @@ public:
 			readHead += buffer.size();
 		}
 		
-		return osci::Point(input.x, buffer[readHead].y, input.z);
+		return osci::Point(input.x, buffer[readHead].y, input.z, input.r, input.g, input.b);
 	}
 
 	std::shared_ptr<osci::Effect> build() const override {

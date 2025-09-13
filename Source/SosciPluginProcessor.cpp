@@ -1,7 +1,7 @@
 #include "SosciPluginProcessor.h"
 #include "SosciPluginEditor.h"
 
-SosciAudioProcessor::SosciAudioProcessor() : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(4), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
+SosciAudioProcessor::SosciAudioProcessor() : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(5), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
     // demo audio file on standalone only
     if (juce::JUCEApplicationBase::isStandaloneApp()) {
         std::unique_ptr<juce::InputStream> stream = std::make_unique<juce::MemoryInputStream>(BinaryData::sosci_flac, BinaryData::sosci_flacSize, false);
@@ -36,23 +36,41 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         } else {
             float x = input.getNumChannels() > 0 ? inputArray[0][sample] : 0.0f;
             float y = input.getNumChannels() > 1 ? inputArray[1][sample] : 0.0f;
-            float brightness = 1.0f;
+            float zAsBrightnessOrR = 1.0f;
             if (input.getNumChannels() > 2 && !forceDisableBrightnessInput) {
-                float brightnessChannel = inputArray[2][sample];
-                // Only enable brightness if we actually receive a signal on the brightness channel
-                if (!brightnessEnabled && brightnessChannel > EPSILON) {
-                    brightnessEnabled = true;
+                float zChan = inputArray[2][sample];
+                if (!brightnessEnabled && zChan > EPSILON) brightnessEnabled = true;
+                if (brightnessEnabled) zAsBrightnessOrR = zChan;
+            }
+            // RGB detection: if channels 3 or 4 present and not forced off, treat as RGB mode.
+            float gChan = 0.0f, bChan = 0.0f;
+            bool haveG = input.getNumChannels() > 3;
+            bool haveB = input.getNumChannels() > 4;
+            if (!forceDisableRgbInput && (haveG || haveB)) {
+                float gIn = haveG ? inputArray[3][sample] : 0.0f;
+                float bIn = haveB ? inputArray[4][sample] : 0.0f;
+                // Enable RGB only when we actually receive signal
+                if (!rgbEnabled && (std::abs(gIn) > EPSILON || std::abs(bIn) > EPSILON)) {
+                    rgbEnabled = true;
                 }
-                if (brightnessEnabled) {
-                    brightness = brightnessChannel;
+                if (rgbEnabled) {
+                    gChan = gIn;
+                    bChan = bIn;
                 }
             }
-            
-            point = { x, y, brightness };
+
+            // Build point:
+            // - In RGB mode: use z as R, and channels 3/4 as G/B
+            // - Otherwise: use z as brightness and leave RGB at defaults
+            if (rgbEnabled && !forceDisableRgbInput) {
+                point = osci::Point(x, y, 1.0f, zAsBrightnessOrR, gChan, bChan);
+            } else {
+                point = osci::Point(x, y, zAsBrightnessOrR);
+            }
         }
 
-        // no negative brightness
-        point.z = juce::jlimit(0.0, 1.0, point.z);
+    // Clamp brightness
+    point.z = juce::jlimit(0.0, 1.0, point.z);
 
         for (auto& effect : permanentEffects) {
             point = effect->apply(sample, point);

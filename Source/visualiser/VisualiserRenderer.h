@@ -15,6 +15,11 @@ struct Texture {
 class VisualiserWindow;
 class VisualiserRenderer : public juce::Component, public osci::AudioBackgroundThread, public juce::OpenGLRenderer, public juce::AsyncUpdater {
 public:
+    enum class RenderMode : int {
+        XY = 1,
+        XYZ = 2,
+        XYRGB = 3,
+    };
     VisualiserRenderer(
         VisualiserParameters &parameters,
         osci::AudioBackgroundThreadManager &threadManager,
@@ -34,6 +39,9 @@ public:
     void openGLContextClosing() override;
     void setResolution(int width);
     void setFrameRate(double frameRate);
+    // Render mode can be changed from the message thread at any time
+    void setRenderMode(RenderMode mode) { renderMode.store(mode); }
+    RenderMode getRenderMode() const { return renderMode.load(); }
 
     int getRenderWidth() const { return renderTexture.width; }
     int getRenderHeight() const { return renderTexture.height; }
@@ -82,11 +90,14 @@ private:    juce::Rectangle<int> viewportArea;
     // XYRGB sample buffers (currently RGB derived from legacy Z brightness until full pipeline provides color)
     std::vector<float> xSamples{2};
     std::vector<float> ySamples{2};
+    // brightness (Z) channel used only in XYZ mode
+    std::vector<float> zSamples{2};
     std::vector<float> rSamples{2};
     std::vector<float> gSamples{2};
     std::vector<float> bSamples{2};
     std::vector<float> smoothedXSamples;
     std::vector<float> smoothedYSamples;
+    std::vector<float> smoothedZSamples;
     std::vector<float> smoothedRSamples;
     std::vector<float> smoothedGSamples;
     std::vector<float> smoothedBSamples;
@@ -155,10 +166,12 @@ private:    juce::Rectangle<int> viewportArea;
     double oldSampleRate = -1;
     chowdsp::ResamplingTypes::LanczosResampler<2048, 8> xResampler;
     chowdsp::ResamplingTypes::LanczosResampler<2048, 8> yResampler;
+    chowdsp::ResamplingTypes::LanczosResampler<2048, 8> zResampler;
     // Dedicated colour channel resamplers to maintain independent filter state per channel
     chowdsp::ResamplingTypes::LanczosResampler<2048, 8> rResampler;
     chowdsp::ResamplingTypes::LanczosResampler<2048, 8> gResampler;
     chowdsp::ResamplingTypes::LanczosResampler<2048, 8> bResampler;
+    std::atomic<RenderMode> renderMode { RenderMode::XYRGB };
 
     void setOffsetAndScale(juce::OpenGLShaderProgram* shader);
     Texture makeTexture(int width, int height, GLuint textureID = 0);
@@ -173,7 +186,9 @@ private:    juce::Rectangle<int> viewportArea;
     void setAdditiveBlending();
     void setNormalBlending();
     void drawLine(const std::vector<float>& xPoints, const std::vector<float>& yPoints,
-                  const std::vector<float>& rPoints, const std::vector<float>& gPoints, const std::vector<float>& bPoints);
+                  const std::vector<float>* brightnessPoints, // optional, used in XY/XYZ
+                  const std::vector<float>& rPoints, const std::vector<float>& gPoints, const std::vector<float>& bPoints,
+                  RenderMode mode);
     void fade();
     void drawCRT();
     void checkGLErrors(juce::String file, int line);

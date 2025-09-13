@@ -50,6 +50,7 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
 
         xSamples.clear();
         ySamples.clear();
+        zSamples.clear();
         rSamples.clear();
         gSamples.clear();
         bSamples.clear();
@@ -71,6 +72,7 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
 
         static double testPhase = 0.0;
 
+        auto mode = renderMode.load();
         if (parameters.isSweepEnabled()) {
             double sweepIncrement = getSweepIncrement();
             long samplesPerSweep = sampleRate * parameters.getSweepSeconds();
@@ -96,11 +98,14 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
 
                 xSamples.push_back(sweepPoint.x);
                 ySamples.push_back(sweepPoint.y);
-
-                // Unconditional test pattern colour (ignore incoming point colour)
-                rSamples.push_back(0.0);
-                gSamples.push_back(1.0);
-                bSamples.push_back(0.0);
+                if (mode == RenderMode::XYZ) {
+                    zSamples.push_back(sweepPoint.z);
+                } else if (mode == RenderMode::XYRGB) {
+                    // colour provided (if not, Z will mirror into r by upstream logic)
+                    rSamples.push_back((float) sweepPoint.r);
+                    gSamples.push_back((float) sweepPoint.g);
+                    bSamples.push_back((float) sweepPoint.b);
+                }
 
                 sampleCount++;
             }
@@ -118,11 +123,13 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
 
                 xSamples.push_back(point.x);
                 ySamples.push_back(point.y);
-
-                // Unconditional test pattern colour (ignore incoming point colour)
-                rSamples.push_back(1.0);
-                gSamples.push_back(0.0);
-                bSamples.push_back(0.0);
+                if (mode == RenderMode::XYZ) {
+                    zSamples.push_back(point.z);
+                } else if (mode == RenderMode::XYRGB) {
+                    rSamples.push_back((float) point.r);
+                    gSamples.push_back((float) point.g);
+                    bSamples.push_back((float) point.b);
+                }
             }
         }
 
@@ -133,9 +140,12 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
 
             smoothedXSamples.resize(newResampledSize);
             smoothedYSamples.resize(newResampledSize);
-            smoothedRSamples.resize(newResampledSize);
-            smoothedGSamples.resize(newResampledSize);
-            smoothedBSamples.resize(newResampledSize);
+            if (mode == RenderMode::XYZ) smoothedZSamples.resize(newResampledSize);
+            if (mode == RenderMode::XYRGB) {
+                smoothedRSamples.resize(newResampledSize);
+                smoothedGSamples.resize(newResampledSize);
+                smoothedBSamples.resize(newResampledSize);
+            }
 
             if (parameters.isSweepEnabled()) {
                 // interpolate between sweep values to avoid any artifacts from quickly going from one sweep to the next
@@ -154,19 +164,16 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
                     }
                 }
             } else {
-                xResampler.process(xSamples.data(), smoothedXSamples.data(), xSamples.size());
+                xResampler.process(xSamples.data(), smoothedXSamples.data(), (int) xSamples.size());
             }
-            yResampler.process(ySamples.data(), smoothedYSamples.data(), ySamples.size());
-            // Legacy: replicate intensity from point.z across RGB until upstream provides distinct channels
-            // When color data available, rSamples/gSamples/bSamples will hold independent values
-            // Colour channels: independent resamplers to avoid cross-channel state pollution that caused
-            // subtle colour discontinuities when a single shared zResampler was reused sequentially.
-            // If residual banding persists, consider:
-            //  * adding slight pre-blur (lowpass) to each colour before upsampling
-            //  * or using a shared phase accumulator & polyphase kernel to guarantee alignment.
-            rResampler.process(rSamples.data(), smoothedRSamples.data(), rSamples.size());
-            gResampler.process(gSamples.data(), smoothedGSamples.data(), gSamples.size());
-            bResampler.process(bSamples.data(), smoothedBSamples.data(), bSamples.size());
+            yResampler.process(ySamples.data(), smoothedYSamples.data(), (int) ySamples.size());
+            if (mode == RenderMode::XYZ) {
+                if (!zSamples.empty()) zResampler.process(zSamples.data(), smoothedZSamples.data(), (int) zSamples.size());
+            } else if (mode == RenderMode::XYRGB) {
+                if (!rSamples.empty()) rResampler.process(rSamples.data(), smoothedRSamples.data(), (int) rSamples.size());
+                if (!gSamples.empty()) gResampler.process(gSamples.data(), smoothedGSamples.data(), (int) gSamples.size());
+                if (!bSamples.empty()) bResampler.process(bSamples.data(), smoothedBSamples.data(), (int) bSamples.size());
+            }
         }
     }
 
@@ -183,6 +190,7 @@ int VisualiserRenderer::prepareTask(double sampleRate, int bufferSize) {
     this->sampleRate = sampleRate;
     xResampler.prepare(sampleRate, RESAMPLE_RATIO);
     yResampler.prepare(sampleRate, RESAMPLE_RATIO);
+    zResampler.prepare(sampleRate, RESAMPLE_RATIO);
     rResampler.prepare(sampleRate, RESAMPLE_RATIO);
     gResampler.prepare(sampleRate, RESAMPLE_RATIO);
     bResampler.prepare(sampleRate, RESAMPLE_RATIO);
@@ -528,7 +536,12 @@ void VisualiserRenderer::drawLineTexture(const std::vector<float> &xPoints, cons
 
     activateTargetTexture(lineTexture);
     fade();
-    drawLine(xPoints, yPoints, rPoints, gPoints, bPoints);
+    const std::vector<float>* brightness = nullptr;
+    auto mode = renderMode.load();
+    if (mode == RenderMode::XYZ) {
+        brightness = parameters.getUpsamplingEnabled() ? &smoothedZSamples : &zSamples;
+    }
+        drawLine(xPoints, yPoints, brightness, rPoints, gPoints, bPoints, renderMode.load());
     glBindTexture(GL_TEXTURE_2D, targetTexture.value().id);
 }
 
@@ -653,33 +666,45 @@ void VisualiserRenderer::setNormalBlending() {
 }
 
 void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::vector<float> &yPoints,
-                                  const std::vector<float> &rPoints, const std::vector<float> &gPoints, const std::vector<float> &bPoints) {
+                                  const std::vector<float> *brightnessPoints,
+                                  const std::vector<float> &rPoints, const std::vector<float> &gPoints, const std::vector<float> &bPoints,
+                                  RenderMode mode) {
     using namespace juce::gl;
 
     setAdditiveBlending();
 
-    int nPoints = xPoints.size();
+    int nPoints = (int) xPoints.size();
 
     // Without this, there's an access violation that seems to occur only on some systems
     std::vector<float> positionData(nPoints * 12);
-    std::vector<float> colorData(nPoints * 12);
+    std::vector<float> colorData;
+    if (mode == RenderMode::XYRGB) colorData.resize(nPoints * 12);
 
     for (int i = 0; i < nPoints; ++i) {
         int p = i * 12;
         float x = xPoints[i];
         float y = yPoints[i];
-        float r = rPoints[i];
-        float g = gPoints[i];
-        float b = bPoints[i];
-        // Use max channel as base beam intensity but scale to compensate for multi-channel energy
-        float brightness = std::max(std::max(r, g), b);
+        float brightness = 1.0f;
+        if (mode == RenderMode::XYZ) {
+            if (brightnessPoints != nullptr && i < (int) brightnessPoints->size()) brightness = (*brightnessPoints)[i];
+        } else if (mode == RenderMode::XYRGB) {
+            float r = rPoints[i];
+            float g = gPoints[i];
+            float b = bPoints[i];
+            brightness = std::max(r, std::max(g, b));
+        }
         for (int k = 0; k < 4; ++k) {
             positionData[p + 3 * k] = x;
             positionData[p + 3 * k + 1] = y;
             positionData[p + 3 * k + 2] = brightness;
-            colorData[p + 3 * k] = r;
-            colorData[p + 3 * k + 1] = g;
-            colorData[p + 3 * k + 2] = b;
+            if (mode == RenderMode::XYRGB) {
+                float r = rPoints[i];
+                float g = gPoints[i];
+                float b = bPoints[i];
+                colorData[p + 3 * k] = r;
+                colorData[p + 3 * k + 1] = g;
+                colorData[p + 3 * k + 2] = b;
+            }
         }
     }
 
@@ -687,9 +712,11 @@ void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::
     glBufferData(GL_ARRAY_BUFFER, positionData.size() * sizeof(float), positionData.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-    glBindBuffer(GL_ARRAY_BUFFER, colorBuffer);
-    glBufferData(GL_ARRAY_BUFFER, colorData.size() * sizeof(float), colorData.data(), GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    if (mode == RenderMode::XYRGB) {
+        glBindBuffer(GL_ARRAY_BUFFER, colorBuffer);
+        glBufferData(GL_ARRAY_BUFFER, colorData.size() * sizeof(float), colorData.data(), GL_STATIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    }
 
     lineShader->use();
     GLint aStartLoc = glGetAttribLocation(lineShader->getProgramID(), "aStart");
@@ -700,16 +727,20 @@ void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::
 
     glEnableVertexAttribArray(aStartLoc);
     glEnableVertexAttribArray(aEndLoc);
-    glEnableVertexAttribArray(aStartColorLoc);
-    glEnableVertexAttribArray(aEndColorLoc);
+    if (mode == RenderMode::XYRGB) {
+        if (aStartColorLoc >= 0) glEnableVertexAttribArray(aStartColorLoc);
+        if (aEndColorLoc >= 0) glEnableVertexAttribArray(aEndColorLoc);
+    }
     glEnableVertexAttribArray(aIdxLoc);
 
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
     glVertexAttribPointer(aStartLoc, 3, GL_FLOAT, GL_FALSE, 0, 0);
     glVertexAttribPointer(aEndLoc, 3, GL_FLOAT, GL_FALSE, 0, (void *)(12 * sizeof(float)));
-    glBindBuffer(GL_ARRAY_BUFFER, colorBuffer);
-    glVertexAttribPointer(aStartColorLoc, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glVertexAttribPointer(aEndColorLoc, 3, GL_FLOAT, GL_FALSE, 0, (void *)(12 * sizeof(float)));
+    if (mode == RenderMode::XYRGB) {
+        glBindBuffer(GL_ARRAY_BUFFER, colorBuffer);
+        if (aStartColorLoc >= 0) glVertexAttribPointer(aStartColorLoc, 3, GL_FLOAT, GL_FALSE, 0, 0);
+        if (aEndColorLoc >= 0) glVertexAttribPointer(aEndColorLoc, 3, GL_FLOAT, GL_FALSE, 0, (void *)(12 * sizeof(float)));
+    }
     glBindBuffer(GL_ARRAY_BUFFER, quadIndexBuffer);
     glVertexAttribPointer(aIdxLoc, 1, GL_FLOAT, GL_FALSE, 0, 0);
 
@@ -720,6 +751,7 @@ void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::
     lineShader->setUniform("uGain", 450.0f / 512.0f);
     lineShader->setUniform("uInvert", 1.0f);
     lineShader->setUniform("uLineHueShift", (GLfloat)(parameters.getHue() / 360.0));
+    lineShader->setUniform("uUseVertexColor", mode == RenderMode::XYRGB ? 1.0f : 0.0f);
 
     float intensity = parameters.getIntensity() * (41000.0f / sampleRate);
     if (parameters.getUpsamplingEnabled()) {
@@ -746,8 +778,10 @@ void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::
 
     glDisableVertexAttribArray(aStartLoc);
     glDisableVertexAttribArray(aEndLoc);
-    glDisableVertexAttribArray(aStartColorLoc);
-    glDisableVertexAttribArray(aEndColorLoc);
+    if (mode == RenderMode::XYRGB) {
+        if (aStartColorLoc >= 0) glDisableVertexAttribArray(aStartColorLoc);
+        if (aEndColorLoc >= 0) glDisableVertexAttribArray(aEndColorLoc);
+    }
     glDisableVertexAttribArray(aIdxLoc);
 }
 
@@ -1036,7 +1070,14 @@ void VisualiserRenderer::renderScope(const std::vector<float> &xPoints, const st
 
     renderScale = (float)openGLContext.getRenderingScale();
 
-            drawLineTexture(xPoints, yPoints, rPoints, gPoints, bPoints);
+    // Provide dummy colour buffers for non-RGB modes to avoid allocations
+    static std::vector<float> empty;
+    auto mode = renderMode.load();
+    if (mode != RenderMode::XYRGB) {
+        drawLineTexture(xPoints, yPoints, empty, empty, empty);
+    } else {
+        drawLineTexture(xPoints, yPoints, rPoints, gPoints, bPoints);
+    }
     checkGLErrors(__FILE__, __LINE__);
     drawCRT();
     checkGLErrors(__FILE__, __LINE__);
