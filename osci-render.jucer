@@ -155,6 +155,7 @@
         <FILE id="ESR7bv" name="trace.svg" compile="0" resource="1" file="Resources/svg/trace.svg"/>
         <FILE id="ID1vTS" name="translate.svg" compile="0" resource="1" file="Resources/svg/translate.svg"/>
         <FILE id="Sw4WWb" name="twist.svg" compile="0" resource="1" file="Resources/svg/twist.svg"/>
+        <FILE id="Y90Viq" name="unfold.svg" compile="0" resource="1" file="Resources/svg/unfold.svg"/>
         <FILE id="praXUY" name="vector-cancelling.svg" compile="0" resource="1"
               file="Resources/svg/vector-cancelling.svg"/>
         <FILE id="qC6QiP" name="volume.svg" compile="0" resource="1" file="Resources/svg/volume.svg"/>
@@ -173,6 +174,9 @@
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
+        <FILE id="XSUjDz" name="KaleidoscopeEffect.h" compile="0" resource="0"
+              file="Source/audio/KaleidoscopeEffect.h"/>
+        <FILE id="mREEpc" name="UnfoldEffect.h" compile="0" resource="0" file="Source/audio/UnfoldEffect.h"/>
         <FILE id="jfRtxu" name="VortexEffect.h" compile="0" resource="0" file="Source/audio/VortexEffect.h"/>
         <FILE id="de5H36" name="GodRayEffect.h" compile="0" resource="0" file="Source/audio/GodRayEffect.h"/>
         <FILE id="tU2pQl" name="SkewEffect.h" compile="0" resource="0" file="Source/audio/SkewEffect.h"/>
@@ -195,8 +199,6 @@
         <FILE id="ux2dO2" name="DistortEffect.h" compile="0" resource="0" file="Source/audio/DistortEffect.h"/>
         <FILE id="SWC0tN" name="MultiplexEffect.h" compile="0" resource="0"
               file="Source/audio/MultiplexEffect.h"/>
-        <FILE id="kAlEiD" name="KaleidoscopeEffect.h" compile="0" resource="0"
-              file="Source/audio/KaleidoscopeEffect.h"/>
         <FILE id="bNcEfx" name="BounceEffect.h" compile="0" resource="0" file="Source/audio/BounceEffect.h"/>
         <FILE id="h0dMim" name="PerspectiveEffect.h" compile="0" resource="0"
               file="Source/audio/PerspectiveEffect.h"/>
@@ -916,4 +918,3 @@
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>
 </JUCERPROJECT>
-

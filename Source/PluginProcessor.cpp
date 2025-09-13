@@ -15,7 +15,7 @@
 #include "audio/PolygonBitCrushEffect.h"
 #include "audio/SpiralBitCrushEffect.h"
 #include "audio/DistortEffect.h"
-#include "audio/KaleidoscopeEffect.h"
+#include "audio/UnfoldEffect.h"
 #include "audio/MultiplexEffect.h"
 #include "audio/SmoothEffect.h"
 #include "audio/WobbleEffect.h"
@@ -29,6 +29,7 @@
 #include "audio/SwirlEffect.h"
 #include "audio/BounceEffect.h"
 #include "audio/SkewEffect.h"
+#include "audio/KaleidoscopeEffect.h"
 #include "audio/VortexEffect.h"
 #include "audio/GodRayEffect.h"
 #include "parser/FileParser.h"
@@ -58,11 +59,12 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
 
 #if OSCI_PREMIUM
     toggleableEffects.push_back(MultiplexEffect(*this).build());
-    toggleableEffects.push_back(KaleidoscopeEffect(*this).build());
+    toggleableEffects.push_back(UnfoldEffect(*this).build());
     toggleableEffects.push_back(BounceEffect().build());
     toggleableEffects.push_back(TwistEffect().build());
     toggleableEffects.push_back(SkewEffect().build());
     toggleableEffects.push_back(PolygonBitCrushEffect().build());
+    toggleableEffects.push_back(KaleidoscopeEffect(*this).build());
     toggleableEffects.push_back(VortexEffect().build());
     toggleableEffects.push_back(GodRayEffect().build());
     toggleableEffects.push_back(SpiralBitCrushEffect().build());

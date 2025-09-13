@@ -12,8 +12,7 @@ public:
         // Bias values toward 0 or 1 based on sign
         if (bias > 0.0) {
             noise = std::pow(noise, biasExponent);
-        }
-        else {
+        } else {
             noise = 1 - std::pow(1 - noise, biasExponent);
         }
         double scale = (1 - noiseAmp) + noise * noiseAmp;
