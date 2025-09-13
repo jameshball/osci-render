@@ -7,11 +7,11 @@ public:
 		double value = values[0];
 		double translatedBulge = -value + 1;
 
-		double r = sqrt(pow(input.x, 2) + pow(input.y, 2));
-		double theta = atan2(input.y, input.x);
-		double rn = pow(r, translatedBulge);
-
-		return osci::Point(rn * cos(theta), rn * sin(theta), input.z);
+		double r = std::hypot(input.x, input.y);
+        if (r == 0) return input;
+		double rn = std::pow(r, translatedBulge);
+		double scale = rn / r;
+		return osci::Point(scale * input.x, scale * input.y, input.z);
 	}
 
 	std::shared_ptr<osci::Effect> build() const override {

@@ -12,11 +12,14 @@
 #include "audio/BitCrushEffect.h"
 #include "audio/BulgeEffect.h"
 #include "audio/TwistEffect.h"
+#include "audio/PolygonBitCrushEffect.h"
+#include "audio/SpiralBitCrushEffect.h"
 #include "audio/DistortEffect.h"
 #include "audio/KaleidoscopeEffect.h"
 #include "audio/MultiplexEffect.h"
 #include "audio/SmoothEffect.h"
 #include "audio/WobbleEffect.h"
+#include "audio/DuplicatorEffect.h"
 #include "audio/DashedLineEffect.h"
 #include "audio/VectorCancellingEffect.h"
 #include "audio/ScaleEffect.h"
@@ -26,6 +29,8 @@
 #include "audio/SwirlEffect.h"
 #include "audio/BounceEffect.h"
 #include "audio/SkewEffect.h"
+#include "audio/VortexEffect.h"
+#include "audio/GodRayEffect.h"
 #include "parser/FileParser.h"
 #include "parser/FrameProducer.h"
 
@@ -49,6 +54,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     toggleableEffects.push_back(DashedLineEffect(*this).build());
     toggleableEffects.push_back(TraceEffect(*this).build());
     toggleableEffects.push_back(WobbleEffect(*this).build());
+    toggleableEffects.push_back(DuplicatorEffect(*this).build());
 
 #if OSCI_PREMIUM
     toggleableEffects.push_back(MultiplexEffect(*this).build());
@@ -56,6 +62,10 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     toggleableEffects.push_back(BounceEffect().build());
     toggleableEffects.push_back(TwistEffect().build());
     toggleableEffects.push_back(SkewEffect().build());
+    toggleableEffects.push_back(PolygonBitCrushEffect().build());
+    toggleableEffects.push_back(VortexEffect().build());
+    toggleableEffects.push_back(GodRayEffect().build());
+    toggleableEffects.push_back(SpiralBitCrushEffect().build());
 #endif
 
     auto scaleEffect = ScaleEffectApp().build();
