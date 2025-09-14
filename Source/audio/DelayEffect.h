@@ -38,7 +38,7 @@ public:
 	}
 
 	std::shared_ptr<osci::Effect> build() const override {
-		auto eff = std::make_shared<osci::Effect>(
+		auto eff = std::make_shared<osci::SimpleEffect>(
 			std::make_shared<DelayEffect>(),
 			std::vector<osci::EffectParameter*>{
 				new osci::EffectParameter("Delay Decay", "Adds repetitions, delays, or echos to the audio. This slider controls the volume of the echo.", "delayDecay", VERSION_HINT, 0.4, 0.0, 1.0),

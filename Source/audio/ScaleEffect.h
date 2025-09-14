@@ -8,7 +8,7 @@ public:
     }
 
     std::shared_ptr<osci::Effect> build() const override {
-        auto eff = std::make_shared<osci::Effect>(
+        auto eff = std::make_shared<osci::SimpleEffect>(
             std::make_shared<ScaleEffectApp>(),
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter("Scale X", "Scales the object in the horizontal direction.", "scaleX", VERSION_HINT, 1.2, -3.0, 3.0),

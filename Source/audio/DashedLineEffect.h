@@ -43,7 +43,7 @@ public:
 	}
 
 	std::shared_ptr<osci::Effect> build() const override {
-		auto eff = std::make_shared<osci::Effect>(
+		auto eff = std::make_shared<osci::SimpleEffect>(
 			std::make_shared<DashedLineEffect>(audioProcessor),
 			std::vector<osci::EffectParameter*>{
 				new osci::EffectParameter("Dash Count", "Controls the number of dashed lines in the drawing.", "dashCount", VERSION_HINT, 16.0, 1.0, 32.0),
@@ -70,7 +70,7 @@ public:
 	TraceEffect(OscirenderAudioProcessor& p) : DashedLineEffect(p) {}
 
 	std::shared_ptr<osci::Effect> build() const override {
-		auto eff = std::make_shared<osci::Effect>(
+		auto eff = std::make_shared<osci::SimpleEffect>(
 			std::make_shared<TraceEffect>(audioProcessor),
 			std::vector<osci::EffectParameter*>{
 				new osci::EffectParameter(

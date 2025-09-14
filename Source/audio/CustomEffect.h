@@ -20,7 +20,7 @@ public:
 
 	std::shared_ptr<osci::Effect> build() const override {
 		// Note: callers needing CustomEffect with callback/vars should construct directly.
-		auto eff = std::make_shared<osci::Effect>(
+		auto eff = std::make_shared<osci::SimpleEffect>(
 			std::make_shared<CustomEffect>([](int, juce::String, juce::String) {}, nullptr),
 			new osci::EffectParameter("Lua Effect", "Controls the strength of the custom Lua effect applied. You can write your own custom effect using Lua by pressing the edit button on the right.", "customEffectStrength", VERSION_HINT, 1.0, 0.0, 1.0));
 		eff->setIcon(BinaryData::lua_svg);

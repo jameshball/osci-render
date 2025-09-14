@@ -11,7 +11,7 @@ public:
     }
 
     std::shared_ptr<osci::Effect> build() const override {
-        auto eff = std::make_shared<osci::Effect>(
+        auto eff = std::make_shared<osci::SimpleEffect>(
             std::make_shared<RippleEffectApp>(),
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter("Ripple Depth", "Controls how large the ripples applied to the image are.", "rippleDepth", VERSION_HINT, 0.2, 0.0, 1.0),

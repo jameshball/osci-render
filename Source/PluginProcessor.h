@@ -61,9 +61,10 @@ public:
     std::shared_ptr<osci::Effect> previewEffect;
     std::atomic<double> luaValues[26] = {0.0};
 
-    std::shared_ptr<osci::Effect> frequencyEffect = std::make_shared<osci::Effect>(
+    std::shared_ptr<osci::Effect> frequencyEffect = std::make_shared<osci::SimpleEffect>(
         [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
-            frequency = values[0].load();
+            // TODO: Root cause why the epsilon is needed. This prevents a weird bug on mac.
+            frequency = values[0].load() + 0.00001;
             return input;
         },
         new osci::EffectParameter(
@@ -76,7 +77,7 @@ public:
 
     std::function<void(int, juce::String, juce::String)> errorCallback = [this](int lineNum, juce::String fileName, juce::String error) { notifyErrorListeners(lineNum, fileName, error); };
     std::shared_ptr<CustomEffect> customEffect = std::make_shared<CustomEffect>(errorCallback, luaValues);
-    std::shared_ptr<osci::Effect> custom = std::make_shared<osci::Effect>(
+    std::shared_ptr<osci::Effect> custom = std::make_shared<osci::SimpleEffect>(
         customEffect,
         new osci::EffectParameter("Lua Effect", "Controls the strength of the custom Lua effect applied. You can write your own custom effect using Lua by pressing the edit button on the right.", "customEffectStrength", VERSION_HINT, 1.0, 0.0, 1.0));
 
@@ -127,7 +128,7 @@ public:
     osci::FloatParameter* animationOffset = new osci::FloatParameter("Animation Offset", "animationOffset", VERSION_HINT, 0, -10000, 10000);
 
     osci::BooleanParameter* invertImage = new osci::BooleanParameter("Invert Image", "invertImage", VERSION_HINT, false, "Inverts the image so that dark pixels become light, and vice versa.");
-    std::shared_ptr<osci::Effect> imageThreshold = std::make_shared<osci::Effect>(
+    std::shared_ptr<osci::Effect> imageThreshold = std::make_shared<osci::SimpleEffect>(
         [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             return input;
         },
@@ -136,7 +137,7 @@ public:
             "Controls the probability of visiting a dark pixel versus a light pixel. Darker pixels are less likely to be visited, so turning the threshold to a lower value makes it more likely to visit dark pixels.",
             "imageThreshold",
             VERSION_HINT, 0.5, 0, 1));
-    std::shared_ptr<osci::Effect> imageStride = std::make_shared<osci::Effect>(
+    std::shared_ptr<osci::Effect> imageStride = std::make_shared<osci::SimpleEffect>(
         [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             return input;
         },

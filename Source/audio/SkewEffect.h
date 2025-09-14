@@ -23,7 +23,7 @@ public:
     }
 
     std::shared_ptr<osci::Effect> build() const override {
-        auto eff = std::make_shared<osci::Effect>(
+        auto eff = std::make_shared<osci::SimpleEffect>(
             std::make_shared<SkewEffect>(),
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter("Skew X", "Skews (shears) the shape horizontally based on vertical position.", "skewX", VERSION_HINT, 0.0, -1.0, 1.0, 0.0001f, osci::LfoType::Sine, 0.2f),

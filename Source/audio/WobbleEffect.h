@@ -15,7 +15,7 @@ public:
     }
 
 	std::shared_ptr<osci::Effect> build() const override {
-        auto wobble = std::make_shared<osci::Effect>(
+        auto wobble = std::make_shared<osci::SimpleEffect>(
             std::make_shared<WobbleEffect>(audioProcessor),
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter("Wobble Amount", "Adds a sine wave of the prominent frequency in the audio currently playing. The sine wave's frequency is slightly offset to create a subtle 'wobble' in the image. Increasing the slider increases the strength of the wobble.", "wobble", VERSION_HINT, 0.3, 0.0, 1.0),

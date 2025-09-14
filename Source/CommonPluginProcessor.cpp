@@ -170,7 +170,7 @@ void CommonAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 	currentSampleRate = sampleRate;
     
     for (auto& effect : effects) {
-        effect->updateSampleRate(currentSampleRate);
+        effect->prepareToPlay(currentSampleRate, samplesPerBlock);
     }
     
     threadManager.prepare(sampleRate, samplesPerBlock);

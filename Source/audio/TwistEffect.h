@@ -12,7 +12,7 @@ public:
 	}
     
     std::shared_ptr<osci::Effect> build() const override {
-        auto eff = std::make_shared<osci::Effect>(
+        auto eff = std::make_shared<osci::SimpleEffect>(
             std::make_shared<TwistEffect>(),
             new osci::EffectParameter("Twist", "Twists the image in a corkscrew pattern.", "twist", VERSION_HINT, 0.5, 0.0, 1.0, 0.0001, osci::LfoType::Sine, 0.5)
         );

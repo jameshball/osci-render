@@ -177,7 +177,7 @@ void OscirenderAudioProcessor::addLuaSlider() {
         sliderNum = (sliderNum - mod) / 26;
     }
 
-    luaEffects.push_back(std::make_shared<osci::Effect>(
+    luaEffects.push_back(std::make_shared<osci::SimpleEffect>(
         [this, sliderIndex](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
             luaValues[sliderIndex].store(values[0]);
             return input;
@@ -412,6 +412,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     int totalNumInputChannels = getTotalNumInputChannels();
     int totalNumOutputChannels = getTotalNumOutputChannels();
     double sampleRate = getSampleRate();
+    int numSamples = buffer.getNumSamples();
 
     // MIDI transport info variables (defaults to 60bpm, 4/4 time signature at zero seconds and not playing)
     double bpm = 60;
@@ -519,7 +520,10 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
     auto* channelData = buffer.getArrayOfWritePointers();
 
-    for (int sample = 0; sample < buffer.getNumSamples(); ++sample) {
+    std::vector<double> currentVolumeBuffer(numSamples, 0.0);
+    double totalVolume = 0.0;
+
+    for (int sample = 0; sample < numSamples; ++sample) {
         if (animateFrames->getBoolValue()) {
             if (juce::JUCEApplicationBase::isStandaloneApp()) {
                 animationFrame = animationFrame + sTimeSec * animationRate->getValueUnnormalised();
@@ -561,43 +565,46 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         currentVolume = std::sqrt(squaredVolume);
         currentVolume = juce::jlimit(0.0, 1.0, currentVolume);
 
-        osci::Point channels = {outputBuffer3d.getSample(0, sample), outputBuffer3d.getSample(1, sample), outputBuffer3d.getSample(2, sample)};
+        currentVolumeBuffer[sample] = currentVolume;
+        totalVolume += currentVolume;
+    }
 
-        {
-            juce::SpinLock::ScopedLockType lock1(parsersLock);
-            juce::SpinLock::ScopedLockType lock2(effectsLock);
-            if (volume > EPSILON) {
-                for (auto& effect : toggleableEffects) {
-                    bool isEnabled = effect->enabled != nullptr && effect->enabled->getValue();
-                    bool isSelected = effect->selected == nullptr ? true : effect->selected->getBoolValue();
-                    if (isEnabled && isSelected) {
-                        if (effect->getId() == custom->getId()) {
-                            effect->setExternalInput(osci::Point{ left, right });
-                        }
-                        channels = effect->apply(sample, channels, currentVolume);
-                    }
-                }
-                // Apply preview effect if present and not already active in the main chain
-                if (previewEffect) {
-                    const bool prevEnabled = (previewEffect->enabled != nullptr) && previewEffect->enabled->getValue();
-                    const bool prevSelected = (previewEffect->selected == nullptr) ? true : previewEffect->selected->getBoolValue();
-                    if (!(prevEnabled && prevSelected)) {
-                        if (previewEffect->getId() == custom->getId())
-                            previewEffect->setExternalInput(osci::Point{ left, right });
-                        channels = previewEffect->apply(sample, channels, currentVolume);
-                    }
-                }
-            }
-            for (auto& effect : permanentEffects) {
-                channels = effect->apply(sample, channels, currentVolume);
-            }
-            auto lua = currentFile >= 0 ? sounds[currentFile]->parser->getLua() : nullptr;
-            if (lua != nullptr || custom->enabled->getBoolValue()) {
-                for (auto& effect : luaEffects) {
-                    effect->apply(sample, channels, currentVolume);
-                }
+    juce::SpinLock::ScopedLockType lock1(parsersLock);
+    juce::SpinLock::ScopedLockType lock2(effectsLock);
+
+    if (totalVolume > EPSILON) {
+        for (auto& effect : toggleableEffects) {
+            bool isEnabled = effect->enabled != nullptr && effect->enabled->getValue();
+            bool isSelected = effect->selected == nullptr ? true : effect->selected->getBoolValue();
+            if (isEnabled && isSelected) {
+                // TODO: need to setExternalInput for Lua custom effect
+                effect->processBlock(outputBuffer3d, midiMessages);
             }
         }
+
+        if (previewEffect) {
+            const bool prevEnabled = (previewEffect->enabled != nullptr) && previewEffect->enabled->getValue();
+            const bool prevSelected = (previewEffect->selected == nullptr) ? true : previewEffect->selected->getBoolValue();
+            if (!(prevEnabled && prevSelected)) {
+                // TODO: need to setExternalInput for Lua custom effect
+                previewEffect->processBlock(outputBuffer3d, midiMessages);
+            }
+        }
+    }
+
+    for (auto& effect : permanentEffects) {
+        effect->processBlock(outputBuffer3d, midiMessages);
+    }
+    auto lua = currentFile >= 0 ? sounds[currentFile]->parser->getLua() : nullptr;
+    if (lua != nullptr || custom->enabled->getBoolValue()) {
+        for (auto& effect : luaEffects) {
+            effect->processBlock(outputBuffer3d, midiMessages);
+        }
+    }
+
+    // TODO: process in batches rather than per-sample
+    for (int sample = 0; sample < numSamples; ++sample) {
+        osci::Point channels = {outputBuffer3d.getSample(0, sample), outputBuffer3d.getSample(1, sample)};
 
         double x = channels.x;
         double y = channels.y;
@@ -830,11 +837,12 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
 }
 
 void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float newValue) {
-    for (auto effect : luaEffects) {
-        if (parameterIndex == effect->parameters[0]->getParameterIndex()) {
-            effect->apply();
-        }
-    }
+    // TODO: Figure out why below code was needed and if it is still needed
+    // for (auto effect : luaEffects) {
+    //     if (parameterIndex == effect->parameters[0]->getParameterIndex()) {
+    //         effect->apply();
+    //     }
+    // }
     if (parameterIndex == voices->getParameterIndex()) {
         int numVoices = voices->getValueUnnormalised();
         // if the number of voices has changed, update the synth without clearing all the voices

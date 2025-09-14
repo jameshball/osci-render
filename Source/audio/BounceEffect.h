@@ -39,7 +39,7 @@ public:
     }
 
     std::shared_ptr<osci::Effect> build() const override {
-        auto eff = std::make_shared<osci::Effect>(
+        auto eff = std::make_shared<osci::SimpleEffect>(
             std::make_shared<BounceEffect>(),
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter("Bounce Size", "Size (scale) of the bouncing object.", "bounceSize", VERSION_HINT, 0.3, 0.05, 1.0),

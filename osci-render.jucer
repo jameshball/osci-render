@@ -855,6 +855,9 @@
         <CONFIGURATION name="Release (Development)" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
                        headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
                        userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
+        <CONFIGURATION name="Profiling" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,GCC_GENERATE_DEBUGGING_SYMBOLS=YES,GCC_DEBUGGING_SYMBOLS=full,DEBUG_INFORMATION_FORMAT=dwarf-with-dsym,STRIP_INSTALLED_PRODUCT = NO,COPY_PHASE_STRIP=NO,DWARF_DSYM_FILE_SHOULD_ACCOMPANY_PRODUCT=YES"
+                       headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
+                       userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>

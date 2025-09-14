@@ -11,7 +11,7 @@ public:
 	}
 
 	std::shared_ptr<osci::Effect> build() const override {
-		auto eff = std::make_shared<osci::Effect>(
+		auto eff = std::make_shared<osci::SimpleEffect>(
 			std::make_shared<DistortEffect>(),
 			std::vector<osci::EffectParameter*>{
 				new osci::EffectParameter("Distort X", "Distorts the image in the horizontal direction by jittering the audio sample being drawn.", "distortX", VERSION_HINT, 0.0, 0.0, 1.0),

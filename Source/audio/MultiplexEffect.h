@@ -57,7 +57,7 @@ public:
     }
 
     std::shared_ptr<osci::Effect> build() const override {
-        auto eff = std::make_shared<osci::Effect>(
+        auto eff = std::make_shared<osci::SimpleEffect>(
             std::make_shared<MultiplexEffect>(audioProcessor),
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter("Multiplex X", "Controls the horizontal grid size for the multiplex effect.", "multiplexGridX", VERSION_HINT, 2.0, 1.0, 8.0),

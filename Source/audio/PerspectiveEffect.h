@@ -26,7 +26,7 @@ public:
 	}
 
 	std::shared_ptr<osci::Effect> build() const override {
-		auto eff = std::make_shared<osci::Effect>(
+		auto eff = std::make_shared<osci::SimpleEffect>(
 			std::make_shared<PerspectiveEffect>(),
 			std::vector<osci::EffectParameter*>{
 				new osci::EffectParameter("Perspective", "Controls the strength of the 3D perspective projection.", "perspectiveStrength", VERSION_HINT, 1.0, 0.0, 1.0),

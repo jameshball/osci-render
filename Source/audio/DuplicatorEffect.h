@@ -24,7 +24,7 @@ public:
     }
 
     std::shared_ptr<osci::Effect> build() const override {
-        auto eff = std::make_shared<osci::Effect>(
+        auto eff = std::make_shared<osci::SimpleEffect>(
             std::make_shared<DuplicatorEffect>(audioProcessor),
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter("Duplicator Copies",

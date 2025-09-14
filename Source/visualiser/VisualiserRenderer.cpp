@@ -54,7 +54,16 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
 
         auto applyEffects = [&](osci::Point point) {
             for (auto &effect : parameters.audioEffects) {
-                point = effect->apply(0, point);
+                // TODO: optimise and process in batches rather than per-point
+                juce::AudioBuffer<float> buffer = juce::AudioBuffer<float>(3, 1);
+                juce::MidiBuffer midiMessages;
+                buffer.setSample(0, 0, point.x);
+                buffer.setSample(1, 0, point.y);
+                buffer.setSample(2, 0, point.z);
+                effect->processBlock(buffer, midiMessages);
+                point.x = buffer.getSample(0, 0);
+                point.y = buffer.getSample(1, 0);
+                point.z = buffer.getSample(2, 0);
             }
 #if OSCI_PREMIUM
             if (parameters.isFlippedHorizontal()) {

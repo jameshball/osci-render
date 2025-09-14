@@ -22,7 +22,7 @@ public:
 	}
 
 	std::shared_ptr<osci::Effect> build() const override {
-		auto eff = std::make_shared<osci::Effect>(
+		auto eff = std::make_shared<osci::SimpleEffect>(
 			std::make_shared<VectorCancellingEffect>(),
 			new osci::EffectParameter("Vector Cancelling", "Inverts the audio and image every few samples to 'cancel out' the audio, making the audio quiet, and distorting the image.", "vectorCancelling", VERSION_HINT, 0.5, 0.0, 1.0));
 		eff->setIcon(BinaryData::vectorcancelling_svg);

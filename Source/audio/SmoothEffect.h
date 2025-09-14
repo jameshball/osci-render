@@ -19,7 +19,7 @@ public:
 
 	std::shared_ptr<osci::Effect> build() const override {
         auto id = idPrefix.isEmpty() ? juce::String("smoothing") : (idPrefix + "Smoothing");
-		auto eff = std::make_shared<osci::Effect>(
+		auto eff = std::make_shared<osci::SimpleEffect>(
 			std::make_shared<SmoothEffect>(id),
 	    	new osci::EffectParameter("Smoothing", "This works as a low-pass frequency filter that removes high frequencies, making the image look smoother, and audio sound less harsh.", id, VERSION_HINT, smoothingDefault, 0.0, 1.0)
 		);

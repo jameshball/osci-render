@@ -41,7 +41,7 @@ public:
     }
     
     std::shared_ptr<osci::Effect> build() const override {
-        auto eff = std::make_shared<osci::Effect>(
+        auto eff = std::make_shared<osci::SimpleEffect>(
             std::make_shared<AutoGainControlEffect>(),
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter("Intensity", "Controls how aggressively the gain adjustment is applied", "agcIntensity", VERSION_HINT, 1.0, 0.0, 1.0),

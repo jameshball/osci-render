@@ -46,7 +46,7 @@ public:
         VERSION_HINT, 0.7, 0.0, 1.0
     );
     osci::BooleanParameter losslessVideo = osci::BooleanParameter("Lossless Video", "losslessVideo", VERSION_HINT, false, "Record video in a lossless format. WARNING: This is not supported by all media players.");
-    osci::Effect qualityEffect = osci::Effect(&qualityParameter);
+    std::shared_ptr<osci::Effect> qualityEffect = std::make_shared<osci::SimpleEffect>(&qualityParameter);
 
     osci::BooleanParameter recordAudio = osci::BooleanParameter("Record Audio", "recordAudio", VERSION_HINT, true, "Record audio along with the video.");
     osci::BooleanParameter recordVideo = osci::BooleanParameter("Record Video", "recordVideo", VERSION_HINT, sosciFeatures, "Record video output of the visualiser.");
@@ -57,7 +57,7 @@ public:
         "resolution",
         VERSION_HINT, 1024, 128, 2048, 1.0
     );
-    osci::Effect resolutionEffect = osci::Effect(&resolution);
+    std::shared_ptr<osci::Effect> resolutionEffect = std::make_shared<osci::SimpleEffect>(&resolution);
     
     osci::EffectParameter frameRate = osci::EffectParameter(
         "Frame Rate",
@@ -65,7 +65,7 @@ public:
         "frameRate",
         VERSION_HINT, 60.0, 10, 240, 0.01
     );
-    osci::Effect frameRateEffect = osci::Effect(&frameRate);
+    std::shared_ptr<osci::Effect> frameRateEffect = std::make_shared<osci::SimpleEffect>(&frameRate);
 
     juce::String compressionPreset = "fast";
     VideoCodec videoCodec = VideoCodec::H264;
@@ -80,13 +80,13 @@ public:
         settingsXml->setAttribute("videoCodec", static_cast<int>(videoCodec));
         
         auto qualityXml = settingsXml->createNewChildElement("quality");
-        qualityEffect.save(qualityXml);
+        qualityEffect->save(qualityXml);
         
         auto resolutionXml = settingsXml->createNewChildElement("resolution");
-        resolutionEffect.save(resolutionXml);
-        
+        resolutionEffect->save(resolutionXml);
+
         auto frameRateXml = settingsXml->createNewChildElement("frameRate");
-        frameRateEffect.save(frameRateXml);
+        frameRateEffect->save(frameRateXml);
     }
 
     // opt to not change any values if not found
@@ -112,13 +112,13 @@ public:
                 videoCodec = static_cast<VideoCodec>(codecValue);
             }
             if (auto* qualityXml = settingsXml->getChildByName("quality")) {
-                qualityEffect.load(qualityXml);
+                qualityEffect->load(qualityXml);
             }
             if (auto* resolutionXml = settingsXml->getChildByName("resolution")) {
-                resolutionEffect.load(resolutionXml);
+                resolutionEffect->load(resolutionXml);
             }
             if (auto* frameRateXml = settingsXml->getChildByName("frameRate")) {
-                frameRateEffect.load(frameRateXml);
+                frameRateEffect->load(frameRateXml);
             }
         }
     }
@@ -138,7 +138,7 @@ public:
         if (parameters.losslessVideo.getBoolValue()) {
             return 0;
         }
-        double quality = juce::jlimit(0.0, 1.0, parameters.qualityEffect.getValue());
+        double quality = juce::jlimit(0.0, 1.0, parameters.qualityEffect->getValue());
         // mapping to 1-51 for ffmpeg's crf value (ignoring 0 as this is lossless and
         // not supported by all media players)
         return 50 * (1.0 - quality) + 1;
@@ -192,9 +192,9 @@ public:
     RecordingParameters& parameters;
 
 private:
-    EffectComponent quality{parameters.qualityEffect};
-    EffectComponent resolution{parameters.resolutionEffect};
-    EffectComponent frameRate{parameters.frameRateEffect};
+    EffectComponent quality{*parameters.qualityEffect};
+    EffectComponent resolution{*parameters.resolutionEffect};
+    EffectComponent frameRate{*parameters.frameRateEffect};
 
     jux::SwitchButton losslessVideo{&parameters.losslessVideo};
     jux::SwitchButton recordAudio{&parameters.recordAudio};

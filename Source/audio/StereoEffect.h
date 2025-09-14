@@ -28,7 +28,7 @@ public:
 	}
 
 	std::shared_ptr<osci::Effect> build() const override {
-		return std::make_shared<osci::Effect>(
+		return std::make_shared<osci::SimpleEffect>(
 			std::make_shared<StereoEffect>(),
 			new osci::EffectParameter(
 				"Stereo",
