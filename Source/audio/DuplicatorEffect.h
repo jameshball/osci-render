@@ -14,7 +14,7 @@ public:
 
         // Offset moves each time the input shape is drawn once
         double theta = std::floor(framePhase * copies) / copies * twoPi + angleOffset;
-        osci::Point offset(std::cos(theta), std::sin(theta), 0.0);
+        osci::Point offset(juce::dsp::FastMathApproximations::cos(theta), juce::dsp::FastMathApproximations::sin(theta), 0.0);
 
         double freqDivisor = std::ceil(copies - 1e-3);
         framePhase += audioProcessor.frequency / freqDivisor / sampleRate;

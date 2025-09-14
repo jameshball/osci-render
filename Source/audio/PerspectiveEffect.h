@@ -7,11 +7,11 @@ public:
 	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) override {
 		auto effectScale = values[0].load();
 		// Far plane clipping happens at about 1.2 deg for 100 far plane dist
-		double fovDegrees = juce::jlimit(1.5f, 179.0f, values[1].load());
-		double fov = juce::degreesToRadians(fovDegrees);
+		float fovDegrees = juce::jlimit(1.5f, 179.0f, values[1].load());
+		float fov = juce::degreesToRadians(fovDegrees);
 
 		// Place camera such that field of view is tangent to unit sphere
-		Vec3 origin = Vec3(0, 0, -1.0f / std::sin(0.5f * (float)fov));
+		Vec3 origin = Vec3(0, 0, -1.0f / juce::dsp::FastMathApproximations::sin(0.5f * (float)fov));
 		camera.setPosition(origin);
 		camera.setFov(fov);
 		Vec3 vec = Vec3(input.x, input.y, input.z);

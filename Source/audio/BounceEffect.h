@@ -16,8 +16,8 @@ public:
         double angle = values[2].load() * juce::MathConstants<double>::twoPi;
 
         // Base direction from user
-        double dirX = std::cos(angle);
-        double dirY = std::sin(angle);
+        double dirX = juce::dsp::FastMathApproximations::cos(angle);
+        double dirY = juce::dsp::FastMathApproximations::sin(angle);
         if (flipX) dirX = -dirX;
         if (flipY) dirY = -dirY;
 

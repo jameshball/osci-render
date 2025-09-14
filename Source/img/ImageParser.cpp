@@ -440,7 +440,7 @@ osci::Point ImageParser::getSample() {
             
             double increment = 0.01;
             if (pixel > audioProcessor.imageThreshold->getActualValue()) {
-                increment = (1 - tanh(4 * pixel)) * 0.3;
+                increment = (1 - juce::dsp::FastMathApproximations::tanh(4 * pixel)) * 0.3;
             }
             
             scanX += increment;

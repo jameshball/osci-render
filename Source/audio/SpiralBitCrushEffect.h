@@ -34,8 +34,8 @@ public:
 			logPolarCoords.rotate(0, 0, -domainTheta);
 			double outR = std::exp(logPolarCoords.y + zoom);
 			double outTheta = logPolarCoords.x + rotation;
-			output.x = outR *  std::sin(outTheta);
-			output.y = outR * -std::cos(outTheta);
+			output.x = outR *  juce::dsp::FastMathApproximations::sin(outTheta);
+			output.y = outR * -juce::dsp::FastMathApproximations::cos(outTheta);
 		}
 
 		// Round z in log space using same spacing as xy log-polar grid

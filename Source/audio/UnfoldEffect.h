@@ -48,8 +48,8 @@ public:
         // Map entire original angle range into [segmentOffset, segmentOffset + wedgeAngle) so edges line up exactly.
         double finalTheta = segmentOffset + thetaNorm * wedgeAngle - juce::MathConstants<double>::pi; // constant 180° rotation
 
-        double newX = r * std::cos(finalTheta);
-        double newY = r * std::sin(finalTheta);
+        double newX = r * juce::dsp::FastMathApproximations::cos(finalTheta);
+        double newY = r * juce::dsp::FastMathApproximations::sin(finalTheta);
         return osci::Point(newX, newY, input.z);
     }
 

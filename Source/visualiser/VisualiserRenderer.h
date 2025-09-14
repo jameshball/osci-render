@@ -65,7 +65,8 @@ protected:
     std::function<void()> postRenderCallback = nullptr;
 
     juce::AudioBuffer<float> audioOutputBuffer;
-private:    juce::Rectangle<int> viewportArea;
+private:
+    juce::Rectangle<int> viewportArea;
     std::optional<juce::Rectangle<float>> cropRectangle;
 
     float renderScale = 1.0f;
@@ -87,6 +88,9 @@ private:    juce::Rectangle<int> viewportArea;
     std::atomic<int> sampleBufferCount = 0;
     int prevSampleBufferCount = 0;
     long lastTriggerPosition = 0;
+
+    juce::AudioBuffer<float> tempBuffer = juce::AudioBuffer<float>(3, 1);
+    juce::MidiBuffer midiMessages;
 
     std::vector<float> scratchVertices;
     std::vector<float> fullScreenQuad;
