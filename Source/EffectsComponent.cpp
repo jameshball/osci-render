@@ -143,6 +143,36 @@ void EffectsComponent::resized() {
 }
 
 void EffectsComponent::changeListenerCallback(juce::ChangeBroadcaster* source) {
+    // Recompute whether any effects are currently selected in the new project
+    bool anySelected = false;
+    {
+        juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+        for (const auto& eff : audioProcessor.toggleableEffects) {
+            const bool isSelected = (eff->selected == nullptr) ? true : eff->selected->getBoolValue();
+            if (isSelected) { anySelected = true; break; }
+        }
+    }
+
+    // Show the grid only when there are no selected effects in the project
+    showingGrid = ! anySelected;
+
+    if (showingGrid) {
+        grid.setVisible(true);
+        listBox.setVisible(false);
+    } else {
+        grid.setVisible(false);
+        listBox.setVisible(true);
+    }
+
+    // Always refresh disabled states so opened projects immediately reflect which
+    // effects are already in use, and so the Cancel button visibility is correct.
+    grid.refreshDisabledStates();
+
+    // Refresh list contents to reflect newly loaded project data
     itemData.resetData();
     listBox.updateContent();
+
+    // Ensure layout updates after visibility changes
+    resized();
+    repaint();
 }

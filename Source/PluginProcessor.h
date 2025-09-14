@@ -63,7 +63,7 @@ public:
 
     std::shared_ptr<osci::Effect> frequencyEffect = std::make_shared<osci::Effect>(
         [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
-            frequency = values[0].load();
+            frequency = values[0].load() + 0.000001;
             return input;
         },
         new osci::EffectParameter(
