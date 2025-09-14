@@ -9,10 +9,10 @@ class UnfoldEffect : public osci::EffectApplication {
 public:
     explicit UnfoldEffect(OscirenderAudioProcessor &p) : audioProcessor(p) {}
 
-    osci::Point apply(int /*index*/, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
+    osci::Point apply(int /*index*/, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) override {
         // values[0] = segments (can be fractional)
         // values[1] = phase (0-1) selecting which segment is currently being drawn
-        double segments = juce::jmax(values[0].load(), 1.0); // ensure at least 1 segment
+        double segments = juce::jmax(values[0].load(), 1.0f); // ensure at least 1 segment
 
         // Polar conversion
         double r = std::sqrt(input.x * input.x + input.y * input.y);

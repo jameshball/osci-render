@@ -178,7 +178,7 @@ void OscirenderAudioProcessor::addLuaSlider() {
     }
 
     luaEffects.push_back(std::make_shared<osci::SimpleEffect>(
-        [this, sliderIndex](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+        [this, sliderIndex](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) {
             luaValues[sliderIndex].store(values[0]);
             return input;
         },

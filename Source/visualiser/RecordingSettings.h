@@ -138,7 +138,7 @@ public:
         if (parameters.losslessVideo.getBoolValue()) {
             return 0;
         }
-        double quality = juce::jlimit(0.0, 1.0, parameters.qualityEffect->getValue());
+        double quality = juce::jlimit(0.0f, 1.0f, parameters.qualityEffect->getValue());
         // mapping to 1-51 for ffmpeg's crf value (ignoring 0 as this is lossless and
         // not supported by all media players)
         return 50 * (1.0 - quality) + 1;

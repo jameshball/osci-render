@@ -3,7 +3,7 @@
 
 class StereoEffect : public osci::EffectApplication {
 public:
-	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
+	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) override {
 		if (this->sampleRate != sampleRate) {
 			this->sampleRate = sampleRate;
 			initialiseBuffer(sampleRate);

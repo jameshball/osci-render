@@ -8,7 +8,7 @@ class MultiplexEffect : public osci::EffectApplication {
 public:
     explicit MultiplexEffect(OscirenderAudioProcessor &p) : audioProcessor(p) {}
 
-    osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
+    osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) override {
         jassert(values.size() == 5);
 
         double gridX = values[0].load();
@@ -28,9 +28,9 @@ public:
                                             std::floor(gridY + 1e-3),
                                             std::floor(gridZ + 1e-3));
 
-        gridFloor.x = std::max(gridFloor.x, 1.0);
-        gridFloor.y = std::max(gridFloor.y, 1.0);
-        gridFloor.z = std::max(gridFloor.z, 1.0);
+        gridFloor.x = std::max(gridFloor.x, 1.0f);
+        gridFloor.y = std::max(gridFloor.y, 1.0f);
+        gridFloor.z = std::max(gridFloor.z, 1.0f);
 
         double totalPositions = gridFloor.x * gridFloor.y * gridFloor.z;
         double position = phase * totalPositions;

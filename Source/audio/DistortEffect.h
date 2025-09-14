@@ -4,7 +4,7 @@
 
 class DistortEffect : public osci::EffectApplication {
 public:
-	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double /*sampleRate*/) override {
+	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) override {
 		int flip = index % 2 == 0 ? 1 : -1;
 		osci::Point jitter = osci::Point(flip * values[0], flip * values[1], flip * values[2]);
 		return input + jitter;

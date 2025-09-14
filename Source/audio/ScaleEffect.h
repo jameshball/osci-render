@@ -3,7 +3,7 @@
 
 class ScaleEffectApp : public osci::EffectApplication {
 public:
-    osci::Point apply(int /*index*/, osci::Point input, const std::vector<std::atomic<double>>& values, double /*sampleRate*/) override {
+    osci::Point apply(int /*index*/, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) override {
         return input * osci::Point(values[0], values[1], values[2]);
     }
 

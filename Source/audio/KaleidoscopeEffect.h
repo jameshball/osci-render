@@ -6,13 +6,13 @@ class KaleidoscopeEffect : public osci::EffectApplication {
 public:
     KaleidoscopeEffect(OscirenderAudioProcessor& p) : audioProcessor(p) {}
 
-    osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
+    osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) override {
         const double pi = juce::MathConstants<double>::pi;
         const double twoPi = juce::MathConstants<double>::twoPi;
-        double segments = juce::jmax(1.0, values[0].load());
+        double segments = juce::jmax(1.0f, values[0].load());
         double mirror = values[1].load();
-        double spread = juce::jlimit(0.0, 1.0, values[2].load());
-        double clip = juce::jlimit(0.0, 1.0, values[3].load());
+        double spread = juce::jlimit(0.0f, 1.0f, values[2].load());
+        double clip = juce::jlimit(0.0f, 1.0f, values[3].load());
 
         // To start, treat everything as if we are on the +X (theta = 0) segment
         // Rotate input shape 90 deg CW so the shape is always "upright" 

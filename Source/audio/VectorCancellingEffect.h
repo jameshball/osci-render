@@ -3,7 +3,7 @@
 
 class VectorCancellingEffect : public osci::EffectApplication {
 public:
-	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
+	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) override {
 		double value = values[0];
 		if (value < 0.001) {
 			return input;

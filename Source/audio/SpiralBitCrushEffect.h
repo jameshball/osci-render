@@ -3,9 +3,9 @@
 
 class SpiralBitCrushEffect : public osci::EffectApplication {
 public:
-	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>> &values, double sampleRate) override {
+	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<float>>&values, float sampleRate) override {
 		// Completing one revolution in input space traverses the hypotenuse of one "domain" in log-polar space
-        double effectScale = juce::jlimit(0.0, 1.0, values[0].load());
+        double effectScale = juce::jlimit(0.0f, 1.0f, values[0].load());
 		double domainX = juce::jmax(2.0, std::floor(values[1].load() + 0.001));
 		double domainY = std::round(domainX * values[2].load());
         double zoom = values[3].load() * juce::MathConstants<double>::twoPi; // Use same scale as angle

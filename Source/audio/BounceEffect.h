@@ -7,11 +7,11 @@
 
 class BounceEffect : public osci::EffectApplication {
 public:
-    osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
+    osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) override {
         // values[0] = size (0.05..1.0)
         // values[1] = speed (0..)
         // values[2] = angle (0..1 -> 0..2π)
-        double size = juce::jlimit(0.05, 1.0, values[0].load());
+        double size = juce::jlimit(0.05f, 1.0f, values[0].load());
         double speed = values[1].load();
         double angle = values[2].load() * juce::MathConstants<double>::twoPi;
 

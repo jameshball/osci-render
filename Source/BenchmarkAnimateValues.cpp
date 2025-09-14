@@ -31,7 +31,7 @@ public:
             }
             parameters.push_back(p);
         }
-        actualValues = std::vector<std::atomic<double>>(parameters.size());
+        actualValues = std::vector<std::atomic<float>>(parameters.size());
     }
 
     // Public wrapper to call protected animateValues

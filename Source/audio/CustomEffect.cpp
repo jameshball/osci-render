@@ -13,7 +13,7 @@ CustomEffect::~CustomEffect() {
 	parser->close(L);
 }
 
-osci::Point CustomEffect::apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+osci::Point CustomEffect::apply(int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) {
 	auto effectScale = values[0].load();
 
 	auto x = input.x;

@@ -224,7 +224,7 @@ public:
     );
     std::shared_ptr<osci::Effect> stereoEffect = StereoEffect().build();
     std::shared_ptr<osci::Effect> scaleEffect = std::make_shared<osci::SimpleEffect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) {
             input.scale(values[0].load(), values[1].load(), 1.0);
             return input;
         }, std::vector<osci::EffectParameter*>{
@@ -242,7 +242,7 @@ public:
         ),
     });
     std::shared_ptr<osci::Effect> offsetEffect = std::make_shared<osci::SimpleEffect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) {
             input.translate(values[0].load(), values[1].load(), 0.0);
             return input;
         }, std::vector<osci::EffectParameter*>{

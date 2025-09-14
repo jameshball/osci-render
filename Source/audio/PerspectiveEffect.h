@@ -4,10 +4,10 @@
 
 class PerspectiveEffect : public osci::EffectApplication {
 public:
-	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
+	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) override {
 		auto effectScale = values[0].load();
 		// Far plane clipping happens at about 1.2 deg for 100 far plane dist
-		double fovDegrees = juce::jlimit(1.5, 179.0, values[1].load());
+		double fovDegrees = juce::jlimit(1.5f, 179.0f, values[1].load());
 		double fov = juce::degreesToRadians(fovDegrees);
 
 		// Place camera such that field of view is tangent to unit sphere

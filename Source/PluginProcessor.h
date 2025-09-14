@@ -62,7 +62,7 @@ public:
     std::atomic<double> luaValues[26] = {0.0};
 
     std::shared_ptr<osci::Effect> frequencyEffect = std::make_shared<osci::SimpleEffect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) {
             // TODO: Root cause why the epsilon is needed. This prevents a weird bug on mac.
             frequency = values[0].load() + 0.00001;
             return input;
@@ -129,7 +129,7 @@ public:
 
     osci::BooleanParameter* invertImage = new osci::BooleanParameter("Invert Image", "invertImage", VERSION_HINT, false, "Inverts the image so that dark pixels become light, and vice versa.");
     std::shared_ptr<osci::Effect> imageThreshold = std::make_shared<osci::SimpleEffect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) {
             return input;
         },
         new osci::EffectParameter(
@@ -138,7 +138,7 @@ public:
             "imageThreshold",
             VERSION_HINT, 0.5, 0, 1));
     std::shared_ptr<osci::Effect> imageStride = std::make_shared<osci::SimpleEffect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) {
             return input;
         },
         new osci::EffectParameter(

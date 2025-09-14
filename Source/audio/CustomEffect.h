@@ -11,7 +11,7 @@ public:
 	static const juce::String UNIQUE_ID;
 	static const juce::String FILE_NAME;
 
-	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override;
+	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) override;
 	void updateCode(const juce::String& newCode);
 
 	juce::String getCode();

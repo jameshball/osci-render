@@ -86,9 +86,9 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
             for (const osci::Point &point : points) {
                 long samplePosition = sampleCount - lastTriggerPosition;
                 double startPoint = 1.135;
-                double sweep = samplePosition * sweepIncrement * 2 * startPoint - startPoint;
+                float sweep = samplePosition * sweepIncrement * 2 * startPoint - startPoint;
 
-                double value = point.x;
+                float value = point.x;
 
                 if (sweep > startPoint && belowTrigger && value >= triggerValue) {
                     lastTriggerPosition = sampleCount;
