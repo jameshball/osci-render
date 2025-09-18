@@ -144,7 +144,7 @@ jobs:
       # Windows packaging (Inno Setup)
       - name: Compile .ISS to .EXE Installer
         if: matrix.os == 'windows-latest'
-        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.7
         with:
           path: "packaging/${{ matrix.project }}.iss"
 
