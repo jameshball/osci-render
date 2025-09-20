@@ -3,7 +3,7 @@
 #include "../MathUtil.h"
 
 // Inspired by xenontesla122
-class PolygonBitCrushEffect : public osci::EffectApplication {
+class PolygonizerEffect : public osci::EffectApplication {
 public:
     osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>&values, float sampleRate) override {
         const double pi = juce::MathConstants<double>::pi;
@@ -40,23 +40,23 @@ public:
 
     std::shared_ptr<osci::Effect> build() const override {
         auto eff = std::make_shared<osci::SimpleEffect>(
-            std::make_shared<PolygonBitCrushEffect>(),
+            std::make_shared<PolygonizerEffect>(),
             std::vector<osci::EffectParameter*>{
-                new osci::EffectParameter("Polygon Bit Crush",
+                new osci::EffectParameter("Polygonizer",
                                           "Constrains points to a polygon pattern.",
-                                          "polygonBitCrush", VERSION_HINT, 1.0, 0.0, 1.0),
+                                          "polygonizer", VERSION_HINT, 1.0, 0.0, 1.0),
                 new osci::EffectParameter("Sides", "Controls the number of sides of the polygon pattern.",
-                                          "polygonBitCrushSides", VERSION_HINT, 5.0, 3.0, 8.0),
+                                          "polygonizerSides", VERSION_HINT, 5.0, 3.0, 8.0),
                 new osci::EffectParameter("Stripe Size",
                                           "Controls the spacing between the stripes of the polygon pattern.",
-                                          "polygonBCStripeSize", VERSION_HINT, 0.5, 0.0, 1.0),
+                                          "polygonizerStripeSize", VERSION_HINT, 0.5, 0.0, 1.0),
                 new osci::EffectParameter("Rotation", "Rotates the polygon pattern.",
-                                          "polygonBCRotation", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 0.1),
+                                          "polygonizerRotation", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 0.1),
                 new osci::EffectParameter("Stripe Phase", "Offsets the stripes of the polygon pattern.",
-                                          "polygonBCStripePhase", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 2.0)
+                                          "polygonizerStripePhase", VERSION_HINT, 0.0, 0.0, 1.0, 0.0001, osci::LfoType::Sawtooth, 2.0)
             }
         );
-        eff->setIcon(BinaryData::polygon_bitcrush_svg);
+        eff->setIcon(BinaryData::polygonizer_svg);
         return eff;
     }
 };

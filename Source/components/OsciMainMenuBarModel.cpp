@@ -40,8 +40,9 @@ void OsciMainMenuBarModel::resetMenuItems() {
                                                        "\n\n"
                                                        "A huge thank you to:\n"
                                                        "DJ_Level_3, for contributing several features to osci-render\n"
+                                                       "Anthony Hall, for adding many new effects, and improving existing ones\n"
                                                        "BUS ERROR Collective, for providing the source code for the Hilligoss encoder\n"
-                                                       "Jean Perbet (@jeanprbt) for the osci-render macOS icon\n"
+                                                       "TheDumbDude, for contributing several example Lua files\n"
                                                        "All the community, for suggesting features and reporting issues!",
                                                    std::any_cast<int>(audioProcessor.getProperty("objectServerPort")));
         options.content.setOwned(about);

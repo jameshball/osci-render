@@ -64,14 +64,16 @@ public:
     std::shared_ptr<osci::Effect> frequencyEffect = std::make_shared<osci::SimpleEffect>(
         [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) {
             // TODO: Root cause why the epsilon is needed. This prevents a weird bug on mac.
-            frequency = values[0].load() + 0.00001;
+            frequency = values[0].load() + 0.000001;
             return input;
         },
         new osci::EffectParameter(
             "Frequency",
             "Controls how many times per second the image is drawn, thereby controlling the pitch of the sound. Lower frequencies result in more-accurately drawn images, but more flickering, and vice versa.",
             "frequency",
-            VERSION_HINT, 220.0, 0.0, 4200.0));
+            VERSION_HINT, 220.0, 0.0, 4200.0
+        )
+    );
 
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
 
