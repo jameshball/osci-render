@@ -8,7 +8,7 @@ class SkewEffect : public osci::EffectApplication {
 public:
     SkewEffect() {}
 
-    osci::Point apply(int /*index*/, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) override {
+    osci::Point apply(int /*index*/, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
         jassert(values.size() == 3);
         double tx = values[0].load(); // skew X by Y
         double ty = values[1].load(); // skew Y by Z

@@ -3,7 +3,7 @@
 
 class DelayEffect : public osci::EffectApplication {
 public:
-	osci::Point apply(int index, osci::Point vector, const std::vector<std::atomic<float>>& values, float sampleRate) override {
+	osci::Point apply(int index, osci::Point vector, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
 		double decay = values[0];
 		double decayLength = values[1];
 		int delayBufferLength = (int)(sampleRate * decayLength);

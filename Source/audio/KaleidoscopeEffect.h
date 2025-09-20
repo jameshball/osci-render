@@ -6,7 +6,7 @@ class KaleidoscopeEffect : public osci::EffectApplication {
 public:
     KaleidoscopeEffect(OscirenderAudioProcessor& p) : audioProcessor(p) {}
 
-    osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) override {
+    osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
         const double pi = juce::MathConstants<double>::pi;
         const double twoPi = juce::MathConstants<double>::twoPi;
         double segments = juce::jmax(1.0f, values[0].load());

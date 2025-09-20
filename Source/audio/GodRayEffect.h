@@ -3,7 +3,7 @@
 
 class GodRayEffect : public osci::EffectApplication {
 public:
-    osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<float>>&values, float sampleRate) override {
+    osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>&values, float sampleRate) override {
         double noiseAmp = juce::jmax(0.0f, values[0].load());
         double bias = values[1];
         double biasExponent = std::pow(12.0, std::abs(bias));

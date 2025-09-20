@@ -4,7 +4,7 @@
 class BitCrushEffect : public osci::EffectApplication {
 public:
 	// algorithm from https://www.kvraudio.com/forum/viewtopic.php?t=163880
-	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) override {
+	osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
 		double effectScale = juce::jlimit(0.0f, 1.0f, values[0].load());
         double value = values[1].load();
 		// change rage of value from 0-1 to 0.0-0.78

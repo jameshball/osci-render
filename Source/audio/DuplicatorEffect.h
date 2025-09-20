@@ -6,7 +6,7 @@ class DuplicatorEffect : public osci::EffectApplication {
 public:
     DuplicatorEffect(OscirenderAudioProcessor& p) : audioProcessor(p) {}
 
-    osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) override {
+    osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
         const double twoPi = juce::MathConstants<double>::twoPi;
         double copies = juce::jmax(1.0f, values[0].load());
         double spread = juce::jlimit(0.0f, 1.0f, values[1].load());

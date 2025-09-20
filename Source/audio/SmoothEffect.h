@@ -6,7 +6,7 @@ public:
 	SmoothEffect() = default;
 	explicit SmoothEffect(juce::String prefix, float defaultValue = 0.75f) : idPrefix(prefix), smoothingDefault(defaultValue) {}
 
-	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) override {
+	osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
 		double weight = juce::jmax(values[0].load(), 0.00001f);
 		weight *= 0.95;
 		double strength = 10;

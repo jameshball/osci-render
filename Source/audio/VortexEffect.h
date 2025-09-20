@@ -3,7 +3,7 @@
 
 class VortexEffect : public osci::EffectApplication {
 public:
-    osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<float>>&values, float sampleRate) override {
+    osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>&values, float sampleRate) override {
         // Treat input as complex number and raise to integer power
         // Disallowing non-integer and negative exponents because of the branch cut
         double effectScale = juce::jlimit(0.0f, 1.0f, values[0].load());

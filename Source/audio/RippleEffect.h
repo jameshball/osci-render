@@ -3,7 +3,7 @@
 
 class RippleEffectApp : public osci::EffectApplication {
 public:
-    osci::Point apply(int /*index*/, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) override {
+    osci::Point apply(int /*index*/, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
         double phase = values[1] * std::numbers::pi;
         double distance = 100 * values[2] * (input.x * input.x + input.y * input.y);
         input.z += values[0] * juce::dsp::FastMathApproximations::sin(phase + distance);

@@ -3,7 +3,7 @@
 
 class SwirlEffectApp : public osci::EffectApplication {
 public:
-    osci::Point apply(int /*index*/, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) override {
+    osci::Point apply(int /*index*/, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
         double length = 10 * values[0] * input.magnitude();
         double newX = input.x * juce::dsp::FastMathApproximations::cos(length) - input.y * juce::dsp::FastMathApproximations::sin(length);
         double newY = input.x * juce::dsp::FastMathApproximations::sin(length) + input.y * juce::dsp::FastMathApproximations::cos(length);

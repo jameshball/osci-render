@@ -3,7 +3,7 @@
 
 class RotateEffectApp : public osci::EffectApplication {
 public:
-    osci::Point apply(int /*index*/, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) override {
+    osci::Point apply(int /*index*/, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
         input.rotate(values[0] * std::numbers::pi, values[1] * std::numbers::pi, values[2] * std::numbers::pi);
         return input;
     }

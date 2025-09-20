@@ -6,7 +6,7 @@ class DashedLineEffect : public osci::EffectApplication {
 public:
 	DashedLineEffect(OscirenderAudioProcessor& p) : audioProcessor(p) {}
 
-	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) override {
+	osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
 		// if only 2 parameters are provided, this is being used as a 'trace effect'
 		// where the dash count is 1.
 		double dashCount = 1.0;

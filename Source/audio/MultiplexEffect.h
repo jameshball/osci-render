@@ -8,7 +8,7 @@ class MultiplexEffect : public osci::EffectApplication {
 public:
     explicit MultiplexEffect(OscirenderAudioProcessor &p) : audioProcessor(p) {}
 
-    osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) override {
+    osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
         jassert(values.size() == 5);
 
         double gridX = values[0].load();

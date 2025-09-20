@@ -5,7 +5,7 @@
 // Inspired by xenontesla122
 class PolygonBitCrushEffect : public osci::EffectApplication {
 public:
-    osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<float>>&values, float sampleRate) override {
+    osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>&values, float sampleRate) override {
         const double pi = juce::MathConstants<double>::pi;
         const double twoPi = juce::MathConstants<double>::twoPi;
         double effectScale = juce::jlimit(0.0f, 1.0f, values[0].load());

@@ -4,7 +4,7 @@
 
 class TwistEffect : public osci::EffectApplication {
 public:
-	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<float>>&values, float sampleRate) override {
+	osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>&values, float sampleRate) override {
 		double twistStrength = values[0] * 4 * std::numbers::pi;
 		double twistTheta = twistStrength * input.y;
 		input.rotate(0.0, twistTheta, 0.0);

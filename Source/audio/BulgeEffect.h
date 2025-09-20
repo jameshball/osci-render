@@ -3,7 +3,7 @@
 
 class BulgeEffect : public osci::EffectApplication {
 public:
-	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) override {
+	osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
 		double value = values[0];
 		double translatedBulge = -value + 1;
 

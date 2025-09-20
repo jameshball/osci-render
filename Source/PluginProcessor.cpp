@@ -577,8 +577,11 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             bool isEnabled = effect->enabled != nullptr && effect->enabled->getValue();
             bool isSelected = effect->selected == nullptr ? true : effect->selected->getBoolValue();
             if (isEnabled && isSelected) {
-                // TODO: need to setExternalInput for Lua custom effect
+                if (effect->getId() == custom->getId()) {
+                    effect->setExternalInput(&inputBuffer);
+                }
                 effect->processBlock(outputBuffer3d, midiMessages);
+                effect->setExternalInput(nullptr);
             }
         }
 
@@ -586,8 +589,11 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             const bool prevEnabled = (previewEffect->enabled != nullptr) && previewEffect->enabled->getValue();
             const bool prevSelected = (previewEffect->selected == nullptr) ? true : previewEffect->selected->getBoolValue();
             if (!(prevEnabled && prevSelected)) {
-                // TODO: need to setExternalInput for Lua custom effect
+                if (previewEffect->getId() == custom->getId()) {
+                    previewEffect->setExternalInput(&inputBuffer);
+                }
                 previewEffect->processBlock(outputBuffer3d, midiMessages);
+                previewEffect->setExternalInput(nullptr);
             }
         }
     }
