@@ -276,8 +276,9 @@ void DraggableListBox::itemDropped(const SourceDetails& details)
             }
         }
 
-        if (fromIndex >= 0 && insertIndex >= 0)
+        if (fromIndex >= 0 && insertIndex >= 0) {
             m->moveByInsertIndex(fromIndex, insertIndex);
+        }
     }
 
     clearDropIndicator();
