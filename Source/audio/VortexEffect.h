@@ -17,8 +17,8 @@ public:
 
             double outR = std::pow(r2, 0.5 * exponent);
             double outTheta = exponent * theta + refTheta;
-            output.x = outR * juce::dsp::FastMathApproximations::cos(outTheta);
-            output.y = outR * juce::dsp::FastMathApproximations::sin(outTheta);
+            output.x = outR * std::cos(outTheta);
+            output.y = outR * std::sin(outTheta);
         }
         return (1 - effectScale) * input + effectScale * output;
     }

@@ -11,7 +11,7 @@ public:
 		float fov = juce::degreesToRadians(fovDegrees);
 
 		// Place camera such that field of view is tangent to unit sphere
-		Vec3 origin = Vec3(0, 0, -1.0f / juce::dsp::FastMathApproximations::sin(0.5f * (float)fov));
+		Vec3 origin = Vec3(0, 0, -1.0f / std::sin(0.5f * (float)fov));
 		camera.setPosition(origin);
 		camera.setFov(fov);
 		Vec3 vec = Vec3(input.x, input.y, input.z);

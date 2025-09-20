@@ -12,8 +12,10 @@ float hypTan(float x) {
 
 void main() {
     vec4 line = texture2D(uTexture0, vTexCoord);
-    float x = min(line.r / afterglowAmount, 10.0);
-    float minFade = 0.1 * (1.0 - clamp(afterglowAmount / 10.0, 0.0, 1.0));
+    float luminance = max(max(line.r, line.g), line.b);
+    float adjustedAfterglow = afterglowAmount * 1.5; // scale to make it closely match old shader
+    float x = min(luminance / adjustedAfterglow, 10.0);
+    float minFade = 0.1 * (1.0 - clamp(adjustedAfterglow / 10.0, 0.0, 1.0));
     float fade = fadeAmount * ((1.0 - minFade) * hypTan(x) + minFade);
     fade = clamp(fade, 0.0, fadeAmount);
     

@@ -13,7 +13,7 @@ public:
         // values[2] = angle (0..1 -> 0..2π)
         double size = juce::jlimit(0.05f, 1.0f, values[0].load());
         double speed = values[1].load();
-        double angle = values[2].load() * juce::MathConstants<double>::twoPi;
+        double angle = values[2].load() * juce::MathConstants<double>::twoPi - juce::MathConstants<double>::pi; // map 0..1 to -π..π
 
         // Base direction from user
         double dirX = juce::dsp::FastMathApproximations::cos(angle);

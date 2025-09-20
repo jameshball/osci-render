@@ -132,6 +132,7 @@ public:
     std::function<void()> haltRecording;
     
     std::atomic<bool> forceDisableBrightnessInput = false;
+    std::atomic<bool> forceDisableRgbInput = false;
 
     // shouldn't be accessed by audio thread, but needs to persist when GUI is closed
     // so should only be accessed by message thread
@@ -163,6 +164,15 @@ public:
 protected:
     
     bool brightnessEnabled = false;
+    bool rgbEnabled = false;
+
+    // Expose flags to GUI thread safely
+public:
+    bool isBrightnessEnabled() const { return brightnessEnabled; }
+    bool isRgbEnabled() const { return rgbEnabled; }
+    bool getForceDisableBrightnessInput() const { return forceDisableBrightnessInput.load(); }
+    bool getForceDisableRgbInput() const { return forceDisableRgbInput.load(); }
+protected:
     
     std::vector<osci::BooleanParameter*> booleanParameters;
     std::vector<osci::FloatParameter*> floatParameters;

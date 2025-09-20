@@ -23,7 +23,7 @@ public:
             theta = MathUtil::wrapAngle(theta + pi) - pi; // Move branch cut to +/-pi after angle offset is applied
             double regionCenterTheta = std::round(theta * nSides / twoPi) / nSides * twoPi;
             double localTheta = theta - regionCenterTheta;
-            double dist = r * juce::dsp::FastMathApproximations::cos(localTheta);
+            double dist = r * std::cos(localTheta);
             double newDist = juce::jmax(0.0, (std::round(dist / stripeSize - stripePhase) + stripePhase) * stripeSize);
             double scale = newDist / dist;
             output.x = scale * input.x;

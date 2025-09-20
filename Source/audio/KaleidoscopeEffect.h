@@ -30,7 +30,7 @@ public:
 
         // Clip the shape to remain within this radial segment
         double segmentSize = twoPi / segments; // Angular size
-        osci::Point upperPlaneNormal(juce::dsp::FastMathApproximations::sin(0.5 * segmentSize), -juce::dsp::FastMathApproximations::cos(0.5 * segmentSize), 0);
+        osci::Point upperPlaneNormal(std::sin(0.5 * segmentSize), -std::cos(0.5 * segmentSize), 0);
         osci::Point lowerPlaneNormal(upperPlaneNormal.x, -upperPlaneNormal.y, 0);
         osci::Point clippedOutput;
         if (segmentSize < pi) {

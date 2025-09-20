@@ -110,6 +110,7 @@ VisualiserComponent::VisualiserComponent(
 
     preRenderCallback = [this] {
         if (!record.getToggleState()) {
+            updateRenderModeFromProcessor();
             setResolution(this->recordingSettings.getResolution());
             setFrameRate(this->recordingSettings.getFrameRate());
         }
@@ -515,6 +516,25 @@ void VisualiserComponent::childUpdated() {
         audioProcessor.haltRecording = [this] {
             setRecording(false);
         };
+    }
+}
+
+void VisualiserComponent::updateRenderModeFromProcessor() {
+    // Called on message thread
+    if (!visualiserOnly) {
+        setRenderMode(RenderMode::XY);
+        return;
+    }
+    // Determine based on whether brightness and RGB are enabled and not force-disabled
+    bool brightnessAllowed = !audioProcessor.getForceDisableBrightnessInput();
+    bool rgbAllowed = !audioProcessor.getForceDisableRgbInput();
+    // Prefer RGB if we have 4th/5th channels effectively
+    if (rgbAllowed && audioProcessor.isRgbEnabled()) {
+        setRenderMode(RenderMode::XYRGB);
+    } else if (brightnessAllowed && audioProcessor.isBrightnessEnabled()) {
+        setRenderMode(RenderMode::XYZ);
+    } else {
+        setRenderMode(RenderMode::XY);
     }
 }
 

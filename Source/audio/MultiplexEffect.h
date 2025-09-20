@@ -36,7 +36,7 @@ public:
         double position = phase * totalPositions;
         double delayPosition = static_cast<int>(position) / totalPositions;
 
-        phase = nextPhase(audioProcessor.frequency / totalPositions, sampleRate) / (2.0 * std::numbers::pi);
+        phase = (nextPhase(audioProcessor.frequency / totalPositions, sampleRate) + juce::MathConstants<float>::pi) / (2.0 * juce::MathConstants<float>::pi);
 
         int delayedIndex = head - static_cast<int>(delayPosition * gridDelay * sampleRate);
         if (delayedIndex < 0) {

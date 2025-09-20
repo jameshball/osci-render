@@ -23,7 +23,7 @@ public:
         double fractionalPart = segments - fullSegments; // in [0,1)
         fullSegments = fractionalPart > 1e-3 ? fullSegments : fullSegments - 1;
 
-        phase = nextPhase(audioProcessor.frequency / (fullSegments + 1), sampleRate) / (2.0 * std::numbers::pi);
+        phase = (nextPhase(audioProcessor.frequency / (fullSegments + 1), sampleRate) + juce::MathConstants<float>::pi) / (2.0 * juce::MathConstants<float>::pi);
 
         // Use 'segments' for timing so partial segment gets proportionally shorter time.
         double currentSegmentFloat = phase * segments; // [0, segments)
@@ -48,8 +48,8 @@ public:
         // Map entire original angle range into [segmentOffset, segmentOffset + wedgeAngle) so edges line up exactly.
         double finalTheta = segmentOffset + thetaNorm * wedgeAngle - juce::MathConstants<double>::pi; // constant 180° rotation
 
-        double newX = r * juce::dsp::FastMathApproximations::cos(finalTheta);
-        double newY = r * juce::dsp::FastMathApproximations::sin(finalTheta);
+        double newX = r * std::cos(finalTheta);
+        double newY = r * std::sin(finalTheta);
         return osci::Point(newX, newY, input.z);
     }
 
