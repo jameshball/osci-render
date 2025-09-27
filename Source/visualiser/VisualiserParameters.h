@@ -101,8 +101,13 @@ public:
         return persistenceEffect->getActualValue() - 1.33;
     }
     
-    double getHue() {
-        return hueEffect->getActualValue();
+    juce::Colour getColour() {
+        return juce::Colour::fromFloatRGBA(
+            (float) lineRedEffect->getActualValue(),
+            (float) lineGreenEffect->getActualValue(),
+            (float) lineBlueEffect->getActualValue(),
+            1.0f
+        );
     }
     
     double getLineSaturation() {
@@ -144,7 +149,7 @@ public:
 #endif
     
     double getFocus() {
-        return focusEffect->getActualValue() / 100;
+        return 0.8 * focusEffect->getActualValue() / 100;
     }
     
     double getNoise() {
@@ -269,12 +274,28 @@ public:
             VERSION_HINT, 0.5, 0, 6.0
         )
     );
-    std::shared_ptr<osci::Effect> hueEffect = std::make_shared<osci::SimpleEffect>(
+    std::shared_ptr<osci::Effect> lineRedEffect = std::make_shared<osci::SimpleEffect>(
         new osci::EffectParameter(
-            "Line Hue",
-            "Controls the hue of the beam of the oscilloscope.",
-            "hue",
-            VERSION_HINT, 125, 0, 359, 1
+            "Line Red",
+            "Controls the red component of the line color.",
+            "lineRed",
+            VERSION_HINT, 0.0, 0.0, 1.0
+        )
+    );
+    std::shared_ptr<osci::Effect> lineGreenEffect = std::make_shared<osci::SimpleEffect>(
+        new osci::EffectParameter(
+            "Line Green",
+            "Controls the green component of the line color.",
+            "lineGreen",
+            VERSION_HINT, 1.0, 0.0, 1.0
+        )
+    );
+    std::shared_ptr<osci::Effect> lineBlueEffect = std::make_shared<osci::SimpleEffect>(
+        new osci::EffectParameter(
+            "Line Blue",
+            "Controls the blue component of the line color.",
+            "lineBlue",
+            VERSION_HINT, 0.0, 0.0, 1.0
         )
     );
     std::shared_ptr<osci::Effect> intensityEffect = std::make_shared<osci::SimpleEffect>(
@@ -345,7 +366,9 @@ public:
     
     std::vector<std::shared_ptr<osci::Effect>> effects = {
         persistenceEffect,
-        hueEffect,
+        lineRedEffect,
+        lineGreenEffect,
+        lineBlueEffect,
         intensityEffect,
         lineSaturationEffect,
         focusEffect,

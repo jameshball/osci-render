@@ -572,29 +572,27 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     juce::SpinLock::ScopedLockType lock1(parsersLock);
     juce::SpinLock::ScopedLockType lock2(effectsLock);
 
-    if (totalVolume > EPSILON) {
-        for (auto& effect : toggleableEffects) {
-            bool isEnabled = effect->enabled != nullptr && effect->enabled->getValue();
-            bool isSelected = effect->selected == nullptr ? true : effect->selected->getBoolValue();
-            if (isEnabled && isSelected) {
-                if (effect->getId() == custom->getId()) {
-                    effect->setExternalInput(&inputBuffer);
-                }
-                effect->processBlock(outputBuffer3d, midiMessages);
-                effect->setExternalInput(nullptr);
+    for (auto& effect : toggleableEffects) {
+        bool isEnabled = effect->enabled != nullptr && effect->enabled->getValue();
+        bool isSelected = effect->selected == nullptr ? true : effect->selected->getBoolValue();
+        if (isEnabled && isSelected) {
+            if (effect->getId() == custom->getId()) {
+                effect->setExternalInput(&inputBuffer);
             }
+            effect->processBlock(outputBuffer3d, midiMessages);
+            effect->setExternalInput(nullptr);
         }
+    }
 
-        if (previewEffect) {
-            const bool prevEnabled = (previewEffect->enabled != nullptr) && previewEffect->enabled->getValue();
-            const bool prevSelected = (previewEffect->selected == nullptr) ? true : previewEffect->selected->getBoolValue();
-            if (!(prevEnabled && prevSelected)) {
-                if (previewEffect->getId() == custom->getId()) {
-                    previewEffect->setExternalInput(&inputBuffer);
-                }
-                previewEffect->processBlock(outputBuffer3d, midiMessages);
-                previewEffect->setExternalInput(nullptr);
+    if (previewEffect) {
+        const bool prevEnabled = (previewEffect->enabled != nullptr) && previewEffect->enabled->getValue();
+        const bool prevSelected = (previewEffect->selected == nullptr) ? true : previewEffect->selected->getBoolValue();
+        if (!(prevEnabled && prevSelected)) {
+            if (previewEffect->getId() == custom->getId()) {
+                previewEffect->setExternalInput(&inputBuffer);
             }
+            previewEffect->processBlock(outputBuffer3d, midiMessages);
+            previewEffect->setExternalInput(nullptr);
         }
     }
 

@@ -548,7 +548,7 @@ void VisualiserRenderer::drawLineTexture(const std::vector<float> &xPoints, cons
     if (mode == RenderMode::XYZ) {
         brightness = parameters.getUpsamplingEnabled() ? &smoothedZSamples : &zSamples;
     }
-        drawLine(xPoints, yPoints, brightness, rPoints, gPoints, bPoints, renderMode.load());
+    drawLine(xPoints, yPoints, brightness, rPoints, gPoints, bPoints, renderMode.load());
     glBindTexture(GL_TEXTURE_2D, targetTexture.value().id);
 }
 
@@ -757,7 +757,8 @@ void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::
     lineShader->setUniform("uSize", (GLfloat)parameters.getFocus());
     lineShader->setUniform("uGain", 450.0f / 512.0f);
     lineShader->setUniform("uInvert", 1.0f);
-    lineShader->setUniform("uLineHueShift", (GLfloat)(parameters.getHue() / 360.0));
+    juce::Colour lineColour = parameters.getColour();
+    lineShader->setUniform("uLineColor", lineColour.getFloatRed(), lineColour.getFloatGreen(), lineColour.getFloatBlue());
     lineShader->setUniform("uUseVertexColor", mode == RenderMode::XYRGB ? 1.0f : 0.0f);
 
     float intensity = parameters.getIntensity() * (41000.0f / sampleRate) * 1.0f;

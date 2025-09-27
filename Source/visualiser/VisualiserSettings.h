@@ -58,7 +58,9 @@ public:
 private:
     GroupedSettings lineColour{
         std::vector<std::shared_ptr<EffectComponent>>{
-            std::make_shared<EffectComponent>(*parameters.hueEffect),
+            std::make_shared<EffectComponent>(*parameters.lineRedEffect),
+            std::make_shared<EffectComponent>(*parameters.lineGreenEffect),
+            std::make_shared<EffectComponent>(*parameters.lineBlueEffect),
             std::make_shared<EffectComponent>(*parameters.lineSaturationEffect),
             std::make_shared<EffectComponent>(*parameters.intensityEffect),
         },
