@@ -108,6 +108,10 @@ void EffectTypeGridComponent::refreshDisabledStates()
     selectedIds.reserve((size_t) audioProcessor.toggleableEffects.size());
     bool anySelected = false;
     for (const auto& eff : audioProcessor.toggleableEffects) {
+#if !OSCI_PREMIUM
+        if (eff->isPremiumOnly())
+            continue;
+#endif
         const bool isSelected = (eff->selected == nullptr) ? true : eff->selected->getBoolValue();
         if (isSelected) {
             anySelected = true;
