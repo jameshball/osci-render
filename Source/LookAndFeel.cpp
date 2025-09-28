@@ -20,6 +20,7 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     // windows & menus
     setColour(juce::ResizableWindow::backgroundColourId, Colours::grey);
     setColour(groupComponentBackgroundColourId, Colours::darker);
+    setColour(scrollFadeOverlayBackgroundColourId, Colours::darker);
     setColour(groupComponentHeaderColourId, Colours::veryDark);
     setColour(juce::PopupMenu::backgroundColourId, Colours::darker);
     setColour(juce::PopupMenu::highlightedBackgroundColourId, Colours::grey);

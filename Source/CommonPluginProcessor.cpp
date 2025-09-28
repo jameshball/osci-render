@@ -189,6 +189,12 @@ bool CommonAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) co
 std::shared_ptr<osci::Effect> CommonAudioProcessor::getEffect(juce::String id) {
     for (auto& effect : effects) {
         if (effect->getId() == id) {
+#if !OSCI_PREMIUM
+            // If this is a premium effect and we are not in premium mode, return nullptr
+            if (effect->isPremiumOnly()) {
+                return nullptr;
+            }
+#endif
             return effect;
         }
     }

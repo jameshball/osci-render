@@ -88,6 +88,9 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
         data.clear();
         for (int i = 0; i < audioProcessor.toggleableEffects.size(); i++) {
             auto effect = audioProcessor.toggleableEffects[i];
+#if !OSCI_PREMIUM
+            if (effect->isPremiumOnly()) continue; // skip premium effects in free version
+#endif
             effect->setValue(effect->getValue());
             // Ensure 'selected' exists and defaults to true for older projects
             effect->markSelectable(effect->selected == nullptr ? true : effect->selected->getBoolValue());

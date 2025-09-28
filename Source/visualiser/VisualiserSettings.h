@@ -54,6 +54,7 @@ public:
 
     VisualiserParameters& parameters;
     int numChannels;
+    std::function<void()> onUpgradeRequested;
 
 private:
     GroupedSettings lineColour{
@@ -131,6 +132,10 @@ private:
     jux::SwitchButton flipHorizontalToggle{parameters.flipHorizontal};
     jux::SwitchButton goniometerToggle{parameters.goniometer};
     jux::SwitchButton shutterSyncToggle{parameters.shutterSync};
+#endif
+
+#if !OSCI_PREMIUM
+    juce::TextButton upgradeButton { "Unlock Premium Features" };
 #endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserSettings)

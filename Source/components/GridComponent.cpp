@@ -18,6 +18,7 @@ void GridComponent::clearItems()
 
 void GridComponent::addItem(GridItemComponent* item)
 {
+    item->setInteractive(itemsInteractive);
     items.add(item);
     content.addAndMakeVisible(item);
 }
@@ -60,8 +61,7 @@ void GridComponent::resized()
 
     // Determine fixed per-item width for this viewport width
     const int viewW = contentArea.getWidth();
-    const int viewH = contentArea.getHeight();
-    const int itemsPerRow = juce::jmax(1, viewW / MIN_ITEM_WIDTH);
+    const int itemsPerRow = juce::jmax(1, viewW / minItemWidth);
     const int fixedItemWidth = (itemsPerRow > 0 ? viewW / itemsPerRow : viewW);
 
     // Add each item with a fixed width, and pad the final row with placeholders so it's centered
@@ -74,7 +74,7 @@ void GridComponent::resized()
         flexBox.items.add(juce::FlexItem(*c)
                               .withMinWidth((float) fixedItemWidth)
                               .withMaxWidth((float) fixedItemWidth)
-                              .withHeight(80.0f)
+                              .withHeight((float) itemHeight)
                               .withFlex(1.0f)
                               .withMargin(juce::FlexItem::Margin(0)));
     };
@@ -82,7 +82,7 @@ void GridComponent::resized()
     auto addPlaceholder = [&]()
     {
         // Placeholder occupies a slot visually but has no component; ensures last row is centered
-        juce::FlexItem placeholder((float) fixedItemWidth, 80.0f);
+    juce::FlexItem placeholder((float) fixedItemWidth, (float) itemHeight);
         placeholder.flexGrow = 1.0f; // match item flex for consistent spacing
         placeholder.margin = juce::FlexItem::Margin(0);
         flexBox.items.add(std::move(placeholder));
@@ -140,15 +140,56 @@ void GridComponent::resized()
 int GridComponent::calculateRequiredHeight(int availableWidth) const
 {
     if (items.isEmpty())
-        return 80; // ITEM_HEIGHT
+        return itemHeight;
 
     // Calculate how many items can fit per row
-    int itemsPerRow = juce::jmax(1, availableWidth / MIN_ITEM_WIDTH);
+    int itemsPerRow = juce::jmax(1, availableWidth / minItemWidth);
 
     // Calculate number of rows needed
     int numRows = (items.size() + itemsPerRow - 1) / itemsPerRow; // Ceiling division
 
-    return numRows * 80; // ITEM_HEIGHT
+    return numRows * itemHeight;
+}
+
+void GridComponent::setItemsInteractive(bool shouldBeInteractive)
+{
+    if (itemsInteractive == shouldBeInteractive)
+        return;
+
+    itemsInteractive = shouldBeInteractive;
+
+    for (auto* item : items)
+        if (item != nullptr)
+            item->setInteractive(shouldBeInteractive);
+}
+
+void GridComponent::setItemHeight(int newHeight)
+{
+    newHeight = juce::jmax(1, newHeight);
+    if (itemHeight == newHeight)
+        return;
+
+    itemHeight = newHeight;
+    resized();
+}
+
+void GridComponent::setMinItemWidth(int newWidth)
+{
+    newWidth = juce::jmax(1, newWidth);
+    if (minItemWidth == newWidth)
+        return;
+
+    minItemWidth = newWidth;
+    resized();
+}
+
+int GridComponent::getItemWidthFor(int availableWidth) const
+{
+    if (availableWidth <= 0)
+        return 0;
+
+    const int itemsPerRow = juce::jmax(1, availableWidth / minItemWidth);
+    return juce::jmax(1, availableWidth / itemsPerRow);
 }
 
 

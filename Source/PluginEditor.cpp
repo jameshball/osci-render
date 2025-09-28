@@ -24,7 +24,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 #if !OSCI_PREMIUM
     addAndMakeVisible(upgradeButton);
     upgradeButton.onClick = [this] {
-        juce::URL("https://osci-render.com/#purchase").launchInDefaultBrowser();
+        showPremiumSplashScreen();
     };
     upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor);
     upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark);
@@ -89,6 +89,12 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     visualiser.closeSettings = [this] {
         visualiserSettingsWindow.setVisible(false);
     };
+
+#if !OSCI_PREMIUM
+    visualiserSettings.onUpgradeRequested = [this] {
+        showPremiumSplashScreen();
+    };
+#endif
 
 #if JUCE_WINDOWS
     // if not standalone, use native title bar for compatibility with DAWs
@@ -277,6 +283,14 @@ void OscirenderAudioProcessorEditor::resized() {
     audioProcessor.setProperty("luaLayoutPreferredSize", luaLayout.getItemCurrentRelativeSize(0));
 
     repaint();
+
+#if !OSCI_PREMIUM
+    if (premiumSplashScreen != nullptr) {
+        visualiser.setVisible(false);
+        premiumSplashScreen->setBounds(getLocalBounds());
+        premiumSplashScreen->toFront(false);
+    }
+#endif
 }
 
 void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
@@ -509,6 +523,48 @@ void OscirenderAudioProcessorEditor::mouseMove(const juce::MouseEvent& event) {
 void OscirenderAudioProcessorEditor::openVisualiserSettings() {
     visualiserSettingsWindow.setVisible(true);
     visualiserSettingsWindow.toFront(true);
+}
+
+void OscirenderAudioProcessorEditor::openRecordingSettings() {
+#if OSCI_PREMIUM
+    CommonPluginEditor::openRecordingSettings();
+#else
+    if (recordingSettingsWindow.isVisible()) {
+        recordingSettingsWindow.setVisible(false);
+    }
+    showPremiumSplashScreen();
+#endif
+}
+
+void OscirenderAudioProcessorEditor::showPremiumSplashScreen() {
+#if !OSCI_PREMIUM
+    if (premiumSplashScreen != nullptr) {
+        premiumSplashScreen->toFront(true);
+        return;
+    }
+
+    auto openUpgradePage = [] {
+        juce::URL("https://osci-render.com/#purchase").launchInDefaultBrowser();
+    };
+
+    premiumSplashScreen = std::make_unique<SplashScreenComponent>();
+    premiumSplashScreen->onUpgradeClicked = openUpgradePage;
+    premiumSplashScreen->onDismissRequested = [this] {
+        if (premiumSplashScreen != nullptr) {
+            visualiser.setVisible(visualiserWasVisibleBeforeSplash);
+            removeChildComponent(premiumSplashScreen.get());
+            premiumSplashScreen.reset();
+            resized();
+        }
+    };
+
+    visualiserWasVisibleBeforeSplash = visualiser.isVisible();
+    visualiser.setVisible(false);
+    premiumSplashScreen->setBounds(getLocalBounds());
+    addAndMakeVisible(*premiumSplashScreen);
+    premiumSplashScreen->toFront(true);
+    resized();
+#endif
 }
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM

@@ -115,6 +115,7 @@
         <FILE id="SE4FA3" name="lamp.svg" compile="0" resource="1" file="Resources/svg/lamp.svg"/>
         <FILE id="n1esUp" name="left_arrow.svg" compile="0" resource="1" file="Resources/svg/left_arrow.svg"/>
         <FILE id="WdfE7J" name="link.svg" compile="0" resource="1" file="Resources/svg/link.svg"/>
+        <FILE id="WnBZf0" name="lock.svg" compile="0" resource="1" file="Resources/svg/lock.svg"/>
         <FILE id="rGSPBN" name="lua.svg" compile="0" resource="1" file="Resources/svg/lua.svg"/>
         <FILE id="PxYKbt" name="microphone.svg" compile="0" resource="1" file="Resources/svg/microphone.svg"/>
         <FILE id="YuYfcJ" name="multiplex.svg" compile="0" resource="1" file="Resources/svg/multiplex.svg"/>
@@ -122,6 +123,8 @@
         <FILE id="eGMxwy" name="mute.svg" compile="0" resource="1" file="Resources/svg/mute.svg"/>
         <FILE id="hJHxFY" name="open_in_new.svg" compile="0" resource="1" file="Resources/svg/open_in_new.svg"/>
         <FILE id="pSc1mq" name="osci.svg" compile="0" resource="1" file="Resources/svg/osci.svg"/>
+        <FILE id="rotjUT" name="oscilloscope.svg" compile="0" resource="1"
+              file="Resources/svg/oscilloscope.svg"/>
         <FILE id="f2D5tv" name="pause.svg" compile="0" resource="1" file="Resources/svg/pause.svg"/>
         <FILE id="D2AI1b" name="pencil.svg" compile="0" resource="1" file="Resources/svg/pencil.svg"/>
         <FILE id="zFdUYi" name="planet.svg" compile="0" resource="1" file="Resources/svg/planet.svg"/>
@@ -313,6 +316,10 @@
         <FILE id="QQzSwh" name="SliderTextBox.h" compile="0" resource="0" file="Source/components/SliderTextBox.h"/>
         <FILE id="QrDKRZ" name="SvgButton.h" compile="0" resource="0" file="Source/components/SvgButton.h"/>
         <FILE id="qzfstC" name="SwitchButton.h" compile="0" resource="0" file="Source/components/SwitchButton.h"/>
+        <FILE id="MwKZ5Q" name="SplashScreenComponent.cpp" compile="1" resource="0"
+              file="Source/components/SplashScreenComponent.cpp"/>
+        <FILE id="M38ypx" name="SplashScreenComponent.h" compile="0" resource="0"
+              file="Source/components/SplashScreenComponent.h"/>
         <FILE id="rA7fII" name="SyphonInputSelectorComponent.h" compile="0"
               resource="0" file="Source/components/SyphonInputSelectorComponent.h"/>
         <FILE id="WfUlLH" name="TimelineComponent.cpp" compile="1" resource="0"

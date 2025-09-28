@@ -2,8 +2,23 @@
 #include "audio/BitCrushEffect.h"
 #include "PluginEditor.h"
 
-EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor)
-    : audioProcessor(p), itemData(p, editor), listBoxModel(listBox, itemData), grid(p) {
+bool EffectsComponent::hasAnySelectedEffects() const {
+    juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+    for (const auto& eff : audioProcessor.toggleableEffects) {
+#if !OSCI_PREMIUM
+        if (eff->isPremiumOnly())
+            continue;
+#endif
+        const bool isSelected = (eff->selected == nullptr) ? true : eff->selected->getBoolValue();
+        if (isSelected)
+            return true;
+    }
+
+    return false;
+}
+
+EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editorRef)
+    : audioProcessor(p), editor(editorRef), itemData(p, editorRef), listBoxModel(listBox, itemData), grid(audioProcessor, editor) {
 	setText("Audio Effects");
 
     addAndMakeVisible(frequency);
@@ -37,14 +52,7 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
     };
 
     // Decide initial view: show grid only if there are no selected effects
-    bool anySelected = false;
-    {
-        juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-        for (const auto& eff : audioProcessor.toggleableEffects) {
-            const bool isSelected = (eff->selected == nullptr) ? true : eff->selected->getBoolValue();
-            if (isSelected) { anySelected = true; break; }
-        }
-    }
+    const bool anySelected = hasAnySelectedEffects();
     showingGrid = !anySelected;
     grid.onEffectSelected = [this](const juce::String& effectId) {
         {
@@ -144,17 +152,8 @@ void EffectsComponent::resized() {
 
 void EffectsComponent::changeListenerCallback(juce::ChangeBroadcaster* source) {
     // Recompute whether any effects are currently selected in the new project
-    bool anySelected = false;
-    {
-        juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-        for (const auto& eff : audioProcessor.toggleableEffects) {
-            const bool isSelected = (eff->selected == nullptr) ? true : eff->selected->getBoolValue();
-            if (isSelected) { anySelected = true; break; }
-        }
-    }
-
     // Show the grid only when there are no selected effects in the project
-    showingGrid = ! anySelected;
+    showingGrid = ! hasAnySelectedEffects();
 
     if (showingGrid) {
         grid.setVisible(true);

@@ -55,9 +55,7 @@ public:
 
     void paint(juce::Graphics& g) override {
         auto area = getLocalBounds();
-        const auto bg = (getParentComponent() != nullptr)
-            ? getParentComponent()->findColour(groupComponentBackgroundColourId)
-            : findColour(groupComponentBackgroundColourId);
+        const auto bg = findColour(scrollFadeOverlayBackgroundColourId, true);
 
         if (showTop && fadeHeightTop > 0) {
             const int h = juce::jmin(fadeHeightTop, area.getHeight());

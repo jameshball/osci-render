@@ -57,18 +57,23 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     toggleableEffects.push_back(WobbleEffect(*this).build());
     toggleableEffects.push_back(DuplicatorEffect(*this).build());
 
-#if OSCI_PREMIUM
-    toggleableEffects.push_back(MultiplexEffect(*this).build());
-    toggleableEffects.push_back(UnfoldEffect(*this).build());
-    toggleableEffects.push_back(BounceEffect().build());
-    toggleableEffects.push_back(TwistEffect().build());
-    toggleableEffects.push_back(SkewEffect().build());
-    toggleableEffects.push_back(PolygonizerEffect().build());
-    toggleableEffects.push_back(KaleidoscopeEffect(*this).build());
-    toggleableEffects.push_back(VortexEffect().build());
-    toggleableEffects.push_back(GodRayEffect().build());
-    toggleableEffects.push_back(SpiralBitCrushEffect().build());
-#endif
+    std::vector<std::shared_ptr<osci::Effect>> premiumEffects;
+
+    premiumEffects.push_back(MultiplexEffect(*this).build());
+    premiumEffects.push_back(UnfoldEffect(*this).build());
+    premiumEffects.push_back(BounceEffect().build());
+    premiumEffects.push_back(TwistEffect().build());
+    premiumEffects.push_back(SkewEffect().build());
+    premiumEffects.push_back(PolygonizerEffect().build());
+    premiumEffects.push_back(KaleidoscopeEffect(*this).build());
+    premiumEffects.push_back(VortexEffect().build());
+    premiumEffects.push_back(GodRayEffect().build());
+    premiumEffects.push_back(SpiralBitCrushEffect().build());
+
+    for (auto& premiumEffect : premiumEffects) {
+        premiumEffect->setPremiumOnly(true);
+        toggleableEffects.push_back(premiumEffect);
+    }
 
     auto scaleEffect = ScaleEffectApp().build();
     booleanParameters.push_back(scaleEffect->linked);
@@ -568,6 +573,11 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             juce::SpinLock::ScopedLockType lock2(effectsLock);
             if (volume > EPSILON) {
                 for (auto& effect : toggleableEffects) {
+#if !OSCI_PREMIUM
+                    if (effect->isPremiumOnly()) {
+                        continue;
+                    }
+#endif
                     bool isEnabled = effect->enabled != nullptr && effect->enabled->getValue();
                     bool isSelected = effect->selected == nullptr ? true : effect->selected->getBoolValue();
                     if (isEnabled && isSelected) {

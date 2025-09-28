@@ -3,14 +3,15 @@
 #include "../LookAndFeel.h"
 #include "GridComponent.h"
 #include "GridItemComponent.h"
+#include "../PluginEditor.h"
 #include <unordered_set>
 #include <algorithm>
 #include <numeric>
 
 // ===================== EffectTypeGridComponent (wrapper) =====================
 
-EffectTypeGridComponent::EffectTypeGridComponent(OscirenderAudioProcessor& processor)
-    : audioProcessor(processor)
+EffectTypeGridComponent::EffectTypeGridComponent(OscirenderAudioProcessor& processor, OscirenderAudioProcessorEditor& editorRef)
+    : audioProcessor(processor), editor(editorRef)
 {
     addAndMakeVisible(grid);
     setSize(400, 200);
@@ -30,46 +31,70 @@ void EffectTypeGridComponent::setupEffectItems()
 
     // Get effect types directly from the audio processor's toggleableEffects
     juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-    const int n = (int) audioProcessor.toggleableEffects.size();
-    std::vector<int> order(n);
-    std::iota(order.begin(), order.end(), 0);
-    std::sort(order.begin(), order.end(), [this](int a, int b) {
-        auto ea = audioProcessor.toggleableEffects[a];
-        auto eb = audioProcessor.toggleableEffects[b];
-        const int cmp = ea->getName().compareIgnoreCase(eb->getName());
+
+    std::vector<std::shared_ptr<osci::Effect>> effectsToDisplay;
+    effectsToDisplay.reserve(audioProcessor.toggleableEffects.size());
+
+    effectsToDisplay.insert(effectsToDisplay.end(), audioProcessor.toggleableEffects.begin(), audioProcessor.toggleableEffects.end());
+
+    std::sort(effectsToDisplay.begin(), effectsToDisplay.end(), [](const auto& a, const auto& b) {
+#if !OSCI_PREMIUM
+        const bool aPremium = a->isPremiumOnly();
+        const bool bPremium = b->isPremiumOnly();
+        if (aPremium != bPremium)
+            return !aPremium; // non-premium effects first
+#endif
+
+        const int cmp = a->getName().compareIgnoreCase(b->getName());
         if (cmp != 0)
             return cmp < 0; // ascending alphabetical, case-insensitive
         // Stable tie-breaker to ensure deterministic layout
-        return ea->getId().compare(eb->getId()) < 0;
+        return a->getId().compare(b->getId()) < 0;
     });
 
-    for (int idx : order)
+    for (const auto& effect : effectsToDisplay)
     {
-        auto effect = audioProcessor.toggleableEffects[idx];
         // Extract effect name from the effect
         juce::String effectName = effect->getName();
 
         // Create new generic item component
         auto* item = new GridItemComponent(effectName, effect->getIcon(), effect->getId());
 
-        // Set up callback to forward selection
-        item->onItemSelected = [this](const juce::String& effectId) {
-            if (onEffectSelected)
-                onEffectSelected(effectId);
-        };
-        // Hover preview: request temporary preview of this effect while hovered
-        item->onHoverStart = [this](const juce::String& effectId) {
-            if (audioProcessor.getGlobalBoolValue("previewEffectOnHover", true)) {
-                juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-                audioProcessor.setPreviewEffectId(effectId);
-            }
-        };
-        item->onHoverEnd = [this]() {
-            if (audioProcessor.getGlobalBoolValue("previewEffectOnHover", true)) {
-                juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-                audioProcessor.clearPreviewEffect();
-            }
-        };
+        const bool isLockedPremium =
+#if !OSCI_PREMIUM
+            effect->isPremiumOnly();
+#else
+            false;
+#endif
+        ;
+
+#if !OSCI_PREMIUM
+        if (isLockedPremium) {
+            item->setLocked(true);
+            item->onLockedClick = [this]() {
+                editor.showPremiumSplashScreen();
+            };
+        }
+#endif
+
+        if (! isLockedPremium) {
+            item->onItemSelected = [this](const juce::String& effectId) {
+                if (onEffectSelected)
+                    onEffectSelected(effectId);
+            };
+            item->onHoverStart = [this](const juce::String& effectId) {
+                if (audioProcessor.getGlobalBoolValue("previewEffectOnHover", true)) {
+                    juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+                    audioProcessor.setPreviewEffectId(effectId);
+                }
+            };
+            item->onHoverEnd = [this]() {
+                if (audioProcessor.getGlobalBoolValue("previewEffectOnHover", true)) {
+                    juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+                    audioProcessor.clearPreviewEffect();
+                }
+            };
+        }
 
         grid.addItem(item);
     }
@@ -90,6 +115,10 @@ void EffectTypeGridComponent::refreshDisabledStates()
         }
     }
     for (auto* item : grid.getItems()) {
+        if (item->isLocked()) {
+            item->setEnabled(true);
+            continue;
+        }
         const bool disable = selectedIds.find(item->getId().toStdString()) != selectedIds.end();
         item->setEnabled(! disable);
     }

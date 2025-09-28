@@ -180,7 +180,17 @@ public:
     }
 
     ScreenOverlayParameter* screenOverlay = new ScreenOverlayParameter("Screen Overlay", "screenOverlay", VERSION_HINT, ScreenOverlay::SmudgedGraticule);
-    osci::BooleanParameter* upsamplingEnabled = new osci::BooleanParameter("Upsample Audio", "upsamplingEnabled", VERSION_HINT, true, "Upsamples the audio before visualising it to make it appear more realistic, at the expense of performance.");
+    osci::BooleanParameter* upsamplingEnabled = new osci::BooleanParameter(
+        "Upsample Audio",
+        "upsamplingEnabled",
+        VERSION_HINT,
+#if JUCE_DEBUG
+        false,
+#else
+        true,
+#endif
+        "Upsamples the audio before visualising it to make it appear more realistic, at the expense of performance."
+    );
     osci::BooleanParameter* sweepEnabled = new osci::BooleanParameter("Sweep", "sweepEnabled", VERSION_HINT, false, "Plots the audio signal over time, sweeping from left to right");
     osci::BooleanParameter* visualiserFullScreen = new osci::BooleanParameter("Visualiser Fullscreen", "visualiserFullScreen", VERSION_HINT, false, "Makes the software visualiser fullscreen.");
 
