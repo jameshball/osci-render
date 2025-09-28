@@ -61,7 +61,7 @@ public:
 
         if (showTop && fadeHeightTop > 0) {
             const int h = juce::jmin(fadeHeightTop, area.getHeight());
-            auto topRect = area.removeFromTop(h);
+            auto topRect = area.removeFromTop(h).expanded(0, 1);
             juce::ColourGradient gradTop(bg.withAlpha(strengthTop),
                                          (float) topRect.getX(), (float) topRect.getY(),
                                          bg.withAlpha(0.0f),

@@ -79,10 +79,10 @@ void OpenFileComponent::resized()
         cat.group.setBounds(categoryBounds);
         cat.grid.setBounds(categoryBounds.removeFromBottom(gridHeight));    
     };
-    layCat(textCat);
-    layCat(luaCat);
     layCat(modelsCat);
+    layCat(luaCat);
     layCat(svgsCat);
+    layCat(textCat);
 
     content.setSize(contentArea.getWidth(), y);
 }
