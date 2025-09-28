@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-latest, windows-latest]
+        os: [ubuntu-24.04, macos-latest, windows-2022]
         project: [osci-render, sosci]
         version: [free, premium]
         exclude:
@@ -80,11 +80,11 @@ jobs:
 
       # Windows specific: NuGet setup
       - name: Setup NuGet.exe for use with actions
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'windows-2022'
         uses: NuGet/setup-nuget@v1.0.5
 
       - name: NuGet Sources
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'windows-2022'
         run: nuget sources
 
       - name: Run build & tests
@@ -143,13 +143,13 @@ jobs:
 
       # Windows packaging (Inno Setup)
       - name: Compile .ISS to .EXE Installer
-        if: matrix.os == 'windows-latest'
-        uses: Minionguyjpro/Inno-Setup-Action@v1.2.7
+        if: matrix.os == 'windows-2022'
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
         with:
           path: "packaging/${{ matrix.project }}.iss"
 
       - name: Move installer to bin (Windows)
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'windows-2022'
         shell: bash
         run: mv "packaging/build/${{ matrix.project }}.exe" "bin/${{ matrix.project }}-${{ matrix.version }}.exe"
 
