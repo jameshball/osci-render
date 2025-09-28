@@ -28,7 +28,8 @@ public:
     void updateTitle();
     void fileUpdated(juce::String fileName);
     void openAudioSettings();
-    void openRecordingSettings();
+    virtual void openRecordingSettings();
+    virtual void showPremiumSplashScreen();
     void resetToDefault();
     void resized() override;
 

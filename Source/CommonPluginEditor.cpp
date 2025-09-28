@@ -206,6 +206,8 @@ void CommonPluginEditor::openRecordingSettings() {
     recordingSettingsWindow.setVisible(true);
 }
 
+void CommonPluginEditor::showPremiumSplashScreen() {}
+
 void CommonPluginEditor::resetToDefault() {
     juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
     if (window != nullptr) {

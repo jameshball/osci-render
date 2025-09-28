@@ -63,8 +63,8 @@ VisualiserComponent::VisualiserComponent(
     addAndMakeVisible(settingsButton);
     settingsButton.setTooltip("Opens the visualiser settings window.");
 
-#if OSCI_PREMIUM
     addAndMakeVisible(sharedTextureButton);
+#if OSCI_PREMIUM
     sharedTextureButton.setTooltip("Toggles sending the oscilloscope's visuals to a Syphon/Spout receiver.");
     sharedTextureButton.onClick = [this] {
         if (sharedTextureSender != nullptr) {
@@ -74,6 +74,13 @@ VisualiserComponent::VisualiserComponent(
             openGLContext.executeOnGLThread([this](juce::OpenGLContext &context) { initialiseSharedTexture(); },
                                             false);
         }
+    };
+#else
+    sharedTextureButton.setTooltip("Live video input via Syphon/Spout is a Premium feature. Click to learn more.");
+    sharedTextureButton.setClickingTogglesState(false);
+    sharedTextureButton.setToggleState(false, juce::NotificationType::dontSendNotification);
+    sharedTextureButton.onClick = [this]() {
+        editor.showPremiumSplashScreen();
     };
 #endif
 
@@ -432,9 +439,7 @@ void VisualiserComponent::resized() {
         audioInputButton.setBounds(buttons.removeFromRight(30));
     }
 
-#if OSCI_PREMIUM
     sharedTextureButton.setBounds(buttons.removeFromRight(30));
-#endif
 
     record.setBounds(buttons.removeFromRight(25));
     if (record.getToggleState()) {

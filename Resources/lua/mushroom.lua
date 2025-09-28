@@ -1,3 +1,5 @@
+-- Inspired by Jerobeam Fenderson's Max for Live patch: https://oscilloscopemusic.com/software/maxforlive/#mushrooms0.3
+
 local LOOPS = 30
 local CAP_WIDTH = 0.35
 local STEM_WIDTH = 0.05

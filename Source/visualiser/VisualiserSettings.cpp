@@ -21,6 +21,16 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
     addAndMakeVisible(goniometerToggle);
     addAndMakeVisible(shutterSyncToggle);
 #endif
+#if !OSCI_PREMIUM
+    addAndMakeVisible(upgradeButton);
+    upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor);
+    upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark);
+    upgradeButton.onClick = [this] {
+        if (onUpgradeRequested) {
+            onUpgradeRequested();
+        }
+    };
+#endif
     
     for (int i = 1; i <= parameters.screenOverlay->max; i++) {
         screenOverlay.addItem(parameters.screenOverlay->getText(parameters.screenOverlay->getNormalisedValue(i)), i);
@@ -86,12 +96,18 @@ void VisualiserSettings::resized() {
 #endif
 
 #if !OSCI_PREMIUM
-    area.removeFromTop(10);
 #endif
     upsamplingToggle.setBounds(area.removeFromTop(rowHeight));
     sweepToggle.setBounds(area.removeFromTop(rowHeight));
     sweepMs.setBounds(area.removeFromTop(rowHeight));
     triggerValue.setBounds(area.removeFromTop(rowHeight));
+#if !OSCI_PREMIUM
+    area.removeFromTop(10);
+    const int buttonHeight = 36;
+    auto buttonArea = area.removeFromTop(buttonHeight);
+    auto buttonWidth = juce::jlimit(180, 320, buttonArea.getWidth());
+    upgradeButton.setBounds(buttonArea.withSizeKeepingCentre(buttonWidth, buttonHeight));
+#endif
 }
 
 void VisualiserSettings::parameterValueChanged(int parameterIndex, float newValue) {

@@ -20,6 +20,7 @@ public:
 
 private:
 	OscirenderAudioProcessor& audioProcessor;
+    OscirenderAudioProcessorEditor& editor;
 
 	SvgButton randomiseButton{ "randomise", juce::String(BinaryData::random_svg), Colours::accentColor };
 
@@ -27,12 +28,14 @@ private:
 	EffectsListBoxModel listBoxModel;
 	DraggableListBox listBox;
 	juce::TextButton addEffectButton { "Add new effect" }; // Separate button under the list
-	EffectTypeGridComponent grid { audioProcessor };
+	EffectTypeGridComponent grid;
 	bool showingGrid = true; // show grid by default
 
 	const int LIST_SPACER = 4; // Space above the list to show drop indicator
 	
 	EffectComponent frequency = EffectComponent(*audioProcessor.frequencyEffect, false);
+
+	bool hasAnySelectedEffects() const;
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EffectsComponent)
 };

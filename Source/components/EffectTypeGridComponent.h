@@ -3,11 +3,13 @@
 #include "../PluginProcessor.h"
 #include "GridComponent.h"
 
+class OscirenderAudioProcessorEditor;
+
 // Effect-specific wrapper that declares which items appear in the grid
 class EffectTypeGridComponent : public juce::Component
 {
 public:
-    EffectTypeGridComponent(OscirenderAudioProcessor& processor);
+    EffectTypeGridComponent(OscirenderAudioProcessor& processor, OscirenderAudioProcessorEditor& editor);
     ~EffectTypeGridComponent() override;
 
     void paint(juce::Graphics& g) override;
@@ -19,6 +21,7 @@ public:
 
 private:
     OscirenderAudioProcessor& audioProcessor;
+    OscirenderAudioProcessorEditor& editor;
     GridComponent grid;
     juce::TextButton cancelButton { "Cancel" };
 
