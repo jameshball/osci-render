@@ -377,9 +377,14 @@ void VisualiserComponent::setRecording(bool recording) {
         auto flags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting;
 
 #if OSCI_PREMIUM
-        chooser->launchAsync(flags, [this, wasRecordingAudio, wasRecordingVideo](const juce::FileChooser &chooser) {
+        chooser->launchAsync(flags, [this, wasRecordingAudio, wasRecordingVideo, extension](const juce::FileChooser &chooser) {
             auto file = chooser.getResult();
             if (file != juce::File()) {
+                // Ensure the file has the correct extension
+                if (!file.hasFileExtension(extension)) {
+                    file = file.withFileExtension(extension);
+                }
+                
                 if (wasRecordingAudio && wasRecordingVideo) {
                     // delete the file if it exists
                     if (file.existsAsFile()) {
@@ -395,9 +400,14 @@ void VisualiserComponent::setRecording(bool recording) {
                 audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
             } });
 #else
-        chooser->launchAsync(flags, [this](const juce::FileChooser &chooser) {
+        chooser->launchAsync(flags, [this, extension](const juce::FileChooser &chooser) {
             auto file = chooser.getResult();
             if (file != juce::File()) {
+                // Ensure the file has the correct extension
+                if (!file.hasFileExtension(extension)) {
+                    file = file.withFileExtension(extension);
+                }
+                
                 tempAudioFile->getFile().copyFileTo(file);
                 audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
             } });
