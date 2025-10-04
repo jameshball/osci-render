@@ -63,8 +63,8 @@ VisualiserComponent::VisualiserComponent(
     addAndMakeVisible(settingsButton);
     settingsButton.setTooltip("Opens the visualiser settings window.");
 
-#if OSCI_PREMIUM
     addAndMakeVisible(sharedTextureButton);
+#if OSCI_PREMIUM
     sharedTextureButton.setTooltip("Toggles sending the oscilloscope's visuals to a Syphon/Spout receiver.");
     sharedTextureButton.onClick = [this] {
         if (sharedTextureSender != nullptr) {
@@ -74,6 +74,13 @@ VisualiserComponent::VisualiserComponent(
             openGLContext.executeOnGLThread([this](juce::OpenGLContext &context) { initialiseSharedTexture(); },
                                             false);
         }
+    };
+#else
+    sharedTextureButton.setTooltip("Live video input via Syphon/Spout is a Premium feature. Click to learn more.");
+    sharedTextureButton.setClickingTogglesState(false);
+    sharedTextureButton.setToggleState(false, juce::NotificationType::dontSendNotification);
+    sharedTextureButton.onClick = [this]() {
+        editor.showPremiumSplashScreen();
     };
 #endif
 
@@ -254,6 +261,9 @@ void VisualiserComponent::mouseDown(const juce::MouseEvent &event) {
 }
 
 bool VisualiserComponent::keyPressed(const juce::KeyPress &key) {
+    // If we're not accepting special keys, end early
+    if (!audioProcessor.getAcceptsKeys()) return false;
+
     if (key.isKeyCode(juce::KeyPress::escapeKey)) {
         if (fullScreenCallback) {
             fullScreenCallback(FullScreenMode::MAIN_COMPONENT);
@@ -367,9 +377,14 @@ void VisualiserComponent::setRecording(bool recording) {
         auto flags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting;
 
 #if OSCI_PREMIUM
-        chooser->launchAsync(flags, [this, wasRecordingAudio, wasRecordingVideo](const juce::FileChooser &chooser) {
+        chooser->launchAsync(flags, [this, wasRecordingAudio, wasRecordingVideo, extension](const juce::FileChooser &chooser) {
             auto file = chooser.getResult();
             if (file != juce::File()) {
+                // Ensure the file has the correct extension
+                if (!file.hasFileExtension(extension)) {
+                    file = file.withFileExtension(extension);
+                }
+                
                 if (wasRecordingAudio && wasRecordingVideo) {
                     // delete the file if it exists
                     if (file.existsAsFile()) {
@@ -385,9 +400,14 @@ void VisualiserComponent::setRecording(bool recording) {
                 audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
             } });
 #else
-        chooser->launchAsync(flags, [this](const juce::FileChooser &chooser) {
+        chooser->launchAsync(flags, [this, extension](const juce::FileChooser &chooser) {
             auto file = chooser.getResult();
             if (file != juce::File()) {
+                // Ensure the file has the correct extension
+                if (!file.hasFileExtension(extension)) {
+                    file = file.withFileExtension(extension);
+                }
+                
                 tempAudioFile->getFile().copyFileTo(file);
                 audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
             } });
@@ -428,9 +448,7 @@ void VisualiserComponent::resized() {
         audioInputButton.setBounds(buttons.removeFromRight(30));
     }
 
-#if OSCI_PREMIUM
     sharedTextureButton.setBounds(buttons.removeFromRight(30));
-#endif
 
     record.setBounds(buttons.removeFromRight(25));
     if (record.getToggleState()) {
@@ -541,7 +559,12 @@ void VisualiserComponent::openGLContextClosing() {
 }
 
 void VisualiserComponent::paint(juce::Graphics &g) {
-    g.setColour(Colours::veryDark);
+    bool colourSpecified = isColourSpecified(buttonRowColourId);
+    auto buttonRowColour = Colours::veryDark;
+    if (colourSpecified) {
+        buttonRowColour = findColour(buttonRowColourId, true);
+    }
+    g.setColour(buttonRowColour);
     g.fillRect(buttonRow);
     if (!active) {
         // draw a translucent overlay

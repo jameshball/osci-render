@@ -40,6 +40,18 @@ public:
         return input * gainAdjust;
     }
     
+    std::shared_ptr<osci::Effect> build() const override {
+        auto eff = std::make_shared<osci::Effect>(
+            std::make_shared<AutoGainControlEffect>(),
+            std::vector<osci::EffectParameter*>{
+                new osci::EffectParameter("Intensity", "Controls how aggressively the gain adjustment is applied", "agcIntensity", VERSION_HINT, 1.0, 0.0, 1.0),
+                new osci::EffectParameter("Target Level", "Target output level for the automatic gain control", "agcTarget", VERSION_HINT, 0.6, 0.0, 1.0),
+                new osci::EffectParameter("Response", "How quickly the effect responds to level changes (lower is slower)", "agcResponse", VERSION_HINT, 0.0001, 0.0, 1.0)
+            }
+        );
+        return eff;
+    }
+    
 private:
     const double EPSILON = 0.00001;
     double smoothedLevel = 0.01; // Start with a small non-zero value to avoid division by zero

@@ -10,12 +10,13 @@ OsciMainMenuBarModel::OsciMainMenuBarModel(OscirenderAudioProcessor& p, Oscirend
 void OsciMainMenuBarModel::resetMenuItems() {
     MainMenuBarModel::resetMenuItems();
 
-    addTopLevelMenu("File");
-    addTopLevelMenu("About");
-    addTopLevelMenu("Video");
+    addTopLevelMenu("File");      // index 0
+    addTopLevelMenu("About");     // index 1
+    addTopLevelMenu("Video");     // index 2
     if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-        addTopLevelMenu("Audio");
+        addTopLevelMenu("Audio"); // index 3 (only if standalone)
     }
+    addTopLevelMenu("Interface"); // index 3 (if not standalone) or 4 (if standalone)
 
     addMenuItem(0, "Open Project", [this] { editor.openProject(); });
     addMenuItem(0, "Save Project", [this] { editor.saveProject(); });
@@ -39,12 +40,13 @@ void OsciMainMenuBarModel::resetMenuItems() {
                                                        "\n\n"
                                                        "A huge thank you to:\n"
                                                        "DJ_Level_3, for contributing several features to osci-render\n"
+                                                       "Anthony Hall, for adding many new effects, and improving existing ones\n"
                                                        "BUS ERROR Collective, for providing the source code for the Hilligoss encoder\n"
-                                                       "Jean Perbet (@jeanprbt) for the osci-render macOS icon\n"
+                                                       "TheDumbDude, for contributing several example Lua files\n"
                                                        "All the community, for suggesting features and reporting issues!",
                                                    std::any_cast<int>(audioProcessor.getProperty("objectServerPort")));
         options.content.setOwned(about);
-        options.content->setSize(500, 270);
+        options.content->setSize(500, 300);
         options.dialogTitle = "About";
         options.dialogBackgroundColour = Colours::dark;
         options.escapeKeyTriggersCloseButton = true;
@@ -64,7 +66,7 @@ void OsciMainMenuBarModel::resetMenuItems() {
 
 #if !OSCI_PREMIUM
     addMenuItem(1, "Purchase osci-render premium!", [this] {
-        juce::URL("https://osci-render.com/#purchase").launchInDefaultBrowser();
+        editor.showPremiumSplashScreen();
     });
 #endif
 
@@ -72,14 +74,25 @@ void OsciMainMenuBarModel::resetMenuItems() {
         editor.openRecordingSettings();
     });
 
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
+#if JUCE_MAC || JUCE_WINDOWS
     // Add Syphon/Spout input menu item under Recording
-    addMenuItem(2, audioProcessor.syphonInputActive ? "Disconnect Syphon/Spout Input" : "Select Syphon/Spout Input...", [this] {
+    juce::String syphonMenuLabel =
+#if OSCI_PREMIUM
+        audioProcessor.syphonInputActive ? "Disconnect Syphon/Spout Input" : "Select Syphon/Spout Input...";
+#else
+        "Select Syphon/Spout Input...";
+#endif
+
+    addMenuItem(2, syphonMenuLabel, [this] {
+#if OSCI_PREMIUM
         if (audioProcessor.syphonInputActive) {
             editor.disconnectSyphonInput();
         } else {
             openSyphonInputDialog();
         }
+#else
+        editor.showPremiumSplashScreen();
+#endif
     });
 #endif
 
@@ -88,6 +101,26 @@ void OsciMainMenuBarModel::resetMenuItems() {
             editor.openAudioSettings();
         });
     }
+
+    // Interface menu index depends on whether Audio menu exists
+    int interfaceMenuIndex = (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) ? 4 : 3;
+    addToggleMenuItem(interfaceMenuIndex, "Preview effect on hover", [this] {
+        bool current = audioProcessor.getGlobalBoolValue("previewEffectOnHover", true);
+        bool newValue = ! current;
+        audioProcessor.setGlobalValue("previewEffectOnHover", newValue);
+        audioProcessor.saveGlobalSettings();
+        if (! newValue) {
+            juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+            audioProcessor.clearPreviewEffect();
+        }
+        resetMenuItems(); // update tick state
+        }, [this] { return audioProcessor.getGlobalBoolValue("previewEffectOnHover", true);
+    });
+
+    addToggleMenuItem(interfaceMenuIndex, "Listen for Special Keys", [this] {
+        audioProcessor.setAcceptsKeys(! audioProcessor.getAcceptsKeys());
+        resetMenuItems();
+    }, [this] { return audioProcessor.getAcceptsKeys(); });
 }
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM

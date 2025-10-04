@@ -10,6 +10,7 @@
 #include "components/ErrorCodeEditorComponent.h"
 #include "components/LuaConsole.h"
 #include "components/OsciMainMenuBarModel.h"
+#include "components/SplashScreenComponent.h"
 #include "visualiser/VisualiserSettings.h"
 
 class OscirenderAudioProcessorEditor : public CommonPluginEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener, public juce::FileDragAndDropTarget {
@@ -29,6 +30,8 @@ public:
     void changeListenerCallback(juce::ChangeBroadcaster* source) override;
     void toggleLayout(juce::StretchableLayoutManager& layout, double prefSize);
     void openVisualiserSettings();
+    void openRecordingSettings() override;
+    void showPremiumSplashScreen() override;
     bool isInterestedInFileDrag(const juce::StringArray& files) override;
     void filesDropped(const juce::StringArray& files, int x, int y) override;
 
@@ -49,6 +52,8 @@ public:
 
 #if !OSCI_PREMIUM
     juce::TextButton upgradeButton{"Upgrade to premium!"};
+    std::unique_ptr<SplashScreenComponent> premiumSplashScreen;
+    bool visualiserWasVisibleBeforeSplash = true;
 #endif
 
     juce::ComponentAnimator codeEditorAnimator;

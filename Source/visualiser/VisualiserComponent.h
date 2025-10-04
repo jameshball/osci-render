@@ -64,6 +64,11 @@ public:
 
     std::atomic<bool> active = true;
 
+    enum ColourIds
+    {
+        buttonRowColourId          = 0x7205900,  /**< A colour to use to fill the button row. */
+    };
+
 private:
     CommonAudioProcessor& audioProcessor;
     CommonPluginEditor& editor;
@@ -78,9 +83,9 @@ private:
     SvgButton popOutButton{"popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::white};
     SvgButton settingsButton{"settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white};
     SvgButton audioInputButton{"audioInput", BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red};
+    SvgButton sharedTextureButton{"sharedTexture", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red};
 
 #if OSCI_PREMIUM
-    SvgButton sharedTextureButton{"sharedTexture", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red};
     SharedTextureManager& sharedTextureManager;
     SharedTextureSender* sharedTextureSender = nullptr;
 #endif

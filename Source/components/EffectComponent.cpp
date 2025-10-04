@@ -28,6 +28,7 @@ EffectComponent::EffectComponent(osci::Effect& effect, int index) : effect(effec
 
     slider.setSliderStyle(juce::Slider::LinearHorizontal);
     slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, TEXT_BOX_WIDTH, slider.getTextBoxHeight());
+    slider.setScrollWheelEnabled(false);
     if (effect.parameters[index]->step == 1.0) {
         slider.setNumDecimalPlacesToDisplay(0);
     } else {
@@ -39,6 +40,7 @@ EffectComponent::EffectComponent(osci::Effect& effect, int index) : effect(effec
     lfoSlider.setTextValueSuffix("Hz");
     lfoSlider.setColour(sliderThumbOutlineColourId, juce::Colour(0xff00ff00));
     lfoSlider.setNumDecimalPlacesToDisplay(3);
+    lfoSlider.setScrollWheelEnabled(false);
 
     label.setFont(juce::Font(14.0f));
 
@@ -213,14 +215,8 @@ void EffectComponent::resized() {
 }
 
 void EffectComponent::paint(juce::Graphics& g) {
-    auto bounds = getLocalBounds();
-    auto length = effect.parameters.size();
-    auto isEnd = index == length - 1;
-    auto isStart = index == 0;
     g.setColour(findColour(effectComponentBackgroundColourId, true));
-    juce::Path path;
-    path.addRoundedRectangle(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), OscirenderLookAndFeel::RECT_RADIUS, OscirenderLookAndFeel::RECT_RADIUS, false, isStart, false, isEnd);
-    g.fillPath(path);
+    g.fillRect(getLocalBounds());
 }
 
 void EffectComponent::parameterValueChanged(int parameterIndex, float newValue) {

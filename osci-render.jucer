@@ -4,11 +4,14 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginCharacteristicsValue="pluginWantsMidiIn"
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
-              version="2.5.1.1" companyName="James H Ball" companyWebsite="https://osci-render.com"
+              version="2.6.3.1" companyName="James H Ball" companyWebsite="https://osci-render.com"
               companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1"
-              pluginAUMainType="'aumf'">
+              pluginAUMainType="'aumf'" postExportShellCommandPosix="echo &quot;Building LuaJIT for $OSTYPE...&quot; &amp;&amp; DIR=%%1%% %%1%%/luajit_linux_macos.sh ">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
+      <GROUP id="{17F5509B-A3D9-D161-3F5C-4DC2E1C335E7}" name="audio">
+        <FILE id="BEhvxK" name="sosci.flac" compile="0" resource="1" file="Resources/audio/sosci.flac"/>
+      </GROUP>
       <GROUP id="{8930EC48-30FD-646B-9DC5-0861171F8B2E}" name="fonts">
         <FILE id="GXGPCT" name="FiraSans-Bold.ttf" compile="0" resource="1"
               file="Resources/fonts/FiraSans-Bold.ttf"/>
@@ -27,10 +30,32 @@
         <FILE id="aZXbCi" name="osci_mac.png" compile="0" resource="1" file="Resources/images/osci_mac.png"/>
       </GROUP>
       <GROUP id="{C2609827-4F4A-1ADA-8BA1-A40C1D92649C}" name="lua">
-        <FILE id="xANsA8" name="demo.lua" compile="0" resource="1" file="Resources/lua/demo.lua"/>
+        <FILE id="IWx6sW" name="donut.lua" compile="0" resource="1" file="Resources/lua/donut.lua"/>
+        <FILE id="iERAeW" name="graph.lua" compile="0" resource="1" file="Resources/lua/graph.lua"/>
+        <FILE id="zPmXIZ" name="gravity.lua" compile="0" resource="1" file="Resources/lua/gravity.lua"/>
+        <FILE id="oGzQQi" name="helix.lua" compile="0" resource="1" file="Resources/lua/helix.lua"/>
+        <FILE id="LzeTt3" name="human.lua" compile="0" resource="1" file="Resources/lua/human.lua"/>
+        <FILE id="LpReIH" name="hypercube.lua" compile="0" resource="1" file="Resources/lua/hypercube.lua"/>
+        <FILE id="s8Zskp" name="mushroom.lua" compile="0" resource="1" file="Resources/lua/mushroom.lua"/>
+        <FILE id="KxI8Pk" name="planet.lua" compile="0" resource="1" file="Resources/lua/planet.lua"/>
+        <FILE id="ojSHC8" name="shape_generator.lua" compile="0" resource="1"
+              file="Resources/lua/shape_generator.lua"/>
+        <FILE id="JKhVQS" name="spiral.lua" compile="0" resource="1" file="Resources/lua/spiral.lua"/>
+        <FILE id="Bh2idf" name="squiggles.lua" compile="0" resource="1" file="Resources/lua/squiggles.lua"/>
       </GROUP>
       <GROUP id="{D084D1B2-6804-34C3-C831-231A00F4103A}" name="models">
         <FILE id="LbviBq" name="cube.obj" compile="0" resource="1" file="Resources/models/cube.obj"/>
+        <FILE id="K6aMQM" name="diamond.obj" compile="0" resource="1" file="Resources/models/diamond.obj"/>
+        <FILE id="p8GPBx" name="dodecahedron.obj" compile="0" resource="1"
+              file="Resources/models/dodecahedron.obj"/>
+        <FILE id="LKD9S8" name="humanoid_quad.obj" compile="0" resource="1"
+              file="Resources/models/humanoid_quad.obj"/>
+        <FILE id="wxgAdx" name="icosahedron.obj" compile="0" resource="1" file="Resources/models/icosahedron.obj"/>
+        <FILE id="O6Z4F9" name="lamp.obj" compile="0" resource="1" file="Resources/models/lamp.obj"/>
+        <FILE id="JSjQhi" name="shuttle.obj" compile="0" resource="1" file="Resources/models/shuttle.obj"/>
+        <FILE id="KDRKsq" name="suzanne.obj" compile="0" resource="1" file="Resources/models/suzanne.obj"/>
+        <FILE id="aNKNgB" name="teapot.obj" compile="0" resource="1" file="Resources/models/teapot.obj"/>
+        <FILE id="FbzhN8" name="tetrahedron.obj" compile="0" resource="1" file="Resources/models/tetrahedron.obj"/>
       </GROUP>
       <GROUP id="{F3C16D02-63B4-E3DA-7498-901173C37D6C}" name="oscilloscope">
         <FILE id="qpPhpN" name="empty.jpg" compile="0" resource="1" file="Resources/oscilloscope/empty.jpg"/>
@@ -46,39 +71,123 @@
               resource="1" file="Resources/oscilloscope/vector_display_reflection.png"/>
       </GROUP>
       <GROUP id="{82BCD6F1-A8BF-F30B-5587-81EE70168883}" name="svg">
+        <FILE id="vvlgxu" name="air-horn.svg" compile="0" resource="1" file="Resources/svg/air-horn.svg"/>
+        <FILE id="CT0UuW" name="alien.svg" compile="0" resource="1" file="Resources/svg/alien.svg"/>
+        <FILE id="EBwPoM" name="bicycle.svg" compile="0" resource="1" file="Resources/svg/bicycle.svg"/>
+        <FILE id="laB1fX" name="bit-crush.svg" compile="0" resource="1" file="Resources/svg/bit-crush.svg"/>
+        <FILE id="LJpyE5" name="blender.svg" compile="0" resource="1" file="Resources/svg/blender.svg"/>
+        <FILE id="Rs9Xr6" name="bounce.svg" compile="0" resource="1" file="Resources/svg/bounce.svg"/>
+        <FILE id="rQlbqP" name="bulge.svg" compile="0" resource="1" file="Resources/svg/bulge.svg"/>
+        <FILE id="hwlzvW" name="card.svg" compile="0" resource="1" file="Resources/svg/card.svg"/>
+        <FILE id="GQM3jZ" name="cash.svg" compile="0" resource="1" file="Resources/svg/cash.svg"/>
+        <FILE id="HtrsBQ" name="cat.svg" compile="0" resource="1" file="Resources/svg/cat.svg"/>
+        <FILE id="y9tCpG" name="clippy.svg" compile="0" resource="1" file="Resources/svg/clippy.svg"/>
+        <FILE id="jYG5GY" name="close.svg" compile="0" resource="1" file="Resources/svg/close.svg"/>
         <FILE id="rl17ZK" name="cog.svg" compile="0" resource="1" file="Resources/svg/cog.svg"/>
+        <FILE id="pTnUPp" name="cube.svg" compile="0" resource="1" file="Resources/svg/cube.svg"/>
+        <FILE id="toeDbG" name="dash.svg" compile="0" resource="1" file="Resources/svg/dash.svg"/>
+        <FILE id="bH7fkX" name="delay.svg" compile="0" resource="1" file="Resources/svg/delay.svg"/>
         <FILE id="sDajXu" name="delete.svg" compile="0" resource="1" file="Resources/svg/delete.svg"/>
         <FILE id="IqXIZW" name="demo.svg" compile="0" resource="1" file="Resources/svg/demo.svg"/>
+        <FILE id="J9H3kV" name="desktop.svg" compile="0" resource="1" file="Resources/svg/desktop.svg"/>
+        <FILE id="KTXUuA" name="diamond.svg" compile="0" resource="1" file="Resources/svg/diamond.svg"/>
+        <FILE id="ATrDxb" name="distort.svg" compile="0" resource="1" file="Resources/svg/distort.svg"/>
+        <FILE id="Z2xdIc" name="dodecahedron.svg" compile="0" resource="1"
+              file="Resources/svg/dodecahedron.svg"/>
+        <FILE id="QkDLXs" name="donut.svg" compile="0" resource="1" file="Resources/svg/donut.svg"/>
+        <FILE id="I5dGjs" name="duplicator.svg" compile="0" resource="1" file="Resources/svg/duplicator.svg"/>
         <FILE id="YwkQpy" name="fixed_rotate.svg" compile="0" resource="1"
               file="Resources/svg/fixed_rotate.svg"/>
         <FILE id="WIkl6l" name="fullscreen.svg" compile="0" resource="1" file="Resources/svg/fullscreen.svg"/>
+        <FILE id="ledD1o" name="god_ray.svg" compile="0" resource="1" file="Resources/svg/god_ray.svg"/>
+        <FILE id="VegGHd" name="graph.svg" compile="0" resource="1" file="Resources/svg/graph.svg"/>
+        <FILE id="dYYqKr" name="gravity.svg" compile="0" resource="1" file="Resources/svg/gravity.svg"/>
+        <FILE id="dYl3l5" name="greek.svg" compile="0" resource="1" file="Resources/svg/greek.svg"/>
+        <FILE id="QbK0Sj" name="helix.svg" compile="0" resource="1" file="Resources/svg/helix.svg"/>
+        <FILE id="tsCJdD" name="hello.svg" compile="0" resource="1" file="Resources/svg/hello.svg"/>
+        <FILE id="F3cjtn" name="human-handsdown.svg" compile="0" resource="1"
+              file="Resources/svg/human-handsdown.svg"/>
+        <FILE id="YNYM3Q" name="human.svg" compile="0" resource="1" file="Resources/svg/human.svg"/>
+        <FILE id="t62FrO" name="icosahedron.svg" compile="0" resource="1" file="Resources/svg/icosahedron.svg"/>
+        <FILE id="AVhjBP" name="kaleidoscope.svg" compile="0" resource="1"
+              file="Resources/svg/kaleidoscope.svg"/>
+        <FILE id="e6m9NA" name="kettle.svg" compile="0" resource="1" file="Resources/svg/kettle.svg"/>
+        <FILE id="SE4FA3" name="lamp.svg" compile="0" resource="1" file="Resources/svg/lamp.svg"/>
         <FILE id="n1esUp" name="left_arrow.svg" compile="0" resource="1" file="Resources/svg/left_arrow.svg"/>
         <FILE id="WdfE7J" name="link.svg" compile="0" resource="1" file="Resources/svg/link.svg"/>
+        <FILE id="WnBZf0" name="lock.svg" compile="0" resource="1" file="Resources/svg/lock.svg"/>
+        <FILE id="rGSPBN" name="lua.svg" compile="0" resource="1" file="Resources/svg/lua.svg"/>
         <FILE id="PxYKbt" name="microphone.svg" compile="0" resource="1" file="Resources/svg/microphone.svg"/>
+        <FILE id="YuYfcJ" name="multiplex.svg" compile="0" resource="1" file="Resources/svg/multiplex.svg"/>
+        <FILE id="lKNfVm" name="mushroom.svg" compile="0" resource="1" file="Resources/svg/mushroom.svg"/>
         <FILE id="eGMxwy" name="mute.svg" compile="0" resource="1" file="Resources/svg/mute.svg"/>
         <FILE id="hJHxFY" name="open_in_new.svg" compile="0" resource="1" file="Resources/svg/open_in_new.svg"/>
         <FILE id="pSc1mq" name="osci.svg" compile="0" resource="1" file="Resources/svg/osci.svg"/>
+        <FILE id="rotjUT" name="oscilloscope.svg" compile="0" resource="1"
+              file="Resources/svg/oscilloscope.svg"/>
         <FILE id="f2D5tv" name="pause.svg" compile="0" resource="1" file="Resources/svg/pause.svg"/>
         <FILE id="D2AI1b" name="pencil.svg" compile="0" resource="1" file="Resources/svg/pencil.svg"/>
+        <FILE id="zFdUYi" name="planet.svg" compile="0" resource="1" file="Resources/svg/planet.svg"/>
         <FILE id="sfWuFd" name="play.svg" compile="0" resource="1" file="Resources/svg/play.svg"/>
+        <FILE id="FJG3Ht" name="plus.svg" compile="0" resource="1" file="Resources/svg/plus.svg"/>
+        <FILE id="iHiXPh" name="polygonizer.svg" compile="0" resource="1" file="Resources/svg/polygonizer.svg"/>
+        <FILE id="f0yiwT" name="puzzle.svg" compile="0" resource="1" file="Resources/svg/puzzle.svg"/>
+        <FILE id="ElMcEN" name="pyramid.svg" compile="0" resource="1" file="Resources/svg/pyramid.svg"/>
         <FILE id="PFc2q2" name="random.svg" compile="0" resource="1" file="Resources/svg/random.svg"/>
         <FILE id="CE6di2" name="range.svg" compile="0" resource="1" file="Resources/svg/range.svg"/>
         <FILE id="n79IAy" name="record.svg" compile="0" resource="1" file="Resources/svg/record.svg"/>
         <FILE id="vOGcgi" name="repeat.svg" compile="0" resource="1" file="Resources/svg/repeat.svg"/>
         <FILE id="OaqZb1" name="right_arrow.svg" compile="0" resource="1" file="Resources/svg/right_arrow.svg"/>
+        <FILE id="Knzo1H" name="ripple.svg" compile="0" resource="1" file="Resources/svg/ripple.svg"/>
+        <FILE id="Gxscyd" name="rotate.svg" compile="0" resource="1" file="Resources/svg/rotate.svg"/>
+        <FILE id="cUDYOM" name="scale.svg" compile="0" resource="1" file="Resources/svg/scale.svg"/>
+        <FILE id="X2NZYP" name="shapes.svg" compile="0" resource="1" file="Resources/svg/shapes.svg"/>
+        <FILE id="kElsj1" name="shuttle.svg" compile="0" resource="1" file="Resources/svg/shuttle.svg"/>
+        <FILE id="GzW5ze" name="skew.svg" compile="0" resource="1" file="Resources/svg/skew.svg"/>
+        <FILE id="OiOWD6" name="skull.svg" compile="0" resource="1" file="Resources/svg/skull.svg"/>
+        <FILE id="ZPUNcg" name="smoothing.svg" compile="0" resource="1" file="Resources/svg/smoothing.svg"/>
+        <FILE id="XxYNOy" name="snowflake.svg" compile="0" resource="1" file="Resources/svg/snowflake.svg"/>
+        <FILE id="iZMino" name="spiral_bitcrush.svg" compile="0" resource="1"
+              file="Resources/svg/spiral_bitcrush.svg"/>
         <FILE id="yiDo4s" name="spout.svg" compile="0" resource="1" file="Resources/svg/spout.svg"/>
         <FILE id="EOWhGi" name="stop.svg" compile="0" resource="1" file="Resources/svg/stop.svg"/>
+        <FILE id="Z3yYJU" name="swirl.svg" compile="0" resource="1" file="Resources/svg/swirl.svg"/>
         <FILE id="rXjNlx" name="threshold.svg" compile="0" resource="1" file="Resources/svg/threshold.svg"/>
         <FILE id="rFYmV8" name="timer.svg" compile="0" resource="1" file="Resources/svg/timer.svg"/>
+        <FILE id="ESR7bv" name="trace.svg" compile="0" resource="1" file="Resources/svg/trace.svg"/>
+        <FILE id="ID1vTS" name="translate.svg" compile="0" resource="1" file="Resources/svg/translate.svg"/>
+        <FILE id="Sw4WWb" name="twist.svg" compile="0" resource="1" file="Resources/svg/twist.svg"/>
+        <FILE id="Y90Viq" name="unfold.svg" compile="0" resource="1" file="Resources/svg/unfold.svg"/>
+        <FILE id="praXUY" name="vector-cancelling.svg" compile="0" resource="1"
+              file="Resources/svg/vector-cancelling.svg"/>
         <FILE id="qC6QiP" name="volume.svg" compile="0" resource="1" file="Resources/svg/volume.svg"/>
+        <FILE id="hH1OSK" name="vortex.svg" compile="0" resource="1" file="Resources/svg/vortex.svg"/>
+        <FILE id="Unp5Kx" name="waves.svg" compile="0" resource="1" file="Resources/svg/waves.svg"/>
+        <FILE id="SkgUSk" name="wobble.svg" compile="0" resource="1" file="Resources/svg/wobble.svg"/>
+        <FILE id="HCK5B8" name="yinyang.svg" compile="0" resource="1" file="Resources/svg/yinyang.svg"/>
       </GROUP>
       <GROUP id="{F8A3D32C-4187-9A2F-5D78-040259957E9B}" name="text">
         <FILE id="N9Q6Zg" name="greek.txt" compile="0" resource="1" file="Resources/text/greek.txt"/>
         <FILE id="OABuJy" name="helloworld.txt" compile="0" resource="1" file="Resources/text/helloworld.txt"/>
+        <FILE id="TSOWpU" name="osci-render.txt" compile="0" resource="1" file="Resources/text/osci-render.txt"/>
+        <FILE id="CmwIW6" name="paperclip.txt" compile="0" resource="1" file="Resources/text/paperclip.txt"/>
+        <FILE id="utV7e3" name="sosci.txt" compile="0" resource="1" file="Resources/text/sosci.txt"/>
       </GROUP>
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
+        <FILE id="EjkbRe" name="PolygonizerEffect.h" compile="0" resource="0"
+              file="Source/audio/PolygonizerEffect.h"/>
+        <FILE id="XSUjDz" name="KaleidoscopeEffect.h" compile="0" resource="0"
+              file="Source/audio/KaleidoscopeEffect.h"/>
+        <FILE id="mREEpc" name="UnfoldEffect.h" compile="0" resource="0" file="Source/audio/UnfoldEffect.h"/>
+        <FILE id="jfRtxu" name="VortexEffect.h" compile="0" resource="0" file="Source/audio/VortexEffect.h"/>
+        <FILE id="de5H36" name="GodRayEffect.h" compile="0" resource="0" file="Source/audio/GodRayEffect.h"/>
+        <FILE id="tU2pQl" name="SkewEffect.h" compile="0" resource="0" file="Source/audio/SkewEffect.h"/>
+        <FILE id="yxWOsR" name="DuplicatorEffect.h" compile="0" resource="0"
+              file="Source/audio/DuplicatorEffect.h"/>
+        <FILE id="GbAmhn" name="SpiralBitCrushEffect.h" compile="0" resource="0"
+              file="Source/audio/SpiralBitCrushEffect.h"/>
         <FILE id="HE3dFE" name="AudioRecorder.h" compile="0" resource="0" file="Source/audio/AudioRecorder.h"/>
         <FILE id="Bc8UeW" name="BitCrushEffect.h" compile="0" resource="0"
               file="Source/audio/BitCrushEffect.h"/>
@@ -86,30 +195,34 @@
         <FILE id="uvMCNC" name="CustomEffect.cpp" compile="1" resource="0"
               file="Source/audio/CustomEffect.cpp"/>
         <FILE id="qFZDUh" name="CustomEffect.h" compile="0" resource="0" file="Source/audio/CustomEffect.h"/>
-        <FILE id="JtasnQ" name="DashedLineEffect.cpp" compile="1" resource="0"
-              file="Source/audio/DashedLineEffect.cpp"/>
         <FILE id="I7B78q" name="DashedLineEffect.h" compile="0" resource="0"
               file="Source/audio/DashedLineEffect.h"/>
         <FILE id="kpI9pv" name="DelayEffect.h" compile="0" resource="0" file="Source/audio/DelayEffect.h"/>
         <FILE id="ux2dO2" name="DistortEffect.h" compile="0" resource="0" file="Source/audio/DistortEffect.h"/>
-        <FILE id="QBWW9w" name="PerspectiveEffect.cpp" compile="1" resource="0"
-              file="Source/audio/PerspectiveEffect.cpp"/>
+        <FILE id="SWC0tN" name="MultiplexEffect.h" compile="0" resource="0"
+              file="Source/audio/MultiplexEffect.h"/>
+        <FILE id="bNcEfx" name="BounceEffect.h" compile="0" resource="0" file="Source/audio/BounceEffect.h"/>
         <FILE id="h0dMim" name="PerspectiveEffect.h" compile="0" resource="0"
               file="Source/audio/PerspectiveEffect.h"/>
         <FILE id="t5g8pf" name="PublicSynthesiser.h" compile="0" resource="0"
               file="Source/audio/PublicSynthesiser.h"/>
+        <FILE id="L01ZLi" name="RippleEffect.h" compile="0" resource="0" file="Source/audio/RippleEffect.h"/>
+        <FILE id="bXcQHc" name="RotateEffect.h" compile="0" resource="0" file="Source/audio/RotateEffect.h"/>
         <FILE id="Q5kjpU" name="SampleRateManager.h" compile="0" resource="0"
               file="Source/audio/SampleRateManager.h"/>
+        <FILE id="Cffx3f" name="ScaleEffect.h" compile="0" resource="0" file="Source/audio/ScaleEffect.h"/>
         <FILE id="dBaZAV" name="ShapeSound.cpp" compile="1" resource="0" file="Source/audio/ShapeSound.cpp"/>
         <FILE id="VKBirB" name="ShapeSound.h" compile="0" resource="0" file="Source/audio/ShapeSound.h"/>
         <FILE id="UcPZ09" name="ShapeVoice.cpp" compile="1" resource="0" file="Source/audio/ShapeVoice.cpp"/>
         <FILE id="WId4vx" name="ShapeVoice.h" compile="0" resource="0" file="Source/audio/ShapeVoice.h"/>
         <FILE id="Vwjht7" name="SmoothEffect.h" compile="0" resource="0" file="Source/audio/SmoothEffect.h"/>
         <FILE id="WACNMe" name="StereoEffect.h" compile="0" resource="0" file="Source/audio/StereoEffect.h"/>
+        <FILE id="yiIupB" name="SwirlEffect.h" compile="0" resource="0" file="Source/audio/SwirlEffect.h"/>
+        <FILE id="qZkeZC" name="TranslateEffect.h" compile="0" resource="0"
+              file="Source/audio/TranslateEffect.h"/>
+        <FILE id="RsHWPN" name="TwistEffect.h" compile="0" resource="0" file="Source/audio/TwistEffect.h"/>
         <FILE id="Be21D0" name="VectorCancellingEffect.h" compile="0" resource="0"
               file="Source/audio/VectorCancellingEffect.h"/>
-        <FILE id="VHRytO" name="WobbleEffect.cpp" compile="1" resource="0"
-              file="Source/audio/WobbleEffect.cpp"/>
         <FILE id="sgdTlo" name="WobbleEffect.h" compile="0" resource="0" file="Source/audio/WobbleEffect.h"/>
       </GROUP>
       <GROUP id="{2A41BAF3-5E83-B018-5668-39D89ABFA00C}" name="chinese_postman">
@@ -159,8 +272,27 @@
               file="Source/components/EffectsListComponent.cpp"/>
         <FILE id="dcLchL" name="EffectsListComponent.h" compile="0" resource="0"
               file="Source/components/EffectsListComponent.h"/>
+        <FILE id="xQQo5D" name="EffectTypeGridComponent.cpp" compile="1" resource="0"
+              file="Source/components/EffectTypeGridComponent.cpp"/>
+        <FILE id="Fb2Qci" name="EffectTypeGridComponent.h" compile="0" resource="0"
+              file="Source/components/EffectTypeGridComponent.h"/>
         <FILE id="aEprcE" name="ErrorCodeEditorComponent.h" compile="0" resource="0"
               file="Source/components/ErrorCodeEditorComponent.h"/>
+        <FILE id="oGIcdI" name="FileControlsComponent.cpp" compile="1" resource="0"
+              file="Source/components/FileControlsComponent.cpp"/>
+        <FILE id="uo7flZ" name="FileControlsComponent.h" compile="0" resource="0"
+              file="Source/components/FileControlsComponent.h"/>
+        <FILE id="sqD2Zy" name="GridComponent.cpp" compile="1" resource="0"
+              file="Source/components/GridComponent.cpp"/>
+        <FILE id="QRwdXD" name="GridComponent.h" compile="0" resource="0" file="Source/components/GridComponent.h"/>
+        <FILE id="Dfsnmg" name="GridItemComponent.cpp" compile="1" resource="0"
+              file="Source/components/GridItemComponent.cpp"/>
+        <FILE id="MwZoTt" name="GridItemComponent.h" compile="0" resource="0"
+              file="Source/components/GridItemComponent.h"/>
+        <FILE id="SYA32K" name="HoverAnimationMixin.cpp" compile="1" resource="0"
+              file="Source/components/HoverAnimationMixin.cpp"/>
+        <FILE id="JyPgec" name="HoverAnimationMixin.h" compile="0" resource="0"
+              file="Source/components/HoverAnimationMixin.h"/>
         <FILE id="L9DIT2" name="LabelledTextBox.h" compile="0" resource="0"
               file="Source/components/LabelledTextBox.h"/>
         <FILE id="tpNWJ3" name="LuaConsole.cpp" compile="1" resource="0" file="Source/components/LuaConsole.cpp"/>
@@ -173,6 +305,10 @@
               file="Source/components/MainMenuBarModel.cpp"/>
         <FILE id="ubDcnO" name="MainMenuBarModel.h" compile="0" resource="0"
               file="Source/components/MainMenuBarModel.h"/>
+        <FILE id="yhsLOr" name="OpenFileComponent.cpp" compile="1" resource="0"
+              file="Source/components/OpenFileComponent.cpp"/>
+        <FILE id="LBoxwR" name="OpenFileComponent.h" compile="0" resource="0"
+              file="Source/components/OpenFileComponent.h"/>
         <FILE id="FbaaC9" name="OsciMainMenuBarModel.cpp" compile="1" resource="0"
               file="Source/components/OsciMainMenuBarModel.cpp"/>
         <FILE id="qAklil" name="OsciMainMenuBarModel.h" compile="0" resource="0"
@@ -180,6 +316,10 @@
         <FILE id="QQzSwh" name="SliderTextBox.h" compile="0" resource="0" file="Source/components/SliderTextBox.h"/>
         <FILE id="QrDKRZ" name="SvgButton.h" compile="0" resource="0" file="Source/components/SvgButton.h"/>
         <FILE id="qzfstC" name="SwitchButton.h" compile="0" resource="0" file="Source/components/SwitchButton.h"/>
+        <FILE id="MwKZ5Q" name="SplashScreenComponent.cpp" compile="1" resource="0"
+              file="Source/components/SplashScreenComponent.cpp"/>
+        <FILE id="M38ypx" name="SplashScreenComponent.h" compile="0" resource="0"
+              file="Source/components/SplashScreenComponent.h"/>
         <FILE id="rA7fII" name="SyphonInputSelectorComponent.h" compile="0"
               resource="0" file="Source/components/SyphonInputSelectorComponent.h"/>
         <FILE id="WfUlLH" name="TimelineComponent.cpp" compile="1" resource="0"
@@ -367,73 +507,6 @@
               file="Source/ixwebsocket/IXWebSocketVersion.h"/>
       </GROUP>
       <GROUP id="{90BFF2D8-C8EE-510F-7993-421FDEEFA277}" name="lua">
-        <GROUP id="{48ED0B9A-609D-7DBC-26B7-D100F7245749}" name="lua">
-          <FILE id="reW6LF" name="lapi.c" compile="1" resource="0" file="Source/lua/lua/lapi.c"/>
-          <FILE id="y6wTEu" name="lapi.h" compile="0" resource="0" file="Source/lua/lua/lapi.h"/>
-          <FILE id="fbjV69" name="lauxlib.c" compile="1" resource="0" file="Source/lua/lua/lauxlib.c"/>
-          <FILE id="xeR3L4" name="lauxlib.h" compile="0" resource="0" file="Source/lua/lua/lauxlib.h"/>
-          <FILE id="tyfIH6" name="lbaselib.c" compile="1" resource="0" file="Source/lua/lua/lbaselib.c"/>
-          <FILE id="DaKxGG" name="lcode.c" compile="1" resource="0" file="Source/lua/lua/lcode.c"/>
-          <FILE id="lheIiL" name="lcode.h" compile="0" resource="0" file="Source/lua/lua/lcode.h"/>
-          <FILE id="UEhwiT" name="lcorolib.c" compile="1" resource="0" file="Source/lua/lua/lcorolib.c"/>
-          <FILE id="OPy1EB" name="lctype.c" compile="1" resource="0" file="Source/lua/lua/lctype.c"/>
-          <FILE id="fryrEr" name="lctype.h" compile="0" resource="0" file="Source/lua/lua/lctype.h"/>
-          <FILE id="bHUPPW" name="ldblib.c" compile="1" resource="0" file="Source/lua/lua/ldblib.c"/>
-          <FILE id="XlYtBV" name="ldebug.c" compile="1" resource="0" file="Source/lua/lua/ldebug.c"/>
-          <FILE id="vAb8NE" name="ldebug.h" compile="0" resource="0" file="Source/lua/lua/ldebug.h"/>
-          <FILE id="rD9LiE" name="ldo.c" compile="1" resource="0" file="Source/lua/lua/ldo.c"/>
-          <FILE id="gEaRAH" name="ldo.h" compile="0" resource="0" file="Source/lua/lua/ldo.h"/>
-          <FILE id="WJkF05" name="ldump.c" compile="1" resource="0" file="Source/lua/lua/ldump.c"/>
-          <FILE id="DgPsbd" name="lfunc.c" compile="1" resource="0" file="Source/lua/lua/lfunc.c"/>
-          <FILE id="znxihn" name="lfunc.h" compile="0" resource="0" file="Source/lua/lua/lfunc.h"/>
-          <FILE id="xGDelH" name="lgc.c" compile="1" resource="0" file="Source/lua/lua/lgc.c"/>
-          <FILE id="vxmneh" name="lgc.h" compile="0" resource="0" file="Source/lua/lua/lgc.h"/>
-          <FILE id="GMI2lH" name="linit.c" compile="1" resource="0" file="Source/lua/lua/linit.c"/>
-          <FILE id="bXgGvu" name="liolib.c" compile="1" resource="0" file="Source/lua/lua/liolib.c"/>
-          <FILE id="JYZsRj" name="ljumptab.h" compile="0" resource="0" file="Source/lua/lua/ljumptab.h"/>
-          <FILE id="MPzwjd" name="llex.c" compile="1" resource="0" file="Source/lua/lua/llex.c"/>
-          <FILE id="ZlS9jV" name="llex.h" compile="0" resource="0" file="Source/lua/lua/llex.h"/>
-          <FILE id="xxSacr" name="llimits.h" compile="0" resource="0" file="Source/lua/lua/llimits.h"/>
-          <FILE id="yZ9gsY" name="lmathlib.c" compile="1" resource="0" file="Source/lua/lua/lmathlib.c"/>
-          <FILE id="vepfiL" name="lmem.c" compile="1" resource="0" file="Source/lua/lua/lmem.c"/>
-          <FILE id="ogXP1X" name="lmem.h" compile="0" resource="0" file="Source/lua/lua/lmem.h"/>
-          <FILE id="hdpbrZ" name="loadlib.c" compile="1" resource="0" file="Source/lua/lua/loadlib.c"/>
-          <FILE id="Ae13uk" name="lobject.c" compile="1" resource="0" file="Source/lua/lua/lobject.c"/>
-          <FILE id="yVQOFR" name="lobject.h" compile="0" resource="0" file="Source/lua/lua/lobject.h"/>
-          <FILE id="Yjl2jU" name="lopcodes.c" compile="1" resource="0" file="Source/lua/lua/lopcodes.c"/>
-          <FILE id="WrOMUG" name="lopcodes.h" compile="0" resource="0" file="Source/lua/lua/lopcodes.h"/>
-          <FILE id="Mcf4k0" name="lopnames.h" compile="0" resource="0" file="Source/lua/lua/lopnames.h"/>
-          <FILE id="IxVaWn" name="loslib.c" compile="1" resource="0" file="Source/lua/lua/loslib.c"/>
-          <FILE id="PT6prM" name="lparser.c" compile="1" resource="0" file="Source/lua/lua/lparser.c"/>
-          <FILE id="glxbom" name="lparser.h" compile="0" resource="0" file="Source/lua/lua/lparser.h"/>
-          <FILE id="mhS3hR" name="lprefix.h" compile="0" resource="0" file="Source/lua/lua/lprefix.h"/>
-          <FILE id="QUU8pb" name="lstate.c" compile="1" resource="0" file="Source/lua/lua/lstate.c"/>
-          <FILE id="nLiPGo" name="lstate.h" compile="0" resource="0" file="Source/lua/lua/lstate.h"/>
-          <FILE id="ACSLBM" name="lstring.c" compile="1" resource="0" file="Source/lua/lua/lstring.c"/>
-          <FILE id="mfaeJ4" name="lstring.h" compile="0" resource="0" file="Source/lua/lua/lstring.h"/>
-          <FILE id="qUaJcc" name="lstrlib.c" compile="1" resource="0" file="Source/lua/lua/lstrlib.c"/>
-          <FILE id="H79BnO" name="ltable.c" compile="1" resource="0" file="Source/lua/lua/ltable.c"/>
-          <FILE id="QWr3bh" name="ltable.h" compile="0" resource="0" file="Source/lua/lua/ltable.h"/>
-          <FILE id="C6dr1W" name="ltablib.c" compile="1" resource="0" file="Source/lua/lua/ltablib.c"/>
-          <FILE id="Dqa8zj" name="ltests.c" compile="1" resource="0" file="Source/lua/lua/ltests.c"/>
-          <FILE id="PSAt8D" name="ltests.h" compile="0" resource="0" file="Source/lua/lua/ltests.h"/>
-          <FILE id="wlxeWJ" name="ltm.c" compile="1" resource="0" file="Source/lua/lua/ltm.c"/>
-          <FILE id="WrmVGh" name="ltm.h" compile="0" resource="0" file="Source/lua/lua/ltm.h"/>
-          <FILE id="tNTcX7" name="lua.c" compile="1" resource="0" file="Source/lua/lua/lua.c"/>
-          <FILE id="VNMXFl" name="lua.h" compile="0" resource="0" file="Source/lua/lua/lua.h"/>
-          <FILE id="Bxx6Ju" name="luaconf.h" compile="0" resource="0" file="Source/lua/lua/luaconf.h"/>
-          <FILE id="uyv67S" name="lualib.h" compile="0" resource="0" file="Source/lua/lua/lualib.h"/>
-          <FILE id="mSI25W" name="lundump.c" compile="1" resource="0" file="Source/lua/lua/lundump.c"/>
-          <FILE id="wzaUVI" name="lundump.h" compile="0" resource="0" file="Source/lua/lua/lundump.h"/>
-          <FILE id="ImkHXE" name="lutf8lib.c" compile="1" resource="0" file="Source/lua/lua/lutf8lib.c"/>
-          <FILE id="IWMeha" name="lvm.c" compile="1" resource="0" file="Source/lua/lua/lvm.c"/>
-          <FILE id="maQFOJ" name="lvm.h" compile="0" resource="0" file="Source/lua/lua/lvm.h"/>
-          <FILE id="JIpgrH" name="lzio.c" compile="1" resource="0" file="Source/lua/lua/lzio.c"/>
-          <FILE id="bm8hWL" name="lzio.h" compile="0" resource="0" file="Source/lua/lua/lzio.h"/>
-          <FILE id="uiz8kq" name="onelua.c" compile="1" resource="0" file="Source/lua/lua/onelua.c"/>
-        </GROUP>
-        <FILE id="abPiYS" name="luaimport.cpp" compile="1" resource="0" file="Source/lua/luaimport.cpp"/>
-        <FILE id="Q0Kb3f" name="luaimport.h" compile="0" resource="0" file="Source/lua/luaimport.h"/>
         <FILE id="WKSBg8" name="LuaParser.cpp" compile="1" resource="0" file="Source/lua/LuaParser.cpp"/>
         <FILE id="E4ORpe" name="LuaParser.h" compile="0" resource="0" file="Source/lua/LuaParser.h"/>
       </GROUP>
@@ -666,9 +739,6 @@
       <FILE id="X26RjJ" name="LuaComponent.cpp" compile="1" resource="0"
             file="Source/LuaComponent.cpp"/>
       <FILE id="g5xRHT" name="LuaComponent.h" compile="0" resource="0" file="Source/LuaComponent.h"/>
-      <FILE id="GKBQ8j" name="MainComponent.cpp" compile="1" resource="0"
-            file="Source/MainComponent.cpp"/>
-      <FILE id="RU8fGr" name="MainComponent.h" compile="0" resource="0" file="Source/MainComponent.h"/>
       <FILE id="cFVaxu" name="MathUtil.h" compile="0" resource="0" file="Source/MathUtil.h"/>
       <FILE id="eB92KJ" name="MidiComponent.cpp" compile="1" resource="0"
             file="Source/MidiComponent.cpp"/>
@@ -697,10 +767,12 @@
                JUCE_WEB_BROWSER="0"/>
   <EXPORTFORMATS>
     <LINUX_MAKE targetFolder="Builds/osci-render/LinuxMakefile" smallIcon="pSc1mq"
-                bigIcon="pSc1mq">
+                bigIcon="pSc1mq" externalLibraries="luajit">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render"/>
-        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" headerPath="../../../modules/LuaJIT/src"
+                       libraryPath="../../../modules/LuaJIT/src"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render" headerPath="../../../modules/LuaJIT/src"
+                       libraryPath="../../../modules/LuaJIT/src"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
@@ -728,15 +800,20 @@
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="melatonin_inspector" path="modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/osci-render/VisualStudio2022" smallIcon="pSc1mq"
             bigIcon="pSc1mq" extraCompilerFlags="/wd4005 /wd4244 /wd4305 /wd4584"
-            extraLinkerFlags="/IGNORE:4006">
+            extraLinkerFlags="/IGNORE:4006" externalLibraries="luajit51.lib">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" winWarningLevel="2"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" winWarningLevel="2"
+                       libraryPath="..\..\..\modules\LuaJIT\src" headerPath="..\..\..\modules\LuaJIT\src"
+                       prebuildCommand="call ..\..\..\luajit_win.bat"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="osci-render" alwaysGenerateDebugSymbols="1"
-                       debugInformationFormat="ProgramDatabase" winWarningLevel="2"/>
+                       debugInformationFormat="ProgramDatabase" winWarningLevel="2"
+                       libraryPath="..\..\..\modules\LuaJIT\src" headerPath="..\..\..\modules\LuaJIT\src"
+                       prebuildCommand="call ..\..\..\luajit_win.bat" enablePluginBinaryCopyStep="0"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
@@ -764,6 +841,7 @@
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="melatonin_inspector" path="modules"/>
       </MODULEPATHS>
     </VS2022>
     <XCODE_MAC targetFolder="Builds/osci-render/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak"
@@ -771,15 +849,18 @@
                bigIcon="aZXbCi" applicationCategory="public.app-category.music"
                microphonePermissionNeeded="1" frameworkSearchPaths="/Library/Frameworks"
                extraCustomFrameworks="/Library/Frameworks/Syphon.framework"
-               hardenedRuntime="1" hardenedRuntimeOptions="com.apple.security.cs.disable-library-validation,com.apple.security.device.audio-input"
-               iosDevelopmentTeamID="D86A3M3H2L">
+               hardenedRuntime="1" hardenedRuntimeOptions="com.apple.security.cs.allow-jit,com.apple.security.cs.allow-unsigned-executable-memory,com.apple.security.cs.disable-library-validation,com.apple.security.device.audio-input"
+               externalLibraries="luajit" userNotes="D86A3M3H2L">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
-                       codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
+                       headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
+                       userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
         <CONFIGURATION name="Release" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO,OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
+                       headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
         <CONFIGURATION name="Release (Development)" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
-                       codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
+                       headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
+                       userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
@@ -807,6 +888,7 @@
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="melatonin_inspector" path="modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
   </EXPORTFORMATS>
@@ -838,6 +920,7 @@
     <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_sharedtexture" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="melatonin_inspector" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>
 </JUCERPROJECT>

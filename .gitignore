@@ -18,6 +18,7 @@ ci/sign.sh
 **/JuceLibraryCode
 
 packaging/Output
+packaging/build
 
 # User-specific files
 *.rsuser
@@ -86,7 +87,6 @@ StyleCopReport.xml
 *.ilk
 *.meta
 *.iobj
-*.obj
 *.pch
 *.pdb
 *.ipdb

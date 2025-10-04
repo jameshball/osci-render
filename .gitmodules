@@ -1,12 +1,17 @@
 [submodule "modules/chowdsp_utils"]
 	path = modules/chowdsp_utils
-	url = https://github.com/Chowdhury-DSP/chowdsp_utils.git
+	url = ../../Chowdhury-DSP/chowdsp_utils.git
 [submodule "modules/juce_sharedtexture"]
 	path = modules/juce_sharedtexture
-	url = git@github.com:jameshball/juce_sharedtexture.git
+	url = ../../jameshball/juce_sharedtexture.git
 [submodule "modules/osci_render_core"]
 	path = modules/osci_render_core
-	url = git@github.com:jameshball/osci_render_core.git
-[submodule "Source/lua/lua"]
-	path = Source/lua/lua
-	url = git@github.com:lua/lua.git
+	url = ../../jameshball/osci_render_core.git
+[submodule "modules/melatonin_inspector"]
+	path = modules/melatonin_inspector
+	url = https://github.com/sudara/melatonin_inspector.git
+	branch = main
+[submodule "LuaJIT"]
+	path = modules/LuaJIT
+	url = https://luajit.org/git/luajit.git
+	ignore = untracked

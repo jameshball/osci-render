@@ -37,7 +37,25 @@ void TxtComponent::update() {
     juce::String defaultFont = audioProcessor.font.getTypefaceName();
     int index = installedFonts.indexOf(defaultFont);
 	if (index == -1) {
-        index = 0;
+		// If the processor's current font isn't in the list (name mismatch), try to find a monospace font.
+		juce::String monoName = juce::Font::getDefaultMonospacedFontName();
+		int monoIndex = installedFonts.indexOf(monoName);
+		if (monoIndex != -1) {
+			index = monoIndex;
+		} else {
+			// Heuristic: pick the first font whose name suggests monospace/code.
+			static const char* monoHints[] = { "mono", "code", "consolas", "courier", "menlo", "andale", "lucida" };
+			for (int i = 0; i < installedFonts.size() && index == -1; ++i) {
+				auto name = installedFonts[i];
+				for (auto hint : monoHints) {
+					if (name.containsIgnoreCase(hint)) { index = i; break; }
+				}
+			}
+			if (index == -1) {
+				// Fall back to first font.
+				index = 0;
+			}
+		}
     }
     font.setSelectedItemIndex(index);
     bold.setToggleState(audioProcessor.font.isBold(), juce::dontSendNotification);

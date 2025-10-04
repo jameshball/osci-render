@@ -20,11 +20,12 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     // windows & menus
     setColour(juce::ResizableWindow::backgroundColourId, Colours::grey);
     setColour(groupComponentBackgroundColourId, Colours::darker);
+    setColour(scrollFadeOverlayBackgroundColourId, Colours::darker);
     setColour(groupComponentHeaderColourId, Colours::veryDark);
     setColour(juce::PopupMenu::backgroundColourId, Colours::darker);
     setColour(juce::PopupMenu::highlightedBackgroundColourId, Colours::grey);
     setColour(juce::TooltipWindow::backgroundColourId, Colours::darker);
-    setColour(juce::TooltipWindow::outlineColourId, juce::Colours::white);
+    setColour(juce::TooltipWindow::outlineColourId, Colours::darker);
     setColour(juce::TextButton::buttonOnColourId, Colours::darker);
     setColour(juce::AlertWindow::outlineColourId, Colours::darker);
     setColour(juce::AlertWindow::backgroundColourId, Colours::darker);
@@ -89,7 +90,6 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
 
     // UI colours
     getCurrentColourScheme().setUIColour(ColourScheme::widgetBackground, Colours::veryDark);
-    getCurrentColourScheme().setUIColour(ColourScheme::UIColour::defaultFill, Colours::accentColor);
 
     // I have to do this, otherwise components are initialised before the look and feel is set
     juce::LookAndFeel::setDefaultLookAndFeel(this);
@@ -486,4 +486,11 @@ juce::Typeface::Ptr OscirenderLookAndFeel::getTypefaceForFont(const juce::Font& 
     }
 
     return juce::Font::getDefaultTypefaceForFont(font);
+}
+
+void OscirenderLookAndFeel::drawStretchableLayoutResizerBar(juce::Graphics& g, int w, int h, bool isVerticalBar, bool isMouseOver, bool isMouseDragging) {
+    if (isMouseOver || isMouseDragging) {
+        g.setColour(Colours::accentColor.withAlpha(0.5f));
+        g.fillRoundedRectangle(0, 0, w, h, 4.0f);
+    }
 }

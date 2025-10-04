@@ -8,8 +8,6 @@
 
 #pragma once
 
-#define VERSION_HINT 2
-
 #include <JuceHeader.h>
 
 #include <numbers>
@@ -18,14 +16,12 @@
 #include "UGen/Env.h"
 #include "UGen/ugen_JuceEnvelopeComponent.h"
 #include "audio/CustomEffect.h"
-#include "audio/DashedLineEffect.h"
 #include "audio/DelayEffect.h"
 #include "audio/PerspectiveEffect.h"
 #include "audio/PublicSynthesiser.h"
 #include "audio/SampleRateManager.h"
 #include "audio/ShapeSound.h"
 #include "audio/ShapeVoice.h"
-#include "audio/WobbleEffect.h"
 #include "obj/ObjectServer.h"
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
@@ -61,11 +57,13 @@ public:
 
     std::vector<std::shared_ptr<osci::Effect>> toggleableEffects;
     std::vector<std::shared_ptr<osci::Effect>> luaEffects;
+    // Temporary preview effect applied while hovering effects in the grid (guarded by effectsLock)
+    std::shared_ptr<osci::Effect> previewEffect;
     std::atomic<double> luaValues[26] = {0.0};
 
     std::shared_ptr<osci::Effect> frequencyEffect = std::make_shared<osci::Effect>(
         [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
-            frequency = values[0].load();
+            frequency = values[0].load() + 0.000001;
             return input;
         },
         new osci::EffectParameter(
@@ -74,23 +72,7 @@ public:
             "frequency",
             VERSION_HINT, 220.0, 0.0, 4200.0));
 
-    std::shared_ptr<osci::Effect> trace = std::make_shared<osci::Effect>(
-        std::vector<osci::EffectParameter*>{
-            new osci::EffectParameter(
-                "Trace Start",
-                "Defines how far into the frame the drawing is started at. This has the effect of 'tracing' out the image from a single dot when animated. By default, we start drawing from the beginning of the frame, so this value is 0.0.",
-                "traceStart",
-                VERSION_HINT, 0.0, 0.0, 1.0, 0.001),
-            new osci::EffectParameter(
-                "Trace Length",
-                "Defines how much of the frame is drawn per cycle. This has the effect of 'tracing' out the image from a single dot when animated. By default, we draw the whole frame, corresponding to a value of 1.0.",
-                "traceLength",
-                VERSION_HINT, 1.0, 0.0, 1.0, 0.001),
-        });
-
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
-
-    std::shared_ptr<DashedLineEffect> dashedLineEffect = std::make_shared<DashedLineEffect>();
 
     std::function<void(int, juce::String, juce::String)> errorCallback = [this](int lineNum, juce::String fileName, juce::String error) { notifyErrorListeners(lineNum, fileName, error); };
     std::shared_ptr<CustomEffect> customEffect = std::make_shared<CustomEffect>(errorCallback, luaValues);
@@ -98,13 +80,7 @@ public:
         customEffect,
         new osci::EffectParameter("Lua Effect", "Controls the strength of the custom Lua effect applied. You can write your own custom effect using Lua by pressing the edit button on the right.", "customEffectStrength", VERSION_HINT, 1.0, 0.0, 1.0));
 
-    std::shared_ptr<PerspectiveEffect> perspectiveEffect = std::make_shared<PerspectiveEffect>();
-    std::shared_ptr<osci::Effect> perspective = std::make_shared<osci::Effect>(
-        perspectiveEffect,
-        std::vector<osci::EffectParameter*>{
-            new osci::EffectParameter("Perspective", "Controls the strength of the 3D perspective projection.", "perspectiveStrength", VERSION_HINT, 1.0, 0.0, 1.0),
-            new osci::EffectParameter("Focal Length", "Controls the focal length of the 3D perspective effect. A higher focal length makes the image look more flat, and a lower focal length makes the image look more 3D.", "perspectiveFocalLength", VERSION_HINT, 2.0, 0.0, 10.0),
-        });
+    std::shared_ptr<osci::Effect> perspective = PerspectiveEffect().build();
 
     osci::BooleanParameter* midiEnabled = new osci::BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false, "Enable MIDI input for the synth. If disabled, the synth will play a constant tone, as controlled by the frequency slider.");
     osci::BooleanParameter* inputEnabled = new osci::BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false, "Enable to use input audio, instead of the generated audio.");
@@ -172,10 +148,8 @@ public:
 
     std::atomic<double> animationFrame = 0.f;
 
-    std::shared_ptr<WobbleEffect> wobbleEffect = std::make_shared<WobbleEffect>(*this);
-
     const double FONT_SIZE = 1.0f;
-    juce::Font font = juce::Font(juce::Font::getDefaultSansSerifFontName(), FONT_SIZE, juce::Font::plain);
+    juce::Font font = juce::Font(juce::Font::getDefaultMonospacedFontName(), FONT_SIZE, juce::Font::plain);
 
     ShapeSound::Ptr objectServerSound = new ShapeSound();
 
@@ -206,6 +180,10 @@ public:
     void removeErrorListener(ErrorListener* listener);
     void notifyErrorListeners(int lineNumber, juce::String id, juce::String error);
 
+    // Preview API: set/clear a temporary effect by ID for hover auditioning
+    void setPreviewEffectId(const juce::String& effectId);
+    void clearPreviewEffect();
+
     // Setter for the callback
     void setFileRemovedCallback(std::function<void(int)> callback);
 
@@ -234,6 +212,8 @@ public:
     };
 
 private:
+    juce::AudioBuffer<float> inputBuffer;
+
     std::atomic<bool> prevMidiEnabled = !midiEnabled->getBoolValue();
 
     juce::SpinLock audioThreadCallbackLock;

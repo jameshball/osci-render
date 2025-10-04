@@ -48,6 +48,7 @@ struct LuaVariables {
 	double phase = 0;
 	double sampleRate = 0;
 	double frequency = 0;
+	double cycle = 1;
 
 	// x, y, z are only used for effects
 	bool isEffect = false;
@@ -55,6 +56,9 @@ struct LuaVariables {
 	double x = 0;
 	double y = 0;
 	double z = 0;
+	
+    double ext_x = 0;
+	double ext_y = 0;
 };
 
 struct lua_State;

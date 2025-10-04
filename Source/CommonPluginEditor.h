@@ -10,6 +10,10 @@
 #include "components/VolumeComponent.h"
 #include "components/DownloaderComponent.h"
 
+#if DEBUG
+    #include "melatonin_inspector/melatonin_inspector.h"
+#endif
+
 class CommonPluginEditor : public juce::AudioProcessorEditor {
 public:
     CommonPluginEditor(CommonAudioProcessor&, juce::String appName, juce::String projectFileType, int width, int height);
@@ -24,7 +28,8 @@ public:
     void updateTitle();
     void fileUpdated(juce::String fileName);
     void openAudioSettings();
-    void openRecordingSettings();
+    virtual void openRecordingSettings();
+    virtual void showPremiumSplashScreen();
     void resetToDefault();
     void resized() override;
 
@@ -76,6 +81,10 @@ public:
 
 #if JUCE_LINUX
     juce::OpenGLContext openGlContext;
+#endif
+
+#if DEBUG
+    melatonin::Inspector inspector { *this, false };
 #endif
 
     bool keyPressed(const juce::KeyPress& key) override;

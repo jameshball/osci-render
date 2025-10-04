@@ -17,14 +17,14 @@ void OscirenderAudioProcessorEditor::registerFileRemovedCallback() {
     });
 }
 
-OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p) : CommonPluginEditor(p, "osci-render", "osci", 1100, 750), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white) {
+OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p) : CommonPluginEditor(p, "osci-render", "osci", 1100, 770), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white) {
     // Register the file removal callback
     registerFileRemovedCallback();
 
 #if !OSCI_PREMIUM
     addAndMakeVisible(upgradeButton);
     upgradeButton.onClick = [this] {
-        juce::URL("https://osci-render.com/#purchase").launchInDefaultBrowser();
+        showPremiumSplashScreen();
     };
     upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor);
     upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark);
@@ -90,6 +90,12 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
         visualiserSettingsWindow.setVisible(false);
     };
 
+#if !OSCI_PREMIUM
+    visualiserSettings.onUpgradeRequested = [this] {
+        showPremiumSplashScreen();
+    };
+#endif
+
 #if JUCE_WINDOWS
     // if not standalone, use native title bar for compatibility with DAWs
     visualiserSettingsWindow.setUsingNativeTitleBar(processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone);
@@ -130,9 +136,8 @@ bool OscirenderAudioProcessorEditor::isInterestedInFileDrag(const juce::StringAr
     }
     juce::File file(files[0]);
     juce::String ext = file.getFileExtension().toLowerCase();
-    if (std::find(audioProcessor.FILE_EXTENSIONS.begin(), audioProcessor.FILE_EXTENSIONS.end(), ext) != audioProcessor.FILE_EXTENSIONS.end()) {
-        return true;
-    }
+    ext = ext.substring(1); // Remove the dot
+    return std::find(audioProcessor.FILE_EXTENSIONS.begin(), audioProcessor.FILE_EXTENSIONS.end(), ext) != audioProcessor.FILE_EXTENSIONS.end();
 }
 
 void OscirenderAudioProcessorEditor::filesDropped(const juce::StringArray& files, int x, int y) {
@@ -278,6 +283,14 @@ void OscirenderAudioProcessorEditor::resized() {
     audioProcessor.setProperty("luaLayoutPreferredSize", luaLayout.getItemCurrentRelativeSize(0));
 
     repaint();
+
+#if !OSCI_PREMIUM
+    if (premiumSplashScreen != nullptr) {
+        visualiser.setVisible(false);
+        premiumSplashScreen->setBounds(getLocalBounds());
+        premiumSplashScreen->toFront(false);
+    }
+#endif
 }
 
 void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
@@ -510,6 +523,48 @@ void OscirenderAudioProcessorEditor::mouseMove(const juce::MouseEvent& event) {
 void OscirenderAudioProcessorEditor::openVisualiserSettings() {
     visualiserSettingsWindow.setVisible(true);
     visualiserSettingsWindow.toFront(true);
+}
+
+void OscirenderAudioProcessorEditor::openRecordingSettings() {
+#if OSCI_PREMIUM
+    CommonPluginEditor::openRecordingSettings();
+#else
+    if (recordingSettingsWindow.isVisible()) {
+        recordingSettingsWindow.setVisible(false);
+    }
+    showPremiumSplashScreen();
+#endif
+}
+
+void OscirenderAudioProcessorEditor::showPremiumSplashScreen() {
+#if !OSCI_PREMIUM
+    if (premiumSplashScreen != nullptr) {
+        premiumSplashScreen->toFront(true);
+        return;
+    }
+
+    auto openUpgradePage = [] {
+        juce::URL("https://osci-render.com/#purchase").launchInDefaultBrowser();
+    };
+
+    premiumSplashScreen = std::make_unique<SplashScreenComponent>();
+    premiumSplashScreen->onUpgradeClicked = openUpgradePage;
+    premiumSplashScreen->onDismissRequested = [this] {
+        if (premiumSplashScreen != nullptr) {
+            visualiser.setVisible(visualiserWasVisibleBeforeSplash);
+            removeChildComponent(premiumSplashScreen.get());
+            premiumSplashScreen.reset();
+            resized();
+        }
+    };
+
+    visualiserWasVisibleBeforeSplash = visualiser.isVisible();
+    visualiser.setVisible(false);
+    premiumSplashScreen->setBounds(getLocalBounds());
+    addAndMakeVisible(*premiumSplashScreen);
+    premiumSplashScreen->toFront(true);
+    resized();
+#endif
 }
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM

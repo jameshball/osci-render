@@ -103,7 +103,7 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
 #if OSCI_PREMIUM
                 if (parameters.isGoniometer()) {
                     // x and y go to a diagonal currently, so we need to scale them down, and rotate them
-                    point.scale(1.0 / std::sqrt(2.0), 1.0 / std::sqrt(2.0), 1.0);
+                    point.scale(-1.0 / std::sqrt(2.0), 1.0 / std::sqrt(2.0), 1.0);
                     point.rotate(0, 0, -juce::MathConstants<double>::pi / 4);
                 }
 #endif
@@ -423,9 +423,8 @@ void VisualiserRenderer::setupTextures(int resolution) {
     blur4Texture = makeTexture(128, 128);
     renderTexture = makeTexture(resolution, resolution);
 
-    screenOpenGLTexture.loadImage(emptyScreenImage);
-    screenTexture = {screenOpenGLTexture.getTextureID(), screenTextureImage.getWidth(), screenTextureImage.getHeight()};
-
+    screenTexture = createScreenTexture();
+    
 #if OSCI_PREMIUM
     glowTexture = makeTexture(512, 512);
     reflectionTexture = createReflectionTexture();

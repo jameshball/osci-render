@@ -5,6 +5,8 @@
 #include "EffectComponent.h"
 #include "ComponentList.h"
 #include "SwitchButton.h"
+#include "EffectTypeGridComponent.h"
+#include "SvgButton.h"
 #include <random>
 
 // Application-specific data container
@@ -14,47 +16,71 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
     std::vector<std::shared_ptr<osci::Effect>> data;
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& editor;
+    std::function<void()> onAddNewEffectRequested; // callback hooked by parent to open the grid
 
     AudioEffectListBoxItemData(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), editor(editor) {
         resetData();
     }
 
     void randomise() {
-        juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+        std::random_device rd;
+        std::mt19937 g(rd());
         
-		for (int i = 0; i < data.size(); i++) {
-			auto effect = data[i];
-			auto id = effect->getId().toLowerCase();
+        {
+            juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+            // Decide how many effects to select (1..5 or up to available)
+            int total = (int) audioProcessor.toggleableEffects.size();
+            int maxPick = juce::jmin(5, total);
+            int numPick = juce::jmax(1, juce::Random::getSystemRandom().nextInt({1, maxPick + 1}));
             
-            if (id.contains("scale") || id.contains("translate") || id.contains("trace")) {
-                continue;
+            // Build indices [0..total)
+            std::vector<int> indices(total);
+            std::iota(indices.begin(), indices.end(), 0);
+            std::shuffle(indices.begin(), indices.end(), g);
+            
+            // First, deselect and disable all
+            for (auto& effect : audioProcessor.toggleableEffects) {
+                effect->markSelectable(false);
+                effect->markEnableable(false);
             }
-
-            for (auto& parameter : effect->parameters) {
-                parameter->setValueNotifyingHost(juce::Random::getSystemRandom().nextFloat());
-                if (parameter->lfo != nullptr) {
-                    parameter->lfo->setUnnormalisedValueNotifyingHost((int) osci::LfoType::Static);
-                    parameter->lfoRate->setUnnormalisedValueNotifyingHost(1);
-                    
-                    if (juce::Random::getSystemRandom().nextFloat() > 0.8) {
-                        parameter->lfo->setUnnormalisedValueNotifyingHost((int)(juce::Random::getSystemRandom().nextFloat() * (int) osci::LfoType::Noise));
-                        parameter->lfoRate->setValueNotifyingHost(juce::Random::getSystemRandom().nextFloat() * 0.1);
+            
+            // Pick numPick to select & enable, and randomise params
+            for (int k = 0; k < numPick && k < indices.size(); ++k) {
+                auto& effect = audioProcessor.toggleableEffects[indices[k]];
+                effect->markSelectable(true);
+                effect->markEnableable(true);
+                
+                auto id = effect->getId().toLowerCase();
+                if (id.contains("scale") || id.contains("translate") || id.contains("trace")) {
+                    continue;
+                }
+                
+                for (auto& parameter : effect->parameters) {
+                    parameter->setValueNotifyingHost(juce::Random::getSystemRandom().nextFloat());
+                    if (parameter->lfo != nullptr) {
+                        parameter->lfo->setUnnormalisedValueNotifyingHost((int) osci::LfoType::Static);
+                        parameter->lfoRate->setUnnormalisedValueNotifyingHost(1);
+                        if (juce::Random::getSystemRandom().nextFloat() > 0.8) {
+                            parameter->lfo->setUnnormalisedValueNotifyingHost((int)(juce::Random::getSystemRandom().nextFloat() * (int) osci::LfoType::Noise));
+                            parameter->lfoRate->setValueNotifyingHost(juce::Random::getSystemRandom().nextFloat() * 0.1);
+                        }
                     }
                 }
             }
-			effect->enabled->setValueNotifyingHost(juce::Random::getSystemRandom().nextFloat() > 0.7);
-		}
+        }
 
-        // shuffle precedence
-        std::random_device rd;
-        std::mt19937 g(rd());
-		std::shuffle(data.begin(), data.end(), g);
-
-		for (int i = 0; i < data.size(); i++) {
-			data[i]->setPrecedence(i);
-		}
-
-		audioProcessor.updateEffectPrecedence();
+        // Refresh local data with only selected effects
+        resetData();
+        
+        {
+            juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+            // shuffle precedence of the selected subset
+            std::shuffle(data.begin(), data.end(), g);
+            for (int i = 0; i < data.size(); i++) {
+                data[i]->setPrecedence(i);
+            }
+            audioProcessor.updateEffectPrecedence();
+        }
     }
 
     void resetData() {
@@ -62,18 +88,26 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
         data.clear();
         for (int i = 0; i < audioProcessor.toggleableEffects.size(); i++) {
             auto effect = audioProcessor.toggleableEffects[i];
+#if !OSCI_PREMIUM
+            if (effect->isPremiumOnly()) continue; // skip premium effects in free version
+#endif
             effect->setValue(effect->getValue());
-            data.push_back(effect);
+            // Ensure 'selected' exists and defaults to true for older projects
+            effect->markSelectable(effect->selected == nullptr ? true : effect->selected->getBoolValue());
+            if (effect->selected == nullptr || effect->selected->getBoolValue()) {
+                data.push_back(effect);
+            }
         }
     }
 
     int getNumItems() override {
-        return data.size();
+    // Only the effects themselves are rows; the "+ Add new effect" button is a separate control below the list
+    return (int) data.size();
     }
 
     // CURRENTLY NOT USED
     void deleteItem(int indexOfItemToDelete) override {
-		// data.erase(data.begin() + indexOfItemToDelete);
+        // data.erase(data.begin() + indexOfItemToDelete);
     }
 
     // CURRENTLY NOT USED
@@ -81,10 +115,10 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
         // data.push_back(juce::String("Yahoo"));
     }
 
-	void moveBefore(int indexOfItemToMove, int indexOfItemToPlaceBefore) override {
+    void moveBefore(int indexOfItemToMove, int indexOfItemToPlaceBefore) override {
         juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
 
-		auto effect = data[indexOfItemToMove];
+        auto effect = data[indexOfItemToMove];
 
         if (indexOfItemToMove < indexOfItemToPlaceBefore) {
             move(data, indexOfItemToMove, indexOfItemToPlaceBefore - 1);
@@ -92,12 +126,12 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
             move(data, indexOfItemToMove, indexOfItemToPlaceBefore);
         }
         
-		for (int i = 0; i < data.size(); i++) {
-			data[i]->setPrecedence(i);
-		}
+        for (int i = 0; i < data.size(); i++) {
+            data[i]->setPrecedence(i);
+        }
 
         audioProcessor.updateEffectPrecedence();
-	}
+    }
 
     void moveAfter(int indexOfItemToMove, int indexOfItemToPlaceAfter) override {
         juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
@@ -150,14 +184,16 @@ public:
     void resized() override;
     
     static const int LEFT_BAR_WIDTH = 50;
+    static const int RIGHT_BAR_WIDTH = 15; // space for close button
     static const int ROW_HEIGHT = 30;
     static const int PADDING = 4;
 
 protected:
     osci::Effect& effect;
-    ComponentListModel listModel;
-    juce::ListBox list;
-    jux::SwitchButton selected = { effect.enabled };
+    ComponentListModel listModel { ROW_HEIGHT };
+    VListBox list;
+    jux::SwitchButton enabled = { effect.enabled };
+    SvgButton closeButton = SvgButton("closeEffect", juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize), juce::Colours::white, juce::Colours::white);
 private:
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& editor;

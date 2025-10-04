@@ -2,21 +2,24 @@ name: Build
 on:
   push:
     branches:
+      - main
       - develop
   workflow_dispatch:
+
 jobs:
-  build-linux:
-    name: Build Linux
-    runs-on: ubuntu-24.04
+  build:
+    name: Build (${{ matrix.project }} ${{ matrix.version }} @ ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
+      fail-fast: false
       matrix:
-        include:
-          - project: osci-render
-            version: free
-          - project: osci-render
-            version: premium
+        os: [ubuntu-24.04, macos-latest, windows-2022]
+        project: [osci-render, sosci]
+        version: [free, premium]
+        exclude:
           - project: sosci
-            version: premium
+            version: free
     steps:
       - name: Fix up git URLs
         run: echo -e '[url "https://github.com/"]\n  insteadOf = "git@github.com:"' >> ~/.gitconfig
@@ -27,47 +30,37 @@ jobs:
           token: ${{ secrets.ACCESS_TOKEN }}
           submodules: true
 
-      - name: "Run script"
+      - name: Set platform variables
+        shell: bash
         run: |
-          export OS="linux"
-          source ./ci/setup-env.sh
-          source ./ci/test.sh
-          source ./ci/build.sh "${{ matrix.project }}" "${{ matrix.version }}"
+          if [[ "${{ matrix.os }}" == ubuntu* ]]; then
+            echo "OS=linux" >> $GITHUB_ENV
+            echo "OS_ARTIFACT=linux" >> $GITHUB_ENV
+          elif [[ "${{ matrix.os }}" == macos* ]]; then
+            echo "OS=mac" >> $GITHUB_ENV
+            echo "OS_ARTIFACT=macos" >> $GITHUB_ENV
+          else
+            echo "OS=win" >> $GITHUB_ENV
+            echo "OS_ARTIFACT=windows" >> $GITHUB_ENV
+          fi
+
+      - name: Extract project version
+        id: version
         shell: bash
+        run: |
+          python3 ci/extract_version.py "${{ matrix.project }}.jucer" > version.txt
+          PROJECT_VERSION=$(cat version.txt)
+          echo "version=$PROJECT_VERSION" >> $GITHUB_OUTPUT
+          echo "Using project version: $PROJECT_VERSION"
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: "${{ matrix.project }}-${{ matrix.version }}-linux"
-          path: bin
-          retention-days: 7
-  build-macos:
-    name: Build macOS
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        include:
-          - project: osci-render
-            version: free
-          - project: osci-render
-            version: premium
-          - project: sosci
-            version: premium
-    steps:
-      - name: Fix up git URLs
-        run: echo -e '[url "https://github.com/"]\n  insteadOf = "git@github.com:"' >> ~/.gitconfig
-        shell: bash
-
-      - uses: actions/checkout@v1
-        with:
-          token: ${{ secrets.ACCESS_TOKEN }}
-          submodules: true
-
+      # macOS specific: setup Xcode and import certificates (skipped in EARLY_MEGA_TEST)
       - uses: maxim-lobanov/setup-xcode@v1
+        if: matrix.os == 'macos-latest'
         with:
           xcode-version: latest
 
       - name: Import application certificates
+        if: matrix.os == 'macos-latest'
         uses: apple-actions/import-codesign-certs@v3
         with:
           keychain: oscirender
@@ -76,6 +69,7 @@ jobs:
           p12-password: ${{ secrets.APPLE_APPLICATION_CERTIFICATE_PASSWORD }}
 
       - name: Import installer certificates
+        if: matrix.os == 'macos-latest'
         uses: apple-actions/import-codesign-certs@v3
         with:
           keychain: oscirender
@@ -84,32 +78,47 @@ jobs:
           p12-password: ${{ secrets.APPLE_INSTALLER_CERTIFICATE_PASSWORD }}
           create-keychain: false
 
-      - name: "Run script"
+      # Windows specific: NuGet setup
+      - name: Setup NuGet.exe for use with actions
+        if: matrix.os == 'windows-2022'
+        uses: NuGet/setup-nuget@v1.0.5
+
+      - name: NuGet Sources
+        if: matrix.os == 'windows-2022'
+        run: nuget sources
+
+      - name: Run build & tests
+        shell: bash
         run: |
-          export OS="mac"
           source ./ci/setup-env.sh
           source ./ci/test.sh
           source ./ci/build.sh "${{ matrix.project }}" "${{ matrix.version }}"
-        shell: bash
 
+      # macOS packaging & notarization
       - name: Download Packages installer build tool
+        if: matrix.os == 'macos-latest'
         run: wget http://s.sudre.free.fr/files/Packages_1211_dev.dmg
 
       - name: Mount Packages image
+        if: matrix.os == 'macos-latest'
         run: hdiutil attach Packages_1211_dev.dmg
 
       - name: Install Packages
+        if: matrix.os == 'macos-latest'
         run: sudo installer -pkg /Volumes/Packages\ 1.2.11/Install\ Packages.pkg -target /
 
-      - name: Build installer
+      - name: Build installer (macOS pkg)
+        if: matrix.os == 'macos-latest'
         run: packagesbuild --project "packaging/${{ matrix.project }}.pkgproj"
 
-      - name: Sign installer
+      - name: Sign installer (macOS pkg)
+        if: matrix.os == 'macos-latest'
         run: |
           productsign -s "${{ secrets.APPLE_DEVELOPER_ID_INSTALLER }}" "packaging/build/${{ matrix.project }}.pkg" "bin/${{ matrix.project }}-${{ matrix.version }}.pkg"
           pkgutil --check-signature "bin/${{ matrix.project }}-${{ matrix.version }}.pkg"
-    
-      - name: Notarize installer
+
+      - name: Notarize installer (macOS)
+        if: matrix.os == 'macos-latest'
         uses: lando/notarize-action@v2
         with:
           product-path: "bin/${{ matrix.project }}-${{ matrix.version }}.pkg"
@@ -119,66 +128,77 @@ jobs:
           primary-bundle-id: com.${{ matrix.project }}.pkg
           tool: notarytool
           verbose: true
-      
-      - name: Staple installer
+
+      - name: Staple installer (macOS)
+        if: matrix.os == 'macos-latest'
         run: xcrun stapler staple "bin/${{ matrix.project }}-${{ matrix.version }}.pkg"
-      
-      - name: Check installer
+
+      - name: Check installer (macOS)
+        if: matrix.os == 'macos-latest'
         run: spctl -a -vvv -t install "bin/${{ matrix.project }}-${{ matrix.version }}.pkg"
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: "${{ matrix.project }}-${{ matrix.version }}-macos"
-          path: bin
-          retention-days: 7
-  build-windows:
-    name: Build Windows
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        include:
-          - project: osci-render
-            version: free
-          - project: osci-render
-            version: premium
-          - project: sosci
-            version: premium
-    steps:
-      - name: Fix up git URLs
-        run: echo -e '[url "https://github.com/"]\n  insteadOf = "git@github.com:"' >> ~/.gitconfig
-        shell: bash
+      - name: List files
+        run: Get-ChildItem -Recurse ${{ github.workspace }}
+        shell: pwsh
 
-      - uses: actions/checkout@v1
-        with:
-          token: ${{ secrets.ACCESS_TOKEN }}
-          submodules: true
-
-      - name: Setup NuGet.exe for use with actions
-        uses: NuGet/setup-nuget@v1.0.5
-
-      - name: NuGet Sources
-        run: nuget sources
-
-      - name: "Run script"
-        run: |
-          export OS="win"
-          source ./ci/setup-env.sh
-          source ./ci/test.sh
-          source ./ci/build.sh "${{ matrix.project }}" "${{ matrix.version }}"
-        shell: bash
-      
+      # Windows packaging (Inno Setup)
       - name: Compile .ISS to .EXE Installer
+        if: matrix.os == 'windows-2022'
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
         with:
           path: "packaging/${{ matrix.project }}.iss"
-      
-      - name: Move installer to bin
+
+      - name: Move installer to bin (Windows)
+        if: matrix.os == 'windows-2022'
+        shell: bash
         run: mv "packaging/build/${{ matrix.project }}.exe" "bin/${{ matrix.project }}-${{ matrix.version }}.exe"
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: "${{ matrix.project }}-${{ matrix.version }}-windows"
-          path: bin
-          retention-days: 7
+      # Combined MEGA upload (Unix)
+      - name: Upload binaries to MEGA (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Install MEGAcmd per platform
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            wget -q https://mega.nz/linux/repo/xUbuntu_24.04/amd64/megacmd-xUbuntu_24.04_amd64.deb
+            sudo apt-get update -y >/dev/null
+            sudo apt-get install -y ./megacmd-xUbuntu_24.04_amd64.deb >/dev/null
+          else
+            brew install --cask megacmd
+            echo "/Applications/MEGAcmd.app/Contents/MacOS" >> $GITHUB_PATH
+          fi
+          mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}"
+          DEST="/${{ matrix.project }}/${{ steps.version.outputs.version }}"
+          ls -1 bin || true
+          # Upload all produced artifacts (files only) into version directory
+          shopt -s nullglob
+          for f in bin/*; do
+            if [[ -f "$f" ]]; then
+              echo "Uploading $f -> $DEST"
+              mega-put -c "$f" "$DEST/"
+            fi
+          done
+          mega-logout
+
+      # Combined MEGA upload (Windows)
+      - name: Install MEGAcmd (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          choco install megacmd -y --no-progress
+          echo "$env:LOCALAPPDATA\MEGAcmd" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Upload binaries to MEGA (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}"
+          $dest = "/${{ matrix.project }}/${{ steps.version.outputs.version }}"
+          Get-ChildItem bin -File | ForEach-Object {
+            Write-Host "Uploading $($_.FullName) -> $dest"
+            mega-put -c $_.FullName $dest/
+          }
+          mega-logout

@@ -8,12 +8,12 @@ class SvgButton : public juce::DrawableButton, public juce::AudioProcessorParame
         
         changeSvgColour(doc.get(), colour);
         normalImage = juce::Drawable::createFromSVG(*doc);
-		changeSvgColour(doc.get(), colour.withBrightness(0.7f));
-		overImage = juce::Drawable::createFromSVG(*doc);
-		changeSvgColour(doc.get(), colour.withBrightness(0.5f));
-		downImage = juce::Drawable::createFromSVG(*doc);
-		changeSvgColour(doc.get(), colour.withBrightness(0.3f));
-		disabledImage = juce::Drawable::createFromSVG(*doc);
+        changeSvgColour(doc.get(), colour.withBrightness(0.7f));
+        overImage = juce::Drawable::createFromSVG(*doc);
+        changeSvgColour(doc.get(), colour.withBrightness(0.5f));
+        downImage = juce::Drawable::createFromSVG(*doc);
+        changeSvgColour(doc.get(), colour.withBrightness(0.3f));
+        disabledImage = juce::Drawable::createFromSVG(*doc);
         
         // If a toggled SVG is provided, use it for the "on" state images
         if (toggledSvg.isNotEmpty()) {
@@ -44,7 +44,8 @@ class SvgButton : public juce::DrawableButton, public juce::AudioProcessorParame
         if (colour != colourOn) {
             setClickingTogglesState(true);
         }
-		setImages(normalImage.get(), overImage.get(), downImage.get(), disabledImage.get(), normalImageOn.get(), overImageOn.get(), downImageOn.get(), disabledImageOn.get());
+        
+        setImages(normalImage.get(), overImage.get(), downImage.get(), disabledImage.get(), normalImageOn.get(), overImageOn.get(), downImageOn.get(), disabledImageOn.get());
 
         if (toggle != nullptr) {
             toggle->addListener(this);
@@ -94,8 +95,7 @@ class SvgButton : public juce::DrawableButton, public juce::AudioProcessorParame
         juce::DrawableButton::resized();
         if (pulseUsed) {
             resizedPath = basePath;
-            // scale path to fit image
-            resizedPath.applyTransform(resizedPath.getTransformToScaleToFit(getImageBounds(), true));
+            resizedPath.applyTransform(getImageTransform());
             repaint();
         }
     }
@@ -122,13 +122,13 @@ class SvgButton : public juce::DrawableButton, public juce::AudioProcessorParame
 
 private:
     std::unique_ptr<juce::Drawable> normalImage;
-	std::unique_ptr<juce::Drawable> overImage;
-	std::unique_ptr<juce::Drawable> downImage;
-	std::unique_ptr<juce::Drawable> disabledImage;
+    std::unique_ptr<juce::Drawable> overImage;
+    std::unique_ptr<juce::Drawable> downImage;
+    std::unique_ptr<juce::Drawable> disabledImage;
 
     std::unique_ptr<juce::Drawable> normalImageOn;
-	std::unique_ptr<juce::Drawable> overImageOn;
-	std::unique_ptr<juce::Drawable> downImageOn;
+    std::unique_ptr<juce::Drawable> overImageOn;
+    std::unique_ptr<juce::Drawable> downImageOn;
     std::unique_ptr<juce::Drawable> disabledImageOn;
 
     osci::BooleanParameter* toggle;
@@ -139,6 +139,7 @@ private:
     bool prevToggleState = false;
     juce::Path basePath;
     juce::Path resizedPath;
+    juce::AffineTransform imageTransform; // Transform applied to all state images
     juce::Animator pulse = juce::ValueAnimatorBuilder {}
         .withEasing([] (float t) { return std::sin(3.14159 * t) / 2 + 0.5; })
         .withDurationMs(500)
@@ -153,5 +154,39 @@ private:
         forEachXmlChildElement(*xml, xmlnode) {
             xmlnode->setAttribute("fill", '#' + colour.toDisplayString(false));
         }
+    }
+
+public:
+    // Allows callers to adjust the placement/scale/rotation of the SVG within the button.
+    void setImageTransform(const juce::AffineTransform& t) {
+        imageTransform = juce::RectanglePlacement(juce::RectanglePlacement::centred).getTransformToFit(normalImage->getDrawableBounds(), getImageBounds()).followedBy(t);
+        if (getLocalBounds().isEmpty()) {
+            return;
+        }
+        setButtonStyle(juce::DrawableButton::ButtonStyle::ImageRaw);
+        applyImageTransform();
+        // Keep the pulse overlay in sync
+        resized();
+    }
+
+    juce::AffineTransform getImageTransform() const { return imageTransform; }
+
+private:
+    void applyImageTransform() {
+        auto apply = [this](std::unique_ptr<juce::Drawable>& d) {
+            if (d != nullptr) {
+                d->setTransform(imageTransform);
+            }
+        };
+        apply(normalImage);
+        apply(overImage);
+        apply(downImage);
+        apply(disabledImage);
+        apply(normalImageOn);
+        apply(overImageOn);
+        apply(downImageOn);
+        apply(disabledImageOn);
+
+        setImages(normalImage.get(), overImage.get(), downImage.get(), disabledImage.get(), normalImageOn.get(), overImageOn.get(), downImageOn.get(), disabledImageOn.get());
     }
 };

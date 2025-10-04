@@ -3,7 +3,7 @@
 #include "CustomStandaloneFilterWindow.h"
 
 CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String appName, juce::String projectFileType, int defaultWidth, int defaultHeight)
-	: AudioProcessorEditor(&p), audioProcessor(p), appName(appName), projectFileType(projectFileType)
+    : AudioProcessorEditor(&p), audioProcessor(p), appName(appName), projectFileType(projectFileType)
 {
 #if JUCE_LINUX
     // use OpenGL on Linux for much better performance. The default on Mac is CoreGraphics, and on Window is Direct2D which is much faster.
@@ -60,7 +60,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     setResizeLimits(250, 250, 999999, 999999);
 
     tooltipDropShadow.setOwner(&tooltipWindow.get());
-    tooltipWindow->setMillisecondsBeforeTipAppears(0);
+    tooltipWindow->setMillisecondsBeforeTipAppears(100);
     
     updateTitle();
 
@@ -112,6 +112,9 @@ CommonPluginEditor::~CommonPluginEditor() {
 }
 
 bool CommonPluginEditor::keyPressed(const juce::KeyPress& key) {
+    // If we're not accepting special keys, end early
+    if (!audioProcessor.getAcceptsKeys()) return false;
+
     if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'S') {
         saveProjectAs();
     } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'S') {
@@ -202,6 +205,8 @@ void CommonPluginEditor::openAudioSettings() {
 void CommonPluginEditor::openRecordingSettings() {
     recordingSettingsWindow.setVisible(true);
 }
+
+void CommonPluginEditor::showPremiumSplashScreen() {}
 
 void CommonPluginEditor::resetToDefault() {
     juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
