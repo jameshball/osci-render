@@ -9,10 +9,10 @@ class UnfoldEffect : public osci::EffectApplication {
 public:
     explicit UnfoldEffect(OscirenderAudioProcessor &p) : audioProcessor(p) {}
 
-    osci::Point apply(int /*index*/, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
+    osci::Point apply(int /*index*/, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
         // values[0] = segments (can be fractional)
         // values[1] = phase (0-1) selecting which segment is currently being drawn
-        double segments = juce::jmax(values[0].load(), 1.0); // ensure at least 1 segment
+        double segments = juce::jmax(values[0].load(), 1.0f); // ensure at least 1 segment
 
         // Polar conversion
         double r = std::sqrt(input.x * input.x + input.y * input.y);
@@ -23,7 +23,7 @@ public:
         double fractionalPart = segments - fullSegments; // in [0,1)
         fullSegments = fractionalPart > 1e-3 ? fullSegments : fullSegments - 1;
 
-        phase = nextPhase(audioProcessor.frequency / (fullSegments + 1), sampleRate) / (2.0 * std::numbers::pi);
+        phase = (nextPhase(audioProcessor.frequency / (fullSegments + 1), sampleRate) + juce::MathConstants<float>::pi) / (2.0 * juce::MathConstants<float>::pi);
 
         // Use 'segments' for timing so partial segment gets proportionally shorter time.
         double currentSegmentFloat = phase * segments; // [0, segments)
@@ -54,7 +54,7 @@ public:
     }
 
     std::shared_ptr<osci::Effect> build() const override {
-        auto eff = std::make_shared<osci::Effect>(
+        auto eff = std::make_shared<osci::SimpleEffect>(
             std::make_shared<UnfoldEffect>(audioProcessor),
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter(

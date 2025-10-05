@@ -1,5 +1,6 @@
 // FROM https://cgvr.cs.uni-bremen.de/teaching/cg_literatur/lighthouse3d_view_frustum_culling/index.html
 
+#include <JuceHeader.h>
 #include "Frustum.h"
 
 void Frustum::setCameraInternals(float fov, float ratio, float nearDistance, float farDistance) {

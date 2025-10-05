@@ -8,7 +8,7 @@ class MultiplexEffect : public osci::EffectApplication {
 public:
     explicit MultiplexEffect(OscirenderAudioProcessor &p) : audioProcessor(p) {}
 
-    osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
+    osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
         jassert(values.size() == 5);
 
         double gridX = values[0].load();
@@ -28,15 +28,15 @@ public:
                                             std::floor(gridY + 1e-3),
                                             std::floor(gridZ + 1e-3));
 
-        gridFloor.x = std::max(gridFloor.x, 1.0);
-        gridFloor.y = std::max(gridFloor.y, 1.0);
-        gridFloor.z = std::max(gridFloor.z, 1.0);
+        gridFloor.x = std::max(gridFloor.x, 1.0f);
+        gridFloor.y = std::max(gridFloor.y, 1.0f);
+        gridFloor.z = std::max(gridFloor.z, 1.0f);
 
         double totalPositions = gridFloor.x * gridFloor.y * gridFloor.z;
         double position = phase * totalPositions;
         double delayPosition = static_cast<int>(position) / totalPositions;
 
-        phase = nextPhase(audioProcessor.frequency / totalPositions, sampleRate) / (2.0 * std::numbers::pi);
+        phase = (nextPhase(audioProcessor.frequency / totalPositions, sampleRate) + juce::MathConstants<float>::pi) / (2.0 * juce::MathConstants<float>::pi);
 
         int delayedIndex = head - static_cast<int>(delayPosition * gridDelay * sampleRate);
         if (delayedIndex < 0) {
@@ -57,7 +57,7 @@ public:
     }
 
     std::shared_ptr<osci::Effect> build() const override {
-        auto eff = std::make_shared<osci::Effect>(
+        auto eff = std::make_shared<osci::SimpleEffect>(
             std::make_shared<MultiplexEffect>(audioProcessor),
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter("Multiplex X", "Controls the horizontal grid size for the multiplex effect.", "multiplexGridX", VERSION_HINT, 2.0, 1.0, 8.0),

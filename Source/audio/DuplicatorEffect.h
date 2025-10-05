@@ -6,10 +6,10 @@ class DuplicatorEffect : public osci::EffectApplication {
 public:
     DuplicatorEffect(OscirenderAudioProcessor& p) : audioProcessor(p) {}
 
-    osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
+    osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
         const double twoPi = juce::MathConstants<double>::twoPi;
-        double copies = juce::jmax(1.0, values[0].load());
-        double spread = juce::jlimit(0.0, 1.0, values[1].load());
+        double copies = juce::jmax(1.0f, values[0].load());
+        double spread = juce::jlimit(0.0f, 1.0f, values[1].load());
         double angleOffset = values[2].load() * juce::MathConstants<double>::twoPi;
 
         // Offset moves each time the input shape is drawn once
@@ -24,7 +24,7 @@ public:
     }
 
     std::shared_ptr<osci::Effect> build() const override {
-        auto eff = std::make_shared<osci::Effect>(
+        auto eff = std::make_shared<osci::SimpleEffect>(
             std::make_shared<DuplicatorEffect>(audioProcessor),
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter("Duplicator Copies",

@@ -57,6 +57,7 @@ public:
     bool keyPressed(const juce::KeyPress& key) override;
     void setRecording(bool recording);
     void childUpdated();
+    void updateRenderModeFromProcessor();
 
     VisualiserComponent* parent = nullptr;
     VisualiserComponent* child = nullptr;
@@ -93,6 +94,7 @@ private:
     int lastMouseX = 0;
     int lastMouseY = 0;
     int timerId = 0;
+    int renderModeTimerId = 0;
     bool hideButtonRow = false;
     bool fullScreen = false;
     std::function<void(FullScreenMode)> fullScreenCallback;

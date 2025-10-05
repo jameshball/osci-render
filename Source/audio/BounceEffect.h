@@ -7,17 +7,17 @@
 
 class BounceEffect : public osci::EffectApplication {
 public:
-    osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
+    osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
         // values[0] = size (0.05..1.0)
         // values[1] = speed (0..)
         // values[2] = angle (0..1 -> 0..2π)
-        double size = juce::jlimit(0.05, 1.0, values[0].load());
+        double size = juce::jlimit(0.05f, 1.0f, values[0].load());
         double speed = values[1].load();
-        double angle = values[2].load() * juce::MathConstants<double>::twoPi;
+        double angle = values[2].load() * juce::MathConstants<double>::twoPi - juce::MathConstants<double>::pi; // map 0..1 to -π..π
 
         // Base direction from user
-        double dirX = std::cos(angle);
-        double dirY = std::sin(angle);
+        double dirX = juce::dsp::FastMathApproximations::cos(angle);
+        double dirY = juce::dsp::FastMathApproximations::sin(angle);
         if (flipX) dirX = -dirX;
         if (flipY) dirY = -dirY;
 
@@ -39,7 +39,7 @@ public:
     }
 
     std::shared_ptr<osci::Effect> build() const override {
-        auto eff = std::make_shared<osci::Effect>(
+        auto eff = std::make_shared<osci::SimpleEffect>(
             std::make_shared<BounceEffect>(),
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter("Bounce Size", "Size (scale) of the bouncing object.", "bounceSize", VERSION_HINT, 0.3, 0.05, 1.0),

@@ -1,7 +1,7 @@
 #include "SosciPluginProcessor.h"
 #include "SosciPluginEditor.h"
 
-SosciAudioProcessor::SosciAudioProcessor() : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(4), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
+SosciAudioProcessor::SosciAudioProcessor() : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(5), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
     // demo audio file on standalone only
     if (juce::JUCEApplicationBase::isStandaloneApp()) {
         std::unique_ptr<juce::InputStream> stream = std::make_unique<juce::MemoryInputStream>(BinaryData::sosci_flac, BinaryData::sosci_flacSize, false);
@@ -16,78 +16,155 @@ SosciAudioProcessor::~SosciAudioProcessor() {}
 void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
     juce::ScopedNoDenormals noDenormals;
 
-    auto input = getBusBuffer(buffer, true, 0);
-    auto output = getBusBuffer(buffer, false, 0);
-    float EPSILON = 0.0001f;
+    juce::AudioBuffer<float> input = getBusBuffer(buffer, true, 0);
+    juce::AudioBuffer<float> output = getBusBuffer(buffer, false, 0);
+    const float EPSILON = 0.0001f;
+    const int numSamples = input.getNumSamples();
 
     midiMessages.clear();
 
-    auto inputArray = input.getArrayOfWritePointers();
-    auto outputArray = output.getArrayOfWritePointers();
+    // Get source buffer (either from WAV parser or input)
+    juce::AudioBuffer<float> sourceBuffer;
     
     juce::SpinLock::ScopedLockType lock2(wavParserLock);
     bool readingFromWav = wavParser.isInitialised();
+
+    if (readingFromWav) {
+        wavBuffer.setSize(6, numSamples, false, true, false);
+        wavBuffer.clear();
+        wavParser.processBlock(wavBuffer);
+        sourceBuffer = juce::AudioBuffer<float>(wavBuffer.getArrayOfWritePointers(), wavBuffer.getNumChannels(), numSamples);
+    } else {
+        sourceBuffer = juce::AudioBuffer<float>(input.getArrayOfWritePointers(), input.getNumChannels(), numSamples);
+    }
+
+    // Resize working buffer with 6 channels: x, y, z/brightness, r, g, b
+    workBuffer.setSize(6, numSamples, false, true, false);
+    auto sourceArray = sourceBuffer.getArrayOfReadPointers();
+    auto workArray = workBuffer.getArrayOfWritePointers();
     
-	for (int sample = 0; sample < input.getNumSamples(); ++sample) {
-        osci::Point point;
-        
-        if (readingFromWav) {
-            point = wavParser.getSample();
+    // Copy X and Y channels
+    for (int ch = 0; ch < 2; ++ch) {
+        if (sourceBuffer.getNumChannels() > ch) {
+            juce::FloatVectorOperations::copy(workArray[ch], sourceArray[ch], numSamples);
         } else {
-            float x = input.getNumChannels() > 0 ? inputArray[0][sample] : 0.0f;
-            float y = input.getNumChannels() > 1 ? inputArray[1][sample] : 0.0f;
-            float brightness = 1.0f;
-            if (input.getNumChannels() > 2 && !forceDisableBrightnessInput) {
-                float brightnessChannel = inputArray[2][sample];
-                // Only enable brightness if we actually receive a signal on the brightness channel
-                if (!brightnessEnabled && brightnessChannel > EPSILON) {
-                    brightnessEnabled = true;
-                }
-                if (brightnessEnabled) {
-                    brightness = brightnessChannel;
-                }
-            }
-            
-            point = { x, y, brightness };
+            juce::FloatVectorOperations::clear(workArray[ch], numSamples);
         }
-
-        // no negative brightness
-        point.z = juce::jlimit(0.0, 1.0, point.z);
-
-        for (auto& effect : permanentEffects) {
-            point = effect->apply(sample, point);
+    }
+    
+    // Detect brightness mode: check if channel 2 has any signal > EPSILON
+    if (!brightnessEnabled && sourceBuffer.getNumChannels() > 2 && !forceDisableBrightnessInput) {
+        auto range = juce::FloatVectorOperations::findMinAndMax(sourceArray[2], numSamples);
+        if (range.getEnd() > EPSILON) {
+            brightnessEnabled = true;
         }
+    }
+    
+    // Detect RGB mode: check if channels 3 or 4 have any signal > EPSILON
+    bool haveG = sourceBuffer.getNumChannels() > 3;
+    bool haveB = sourceBuffer.getNumChannels() > 4;
+    if (!rgbEnabled && !forceDisableRgbInput && (haveG || haveB)) {
+        bool hasGSignal = false;
+        bool hasBSignal = false;
+        
+        if (haveG) {
+            auto gRange = juce::FloatVectorOperations::findMinAndMax(sourceArray[3], numSamples);
+            hasGSignal = std::abs(gRange.getStart()) > EPSILON || std::abs(gRange.getEnd()) > EPSILON;
+        }
+        if (haveB) {
+            auto bRange = juce::FloatVectorOperations::findMinAndMax(sourceArray[4], numSamples);
+            hasBSignal = std::abs(bRange.getStart()) > EPSILON || std::abs(bRange.getEnd()) > EPSILON;
+        }
+        
+        if (hasGSignal || hasBSignal) {
+            rgbEnabled = true;
+        }
+    }
+    
+    // Populate remaining channels based on detected mode
+    if (rgbEnabled && !forceDisableRgbInput) {
+        // RGB mode: z=1.0, r=ch2, g=ch3, b=ch4
+        juce::FloatVectorOperations::fill(workArray[2], 1.0f, numSamples);
+        
+        if (sourceBuffer.getNumChannels() > 2) {
+            juce::FloatVectorOperations::copy(workArray[3], sourceArray[2], numSamples);
+        } else {
+            juce::FloatVectorOperations::fill(workArray[3], 1.0f, numSamples);
+        }
+        
+        if (haveG) {
+            juce::FloatVectorOperations::copy(workArray[4], sourceArray[3], numSamples);
+        } else {
+            juce::FloatVectorOperations::clear(workArray[4], numSamples);
+        }
+        
+        if (haveB) {
+            juce::FloatVectorOperations::copy(workArray[5], sourceArray[4], numSamples);
+        } else {
+            juce::FloatVectorOperations::clear(workArray[5], numSamples);
+        }
+    } else {
+        // Brightness mode: z=ch2 or 1.0, r=1.0, g=0, b=0
+        if (brightnessEnabled && sourceBuffer.getNumChannels() > 2) {
+            juce::FloatVectorOperations::copy(workArray[2], sourceArray[2], numSamples);
+        } else {
+            juce::FloatVectorOperations::fill(workArray[2], 1.0f, numSamples);
+        }
+        
+        juce::FloatVectorOperations::fill(workArray[3], 1.0f, numSamples);
+        juce::FloatVectorOperations::clear(workArray[4], numSamples);
+        juce::FloatVectorOperations::clear(workArray[5], numSamples);
+    }
+    
+    // Clamp brightness channel
+    juce::FloatVectorOperations::clip(workBuffer.getWritePointer(2), workBuffer.getReadPointer(2), 0.0f, 1.0f, numSamples);
 
-        // this is the point that the visualiser will draw
+    // Apply effects
+    juce::AudioBuffer<float> effectBuffer(workBuffer.getArrayOfWritePointers(), 3, numSamples);
+    for (auto& effect : permanentEffects) {
+        effect->processBlock(effectBuffer, midiMessages);
+    }
+
+    // Process output sample-by-sample for visualiser, volume, clipping
+    auto outputArray = output.getArrayOfWritePointers();
+    
+    for (int sample = 0; sample < numSamples; ++sample) {
+        osci::Point point(workArray[0][sample], workArray[1][sample], workArray[2][sample], 
+                         workArray[3][sample], workArray[4][sample], workArray[5][sample]);
         threadManager.write(point, "VisualiserRenderer");
+    }
 
-        if (juce::JUCEApplication::isStandaloneApp()) {
-            point.scale(volume, volume, 1.0);
+    if (juce::JUCEApplication::isStandaloneApp()) {
+        // Scale output by volume
+        juce::FloatVectorOperations::multiply(workArray[0], workArray[0], volume.load(), numSamples);
+        juce::FloatVectorOperations::multiply(workArray[1], workArray[1], volume.load(), numSamples);
 
-            // clip
-            point.x = juce::jmax(-threshold, juce::jmin(threshold.load(), point.x));
-            point.y = juce::jmax(-threshold, juce::jmin(threshold.load(), point.y));
+        // Hard clip to threshold
+        float thresholdVal = threshold.load();
+        juce::FloatVectorOperations::clip(workArray[0], workArray[0], -thresholdVal, thresholdVal, numSamples);
+        juce::FloatVectorOperations::clip(workArray[1], workArray[1], -thresholdVal, thresholdVal, numSamples);
 
-            // Apply mute if active
-            if (muteParameter->getBoolValue()) {
-                point.x = 0.0;
-                point.y = 0.0;
+        // apply mute if active
+        if (muteParameter->getBoolValue()) {
+            juce::FloatVectorOperations::clear(workArray[0], numSamples);
+            juce::FloatVectorOperations::clear(workArray[1], numSamples);
+        }
+
+        // Copy to output for all channels available from work buffer
+        for (int ch = 0; ch < output.getNumChannels(); ++ch) {
+            if (workBuffer.getNumChannels() > ch) {
+                juce::FloatVectorOperations::copy(outputArray[ch], workArray[ch], numSamples);
+            } else {
+                juce::FloatVectorOperations::clear(outputArray[ch], numSamples);
             }
+        }
 
-            // this is the point that the volume component will draw (i.e. post scale/clipping)
+        for (int sample = 0; sample < numSamples; ++sample) {
+            osci::Point point(workArray[0][sample], workArray[1][sample], workArray[2][sample], 
+                            workArray[3][sample], workArray[4][sample], workArray[5][sample]);
             threadManager.write(point, "VolumeComponent");
         }
-        
-        if (output.getNumChannels() > 0) {
-            outputArray[0][sample] = point.x;
-        }
-        if (output.getNumChannels() > 1) {
-            outputArray[1][sample] = point.y;
-        }
-        if (output.getNumChannels() > 2) {
-            outputArray[2][sample] = point.z;
-        }
-	}
+    }
 }
 
 void SosciAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {

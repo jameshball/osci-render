@@ -13,7 +13,7 @@ CustomEffect::~CustomEffect() {
 	parser->close(L);
 }
 
-osci::Point CustomEffect::apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+osci::Point CustomEffect::apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) {
 	auto effectScale = values[0].load();
 
 	auto x = input.x;
@@ -29,9 +29,8 @@ osci::Point CustomEffect::apply(int index, osci::Point input, const std::vector<
 			vars.x = x;
 			vars.y = y;
 			vars.z = z;
-			vars.ext_x = extInput.x;
-			vars.ext_y = extInput.y;
-
+			vars.ext_x = externalInput.x;
+			vars.ext_y = externalInput.y;
 
 			std::copy(luaValues, luaValues + 26, std::begin(vars.sliders));
 

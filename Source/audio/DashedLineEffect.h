@@ -6,18 +6,18 @@ class DashedLineEffect : public osci::EffectApplication {
 public:
 	DashedLineEffect(OscirenderAudioProcessor& p) : audioProcessor(p) {}
 
-	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
+	osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
 		// if only 2 parameters are provided, this is being used as a 'trace effect'
 		// where the dash count is 1.
 		double dashCount = 1.0;
 		int i = 0;
 
 		if (values.size() > 2) {
-			dashCount = juce::jmax(1.0, values[i++].load()); // Dashes per cycle
+			dashCount = juce::jmax(1.0f, values[i++].load()); // Dashes per cycle
 		}
 
 		double dashOffset = values[i++];
-		double dashCoverage = juce::jlimit(0.0, 1.0, values[i++].load());
+		double dashCoverage = juce::jlimit(0.0f, 1.0f, values[i++].load());
         
 		double dashLengthSamples = (sampleRate / audioProcessor.frequency) / dashCount;
 		double dashPhase = framePhase * dashCount - dashOffset;
@@ -43,7 +43,7 @@ public:
 	}
 
 	std::shared_ptr<osci::Effect> build() const override {
-		auto eff = std::make_shared<osci::Effect>(
+		auto eff = std::make_shared<osci::SimpleEffect>(
 			std::make_shared<DashedLineEffect>(audioProcessor),
 			std::vector<osci::EffectParameter*>{
 				new osci::EffectParameter("Dash Count", "Controls the number of dashed lines in the drawing.", "dashCount", VERSION_HINT, 16.0, 1.0, 32.0),
@@ -70,7 +70,7 @@ public:
 	TraceEffect(OscirenderAudioProcessor& p) : DashedLineEffect(p) {}
 
 	std::shared_ptr<osci::Effect> build() const override {
-		auto eff = std::make_shared<osci::Effect>(
+		auto eff = std::make_shared<osci::SimpleEffect>(
 			std::make_shared<TraceEffect>(audioProcessor),
 			std::vector<osci::EffectParameter*>{
 				new osci::EffectParameter(

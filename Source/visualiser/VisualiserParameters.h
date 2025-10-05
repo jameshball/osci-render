@@ -101,8 +101,13 @@ public:
         return persistenceEffect->getActualValue() - 1.33;
     }
     
-    double getHue() {
-        return hueEffect->getActualValue();
+    juce::Colour getColour() {
+        return juce::Colour::fromFloatRGBA(
+            (float) lineRedEffect->getActualValue(),
+            (float) lineGreenEffect->getActualValue(),
+            (float) lineBlueEffect->getActualValue(),
+            1.0f
+        );
     }
     
     double getLineSaturation() {
@@ -144,7 +149,7 @@ public:
 #endif
     
     double getFocus() {
-        return focusEffect->getActualValue() / 100;
+        return 0.8 * focusEffect->getActualValue() / 100;
     }
     
     double getNoise() {
@@ -200,7 +205,7 @@ public:
     osci::BooleanParameter* goniometer = new osci::BooleanParameter("Goniometer", "goniometer", VERSION_HINT, false, "Rotates the visualiser to replicate a goniometer display to show the phase relationship between two channels.");
     osci::BooleanParameter* shutterSync = new osci::BooleanParameter("Shutter Sync", "shutterSync", VERSION_HINT, false, "Controls whether the camera's shutter speed is in sync with framerate. This makes the brightness of a single frame constant. This can be beneficial when the drawing frequency and frame rate are in sync.");
 
-    std::shared_ptr<osci::Effect> screenSaturationEffect = std::make_shared<osci::Effect>(
+    std::shared_ptr<osci::Effect> screenSaturationEffect = std::make_shared<osci::SimpleEffect>(
         new osci::EffectParameter(
             "Screen Saturation",
             "Controls how saturated the colours are on the oscilloscope screen.",
@@ -208,7 +213,7 @@ public:
             VERSION_HINT, 1.0, 0.0, 5.0
         )
     );
-    std::shared_ptr<osci::Effect> screenHueEffect = std::make_shared<osci::Effect>(
+    std::shared_ptr<osci::Effect> screenHueEffect = std::make_shared<osci::SimpleEffect>(
         new osci::EffectParameter(
             "Screen Hue",
             "Controls the hue shift of the oscilloscope screen.",
@@ -216,7 +221,7 @@ public:
             VERSION_HINT, 0, 0, 359, 1
         )
     );
-    std::shared_ptr<osci::Effect> afterglowEffect = std::make_shared<osci::Effect>(
+    std::shared_ptr<osci::Effect> afterglowEffect = std::make_shared<osci::SimpleEffect>(
         new osci::EffectParameter(
             "Afterglow",
             "Controls how quickly the image disappears after glowing brightly. Closely related to persistence.",
@@ -224,7 +229,7 @@ public:
             VERSION_HINT, 1.0, 0.0, 10.0
         )
     );
-    std::shared_ptr<osci::Effect> overexposureEffect = std::make_shared<osci::Effect>(
+    std::shared_ptr<osci::Effect> overexposureEffect = std::make_shared<osci::SimpleEffect>(
         new osci::EffectParameter(
             "Overexposure",
             "Controls at which point the line becomes overexposed and clips, turning white.",
@@ -233,8 +238,8 @@ public:
         )
     );
     std::shared_ptr<osci::Effect> stereoEffect = StereoEffect().build();
-    std::shared_ptr<osci::Effect> scaleEffect = std::make_shared<osci::Effect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+    std::shared_ptr<osci::Effect> scaleEffect = std::make_shared<osci::SimpleEffect>(
+        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) {
             input.scale(values[0].load(), values[1].load(), 1.0);
             return input;
         }, std::vector<osci::EffectParameter*>{
@@ -251,8 +256,8 @@ public:
             VERSION_HINT, 1.0, -3.0, 3.0
         ),
     });
-    std::shared_ptr<osci::Effect> offsetEffect = std::make_shared<osci::Effect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+    std::shared_ptr<osci::Effect> offsetEffect = std::make_shared<osci::SimpleEffect>(
+        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) {
             input.translate(values[0].load(), values[1].load(), 0.0);
             return input;
         }, std::vector<osci::EffectParameter*>{
@@ -271,7 +276,7 @@ public:
     });
 #endif
 
-    std::shared_ptr<osci::Effect> persistenceEffect = std::make_shared<osci::Effect>(
+    std::shared_ptr<osci::Effect> persistenceEffect = std::make_shared<osci::SimpleEffect>(
         new osci::EffectParameter(
             "Persistence",
             "Controls how long the light glows for on the oscilloscope display.",
@@ -279,15 +284,31 @@ public:
             VERSION_HINT, 0.5, 0, 6.0
         )
     );
-    std::shared_ptr<osci::Effect> hueEffect = std::make_shared<osci::Effect>(
+    std::shared_ptr<osci::Effect> lineRedEffect = std::make_shared<osci::SimpleEffect>(
         new osci::EffectParameter(
-            "Line Hue",
-            "Controls the hue of the beam of the oscilloscope.",
-            "hue",
-            VERSION_HINT, 125, 0, 359, 1
+            "Line Red",
+            "Controls the red component of the line color.",
+            "lineRed",
+            VERSION_HINT, 0.0, 0.0, 1.0
         )
     );
-    std::shared_ptr<osci::Effect> intensityEffect = std::make_shared<osci::Effect>(
+    std::shared_ptr<osci::Effect> lineGreenEffect = std::make_shared<osci::SimpleEffect>(
+        new osci::EffectParameter(
+            "Line Green",
+            "Controls the green component of the line color.",
+            "lineGreen",
+            VERSION_HINT, 1.0, 0.0, 1.0
+        )
+    );
+    std::shared_ptr<osci::Effect> lineBlueEffect = std::make_shared<osci::SimpleEffect>(
+        new osci::EffectParameter(
+            "Line Blue",
+            "Controls the blue component of the line color.",
+            "lineBlue",
+            VERSION_HINT, 0.0, 0.0, 1.0
+        )
+    );
+    std::shared_ptr<osci::Effect> intensityEffect = std::make_shared<osci::SimpleEffect>(
         new osci::EffectParameter(
             "Line Intensity",
             "Controls how bright the electron beam of the oscilloscope is.",
@@ -295,7 +316,7 @@ public:
             VERSION_HINT, 5.0, 0.0, 10.0
         )
     );
-    std::shared_ptr<osci::Effect> lineSaturationEffect = std::make_shared<osci::Effect>(
+    std::shared_ptr<osci::Effect> lineSaturationEffect = std::make_shared<osci::SimpleEffect>(
         new osci::EffectParameter(
             "Line Saturation",
             "Controls how saturated the colours are on the oscilloscope lines.",
@@ -303,7 +324,7 @@ public:
             VERSION_HINT, 1.0, 0.0, 5.0
         )
     );
-    std::shared_ptr<osci::Effect> focusEffect = std::make_shared<osci::Effect>(
+    std::shared_ptr<osci::Effect> focusEffect = std::make_shared<osci::SimpleEffect>(
         new osci::EffectParameter(
             "Focus",
             "Controls how focused the electron beam of the oscilloscope is.",
@@ -311,7 +332,7 @@ public:
             VERSION_HINT, 1.0, 0.3, 10.0
         )
     );
-    std::shared_ptr<osci::Effect> noiseEffect = std::make_shared<osci::Effect>(
+    std::shared_ptr<osci::Effect> noiseEffect = std::make_shared<osci::SimpleEffect>(
         new osci::EffectParameter(
             "Noise",
             "Controls how much noise/grain is added to the oscilloscope display.",
@@ -319,7 +340,7 @@ public:
             VERSION_HINT, 0.0, 0.0, 1.0
         )
     );
-    std::shared_ptr<osci::Effect> glowEffect = std::make_shared<osci::Effect>(
+    std::shared_ptr<osci::Effect> glowEffect = std::make_shared<osci::SimpleEffect>(
         new osci::EffectParameter(
             "Glow",
             "Controls how much the light glows on the oscilloscope display.",
@@ -327,7 +348,7 @@ public:
             VERSION_HINT, 0.3, 0.0, 1.0
         )
     );
-    std::shared_ptr<osci::Effect> ambientEffect = std::make_shared<osci::Effect>(
+    std::shared_ptr<osci::Effect> ambientEffect = std::make_shared<osci::SimpleEffect>(
         new osci::EffectParameter(
             "Ambient Light",
             "Controls how much ambient light is added to the oscilloscope display.",
@@ -336,7 +357,7 @@ public:
         )
     );
     std::shared_ptr<osci::Effect> smoothEffect = SmoothEffect("visualiser", 0.0f).build();
-    std::shared_ptr<osci::Effect> sweepMsEffect = std::make_shared<osci::Effect>(
+    std::shared_ptr<osci::Effect> sweepMsEffect = std::make_shared<osci::SimpleEffect>(
         new osci::EffectParameter(
             "Sweep (ms)",
             "The number of milliseconds it takes for the oscilloscope to sweep from left to right.",
@@ -344,7 +365,7 @@ public:
             VERSION_HINT, 10.0, 0.0, 1000.0
         )
     );
-    std::shared_ptr<osci::Effect> triggerValueEffect = std::make_shared<osci::Effect>(
+    std::shared_ptr<osci::Effect> triggerValueEffect = std::make_shared<osci::SimpleEffect>(
         new osci::EffectParameter(
             "Trigger Value",
             "The trigger value sets the signal level that starts waveform capture to display a stable waveform.",
@@ -355,7 +376,9 @@ public:
     
     std::vector<std::shared_ptr<osci::Effect>> effects = {
         persistenceEffect,
-        hueEffect,
+        lineRedEffect,
+        lineGreenEffect,
+        lineBlueEffect,
         intensityEffect,
         lineSaturationEffect,
         focusEffect,

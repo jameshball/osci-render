@@ -3,8 +3,8 @@
 
 class GodRayEffect : public osci::EffectApplication {
 public:
-    osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>> &values, double sampleRate) override {
-        double noiseAmp = juce::jmax(0.0, values[0].load());
+    osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>&values, float sampleRate) override {
+        double noiseAmp = juce::jmax(0.0f, values[0].load());
         double bias = values[1];
         double biasExponent = std::pow(12.0, std::abs(bias));
 
@@ -20,7 +20,7 @@ public:
     }
 
     std::shared_ptr<osci::Effect> build() const override {
-        auto eff = std::make_shared<osci::Effect>(
+        auto eff = std::make_shared<osci::SimpleEffect>(
             std::make_shared<GodRayEffect>(),
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter("God Ray Strength",

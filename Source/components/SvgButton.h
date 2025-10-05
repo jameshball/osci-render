@@ -141,7 +141,7 @@ private:
     juce::Path resizedPath;
     juce::AffineTransform imageTransform; // Transform applied to all state images
     juce::Animator pulse = juce::ValueAnimatorBuilder {}
-        .withEasing([] (float t) { return std::sin(3.14159 * t) / 2 + 0.5; })
+        .withEasing([] (float t) { return juce::dsp::FastMathApproximations::sin(3.14159 * t) / 2 + 0.5; })
         .withDurationMs(500)
         .runningInfinitely()
         .withValueChangedCallback([this] (auto value) {

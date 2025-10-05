@@ -3,7 +3,7 @@
 
 class SwirlEffectApp : public osci::EffectApplication {
 public:
-    osci::Point apply(int /*index*/, osci::Point input, const std::vector<std::atomic<double>>& values, double /*sampleRate*/) override {
+    osci::Point apply(int /*index*/, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
         double length = 10 * values[0] * input.magnitude();
         double newX = input.x * std::cos(length) - input.y * std::sin(length);
         double newY = input.x * std::sin(length) + input.y * std::cos(length);
@@ -11,7 +11,7 @@ public:
     }
 
     std::shared_ptr<osci::Effect> build() const override {
-        auto eff = std::make_shared<osci::Effect>(
+        auto eff = std::make_shared<osci::SimpleEffect>(
             std::make_shared<SwirlEffectApp>(),
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter("Swirl", "Swirls the image in a spiral pattern.", "swirl", VERSION_HINT, 0.4, -1.0, 1.0),

@@ -10,10 +10,13 @@ uniform float uIntensity;
 uniform vec2 uOffset;
 uniform vec2 uScale;
 uniform float uFishEye;
-uniform sampler2D uScreen;
+uniform sampler2D uScreen; // still sampled for focus/gain texturing, but we'll reduce its influence on colour
+uniform vec3 uLineColor;
+uniform float uUseVertexColor; // 1.0 to use per-vertex RGB, 0.0 to use hue-only
 varying float vSize;
 varying vec4 uvl;
 varying vec2 vTexCoord;
+varying vec3 vColor;
 
 // A standard gaussian function, used for weighting samples
 float gaussian(float x, float sigma) {
@@ -26,6 +29,14 @@ float erf(float x) {
     x = 1.0 + (0.278393 + (0.230389 + 0.078108 * (a * a)) * a) * a;
     x *= x;
     return s - s / (x * x);
+}
+
+// Rotate hue around an axis in RGB space (same method as output shader)
+vec3 hueShift(vec3 color, float shift) {
+    vec3 p = vec3(0.55735) * dot(vec3(0.55735), color);
+    vec3 u = color - p;
+    vec3 v = cross(vec3(0.55735), u);
+    return u * cos(shift * 6.2832) + v * sin(shift * 6.2832) + p;
 }
 
 void main() {
@@ -41,6 +52,9 @@ void main() {
     float len = uvl.z;
     vec2 xy = uvl.xy;
     float brightness;
+    // Determine base color: either per-vertex RGB, or a color from the settings
+    vec3 baseColor = uUseVertexColor > 0.5 ? vColor : uLineColor;
+    baseColor = clamp(baseColor, 0.0, 1.0);
     
     float sigma = vSize/5.0;
     if (len < EPS) {
@@ -54,8 +68,10 @@ void main() {
 
     brightness *= uvl.w;
     
-    gl_FragColor = 2.0 * texture2D(uScreen, texCoord) * brightness;
-    gl_FragColor.a = 1.0;
+    vec3 screenSample = texture2D(uScreen, texCoord).rgb;
+    float screenLuma = clamp(screenSample.g, 0.1, 1.0);
+    vec3 rgb = brightness * baseColor * screenLuma;
+    gl_FragColor = vec4(rgb, 1.0);
 }
 
 )";
