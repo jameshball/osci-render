@@ -7,7 +7,7 @@ public:
     WavParser(CommonAudioProcessor& p);
 	~WavParser();
 
-	osci::Point getSample();
+	void processBlock(juce::AudioBuffer<float>& buffer);
 
 	void setProgress(double progress);
 	void setPaused(bool paused);
@@ -29,7 +29,6 @@ private:
 	std::atomic<bool> looping = true;
 	std::unique_ptr<juce::ResamplingAudioSource> source = nullptr;
 	juce::AudioBuffer<float> audioBuffer;
-	std::atomic<long> counter = 0;
 	std::atomic<bool> paused = false;
 	int fileSampleRate;
 	int currentSampleRate;

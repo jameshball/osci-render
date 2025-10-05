@@ -30,6 +30,11 @@ public:
 
     juce::AudioProcessorEditor* createEditor() override;
 
+private:
+    // Cached buffers to avoid reallocations in processBlock
+    juce::AudioBuffer<float> wavBuffer;
+    juce::AudioBuffer<float> workBuffer;
+
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SosciAudioProcessor)
 };
