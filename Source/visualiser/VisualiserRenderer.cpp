@@ -464,9 +464,8 @@ void VisualiserRenderer::setupTextures(int resolution) {
     blur4Texture = makeTexture(128, 128);
     renderTexture = makeTexture(resolution, resolution);
 
-    screenOpenGLTexture.loadImage(emptyScreenImage);
-    screenTexture = {screenOpenGLTexture.getTextureID(), screenTextureImage.getWidth(), screenTextureImage.getHeight()};
-
+    screenTexture = createScreenTexture();
+    
 #if OSCI_PREMIUM
     glowTexture = makeTexture(512, 512);
     reflectionTexture = createReflectionTexture();
