@@ -3,7 +3,7 @@
 <JUCERPROJECT id="HH2E72" name="sosci" projectType="audioplug" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginManufacturer="jameshball"
               aaxIdentifier="sh.ball.sosci" cppLanguageStandard="20" projectLineFeed="&#10;"
-              headerPath="./include" version="1.1.8.4" companyName="James H Ball"
+              headerPath="./include" version="1.1.8.5" companyName="James H Ball"
               companyWebsite="https://osci-render.com" companyEmail="james@ball.sh"
               defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1"
               pluginManufacturerCode="Jhba" pluginCode="Sosc" pluginAUMainType="'aufx'">
