@@ -33,7 +33,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 DEPRECATED_MSG_ATTRIBUTE("Use SyphonOpenGLClient")
 @interface SyphonClient : SyphonOpenGLClient
-- (id)initWithServerDescription:(NSDictionary *)description context:(CGLContextObj)context options:(nullable NSDictionary *)options newFrameHandler:(nullable void (^)(SyphonClient *client))handler;
+- (id)initWithServerDescription:(NSDictionary<NSString *, id> *)description context:(CGLContextObj)context options:(nullable NSDictionary<NSString *, id> *)options newFrameHandler:(nullable void (^)(SyphonClient *client))handler;
 @end
 
 NS_ASSUME_NONNULL_END

@@ -6,11 +6,11 @@
 	<dict>
 		<key>Resources/Info.plist</key>
 		<data>
-		yxUj4GSIaau8e+8oANXa2rkqRKM=
+		SZm2aKzm3vbIEoimyULj8iuRpKs=
 		</data>
 		<key>Resources/default.metallib</key>
 		<data>
-		y9yCbGjZlc3Q2mA9X4ne5dh2lfo=
+		tHM7nqTcQ3g3wCbQmC9kuJlojJ0=
 		</data>
 		<key>Resources/en.lproj/InfoPlist.strings</key>
 		<dict>
@@ -35,14 +35,14 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			CXLWpC7I4+uJRJfpY2bqLIBeLla+V1m8RP0VMqRq5xo=
+			Jk8cSTKDY3DZCdpvIx/1eg0RglH7/nm5aCR/WXXfcRg=
 			</data>
 		</dict>
 		<key>Headers/SyphonClientBase.h</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			3gL3bBGg9UgPiqeGGi69LcxA74EFvnOyRDhVOjAqfU8=
+			zQLUZe74c6JO9xjBiX+xuHUageofa+bjX2mNXhbyGWg=
 			</data>
 		</dict>
 		<key>Headers/SyphonImage.h</key>
@@ -63,21 +63,21 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			xM+qPGYKvRgZHB9je7qep+GiD577lOGNGw3qmxtGPj8=
+			Kk9F3txvPQUrBEqyJ2hpfhSH1K/JJqmTy6PbDiCv7SY=
 			</data>
 		</dict>
 		<key>Headers/SyphonMetalServer.h</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			izsmNjGV3axQRMWbsAaGcB/n/5HWBzOY2BvYY8QGyAU=
+			LQa5C3EWy8x0MLnjTUlY1a25r6+GhWex9ZmWdQAr4rQ=
 			</data>
 		</dict>
 		<key>Headers/SyphonOpenGLClient.h</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			35RXj7wesL4MU1FfBdN9/uujWmDKqnVfTmv1aEORvcY=
+			Y9YT0UpgdQngGd88C3kHZ00pJ3v6KqPsYErhpx+ZZ1A=
 			</data>
 		</dict>
 		<key>Headers/SyphonOpenGLImage.h</key>
@@ -91,7 +91,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			ZbEfiEHzk5SzCxBeEHNCUkfeKYL+HxhzKtZYExTkfGQ=
+			37XiVDPQ+Q/fOTv0ciPn9USqEzlXSHGBuIt2OCtLqA0=
 			</data>
 		</dict>
 		<key>Headers/SyphonServer.h</key>
@@ -105,14 +105,14 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			+aLvZiQEGiO0ltZUpi3age7wcGfX7A7sGmo2Yz0BCG0=
+			4IFngiHTLC9pUhM2LPy48xvjiHqdZCPHpql0fmE5x6M=
 			</data>
 		</dict>
 		<key>Headers/SyphonServerDirectory.h</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			bODRqLi0K9qDLxr8QjK7DMkr8WKXJItwRuF1QBQV5+0=
+			5NgycyRAZnB+UCFHhj9rgTbLJ9EXjjF/W+xGcD0vvI8=
 			</data>
 		</dict>
 		<key>Headers/SyphonSubclassing.h</key>
@@ -133,14 +133,14 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			Yiet3hYzxZ694WKjPGC+bjn+45g5jNspR+/S/nCq/zA=
+			Xv5G7n8RjzP5k/L0Sil+Lu1o5aOLnka/lLW9M824xAI=
 			</data>
 		</dict>
 		<key>Resources/default.metallib</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			48b4CmXv0Da50Av/YKtU2CeOhkcescLZ18sflYJt6Ds=
+			y4apBrgdVfHJvHbMoX2vKD1oshLppZbRArEfM4JSQ5c=
 			</data>
 		</dict>
 		<key>Resources/en.lproj/InfoPlist.strings</key>

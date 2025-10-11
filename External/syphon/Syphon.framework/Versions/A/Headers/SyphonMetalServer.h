@@ -57,7 +57,7 @@ extern NSString * const SyphonServerOptionIsPrivate;
  @param options A dictionary containing key-value pairs to specify options for the server. The only currently supported option is SyphonServerOptionIsPrivate. See its description for details.
  @returns A newly intialized SyphonMetalServer. Nil on failure.
 */
-- (id)initWithName:(nullable NSString*)name device:(id<MTLDevice>)device options:(nullable NSDictionary *)options;
+- (id)initWithName:(nullable NSString*)name device:(id<MTLDevice>)device options:(nullable NSDictionary<NSString *, id> *)options;
 
 /*!
  The MTLDevice the server uses for drawing.
@@ -70,9 +70,9 @@ A string representing the name of the server.
 @property (nullable, strong) NSString* name;
 
 /*!
-A dictionary describing the server. Normally you won't need to access this, however if you created the server as private (using ``SyphonServerOptionIsPrivate``) then you must pass this dictionary to any process in which you wish to create a SyphonClient. You should not rely on the presence of any particular keys in this dictionary. The content will always conform to the `<NSCoding>` protocol.
+A dictionary describing the server. Normally you won't need to access this, however if you created the server as private (using ``SyphonServerOptionIsPrivate``) then you must pass this dictionary to any process in which you wish to create a SyphonClient. You should not rely on the presence of any particular keys in this dictionary.
 */
-@property (readonly) NSDictionary* serverDescription;
+@property (readonly) NSDictionary<NSString *, id<NSCoding>>* serverDescription;
 
 /*!
 `YES` if clients are currently attached, `NO` otherwise. If you generate frames frequently (for instance on a display-link timer), you may choose to test this and only call ``publishFrameTexture:onCommandBuffer:imageRegion:flipped:`` when clients are attached.

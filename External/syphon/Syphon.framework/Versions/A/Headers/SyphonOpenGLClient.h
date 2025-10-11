@@ -53,7 +53,7 @@ NS_ASSUME_NONNULL_BEGIN
  @param handler A block which is invoked when a new frame becomes available. handler may be nil. This block may be invoked on a thread other than that on which the client was created.
  @returns A newly initialized SyphonOpenGLClient object, or nil if a client could not be created.
 */
-- (id)initWithServerDescription:(NSDictionary *)description context:(CGLContextObj)context options:(nullable NSDictionary *)options newFrameHandler:(nullable void (^)(SyphonOpenGLClient *client))handler;
+- (id)initWithServerDescription:(NSDictionary<NSString *, id> *)description context:(CGLContextObj)context options:(nullable NSDictionary<NSString *, id> *)options newFrameHandler:(nullable void (^)(SyphonOpenGLClient *client))handler;
 
 /*!
  Returns the CGLContextObj associated with the client.
@@ -68,7 +68,7 @@ NS_ASSUME_NONNULL_BEGIN
 /*!
  Returns a dictionary with a description of the server the client is attached to. See SyphonServerDirectory for the keys this dictionary contains
 */
-@property (readonly) NSDictionary *serverDescription;
+@property (readonly) NSDictionary<NSString *, id> *serverDescription;
 
 /*!
  Returns YES if the server has output a new frame since the last time newFrameImage was called for this client, NO otherwise.
