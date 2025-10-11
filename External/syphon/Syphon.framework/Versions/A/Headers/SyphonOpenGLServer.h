@@ -80,7 +80,7 @@ extern NSString * const SyphonServerOptionStencilBufferResolution;
  @param options A dictionary containing key-value pairs to specify options for the server.
  @returns A newly intialized ``SyphonOpenGLServer``. `nil` on failure.
 */
-- (instancetype)initWithName:(nullable NSString*)serverName context:(CGLContextObj)context options:(nullable NSDictionary *)options;
+- (instancetype)initWithName:(nullable NSString*)serverName context:(CGLContextObj)context options:(nullable NSDictionary<NSString *, id> *)options;
 
 /*!
  The `CGLContext` the server uses for drawing. This may or may not be the context passed in at init.
@@ -93,9 +93,9 @@ extern NSString * const SyphonServerOptionStencilBufferResolution;
 @property (nullable, strong) NSString* name;
 
 /*! 
- A dictionary describing the server. Normally you won't need to access this, however if you created the server as private (using ``SyphonServerOptionIsPrivate``) then you must pass this dictionary to any process in which you wish to create a SyphonClient. You should not rely on the presence of any particular keys in this dictionary. The content will always conform to the `<NSCoding>` protocol.
+ A dictionary describing the server. Normally you won't need to access this, however if you created the server as private (using ``SyphonServerOptionIsPrivate``) then you must pass this dictionary to any process in which you wish to create a SyphonClient. You should not rely on the presence of any particular keys in this dictionary.
 */
-@property (readonly) NSDictionary* serverDescription;
+@property (readonly) NSDictionary<NSString *, id<NSCoding>>* serverDescription;
 
 /*! 
 `YES` if clients are currently attached, `NO` otherwise. If you generate frames frequently (for instance on a display-link timer), you may choose to test this and only call ``publishFrameTexture:textureTarget:imageRegion:textureDimensions:flipped:`` when clients are attached.

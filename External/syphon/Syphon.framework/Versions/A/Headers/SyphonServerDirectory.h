@@ -88,7 +88,7 @@ extern NSString * const SyphonServerRetireNotification;
 /*!
  `NSArray` of `NSDictionaries` that describe (using the keys above) currently available SyphonServer instances on the system.
 */
-@property (readonly) NSArray *servers;
+@property (readonly) NSArray<NSDictionary<NSString *, id<NSCoding>> *> *servers;
 
 /*! 
  Use this method to discover servers based soley on their name, or application host name. Both parameters are optional. If you do not specify either, all available Syphon servers will be returned.
@@ -96,7 +96,7 @@ extern NSString * const SyphonServerRetireNotification;
  @param appname Optional (pass `nil` to not specify) Application name of the published Syphon server, matches the key value for ``SyphonServerDescriptionAppNameKey``
  @returns An array of dictionaries matching the query you specified. 
 */
-- (NSArray *)serversMatchingName:(nullable NSString *)name appName:(nullable NSString *)appname;
+- (NSArray<NSDictionary<NSString *, id<NSCoding>> *> *)serversMatchingName:(nullable NSString *)name appName:(nullable NSString *)appname;
 
 @end
 

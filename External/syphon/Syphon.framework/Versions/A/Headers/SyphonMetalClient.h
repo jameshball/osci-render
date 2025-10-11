@@ -43,9 +43,9 @@ NS_ASSUME_NONNULL_BEGIN
  @param handler A block which is invoked when a new frame becomes available. handler may be nil. This block may be invoked on a thread other than that on which the client was created.
  @returns A newly initialized SyphonMetalClient object, or nil if a client could not be created.
 */
-- (id)initWithServerDescription:(NSDictionary *)description
+- (id)initWithServerDescription:(NSDictionary<NSString *, id>  *)description
                          device:(id<MTLDevice>)device
-                        options:(nullable NSDictionary *)options
+                        options:(nullable NSDictionary<NSString *, id> *)options
                 newFrameHandler:(nullable void (^)(SyphonMetalClient *client))handler;
 
 /*!
