@@ -125,14 +125,7 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         effect->processBlock(effectBuffer, midiMessages);
     }
 
-    // Process output sample-by-sample for visualiser, volume, clipping
-    auto outputArray = output.getArrayOfWritePointers();
-    
-    for (int sample = 0; sample < numSamples; ++sample) {
-        osci::Point point(workArray[0][sample], workArray[1][sample], workArray[2][sample], 
-                         workArray[3][sample], workArray[4][sample], workArray[5][sample]);
-        threadManager.write(point, "VisualiserRenderer");
-    }
+    threadManager.write(workBuffer, "VisualiserRenderer");
 
     if (juce::JUCEApplication::isStandaloneApp()) {
         // Scale output by volume
@@ -150,19 +143,17 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             juce::FloatVectorOperations::clear(workArray[1], numSamples);
         }
 
-        // Copy to output for all channels available from work buffer
-        for (int ch = 0; ch < output.getNumChannels(); ++ch) {
-            if (workBuffer.getNumChannels() > ch) {
-                juce::FloatVectorOperations::copy(outputArray[ch], workArray[ch], numSamples);
-            } else {
-                juce::FloatVectorOperations::clear(outputArray[ch], numSamples);
-            }
-        }
+        threadManager.write(workBuffer, "VolumeComponent");
+    }
 
-        for (int sample = 0; sample < numSamples; ++sample) {
-            osci::Point point(workArray[0][sample], workArray[1][sample], workArray[2][sample], 
-                            workArray[3][sample], workArray[4][sample], workArray[5][sample]);
-            threadManager.write(point, "VolumeComponent");
+    auto outputArray = output.getArrayOfWritePointers();
+
+    // Copy to output for all channels available from work buffer
+    for (int ch = 0; ch < output.getNumChannels(); ++ch) {
+        if (workBuffer.getNumChannels() > ch) {
+            juce::FloatVectorOperations::copy(outputArray[ch], workArray[ch], numSamples);
+        } else {
+            juce::FloatVectorOperations::clear(outputArray[ch], numSamples);
         }
     }
 }

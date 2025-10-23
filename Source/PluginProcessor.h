@@ -232,11 +232,8 @@ private:
     ObjectServer objectServer{*this};
 
     const double VOLUME_BUFFER_SECONDS = 0.1;
-
-    std::vector<double> volumeBuffer;
-    int volumeBufferIndex = 0;
-    double squaredVolume = 0;
-    double currentVolume = 0;
+    double currentVolume = 0.0;
+    juce::AudioBuffer<float> currentVolumeBuffer;
 
     std::pair<std::shared_ptr<osci::Effect>, osci::EffectParameter*> effectFromLegacyId(const juce::String& id, bool updatePrecedence = false);
     osci::LfoType lfoTypeFromLegacyAnimationType(const juce::String& type);

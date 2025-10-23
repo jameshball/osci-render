@@ -165,7 +165,7 @@ void OscirenderAudioProcessor::setAudioThreadCallback(std::function<void(const j
 void OscirenderAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
     CommonAudioProcessor::prepareToPlay(sampleRate, samplesPerBlock);
 
-    volumeBuffer = std::vector<double>(VOLUME_BUFFER_SECONDS * sampleRate, 0);
+    currentVolume = 0.0;
     synth.setCurrentPlaybackSampleRate(sampleRate);
     retriggerMidi = true;
 }
@@ -525,53 +525,66 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
     auto* channelData = buffer.getArrayOfWritePointers();
 
-    std::vector<double> currentVolumeBuffer(numSamples, 0.0);
-    double totalVolume = 0.0;
+    // Handle animation frame updates
+    if (animateFrames->getBoolValue()) {
+        double frameIncrement;
+        if (juce::JUCEApplicationBase::isStandaloneApp()) {
+            frameIncrement = sTimeSec * animationRate->getValueUnnormalised() * numSamples;
+        } else if (animationSyncBPM->getValue()) {
+            animationFrame = playTimeBeats * animationRate->getValueUnnormalised() + animationOffset->getValueUnnormalised();
+            frameIncrement = 0.0; // Already calculated absolute position
+        } else {
+            animationFrame = playTimeSeconds * animationRate->getValueUnnormalised() + animationOffset->getValueUnnormalised();
+            frameIncrement = 0.0; // Already calculated absolute position
+        }
 
-    for (int sample = 0; sample < numSamples; ++sample) {
-        if (animateFrames->getBoolValue()) {
-            if (juce::JUCEApplicationBase::isStandaloneApp()) {
-                animationFrame = animationFrame + sTimeSec * animationRate->getValueUnnormalised();
-            } else if (animationSyncBPM->getValue()) {
-                animationFrame = playTimeBeats * animationRate->getValueUnnormalised() + animationOffset->getValueUnnormalised();
+        if (juce::JUCEApplicationBase::isStandaloneApp()) {
+            animationFrame = animationFrame + frameIncrement;
+        }
+
+        juce::SpinLock::ScopedLockType lock1(parsersLock);
+        juce::SpinLock::ScopedLockType lock2(effectsLock);
+        if (currentFile >= 0 && sounds[currentFile]->parser->isAnimatable) {
+            int totalFrames = sounds[currentFile]->parser->getNumFrames();
+            if (loopAnimation->getBoolValue()) {
+                animationFrame = std::fmod(animationFrame, totalFrames);
             } else {
-                animationFrame = playTimeSeconds * animationRate->getValueUnnormalised() + animationOffset->getValueUnnormalised();
+                animationFrame = juce::jlimit(0.0, (double)totalFrames - 1, animationFrame.load());
             }
-
-            juce::SpinLock::ScopedLockType lock1(parsersLock);
-            juce::SpinLock::ScopedLockType lock2(effectsLock);
-            if (currentFile >= 0 && sounds[currentFile]->parser->isAnimatable) {
-                int totalFrames = sounds[currentFile]->parser->getNumFrames();
-                if (loopAnimation->getBoolValue()) {
-                    animationFrame = std::fmod(animationFrame, totalFrames);
-                } else {
-                    animationFrame = juce::jlimit(0.0, (double)totalFrames - 1, animationFrame.load());
-                }
-                sounds[currentFile]->parser->setFrame(animationFrame);
-            }
+            sounds[currentFile]->parser->setFrame(animationFrame);
         }
+    }
 
-        auto left = 0.0;
-        auto right = 0.0;
-        if (totalNumInputChannels >= 2) {
-            left = inputBuffer.getSample(0, sample);
-            right = inputBuffer.getSample(1, sample);
-        } else if (totalNumInputChannels == 1) {
-            left = inputBuffer.getSample(0, sample);
-            right = inputBuffer.getSample(0, sample);
-        }
-
-        // update volume using a moving average
-        int oldestBufferIndex = (volumeBufferIndex + 1) % volumeBuffer.size();
-        squaredVolume -= volumeBuffer[oldestBufferIndex] / volumeBuffer.size();
-        volumeBufferIndex = oldestBufferIndex;
-        volumeBuffer[volumeBufferIndex] = (left * left + right * right) / 2;
-        squaredVolume += volumeBuffer[volumeBufferIndex] / volumeBuffer.size();
-        currentVolume = std::sqrt(squaredVolume);
-        currentVolume = juce::jlimit(0.0, 1.0, currentVolume);
-
-        currentVolumeBuffer[sample] = currentVolume;
-        totalVolume += currentVolume;
+    // Calculate per-sample volume using efficient buffer operations
+    currentVolumeBuffer.setSize(1, numSamples, false, false, false);
+    auto* volumeData = currentVolumeBuffer.getWritePointer(0);
+    
+    // Calculate instantaneous squared magnitude using vectorized operations
+    if (totalNumInputChannels >= 2) {
+        const float* leftData = inputBuffer.getReadPointer(0);
+        const float* rightData = inputBuffer.getReadPointer(1);
+        
+        // L² + R² using SIMD operations
+        juce::FloatVectorOperations::multiply(volumeData, leftData, leftData, numSamples);
+        juce::FloatVectorOperations::addWithMultiply(volumeData, rightData, rightData, numSamples);
+        // Divide by 2: (L² + R²) / 2
+        juce::FloatVectorOperations::multiply(volumeData, 0.5f, numSamples);
+    } else if (totalNumInputChannels == 1) {
+        const float* monoData = inputBuffer.getReadPointer(0);
+        // mono²
+        juce::FloatVectorOperations::multiply(volumeData, monoData, monoData, numSamples);
+    } else {
+        juce::FloatVectorOperations::clear(volumeData, numSamples);
+    }
+    
+    // Apply exponential moving average for smoothing
+    const float smoothingCoeff = 1.0f - std::exp(-1.0f / (float)(VOLUME_BUFFER_SECONDS * sampleRate));
+    
+    for (int i = 0; i < numSamples; ++i) {
+        // EMA: smoothed = smoothed + coeff * (new - smoothed)
+        currentVolume += smoothingCoeff * (volumeData[i] - currentVolume);
+        // Take square root and clamp to get final volume
+        volumeData[i] = juce::jlimit(0.0f, 1.0f, std::sqrt((float)currentVolume));
     }
 
     juce::SpinLock::ScopedLockType lock1(parsersLock);
@@ -589,8 +602,10 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             if (effect->getId() == custom->getId()) {
                 effect->setExternalInput(&inputBuffer);
             }
+            effect->setVolumeInput(&currentVolumeBuffer);
             effect->processBlock(outputBuffer3d, midiMessages);
             effect->setExternalInput(nullptr);
+            effect->setVolumeInput(nullptr);
         }
     }
 
@@ -601,54 +616,60 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             if (previewEffect->getId() == custom->getId()) {
                 previewEffect->setExternalInput(&inputBuffer);
             }
+            previewEffect->setVolumeInput(&currentVolumeBuffer);
             previewEffect->processBlock(outputBuffer3d, midiMessages);
             previewEffect->setExternalInput(nullptr);
+            previewEffect->setVolumeInput(nullptr);
         }
     }
 
     for (auto& effect : permanentEffects) {
+        effect->setVolumeInput(&currentVolumeBuffer);
         effect->processBlock(outputBuffer3d, midiMessages);
+        effect->setVolumeInput(nullptr);
     }
     auto lua = currentFile >= 0 ? sounds[currentFile]->parser->getLua() : nullptr;
     if (lua != nullptr || custom->enabled->getBoolValue()) {
         for (auto& effect : luaEffects) {
+            effect->setVolumeInput(&currentVolumeBuffer);
             effect->processBlock(outputBuffer3d, midiMessages);
+            effect->setVolumeInput(nullptr);
         }
     }
 
-    // TODO: process in batches rather than per-sample
-    for (int sample = 0; sample < numSamples; ++sample) {
-        osci::Point channels = {outputBuffer3d.getSample(0, sample), outputBuffer3d.getSample(1, sample)};
-
-        double x = channels.x;
-        double y = channels.y;
-
-        x *= volume;
-        y *= volume;
-
-        // clip
-        x = juce::jmax(-threshold, juce::jmin(threshold.load(), x));
-        y = juce::jmax(-threshold, juce::jmin(threshold.load(), y));
-
-        threadManager.write(osci::Point(x, y, 1));
-
-        // Apply mute if active
-        if (muteParameter->getBoolValue()) {
-            x = 0.0;
-            y = 0.0;
-        }
-
-        if (totalNumOutputChannels >= 2) {
-            channelData[0][sample] = x;
-            channelData[1][sample] = y;
-        } else if (totalNumOutputChannels == 1) {
-            channelData[0][sample] = x;
-        }
-
-        if (isPlaying) {
-            playTimeSeconds += sTimeSec;
-            playTimeBeats += sTimeBeats;
-        }
+    // Process in batches using buffer-wide operations
+    auto* outputArray = outputBuffer3d.getArrayOfWritePointers();
+    
+    // Scale by volume
+    juce::FloatVectorOperations::multiply(outputArray[0], outputArray[0], (float)volume.load(), numSamples);
+    juce::FloatVectorOperations::multiply(outputArray[1], outputArray[1], (float)volume.load(), numSamples);
+    
+    // Hard clip to threshold
+    float thresholdVal = (float)threshold.load();
+    juce::FloatVectorOperations::clip(outputArray[0], outputArray[0], -thresholdVal, thresholdVal, numSamples);
+    juce::FloatVectorOperations::clip(outputArray[1], outputArray[1], -thresholdVal, thresholdVal, numSamples);
+    
+    // Write to thread manager (for visualizers, etc.)
+    threadManager.write(outputBuffer3d);
+    
+    // Apply mute if active
+    if (muteParameter->getBoolValue()) {
+        juce::FloatVectorOperations::clear(outputArray[0], numSamples);
+        juce::FloatVectorOperations::clear(outputArray[1], numSamples);
+    }
+    
+    // Copy to output channels
+    if (totalNumOutputChannels >= 2) {
+        juce::FloatVectorOperations::copy(channelData[0], outputArray[0], numSamples);
+        juce::FloatVectorOperations::copy(channelData[1], outputArray[1], numSamples);
+    } else if (totalNumOutputChannels == 1) {
+        juce::FloatVectorOperations::copy(channelData[0], outputArray[0], numSamples);
+    }
+    
+    // Update playback time
+    if (isPlaying) {
+        playTimeSeconds += sTimeSec * numSamples;
+        playTimeBeats += sTimeBeats * numSamples;
     }
 
     // used for any callback that must guarantee all audio is recieved (e.g. when recording to a file)

@@ -69,12 +69,13 @@ void WavParser::processBlock(juce::AudioBuffer<float> &buffer) {
         afSource->setLooping(looping);
     }
 
-    source->getNextAudioBlock(juce::AudioSourceChannelInfo(buffer));
     currentSample += source->getResamplingRatio() * buffer.getNumSamples();
     if (currentSample >= totalSamples && afSource->isLooping()) {
         currentSample = 0;
         afSource->setNextReadPosition(0);
     }
+
+    source->getNextAudioBlock(juce::AudioSourceChannelInfo(buffer));
 }
 
 void WavParser::setProgress(double progress) {
