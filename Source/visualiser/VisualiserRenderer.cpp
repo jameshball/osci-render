@@ -37,16 +37,17 @@ VisualiserRenderer::~VisualiserRenderer() {
     setShouldBeRunning(false, [this] { renderingSemaphore.release(); });
 }
 
-void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
+void VisualiserRenderer::runTask(const juce::AudioBuffer<float>& buffer) {
     {
         juce::CriticalSection::ScopedLockType lock(samplesLock);
 
-        // copy the points before applying effects
-        audioOutputBuffer.setSize(2, points.size(), false, true, true);
-        for (int i = 0; i < points.size(); ++i) {
-            audioOutputBuffer.setSample(0, i, points[i].x);
-            audioOutputBuffer.setSample(1, i, points[i].y);
-        }
+        const int numSamples = buffer.getNumSamples();
+        const int numChannels = buffer.getNumChannels();
+
+        // copy the buffer before applying effects
+        audioOutputBuffer.setSize(2, numSamples, false, true, true);
+        audioOutputBuffer.copyFrom(0, 0, buffer, 0, 0, numSamples);
+        audioOutputBuffer.copyFrom(1, 0, buffer, 1, 0, numSamples);
 
         xSamples.clear();
         ySamples.clear();
@@ -55,44 +56,46 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
         gSamples.clear();
         bSamples.clear();
 
-        auto applyEffects = [this](osci::Point point) {
-            for (auto &effect : parameters.audioEffects) {
-                // TODO: optimise and process in batches rather than per-point
-                tempBuffer.setSample(0, 0, point.x);
-                tempBuffer.setSample(1, 0, point.y);
-                tempBuffer.setSample(2, 0, point.z);
-                effect->processBlock(tempBuffer, midiMessages);
-                point.x = tempBuffer.getSample(0, 0);
-                point.y = tempBuffer.getSample(1, 0);
-                point.z = tempBuffer.getSample(2, 0);
-            }
-#if OSCI_PREMIUM
-            if (parameters.isFlippedHorizontal()) {
-                point.x = -point.x;
-            }
-            if (parameters.isFlippedVertical()) {
-                point.y = -point.y;
-            }
-#endif
-            return point;
-        };
+        // Create a working buffer for effects processing (6 channels: XYZRGB)
+        tempBuffer.setSize(6, numSamples, false, true, false);
+        
+        // Copy input channels to temp buffer
+        for (int ch = 0; ch < juce::jmin(6, numChannels); ++ch) {
+            tempBuffer.copyFrom(ch, 0, buffer, ch, 0, numSamples);
+        }
+        
+        // Apply effects to the entire buffer (only first 3 channels for effects)
+        juce::AudioBuffer<float> effectBuffer(tempBuffer.getArrayOfWritePointers(), 3, numSamples);
+        for (auto &effect : parameters.audioEffects) {
+            effect->processBlock(effectBuffer, midiMessages);
+        }
 
-        static double testPhase = 0.0;
+#if OSCI_PREMIUM
+        // Apply horizontal/vertical flip to the entire buffer
+        if (parameters.isFlippedHorizontal()) {
+            juce::FloatVectorOperations::negate(tempBuffer.getWritePointer(0), tempBuffer.getReadPointer(0), numSamples);
+        }
+        if (parameters.isFlippedVertical()) {
+            juce::FloatVectorOperations::negate(tempBuffer.getWritePointer(1), tempBuffer.getReadPointer(1), numSamples);
+        }
+#endif
 
         auto mode = renderMode.load();
+        
+        // Get array of read pointers for all 6 channels (XYZRGB)
+        auto channelData = tempBuffer.getArrayOfReadPointers();
+        
         if (parameters.isSweepEnabled()) {
             double sweepIncrement = getSweepIncrement();
-            long samplesPerSweep = sampleRate * parameters.getSweepSeconds();
-
             double triggerValue = parameters.getTriggerValue();
             bool belowTrigger = false;
 
-            for (const osci::Point &point : points) {
+            for (int i = 0; i < numSamples; ++i) {
                 long samplePosition = sampleCount - lastTriggerPosition;
                 double startPoint = 1.135;
                 float sweep = samplePosition * sweepIncrement * 2 * startPoint - startPoint;
 
-                float value = point.x;
+                float value = channelData[0][i];
 
                 if (sweep > startPoint && belowTrigger && value >= triggerValue) {
                     lastTriggerPosition = sampleCount;
@@ -100,43 +103,77 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
 
                 belowTrigger = value < triggerValue;
 
-                osci::Point sweepPoint = {sweep, value, 1}; // legacy: third component treated as brightness
-                sweepPoint = applyEffects(sweepPoint);
-
-                xSamples.push_back(sweepPoint.x);
-                ySamples.push_back(sweepPoint.y);
+                xSamples.push_back(sweep);
+                ySamples.push_back(value);
                 if (mode == RenderMode::XYZ) {
-                    zSamples.push_back(sweepPoint.z);
+                    zSamples.push_back(1.0f); // legacy: third component treated as brightness
                 } else if (mode == RenderMode::XYRGB) {
-                    // colour provided (if not, Z will mirror into r by upstream logic)
-                    rSamples.push_back((float) sweepPoint.r);
-                    gSamples.push_back((float) sweepPoint.g);
-                    bSamples.push_back((float) sweepPoint.b);
+                    // colour provided (if not, upstream logic should have set defaults)
+                    rSamples.push_back(numChannels > 3 ? channelData[3][i] : 1.0f);
+                    gSamples.push_back(numChannels > 4 ? channelData[4][i] : 0.0f);
+                    bSamples.push_back(numChannels > 5 ? channelData[5][i] : 0.0f);
                 }
 
                 sampleCount++;
             }
         } else {
-            for (const osci::Point &rawPoint : points) {
-                osci::Point point = applyEffects(rawPoint);
-
+            // Helper lambda to copy channel data or fill with default value
+            auto copyOrFillChannel = [&](std::vector<float>& dest, int channelIndex, float defaultValue) {
+                dest.resize(numSamples);
+                if (numChannels > channelIndex) {
+                    juce::FloatVectorOperations::copy(dest.data(), channelData[channelIndex], numSamples);
+                } else {
+                    juce::FloatVectorOperations::fill(dest.data(), defaultValue, numSamples);
+                }
+            };
+            
 #if OSCI_PREMIUM
-                if (parameters.isGoniometer()) {
-                    // x and y go to a diagonal currently, so we need to scale them down, and rotate them
-                    point.scale(-1.0 / std::sqrt(2.0), 1.0 / std::sqrt(2.0), 1.0);
-                    point.rotate(0, 0, -juce::MathConstants<double>::pi / 4);
-                }
+            if (parameters.isGoniometer()) {
+                // x and y go to a diagonal currently, so we need to scale them down, and rotate them
+                const float xScale = -1.0f / std::sqrt(2.0f);
+                const float yScale = 1.0f / std::sqrt(2.0f);
+                const float rotationAngle = -juce::MathConstants<float>::pi / 4.0f;
+                const float cosAngle = std::cos(rotationAngle);
+                const float sinAngle = std::sin(rotationAngle);
+                
+                // Resize output vectors to hold all samples
+                xSamples.resize(numSamples);
+                ySamples.resize(numSamples);
+                
+                // Create temporary buffers for scaled values
+                std::vector<float> scaledX(numSamples);
+                std::vector<float> scaledY(numSamples);
+                
+                // Scale X and Y channels
+                juce::FloatVectorOperations::copyWithMultiply(scaledX.data(), channelData[0], xScale, numSamples);
+                juce::FloatVectorOperations::copyWithMultiply(scaledY.data(), channelData[1], yScale, numSamples);
+                
+                // Apply rotation: rotatedX = scaledX * cosAngle - scaledY * sinAngle
+                juce::FloatVectorOperations::copyWithMultiply(xSamples.data(), scaledX.data(), cosAngle, numSamples);
+                juce::FloatVectorOperations::addWithMultiply(xSamples.data(), scaledY.data(), -sinAngle, numSamples);
+                
+                // Apply rotation: rotatedY = scaledX * sinAngle + scaledY * cosAngle
+                juce::FloatVectorOperations::copyWithMultiply(ySamples.data(), scaledX.data(), sinAngle, numSamples);
+                juce::FloatVectorOperations::addWithMultiply(ySamples.data(), scaledY.data(), cosAngle, numSamples);
+            } else
 #endif
-
-                xSamples.push_back(point.x);
-                ySamples.push_back(point.y);
-                if (mode == RenderMode::XYZ) {
-                    zSamples.push_back(point.z);
-                } else if (mode == RenderMode::XYRGB) {
-                    rSamples.push_back((float) point.r);
-                    gSamples.push_back((float) point.g);
-                    bSamples.push_back((float) point.b);
-                }
+            {
+                // Resize output vectors to hold all samples
+                xSamples.resize(numSamples);
+                ySamples.resize(numSamples);
+                
+                // Copy X and Y channels directly
+                juce::FloatVectorOperations::copy(xSamples.data(), channelData[0], numSamples);
+                juce::FloatVectorOperations::copy(ySamples.data(), channelData[1], numSamples);
+            }
+            
+            // Handle Z/RGB channels using helper lambda
+            if (mode == RenderMode::XYZ) {
+                copyOrFillChannel(zSamples, 2, 1.0f);
+            } else if (mode == RenderMode::XYRGB) {
+                copyOrFillChannel(rSamples, 3, 1.0f);
+                copyOrFillChannel(gSamples, 4, 0.0f);
+                copyOrFillChannel(bSamples, 5, 0.0f);
             }
         }
 

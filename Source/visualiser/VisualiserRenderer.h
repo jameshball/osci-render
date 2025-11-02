@@ -31,7 +31,7 @@ public:
 
     void resized() override;
     int prepareTask(double sampleRate, int samplesPerBlock) override;
-    void runTask(const std::vector<osci::Point>& points) override;
+    void runTask(const juce::AudioBuffer<float>& buffer) override;
     void stopTask() override;
     void handleAsyncUpdate() override;
     void newOpenGLContextCreated() override;
@@ -106,7 +106,7 @@ private:
     int prevSampleBufferCount = 0;
     long lastTriggerPosition = 0;
 
-    juce::AudioBuffer<float> tempBuffer = juce::AudioBuffer<float>(3, 1);
+    juce::AudioBuffer<float> tempBuffer = juce::AudioBuffer<float>(6, 1);
     juce::MidiBuffer midiMessages;
 
     std::vector<float> scratchVertices;
