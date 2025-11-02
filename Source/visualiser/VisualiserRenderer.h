@@ -20,6 +20,17 @@ public:
         XYZ = 2,
         XYRGB = 3,
     };
+
+    // Convert RenderMode to the number of audio channels
+    static int getChannelCountForRenderMode(RenderMode mode) {
+        switch (mode) {
+            case RenderMode::XYZ:  return 3;
+            case RenderMode::XYRGB: return 5;
+            case RenderMode::XY:
+            default:                return 2;
+        }
+    }
+
     VisualiserRenderer(
         VisualiserParameters &parameters,
         osci::AudioBackgroundThreadManager &threadManager,

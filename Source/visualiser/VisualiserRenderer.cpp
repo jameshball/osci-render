@@ -44,10 +44,15 @@ void VisualiserRenderer::runTask(const juce::AudioBuffer<float>& buffer) {
         const int numSamples = buffer.getNumSamples();
         const int numChannels = buffer.getNumChannels();
 
+        // Determine the number of output channels based on render mode
+        auto mode = renderMode.load();
+        int outputChannels = getChannelCountForRenderMode(mode);
+
         // copy the buffer before applying effects
-        audioOutputBuffer.setSize(2, numSamples, false, true, true);
-        audioOutputBuffer.copyFrom(0, 0, buffer, 0, 0, numSamples);
-        audioOutputBuffer.copyFrom(1, 0, buffer, 1, 0, numSamples);
+        audioOutputBuffer.setSize(outputChannels, numSamples, false, true, true);
+        for (int ch = 0; ch < juce::jmin(outputChannels, numChannels); ++ch) {
+            audioOutputBuffer.copyFrom(ch, 0, buffer, ch, 0, numSamples);
+        }
 
         xSamples.clear();
         ySamples.clear();

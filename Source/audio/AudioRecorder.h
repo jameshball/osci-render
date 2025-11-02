@@ -17,6 +17,11 @@ public:
         this->sampleRate = sampleRate;
     }
 
+    void setNumChannels(int numChannels) {
+        stop();
+        this->numChannels = numChannels;
+    }
+
     //==============================================================================
     void startRecording(const juce::File& file) {
         stop();
@@ -29,7 +34,7 @@ public:
                 // Now create a WAV writer object that writes to our output stream...
                 juce::WavAudioFormat wavFormat;
 
-                if (auto writer = wavFormat.createWriterFor(fileStream.get(), sampleRate, 2, 32, {}, 0)) {
+                if (auto writer = wavFormat.createWriterFor(fileStream.get(), sampleRate, numChannels, 32, {}, 0)) {
                     fileStream.release(); // (passes responsibility for deleting the stream to the writer object that is now using it)
 
                     // Now we'll create one of these helper objects which will act as a FIFO buffer, and will
@@ -85,7 +90,29 @@ public:
         int numSamples = buffer.getNumSamples();
 
         if (activeWriter.load() != nullptr) {
-            activeWriter.load()->write(buffer.getArrayOfReadPointers(), numSamples);
+            // Ensure we only write the number of channels configured when recording started
+            // This prevents corruption if the buffer channel count changes mid-recording
+            if (buffer.getNumChannels() == numChannels) {
+                // Fast path: buffer has exactly the right number of channels
+                activeWriter.load()->write(buffer.getArrayOfReadPointers(), numSamples);
+            } else {
+                // Safety path: adapt the buffer to match the expected channel count
+                // Resize the temp buffer if needed
+                if (tempRecordBuffer.getNumChannels() != numChannels || tempRecordBuffer.getNumSamples() < numSamples) {
+                    tempRecordBuffer.setSize(numChannels, numSamples, false, false, true);
+                }
+                
+                // Copy channels from input buffer (or fill with zeros if not enough channels)
+                for (int ch = 0; ch < numChannels; ++ch) {
+                    if (ch < buffer.getNumChannels()) {
+                        tempRecordBuffer.copyFrom(ch, 0, buffer, ch, 0, numSamples);
+                    } else {
+                        tempRecordBuffer.clear(ch, 0, numSamples);
+                    }
+                }
+                
+                activeWriter.load()->write(tempRecordBuffer.getArrayOfReadPointers(), numSamples);
+            }
             nextSampleNum += numSamples;
         }
     }
@@ -103,6 +130,9 @@ private:
 
     double recordingLength = 99999999999.0;
     double sampleRate = -1;
+    int numChannels = 2;
+    
+    juce::AudioBuffer<float> tempRecordBuffer; // Used when input buffer channel count doesn't match recording channel count
 
     juce::CriticalSection writerLock;
     std::atomic<juce::AudioFormatWriter::ThreadedWriter*> activeWriter { nullptr };

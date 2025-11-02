@@ -101,6 +101,7 @@ private:
 
     juce::File ffmpegFile;
     bool recordingAudio = true;
+    int recordingChannelCount = 2; // Number of channels for the current recording session
 
 #if OSCI_PREMIUM
     bool recordingVideo = true;

@@ -292,6 +292,9 @@ void VisualiserComponent::setRecording(bool recording) {
     renderingSemaphore.release();
 
     if (recording) {
+        RenderMode mode = getRenderMode();
+        recordingChannelCount = VisualiserRenderer::getChannelCountForRenderMode(mode);
+        audioRecorder.setNumChannels(recordingChannelCount);
 #if OSCI_PREMIUM
         recordingVideo = recordingSettings.recordingVideo();
         recordingAudio = recordingSettings.recordingAudio();
