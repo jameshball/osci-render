@@ -9,6 +9,7 @@
 #include "components/SvgButton.h"
 #include "components/VolumeComponent.h"
 #include "components/DownloaderComponent.h"
+#include "components/CustomTooltipWindow.h"
 
 #if DEBUG
     #include "melatonin_inspector/melatonin_inspector.h"
@@ -76,8 +77,7 @@ public:
 
     std::unique_ptr<juce::FileChooser> chooser;
     juce::MenuBarComponent menuBar;
-    juce::SharedResourcePointer<juce::TooltipWindow> tooltipWindow;
-    juce::DropShadower tooltipDropShadow{juce::DropShadow(juce::Colours::black.withAlpha(0.5f), 6, {0,0})};
+    juce::SharedResourcePointer<CustomTooltipWindow> tooltipWindow;
 
     bool usingNativeMenuBar = false;
 

@@ -24,7 +24,7 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     setColour(groupComponentHeaderColourId, Colours::veryDark);
     setColour(juce::PopupMenu::backgroundColourId, Colours::darker);
     setColour(juce::PopupMenu::highlightedBackgroundColourId, Colours::grey);
-    setColour(juce::TooltipWindow::backgroundColourId, Colours::darker);
+    setColour(juce::TooltipWindow::backgroundColourId, Colours::darker.darker(0.5f));
     setColour(juce::TooltipWindow::outlineColourId, Colours::darker);
     setColour(juce::TextButton::buttonOnColourId, Colours::darker);
     setColour(juce::AlertWindow::outlineColourId, Colours::darker);
