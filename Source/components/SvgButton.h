@@ -102,7 +102,7 @@ class SvgButton : public juce::DrawableButton, public juce::AudioProcessorParame
     
     void paintOverChildren(juce::Graphics& g) override {
         if (pulseUsed && getToggleState()) {
-            g.setColour(juce::Colours::black.withAlpha(colourFade / 1.5f));
+            g.setColour(juce::Colours::black.withAlpha(juce::jlimit(0.0f, 1.0f, colourFade / 1.5f)));
             g.fillPath(resizedPath);
         }
     }

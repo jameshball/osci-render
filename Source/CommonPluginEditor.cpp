@@ -67,6 +67,16 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
 #if OSCI_PREMIUM
     sharedTextureManager.initGL();
 #endif
+
+    // Enable keyboard focus so F11 key works immediately
+    setWantsKeyboardFocus(true);
+    
+    // Use a short timer to grab focus after the window is fully initialized
+    juce::Timer::callAfterDelay(100, [this]() {
+        if (isShowing()) {
+            grabKeyboardFocus();
+        }
+    });
 }
 
 void CommonPluginEditor::handleCommandLine(const juce::String& commandLine) {
@@ -122,10 +132,13 @@ bool CommonPluginEditor::keyPressed(const juce::KeyPress& key) {
     } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'O') {
         openProject();
     } else if (key.isKeyCode(juce::KeyPress::F11Key) && juce::JUCEApplicationBase::isStandaloneApp()) {
-        // set fullscreen
-        juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
-        if (window != nullptr) {
-            window->setFullScreen(!fullScreen);
+        // toggle fullscreen
+        toggleFullScreen();
+    } else if (key.isKeyCode(juce::KeyPress::escapeKey) && juce::JUCEApplicationBase::isStandaloneApp()) {
+        // exit fullscreen if we're in fullscreen mode
+        // Return true to consume the event and prevent it from reaching child components
+        if (fullScreen) {
+            toggleFullScreen();
         }
     }
 
@@ -214,4 +227,40 @@ void CommonPluginEditor::resetToDefault() {
         window->resetToDefaultState();
         window->setName(ProjectInfo::projectName);
     }
+}
+
+void CommonPluginEditor::toggleFullScreen() {
+#if JUCE_WINDOWS
+    juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
+    if (window != nullptr) {
+        fullScreen = !fullScreen;
+        
+        if (fullScreen) {
+            // Store the current window bounds before going fullscreen
+            windowedBounds = window->getBounds();
+            
+            // Get the display that contains the window
+            auto& displays = juce::Desktop::getInstance().getDisplays();
+            auto* display = displays.getDisplayForRect(window->getBounds());
+            
+            if (display != nullptr) {
+                // Set window to cover the entire screen
+                window->setFullScreen(true);
+                window->setBounds(display->totalArea);
+            }
+        } else {
+            // Restore the previous windowed bounds
+            window->setFullScreen(false);
+            if (!windowedBounds.isEmpty()) {
+                window->setBounds(windowedBounds);
+            }
+        }
+    }
+#else
+    juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
+    if (window != nullptr) {
+        fullScreen = !fullScreen;
+        window->setFullScreen(fullScreen);
+    }
+#endif
 }

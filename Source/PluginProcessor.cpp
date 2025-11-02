@@ -587,53 +587,55 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         volumeData[i] = juce::jlimit(0.0f, 1.0f, std::sqrt((float)currentVolume));
     }
 
-    juce::SpinLock::ScopedLockType lock1(parsersLock);
-    juce::SpinLock::ScopedLockType lock2(effectsLock);
+    {
+        juce::SpinLock::ScopedLockType lock1(parsersLock);
+        juce::SpinLock::ScopedLockType lock2(effectsLock);
 
-    for (auto& effect : toggleableEffects) {
+        for (auto& effect : toggleableEffects) {
 #if !OSCI_PREMIUM
-        if (effect->isPremiumOnly()) {
-            continue;
-        }
+            if (effect->isPremiumOnly()) {
+                continue;
+            }
 #endif
-        bool isEnabled = effect->enabled != nullptr && effect->enabled->getValue();
-        bool isSelected = effect->selected == nullptr ? true : effect->selected->getBoolValue();
-        if (isEnabled && isSelected) {
-            if (effect->getId() == custom->getId()) {
-                effect->setExternalInput(&inputBuffer);
+            bool isEnabled = effect->enabled != nullptr && effect->enabled->getValue();
+            bool isSelected = effect->selected == nullptr ? true : effect->selected->getBoolValue();
+            if (isEnabled && isSelected) {
+                if (effect->getId() == custom->getId()) {
+                    effect->setExternalInput(&inputBuffer);
+                }
+                effect->setVolumeInput(&currentVolumeBuffer);
+                effect->processBlock(outputBuffer3d, midiMessages);
+                effect->setExternalInput(nullptr);
+                effect->setVolumeInput(nullptr);
             }
-            effect->setVolumeInput(&currentVolumeBuffer);
-            effect->processBlock(outputBuffer3d, midiMessages);
-            effect->setExternalInput(nullptr);
-            effect->setVolumeInput(nullptr);
         }
-    }
 
-    if (previewEffect) {
-        const bool prevEnabled = (previewEffect->enabled != nullptr) && previewEffect->enabled->getValue();
-        const bool prevSelected = (previewEffect->selected == nullptr) ? true : previewEffect->selected->getBoolValue();
-        if (!(prevEnabled && prevSelected)) {
-            if (previewEffect->getId() == custom->getId()) {
-                previewEffect->setExternalInput(&inputBuffer);
+        if (previewEffect) {
+            const bool prevEnabled = (previewEffect->enabled != nullptr) && previewEffect->enabled->getValue();
+            const bool prevSelected = (previewEffect->selected == nullptr) ? true : previewEffect->selected->getBoolValue();
+            if (!(prevEnabled && prevSelected)) {
+                if (previewEffect->getId() == custom->getId()) {
+                    previewEffect->setExternalInput(&inputBuffer);
+                }
+                previewEffect->setVolumeInput(&currentVolumeBuffer);
+                previewEffect->processBlock(outputBuffer3d, midiMessages);
+                previewEffect->setExternalInput(nullptr);
+                previewEffect->setVolumeInput(nullptr);
             }
-            previewEffect->setVolumeInput(&currentVolumeBuffer);
-            previewEffect->processBlock(outputBuffer3d, midiMessages);
-            previewEffect->setExternalInput(nullptr);
-            previewEffect->setVolumeInput(nullptr);
         }
-    }
 
-    for (auto& effect : permanentEffects) {
-        effect->setVolumeInput(&currentVolumeBuffer);
-        effect->processBlock(outputBuffer3d, midiMessages);
-        effect->setVolumeInput(nullptr);
-    }
-    auto lua = currentFile >= 0 ? sounds[currentFile]->parser->getLua() : nullptr;
-    if (lua != nullptr || custom->enabled->getBoolValue()) {
-        for (auto& effect : luaEffects) {
+        for (auto& effect : permanentEffects) {
             effect->setVolumeInput(&currentVolumeBuffer);
             effect->processBlock(outputBuffer3d, midiMessages);
             effect->setVolumeInput(nullptr);
+        }
+        auto lua = currentFile >= 0 ? sounds[currentFile]->parser->getLua() : nullptr;
+        if (lua != nullptr || custom->enabled->getBoolValue()) {
+            for (auto& effect : luaEffects) {
+                effect->setVolumeInput(&currentVolumeBuffer);
+                effect->processBlock(outputBuffer3d, midiMessages);
+                effect->setVolumeInput(nullptr);
+            }
         }
     }
 

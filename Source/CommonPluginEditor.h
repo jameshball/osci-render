@@ -31,11 +31,13 @@ public:
     virtual void openRecordingSettings();
     virtual void showPremiumSplashScreen();
     void resetToDefault();
+    void toggleFullScreen();
     void resized() override;
 
 private:
     CommonAudioProcessor& audioProcessor;
     bool fullScreen = false;
+    juce::Rectangle<int> windowedBounds;
 public:
     OscirenderLookAndFeel lookAndFeel;
 
