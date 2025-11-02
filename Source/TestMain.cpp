@@ -23,8 +23,8 @@ public:
         for (int i = 0; i < 100; i++) {
             consumer.waitUntilFull();
             auto buffer = consumer.getBuffer();
-            for (auto& point : buffer) {
-                values.push_back(point.x);
+            for (int i = 0; i < buffer.getNumSamples(); i++) {
+                values.push_back(osci::Point::fromAudioBuffer(buffer, i).x);
             }
         }
     }
