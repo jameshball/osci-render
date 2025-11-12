@@ -1,4 +1,4 @@
-﻿// The Code Project Open License (CPOL) 1.02
+// The Code Project Open License (CPOL) 1.02
 
 [Code]
 // https://github.com/DomGries/InnoDependencyInstaller
@@ -219,6 +219,19 @@ function Dependency_ArchTitle: String;
 begin
   Result := Dependency_String(' (x86)', ' (x64)');
 end;
+
+function Dependency_IsMsiProductInstalled(const UpgradeCode: String; const PackedMinVersion: Int64): Boolean;
+begin
+  // Simple, crash-proof wrapper around the MSI query
+  try
+    Result := IsMsiProductInstalled(UpgradeCode, PackedMinVersion);
+  except
+    // If MSI throws *anything* (missing service, invalid GUID, corrupted MSI DB),
+    // just treat it as "not installed" so the dependency installer can continue
+    Result := False;
+  end;
+end;
+
 
 function Dependency_IsNetCoreInstalled(Runtime: String; Major, Minor, Revision: Word): Boolean;
 var
@@ -554,7 +567,7 @@ end;
 procedure Dependency_AddVC2005;
 begin
   // https://www.microsoft.com/en-us/download/details.aspx?id=26347
-  if not IsMsiProductInstalled(Dependency_String('{86C9D5AA-F00C-4921-B3F2-C60AF92E2844}', '{A8D19029-8E5C-4E22-8011-48070F9E796E}'), PackVersionComponents(8, 0, 61000, 0)) then begin
+  if not Dependency_IsMsiProductInstalled(Dependency_String('{86C9D5AA-F00C-4921-B3F2-C60AF92E2844}', '{A8D19029-8E5C-4E22-8011-48070F9E796E}'), PackVersionComponents(8, 0, 61000, 0)) then begin
     Dependency_Add('vcredist2005' + Dependency_ArchSuffix + '.exe',
       '/q',
       'Visual C++ 2005 Service Pack 1 Redistributable' + Dependency_ArchTitle,
@@ -566,7 +579,7 @@ end;
 procedure Dependency_AddVC2008;
 begin
   // https://www.microsoft.com/en-us/download/details.aspx?id=26368
-  if not IsMsiProductInstalled(Dependency_String('{DE2C306F-A067-38EF-B86C-03DE4B0312F9}', '{FDA45DDF-8E17-336F-A3ED-356B7B7C688A}'), PackVersionComponents(9, 0, 30729, 6161)) then begin
+  if not Dependency_IsMsiProductInstalled(Dependency_String('{DE2C306F-A067-38EF-B86C-03DE4B0312F9}', '{FDA45DDF-8E17-336F-A3ED-356B7B7C688A}'), PackVersionComponents(9, 0, 30729, 6161)) then begin
     Dependency_Add('vcredist2008' + Dependency_ArchSuffix + '.exe',
       '/q',
       'Visual C++ 2008 Service Pack 1 Redistributable' + Dependency_ArchTitle,
@@ -578,7 +591,7 @@ end;
 procedure Dependency_AddVC2010;
 begin
   // https://www.microsoft.com/en-us/download/details.aspx?id=26999
-  if not IsMsiProductInstalled(Dependency_String('{1F4F1D2A-D9DA-32CF-9909-48485DA06DD5}', '{5B75F761-BAC8-33BC-A381-464DDDD813A3}'), PackVersionComponents(10, 0, 40219, 0)) then begin
+  if not Dependency_IsMsiProductInstalled(Dependency_String('{1F4F1D2A-D9DA-32CF-9909-48485DA06DD5}', '{5B75F761-BAC8-33BC-A381-464DDDD813A3}'), PackVersionComponents(10, 0, 40219, 0)) then begin
     Dependency_Add('vcredist2010' + Dependency_ArchSuffix + '.exe',
       '/passive /norestart',
       'Visual C++ 2010 Service Pack 1 Redistributable' + Dependency_ArchTitle,
@@ -590,7 +603,7 @@ end;
 procedure Dependency_AddVC2012;
 begin
   // https://www.microsoft.com/en-us/download/details.aspx?id=30679
-  if not IsMsiProductInstalled(Dependency_String('{4121ED58-4BD9-3E7B-A8B5-9F8BAAE045B7}', '{EFA6AFA1-738E-3E00-8101-FD03B86B29D1}'), PackVersionComponents(11, 0, 61030, 0)) then begin
+  if not Dependency_IsMsiProductInstalled(Dependency_String('{4121ED58-4BD9-3E7B-A8B5-9F8BAAE045B7}', '{EFA6AFA1-738E-3E00-8101-FD03B86B29D1}'), PackVersionComponents(11, 0, 61030, 0)) then begin
     Dependency_Add('vcredist2012' + Dependency_ArchSuffix + '.exe',
       '/passive /norestart',
       'Visual C++ 2012 Update 4 Redistributable' + Dependency_ArchTitle,
@@ -602,7 +615,7 @@ end;
 procedure Dependency_AddVC2013;
 begin
   // https://support.microsoft.com/en-us/help/4032938
-  if not IsMsiProductInstalled(Dependency_String('{B59F5BF1-67C8-3802-8E59-2CE551A39FC5}', '{20400CF0-DE7C-327E-9AE4-F0F38D9085F8}'), PackVersionComponents(12, 0, 40664, 0)) then begin
+  if not Dependency_IsMsiProductInstalled(Dependency_String('{B59F5BF1-67C8-3802-8E59-2CE551A39FC5}', '{20400CF0-DE7C-327E-9AE4-F0F38D9085F8}'), PackVersionComponents(12, 0, 40664, 0)) then begin
     Dependency_Add('vcredist2013' + Dependency_ArchSuffix + '.exe',
       '/passive /norestart',
       'Visual C++ 2013 Update 5 Redistributable' + Dependency_ArchTitle,
@@ -614,7 +627,7 @@ end;
 procedure Dependency_AddVC2015To2022;
 begin
   // https://docs.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist
-  if not IsMsiProductInstalled(Dependency_String('{65E5BD06-6392-3027-8C26-853107D3CF1A}', '{36F68A90-239C-34DF-B58C-64B30153CE35}'), PackVersionComponents(14, 42, 34433, 0)) then begin
+  if not Dependency_IsMsiProductInstalled(Dependency_String('{65E5BD06-6392-3027-8C26-853107D3CF1A}', '{36F68A90-239C-34DF-B58C-64B30153CE35}'), PackVersionComponents(14, 42, 34433, 0)) then begin
     Dependency_Add('vcredist2022' + Dependency_ArchSuffix + '.exe',
       '/passive /norestart',
       'Visual C++ 2015-2022 Redistributable' + Dependency_ArchTitle,
