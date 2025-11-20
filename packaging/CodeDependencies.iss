@@ -221,19 +221,17 @@ begin
 end;
 
 function Dependency_IsMsiProductInstalled(const UpgradeCode: String; const PackedMinVersion: Int64): Boolean;
-var
-  ErrorCode: Cardinal;
 begin
-  // Wrapper function that handles MSI errors gracefully
-  // If IsMsiProductInstalled fails (e.g., MSI service disabled, corrupted, or insufficient permissions),
-  // we'll assume the product is not installed and let the dependency installer handle it
-  Result := IsMsiProductInstalled(UpgradeCode, PackedMinVersion, ErrorCode);
-  
-  // If there was an error querying MSI, assume not installed to be safe
-  if ErrorCode <> ERROR_SUCCESS then begin
+  // Simple, crash-proof wrapper around the MSI query
+  try
+    Result := IsMsiProductInstalled(UpgradeCode, PackedMinVersion);
+  except
+    // If MSI throws *anything* (missing service, invalid GUID, corrupted MSI DB),
+    // just treat it as "not installed" so the dependency installer can continue
     Result := False;
   end;
 end;
+
 
 function Dependency_IsNetCoreInstalled(Runtime: String; Major, Minor, Revision: Word): Boolean;
 var
