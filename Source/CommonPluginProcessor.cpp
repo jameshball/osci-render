@@ -64,6 +64,12 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
 
     wavParser.setLooping(false);
     startHeartbeat();
+    
+    // Initialize analytics
+    juce::Analytics::getInstance()->addDestination(new osci::PostHogAnalyticsDestination());
+    
+    // Log app startup event
+    logAnalyticsEvent("app_startup");
 }
 
 void CommonAudioProcessor::addAllParameters() {
@@ -111,6 +117,9 @@ void CommonAudioProcessor::timerCallback() {
 
 CommonAudioProcessor::~CommonAudioProcessor() 
 {
+    // Log app shutdown event before cleaning up
+    logAnalyticsEvent("app_shutdown");
+    
     setGlobalValue("endTime", juce::Time::getCurrentTime().toISO8601(true));
     saveGlobalSettings();
     stopHeartbeat();
@@ -539,3 +548,19 @@ bool CommonAudioProcessor::ensureFFmpegExists(std::function<void()> onStart, std
     return false;
 }
 #endif
+
+void CommonAudioProcessor::logAnalyticsEvent(const juce::String& eventName, const juce::StringPairArray& parameters)
+{
+    // Use JUCE's Analytics singleton to log events
+    // The event type is set to 0 (can be customized for different event categories)
+    juce::Analytics::getInstance()->logEvent(eventName, parameters, 0);
+}
+
+std::unique_ptr<juce::ButtonTracker> CommonAudioProcessor::createButtonTracker(
+    juce::Button& button,
+    const juce::String& eventName,
+    const juce::StringPairArray& parameters)
+{
+    // Create and return a ButtonTracker that will automatically log events when the button is clicked
+    return std::make_unique<juce::ButtonTracker>(button, eventName, parameters);
+}

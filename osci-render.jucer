@@ -4,8 +4,8 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginCharacteristicsValue="pluginWantsMidiIn"
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
-              version="2.7.0.2" companyName="James H Ball" companyWebsite="https://osci-render.com"
-              companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1"
+              version="2.7.0.3" companyName="James H Ball" companyWebsite="https://osci-render.com"
+              companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=0&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1"
               pluginAUMainType="'aumf'" postExportShellCommandPosix="echo &quot;Building LuaJIT for $OSTYPE...&quot; &amp;&amp; DIR=%%1%% %%1%%/luajit_linux_macos.sh ">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
@@ -224,6 +224,12 @@
         <FILE id="Be21D0" name="VectorCancellingEffect.h" compile="0" resource="0"
               file="Source/audio/VectorCancellingEffect.h"/>
         <FILE id="sgdTlo" name="WobbleEffect.h" compile="0" resource="0" file="Source/audio/WobbleEffect.h"/>
+      </GROUP>
+      <GROUP id="{A1B2C3D4-5E6F-7G8H-9I0J-1K2L3M4N5O6P}" name="analytics">
+        <FILE id="ph1Ana" name="PostHogAnalyticsDestination.cpp" compile="1"
+              resource="0" file="Source/analytics/PostHogAnalyticsDestination.cpp"/>
+        <FILE id="ph2Ana" name="PostHogAnalyticsDestination.h" compile="0"
+              resource="0" file="Source/analytics/PostHogAnalyticsDestination.h"/>
       </GROUP>
       <GROUP id="{2A41BAF3-5E83-B018-5668-39D89ABFA00C}" name="chinese_postman">
         <FILE id="LcDpwe" name="BinaryHeap.cpp" compile="1" resource="0" file="Source/chinese_postman/BinaryHeap.cpp"/>
@@ -910,6 +916,7 @@
     <MODULE id="chowdsp_filters" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="chowdsp_math" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="chowdsp_simd" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_analytics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_animation" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
