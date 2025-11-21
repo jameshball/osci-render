@@ -69,13 +69,6 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
 
     // Enable keyboard focus so F11 key works immediately
     setWantsKeyboardFocus(true);
-    
-    // Use a short timer to grab focus after the window is fully initialized
-    juce::Timer::callAfterDelay(100, [this]() {
-        if (isShowing()) {
-            grabKeyboardFocus();
-        }
-    });
 }
 
 void CommonPluginEditor::handleCommandLine(const juce::String& commandLine) {

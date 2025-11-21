@@ -3,6 +3,12 @@
 #include "CustomStandaloneFilterWindow.h"
 
 SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p) : CommonPluginEditor(p, "sosci", "sosci", 1180, 750), audioProcessor(p) {
+    // Create timeline controller for audio playback
+    audioTimelineController = std::make_shared<AudioTimelineController>(audioProcessor);
+    
+    // Listen for audio file changes
+    audioProcessor.addAudioPlayerListener(this);
+    
     initialiseMenuBar(model);
     if (juce::JUCEApplication::isStandaloneApp()) {
         addAndMakeVisible(volume);
@@ -33,9 +39,13 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p) : CommonPluginEdito
         manager.addChangeListener(this);
         currentInputDevice = getInputDeviceName();
     }
+    
+    // Set initial timeline controller state
+    updateTimelineController();
 }
 
 SosciPluginEditor::~SosciPluginEditor() {
+    audioProcessor.removeAudioPlayerListener(this);
     if (juce::JUCEApplication::isStandaloneApp()) {
         juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
         juce::AudioDeviceManager& manager = standalone->deviceManager;
@@ -136,6 +146,19 @@ void SosciPluginEditor::changeListenerCallback(juce::ChangeBroadcaster* source) 
             audioProcessor.stopAudioFile();
         }
     }
+}
+
+void SosciPluginEditor::parserChanged() {
+    updateTimelineController();
+}
+
+void SosciPluginEditor::updateTimelineController() {
+    // Show timeline when audio file is loaded
+    std::shared_ptr<TimelineController> controller = audioProcessor.wavParser.isInitialised() 
+        ? audioTimelineController 
+        : nullptr;
+    
+    visualiser.setTimelineController(controller);
 }
 
 juce::String SosciPluginEditor::getInputDeviceName() {

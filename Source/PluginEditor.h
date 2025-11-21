@@ -7,6 +7,7 @@
 #include "MidiComponent.h"
 #include "PluginProcessor.h"
 #include "SettingsComponent.h"
+#include "TxtComponent.h"
 #include "components/ErrorCodeEditorComponent.h"
 #include "components/LuaConsole.h"
 #include "components/OsciMainMenuBarModel.h"
@@ -58,6 +59,7 @@ public:
 
     juce::ComponentAnimator codeEditorAnimator;
     LuaComponent lua{audioProcessor, *this};
+    TxtComponent txtFont{audioProcessor, *this};
 
     SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings", visualiserSettings, 550, 500, 1500, VISUALISER_SETTINGS_HEIGHT);
 

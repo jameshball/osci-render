@@ -80,6 +80,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 
     addAndMakeVisible(lua);
     addAndMakeVisible(luaResizerBar);
+    addChildComponent(txtFont);
     addAndMakeVisible(visualiser);
 
     visualiser.openSettings = [this] {
@@ -237,6 +238,9 @@ void OscirenderAudioProcessorEditor::resized() {
                     extension = audioProcessor.getFileName(originalIndex).fromLastOccurrenceOf(".", true, false);
                 }
 
+                bool isTxtFile = extension == ".txt";
+                txtFont.setVisible(isTxtFile);
+
                 if (editingCustomFunction || extension == ".lua") {
                     juce::Component* rows[] = {&dummy3, &luaResizerBar, &lua};
                     luaLayout.layOutComponents(rows, 3, dummy2Bounds.getX(), dummy2Bounds.getY(), dummy2Bounds.getWidth(), dummy2Bounds.getHeight(), true, true);
@@ -246,7 +250,12 @@ void OscirenderAudioProcessorEditor::resized() {
                     codeEditors[index]->setBounds(dummy3Bounds);
                     luaFileOpen = true;
                 } else {
-                    codeEditors[index]->setBounds(dummy2Bounds);
+                    auto editorBounds = dummy2Bounds;
+                    if (isTxtFile) {
+                        txtFont.setBounds(editorBounds.removeFromTop(30));
+                        editorBounds.removeFromTop(5); // Add small gap
+                    }
+                    codeEditors[index]->setBounds(editorBounds);
                 }
 
                 fileOpen = true;
@@ -265,6 +274,11 @@ void OscirenderAudioProcessorEditor::resized() {
         console.setVisible(luaFileOpen);
         luaResizerBar.setVisible(luaFileOpen);
         lua.setVisible(luaFileOpen);
+        
+        // Hide txtFont if code editor is not visible
+        if (!fileOpen) {
+            txtFont.setVisible(false);
+        }
     }
 
     if (editorVisible) {

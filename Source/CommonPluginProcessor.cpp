@@ -8,7 +8,6 @@
 
 #include "CommonPluginProcessor.h"
 #include "CommonPluginEditor.h"
-#include "components/AudioPlayerComponent.h"
 
 //==============================================================================
 CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesProperties)

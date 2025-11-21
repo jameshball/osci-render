@@ -4,8 +4,8 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginCharacteristicsValue="pluginWantsMidiIn"
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
-              version="2.7.0.3" companyName="James H Ball" companyWebsite="https://osci-render.com"
-              companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=0&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1"
+              version="2.7.1.0" companyName="James H Ball" companyWebsite="https://osci-render.com"
+              companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1"
               pluginAUMainType="'aumf'" postExportShellCommandPosix="echo &quot;Building LuaJIT for $OSTYPE...&quot; &amp;&amp; DIR=%%1%% %%1%%/luajit_linux_macos.sh ">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
@@ -254,14 +254,6 @@
               file="Source/components/AboutComponent.cpp"/>
         <FILE id="vDlOTn" name="AboutComponent.h" compile="0" resource="0"
               file="Source/components/AboutComponent.h"/>
-        <FILE id="AAXWW6" name="AnimationTimelineComponent.cpp" compile="1"
-              resource="0" file="Source/components/AnimationTimelineComponent.cpp"/>
-        <FILE id="ppzO8J" name="AnimationTimelineComponent.h" compile="0" resource="0"
-              file="Source/components/AnimationTimelineComponent.h"/>
-        <FILE id="xxiMAy" name="AudioPlayerComponent.cpp" compile="1" resource="0"
-              file="Source/components/AudioPlayerComponent.cpp"/>
-        <FILE id="DSvDMv" name="AudioPlayerComponent.h" compile="0" resource="0"
-              file="Source/components/AudioPlayerComponent.h"/>
         <FILE id="kUinTt" name="ComponentList.cpp" compile="1" resource="0"
               file="Source/components/ComponentList.cpp"/>
         <FILE id="HGTPEW" name="ComponentList.h" compile="0" resource="0" file="Source/components/ComponentList.h"/>
@@ -336,6 +328,20 @@
               file="Source/components/TimelineComponent.cpp"/>
         <FILE id="fsckjw" name="TimelineComponent.h" compile="0" resource="0"
               file="Source/components/TimelineComponent.h"/>
+        <FILE id="tlCtrl" name="TimelineController.h" compile="0" resource="0"
+              file="Source/components/TimelineController.h"/>
+        <FILE id="audTlC" name="AudioTimelineController.cpp" compile="1" resource="0"
+              file="Source/components/AudioTimelineController.cpp"/>
+        <FILE id="audTlH" name="AudioTimelineController.h" compile="0" resource="0"
+              file="Source/components/AudioTimelineController.h"/>
+        <FILE id="aniTlC" name="AnimationTimelineController.cpp" compile="1"
+              resource="0" file="Source/components/AnimationTimelineController.cpp"/>
+        <FILE id="aniTlH" name="AnimationTimelineController.h" compile="0"
+              resource="0" file="Source/components/AnimationTimelineController.h"/>
+        <FILE id="oscAuC" name="OscirenderAudioTimelineController.cpp" compile="1"
+              resource="0" file="Source/components/OscirenderAudioTimelineController.cpp"/>
+        <FILE id="oscAuH" name="OscirenderAudioTimelineController.h" compile="0"
+              resource="0" file="Source/components/OscirenderAudioTimelineController.h"/>
         <FILE id="t9xeSp" name="TimelineLookAndFeel.h" compile="0" resource="0"
               file="Source/components/TimelineLookAndFeel.h"/>
         <FILE id="icFMpl" name="VListBox.cpp" compile="1" resource="0" file="Source/components/VListBox.cpp"/>

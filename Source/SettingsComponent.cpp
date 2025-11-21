@@ -3,13 +3,16 @@
 #include "PluginEditor.h"
 
 SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
+    // Create timeline controllers for osci-render
+    animationTimelineController = std::make_shared<AnimationTimelineController>(audioProcessor);
+    audioTimelineController = std::make_shared<OscirenderAudioTimelineController>(audioProcessor);
+    
     addAndMakeVisible(effects);
     addAndMakeVisible(fileControls);
     addAndMakeVisible(perspective);
     addAndMakeVisible(midiResizerBar);
     addAndMakeVisible(mainResizerBar);
     addAndMakeVisible(midi);
-    addChildComponent(txt);
     addChildComponent(frame);
     addChildComponent(examples);
 
@@ -124,14 +127,10 @@ void SettingsComponent::resized() {
 
     // Only reserve space for effect settings panel when not showing the Open Files panel
     if (!examplesVisible) {
-        if (txt.isVisible()) {
-            effectSettings = &txt;
-        } else if (frame.isVisible()) {
+        if (frame.isVisible()) {
             effectSettings = &frame;
-        }
-
-        if (effectSettings != nullptr) {
-            effectSettings->setBounds(dummyBounds.removeFromBottom(160));
+            int preferredHeight = frame.getPreferredHeight();
+            effectSettings->setBounds(dummyBounds.removeFromBottom(preferredHeight));
             dummyBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
         }
     }
@@ -140,7 +139,6 @@ void SettingsComponent::resized() {
         // Hide other panels while examples are visible
         perspective.setVisible(false);
         effects.setVisible(false);
-        txt.setVisible(false);
         frame.setVisible(false);
         examples.setVisible(true);
         examples.setBounds(dummyBounds);
@@ -169,7 +167,6 @@ void SettingsComponent::paint(juce::Graphics& g) {
 // syphonLock must be held when calling this function
 void SettingsComponent::fileUpdated(juce::String fileName) {
     juce::String extension = fileName.fromLastOccurrenceOf(".", true, false).toLowerCase();
-    txt.setVisible(false);
     frame.setVisible(false);
 
     // Check if the file is an image based on extension or Syphon/Spout input
@@ -191,8 +188,6 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
 
     if (skipProcessing) {
         // do nothing
-    } else if (extension == ".txt") {
-        txt.setVisible(true);
     } else if (extension == ".gpla" || isImage) {
         frame.setVisible(true);
         frame.setAnimated(extension == ".gpla" || extension == ".gif" || extension == ".mov" || extension == ".mp4");
@@ -200,11 +195,31 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
         frame.resized();
     }
     fileControls.updateFileLabel();
+    updateTimelineController();
     resized();
 }
 
+void SettingsComponent::updateTimelineController() {
+    std::shared_ptr<TimelineController> controller = nullptr;
+    
+    int currentFileIndex = audioProcessor.getCurrentFileIndex();
+    if (currentFileIndex >= 0 && audioProcessor.parsers[currentFileIndex] != nullptr) {
+        auto parser = audioProcessor.parsers[currentFileIndex];
+        
+        // Check if it's an animatable file (gpla, gif, video)
+        if (parser->isAnimatable) {
+            controller = animationTimelineController;
+        }
+        // Check if it's an audio file (FileParser contains a WavParser)
+        else if (parser->getWav() != nullptr) {
+            controller = audioTimelineController;
+        }
+    }
+    
+    pluginEditor.visualiser.setTimelineController(controller);
+}
+
 void SettingsComponent::update() {
-    txt.update();
     frame.update();
 }
 

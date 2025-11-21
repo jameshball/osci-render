@@ -16,9 +16,6 @@ FrameSettingsComponent::FrameSettingsComponent(OscirenderAudioProcessor& p, Osci
         offsetLabel.setTooltip("Offsets the animation's start point by a specified number of frames.");
     } else {
         audioProcessor.animationSyncBPM->setValueNotifyingHost(false);
-#if OSCI_PREMIUM
-        addAndMakeVisible(timeline);
-#endif
     }
 	addAndMakeVisible(rateLabel);
 	addAndMakeVisible(rateBox);
@@ -59,64 +56,89 @@ FrameSettingsComponent::~FrameSettingsComponent() {
 }
 
 void FrameSettingsComponent::resized() {
-	auto area = getLocalBounds().withTrimmedTop(20).reduced(20);
-    double rowHeight = 20;
-
-#if OSCI_PREMIUM
-    auto timelineArea = juce::JUCEApplicationBase::isStandaloneApp() ? area.removeFromBottom(30) : juce::Rectangle<int>();
-#endif
+    // Calculate preferred height while laying out components
+    const int topMargin = 20;
+    const int sideMargins = 40; // reduced(20) removes 20 from each side
+    int heightUsed = topMargin + sideMargins;
     
-    auto toggleBounds = juce::JUCEApplicationBase::isStandaloneApp() ? juce::Rectangle<int>() : area.removeFromTop(rowHeight);
+	auto area = getLocalBounds().withTrimmedTop(topMargin).reduced(20);
+    double rowHeight = 20;
+    
+    bool isPlugin = !juce::JUCEApplicationBase::isStandaloneApp();
+    auto toggleBounds = isPlugin && animated ? area.removeFromTop(rowHeight) : juce::Rectangle<int>();
     auto toggleWidth = juce::jmin(area.getWidth() / 3, 150);
+    
+    // Track toggle row usage and heights for each column (they're side by side)
+    bool toggleRowUsed = false;
+    int firstColumnHeight = 0;
+    int secondColumnHeight = 0;
 
     auto firstColumn = area.removeFromLeft(220);
     
-#if OSCI_PREMIUM
-    if (juce::JUCEApplicationBase::isStandaloneApp()) {
-        timeline.setVisible(animated);
-    }
-#endif
-    
     if (animated) {
-        if (juce::JUCEApplicationBase::isStandaloneApp()) {
-#if OSCI_PREMIUM
-            timeline.setBounds(timelineArea);
-#endif
-        } else {
+        if (isPlugin) {
             animate.setBounds(toggleBounds.removeFromLeft(toggleWidth));
             sync.setBounds(toggleBounds.removeFromLeft(toggleWidth));
+            if (!toggleRowUsed) {
+                heightUsed += rowHeight; // Toggle row (only count once)
+                toggleRowUsed = true;
+            }
         }
         
-        double rowSpace = 10;
-        
-        firstColumn.removeFromTop(rowSpace);
+        firstColumn.removeFromTop(5);
+        firstColumnHeight += 5; // Spacing
 
         auto animateBounds = firstColumn.removeFromTop(rowHeight);
         rateLabel.setBounds(animateBounds.removeFromLeft(140));
         rateBox.setBounds(animateBounds.removeFromLeft(60));
-        firstColumn.removeFromTop(rowSpace);
+        firstColumnHeight += rowHeight; // Rate row
+        
+        firstColumn.removeFromTop(10);
+        firstColumnHeight += 10; // Spacing
 
-        if (!juce::JUCEApplicationBase::isStandaloneApp()) {
+        if (isPlugin) {
             animateBounds = firstColumn.removeFromTop(rowHeight);
             offsetLabel.setBounds(animateBounds.removeFromLeft(140));
             offsetBox.setBounds(animateBounds.removeFromLeft(60));
+            firstColumnHeight += rowHeight; // Offset row
         }
     }
 
     if (image) {
-        if (juce::JUCEApplicationBase::isStandaloneApp()) {
+        if (!animated) {
+            firstColumn.removeFromTop(5);
+            firstColumnHeight += 5; // Spacing
+        }
+
+        if (!isPlugin || !animated) {
+            // Standalone: invertImage goes in first column
             invertImage.setBounds(firstColumn.removeFromTop(rowHeight));
+            firstColumnHeight += rowHeight; // Invert toggle row
         } else {
+            // Plugin: invertImage goes in toggle row
             invertImage.setBounds(toggleBounds.removeFromLeft(toggleWidth));
+            if (!toggleRowUsed) {
+                heightUsed += rowHeight; // Toggle row (only if not already counted)
+                toggleRowUsed = true;
+            }
         }
         
+        // Second column for threshold and stride (parallel to first column)
         auto secondColumn = area;
-        secondColumn.removeFromTop(5);
         
         rowHeight = 30;
         threshold.setBounds(secondColumn.removeFromTop(rowHeight));
+        secondColumnHeight += rowHeight; // Threshold row
+        
         stride.setBounds(secondColumn.removeFromTop(rowHeight));
+        secondColumnHeight += rowHeight; // Stride row
     }
+    
+    // Add the taller of the two columns (they're side by side)
+    heightUsed += juce::jmax(firstColumnHeight, secondColumnHeight);
+    
+    // Cache the calculated height
+    cachedPreferredHeight = heightUsed;
 }
 
 void FrameSettingsComponent::update() {
@@ -156,4 +178,10 @@ void FrameSettingsComponent::setImage(bool image) {
     invertImage.setVisible(image);
     threshold.setVisible(image);
     stride.setVisible(image);
+}
+
+int FrameSettingsComponent::getPreferredHeight() const {
+    // Return cached height calculated during resized()
+    // If not yet calculated (cachedPreferredHeight == 0), return a reasonable default
+    return cachedPreferredHeight > 0 ? cachedPreferredHeight : 60;
 }

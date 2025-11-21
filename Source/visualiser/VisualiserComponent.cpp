@@ -102,18 +102,19 @@ VisualiserComponent::VisualiserComponent(
         addAndMakeVisible(audioInputButton);
         audioInputButton.setTooltip("Appears red when audio input is being used. Click to enable audio input and close any open audio files.");
         audioInputButton.setClickingTogglesState(false);
-        audioInputButton.setToggleState(!audioPlayer.isInitialised(), juce::NotificationType::dontSendNotification);
-        audioPlayer.onParserChanged = [this] {
-            juce::MessageManager::callAsync([this] { audioInputButton.setToggleState(!audioPlayer.isInitialised(), juce::NotificationType::dontSendNotification); });
-        };
+        audioInputButton.setToggleState(!audioProcessor.wavParser.isInitialised(), juce::NotificationType::dontSendNotification);
         audioInputButton.onClick = [this] {
             audioProcessor.stopAudioFile();
         };
     }
 
-    addChildComponent(audioPlayer);
-    audioPlayer.setVisible(visualiserOnly);
-    audioPlayer.addMouseListener(static_cast<juce::Component *>(this), true);
+    // Listen for audio file changes
+    audioProcessor.addAudioPlayerListener(this);
+    
+    // Initialize timeline for standalone premium builds
+    // Controller will be set by parent component
+    addChildComponent(timeline);
+    timeline.addMouseListener(static_cast<juce::Component *>(this), true);
 
     preRenderCallback = [this] {
         if (!record.getToggleState()) {
@@ -159,6 +160,7 @@ VisualiserComponent::VisualiserComponent(
 
 VisualiserComponent::~VisualiserComponent() {
     setRecording(false);
+    audioProcessor.removeAudioPlayerListener(this);
     if (parent == nullptr) {
         audioProcessor.haltRecording = nullptr;
     }
@@ -209,7 +211,7 @@ void VisualiserComponent::setPaused(bool paused, bool affectAudio) {
     setShouldBeRunning(active);
     renderingSemaphore.release();
     if (affectAudio) {
-        audioPlayer.setPaused(paused);
+        audioProcessor.wavParser.setPaused(paused);
     }
     repaint();
 }
@@ -469,7 +471,8 @@ void VisualiserComponent::resized() {
     buttons.removeFromRight(10); // padding
 
     if (child == nullptr) {
-        audioPlayer.setBounds(buttons);
+        // Timeline replaces the old audioPlayer UI
+        timeline.setBounds(buttons);
     }
 
     setViewportArea(area);
@@ -520,14 +523,12 @@ void VisualiserComponent::childUpdated() {
     editor.ffmpegDownloader.setVisible(child == nullptr);
 #endif
     record.setVisible(child == nullptr);
-    audioPlayer.setVisible(child == nullptr);
     if (child != nullptr) {
         audioProcessor.haltRecording = [this] {
             setRecording(false);
             child->setRecording(false);
         };
     } else {
-        audioPlayer.setup();
         audioProcessor.haltRecording = [this] {
             setRecording(false);
         };
@@ -576,6 +577,34 @@ void VisualiserComponent::openGLContextClosing() {
 #endif
 
     VisualiserRenderer::openGLContextClosing();
+}
+
+void VisualiserComponent::parserChanged() {
+    // Update audio input button when audio file changes
+    juce::MessageManager::callAsync([this] {
+        if (visualiserOnly && juce::JUCEApplication::isStandaloneApp()) {
+            audioInputButton.setToggleState(!audioProcessor.wavParser.isInitialised(), juce::NotificationType::dontSendNotification);
+        }
+        // Parent component should update timeline controller/visibility as needed
+    });
+}
+
+void VisualiserComponent::setTimelineController(std::shared_ptr<TimelineController> controller) {
+    bool shouldShow = controller != nullptr && 
+                      juce::JUCEApplicationBase::isStandaloneApp();
+    
+#if !OSCI_PREMIUM
+    shouldShow = false;
+#endif
+    
+    if (shouldShow) {
+        timeline.setController(controller);
+        timeline.setVisible(true);
+    } else {
+        timeline.setVisible(false);
+    }
+    
+    resized();
 }
 
 void VisualiserComponent::paint(juce::Graphics &g) {

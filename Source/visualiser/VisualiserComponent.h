@@ -4,12 +4,14 @@
 
 #include <algorithm>
 
+#include "../CommonPluginProcessor.h"
 #include "../LookAndFeel.h"
 #include "../audio/AudioRecorder.h"
-#include "../components/AudioPlayerComponent.h"
 #include "../components/DownloaderComponent.h"
 #include "../components/StopwatchComponent.h"
 #include "../components/SvgButton.h"
+#include "../components/TimelineComponent.h"
+#include "../components/TimelineController.h"
 #include "../img/qoixx.hpp"
 #include "../video/FFmpegEncoderManager.h"
 #include "../wav/WavParser.h"
@@ -23,10 +25,9 @@ enum class FullScreenMode {
     MAIN_COMPONENT,
 };
 
-class CommonAudioProcessor;
 class CommonPluginEditor;
 class VisualiserWindow;
-class VisualiserComponent : public VisualiserRenderer, public juce::MouseListener {
+class VisualiserComponent : public VisualiserRenderer, public juce::MouseListener, public AudioPlayerListener {
 public:
     VisualiserComponent(
         CommonAudioProcessor& processor,
@@ -58,6 +59,8 @@ public:
     void setRecording(bool recording);
     void childUpdated();
     void updateRenderModeFromProcessor();
+    void setTimelineController(std::shared_ptr<TimelineController> controller);
+    void parserChanged() override;
 
     VisualiserComponent* parent = nullptr;
     VisualiserComponent* child = nullptr;
@@ -78,7 +81,10 @@ private:
     RecordingSettings& recordingSettings;
 
     bool visualiserOnly;
-    AudioPlayerComponent audioPlayer{audioProcessor};
+    
+    // Timeline for controlling playback (audio, video, gif, gpla)
+    // Controller is set by parent component based on file type
+    TimelineComponent timeline;
 
     SvgButton fullScreenButton{"fullScreen", BinaryData::fullscreen_svg, juce::Colours::white, juce::Colours::white};
     SvgButton popOutButton{"popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::white};

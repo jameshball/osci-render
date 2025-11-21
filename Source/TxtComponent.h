@@ -4,21 +4,17 @@
 #include "PluginProcessor.h"
 
 class OscirenderAudioProcessorEditor;
-class TxtComponent : public juce::GroupComponent, public juce::MouseListener {
+class TxtComponent : public juce::ComboBox {
 public:
     TxtComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
 
-    void resized() override;
     void update();
+    
 private:
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& pluginEditor;
 
     juce::StringArray installedFonts = juce::Font::findAllTypefaceNames();
-
-    juce::ComboBox font;
-    juce::ToggleButton bold{"Bold"};
-    juce::ToggleButton italic{"Italic"};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TxtComponent)
 };
