@@ -13,9 +13,8 @@ public:
     void resized() override;
 
     // Set the controller that defines timeline behavior
-    // Controller lifetime is managed externally and must outlive this component
     void setController(std::shared_ptr<TimelineController> controller);
-    std::shared_ptr<TimelineController> getController() const { return controller.lock(); }
+    std::shared_ptr<TimelineController> getController() const { return controller; }
 
     // Public interface
     void setValue(double value, juce::NotificationType notification);
@@ -29,8 +28,7 @@ public:
 private:
     void timerCallback() override;
 
-    // Weak pointer to avoid circular dependencies and allow external lifetime management
-    std::weak_ptr<TimelineController> controller;
+    std::shared_ptr<TimelineController> controller;
     
     TimelineLookAndFeel timelineLookAndFeel;
     juce::Slider slider;

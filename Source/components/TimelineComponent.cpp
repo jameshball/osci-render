@@ -27,28 +27,28 @@ TimelineComponent::TimelineComponent()
     
     playButton.onClick = [this]() {
         setPlaying(true);
-        if (auto ctrl = controller.lock()) ctrl->onPlay();
+        if (controller) controller->onPlay();
     };
 
     pauseButton.onClick = [this]() {
         setPlaying(false);
-        if (auto ctrl = controller.lock()) ctrl->onPause();
+        if (controller) controller->onPause();
     };
     
     repeatButton.onClick = [this]() {
-        if (auto ctrl = controller.lock())
-            ctrl->onRepeatChanged(repeatButton.getToggleState());
+        if (controller)
+            controller->onRepeatChanged(repeatButton.getToggleState());
     };
     
     stopButton.onClick = [this]() {
         setPlaying(false);
         slider.setValue(0, juce::sendNotification);
-        if (auto ctrl = controller.lock()) ctrl->onStop();
+        if (controller) controller->onStop();
     };
 
     slider.onValueChange = [this]() {
-        if (auto ctrl = controller.lock())
-            ctrl->onValueChange(slider.getValue());
+        if (controller)
+            controller->onValueChange(slider.getValue());
     };
 
     startTimer(20);
@@ -72,12 +72,10 @@ double TimelineComponent::getValue() const
 
 void TimelineComponent::setPlaying(bool shouldBePlaying)
 {
-    if (auto ctrl = controller.lock()) {
-        if (!ctrl->isActive()) {
-            playButton.setVisible(false);
-            pauseButton.setVisible(false);
-            return;
-        }
+    if (controller && !controller->isActive()) {
+        playButton.setVisible(false);
+        pauseButton.setVisible(false);
+        return;
     }
     playButton.setVisible(!shouldBePlaying);
     pauseButton.setVisible(shouldBePlaying);
@@ -120,7 +118,7 @@ void TimelineComponent::resized()
 void TimelineComponent::setController(std::shared_ptr<TimelineController> newController)
 {
     controller = newController;
-    if (auto ctrl = controller.lock()) {
+    if (controller) {
         // Setup callbacks for the controller to update the timeline UI
         auto setValueCallback = [this](double value) {
             setValue(value, juce::dontSendNotification);
@@ -132,14 +130,14 @@ void TimelineComponent::setController(std::shared_ptr<TimelineController> newCon
             setRepeat(repeat);
         };
         
-        ctrl->setup(setValueCallback, setPlayingCallback, setRepeatCallback);
+        controller->setup(setValueCallback, setPlayingCallback, setRepeatCallback);
     }
 }
 
 void TimelineComponent::timerCallback()
 {
-    if (auto ctrl = controller.lock()) {
-        double position = ctrl->getCurrentPosition();
+    if (controller) {
+        double position = controller->getCurrentPosition();
         setValue(position, juce::dontSendNotification);
     }
 }
