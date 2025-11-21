@@ -3,10 +3,6 @@
 #include "PluginEditor.h"
 
 SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
-    // Create timeline controllers for osci-render
-    animationTimelineController = std::make_shared<AnimationTimelineController>(audioProcessor);
-    audioTimelineController = std::make_shared<OscirenderAudioTimelineController>(audioProcessor);
-    
     addAndMakeVisible(effects);
     addAndMakeVisible(fileControls);
     addAndMakeVisible(perspective);
@@ -195,28 +191,7 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
         frame.resized();
     }
     fileControls.updateFileLabel();
-    updateTimelineController();
     resized();
-}
-
-void SettingsComponent::updateTimelineController() {
-    std::shared_ptr<TimelineController> controller = nullptr;
-    
-    int currentFileIndex = audioProcessor.getCurrentFileIndex();
-    if (currentFileIndex >= 0 && audioProcessor.parsers[currentFileIndex] != nullptr) {
-        auto parser = audioProcessor.parsers[currentFileIndex];
-        
-        // Check if it's an animatable file (gpla, gif, video)
-        if (parser->isAnimatable) {
-            controller = animationTimelineController;
-        }
-        // Check if it's an audio file (FileParser contains a WavParser)
-        else if (parser->getWav() != nullptr) {
-            controller = audioTimelineController;
-        }
-    }
-    
-    pluginEditor.visualiser.setTimelineController(controller);
 }
 
 void SettingsComponent::update() {

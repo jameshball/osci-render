@@ -8,8 +8,10 @@
 #include "PluginProcessor.h"
 #include "SettingsComponent.h"
 #include "TxtComponent.h"
+#include "components/AnimationTimelineController.h"
 #include "components/ErrorCodeEditorComponent.h"
 #include "components/LuaConsole.h"
+#include "components/OscirenderAudioTimelineController.h"
 #include "components/OsciMainMenuBarModel.h"
 #include "components/SplashScreenComponent.h"
 #include "visualiser/VisualiserSettings.h"
@@ -93,6 +95,11 @@ public:
     bool keyPressed(const juce::KeyPress& key) override;
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseMove(const juce::MouseEvent& event) override;
+
+    // Timeline controllers for osci-render (shared pointers to allow passing to timeline component)
+    std::shared_ptr<AnimationTimelineController> animationTimelineController;
+    std::shared_ptr<OscirenderAudioTimelineController> audioTimelineController;
+    void updateTimelineController();
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
     // Syphon/Spout input dialog

@@ -9,8 +9,6 @@
 #include "MidiComponent.h"
 #include "PerspectiveComponent.h"
 #include "PluginProcessor.h"
-#include "components/AnimationTimelineController.h"
-#include "components/OscirenderAudioTimelineController.h"
 #include "components/OpenFileComponent.h"
 #include "components/FileControlsComponent.h"
 
@@ -54,12 +52,6 @@ private:
     double prefSizes[1] = {300};
 
     juce::Rectangle<int> volumeVisualiserBounds;
-    
-    // Timeline controllers for osci-render (shared pointers to allow passing to timeline component)
-    std::shared_ptr<AnimationTimelineController> animationTimelineController;
-    std::shared_ptr<OscirenderAudioTimelineController> audioTimelineController;
-    
-    void updateTimelineController();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SettingsComponent)
 };

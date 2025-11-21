@@ -18,6 +18,10 @@ void OscirenderAudioProcessorEditor::registerFileRemovedCallback() {
 }
 
 OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p) : CommonPluginEditor(p, "osci-render", "osci", 1100, 770), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white) {
+    // Create timeline controllers for osci-render
+    animationTimelineController = std::make_shared<AnimationTimelineController>(audioProcessor);
+    audioTimelineController = std::make_shared<OscirenderAudioTimelineController>(audioProcessor);
+    
     // Register the file removal callback
     registerFileRemovedCallback();
 
@@ -395,6 +399,7 @@ void OscirenderAudioProcessorEditor::fileUpdated(juce::String fileName, bool sho
     CommonPluginEditor::fileUpdated(fileName);
     settings.fileUpdated(fileName);
     updateCodeEditor(isBinaryFile(fileName), shouldOpenEditor);
+    updateTimelineController();
 }
 
 void OscirenderAudioProcessorEditor::handleAsyncUpdate() {
@@ -579,6 +584,26 @@ void OscirenderAudioProcessorEditor::showPremiumSplashScreen() {
     premiumSplashScreen->toFront(true);
     resized();
 #endif
+}
+
+void OscirenderAudioProcessorEditor::updateTimelineController() {
+    std::shared_ptr<TimelineController> controller = nullptr;
+    
+    int currentFileIndex = audioProcessor.getCurrentFileIndex();
+    if (currentFileIndex >= 0 && audioProcessor.parsers[currentFileIndex] != nullptr) {
+        auto parser = audioProcessor.parsers[currentFileIndex];
+        
+        // Check if it's an animatable file (gpla, gif, video)
+        if (parser->isAnimatable) {
+            controller = animationTimelineController;
+        }
+        // Check if it's an audio file (FileParser contains a WavParser)
+        else if (parser->getWav() != nullptr) {
+            controller = audioTimelineController;
+        }
+    }
+    
+    visualiser.setTimelineController(controller);
 }
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
