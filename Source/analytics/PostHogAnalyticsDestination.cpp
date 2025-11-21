@@ -18,7 +18,8 @@ PostHogAnalyticsDestination::PostHogAnalyticsDestination()
       projectName(JucePlugin_Name),
       appVersion(JucePlugin_VersionString),
       osVersion(getOSVersion()),
-      pluginType(getPluginType())
+      pluginType(getPluginType()),
+      versionTier(getVersionTier())
 {
     // Start the analytics thread with initial batch period
     startAnalyticsThread(initialPeriodMs);
@@ -49,6 +50,7 @@ bool PostHogAnalyticsDestination::logBatchedEvents(const juce::Array<AnalyticsEv
         properties->setProperty("app_version", appVersion);
         properties->setProperty("os_version", osVersion);
         properties->setProperty("plugin_type", pluginType);
+        properties->setProperty("version_tier", versionTier);
         properties->setProperty("$process_person_profile", false);
         
         // Add all custom event parameters
@@ -195,6 +197,16 @@ juce::String PostHogAnalyticsDestination::getPluginType()
         return "standalone";
     #else
         return "plugin";
+    #endif
+}
+
+juce::String PostHogAnalyticsDestination::getVersionTier()
+{
+    // Determine if this is the free or premium version
+    #if OSCI_PREMIUM
+        return "premium";
+    #else
+        return "free";
     #endif
 }
 

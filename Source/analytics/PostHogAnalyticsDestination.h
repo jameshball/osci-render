@@ -22,9 +22,10 @@
     - Anonymized session ID (changes per app launch)
     - Project name (e.g., "osci-render", "sosci")
     - App version
-    - OS version (e.g., "macOS", "Windows")
+    - OS version (e.g., "macOS 14", "Windows 11")
     - Plugin type ("standalone" or "plugin")
-    - Rounded timestamp (to nearest hour for anonymity)
+    - Version tier ("free" or "premium")
+    - Rounded timestamp (to nearest 10 minutes for anonymity)
 
   ==============================================================================
 */
@@ -66,6 +67,7 @@ private:
     const juce::String appVersion;
     const juce::String osVersion;
     const juce::String pluginType;
+    const juce::String versionTier;
     
     // Batch period management
     static constexpr int initialPeriodMs = 2000; // 2 seconds
@@ -80,6 +82,7 @@ private:
     static juce::String generateSessionId();
     static juce::String getOSVersion();
     static juce::String getPluginType();
+    static juce::String getVersionTier();
     static juce::int64 roundTimestamp(juce::int64 timestamp);
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PostHogAnalyticsDestination)
