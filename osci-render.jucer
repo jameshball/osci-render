@@ -4,7 +4,7 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginCharacteristicsValue="pluginWantsMidiIn"
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
-              version="2.7.1.0" companyName="James H Ball" companyWebsite="https://osci-render.com"
+              version="2.7.1.1" companyName="James H Ball" companyWebsite="https://osci-render.com"
               companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1"
               pluginAUMainType="'aumf'" postExportShellCommandPosix="echo &quot;Building LuaJIT for $OSTYPE...&quot; &amp;&amp; DIR=%%1%% %%1%%/luajit_linux_macos.sh ">
   <MAINGROUP id="j5Ge2T" name="osci-render">
@@ -780,7 +780,7 @@
     </GROUP>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"
-               JUCE_WEB_BROWSER="0"/>
+               JUCE_WEB_BROWSER="0" JUCE_ASIO="1"/>
   <EXPORTFORMATS>
     <LINUX_MAKE targetFolder="Builds/osci-render/LinuxMakefile" smallIcon="pSc1mq"
                 bigIcon="pSc1mq" externalLibraries="luajit" extraCompilerFlags="-mavx">
@@ -817,6 +817,8 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
+        <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_analytics"/>
       </MODULEPATHS>
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/osci-render/VisualStudio2022" smallIcon="pSc1mq"
@@ -858,6 +860,8 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
+        <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_analytics"/>
       </MODULEPATHS>
     </VS2022>
     <XCODE_MAC targetFolder="Builds/osci-render/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak"
@@ -908,6 +912,8 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
+        <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_analytics"/>
       </MODULEPATHS>
     </XCODE_MAC>
   </EXPORTFORMATS>
@@ -930,6 +936,8 @@
     <MODULE id="juce_audio_plugin_client" showAllCode="1" useLocalCopy="0"
             useGlobalPath="1"/>
     <MODULE id="juce_audio_processors" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_processors_headless" showAllCode="1" useLocalCopy="0"
+            useGlobalPath="1"/>
     <MODULE id="juce_audio_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
