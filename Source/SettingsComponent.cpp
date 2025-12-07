@@ -15,8 +15,8 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     examples.onClosed = [this]() {
         showExamples(false);
     };
-    examples.onExampleOpened = [this](const juce::String& fileName, bool shouldOpenEditor) {
-        pluginEditor.addCodeEditor(audioProcessor.getCurrentFileIndex());
+    examples.onFileOpened = [this](const juce::String& fileName, bool shouldOpenEditor, int fileIndex) {
+        pluginEditor.addCodeEditor(fileIndex);
         pluginEditor.fileUpdated(fileName, shouldOpenEditor);
     };
 

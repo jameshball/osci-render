@@ -114,11 +114,12 @@ void OpenFileComponent::addExample(CategoryViews& cat, const juce::String& fileN
     item->onItemSelected = [this, fileName, data, size](const juce::String&) {
         juce::SpinLock::ScopedLockType parsersLock(audioProcessor.parsersLock);
         audioProcessor.addFile(fileName, data, size);
+        int fileIndex = audioProcessor.numFiles() - 1;
         if (fileName.equalsIgnoreCase("shape_generator.lua"))
             initialiseShapeGeneratorLuaSliders(audioProcessor);
         const bool openEditor = fileName.endsWithIgnoreCase(".lua") || fileName.endsWithIgnoreCase(".txt");
         if (onClosed) onClosed();
-        if (onExampleOpened) onExampleOpened(fileName, openEditor);
+        if (onFileOpened) onFileOpened(fileName, openEditor, fileIndex);
     };
     cat.grid.addItem(item);
 }
@@ -181,22 +182,22 @@ void OpenFileComponent::openFileChooser()
 
     chooser->launchAsync(flags, [this](const juce::FileChooser& chooserRef) {
         juce::SpinLock::ScopedLockType parsersLock(audioProcessor.parsersLock);
-        bool anyAdded = false;
-        juce::String lastName;
-        for (auto& file : chooserRef.getResults()) {
+        
+        auto results = chooserRef.getResults();
+        if (results.isEmpty()) return;
+        
+        if (onClosed) onClosed();
+        
+        for (auto& file : results) {
             if (file != juce::File()) {
                 audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
                 audioProcessor.addFile(file);
-                anyAdded = true;
-                lastName = file.getFileName();
-                if (lastName.equalsIgnoreCase("shape_generator.lua"))
+                int fileIndex = audioProcessor.numFiles() - 1;
+                juce::String fileName = file.getFileName();
+                if (fileName.equalsIgnoreCase("shape_generator.lua"))
                     initialiseShapeGeneratorLuaSliders(audioProcessor);
+                if (onFileOpened) onFileOpened(fileName, shouldOpenEditorFor(fileName), fileIndex);
             }
-        }
-
-        if (anyAdded) {
-            if (onClosed) onClosed();
-            if (onExampleOpened) onExampleOpened(lastName, shouldOpenEditorFor(lastName));
         }
     });
 }
