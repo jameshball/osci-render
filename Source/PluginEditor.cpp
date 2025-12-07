@@ -163,9 +163,24 @@ void OscirenderAudioProcessorEditor::filesDropped(const juce::StringArray& files
     }
 }
 
+// Anything with these extensions will not be opened in the code editor
 bool OscirenderAudioProcessorEditor::isBinaryFile(juce::String name) {
     name = name.toLowerCase();
-    return name.endsWith(".gpla") || name.endsWith(".gif") || name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".wav") || name.endsWith(".aiff") || name.endsWith(".ogg") || name.endsWith(".mp3") || name.endsWith(".flac") || name.endsWith(".mp4") || name.endsWith(".mov");
+    return name.endsWith(".gpla")
+        || name.endsWith(".gif")
+        || name.endsWith(".png")
+        || name.endsWith(".jpg")
+        || name.endsWith(".jpeg")
+        || name.endsWith(".wav")
+        || name.endsWith(".aiff")
+        || name.endsWith(".ogg")
+        || name.endsWith(".mp3")
+        || name.endsWith(".flac")
+        || name.endsWith(".mp4")
+        || name.endsWith(".mov")
+        // doesn't really make sense to edit SVG or OBJ files as text in this context
+        || name.endsWith(".svg")
+        || name.endsWith(".obj");
 }
 
 // parsersLock and syphonLock must be held
