@@ -47,6 +47,18 @@ effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
 
     closeButton.setEdgeIndent(2);
     closeButton.onClick = [this]() {
+        // Check if this is the custom Lua effect and close the editor if so
+        bool isCustomEffect = false;
+        for (auto& parameter : this->effect.parameters) {
+            if (parameter->paramID == "customEffectStrength") {
+                isCustomEffect = true;
+                break;
+            }
+        }
+        if (isCustomEffect && editor.editingCustomFunction) {
+            editor.editCustomFunction(false);
+        }
+
         // Flip flags under lock
         {
             juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
