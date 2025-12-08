@@ -198,6 +198,7 @@ public:
     );
     osci::BooleanParameter* sweepEnabled = new osci::BooleanParameter("Sweep", "sweepEnabled", VERSION_HINT, false, "Plots the audio signal over time, sweeping from left to right");
     osci::BooleanParameter* visualiserFullScreen = new osci::BooleanParameter("Visualiser Fullscreen", "visualiserFullScreen", VERSION_HINT, false, "Makes the software visualiser fullscreen.");
+    osci::BooleanParameter* visualiserPaused = new osci::BooleanParameter("Visualiser Paused", "visualiserPaused", VERSION_HINT, false, "Pauses the visualiser rendering.");
 
 #if OSCI_PREMIUM
     osci::BooleanParameter* flipVertical = new osci::BooleanParameter("Flip Vertical", "flipVertical", VERSION_HINT, false, "Flips the visualiser vertically.");
@@ -405,6 +406,7 @@ public:
     std::vector<osci::BooleanParameter*> booleans = {
         upsamplingEnabled,
         visualiserFullScreen,
+        visualiserPaused,
         sweepEnabled,
 #if OSCI_PREMIUM
         flipVertical,

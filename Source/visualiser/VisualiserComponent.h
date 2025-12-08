@@ -27,7 +27,7 @@ enum class FullScreenMode {
 
 class CommonPluginEditor;
 class VisualiserWindow;
-class VisualiserComponent : public VisualiserRenderer, public juce::MouseListener, public AudioPlayerListener {
+class VisualiserComponent : public VisualiserRenderer, public juce::MouseListener, public AudioPlayerListener, public juce::AudioProcessorParameter::Listener {
 public:
     VisualiserComponent(
         CommonAudioProcessor& processor,
@@ -52,6 +52,7 @@ public:
     void resized() override;
     void paint(juce::Graphics& g) override;
     void setPaused(bool paused, bool affectAudio = true);
+    bool isPaused() const;
     void mouseDrag(const juce::MouseEvent& event) override;
     void mouseMove(const juce::MouseEvent& event) override;
     void mouseDown(const juce::MouseEvent& event) override;
@@ -61,12 +62,12 @@ public:
     void updateRenderModeFromProcessor();
     void setTimelineController(std::shared_ptr<TimelineController> controller);
     void parserChanged() override;
+    void parameterValueChanged(int parameterIndex, float newValue) override;
+    void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
 
     VisualiserComponent* parent = nullptr;
     VisualiserComponent* child = nullptr;
     std::unique_ptr<VisualiserWindow> popout = nullptr;
-
-    std::atomic<bool> active = true;
 
     enum ColourIds
     {
@@ -74,6 +75,11 @@ public:
     };
 
 private:
+    void updatePausedState();
+    bool isPrimaryVisualiser() const;
+
+    std::atomic<bool> active = true;
+
     CommonAudioProcessor& audioProcessor;
     CommonPluginEditor& editor;
 
@@ -144,7 +150,7 @@ private:
 
 class VisualiserWindow : public juce::DocumentWindow {
 public:
-    VisualiserWindow(juce::String name, VisualiserComponent* parent) : parent(parent), wasPaused(!parent->active), juce::DocumentWindow(name, juce::Colours::black, juce::DocumentWindow::TitleBarButtons::allButtons) {
+    VisualiserWindow(juce::String name, VisualiserComponent* parent) : parent(parent), wasPaused(parent->isPaused()), juce::DocumentWindow(name, juce::Colours::black, juce::DocumentWindow::TitleBarButtons::allButtons) {
         setAlwaysOnTop(true);
     }
 

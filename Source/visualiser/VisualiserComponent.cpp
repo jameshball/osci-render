@@ -26,7 +26,13 @@ VisualiserComponent::VisualiserComponent(
                            visualiserOnly(visualiserOnly),
                            parent(parent),
                            editor(pluginEditor) {
-    setShouldBeRunning(true);
+    // Sync active state with the parameter for the primary visualiser
+    if (isPrimaryVisualiser()) {
+        active = !audioProcessor.visualiserParameters.visualiserPaused->getBoolValue();
+        audioProcessor.visualiserParameters.visualiserPaused->addListener(this);
+    }
+    
+    setShouldBeRunning(active);
 
 #if OSCI_PREMIUM
     addAndMakeVisible(editor.ffmpegDownloader);
@@ -161,6 +167,9 @@ VisualiserComponent::VisualiserComponent(
 VisualiserComponent::~VisualiserComponent() {
     setRecording(false);
     audioProcessor.removeAudioPlayerListener(this);
+    if (isPrimaryVisualiser()) {
+        audioProcessor.visualiserParameters.visualiserPaused->removeListener(this);
+    }
     if (parent == nullptr) {
         audioProcessor.haltRecording = nullptr;
     }
@@ -213,7 +222,47 @@ void VisualiserComponent::setPaused(bool paused, bool affectAudio) {
     if (affectAudio) {
         audioProcessor.wavParser.setPaused(paused);
     }
+    
+    // Update the parameter only for primary visualiser with no child window
+    // When a child window exists, the parent is temporarily paused but we don't 
+    // want to save this state to the parameter
+    if (isPrimaryVisualiser() && child == nullptr) {
+        bool currentParamValue = audioProcessor.visualiserParameters.visualiserPaused->getBoolValue();
+        if (currentParamValue != paused) {
+            audioProcessor.visualiserParameters.visualiserPaused->setBoolValueNotifyingHost(paused);
+        }
+    }
+    
     repaint();
+}
+
+bool VisualiserComponent::isPaused() const {
+    return !active;
+}
+
+bool VisualiserComponent::isPrimaryVisualiser() const {
+    return parent == nullptr;
+}
+
+void VisualiserComponent::updatePausedState() {
+    // Called when the parameter changes - only relevant for primary visualiser with no child
+    if (isPrimaryVisualiser() && child == nullptr) {
+        bool shouldBePaused = audioProcessor.visualiserParameters.visualiserPaused->getBoolValue();
+        if (active == shouldBePaused) { // active and paused are opposites
+            setPaused(shouldBePaused, true);
+        }
+    }
+}
+
+void VisualiserComponent::parameterValueChanged(int parameterIndex, float newValue) {
+    // Handle parameter changes on the message thread
+    juce::MessageManager::callAsync([this] {
+        updatePausedState();
+    });
+}
+
+void VisualiserComponent::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {
+    // Not needed for this parameter
 }
 
 void VisualiserComponent::mouseDrag(const juce::MouseEvent &event) {
