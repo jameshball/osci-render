@@ -73,7 +73,7 @@ Reaper project used to create the above demo: [square_spiral.rpp](projects/squar
 
 ## Download
 
-Pay what you want from the official website: [osci-render.com](https://osci-render.com) to get access to the latest version.
+Download the free version or purchase osci-render premium from the official website: [osci-render.com](https://osci-render.com) to get access to the latest version.
 
 After you've purchased, you'll be sent an email with a download link. Here you can download the latest version for Windows or macOS, as a standalone application or as a VST or AU plugin.
 
