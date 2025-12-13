@@ -3,7 +3,11 @@
 
 class RotateEffectApp : public osci::EffectApplication {
 public:
-    osci::Point apply(int /*index*/, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
+    std::shared_ptr<osci::EffectApplication> clone() const override {
+        return std::make_shared<RotateEffectApp>();
+    }
+
+    osci::Point apply(int /*index*/, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
         input.rotate(values[0] * std::numbers::pi, values[1] * std::numbers::pi, values[2] * std::numbers::pi);
         return input;
     }

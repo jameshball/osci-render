@@ -3,7 +3,11 @@
 
 class TranslateEffectApp : public osci::EffectApplication {
 public:
-    osci::Point apply(int /*index*/, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
+    std::shared_ptr<osci::EffectApplication> clone() const override {
+        return std::make_shared<TranslateEffectApp>();
+    }
+
+    osci::Point apply(int /*index*/, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
         return input + osci::Point(values[0], values[1], values[2]);
     }
 

@@ -67,6 +67,8 @@ void VisualiserRenderer::runTask(const juce::AudioBuffer<float>& buffer) {
         // Apply effects to the entire buffer (only first 3 channels for effects)
         juce::AudioBuffer<float> effectBuffer(tempBuffer.getArrayOfWritePointers(), 3, numSamples);
         for (auto &effect : parameters.audioEffects) {
+            // Pre-animate effect values for this block before processing
+            effect->animateValues(numSamples, nullptr);
             effect->processBlock(effectBuffer, midiMessages);
         }
 
@@ -238,6 +240,11 @@ int VisualiserRenderer::prepareTask(double sampleRate, int bufferSize) {
     rResampler.prepare(sampleRate, RESAMPLE_RATIO);
     gResampler.prepare(sampleRate, RESAMPLE_RATIO);
     bResampler.prepare(sampleRate, RESAMPLE_RATIO);
+    
+    // Prepare audio effects with the correct sample rate
+    for (auto& effect : parameters.audioEffects) {
+        effect->prepareToPlay(sampleRate, bufferSize);
+    }
 
     int desiredBufferSize = sampleRate / frameRate;
 

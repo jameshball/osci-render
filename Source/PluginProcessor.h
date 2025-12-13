@@ -17,6 +17,7 @@
 #include "UGen/ugen_JuceEnvelopeComponent.h"
 #include "audio/CustomEffect.h"
 #include "audio/DelayEffect.h"
+#include "audio/LuaEffectState.h"
 #include "audio/PerspectiveEffect.h"
 #include "audio/PublicSynthesiser.h"
 #include "audio/SampleRateManager.h"
@@ -62,9 +63,9 @@ public:
     std::atomic<double> luaValues[26] = {0.0};
 
     std::shared_ptr<osci::Effect> frequencyEffect = std::make_shared<osci::SimpleEffect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) {
-            // TODO: Root cause why the epsilon is needed. This prevents a weird bug on mac.
-            frequency = values[0].load() + 0.000001;
+        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float freq) {
+            // Update the global frequency from the slider value
+            frequency = values[0].load() + 0.000001; // epsilon prevents a weird bug on mac
             return input;
         },
         new osci::EffectParameter(
@@ -78,9 +79,9 @@ public:
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
 
     std::function<void(int, juce::String, juce::String)> errorCallback = [this](int lineNum, juce::String fileName, juce::String error) { notifyErrorListeners(lineNum, fileName, error); };
-    std::shared_ptr<CustomEffect> customEffect = std::make_shared<CustomEffect>(errorCallback, luaValues);
+    std::unique_ptr<LuaEffectState> luaEffectState = std::make_unique<LuaEffectState>(CustomEffect::FILE_NAME, "return { x, y, z }", errorCallback);
     std::shared_ptr<osci::Effect> custom = std::make_shared<osci::SimpleEffect>(
-        customEffect,
+        std::make_shared<CustomEffect>(*luaEffectState, luaValues),
         new osci::EffectParameter("Lua Effect", "Controls the strength of the custom Lua effect applied. You can write your own custom effect using Lua by pressing the edit button on the right.", "customEffectStrength", VERSION_HINT, 1.0, 0.0, 1.0));
 
     std::shared_ptr<osci::Effect> perspective = PerspectiveEffect().build();
@@ -131,7 +132,7 @@ public:
 
     osci::BooleanParameter* invertImage = new osci::BooleanParameter("Invert Image", "invertImage", VERSION_HINT, false, "Inverts the image so that dark pixels become light, and vice versa.");
     std::shared_ptr<osci::Effect> imageThreshold = std::make_shared<osci::SimpleEffect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) {
+        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {
             return input;
         },
         new osci::EffectParameter(
@@ -140,7 +141,7 @@ public:
             "imageThreshold",
             VERSION_HINT, 0.5, 0, 1));
     std::shared_ptr<osci::Effect> imageStride = std::make_shared<osci::SimpleEffect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) {
+        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {
             return input;
         },
         new osci::EffectParameter(
@@ -186,6 +187,12 @@ public:
     // Preview API: set/clear a temporary effect by ID for hover auditioning
     void setPreviewEffectId(const juce::String& effectId);
     void clearPreviewEffect();
+    std::shared_ptr<osci::SimpleEffect> getCachedPreviewEffect() { 
+        return std::dynamic_pointer_cast<osci::SimpleEffect>(previewEffect); 
+    }
+
+    // Get the external input buffer for effects that need it
+    juce::AudioBuffer<float>* getInputBuffer() { return &inputBuffer; }
 
     // Setter for the callback
     void setFileRemovedCallback(std::function<void(int)> callback);

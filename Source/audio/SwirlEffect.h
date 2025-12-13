@@ -3,7 +3,11 @@
 
 class SwirlEffectApp : public osci::EffectApplication {
 public:
-    osci::Point apply(int /*index*/, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
+    std::shared_ptr<osci::EffectApplication> clone() const override {
+        return std::make_shared<SwirlEffectApp>();
+    }
+
+    osci::Point apply(int /*index*/, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
         double length = 10 * values[0] * input.magnitude();
         double newX = input.x * std::cos(length) - input.y * std::sin(length);
         double newY = input.x * std::sin(length) + input.y * std::cos(length);

@@ -70,7 +70,7 @@ Effects inherit from `osci::EffectApplication` and implement `build()`:
 class MyEffect : public osci::EffectApplication {
 public:
     osci::Point apply(int index, osci::Point input, osci::Point externalInput, 
-                      const std::vector<std::atomic<float>>& values, float sampleRate) override {
+                      const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
         float strength = values[0].load();
         // Transform input point
         return transformedPoint;

@@ -72,6 +72,7 @@ public:
 	juce::String getScript();
 	void resetErrors();
 	void close(lua_State*& L);
+	std::function<void(int, juce::String, juce::String)> getErrorCallback() const { return errorCallback; }
 
 	static std::function<void(const std::string&)> onPrint;
 	static std::function<void()> onClear;

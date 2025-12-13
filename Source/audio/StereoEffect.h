@@ -3,7 +3,11 @@
 
 class StereoEffect : public osci::EffectApplication {
 public:
-	osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
+	std::shared_ptr<osci::EffectApplication> clone() const override {
+		return std::make_shared<StereoEffect>();
+	}
+
+	osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
 		if (this->sampleRate != sampleRate) {
 			this->sampleRate = sampleRate;
 			initialiseBuffer(sampleRate);

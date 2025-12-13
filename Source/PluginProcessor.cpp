@@ -52,20 +52,20 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     toggleableEffects.push_back(SwirlEffectApp().build());
     toggleableEffects.push_back(SmoothEffect().build());
     toggleableEffects.push_back(DelayEffect().build());
-    toggleableEffects.push_back(DashedLineEffect(*this).build());
-    toggleableEffects.push_back(TraceEffect(*this).build());
-    toggleableEffects.push_back(WobbleEffect(*this).build());
-    toggleableEffects.push_back(DuplicatorEffect(*this).build());
+    toggleableEffects.push_back(DashedLineEffect().build());
+    toggleableEffects.push_back(TraceEffect().build());
+    toggleableEffects.push_back(WobbleEffect().build());
+    toggleableEffects.push_back(DuplicatorEffect().build());
 
     std::vector<std::shared_ptr<osci::Effect>> premiumEffects;
 
-    premiumEffects.push_back(MultiplexEffect(*this).build());
-    premiumEffects.push_back(UnfoldEffect(*this).build());
+    premiumEffects.push_back(MultiplexEffect().build());
+    premiumEffects.push_back(UnfoldEffect().build());
     premiumEffects.push_back(BounceEffect().build());
     premiumEffects.push_back(TwistEffect().build());
     premiumEffects.push_back(SkewEffect().build());
     premiumEffects.push_back(PolygonizerEffect().build());
-    premiumEffects.push_back(KaleidoscopeEffect(*this).build());
+    premiumEffects.push_back(KaleidoscopeEffect().build());
     premiumEffects.push_back(VortexEffect().build());
     premiumEffects.push_back(GodRayEffect().build());
     premiumEffects.push_back(SpiralBitCrushEffect().build());
@@ -168,6 +168,19 @@ void OscirenderAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
     currentVolume = 0.0;
     synth.setCurrentPlaybackSampleRate(sampleRate);
     retriggerMidi = true;
+    
+    // Update sample rate for all effects so they have correct timing
+    {
+        juce::SpinLock::ScopedLockType lock(effectsLock);
+        
+        // Update sample rate for all voice effects
+        for (int i = 0; i < synth.getNumVoices(); i++) {
+            auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
+            if (voice) {
+                voice->prepareToPlay(sampleRate, samplesPerBlock);
+            }
+        }
+    }
 }
 
 // effectsLock should be held when calling this
@@ -183,7 +196,7 @@ void OscirenderAudioProcessor::addLuaSlider() {
     }
 
     luaEffects.push_back(std::make_shared<osci::SimpleEffect>(
-        [this, sliderIndex](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) {
+        [this, sliderIndex](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {
             luaValues[sliderIndex].store(values[0]);
             return input;
         },
@@ -403,12 +416,31 @@ void OscirenderAudioProcessor::setObjectServerPort(int port) {
 void OscirenderAudioProcessor::setPreviewEffectId(const juce::String& effectId) {
     previewEffect.reset();
     for (auto& eff : toggleableEffects) {
-        if (eff->getId() == effectId) { previewEffect = eff; break; }
+        if (eff->getId() == effectId) {
+            previewEffect = eff;
+            break;
+        }
+    }
+    // Only set preview effect on active voices to reduce overhead
+    // Inactive voices will get it lazily when they become active
+    auto simplePreview = std::dynamic_pointer_cast<osci::SimpleEffect>(previewEffect);
+    for (int i = 0; i < synth.getNumVoices(); i++) {
+        auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
+        if (voice && voice->isVoiceActive()) {
+            voice->setPreviewEffect(simplePreview);
+        }
     }
 }
 
 void OscirenderAudioProcessor::clearPreviewEffect() {
     previewEffect.reset();
+    // Clear preview effect from active voices
+    for (int i = 0; i < synth.getNumVoices(); i++) {
+        auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
+        if (voice && voice->isVoiceActive()) {
+            voice->clearPreviewEffect();
+        }
+    }
 }
 
 void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
@@ -479,6 +511,58 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         inputBuffer.copyFrom(channel, 0, buffer, channel, 0, buffer.getNumSamples());
     }
 
+    // Calculate per-sample volume buffer BEFORE synth rendering (needed for effect pre-animation)
+    currentVolumeBuffer.setSize(1, numSamples, false, false, false);
+    auto* volumeData = currentVolumeBuffer.getWritePointer(0);
+    
+    // Calculate instantaneous squared magnitude using vectorized operations
+    if (totalNumInputChannels >= 2) {
+        const float* leftData = inputBuffer.getReadPointer(0);
+        const float* rightData = inputBuffer.getReadPointer(1);
+        
+        // L² + R² using SIMD operations
+        juce::FloatVectorOperations::multiply(volumeData, leftData, leftData, numSamples);
+        juce::FloatVectorOperations::addWithMultiply(volumeData, rightData, rightData, numSamples);
+        // Divide by 2: (L² + R²) / 2
+        juce::FloatVectorOperations::multiply(volumeData, 0.5f, numSamples);
+    } else if (totalNumInputChannels == 1) {
+        const float* monoData = inputBuffer.getReadPointer(0);
+        // mono²
+        juce::FloatVectorOperations::multiply(volumeData, monoData, monoData, numSamples);
+    } else {
+        juce::FloatVectorOperations::clear(volumeData, numSamples);
+    }
+    
+    // Apply exponential moving average for smoothing
+    const float smoothingCoeff = 1.0f - std::exp(-1.0f / (float)(VOLUME_BUFFER_SECONDS * sampleRate));
+    
+    for (int i = 0; i < numSamples; ++i) {
+        // EMA: smoothed = smoothed + coeff * (new - smoothed)
+        currentVolume += smoothingCoeff * (volumeData[i] - currentVolume);
+        // Take square root and clamp to get final volume
+        volumeData[i] = juce::jlimit(0.0f, 1.0f, std::sqrt((float)currentVolume));
+    }
+
+    // Pre-animate all effects for this block BEFORE rendering
+    // This ensures LFO phases advance exactly once per sample regardless of voice count or processing location
+    // Only animate effects that are enabled or being previewed (animation is expensive!)
+    {
+        juce::SpinLock::ScopedLockType lock(effectsLock);
+        for (auto& effect : toggleableEffects) {
+            const bool isEnabled = effect->enabled != nullptr && effect->enabled->getBoolValue();
+            const bool isPreviewed = (effect == previewEffect);
+            if (isEnabled || isPreviewed) {
+                effect->animateValues(numSamples, &currentVolumeBuffer);
+            }
+        }
+        for (auto& effect : permanentEffects) {
+            effect->animateValues(numSamples, &currentVolumeBuffer);
+        }
+        for (auto& effect : luaEffects) {
+            effect->animateValues(numSamples, &currentVolumeBuffer);
+        }
+    }
+
     juce::AudioBuffer<float> outputBuffer3d = juce::AudioBuffer<float>(3, buffer.getNumSamples());
     outputBuffer3d.clear();
 
@@ -512,13 +596,6 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
         synth.renderNextBlock(outputBuffer3d, midiMessages, 0, buffer.getNumSamples());
-        for (int i = 0; i < synth.getNumVoices(); i++) {
-            auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
-            if (voice->isVoiceActive()) {
-                customEffect->frequency = voice->getFrequency();
-                break;
-            }
-        }
     }
 
     midiMessages.clear();
@@ -555,86 +632,21 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         }
     }
 
-    // Calculate per-sample volume using efficient buffer operations
-    currentVolumeBuffer.setSize(1, numSamples, false, false, false);
-    auto* volumeData = currentVolumeBuffer.getWritePointer(0);
-    
-    // Calculate instantaneous squared magnitude using vectorized operations
-    if (totalNumInputChannels >= 2) {
-        const float* leftData = inputBuffer.getReadPointer(0);
-        const float* rightData = inputBuffer.getReadPointer(1);
-        
-        // L² + R² using SIMD operations
-        juce::FloatVectorOperations::multiply(volumeData, leftData, leftData, numSamples);
-        juce::FloatVectorOperations::addWithMultiply(volumeData, rightData, rightData, numSamples);
-        // Divide by 2: (L² + R²) / 2
-        juce::FloatVectorOperations::multiply(volumeData, 0.5f, numSamples);
-    } else if (totalNumInputChannels == 1) {
-        const float* monoData = inputBuffer.getReadPointer(0);
-        // mono²
-        juce::FloatVectorOperations::multiply(volumeData, monoData, monoData, numSamples);
-    } else {
-        juce::FloatVectorOperations::clear(volumeData, numSamples);
-    }
-    
-    // Apply exponential moving average for smoothing
-    const float smoothingCoeff = 1.0f - std::exp(-1.0f / (float)(VOLUME_BUFFER_SECONDS * sampleRate));
-    
-    for (int i = 0; i < numSamples; ++i) {
-        // EMA: smoothed = smoothed + coeff * (new - smoothed)
-        currentVolume += smoothingCoeff * (volumeData[i] - currentVolume);
-        // Take square root and clamp to get final volume
-        volumeData[i] = juce::jlimit(0.0f, 1.0f, std::sqrt((float)currentVolume));
-    }
 
     {
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
 
-        for (auto& effect : toggleableEffects) {
-#if !OSCI_PREMIUM
-            if (effect->isPremiumOnly()) {
-                continue;
-            }
-#endif
-            bool isEnabled = effect->enabled != nullptr && effect->enabled->getValue();
-            bool isSelected = effect->selected == nullptr ? true : effect->selected->getBoolValue();
-            if (isEnabled && isSelected) {
-                if (effect->getId() == custom->getId()) {
-                    effect->setExternalInput(&inputBuffer);
-                }
-                effect->setVolumeInput(&currentVolumeBuffer);
-                effect->processBlock(outputBuffer3d, midiMessages);
-                effect->setExternalInput(nullptr);
-                effect->setVolumeInput(nullptr);
-            }
-        }
-
-        if (previewEffect) {
-            const bool prevEnabled = (previewEffect->enabled != nullptr) && previewEffect->enabled->getValue();
-            const bool prevSelected = (previewEffect->selected == nullptr) ? true : previewEffect->selected->getBoolValue();
-            if (!(prevEnabled && prevSelected)) {
-                if (previewEffect->getId() == custom->getId()) {
-                    previewEffect->setExternalInput(&inputBuffer);
-                }
-                previewEffect->setVolumeInput(&currentVolumeBuffer);
-                previewEffect->processBlock(outputBuffer3d, midiMessages);
-                previewEffect->setExternalInput(nullptr);
-                previewEffect->setVolumeInput(nullptr);
-            }
-        }
+        // Note: toggleableEffects and previewEffect are applied per-voice in ShapeVoice::renderNextBlock()
+        // Only permanentEffects and luaEffects remain global
 
         for (auto& effect : permanentEffects) {
-            effect->setVolumeInput(&currentVolumeBuffer);
-            effect->processBlock(outputBuffer3d, midiMessages);
-            effect->setVolumeInput(nullptr);
+            effect->processBlockWithInputs(outputBuffer3d, midiMessages, nullptr, &currentVolumeBuffer, nullptr);
         }
         auto lua = currentFile >= 0 ? sounds[currentFile]->parser->getLua() : nullptr;
         if (lua != nullptr || custom->enabled->getBoolValue()) {
             for (auto& effect : luaEffects) {
-                effect->setVolumeInput(&currentVolumeBuffer);
-                effect->processBlock(outputBuffer3d, midiMessages);
-                effect->setVolumeInput(nullptr);
+                effect->processBlockWithInputs(outputBuffer3d, midiMessages, nullptr, &currentVolumeBuffer, nullptr);
             }
         }
     }
@@ -725,7 +737,7 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
     }
 
     auto customFunction = xml->createNewChildElement("customFunction");
-    customFunction->addTextElement(juce::Base64::toBase64(customEffect->getCode()));
+    customFunction->addTextElement(juce::Base64::toBase64(luaEffectState->getCode()));
 
     auto fontXml = xml->createNewChildElement("font");
     fontXml->setAttribute("family", font.getTypefaceName());
@@ -824,7 +836,7 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         if (customFunction != nullptr) {
             auto stream = juce::MemoryOutputStream();
             juce::Base64::convertFromBase64(stream, customFunction->getAllSubText());
-            customEffect->updateCode(stream.toString());
+            luaEffectState->updateCode(stream.toString());
         }
 
         auto fontXml = xml->getChildByName("font");

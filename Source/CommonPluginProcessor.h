@@ -98,7 +98,7 @@ public:
     osci::BooleanParameter* muteParameter = nullptr;
 
     std::shared_ptr<osci::Effect> volumeEffect = std::make_shared<osci::SimpleEffect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) {
+        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {
             volume = values[0].load();
             return input;
         }, new osci::EffectParameter(
@@ -110,7 +110,7 @@ public:
     );
 
     std::shared_ptr<osci::Effect> thresholdEffect = std::make_shared<osci::SimpleEffect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate) {
+        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {
             threshold = values[0].load();
             return input;
         }, new osci::EffectParameter(

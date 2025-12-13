@@ -3,7 +3,11 @@
 
 class DelayEffect : public osci::EffectApplication {
 public:
-	osci::Point apply(int index, osci::Point vector, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
+	std::shared_ptr<osci::EffectApplication> clone() const override {
+		return std::make_shared<DelayEffect>();
+	}
+
+	osci::Point apply(int index, osci::Point vector, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
 		double decay = values[0];
 		double decayLength = values[1];
 		int delayBufferLength = (int)(sampleRate * decayLength);

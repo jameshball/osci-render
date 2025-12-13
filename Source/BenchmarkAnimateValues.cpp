@@ -34,31 +34,31 @@ public:
         actualValues = std::vector<std::atomic<float>>(parameters.size());
     }
 
-    // Public wrapper to call protected animateValues
-    void benchAnimate(double volume) { this->Effect::animateValues(volume); }
+    // Public wrapper to call block-based animateValues
+    void benchAnimate(int blockSize) { this->Effect::animateValues(blockSize, nullptr); }
 };
 
-static double runBenchmarkOnce(int numParams, int numIterations, bool enableLfo)
+static double runBenchmarkOnce(int numParams, int numBlocks, int blockSize, bool enableLfo)
 {
     NullEffect effect;
     effect.initParams(numParams, enableLfo);
 
     // Prepare sample rate
-    effect.prepareToPlay(48000.0, 512);
+    effect.prepareToPlay(48000.0, blockSize);
 
     // Warm up
-    for (int i = 0; i < 1000; ++i) effect.benchAnimate(0.2);
+    for (int i = 0; i < 100; ++i) effect.benchAnimate(blockSize);
 
     // Benchmark
     const auto start = juce::Time::getHighResolutionTicks();
-    for (int it = 0; it < numIterations; ++it) {
-        effect.benchAnimate(0.2);
+    for (int it = 0; it < numBlocks; ++it) {
+        effect.benchAnimate(blockSize);
     }
     const auto end = juce::Time::getHighResolutionTicks();
     return juce::Time::highResolutionTicksToSeconds(end - start);
 }
 
-static double runBenchmarkMixedStaticSaw(int numParams, int numIterations)
+static double runBenchmarkMixedStaticSaw(int numParams, int numBlocks, int blockSize)
 {
     NullEffect effect;
     // Start with all static
@@ -76,15 +76,15 @@ static double runBenchmarkMixedStaticSaw(int numParams, int numIterations)
     }
 
     // Prepare sample rate
-    effect.prepareToPlay(48000.0, 512);
+    effect.prepareToPlay(48000.0, blockSize);
 
     // Warm up
-    for (int i = 0; i < 1000; ++i) effect.benchAnimate(0.2);
+    for (int i = 0; i < 100; ++i) effect.benchAnimate(blockSize);
 
     // Benchmark
     const auto start = juce::Time::getHighResolutionTicks();
-    for (int it = 0; it < numIterations; ++it) {
-        effect.benchAnimate(0.2);
+    for (int it = 0; it < numBlocks; ++it) {
+        effect.benchAnimate(blockSize);
     }
     const auto end = juce::Time::getHighResolutionTicks();
     return juce::Time::highResolutionTicksToSeconds(end - start);
@@ -96,32 +96,34 @@ public:
 
     void runTest() override {
         const int numParams = 3;
-        const int iterations = 192000 * 5; // 5 seconds at 192kHz
+        const int blockSize = 512;
+        const int numBlocks = (192000 * 5) / blockSize; // ~5 seconds at 192kHz
 
         beginTest("Static path");
         {
-            const double seconds = runBenchmarkOnce(numParams, iterations, false);
+            const double seconds = runBenchmarkOnce(numParams, numBlocks, blockSize, false);
+            const int totalSamples = numBlocks * blockSize;
             juce::Logger::outputDebugString(juce::String::formatted(
-                "animateValues [Static]: params=%d, Iters=%d, total=%.3fms, per-iter=%.3fus",
-                numParams, iterations, seconds * 1000.0, seconds * 1e6 / iterations));
+                "animateValues [Static]: params=%d, blocks=%d, blockSize=%d, total=%.3fms, per-block=%.3fus",
+                numParams, numBlocks, blockSize, seconds * 1000.0, seconds * 1e6 / numBlocks));
             expectGreaterThan(seconds, 0.0, "Benchmark duration should be > 0");
         }
 
         beginTest("LFO Sine path");
         {
-            const double seconds = runBenchmarkOnce(numParams, iterations, true);
+            const double seconds = runBenchmarkOnce(numParams, numBlocks, blockSize, true);
             juce::Logger::outputDebugString(juce::String::formatted(
-                "animateValues [LFO Sine]: params=%d, Iters=%d, total=%.3fms, per-iter=%.3fus",
-                numParams, iterations, seconds * 1000.0, seconds * 1e6 / iterations));
+                "animateValues [LFO Sine]: params=%d, blocks=%d, blockSize=%d, total=%.3fms, per-block=%.3fus",
+                numParams, numBlocks, blockSize, seconds * 1000.0, seconds * 1e6 / numBlocks));
             expectGreaterThan(seconds, 0.0, "Benchmark duration should be > 0");
         }
 
         beginTest("Mixed Static + Sawtooth LFOs");
         {
-            const double seconds = runBenchmarkMixedStaticSaw(numParams, iterations);
+            const double seconds = runBenchmarkMixedStaticSaw(numParams, numBlocks, blockSize);
             juce::Logger::outputDebugString(juce::String::formatted(
-                "animateValues [Mixed Static+Saw]: params=%d, Iters=%d, total=%.3fms, per-iter=%.3fus",
-                numParams, iterations, seconds * 1000.0, seconds * 1e6 / iterations));
+                "animateValues [Mixed Static+Saw]: params=%d, blocks=%d, blockSize=%d, total=%.3fms, per-block=%.3fus",
+                numParams, numBlocks, blockSize, seconds * 1000.0, seconds * 1e6 / numBlocks));
             expectGreaterThan(seconds, 0.0, "Benchmark duration should be > 0");
         }
     }

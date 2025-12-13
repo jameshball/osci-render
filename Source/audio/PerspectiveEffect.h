@@ -4,7 +4,11 @@
 
 class PerspectiveEffect : public osci::EffectApplication {
 public:
-	osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
+	std::shared_ptr<osci::EffectApplication> clone() const override {
+		return std::make_shared<PerspectiveEffect>();
+	}
+
+	osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
 		auto effectScale = values[0].load();
 		// Far plane clipping happens at about 1.2 deg for 100 far plane dist
 		float fovDegrees = juce::jlimit(1.5f, 179.0f, values[1].load());

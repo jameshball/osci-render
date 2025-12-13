@@ -122,6 +122,7 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // Apply effects
     juce::AudioBuffer<float> effectBuffer(workBuffer.getArrayOfWritePointers(), 3, numSamples);
     for (auto& effect : permanentEffects) {
+        effect->animateValues(numSamples, nullptr);
         effect->processBlock(effectBuffer, midiMessages);
     }
 

@@ -1,12 +1,13 @@
 #pragma once
 #include <JuceHeader.h>
-#include "../PluginProcessor.h"
 
 class KaleidoscopeEffect : public osci::EffectApplication {
 public:
-    KaleidoscopeEffect(OscirenderAudioProcessor& p) : audioProcessor(p) {}
+    std::shared_ptr<osci::EffectApplication> clone() const override {
+        return std::make_shared<KaleidoscopeEffect>();
+    }
 
-    osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
+    osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
         const double pi = juce::MathConstants<double>::pi;
         const double twoPi = juce::MathConstants<double>::twoPi;
         double segments = juce::jmax(1.0f, values[0].load());
@@ -59,7 +60,7 @@ public:
         output.rotate(0, 0, rotTheta);
 
         double freqDivisor = std::ceil(segments - 1e-3);
-        framePhase += audioProcessor.frequency / freqDivisor / sampleRate;
+        framePhase += frequency / freqDivisor / sampleRate;
         framePhase = framePhase - std::floor(framePhase);
 
         return output;
@@ -67,7 +68,7 @@ public:
 
     std::shared_ptr<osci::Effect> build() const override {
         auto eff = std::make_shared<osci::SimpleEffect>(
-            std::make_shared<KaleidoscopeEffect>(audioProcessor),
+            std::make_shared<KaleidoscopeEffect>(),
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter("Kaeidoscope Segments",
                                           "Controls how many times the input shape is rotationally duplicated around the centre.",
@@ -89,7 +90,6 @@ public:
     }
 
 private:
-    OscirenderAudioProcessor &audioProcessor;
     double framePhase = 0.0; // [0, 1]
 
     // Clips points behind the plane to the plane

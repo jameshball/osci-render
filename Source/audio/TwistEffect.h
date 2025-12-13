@@ -4,7 +4,11 @@
 
 class TwistEffect : public osci::EffectApplication {
 public:
-	osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>&values, float sampleRate) override {
+	std::shared_ptr<osci::EffectApplication> clone() const override {
+		return std::make_shared<TwistEffect>();
+	}
+
+	osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>&values, float sampleRate, float frequency) override {
 		double twistStrength = values[0] * 4 * std::numbers::pi;
 		double twistTheta = twistStrength * input.y;
 		input.rotate(0.0, twistTheta, 0.0);

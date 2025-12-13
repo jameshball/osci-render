@@ -5,7 +5,11 @@ class AutoGainControlEffect : public osci::EffectApplication {
 public:
     AutoGainControlEffect() {}
 
-    osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate) override {
+    std::shared_ptr<osci::EffectApplication> clone() const override {
+        return std::make_shared<AutoGainControlEffect>();
+    }
+
+    osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
         // Extract parameters from values
         double intensity = values[0]; // How aggressively the gain is adjusted (0.0 - 1.0)
         double targetLevel = values[1]; // The target RMS level to achieve (0.0 - 1.0)

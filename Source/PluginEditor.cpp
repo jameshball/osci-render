@@ -396,7 +396,7 @@ void OscirenderAudioProcessorEditor::updateCodeEditor(bool binaryFile, bool shou
             // message thread, this is safe.
             updatingDocumentsWithParserLock = true;
             if (index == 0) {
-                codeEditors[index]->getEditor().loadContent(audioProcessor.customEffect->getCode());
+                codeEditors[index]->getEditor().loadContent(audioProcessor.luaEffectState->getCode());
             } else {
                 codeEditors[index]->getEditor().loadContent(juce::MemoryInputStream(*audioProcessor.getFileBlock(originalIndex), false).readEntireStreamAsString());
             }
@@ -488,7 +488,7 @@ void OscirenderAudioProcessorEditor::codeDocumentTextDeleted(int startIndex, int
 void OscirenderAudioProcessorEditor::updateCodeDocument() {
     if (editingCustomFunction) {
         juce::String file = codeDocuments[0]->getAllContent();
-        audioProcessor.customEffect->updateCode(file);
+        audioProcessor.luaEffectState->updateCode(file);
     } else {
         int originalIndex = audioProcessor.getCurrentFileIndex();
         int index = audioProcessor.getCurrentFileIndex();
