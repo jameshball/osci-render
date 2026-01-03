@@ -96,12 +96,6 @@
       </GROUP>
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
-      <GROUP id="{FA4E9F8B-95B6-AB17-A004-B1CCC7A842E8}" name="analytics">
-        <FILE id="Uk7JmR" name="PostHogAnalyticsDestination.cpp" compile="1"
-              resource="0" file="Source/analytics/PostHogAnalyticsDestination.cpp"/>
-        <FILE id="A6lT0o" name="PostHogAnalyticsDestination.h" compile="0"
-              resource="0" file="Source/analytics/PostHogAnalyticsDestination.h"/>
-      </GROUP>
       <GROUP id="{34BCEBE9-062C-27E1-5661-B33652D8F4F5}" name="video">
         <FILE id="pmHHqY" name="FFmpegEncoderManager.cpp" compile="1" resource="0"
               file="Source/video/FFmpegEncoderManager.cpp"/>
@@ -276,7 +270,6 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
-        <MODULEPATH id="juce_analytics" path="../JUCE/modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
@@ -314,7 +307,6 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
-        <MODULEPATH id="juce_analytics" path="../JUCE/modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
       </MODULEPATHS>
     </VS2022>
@@ -360,7 +352,6 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
-        <MODULEPATH id="juce_analytics" path="../JUCE/modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
@@ -376,7 +367,6 @@
     <MODULE id="chowdsp_filters" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="chowdsp_math" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="chowdsp_simd" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
-    <MODULE id="juce_analytics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_animation" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>

@@ -30,10 +30,6 @@ private:
 
     juce::TextButton upgradeButton{"Upgrade to Premium"};
     juce::TextButton continueButton{"Maybe later"};
-    
-    // Analytics button trackers
-    std::unique_ptr<juce::ButtonTracker> upgradeButtonTracker;
-    std::unique_ptr<juce::ButtonTracker> continueButtonTracker;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SplashScreenComponent)
 };

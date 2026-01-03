@@ -58,17 +58,6 @@ SplashScreenComponent::SplashScreenComponent()
     addAndMakeVisible(subtitleLabel);
     addAndMakeVisible(upgradeButton);
     addAndMakeVisible(continueButton);
-    
-    // Set up analytics tracking for buttons
-    juce::StringPairArray upgradeParams;
-    upgradeParams.set("button_id", "upgrade_premium");
-    upgradeParams.set("context", "splash_screen");
-    upgradeButtonTracker = std::make_unique<juce::ButtonTracker>(upgradeButton, "button_clicked", upgradeParams);
-    
-    juce::StringPairArray continueParams;
-    continueParams.set("button_id", "maybe_later");
-    continueParams.set("context", "splash_screen");
-    continueButtonTracker = std::make_unique<juce::ButtonTracker>(continueButton, "button_clicked", continueParams);
 }
 
 void SplashScreenComponent::configureLabel(juce::Label& label, const juce::Font& font, juce::Justification justification) {

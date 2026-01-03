@@ -225,12 +225,6 @@
               file="Source/audio/VectorCancellingEffect.h"/>
         <FILE id="sgdTlo" name="WobbleEffect.h" compile="0" resource="0" file="Source/audio/WobbleEffect.h"/>
       </GROUP>
-      <GROUP id="{A1B2C3D4-5E6F-7G8H-9I0J-1K2L3M4N5O6P}" name="analytics">
-        <FILE id="ph1Ana" name="PostHogAnalyticsDestination.cpp" compile="1"
-              resource="0" file="Source/analytics/PostHogAnalyticsDestination.cpp"/>
-        <FILE id="ph2Ana" name="PostHogAnalyticsDestination.h" compile="0"
-              resource="0" file="Source/analytics/PostHogAnalyticsDestination.h"/>
-      </GROUP>
       <GROUP id="{2A41BAF3-5E83-B018-5668-39D89ABFA00C}" name="chinese_postman">
         <FILE id="LcDpwe" name="BinaryHeap.cpp" compile="1" resource="0" file="Source/chinese_postman/BinaryHeap.cpp"/>
         <FILE id="UYdaXR" name="BinaryHeap.h" compile="0" resource="0" file="Source/chinese_postman/BinaryHeap.h"/>
@@ -818,7 +812,6 @@
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
-        <MODULEPATH id="juce_analytics"/>
       </MODULEPATHS>
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/osci-render/VisualStudio2022" smallIcon="pSc1mq"
@@ -861,7 +854,6 @@
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
-        <MODULEPATH id="juce_analytics"/>
       </MODULEPATHS>
     </VS2022>
     <XCODE_MAC targetFolder="Builds/osci-render/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak"
@@ -913,7 +905,6 @@
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
-        <MODULEPATH id="juce_analytics"/>
       </MODULEPATHS>
     </XCODE_MAC>
   </EXPORTFORMATS>
@@ -928,7 +919,6 @@
     <MODULE id="chowdsp_filters" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="chowdsp_math" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="chowdsp_simd" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
-    <MODULE id="juce_analytics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_animation" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>

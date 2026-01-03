@@ -15,7 +15,6 @@
 #include "visualiser/VisualiserSettings.h"
 #include "visualiser/RecordingSettings.h"
 #include "wav/WavParser.h"
-#include "analytics/PostHogAnalyticsDestination.h"
 
 class AudioPlayerListener {
 public:
@@ -162,15 +161,6 @@ public:
         return getGlobalBoolValue("acceptsAllKeys", juce::JUCEApplicationBase::isStandaloneApp());
     }
     
-    // Analytics helper methods
-    void logAnalyticsEvent(const juce::String& eventName, const juce::StringPairArray& parameters = {});
-    
-    // Create a button tracker for analytics - ownership is returned to caller
-    static std::unique_ptr<juce::ButtonTracker> createButtonTracker(
-        juce::Button& button, 
-        const juce::String& eventName, 
-        const juce::StringPairArray& parameters = {});
-
 protected:
     
     bool brightnessEnabled = false;
