@@ -231,7 +231,6 @@
         <FILE id="UnjMQ4" name="ChinesePostman.h" compile="0" resource="0"
               file="Source/chinese_postman/ChinesePostman.h"/>
         <FILE id="ItJWxN" name="Dijkstra.h" compile="0" resource="0" file="Source/chinese_postman/Dijkstra.h"/>
-        <FILE id="PFBBHM" name="Example.cpp" compile="1" resource="0" file="Source/chinese_postman/Example.cpp"/>
         <FILE id="r66okI" name="Globals.h" compile="0" resource="0" file="Source/chinese_postman/Globals.h"/>
         <FILE id="GN3vkN" name="Graph.cpp" compile="1" resource="0" file="Source/chinese_postman/Graph.cpp"/>
         <FILE id="tpPZBV" name="Graph.h" compile="0" resource="0" file="Source/chinese_postman/Graph.h"/>
