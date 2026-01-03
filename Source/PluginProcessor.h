@@ -11,6 +11,7 @@
 #include <JuceHeader.h>
 
 #include <numbers>
+#include <unordered_map>
 
 #include "CommonPluginProcessor.h"
 #include "UGen/Env.h"
@@ -194,6 +195,16 @@ public:
     // Get the external input buffer for effects that need it
     juce::AudioBuffer<float>* getInputBuffer() { return &inputBuffer; }
 
+    // Centralized toggleable effect application (used by both synth voices and audio-input mode)
+    // effectsLock should be held when calling this from the audio thread.
+    void applyToggleableEffectsToBuffer(
+        juce::AudioBuffer<float>& buffer,
+        juce::AudioBuffer<float>* externalInput,
+        juce::AudioBuffer<float>* volumeBuffer,
+        juce::AudioBuffer<float>* frequencyBuffer,
+        const std::unordered_map<juce::String, std::shared_ptr<osci::SimpleEffect>>* perVoiceEffects,
+        const std::shared_ptr<osci::Effect>& previewEffectInstance);
+
     // Setter for the callback
     void setFileRemovedCallback(std::function<void(int)> callback);
 
@@ -223,6 +234,7 @@ public:
 
 private:
     juce::AudioBuffer<float> inputBuffer;
+    juce::AudioBuffer<float> inputFrequencyBuffer;
 
     std::atomic<bool> prevMidiEnabled = !midiEnabled->getBoolValue();
 
@@ -262,8 +274,6 @@ private:
         parseVersion(parsedB, b);
         return std::lexicographical_compare(parsedA, parsedA + 3, parsedB, parsedB + 3);
     }
-
-    const double MIN_LENGTH_INCREMENT = 0.000001;
 
     juce::AudioPlayHead* playHead;
 

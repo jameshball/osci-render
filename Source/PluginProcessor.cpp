@@ -246,6 +246,7 @@ void OscirenderAudioProcessor::addFile(juce::File file) {
     openFile(fileBlocks.size() - 1);
 }
 
+
 // parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessor::addFile(juce::String fileName, const char* data, const int size) {
     fileBlocks.push_back(std::make_shared<juce::MemoryBlock>());
@@ -443,6 +444,60 @@ void OscirenderAudioProcessor::clearPreviewEffect() {
     }
 }
 
+// effectsLock should be held when calling this
+void OscirenderAudioProcessor::applyToggleableEffectsToBuffer(
+    juce::AudioBuffer<float>& buffer,
+    juce::AudioBuffer<float>* externalInput,
+    juce::AudioBuffer<float>* volumeBuffer,
+    juce::AudioBuffer<float>* frequencyBuffer,
+    const std::unordered_map<juce::String, std::shared_ptr<osci::SimpleEffect>>* perVoiceEffects,
+    const std::shared_ptr<osci::Effect>& previewEffectInstance) {
+    juce::MidiBuffer emptyMidi;
+
+    for (auto& globalEffect : toggleableEffects) {
+        std::shared_ptr<osci::Effect> effectInstance = globalEffect;
+        if (perVoiceEffects != nullptr) {
+            auto it = perVoiceEffects->find(globalEffect->getId());
+            if (it == perVoiceEffects->end()) {
+                continue;
+            }
+            effectInstance = it->second;
+        }
+
+#if !OSCI_PREMIUM
+        if (effectInstance->isPremiumOnly()) {
+            continue;
+        }
+#endif
+
+        const bool isEnabled = effectInstance->enabled != nullptr && effectInstance->enabled->getValue();
+        const bool isSelected = effectInstance->selected == nullptr ? true : effectInstance->selected->getBoolValue();
+        if (!(isEnabled && isSelected)) {
+            continue;
+        }
+
+        juce::AudioBuffer<float>* extInput = nullptr;
+        if (externalInput != nullptr && globalEffect->getId() == custom->getId()) {
+            extInput = externalInput;
+        }
+        effectInstance->processBlockWithInputs(buffer, emptyMidi, extInput, volumeBuffer, frequencyBuffer);
+    }
+
+    if (previewEffectInstance != nullptr) {
+        const bool prevEnabled = (previewEffectInstance->enabled != nullptr) && previewEffectInstance->enabled->getValue();
+        const bool prevSelected = (previewEffectInstance->selected == nullptr) ? true : previewEffectInstance->selected->getBoolValue();
+        
+        // We only apply the preview effect if it wasn't already applied as a regular effect
+        if (!(prevEnabled && prevSelected)) {
+            juce::AudioBuffer<float>* extInput = nullptr;
+            if (externalInput != nullptr && previewEffectInstance->getId() == custom->getId()) {
+                extInput = externalInput;
+            }
+            previewEffectInstance->processBlockWithInputs(buffer, emptyMidi, extInput, volumeBuffer, frequencyBuffer);
+        }
+    }
+}
+
 void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
     juce::ScopedNoDenormals noDenormals;
     // Audio info variables
@@ -592,6 +647,16 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             midiMessages.cend(),
             [&] (const juce::MidiMessageMetadata& meta) { synth.publicHandleMidiEvent(meta.getMessage()); }
         );
+
+		// Apply toggleable effects directly in input mode (no synth voices involved)
+		{
+			juce::SpinLock::ScopedLockType lock(effectsLock);
+
+            inputFrequencyBuffer.setSize(1, numSamples, false, false, true);
+            juce::FloatVectorOperations::fill(inputFrequencyBuffer.getWritePointer(0), (float)frequency.load(), numSamples);
+
+            applyToggleableEffectsToBuffer(outputBuffer3d, &inputBuffer, &currentVolumeBuffer, &inputFrequencyBuffer, nullptr, previewEffect);
+		}
     } else {
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
@@ -637,8 +702,10 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
 
-        // Note: toggleableEffects and previewEffect are applied per-voice in ShapeVoice::renderNextBlock()
-        // Only permanentEffects and luaEffects remain global
+        // Note: toggleableEffects/previewEffect are applied via shared helper:
+        // - per-voice when using the synth path
+        // - directly to the buffer when using input mode
+        // Only permanentEffects and luaEffects are always global
 
         for (auto& effect : permanentEffects) {
             effect->processBlockWithInputs(outputBuffer3d, midiMessages, nullptr, &currentVolumeBuffer, nullptr);

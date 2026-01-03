@@ -934,10 +934,17 @@ void VisualiserRenderer::drawCRT() {
     outputShader->setUniform("uRandom", juce::Random::getSystemRandom().nextFloat());
     outputShader->setUniform("uGlow", (float)parameters.getGlow());
     outputShader->setUniform("uAmbient", (float)parameters.getAmbient());
+    {
+        juce::Colour lineColour = parameters.getColour();
+        outputShader->setUniform("uBeamColor", lineColour.getFloatRed(), lineColour.getFloatGreen(), lineColour.getFloatBlue());
+    }
     setOffsetAndScale(outputShader.get());
 #if OSCI_PREMIUM
     outputShader->setUniform("uFishEye", screenOverlay == ScreenOverlay::VectorDisplay ? VECTOR_DISPLAY_FISH_EYE : 0.0f);
     outputShader->setUniform("uRealScreen", parameters.screenOverlay->isRealisticDisplay() ? 1.0f : 0.0f);
+#else
+    outputShader->setUniform("uFishEye", 0.0f);
+    outputShader->setUniform("uRealScreen", 0.0f);
 #endif
     outputShader->setUniform("uResizeForCanvas", lineTexture.width / (float) renderTexture.width);
     // Colour uniform removed: line texture already encodes RGB
@@ -1061,6 +1068,41 @@ Texture VisualiserRenderer::createScreenTexture() {
         simpleShader->setUniform("colour", 0.01f, 0.05f, 0.01f, 1.0f);
         glLineWidth(4.0f);
         glDrawArrays(GL_LINES, 0, data.size() / 2);
+
+        // Also write a clean graticule mask into alpha so the compositor can
+        // reveal grid lines under ambient without washing out the smudged texture.
+        // We want: alpha = 1.0 everywhere, alpha = 0.0 on the grid lines.
+        {
+            GLboolean prevColourMask[4] { GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE };
+            glGetBooleanv(GL_COLOR_WRITEMASK, prevColourMask);
+            const bool prevBlendEnabled = glIsEnabled(GL_BLEND);
+            GLint prevBlendSrc = GL_SRC_ALPHA;
+            GLint prevBlendDst = GL_ONE_MINUS_SRC_ALPHA;
+            glGetIntegerv(GL_BLEND_SRC_RGB, &prevBlendSrc);
+            glGetIntegerv(GL_BLEND_DST_RGB, &prevBlendDst);
+            GLfloat prevClearColour[4] { 0.0f, 0.0f, 0.0f, 0.0f };
+            glGetFloatv(GL_COLOR_CLEAR_VALUE, prevClearColour);
+
+            glDisable(GL_BLEND);
+            glColorMask(false, false, false, true);
+
+            // Ensure non-grid pixels don't inherit arbitrary alpha from the source image.
+            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+
+            // Draw grid lines into alpha only.
+            simpleShader->setUniform("colour", 0.0f, 0.0f, 0.0f, 0.0f);
+            glDrawArrays(GL_LINES, 0, data.size() / 2);
+
+            glClearColor(prevClearColour[0], prevClearColour[1], prevClearColour[2], prevClearColour[3]);
+            glColorMask(prevColourMask[0], prevColourMask[1], prevColourMask[2], prevColourMask[3]);
+            glBlendFunc(prevBlendSrc, prevBlendDst);
+            if (prevBlendEnabled)
+                glEnable(GL_BLEND);
+            else
+                glDisable(GL_BLEND);
+        }
+
         glBindTexture(GL_TEXTURE_2D, targetTexture.value().id);
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     }

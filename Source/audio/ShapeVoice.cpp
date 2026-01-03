@@ -250,46 +250,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         }
     }
 
-    // Apply per-voice toggleable effects using global ordering from toggleableEffects
-    juce::MidiBuffer emptyMidi;
-    for (auto& globalEffect : audioProcessor.toggleableEffects) {
-        // Look up this voice's clone of the effect
-        auto it = voiceEffectsMap.find(globalEffect->getId());
-        if (it == voiceEffectsMap.end()) {
-            continue; // Effect not cloned for this voice (shouldn't happen)
-        }
-        auto& effect = it->second;
-        
-#if !OSCI_PREMIUM
-        if (effect->isPremiumOnly()) {
-            continue;
-        }
-#endif
-        bool isEnabled = effect->enabled != nullptr && effect->enabled->getValue();
-        bool isSelected = effect->selected == nullptr ? true : effect->selected->getBoolValue();
-        if (isEnabled && isSelected) {
-            // Check if this effect needs external input (custom/Lua effect)
-            juce::AudioBuffer<float>* extInput = nullptr;
-            if (globalEffect->getId() == audioProcessor.custom->getId()) {
-                extInput = audioProcessor.getInputBuffer();
-            }
-            effect->processBlockWithInputs(voiceBuffer, emptyMidi, extInput, &volumeBuffer, &frequencyBuffer);
-        }
-    }
-
-    // Apply preview effect if set and not already enabled
-    if (voicePreviewEffect) {
-        const bool prevEnabled = (voicePreviewEffect->enabled != nullptr) && voicePreviewEffect->enabled->getValue();
-        const bool prevSelected = (voicePreviewEffect->selected == nullptr) ? true : voicePreviewEffect->selected->getBoolValue();
-        if (!(prevEnabled && prevSelected)) {
-            juce::AudioBuffer<float>* extInput = nullptr;
-            // Check if preview effect needs external input
-            if (voicePreviewEffect->getId() == audioProcessor.custom->getId()) {
-                extInput = audioProcessor.getInputBuffer();
-            }
-            voicePreviewEffect->processBlockWithInputs(voiceBuffer, emptyMidi, extInput, &volumeBuffer, &frequencyBuffer);
-        }
-    }
+    audioProcessor.applyToggleableEffectsToBuffer(voiceBuffer, audioProcessor.getInputBuffer(), &volumeBuffer, &frequencyBuffer, &voiceEffectsMap, voicePreviewEffect);
 
     // Apply gain (ADSR * velocity) after effects and add to output buffer
     for (int i = 0; i < numSamples; ++i) {

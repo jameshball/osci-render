@@ -14,6 +14,7 @@ uniform float uNoise;
 uniform float uRandom;
 uniform float uGlow;
 uniform float uAmbient; 
+uniform vec3 uBeamColor;
 uniform float uFishEye;
 uniform float uRealScreen;
 uniform float uHueShift;
@@ -77,10 +78,6 @@ void main() {
     float glow = 1.75 * pow(uGlow, 1.5);
     float scatterScalar = 0.3 * (2.0 + 1.0 * screen.g + 0.5 * screen.r);
     vec3 bloom = glow * ((0.25 * screen.r + 0.75 * screen.g) * tightGlow.rgb + scatter.rgb * scatterScalar);
-    if (uRealScreen > 0.5) {
-        float ambientFactor = (1.0 - uRealScreen) * max(uAmbient, 0.0);
-        bloom += ambientFactor * 0.6 * scatterScalar;
-    }
     float screenFactor = clamp(screen.r * 4.0, 0.1, 1.0);
     vec3 light = screenFactor * line.rgb + bloom;
     // vec3 light = line.rgb + bloom;
@@ -94,12 +91,32 @@ void main() {
     float whiteMix = clamp(0.3 + pow(s, 3.0) * uOverexposure, 0.0, 1.0);
     vec3 colorOut = mix(baseCol, vec3(1.0), whiteMix) * s;
     gl_FragColor.rgb = desaturate(colorOut, 1.0 - uLineSaturation);
-    if (uRealScreen > 0.5) {
-        // this isn't how light works, but it looks cool
-        float ambient = uExposure * uAmbient;
-        if (uAmbient > 0.0) {
+    // Ambient light:
+    // - Realistic displays: tint by the screen texture (existing behavior)
+    // - Non-real overlays: tint the background by the current beam colour even where there's no beam energy
+    float ambient = uExposure * max(uAmbient, 0.0);
+    if (ambient > 0.0) {
+        if (uRealScreen > 0.5) {
+            // this isn't how light works, but it looks cool
             vec3 screenCol = ambient * hueShift(screen.rgb, uHueShift);
             gl_FragColor.rgb += desaturate(screenCol, 1.0 - uScreenSaturation);
+        } else {
+                // Non-real overlays:
+                // - screen.g carries the "screen" texture (smudge/noise)
+                // - screen.a carries a graticule mask (0 on grid lines, 1 elsewhere)
+                // Using alpha avoids needing to infer the grid from RGB, which can fail
+                // depending on the underlying image.
+                float gridMask = clamp(1.0 - screen.a, 0.0, 1.0);
+                float screenMask = clamp(screen.g, 0.0, 1.0);
+                float base = 0.15;
+                float ambientMask = base + (1.0 - base) * screenMask;
+
+                // Keep graticule dark: reduce ambient where grid lines exist.
+                float gridDarken = 0.15; // 0 = no effect, 1 = maximum darkening on grid
+                float maskedAmbient = ambientMask * (1.0 - gridDarken * gridMask);
+                vec3 bgCol = hueShift(uBeamColor, uHueShift);
+                bgCol = desaturate(bgCol, 1.0 - uScreenSaturation);
+                gl_FragColor.rgb += ambient * maskedAmbient * bgCol;
         }
     }
     gl_FragColor.rgb += uNoise * noise(gl_FragCoord.xy * 0.01, uRandom * 100.0);
