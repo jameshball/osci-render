@@ -1,7 +1,8 @@
 #include "ShapeVoice.h"
 #include "../PluginProcessor.h"
 
-ShapeVoice::ShapeVoice(OscirenderAudioProcessor& p, juce::AudioSampleBuffer& externalAudio) : audioProcessor(p), externalAudio(externalAudio) {
+ShapeVoice::ShapeVoice(OscirenderAudioProcessor& p, juce::AudioSampleBuffer& externalAudio, int voiceIndex)
+    : audioProcessor(p), voiceIndex(voiceIndex), externalAudio(externalAudio) {
     initializeEffectsFromGlobal();
 }
 
@@ -58,6 +59,11 @@ void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesiser
 
     currentlyPlaying = true;
     this->sound = shapeSound;
+
+    if (voiceIndex >= 0 && voiceIndex < OscirenderAudioProcessor::kMaxUiVoices) {
+        audioProcessor.uiVoiceActive[voiceIndex].store(true, std::memory_order_relaxed);
+        audioProcessor.uiVoiceEnvelopeTimeSeconds[voiceIndex].store(0.0, std::memory_order_relaxed);
+    }
     
     // Sync preview effect state: set if there's one cached, clear if not
     auto cachedPreview = audioProcessor.getCachedPreviewEffect();
@@ -71,25 +77,23 @@ void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesiser
     renderingSample = parser != nullptr && parser->isSample();
 
     if (shapeSound != nullptr) {
+        frame.clear();
+        frameLength = 0.0;
+        currentShape = 0;
+        shapeDrawn = 0.0;
+        frameDrawn = 0.0;
         int tries = 0;
         while (frame.empty() && tries < 50) {
             frameLength = shapeSound->updateFrame(frame);
             tries++;
         }
-        adsr = audioProcessor.adsrEnv;
-        time = 0.0;
-        releaseTime = 0.0;
-        endTime = 0.0;
-        waitingForRelease = true;
-        std::vector<double> times = adsr.getTimes();
-        for (int i = 0; i < times.size(); i++) {
-            if (i < adsr.getReleaseNode()) {
-                releaseTime += times[i];
-            }
-            endTime += times[i];
-        }
+        // Snapshot DAHDSR parameters per-voice (Vital-style; peak fixed at 1.0)
+        dahdsr = audioProcessor.getCurrentDahdsrParams();
+        envState.reset(dahdsr);
+
         if (audioProcessor.midiEnabled->getBoolValue()) {
-            frequency = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber);
+            // Match the frequency slider behavior: tiny epsilon prevents a weird mac glitch at certain exact frequencies.
+            frequency = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber) + osci_audio::kMacFrequencyEpsilonHz;
         }
     }
 }
@@ -136,6 +140,10 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     // Early exit if voice is not active - this shouldn't normally be called for inactive voices
     // but we check just in case to avoid unnecessary processing
     if (!isVoiceActive()) {
+        if (voiceIndex >= 0 && voiceIndex < OscirenderAudioProcessor::kMaxUiVoices) {
+            audioProcessor.uiVoiceActive[voiceIndex].store(false, std::memory_order_relaxed);
+            audioProcessor.uiVoiceEnvelopeTimeSeconds[voiceIndex].store(0.0, std::memory_order_relaxed);
+        }
         return;
     }
 
@@ -153,7 +161,10 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     frequencyBuffer.setSize(1, numSamples, false, false, true);
     volumeBuffer.setSize(1, numSamples, false, false, true);
 
-    // First pass: generate raw audio samples (without gain) and fill frequency buffer
+    const bool midiEnabled = audioProcessor.midiEnabled->getBoolValue();
+    const double dt = 1.0 / audioProcessor.currentSampleRate;
+
+    // First pass: generate raw audio samples (without gain) and fill frequency buffer + per-sample envelope
     for (int i = 0; i < numSamples; ++i) {
         int sample = startSample + i;
         lengthIncrement = juce::jmax(frameLength / (audioProcessor.currentSampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
@@ -190,7 +201,26 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             }
         }
 
-        // Write raw samples to voice buffer (without gain - gain applied after effects)
+        const float envValue = midiEnabled ? envState.advance(dt) : 1.0f;
+        volumeBuffer.setSample(0, i, envValue);
+
+        if (midiEnabled && envState.getStage() == DahdsrState::Stage::Done)
+        {
+            const int remainingSamples = numSamples - (i + 1);
+            if (remainingSamples > 0)
+            {
+                const int startSample2 = i + 1;
+                if (numChannels >= 1) juce::FloatVectorOperations::clear(voiceBuffer.getWritePointer(0) + startSample2, remainingSamples);
+                if (numChannels >= 2) juce::FloatVectorOperations::clear(voiceBuffer.getWritePointer(1) + startSample2, remainingSamples);
+                if (numChannels >= 3) juce::FloatVectorOperations::clear(voiceBuffer.getWritePointer(2) + startSample2, remainingSamples);
+                juce::FloatVectorOperations::fill(frequencyBuffer.getWritePointer(0) + startSample2, (float) actualFrequency, remainingSamples);
+                juce::FloatVectorOperations::clear(volumeBuffer.getWritePointer(0) + startSample2, remainingSamples);
+            }
+            noteStopped();
+            break;
+        }
+
+        // NOTE: gain is applied AFTER effects (host-visible behavior).
         if (numChannels >= 3) {
             voiceBuffer.setSample(0, i, channels.x);
             voiceBuffer.setSample(1, i, channels.y);
@@ -204,33 +234,6 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
 
         // Fill frequency buffer with per-sample frequency
         frequencyBuffer.setSample(0, i, (float) actualFrequency);
-
-        // Fill volume buffer (used for LFO modulation in effects)
-        // Use a simple normalized value based on current envelope position
-        double envValue = audioProcessor.midiEnabled->getBoolValue() ? adsr.lookup(time) : 1.0;
-        volumeBuffer.setSample(0, i, (float) envValue);
-
-        time += 1.0 / audioProcessor.currentSampleRate;
-
-        if (waitingForRelease) {
-            time = juce::jmin(time, releaseTime);
-        } else if (time >= endTime) {
-            // Fill remaining samples with zeros and mark note as stopped
-            const int remainingSamples = numSamples - (i + 1);
-            if (remainingSamples > 0) {
-                const int startSample = i + 1;
-                // Clear voice buffer channels
-                if (numChannels >= 1) juce::FloatVectorOperations::clear(voiceBuffer.getWritePointer(0) + startSample, remainingSamples);
-                if (numChannels >= 2) juce::FloatVectorOperations::clear(voiceBuffer.getWritePointer(1) + startSample, remainingSamples);
-                if (numChannels >= 3) juce::FloatVectorOperations::clear(voiceBuffer.getWritePointer(2) + startSample, remainingSamples);
-                // Fill frequency buffer with actualFrequency
-                juce::FloatVectorOperations::fill(frequencyBuffer.getWritePointer(0) + startSample, (float) actualFrequency, remainingSamples);
-                // Clear volume buffer
-                juce::FloatVectorOperations::clear(volumeBuffer.getWritePointer(0) + startSample, remainingSamples);
-            }
-            noteStopped();
-            break;
-        }
 
         if (!renderingSample) {
             incrementShapeDrawing();
@@ -250,19 +253,16 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         }
     }
 
+    if (voiceIndex >= 0 && voiceIndex < OscirenderAudioProcessor::kMaxUiVoices) {
+        audioProcessor.uiVoiceActive[voiceIndex].store(isVoiceActive(), std::memory_order_relaxed);
+        audioProcessor.uiVoiceEnvelopeTimeSeconds[voiceIndex].store(midiEnabled ? envState.getUiTimeSeconds() : 0.0, std::memory_order_relaxed);
+    }
+
     audioProcessor.applyToggleableEffectsToBuffer(voiceBuffer, audioProcessor.getInputBuffer(), &volumeBuffer, &frequencyBuffer, &voiceEffectsMap, voicePreviewEffect);
 
-    // Apply gain (ADSR * velocity) after effects and add to output buffer
+    // Add processed samples to output buffer (apply envelope/velocity gain AFTER effects)
     for (int i = 0; i < numSamples; ++i) {
-        // Recalculate time position for this sample to get correct envelope value
-        // (We need to track this more carefully since we already advanced time above)
-        double sampleTime = time - (numSamples - i - 1) / audioProcessor.currentSampleRate;
-        if (waitingForRelease) {
-            sampleTime = juce::jmin(sampleTime, releaseTime);
-        }
-        double gain = audioProcessor.midiEnabled->getBoolValue() ? adsr.lookup(sampleTime) : 1.0;
-        gain *= velocity;
-
+        const float gain = (float)velocity * volumeBuffer.getSample(0, i);
         int sample = startSample + i;
         if (numChannels >= 3) {
             outputBuffer.addSample(0, sample, voiceBuffer.getSample(0, i) * gain);
@@ -278,16 +278,24 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
 }
 
 void ShapeVoice::stopNote(float velocity, bool allowTailOff) {
-    currentlyPlaying = false;
-    waitingForRelease = false;
-    if (!allowTailOff) {
+    if (!allowTailOff || !audioProcessor.midiEnabled->getBoolValue()) {
+        currentlyPlaying = false;
         noteStopped();
+        return;
     }
+
+    envState.beginRelease();
 }
 
 void ShapeVoice::noteStopped() {
+    currentlyPlaying = false;
     clearCurrentNote();
     sound = nullptr;
+
+    if (voiceIndex >= 0 && voiceIndex < OscirenderAudioProcessor::kMaxUiVoices) {
+        audioProcessor.uiVoiceActive[voiceIndex].store(false, std::memory_order_relaxed);
+        audioProcessor.uiVoiceEnvelopeTimeSeconds[voiceIndex].store(0.0, std::memory_order_relaxed);
+    }
 }
 
 void ShapeVoice::pitchWheelMoved(int newPitchWheelValue) {

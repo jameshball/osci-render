@@ -5,7 +5,7 @@
 #include "components/SwitchButton.h"
 
 class OscirenderAudioProcessorEditor;
-class MidiComponent : public juce::GroupComponent, public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater {
+class MidiComponent : public juce::GroupComponent, public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater, private juce::Timer {
 public:
 	MidiComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
 	~MidiComponent() override;
@@ -13,6 +13,7 @@ public:
 	void parameterValueChanged(int parameterIndex, float newValue) override;
 	void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
 	void handleAsyncUpdate() override;
+	void timerCallback() override;
 
 	void resized() override;
 	void paint(juce::Graphics& g) override;

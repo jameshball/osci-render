@@ -122,8 +122,9 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     booleanParameters.push_back(animationSyncBPM);
     booleanParameters.push_back(invertImage);
 
+    floatParameters.push_back(delayTime);
     floatParameters.push_back(attackTime);
-    floatParameters.push_back(attackLevel);
+    floatParameters.push_back(holdTime);
     floatParameters.push_back(attackShape);
     floatParameters.push_back(decayTime);
     floatParameters.push_back(decayShape);
@@ -134,7 +135,9 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     floatParameters.push_back(animationOffset);
 
     for (int i = 0; i < voices->getValueUnnormalised(); i++) {
-        synth.addVoice(new ShapeVoice(*this, inputBuffer));
+        uiVoiceActive[i].store(false, std::memory_order_relaxed);
+        uiVoiceEnvelopeTimeSeconds[i].store(0.0, std::memory_order_relaxed);
+        synth.addVoice(new ShapeVoice(*this, inputBuffer, i));
     }
 
     intParameters.push_back(voices);
@@ -965,10 +968,14 @@ void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float n
         if (numVoices != synth.getNumVoices()) {
             if (numVoices > synth.getNumVoices()) {
                 for (int i = synth.getNumVoices(); i < numVoices; i++) {
-                    synth.addVoice(new ShapeVoice(*this, inputBuffer));
+                    uiVoiceActive[i].store(false, std::memory_order_relaxed);
+                    uiVoiceEnvelopeTimeSeconds[i].store(0.0, std::memory_order_relaxed);
+                    synth.addVoice(new ShapeVoice(*this, inputBuffer, i));
                 }
             } else {
                 for (int i = synth.getNumVoices() - 1; i >= numVoices; i--) {
+                    uiVoiceActive[i].store(false, std::memory_order_relaxed);
+                    uiVoiceEnvelopeTimeSeconds[i].store(0.0, std::memory_order_relaxed);
                     synth.removeVoice(i);
                 }
             }
@@ -984,26 +991,34 @@ void updateIfApproxEqual(osci::FloatParameter* parameter, float newValue) {
     }
 }
 
-void OscirenderAudioProcessor::envelopeChanged(EnvelopeComponent* changedEnvelope) {
-    Env env = changedEnvelope->getEnv();
-    std::vector<double> levels = env.getLevels();
-    std::vector<double> times = env.getTimes();
-    EnvCurveList curves = env.getCurves();
+DahdsrParams OscirenderAudioProcessor::getCurrentDahdsrParams() const
+{
+    return DahdsrParams{
+        .delaySeconds = delayTime->getValueUnnormalised(),
+        .attackSeconds = attackTime->getValueUnnormalised(),
+        .holdSeconds = holdTime->getValueUnnormalised(),
+        .decaySeconds = decayTime->getValueUnnormalised(),
+        .sustainLevel = sustainLevel->getValueUnnormalised(),
+        .releaseSeconds = releaseTime->getValueUnnormalised(),
+        .attackCurve = attackShape->getValueUnnormalised(),
+        .decayCurve = decayShape->getValueUnnormalised(),
+        .releaseCurve = releaseShape->getValueUnnormalised(),
+    };
+}
 
-    if (levels.size() == 4 && times.size() == 3 && curves.size() == 3) {
-        {
-            juce::SpinLock::ScopedLockType lock(effectsLock);
-            this->adsrEnv = env;
-        }
-        updateIfApproxEqual(attackTime, times[0]);
-        updateIfApproxEqual(attackLevel, levels[1]);
-        updateIfApproxEqual(attackShape, curves[0].getCurve());
-        updateIfApproxEqual(decayTime, times[1]);
-        updateIfApproxEqual(sustainLevel, levels[2]);
-        updateIfApproxEqual(decayShape, curves[1].getCurve());
-        updateIfApproxEqual(releaseTime, times[2]);
-        updateIfApproxEqual(releaseShape, curves[2].getCurve());
-    }
+void OscirenderAudioProcessor::envelopeChanged(EnvelopeComponent* changedEnvelope) {
+    const auto dahdsr = changedEnvelope->getDahdsrParams();
+
+    updateIfApproxEqual(delayTime, (float) dahdsr.delaySeconds);
+    updateIfApproxEqual(attackTime, (float) dahdsr.attackSeconds);
+    updateIfApproxEqual(holdTime, (float) dahdsr.holdSeconds);
+    updateIfApproxEqual(decayTime, (float) dahdsr.decaySeconds);
+    updateIfApproxEqual(sustainLevel, (float) dahdsr.sustainLevel);
+    updateIfApproxEqual(releaseTime, (float) dahdsr.releaseSeconds);
+
+    updateIfApproxEqual(attackShape, dahdsr.attackCurve);
+    updateIfApproxEqual(decayShape, dahdsr.decayCurve);
+    updateIfApproxEqual(releaseShape, dahdsr.releaseCurve);
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {

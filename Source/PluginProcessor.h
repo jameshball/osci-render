@@ -14,8 +14,7 @@
 #include <unordered_map>
 
 #include "CommonPluginProcessor.h"
-#include "UGen/Env.h"
-#include "UGen/ugen_JuceEnvelopeComponent.h"
+#include "envelope/ugen_JuceEnvelopeComponent.h"
 #include "audio/CustomEffect.h"
 #include "audio/DelayEffect.h"
 #include "audio/LuaEffectState.h"
@@ -24,6 +23,7 @@
 #include "audio/SampleRateManager.h"
 #include "audio/ShapeSound.h"
 #include "audio/ShapeVoice.h"
+#include "audio/DahdsrEnvelope.h"
 #include "obj/ObjectServer.h"
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
@@ -56,6 +56,13 @@ public:
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void envelopeChanged(EnvelopeComponent* changedEnvelope) override;
+
+    DahdsrParams getCurrentDahdsrParams() const;
+
+    // UI telemetry for per-voice envelope visualization (written on audio thread, read on message thread)
+    static constexpr int kMaxUiVoices = 16;
+    std::atomic<double> uiVoiceEnvelopeTimeSeconds[kMaxUiVoices]{};
+    std::atomic<bool> uiVoiceActive[kMaxUiVoices]{};
 
     std::vector<std::shared_ptr<osci::Effect>> toggleableEffects;
     std::vector<std::shared_ptr<osci::Effect>> luaEffects;
@@ -104,8 +111,9 @@ public:
     std::atomic<bool> objectServerRendering = false;
     juce::ChangeBroadcaster fileChangeBroadcaster;
 
+    osci::FloatParameter* delayTime = new osci::FloatParameter("Delay Time", "delayTime", VERSION_HINT, 0.0, 0.0, 1.0);
     osci::FloatParameter* attackTime = new osci::FloatParameter("Attack Time", "attackTime", VERSION_HINT, 0.005, 0.0, 1.0);
-    osci::FloatParameter* attackLevel = new osci::FloatParameter("Attack Level", "attackLevel", VERSION_HINT, 1.0, 0.0, 1.0);
+    osci::FloatParameter* holdTime = new osci::FloatParameter("Hold Time", "holdTime", VERSION_HINT, 0.0, 0.0, 1.0);
     osci::FloatParameter* decayTime = new osci::FloatParameter("Decay Time", "decayTime", VERSION_HINT, 0.095, 0.0, 1.0);
     osci::FloatParameter* sustainLevel = new osci::FloatParameter("Sustain Level", "sustainLevel", VERSION_HINT, 0.6, 0.0, 1.0);
     osci::FloatParameter* releaseTime = new osci::FloatParameter("Release Time", "releaseTime", VERSION_HINT, 0.4, 0.0, 1.0);
@@ -113,13 +121,7 @@ public:
     osci::FloatParameter* decayShape = new osci::FloatParameter("Decay osci::Shape", "decayShape", VERSION_HINT, -20, -50, 50);
     osci::FloatParameter* releaseShape = new osci::FloatParameter("Release Shape", "releaseShape", VERSION_HINT, -5, -50, 50);
 
-    Env adsrEnv = Env::adsr(
-        attackTime->getValueUnnormalised(),
-        decayTime->getValueUnnormalised(),
-        sustainLevel->getValueUnnormalised(),
-        releaseTime->getValueUnnormalised(),
-        1.0,
-        std::vector<EnvCurve>{attackShape->getValueUnnormalised(), decayShape->getValueUnnormalised(), releaseShape->getValueUnnormalised()});
+
 
     juce::MidiKeyboardState keyboardState;
 

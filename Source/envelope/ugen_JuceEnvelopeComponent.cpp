@@ -40,6 +40,9 @@
 
 #include "ugen_JuceEnvelopeComponent.h"
 
+#include <algorithm>
+#include <cmath>
+
 
 EnvelopeHandleComponentConstrainer::EnvelopeHandleComponentConstrainer(EnvelopeHandleComponent* handleOwner)
 	:	leftLimit(0),
@@ -70,12 +73,6 @@ void EnvelopeHandleComponentConstrainer::checkBounds (juce::Rectangle<int>& boun
 //	
 //	if(env)
 //	{
-//		double domain = env->convertPixelsToDomain(bounds.getX());
-//		double value = env->convertPixelsToValue(bounds.getY());
-//		
-//		domain = env->quantiseDomain(domain);
-//		value = env->quantiseValue(value);
-//		
 //		bounds.setPosition(env->convertDomainToPixels(domain), 
 //						   env->convertValueToPixels(value));
 //	}
@@ -96,8 +93,10 @@ EnvelopeHandleComponent::EnvelopeHandleComponent()
 	shouldLockTime(false),
 	shouldLockValue(false),
 	shouldDraw(!shouldLockTime || !shouldLockValue),
+	curve(0.0f),
 	ignoreDrag(false)
 {
+	setRepaintsOnMouseActivity(true);
 
 	if (shouldDraw) {
 		setMouseCursor(juce::MouseCursor::DraggingHandCursor);
@@ -163,29 +162,37 @@ void EnvelopeHandleComponent::updateLegend()
 		places = 1;
 	}
 	
-	if (env->getAdsrMode()) {
+	if (env->getDahdsrMode()) {
 		int index = env->getHandleIndex(this);
-		Env envelope = env->getEnv();
-		
-		double envTime = envelope.getTimes()[index - 1];
+		const auto dahdsr = env->getDahdsrParams();
+		double safeTime = 0.0;
+		switch (index)
+		{
+			case 1: safeTime = dahdsr.delaySeconds; break;
+			case 2: safeTime = dahdsr.attackSeconds; break;
+			case 3: safeTime = dahdsr.holdSeconds; break;
+			case 4: safeTime = dahdsr.decaySeconds; break;
+			case 5: safeTime = dahdsr.releaseSeconds; break;
+			default: safeTime = 0.0; break;
+		}
 
 		if (index == 1) {
-			text = "Attack time (s): " + juce::String(legend->mapTime(envTime), places);
-			text << ", Attack level: " << juce::String(legend->mapValue(value), places);
+			text = "Delay time (s): " + juce::String(legend->mapTime(safeTime), places);
 		} else if (index == 2) {
-			text = "Decay time (s): " + juce::String(legend->mapTime(envTime), places);
-			text << ", Sustain level: " << juce::String(legend->mapValue(value), places);
+			text = "Attack time (s): " + juce::String(legend->mapTime(safeTime), places);
+		} else if (index == 3) {
+			text = "Hold time (s): " + juce::String(legend->mapTime(safeTime), places);
+		} else if (index == 4) {
+			text = "Decay time (s): " + juce::String(legend->mapTime(safeTime), places);
+			text << ", Sustain level: " << juce::String(legend->mapValue(dahdsr.sustainLevel), places);
+		} else if (index == 5) {
+			text = "Release time (s): " + juce::String(legend->mapTime(safeTime), places);
 		} else {
-			text = "Release time (s): " + juce::String(legend->mapTime(envTime), places);
+			text = "";
 		}
 	} else {
 		if (width >= 165) {
-			if (env && env->isLoopNode(this))
-				text << "(Loop) ";
-			else if (env && env->isReleaseNode(this))
-				text << "(Release) ";
-			else
-				text << "Point ";
+			text << "Point ";
 		} else if (width >= 140) {
 			text << "Point ";
 		} else if (width >= 115) {
@@ -212,29 +219,17 @@ void EnvelopeHandleComponent::paint(juce::Graphics& g)
 {
 	if (shouldDraw) {
 		EnvelopeComponent *env = getParentComponent();
-		juce::Colour handleColour;
+		juce::Colour handleColour = (env != 0) ? findColour(EnvelopeComponent::Node)
+			: juce::Colour(0xFF69B4FF);
 
-		if(env == 0)
-		{
-			handleColour = juce::Colour(0xFF69B4FF);
-		}
-		else if(env->isReleaseNode(this))
-		{
-			handleColour = findColour(EnvelopeComponent::ReleaseNode);
-		}
-		else if(env->isLoopNode(this))
-		{
-			handleColour = findColour(EnvelopeComponent::LoopNode);
-		}
-		else
-		{
-			handleColour = findColour(EnvelopeComponent::Node);
-		}
+		const bool hot = isMouseOverOrDragging(true);
+		const float inset = hot ? 0.5f : 1.0f;
+		const float size = (float)getWidth() - inset * 2.0f;
 
-		g.setColour(handleColour);
-		g.fillEllipse(1, 1, getWidth() - 2, getHeight() - 2);
-		g.setColour(findColour(EnvelopeComponent::NodeOutline));
-		g.drawEllipse(1, 1, getWidth() - 2, getHeight() - 2, 1.0f);
+		g.setColour(handleColour.withAlpha(hot ? 1.0f : 0.95f));
+		g.fillEllipse(inset, inset, size, size);
+		g.setColour(findColour(EnvelopeComponent::NodeOutline).withAlpha(hot ? 1.0f : 0.85f));
+		g.drawEllipse(inset, inset, size, size, hot ? 1.5f : 1.0f);
 	}
 }
 
@@ -462,7 +457,7 @@ void EnvelopeHandleComponent::setValue(double valueToSet)
 	((EnvelopeComponent*)getParentComponent())->sendChangeMessage();
 }
 
-void EnvelopeHandleComponent::setCurve(EnvCurve curveToSet)
+void EnvelopeHandleComponent::setCurve(float curveToSet)
 {
 	curve = curveToSet;
 	getParentComponent()->repaint();
@@ -575,26 +570,55 @@ void EnvelopeHandleComponent::recalculateShouldDraw() {
 
 
 EnvelopeComponent::EnvelopeComponent()
-:	minNumHandles(0),
-	maxNumHandles(0xffffff),
-	domainMin(0.0),
-	domainMax(1.0),
-	valueMin(0.0),
-	valueMax(1.0),
-	valueGrid((valueMax-valueMin) / 10),
-	domainGrid((domainMax-domainMin) / 16),
-	gridDisplayMode(GridNone),
-	gridQuantiseMode(GridNone),
-	draggingHandle(0),
-	adjustingHandle(nullptr),
-	curvePoints(64),
-	releaseNode(-1),
-	loopNode(-1),
-	allowCurveEditing(true),
-	allowNodeEditing(true)
+	: minNumHandles(0),
+	  maxNumHandles(0xffffff),
+	  domainMin(0.0),
+	  domainMax(1.0),
+	  valueMin(0.0),
+	  valueMax(1.0),
+	  valueGrid((valueMax - valueMin) / 10.0),
+	  domainGrid((domainMax - domainMin) / 16.0),
+	  gridDisplayMode(GridNone),
+	  gridQuantiseMode(GridNone),
+	  draggingHandle(nullptr),
+	  adjustingHandle(nullptr),
+	  curvePoints(64),
+	  dahdsrMode(false)
 {
+	stopTimer();
 	setMouseCursor(juce::MouseCursor::NormalCursor);
 	setBounds(0, 0, 200, 200); // non-zero size to start with
+}
+
+void EnvelopeComponent::timerCallback()
+{
+	// Self-driven repaint so the flow trail can decay smoothly even when the host/UI stops pushing updates.
+	if (flowTrailLastSeenMs.empty())
+	{
+		stopTimer();
+		return;
+	}
+
+	const double nowMs = juce::Time::getMillisecondCounterHiRes();
+	const double tauMs = juce::jmax(1.0, (double) flowTrailTauMs);
+	const double maxAgeMs = tauMs * 6.0; // ~1% remaining for an exponential, fine for linear too
+	if (numFlowMarkers == 0 && flowTrailNewestMs > 0.0 && (nowMs - flowTrailNewestMs) > maxAgeMs)
+	{
+		// Trail is effectively invisible; stop repainting.
+		std::fill(flowTrailLastSeenMs.begin(), flowTrailLastSeenMs.end(), 0.0);
+		flowTrailNewestMs = 0.0;
+		stopTimer();
+		repaint();
+		return;
+	}
+
+	repaint();
+}
+
+void EnvelopeComponent::ensureFlowRepaintTimerRunning()
+{
+	if (!isTimerRunning())
+		startTimerHz(60);
 }
 
 EnvelopeComponent::~EnvelopeComponent()
@@ -664,6 +688,39 @@ void EnvelopeComponent::recalculateHandles()
 	{
 		handles.getUnchecked(i)->recalculatePosition();
 	}
+
+	applyDahdsrHandleLocks();
+}
+
+void EnvelopeComponent::applyDahdsrHandleLocks()
+{
+	if (!dahdsrMode)
+		return;
+
+	// Clear any previous constraints first.
+	for (int i = 0; i < handles.size(); ++i)
+	{
+		auto* handle = handles.getUnchecked(i);
+		handle->unlockTime();
+		handle->unlockValue();
+	}
+
+	if (handles.size() == 0)
+		return;
+
+	// Always anchor start.
+	handles.getUnchecked(0)->lockTime(0.0);
+	handles.getUnchecked(0)->lockValue(0.0);
+
+	// DAHDSR (6 points): start 0, delay end 0, peak 1, hold end 1, sustain editable, release end 0.
+	if (handles.size() == 6)
+	{
+		handles.getUnchecked(1)->lockValue(0.0);
+		handles.getUnchecked(2)->lockValue(1.0);
+		handles.getUnchecked(3)->lockValue(1.0);
+		handles.getUnchecked(5)->lockValue(0.0);
+		return;
+	}
 }
 
 EnvelopeHandleComponent* EnvelopeComponent::findHandle(double time) {
@@ -702,14 +759,6 @@ void EnvelopeComponent::setGrid(const GridMode display, const GridMode quantise,
 	}
 }
 
-void EnvelopeComponent::getGrid(GridMode& display, GridMode& quantise, double& domainQ, double& valueQ) const
-{
-	display = gridDisplayMode;
-	quantise = gridQuantiseMode;
-	domainQ = domainGrid;
-	valueQ = valueGrid;
-}
-
 void EnvelopeComponent::paint(juce::Graphics& g)
 {
 	paintBackground(g);
@@ -717,7 +766,7 @@ void EnvelopeComponent::paint(juce::Graphics& g)
 	if(handles.size() > 0)
 	{
 		juce::Path path;
-		Env env = getEnv();
+		
 		
 		EnvelopeHandleComponent* handle = handles.getUnchecked(0);
 		path.startNewSubPath((handle->getX() + handle->getRight()) * 0.5f,
@@ -738,7 +787,7 @@ void EnvelopeComponent::paint(juce::Graphics& g)
 			
 			for(int j = 0; j < curvePoints; j++)
 			{
-				float value = env.lookup(time - firstTime);
+				float value = lookup(time);
 				path.lineTo(convertDomainToPixels(time) + halfWidth, 
 							convertValueToPixels(value) + halfHeight);
 				time += timeInc;
@@ -750,53 +799,93 @@ void EnvelopeComponent::paint(juce::Graphics& g)
 			time = nextTime;
 		}
 		
-		g.setColour(findColour(Line));
-		g.strokePath (path, juce::PathStrokeType(2.0f));
+		// Build a fill path (area under curve) and render it first
+		juce::Path fillPath(path);
+		fillPath.lineTo(handle->getRight(), getHeight());
+		fillPath.lineTo(0, getHeight());
+		fillPath.closeSubPath();
 
-		path.lineTo(handle->getRight(), getHeight());
-		path.lineTo(0, getHeight());
+		{
+			auto fillColour = findColour(LineBackground).withAlpha(0.26f);
+			g.setColour(fillColour);
+			g.fillPath(fillPath);
+		}
 
-		// gradient fill the path
-		juce::ColourGradient gradient(findColour(LoopLine), 0, 0, juce::Colours::transparentWhite, 0, getHeight(), false);
-		g.setGradientFill(gradient);
-		g.fillPath(path);
-		
-		if((loopNode >= 0) && (releaseNode >= 0) && (releaseNode > loopNode))
-		{			
-			EnvelopeHandleComponent* releaseHandle = handles[releaseNode];
-			EnvelopeHandleComponent* loopHandle = handles[loopNode];
-			
-			if((releaseHandle != 0) && (loopHandle != 0))
+		// VITAL-style trail: time-based persistence using per-x lastSeen timestamps.
+		{
+			juce::Graphics::ScopedSaveState state(g);
+			g.reduceClipRegion(fillPath);
+			auto markerColour = findColour(LineBackground);
+			const int w = getWidth();
+			if ((int)flowTrailLastSeenMs.size() == w)
 			{
-				// draw a horizontal line from release
-				g.setColour(findColour(LoopLine));
-				
-				const float loopY = (loopHandle->getY() + loopHandle->getBottom()) * 0.5f;
-				const float releaseY = (releaseHandle->getY() + releaseHandle->getBottom()) * 0.5f;
-				const float loopX = (loopHandle->getX() + loopHandle->getRight()) * 0.5f;
-				const float releaseX = (releaseHandle->getX() + releaseHandle->getRight()) * 0.5f;
-				
-				float dashes[] = { 5, 3 };
-				juce::Line<float> line(loopX, releaseY, loopX, loopY);
-				g.drawDashedLine(line, dashes, 2, 0.5f);
-				
-				const int arrowLength = HANDLESIZE*2;
-				
-				g.drawLine(releaseX, releaseY, 
-						   loopX + arrowLength, releaseY, 
-						   0.5f);
-				
-				if(loopY == releaseY)
-					g.setColour(findColour(LoopNode));
-				
-//				g.drawArrow(loopX + arrowLength, releaseY, 
-//							loopX, releaseY, 
-//							0.5f, HANDLESIZE, arrowLength);
-				g.drawArrow(juce::Line<float>((float)(loopX + arrowLength), releaseY, loopX, releaseY), 
-							0.5f, HANDLESIZE, arrowLength);
-				
+				const double nowMs = juce::Time::getMillisecondCounterHiRes();
+				const double tauMs = juce::jmax(1.0, (double) flowTrailTauMs);
+				const float invTau = 1.0f / (float) tauMs;
+				const int step = juce::jmax(1, flowTrailPaintStepPx);
+				for (int x = 0; x < w; x += step)
+				{
+					const double lastSeen = flowTrailLastSeenMs[(size_t)x];
+					if (lastSeen <= 0.0)
+						continue;
+					const double ageMs = nowMs - lastSeen;
+					if (ageMs <= 0.0)
+					{
+						g.setColour(markerColour.withAlpha(flowTrailMaxAlpha));
+						g.fillRect((float) x, 0.0f, (float) step, (float) getHeight());
+						continue;
+					}
+					// Linear fade is much cheaper than exp() and good enough for UI.
+					const float a = juce::jlimit(0.0f, 1.0f, 1.0f - ((float) ageMs * invTau));
+					if (a <= 0.001f)
+						continue;
+					g.setColour(markerColour.withAlpha(flowTrailMaxAlpha * a));
+					g.fillRect((float) x, 0.0f, (float) step, (float) getHeight());
+				}
 			}
 		}
+
+		// Draw marker heads on top (glow band + center line)
+		if (numFlowMarkers > 0)
+		{
+			juce::Graphics::ScopedSaveState state(g);
+			g.reduceClipRegion(fillPath);
+			auto markerColour = findColour(LineBackground);
+			for (int i = 0; i < numFlowMarkers; ++i)
+			{
+				const double timeSeconds = flowMarkerTimesSeconds[i];
+				if (timeSeconds < 0.0)
+					continue;
+				const float x = (float)convertDomainToPixels(timeSeconds) + (HANDLESIZE * 0.5f);
+
+				const float outerHalfWidth = 10.0f;
+				juce::Rectangle<float> outer(x - outerHalfWidth, 0.0f, outerHalfWidth * 2.0f, (float)getHeight());
+				juce::ColourGradient outerGradient(
+					markerColour.withAlpha(0.0f), outer.getX(), 0.0f,
+					markerColour.withAlpha(0.0f), outer.getRight(), 0.0f,
+					false);
+				outerGradient.addColour(0.5, markerColour.withAlpha(0.18f));
+				g.setGradientFill(outerGradient);
+				g.fillRect(outer);
+
+				const float innerHalfWidth = 5.0f;
+				juce::Rectangle<float> inner(x - innerHalfWidth, 0.0f, innerHalfWidth * 2.0f, (float)getHeight());
+				juce::ColourGradient innerGradient(
+					markerColour.withAlpha(0.0f), inner.getX(), 0.0f,
+					markerColour.withAlpha(0.0f), inner.getRight(), 0.0f,
+					false);
+				innerGradient.addColour(0.5, markerColour.withAlpha(0.32f));
+				g.setGradientFill(innerGradient);
+				g.fillRect(inner);
+
+				g.setColour(markerColour.withAlpha(0.60f));
+				g.drawLine(x, 0.0f, x, (float)getHeight(), 2.5f);
+			}
+		}
+
+		// Curve stroke on top
+		g.setColour(findColour(Line).withAlpha(0.95f));
+		g.strokePath(path, juce::PathStrokeType(1.75f));
 	}
 }
 
@@ -812,32 +901,124 @@ void EnvelopeComponent::paintBackground(juce::Graphics& g)
 	g.setColour(findColour(Background));
 	g.fillRect(0, 0, getWidth(), getHeight());
 	
-	g.setColour(findColour(GridLine));
+	// Subtle grid for a more modern look
+	auto gridColour = findColour(GridLine).withAlpha(0.55f);
+	g.setColour(gridColour);
 	
 	if((gridDisplayMode & GridValue) && (valueGrid > 0.0))
 	{
 		double value = valueMin;
+		int idx = 0;
 		
 		while(value <= valueMax)
 		{
 			//g.drawHorizontalLine(convertValueToPixels(value) + HANDLESIZE/2, 0, getWidth());
 			float y = convertValueToPixels(value) + HANDLESIZE/2;
 			y = round(y, 1.f) + 0.5f;
-			g.drawLine(0, y, getWidth(), y, 1.0f);
+			// Slightly emphasize every 4th line
+			const float alpha = (idx % 4 == 0) ? 0.85f : 0.55f;
+			g.setColour(findColour(GridLine).withAlpha(alpha));
+			g.drawLine(0, y, (float)getWidth(), y, 1.0f);
 			value += valueGrid;
+			idx++;
 		}
 	}
 	
 	if((gridDisplayMode & GridDomain) && (domainGrid > 0.0))
 	{
 		double domain = domainMin;
+		int idx = 0;
 		
 		while(domain <= domainMax)
 		{
-			g.drawVerticalLine(convertDomainToPixels(domain) + HANDLESIZE/2, 0, getHeight());
+			const float alpha = (idx % 4 == 0) ? 0.85f : 0.55f;
+			g.setColour(findColour(GridLine).withAlpha(alpha));
+			g.drawVerticalLine((int)(convertDomainToPixels(domain) + HANDLESIZE/2), 0.0f, (float)getHeight());
 			domain += domainGrid;
+			idx++;
 		}
 	}
+}
+
+void EnvelopeComponent::setFlowMarkerTimesForUi(const double* timesSeconds, int numTimes)
+{
+	numFlowMarkers = juce::jmax(0, numTimes);
+	if ((int)flowMarkerTimesSeconds.size() < numFlowMarkers)
+		flowMarkerTimesSeconds.resize((size_t) numFlowMarkers, -1.0);
+	for (int i = 0; i < numFlowMarkers; ++i)
+		flowMarkerTimesSeconds[(size_t) i] = timesSeconds[i];
+
+	if ((int)prevFlowMarkerX.size() < numFlowMarkers)
+	{
+		prevFlowMarkerX.resize((size_t) numFlowMarkers, 0.0f);
+		prevFlowMarkerValid.resize((size_t) numFlowMarkers, 0);
+		prevFlowMarkerTimeSeconds.resize((size_t) numFlowMarkers, 0.0);
+	}
+
+	const int w = getWidth();
+	if (w > 0)
+	{
+		if ((int)flowTrailLastSeenMs.size() != w)
+			flowTrailLastSeenMs.assign((size_t)w, 0.0);
+
+		const double nowMs = juce::Time::getMillisecondCounterHiRes();
+		flowTrailNewestMs = juce::jmax(flowTrailNewestMs, nowMs);
+		for (int i = 0; i < numFlowMarkers; ++i)
+		{
+			const double t = flowMarkerTimesSeconds[i];
+			if (t < 0.0)
+			{
+				prevFlowMarkerValid[(size_t) i] = 0;
+				prevFlowMarkerTimeSeconds[(size_t) i] = 0.0;
+				continue;
+			}
+
+			const float x = (float)convertDomainToPixels(t) + (HANDLESIZE * 0.5f);
+			const int xi = (int)juce::jlimit(0.0f, (float)(w - 1), x);
+
+			const bool canBridge = prevFlowMarkerValid[(size_t) i] != 0
+				&& (t >= prevFlowMarkerTimeSeconds[(size_t) i])
+				&& ((t - prevFlowMarkerTimeSeconds[(size_t) i]) <= (double)flowTrailMaxBridgeTimeSeconds);
+
+			if (canBridge)
+			{
+				const float prevX = prevFlowMarkerX[(size_t) i];
+				const int a = (int)juce::jlimit(0.0f, (float)(w - 1), juce::jmin(prevX, x));
+				const int b = (int)juce::jlimit(0.0f, (float)(w - 1), juce::jmax(prevX, x));
+				// Fill between frames to eliminate gaps
+				for (int xx = a; xx <= b; ++xx)
+					flowTrailLastSeenMs[(size_t)xx] = nowMs;
+			}
+			else
+			{
+				flowTrailLastSeenMs[(size_t)xi] = nowMs;
+			}
+
+			prevFlowMarkerX[(size_t) i] = x;
+			prevFlowMarkerValid[(size_t) i] = 1;
+			prevFlowMarkerTimeSeconds[(size_t) i] = t;
+		}
+	}
+	ensureFlowRepaintTimerRunning();
+	repaint();
+}
+
+void EnvelopeComponent::clearFlowMarkerTimesForUi()
+{
+	numFlowMarkers = 0;
+	ensureFlowRepaintTimerRunning();
+	repaint();
+}
+
+void EnvelopeComponent::resetFlowPersistenceForUi()
+{
+	numFlowMarkers = 0;
+	std::fill(flowTrailLastSeenMs.begin(), flowTrailLastSeenMs.end(), 0.0);
+	flowTrailNewestMs = 0.0;
+	std::fill(prevFlowMarkerValid.begin(), prevFlowMarkerValid.end(), 0);
+	std::fill(prevFlowMarkerTimeSeconds.begin(), prevFlowMarkerTimeSeconds.end(), 0.0);
+	stopTimer();
+	repaint();
 }
 
 void EnvelopeComponent::resized()
@@ -858,6 +1039,12 @@ void EnvelopeComponent::resized()
 			handle->dontUpdateTimeAndValue = oldDontUpdateTimeAndValue;
 		}
 	}	
+
+	if (getWidth() > 0)
+		flowTrailLastSeenMs.assign((size_t)getWidth(), 0.0);
+	flowTrailNewestMs = 0.0;
+	std::fill(prevFlowMarkerValid.begin(), prevFlowMarkerValid.end(), 0);
+	std::fill(prevFlowMarkerTimeSeconds.begin(), prevFlowMarkerTimeSeconds.end(), 0.0);
 }
 
 
@@ -904,7 +1091,7 @@ void EnvelopeComponent::mouseDown(const juce::MouseEvent& e)
 	
 	if (adjustable) {
 		adjustingHandle = findHandle(convertPixelsToDomain(e.x));
-		prevCurveValue = adjustingHandle->getCurve().getCurve();
+		prevCurveValue = adjustingHandle != nullptr ? adjustingHandle->getCurve() : 0.0f;
 	}
 }
 
@@ -915,7 +1102,6 @@ void EnvelopeComponent::mouseDrag(const juce::MouseEvent& e)
 #endif
 	
 	if (adjustable && adjustingHandle != nullptr) {
-		EnvCurve curve = adjustingHandle->getCurve();
 		EnvelopeHandleComponent* prevHandle = adjustingHandle->getPreviousHandle();
 		// get distance as proportion of height
 		double originalValue = e.getDistanceFromDragStartY() / (double) getHeight();
@@ -928,9 +1114,8 @@ void EnvelopeComponent::mouseDrag(const juce::MouseEvent& e)
 		if (prevHandle != nullptr && prevHandle->getValue() > adjustingHandle->getValue()) {
 			value = -value;
         }
-		value = juce::jmin(prevCurveValue + value, 50.0);
-		curve.setCurve(value);
-		adjustingHandle->setCurve(curve);
+		value = juce::jlimit(-50.0, 50.0, (double) prevCurveValue + value);
+		adjustingHandle->setCurve((float) value);
 	} else if (draggingHandle != nullptr) {
 		draggingHandle->mouseDrag(e.getEventRelativeTo(draggingHandle));
 	}
@@ -999,6 +1184,7 @@ void EnvelopeComponent::sendEndDrag()
 
 void EnvelopeComponent::clear()
 {
+	ScopedStructuralEdit edit(*this);
     int i = getNumHandles();
     
     while (i > 0)
@@ -1064,7 +1250,7 @@ EnvelopeHandleComponent* EnvelopeComponent::getNextHandle(const EnvelopeHandleCo
 }
 
 
-EnvelopeHandleComponent* EnvelopeComponent::addHandle(int newX, int newY, EnvCurve curve)
+EnvelopeHandleComponent* EnvelopeComponent::addHandle(int newX, int newY, float curve)
 {
 #ifdef MYDEBUG
 	printf("MyEnvelopeComponent::addHandle(%d, %d)\n", newX, newY);
@@ -1074,11 +1260,14 @@ EnvelopeHandleComponent* EnvelopeComponent::addHandle(int newX, int newY, EnvCur
 }
 
 
-EnvelopeHandleComponent* EnvelopeComponent::addHandle(double newDomain, double newValue, EnvCurve curve)
+EnvelopeHandleComponent* EnvelopeComponent::addHandle(double newDomain, double newValue, float curve)
 {
 #ifdef MYDEBUG
 	printf("MyEnvelopeComponent::addHandle(%f, %f)\n", (float)newDomain, (float)newValue);
 #endif
+
+	if (!canEditStructure())
+		return 0;
 	
 //	newDomain = quantiseDomain(newDomain);
 //	newValue = quantiseValue(newValue);
@@ -1091,22 +1280,17 @@ EnvelopeHandleComponent* EnvelopeComponent::addHandle(double newDomain, double n
 				break;
 		}
 		
-		if(releaseNode >= i) releaseNode++;
-		if(loopNode >= i) loopNode++;
-		
 		EnvelopeHandleComponent* handle;
 		addAndMakeVisible(handle = new EnvelopeHandleComponent());
 		handle->setSize(HANDLESIZE, HANDLESIZE);
 		handle->setTimeAndValue(newDomain, newValue, 0.0);	
 		handle->setCurve(curve);
 		handles.insert(i, handle);
-		if (adsrMode) {
+		if (dahdsrMode) {
 			if (i == 0) {
 				handle->lockTime(0);
 			}
-			if (i == 0 || i == 3) {
-				handle->lockValue(0);
-			}
+			// Constraints are applied in applyAdsrHandleLocks() after handles are rebuilt.
 		}
 	//	sendChangeMessage();
 		return handle;
@@ -1117,25 +1301,10 @@ EnvelopeHandleComponent* EnvelopeComponent::addHandle(double newDomain, double n
 
 void EnvelopeComponent::removeHandle(EnvelopeHandleComponent* thisHandle)
 {
+	if (!canEditStructure())
+		return;
+
 	if(handles.size() > minNumHandles) {
-		int index = handles.indexOf(thisHandle);
-		
-		if(releaseNode >= 0)
-		{
-			if(releaseNode == index)
-				releaseNode = -1;
-			else if(releaseNode > index)
-				releaseNode--;
-		}
-		
-		if(loopNode >= 0)
-		{
-			if(loopNode == index)
-				loopNode = -1;
-			else if(loopNode > index)
-				loopNode--;
-		}
-		
 		handles.removeFirstMatchingValue(thisHandle);
 		removeChildComponent(thisHandle);
 		delete thisHandle;
@@ -1158,92 +1327,6 @@ void EnvelopeComponent::quantiseHandle(EnvelopeHandleComponent* thisHandle)
 		double value = round(thisHandle->getValue(), valueGrid);
 		thisHandle->setValue(value);
 	}
-}
-
-bool EnvelopeComponent::isReleaseNode(EnvelopeHandleComponent* thisHandle) const
-{
-	int index = handles.indexOf(thisHandle);
-	
-	if(index < 0) 
-		return false;
-	else
-		return index == releaseNode;
-}
-
-bool EnvelopeComponent::isLoopNode(EnvelopeHandleComponent* thisHandle) const
-{
-	int index = handles.indexOf(thisHandle);
-	
-	if(index < 0) 
-		return false;
-	else
-		return index == loopNode;	
-}
-
-void EnvelopeComponent::setReleaseNode(const int index)
-{
-	if((index >= -1) && index < handles.size())
-	{
-		releaseNode = index;
-		repaint();
-	}
-}
-
-int EnvelopeComponent::getReleaseNode() const
-{
-	return releaseNode;
-}
-
-void EnvelopeComponent::setLoopNode(const int index)
-{
-	if((index >= -1) && index < handles.size())
-	{
-		loopNode = index;
-		repaint();
-	}
-}
-
-int EnvelopeComponent::getLoopNode() const
-{
-	return loopNode;
-}
-
-void EnvelopeComponent::setAllowCurveEditing(const bool flag)
-{
-	allowCurveEditing = flag;
-}
-
-bool EnvelopeComponent::getAllowCurveEditing() const
-{
-	return allowCurveEditing;
-}
-
-void EnvelopeComponent::setAllowNodeEditing(const bool flag)
-{
-	allowNodeEditing = flag;
-}
-
-bool EnvelopeComponent::getAllowNodeEditing() const
-{
-	return allowNodeEditing;
-}
-
-void EnvelopeComponent::setAdsrMode(const bool adsrMode) {
-	this->adsrMode = adsrMode;
-}
-
-bool EnvelopeComponent::getAdsrMode() const {
-    return adsrMode;
-}
-
-void EnvelopeComponent::setReleaseNode(EnvelopeHandleComponent* thisHandle)
-{
-	setReleaseNode(handles.indexOf(thisHandle));
-}
-
-void EnvelopeComponent::setLoopNode(EnvelopeHandleComponent* thisHandle)
-{
-	setLoopNode(handles.indexOf(thisHandle));
 }
 
 double EnvelopeComponent::convertPixelsToDomain(int pixelsX, int pixelsXMax) const
@@ -1274,79 +1357,99 @@ double EnvelopeComponent::convertValueToPixels(double value) const
 	return pixelsYMax-((value- valueMin) / (valueMax - valueMin) * pixelsYMax);
 }
 
-Env EnvelopeComponent::getEnv() const
+static inline float osciEvalCurve01(float curveValue, float pos)
 {
-	if (handles.size() < 1) return Env({ 0.0, 0.0 }, { 0.0 });
-	if (handles.size() < 2) return Env({ 0.0, 0.0 }, { handles.getUnchecked(0)->getValue() });
-	
-	EnvelopeHandleComponent* startHandle = handles.getUnchecked(0);
-	double currentLevel = startHandle->getValue();
-	double currentTime = startHandle->getTime();
-	
-	std::vector<double> levels(handles.size(), 0.0);
-	std::vector<double> times(handles.size() - 1, 0.0);
-	EnvCurveList curves = EnvCurveList(EnvCurve::Empty, handles.size()-1);
-	
-	levels[0] = currentLevel;
-	
-	for(int i = 1; i < handles.size(); i++) 
-	{
-		EnvelopeHandleComponent* handle = handles.getUnchecked(i);
-		
-		currentLevel = handle->getValue();
-		double time = handle->getTime();
-		
-		levels[i] = currentLevel;
-		times[i-1] = time-currentTime;
-		curves[i-1] = handle->getCurve();
-		
-		currentTime = time;
-	}
-	
-	return Env(levels, times, curves, releaseNode, loopNode);
+	pos = juce::jlimit(0.0f, 1.0f, pos);
+	if (std::abs(curveValue) <= 0.001f)
+		return pos;
+	const float denom = 1.0f - std::exp(curveValue);
+	const float numer = 1.0f - std::exp(pos * curveValue);
+	return (denom != 0.0f) ? (numer / denom) : pos;
 }
 
-void EnvelopeComponent::setEnv(Env const& env)
+static inline float osciLerp(float a, float b, float t) { return a + (b - a) * t; }
+
+DahdsrParams EnvelopeComponent::getDahdsrParams() const
 {
-	if (env.getLevels().size() == handles.size()) {
-		double time = 0.0;
+	DahdsrParams p;
+	if (handles.size() != 6)
+		return p;
 
-		std::vector<double> levels = env.getLevels();
-		std::vector<double> times = env.getTimes();
-		const EnvCurveList& curves = env.getCurves();
+	const auto t0 = handles.getUnchecked(0)->getTime();
+	const auto t1 = handles.getUnchecked(1)->getTime();
+	const auto t2 = handles.getUnchecked(2)->getTime();
+	const auto t3 = handles.getUnchecked(3)->getTime();
+	const auto t4 = handles.getUnchecked(4)->getTime();
+	const auto t5 = handles.getUnchecked(5)->getTime();
 
-		for (int i = 0; i < handles.size(); i++) {
-			EnvelopeHandleComponent* handle = handles.getUnchecked(i);
-            handle->setTimeAndValue(time, (double)levels[i], 0.0);
-			if (i > 0) {
-				handle->curve = curves[i - 1];
-			}
-			if (i < times.size()) {
-				time += times[i];
-			}
-		}
-	} else {
+	p.delaySeconds = juce::jmax(0.0, t1 - t0);
+	p.attackSeconds = juce::jmax(0.0, t2 - t1);
+	p.holdSeconds = juce::jmax(0.0, t3 - t2);
+	p.decaySeconds = juce::jmax(0.0, t4 - t3);
+	p.releaseSeconds = juce::jmax(0.0, t5 - t4);
+
+	p.sustainLevel = juce::jlimit(0.0, 1.0, handles.getUnchecked(4)->getValue());
+
+	// Segment curves are stored on the destination handle (incoming segment).
+	p.attackCurve = handles.getUnchecked(2)->getCurve();
+	p.decayCurve = handles.getUnchecked(4)->getCurve();
+	p.releaseCurve = handles.getUnchecked(5)->getCurve();
+
+	return p;
+}
+
+void EnvelopeComponent::setDahdsrParams(const DahdsrParams& params)
+{
+	if (!dahdsrMode)
+		setDahdsrMode(true);
+
+	ScopedStructuralEdit edit(*this);
+
+	if (handles.size() != kDahdsrNumHandles)
+	{
 		clear();
-
-		double time = 0.0;
-
-		std::vector<double> levels = env.getLevels();
-		std::vector<double> times = env.getTimes();
-		const EnvCurveList& curves = env.getCurves();
-
-		EnvelopeHandleComponent* handle = addHandle(time, (double)levels[0], EnvCurve::Linear);
-		quantiseHandle(handle);
-
-		for(int i = 0; i < times.size(); i++)
-		{
-			time += times[i];
-			handle = addHandle(time, (double)levels[i+1], curves[i]);
-			quantiseHandle(handle);
-		}
+		// Start at 0
+		addHandle(0.0, 0.0, 0.0f);
+		addHandle(0.0, 0.0, 0.0f);
+		addHandle(0.0, 1.0, 0.0f);
+		addHandle(0.0, 1.0, 0.0f);
+		addHandle(0.0, 0.5, 0.0f);
+		addHandle(0.0, 0.0, 0.0f);
 	}
 
-	releaseNode = env.getReleaseNode();
-	loopNode = env.getLoopNode();
+	double t = 0.0;
+	const double delay = juce::jmax(0.0, params.delaySeconds);
+	const double attack = juce::jmax(0.0, params.attackSeconds);
+	const double hold = juce::jmax(0.0, params.holdSeconds);
+	const double decay = juce::jmax(0.0, params.decaySeconds);
+	const double release = juce::jmax(0.0, params.releaseSeconds);
+	const double sustain = juce::jlimit(0.0, 1.0, params.sustainLevel);
+
+	// Handle indices: 0 start, 1 delay end, 2 attack peak, 3 hold end, 4 sustain, 5 release end.
+	handles.getUnchecked(0)->setTimeAndValue(t, 0.0, 0.0);
+
+	t += delay;
+	handles.getUnchecked(1)->setTimeAndValue(t, 0.0, 0.0);
+	handles.getUnchecked(1)->setCurve(0.0f);
+
+	t += attack;
+	handles.getUnchecked(2)->setTimeAndValue(t, 1.0, 0.0);
+	handles.getUnchecked(2)->setCurve(params.attackCurve);
+
+	t += hold;
+	handles.getUnchecked(3)->setTimeAndValue(t, 1.0, 0.0);
+	handles.getUnchecked(3)->setCurve(0.0f);
+
+	t += decay;
+	handles.getUnchecked(4)->setTimeAndValue(t, sustain, 0.0);
+	handles.getUnchecked(4)->setCurve(params.decayCurve);
+
+	t += release;
+	handles.getUnchecked(5)->setTimeAndValue(t, 0.0, 0.0);
+	handles.getUnchecked(5)->setCurve(params.releaseCurve);
+
+	applyDahdsrHandleLocks();
+	repaint();
 }
 
 float EnvelopeComponent::lookup(const float time) const
@@ -1370,13 +1473,49 @@ float EnvelopeComponent::lookup(const float time) const
 		}
 		else
 		{
-			return getEnv().lookup(time - first->getTime());
+			// DAHDSR-only lookup used for drawing.
+			const auto p = getDahdsrParams();
+			const float tRel = time - (float) first->getTime();
+			if (tRel <= 0.0f)
+				return (float) first->getValue();
+
+			const float d0 = (float) p.delaySeconds;
+			const float d1 = d0 + (float) p.attackSeconds;
+			const float d2 = d1 + (float) p.holdSeconds;
+			const float d3 = d2 + (float) p.decaySeconds;
+			const float d4 = d3 + (float) p.releaseSeconds;
+
+			auto evalSeg = [](float start, float end, float elapsed, float duration, float curve)
+			{
+				if (duration <= 0.0f)
+					return end;
+				const float pos = juce::jlimit(0.0f, 1.0f, elapsed / duration);
+				const float shaped = osciEvalCurve01(curve, pos);
+				return osciLerp(start, end, shaped);
+			};
+
+			if (tRel < d0)
+				return 0.0f;
+			if (tRel < d1)
+				return evalSeg(0.0f, 1.0f, tRel - d0, (float) p.attackSeconds, p.attackCurve);
+			if (tRel < d2)
+				return 1.0f;
+			if (tRel < d3)
+				return evalSeg(1.0f, (float) p.sustainLevel, tRel - d2, (float) p.decaySeconds, p.decayCurve);
+			if (tRel < d4)
+				return evalSeg((float) p.sustainLevel, 0.0f, tRel - d3, (float) p.releaseSeconds, p.releaseCurve);
+			return 0.0f;
 		}
 	}
 }
 
 void EnvelopeComponent::setMinMaxNumHandles(int min, int max)
 {
+	// DAHDSR mode uses a fixed, deterministic handle layout.
+	// Avoid accidental random handle insertion/removal from external callers.
+	if (dahdsrMode && !canEditStructure())
+		return;
+
 	if(min <= max) {
 		minNumHandles = min;
 		maxNumHandles = max;
@@ -1394,7 +1533,7 @@ void EnvelopeComponent::setMinMaxNumHandles(int min, int max)
 			double randX = rand.nextDouble() * (domainMax-domainMin) + domainMin;
 			double randY = rand.nextDouble() * (valueMax-valueMin) + valueMin;
 						
-			addHandle(randX, randY, EnvCurve::Linear);
+			addHandle(randX, randY, 0.0f);
 		}
 		
 	} else if(handles.size() > maxNumHandles) {
@@ -1453,6 +1592,53 @@ EnvelopeComponent* EnvelopeLegendComponent::getEnvelopeComponent() const
 	if(parent == 0) return 0;
 	
 	return parent->getEnvelopeComponent();
+}
+
+void EnvelopeComponent::setDahdsrMode(const bool dahdsrMode) {
+	if (this->dahdsrMode == dahdsrMode)
+		return;
+
+	this->dahdsrMode = dahdsrMode;
+	if (this->dahdsrMode)
+	{
+		ScopedStructuralEdit edit(*this);
+		// DAHDSR mode is always a fixed 6-handle envelope.
+		minNumHandles = kDahdsrNumHandles;
+		maxNumHandles = kDahdsrNumHandles;
+
+		if (handles.size() != kDahdsrNumHandles)
+		{
+			// Deterministic default shape; callers (e.g. MidiComponent) typically
+			// follow up with setDahdsrParams() from processor parameters.
+			clear();
+			addHandle(0.0, 0.0, 0.0f);
+			addHandle(0.0, 0.0, 0.0f);
+			addHandle(0.0, 1.0, 0.0f);
+			addHandle(0.0, 1.0, 0.0f);
+			addHandle(0.0, 0.5, 0.0f);
+			addHandle(0.0, 0.0, 0.0f);
+		}
+
+		applyDahdsrHandleLocks();
+		repaint();
+	}
+	else
+	{
+		ScopedStructuralEdit edit(*this);
+		minNumHandles = 0;
+		maxNumHandles = 0xffffff;
+		for (int i = 0; i < handles.size(); ++i)
+		{
+			auto* handle = handles.getUnchecked(i);
+			handle->unlockTime();
+			handle->unlockValue();
+		}
+		repaint();
+	}
+}
+
+bool EnvelopeComponent::getDahdsrMode() const {
+    return dahdsrMode;
 }
 
 void EnvelopeLegendComponent::resized()
@@ -1525,342 +1711,5 @@ void EnvelopeContainerComponent::setLegendComponent(EnvelopeLegendComponent* new
 	deleteAndZero(legend);
 	addAndMakeVisible(legend = newLegend);
 }
-
-EnvelopeCurvePopup::EnvelopeCurvePopup(EnvelopeHandleComponent* handleToEdit)
-:	handle(handleToEdit),
-	initialised(false)
-{
-	resetCounter();
-	
-	EnvCurve curve = handle->getCurve();
-	EnvCurve::CurveType type = curve.getType();
-	float curveValue = curve.getCurve();
-	
-	addChildComponent(slider = new CurveSlider());
-	slider->setSliderStyle(juce::Slider::LinearBar);
-	//slider->setTextBoxStyle(Slider::NoTextBox, false, 0,0);
-	slider->setRange(-1, 1, 0.0);
-    
-    slider->setValue(curveValue, juce::dontSendNotification);
-	
-	
-	addAndMakeVisible(combo = new juce::ComboBox("combo"));	
-	combo->addItem("Empty",			idOffset + (int)EnvCurve::Empty);
-	combo->addItem("Numerical...",	idOffset + (int)EnvCurve::Numerical);
-	combo->addItem("Step",			idOffset + (int)EnvCurve::Step);
-	combo->addItem("Linear",		idOffset + (int)EnvCurve::Linear);
-	
-	EnvelopeComponent *parent = handleToEdit->getParentComponent();
-	double min, max;
-	parent->getValueRange(min, max);
-	
-	if(((min > 0.0) && (max > 0.0)) || ((min < 0.0) && (min < 0.0)))
-	{
-		// exponential can't cross zero
-		combo->addItem("Exponential",	idOffset + (int)EnvCurve::Exponential);
-	}
-	
-	combo->addItem("Sine",			idOffset + (int)EnvCurve::Sine);
-	combo->addItem("Welch",			idOffset + (int)EnvCurve::Welch);
-	
-	combo->addListener(this);
-	
-	switch(type)
-	{
-		case EnvCurve::Empty:		combo->setSelectedId(idOffset + (int)EnvCurve::Empty,		juce::dontSendNotification); break;
-		case EnvCurve::Numerical:	combo->setSelectedId(idOffset + (int)EnvCurve::Numerical,	juce::dontSendNotification); break;
-		case EnvCurve::Step:		combo->setSelectedId(idOffset + (int)EnvCurve::Step,		juce::dontSendNotification); break;
-		case EnvCurve::Linear:		combo->setSelectedId(idOffset + (int)EnvCurve::Linear,		juce::dontSendNotification); break;
-		case EnvCurve::Exponential: combo->setSelectedId(idOffset + (int)EnvCurve::Exponential, juce::dontSendNotification); break;
-		case EnvCurve::Sine:		combo->setSelectedId(idOffset + (int)EnvCurve::Sine,		juce::dontSendNotification); break;
-		case EnvCurve::Welch:		combo->setSelectedId(idOffset + (int)EnvCurve::Welch,		juce::dontSendNotification); break;
-	}
-	
-	slider->addListener(this);
-}
-
-void EnvelopeCurvePopup::create(EnvelopeHandleComponent* handle, int x, int y)
-{
-	EnvelopeCurvePopup *popup = new EnvelopeCurvePopup(handle);
-	popup->addToDesktop(juce::ComponentPeer::windowIsTemporary);
-	
-	if(x > 20) x -= 20;
-	//if(y > 20) y -= 20;
-	
-	const int w = 200;
-	const int h = 50;
-	const int r = x+w;
-	const int b = y+h;
-	
-	juce::Rectangle<int> monitorArea = popup->getParentMonitorArea();
-	
-	if(r > monitorArea.getRight())
-		x = monitorArea.getRight() - w;
-		
-	if(b > monitorArea.getBottom())
-		y = monitorArea.getBottom() - h;
-		
-	popup->setBounds(x, y, w, h);
-	popup->setVisible(true);		
-	popup->getPeer()->setAlwaysOnTop(true);	
-}
-
-EnvelopeCurvePopup::~EnvelopeCurvePopup()
-{
-	deleteAllChildren();
-}
-
-void EnvelopeCurvePopup::resized()
-{
-	combo->setBoundsRelative(0.05f, 0.1f, 0.9f, 0.4f);
-	slider->setBoundsRelative(0.05f, 0.50f, 0.9f, 0.4f);
-}
-
-inline double linlin(const double input, 
-	const double inLow, const double inHigh,
-	const double outLow, const double outHigh) throw()
-{
-	double inRange = inHigh - inLow;
-	double outRange = outHigh - outLow;
-	return (input - inLow) * outRange / inRange + outLow;
-}
-
-void EnvelopeCurvePopup::sliderValueChanged(juce::Slider* sliderThatChanged)
-{
-	resetCounter();
-	
-	if(sliderThatChanged == slider)
-	{
-		EnvCurve curve = handle->getCurve();
-		double value = slider->getValue();
-		value = value * value * value;
-		value = linlin(value, -1.0, 1.0, -50.0, 50.0);
-		curve.setCurve(value);
-		handle->setCurve(curve);
-	}
-}
-
-void EnvelopeCurvePopup::comboBoxChanged (juce::ComboBox* comboBoxThatHasChanged)
-{
-	resetCounter();
-	
-	if(comboBoxThatHasChanged == combo)
-	{
-		EnvCurve::CurveType type = (EnvCurve::CurveType)(combo->getSelectedId() - idOffset);
-		bool showSlider = type == EnvCurve::Numerical;
-		slider->setVisible(showSlider);
-		
-		EnvCurve curve = handle->getCurve();
-		curve.setType(type);
-		handle->setCurve(curve);
-		
-		if(!showSlider && initialised) expire();
-		
-		initialised = true;
-	}
-}
-
-void EnvelopeCurvePopup::expired()
-{
-    handle->getParentComponent()->sendEndDrag();
-}
-
-const int EnvelopeCurvePopup::idOffset = 1000;
-
-
-EnvelopeNodePopup::EnvelopeNodePopup(EnvelopeHandleComponent* handleToEdit)
-:	handle(handleToEdit),
-	initialised(false)
-{
-	resetCounter();
-	
-	addChildComponent(setLoopButton = new juce::TextButton("Set Y to Loop"));
-	addChildComponent(setReleaseButton = new juce::TextButton("Set Y to Release"));
-	setLoopButton->addListener(this);
-	setReleaseButton->addListener(this);
-	
-	addAndMakeVisible(combo = new juce::ComboBox("combo"));
-	combo->addItem("Normal",            idOffset + (int)Normal);
-	combo->addItem("Release",           idOffset + (int)Release);
-	combo->addItem("Loop",              idOffset + (int)Loop);
-	combo->addItem("Release & Loop",	idOffset + (int)ReleaseAndLoop);
-	combo->addListener(this);
-	
-	EnvelopeComponent* env = handle->getParentComponent();
-	
-	if(env != 0)
-	{
-		if(env->isLoopNode(handle) && env->isReleaseNode(handle))
-			combo->setSelectedId(idOffset + (int)ReleaseAndLoop, false);
-		else if(env->isLoopNode(handle))
-			combo->setSelectedId(idOffset + (int)Loop, false);
-		else if(env->isReleaseNode(handle))
-			combo->setSelectedId(idOffset + (int)Release, false);
-		else
-			combo->setSelectedId(idOffset + (int)Normal, false);
-	}
-	
-}
-
-void EnvelopeNodePopup::create(EnvelopeHandleComponent* handle, int x, int y)
-{
-	EnvelopeNodePopup *popup = new EnvelopeNodePopup(handle);
-	popup->addToDesktop(juce::ComponentPeer::windowIsTemporary);
-	
-	if(x > 20) x -= 20;
-	if(y > 20) y -= 20;
-	
-	const int w = 200;
-	const int h = 50;
-	const int r = x+w;
-	const int b = y+h;
-	
-	juce::Rectangle<int> monitorArea = popup->getParentMonitorArea();
-	
-	if(r > monitorArea.getRight())
-		x = monitorArea.getRight() - w;
-	
-	if(b > monitorArea.getBottom())
-		y = monitorArea.getBottom() - h;
-	
-	popup->setBounds(x, y, w, h);
-	popup->setVisible(true);		
-	popup->getPeer()->setAlwaysOnTop(true);	
-}
-
-EnvelopeNodePopup::~EnvelopeNodePopup()
-{
-	deleteAllChildren();
-}
-
-void EnvelopeNodePopup::resized()
-{
-	combo->setBoundsRelative(0.05f, 0.1f, 0.9f, 0.4f);
-	
-	// the same pos but we should see only one at a time
-	setLoopButton->setBoundsRelative(0.05f, 0.50f, 0.9f, 0.4f);
-	setReleaseButton->setBoundsRelative(0.05f, 0.50f, 0.9f, 0.4f);
-}
-
-void EnvelopeNodePopup::comboBoxChanged (juce::ComboBox* comboBoxThatHasChanged)
-{
-	resetCounter();
-	
-	if(comboBoxThatHasChanged == combo)
-	{
-		EnvelopeComponent* env = handle->getParentComponent();
-		
-		if(env != 0)
-		{
-			NodeType type = (NodeType)(combo->getSelectedId() - idOffset);
-			
-			switch(type)
-			{
-				case Normal: {
-					
-					if(env->isLoopNode(handle)) 
-						env->setLoopNode(-1);
-					
-					if(env->isReleaseNode(handle)) 
-						env->setReleaseNode(-1);
-					
-					setLoopButton->setVisible(false);
-					setReleaseButton->setVisible(false);
-					
-				} break;
-					
-				case Release: {
-					
-					if(env->isLoopNode(handle)) 
-						env->setLoopNode(-1);
-					
-					env->setReleaseNode(handle);
-					
-					setReleaseButton->setVisible(false);
-					
-					if(env->getLoopNode() != -1)
-						setLoopButton->setVisible(true);
-					
-				} break;
-					
-				case Loop: {
-					
-					env->setLoopNode(handle);
-					
-					if(env->isReleaseNode(handle)) 
-						env->setReleaseNode(-1);
-					
-					if(env->getReleaseNode() != -1)
-						setReleaseButton->setVisible(true);
-					
-					setLoopButton->setVisible(false);
-					
-				} break;
-					
-				case ReleaseAndLoop: {
-					
-					env->setLoopNode(handle);
-					env->setReleaseNode(handle);
-					
-					setLoopButton->setVisible(false);
-					setReleaseButton->setVisible(false);
-					
-				}
-			}
-		}
-		
-		if(initialised) expire();
-		
-		initialised = true;
-	}
-}
-
-void EnvelopeNodePopup::buttonClicked(juce::Button *button)
-{
-	EnvelopeComponent* env = handle->getParentComponent();
-	
-	if(env != 0)
-	{
-		if(button == setLoopButton)
-		{
-			int loopNode = env->getLoopNode();
-			
-			if(loopNode >= 0)
-			{
-				EnvelopeHandleComponent *loopHandle = env->getHandle(loopNode);
-				
-				if(loopHandle != 0)
-				{
-					float value = loopHandle->getValue();
-					handle->setValue(value);
-					expire();
-				}
-			}
-		}
-		else if(button == setReleaseButton)
-		{
-			int releaseNode = env->getReleaseNode();
-			
-			if(releaseNode >= 0)
-			{
-				EnvelopeHandleComponent *releaseHandle = env->getHandle(releaseNode);
-				
-				if(releaseHandle != 0)
-				{
-					float value = releaseHandle->getValue();
-					handle->setValue(value);
-					expire();
-				}
-			}
-			
-		}
-	}
-}
-
-void EnvelopeNodePopup::expired()
-{
-}
-
-const int EnvelopeNodePopup::idOffset = 2000;
 
 #endif // gpl

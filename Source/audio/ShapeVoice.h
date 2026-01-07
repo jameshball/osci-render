@@ -1,12 +1,12 @@
 #pragma once
 #include <JuceHeader.h>
 #include "ShapeSound.h"
-#include "../UGen/Env.h"
+#include "DahdsrEnvelope.h"
 
 class OscirenderAudioProcessor;
 class ShapeVoice : public juce::SynthesiserVoice {
 public:
-	ShapeVoice(OscirenderAudioProcessor& p, juce::AudioSampleBuffer& externalAudio);
+	ShapeVoice(OscirenderAudioProcessor& p, juce::AudioSampleBuffer& externalAudio, int voiceIndex);
 
 	void prepareToPlay(double sampleRate, int samplesPerBlock);
 	bool canPlaySound(juce::SynthesiserSound* sound) override;
@@ -30,6 +30,7 @@ private:
 	const double MIN_LENGTH_INCREMENT = 0.000001;
 
 	OscirenderAudioProcessor& audioProcessor;
+	const int voiceIndex = 0;
 	std::vector<std::unique_ptr<osci::Shape>> frame;
 	std::atomic<ShapeSound*> sound = nullptr;
 
@@ -48,11 +49,8 @@ private:
 	lua_State* L = nullptr;
 	LuaVariables vars;
 
-	Env adsr;
-	double time = 0.0;
-	double releaseTime = 0.0;
-	double endTime = 99999999;
-	bool waitingForRelease = false;
+	DahdsrParams dahdsr;
+	DahdsrState envState;
 
 	juce::AudioSampleBuffer& externalAudio;
 
