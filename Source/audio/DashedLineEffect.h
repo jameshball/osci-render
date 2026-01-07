@@ -7,6 +7,11 @@ public:
 		return std::make_shared<DashedLineEffect>();
 	}
 
+	void onFrameStart() override {
+		bufferIndex = 0;
+		samplesSinceFrameStart = 0;
+	}
+
 	osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
 		// if only 2 parameters are provided, this is being used as a 'trace effect'
 		// where the dash count is 1.
@@ -17,28 +22,38 @@ public:
 			dashCount = juce::jmax(1.0f, values[i++].load()); // Dashes per cycle
 		}
 
-		double dashOffset = values[i++];
+		double dashOffset = values[i++].load();
 		double dashCoverage = juce::jlimit(0.0f, 1.0f, values[i++].load());
-        
-		double dashLengthSamples = (sampleRate / frequency) / dashCount;
-		double dashPhase = framePhase * dashCount - dashOffset;
+
+		const double safeFrequency = juce::jmax(1.0, (double)frequency);
+		const int cycleSamples = juce::jlimit(1, MAX_BUFFER, (int)std::ceil(sampleRate / safeFrequency));
+
+		// Fallback for contexts where we don't get explicit frame sync pulses
+		if (samplesSinceFrameStart >= cycleSamples) {
+			samplesSinceFrameStart = 0;
+			bufferIndex = 0;
+		}
+
+		const double framePhase01 = (double)samplesSinceFrameStart / (double)cycleSamples; // [0, 1)
+		const double dashLengthSamples = ((double)cycleSamples / dashCount);
+		double dashPhase = framePhase01 * dashCount - dashOffset;
 		dashPhase = dashPhase - std::floor(dashPhase); // Wrap
+
 		buffer[bufferIndex] = input;
 
 		// Linear interpolation works much better than nearest for this
-		double samplePos = bufferIndex - dashLengthSamples * dashPhase * (1 - dashCoverage);
-		samplePos = samplePos - buffer.size() * std::floor(samplePos / buffer.size()); // Wrap to [0, size]
-		int lowIndex = (int)std::floor(samplePos) % buffer.size();
-		int highIndex = (lowIndex + 1) % buffer.size();
+		double samplePos = bufferIndex - dashLengthSamples * dashPhase * (1.0 - dashCoverage);
+		samplePos = samplePos - cycleSamples * std::floor(samplePos / (double)cycleSamples); // Wrap to [0, cycleSamples)
+		int lowIndex = (int)std::floor(samplePos) % cycleSamples;
+		int highIndex = (lowIndex + 1) % cycleSamples;
 		double mixFactor = samplePos - std::floor(samplePos); // Fractional part
 		osci::Point output = (1 - mixFactor) * buffer[lowIndex] + mixFactor * buffer[highIndex];
 
 		bufferIndex++;
-		if (bufferIndex >= buffer.size()) {
+		if (bufferIndex >= cycleSamples) {
 			bufferIndex = 0;
 		}
-		framePhase += frequency / sampleRate;
-		framePhase = framePhase - std::floor(framePhase);
+		samplesSinceFrameStart++;
 
 		return output;
 	}
@@ -61,7 +76,7 @@ private:
 	const static int MAX_BUFFER = 192000;
 	std::vector<osci::Point> buffer = std::vector<osci::Point>(MAX_BUFFER);
 	int bufferIndex = 0;
-	double framePhase = 0.0; // [0, 1]
+	int samplesSinceFrameStart = 0;
 };
 
 class TraceEffect : public DashedLineEffect {

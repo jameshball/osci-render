@@ -450,6 +450,7 @@ void OscirenderAudioProcessor::applyToggleableEffectsToBuffer(
     juce::AudioBuffer<float>* externalInput,
     juce::AudioBuffer<float>* volumeBuffer,
     juce::AudioBuffer<float>* frequencyBuffer,
+    juce::AudioBuffer<float>* frameSyncBuffer,
     const std::unordered_map<juce::String, std::shared_ptr<osci::SimpleEffect>>* perVoiceEffects,
     const std::shared_ptr<osci::Effect>& previewEffectInstance) {
     juce::MidiBuffer emptyMidi;
@@ -480,7 +481,7 @@ void OscirenderAudioProcessor::applyToggleableEffectsToBuffer(
         if (externalInput != nullptr && globalEffect->getId() == custom->getId()) {
             extInput = externalInput;
         }
-        effectInstance->processBlockWithInputs(buffer, emptyMidi, extInput, volumeBuffer, frequencyBuffer);
+        effectInstance->processBlockWithInputs(buffer, emptyMidi, extInput, volumeBuffer, frequencyBuffer, frameSyncBuffer);
     }
 
     if (previewEffectInstance != nullptr) {
@@ -493,7 +494,7 @@ void OscirenderAudioProcessor::applyToggleableEffectsToBuffer(
             if (externalInput != nullptr && previewEffectInstance->getId() == custom->getId()) {
                 extInput = externalInput;
             }
-            previewEffectInstance->processBlockWithInputs(buffer, emptyMidi, extInput, volumeBuffer, frequencyBuffer);
+            previewEffectInstance->processBlockWithInputs(buffer, emptyMidi, extInput, volumeBuffer, frequencyBuffer, frameSyncBuffer);
         }
     }
 }
@@ -655,7 +656,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             inputFrequencyBuffer.setSize(1, numSamples, false, false, true);
             juce::FloatVectorOperations::fill(inputFrequencyBuffer.getWritePointer(0), (float)frequency.load(), numSamples);
 
-            applyToggleableEffectsToBuffer(outputBuffer3d, &inputBuffer, &currentVolumeBuffer, &inputFrequencyBuffer, nullptr, previewEffect);
+                        applyToggleableEffectsToBuffer(outputBuffer3d, &inputBuffer, &currentVolumeBuffer, &inputFrequencyBuffer, nullptr, nullptr, previewEffect);
 		}
     } else {
         juce::SpinLock::ScopedLockType lock1(parsersLock);

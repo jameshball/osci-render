@@ -202,6 +202,7 @@ public:
         juce::AudioBuffer<float>* externalInput,
         juce::AudioBuffer<float>* volumeBuffer,
         juce::AudioBuffer<float>* frequencyBuffer,
+        juce::AudioBuffer<float>* frameSyncBuffer,
         const std::unordered_map<juce::String, std::shared_ptr<osci::SimpleEffect>>* perVoiceEffects,
         const std::shared_ptr<osci::Effect>& previewEffectInstance);
 

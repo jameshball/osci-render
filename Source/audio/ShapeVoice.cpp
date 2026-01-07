@@ -76,6 +76,7 @@ void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesiser
             frameLength = shapeSound->updateFrame(frame);
             tries++;
         }
+        pendingFrameStart = true;
         adsr = audioProcessor.adsrEnv;
         time = 0.0;
         releaseTime = 0.0;
@@ -152,9 +153,16 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     voiceBuffer.clear();
     frequencyBuffer.setSize(1, numSamples, false, false, true);
     volumeBuffer.setSize(1, numSamples, false, false, true);
+    frameSyncBuffer.setSize(1, numSamples, false, false, true);
+    frameSyncBuffer.clear();
 
     // First pass: generate raw audio samples (without gain) and fill frequency buffer
     for (int i = 0; i < numSamples; ++i) {
+        if (pendingFrameStart) {
+            frameSyncBuffer.setSample(0, i, 1.0f);
+            pendingFrameStart = false;
+        }
+
         int sample = startSample + i;
         lengthIncrement = juce::jmax(frameLength / (audioProcessor.currentSampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
 
@@ -247,10 +255,13 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             double prevFrameLength = frameLength;
             frameDrawn -= prevFrameLength;
             currentShape = 0;
+
+            // The first sample of the new frame is the *next* sample.
+            pendingFrameStart = true;
         }
     }
 
-    audioProcessor.applyToggleableEffectsToBuffer(voiceBuffer, audioProcessor.getInputBuffer(), &volumeBuffer, &frequencyBuffer, &voiceEffectsMap, voicePreviewEffect);
+    audioProcessor.applyToggleableEffectsToBuffer(voiceBuffer, audioProcessor.getInputBuffer(), &volumeBuffer, &frequencyBuffer, &frameSyncBuffer, &voiceEffectsMap, voicePreviewEffect);
 
     // Apply gain (ADSR * velocity) after effects and add to output buffer
     for (int i = 0; i < numSamples; ++i) {
