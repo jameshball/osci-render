@@ -74,7 +74,7 @@ public:
     juce::XmlTokeniser xmlTokeniser;
     juce::ShapeButton collapseButton;
     std::shared_ptr<juce::CodeDocument> customFunctionCodeDocument = std::make_shared<juce::CodeDocument>();
-    std::shared_ptr<OscirenderCodeEditorComponent> customFunctionCodeEditor = std::make_shared<OscirenderCodeEditorComponent>(*customFunctionCodeDocument, &luaTokeniser, audioProcessor, CustomEffect::UNIQUE_ID, CustomEffect::FILE_NAME);
+    std::shared_ptr<OscirenderCodeEditorComponent> customFunctionCodeEditor = std::make_shared<OscirenderCodeEditorComponent>(*customFunctionCodeDocument, &luaTokeniser, audioProcessor, LuaEffectState::UNIQUE_ID, LuaEffectState::FILE_NAME);
 
     OsciMainMenuBarModel model{audioProcessor, *this};
 

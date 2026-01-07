@@ -7,10 +7,6 @@ public:
 	CustomEffect(LuaEffectState& luaState, std::atomic<double>* luaValues);
 	~CustomEffect();
 
-	// arbitrary UUID
-	static const juce::String UNIQUE_ID;
-	static const juce::String FILE_NAME;
-
 	std::shared_ptr<osci::EffectApplication> clone() const override {
 		return std::make_shared<CustomEffect>(luaState, luaValues);
 	}

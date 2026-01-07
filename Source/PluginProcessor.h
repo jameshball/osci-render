@@ -80,7 +80,7 @@ public:
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
 
     std::function<void(int, juce::String, juce::String)> errorCallback = [this](int lineNum, juce::String fileName, juce::String error) { notifyErrorListeners(lineNum, fileName, error); };
-    std::unique_ptr<LuaEffectState> luaEffectState = std::make_unique<LuaEffectState>(CustomEffect::FILE_NAME, "return { x, y, z }", errorCallback);
+    std::unique_ptr<LuaEffectState> luaEffectState = std::make_unique<LuaEffectState>(LuaEffectState::UNIQUE_ID, "return { x, y, z }", errorCallback);
     std::shared_ptr<osci::Effect> custom = std::make_shared<osci::SimpleEffect>(
         std::make_shared<CustomEffect>(*luaEffectState, luaValues),
         new osci::EffectParameter("Lua Effect", "Controls the strength of the custom Lua effect applied. You can write your own custom effect using Lua by pressing the edit button on the right.", "customEffectStrength", VERSION_HINT, 1.0, 0.0, 1.0));

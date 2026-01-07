@@ -2,9 +2,6 @@
 #include <numbers>
 #include "../MathUtil.h"
 
-const juce::String CustomEffect::UNIQUE_ID = "6a3580b0-c5fc-4b28-a33e-e26a487f052f";
-const juce::String CustomEffect::FILE_NAME = "Custom Lua Effect";
-
 CustomEffect::CustomEffect(LuaEffectState& luaState, std::atomic<double>* luaValues) 
 	: luaState(luaState), luaValues(luaValues) {
 	vars.isEffect = true;
