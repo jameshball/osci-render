@@ -432,8 +432,8 @@ void OscirenderAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcas
         repaint();
     } else if (source == &audioProcessor.fileChangeBroadcaster) {
         juce::SpinLock::ScopedLockType parsersLock(audioProcessor.parsersLock);
-        // triggered when the audioProcessor changes the current file (e.g. to Blender)
-        settings.fileUpdated(audioProcessor.getCurrentFileName());
+        // Triggered when the processor changes the current file (e.g. Blender or automation).
+        fileUpdated(audioProcessor.getCurrentFileName());
     }
 }
 

@@ -54,7 +54,14 @@ bool ShapeVoice::canPlaySound(juce::SynthesiserSound* sound) {
 void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::SynthesiserSound* sound, int currentPitchWheelPosition) {
     this->velocity = velocity;
     pitchWheelMoved(currentPitchWheelPosition);
-    auto* shapeSound = dynamic_cast<ShapeSound*>(sound);
+
+    // Don't rely on JUCE's Synthesiser sound list for routing; use the processor's
+    // active sound so we can switch files on the audio thread without mutating
+    // the synth's sound list.
+    auto* shapeSound = audioProcessor.getActiveShapeSound();
+    if (shapeSound == nullptr) {
+        shapeSound = dynamic_cast<ShapeSound*>(sound);
+    }
 
     currentlyPlaying = true;
     this->sound = shapeSound;
@@ -67,7 +74,7 @@ void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesiser
         clearPreviewEffect();
     }
 
-    auto parser = this->sound.load()->parser;
+    auto parser = this->sound.load() != nullptr ? this->sound.load()->parser : nullptr;
     renderingSample = parser != nullptr && parser->isSample();
 
     if (shapeSound != nullptr) {

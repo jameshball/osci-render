@@ -138,6 +138,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     }
 
     intParameters.push_back(voices);
+    intParameters.push_back(fileSelect);
 
     voices->addListener(this);
 
@@ -147,6 +148,10 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
 
     synth.addSound(defaultSound);
 
+    activeShapeSound.store(defaultSound.get(), std::memory_order_release);
+
+    fileSelectionNotifier = std::make_unique<FileSelectionAsyncNotifier>(*this);
+
     addAllParameters();
 }
 
@@ -155,6 +160,58 @@ OscirenderAudioProcessor::~OscirenderAudioProcessor() {
         luaEffects[i]->parameters[0]->removeListener(this);
     }
     voices->removeListener(this);
+}
+
+// parsersLock AND effectsLock must be held when calling this
+void OscirenderAudioProcessor::applyFileSelectLocked() {
+    const int previousFileIndex = currentFile.load();
+    auto* previousSound = activeShapeSound.load(std::memory_order_acquire);
+
+    ShapeSound* selectedSound = nullptr;
+
+    if (objectServerRendering.load()) {
+        selectedSound = objectServerSound.get();
+        activeShapeSound.store(selectedSound, std::memory_order_release);
+        currentFile.store(-1);
+    } else {
+        const int fileCount = (int)fileBlocks.size();
+
+        // 1-based mapping: 1 -> first file (index 0), 2 -> second file (index 1), ...
+        const int requestedParamValue = juce::jlimit(1, 100, (int)fileSelect->getValueUnnormalised());
+        const int requestedIndex = requestedParamValue - 1;
+
+        int targetFileIndex = -1;
+        if (fileCount <= 0) {
+            targetFileIndex = -1;
+        } else {
+            const int maxIndex = fileCount - 1;
+            targetFileIndex = juce::jlimit(0, maxIndex, requestedIndex);
+        }
+
+        currentFile.store(targetFileIndex);
+        selectedSound = targetFileIndex >= 0 ? sounds[(size_t)targetFileIndex].get() : defaultSound.get();
+        activeShapeSound.store(selectedSound, std::memory_order_release);
+    }
+
+    assert(selectedSound != nullptr);
+
+    const int newFileIndex = currentFile.load();
+    const bool selectionChanged = (newFileIndex != previousFileIndex) || (selectedSound != previousSound);
+    if (!selectionChanged || selectedSound == nullptr) {
+        return;
+    }
+
+    for (int i = 0; i < synth.getNumVoices(); i++) {
+        auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
+        if (voice != nullptr) {
+            voice->updateSound(selectedSound);
+        }
+    }
+
+    // Safe to call from the audio thread; AsyncUpdater will deliver on message thread.
+    if (fileSelectionNotifier != nullptr) {
+        fileSelectionNotifier->triggerAsyncUpdate();
+    }
 }
 
 void OscirenderAudioProcessor::setAudioThreadCallback(std::function<void(const juce::AudioBuffer<float>&)> callback) {
@@ -341,14 +398,21 @@ void OscirenderAudioProcessor::changeCurrentFile(int index) {
     }
     currentFile = index;
     changeSound(sounds[index]);
+
+    // Keep fileSelect parameter in sync with UI-driven file selection.
+    const int value = juce::jlimit(1, 100, index + 1);
+    fileSelect->setUnnormalisedValueNotifyingHost((float)value);
 }
 
 void OscirenderAudioProcessor::changeSound(ShapeSound::Ptr sound) {
-    if (!objectServerRendering || sound == objectServerSound) {
-        synth.clearSounds();
-        synth.addSound(sound);
-        for (int i = 0; i < synth.getNumVoices(); i++) {
-            auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
+    if (objectServerRendering && sound != objectServerSound) {
+        return;
+    }
+
+    activeShapeSound.store(sound.get(), std::memory_order_release);
+    for (int i = 0; i < synth.getNumVoices(); i++) {
+        auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
+        if (voice != nullptr) {
             voice->updateSound(sound.get());
         }
     }
@@ -394,6 +458,7 @@ std::shared_ptr<juce::MemoryBlock> OscirenderAudioProcessor::getFileBlock(int in
 void OscirenderAudioProcessor::setObjectServerRendering(bool enabled) {
     {
         juce::SpinLock::ScopedLockType lock1(parsersLock);
+        juce::SpinLock::ScopedLockType lock2(effectsLock);
 
         objectServerRendering = enabled;
         if (enabled) {
@@ -660,6 +725,10 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     } else {
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
+
+        // Apply file selection on the audio thread (among already-loaded files)
+        applyFileSelectLocked();
+
         synth.renderNextBlock(outputBuffer3d, midiMessages, 0, buffer.getNumSamples());
     }
 
@@ -701,6 +770,12 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     {
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
+
+        // If we're in audio-input mode, the synth path above didn't run, but we still
+        // want file selection to affect Lua/custom processing on the audio thread.
+        if (usingInput) {
+            applyFileSelectLocked();
+        }
 
         // Note: toggleableEffects/previewEffect are applied via shared helper:
         // - per-voice when using the synth path

@@ -10,6 +10,7 @@
 
 #include <JuceHeader.h>
 
+#include <limits>
 #include <numbers>
 #include <unordered_map>
 
@@ -124,6 +125,13 @@ public:
     juce::MidiKeyboardState keyboardState;
 
     osci::IntParameter* voices = new osci::IntParameter("Voices", "voices", VERSION_HINT, 4, 1, 16);
+
+    // 1..100 maps to file index with a 1-based offset (1 = first file, 2 = second, ...). Intended for DAW automation.
+    osci::IntParameter* fileSelect = new osci::IntParameter("File Select", "fileSelect", VERSION_HINT, 1, 1, 100);
+
+    // Audio-thread readable pointer to the currently selected sound.
+    // Lifetime is owned by defaultSound/objectServerSound/sounds[].
+    ShapeSound* getActiveShapeSound() const { return activeShapeSound.load(std::memory_order_acquire); }
 
     osci::BooleanParameter* animateFrames = new osci::BooleanParameter("Animate", "animateFrames", VERSION_HINT, true, "Enables animation for files that have multiple frames, such as GIFs or Line Art.");
     osci::BooleanParameter* loopAnimation = new osci::BooleanParameter("Loop Animation", "loopAnimation", VERSION_HINT, true, "Loops the animation. If disabled, the animation will stop at the last frame.");
@@ -258,6 +266,19 @@ private:
     osci::LfoType lfoTypeFromLegacyAnimationType(const juce::String& type);
     double valueFromLegacy(double value, const juce::String& id);
     void changeSound(ShapeSound::Ptr sound);
+
+    // parsersLock AND effectsLock must be held when calling this
+    void applyFileSelectLocked();
+
+    std::atomic<ShapeSound*> activeShapeSound { nullptr };
+
+    struct FileSelectionAsyncNotifier : public juce::AsyncUpdater {
+        explicit FileSelectionAsyncNotifier(OscirenderAudioProcessor& p) : processor(p) {}
+        void handleAsyncUpdate() override { processor.fileChangeBroadcaster.sendChangeMessage(); }
+        OscirenderAudioProcessor& processor;
+    };
+
+    std::unique_ptr<FileSelectionAsyncNotifier> fileSelectionNotifier;
 
     void parseVersion(int result[3], const juce::String& input) {
         std::istringstream parser(input.toStdString());
