@@ -856,6 +856,8 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
 
     std::unique_ptr<juce::XmlElement> xml = std::make_unique<juce::XmlElement>("project");
     xml->setAttribute("version", ProjectInfo::versionString);
+
+    saveStandaloneProjectFilePathToXml(*xml);
     auto effectsXml = xml->createNewChildElement("effects");
     for (auto effect : effects) {
         effect->save(effectsXml->createNewChildElement("effect"));
@@ -921,6 +923,8 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
     }
 
     if (xml.get() != nullptr && xml->hasTagName("project")) {
+        restoreStandaloneProjectFilePathFromXml(*xml);
+
         auto versionXml = xml->getChildByName("version");
         if (versionXml != nullptr && versionXml->getAllSubText().startsWith("v1.")) {
             // this is an old version of osci-render, ignore it

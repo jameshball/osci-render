@@ -33,6 +33,14 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
     #endif
     
     globalSettings = std::make_unique<juce::PropertiesFile>(options);
+
+    // Restore recently-opened project files (shared across instances).
+    recentProjectFiles.setMaxNumberOfItems(10);
+    {
+        const auto savedRecent = getGlobalStringValue("recentProjectFiles");
+        if (savedRecent.isNotEmpty())
+            recentProjectFiles.restoreFromString(savedRecent);
+    }
     
     // locking isn't necessary here because we are in the constructor
 
@@ -63,6 +71,76 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
 
     wavParser.setLooping(false);
     startHeartbeat();
+}
+
+int CommonAudioProcessor::getNumRecentProjectFiles() const
+{
+    return recentProjectFiles.getNumFiles();
+}
+
+juce::File CommonAudioProcessor::getRecentProjectFile(int index) const
+{
+    return recentProjectFiles.getFile(index);
+}
+
+void CommonAudioProcessor::addRecentProjectFile(const juce::File& file)
+{
+    if (file == juce::File())
+        return;
+
+    recentProjectFiles.addFile(file);
+
+    // Persist to global settings.
+    setGlobalValue("recentProjectFiles", recentProjectFiles.toString());
+    saveGlobalSettings();
+
+    // Best-effort: register with OS for native "recent documents" integration (jump lists / dock).
+    // This is optional and should be safe across platforms.
+    recentProjectFiles.registerRecentFileNatively(file);
+}
+
+int CommonAudioProcessor::createRecentProjectsPopupMenuItems(juce::PopupMenu& menuToAddItemsTo,
+                                                            int baseItemId,
+                                                            bool showFullPaths,
+                                                            bool dontAddNonExistentFiles)
+{
+    if (dontAddNonExistentFiles) {
+        const auto before = recentProjectFiles.toString();
+        recentProjectFiles.removeNonExistentFiles();
+        const auto after = recentProjectFiles.toString();
+        if (after != before) {
+            setGlobalValue("recentProjectFiles", after);
+            saveGlobalSettings();
+        }
+    }
+
+    return recentProjectFiles.createPopupMenuItems(menuToAddItemsTo,
+                                                   baseItemId,
+                                                   showFullPaths,
+                                                   dontAddNonExistentFiles,
+                                                   nullptr);
+}
+
+void CommonAudioProcessor::saveStandaloneProjectFilePathToXml(juce::XmlElement& xml) const
+{
+    if (!juce::JUCEApplicationBase::isStandaloneApp())
+        return;
+
+    xml.setAttribute("projectFilePath", currentProjectFile);
+}
+
+void CommonAudioProcessor::restoreStandaloneProjectFilePathFromXml(const juce::XmlElement& xml)
+{
+    if (!juce::JUCEApplicationBase::isStandaloneApp())
+        return;
+
+    const auto projectPath = xml.getStringAttribute("projectFilePath");
+    if (projectPath.isNotEmpty()) {
+        const juce::File f(projectPath);
+        currentProjectFile = f.existsAsFile() ? f.getFullPathName() : juce::String();
+    } else {
+        currentProjectFile = juce::String();
+    }
 }
 
 void CommonAudioProcessor::addAllParameters() {

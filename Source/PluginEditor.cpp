@@ -8,11 +8,16 @@
 #include "components/SyphonInputSelectorComponent.h"
 
 void OscirenderAudioProcessorEditor::registerFileRemovedCallback() {
-    audioProcessor.setFileRemovedCallback([this](int index) {
-        removeCodeEditor(index);
-        fileUpdated(audioProcessor.getCurrentFileName());
-        juce::MessageManager::callAsync([this] {
-            resized();
+    juce::Component::SafePointer<OscirenderAudioProcessorEditor> safeThis(this);
+    audioProcessor.setFileRemovedCallback([safeThis](int index) {
+        if (safeThis == nullptr)
+            return;
+
+        safeThis->removeCodeEditor(index);
+        safeThis->fileUpdated(safeThis->audioProcessor.getCurrentFileName());
+        juce::MessageManager::callAsync([safeThis] {
+            if (safeThis != nullptr)
+                safeThis->resized();
         });
     });
 }
@@ -365,6 +370,10 @@ void OscirenderAudioProcessorEditor::removeCodeEditor(int index) {
 
 // parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessorEditor::updateCodeEditor(bool binaryFile, bool shouldOpenEditor) {
+    // While editing the custom Lua effect, we should not treat the currently-selected file's
+    // extension as a reason to close the editor panel (the custom editor is always valid).
+    binaryFile = binaryFile && !editingCustomFunction;
+
     // check if any code editors are visible
     bool visible = shouldOpenEditor;
     if (!visible) {
@@ -457,11 +466,25 @@ void OscirenderAudioProcessorEditor::toggleLayout(juce::StretchableLayoutManager
 }
 
 void OscirenderAudioProcessorEditor::editCustomFunction(bool enable) {
+    if (enable) {
+        // Record whether the code editor was open before entering custom-function edit mode.
+        // We'll restore this state when exiting.
+        codeEditorWasVisibleBeforeEditingCustomFunction = std::any_cast<bool>(audioProcessor.getProperty("codeEditorVisible", false));
+    }
+
     editingCustomFunction = enable;
     juce::SpinLock::ScopedLockType lock1(audioProcessor.parsersLock);
     juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
+
+    const auto currentFileName = audioProcessor.getCurrentFileName();
+    const bool binaryFile = !editingCustomFunction && isBinaryFile(currentFileName);
+
+    // When disabling the pencil icon, don't close the editor if it was already open.
+    // Instead, switch back to the currently-open file (unless it's a binary file).
+    const bool shouldOpenEditor = enable || (codeEditorWasVisibleBeforeEditingCustomFunction && !binaryFile);
+
     codeEditors[0]->setVisible(enable);
-    updateCodeEditor(!editingCustomFunction && isBinaryFile(audioProcessor.getCurrentFileName()));
+    updateCodeEditor(binaryFile, shouldOpenEditor);
 }
 
 // parsersLock AND effectsLock must be locked before calling this function

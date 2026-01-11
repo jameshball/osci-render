@@ -172,6 +172,8 @@ void SosciAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
 
     std::unique_ptr<juce::XmlElement> xml = std::make_unique<juce::XmlElement>("project");
     xml->setAttribute("version", ProjectInfo::versionString);
+
+    saveStandaloneProjectFilePathToXml(*xml);
     auto effectsXml = xml->createNewChildElement("effects");
     for (auto effect : effects) {
         effect->save(effectsXml->createNewChildElement("effect"));
@@ -219,6 +221,8 @@ void SosciAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
     }
 
     if (xml.get() != nullptr && xml->hasTagName("project")) {
+        restoreStandaloneProjectFilePathFromXml(*xml);
+
         juce::SpinLock::ScopedLockType lock2(effectsLock);
 
         auto effectsXml = xml->getChildByName("effects");

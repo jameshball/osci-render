@@ -10,6 +10,8 @@ SosciMainMenuBarModel::SosciMainMenuBarModel(SosciPluginEditor& e, SosciAudioPro
 void SosciMainMenuBarModel::resetMenuItems() {
     MainMenuBarModel::resetMenuItems();
 
+    constexpr int RECENT_BASE_ID = 1000;
+
     addTopLevelMenu("File");
     addTopLevelMenu("About");
     addTopLevelMenu("Video");
@@ -26,25 +28,46 @@ void SosciMainMenuBarModel::resetMenuItems() {
 
     // This is a hack - ideally I would improve the MainMenuBarModel class to allow for submenus
     customMenuLogic = [this, examples](juce::PopupMenu& menu, int topLevelMenuIndex) {
-        if (topLevelMenuIndex == 0) {
-            juce::PopupMenu submenu;
+        if (topLevelMenuIndex != 0)
+            return;
 
-            for (int i = 0; i < examples.size(); i++) {
-                submenu.addItem(SUBMENU_ID + i, std::get<0>(examples[i]));
-            }
+        juce::PopupMenu recentMenu;
+        const int added = processor.createRecentProjectsPopupMenuItems(recentMenu,
+                                                                       RECENT_BASE_ID,
+                                                                       true,
+                                                                       true);
+        if (added == 0)
+            recentMenu.addItem(RECENT_BASE_ID, "(No Recent Projects)", false);
 
-            menu.addSubMenu("Examples", submenu);
+        menu.addSubMenu("Open Recent", recentMenu);
+
+        juce::PopupMenu submenu;
+        for (int i = 0; i < (int) examples.size(); i++) {
+            submenu.addItem(SUBMENU_ID + i, std::get<0>(examples[i]));
         }
+
+        menu.addSubMenu("Examples", submenu);
+        menu.addSeparator();
     };
 
     customMenuSelectedLogic = [this, examples](int menuItemID, int topLevelMenuIndex) {
-        if (topLevelMenuIndex == 0) {
-            if (menuItemID >= SUBMENU_ID) {
-                int index = menuItemID - SUBMENU_ID;
-                processor.setStateInformation(std::get<1>(examples[index]), std::get<2>(examples[index]));
-                return true;
-            }
+        if (topLevelMenuIndex != 0)
+            return false;
+
+        if (menuItemID >= RECENT_BASE_ID) {
+            const int index = menuItemID - RECENT_BASE_ID;
+            const auto file = processor.getRecentProjectFile(index);
+            if (file != juce::File() && file.existsAsFile())
+                editor.openProject(file);
+            return true;
         }
+
+        if (menuItemID >= SUBMENU_ID) {
+            int index = menuItemID - SUBMENU_ID;
+            processor.setStateInformation(std::get<1>(examples[index]), std::get<2>(examples[index]));
+            return true;
+        }
+
         return false;
     };
 

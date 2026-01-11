@@ -29,8 +29,10 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
         juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
         if (standalone != nullptr) {
             standalone->getMuteInputValue().setValue(false);
-            standalone->commandLineCallback = [this](const juce::String& commandLine) {
-                handleCommandLine(commandLine);
+            juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
+            standalone->commandLineCallback = [safeThis](const juce::String& commandLine) {
+                if (safeThis != nullptr)
+                    safeThis->handleCommandLine(commandLine);
             };
         }
     }
@@ -63,12 +65,26 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     
     updateTitle();
 
+    // On startup (especially standalone state restore), the editor may not yet be attached to a
+    // top-level window when updateTitle() is first called. Refresh once the message loop runs.
+    juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
+    juce::MessageManager::callAsync([safeThis] {
+        if (safeThis != nullptr)
+            safeThis->updateTitle();
+    });
+
 #if OSCI_PREMIUM
     sharedTextureManager.initGL();
 #endif
 
     // Enable keyboard focus so F11 key works immediately
     setWantsKeyboardFocus(true);
+}
+
+void CommonPluginEditor::parentHierarchyChanged()
+{
+    // Refresh the title when the editor is attached/detached.
+    updateTitle();
 }
 
 void CommonPluginEditor::handleCommandLine(const juce::String& commandLine) {
@@ -145,6 +161,7 @@ void CommonPluginEditor::openProject(const juce::File& file) {
         }
         audioProcessor.currentProjectFile = file.getFullPathName();
         audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
+        audioProcessor.addRecentProjectFile(file);
         updateTitle();
     }
 }
@@ -154,8 +171,10 @@ void CommonPluginEditor::openProject() {
     auto flags = juce::FileBrowserComponent::openMode |
         juce::FileBrowserComponent::canSelectFiles;
 
-    chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
-        openProject(chooser.getResult());
+    juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
+    chooser->launchAsync(flags, [safeThis](const juce::FileChooser& chooser) {
+        if (safeThis != nullptr)
+            safeThis->openProject(chooser.getResult());
     });
 }
 
@@ -176,12 +195,17 @@ void CommonPluginEditor::saveProjectAs() {
     chooser = std::make_unique<juce::FileChooser>("Save " + appName + " Project", audioProcessor.getLastOpenedDirectory(), "*." + projectFileType);
     auto flags = juce::FileBrowserComponent::saveMode;
 
-    chooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
+    juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
+    chooser->launchAsync(flags, [safeThis](const juce::FileChooser& chooser) {
+        if (safeThis == nullptr)
+            return;
+
         auto file = chooser.getResult();
         if (file != juce::File()) {
-            audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
-            audioProcessor.currentProjectFile = file.getFullPathName();
-            saveProject();
+            safeThis->audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
+            safeThis->audioProcessor.currentProjectFile = file.getFullPathName();
+            safeThis->audioProcessor.addRecentProjectFile(file);
+            safeThis->saveProject();
         }
     });
 }

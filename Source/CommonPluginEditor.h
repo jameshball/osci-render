@@ -34,6 +34,7 @@ public:
     void resetToDefault();
     void toggleFullScreen();
     void resized() override;
+    void parentHierarchyChanged() override;
 
 private:
     CommonAudioProcessor& audioProcessor;

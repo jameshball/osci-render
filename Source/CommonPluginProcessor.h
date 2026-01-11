@@ -142,6 +142,21 @@ public:
     juce::File getLastOpenedDirectory();
     void setLastOpenedDirectory(const juce::File& directory);
 
+    // Standalone-only: persist and restore currentProjectFile in the project state XML.
+    // This allows standalone to "relink" saves to the same project file after restart.
+    void saveStandaloneProjectFilePathToXml(juce::XmlElement& xml) const;
+    void restoreStandaloneProjectFilePathFromXml(const juce::XmlElement& xml);
+
+    // Recently opened project files (persisted in global settings).
+    // This is used for the File > Open Recent menu in both standalone and DAW plugin builds.
+    int getNumRecentProjectFiles() const;
+    juce::File getRecentProjectFile(int index) const;
+    void addRecentProjectFile(const juce::File& file);
+    int createRecentProjectsPopupMenuItems(juce::PopupMenu& menuToAddItemsTo,
+                                          int baseItemId,
+                                          bool showFullPaths,
+                                          bool dontAddNonExistentFiles);
+
     juce::File applicationFolder = juce::File::getSpecialLocation(juce::File::SpecialLocationType::userApplicationDataDirectory)
 #if JUCE_MAC
         .getChildFile("Application Support")
@@ -193,6 +208,8 @@ protected:
     
     // Global settings that persist across plugin instances
     std::unique_ptr<juce::PropertiesFile> globalSettings;
+
+    juce::RecentlyOpenedFilesList recentProjectFiles;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CommonAudioProcessor)

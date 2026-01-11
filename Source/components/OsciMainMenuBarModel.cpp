@@ -10,6 +10,39 @@ OsciMainMenuBarModel::OsciMainMenuBarModel(OscirenderAudioProcessor& p, Oscirend
 void OsciMainMenuBarModel::resetMenuItems() {
     MainMenuBarModel::resetMenuItems();
 
+    constexpr int RECENT_BASE_ID = 1000;
+
+    customMenuLogic = [this](juce::PopupMenu& menu, int topLevelMenuIndex) {
+        if (topLevelMenuIndex != 0)
+            return;
+
+        juce::PopupMenu recentMenu;
+        const int added = audioProcessor.createRecentProjectsPopupMenuItems(recentMenu,
+                                                                            RECENT_BASE_ID,
+                                                                            true,
+                                                                            true);
+        if (added == 0)
+            recentMenu.addItem(RECENT_BASE_ID, "(No Recent Projects)", false);
+
+        menu.addSubMenu("Open Recent", recentMenu);
+        menu.addSeparator();
+    };
+
+    customMenuSelectedLogic = [this](int menuItemID, int topLevelMenuIndex) {
+        if (topLevelMenuIndex != 0)
+            return false;
+
+        if (menuItemID < RECENT_BASE_ID)
+            return false;
+
+        const int index = menuItemID - RECENT_BASE_ID;
+        const auto file = audioProcessor.getRecentProjectFile(index);
+        if (file != juce::File() && file.existsAsFile())
+            editor.openProject(file);
+
+        return true;
+    };
+
     addTopLevelMenu("File");      // index 0
     addTopLevelMenu("About");     // index 1
     addTopLevelMenu("Video");     // index 2
