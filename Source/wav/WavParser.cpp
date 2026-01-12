@@ -18,29 +18,65 @@ bool WavParser::parse(std::unique_ptr<juce::InputStream> stream) {
     if (reader == nullptr) {
         return false;
     }
-    afSource = new juce::AudioFormatReaderSource(reader, true);
-    if (afSource == nullptr) {
-        return false;
-    }
+    afSource = std::make_unique<juce::AudioFormatReaderSource>(reader, true);
     totalSamples = afSource->getTotalLength();
     afSource->setLooping(looping);
-    source = std::make_unique<juce::ResamplingAudioSource>(afSource, true, reader->numChannels);
+    // afSource is owned by this class (unique_ptr), so ResamplingAudioSource must NOT delete it.
+    source = std::make_unique<juce::ResamplingAudioSource>(afSource.get(), false, reader->numChannels);
     if (source == nullptr) {
         return false;
     }
     fileSampleRate = reader->sampleRate;
+    numChannels = (int) reader->numChannels;
     audioBuffer.setSize(reader->numChannels, 1);
-    setSampleRate(audioProcessor.currentSampleRate);
+    // Default behaviour: follow the processor sample rate for realtime playback.
+    // If the processor sample rate isn't known yet, fall back to the file sample rate.
+    // For offline rendering, callers can disable following before parse() and optionally
+    // set a fixed target sample rate.
+    const double processorRate = (double) audioProcessor.currentSampleRate.load();
+    const double defaultTarget = processorRate > 0.0 ? processorRate : fileSampleRate;
+
+    const bool shouldFollow = followProcessorSampleRate.load();
+    const double existingTarget = targetSampleRate.load();
+    const double initialTarget = shouldFollow
+        ? defaultTarget
+        : (existingTarget > 0.0 ? existingTarget : fileSampleRate);
+
+    targetSampleRate.store(initialTarget);
+    setSampleRate(initialTarget);
     initialised = true;
 
     return true;
+}
+
+void WavParser::setFollowProcessorSampleRate(bool shouldFollow) {
+    followProcessorSampleRate.store(shouldFollow);
+}
+
+void WavParser::setTargetSampleRate(double sampleRate) {
+    if (sampleRate <= 0.0) {
+        return;
+    }
+
+    targetSampleRate.store(sampleRate);
+    if (initialised && source != nullptr && currentSampleRate != sampleRate) {
+        setSampleRate(sampleRate);
+    }
+}
+
+double WavParser::getFileSampleRate() const {
+    return fileSampleRate;
+}
+
+int WavParser::getNumChannels() const {
+    return numChannels;
 }
 
 void WavParser::close() {
     if (initialised) {
         initialised = false;
         source.reset();
-        afSource = nullptr;
+        afSource.reset();
     }
 }
 
@@ -61,8 +97,16 @@ void WavParser::processBlock(juce::AudioBuffer<float> &buffer) {
         return;
     }
 
-    if (currentSampleRate != audioProcessor.currentSampleRate) {
-        setSampleRate(audioProcessor.currentSampleRate);
+    if (followProcessorSampleRate.load()) {
+        const int desired = (int) audioProcessor.currentSampleRate.load();
+        if (desired > 0 && currentSampleRate != desired) {
+            setSampleRate(desired);
+        }
+    } else {
+        const int desired = (int) targetSampleRate.load();
+        if (desired > 0 && currentSampleRate != desired) {
+            setSampleRate(desired);
+        }
     }
 
     if (looping != afSource->isLooping()) {

@@ -107,6 +107,14 @@ void OsciMainMenuBarModel::resetMenuItems() {
         editor.openRecordingSettings();
     });
 
+    addMenuItem(2, "Render Audio File to Video...", [this] {
+#if OSCI_PREMIUM
+        editor.renderAudioFileToVideo();
+#else
+        editor.showPremiumSplashScreen();
+#endif
+    });
+
 #if JUCE_MAC || JUCE_WINDOWS
     // Add Syphon/Spout input menu item under Recording
     juce::String syphonMenuLabel =

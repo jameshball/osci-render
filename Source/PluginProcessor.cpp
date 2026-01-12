@@ -566,6 +566,13 @@ void OscirenderAudioProcessor::applyToggleableEffectsToBuffer(
 
 void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
     juce::ScopedNoDenormals noDenormals;
+
+    if (isOfflineRenderActive()) {
+        midiMessages.clear();
+        buffer.clear();
+        return;
+    }
+
     // Audio info variables
     int totalNumInputChannels = getTotalNumInputChannels();
     int totalNumOutputChannels = getTotalNumOutputChannels();

@@ -199,6 +199,10 @@
               file="Source/visualiser/RecordingSettings.cpp"/>
         <FILE id="dAhaYq" name="RecordingSettings.h" compile="0" resource="0"
               file="Source/visualiser/RecordingSettings.h"/>
+        <FILE id="oAVr2a" name="OfflineAudioToVideoRenderer.cpp" compile="1" resource="0"
+              file="Source/visualiser/OfflineAudioToVideoRenderer.cpp"/>
+        <FILE id="oAVr2b" name="OfflineAudioToVideoRenderer.h" compile="0" resource="0"
+              file="Source/visualiser/OfflineAudioToVideoRenderer.h"/>
         <FILE id="ePJ1g0" name="SimpleFragmentShader.glsl" compile="0" resource="0"
               file="Source/visualiser/SimpleFragmentShader.glsl"/>
         <FILE id="GFGIEu" name="SimpleVertexShader.glsl" compile="0" resource="0"

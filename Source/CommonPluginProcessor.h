@@ -130,6 +130,10 @@ public:
     
     osci::AudioBackgroundThreadManager threadManager;
     std::function<void()> haltRecording;
+
+    // When true, processBlock should do minimal work and output silence.
+    // Used during offline video rendering so the UI renderer can use CPU/GPU without contention.
+    std::atomic<bool> offlineRenderActive { false };
     
     std::atomic<bool> forceDisableBrightnessInput = false;
     std::atomic<bool> forceDisableRgbInput = false;
@@ -187,6 +191,9 @@ public:
     bool isRgbEnabled() const { return rgbEnabled; }
     bool getForceDisableBrightnessInput() const { return forceDisableBrightnessInput.load(); }
     bool getForceDisableRgbInput() const { return forceDisableRgbInput.load(); }
+
+    void setOfflineRenderActive(bool active) { offlineRenderActive.store(active); }
+    bool isOfflineRenderActive() const { return offlineRenderActive.load(); }
 protected:
     
     std::vector<osci::BooleanParameter*> booleanParameters;

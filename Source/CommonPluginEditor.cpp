@@ -2,6 +2,10 @@
 #include "CommonPluginEditor.h"
 #include "CustomStandaloneFilterWindow.h"
 
+#if OSCI_PREMIUM
+#include "visualiser/OfflineAudioToVideoRenderer.h"
+#endif
+
 CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String appName, juce::String projectFileType, int defaultWidth, int defaultHeight)
     : AudioProcessorEditor(&p), audioProcessor(p), appName(appName), projectFileType(projectFileType)
 {
@@ -125,6 +129,16 @@ CommonPluginEditor::~CommonPluginEditor() {
     if (audioProcessor.haltRecording != nullptr) {
         audioProcessor.haltRecording();
     }
+
+#if OSCI_PREMIUM
+    if (offlineRenderDialog != nullptr)
+    {
+        // Dismiss any active modal dialog so it can auto-delete.
+        offlineRenderDialog->exitModalState(0);
+        offlineRenderDialog = nullptr;
+    }
+#endif
+
     setLookAndFeel(nullptr);
     juce::Desktop::getInstance().setDefaultLookAndFeel(nullptr);
 }
@@ -235,7 +249,159 @@ void CommonPluginEditor::openRecordingSettings() {
     recordingSettingsWindow.setVisible(true);
 }
 
-void CommonPluginEditor::showPremiumSplashScreen() {}
+void CommonPluginEditor::showPremiumSplashScreen() {
+    juce::AlertWindow::showMessageBoxAsync(
+        juce::AlertWindow::InfoIcon,
+        "Premium Feature",
+        "This feature is available in the premium version.");
+}
+
+void CommonPluginEditor::renderAudioFileToVideo() {
+#if !OSCI_PREMIUM
+    showPremiumSplashScreen();
+    return;
+#else
+    if (offlineRenderDialog != nullptr) {
+        offlineRenderDialog->toFront(true);
+        return;
+    }
+
+    // Step 1: choose input audio file
+    chooser = std::make_unique<juce::FileChooser>(
+        "Choose an input audio file",
+        audioProcessor.getLastOpenedDirectory(),
+        "*.wav;*.aiff;*.flac;*.ogg;*.mp3");
+
+    auto openFlags = juce::FileBrowserComponent::openMode |
+        juce::FileBrowserComponent::canSelectFiles;
+
+    juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
+    chooser->launchAsync(openFlags, [safeThis](const juce::FileChooser& inputChooser) {
+        if (safeThis == nullptr)
+            return;
+
+        const auto inputFile = inputChooser.getResult();
+        if (inputFile == juce::File())
+            return;
+
+        safeThis->audioProcessor.setLastOpenedDirectory(inputFile.getParentDirectory());
+
+        // Step 2: choose output video file (default: inputName + codec extension)
+        const auto ext = safeThis->recordingSettings.getFileExtensionForCodec();
+        const auto suggestedOutput = inputFile.getParentDirectory().getChildFile(
+            inputFile.getFileNameWithoutExtension() + "." + ext);
+
+        safeThis->chooser = std::make_unique<juce::FileChooser>(
+            "Choose an output video file",
+            suggestedOutput,
+            "*." + ext);
+
+        auto saveFlags = juce::FileBrowserComponent::saveMode |
+            juce::FileBrowserComponent::canSelectFiles;
+
+        safeThis->chooser->launchAsync(saveFlags, [safeThis, inputFile, ext](const juce::FileChooser& outputChooser) {
+            if (safeThis == nullptr)
+                return;
+
+            auto outputFile = outputChooser.getResult();
+            if (outputFile == juce::File())
+                return;
+
+            // Ensure the file extension matches the codec container by default.
+            if (outputFile.getFileExtension().isEmpty())
+                outputFile = outputFile.withFileExtension(ext);
+
+            safeThis->audioProcessor.setLastOpenedDirectory(outputFile.getParentDirectory());
+
+            // Ensure FFmpeg exists. If it doesn't, this will prompt the user to download it.
+            if (!safeThis->audioProcessor.ensureFFmpegExists())
+                return;
+
+            // Stop any live recording and pause the main visualiser.
+            if (safeThis->audioProcessor.haltRecording != nullptr)
+                safeThis->audioProcessor.haltRecording();
+
+            const bool wasVisualiserPaused = safeThis->visualiser.isPaused();
+            const bool wasOfflineRenderActive = safeThis->audioProcessor.isOfflineRenderActive();
+
+            // Make the plugin output silent and skip heavy processing during offline render.
+            safeThis->audioProcessor.setOfflineRenderActive(true);
+
+            safeThis->visualiser.setPaused(true);
+
+            auto resultHolder = std::make_shared<std::optional<OfflineAudioToVideoRendererComponent::Result>>();
+
+            auto content = std::make_unique<OfflineAudioToVideoRendererComponent>(
+                safeThis->audioProcessor,
+                safeThis->audioProcessor.visualiserParameters,
+                safeThis->audioProcessor.threadManager,
+                safeThis->recordingSettings,
+                inputFile,
+                outputFile,
+                safeThis->visualiser.getRenderMode());
+
+            content->setSize(700, 520);
+
+            // When the render finishes, store the result and dismiss the modal dialog.
+            content->setOnFinished([safeThis, resultHolder](OfflineAudioToVideoRendererComponent::Result r) {
+                if (safeThis == nullptr)
+                    return;
+
+                *resultHolder = r;
+
+                if (auto* dw = safeThis->offlineRenderDialog.getComponent())
+                    dw->exitModalState(1);
+            });
+
+            auto* contentPtr = content.get();
+
+            juce::DialogWindow::LaunchOptions options;
+            options.dialogTitle = "Render Audio File to Video";
+            options.dialogBackgroundColour = Colours::dark;
+            options.content.setOwned(content.release());
+            options.componentToCentreAround = safeThis.getComponent();
+            options.escapeKeyTriggersCloseButton = true;
+            options.useNativeTitleBar = true;
+            options.resizable = true;
+            options.useBottomRightCornerResizer = true;
+
+            // Create the dialog and enter modal state with a callback so we restore state
+            // regardless of how the dialog is dismissed. The window will auto-delete.
+            auto* window = options.create();
+            safeThis->offlineRenderDialog = window;
+
+            // Ensure this dialog doesn't float above other apps.
+            window->setAlwaysOnTop(false);
+
+            window->enterModalState(
+                true,
+                juce::ModalCallbackFunction::create([safeThis, wasVisualiserPaused, wasOfflineRenderActive, resultHolder](int) {
+                    if (safeThis == nullptr)
+                        return;
+
+                    safeThis->audioProcessor.setOfflineRenderActive(wasOfflineRenderActive);
+                    safeThis->visualiser.setPaused(wasVisualiserPaused);
+                    safeThis->offlineRenderDialog = nullptr;
+
+                    if (resultHolder != nullptr && resultHolder->has_value())
+                    {
+                        const auto& r = resultHolder->value();
+                        if (!r.success && !r.cancelled)
+                        {
+                            juce::AlertWindow::showMessageBoxAsync(
+                                juce::AlertWindow::WarningIcon,
+                                "Render Failed",
+                                r.errorMessage.isNotEmpty() ? r.errorMessage : "An error occurred while rendering.");
+                        }
+                    }
+                }),
+                true);
+
+            contentPtr->start();
+        });
+    });
+#endif
+}
 
 void CommonPluginEditor::resetToDefault() {
     juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();

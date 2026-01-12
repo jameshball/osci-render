@@ -16,6 +16,12 @@ SosciAudioProcessor::~SosciAudioProcessor() {}
 void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
     juce::ScopedNoDenormals noDenormals;
 
+    if (isOfflineRenderActive()) {
+        midiMessages.clear();
+        buffer.clear();
+        return;
+    }
+
     juce::AudioBuffer<float> input = getBusBuffer(buffer, true, 0);
     juce::AudioBuffer<float> output = getBusBuffer(buffer, false, 0);
     const float EPSILON = 0.0001f;

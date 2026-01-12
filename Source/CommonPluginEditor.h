@@ -31,6 +31,9 @@ public:
     void openAudioSettings();
     virtual void openRecordingSettings();
     virtual void showPremiumSplashScreen();
+
+    // Offline render: input audio file -> encoded video using Recording Settings
+    void renderAudioFileToVideo();
     void resetToDefault();
     void toggleFullScreen();
     void resized() override;
@@ -81,6 +84,10 @@ public:
     juce::SharedResourcePointer<CustomTooltipWindow> tooltipWindow;
 
     bool usingNativeMenuBar = false;
+
+#if OSCI_PREMIUM
+    juce::Component::SafePointer<juce::DialogWindow> offlineRenderDialog;
+#endif
 
 #if JUCE_LINUX
     juce::OpenGLContext openGlContext;

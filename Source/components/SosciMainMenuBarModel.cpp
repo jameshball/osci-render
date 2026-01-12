@@ -127,6 +127,10 @@ void SosciMainMenuBarModel::resetMenuItems() {
         editor.openRecordingSettings();
     });
 
+    addMenuItem(2, "Render Audio File to Video...", [this] {
+        editor.renderAudioFileToVideo();
+    });
+
     addMenuItem(3, "Force Disable Brightness Input", [&]() {
         processor.forceDisableBrightnessInput = !processor.forceDisableBrightnessInput;
         if (processor.forceDisableBrightnessInput) {
