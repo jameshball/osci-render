@@ -170,4 +170,6 @@ James H Ball, [james@ball.sh](mailto:james@ball.sh)
 
 ## License
 
-The source code in this repository is licensed under the GNU General Public License v3.0 (see [LICENSE](LICENSE)). All image assets in the repository (including files under `images/`, `Resources/`, `External/Resources`, and any other artwork) are copyright © James H Ball and/or their respective creators. These images are provided only for documentation, demonstration, and build purposes and are **not** licensed under GPLv3 or any other open-source license. Please obtain written permission before reusing, redistributing, or creating derivative works from these images. See [IMAGE_LICENSE.md](IMAGE_LICENSE.md) for details.
+The source code in this repository is licensed under the GNU General Public License v3.0 (see [LICENSE](LICENSE)).
+
+All image assets in the repository (including files under `images/`, `Resources/`, `External/Resources`, and any other artwork) are copyright © James H Ball and/or their respective creators. These images are provided only for documentation, demonstration, and build purposes and are **not** licensed under GPLv3 or any other open-source license. Please obtain written permission before reusing, redistributing, or creating derivative works from these images. See [IMAGE_LICENSE.md](IMAGE_LICENSE.md) for details.
