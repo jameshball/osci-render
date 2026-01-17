@@ -41,9 +41,7 @@
 #ifndef UGEN_NOEXTGPL
 
 #include <JuceHeader.h>
-#include "ugen_JuceUtility.h"
-#include "Env.h"
-#include "EnvCurve.h"
+#include "../audio/DahdsrEnvelope.h"
 
 
 #define HANDLESIZE 11
@@ -100,12 +98,12 @@ public:
 	void resetOffsets() { offsetX = offsetY = 0; }
 	double getTime() const	{ return time;	}
 	double getValue() const	{ return value; }
-	EnvCurve getCurve() const	{ return curve; }
+	float getCurve() const	{ return curve; }
 	int getHandleIndex() const;
 		
 	void setTime(double timeToSet);
 	void setValue(double valueToSet);
-	void setCurve(EnvCurve curveToSet);
+	void setCurve(float curveToSet);
 	void setTimeAndValue(double timeToSet, double valueToSet, double quantise = 0.0);
 	void offsetTimeAndValue(double offsetTime, double offsetValue, double quantise = 0.0);
 	double constrainDomain(double domainToConstrain) const;
@@ -130,7 +128,7 @@ private:
 	
 	double time, value;
     bool shouldLockTime, shouldLockValue, shouldDraw;
-	EnvCurve curve;
+	float curve;
 	bool ignoreDrag;
 };
 
@@ -148,11 +146,15 @@ public:
 /** For displaying and editing a breakpoint envelope. 
  @ingoup EnvUGens
  @see Env */
-class EnvelopeComponent : public juce::Component
+class EnvelopeComponent : public juce::Component, private juce::Timer
 {
 public:
 	EnvelopeComponent();
 	~EnvelopeComponent();
+
+	// DAHDSR editor mode (fixed 6 points: start, delay, attack, hold, sustain, release).
+	void setDahdsrMode(bool enabled);
+	bool getDahdsrMode() const;
 	
 	void setDomainRange(const double min, const double max);
 	void setDomainRange(const double max) { setDomainRange(0.0, max); }
@@ -169,11 +171,11 @@ public:
 		GridBoth = GridValue | GridDomain 
 	};
 	void setGrid(const GridMode display, const GridMode quantise, const double domain = 0.0, const double value = 0.0);
-	void getGrid(GridMode& display, GridMode& quantise, double& domain, double& value) const;
 	
 	void paint(juce::Graphics& g);
 	void paintBackground(juce::Graphics& g);
 	void resized();
+	void timerCallback() override;
 		
 	void mouseMove         (const juce::MouseEvent& e);
     void mouseEnter        (const juce::MouseEvent& e);
@@ -198,26 +200,10 @@ public:
 	
 	EnvelopeHandleComponent* getPreviousHandle(const EnvelopeHandleComponent* thisHandle) const;
 	EnvelopeHandleComponent* getNextHandle(const EnvelopeHandleComponent* thisHandle) const;
-	EnvelopeHandleComponent* addHandle(int newX, int newY, EnvCurve curve);
-	EnvelopeHandleComponent* addHandle(double newDomain, double newValue, EnvCurve curve);
+	EnvelopeHandleComponent* addHandle(int newX, int newY, float curve);
+	EnvelopeHandleComponent* addHandle(double newDomain, double newValue, float curve);
 	void removeHandle(EnvelopeHandleComponent* thisHandle);
 	void quantiseHandle(EnvelopeHandleComponent* thisHandle);
-	
-	bool isReleaseNode(EnvelopeHandleComponent* thisHandle) const;
-	bool isLoopNode(EnvelopeHandleComponent* thisHandle) const;
-	void setReleaseNode(const int index);
-	void setReleaseNode(EnvelopeHandleComponent* thisHandle);
-	int getReleaseNode() const;
-	void setLoopNode(const int index);
-	void setLoopNode(EnvelopeHandleComponent* thisHandle);
-	int getLoopNode() const;
-	
-	void setAllowCurveEditing(const bool flag);
-	bool getAllowCurveEditing() const;
-	void setAllowNodeEditing(const bool flag);
-	bool getAllowNodeEditing() const;
-	void setAdsrMode(const bool adsrMode);
-	bool getAdsrMode() const;
 
 	
 	double convertPixelsToDomain(int pixelsX, int pixelsXMax = -1) const;
@@ -225,10 +211,16 @@ public:
 	double convertDomainToPixels(double domainValue) const;
 	double convertValueToPixels(double value) const;
 	
-	Env getEnv() const;
-	void setEnv(Env const& env);
+	DahdsrParams getDahdsrParams() const;
+	void setDahdsrParams(const DahdsrParams& params);
 	float lookup(const float time) const;
 	void setMinMaxNumHandles(int min, int max);
+
+	// Optional UI-only overlay: vertical markers that “flow” through the envelope fill.
+	// Times are in the same domain as the envelope (seconds for ADSR in osci-render).
+	void setFlowMarkerTimesForUi(const double* timesSeconds, int numTimes);
+	void clearFlowMarkerTimesForUi();
+	void resetFlowPersistenceForUi();
 	
 	double constrainDomain(double domainToConstrain) const;
 	double constrainValue(double valueToConstrain) const;
@@ -256,8 +248,21 @@ public:
 	enum MoveMode { MoveClip, MoveSlide, NumMoveModes };
 	
 private:
+	static constexpr int kDahdsrNumHandles = 6;
+
+	struct ScopedStructuralEdit
+	{
+		explicit ScopedStructuralEdit(EnvelopeComponent& owner) : env(owner) { ++env.structuralEditDepth; }
+		~ScopedStructuralEdit() { --env.structuralEditDepth; }
+		EnvelopeComponent& env;
+	};
+
+	bool canEditStructure() const { return structuralEditDepth > 0 || !dahdsrMode; }
+
 	void recalculateHandles();
 	EnvelopeHandleComponent* findHandle(double time);
+	void applyDahdsrHandleLocks();
+	void ensureFlowRepaintTimerRunning();
 	
 	juce::SortedSet <void*> listeners;
 	juce::Array<EnvelopeHandleComponent*> handles;
@@ -271,11 +276,23 @@ private:
 	bool adjustable = false;
 	double prevCurveValue = 0.0;
 	int curvePoints;
-	int releaseNode, loopNode;
-	
-	bool allowCurveEditing = false;
-	bool allowNodeEditing = false;
-	bool adsrMode = false;
+
+	bool dahdsrMode = false;
+	int structuralEditDepth = 0;
+
+	int numFlowMarkers = 0;
+	std::vector<double> flowMarkerTimesSeconds;
+	std::vector<double> flowTrailLastSeenMs; // per-x timestamp; 0 means "never"
+	std::vector<float> prevFlowMarkerX;
+	std::vector<char> prevFlowMarkerValid;
+	std::vector<double> prevFlowMarkerTimeSeconds;
+	double flowTrailNewestMs = 0.0;
+
+	// Tunables (time-based, independent of envelope domain range)
+	float flowTrailTauMs = 140.0f; // decay time constant
+	float flowTrailMaxAlpha = 0.38f;
+	float flowTrailMaxBridgeTimeSeconds = 0.05f; // don't connect jumps larger than this
+	int flowTrailPaintStepPx = 2; // reduce overdraw in paint()
 };
 
 class EnvelopeLegendComponent : public juce::Component
@@ -320,8 +337,8 @@ public:
 	void addListener (EnvelopeComponentListener* const listener) { envelope->addListener(listener); }
     void removeListener (EnvelopeComponentListener* const listener) { envelope->removeListener(listener); }
 	
-	Env getEnv() const { return getEnvelopeComponent()->getEnv(); }
-	void setEnv(Env const& env) { return getEnvelopeComponent()->setEnv(env); }
+	DahdsrParams getDahdsrParams() const { return getEnvelopeComponent()->getDahdsrParams(); }
+	void setDahdsrParams(const DahdsrParams& params) { return getEnvelopeComponent()->setDahdsrParams(params); }
 	float lookup(const float time) const { return getEnvelopeComponent()->lookup(time); }
 
 	
@@ -339,105 +356,13 @@ public:
 	{
 		envelope->setGrid(display, quantise, domain, value);
 	}
-	
-	void getGrid(EnvelopeComponent::GridMode& display, 
-				 EnvelopeComponent::GridMode& quantise,
-				 double& domain, 
-				 double& value) const
-	{
-		envelope->getGrid(display, quantise, domain, value);
-	}
-	
-	void setAllowCurveEditing(const bool flag)	{ envelope->setAllowCurveEditing(flag);		}
-	bool getAllowCurveEditing() const			{ return envelope->getAllowCurveEditing();	}
-	void setAllowNodeEditing(const bool flag)	{ envelope->setAllowNodeEditing(flag);		}
-	bool getAllowNodeEditing() const			{ return envelope->getAllowNodeEditing();	}
-	void setAdsrMode(const bool adsrMode)		{ envelope->setAdsrMode(adsrMode);			}
+
+	void setDahdsrMode(const bool enabled)		{ envelope->setDahdsrMode(enabled);			}
 
 	
 private:
 	EnvelopeComponent*			envelope;
 	EnvelopeLegendComponent*	legend;
-};
-
-class EnvelopeCurvePopup :	public PopupComponent,
-	public juce::Slider::Listener,
-	public juce::ComboBox::Listener
-{
-private:
-	
-	class CurveSlider : public juce::Slider
-	{
-	public:
-		inline double linlin(const double input, 
-			const double inLow, const double inHigh,
-			const double outLow, const double outHigh) throw()
-		{
-			double inRange = inHigh - inLow;
-			double outRange = outHigh - outLow;
-			return (input - inLow) * outRange / inRange + outLow;
-		}
-
-		CurveSlider() : juce::Slider("CurveSlider") { }
-        
-#if JUCE_MAJOR_VERSION < 2
-        const
-#endif
-			juce::String getTextFromValue (double value)
-		{
-			value = value * value * value;
-			value = linlin(value, -1.0, 1.0, -50.0, 50.0);
-			return juce::String(value, 6);
-		}
-	};
-	
-	EnvelopeHandleComponent* handle;
-	juce::Slider *slider;
-	juce::ComboBox *combo;
-	
-	bool initialised;
-	
-	static const int idOffset;
-
-	EnvelopeCurvePopup(EnvelopeHandleComponent* handle);
-	
-public:	
-	static void create(EnvelopeHandleComponent* handle, int x, int y);
-	
-	~EnvelopeCurvePopup();
-	void resized();
-	void sliderValueChanged(juce::Slider* sliderThatChanged);
-	void comboBoxChanged (juce::ComboBox* comboBoxThatHasChanged);
-    void expired();
-	
-};
-
-class EnvelopeNodePopup :	public PopupComponent,
-	public juce::ComboBox::Listener,
-	public juce::Button::Listener
-{
-private:
-	EnvelopeHandleComponent* handle;
-	juce::ComboBox *combo;
-	juce::TextButton *setLoopButton;
-	juce::TextButton *setReleaseButton;
-	
-	bool initialised;
-	
-	static const int idOffset;
-	
-	EnvelopeNodePopup(EnvelopeHandleComponent* handle);
-	
-public:	
-	enum NodeType { Normal, Release, Loop, ReleaseAndLoop };
-	
-	static void create(EnvelopeHandleComponent* handle, int x, int y);
-	
-	~EnvelopeNodePopup();
-	void resized();
-	void comboBoxChanged (juce::ComboBox* comboBoxThatHasChanged);
-	void buttonClicked(juce::Button *button);
-    void expired();
 };
 
 #endif // gpl
