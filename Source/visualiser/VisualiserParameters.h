@@ -101,13 +101,8 @@ public:
         return persistenceEffect->getActualValue() - 1.33;
     }
     
-    juce::Colour getColour() {
-        return juce::Colour::fromFloatRGBA(
-            (float) lineRedEffect->getActualValue(),
-            (float) lineGreenEffect->getActualValue(),
-            (float) lineBlueEffect->getActualValue(),
-            1.0f
-        );
+    double getHue() {
+        return hueEffect->getActualValue();
     }
     
     double getLineSaturation() {
@@ -285,28 +280,12 @@ public:
             VERSION_HINT, 0.5, 0, 6.0
         )
     );
-    std::shared_ptr<osci::Effect> lineRedEffect = std::make_shared<osci::SimpleEffect>(
+    std::shared_ptr<osci::Effect> hueEffect = std::make_shared<osci::SimpleEffect>(
         new osci::EffectParameter(
-            "Line Red",
-            "Controls the red component of the line color.",
-            "lineRed",
-            VERSION_HINT, 0.0, 0.0, 1.0
-        )
-    );
-    std::shared_ptr<osci::Effect> lineGreenEffect = std::make_shared<osci::SimpleEffect>(
-        new osci::EffectParameter(
-            "Line Green",
-            "Controls the green component of the line color.",
-            "lineGreen",
-            VERSION_HINT, 1.0, 0.0, 1.0
-        )
-    );
-    std::shared_ptr<osci::Effect> lineBlueEffect = std::make_shared<osci::SimpleEffect>(
-        new osci::EffectParameter(
-            "Line Blue",
-            "Controls the blue component of the line color.",
-            "lineBlue",
-            VERSION_HINT, 0.0, 0.0, 1.0
+            "Line Hue",
+            "Controls the hue of the beam of the oscilloscope.",
+            "hue",
+            VERSION_HINT, 125, 0, 359, 1
         )
     );
     std::shared_ptr<osci::Effect> intensityEffect = std::make_shared<osci::SimpleEffect>(
@@ -377,9 +356,7 @@ public:
     
     std::vector<std::shared_ptr<osci::Effect>> effects = {
         persistenceEffect,
-        lineRedEffect,
-        lineGreenEffect,
-        lineBlueEffect,
+        hueEffect,
         intensityEffect,
         lineSaturationEffect,
         focusEffect,
