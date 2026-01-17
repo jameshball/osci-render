@@ -56,6 +56,9 @@ public:
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void envelopeChanged(EnvelopeComponent* changedEnvelope) override;
+    void envelopeStartDrag(EnvelopeComponent* changedEnvelope) override;
+    void envelopeEndDrag(EnvelopeComponent* changedEnvelope) override;
+    Env buildAdsrEnvFromParameters() const;
 
     std::vector<std::shared_ptr<osci::Effect>> toggleableEffects;
     std::vector<std::shared_ptr<osci::Effect>> luaEffects;
@@ -110,16 +113,28 @@ public:
     osci::FloatParameter* sustainLevel = new osci::FloatParameter("Sustain Level", "sustainLevel", VERSION_HINT, 0.6, 0.0, 1.0);
     osci::FloatParameter* releaseTime = new osci::FloatParameter("Release Time", "releaseTime", VERSION_HINT, 0.4, 0.0, 1.0);
     osci::FloatParameter* attackShape = new osci::FloatParameter("Attack Shape", "attackShape", VERSION_HINT, 5, -50, 50);
-    osci::FloatParameter* decayShape = new osci::FloatParameter("Decay osci::Shape", "decayShape", VERSION_HINT, -20, -50, 50);
+    osci::FloatParameter* decayShape = new osci::FloatParameter("Decay Shape", "decayShape", VERSION_HINT, -20, -50, 50);
     osci::FloatParameter* releaseShape = new osci::FloatParameter("Release Shape", "releaseShape", VERSION_HINT, -5, -50, 50);
 
-    Env adsrEnv = Env::adsr(
-        attackTime->getValueUnnormalised(),
-        decayTime->getValueUnnormalised(),
-        sustainLevel->getValueUnnormalised(),
-        releaseTime->getValueUnnormalised(),
-        1.0,
-        std::vector<EnvCurve>{attackShape->getValueUnnormalised(), decayShape->getValueUnnormalised(), releaseShape->getValueUnnormalised()});
+    Env adsrEnv = Env(
+        {
+            0.0,
+            attackLevel->getValueUnnormalised(),
+            sustainLevel->getValueUnnormalised(),
+            0.0
+        },
+        {
+            attackTime->getValueUnnormalised(),
+            decayTime->getValueUnnormalised(),
+            releaseTime->getValueUnnormalised()
+        },
+        std::vector<EnvCurve>{
+            attackShape->getValueUnnormalised(),
+            decayShape->getValueUnnormalised(),
+            releaseShape->getValueUnnormalised()
+        },
+        2
+    );
 
     juce::MidiKeyboardState keyboardState;
 
@@ -276,6 +291,11 @@ private:
     }
 
     juce::AudioPlayHead* playHead;
+
+    std::vector<osci::FloatParameter*> activeAdsrGestureParameters;
+    void resetActiveAdsrGestures();
+    void beginAdsrGesturesForEnvelope(EnvelopeComponent* changedEnvelope);
+    std::atomic<bool> adsrNeedsUpdate { false };
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
 public:

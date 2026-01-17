@@ -71,28 +71,7 @@ void MidiComponent::parameterGestureChanged(int parameterIndex, bool gestureIsSt
 void MidiComponent::handleAsyncUpdate() {
     voicesSlider.setValue(audioProcessor.voices->getValueUnnormalised(), juce::dontSendNotification);
 
-    Env newEnv = Env(
-        { 
-            0.0,
-            audioProcessor.attackLevel->getValueUnnormalised(),
-            audioProcessor.sustainLevel->getValueUnnormalised(),
-            0.0
-        },
-        {
-            audioProcessor.attackTime->getValueUnnormalised(),
-            audioProcessor.decayTime->getValueUnnormalised(),
-            audioProcessor.releaseTime->getValueUnnormalised()
-        },
-        std::vector<EnvCurve>{ audioProcessor.attackShape->getValueUnnormalised(), audioProcessor.decayShape->getValueUnnormalised(), audioProcessor.releaseShape->getValueUnnormalised() },
-        2
-    );
-
-    {
-        juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-        audioProcessor.adsrEnv = newEnv;
-    }
-
-    envelope.setEnv(newEnv);
+    envelope.setEnv(audioProcessor.buildAdsrEnvFromParameters());
 }
 
 void MidiComponent::resized() {
