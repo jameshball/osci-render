@@ -800,7 +800,7 @@ void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::
     lineShader->setUniform("uSize", (GLfloat)parameters.getFocus());
     lineShader->setUniform("uGain", 450.0f / 512.0f);
     lineShader->setUniform("uInvert", 1.0f);
-    juce::Colour lineColour = parameters.getColour();
+    juce::Colour lineColour = juce::Colour::fromHSV((float)(parameters.getHue() / 360.0f), 1.0f, 1.0f, 1.0f);
     lineShader->setUniform("uLineColor", lineColour.getFloatRed(), lineColour.getFloatGreen(), lineColour.getFloatBlue());
     lineShader->setUniform("uUseVertexColor", mode == RenderMode::XYRGB ? 1.0f : 0.0f);
 
@@ -935,7 +935,7 @@ void VisualiserRenderer::drawCRT() {
     outputShader->setUniform("uGlow", (float)parameters.getGlow());
     outputShader->setUniform("uAmbient", (float)parameters.getAmbient());
     {
-        juce::Colour lineColour = parameters.getColour();
+        juce::Colour lineColour = juce::Colour::fromHSV((float)(parameters.getHue() / 360.0f), 1.0f, 1.0f, 1.0f);
         outputShader->setUniform("uBeamColor", lineColour.getFloatRed(), lineColour.getFloatGreen(), lineColour.getFloatBlue());
     }
     setOffsetAndScale(outputShader.get());

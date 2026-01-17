@@ -57,6 +57,8 @@ public:
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void envelopeChanged(EnvelopeComponent* changedEnvelope) override;
+    void envelopeStartDrag(EnvelopeComponent* changedEnvelope) override;
+    void envelopeEndDrag(EnvelopeComponent* changedEnvelope) override;
 
     DahdsrParams getCurrentDahdsrParams() const;
 
@@ -119,10 +121,8 @@ public:
     osci::FloatParameter* sustainLevel = new osci::FloatParameter("Sustain Level", "sustainLevel", VERSION_HINT, 0.6, 0.0, 1.0);
     osci::FloatParameter* releaseTime = new osci::FloatParameter("Release Time", "releaseTime", VERSION_HINT, 0.4, 0.0, 1.0);
     osci::FloatParameter* attackShape = new osci::FloatParameter("Attack Shape", "attackShape", VERSION_HINT, 5, -50, 50);
-    osci::FloatParameter* decayShape = new osci::FloatParameter("Decay osci::Shape", "decayShape", VERSION_HINT, -20, -50, 50);
+    osci::FloatParameter* decayShape = new osci::FloatParameter("Decay Shape", "decayShape", VERSION_HINT, -20, -50, 50);
     osci::FloatParameter* releaseShape = new osci::FloatParameter("Release Shape", "releaseShape", VERSION_HINT, -5, -50, 50);
-
-
 
     juce::MidiKeyboardState keyboardState;
 
@@ -300,6 +300,10 @@ private:
     }
 
     juce::AudioPlayHead* playHead;
+
+    std::vector<osci::FloatParameter*> activeAdsrGestureParameters;
+    void resetActiveAdsrGestures();
+    void beginAdsrGesturesForEnvelope(EnvelopeComponent* changedEnvelope);
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
 public:

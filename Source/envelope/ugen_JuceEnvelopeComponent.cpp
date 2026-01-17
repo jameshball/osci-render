@@ -85,43 +85,23 @@ void EnvelopeHandleComponentConstrainer::setAdjacentHandleLimits(int setLeftLimi
 	rightLimit = setRightLimit;
 }
 
-EnvelopeHandleComponent::EnvelopeHandleComponent()
-	: dontUpdateTimeAndValue(false),
-	lastX(-1),
-	lastY(-1),
-	resizeLimits(this),
-	shouldLockTime(false),
-	shouldLockValue(false),
-	shouldDraw(!shouldLockTime || !shouldLockValue),
-	curve(0.0f),
-	ignoreDrag(false)
-{
-	setRepaintsOnMouseActivity(true);
-
-	if (shouldDraw) {
-		setMouseCursor(juce::MouseCursor::DraggingHandCursor);
-	}
-	resetOffsets();
-}
-
-EnvelopeComponent* EnvelopeHandleComponent::getParentComponent() const
-{
-	return (EnvelopeComponent*)Component::getParentComponent();
-}
-
-void EnvelopeHandleComponent::updateTimeAndValue()
-{
-	bool envChanged = false;
-
-    if (shouldLockTime)
-    {
-        setTopLeftPosition(getParentComponent()->convertDomainToPixels(time),
-                           getY());
-    }
-	else {
-		envChanged = true;
-		time = getParentComponent()->convertPixelsToDomain(getX());
-	}
+EnvelopeComponent::EnvelopeComponent()
+	: minNumHandles(0),
+	  maxNumHandles(0xffffff),
+	  domainMin(0.0),
+	  domainMax(1.0),
+	  valueMin(0.0),
+	  valueMax(1.0),
+	  valueGrid((valueMax - valueMin) / 10.0),
+	  domainGrid((domainMax - domainMin) / 16.0),
+	  gridDisplayMode(GridNone),
+	  gridQuantiseMode(GridNone),
+	  draggingHandle(nullptr),
+	  adjustingHandle(nullptr),
+	  activeHandle(nullptr),
+	  activeCurveHandle(nullptr),
+	  curvePoints(64),
+	  dahdsrMode(false)
     
     if (shouldLockValue)
     {
@@ -279,8 +259,6 @@ void EnvelopeHandleComponent::mouseDown(const juce::MouseEvent& e)
 #endif
 	
 	if (shouldDraw) {
-		setMouseCursor(juce::MouseCursor::NoCursor);
-
 		if(e.mods.isShiftDown()) {
 
 			if(!shouldLockTime && !shouldLockValue)
@@ -327,6 +305,8 @@ void EnvelopeHandleComponent::mouseDown(const juce::MouseEvent& e)
 
 		}
 
+		getParentComponent()->setActiveHandle(this);
+		getParentComponent()->setActiveCurveHandle(nullptr);
 		getParentComponent()->sendStartDrag();
 	}
 }
@@ -340,15 +320,6 @@ void EnvelopeHandleComponent::mouseDrag(const juce::MouseEvent& e)
 	updateLegend();
 	getParentComponent()->repaint();
 	
-	if(lastX == getX() && lastY == getY()) {	
-		setMousePositionToThisHandle();
-#ifdef MYDEBUG
-		int x, y;
-		Desktop::getMousePosition(x, y);	
-		printf("screen pos (and mouse pos): %d (%d) %d (%d)\n", getScreenX(), x, getScreenY(), y);
-#endif	
-	}
-
 	lastX = getX();
 	lastY = getY();
 	
@@ -390,13 +361,13 @@ void EnvelopeHandleComponent::mouseUp(const juce::MouseEvent& e)
 //	}
 	
 	setMouseCursor(juce::MouseCursor::DraggingHandCursor);
-	setMousePositionToThisHandle();
 	
 	offsetX = 0;
 	offsetY = 0;
     
 exit:
-    getParentComponent()->sendEndDrag();
+	getParentComponent()->sendEndDrag();
+	getParentComponent()->setActiveHandle(nullptr);
 }
 
 
@@ -413,11 +384,6 @@ EnvelopeHandleComponent* EnvelopeHandleComponent::getNextHandle() const
 void EnvelopeHandleComponent::removeThisHandle()
 {
 	getParentComponent()->removeHandle(this);
-}
-
-void EnvelopeHandleComponent::setMousePositionToThisHandle()
-{
-	juce::Desktop::setMousePosition(juce::Point<int>(getScreenX()+offsetX, getScreenY()+offsetY));
 }
 
 int EnvelopeHandleComponent::getHandleIndex() const
@@ -582,6 +548,8 @@ EnvelopeComponent::EnvelopeComponent()
 	  gridQuantiseMode(GridNone),
 	  draggingHandle(nullptr),
 	  adjustingHandle(nullptr),
+	  activeHandle(nullptr),
+	  activeCurveHandle(nullptr),
 	  curvePoints(64),
 	  dahdsrMode(false)
 {
@@ -1092,6 +1060,9 @@ void EnvelopeComponent::mouseDown(const juce::MouseEvent& e)
 	if (adjustable) {
 		adjustingHandle = findHandle(convertPixelsToDomain(e.x));
 		prevCurveValue = adjustingHandle != nullptr ? adjustingHandle->getCurve() : 0.0f;
+		setActiveCurveHandle(adjustingHandle);
+		setActiveHandle(nullptr);
+		sendStartDrag();
 	}
 }
 
@@ -1127,6 +1098,7 @@ void EnvelopeComponent::mouseUp(const juce::MouseEvent& e)
 	printf("MyEnvelopeComponent::mouseUp\n");
 #endif
 
+	bool wasAdjusting = (adjustingHandle != nullptr);
 	adjustingHandle = nullptr;
 	
 	if(draggingHandle != 0) 
@@ -1135,13 +1107,27 @@ void EnvelopeComponent::mouseUp(const juce::MouseEvent& e)
 			quantiseHandle(draggingHandle);
 		
 		setMouseCursor(juce::MouseCursor::DraggingHandCursor);
-		draggingHandle->setMousePositionToThisHandle();
 		draggingHandle->resetOffsets();
 		draggingHandle = 0;
         sendEndDrag();
 	} else {
 		setMouseCursor(juce::MouseCursor::NormalCursor);
 	}
+
+	if (wasAdjusting) {
+		sendEndDrag();
+	}
+	setActiveCurveHandle(nullptr);
+}
+
+void EnvelopeComponent::setActiveHandle(EnvelopeHandleComponent* handle)
+{
+	activeHandle = handle;
+}
+
+void EnvelopeComponent::setActiveCurveHandle(EnvelopeHandleComponent* handle)
+{
+	activeCurveHandle = handle;
 }
 
 void EnvelopeComponent::addListener (EnvelopeComponentListener* const listener)

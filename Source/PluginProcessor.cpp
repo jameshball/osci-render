@@ -144,6 +144,15 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     intParameters.push_back(fileSelect);
 
     voices->addListener(this);
+    attackTime->addListener(this);
+    attackShape->addListener(this);
+    delayTime->addListener(this);
+    holdTime->addListener(this);
+    decayTime->addListener(this);
+    decayShape->addListener(this);
+    sustainLevel->addListener(this);
+    releaseTime->addListener(this);
+    releaseShape->addListener(this);
 
     for (int i = 0; i < luaEffects.size(); i++) {
         luaEffects[i]->parameters[0]->addListener(this);
@@ -162,6 +171,15 @@ OscirenderAudioProcessor::~OscirenderAudioProcessor() {
     for (int i = luaEffects.size() - 1; i >= 0; i--) {
         luaEffects[i]->parameters[0]->removeListener(this);
     }
+    releaseShape->removeListener(this);
+    releaseTime->removeListener(this);
+    sustainLevel->removeListener(this);
+    decayShape->removeListener(this);
+    decayTime->removeListener(this);
+    holdTime->removeListener(this);
+    delayTime->removeListener(this);
+    attackShape->removeListener(this);
+    attackTime->removeListener(this);
     voices->removeListener(this);
 }
 
@@ -1068,6 +1086,8 @@ void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float n
             }
         }
     }
+
+    // Envelope parameters are handled by the envelope component listeners.
 }
 
 void OscirenderAudioProcessor::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
@@ -1075,6 +1095,58 @@ void OscirenderAudioProcessor::parameterGestureChanged(int parameterIndex, bool 
 void updateIfApproxEqual(osci::FloatParameter* parameter, float newValue) {
     if (std::abs(parameter->getValueUnnormalised() - newValue) > 0.0001) {
         parameter->setUnnormalisedValueNotifyingHost(newValue);
+    }
+}
+
+void OscirenderAudioProcessor::resetActiveAdsrGestures() {
+    for (auto* parameter : activeAdsrGestureParameters) {
+        if (parameter != nullptr) {
+            parameter->endChangeGesture();
+        }
+    }
+    activeAdsrGestureParameters.clear();
+}
+
+void OscirenderAudioProcessor::beginAdsrGesturesForEnvelope(EnvelopeComponent* changedEnvelope) {
+    if (changedEnvelope == nullptr || !changedEnvelope->getDahdsrMode()) {
+        return;
+    }
+
+    resetActiveAdsrGestures();
+
+    auto addGestureParam = [this](osci::FloatParameter* parameter) {
+        if (parameter != nullptr) {
+            activeAdsrGestureParameters.push_back(parameter);
+        }
+    };
+
+    if (auto* curveHandle = changedEnvelope->getActiveCurveHandle()) {
+        const int index = changedEnvelope->getHandleIndex(curveHandle);
+        if (index == 2) {
+            addGestureParam(attackShape);
+        } else if (index == 4) {
+            addGestureParam(decayShape);
+        } else if (index == 5) {
+            addGestureParam(releaseShape);
+        }
+    } else if (auto* handle = changedEnvelope->getActiveHandle()) {
+        const int index = changedEnvelope->getHandleIndex(handle);
+        if (index == 1) {
+            addGestureParam(delayTime);
+        } else if (index == 2) {
+            addGestureParam(attackTime);
+        } else if (index == 3) {
+            addGestureParam(holdTime);
+        } else if (index == 4) {
+            addGestureParam(decayTime);
+            addGestureParam(sustainLevel);
+        } else if (index == 5) {
+            addGestureParam(releaseTime);
+        }
+    }
+
+    for (auto* parameter : activeAdsrGestureParameters) {
+        parameter->beginChangeGesture();
     }
 }
 
@@ -1106,6 +1178,14 @@ void OscirenderAudioProcessor::envelopeChanged(EnvelopeComponent* changedEnvelop
     updateIfApproxEqual(attackShape, dahdsr.attackCurve);
     updateIfApproxEqual(decayShape, dahdsr.decayCurve);
     updateIfApproxEqual(releaseShape, dahdsr.releaseCurve);
+}
+
+void OscirenderAudioProcessor::envelopeStartDrag(EnvelopeComponent* changedEnvelope) {
+    beginAdsrGesturesForEnvelope(changedEnvelope);
+}
+
+void OscirenderAudioProcessor::envelopeEndDrag(EnvelopeComponent* changedEnvelope) {
+    resetActiveAdsrGestures();
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {
