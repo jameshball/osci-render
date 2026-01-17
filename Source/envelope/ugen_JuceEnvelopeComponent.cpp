@@ -85,38 +85,58 @@ void EnvelopeHandleComponentConstrainer::setAdjacentHandleLimits(int setLeftLimi
 	rightLimit = setRightLimit;
 }
 
-EnvelopeComponent::EnvelopeComponent()
-	: minNumHandles(0),
-	  maxNumHandles(0xffffff),
-	  domainMin(0.0),
-	  domainMax(1.0),
-	  valueMin(0.0),
-	  valueMax(1.0),
-	  valueGrid((valueMax - valueMin) / 10.0),
-	  domainGrid((domainMax - domainMin) / 16.0),
-	  gridDisplayMode(GridNone),
-	  gridQuantiseMode(GridNone),
-	  draggingHandle(nullptr),
-	  adjustingHandle(nullptr),
-	  activeHandle(nullptr),
-	  activeCurveHandle(nullptr),
-	  curvePoints(64),
-	  dahdsrMode(false)
-    
-    if (shouldLockValue)
-    {
-        setTopLeftPosition(getX(),
-                           getParentComponent()->convertValueToPixels(value));
-    }
+EnvelopeHandleComponent::EnvelopeHandleComponent()
+	: dontUpdateTimeAndValue(false),
+	  lastX(-1),
+	  lastY(-1),
+	  resizeLimits(this),
+	  shouldLockTime(false),
+	  shouldLockValue(false),
+	  shouldDraw(!shouldLockTime || !shouldLockValue),
+	  curve(0.0f),
+	  ignoreDrag(false)
+{
+	setRepaintsOnMouseActivity(true);
+
+	if (shouldDraw) {
+		setMouseCursor(juce::MouseCursor::DraggingHandCursor);
+	}
+	resetOffsets();
+}
+
+EnvelopeComponent* EnvelopeHandleComponent::getParentComponent() const
+{
+	return (EnvelopeComponent*)Component::getParentComponent();
+}
+
+void EnvelopeHandleComponent::updateTimeAndValue()
+{
+	bool envChanged = false;
+
+	if (shouldLockTime)
+	{
+		setTopLeftPosition(getParentComponent()->convertDomainToPixels(time),
+					   getY());
+	}
+	else {
+		envChanged = true;
+		time = getParentComponent()->convertPixelsToDomain(getX());
+	}
+
+	if (shouldLockValue)
+	{
+		setTopLeftPosition(getX(),
+					   getParentComponent()->convertValueToPixels(value));
+	}
 	else {
 		envChanged = true;
 		value = getParentComponent()->convertPixelsToValue(getY());
 	}
 
 	if (envChanged == true) {
-        ((EnvelopeComponent*)getParentComponent())->sendChangeMessage();
-    }
-	
+		((EnvelopeComponent*)getParentComponent())->sendChangeMessage();
+	}
+
 #ifdef MYDEBUG
 	printf("MyEnvelopeHandleComponent::updateTimeAndValue(%f, %f)\n", time, value);
 #endif
