@@ -66,6 +66,10 @@ class OscirenderLookAndFeel : public juce::LookAndFeel_V4 {
 public:
     OscirenderLookAndFeel();
 
+    static void applyOscirenderColours(juce::LookAndFeel& lookAndFeel);
+    static void drawOscirenderComboBox(juce::Graphics& g, int width, int height, juce::ComboBox& box);
+    static void positionOscirenderComboBoxText(juce::LookAndFeel& lookAndFeel, juce::ComboBox& box, juce::Label& label);
+
     static const int RECT_RADIUS = 5;
     juce::Typeface::Ptr regularTypeface = juce::Typeface::createSystemTypefaceFor(BinaryData::FiraSansRegular_ttf, BinaryData::FiraSansRegular_ttfSize);
     juce::Typeface::Ptr boldTypeface = juce::Typeface::createSystemTypefaceFor(BinaryData::FiraSansBold_ttf, BinaryData::FiraSansBold_ttfSize);
