@@ -9,6 +9,7 @@
 #include "components/SvgButton.h"
 #include "components/VolumeComponent.h"
 #include "components/DownloaderComponent.h"
+#include "components/CustomTooltipWindow.h"
 
 #if DEBUG
     #include "melatonin_inspector/melatonin_inspector.h"
@@ -31,11 +32,13 @@ public:
     virtual void openRecordingSettings();
     virtual void showPremiumSplashScreen();
     void resetToDefault();
+    void toggleFullScreen();
     void resized() override;
 
 private:
     CommonAudioProcessor& audioProcessor;
     bool fullScreen = false;
+    juce::Rectangle<int> windowedBounds;
 public:
     OscirenderLookAndFeel lookAndFeel;
 
@@ -49,9 +52,9 @@ public:
 #endif
 
 #if OSCI_PREMIUM
-    int VISUALISER_SETTINGS_HEIGHT = 1230;
+    int VISUALISER_SETTINGS_HEIGHT = 1300;
 #else
-    int VISUALISER_SETTINGS_HEIGHT = 700;
+    int VISUALISER_SETTINGS_HEIGHT = 770;
 #endif
 
     VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.visualiserParameters, 3);
@@ -74,8 +77,7 @@ public:
 
     std::unique_ptr<juce::FileChooser> chooser;
     juce::MenuBarComponent menuBar;
-    juce::SharedResourcePointer<juce::TooltipWindow> tooltipWindow;
-    juce::DropShadower tooltipDropShadow{juce::DropShadow(juce::Colours::black.withAlpha(0.5f), 6, {0,0})};
+    juce::SharedResourcePointer<CustomTooltipWindow> tooltipWindow;
 
     bool usingNativeMenuBar = false;
 

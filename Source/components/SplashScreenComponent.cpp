@@ -19,7 +19,7 @@ SplashScreenComponent::SplashScreenComponent()
     titleLabel.setText("Upgrade to osci-render Premium", juce::NotificationType::dontSendNotification);
 
     configureLabel(subtitleLabel, subtitleFont, juce::Justification::centred);
-    subtitleLabel.setText("Unlock commercial licensing, new features, and more creative firepower.", juce::NotificationType::dontSendNotification);
+    subtitleLabel.setText("Unlock new features, and more creative firepower.", juce::NotificationType::dontSendNotification);
 
     benefitsGrid.setUseViewport(true);
     benefitsGrid.setUseCenteringPlaceholders(true);

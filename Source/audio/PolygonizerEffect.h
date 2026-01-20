@@ -5,12 +5,16 @@
 // Inspired by xenontesla122
 class PolygonizerEffect : public osci::EffectApplication {
 public:
-    osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>> &values, double sampleRate) override {
+    std::shared_ptr<osci::EffectApplication> clone() const override {
+        return std::make_shared<PolygonizerEffect>();
+    }
+
+    osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>&values, float sampleRate, float frequency) override {
         const double pi = juce::MathConstants<double>::pi;
         const double twoPi = juce::MathConstants<double>::twoPi;
-        double effectScale = juce::jlimit(0.0, 1.0, values[0].load());
-        double nSides = juce::jmax(2.0, values[1].load());
-        double stripeSize = juce::jmax(1e-4, values[2].load());
+        double effectScale = juce::jlimit(0.0f, 1.0f, values[0].load());
+        double nSides = juce::jmax(2.0f, values[1].load());
+        double stripeSize = juce::jmax(1e-4f, values[2].load());
         stripeSize = std::pow(0.63 * stripeSize, 1.5); // Change range and bias toward smaller values
         double rotation = values[3] * twoPi;
         double stripePhase = values[4];
@@ -39,7 +43,7 @@ public:
     }
 
     std::shared_ptr<osci::Effect> build() const override {
-        auto eff = std::make_shared<osci::Effect>(
+        auto eff = std::make_shared<osci::SimpleEffect>(
             std::make_shared<PolygonizerEffect>(),
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter("Polygonizer",

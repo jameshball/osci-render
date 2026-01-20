@@ -9,15 +9,14 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     addAndMakeVisible(midiResizerBar);
     addAndMakeVisible(mainResizerBar);
     addAndMakeVisible(midi);
-    addChildComponent(txt);
     addChildComponent(frame);
     addChildComponent(examples);
 
     examples.onClosed = [this]() {
         showExamples(false);
     };
-    examples.onExampleOpened = [this](const juce::String& fileName, bool shouldOpenEditor) {
-        pluginEditor.addCodeEditor(audioProcessor.getCurrentFileIndex());
+    examples.onFileOpened = [this](const juce::String& fileName, bool shouldOpenEditor, int fileIndex) {
+        pluginEditor.addCodeEditor(fileIndex);
         pluginEditor.fileUpdated(fileName, shouldOpenEditor);
     };
 
@@ -124,14 +123,10 @@ void SettingsComponent::resized() {
 
     // Only reserve space for effect settings panel when not showing the Open Files panel
     if (!examplesVisible) {
-        if (txt.isVisible()) {
-            effectSettings = &txt;
-        } else if (frame.isVisible()) {
+        if (frame.isVisible()) {
             effectSettings = &frame;
-        }
-
-        if (effectSettings != nullptr) {
-            effectSettings->setBounds(dummyBounds.removeFromBottom(160));
+            int preferredHeight = frame.getPreferredHeight();
+            effectSettings->setBounds(dummyBounds.removeFromBottom(preferredHeight));
             dummyBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
         }
     }
@@ -140,7 +135,6 @@ void SettingsComponent::resized() {
         // Hide other panels while examples are visible
         perspective.setVisible(false);
         effects.setVisible(false);
-        txt.setVisible(false);
         frame.setVisible(false);
         examples.setVisible(true);
         examples.setBounds(dummyBounds);
@@ -169,7 +163,6 @@ void SettingsComponent::paint(juce::Graphics& g) {
 // syphonLock must be held when calling this function
 void SettingsComponent::fileUpdated(juce::String fileName) {
     juce::String extension = fileName.fromLastOccurrenceOf(".", true, false).toLowerCase();
-    txt.setVisible(false);
     frame.setVisible(false);
 
     // Check if the file is an image based on extension or Syphon/Spout input
@@ -191,8 +184,6 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
 
     if (skipProcessing) {
         // do nothing
-    } else if (extension == ".txt") {
-        txt.setVisible(true);
     } else if (extension == ".gpla" || isImage) {
         frame.setVisible(true);
         frame.setAnimated(extension == ".gpla" || extension == ".gif" || extension == ".mov" || extension == ".mp4");
@@ -204,7 +195,6 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
 }
 
 void SettingsComponent::update() {
-    txt.update();
     frame.update();
 }
 

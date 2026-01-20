@@ -37,49 +37,67 @@ VisualiserRenderer::~VisualiserRenderer() {
     setShouldBeRunning(false, [this] { renderingSemaphore.release(); });
 }
 
-void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
+void VisualiserRenderer::runTask(const juce::AudioBuffer<float>& buffer) {
     {
         juce::CriticalSection::ScopedLockType lock(samplesLock);
 
-        // copy the points before applying effects
-        audioOutputBuffer.setSize(2, points.size(), false, true, true);
-        for (int i = 0; i < points.size(); ++i) {
-            audioOutputBuffer.setSample(0, i, points[i].x);
-            audioOutputBuffer.setSample(1, i, points[i].y);
-        }
+        const int numSamples = buffer.getNumSamples();
+        const int numChannels = buffer.getNumChannels();
+
+        // copy the buffer before applying effects
+        audioOutputBuffer.setSize(2, numSamples, false, true, true);
+        audioOutputBuffer.copyFrom(0, 0, buffer, 0, 0, numSamples);
+        audioOutputBuffer.copyFrom(1, 0, buffer, 1, 0, numSamples);
 
         xSamples.clear();
         ySamples.clear();
         zSamples.clear();
+        rSamples.clear();
+        gSamples.clear();
+        bSamples.clear();
 
-        auto applyEffects = [&](osci::Point point) {
-            for (auto &effect : parameters.audioEffects) {
-                point = effect->apply(0, point);
-            }
+        // Create a working buffer for effects processing (6 channels: XYZRGB)
+        tempBuffer.setSize(6, numSamples, false, true, false);
+        
+        // Copy input channels to temp buffer
+        for (int ch = 0; ch < juce::jmin(6, numChannels); ++ch) {
+            tempBuffer.copyFrom(ch, 0, buffer, ch, 0, numSamples);
+        }
+        
+        // Apply effects to the entire buffer (only first 3 channels for effects)
+        juce::AudioBuffer<float> effectBuffer(tempBuffer.getArrayOfWritePointers(), 3, numSamples);
+        for (auto &effect : parameters.audioEffects) {
+            // Pre-animate effect values for this block before processing
+            effect->animateValues(numSamples, nullptr);
+            effect->processBlock(effectBuffer, midiMessages);
+        }
+
 #if OSCI_PREMIUM
-            if (parameters.isFlippedHorizontal()) {
-                point.x = -point.x;
-            }
-            if (parameters.isFlippedVertical()) {
-                point.y = -point.y;
-            }
+        // Apply horizontal/vertical flip to the entire buffer
+        if (parameters.isFlippedHorizontal()) {
+            juce::FloatVectorOperations::negate(tempBuffer.getWritePointer(0), tempBuffer.getReadPointer(0), numSamples);
+        }
+        if (parameters.isFlippedVertical()) {
+            juce::FloatVectorOperations::negate(tempBuffer.getWritePointer(1), tempBuffer.getReadPointer(1), numSamples);
+        }
 #endif
-            return point;
-        };
 
+        auto mode = renderMode.load();
+        
+        // Get array of read pointers for all 6 channels (XYZRGB)
+        auto channelData = tempBuffer.getArrayOfReadPointers();
+        
         if (parameters.isSweepEnabled()) {
             double sweepIncrement = getSweepIncrement();
-            long samplesPerSweep = sampleRate * parameters.getSweepSeconds();
-
             double triggerValue = parameters.getTriggerValue();
             bool belowTrigger = false;
 
-            for (const osci::Point &point : points) {
+            for (int i = 0; i < numSamples; ++i) {
                 long samplePosition = sampleCount - lastTriggerPosition;
                 double startPoint = 1.135;
-                double sweep = samplePosition * sweepIncrement * 2 * startPoint - startPoint;
+                float sweep = samplePosition * sweepIncrement * 2 * startPoint - startPoint;
 
-                double value = point.x;
+                float value = channelData[0][i];
 
                 if (sweep > startPoint && belowTrigger && value >= triggerValue) {
                     lastTriggerPosition = sampleCount;
@@ -87,30 +105,77 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
 
                 belowTrigger = value < triggerValue;
 
-                osci::Point sweepPoint = {sweep, value, 1};
-                sweepPoint = applyEffects(sweepPoint);
-
-                xSamples.push_back(sweepPoint.x);
-                ySamples.push_back(sweepPoint.y);
-                zSamples.push_back(1);
+                xSamples.push_back(sweep);
+                ySamples.push_back(value);
+                if (mode == RenderMode::XYZ) {
+                    zSamples.push_back(1.0f); // legacy: third component treated as brightness
+                } else if (mode == RenderMode::XYRGB) {
+                    // colour provided (if not, upstream logic should have set defaults)
+                    rSamples.push_back(numChannels > 3 ? channelData[3][i] : 1.0f);
+                    gSamples.push_back(numChannels > 4 ? channelData[4][i] : 0.0f);
+                    bSamples.push_back(numChannels > 5 ? channelData[5][i] : 0.0f);
+                }
 
                 sampleCount++;
             }
         } else {
-            for (const osci::Point &rawPoint : points) {
-                osci::Point point = applyEffects(rawPoint);
-
-#if OSCI_PREMIUM
-                if (parameters.isGoniometer()) {
-                    // x and y go to a diagonal currently, so we need to scale them down, and rotate them
-                    point.scale(-1.0 / std::sqrt(2.0), 1.0 / std::sqrt(2.0), 1.0);
-                    point.rotate(0, 0, -juce::MathConstants<double>::pi / 4);
+            // Helper lambda to copy channel data or fill with default value
+            auto copyOrFillChannel = [&](std::vector<float>& dest, int channelIndex, float defaultValue) {
+                dest.resize(numSamples);
+                if (numChannels > channelIndex) {
+                    juce::FloatVectorOperations::copy(dest.data(), channelData[channelIndex], numSamples);
+                } else {
+                    juce::FloatVectorOperations::fill(dest.data(), defaultValue, numSamples);
                 }
+            };
+            
+#if OSCI_PREMIUM
+            if (parameters.isGoniometer()) {
+                // x and y go to a diagonal currently, so we need to scale them down, and rotate them
+                const float xScale = -1.0f / std::sqrt(2.0f);
+                const float yScale = 1.0f / std::sqrt(2.0f);
+                const float rotationAngle = -juce::MathConstants<float>::pi / 4.0f;
+                const float cosAngle = std::cos(rotationAngle);
+                const float sinAngle = std::sin(rotationAngle);
+                
+                // Resize output vectors to hold all samples
+                xSamples.resize(numSamples);
+                ySamples.resize(numSamples);
+                
+                // Create temporary buffers for scaled values
+                std::vector<float> scaledX(numSamples);
+                std::vector<float> scaledY(numSamples);
+                
+                // Scale X and Y channels
+                juce::FloatVectorOperations::copyWithMultiply(scaledX.data(), channelData[0], xScale, numSamples);
+                juce::FloatVectorOperations::copyWithMultiply(scaledY.data(), channelData[1], yScale, numSamples);
+                
+                // Apply rotation: rotatedX = scaledX * cosAngle - scaledY * sinAngle
+                juce::FloatVectorOperations::copyWithMultiply(xSamples.data(), scaledX.data(), cosAngle, numSamples);
+                juce::FloatVectorOperations::addWithMultiply(xSamples.data(), scaledY.data(), -sinAngle, numSamples);
+                
+                // Apply rotation: rotatedY = scaledX * sinAngle + scaledY * cosAngle
+                juce::FloatVectorOperations::copyWithMultiply(ySamples.data(), scaledX.data(), sinAngle, numSamples);
+                juce::FloatVectorOperations::addWithMultiply(ySamples.data(), scaledY.data(), cosAngle, numSamples);
+            } else
 #endif
-
-                xSamples.push_back(point.x);
-                ySamples.push_back(point.y);
-                zSamples.push_back(point.z);
+            {
+                // Resize output vectors to hold all samples
+                xSamples.resize(numSamples);
+                ySamples.resize(numSamples);
+                
+                // Copy X and Y channels directly
+                juce::FloatVectorOperations::copy(xSamples.data(), channelData[0], numSamples);
+                juce::FloatVectorOperations::copy(ySamples.data(), channelData[1], numSamples);
+            }
+            
+            // Handle Z/RGB channels using helper lambda
+            if (mode == RenderMode::XYZ) {
+                copyOrFillChannel(zSamples, 2, 1.0f);
+            } else if (mode == RenderMode::XYRGB) {
+                copyOrFillChannel(rSamples, 3, 1.0f);
+                copyOrFillChannel(gSamples, 4, 0.0f);
+                copyOrFillChannel(bSamples, 5, 0.0f);
             }
         }
 
@@ -121,8 +186,12 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
 
             smoothedXSamples.resize(newResampledSize);
             smoothedYSamples.resize(newResampledSize);
-            smoothedZSamples.resize(newResampledSize);
-            smoothedZSamples.resize(newResampledSize);
+            if (mode == RenderMode::XYZ) smoothedZSamples.resize(newResampledSize);
+            if (mode == RenderMode::XYRGB) {
+                smoothedRSamples.resize(newResampledSize);
+                smoothedGSamples.resize(newResampledSize);
+                smoothedBSamples.resize(newResampledSize);
+            }
 
             if (parameters.isSweepEnabled()) {
                 // interpolate between sweep values to avoid any artifacts from quickly going from one sweep to the next
@@ -141,10 +210,16 @@ void VisualiserRenderer::runTask(const std::vector<osci::Point> &points) {
                     }
                 }
             } else {
-                xResampler.process(xSamples.data(), smoothedXSamples.data(), xSamples.size());
+                xResampler.process(xSamples.data(), smoothedXSamples.data(), (int) xSamples.size());
             }
-            yResampler.process(ySamples.data(), smoothedYSamples.data(), ySamples.size());
-            zResampler.process(zSamples.data(), smoothedZSamples.data(), zSamples.size());
+            yResampler.process(ySamples.data(), smoothedYSamples.data(), (int) ySamples.size());
+            if (mode == RenderMode::XYZ) {
+                if (!zSamples.empty()) zResampler.process(zSamples.data(), smoothedZSamples.data(), (int) zSamples.size());
+            } else if (mode == RenderMode::XYRGB) {
+                if (!rSamples.empty()) rResampler.process(rSamples.data(), smoothedRSamples.data(), (int) rSamples.size());
+                if (!gSamples.empty()) gResampler.process(gSamples.data(), smoothedGSamples.data(), (int) gSamples.size());
+                if (!bSamples.empty()) bResampler.process(bSamples.data(), smoothedBSamples.data(), (int) bSamples.size());
+            }
         }
     }
 
@@ -162,6 +237,14 @@ int VisualiserRenderer::prepareTask(double sampleRate, int bufferSize) {
     xResampler.prepare(sampleRate, RESAMPLE_RATIO);
     yResampler.prepare(sampleRate, RESAMPLE_RATIO);
     zResampler.prepare(sampleRate, RESAMPLE_RATIO);
+    rResampler.prepare(sampleRate, RESAMPLE_RATIO);
+    gResampler.prepare(sampleRate, RESAMPLE_RATIO);
+    bResampler.prepare(sampleRate, RESAMPLE_RATIO);
+    
+    // Prepare audio effects with the correct sample rate
+    for (auto& effect : parameters.audioEffects) {
+        effect->prepareToPlay(sampleRate, bufferSize);
+    }
 
     int desiredBufferSize = sampleRate / frameRate;
 
@@ -260,6 +343,7 @@ void VisualiserRenderer::newOpenGLContextCreated() {
 #endif
 
     glGenBuffers(1, &vertexBuffer);
+    glGenBuffers(1, &colorBuffer);
     glGenBuffers(1, &quadIndexBuffer);
     glGenBuffers(1, &vertexIndexBuffer);
 
@@ -272,6 +356,7 @@ void VisualiserRenderer::openGLContextClosing() {
     glDeleteBuffers(1, &quadIndexBuffer);
     glDeleteBuffers(1, &vertexIndexBuffer);
     glDeleteBuffers(1, &vertexBuffer);
+    glDeleteBuffers(1, &colorBuffer);
     glDeleteFramebuffers(1, &frameBuffer);
     glDeleteTextures(1, &lineTexture.id);
     glDeleteTextures(1, &blur1Texture.id);
@@ -320,9 +405,9 @@ void VisualiserRenderer::renderOpenGL() {
             juce::CriticalSection::ScopedLockType lock(samplesLock);
 
             if (parameters.upsamplingEnabled->getBoolValue()) {
-                renderScope(smoothedXSamples, smoothedYSamples, smoothedZSamples);
+                renderScope(smoothedXSamples, smoothedYSamples, smoothedRSamples, smoothedGSamples, smoothedBSamples);
             } else {
-                renderScope(xSamples, ySamples, zSamples);
+                renderScope(xSamples, ySamples, rSamples, gSamples, bSamples);
             }
 
             if (postRenderCallback) {
@@ -491,7 +576,8 @@ void VisualiserRenderer::setFrameRate(double frameRate) {
     }
 }
 
-void VisualiserRenderer::drawLineTexture(const std::vector<float> &xPoints, const std::vector<float> &yPoints, const std::vector<float> &zPoints) {
+void VisualiserRenderer::drawLineTexture(const std::vector<float> &xPoints, const std::vector<float> &yPoints,
+                                         const std::vector<float> &rPoints, const std::vector<float> &gPoints, const std::vector<float> &bPoints) {
     using namespace juce::gl;
 
     double persistence = std::pow(0.5, parameters.getPersistence()) * 0.4;
@@ -500,7 +586,12 @@ void VisualiserRenderer::drawLineTexture(const std::vector<float> &xPoints, cons
 
     activateTargetTexture(lineTexture);
     fade();
-    drawLine(xPoints, yPoints, zPoints);
+    const std::vector<float>* brightness = nullptr;
+    auto mode = renderMode.load();
+    if (mode == RenderMode::XYZ) {
+        brightness = parameters.getUpsamplingEnabled() ? &smoothedZSamples : &zSamples;
+    }
+    drawLine(xPoints, yPoints, brightness, rPoints, gPoints, bPoints, renderMode.load());
     glBindTexture(GL_TEXTURE_2D, targetTexture.value().id);
 }
 
@@ -624,38 +715,84 @@ void VisualiserRenderer::setNormalBlending() {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
-void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::vector<float> &yPoints, const std::vector<float> &zPoints) {
+void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::vector<float> &yPoints,
+                                  const std::vector<float> *brightnessPoints,
+                                  const std::vector<float> &rPoints, const std::vector<float> &gPoints, const std::vector<float> &bPoints,
+                                  RenderMode mode) {
     using namespace juce::gl;
 
     setAdditiveBlending();
 
-    int nPoints = xPoints.size();
+    int nPoints = (int) xPoints.size();
 
     // Without this, there's an access violation that seems to occur only on some systems
-    if (scratchVertices.size() != nPoints * 12)
-        scratchVertices.resize(nPoints * 12);
+    std::vector<float> positionData(nPoints * 12);
+    std::vector<float> colorData;
+    if (mode == RenderMode::XYRGB) colorData.resize(nPoints * 12);
 
     for (int i = 0; i < nPoints; ++i) {
         int p = i * 12;
-        scratchVertices[p] = scratchVertices[p + 3] = scratchVertices[p + 6] = scratchVertices[p + 9] = xPoints[i];
-        scratchVertices[p + 1] = scratchVertices[p + 4] = scratchVertices[p + 7] = scratchVertices[p + 10] = yPoints[i];
-        scratchVertices[p + 2] = scratchVertices[p + 5] = scratchVertices[p + 8] = scratchVertices[p + 11] = zPoints[i];
+        float x = xPoints[i];
+        float y = yPoints[i];
+        float brightness = 1.0f;
+        if (mode == RenderMode::XYZ) {
+            if (brightnessPoints != nullptr && i < (int) brightnessPoints->size()) brightness = (*brightnessPoints)[i];
+        } else if (mode == RenderMode::XYRGB) {
+            float r = rPoints[i];
+            float g = gPoints[i];
+            float b = bPoints[i];
+            brightness = std::max(r, std::max(g, b));
+        }
+        for (int k = 0; k < 4; ++k) {
+            positionData[p + 3 * k] = x;
+            positionData[p + 3 * k + 1] = y;
+            positionData[p + 3 * k + 2] = brightness;
+            if (mode == RenderMode::XYRGB) {
+                float r = rPoints[i];
+                float g = gPoints[i];
+                float b = bPoints[i];
+                colorData[p + 3 * k] = r;
+                colorData[p + 3 * k + 1] = g;
+                colorData[p + 3 * k + 2] = b;
+            }
+        }
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, nPoints * 12 * sizeof(float), scratchVertices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, positionData.size() * sizeof(float), positionData.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
+    if (mode == RenderMode::XYRGB) {
+        glBindBuffer(GL_ARRAY_BUFFER, colorBuffer);
+        glBufferData(GL_ARRAY_BUFFER, colorData.size() * sizeof(float), colorData.data(), GL_STATIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    }
+
     lineShader->use();
-    glEnableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aStart"));
-    glEnableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aEnd"));
-    glEnableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aIdx"));
+    GLint aStartLoc = glGetAttribLocation(lineShader->getProgramID(), "aStart");
+    GLint aEndLoc = glGetAttribLocation(lineShader->getProgramID(), "aEnd");
+    GLint aStartColorLoc = glGetAttribLocation(lineShader->getProgramID(), "aStartColor");
+    GLint aEndColorLoc = glGetAttribLocation(lineShader->getProgramID(), "aEndColor");
+    GLint aIdxLoc = glGetAttribLocation(lineShader->getProgramID(), "aIdx");
+
+    glEnableVertexAttribArray(aStartLoc);
+    glEnableVertexAttribArray(aEndLoc);
+    if (mode == RenderMode::XYRGB) {
+        if (aStartColorLoc >= 0) glEnableVertexAttribArray(aStartColorLoc);
+        if (aEndColorLoc >= 0) glEnableVertexAttribArray(aEndColorLoc);
+    }
+    glEnableVertexAttribArray(aIdxLoc);
 
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-    glVertexAttribPointer(glGetAttribLocation(lineShader->getProgramID(), "aStart"), 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glVertexAttribPointer(glGetAttribLocation(lineShader->getProgramID(), "aEnd"), 3, GL_FLOAT, GL_FALSE, 0, (void *)(12 * sizeof(float)));
+    glVertexAttribPointer(aStartLoc, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(aEndLoc, 3, GL_FLOAT, GL_FALSE, 0, (void *)(12 * sizeof(float)));
+    if (mode == RenderMode::XYRGB) {
+        glBindBuffer(GL_ARRAY_BUFFER, colorBuffer);
+        if (aStartColorLoc >= 0) glVertexAttribPointer(aStartColorLoc, 3, GL_FLOAT, GL_FALSE, 0, 0);
+        if (aEndColorLoc >= 0) glVertexAttribPointer(aEndColorLoc, 3, GL_FLOAT, GL_FALSE, 0, (void *)(12 * sizeof(float)));
+    }
     glBindBuffer(GL_ARRAY_BUFFER, quadIndexBuffer);
-    glVertexAttribPointer(glGetAttribLocation(lineShader->getProgramID(), "aIdx"), 1, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(aIdxLoc, 1, GL_FLOAT, GL_FALSE, 0, 0);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, screenTexture.id);
@@ -663,8 +800,11 @@ void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::
     lineShader->setUniform("uSize", (GLfloat)parameters.getFocus());
     lineShader->setUniform("uGain", 450.0f / 512.0f);
     lineShader->setUniform("uInvert", 1.0f);
+    juce::Colour lineColour = juce::Colour::fromHSV((float)(parameters.getHue() / 360.0f), 1.0f, 1.0f, 1.0f);
+    lineShader->setUniform("uLineColor", lineColour.getFloatRed(), lineColour.getFloatGreen(), lineColour.getFloatBlue());
+    lineShader->setUniform("uUseVertexColor", mode == RenderMode::XYRGB ? 1.0f : 0.0f);
 
-    float intensity = parameters.getIntensity() * (41000.0f / sampleRate);
+    float intensity = parameters.getIntensity() * (41000.0f / sampleRate) * 1.0f;
     if (parameters.getUpsamplingEnabled()) {
         lineShader->setUniform("uIntensity", intensity);
     } else {
@@ -687,9 +827,13 @@ void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::
     int nEdgesThisTime = xPoints.size() - 1;
     glDrawElements(GL_TRIANGLES, nEdgesThisTime * 6, GL_UNSIGNED_INT, 0);
 
-    glDisableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aStart"));
-    glDisableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aEnd"));
-    glDisableVertexAttribArray(glGetAttribLocation(lineShader->getProgramID(), "aIdx"));
+    glDisableVertexAttribArray(aStartLoc);
+    glDisableVertexAttribArray(aEndLoc);
+    if (mode == RenderMode::XYRGB) {
+        if (aStartColorLoc >= 0) glDisableVertexAttribArray(aStartColorLoc);
+        if (aEndColorLoc >= 0) glDisableVertexAttribArray(aEndColorLoc);
+    }
+    glDisableVertexAttribArray(aIdxLoc);
 }
 
 void VisualiserRenderer::fade() {
@@ -774,7 +918,8 @@ void VisualiserRenderer::drawCRT() {
 
     activateTargetTexture(renderTexture);
     setShader(outputShader.get());
-    outputShader->setUniform("uExposure", 0.25f);
+    // Lower exposure slightly for RGB pipeline (previous mono calibration was higher)
+    outputShader->setUniform("uExposure", 0.18f);
     outputShader->setUniform("uLineSaturation", (float)parameters.getLineSaturation());
 #if OSCI_PREMIUM
     outputShader->setUniform("uScreenSaturation", (float)parameters.getScreenSaturation());
@@ -789,14 +934,20 @@ void VisualiserRenderer::drawCRT() {
     outputShader->setUniform("uRandom", juce::Random::getSystemRandom().nextFloat());
     outputShader->setUniform("uGlow", (float)parameters.getGlow());
     outputShader->setUniform("uAmbient", (float)parameters.getAmbient());
+    {
+        juce::Colour lineColour = juce::Colour::fromHSV((float)(parameters.getHue() / 360.0f), 1.0f, 1.0f, 1.0f);
+        outputShader->setUniform("uBeamColor", lineColour.getFloatRed(), lineColour.getFloatGreen(), lineColour.getFloatBlue());
+    }
     setOffsetAndScale(outputShader.get());
 #if OSCI_PREMIUM
     outputShader->setUniform("uFishEye", screenOverlay == ScreenOverlay::VectorDisplay ? VECTOR_DISPLAY_FISH_EYE : 0.0f);
     outputShader->setUniform("uRealScreen", parameters.screenOverlay->isRealisticDisplay() ? 1.0f : 0.0f);
+#else
+    outputShader->setUniform("uFishEye", 0.0f);
+    outputShader->setUniform("uRealScreen", 0.0f);
 #endif
     outputShader->setUniform("uResizeForCanvas", lineTexture.width / (float) renderTexture.width);
-    juce::Colour colour = juce::Colour::fromHSV(parameters.getHue() / 360.0f, 1.0, 1.0, 1.0);
-    outputShader->setUniform("uColour", colour.getFloatRed(), colour.getFloatGreen(), colour.getFloatBlue());
+    // Colour uniform removed: line texture already encodes RGB
     drawTexture({
         lineTexture,
         blur1Texture,
@@ -917,6 +1068,41 @@ Texture VisualiserRenderer::createScreenTexture() {
         simpleShader->setUniform("colour", 0.01f, 0.05f, 0.01f, 1.0f);
         glLineWidth(4.0f);
         glDrawArrays(GL_LINES, 0, data.size() / 2);
+
+        // Also write a clean graticule mask into alpha so the compositor can
+        // reveal grid lines under ambient without washing out the smudged texture.
+        // We want: alpha = 1.0 everywhere, alpha = 0.0 on the grid lines.
+        {
+            GLboolean prevColourMask[4] { GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE };
+            glGetBooleanv(GL_COLOR_WRITEMASK, prevColourMask);
+            const bool prevBlendEnabled = glIsEnabled(GL_BLEND);
+            GLint prevBlendSrc = GL_SRC_ALPHA;
+            GLint prevBlendDst = GL_ONE_MINUS_SRC_ALPHA;
+            glGetIntegerv(GL_BLEND_SRC_RGB, &prevBlendSrc);
+            glGetIntegerv(GL_BLEND_DST_RGB, &prevBlendDst);
+            GLfloat prevClearColour[4] { 0.0f, 0.0f, 0.0f, 0.0f };
+            glGetFloatv(GL_COLOR_CLEAR_VALUE, prevClearColour);
+
+            glDisable(GL_BLEND);
+            glColorMask(false, false, false, true);
+
+            // Ensure non-grid pixels don't inherit arbitrary alpha from the source image.
+            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+
+            // Draw grid lines into alpha only.
+            simpleShader->setUniform("colour", 0.0f, 0.0f, 0.0f, 0.0f);
+            glDrawArrays(GL_LINES, 0, data.size() / 2);
+
+            glClearColor(prevClearColour[0], prevClearColour[1], prevClearColour[2], prevClearColour[3]);
+            glColorMask(prevColourMask[0], prevColourMask[1], prevColourMask[2], prevColourMask[3]);
+            glBlendFunc(prevBlendSrc, prevBlendDst);
+            if (prevBlendEnabled)
+                glEnable(GL_BLEND);
+            else
+                glDisable(GL_BLEND);
+        }
+
         glBindTexture(GL_TEXTURE_2D, targetTexture.value().id);
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     }
@@ -960,7 +1146,8 @@ void VisualiserRenderer::checkGLErrors(juce::String file, int line) {
     }
 }
 
-void VisualiserRenderer::renderScope(const std::vector<float> &xPoints, const std::vector<float> &yPoints, const std::vector<float> &zPoints) {
+void VisualiserRenderer::renderScope(const std::vector<float> &xPoints, const std::vector<float> &yPoints,
+                                     const std::vector<float> &rPoints, const std::vector<float> &gPoints, const std::vector<float> &bPoints) {
     if (screenOverlay != parameters.getScreenOverlay()) {
         screenOverlay = parameters.getScreenOverlay();
 #if OSCI_PREMIUM
@@ -976,7 +1163,14 @@ void VisualiserRenderer::renderScope(const std::vector<float> &xPoints, const st
 
     renderScale = (float)openGLContext.getRenderingScale();
 
-    drawLineTexture(xPoints, yPoints, zPoints);
+    // Provide dummy colour buffers for non-RGB modes to avoid allocations
+    static std::vector<float> empty;
+    auto mode = renderMode.load();
+    if (mode != RenderMode::XYRGB) {
+        drawLineTexture(xPoints, yPoints, empty, empty, empty);
+    } else {
+        drawLineTexture(xPoints, yPoints, rPoints, gPoints, bPoints);
+    }
     checkGLErrors(__FILE__, __LINE__);
     drawCRT();
     checkGLErrors(__FILE__, __LINE__);

@@ -2,13 +2,14 @@
 #include <JuceHeader.h>
 #include <cmath>
 #include <numbers>
-#include "../PluginProcessor.h"
 
 class MultiplexEffect : public osci::EffectApplication {
 public:
-    explicit MultiplexEffect(OscirenderAudioProcessor &p) : audioProcessor(p) {}
+    std::shared_ptr<osci::EffectApplication> clone() const override {
+        return std::make_shared<MultiplexEffect>();
+    }
 
-    osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
+    osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
         jassert(values.size() == 5);
 
         double gridX = values[0].load();
@@ -28,15 +29,15 @@ public:
                                             std::floor(gridY + 1e-3),
                                             std::floor(gridZ + 1e-3));
 
-        gridFloor.x = std::max(gridFloor.x, 1.0);
-        gridFloor.y = std::max(gridFloor.y, 1.0);
-        gridFloor.z = std::max(gridFloor.z, 1.0);
+        gridFloor.x = std::max(gridFloor.x, 1.0f);
+        gridFloor.y = std::max(gridFloor.y, 1.0f);
+        gridFloor.z = std::max(gridFloor.z, 1.0f);
 
         double totalPositions = gridFloor.x * gridFloor.y * gridFloor.z;
         double position = phase * totalPositions;
         double delayPosition = static_cast<int>(position) / totalPositions;
 
-        phase = nextPhase(audioProcessor.frequency / totalPositions, sampleRate) / (2.0 * std::numbers::pi);
+        phase = (nextPhase(frequency / totalPositions, sampleRate) + juce::MathConstants<float>::pi) / (2.0 * juce::MathConstants<float>::pi);
 
         int delayedIndex = head - static_cast<int>(delayPosition * gridDelay * sampleRate);
         if (delayedIndex < 0) {
@@ -57,8 +58,8 @@ public:
     }
 
     std::shared_ptr<osci::Effect> build() const override {
-        auto eff = std::make_shared<osci::Effect>(
-            std::make_shared<MultiplexEffect>(audioProcessor),
+        auto eff = std::make_shared<osci::SimpleEffect>(
+            std::make_shared<MultiplexEffect>(),
             std::vector<osci::EffectParameter*>{
                 new osci::EffectParameter("Multiplex X", "Controls the horizontal grid size for the multiplex effect.", "multiplexGridX", VERSION_HINT, 2.0, 1.0, 8.0),
                 new osci::EffectParameter("Multiplex Y", "Controls the vertical grid size for the multiplex effect.", "multiplexGridY", VERSION_HINT, 2.0, 1.0, 8.0),
@@ -100,7 +101,6 @@ private:
         return point;
     }
 
-    OscirenderAudioProcessor &audioProcessor;
     double phase = 0.0; // Normalised 0..1 phase for multiplex traversal
     const static int MAX_DELAY = 192000 * 10;
     std::vector<osci::Point> buffer = std::vector<osci::Point>(MAX_DELAY);

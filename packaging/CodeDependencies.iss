@@ -1,4 +1,4 @@
-// The Code Project Open License (CPOL) 1.02
+﻿// The Code Project Open License (CPOL) 1.02
 
 [Code]
 // https://github.com/DomGries/InnoDependencyInstaller

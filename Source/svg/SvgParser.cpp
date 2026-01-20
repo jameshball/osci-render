@@ -72,10 +72,10 @@ void SvgParser::pathToShapes(juce::Path& path, std::vector<std::unique_ptr<osci:
 	// Normalize shapes if requested and if there are shapes to normalize
 	if (normalise && !shapes.empty()) {
 		// Find the bounding box of all shapes
-		double minX = std::numeric_limits<double>::max();
-		double minY = std::numeric_limits<double>::max();
-		double maxX = std::numeric_limits<double>::lowest();
-		double maxY = std::numeric_limits<double>::lowest();
+        float minX = std::numeric_limits<float>::max();
+        float minY = std::numeric_limits<float>::max();
+        float maxX = std::numeric_limits<float>::lowest();
+        float maxY = std::numeric_limits<float>::lowest();
 		
 		for (const auto& shape : shapes) {
 			auto start = shape->nextVector(0);
@@ -92,13 +92,13 @@ void SvgParser::pathToShapes(juce::Path& path, std::vector<std::unique_ptr<osci:
 		}
 		
 		// Calculate center of all shapes
-		double centerX = (minX + maxX) / 2.0;
-		double centerY = (minY + maxY) / 2.0;
+        float centerX = (minX + maxX) / 2.0;
+        float centerY = (minY + maxY) / 2.0;
 		
 		// Calculate uniform scale factor based on the maximum dimension
-		double width = maxX - minX;
-		double height = maxY - minY;
-		double scaleFactor = 1.8 / std::max(width, height); // Scale to fit within -1 to 1
+        float width = maxX - minX;
+        float height = maxY - minY;
+        float scaleFactor = 1.8 / std::max(width, height); // Scale to fit within -1 to 1
 		
 		// Apply translation and scaling to all shapes
 		for (auto& shape : shapes) {

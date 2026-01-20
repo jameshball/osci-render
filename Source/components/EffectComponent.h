@@ -4,7 +4,7 @@
 #include "LabelledTextBox.h"
 #include "SvgButton.h"
 
-class EffectComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater, public juce::SettableTooltipClient {
+class EffectComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater, public juce::SettableTooltipClient, private juce::Slider::Listener {
 public:
     EffectComponent(osci::Effect& effect, int index);
     EffectComponent(osci::Effect& effect);
@@ -15,6 +15,11 @@ public:
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void handleAsyncUpdate() override;
+    
+    // Slider::Listener callbacks for MIDI learn support
+    void sliderValueChanged(juce::Slider* slider) override;
+    void sliderDragStarted(juce::Slider* slider) override;
+    void sliderDragEnded(juce::Slider* slider) override;
 
     void setRangeEnabled(bool enabled);
 
@@ -26,9 +31,9 @@ public:
     int index = 0;
     juce::ComboBox lfo;
 
-    class EffectSettingsComponent : public juce::Component {
+    class EffectSettingsComponent : public juce::Component, private juce::Slider::Listener {
     public:
-        EffectSettingsComponent(EffectComponent* parent) {
+        EffectSettingsComponent(EffectComponent* parent) : parameter(parent->effect.parameters[parent->index]) {
             addAndMakeVisible(popupLabel);
             addAndMakeVisible(min);
             addAndMakeVisible(max);
@@ -39,12 +44,10 @@ public:
             addAndMakeVisible(smoothValueChangeLabel);
             addAndMakeVisible(smoothValueChangeSlider);
 
-            osci::EffectParameter* parameter = parent->effect.parameters[parent->index];
-
             min.textBox.setValue(parameter->min, juce::dontSendNotification);
             max.textBox.setValue(parameter->max, juce::dontSendNotification);
 
-            min.textBox.onValueChange = [this, parameter, parent]() {
+            min.textBox.onValueChange = [this, parent]() {
                 double minValue = min.textBox.getValue();
                 double maxValue = max.textBox.getValue();
                 if (minValue >= maxValue) {
@@ -55,7 +58,7 @@ public:
                 parent->slider.setRange(parameter->min, parameter->max, parameter->step);
             };
 
-            max.textBox.onValueChange = [this, parameter, parent]() {
+            max.textBox.onValueChange = [this, parent]() {
                 double minValue = min.textBox.getValue();
                 double maxValue = max.textBox.getValue();
                 if (maxValue <= minValue) {
@@ -77,14 +80,16 @@ public:
             lfoStartSlider.setRange(parameter->lfoStartPercent->min, parameter->lfoStartPercent->max, parameter->lfoStartPercent->step);
             lfoStartSlider.setValue(parameter->lfoStartPercent->getValueUnnormalised(), juce::dontSendNotification);
             lfoStartSlider.setTextValueSuffix("%");
-            lfoStartSlider.onValueChange = [this, parameter]() {
+            lfoStartSlider.addListener(this);
+            lfoStartSlider.onValueChange = [this]() {
                 parameter->lfoStartPercent->setUnnormalisedValueNotifyingHost(lfoStartSlider.getValue());
             };
 
             lfoEndSlider.setRange(parameter->lfoEndPercent->min, parameter->lfoEndPercent->max, parameter->lfoEndPercent->step);
             lfoEndSlider.setValue(parameter->lfoEndPercent->getValueUnnormalised(), juce::dontSendNotification);
             lfoEndSlider.setTextValueSuffix("%");
-            lfoEndSlider.onValueChange = [this, parameter]() {
+            lfoEndSlider.addListener(this);
+            lfoEndSlider.onValueChange = [this]() {
                 parameter->lfoEndPercent->setUnnormalisedValueNotifyingHost(lfoEndSlider.getValue());
             };
 
@@ -94,13 +99,18 @@ public:
 
             smoothValueChangeSlider.setRange(0.01, 1.0, 0.0001);
             smoothValueChangeSlider.setValue(parameter->smoothValueChange, juce::dontSendNotification);
-            smoothValueChangeSlider.onValueChange = [this, parameter]() {
+            smoothValueChangeSlider.onValueChange = [this]() {
                 parameter->smoothValueChange = smoothValueChangeSlider.getValue();
             };
 
             popupLabel.setText(parameter->name + " Range", juce::dontSendNotification);
             popupLabel.setJustificationType(juce::Justification::centred);
             popupLabel.setFont(juce::Font(14.0f, juce::Font::bold));
+        }
+        
+        ~EffectSettingsComponent() override {
+            lfoStartSlider.removeListener(this);
+            lfoEndSlider.removeListener(this);
         }
 
         void resized() override {
@@ -115,8 +125,27 @@ public:
             smoothValueChangeLabel.setBounds(bounds.removeFromTop(20));
             smoothValueChangeSlider.setBounds(bounds.removeFromTop(40));
         }
+        
+        void sliderValueChanged(juce::Slider*) override {}
+        
+        void sliderDragStarted(juce::Slider* slider) override {
+            if (slider == &lfoStartSlider && parameter->lfoStartPercent != nullptr) {
+                parameter->lfoStartPercent->beginChangeGesture();
+            } else if (slider == &lfoEndSlider && parameter->lfoEndPercent != nullptr) {
+                parameter->lfoEndPercent->beginChangeGesture();
+            }
+        }
+        
+        void sliderDragEnded(juce::Slider* slider) override {
+            if (slider == &lfoStartSlider && parameter->lfoStartPercent != nullptr) {
+                parameter->lfoStartPercent->endChangeGesture();
+            } else if (slider == &lfoEndSlider && parameter->lfoEndPercent != nullptr) {
+                parameter->lfoEndPercent->endChangeGesture();
+            }
+        }
 
     private:
+        osci::EffectParameter* parameter;
         juce::Label popupLabel;
         LabelledTextBox min{"Min"};
         LabelledTextBox max{"Max"};

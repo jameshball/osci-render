@@ -7,8 +7,11 @@
 #include "MidiComponent.h"
 #include "PluginProcessor.h"
 #include "SettingsComponent.h"
+#include "TxtComponent.h"
+#include "components/AnimationTimelineController.h"
 #include "components/ErrorCodeEditorComponent.h"
 #include "components/LuaConsole.h"
+#include "components/OscirenderAudioTimelineController.h"
 #include "components/OsciMainMenuBarModel.h"
 #include "components/SplashScreenComponent.h"
 #include "visualiser/VisualiserSettings.h"
@@ -58,6 +61,7 @@ public:
 
     juce::ComponentAnimator codeEditorAnimator;
     LuaComponent lua{audioProcessor, *this};
+    TxtComponent txtFont{audioProcessor, *this};
 
     SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings", visualiserSettings, 550, 500, 1500, VISUALISER_SETTINGS_HEIGHT);
 
@@ -70,7 +74,7 @@ public:
     juce::XmlTokeniser xmlTokeniser;
     juce::ShapeButton collapseButton;
     std::shared_ptr<juce::CodeDocument> customFunctionCodeDocument = std::make_shared<juce::CodeDocument>();
-    std::shared_ptr<OscirenderCodeEditorComponent> customFunctionCodeEditor = std::make_shared<OscirenderCodeEditorComponent>(*customFunctionCodeDocument, &luaTokeniser, audioProcessor, CustomEffect::UNIQUE_ID, CustomEffect::FILE_NAME);
+    std::shared_ptr<OscirenderCodeEditorComponent> customFunctionCodeEditor = std::make_shared<OscirenderCodeEditorComponent>(*customFunctionCodeDocument, &luaTokeniser, audioProcessor, LuaEffectState::UNIQUE_ID, LuaEffectState::FILE_NAME);
 
     OsciMainMenuBarModel model{audioProcessor, *this};
 
@@ -91,6 +95,11 @@ public:
     bool keyPressed(const juce::KeyPress& key) override;
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseMove(const juce::MouseEvent& event) override;
+
+    // Timeline controllers for osci-render (shared pointers to allow passing to timeline component)
+    std::shared_ptr<AnimationTimelineController> animationTimelineController;
+    std::shared_ptr<OscirenderAudioTimelineController> audioTimelineController;
+    void updateTimelineController();
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
     // Syphon/Spout input dialog

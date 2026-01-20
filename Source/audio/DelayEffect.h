@@ -3,7 +3,11 @@
 
 class DelayEffect : public osci::EffectApplication {
 public:
-	osci::Point apply(int index, osci::Point vector, const std::vector<std::atomic<double>>& values, double sampleRate) override {
+	std::shared_ptr<osci::EffectApplication> clone() const override {
+		return std::make_shared<DelayEffect>();
+	}
+
+	osci::Point apply(int index, osci::Point vector, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
 		double decay = values[0];
 		double decayLength = values[1];
 		int delayBufferLength = (int)(sampleRate * decayLength);
@@ -38,7 +42,7 @@ public:
 	}
 
 	std::shared_ptr<osci::Effect> build() const override {
-		auto eff = std::make_shared<osci::Effect>(
+		auto eff = std::make_shared<osci::SimpleEffect>(
 			std::make_shared<DelayEffect>(),
 			std::vector<osci::EffectParameter*>{
 				new osci::EffectParameter("Delay Decay", "Adds repetitions, delays, or echos to the audio. This slider controls the volume of the echo.", "delayDecay", VERSION_HINT, 0.4, 0.0, 1.0),

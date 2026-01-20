@@ -6,10 +6,14 @@ public:
 	SmoothEffect() = default;
 	explicit SmoothEffect(juce::String prefix, float defaultValue = 0.75f) : idPrefix(prefix), smoothingDefault(defaultValue) {}
 
-	osci::Point apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) override {
-		double weight = juce::jmax(values[0].load(), 0.00001);
+	std::shared_ptr<osci::EffectApplication> clone() const override {
+		return std::make_shared<SmoothEffect>(idPrefix, smoothingDefault);
+	}
+
+	osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
+		float weight = juce::jmax(values[0].load(), 0.00001f);
 		weight *= 0.95;
-		double strength = 10;
+		float strength = 10;
 		weight = std::log(strength * weight + 1) / std::log(strength + 1);
 		weight = std::pow(weight, 48000 / sampleRate);
 		avg = weight * avg + (1 - weight) * input;
@@ -19,7 +23,7 @@ public:
 
 	std::shared_ptr<osci::Effect> build() const override {
         auto id = idPrefix.isEmpty() ? juce::String("smoothing") : (idPrefix + "Smoothing");
-		auto eff = std::make_shared<osci::Effect>(
+		auto eff = std::make_shared<osci::SimpleEffect>(
 			std::make_shared<SmoothEffect>(id),
 	    	new osci::EffectParameter("Smoothing", "This works as a low-pass frequency filter that removes high frequencies, making the image look smoother, and audio sound less harsh.", id, VERSION_HINT, smoothingDefault, 0.0, 1.0)
 		);

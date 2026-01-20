@@ -9,7 +9,6 @@
 #include "MidiComponent.h"
 #include "PerspectiveComponent.h"
 #include "PluginProcessor.h"
-#include "TxtComponent.h"
 #include "components/OpenFileComponent.h"
 #include "components/FileControlsComponent.h"
 
@@ -36,7 +35,6 @@ private:
 
     FileControlsComponent fileControls{audioProcessor, pluginEditor};
     PerspectiveComponent perspective{audioProcessor, pluginEditor};
-    TxtComponent txt{audioProcessor, pluginEditor};
     FrameSettingsComponent frame{audioProcessor, pluginEditor};
     EffectsComponent effects{audioProcessor, pluginEditor};
     MidiComponent midi{audioProcessor, pluginEditor};

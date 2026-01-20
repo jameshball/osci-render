@@ -11,7 +11,6 @@ bool WavParser::parse(std::unique_ptr<juce::InputStream> stream) {
     if (stream == nullptr) {
         return false;
     }
-    counter = 0;
     currentSample = 0;
     juce::AudioFormatManager formatManager;
     formatManager.registerBasicFormats();
@@ -56,9 +55,10 @@ void WavParser::setSampleRate(double sampleRate) {
     currentSampleRate = sampleRate;
 }
 
-osci::Point WavParser::getSample() {
+void WavParser::processBlock(juce::AudioBuffer<float> &buffer) {
     if (!initialised || paused) {
-        return osci::Point();
+        buffer.clear();
+        return;
     }
 
     if (currentSampleRate != audioProcessor.currentSampleRate) {
@@ -69,24 +69,13 @@ osci::Point WavParser::getSample() {
         afSource->setLooping(looping);
     }
 
-    source->getNextAudioBlock(juce::AudioSourceChannelInfo(audioBuffer));
-    currentSample += source->getResamplingRatio();
-    counter++;
+    currentSample += source->getResamplingRatio() * buffer.getNumSamples();
     if (currentSample >= totalSamples && afSource->isLooping()) {
         currentSample = 0;
-        counter = 0;
         afSource->setNextReadPosition(0);
     }
-    
-    if (audioBuffer.getNumChannels() == 1) {
-        return osci::Point(audioBuffer.getSample(0, 0), audioBuffer.getSample(0, 0), 1.0);
-    } else if (audioBuffer.getNumChannels() == 2) {
-        return osci::Point(audioBuffer.getSample(0, 0), audioBuffer.getSample(1, 0), 1.0);
-    } else if (audioBuffer.getNumChannels() >= 3) {
-        return osci::Point(audioBuffer.getSample(0, 0), audioBuffer.getSample(1, 0), audioBuffer.getSample(2, 0));
-    } else {
-        return osci::Point();
-    }
+
+    source->getNextAudioBlock(juce::AudioSourceChannelInfo(buffer));
 }
 
 void WavParser::setProgress(double progress) {
@@ -106,7 +95,6 @@ bool WavParser::isLooping() {
 
 void WavParser::setPaused(bool paused) {
     this->paused = paused;
-    counter = 0;
 }
 
 bool WavParser::isPaused() {

@@ -17,8 +17,9 @@ public:
 
     // Called when the user closes the view
     std::function<void()> onClosed;
-    // Called after the file has been added to the processor; consumer may open editors, etc.
-    std::function<void(const juce::String& fileName, bool shouldOpenEditor)> onExampleOpened;
+    // Called after a file has been added to the processor; consumer may open editors, etc.
+    // This is called for each file opened (e.g., multiple files when importing).
+    std::function<void(const juce::String& fileName, bool shouldOpenEditor, int fileIndex)> onFileOpened;
 
 private:
     OscirenderAudioProcessor& audioProcessor;

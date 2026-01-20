@@ -42,6 +42,10 @@ EffectComponent::EffectComponent(osci::Effect& effect, int index) : effect(effec
     lfoSlider.setNumDecimalPlacesToDisplay(3);
     lfoSlider.setScrollWheelEnabled(false);
 
+    // Add this component as a listener for both sliders to handle gesture notifications
+    slider.addListener(this);
+    lfoSlider.addListener(this);
+
     label.setFont(juce::Font(14.0f));
 
     lfo.addItem("Static", static_cast<int>(osci::LfoType::Static));
@@ -175,6 +179,8 @@ void EffectComponent::setupComponent() {
 }
 
 EffectComponent::~EffectComponent() {
+    slider.removeListener(this);
+    lfoSlider.removeListener(this);
     effect.removeListener(index, this);
 }
 
@@ -224,6 +230,50 @@ void EffectComponent::parameterValueChanged(int parameterIndex, float newValue) 
 }
 
 void EffectComponent::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
+
+// Slider::Listener callbacks for MIDI learn support
+void EffectComponent::sliderValueChanged(juce::Slider* sliderThatChanged) {
+    // Value changes are handled by the slider's onValueChange lambda
+    // This is intentionally empty as the lambda provides more flexibility
+}
+
+void EffectComponent::sliderDragStarted(juce::Slider* sliderThatChanged) {
+    // Notify the host that a gesture (parameter change) is starting
+    // This is critical for MIDI learn functionality in DAWs like Logic and Ableton
+    if (sliderThatChanged == &slider) {
+        effect.parameters[index]->beginChangeGesture();
+        
+        // Also begin gesture for linked parameters
+        if (effect.linked != nullptr && effect.linked->getBoolValue()) {
+            for (int i = 0; i < effect.parameters.size(); i++) {
+                if (i != index) {
+                    effect.parameters[i]->beginChangeGesture();
+                }
+            }
+        }
+    } else if (sliderThatChanged == &lfoSlider && effect.parameters[index]->lfoRate != nullptr) {
+        effect.parameters[index]->lfoRate->beginChangeGesture();
+    }
+}
+
+void EffectComponent::sliderDragEnded(juce::Slider* sliderThatChanged) {
+    // Notify the host that a gesture (parameter change) has ended
+    // This is critical for MIDI learn functionality in DAWs like Logic and Ableton
+    if (sliderThatChanged == &slider) {
+        effect.parameters[index]->endChangeGesture();
+        
+        // Also end gesture for linked parameters
+        if (effect.linked != nullptr && effect.linked->getBoolValue()) {
+            for (int i = 0; i < effect.parameters.size(); i++) {
+                if (i != index) {
+                    effect.parameters[i]->endChangeGesture();
+                }
+            }
+        }
+    } else if (sliderThatChanged == &lfoSlider && effect.parameters[index]->lfoRate != nullptr) {
+        effect.parameters[index]->lfoRate->endChangeGesture();
+    }
+}
 
 void EffectComponent::handleAsyncUpdate() {
     setupComponent();

@@ -4,7 +4,7 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginCharacteristicsValue="pluginWantsMidiIn"
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
-              version="2.6.3.3" companyName="James H Ball" companyWebsite="https://osci-render.com"
+              version="2.7.2.4" companyName="James H Ball" companyWebsite="https://osci-render.com"
               companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1"
               pluginAUMainType="'aumf'" postExportShellCommandPosix="echo &quot;Building LuaJIT for $OSTYPE...&quot; &amp;&amp; DIR=%%1%% %%1%%/luajit_linux_macos.sh ">
   <MAINGROUP id="j5Ge2T" name="osci-render">
@@ -231,7 +231,6 @@
         <FILE id="UnjMQ4" name="ChinesePostman.h" compile="0" resource="0"
               file="Source/chinese_postman/ChinesePostman.h"/>
         <FILE id="ItJWxN" name="Dijkstra.h" compile="0" resource="0" file="Source/chinese_postman/Dijkstra.h"/>
-        <FILE id="PFBBHM" name="Example.cpp" compile="1" resource="0" file="Source/chinese_postman/Example.cpp"/>
         <FILE id="r66okI" name="Globals.h" compile="0" resource="0" file="Source/chinese_postman/Globals.h"/>
         <FILE id="GN3vkN" name="Graph.cpp" compile="1" resource="0" file="Source/chinese_postman/Graph.cpp"/>
         <FILE id="tpPZBV" name="Graph.h" compile="0" resource="0" file="Source/chinese_postman/Graph.h"/>
@@ -240,18 +239,14 @@
         <FILE id="CdKZCg" name="Matching.h" compile="0" resource="0" file="Source/chinese_postman/Matching.h"/>
       </GROUP>
       <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
+        <FILE id="kzXVmm" name="CustomTooltipWindow.cpp" compile="1" resource="0"
+              file="Source/components/CustomTooltipWindow.cpp"/>
+        <FILE id="A4ukex" name="CustomTooltipWindow.h" compile="0" resource="0"
+              file="Source/components/CustomTooltipWindow.h"/>
         <FILE id="gPTmR4" name="AboutComponent.cpp" compile="1" resource="0"
               file="Source/components/AboutComponent.cpp"/>
         <FILE id="vDlOTn" name="AboutComponent.h" compile="0" resource="0"
               file="Source/components/AboutComponent.h"/>
-        <FILE id="AAXWW6" name="AnimationTimelineComponent.cpp" compile="1"
-              resource="0" file="Source/components/AnimationTimelineComponent.cpp"/>
-        <FILE id="ppzO8J" name="AnimationTimelineComponent.h" compile="0" resource="0"
-              file="Source/components/AnimationTimelineComponent.h"/>
-        <FILE id="xxiMAy" name="AudioPlayerComponent.cpp" compile="1" resource="0"
-              file="Source/components/AudioPlayerComponent.cpp"/>
-        <FILE id="DSvDMv" name="AudioPlayerComponent.h" compile="0" resource="0"
-              file="Source/components/AudioPlayerComponent.h"/>
         <FILE id="kUinTt" name="ComponentList.cpp" compile="1" resource="0"
               file="Source/components/ComponentList.cpp"/>
         <FILE id="HGTPEW" name="ComponentList.h" compile="0" resource="0" file="Source/components/ComponentList.h"/>
@@ -326,6 +321,20 @@
               file="Source/components/TimelineComponent.cpp"/>
         <FILE id="fsckjw" name="TimelineComponent.h" compile="0" resource="0"
               file="Source/components/TimelineComponent.h"/>
+        <FILE id="tlCtrl" name="TimelineController.h" compile="0" resource="0"
+              file="Source/components/TimelineController.h"/>
+        <FILE id="audTlC" name="AudioTimelineController.cpp" compile="1" resource="0"
+              file="Source/components/AudioTimelineController.cpp"/>
+        <FILE id="audTlH" name="AudioTimelineController.h" compile="0" resource="0"
+              file="Source/components/AudioTimelineController.h"/>
+        <FILE id="aniTlC" name="AnimationTimelineController.cpp" compile="1"
+              resource="0" file="Source/components/AnimationTimelineController.cpp"/>
+        <FILE id="aniTlH" name="AnimationTimelineController.h" compile="0"
+              resource="0" file="Source/components/AnimationTimelineController.h"/>
+        <FILE id="oscAuC" name="OscirenderAudioTimelineController.cpp" compile="1"
+              resource="0" file="Source/components/OscirenderAudioTimelineController.cpp"/>
+        <FILE id="oscAuH" name="OscirenderAudioTimelineController.h" compile="0"
+              resource="0" file="Source/components/OscirenderAudioTimelineController.h"/>
         <FILE id="t9xeSp" name="TimelineLookAndFeel.h" compile="0" resource="0"
               file="Source/components/TimelineLookAndFeel.h"/>
         <FILE id="icFMpl" name="VListBox.cpp" compile="1" resource="0" file="Source/components/VListBox.cpp"/>
@@ -764,10 +773,10 @@
     </GROUP>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"
-               JUCE_WEB_BROWSER="0"/>
+               JUCE_WEB_BROWSER="0" JUCE_ASIO="1"/>
   <EXPORTFORMATS>
     <LINUX_MAKE targetFolder="Builds/osci-render/LinuxMakefile" smallIcon="pSc1mq"
-                bigIcon="pSc1mq" externalLibraries="luajit">
+                bigIcon="pSc1mq" externalLibraries="luajit" extraCompilerFlags="-mavx">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" headerPath="../../../modules/LuaJIT/src"
                        libraryPath="../../../modules/LuaJIT/src"/>
@@ -801,10 +810,11 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
+        <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/osci-render/VisualStudio2022" smallIcon="pSc1mq"
-            bigIcon="pSc1mq" extraCompilerFlags="/wd4005 /wd4244 /wd4305 /wd4584"
+            bigIcon="pSc1mq" extraCompilerFlags="/wd4005 /wd4244 /wd4305 /wd4584 /arch:AVX"
             extraLinkerFlags="/IGNORE:4006" externalLibraries="luajit51.lib">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" winWarningLevel="2"
@@ -842,6 +852,7 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
+        <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
       </MODULEPATHS>
     </VS2022>
     <XCODE_MAC targetFolder="Builds/osci-render/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak"
@@ -852,13 +863,16 @@
                hardenedRuntime="1" hardenedRuntimeOptions="com.apple.security.cs.allow-jit,com.apple.security.cs.allow-unsigned-executable-memory,com.apple.security.cs.disable-library-validation,com.apple.security.device.audio-input"
                externalLibraries="luajit" userNotes="D86A3M3H2L">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
                        headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
                        userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
-        <CONFIGURATION name="Release" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO,OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
+        <CONFIGURATION name="Release" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO,OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
                        headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
-        <CONFIGURATION name="Release (Development)" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep"
+        <CONFIGURATION name="Release (Development)" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
+                       headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
+                       userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
+        <CONFIGURATION name="Profiling" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx,GCC_GENERATE_DEBUGGING_SYMBOLS=YES,GCC_DEBUGGING_SYMBOLS=full,DEBUG_INFORMATION_FORMAT=dwarf-with-dsym,STRIP_INSTALLED_PRODUCT = NO,COPY_PHASE_STRIP=NO,DWARF_DSYM_FILE_SHOULD_ACCOMPANY_PRODUCT=YES"
                        headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
                        userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
       </CONFIGURATIONS>
@@ -889,6 +903,7 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
+        <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
   </EXPORTFORMATS>
@@ -910,6 +925,8 @@
     <MODULE id="juce_audio_plugin_client" showAllCode="1" useLocalCopy="0"
             useGlobalPath="1"/>
     <MODULE id="juce_audio_processors" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_processors_headless" showAllCode="1" useLocalCopy="0"
+            useGlobalPath="1"/>
     <MODULE id="juce_audio_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>

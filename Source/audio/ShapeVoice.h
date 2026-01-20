@@ -8,6 +8,7 @@ class ShapeVoice : public juce::SynthesiserVoice {
 public:
 	ShapeVoice(OscirenderAudioProcessor& p, juce::AudioSampleBuffer& externalAudio);
 
+	void prepareToPlay(double sampleRate, int samplesPerBlock);
 	bool canPlaySound(juce::SynthesiserSound* sound) override;
 	void startNote(int midiNoteNumber, float velocity, juce::SynthesiserSound* sound, int currentPitchWheelPosition) override;
     void updateSound(juce::SynthesiserSound* sound);
@@ -18,6 +19,11 @@ public:
 
 	void incrementShapeDrawing();
 	double getFrequency();
+
+	// Per-voice effect management
+	void initializeEffectsFromGlobal();
+	void setPreviewEffect(std::shared_ptr<osci::SimpleEffect> effect);
+	void clearPreviewEffect();
 
 	bool renderingSample = false;
 private:
@@ -49,6 +55,16 @@ private:
 	bool waitingForRelease = false;
 
 	juce::AudioSampleBuffer& externalAudio;
+
+	// Per-voice effect instances (cloned from global toggleableEffects)
+	// Mapped by effect ID so we can use global ordering from toggleableEffects
+	std::unordered_map<juce::String, std::shared_ptr<osci::SimpleEffect>> voiceEffectsMap;
+	std::shared_ptr<osci::SimpleEffect> voicePreviewEffect;
+	
+	// Working buffers for per-voice effect processing
+	juce::AudioBuffer<float> voiceBuffer;
+	juce::AudioBuffer<float> frequencyBuffer;
+	juce::AudioBuffer<float> volumeBuffer;
 
 	void noteStopped();
 };

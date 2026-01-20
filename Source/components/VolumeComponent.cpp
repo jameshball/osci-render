@@ -135,17 +135,17 @@ void VolumeComponent::handleAsyncUpdate() {
     thresholdSlider.setValue(audioProcessor.thresholdEffect->getValue(), juce::NotificationType::dontSendNotification);
 }
 
-void VolumeComponent::runTask(const std::vector<osci::Point>& buffer) {
+void VolumeComponent::runTask(const juce::AudioBuffer<float>& buffer) {
     float leftVolume = 0;
     float rightVolume = 0;
 
-    for (int i = 0; i < buffer.size(); i++) {
-        leftVolume += buffer[i].x * buffer[i].x;
-        rightVolume += buffer[i].y * buffer[i].y;
+    for (int i = 0; i < buffer.getNumSamples(); i++) {
+        leftVolume += buffer.getSample(0, i) * buffer.getSample(0, i);
+        rightVolume += buffer.getSample(1, i) * buffer.getSample(1, i);
     }
     // RMS
-    leftVolume = std::sqrt(leftVolume / buffer.size());
-    rightVolume = std::sqrt(rightVolume / buffer.size());
+    leftVolume = std::sqrt(leftVolume / buffer.getNumSamples());
+    rightVolume = std::sqrt(rightVolume / buffer.getNumSamples());
 
     if (std::isnan(leftVolume) || std::isnan(rightVolume)) {
         leftVolume = 0;

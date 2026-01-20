@@ -52,20 +52,20 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     toggleableEffects.push_back(SwirlEffectApp().build());
     toggleableEffects.push_back(SmoothEffect().build());
     toggleableEffects.push_back(DelayEffect().build());
-    toggleableEffects.push_back(DashedLineEffect(*this).build());
-    toggleableEffects.push_back(TraceEffect(*this).build());
-    toggleableEffects.push_back(WobbleEffect(*this).build());
-    toggleableEffects.push_back(DuplicatorEffect(*this).build());
+    toggleableEffects.push_back(DashedLineEffect().build());
+    toggleableEffects.push_back(TraceEffect().build());
+    toggleableEffects.push_back(WobbleEffect().build());
+    toggleableEffects.push_back(DuplicatorEffect().build());
 
     std::vector<std::shared_ptr<osci::Effect>> premiumEffects;
 
-    premiumEffects.push_back(MultiplexEffect(*this).build());
-    premiumEffects.push_back(UnfoldEffect(*this).build());
+    premiumEffects.push_back(MultiplexEffect().build());
+    premiumEffects.push_back(UnfoldEffect().build());
     premiumEffects.push_back(BounceEffect().build());
     premiumEffects.push_back(TwistEffect().build());
     premiumEffects.push_back(SkewEffect().build());
     premiumEffects.push_back(PolygonizerEffect().build());
-    premiumEffects.push_back(KaleidoscopeEffect(*this).build());
+    premiumEffects.push_back(KaleidoscopeEffect().build());
     premiumEffects.push_back(VortexEffect().build());
     premiumEffects.push_back(GodRayEffect().build());
     premiumEffects.push_back(SpiralBitCrushEffect().build());
@@ -140,6 +140,14 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     intParameters.push_back(voices);
 
     voices->addListener(this);
+    attackTime->addListener(this);
+    attackLevel->addListener(this);
+    attackShape->addListener(this);
+    decayTime->addListener(this);
+    decayShape->addListener(this);
+    sustainLevel->addListener(this);
+    releaseTime->addListener(this);
+    releaseShape->addListener(this);
 
     for (int i = 0; i < luaEffects.size(); i++) {
         luaEffects[i]->parameters[0]->addListener(this);
@@ -154,6 +162,14 @@ OscirenderAudioProcessor::~OscirenderAudioProcessor() {
     for (int i = luaEffects.size() - 1; i >= 0; i--) {
         luaEffects[i]->parameters[0]->removeListener(this);
     }
+    releaseShape->removeListener(this);
+    releaseTime->removeListener(this);
+    sustainLevel->removeListener(this);
+    decayShape->removeListener(this);
+    decayTime->removeListener(this);
+    attackShape->removeListener(this);
+    attackLevel->removeListener(this);
+    attackTime->removeListener(this);
     voices->removeListener(this);
 }
 
@@ -165,9 +181,22 @@ void OscirenderAudioProcessor::setAudioThreadCallback(std::function<void(const j
 void OscirenderAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
     CommonAudioProcessor::prepareToPlay(sampleRate, samplesPerBlock);
 
-    volumeBuffer = std::vector<double>(VOLUME_BUFFER_SECONDS * sampleRate, 0);
+    currentVolume = 0.0;
     synth.setCurrentPlaybackSampleRate(sampleRate);
     retriggerMidi = true;
+    
+    // Update sample rate for all effects so they have correct timing
+    {
+        juce::SpinLock::ScopedLockType lock(effectsLock);
+        
+        // Update sample rate for all voice effects
+        for (int i = 0; i < synth.getNumVoices(); i++) {
+            auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
+            if (voice) {
+                voice->prepareToPlay(sampleRate, samplesPerBlock);
+            }
+        }
+    }
 }
 
 // effectsLock should be held when calling this
@@ -182,8 +211,8 @@ void OscirenderAudioProcessor::addLuaSlider() {
         sliderNum = (sliderNum - mod) / 26;
     }
 
-    luaEffects.push_back(std::make_shared<osci::Effect>(
-        [this, sliderIndex](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+    luaEffects.push_back(std::make_shared<osci::SimpleEffect>(
+        [this, sliderIndex](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {
             luaValues[sliderIndex].store(values[0]);
             return input;
         },
@@ -232,6 +261,7 @@ void OscirenderAudioProcessor::addFile(juce::File file) {
 
     openFile(fileBlocks.size() - 1);
 }
+
 
 // parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessor::addFile(juce::String fileName, const char* data, const int size) {
@@ -403,12 +433,85 @@ void OscirenderAudioProcessor::setObjectServerPort(int port) {
 void OscirenderAudioProcessor::setPreviewEffectId(const juce::String& effectId) {
     previewEffect.reset();
     for (auto& eff : toggleableEffects) {
-        if (eff->getId() == effectId) { previewEffect = eff; break; }
+        if (eff->getId() == effectId) {
+            previewEffect = eff;
+            break;
+        }
+    }
+    // Only set preview effect on active voices to reduce overhead
+    // Inactive voices will get it lazily when they become active
+    auto simplePreview = std::dynamic_pointer_cast<osci::SimpleEffect>(previewEffect);
+    for (int i = 0; i < synth.getNumVoices(); i++) {
+        auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
+        if (voice && voice->isVoiceActive()) {
+            voice->setPreviewEffect(simplePreview);
+        }
     }
 }
 
 void OscirenderAudioProcessor::clearPreviewEffect() {
     previewEffect.reset();
+    // Clear preview effect from active voices
+    for (int i = 0; i < synth.getNumVoices(); i++) {
+        auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
+        if (voice && voice->isVoiceActive()) {
+            voice->clearPreviewEffect();
+        }
+    }
+}
+
+// effectsLock should be held when calling this
+void OscirenderAudioProcessor::applyToggleableEffectsToBuffer(
+    juce::AudioBuffer<float>& buffer,
+    juce::AudioBuffer<float>* externalInput,
+    juce::AudioBuffer<float>* volumeBuffer,
+    juce::AudioBuffer<float>* frequencyBuffer,
+    const std::unordered_map<juce::String, std::shared_ptr<osci::SimpleEffect>>* perVoiceEffects,
+    const std::shared_ptr<osci::Effect>& previewEffectInstance) {
+    juce::MidiBuffer emptyMidi;
+
+    for (auto& globalEffect : toggleableEffects) {
+        std::shared_ptr<osci::Effect> effectInstance = globalEffect;
+        if (perVoiceEffects != nullptr) {
+            auto it = perVoiceEffects->find(globalEffect->getId());
+            if (it == perVoiceEffects->end()) {
+                continue;
+            }
+            effectInstance = it->second;
+        }
+
+#if !OSCI_PREMIUM
+        if (effectInstance->isPremiumOnly()) {
+            continue;
+        }
+#endif
+
+        const bool isEnabled = effectInstance->enabled != nullptr && effectInstance->enabled->getValue();
+        const bool isSelected = effectInstance->selected == nullptr ? true : effectInstance->selected->getBoolValue();
+        if (!(isEnabled && isSelected)) {
+            continue;
+        }
+
+        juce::AudioBuffer<float>* extInput = nullptr;
+        if (externalInput != nullptr && globalEffect->getId() == custom->getId()) {
+            extInput = externalInput;
+        }
+        effectInstance->processBlockWithInputs(buffer, emptyMidi, extInput, volumeBuffer, frequencyBuffer);
+    }
+
+    if (previewEffectInstance != nullptr) {
+        const bool prevEnabled = (previewEffectInstance->enabled != nullptr) && previewEffectInstance->enabled->getValue();
+        const bool prevSelected = (previewEffectInstance->selected == nullptr) ? true : previewEffectInstance->selected->getBoolValue();
+        
+        // We only apply the preview effect if it wasn't already applied as a regular effect
+        if (!(prevEnabled && prevSelected)) {
+            juce::AudioBuffer<float>* extInput = nullptr;
+            if (externalInput != nullptr && previewEffectInstance->getId() == custom->getId()) {
+                extInput = externalInput;
+            }
+            previewEffectInstance->processBlockWithInputs(buffer, emptyMidi, extInput, volumeBuffer, frequencyBuffer);
+        }
+    }
 }
 
 void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
@@ -417,6 +520,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     int totalNumInputChannels = getTotalNumInputChannels();
     int totalNumOutputChannels = getTotalNumOutputChannels();
     double sampleRate = getSampleRate();
+    int numSamples = buffer.getNumSamples();
 
     // MIDI transport info variables (defaults to 60bpm, 4/4 time signature at zero seconds and not playing)
     double bpm = 60;
@@ -478,6 +582,61 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         inputBuffer.copyFrom(channel, 0, buffer, channel, 0, buffer.getNumSamples());
     }
 
+    // Calculate per-sample volume buffer BEFORE synth rendering (needed for effect pre-animation)
+    currentVolumeBuffer.setSize(1, numSamples, false, false, false);
+    auto* volumeData = currentVolumeBuffer.getWritePointer(0);
+    
+    // Calculate instantaneous squared magnitude using vectorized operations
+    if (totalNumInputChannels >= 2) {
+        const float* leftData = inputBuffer.getReadPointer(0);
+        const float* rightData = inputBuffer.getReadPointer(1);
+        
+        // L² + R² using SIMD operations
+        juce::FloatVectorOperations::multiply(volumeData, leftData, leftData, numSamples);
+        juce::FloatVectorOperations::addWithMultiply(volumeData, rightData, rightData, numSamples);
+        // Divide by 2: (L² + R²) / 2
+        juce::FloatVectorOperations::multiply(volumeData, 0.5f, numSamples);
+    } else if (totalNumInputChannels == 1) {
+        const float* monoData = inputBuffer.getReadPointer(0);
+        // mono²
+        juce::FloatVectorOperations::multiply(volumeData, monoData, monoData, numSamples);
+    } else {
+        juce::FloatVectorOperations::clear(volumeData, numSamples);
+    }
+    
+    // Apply exponential moving average for smoothing
+    const float smoothingCoeff = 1.0f - std::exp(-1.0f / (float)(VOLUME_BUFFER_SECONDS * sampleRate));
+    
+    for (int i = 0; i < numSamples; ++i) {
+        // EMA: smoothed = smoothed + coeff * (new - smoothed)
+        currentVolume += smoothingCoeff * (volumeData[i] - currentVolume);
+        // Take square root and clamp to get final volume
+        volumeData[i] = juce::jlimit(0.0f, 1.0f, std::sqrt((float)currentVolume));
+    }
+
+    // Pre-animate all effects for this block BEFORE rendering
+    // This ensures LFO phases advance exactly once per sample regardless of voice count or processing location
+    // Only animate effects that are enabled or being previewed (animation is expensive!)
+    {
+        juce::SpinLock::ScopedLockType lock(effectsLock);
+        if (adsrNeedsUpdate.exchange(false, std::memory_order_acq_rel)) {
+            adsrEnv = buildAdsrEnvFromParameters();
+        }
+        for (auto& effect : toggleableEffects) {
+            const bool isEnabled = effect->enabled != nullptr && effect->enabled->getBoolValue();
+            const bool isPreviewed = (effect == previewEffect);
+            if (isEnabled || isPreviewed) {
+                effect->animateValues(numSamples, &currentVolumeBuffer);
+            }
+        }
+        for (auto& effect : permanentEffects) {
+            effect->animateValues(numSamples, &currentVolumeBuffer);
+        }
+        for (auto& effect : luaEffects) {
+            effect->animateValues(numSamples, &currentVolumeBuffer);
+        }
+    }
+
     juce::AudioBuffer<float> outputBuffer3d = juce::AudioBuffer<float>(3, buffer.getNumSamples());
     outputBuffer3d.clear();
 
@@ -507,137 +666,110 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             midiMessages.cend(),
             [&] (const juce::MidiMessageMetadata& meta) { synth.publicHandleMidiEvent(meta.getMessage()); }
         );
+
+		// Apply toggleable effects directly in input mode (no synth voices involved)
+		{
+			juce::SpinLock::ScopedLockType lock(effectsLock);
+
+            inputFrequencyBuffer.setSize(1, numSamples, false, false, true);
+            juce::FloatVectorOperations::fill(inputFrequencyBuffer.getWritePointer(0), (float)frequency.load(), numSamples);
+
+            applyToggleableEffectsToBuffer(outputBuffer3d, &inputBuffer, &currentVolumeBuffer, &inputFrequencyBuffer, nullptr, previewEffect);
+		}
     } else {
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
         synth.renderNextBlock(outputBuffer3d, midiMessages, 0, buffer.getNumSamples());
-        for (int i = 0; i < synth.getNumVoices(); i++) {
-            auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
-            if (voice->isVoiceActive()) {
-                customEffect->frequency = voice->getFrequency();
-                break;
-            }
-        }
     }
 
     midiMessages.clear();
 
     auto* channelData = buffer.getArrayOfWritePointers();
 
-    for (int sample = 0; sample < buffer.getNumSamples(); ++sample) {
-        if (animateFrames->getBoolValue()) {
-            if (juce::JUCEApplicationBase::isStandaloneApp()) {
-                animationFrame = animationFrame + sTimeSec * animationRate->getValueUnnormalised();
-            } else if (animationSyncBPM->getValue()) {
-                animationFrame = playTimeBeats * animationRate->getValueUnnormalised() + animationOffset->getValueUnnormalised();
+    // Handle animation frame updates
+    if (animateFrames->getBoolValue()) {
+        double frameIncrement;
+        if (juce::JUCEApplicationBase::isStandaloneApp()) {
+            frameIncrement = sTimeSec * animationRate->getValueUnnormalised() * numSamples;
+        } else if (animationSyncBPM->getValue()) {
+            animationFrame = playTimeBeats * animationRate->getValueUnnormalised() + animationOffset->getValueUnnormalised();
+            frameIncrement = 0.0; // Already calculated absolute position
+        } else {
+            animationFrame = playTimeSeconds * animationRate->getValueUnnormalised() + animationOffset->getValueUnnormalised();
+            frameIncrement = 0.0; // Already calculated absolute position
+        }
+
+        if (juce::JUCEApplicationBase::isStandaloneApp()) {
+            animationFrame = animationFrame + frameIncrement;
+        }
+
+        juce::SpinLock::ScopedLockType lock1(parsersLock);
+        juce::SpinLock::ScopedLockType lock2(effectsLock);
+        if (currentFile >= 0 && sounds[currentFile]->parser->isAnimatable) {
+            int totalFrames = sounds[currentFile]->parser->getNumFrames();
+            if (loopAnimation->getBoolValue()) {
+                animationFrame = std::fmod(animationFrame, totalFrames);
             } else {
-                animationFrame = playTimeSeconds * animationRate->getValueUnnormalised() + animationOffset->getValueUnnormalised();
+                animationFrame = juce::jlimit(0.0, (double)totalFrames - 1, animationFrame.load());
             }
-
-            juce::SpinLock::ScopedLockType lock1(parsersLock);
-            juce::SpinLock::ScopedLockType lock2(effectsLock);
-            if (currentFile >= 0 && sounds[currentFile]->parser->isAnimatable) {
-                int totalFrames = sounds[currentFile]->parser->getNumFrames();
-                if (loopAnimation->getBoolValue()) {
-                    animationFrame = std::fmod(animationFrame, totalFrames);
-                } else {
-                    animationFrame = juce::jlimit(0.0, (double)totalFrames - 1, animationFrame.load());
-                }
-                sounds[currentFile]->parser->setFrame(animationFrame);
-            }
+            sounds[currentFile]->parser->setFrame(animationFrame);
         }
+    }
 
-        auto left = 0.0;
-        auto right = 0.0;
-        if (totalNumInputChannels >= 2) {
-            left = inputBuffer.getSample(0, sample);
-            right = inputBuffer.getSample(1, sample);
-        } else if (totalNumInputChannels == 1) {
-            left = inputBuffer.getSample(0, sample);
-            right = inputBuffer.getSample(0, sample);
+
+    {
+        juce::SpinLock::ScopedLockType lock1(parsersLock);
+        juce::SpinLock::ScopedLockType lock2(effectsLock);
+
+        // Note: toggleableEffects/previewEffect are applied via shared helper:
+        // - per-voice when using the synth path
+        // - directly to the buffer when using input mode
+        // Only permanentEffects and luaEffects are always global
+
+        for (auto& effect : permanentEffects) {
+            effect->processBlockWithInputs(outputBuffer3d, midiMessages, nullptr, &currentVolumeBuffer, nullptr);
         }
-
-        // update volume using a moving average
-        int oldestBufferIndex = (volumeBufferIndex + 1) % volumeBuffer.size();
-        squaredVolume -= volumeBuffer[oldestBufferIndex] / volumeBuffer.size();
-        volumeBufferIndex = oldestBufferIndex;
-        volumeBuffer[volumeBufferIndex] = (left * left + right * right) / 2;
-        squaredVolume += volumeBuffer[volumeBufferIndex] / volumeBuffer.size();
-        currentVolume = std::sqrt(squaredVolume);
-        currentVolume = juce::jlimit(0.0, 1.0, currentVolume);
-
-        osci::Point channels = {outputBuffer3d.getSample(0, sample), outputBuffer3d.getSample(1, sample), outputBuffer3d.getSample(2, sample)};
-
-        {
-            juce::SpinLock::ScopedLockType lock1(parsersLock);
-            juce::SpinLock::ScopedLockType lock2(effectsLock);
-            if (volume > EPSILON) {
-                for (auto& effect : toggleableEffects) {
-#if !OSCI_PREMIUM
-                    if (effect->isPremiumOnly()) {
-                        continue;
-                    }
-#endif
-                    bool isEnabled = effect->enabled != nullptr && effect->enabled->getValue();
-                    bool isSelected = effect->selected == nullptr ? true : effect->selected->getBoolValue();
-                    if (isEnabled && isSelected) {
-                        if (effect->getId() == custom->getId()) {
-                            effect->setExternalInput(osci::Point{ left, right });
-                        }
-                        channels = effect->apply(sample, channels, currentVolume);
-                    }
-                }
-                // Apply preview effect if present and not already active in the main chain
-                if (previewEffect) {
-                    const bool prevEnabled = (previewEffect->enabled != nullptr) && previewEffect->enabled->getValue();
-                    const bool prevSelected = (previewEffect->selected == nullptr) ? true : previewEffect->selected->getBoolValue();
-                    if (!(prevEnabled && prevSelected)) {
-                        if (previewEffect->getId() == custom->getId())
-                            previewEffect->setExternalInput(osci::Point{ left, right });
-                        channels = previewEffect->apply(sample, channels, currentVolume);
-                    }
-                }
-            }
-            for (auto& effect : permanentEffects) {
-                channels = effect->apply(sample, channels, currentVolume);
-            }
-            auto lua = currentFile >= 0 ? sounds[currentFile]->parser->getLua() : nullptr;
-            if (lua != nullptr || custom->enabled->getBoolValue()) {
-                for (auto& effect : luaEffects) {
-                    effect->apply(sample, channels, currentVolume);
-                }
+        auto lua = currentFile >= 0 ? sounds[currentFile]->parser->getLua() : nullptr;
+        if (lua != nullptr || custom->enabled->getBoolValue()) {
+            for (auto& effect : luaEffects) {
+                effect->processBlockWithInputs(outputBuffer3d, midiMessages, nullptr, &currentVolumeBuffer, nullptr);
             }
         }
+    }
 
-        double x = channels.x;
-        double y = channels.y;
-
-        x *= volume;
-        y *= volume;
-
-        // clip
-        x = juce::jmax(-threshold, juce::jmin(threshold.load(), x));
-        y = juce::jmax(-threshold, juce::jmin(threshold.load(), y));
-
-        threadManager.write(osci::Point(x, y, 1));
-
-        // Apply mute if active
-        if (muteParameter->getBoolValue()) {
-            x = 0.0;
-            y = 0.0;
-        }
-
-        if (totalNumOutputChannels >= 2) {
-            channelData[0][sample] = x;
-            channelData[1][sample] = y;
-        } else if (totalNumOutputChannels == 1) {
-            channelData[0][sample] = x;
-        }
-
-        if (isPlaying) {
-            playTimeSeconds += sTimeSec;
-            playTimeBeats += sTimeBeats;
-        }
+    // Process in batches using buffer-wide operations
+    auto* outputArray = outputBuffer3d.getArrayOfWritePointers();
+    
+    // Scale by volume
+    juce::FloatVectorOperations::multiply(outputArray[0], outputArray[0], (float)volume.load(), numSamples);
+    juce::FloatVectorOperations::multiply(outputArray[1], outputArray[1], (float)volume.load(), numSamples);
+    
+    // Hard clip to threshold
+    float thresholdVal = (float)threshold.load();
+    juce::FloatVectorOperations::clip(outputArray[0], outputArray[0], -thresholdVal, thresholdVal, numSamples);
+    juce::FloatVectorOperations::clip(outputArray[1], outputArray[1], -thresholdVal, thresholdVal, numSamples);
+    
+    // Write to thread manager (for visualizers, etc.)
+    threadManager.write(outputBuffer3d);
+    
+    // Apply mute if active
+    if (muteParameter->getBoolValue()) {
+        juce::FloatVectorOperations::clear(outputArray[0], numSamples);
+        juce::FloatVectorOperations::clear(outputArray[1], numSamples);
+    }
+    
+    // Copy to output channels
+    if (totalNumOutputChannels >= 2) {
+        juce::FloatVectorOperations::copy(channelData[0], outputArray[0], numSamples);
+        juce::FloatVectorOperations::copy(channelData[1], outputArray[1], numSamples);
+    } else if (totalNumOutputChannels == 1) {
+        juce::FloatVectorOperations::copy(channelData[0], outputArray[0], numSamples);
+    }
+    
+    // Update playback time
+    if (isPlaying) {
+        playTimeSeconds += sTimeSec * numSamples;
+        playTimeBeats += sTimeBeats * numSamples;
     }
 
     // used for any callback that must guarantee all audio is recieved (e.g. when recording to a file)
@@ -691,7 +823,7 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
     }
 
     auto customFunction = xml->createNewChildElement("customFunction");
-    customFunction->addTextElement(juce::Base64::toBase64(customEffect->getCode()));
+    customFunction->addTextElement(juce::Base64::toBase64(luaEffectState->getCode()));
 
     auto fontXml = xml->createNewChildElement("font");
     fontXml->setAttribute("family", font.getTypefaceName());
@@ -783,6 +915,8 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
             }
         }
 
+        adsrEnv = buildAdsrEnvFromParameters();
+
         auto customFunction = xml->getChildByName("customFunction");
         if (customFunction == nullptr) {
             customFunction = xml->getChildByName("perspectiveFunction");
@@ -790,7 +924,7 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         if (customFunction != nullptr) {
             auto stream = juce::MemoryOutputStream();
             juce::Base64::convertFromBase64(stream, customFunction->getAllSubText());
-            customEffect->updateCode(stream.toString());
+            luaEffectState->updateCode(stream.toString());
         }
 
         auto fontXml = xml->getChildByName("font");
@@ -840,11 +974,12 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
 }
 
 void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float newValue) {
-    for (auto effect : luaEffects) {
-        if (parameterIndex == effect->parameters[0]->getParameterIndex()) {
-            effect->apply();
-        }
-    }
+    // TODO: Figure out why below code was needed and if it is still needed
+    // for (auto effect : luaEffects) {
+    //     if (parameterIndex == effect->parameters[0]->getParameterIndex()) {
+    //         effect->apply();
+    //     }
+    // }
     if (parameterIndex == voices->getParameterIndex()) {
         int numVoices = voices->getValueUnnormalised();
         // if the number of voices has changed, update the synth without clearing all the voices
@@ -860,6 +995,17 @@ void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float n
             }
         }
     }
+
+    if (parameterIndex == attackTime->getParameterIndex()
+        || parameterIndex == attackLevel->getParameterIndex()
+        || parameterIndex == attackShape->getParameterIndex()
+        || parameterIndex == decayTime->getParameterIndex()
+        || parameterIndex == decayShape->getParameterIndex()
+        || parameterIndex == sustainLevel->getParameterIndex()
+        || parameterIndex == releaseTime->getParameterIndex()
+        || parameterIndex == releaseShape->getParameterIndex()) {
+        adsrNeedsUpdate.store(true, std::memory_order_release);
+    }
 }
 
 void OscirenderAudioProcessor::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
@@ -868,6 +1014,77 @@ void updateIfApproxEqual(osci::FloatParameter* parameter, float newValue) {
     if (std::abs(parameter->getValueUnnormalised() - newValue) > 0.0001) {
         parameter->setUnnormalisedValueNotifyingHost(newValue);
     }
+}
+
+void OscirenderAudioProcessor::resetActiveAdsrGestures() {
+    for (auto* parameter : activeAdsrGestureParameters) {
+        if (parameter != nullptr) {
+            parameter->endChangeGesture();
+        }
+    }
+    activeAdsrGestureParameters.clear();
+}
+
+void OscirenderAudioProcessor::beginAdsrGesturesForEnvelope(EnvelopeComponent* changedEnvelope) {
+    if (changedEnvelope == nullptr || !changedEnvelope->getAdsrMode()) {
+        return;
+    }
+
+    resetActiveAdsrGestures();
+
+    auto addGestureParam = [this](osci::FloatParameter* parameter) {
+        if (parameter != nullptr) {
+            activeAdsrGestureParameters.push_back(parameter);
+        }
+    };
+
+    if (auto* curveHandle = changedEnvelope->getActiveCurveHandle()) {
+        const int index = changedEnvelope->getHandleIndex(curveHandle);
+        if (index == 1) {
+            addGestureParam(attackShape);
+        } else if (index == 2) {
+            addGestureParam(decayShape);
+        } else if (index == 3) {
+            addGestureParam(releaseShape);
+        }
+    } else if (auto* handle = changedEnvelope->getActiveHandle()) {
+        const int index = changedEnvelope->getHandleIndex(handle);
+        if (index == 1) {
+            addGestureParam(attackTime);
+            addGestureParam(attackLevel);
+        } else if (index == 2) {
+            addGestureParam(decayTime);
+            addGestureParam(sustainLevel);
+        } else if (index == 3) {
+            addGestureParam(releaseTime);
+        }
+    }
+
+    for (auto* parameter : activeAdsrGestureParameters) {
+        parameter->beginChangeGesture();
+    }
+}
+
+Env OscirenderAudioProcessor::buildAdsrEnvFromParameters() const {
+    return Env(
+        {
+            0.0,
+            attackLevel->getValueUnnormalised(),
+            sustainLevel->getValueUnnormalised(),
+            0.0
+        },
+        {
+            attackTime->getValueUnnormalised(),
+            decayTime->getValueUnnormalised(),
+            releaseTime->getValueUnnormalised()
+        },
+        std::vector<EnvCurve>{
+            attackShape->getValueUnnormalised(),
+            decayShape->getValueUnnormalised(),
+            releaseShape->getValueUnnormalised()
+        },
+        2
+    );
 }
 
 void OscirenderAudioProcessor::envelopeChanged(EnvelopeComponent* changedEnvelope) {
@@ -890,6 +1107,14 @@ void OscirenderAudioProcessor::envelopeChanged(EnvelopeComponent* changedEnvelop
         updateIfApproxEqual(releaseTime, times[2]);
         updateIfApproxEqual(releaseShape, curves[2].getCurve());
     }
+}
+
+void OscirenderAudioProcessor::envelopeStartDrag(EnvelopeComponent* changedEnvelope) {
+    beginAdsrGesturesForEnvelope(changedEnvelope);
+}
+
+void OscirenderAudioProcessor::envelopeEndDrag(EnvelopeComponent* changedEnvelope) {
+    resetActiveAdsrGestures();
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {

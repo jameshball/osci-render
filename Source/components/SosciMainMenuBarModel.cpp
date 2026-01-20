@@ -106,6 +106,18 @@ void SosciMainMenuBarModel::resetMenuItems() {
 
     addMenuItem(3, "Force Disable Brightness Input", [&]() {
         processor.forceDisableBrightnessInput = !processor.forceDisableBrightnessInput;
+        if (processor.forceDisableBrightnessInput) {
+            // Disabling brightness should also disable RGB
+            processor.forceDisableRgbInput = true;
+        }
+        menuItemsChanged();
+    });
+    addMenuItem(3, "Force Disable RGB Input", [&]() {
+        processor.forceDisableRgbInput = !processor.forceDisableRgbInput;
+        if (!processor.forceDisableRgbInput) {
+            // Enabling RGB implies brightness is allowed too
+            processor.forceDisableBrightnessInput = false;
+        }
         menuItemsChanged();
     });
 

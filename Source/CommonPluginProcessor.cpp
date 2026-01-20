@@ -8,7 +8,6 @@
 
 #include "CommonPluginProcessor.h"
 #include "CommonPluginEditor.h"
-#include "components/AudioPlayerComponent.h"
 
 //==============================================================================
 CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesProperties)
@@ -170,7 +169,7 @@ void CommonAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 	currentSampleRate = sampleRate;
     
     for (auto& effect : effects) {
-        effect->updateSampleRate(currentSampleRate);
+        effect->prepareToPlay(currentSampleRate, samplesPerBlock);
     }
     
     threadManager.prepare(sampleRate, samplesPerBlock);
@@ -539,3 +538,4 @@ bool CommonAudioProcessor::ensureFFmpegExists(std::function<void()> onStart, std
     return false;
 }
 #endif
+

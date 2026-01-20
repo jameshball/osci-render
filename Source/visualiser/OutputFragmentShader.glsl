@@ -14,12 +14,13 @@ uniform float uNoise;
 uniform float uRandom;
 uniform float uGlow;
 uniform float uAmbient; 
+uniform vec3 uBeamColor;
 uniform float uFishEye;
 uniform float uRealScreen;
 uniform float uHueShift;
 uniform vec2 uOffset;
 uniform vec2 uScale;
-uniform vec3 uColour;
+// uColour removed; line texture already contains RGB
 varying vec2 vTexCoord;
 varying vec2 vTexCoordCanvas;
 
@@ -74,22 +75,49 @@ void main() {
     }
     
     // making the range of the glow slider more useful
-    float glow = 1.05 * pow(uGlow, 1.5);
-    float light = line.r + glow * 1.5 * screen.g * screen.g * tightGlow.r;
+    float glow = 1.75 * pow(uGlow, 1.5);
     float scatterScalar = 0.3 * (2.0 + 1.0 * screen.g + 0.5 * screen.r);
-    light += glow * scatter.g * scatterScalar;
-    // add ambient light to graticule
-    light += (1.0 - uRealScreen) * max(uAmbient - 0.35, 0.0) * scatterScalar;
-    
-    float tlight = 1.0-pow(2.0, -uExposure*light);
-    float tlight2 = tlight * tlight * tlight;
-    gl_FragColor.rgb = mix(uColour, vec3(1.0), 0.3+tlight2*tlight2*uOverexposure) * tlight;
-    gl_FragColor.rgb = desaturate(gl_FragColor.rgb, 1.0 - uLineSaturation);
-    if (uRealScreen > 0.5) {
-        // this isn't how light works, but it looks cool
-        float ambient = uExposure * uAmbient;
-        vec3 screen = ambient * hueShift(screen.rgb, uHueShift);
-        gl_FragColor.rgb += desaturate(screen, 1.0 - uScreenSaturation);
+    vec3 bloom = glow * ((0.25 * screen.r + 0.75 * screen.g) * tightGlow.rgb + scatter.rgb * scatterScalar);
+    float screenFactor = clamp(screen.r * 4.0, 0.1, 1.0);
+    vec3 light = screenFactor * line.rgb + bloom;
+    // vec3 light = line.rgb + bloom;
+    // tone map
+    vec3 tlight = 1.0 - exp(-uExposure * light);
+    // Overexposure that goes to white regardless of colour, like the old single-colour shader
+    // Use a scalar brightness to drive the white clip and keep hue in a normalized base colour.
+    float s = max(max(tlight.r, tlight.g), tlight.b); // perceived brightness proxy
+    vec3 baseCol = s > 1e-6 ? (tlight / s) : vec3(0.0);
+    // Mimic old curve: 0.3 + (brightness^6) * uOverexposure, then clamp to [0,1]
+    float whiteMix = clamp(0.3 + pow(s, 3.0) * uOverexposure, 0.0, 1.0);
+    vec3 colorOut = mix(baseCol, vec3(1.0), whiteMix) * s;
+    gl_FragColor.rgb = desaturate(colorOut, 1.0 - uLineSaturation);
+    // Ambient light:
+    // - Realistic displays: tint by the screen texture (existing behavior)
+    // - Non-real overlays: tint the background by the current beam colour even where there's no beam energy
+    float ambient = uExposure * max(uAmbient, 0.0);
+    if (ambient > 0.0) {
+        if (uRealScreen > 0.5) {
+            // this isn't how light works, but it looks cool
+            vec3 screenCol = ambient * hueShift(screen.rgb, uHueShift);
+            gl_FragColor.rgb += desaturate(screenCol, 1.0 - uScreenSaturation);
+        } else {
+                // Non-real overlays:
+                // - screen.g carries the "screen" texture (smudge/noise)
+                // - screen.a carries a graticule mask (0 on grid lines, 1 elsewhere)
+                // Using alpha avoids needing to infer the grid from RGB, which can fail
+                // depending on the underlying image.
+                float gridMask = clamp(1.0 - screen.a, 0.0, 1.0);
+                float screenMask = clamp(screen.g, 0.0, 1.0);
+                float base = 0.15;
+                float ambientMask = base + (1.0 - base) * screenMask;
+
+                // Keep graticule dark: reduce ambient where grid lines exist.
+                float gridDarken = 0.15; // 0 = no effect, 1 = maximum darkening on grid
+                float maskedAmbient = ambientMask * (1.0 - gridDarken * gridMask);
+                vec3 bgCol = hueShift(uBeamColor, uHueShift);
+                bgCol = desaturate(bgCol, 1.0 - uScreenSaturation);
+                gl_FragColor.rgb += ambient * maskedAmbient * bgCol;
+        }
     }
     gl_FragColor.rgb += uNoise * noise(gl_FragCoord.xy * 0.01, uRandom * 100.0);
     gl_FragColor.a = 1.0;

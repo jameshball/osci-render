@@ -26,7 +26,13 @@ VisualiserComponent::VisualiserComponent(
                            visualiserOnly(visualiserOnly),
                            parent(parent),
                            editor(pluginEditor) {
-    setShouldBeRunning(true);
+    // Sync active state with the parameter for the primary visualiser
+    if (isPrimaryVisualiser()) {
+        active = !audioProcessor.visualiserParameters.visualiserPaused->getBoolValue();
+        audioProcessor.visualiserParameters.visualiserPaused->addListener(this);
+    }
+    
+    setShouldBeRunning(active);
 
 #if OSCI_PREMIUM
     addAndMakeVisible(editor.ffmpegDownloader);
@@ -102,21 +108,23 @@ VisualiserComponent::VisualiserComponent(
         addAndMakeVisible(audioInputButton);
         audioInputButton.setTooltip("Appears red when audio input is being used. Click to enable audio input and close any open audio files.");
         audioInputButton.setClickingTogglesState(false);
-        audioInputButton.setToggleState(!audioPlayer.isInitialised(), juce::NotificationType::dontSendNotification);
-        audioPlayer.onParserChanged = [this] {
-            juce::MessageManager::callAsync([this] { audioInputButton.setToggleState(!audioPlayer.isInitialised(), juce::NotificationType::dontSendNotification); });
-        };
+        audioInputButton.setToggleState(!audioProcessor.wavParser.isInitialised(), juce::NotificationType::dontSendNotification);
         audioInputButton.onClick = [this] {
             audioProcessor.stopAudioFile();
         };
     }
 
-    addChildComponent(audioPlayer);
-    audioPlayer.setVisible(visualiserOnly);
-    audioPlayer.addMouseListener(static_cast<juce::Component *>(this), true);
+    // Listen for audio file changes
+    audioProcessor.addAudioPlayerListener(this);
+    
+    // Initialize timeline for standalone premium builds
+    // Controller will be set by parent component
+    addChildComponent(timeline);
+    timeline.addMouseListener(static_cast<juce::Component *>(this), true);
 
     preRenderCallback = [this] {
         if (!record.getToggleState()) {
+            updateRenderModeFromProcessor();
             setResolution(this->recordingSettings.getResolution());
             setFrameRate(this->recordingSettings.getFrameRate());
         }
@@ -158,6 +166,10 @@ VisualiserComponent::VisualiserComponent(
 
 VisualiserComponent::~VisualiserComponent() {
     setRecording(false);
+    audioProcessor.removeAudioPlayerListener(this);
+    if (isPrimaryVisualiser()) {
+        audioProcessor.visualiserParameters.visualiserPaused->removeListener(this);
+    }
     if (parent == nullptr) {
         audioProcessor.haltRecording = nullptr;
     }
@@ -208,9 +220,49 @@ void VisualiserComponent::setPaused(bool paused, bool affectAudio) {
     setShouldBeRunning(active);
     renderingSemaphore.release();
     if (affectAudio) {
-        audioPlayer.setPaused(paused);
+        audioProcessor.wavParser.setPaused(paused);
     }
+    
+    // Update the parameter only for primary visualiser with no child window
+    // When a child window exists, the parent is temporarily paused but we don't 
+    // want to save this state to the parameter
+    if (isPrimaryVisualiser() && child == nullptr) {
+        bool currentParamValue = audioProcessor.visualiserParameters.visualiserPaused->getBoolValue();
+        if (currentParamValue != paused) {
+            audioProcessor.visualiserParameters.visualiserPaused->setBoolValueNotifyingHost(paused);
+        }
+    }
+    
     repaint();
+}
+
+bool VisualiserComponent::isPaused() const {
+    return !active;
+}
+
+bool VisualiserComponent::isPrimaryVisualiser() const {
+    return parent == nullptr;
+}
+
+void VisualiserComponent::updatePausedState() {
+    // Called when the parameter changes - only relevant for primary visualiser with no child
+    if (isPrimaryVisualiser() && child == nullptr) {
+        bool shouldBePaused = audioProcessor.visualiserParameters.visualiserPaused->getBoolValue();
+        if (active == shouldBePaused) { // active and paused are opposites
+            setPaused(shouldBePaused, true);
+        }
+    }
+}
+
+void VisualiserComponent::parameterValueChanged(int parameterIndex, float newValue) {
+    // Handle parameter changes on the message thread
+    juce::MessageManager::callAsync([this] {
+        updatePausedState();
+    });
+}
+
+void VisualiserComponent::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {
+    // Not needed for this parameter
 }
 
 void VisualiserComponent::mouseDrag(const juce::MouseEvent &event) {
@@ -468,7 +520,8 @@ void VisualiserComponent::resized() {
     buttons.removeFromRight(10); // padding
 
     if (child == nullptr) {
-        audioPlayer.setBounds(buttons);
+        // Timeline replaces the old audioPlayer UI
+        timeline.setBounds(buttons);
     }
 
     setViewportArea(area);
@@ -519,17 +572,34 @@ void VisualiserComponent::childUpdated() {
     editor.ffmpegDownloader.setVisible(child == nullptr);
 #endif
     record.setVisible(child == nullptr);
-    audioPlayer.setVisible(child == nullptr);
     if (child != nullptr) {
         audioProcessor.haltRecording = [this] {
             setRecording(false);
             child->setRecording(false);
         };
     } else {
-        audioPlayer.setup();
         audioProcessor.haltRecording = [this] {
             setRecording(false);
         };
+    }
+}
+
+void VisualiserComponent::updateRenderModeFromProcessor() {
+    // Called on message thread
+    if (!visualiserOnly) {
+        setRenderMode(RenderMode::XY);
+        return;
+    }
+    // Determine based on whether brightness and RGB are enabled and not force-disabled
+    bool brightnessAllowed = !audioProcessor.getForceDisableBrightnessInput();
+    bool rgbAllowed = !audioProcessor.getForceDisableRgbInput();
+    // Prefer RGB if we have 4th/5th channels effectively
+    if (rgbAllowed && audioProcessor.isRgbEnabled()) {
+        setRenderMode(RenderMode::XYRGB);
+    } else if (brightnessAllowed && audioProcessor.isBrightnessEnabled()) {
+        setRenderMode(RenderMode::XYZ);
+    } else {
+        setRenderMode(RenderMode::XY);
     }
 }
 
@@ -556,6 +626,34 @@ void VisualiserComponent::openGLContextClosing() {
 #endif
 
     VisualiserRenderer::openGLContextClosing();
+}
+
+void VisualiserComponent::parserChanged() {
+    // Update audio input button when audio file changes
+    juce::MessageManager::callAsync([this] {
+        if (visualiserOnly && juce::JUCEApplication::isStandaloneApp()) {
+            audioInputButton.setToggleState(!audioProcessor.wavParser.isInitialised(), juce::NotificationType::dontSendNotification);
+        }
+        // Parent component should update timeline controller/visibility as needed
+    });
+}
+
+void VisualiserComponent::setTimelineController(std::shared_ptr<TimelineController> controller) {
+    bool shouldShow = controller != nullptr && 
+                      juce::JUCEApplicationBase::isStandaloneApp();
+    
+#if !OSCI_PREMIUM
+    shouldShow = false;
+#endif
+    
+    if (shouldShow) {
+        timeline.setController(controller);
+        timeline.setVisible(true);
+    } else {
+        timeline.setVisible(false);
+    }
+    
+    resized();
 }
 
 void VisualiserComponent::paint(juce::Graphics &g) {

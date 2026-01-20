@@ -27,28 +27,28 @@ TimelineComponent::TimelineComponent()
     
     playButton.onClick = [this]() {
         setPlaying(true);
-        if (onPlay) onPlay();
+        if (controller) controller->onPlay();
     };
 
     pauseButton.onClick = [this]() {
         setPlaying(false);
-        if (onPause) onPause();
+        if (controller) controller->onPause();
     };
     
     repeatButton.onClick = [this]() {
-        if (onRepeatChanged)
-            onRepeatChanged(repeatButton.getToggleState());
+        if (controller)
+            controller->onRepeatChanged(repeatButton.getToggleState());
     };
     
     stopButton.onClick = [this]() {
         setPlaying(false);
         slider.setValue(0, juce::sendNotification);
-        if (onStop) onStop();
+        if (controller) controller->onStop();
     };
 
     slider.onValueChange = [this]() {
-        if (onValueChange)
-            onValueChange(slider.getValue());
+        if (controller)
+            controller->onValueChange(slider.getValue());
     };
 
     startTimer(20);
@@ -72,13 +72,13 @@ double TimelineComponent::getValue() const
 
 void TimelineComponent::setPlaying(bool shouldBePlaying)
 {
-    if (isActive != nullptr && !isActive()) {
+    if (controller && !controller->isActive()) {
         playButton.setVisible(false);
         pauseButton.setVisible(false);
-    } else {
-        playButton.setVisible(!shouldBePlaying);
-        pauseButton.setVisible(shouldBePlaying);
+        return;
     }
+    playButton.setVisible(!shouldBePlaying);
+    pauseButton.setVisible(shouldBePlaying);
 }
 
 bool TimelineComponent::isPlaying() const
@@ -115,7 +115,29 @@ void TimelineComponent::resized()
     slider.setBounds(r);
 }
 
+void TimelineComponent::setController(std::shared_ptr<TimelineController> newController)
+{
+    controller = newController;
+    if (controller) {
+        // Setup callbacks for the controller to update the timeline UI
+        auto setValueCallback = [this](double value) {
+            setValue(value, juce::dontSendNotification);
+        };
+        auto setPlayingCallback = [this](bool playing) {
+            setPlaying(playing);
+        };
+        auto setRepeatCallback = [this](bool repeat) {
+            setRepeat(repeat);
+        };
+        
+        controller->setup(setValueCallback, setPlayingCallback, setRepeatCallback);
+    }
+}
+
 void TimelineComponent::timerCallback()
 {
-    // Base implementation does nothing - derived classes will override if needed
+    if (controller) {
+        double position = controller->getCurrentPosition();
+        setValue(position, juce::dontSendNotification);
+    }
 }

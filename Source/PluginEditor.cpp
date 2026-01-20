@@ -18,6 +18,10 @@ void OscirenderAudioProcessorEditor::registerFileRemovedCallback() {
 }
 
 OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p) : CommonPluginEditor(p, "osci-render", "osci", 1100, 770), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white) {
+    // Create timeline controllers for osci-render
+    animationTimelineController = std::make_shared<AnimationTimelineController>(audioProcessor);
+    audioTimelineController = std::make_shared<OscirenderAudioTimelineController>(audioProcessor);
+    
     // Register the file removal callback
     registerFileRemovedCallback();
 
@@ -80,6 +84,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 
     addAndMakeVisible(lua);
     addAndMakeVisible(luaResizerBar);
+    addChildComponent(txtFont);
     addAndMakeVisible(visualiser);
 
     visualiser.openSettings = [this] {
@@ -158,9 +163,24 @@ void OscirenderAudioProcessorEditor::filesDropped(const juce::StringArray& files
     }
 }
 
+// Anything with these extensions will not be opened in the code editor
 bool OscirenderAudioProcessorEditor::isBinaryFile(juce::String name) {
     name = name.toLowerCase();
-    return name.endsWith(".gpla") || name.endsWith(".gif") || name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".wav") || name.endsWith(".aiff") || name.endsWith(".ogg") || name.endsWith(".mp3") || name.endsWith(".flac") || name.endsWith(".mp4") || name.endsWith(".mov");
+    return name.endsWith(".gpla")
+        || name.endsWith(".gif")
+        || name.endsWith(".png")
+        || name.endsWith(".jpg")
+        || name.endsWith(".jpeg")
+        || name.endsWith(".wav")
+        || name.endsWith(".aiff")
+        || name.endsWith(".ogg")
+        || name.endsWith(".mp3")
+        || name.endsWith(".flac")
+        || name.endsWith(".mp4")
+        || name.endsWith(".mov")
+        // doesn't really make sense to edit SVG or OBJ files as text in this context
+        || name.endsWith(".svg")
+        || name.endsWith(".obj");
 }
 
 // parsersLock and syphonLock must be held
@@ -237,6 +257,9 @@ void OscirenderAudioProcessorEditor::resized() {
                     extension = audioProcessor.getFileName(originalIndex).fromLastOccurrenceOf(".", true, false);
                 }
 
+                bool isTxtFile = extension == ".txt";
+                txtFont.setVisible(isTxtFile);
+
                 if (editingCustomFunction || extension == ".lua") {
                     juce::Component* rows[] = {&dummy3, &luaResizerBar, &lua};
                     luaLayout.layOutComponents(rows, 3, dummy2Bounds.getX(), dummy2Bounds.getY(), dummy2Bounds.getWidth(), dummy2Bounds.getHeight(), true, true);
@@ -246,7 +269,12 @@ void OscirenderAudioProcessorEditor::resized() {
                     codeEditors[index]->setBounds(dummy3Bounds);
                     luaFileOpen = true;
                 } else {
-                    codeEditors[index]->setBounds(dummy2Bounds);
+                    auto editorBounds = dummy2Bounds;
+                    if (isTxtFile) {
+                        txtFont.setBounds(editorBounds.removeFromTop(30));
+                        editorBounds.removeFromTop(5); // Add small gap
+                    }
+                    codeEditors[index]->setBounds(editorBounds);
                 }
 
                 fileOpen = true;
@@ -265,6 +293,11 @@ void OscirenderAudioProcessorEditor::resized() {
         console.setVisible(luaFileOpen);
         luaResizerBar.setVisible(luaFileOpen);
         lua.setVisible(luaFileOpen);
+        
+        // Hide txtFont if code editor is not visible
+        if (!fileOpen) {
+            txtFont.setVisible(false);
+        }
     }
 
     if (editorVisible) {
@@ -363,7 +396,7 @@ void OscirenderAudioProcessorEditor::updateCodeEditor(bool binaryFile, bool shou
             // message thread, this is safe.
             updatingDocumentsWithParserLock = true;
             if (index == 0) {
-                codeEditors[index]->getEditor().loadContent(audioProcessor.customEffect->getCode());
+                codeEditors[index]->getEditor().loadContent(audioProcessor.luaEffectState->getCode());
             } else {
                 codeEditors[index]->getEditor().loadContent(juce::MemoryInputStream(*audioProcessor.getFileBlock(originalIndex), false).readEntireStreamAsString());
             }
@@ -381,6 +414,7 @@ void OscirenderAudioProcessorEditor::fileUpdated(juce::String fileName, bool sho
     CommonPluginEditor::fileUpdated(fileName);
     settings.fileUpdated(fileName);
     updateCodeEditor(isBinaryFile(fileName), shouldOpenEditor);
+    updateTimelineController();
 }
 
 void OscirenderAudioProcessorEditor::handleAsyncUpdate() {
@@ -454,7 +488,7 @@ void OscirenderAudioProcessorEditor::codeDocumentTextDeleted(int startIndex, int
 void OscirenderAudioProcessorEditor::updateCodeDocument() {
     if (editingCustomFunction) {
         juce::String file = codeDocuments[0]->getAllContent();
-        audioProcessor.customEffect->updateCode(file);
+        audioProcessor.luaEffectState->updateCode(file);
     } else {
         int originalIndex = audioProcessor.getCurrentFileIndex();
         int index = audioProcessor.getCurrentFileIndex();
@@ -565,6 +599,26 @@ void OscirenderAudioProcessorEditor::showPremiumSplashScreen() {
     premiumSplashScreen->toFront(true);
     resized();
 #endif
+}
+
+void OscirenderAudioProcessorEditor::updateTimelineController() {
+    std::shared_ptr<TimelineController> controller = nullptr;
+    
+    int currentFileIndex = audioProcessor.getCurrentFileIndex();
+    if (currentFileIndex >= 0 && audioProcessor.parsers[currentFileIndex] != nullptr) {
+        auto parser = audioProcessor.parsers[currentFileIndex];
+        
+        // Check if it's an animatable file (gpla, gif, video)
+        if (parser->isAnimatable) {
+            controller = animationTimelineController;
+        }
+        // Check if it's an audio file (FileParser contains a WavParser)
+        else if (parser->getWav() != nullptr) {
+            controller = audioTimelineController;
+        }
+    }
+    
+    visualiser.setTimelineController(controller);
 }
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM

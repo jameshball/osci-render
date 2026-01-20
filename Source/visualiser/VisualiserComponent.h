@@ -4,12 +4,14 @@
 
 #include <algorithm>
 
+#include "../CommonPluginProcessor.h"
 #include "../LookAndFeel.h"
 #include "../audio/AudioRecorder.h"
-#include "../components/AudioPlayerComponent.h"
 #include "../components/DownloaderComponent.h"
 #include "../components/StopwatchComponent.h"
 #include "../components/SvgButton.h"
+#include "../components/TimelineComponent.h"
+#include "../components/TimelineController.h"
 #include "../img/qoixx.hpp"
 #include "../video/FFmpegEncoderManager.h"
 #include "../wav/WavParser.h"
@@ -23,10 +25,9 @@ enum class FullScreenMode {
     MAIN_COMPONENT,
 };
 
-class CommonAudioProcessor;
 class CommonPluginEditor;
 class VisualiserWindow;
-class VisualiserComponent : public VisualiserRenderer, public juce::MouseListener {
+class VisualiserComponent : public VisualiserRenderer, public juce::MouseListener, public AudioPlayerListener, public juce::AudioProcessorParameter::Listener {
 public:
     VisualiserComponent(
         CommonAudioProcessor& processor,
@@ -51,18 +52,22 @@ public:
     void resized() override;
     void paint(juce::Graphics& g) override;
     void setPaused(bool paused, bool affectAudio = true);
+    bool isPaused() const;
     void mouseDrag(const juce::MouseEvent& event) override;
     void mouseMove(const juce::MouseEvent& event) override;
     void mouseDown(const juce::MouseEvent& event) override;
     bool keyPressed(const juce::KeyPress& key) override;
     void setRecording(bool recording);
     void childUpdated();
+    void updateRenderModeFromProcessor();
+    void setTimelineController(std::shared_ptr<TimelineController> controller);
+    void parserChanged() override;
+    void parameterValueChanged(int parameterIndex, float newValue) override;
+    void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
 
     VisualiserComponent* parent = nullptr;
     VisualiserComponent* child = nullptr;
     std::unique_ptr<VisualiserWindow> popout = nullptr;
-
-    std::atomic<bool> active = true;
 
     enum ColourIds
     {
@@ -70,6 +75,11 @@ public:
     };
 
 private:
+    void updatePausedState();
+    bool isPrimaryVisualiser() const;
+
+    std::atomic<bool> active = true;
+
     CommonAudioProcessor& audioProcessor;
     CommonPluginEditor& editor;
 
@@ -77,7 +87,10 @@ private:
     RecordingSettings& recordingSettings;
 
     bool visualiserOnly;
-    AudioPlayerComponent audioPlayer{audioProcessor};
+    
+    // Timeline for controlling playback (audio, video, gif, gpla)
+    // Controller is set by parent component based on file type
+    TimelineComponent timeline;
 
     SvgButton fullScreenButton{"fullScreen", BinaryData::fullscreen_svg, juce::Colours::white, juce::Colours::white};
     SvgButton popOutButton{"popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::white};
@@ -93,6 +106,7 @@ private:
     int lastMouseX = 0;
     int lastMouseY = 0;
     int timerId = 0;
+    int renderModeTimerId = 0;
     bool hideButtonRow = false;
     bool fullScreen = false;
     std::function<void(FullScreenMode)> fullScreenCallback;
@@ -136,7 +150,7 @@ private:
 
 class VisualiserWindow : public juce::DocumentWindow {
 public:
-    VisualiserWindow(juce::String name, VisualiserComponent* parent) : parent(parent), wasPaused(!parent->active), juce::DocumentWindow(name, juce::Colours::black, juce::DocumentWindow::TitleBarButtons::allButtons) {
+    VisualiserWindow(juce::String name, VisualiserComponent* parent) : parent(parent), wasPaused(parent->isPaused()), juce::DocumentWindow(name, juce::Colours::black, juce::DocumentWindow::TitleBarButtons::allButtons) {
         setAlwaysOnTop(true);
     }
 

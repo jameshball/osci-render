@@ -2,18 +2,22 @@
 #include <numbers>
 #include "../MathUtil.h"
 
-const juce::String CustomEffect::UNIQUE_ID = "6a3580b0-c5fc-4b28-a33e-e26a487f052f";
-const juce::String CustomEffect::FILE_NAME = "Custom Lua Effect";
-
-CustomEffect::CustomEffect(std::function<void(int, juce::String, juce::String)> errorCallback, std::atomic<double>* luaValues) : errorCallback(errorCallback), luaValues(luaValues) {
+CustomEffect::CustomEffect(LuaEffectState& luaState, std::atomic<double>* luaValues) 
+	: luaState(luaState), luaValues(luaValues) {
 	vars.isEffect = true;
 }
 
 CustomEffect::~CustomEffect() {
-	parser->close(L);
+	if (luaState.parser) {
+		luaState.parser->close(L);
+	}
 }
 
-osci::Point CustomEffect::apply(int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+osci::Point CustomEffect::apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {
+	if (!luaState.parser || !luaValues) {
+		return input;
+	}
+	
 	auto effectScale = values[0].load();
 
 	auto x = input.x;
@@ -21,21 +25,20 @@ osci::Point CustomEffect::apply(int index, osci::Point input, const std::vector<
 	auto z = input.z;
 
 	{
-		juce::SpinLock::ScopedLockType lock(codeLock);
-		if (!defaultScript) {
+		juce::SpinLock::ScopedLockType lock(luaState.codeLock);
+		if (!luaState.defaultScript) {
 			vars.sampleRate = sampleRate;
 			vars.frequency = frequency;
 
 			vars.x = x;
 			vars.y = y;
 			vars.z = z;
-			vars.ext_x = extInput.x;
-			vars.ext_y = extInput.y;
-
+			vars.ext_x = externalInput.x;
+			vars.ext_y = externalInput.y;
 
 			std::copy(luaValues, luaValues + 26, std::begin(vars.sliders));
 
-			auto result = parser->run(L, vars);
+			auto result = luaState.parser->run(L, vars);
 			if (result.size() >= 2) {
 				x = result[0];
 				y = result[1];
@@ -44,7 +47,7 @@ osci::Point CustomEffect::apply(int index, osci::Point input, const std::vector<
 				}
 			}
 		} else {
-			parser->resetErrors();
+			luaState.parser->resetErrors();
 		}
 	}
 
@@ -53,16 +56,4 @@ osci::Point CustomEffect::apply(int index, osci::Point input, const std::vector<
 		(1 - effectScale) * input.y + effectScale * y,
 		(1 - effectScale) * input.z + effectScale * z
 	);
-}
-
-void CustomEffect::updateCode(const juce::String& newCode) {
-	juce::SpinLock::ScopedLockType lock(codeLock);
-	defaultScript = newCode == DEFAULT_SCRIPT;
-    code = newCode;
-	parser = std::make_unique<LuaParser>(FILE_NAME, code, errorCallback);
-}
-
-juce::String CustomEffect::getCode() {
-	juce::SpinLock::ScopedLockType lock(codeLock);
-    return code;
 }

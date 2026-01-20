@@ -95,8 +95,6 @@ public:
 	EnvelopeHandleComponent* getNextHandle() const;
 	void removeThisHandle();
 	
-	void setMousePositionToThisHandle();
-	
 	void resetOffsets() { offsetX = offsetY = 0; }
 	double getTime() const	{ return time;	}
 	double getValue() const	{ return value; }
@@ -195,6 +193,10 @@ public:
 	int getHandleIndex(EnvelopeHandleComponent* handle) const;
 	EnvelopeHandleComponent* getHandle(const int index) const;
     int getNumHandles() const { return handles.size(); }
+	void setActiveHandle(EnvelopeHandleComponent* handle);
+	void setActiveCurveHandle(EnvelopeHandleComponent* handle);
+	EnvelopeHandleComponent* getActiveHandle() const { return activeHandle; }
+	EnvelopeHandleComponent* getActiveCurveHandle() const { return activeCurveHandle; }
 	
 	EnvelopeHandleComponent* getPreviousHandle(const EnvelopeHandleComponent* thisHandle) const;
 	EnvelopeHandleComponent* getNextHandle(const EnvelopeHandleComponent* thisHandle) const;
@@ -268,6 +270,8 @@ private:
 	GridMode gridDisplayMode, gridQuantiseMode;
 	EnvelopeHandleComponent* draggingHandle;
 	EnvelopeHandleComponent* adjustingHandle;
+	EnvelopeHandleComponent* activeHandle;
+	EnvelopeHandleComponent* activeCurveHandle;
 	bool adjustable = false;
 	double prevCurveValue = 0.0;
 	int curvePoints;

@@ -168,7 +168,7 @@ inline double linsin(const double input,
 
 	double inPhase = (input - inLow) * std::numbers::pi / inRange + std::numbers::pi;
 #ifndef UGEN_ANDROID
-	double cosInPhase = std::cos(inPhase) * 0.5 + 0.5;
+	double cosInPhase = juce::dsp::FastMathApproximations::cos(inPhase) * 0.5 + 0.5;
 #else
 	double cosInPhase = cos(inPhase) * 0.5 + 0.5;
 #endif
@@ -186,9 +186,9 @@ inline float linwelch(const float input,
 
 #ifndef UGEN_ANDROID
 	if (outLow < outHigh)
-		return outLow + outRange * std::sin(std::numbers::pi * inPos / 2);
+		return outLow + outRange * juce::dsp::FastMathApproximations::sin(std::numbers::pi * inPos / 2);
 	else
-		return outHigh - outRange * std::sin(std::numbers::pi / 2 - std::numbers::pi * inPos / 2);
+		return outHigh - outRange * juce::dsp::FastMathApproximations::sin(std::numbers::pi / 2 - std::numbers::pi * inPos / 2);
 #else
 	if (outLow < outHigh)
 		return outLow + outRange * sinf(piOverTwo * inPos);

@@ -11,12 +11,14 @@
 #include <JuceHeader.h>
 
 #include <numbers>
+#include <unordered_map>
 
 #include "CommonPluginProcessor.h"
 #include "UGen/Env.h"
 #include "UGen/ugen_JuceEnvelopeComponent.h"
 #include "audio/CustomEffect.h"
 #include "audio/DelayEffect.h"
+#include "audio/LuaEffectState.h"
 #include "audio/PerspectiveEffect.h"
 #include "audio/PublicSynthesiser.h"
 #include "audio/SampleRateManager.h"
@@ -54,6 +56,9 @@ public:
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void envelopeChanged(EnvelopeComponent* changedEnvelope) override;
+    void envelopeStartDrag(EnvelopeComponent* changedEnvelope) override;
+    void envelopeEndDrag(EnvelopeComponent* changedEnvelope) override;
+    Env buildAdsrEnvFromParameters() const;
 
     std::vector<std::shared_ptr<osci::Effect>> toggleableEffects;
     std::vector<std::shared_ptr<osci::Effect>> luaEffects;
@@ -61,23 +66,26 @@ public:
     std::shared_ptr<osci::Effect> previewEffect;
     std::atomic<double> luaValues[26] = {0.0};
 
-    std::shared_ptr<osci::Effect> frequencyEffect = std::make_shared<osci::Effect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
-            frequency = values[0].load() + 0.000001;
+    std::shared_ptr<osci::Effect> frequencyEffect = std::make_shared<osci::SimpleEffect>(
+        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float freq) {
+            // Update the global frequency from the slider value
+            frequency = values[0].load() + 0.000001; // epsilon prevents a weird bug on mac
             return input;
         },
         new osci::EffectParameter(
             "Frequency",
             "Controls how many times per second the image is drawn, thereby controlling the pitch of the sound. Lower frequencies result in more-accurately drawn images, but more flickering, and vice versa.",
             "frequency",
-            VERSION_HINT, 220.0, 0.0, 4200.0));
+            VERSION_HINT, 220.0, 0.0, 4200.0
+        )
+    );
 
     std::shared_ptr<DelayEffect> delayEffect = std::make_shared<DelayEffect>();
 
     std::function<void(int, juce::String, juce::String)> errorCallback = [this](int lineNum, juce::String fileName, juce::String error) { notifyErrorListeners(lineNum, fileName, error); };
-    std::shared_ptr<CustomEffect> customEffect = std::make_shared<CustomEffect>(errorCallback, luaValues);
-    std::shared_ptr<osci::Effect> custom = std::make_shared<osci::Effect>(
-        customEffect,
+    std::unique_ptr<LuaEffectState> luaEffectState = std::make_unique<LuaEffectState>(LuaEffectState::UNIQUE_ID, "return { x, y, z }", errorCallback);
+    std::shared_ptr<osci::Effect> custom = std::make_shared<osci::SimpleEffect>(
+        std::make_shared<CustomEffect>(*luaEffectState, luaValues),
         new osci::EffectParameter("Lua Effect", "Controls the strength of the custom Lua effect applied. You can write your own custom effect using Lua by pressing the edit button on the right.", "customEffectStrength", VERSION_HINT, 1.0, 0.0, 1.0));
 
     std::shared_ptr<osci::Effect> perspective = PerspectiveEffect().build();
@@ -105,16 +113,28 @@ public:
     osci::FloatParameter* sustainLevel = new osci::FloatParameter("Sustain Level", "sustainLevel", VERSION_HINT, 0.6, 0.0, 1.0);
     osci::FloatParameter* releaseTime = new osci::FloatParameter("Release Time", "releaseTime", VERSION_HINT, 0.4, 0.0, 1.0);
     osci::FloatParameter* attackShape = new osci::FloatParameter("Attack Shape", "attackShape", VERSION_HINT, 5, -50, 50);
-    osci::FloatParameter* decayShape = new osci::FloatParameter("Decay osci::Shape", "decayShape", VERSION_HINT, -20, -50, 50);
+    osci::FloatParameter* decayShape = new osci::FloatParameter("Decay Shape", "decayShape", VERSION_HINT, -20, -50, 50);
     osci::FloatParameter* releaseShape = new osci::FloatParameter("Release Shape", "releaseShape", VERSION_HINT, -5, -50, 50);
 
-    Env adsrEnv = Env::adsr(
-        attackTime->getValueUnnormalised(),
-        decayTime->getValueUnnormalised(),
-        sustainLevel->getValueUnnormalised(),
-        releaseTime->getValueUnnormalised(),
-        1.0,
-        std::vector<EnvCurve>{attackShape->getValueUnnormalised(), decayShape->getValueUnnormalised(), releaseShape->getValueUnnormalised()});
+    Env adsrEnv = Env(
+        {
+            0.0,
+            attackLevel->getValueUnnormalised(),
+            sustainLevel->getValueUnnormalised(),
+            0.0
+        },
+        {
+            attackTime->getValueUnnormalised(),
+            decayTime->getValueUnnormalised(),
+            releaseTime->getValueUnnormalised()
+        },
+        std::vector<EnvCurve>{
+            attackShape->getValueUnnormalised(),
+            decayShape->getValueUnnormalised(),
+            releaseShape->getValueUnnormalised()
+        },
+        2
+    );
 
     juce::MidiKeyboardState keyboardState;
 
@@ -127,8 +147,8 @@ public:
     osci::FloatParameter* animationOffset = new osci::FloatParameter("Animation Offset", "animationOffset", VERSION_HINT, 0, -10000, 10000);
 
     osci::BooleanParameter* invertImage = new osci::BooleanParameter("Invert Image", "invertImage", VERSION_HINT, false, "Inverts the image so that dark pixels become light, and vice versa.");
-    std::shared_ptr<osci::Effect> imageThreshold = std::make_shared<osci::Effect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+    std::shared_ptr<osci::Effect> imageThreshold = std::make_shared<osci::SimpleEffect>(
+        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {
             return input;
         },
         new osci::EffectParameter(
@@ -136,8 +156,8 @@ public:
             "Controls the probability of visiting a dark pixel versus a light pixel. Darker pixels are less likely to be visited, so turning the threshold to a lower value makes it more likely to visit dark pixels.",
             "imageThreshold",
             VERSION_HINT, 0.5, 0, 1));
-    std::shared_ptr<osci::Effect> imageStride = std::make_shared<osci::Effect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<double>>& values, double sampleRate) {
+    std::shared_ptr<osci::Effect> imageStride = std::make_shared<osci::SimpleEffect>(
+        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {
             return input;
         },
         new osci::EffectParameter(
@@ -183,6 +203,22 @@ public:
     // Preview API: set/clear a temporary effect by ID for hover auditioning
     void setPreviewEffectId(const juce::String& effectId);
     void clearPreviewEffect();
+    std::shared_ptr<osci::SimpleEffect> getCachedPreviewEffect() { 
+        return std::dynamic_pointer_cast<osci::SimpleEffect>(previewEffect); 
+    }
+
+    // Get the external input buffer for effects that need it
+    juce::AudioBuffer<float>* getInputBuffer() { return &inputBuffer; }
+
+    // Centralized toggleable effect application (used by both synth voices and audio-input mode)
+    // effectsLock should be held when calling this from the audio thread.
+    void applyToggleableEffectsToBuffer(
+        juce::AudioBuffer<float>& buffer,
+        juce::AudioBuffer<float>* externalInput,
+        juce::AudioBuffer<float>* volumeBuffer,
+        juce::AudioBuffer<float>* frequencyBuffer,
+        const std::unordered_map<juce::String, std::shared_ptr<osci::SimpleEffect>>* perVoiceEffects,
+        const std::shared_ptr<osci::Effect>& previewEffectInstance);
 
     // Setter for the callback
     void setFileRemovedCallback(std::function<void(int)> callback);
@@ -213,6 +249,7 @@ public:
 
 private:
     juce::AudioBuffer<float> inputBuffer;
+    juce::AudioBuffer<float> inputFrequencyBuffer;
 
     std::atomic<bool> prevMidiEnabled = !midiEnabled->getBoolValue();
 
@@ -229,11 +266,8 @@ private:
     ObjectServer objectServer{*this};
 
     const double VOLUME_BUFFER_SECONDS = 0.1;
-
-    std::vector<double> volumeBuffer;
-    int volumeBufferIndex = 0;
-    double squaredVolume = 0;
-    double currentVolume = 0;
+    double currentVolume = 0.0;
+    juce::AudioBuffer<float> currentVolumeBuffer;
 
     std::pair<std::shared_ptr<osci::Effect>, osci::EffectParameter*> effectFromLegacyId(const juce::String& id, bool updatePrecedence = false);
     osci::LfoType lfoTypeFromLegacyAnimationType(const juce::String& type);
@@ -256,9 +290,12 @@ private:
         return std::lexicographical_compare(parsedA, parsedA + 3, parsedB, parsedB + 3);
     }
 
-    const double MIN_LENGTH_INCREMENT = 0.000001;
-
     juce::AudioPlayHead* playHead;
+
+    std::vector<osci::FloatParameter*> activeAdsrGestureParameters;
+    void resetActiveAdsrGestures();
+    void beginAdsrGesturesForEnvelope(EnvelopeComponent* changedEnvelope);
+    std::atomic<bool> adsrNeedsUpdate { false };
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
 public:
