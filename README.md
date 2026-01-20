@@ -9,6 +9,10 @@
 
 Open-source synthesizer for making music by drawing objects, text, and images on an oscilloscope using audio. Allows for 3D rendering of `.obj` files, `.svg` images, `.txt` files, and Blender scenes on Windows, macOS, and Linux.
 
+## Licensing
+
+Source code is licensed under GPLv3 (see [LICENSE](LICENSE)). Project names/logos/branding are not licensed under GPLv3; see [TRADEMARKS.md](TRADEMARKS.md) and the branding notices in [Resources/images](Resources/images), [Resources/svg](Resources/svg), and [images](images).
+
 Everything is controllable from a Digital Audio Workstation (DAW), allowing for parameter automation and MIDI control. If you prefer to use osci-render as a standalone application, you can do that too!
 
 Osci-render is a fully programmable synthesiser, allowing for custom visuals, sounds, and audio effects to be scripted using Lua, and interacted with using your DAW.
@@ -73,7 +77,7 @@ Reaper project used to create the above demo: [square_spiral.rpp](projects/squar
 
 ## Download
 
-Pay what you want from the official website: [osci-render.com](https://osci-render.com) to get access to the latest version.
+Download the free version or purchase osci-render premium from the official website: [osci-render.com](https://osci-render.com) to get access to the latest version.
 
 After you've purchased, you'll be sent an email with a download link. Here you can download the latest version for Windows or macOS, as a standalone application or as a VST or AU plugin.
 

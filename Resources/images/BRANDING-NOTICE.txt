@@ -1,0 +1,18 @@
+Branding assets notice (osci-render / sosci)
+
+This repository's source code is licensed under the GNU GPLv3 (see ../../LICENSE).
+
+The following files in this directory are branding assets (logos/wordmarks) and are
+NOT licensed under the GPLv3. No trademark rights are granted. All rights reserved.
+
+This notice does not alter the GPLv3 license of the source code; it only identifies
+separately-licensed branding assets.
+
+- logo.png
+- osci*.png
+- sosci*.png
+
+If you redistribute a modified build or fork, you should remove/replace these
+branding assets to avoid suggesting endorsement or official status.
+
+See ../../TRADEMARKS.md for more context.
