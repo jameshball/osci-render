@@ -1087,68 +1087,10 @@ void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float n
         }
     }
 
-    // Envelope parameters are handled by the envelope component listeners.
+    // Envelope UI listens to these parameters.
 }
 
 void OscirenderAudioProcessor::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
-
-void updateIfApproxEqual(osci::FloatParameter* parameter, float newValue) {
-    if (std::abs(parameter->getValueUnnormalised() - newValue) > 0.0001) {
-        parameter->setUnnormalisedValueNotifyingHost(newValue);
-    }
-}
-
-void OscirenderAudioProcessor::resetActiveAdsrGestures() {
-    for (auto* parameter : activeAdsrGestureParameters) {
-        if (parameter != nullptr) {
-            parameter->endChangeGesture();
-        }
-    }
-    activeAdsrGestureParameters.clear();
-}
-
-void OscirenderAudioProcessor::beginAdsrGesturesForEnvelope(EnvelopeComponent* changedEnvelope) {
-    if (changedEnvelope == nullptr || !changedEnvelope->getDahdsrMode()) {
-        return;
-    }
-
-    resetActiveAdsrGestures();
-
-    auto addGestureParam = [this](osci::FloatParameter* parameter) {
-        if (parameter != nullptr) {
-            activeAdsrGestureParameters.push_back(parameter);
-        }
-    };
-
-    if (auto* curveHandle = changedEnvelope->getActiveCurveHandle()) {
-        const int index = changedEnvelope->getHandleIndex(curveHandle);
-        if (index == 2) {
-            addGestureParam(attackShape);
-        } else if (index == 4) {
-            addGestureParam(decayShape);
-        } else if (index == 5) {
-            addGestureParam(releaseShape);
-        }
-    } else if (auto* handle = changedEnvelope->getActiveHandle()) {
-        const int index = changedEnvelope->getHandleIndex(handle);
-        if (index == 1) {
-            addGestureParam(delayTime);
-        } else if (index == 2) {
-            addGestureParam(attackTime);
-        } else if (index == 3) {
-            addGestureParam(holdTime);
-        } else if (index == 4) {
-            addGestureParam(decayTime);
-            addGestureParam(sustainLevel);
-        } else if (index == 5) {
-            addGestureParam(releaseTime);
-        }
-    }
-
-    for (auto* parameter : activeAdsrGestureParameters) {
-        parameter->beginChangeGesture();
-    }
-}
 
 DahdsrParams OscirenderAudioProcessor::getCurrentDahdsrParams() const
 {
@@ -1163,29 +1105,6 @@ DahdsrParams OscirenderAudioProcessor::getCurrentDahdsrParams() const
         .decayCurve = decayShape->getValueUnnormalised(),
         .releaseCurve = releaseShape->getValueUnnormalised(),
     };
-}
-
-void OscirenderAudioProcessor::envelopeChanged(EnvelopeComponent* changedEnvelope) {
-    const auto dahdsr = changedEnvelope->getDahdsrParams();
-
-    updateIfApproxEqual(delayTime, (float) dahdsr.delaySeconds);
-    updateIfApproxEqual(attackTime, (float) dahdsr.attackSeconds);
-    updateIfApproxEqual(holdTime, (float) dahdsr.holdSeconds);
-    updateIfApproxEqual(decayTime, (float) dahdsr.decaySeconds);
-    updateIfApproxEqual(sustainLevel, (float) dahdsr.sustainLevel);
-    updateIfApproxEqual(releaseTime, (float) dahdsr.releaseSeconds);
-
-    updateIfApproxEqual(attackShape, dahdsr.attackCurve);
-    updateIfApproxEqual(decayShape, dahdsr.decayCurve);
-    updateIfApproxEqual(releaseShape, dahdsr.releaseCurve);
-}
-
-void OscirenderAudioProcessor::envelopeStartDrag(EnvelopeComponent* changedEnvelope) {
-    beginAdsrGesturesForEnvelope(changedEnvelope);
-}
-
-void OscirenderAudioProcessor::envelopeEndDrag(EnvelopeComponent* changedEnvelope) {
-    resetActiveAdsrGestures();
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {

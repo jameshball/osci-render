@@ -35,40 +35,24 @@
  ==============================================================================
  */
 
-#ifndef UGEN_JUCEENVELOPECOMPONENT_H
-#define UGEN_JUCEENVELOPECOMPONENT_H
+#ifndef ENVELOPE_COMPONENT_H
+#define ENVELOPE_COMPONENT_H
 
 #ifndef UGEN_NOEXTGPL
 
 #include <JuceHeader.h>
+#include <array>
 #include "../audio/DahdsrEnvelope.h"
 
 
 #define HANDLESIZE 11
-#define FINETUNE 0.001
+#define FINETUNE 0.00001
 
 //#define MYDEBUG 1 // get rid of this later
 
 class EnvelopeComponent;
 class EnvelopeHandleComponent;
 class EnvelopeLegendComponent;
-
-class EnvelopeHandleComponentConstrainer :	public juce::ComponentBoundsConstrainer
-{
-public:
-	EnvelopeHandleComponentConstrainer(EnvelopeHandleComponent* handle);
-	
-	void checkBounds (juce::Rectangle<int>& bounds,
-					  const juce::Rectangle<int>& old, const juce::Rectangle<int>& limits,
-					  bool isStretchingTop, bool isStretchingLeft,
-					  bool isStretchingBottom, bool isStretchingRight);
-	
-	void setAdjacentHandleLimits(int setLeftLimit, int setRightLimit);
-	
-private:
-	int leftLimit, rightLimit;
-	EnvelopeHandleComponent* handle;
-};
 
 class EnvelopeHandleComponent :	public juce::Component
 {
@@ -103,6 +87,7 @@ public:
 	void setValue(double valueToSet);
 	void setCurve(float curveToSet);
 	void setTimeAndValue(double timeToSet, double valueToSet, double quantise = 0.0);
+	void setTimeAndValueUnclamped(double timeToSet, double valueToSet);
 	void offsetTimeAndValue(double offsetTime, double offsetValue, double quantise = 0.0);
 	double constrainDomain(double domainToConstrain) const;
 	double constrainValue(double valueToConstrain) const;
@@ -122,8 +107,6 @@ private:
 	juce::ComponentDragger dragger;
 	int lastX, lastY;
 	int offsetX, offsetY;
-	EnvelopeHandleComponentConstrainer resizeLimits;
-	
 	double time, value;
     bool shouldLockTime, shouldLockValue, shouldDraw;
 	float curve;
@@ -131,15 +114,7 @@ private:
 };
 
 
-class EnvelopeComponentListener
-{
-public:
-	EnvelopeComponentListener() throw() {}
-	virtual ~EnvelopeComponentListener() {}
-	virtual void envelopeChanged(EnvelopeComponent* changedEnvelope) = 0;
-    virtual void envelopeStartDrag(EnvelopeComponent*) { }
-    virtual void envelopeEndDrag(EnvelopeComponent*) { }
-};
+class OscirenderAudioProcessor;
 
 /** For displaying and editing a breakpoint envelope. 
  @ingoup EnvUGens
@@ -147,13 +122,9 @@ public:
 class EnvelopeComponent : public juce::Component, private juce::Timer
 {
 public:
-	EnvelopeComponent();
+	explicit EnvelopeComponent(OscirenderAudioProcessor& processor);
 	~EnvelopeComponent();
 
-	// DAHDSR editor mode (fixed 6 points: start, delay, attack, hold, sustain, release).
-	void setDahdsrMode(bool enabled);
-	bool getDahdsrMode() const;
-	
 	void setDomainRange(const double min, const double max);
 	void setDomainRange(const double max) { setDomainRange(0.0, max); }
 	void getDomainRange(double& min, double& max) const;
@@ -180,12 +151,11 @@ public:
 	void mouseDown         (const juce::MouseEvent& e);
 	void mouseDrag         (const juce::MouseEvent& e);
 	void mouseUp           (const juce::MouseEvent& e);
+	void mouseWheelMove    (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
 	
-	void addListener (EnvelopeComponentListener* const listener);
-    void removeListener (EnvelopeComponentListener* const listener);
 	void sendChangeMessage();
-    void sendStartDrag();
-    void sendEndDrag();
+	void sendStartDrag();
+	void sendEndDrag();
 	
     void clear();
     
@@ -216,7 +186,6 @@ public:
 	DahdsrParams getDahdsrParams() const;
 	void setDahdsrParams(const DahdsrParams& params);
 	float lookup(const float time) const;
-	void setMinMaxNumHandles(int min, int max);
 
 	// Optional UI-only overlay: vertical markers that “flow” through the envelope fill.
 	// Times are in the same domain as the envelope (seconds for ADSR in osci-render).
@@ -259,14 +228,22 @@ private:
 		EnvelopeComponent& env;
 	};
 
-	bool canEditStructure() const { return structuralEditDepth > 0 || !dahdsrMode; }
+	bool canEditStructure() const { return structuralEditDepth > 0; }
 
 	void recalculateHandles();
 	EnvelopeHandleComponent* findHandle(double time);
 	void applyDahdsrHandleLocks();
 	void ensureFlowRepaintTimerRunning();
 	
-	juce::SortedSet <void*> listeners;
+	void beginGestureForActiveHandle();
+	void endGestureForActiveHandle();
+	void pushParamsForActiveHandle();
+
+	OscirenderAudioProcessor& processor;
+	std::array<osci::FloatParameter*, kDahdsrNumHandles> timeParams{};
+	std::array<osci::FloatParameter*, kDahdsrNumHandles> valueParams{};
+	std::array<osci::FloatParameter*, kDahdsrNumHandles> curveParams{};
+
 	juce::Array<EnvelopeHandleComponent*> handles;
 	int minNumHandles, maxNumHandles;
 	double domainMin, domainMax;
@@ -281,7 +258,6 @@ private:
 	double prevCurveValue = 0.0;
 	int curvePoints;
 
-	bool dahdsrMode = false;
 	int structuralEditDepth = 0;
 
 	int numFlowMarkers = 0;
@@ -329,29 +305,17 @@ private:
 class EnvelopeContainerComponent : public juce::Component
 {
 public:
-	EnvelopeContainerComponent(juce::String defaultText = juce::String());
+	explicit EnvelopeContainerComponent(OscirenderAudioProcessor& processor, juce::String defaultText = juce::String());
 	~EnvelopeContainerComponent();
 	void resized();
 	
 	EnvelopeComponent* getEnvelopeComponent() const		{ return envelope; }
 	EnvelopeLegendComponent* getLegendComponent() const	{ return legend;   }
-	void setLegendComponent(EnvelopeLegendComponent* newLegend);
-	
-	
-	void addListener (EnvelopeComponentListener* const listener) { envelope->addListener(listener); }
-    void removeListener (EnvelopeComponentListener* const listener) { envelope->removeListener(listener); }
-	
-	DahdsrParams getDahdsrParams() const { return getEnvelopeComponent()->getDahdsrParams(); }
-	void setDahdsrParams(const DahdsrParams& params) { return getEnvelopeComponent()->setDahdsrParams(params); }
-	float lookup(const float time) const { return getEnvelopeComponent()->lookup(time); }
+
 
 	
-	void setDomainRange(const double min, const double max)		{ envelope->setDomainRange(min, max);	}
-	void setDomainRange(const double max)						{ setDomainRange(0.0, max);				}
-	void getDomainRange(double& min, double& max) const			{ envelope->getDomainRange(min, max);	}
-	void setValueRange(const double min, const double max)		{ envelope->setValueRange(min, max);	} 
-	void setValueRange(const double max)						{ setValueRange(0.0, max);				}
-	void getValueRange(double& min, double& max) const			{ envelope->getValueRange(min, max);	}
+	void setDahdsrParams(const DahdsrParams& params) { return getEnvelopeComponent()->setDahdsrParams(params); }
+
 	
 	void setGrid(const EnvelopeComponent::GridMode display, 
 				 const EnvelopeComponent::GridMode quantise, 
@@ -361,9 +325,7 @@ public:
 		envelope->setGrid(display, quantise, domain, value);
 	}
 
-	void setDahdsrMode(const bool enabled)		{ envelope->setDahdsrMode(enabled);			}
 
-	
 private:
 	EnvelopeComponent*			envelope;
 	EnvelopeLegendComponent*	legend;
@@ -372,4 +334,4 @@ private:
 #endif // gpl
 
 
-#endif //UGEN_JUCEENVELOPECOMPONENT_H
+#endif // ENVELOPE_COMPONENT_H

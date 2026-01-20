@@ -38,58 +38,28 @@
 
 #ifndef UGEN_NOEXTGPL
 
-#include "ugen_JuceEnvelopeComponent.h"
+#include "EnvelopeComponent.h"
+#include "../PluginProcessor.h"
+namespace {
+void updateIfApproxEqual(osci::FloatParameter* parameter, float newValue) {
+	if (parameter == nullptr) {
+		return;
+	}
+
+	if (std::abs(parameter->getValueUnnormalised() - newValue) > 0.000001f) {
+		parameter->setUnnormalisedValueNotifyingHost(newValue);
+	}
+}
+}
 
 #include <algorithm>
 #include <cmath>
 
 
-EnvelopeHandleComponentConstrainer::EnvelopeHandleComponentConstrainer(EnvelopeHandleComponent* handleOwner)
-	:	leftLimit(0),
-		rightLimit(0xffffff),
-		handle(handleOwner)
-{
-}
-
-void EnvelopeHandleComponentConstrainer::checkBounds (juce::Rectangle<int>& bounds,
-					  const juce::Rectangle<int>& old, const juce::Rectangle<int>& limits,
-					  bool isStretchingTop, bool isStretchingLeft,
-					  bool isStretchingBottom, bool isStretchingRight)
-{
-	
-	ComponentBoundsConstrainer::checkBounds(bounds,
-											old,limits,
-											isStretchingTop,isStretchingLeft,
-											isStretchingBottom,isStretchingRight);
-	
-	// prevent this handle moving before the previous point
-	// or after the next point	
-	bounds.setPosition(juce::jlimit(leftLimit, rightLimit, bounds.getX()), bounds.getY());
-	
-	
-	// then use the handle to access the envelope to then quantise x+y..
-	
-//	EnvelopeComponent* env = handle->getParentComponent();
-//	
-//	if(env)
-//	{
-//		bounds.setPosition(env->convertDomainToPixels(domain), 
-//						   env->convertValueToPixels(value));
-//	}
-}
-
-
-void EnvelopeHandleComponentConstrainer::setAdjacentHandleLimits(int setLeftLimit, int setRightLimit)
-{
-	leftLimit = setLeftLimit;
-	rightLimit = setRightLimit;
-}
-
 EnvelopeHandleComponent::EnvelopeHandleComponent()
 	: dontUpdateTimeAndValue(false),
 	  lastX(-1),
 	  lastY(-1),
-	  resizeLimits(this),
 	  shouldLockTime(false),
 	  shouldLockValue(false),
 	  shouldDraw(!shouldLockTime || !shouldLockValue),
@@ -112,15 +82,16 @@ EnvelopeComponent* EnvelopeHandleComponent::getParentComponent() const
 void EnvelopeHandleComponent::updateTimeAndValue()
 {
 	bool envChanged = false;
+	EnvelopeComponent* env = getParentComponent();
 
 	if (shouldLockTime)
 	{
-		setTopLeftPosition(getParentComponent()->convertDomainToPixels(time),
+		setTopLeftPosition(env->convertDomainToPixels(time),
 					   getY());
 	}
 	else {
 		envChanged = true;
-		time = getParentComponent()->convertPixelsToDomain(getX());
+		time = env->convertPixelsToDomain(getX());
 	}
 
 	if (shouldLockValue)
@@ -134,7 +105,7 @@ void EnvelopeHandleComponent::updateTimeAndValue()
 	}
 
 	if (envChanged == true) {
-		((EnvelopeComponent*)getParentComponent())->sendChangeMessage();
+		env->sendChangeMessage();
 	}
 
 #ifdef MYDEBUG
@@ -143,14 +114,14 @@ void EnvelopeHandleComponent::updateTimeAndValue()
 }
 
 void EnvelopeHandleComponent::updateLegend()
-{	
+{
 	EnvelopeComponent *env = getParentComponent();
 	EnvelopeLegendComponent* legend = env->getLegend();
 
-	if(legend == 0) return;
+	if (legend == 0) return;
 
 	juce::String text;
-	
+
 	int width = getParentWidth();
 	int places;
 
@@ -161,57 +132,35 @@ void EnvelopeHandleComponent::updateLegend()
 	} else {
 		places = 1;
 	}
-	
-	if (env->getDahdsrMode()) {
-		int index = env->getHandleIndex(this);
-		const auto dahdsr = env->getDahdsrParams();
-		double safeTime = 0.0;
-		switch (index)
-		{
-			case 1: safeTime = dahdsr.delaySeconds; break;
-			case 2: safeTime = dahdsr.attackSeconds; break;
-			case 3: safeTime = dahdsr.holdSeconds; break;
-			case 4: safeTime = dahdsr.decaySeconds; break;
-			case 5: safeTime = dahdsr.releaseSeconds; break;
-			default: safeTime = 0.0; break;
-		}
 
-		if (index == 1) {
-			text = "Delay time (s): " + juce::String(legend->mapTime(safeTime), places);
-		} else if (index == 2) {
-			text = "Attack time (s): " + juce::String(legend->mapTime(safeTime), places);
-		} else if (index == 3) {
-			text = "Hold time (s): " + juce::String(legend->mapTime(safeTime), places);
-		} else if (index == 4) {
-			text = "Decay time (s): " + juce::String(legend->mapTime(safeTime), places);
-			text << ", Sustain level: " << juce::String(legend->mapValue(dahdsr.sustainLevel), places);
-		} else if (index == 5) {
-			text = "Release time (s): " + juce::String(legend->mapTime(safeTime), places);
-		} else {
-			text = "";
-		}
-	} else {
-		if (width >= 165) {
-			text << "Point ";
-		} else if (width >= 140) {
-			text << "Point ";
-		} else if (width >= 115) {
-			text << "Pt ";
-		} else if (width >= 100) {
-			text << "Pt ";
-		} else if (width >= 85) {
-			text << "Pt ";
-		} else if (width >= 65) {
-			text << "P ";
-		}
-
-		text << (getHandleIndex())
-			<< ": "
-			<< juce::String(legend->mapTime(time), places) << legend->getTimeUnits()
-			<< ", "
-			<< juce::String(legend->mapValue(value), places) << legend->getValueUnits();
+	int index = env->getHandleIndex(this);
+	const auto dahdsr = env->getDahdsrParams();
+	double safeTime = 0.0;
+	switch (index)
+	{
+		case 1: safeTime = dahdsr.delaySeconds; break;
+		case 2: safeTime = dahdsr.attackSeconds; break;
+		case 3: safeTime = dahdsr.holdSeconds; break;
+		case 4: safeTime = dahdsr.decaySeconds; break;
+		case 5: safeTime = dahdsr.releaseSeconds; break;
+		default: safeTime = 0.0; break;
 	}
-	
+
+	if (index == 1) {
+		text = "Delay time (s): " + juce::String(legend->mapTime(safeTime), places);
+	} else if (index == 2) {
+		text = "Attack time (s): " + juce::String(legend->mapTime(safeTime), places);
+	} else if (index == 3) {
+		text = "Hold time (s): " + juce::String(legend->mapTime(safeTime), places);
+	} else if (index == 4) {
+		text = "Decay time (s): " + juce::String(legend->mapTime(safeTime), places);
+		text << ", Sustain level: " << juce::String(legend->mapValue(dahdsr.sustainLevel), places);
+	} else if (index == 5) {
+		text = "Release time (s): " + juce::String(legend->mapTime(safeTime), places);
+	} else {
+		text = "";
+	}
+
 	getParentComponent()->setLegendText(text);
 }
 
@@ -308,20 +257,7 @@ void EnvelopeHandleComponent::mouseDown(const juce::MouseEvent& e)
 			offsetX = e.x;
 			offsetY = e.y;
 
-			resizeLimits.setMinimumOnscreenAmounts(HANDLESIZE,HANDLESIZE,HANDLESIZE,HANDLESIZE);
-
-			EnvelopeHandleComponent* previousHandle = getPreviousHandle();
-			EnvelopeHandleComponent* nextHandle = getNextHandle();
-
-			int leftLimit = previousHandle == 0 ? 0 : previousHandle->getX()+2;
-			int rightLimit = nextHandle == 0 ? getParentWidth()-HANDLESIZE : nextHandle->getX()-2;
-			//		int leftLimit = previousHandle == 0 ? 0 : previousHandle->getX();
-			//		int rightLimit = nextHandle == 0 ? getParentWidth()-HANDLESIZE : nextHandle->getX();
-
-
-			resizeLimits.setAdjacentHandleLimits(leftLimit, rightLimit);
-
-			dragger.startDraggingComponent(this, e);//&resizeLimits);
+			dragger.startDraggingComponent(this, e);
 
 		}
 
@@ -335,7 +271,19 @@ void EnvelopeHandleComponent::mouseDrag(const juce::MouseEvent& e)
 {
 	if(ignoreDrag || !shouldDraw) return;
 	
-	dragger.dragComponent(this, e, &resizeLimits);
+	dragger.dragComponent(this, e, nullptr);
+
+	const int maxX = getParentWidth() - HANDLESIZE;
+	const int maxY = getParentHeight() - HANDLESIZE;
+	const int minX = [&]() {
+		if (auto* prev = getPreviousHandle()) {
+			return prev->getX();
+		}
+		return 0;
+	}();
+	const int clampedX = juce::jlimit(minX, juce::jmax(minX, maxX), getX());
+	const int clampedY = juce::jlimit(0, juce::jmax(0, maxY), getY());
+	setTopLeftPosition(clampedX, clampedY);
 	
 	updateLegend();
 	getParentComponent()->repaint();
@@ -486,6 +434,22 @@ void EnvelopeHandleComponent::setTimeAndValue(double timeToSet, double valueToSe
 	getParentComponent()->repaint();
 }
 
+void EnvelopeHandleComponent::setTimeAndValueUnclamped(double timeToSet, double valueToSet)
+{
+	bool oldDontUpdateTimeAndValue = dontUpdateTimeAndValue;
+	dontUpdateTimeAndValue = true;
+
+	time = timeToSet;
+	value = valueToSet;
+
+	setTopLeftPosition(getParentComponent()->convertDomainToPixels(time),
+					   getParentComponent()->convertValueToPixels(value));
+
+	dontUpdateTimeAndValue = oldDontUpdateTimeAndValue;
+
+	getParentComponent()->repaint();
+}
+
 void EnvelopeHandleComponent::offsetTimeAndValue(double offsetTime, double offsetValue, double quantise)
 {
 	setTimeAndValue(time+offsetTime, value+offsetValue, quantise);
@@ -494,18 +458,12 @@ void EnvelopeHandleComponent::offsetTimeAndValue(double offsetTime, double offse
 
 double EnvelopeHandleComponent::constrainDomain(double domainToConstrain) const
 { 
-	EnvelopeHandleComponent* previousHandle = getPreviousHandle();
-	EnvelopeHandleComponent* nextHandle = getNextHandle();
+	const int leftLimit = 0;
+	const int rightLimit = getParentWidth() - HANDLESIZE;
 
-	int leftLimit = previousHandle == 0 ? 0 : previousHandle->getX();
-	int rightLimit = nextHandle == 0 ? getParentWidth()-HANDLESIZE : nextHandle->getX();
-	
-	double left = getParentComponent()->convertPixelsToDomain(leftLimit);
-	double right = getParentComponent()->convertPixelsToDomain(rightLimit);
-	
-	if(previousHandle != 0) left += FINETUNE;
-	if(nextHandle != 0) right -= FINETUNE;
-		
+	const double left = getParentComponent()->convertPixelsToDomain(leftLimit);
+	const double right = getParentComponent()->convertPixelsToDomain(rightLimit);
+
 	return juce::jlimit(juce::jmin(left, right), juce::jmax(left, right), shouldLockTime ? time : domainToConstrain);
 }
 
@@ -555,9 +513,9 @@ void EnvelopeHandleComponent::recalculateShouldDraw() {
 }
 
 
-EnvelopeComponent::EnvelopeComponent()
-	: minNumHandles(0),
-	  maxNumHandles(0xffffff),
+EnvelopeComponent::EnvelopeComponent(OscirenderAudioProcessor& processorToUse)
+	: minNumHandles(kDahdsrNumHandles),
+	  maxNumHandles(kDahdsrNumHandles),
 	  domainMin(0.0),
 	  domainMax(1.0),
 	  valueMin(0.0),
@@ -571,11 +529,27 @@ EnvelopeComponent::EnvelopeComponent()
 	  activeHandle(nullptr),
 	  activeCurveHandle(nullptr),
 	  curvePoints(64),
-	  dahdsrMode(false)
+	  processor(processorToUse)
 {
 	stopTimer();
 	setMouseCursor(juce::MouseCursor::NormalCursor);
 	setBounds(0, 0, 200, 200); // non-zero size to start with
+
+	timeParams = { nullptr, processor.delayTime, processor.attackTime, processor.holdTime, processor.decayTime, processor.releaseTime };
+	valueParams = { nullptr, nullptr, nullptr, nullptr, processor.sustainLevel, nullptr };
+	curveParams = { nullptr, nullptr, processor.attackShape, nullptr, processor.decayShape, processor.releaseShape };
+
+	DahdsrParams params;
+	params.delaySeconds = processor.delayTime->getValueUnnormalised();
+	params.attackSeconds = processor.attackTime->getValueUnnormalised();
+	params.holdSeconds = processor.holdTime->getValueUnnormalised();
+	params.decaySeconds = processor.decayTime->getValueUnnormalised();
+	params.sustainLevel = processor.sustainLevel->getValueUnnormalised();
+	params.releaseSeconds = processor.releaseTime->getValueUnnormalised();
+	params.attackCurve = processor.attackShape->getValueUnnormalised();
+	params.decayCurve = processor.decayShape->getValueUnnormalised();
+	params.releaseCurve = processor.releaseShape->getValueUnnormalised();
+	setDahdsrParams(params);
 }
 
 void EnvelopeComponent::timerCallback()
@@ -682,9 +656,6 @@ void EnvelopeComponent::recalculateHandles()
 
 void EnvelopeComponent::applyDahdsrHandleLocks()
 {
-	if (!dahdsrMode)
-		return;
-
 	// Clear any previous constraints first.
 	for (int i = 0; i < handles.size(); ++i)
 	{
@@ -1129,7 +1100,7 @@ void EnvelopeComponent::mouseUp(const juce::MouseEvent& e)
 		setMouseCursor(juce::MouseCursor::DraggingHandCursor);
 		draggingHandle->resetOffsets();
 		draggingHandle = 0;
-        sendEndDrag();
+		sendEndDrag();
 	} else {
 		setMouseCursor(juce::MouseCursor::NormalCursor);
 	}
@@ -1138,6 +1109,22 @@ void EnvelopeComponent::mouseUp(const juce::MouseEvent& e)
 		sendEndDrag();
 	}
 	setActiveCurveHandle(nullptr);
+}
+
+void EnvelopeComponent::mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
+{
+	juce::ignoreUnused(e);
+
+	if (wheel.deltaY == 0.0f)
+		return;
+
+	const double minDomain = osci_audio::kEnvelopeZoomMinSeconds;
+	const double maxDomain = osci_audio::kEnvelopeZoomMaxSeconds;
+	const double base = 0.98;
+	const double zoomFactor = std::pow(base, wheel.deltaY * 10.0);
+
+	const double newMax = juce::jlimit(minDomain, maxDomain, domainMax * zoomFactor);
+	setDomainRange(0.0, newMax);
 }
 
 void EnvelopeComponent::setActiveHandle(EnvelopeHandleComponent* handle)
@@ -1150,42 +1137,19 @@ void EnvelopeComponent::setActiveCurveHandle(EnvelopeHandleComponent* handle)
 	activeCurveHandle = handle;
 }
 
-void EnvelopeComponent::addListener (EnvelopeComponentListener* const listener)
-{
-	if (listener != 0)
-        listeners.add (listener);
-}
-
-void EnvelopeComponent::removeListener (EnvelopeComponentListener* const listener)
-{
-	listeners.removeValue(listener);
-}
-
 void EnvelopeComponent::sendChangeMessage()
 {
-	for (int i = listeners.size(); --i >= 0;)
-    {
-        ((EnvelopeComponentListener*) listeners.getUnchecked (i))->envelopeChanged (this);
-        i = juce::jmin (i, listeners.size());
-    }
+	pushParamsForActiveHandle();
 }
 
 void EnvelopeComponent::sendStartDrag()
 {
-    for (int i = listeners.size(); --i >= 0;)
-    {
-        ((EnvelopeComponentListener*) listeners.getUnchecked (i))->envelopeStartDrag (this);
-        i = juce::jmin (i, listeners.size());
-    }
+	beginGestureForActiveHandle();
 }
 
 void EnvelopeComponent::sendEndDrag()
 {
-    for (int i = listeners.size(); --i >= 0;)
-    {
-        ((EnvelopeComponentListener*) listeners.getUnchecked (i))->envelopeEndDrag (this);
-        i = juce::jmin (i, listeners.size());
-    }
+	endGestureForActiveHandle();
 }
 
 void EnvelopeComponent::clear()
@@ -1292,12 +1256,10 @@ EnvelopeHandleComponent* EnvelopeComponent::addHandle(double newDomain, double n
 		handle->setTimeAndValue(newDomain, newValue, 0.0);	
 		handle->setCurve(curve);
 		handles.insert(i, handle);
-		if (dahdsrMode) {
-			if (i == 0) {
-				handle->lockTime(0);
-			}
-			// Constraints are applied in applyAdsrHandleLocks() after handles are rebuilt.
+		if (i == 0) {
+			handle->lockTime(0);
 		}
+		// Constraints are applied in applyAdsrHandleLocks() after handles are rebuilt.
 	//	sendChangeMessage();
 		return handle;
 	}
@@ -1406,9 +1368,6 @@ DahdsrParams EnvelopeComponent::getDahdsrParams() const
 
 void EnvelopeComponent::setDahdsrParams(const DahdsrParams& params)
 {
-	if (!dahdsrMode)
-		setDahdsrMode(true);
-
 	ScopedStructuralEdit edit(*this);
 
 	if (handles.size() != kDahdsrNumHandles)
@@ -1432,30 +1391,143 @@ void EnvelopeComponent::setDahdsrParams(const DahdsrParams& params)
 	const double sustain = juce::jlimit(0.0, 1.0, params.sustainLevel);
 
 	// Handle indices: 0 start, 1 delay end, 2 attack peak, 3 hold end, 4 sustain, 5 release end.
-	handles.getUnchecked(0)->setTimeAndValue(t, 0.0, 0.0);
+	handles.getUnchecked(0)->setTimeAndValueUnclamped(t, 0.0);
 
 	t += delay;
-	handles.getUnchecked(1)->setTimeAndValue(t, 0.0, 0.0);
+	handles.getUnchecked(1)->setTimeAndValueUnclamped(t, 0.0);
 	handles.getUnchecked(1)->setCurve(0.0f);
 
 	t += attack;
-	handles.getUnchecked(2)->setTimeAndValue(t, 1.0, 0.0);
+	handles.getUnchecked(2)->setTimeAndValueUnclamped(t, 1.0);
 	handles.getUnchecked(2)->setCurve(params.attackCurve);
 
 	t += hold;
-	handles.getUnchecked(3)->setTimeAndValue(t, 1.0, 0.0);
+	handles.getUnchecked(3)->setTimeAndValueUnclamped(t, 1.0);
 	handles.getUnchecked(3)->setCurve(0.0f);
 
 	t += decay;
-	handles.getUnchecked(4)->setTimeAndValue(t, sustain, 0.0);
+	handles.getUnchecked(4)->setTimeAndValueUnclamped(t, sustain);
 	handles.getUnchecked(4)->setCurve(params.decayCurve);
 
 	t += release;
-	handles.getUnchecked(5)->setTimeAndValue(t, 0.0, 0.0);
+	handles.getUnchecked(5)->setTimeAndValueUnclamped(t, 0.0);
 	handles.getUnchecked(5)->setCurve(params.releaseCurve);
 
 	applyDahdsrHandleLocks();
 	repaint();
+}
+
+void EnvelopeComponent::beginGestureForActiveHandle()
+{
+	if (auto* curveHandle = getActiveCurveHandle())
+	{
+		const int curveHandleIndex = getHandleIndex(curveHandle);
+		if (curveHandleIndex >= 0 && curveHandleIndex < (int)curveParams.size()) {
+			if (auto* param = curveParams[(size_t)curveHandleIndex]) {
+				param->beginChangeGesture();
+			}
+		}
+		return;
+	}
+
+	if (auto* handle = getActiveHandle())
+	{
+		const int handleIndex = getHandleIndex(handle);
+		if (handleIndex >= 0 && handleIndex < (int)timeParams.size()) {
+			if (auto* param = timeParams[(size_t)handleIndex]) {
+				param->beginChangeGesture();
+			}
+			if (auto* param = valueParams[(size_t)handleIndex]) {
+				param->beginChangeGesture();
+			}
+		}
+	}
+}
+
+void EnvelopeComponent::endGestureForActiveHandle()
+{
+	if (auto* curveHandle = getActiveCurveHandle())
+	{
+		const int curveHandleIndex = getHandleIndex(curveHandle);
+		if (curveHandleIndex >= 0 && curveHandleIndex < (int)curveParams.size()) {
+			if (auto* param = curveParams[(size_t)curveHandleIndex]) {
+				param->endChangeGesture();
+			}
+		}
+		return;
+	}
+
+	if (auto* handle = getActiveHandle())
+	{
+		const int handleIndex = getHandleIndex(handle);
+		if (handleIndex >= 0 && handleIndex < (int)timeParams.size()) {
+			if (auto* param = timeParams[(size_t)handleIndex]) {
+				param->endChangeGesture();
+			}
+			if (auto* param = valueParams[(size_t)handleIndex]) {
+				param->endChangeGesture();
+			}
+		}
+	}
+}
+
+void EnvelopeComponent::pushParamsForActiveHandle()
+{
+	const auto* curveHandle = getActiveCurveHandle();
+	const auto* handle = getActiveHandle();
+	if (curveHandle == nullptr && handle == nullptr) {
+		return;
+	}
+
+	const auto params = getDahdsrParams();
+	const std::array<float, kDahdsrNumHandles> timeValues = {
+		0.0f,
+		(float)params.delaySeconds,
+		(float)params.attackSeconds,
+		(float)params.holdSeconds,
+		(float)params.decaySeconds,
+		(float)params.releaseSeconds
+	};
+	const std::array<float, kDahdsrNumHandles> valueValues = {
+		0.0f,
+		0.0f,
+		0.0f,
+		0.0f,
+		(float)params.sustainLevel,
+		0.0f
+	};
+	const std::array<float, kDahdsrNumHandles> curveValues = {
+		0.0f,
+		0.0f,
+		params.attackCurve,
+		0.0f,
+		params.decayCurve,
+		params.releaseCurve
+	};
+
+	if (curveHandle != nullptr)
+	{
+		const int curveHandleIndex = getHandleIndex(const_cast<EnvelopeHandleComponent*>(curveHandle));
+		if (curveHandleIndex >= 0 && curveHandleIndex < (int)curveParams.size()) {
+			if (auto* param = curveParams[(size_t)curveHandleIndex]) {
+				updateIfApproxEqual(param, curveValues[(size_t)curveHandleIndex]);
+			}
+		}
+		return;
+	}
+
+	if (handle != nullptr)
+	{
+		const int handleIndex = getHandleIndex(const_cast<EnvelopeHandleComponent*>(handle));
+		if (handleIndex >= 0 && handleIndex < (int)timeParams.size()) {
+			if (auto* param = timeParams[(size_t)handleIndex]) {
+				updateIfApproxEqual(param, timeValues[(size_t)handleIndex]);
+			}
+			if (auto* param = valueParams[(size_t)handleIndex]) {
+				updateIfApproxEqual(param, valueValues[(size_t)handleIndex]);
+			}
+		}
+	}
 }
 
 float EnvelopeComponent::lookup(const float time) const
@@ -1515,43 +1587,6 @@ float EnvelopeComponent::lookup(const float time) const
 	}
 }
 
-void EnvelopeComponent::setMinMaxNumHandles(int min, int max)
-{
-	// DAHDSR mode uses a fixed, deterministic handle layout.
-	// Avoid accidental random handle insertion/removal from external callers.
-	if (dahdsrMode && !canEditStructure())
-		return;
-
-	if(min <= max) {
-		minNumHandles = min;
-		maxNumHandles = max;
-	} else {
-		minNumHandles = max;
-		maxNumHandles = min;
-	}
-	
-	juce::Random rand(juce::Time::currentTimeMillis());
-	
-	if(handles.size() < minNumHandles) {
-		int num = minNumHandles-handles.size();
-		
-		for(int i = 0; i < num; i++) {
-			double randX = rand.nextDouble() * (domainMax-domainMin) + domainMin;
-			double randY = rand.nextDouble() * (valueMax-valueMin) + valueMin;
-						
-			addHandle(randX, randY, 0.0f);
-		}
-		
-	} else if(handles.size() > maxNumHandles) {
-		int num = handles.size()-maxNumHandles;
-		
-		for(int i = 0; i < num; i++) {
-			removeHandle(handles.getLast());
-		}
-	}
-	
-}
-
 double EnvelopeComponent::constrainDomain(double domainToConstrain) const
 {
 	return juce::jlimit(domainMin, domainMax, domainToConstrain); 
@@ -1570,9 +1605,6 @@ double EnvelopeComponent::constrainValue(double valueToConstrain) const
 //	else
 //		return value;
 //}
-//
-//double EnvelopeComponent::quantiseValue(double value)
-//{
 //	if((gridQuantiseMode & GridValue) && (valueGrid > 0.0))
 //		return round(value, valueGrid);
 //	else
@@ -1598,53 +1630,6 @@ EnvelopeComponent* EnvelopeLegendComponent::getEnvelopeComponent() const
 	if(parent == 0) return 0;
 	
 	return parent->getEnvelopeComponent();
-}
-
-void EnvelopeComponent::setDahdsrMode(const bool dahdsrMode) {
-	if (this->dahdsrMode == dahdsrMode)
-		return;
-
-	this->dahdsrMode = dahdsrMode;
-	if (this->dahdsrMode)
-	{
-		ScopedStructuralEdit edit(*this);
-		// DAHDSR mode is always a fixed 6-handle envelope.
-		minNumHandles = kDahdsrNumHandles;
-		maxNumHandles = kDahdsrNumHandles;
-
-		if (handles.size() != kDahdsrNumHandles)
-		{
-			// Deterministic default shape; callers (e.g. MidiComponent) typically
-			// follow up with setDahdsrParams() from processor parameters.
-			clear();
-			addHandle(0.0, 0.0, 0.0f);
-			addHandle(0.0, 0.0, 0.0f);
-			addHandle(0.0, 1.0, 0.0f);
-			addHandle(0.0, 1.0, 0.0f);
-			addHandle(0.0, 0.5, 0.0f);
-			addHandle(0.0, 0.0, 0.0f);
-		}
-
-		applyDahdsrHandleLocks();
-		repaint();
-	}
-	else
-	{
-		ScopedStructuralEdit edit(*this);
-		minNumHandles = 0;
-		maxNumHandles = 0xffffff;
-		for (int i = 0; i < handles.size(); ++i)
-		{
-			auto* handle = handles.getUnchecked(i);
-			handle->unlockTime();
-			handle->unlockValue();
-		}
-		repaint();
-	}
-}
-
-bool EnvelopeComponent::getDahdsrMode() const {
-    return dahdsrMode;
 }
 
 void EnvelopeLegendComponent::resized()
@@ -1686,10 +1671,10 @@ double EnvelopeLegendComponent::mapTime(double time)
 	return time;
 }
 
-EnvelopeContainerComponent::EnvelopeContainerComponent(juce::String defaultText)
+EnvelopeContainerComponent::EnvelopeContainerComponent(OscirenderAudioProcessor& processor, juce::String defaultText)
 {
 	addAndMakeVisible(legend = new EnvelopeLegendComponent(defaultText));
-	addAndMakeVisible(envelope = new EnvelopeComponent());
+	addAndMakeVisible(envelope = new EnvelopeComponent(processor));
 }
 
 EnvelopeContainerComponent::~EnvelopeContainerComponent()
@@ -1703,19 +1688,12 @@ void EnvelopeContainerComponent::resized()
 	
 	envelope->setBounds(0, 
 						0, 
-						getWidth(), 
+						getWidth(),
 						getHeight()-legendHeight);
-	
 	legend->setBounds(0, 
 					  getHeight()-legendHeight, 
 					  getWidth(), 
 					  legend->getHeight());
-}
-
-void EnvelopeContainerComponent::setLegendComponent(EnvelopeLegendComponent* newLegend)
-{
-	deleteAndZero(legend);
-	addAndMakeVisible(legend = newLegend);
 }
 
 #endif // gpl

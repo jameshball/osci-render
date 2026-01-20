@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
+#include "components/EnvelopeComponent.h"
 #include "components/SwitchButton.h"
 
 class OscirenderAudioProcessorEditor;

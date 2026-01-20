@@ -8,6 +8,15 @@ namespace osci_audio
 // Tiny epsilon prevents a weird mac glitch at certain exact frequencies.
 // Keep this centralized so we don't cargo-cult magic numbers.
 inline constexpr double kMacFrequencyEpsilonHz = 1.0e-6;
+
+// DAHDSR time parameter bounds and step.
+inline constexpr float kDahdsrTimeMinSeconds = 0.0f;
+inline constexpr float kDahdsrTimeMaxSeconds = 30.0f;
+inline constexpr float kDahdsrTimeStepSeconds = 0.00001f;
+
+// Envelope time-axis zoom bounds (seconds).
+inline constexpr double kEnvelopeZoomMinSeconds = 0.05;
+inline constexpr double kEnvelopeZoomMaxSeconds = 30.0;
 }
 
 struct DahdsrParams

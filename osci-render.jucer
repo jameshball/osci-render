@@ -345,16 +345,10 @@
               file="Source/components/VolumeComponent.cpp"/>
         <FILE id="MWkfTv" name="VolumeComponent.h" compile="0" resource="0"
               file="Source/components/VolumeComponent.h"/>
-      </GROUP>
-      <GROUP id="{A3039833-D3AB-7DA4-CB3F-2089901FEE3F}" name="envelope">
-        <FILE id="WHz3FS" name="ugen_JuceEnvelopeComponent.cpp" compile="1"
-              resource="0" file="Source/envelope/ugen_JuceEnvelopeComponent.cpp"/>
-        <FILE id="A8OllZ" name="ugen_JuceEnvelopeComponent.h" compile="0" resource="0"
-              file="Source/envelope/ugen_JuceEnvelopeComponent.h"/>
-        <FILE id="fPRNfc" name="ugen_JuceUtility.cpp" compile="1" resource="0"
-              file="Source/envelope/ugen_JuceUtility.cpp"/>
-        <FILE id="q9LdV8" name="ugen_JuceUtility.h" compile="0" resource="0"
-              file="Source/envelope/ugen_JuceUtility.h"/>
+        <FILE id="WHz3FS" name="EnvelopeComponent.cpp" compile="1" resource="0"
+              file="Source/components/EnvelopeComponent.cpp"/>
+        <FILE id="A8OllZ" name="EnvelopeComponent.h" compile="0" resource="0"
+              file="Source/components/EnvelopeComponent.h"/>
       </GROUP>
       <GROUP id="{A3E24187-62A5-AB8D-8837-14043B89A640}" name="gpla">
         <FILE id="KvDV8j" name="LineArtParser.cpp" compile="1" resource="0"

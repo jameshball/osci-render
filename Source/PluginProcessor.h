@@ -15,7 +15,6 @@
 #include <unordered_map>
 
 #include "CommonPluginProcessor.h"
-#include "envelope/ugen_JuceEnvelopeComponent.h"
 #include "audio/CustomEffect.h"
 #include "audio/DelayEffect.h"
 #include "audio/LuaEffectState.h"
@@ -35,7 +34,7 @@
 //==============================================================================
 /**
  */
-class OscirenderAudioProcessor : public CommonAudioProcessor, juce::AudioProcessorParameter::Listener, public EnvelopeComponentListener
+class OscirenderAudioProcessor : public CommonAudioProcessor, juce::AudioProcessorParameter::Listener
 #if JucePlugin_Enable_ARA
     ,
                                  public juce::AudioProcessorARAExtension
@@ -56,10 +55,6 @@ public:
     void setStateInformation(const void* data, int sizeInBytes) override;
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
-    void envelopeChanged(EnvelopeComponent* changedEnvelope) override;
-    void envelopeStartDrag(EnvelopeComponent* changedEnvelope) override;
-    void envelopeEndDrag(EnvelopeComponent* changedEnvelope) override;
-
     DahdsrParams getCurrentDahdsrParams() const;
 
     // UI telemetry for per-voice envelope visualization (written on audio thread, read on message thread)
@@ -114,15 +109,15 @@ public:
     std::atomic<bool> objectServerRendering = false;
     juce::ChangeBroadcaster fileChangeBroadcaster;
 
-    osci::FloatParameter* delayTime = new osci::FloatParameter("Delay Time", "delayTime", VERSION_HINT, 0.0, 0.0, 1.0);
-    osci::FloatParameter* attackTime = new osci::FloatParameter("Attack Time", "attackTime", VERSION_HINT, 0.005, 0.0, 1.0);
-    osci::FloatParameter* holdTime = new osci::FloatParameter("Hold Time", "holdTime", VERSION_HINT, 0.0, 0.0, 1.0);
-    osci::FloatParameter* decayTime = new osci::FloatParameter("Decay Time", "decayTime", VERSION_HINT, 0.095, 0.0, 1.0);
-    osci::FloatParameter* sustainLevel = new osci::FloatParameter("Sustain Level", "sustainLevel", VERSION_HINT, 0.6, 0.0, 1.0);
-    osci::FloatParameter* releaseTime = new osci::FloatParameter("Release Time", "releaseTime", VERSION_HINT, 0.4, 0.0, 1.0);
-    osci::FloatParameter* attackShape = new osci::FloatParameter("Attack Shape", "attackShape", VERSION_HINT, 5, -50, 50);
-    osci::FloatParameter* decayShape = new osci::FloatParameter("Decay Shape", "decayShape", VERSION_HINT, -20, -50, 50);
-    osci::FloatParameter* releaseShape = new osci::FloatParameter("Release Shape", "releaseShape", VERSION_HINT, -5, -50, 50);
+    osci::FloatParameter* delayTime = new osci::FloatParameter("Delay Time", "delayTime", VERSION_HINT, 0.0f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+    osci::FloatParameter* attackTime = new osci::FloatParameter("Attack Time", "attackTime", VERSION_HINT, 0.005f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+    osci::FloatParameter* holdTime = new osci::FloatParameter("Hold Time", "holdTime", VERSION_HINT, 0.0f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+    osci::FloatParameter* decayTime = new osci::FloatParameter("Decay Time", "decayTime", VERSION_HINT, 0.095f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+    osci::FloatParameter* sustainLevel = new osci::FloatParameter("Sustain Level", "sustainLevel", VERSION_HINT, 0.6f, 0.0f, 1.0f, 0.00001f);
+    osci::FloatParameter* releaseTime = new osci::FloatParameter("Release Time", "releaseTime", VERSION_HINT, 0.4f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+    osci::FloatParameter* attackShape = new osci::FloatParameter("Attack Shape", "attackShape", VERSION_HINT, 5.0f, -50.0f, 50.0f, 0.00001f);
+    osci::FloatParameter* decayShape = new osci::FloatParameter("Decay Shape", "decayShape", VERSION_HINT, -20.0f, -50.0f, 50.0f, 0.00001f);
+    osci::FloatParameter* releaseShape = new osci::FloatParameter("Release Shape", "releaseShape", VERSION_HINT, -5.0f, -50.0f, 50.0f, 0.00001f);
 
     juce::MidiKeyboardState keyboardState;
 
@@ -300,10 +295,6 @@ private:
     }
 
     juce::AudioPlayHead* playHead;
-
-    std::vector<osci::FloatParameter*> activeAdsrGestureParameters;
-    void resetActiveAdsrGestures();
-    void beginAdsrGesturesForEnvelope(EnvelopeComponent* changedEnvelope);
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
 public:

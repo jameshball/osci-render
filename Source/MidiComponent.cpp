@@ -2,7 +2,7 @@
 #include "PluginEditor.h"
 #include "audio/DahdsrEnvelope.h"
 
-MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
+MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor), envelope(p) {
     setText("MIDI Settings");
 
     addAndMakeVisible(midiToggle);
@@ -25,9 +25,7 @@ MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
     audioProcessor.voices->addListener(this);
 
     addAndMakeVisible(envelope);
-    envelope.setDahdsrMode(true);
     envelope.setDahdsrParams(audioProcessor.getCurrentDahdsrParams());
-    envelope.addListener(&audioProcessor);
     envelope.setGrid(EnvelopeComponent::GridBoth, EnvelopeComponent::GridNone, 0.1, 0.25);
 
     // UI-only animation for note flow markers.
@@ -55,7 +53,6 @@ MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 
 MidiComponent::~MidiComponent() {
     stopTimer();
-    envelope.removeListener(&audioProcessor);
     audioProcessor.attackTime->removeListener(this);
     audioProcessor.delayTime->removeListener(this);
     audioProcessor.attackShape->removeListener(this);
