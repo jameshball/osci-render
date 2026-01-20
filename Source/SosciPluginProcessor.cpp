@@ -83,7 +83,7 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     
     // Populate remaining channels based on detected mode
     if (rgbEnabled && !forceDisableRgbInput) {
-        // RGB mode: z=1.0, r=ch2, g=ch3, b=ch4
+        // RGB mode: z = 1.0; r = ch2 (or 1.0 if unavailable); g = ch3 (or 0.0); b = ch4 (or 0.0)
         juce::FloatVectorOperations::fill(workArray[2], 1.0f, numSamples);
         
         if (sourceBuffer.getNumChannels() > 2) {
