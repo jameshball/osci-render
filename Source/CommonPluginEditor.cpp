@@ -124,8 +124,9 @@ bool CommonPluginEditor::keyPressed(const juce::KeyPress& key) {
     } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'O') {
         openProject();
     } else if (key.isKeyCode(juce::KeyPress::F11Key) && juce::JUCEApplicationBase::isStandaloneApp()) {
-        // toggle fullscreen
+#if OSCI_PREMIUM
         toggleFullScreen();
+#endif
     } else if (key.isKeyCode(juce::KeyPress::escapeKey) && juce::JUCEApplicationBase::isStandaloneApp()) {
         // exit fullscreen if we're in fullscreen mode
         // Return true to consume the event and prevent it from reaching child components
