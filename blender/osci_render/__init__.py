@@ -137,8 +137,7 @@ def get_gpla_file_allframes(scene):
     bin.extend(GPLA_PATCH.to_bytes(8, "little"))
     
     # file info
-    bin.extend(("FILE    ").encode("utf8"))
-    bin.extend(("fCount  ").encode("utf8"))
+    bin.extend(("FILE    fCount  ").encode("utf8"))
     bin.extend((scene.frame_end - scene.frame_start + 1).to_bytes(8, "little"))
     bin.extend(("fRate   ").encode("utf8"))
     bin.extend(scene.render.fps.to_bytes(8, "little"))
@@ -162,8 +161,7 @@ def get_gpla_file(scene):
     bin.extend(GPLA_PATCH.to_bytes(8, "little"))
     
     # file info
-    bin.extend(("FILE    ").encode("utf8"))
-    bin.extend(("fCount  ").encode("utf8"))
+    bin.extend(("FILE    fCount  ").encode("utf8"))
     bin.extend((scene.frame_end - scene.frame_start + 1).to_bytes(8, "little"))
     bin.extend(("fRate   ").encode("utf8"))
     bin.extend(scene.render.fps.to_bytes(8, "little"))
@@ -192,9 +190,7 @@ def save_scene_to_file(scene, file_path):
 
 def get_frame_info_binary():
     frame_info = bytearray() 
-    frame_info.extend(("FRAME   ").encode("utf8"))
-    
-    frame_info.extend(("focalLen").encode("utf8"))
+    frame_info.extend(("FRAME   focalLen").encode("utf8"))
     frame_info.extend(struct.pack("d", -0.05 * bpy.data.cameras[0].lens))
     
     frame_info.extend(("OBJECTS ").encode("utf8"))
@@ -204,92 +200,63 @@ def get_frame_info_binary():
             if object.visible_get() and object.type == 'GREASEPENCIL':
                 dg =  bpy.context.evaluated_depsgraph_get()
                 obj = object.evaluated_get(dg)
-                frame_info.extend(("OBJECT  ").encode("utf8"))
-                
                 # matrix
-                frame_info.extend(("MATRIX  ").encode("utf8"))
+                frame_info.extend(("OBJECT  MATRIX  ").encode("utf8"))
                 camera_space = bpy.context.scene.camera.matrix_world.inverted() @ obj.matrix_world
-                for i in range(4):
-                    for j in range(4):
-                        frame_info.extend(struct.pack("d", camera_space[i][j]))
-                frame_info.extend(("DONE    ").encode("utf8"))
-                
+                frame_info.extend(struct.pack("16d", camera_space[0][0], camera_space[0][1], camera_space[0][2], camera_space[0][3],
+                                             camera_space[1][0], camera_space[1][1], camera_space[1][2], camera_space[1][3],
+                                             camera_space[2][0], camera_space[2][1], camera_space[2][2], camera_space[2][3],
+                                             camera_space[3][0], camera_space[3][1], camera_space[3][2], camera_space[3][3]))
                 # strokes
-                frame_info.extend(("STROKES ").encode("utf8"))
+                frame_info.extend(("DONE    STROKES ").encode("utf8"))
                 layers = obj.data.layers
                 for layer in layers:
                     strokes = layer.frames.data.current_frame().drawing.strokes
                     for stroke in strokes:
-                        frame_info.extend(("STROKE  ").encode("utf8"))
-                    
-                        frame_info.extend(("vertexCt").encode("utf8"))
+                        frame_info.extend(("STROKE  vertexCt").encode("utf8"))
                         frame_info.extend(len(stroke.points).to_bytes(8, "little"))
                     
                         frame_info.extend(("VERTICES").encode("utf8"))
                         for vert in stroke.points:
-                            frame_info.extend(struct.pack("d", vert.position.x))
-                            frame_info.extend(struct.pack("d", vert.position.y))
-                            frame_info.extend(struct.pack("d", vert.position.z))
-                        # VERTICES
-                        frame_info.extend(("DONE    ").encode("utf8"))
+                            frame_info.extend(struct.pack("3d", vert.position.x, vert.position.y, vert.position.z))
+                        # VERTICES, STROKE
+                        frame_info.extend(("DONE    DONE    ").encode("utf8"))
                 
-                        # STROKE
-                        frame_info.extend(("DONE    ").encode("utf8"))
-                
-                # STROKES
-                frame_info.extend(("DONE    ").encode("utf8"))
-                
-                # OBJECT
-                frame_info.extend(("DONE    ").encode("utf8"))
+                # STROKES, OBJECT
+                frame_info.extend(("DONE    DONE    ").encode("utf8"))
     else:
         for object in bpy.data.objects: 
             if object.visible_get() and object.type == 'GPENCIL':
                 dg =  bpy.context.evaluated_depsgraph_get()
                 obj = object.evaluated_get(dg)
-                frame_info.extend(("OBJECT  ").encode("utf8"))
-                
                 # matrix
-                frame_info.extend(("MATRIX  ").encode("utf8"))
+                frame_info.extend(("OBJECT  MATRIX  ").encode("utf8"))
                 camera_space = bpy.context.scene.camera.matrix_world.inverted() @ obj.matrix_world
-                for i in range(4):
-                    for j in range(4):
-                        frame_info.extend(struct.pack("d", camera_space[i][j]))
+                frame_info.extend(struct.pack("16d", camera_space[0][0], camera_space[0][1], camera_space[0][2], camera_space[0][3],
+                                             camera_space[1][0], camera_space[1][1], camera_space[1][2], camera_space[1][3],
+                                             camera_space[2][0], camera_space[2][1], camera_space[2][2], camera_space[2][3],
+                                             camera_space[3][0], camera_space[3][1], camera_space[3][2], camera_space[3][3]))
                 # MATRIX
-                frame_info.extend(("DONE    ").encode("utf8"))
-                
                 # strokes
-                frame_info.extend(("STROKES ").encode("utf8"))
+                frame_info.extend(("DONE    STROKES ").encode("utf8"))
                 layers = obj.data.layers
                 for layer in layers:
                     strokes = layer.frames.data.active_frame.strokes
                     for stroke in strokes:
-                        frame_info.extend(("STROKE  ").encode("utf8"))
-                        
-                        frame_info.extend(("vertexCt").encode("utf8"))
+                        frame_info.extend(("STROKE  vertexCt").encode("utf8"))
                         frame_info.extend(len(stroke.points).to_bytes(8, "little"))
                         
                         frame_info.extend(("VERTICES").encode("utf8"))
                         for vert in stroke.points:
-                            frame_info.extend(struct.pack("d", vert.co[0]))
-                            frame_info.extend(struct.pack("d", vert.co[1]))
-                            frame_info.extend(struct.pack("d", vert.co[2]))
-                        # VERTICES
-                        frame_info.extend(("DONE    ").encode("utf8"))
-                    
-                        # STROKE
-                        frame_info.extend(("DONE    ").encode("utf8"))
+                            frame_info.extend(struct.pack("3d", vert.co[0], vert.co[1], vert.co[2]))
+                        # VERTICES, STROKE
+                        frame_info.extend(("DONE    DONE    ").encode("utf8"))
                 
-                # STROKES
-                frame_info.extend(("DONE    ").encode("utf8"))
-                
-                # OBJECT
-                frame_info.extend(("DONE    ").encode("utf8"))
+                # STROKES, OBJECT
+                frame_info.extend(("DONE    DONE    ").encode("utf8"))
     
-    # OBJECTS
-    frame_info.extend(("DONE    ").encode("utf8"))
-    
-    # FRAME
-    frame_info.extend(("DONE    ").encode("utf8"))
+    # OBJECTS, FRAME
+    frame_info.extend(("DONE    DONE    ").encode("utf8"))
     
     return frame_info
     
