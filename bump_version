@@ -11,13 +11,10 @@ Versioning scheme here is 4-part: A.B.C.D
 By default, both products get a patch bump.
 
 Usage:
-    ./bump_version [--major|--minor|--patch]
-                                [--osci {major,minor,patch,none}] [--sosci {major,minor,patch,none}]
-                                [--message MSG]
+    ./bump_version --osci {major,minor,patch,none} --sosci {major,minor,patch,none} [--message MSG]
 
 Examples:
     ./bump_version
-    ./bump_version --minor
     ./bump_version --osci minor --sosci patch
     ./bump_version --sosci none
 
@@ -194,22 +191,17 @@ def commit(message: str) -> None:
 
 def parse_args(argv: Sequence[str]) -> tuple[argparse.Namespace, list[str]]:
     parser = argparse.ArgumentParser(prog="bump_version", add_help=True)
-    bump = parser.add_mutually_exclusive_group()
-    bump.add_argument("--major", action="store_true", help="Bump 2nd digit (A.B+1.0.0)")
-    bump.add_argument("--minor", action="store_true", help="Bump 3rd digit (A.B.C+1.0)")
-    bump.add_argument("--patch", action="store_true", help="Bump 4th digit (A.B.C.D+1) [default]")
-
     parser.add_argument(
         "--osci",
         choices=["major", "minor", "patch", "none"],
-        default=None,
-        help="Override bump kind for osci-render (default: follow global bump, else patch)",
+        required=True,
+        help="Bump kind for osci-render",
     )
     parser.add_argument(
         "--sosci",
         choices=["major", "minor", "patch", "none"],
-        default=None,
-        help="Override bump kind for sosci (default: follow global bump, else patch)",
+        required=True,
+        help="Bump kind for sosci",
     )
 
     parser.add_argument(
@@ -222,25 +214,10 @@ def parse_args(argv: Sequence[str]) -> tuple[argparse.Namespace, list[str]]:
     return ns, []
 
 
-def bump_kind_from_ns(ns: argparse.Namespace) -> str:
-    if ns.major:
-        return "major"
-    if ns.minor:
-        return "minor"
-    if ns.patch:
-        return "patch"
-    return "patch"
-
-
-def bump_kind_for_product(global_kind: str, override: str | None) -> str:
-    return override if override is not None else global_kind
-
-
 def main(argv: Sequence[str]) -> int:
     ns, _ = parse_args(list(argv))
-    global_kind = bump_kind_from_ns(ns)
-    osci_kind = bump_kind_for_product(global_kind, ns.osci)
-    sosci_kind = bump_kind_for_product(global_kind, ns.sosci)
+    osci_kind = ns.osci
+    sosci_kind = ns.sosci
 
     ensure_clean_working_tree()
 
