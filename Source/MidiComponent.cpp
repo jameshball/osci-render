@@ -1,7 +1,8 @@
 #include "MidiComponent.h"
 #include "PluginEditor.h"
+#include "audio/DahdsrEnvelope.h"
 
-MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
+MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor), envelope(p) {
     setText("MIDI Settings");
 
     addAndMakeVisible(midiToggle);
@@ -24,10 +25,11 @@ MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
     audioProcessor.voices->addListener(this);
 
     addAndMakeVisible(envelope);
-    envelope.setAdsrMode(true);
-    envelope.setEnv(audioProcessor.adsrEnv);
-    envelope.addListener(&audioProcessor);
+    envelope.setDahdsrParams(audioProcessor.getCurrentDahdsrParams());
     envelope.setGrid(EnvelopeComponent::GridBoth, EnvelopeComponent::GridNone, 0.1, 0.25);
+
+    // UI-only animation for note flow markers.
+    startTimerHz(60);
 
     if (juce::JUCEApplicationBase::isStandaloneApp()) {
         addAndMakeVisible(midiSettingsButton);
@@ -37,8 +39,9 @@ MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
     }
 
     audioProcessor.attackTime->addListener(this);
-    audioProcessor.attackLevel->addListener(this);
+    audioProcessor.delayTime->addListener(this);
     audioProcessor.attackShape->addListener(this);
+    audioProcessor.holdTime->addListener(this);
     audioProcessor.decayTime->addListener(this);
     audioProcessor.decayShape->addListener(this);
     audioProcessor.sustainLevel->addListener(this);
@@ -49,10 +52,11 @@ MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 }
 
 MidiComponent::~MidiComponent() {
-    envelope.removeListener(&audioProcessor);
+    stopTimer();
     audioProcessor.attackTime->removeListener(this);
-    audioProcessor.attackLevel->removeListener(this);
+    audioProcessor.delayTime->removeListener(this);
     audioProcessor.attackShape->removeListener(this);
+    audioProcessor.holdTime->removeListener(this);
     audioProcessor.decayTime->removeListener(this);
     audioProcessor.decayShape->removeListener(this);
     audioProcessor.sustainLevel->removeListener(this);
@@ -60,6 +64,36 @@ MidiComponent::~MidiComponent() {
     audioProcessor.releaseShape->removeListener(this);
 
     audioProcessor.voices->removeListener(this);
+}
+
+void MidiComponent::timerCallback() {
+    // Only show flow markers when MIDI is enabled
+    if (!audioProcessor.midiEnabled->getBoolValue()) {
+        envelope.getEnvelopeComponent()->resetFlowPersistenceForUi();
+        return;
+    }
+
+
+    // Fixed slots (one per voice) so the envelope can draw seamless motion streaks.
+    constexpr int kMax = OscirenderAudioProcessor::kMaxUiVoices;
+    double times[kMax];
+    bool anyActive = false;
+    for (int i = 0; i < kMax; ++i) {
+        if (audioProcessor.uiVoiceActive[i].load(std::memory_order_relaxed)) {
+            times[i] = audioProcessor.uiVoiceEnvelopeTimeSeconds[i].load(std::memory_order_relaxed);
+            anyActive = true;
+        } else {
+            times[i] = -1.0;
+        }
+    }
+
+    if (!anyActive) {
+        // Stop pushing markers; the envelope component will keep repainting to fade the existing trail.
+        envelope.getEnvelopeComponent()->clearFlowMarkerTimesForUi();
+        return;
+    }
+
+    envelope.getEnvelopeComponent()->setFlowMarkerTimesForUi(times, kMax);
 }
 
 void MidiComponent::parameterValueChanged(int parameterIndex, float newValue) {
@@ -71,7 +105,7 @@ void MidiComponent::parameterGestureChanged(int parameterIndex, bool gestureIsSt
 void MidiComponent::handleAsyncUpdate() {
     voicesSlider.setValue(audioProcessor.voices->getValueUnnormalised(), juce::dontSendNotification);
 
-    envelope.setEnv(audioProcessor.buildAdsrEnvFromParameters());
+    envelope.setDahdsrParams(audioProcessor.getCurrentDahdsrParams());
 }
 
 void MidiComponent::resized() {

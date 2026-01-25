@@ -10,12 +10,11 @@
 
 #include <JuceHeader.h>
 
+#include <limits>
 #include <numbers>
 #include <unordered_map>
 
 #include "CommonPluginProcessor.h"
-#include "UGen/Env.h"
-#include "UGen/ugen_JuceEnvelopeComponent.h"
 #include "audio/CustomEffect.h"
 #include "audio/DelayEffect.h"
 #include "audio/LuaEffectState.h"
@@ -24,6 +23,7 @@
 #include "audio/SampleRateManager.h"
 #include "audio/ShapeSound.h"
 #include "audio/ShapeVoice.h"
+#include "audio/DahdsrEnvelope.h"
 #include "obj/ObjectServer.h"
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
@@ -34,7 +34,7 @@
 //==============================================================================
 /**
  */
-class OscirenderAudioProcessor : public CommonAudioProcessor, juce::AudioProcessorParameter::Listener, public EnvelopeComponentListener
+class OscirenderAudioProcessor : public CommonAudioProcessor, juce::AudioProcessorParameter::Listener
 #if JucePlugin_Enable_ARA
     ,
                                  public juce::AudioProcessorARAExtension
@@ -55,10 +55,12 @@ public:
     void setStateInformation(const void* data, int sizeInBytes) override;
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
-    void envelopeChanged(EnvelopeComponent* changedEnvelope) override;
-    void envelopeStartDrag(EnvelopeComponent* changedEnvelope) override;
-    void envelopeEndDrag(EnvelopeComponent* changedEnvelope) override;
-    Env buildAdsrEnvFromParameters() const;
+    DahdsrParams getCurrentDahdsrParams() const;
+
+    // UI telemetry for per-voice envelope visualization (written on audio thread, read on message thread)
+    static constexpr int kMaxUiVoices = 16;
+    std::atomic<double> uiVoiceEnvelopeTimeSeconds[kMaxUiVoices]{};
+    std::atomic<bool> uiVoiceActive[kMaxUiVoices]{};
 
     std::vector<std::shared_ptr<osci::Effect>> toggleableEffects;
     std::vector<std::shared_ptr<osci::Effect>> luaEffects;
@@ -107,38 +109,26 @@ public:
     std::atomic<bool> objectServerRendering = false;
     juce::ChangeBroadcaster fileChangeBroadcaster;
 
-    osci::FloatParameter* attackTime = new osci::FloatParameter("Attack Time", "attackTime", VERSION_HINT, 0.005, 0.0, 1.0);
-    osci::FloatParameter* attackLevel = new osci::FloatParameter("Attack Level", "attackLevel", VERSION_HINT, 1.0, 0.0, 1.0);
-    osci::FloatParameter* decayTime = new osci::FloatParameter("Decay Time", "decayTime", VERSION_HINT, 0.095, 0.0, 1.0);
-    osci::FloatParameter* sustainLevel = new osci::FloatParameter("Sustain Level", "sustainLevel", VERSION_HINT, 0.6, 0.0, 1.0);
-    osci::FloatParameter* releaseTime = new osci::FloatParameter("Release Time", "releaseTime", VERSION_HINT, 0.4, 0.0, 1.0);
-    osci::FloatParameter* attackShape = new osci::FloatParameter("Attack Shape", "attackShape", VERSION_HINT, 5, -50, 50);
-    osci::FloatParameter* decayShape = new osci::FloatParameter("Decay Shape", "decayShape", VERSION_HINT, -20, -50, 50);
-    osci::FloatParameter* releaseShape = new osci::FloatParameter("Release Shape", "releaseShape", VERSION_HINT, -5, -50, 50);
-
-    Env adsrEnv = Env(
-        {
-            0.0,
-            attackLevel->getValueUnnormalised(),
-            sustainLevel->getValueUnnormalised(),
-            0.0
-        },
-        {
-            attackTime->getValueUnnormalised(),
-            decayTime->getValueUnnormalised(),
-            releaseTime->getValueUnnormalised()
-        },
-        std::vector<EnvCurve>{
-            attackShape->getValueUnnormalised(),
-            decayShape->getValueUnnormalised(),
-            releaseShape->getValueUnnormalised()
-        },
-        2
-    );
+    osci::FloatParameter* delayTime = new osci::FloatParameter("Delay Time", "delayTime", VERSION_HINT, 0.0f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+    osci::FloatParameter* attackTime = new osci::FloatParameter("Attack Time", "attackTime", VERSION_HINT, 0.005f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+    osci::FloatParameter* holdTime = new osci::FloatParameter("Hold Time", "holdTime", VERSION_HINT, 0.0f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+    osci::FloatParameter* decayTime = new osci::FloatParameter("Decay Time", "decayTime", VERSION_HINT, 0.095f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+    osci::FloatParameter* sustainLevel = new osci::FloatParameter("Sustain Level", "sustainLevel", VERSION_HINT, 0.6f, 0.0f, 1.0f, 0.00001f);
+    osci::FloatParameter* releaseTime = new osci::FloatParameter("Release Time", "releaseTime", VERSION_HINT, 0.4f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+    osci::FloatParameter* attackShape = new osci::FloatParameter("Attack Shape", "attackShape", VERSION_HINT, 5.0f, -50.0f, 50.0f, 0.00001f);
+    osci::FloatParameter* decayShape = new osci::FloatParameter("Decay Shape", "decayShape", VERSION_HINT, -20.0f, -50.0f, 50.0f, 0.00001f);
+    osci::FloatParameter* releaseShape = new osci::FloatParameter("Release Shape", "releaseShape", VERSION_HINT, -5.0f, -50.0f, 50.0f, 0.00001f);
 
     juce::MidiKeyboardState keyboardState;
 
     osci::IntParameter* voices = new osci::IntParameter("Voices", "voices", VERSION_HINT, 4, 1, 16);
+
+    // 1..100 maps to file index with a 1-based offset (1 = first file, 2 = second, ...). Intended for DAW automation.
+    osci::IntParameter* fileSelect = new osci::IntParameter("File Select", "fileSelect", VERSION_HINT, 1, 1, 100);
+
+    // Audio-thread readable pointer to the currently selected sound.
+    // Lifetime is owned by defaultSound/objectServerSound/sounds[].
+    ShapeSound* getActiveShapeSound() const { return activeShapeSound.load(std::memory_order_acquire); }
 
     osci::BooleanParameter* animateFrames = new osci::BooleanParameter("Animate", "animateFrames", VERSION_HINT, true, "Enables animation for files that have multiple frames, such as GIFs or Line Art.");
     osci::BooleanParameter* loopAnimation = new osci::BooleanParameter("Loop Animation", "loopAnimation", VERSION_HINT, true, "Loops the animation. If disabled, the animation will stop at the last frame.");
@@ -217,6 +207,7 @@ public:
         juce::AudioBuffer<float>* externalInput,
         juce::AudioBuffer<float>* volumeBuffer,
         juce::AudioBuffer<float>* frequencyBuffer,
+        juce::AudioBuffer<float>* frameSyncBuffer,
         const std::unordered_map<juce::String, std::shared_ptr<osci::SimpleEffect>>* perVoiceEffects,
         const std::shared_ptr<osci::Effect>& previewEffectInstance);
 
@@ -274,6 +265,19 @@ private:
     double valueFromLegacy(double value, const juce::String& id);
     void changeSound(ShapeSound::Ptr sound);
 
+    // parsersLock AND effectsLock must be held when calling this
+    void applyFileSelectLocked();
+
+    std::atomic<ShapeSound*> activeShapeSound { nullptr };
+
+    struct FileSelectionAsyncNotifier : public juce::AsyncUpdater {
+        explicit FileSelectionAsyncNotifier(OscirenderAudioProcessor& p) : processor(p) {}
+        void handleAsyncUpdate() override { processor.fileChangeBroadcaster.sendChangeMessage(); }
+        OscirenderAudioProcessor& processor;
+    };
+
+    std::unique_ptr<FileSelectionAsyncNotifier> fileSelectionNotifier;
+
     void parseVersion(int result[3], const juce::String& input) {
         std::istringstream parser(input.toStdString());
         parser >> result[0];
@@ -291,11 +295,6 @@ private:
     }
 
     juce::AudioPlayHead* playHead;
-
-    std::vector<osci::FloatParameter*> activeAdsrGestureParameters;
-    void resetActiveAdsrGestures();
-    void beginAdsrGesturesForEnvelope(EnvelopeComponent* changedEnvelope);
-    std::atomic<bool> adsrNeedsUpdate { false };
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
 public:

@@ -16,6 +16,12 @@ SosciAudioProcessor::~SosciAudioProcessor() {}
 void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
     juce::ScopedNoDenormals noDenormals;
 
+    if (isOfflineRenderActive()) {
+        midiMessages.clear();
+        buffer.clear();
+        return;
+    }
+
     juce::AudioBuffer<float> input = getBusBuffer(buffer, true, 0);
     juce::AudioBuffer<float> output = getBusBuffer(buffer, false, 0);
     const float EPSILON = 0.0001f;
@@ -172,6 +178,8 @@ void SosciAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
 
     std::unique_ptr<juce::XmlElement> xml = std::make_unique<juce::XmlElement>("project");
     xml->setAttribute("version", ProjectInfo::versionString);
+
+    saveStandaloneProjectFilePathToXml(*xml);
     auto effectsXml = xml->createNewChildElement("effects");
     for (auto effect : effects) {
         effect->save(effectsXml->createNewChildElement("effect"));
@@ -219,6 +227,8 @@ void SosciAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
     }
 
     if (xml.get() != nullptr && xml->hasTagName("project")) {
+        restoreStandaloneProjectFilePathFromXml(*xml);
+
         juce::SpinLock::ScopedLockType lock2(effectsLock);
 
         auto effectsXml = xml->getChildByName("effects");

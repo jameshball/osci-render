@@ -122,8 +122,9 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     booleanParameters.push_back(animationSyncBPM);
     booleanParameters.push_back(invertImage);
 
+    floatParameters.push_back(delayTime);
     floatParameters.push_back(attackTime);
-    floatParameters.push_back(attackLevel);
+    floatParameters.push_back(holdTime);
     floatParameters.push_back(attackShape);
     floatParameters.push_back(decayTime);
     floatParameters.push_back(decayShape);
@@ -134,15 +135,19 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     floatParameters.push_back(animationOffset);
 
     for (int i = 0; i < voices->getValueUnnormalised(); i++) {
-        synth.addVoice(new ShapeVoice(*this, inputBuffer));
+        uiVoiceActive[i].store(false, std::memory_order_relaxed);
+        uiVoiceEnvelopeTimeSeconds[i].store(0.0, std::memory_order_relaxed);
+        synth.addVoice(new ShapeVoice(*this, inputBuffer, i));
     }
 
     intParameters.push_back(voices);
+    intParameters.push_back(fileSelect);
 
     voices->addListener(this);
     attackTime->addListener(this);
-    attackLevel->addListener(this);
     attackShape->addListener(this);
+    delayTime->addListener(this);
+    holdTime->addListener(this);
     decayTime->addListener(this);
     decayShape->addListener(this);
     sustainLevel->addListener(this);
@@ -154,6 +159,10 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     }
 
     synth.addSound(defaultSound);
+
+    activeShapeSound.store(defaultSound.get(), std::memory_order_release);
+
+    fileSelectionNotifier = std::make_unique<FileSelectionAsyncNotifier>(*this);
 
     addAllParameters();
 }
@@ -167,10 +176,63 @@ OscirenderAudioProcessor::~OscirenderAudioProcessor() {
     sustainLevel->removeListener(this);
     decayShape->removeListener(this);
     decayTime->removeListener(this);
+    holdTime->removeListener(this);
+    delayTime->removeListener(this);
     attackShape->removeListener(this);
-    attackLevel->removeListener(this);
     attackTime->removeListener(this);
     voices->removeListener(this);
+}
+
+// parsersLock AND effectsLock must be held when calling this
+void OscirenderAudioProcessor::applyFileSelectLocked() {
+    const int previousFileIndex = currentFile.load();
+    auto* previousSound = activeShapeSound.load(std::memory_order_acquire);
+
+    ShapeSound* selectedSound = nullptr;
+
+    if (objectServerRendering.load()) {
+        selectedSound = objectServerSound.get();
+        activeShapeSound.store(selectedSound, std::memory_order_release);
+        currentFile.store(-1);
+    } else {
+        const int fileCount = (int)fileBlocks.size();
+
+        // 1-based mapping: 1 -> first file (index 0), 2 -> second file (index 1), ...
+        const int requestedParamValue = juce::jlimit(1, 100, (int)fileSelect->getValueUnnormalised());
+        const int requestedIndex = requestedParamValue - 1;
+
+        int targetFileIndex = -1;
+        if (fileCount <= 0) {
+            targetFileIndex = -1;
+        } else {
+            const int maxIndex = fileCount - 1;
+            targetFileIndex = juce::jlimit(0, maxIndex, requestedIndex);
+        }
+
+        currentFile.store(targetFileIndex);
+        selectedSound = targetFileIndex >= 0 ? sounds[(size_t)targetFileIndex].get() : defaultSound.get();
+        activeShapeSound.store(selectedSound, std::memory_order_release);
+    }
+
+    assert(selectedSound != nullptr);
+
+    const int newFileIndex = currentFile.load();
+    const bool selectionChanged = (newFileIndex != previousFileIndex) || (selectedSound != previousSound);
+    if (!selectionChanged || selectedSound == nullptr) {
+        return;
+    }
+
+    for (int i = 0; i < synth.getNumVoices(); i++) {
+        auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
+        if (voice != nullptr) {
+            voice->updateSound(selectedSound);
+        }
+    }
+
+    // Safe to call from the audio thread; AsyncUpdater will deliver on message thread.
+    if (fileSelectionNotifier != nullptr) {
+        fileSelectionNotifier->triggerAsyncUpdate();
+    }
 }
 
 void OscirenderAudioProcessor::setAudioThreadCallback(std::function<void(const juce::AudioBuffer<float>&)> callback) {
@@ -357,14 +419,21 @@ void OscirenderAudioProcessor::changeCurrentFile(int index) {
     }
     currentFile = index;
     changeSound(sounds[index]);
+
+    // Keep fileSelect parameter in sync with UI-driven file selection.
+    const int value = juce::jlimit(1, 100, index + 1);
+    fileSelect->setUnnormalisedValueNotifyingHost((float)value);
 }
 
 void OscirenderAudioProcessor::changeSound(ShapeSound::Ptr sound) {
-    if (!objectServerRendering || sound == objectServerSound) {
-        synth.clearSounds();
-        synth.addSound(sound);
-        for (int i = 0; i < synth.getNumVoices(); i++) {
-            auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
+    if (objectServerRendering && sound != objectServerSound) {
+        return;
+    }
+
+    activeShapeSound.store(sound.get(), std::memory_order_release);
+    for (int i = 0; i < synth.getNumVoices(); i++) {
+        auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
+        if (voice != nullptr) {
             voice->updateSound(sound.get());
         }
     }
@@ -410,6 +479,7 @@ std::shared_ptr<juce::MemoryBlock> OscirenderAudioProcessor::getFileBlock(int in
 void OscirenderAudioProcessor::setObjectServerRendering(bool enabled) {
     {
         juce::SpinLock::ScopedLockType lock1(parsersLock);
+        juce::SpinLock::ScopedLockType lock2(effectsLock);
 
         objectServerRendering = enabled;
         if (enabled) {
@@ -466,6 +536,7 @@ void OscirenderAudioProcessor::applyToggleableEffectsToBuffer(
     juce::AudioBuffer<float>* externalInput,
     juce::AudioBuffer<float>* volumeBuffer,
     juce::AudioBuffer<float>* frequencyBuffer,
+    juce::AudioBuffer<float>* frameSyncBuffer,
     const std::unordered_map<juce::String, std::shared_ptr<osci::SimpleEffect>>* perVoiceEffects,
     const std::shared_ptr<osci::Effect>& previewEffectInstance) {
     juce::MidiBuffer emptyMidi;
@@ -496,7 +567,7 @@ void OscirenderAudioProcessor::applyToggleableEffectsToBuffer(
         if (externalInput != nullptr && globalEffect->getId() == custom->getId()) {
             extInput = externalInput;
         }
-        effectInstance->processBlockWithInputs(buffer, emptyMidi, extInput, volumeBuffer, frequencyBuffer);
+        effectInstance->processBlockWithInputs(buffer, emptyMidi, extInput, volumeBuffer, frequencyBuffer, frameSyncBuffer);
     }
 
     if (previewEffectInstance != nullptr) {
@@ -509,13 +580,20 @@ void OscirenderAudioProcessor::applyToggleableEffectsToBuffer(
             if (externalInput != nullptr && previewEffectInstance->getId() == custom->getId()) {
                 extInput = externalInput;
             }
-            previewEffectInstance->processBlockWithInputs(buffer, emptyMidi, extInput, volumeBuffer, frequencyBuffer);
+            previewEffectInstance->processBlockWithInputs(buffer, emptyMidi, extInput, volumeBuffer, frequencyBuffer, frameSyncBuffer);
         }
     }
 }
 
 void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
     juce::ScopedNoDenormals noDenormals;
+
+    if (isOfflineRenderActive()) {
+        midiMessages.clear();
+        buffer.clear();
+        return;
+    }
+
     // Audio info variables
     int totalNumInputChannels = getTotalNumInputChannels();
     int totalNumOutputChannels = getTotalNumOutputChannels();
@@ -619,9 +697,6 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     // Only animate effects that are enabled or being previewed (animation is expensive!)
     {
         juce::SpinLock::ScopedLockType lock(effectsLock);
-        if (adsrNeedsUpdate.exchange(false, std::memory_order_acq_rel)) {
-            adsrEnv = buildAdsrEnvFromParameters();
-        }
         for (auto& effect : toggleableEffects) {
             const bool isEnabled = effect->enabled != nullptr && effect->enabled->getBoolValue();
             const bool isPreviewed = (effect == previewEffect);
@@ -674,11 +749,15 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             inputFrequencyBuffer.setSize(1, numSamples, false, false, true);
             juce::FloatVectorOperations::fill(inputFrequencyBuffer.getWritePointer(0), (float)frequency.load(), numSamples);
 
-            applyToggleableEffectsToBuffer(outputBuffer3d, &inputBuffer, &currentVolumeBuffer, &inputFrequencyBuffer, nullptr, previewEffect);
+                        applyToggleableEffectsToBuffer(outputBuffer3d, &inputBuffer, &currentVolumeBuffer, &inputFrequencyBuffer, nullptr, nullptr, previewEffect);
 		}
     } else {
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
+
+        // Apply file selection on the audio thread (among already-loaded files)
+        applyFileSelectLocked();
+
         synth.renderNextBlock(outputBuffer3d, midiMessages, 0, buffer.getNumSamples());
     }
 
@@ -720,6 +799,12 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     {
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
+
+        // If we're in audio-input mode, the synth path above didn't run, but we still
+        // want file selection to affect Lua/custom processing on the audio thread.
+        if (usingInput) {
+            applyFileSelectLocked();
+        }
 
         // Note: toggleableEffects/previewEffect are applied via shared helper:
         // - per-voice when using the synth path
@@ -799,6 +884,8 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
 
     std::unique_ptr<juce::XmlElement> xml = std::make_unique<juce::XmlElement>("project");
     xml->setAttribute("version", ProjectInfo::versionString);
+
+    saveStandaloneProjectFilePathToXml(*xml);
     auto effectsXml = xml->createNewChildElement("effects");
     for (auto effect : effects) {
         effect->save(effectsXml->createNewChildElement("effect"));
@@ -864,6 +951,8 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
     }
 
     if (xml.get() != nullptr && xml->hasTagName("project")) {
+        restoreStandaloneProjectFilePathFromXml(*xml);
+
         auto versionXml = xml->getChildByName("version");
         if (versionXml != nullptr && versionXml->getAllSubText().startsWith("v1.")) {
             // this is an old version of osci-render, ignore it
@@ -914,8 +1003,6 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
                 }
             }
         }
-
-        adsrEnv = buildAdsrEnvFromParameters();
 
         auto customFunction = xml->getChildByName("customFunction");
         if (customFunction == nullptr) {
@@ -986,135 +1073,38 @@ void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float n
         if (numVoices != synth.getNumVoices()) {
             if (numVoices > synth.getNumVoices()) {
                 for (int i = synth.getNumVoices(); i < numVoices; i++) {
-                    synth.addVoice(new ShapeVoice(*this, inputBuffer));
+                    uiVoiceActive[i].store(false, std::memory_order_relaxed);
+                    uiVoiceEnvelopeTimeSeconds[i].store(0.0, std::memory_order_relaxed);
+                    synth.addVoice(new ShapeVoice(*this, inputBuffer, i));
                 }
             } else {
                 for (int i = synth.getNumVoices() - 1; i >= numVoices; i--) {
+                    uiVoiceActive[i].store(false, std::memory_order_relaxed);
+                    uiVoiceEnvelopeTimeSeconds[i].store(0.0, std::memory_order_relaxed);
                     synth.removeVoice(i);
                 }
             }
         }
     }
 
-    if (parameterIndex == attackTime->getParameterIndex()
-        || parameterIndex == attackLevel->getParameterIndex()
-        || parameterIndex == attackShape->getParameterIndex()
-        || parameterIndex == decayTime->getParameterIndex()
-        || parameterIndex == decayShape->getParameterIndex()
-        || parameterIndex == sustainLevel->getParameterIndex()
-        || parameterIndex == releaseTime->getParameterIndex()
-        || parameterIndex == releaseShape->getParameterIndex()) {
-        adsrNeedsUpdate.store(true, std::memory_order_release);
-    }
+    // Envelope UI listens to these parameters.
 }
 
 void OscirenderAudioProcessor::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
 
-void updateIfApproxEqual(osci::FloatParameter* parameter, float newValue) {
-    if (std::abs(parameter->getValueUnnormalised() - newValue) > 0.0001) {
-        parameter->setUnnormalisedValueNotifyingHost(newValue);
-    }
-}
-
-void OscirenderAudioProcessor::resetActiveAdsrGestures() {
-    for (auto* parameter : activeAdsrGestureParameters) {
-        if (parameter != nullptr) {
-            parameter->endChangeGesture();
-        }
-    }
-    activeAdsrGestureParameters.clear();
-}
-
-void OscirenderAudioProcessor::beginAdsrGesturesForEnvelope(EnvelopeComponent* changedEnvelope) {
-    if (changedEnvelope == nullptr || !changedEnvelope->getAdsrMode()) {
-        return;
-    }
-
-    resetActiveAdsrGestures();
-
-    auto addGestureParam = [this](osci::FloatParameter* parameter) {
-        if (parameter != nullptr) {
-            activeAdsrGestureParameters.push_back(parameter);
-        }
+DahdsrParams OscirenderAudioProcessor::getCurrentDahdsrParams() const
+{
+    return DahdsrParams{
+        .delaySeconds = delayTime->getValueUnnormalised(),
+        .attackSeconds = attackTime->getValueUnnormalised(),
+        .holdSeconds = holdTime->getValueUnnormalised(),
+        .decaySeconds = decayTime->getValueUnnormalised(),
+        .sustainLevel = sustainLevel->getValueUnnormalised(),
+        .releaseSeconds = releaseTime->getValueUnnormalised(),
+        .attackCurve = attackShape->getValueUnnormalised(),
+        .decayCurve = decayShape->getValueUnnormalised(),
+        .releaseCurve = releaseShape->getValueUnnormalised(),
     };
-
-    if (auto* curveHandle = changedEnvelope->getActiveCurveHandle()) {
-        const int index = changedEnvelope->getHandleIndex(curveHandle);
-        if (index == 1) {
-            addGestureParam(attackShape);
-        } else if (index == 2) {
-            addGestureParam(decayShape);
-        } else if (index == 3) {
-            addGestureParam(releaseShape);
-        }
-    } else if (auto* handle = changedEnvelope->getActiveHandle()) {
-        const int index = changedEnvelope->getHandleIndex(handle);
-        if (index == 1) {
-            addGestureParam(attackTime);
-            addGestureParam(attackLevel);
-        } else if (index == 2) {
-            addGestureParam(decayTime);
-            addGestureParam(sustainLevel);
-        } else if (index == 3) {
-            addGestureParam(releaseTime);
-        }
-    }
-
-    for (auto* parameter : activeAdsrGestureParameters) {
-        parameter->beginChangeGesture();
-    }
-}
-
-Env OscirenderAudioProcessor::buildAdsrEnvFromParameters() const {
-    return Env(
-        {
-            0.0,
-            attackLevel->getValueUnnormalised(),
-            sustainLevel->getValueUnnormalised(),
-            0.0
-        },
-        {
-            attackTime->getValueUnnormalised(),
-            decayTime->getValueUnnormalised(),
-            releaseTime->getValueUnnormalised()
-        },
-        std::vector<EnvCurve>{
-            attackShape->getValueUnnormalised(),
-            decayShape->getValueUnnormalised(),
-            releaseShape->getValueUnnormalised()
-        },
-        2
-    );
-}
-
-void OscirenderAudioProcessor::envelopeChanged(EnvelopeComponent* changedEnvelope) {
-    Env env = changedEnvelope->getEnv();
-    std::vector<double> levels = env.getLevels();
-    std::vector<double> times = env.getTimes();
-    EnvCurveList curves = env.getCurves();
-
-    if (levels.size() == 4 && times.size() == 3 && curves.size() == 3) {
-        {
-            juce::SpinLock::ScopedLockType lock(effectsLock);
-            this->adsrEnv = env;
-        }
-        updateIfApproxEqual(attackTime, times[0]);
-        updateIfApproxEqual(attackLevel, levels[1]);
-        updateIfApproxEqual(attackShape, curves[0].getCurve());
-        updateIfApproxEqual(decayTime, times[1]);
-        updateIfApproxEqual(sustainLevel, levels[2]);
-        updateIfApproxEqual(decayShape, curves[1].getCurve());
-        updateIfApproxEqual(releaseTime, times[2]);
-        updateIfApproxEqual(releaseShape, curves[2].getCurve());
-    }
-}
-
-void OscirenderAudioProcessor::envelopeStartDrag(EnvelopeComponent* changedEnvelope) {
-    beginAdsrGesturesForEnvelope(changedEnvelope);
-}
-
-void OscirenderAudioProcessor::envelopeEndDrag(EnvelopeComponent* changedEnvelope) {
-    resetActiveAdsrGestures();
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {

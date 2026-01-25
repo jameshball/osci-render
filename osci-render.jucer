@@ -176,6 +176,8 @@
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
+        <FILE id="Y1Qska" name="DahdsrEnvelope.h" compile="0" resource="0"
+              file="Source/audio/DahdsrEnvelope.h"/>
         <FILE id="EjkbRe" name="PolygonizerEffect.h" compile="0" resource="0"
               file="Source/audio/PolygonizerEffect.h"/>
         <FILE id="XSUjDz" name="KaleidoscopeEffect.h" compile="0" resource="0"
@@ -343,6 +345,10 @@
               file="Source/components/VolumeComponent.cpp"/>
         <FILE id="MWkfTv" name="VolumeComponent.h" compile="0" resource="0"
               file="Source/components/VolumeComponent.h"/>
+        <FILE id="WHz3FS" name="EnvelopeComponent.cpp" compile="1" resource="0"
+              file="Source/components/EnvelopeComponent.cpp"/>
+        <FILE id="A8OllZ" name="EnvelopeComponent.h" compile="0" resource="0"
+              file="Source/components/EnvelopeComponent.h"/>
       </GROUP>
       <GROUP id="{A3E24187-62A5-AB8D-8837-14043B89A640}" name="gpla">
         <FILE id="KvDV8j" name="LineArtParser.cpp" compile="1" resource="0"
@@ -643,20 +649,6 @@
         <FILE id="vIYWRG" name="TextParser.cpp" compile="1" resource="0" file="Source/txt/TextParser.cpp"/>
         <FILE id="LlefOK" name="TextParser.h" compile="0" resource="0" file="Source/txt/TextParser.h"/>
       </GROUP>
-      <GROUP id="{0C40BD3D-FDE8-D3CD-E1AB-14CA04799E4A}" name="UGen">
-        <FILE id="zfNA3c" name="Env.cpp" compile="1" resource="0" file="Source/UGen/Env.cpp"/>
-        <FILE id="DHCLp1" name="Env.h" compile="0" resource="0" file="Source/UGen/Env.h"/>
-        <FILE id="K4CI4M" name="EnvCurve.cpp" compile="1" resource="0" file="Source/UGen/EnvCurve.cpp"/>
-        <FILE id="w3bgas" name="EnvCurve.h" compile="0" resource="0" file="Source/UGen/EnvCurve.h"/>
-        <FILE id="aBbEWE" name="ugen_JuceEnvelopeComponent.cpp" compile="1"
-              resource="0" file="Source/UGen/ugen_JuceEnvelopeComponent.cpp"/>
-        <FILE id="ayzzMJ" name="ugen_JuceEnvelopeComponent.h" compile="0" resource="0"
-              file="Source/UGen/ugen_JuceEnvelopeComponent.h"/>
-        <FILE id="eOA8hh" name="ugen_JuceUtility.cpp" compile="1" resource="0"
-              file="Source/UGen/ugen_JuceUtility.cpp"/>
-        <FILE id="mC1tUv" name="ugen_JuceUtility.h" compile="0" resource="0"
-              file="Source/UGen/ugen_JuceUtility.h"/>
-      </GROUP>
       <GROUP id="{0F62E77C-5385-0C56-69A1-3C8866A6E6E3}" name="video">
         <FILE id="DniMew" name="FFmpegEncoderManager.cpp" compile="1" resource="0"
               file="Source/video/FFmpegEncoderManager.cpp"/>
@@ -692,6 +684,10 @@
               file="Source/visualiser/RecordingSettings.cpp"/>
         <FILE id="EOcvBc" name="RecordingSettings.h" compile="0" resource="0"
               file="Source/visualiser/RecordingSettings.h"/>
+        <FILE id="oAVr1a" name="OfflineAudioToVideoRenderer.cpp" compile="1"
+              resource="0" file="Source/visualiser/OfflineAudioToVideoRenderer.cpp"/>
+        <FILE id="oAVr1b" name="OfflineAudioToVideoRenderer.h" compile="0"
+              resource="0" file="Source/visualiser/OfflineAudioToVideoRenderer.h"/>
         <FILE id="Gwupwc" name="SimpleFragmentShader.glsl" compile="0" resource="0"
               file="Source/visualiser/SimpleFragmentShader.glsl"/>
         <FILE id="RX1oPv" name="SimpleVertexShader.glsl" compile="0" resource="0"
@@ -773,7 +769,7 @@
     </GROUP>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"
-               JUCE_WEB_BROWSER="0" JUCE_ASIO="1"/>
+               JUCE_WEB_BROWSER="0" JUCE_ASIO="1" JUCE_ENABLE_LIVE_CONSTANT_EDITOR="1"/>
   <EXPORTFORMATS>
     <LINUX_MAKE targetFolder="Builds/osci-render/LinuxMakefile" smallIcon="pSc1mq"
                 bigIcon="pSc1mq" externalLibraries="luajit" extraCompilerFlags="-mavx">

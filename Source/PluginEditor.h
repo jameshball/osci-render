@@ -51,6 +51,8 @@ public:
 
     std::atomic<bool> editingCustomFunction = false;
 
+    bool codeEditorWasVisibleBeforeEditingCustomFunction = false;
+
     SettingsComponent settings{audioProcessor, *this};
 
 #if !OSCI_PREMIUM

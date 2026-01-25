@@ -1,98 +1,126 @@
 #include "LookAndFeel.h"
 #include "components/SwitchButton.h"
+#include "components/EnvelopeComponent.h"
 
 OscirenderLookAndFeel::OscirenderLookAndFeel() {
-    // slider
-    setColour(juce::Slider::thumbColourId, Colours::veryDark);
-    setColour(juce::Slider::textBoxOutlineColourId, Colours::veryDark);
-    setColour(juce::Slider::textBoxBackgroundColourId, Colours::veryDark);
-    setColour(juce::Slider::textBoxHighlightColourId, Colours::accentColor.withMultipliedAlpha(0.5));
-    setColour(juce::Slider::trackColourId, juce::Colours::grey);
-    setColour(juce::Slider::backgroundColourId, Colours::dark);
-    setColour(sliderThumbOutlineColourId, juce::Colours::white);
-
-    // buttons
-    setColour(juce::TextButton::buttonColourId, Colours::veryDark);
-    setColour(jux::SwitchButton::switchColour, juce::Colours::white);
-    setColour(jux::SwitchButton::switchOnBackgroundColour, Colours::accentColor);
-    setColour(jux::SwitchButton::switchOffBackgroundColour, Colours::grey);
-
-    // windows & menus
-    setColour(juce::ResizableWindow::backgroundColourId, Colours::grey);
-    setColour(groupComponentBackgroundColourId, Colours::darker);
-    setColour(scrollFadeOverlayBackgroundColourId, Colours::darker);
-    setColour(groupComponentHeaderColourId, Colours::veryDark);
-    setColour(juce::PopupMenu::backgroundColourId, Colours::darker);
-    setColour(juce::PopupMenu::highlightedBackgroundColourId, Colours::grey);
-    setColour(juce::TooltipWindow::backgroundColourId, Colours::darker.darker(0.5f));
-    setColour(juce::TooltipWindow::outlineColourId, Colours::darker);
-    setColour(juce::TextButton::buttonOnColourId, Colours::darker);
-    setColour(juce::AlertWindow::outlineColourId, Colours::darker);
-    setColour(juce::AlertWindow::backgroundColourId, Colours::darker);
-    setColour(juce::ColourSelector::backgroundColourId, Colours::darker);
-
-    // combo box
-    setColour(juce::ComboBox::backgroundColourId, Colours::veryDark);
-    setColour(juce::ComboBox::outlineColourId, Colours::veryDark);
-    setColour(juce::ComboBox::arrowColourId, juce::Colours::white);
-    
-    // text box
-    setColour(juce::TextEditor::backgroundColourId, Colours::veryDark);
-    setColour(juce::TextEditor::outlineColourId, Colours::veryDark);
-    setColour(juce::TextEditor::focusedOutlineColourId, Colours::accentColor);
-    setColour(juce::CaretComponent::caretColourId, Dracula::foreground);
-    setColour(juce::TextEditor::highlightColourId, Colours::grey);
-
-    // list box
-    setColour(juce::ListBox::backgroundColourId, Colours::darker);
-
-    // scroll bar
-    setColour(juce::ScrollBar::thumbColourId, juce::Colours::white);
-    setColour(juce::ScrollBar::trackColourId, Colours::veryDark);
-    setColour(juce::ScrollBar::backgroundColourId, Colours::veryDark);
-
-    // custom components
-    setColour(effectComponentBackgroundColourId, juce::Colours::transparentBlack);
-    setColour(effectComponentHandleColourId, Colours::veryDark);
-
-    // code editor
-    setColour(juce::CodeEditorComponent::backgroundColourId, Colours::darker);
-    setColour(juce::CodeEditorComponent::defaultTextColourId, Dracula::foreground);
-    setColour(juce::CodeEditorComponent::lineNumberBackgroundId, Colours::veryDark);
-    setColour(juce::CodeEditorComponent::lineNumberTextId, Dracula::foreground);
-    setColour(juce::CodeEditorComponent::highlightColourId, Colours::grey);
-
-    // envelope
-    setColour(EnvelopeComponent::Node, Colours::veryDark);
-    setColour(EnvelopeComponent::ReleaseNode, Colours::veryDark);
-    setColour(EnvelopeComponent::LoopNode, Colours::veryDark);
-    setColour(EnvelopeComponent::NodeOutline, juce::Colours::white);
-    setColour(EnvelopeComponent::Line, juce::Colours::white);
-    setColour(EnvelopeComponent::LoopLine, juce::Colours::white);
-    setColour(EnvelopeComponent::Background, Colours::veryDark);
-    setColour(EnvelopeComponent::GridLine, Colours::dark);
-    setColour(EnvelopeComponent::LegendText, juce::Colours::white);
-    setColour(EnvelopeComponent::LegendBackground, Colours::veryDark);
-    setColour(EnvelopeComponent::LineBackground, juce::Colours::white);
-
-    // midi keyboard
-    setColour(juce::MidiKeyboardComponent::blackNoteColourId, Colours::veryDark);
-    setColour(juce::MidiKeyboardComponent::whiteNoteColourId, juce::Colours::white);
-    setColour(juce::MidiKeyboardComponent::mouseOverKeyOverlayColourId, Colours::accentColor.withAlpha(0.3f));
-    setColour(juce::MidiKeyboardComponent::keyDownOverlayColourId, Colours::accentColor.withAlpha(0.7f));
-    setColour(juce::MidiKeyboardComponent::shadowColourId, juce::Colours::transparentBlack);
-    setColour(juce::MidiKeyboardComponent::upDownButtonBackgroundColourId, Colours::veryDark);
-    setColour(juce::MidiKeyboardComponent::upDownButtonArrowColourId, juce::Colours::white);
-    
-    // progress bar
-    setColour(juce::ProgressBar::backgroundColourId, juce::Colours::transparentBlack);
-    setColour(juce::ProgressBar::foregroundColourId, Colours::accentColor);
+    applyOscirenderColours(*this);
 
     // UI colours
     getCurrentColourScheme().setUIColour(ColourScheme::widgetBackground, Colours::veryDark);
 
     // I have to do this, otherwise components are initialised before the look and feel is set
     juce::LookAndFeel::setDefaultLookAndFeel(this);
+}
+
+void OscirenderLookAndFeel::applyOscirenderColours(juce::LookAndFeel& lookAndFeel) {
+    // slider
+    lookAndFeel.setColour(juce::Slider::thumbColourId, Colours::veryDark);
+    lookAndFeel.setColour(juce::Slider::textBoxOutlineColourId, Colours::veryDark);
+    lookAndFeel.setColour(juce::Slider::textBoxBackgroundColourId, Colours::veryDark);
+    lookAndFeel.setColour(juce::Slider::textBoxHighlightColourId, Colours::accentColor.withMultipliedAlpha(0.5f));
+    lookAndFeel.setColour(juce::Slider::trackColourId, juce::Colours::grey);
+    lookAndFeel.setColour(juce::Slider::backgroundColourId, Colours::dark);
+    lookAndFeel.setColour(sliderThumbOutlineColourId, juce::Colours::white);
+
+    // buttons
+    lookAndFeel.setColour(juce::TextButton::buttonColourId, Colours::veryDark);
+    lookAndFeel.setColour(jux::SwitchButton::switchColour, juce::Colours::white);
+    lookAndFeel.setColour(jux::SwitchButton::switchOnBackgroundColour, Colours::accentColor);
+    lookAndFeel.setColour(jux::SwitchButton::switchOffBackgroundColour, Colours::grey);
+
+    // windows & menus
+    lookAndFeel.setColour(juce::ResizableWindow::backgroundColourId, Colours::grey);
+    lookAndFeel.setColour(groupComponentBackgroundColourId, Colours::darker);
+    lookAndFeel.setColour(scrollFadeOverlayBackgroundColourId, Colours::darker);
+    lookAndFeel.setColour(groupComponentHeaderColourId, Colours::veryDark);
+    lookAndFeel.setColour(juce::PopupMenu::backgroundColourId, Colours::darker);
+    lookAndFeel.setColour(juce::PopupMenu::highlightedBackgroundColourId, Colours::grey);
+    lookAndFeel.setColour(juce::TooltipWindow::backgroundColourId, Colours::darker.darker(0.5f));
+    lookAndFeel.setColour(juce::TooltipWindow::outlineColourId, Colours::darker);
+    lookAndFeel.setColour(juce::TextButton::buttonOnColourId, Colours::darker);
+    lookAndFeel.setColour(juce::AlertWindow::outlineColourId, Colours::darker);
+    lookAndFeel.setColour(juce::AlertWindow::backgroundColourId, Colours::darker);
+    lookAndFeel.setColour(juce::ColourSelector::backgroundColourId, Colours::darker);
+
+    // combo box
+    lookAndFeel.setColour(juce::ComboBox::backgroundColourId, Colours::veryDark);
+    lookAndFeel.setColour(juce::ComboBox::outlineColourId, Colours::veryDark);
+    lookAndFeel.setColour(juce::ComboBox::arrowColourId, juce::Colours::white);
+
+    // text box
+    lookAndFeel.setColour(juce::TextEditor::backgroundColourId, Colours::veryDark);
+    lookAndFeel.setColour(juce::TextEditor::outlineColourId, Colours::veryDark);
+    lookAndFeel.setColour(juce::TextEditor::focusedOutlineColourId, Colours::accentColor);
+    lookAndFeel.setColour(juce::CaretComponent::caretColourId, Dracula::foreground);
+    lookAndFeel.setColour(juce::TextEditor::highlightColourId, Colours::grey);
+
+    // list box
+    lookAndFeel.setColour(juce::ListBox::backgroundColourId, Colours::darker);
+
+    // scroll bar
+    lookAndFeel.setColour(juce::ScrollBar::thumbColourId, juce::Colours::white);
+    lookAndFeel.setColour(juce::ScrollBar::trackColourId, Colours::veryDark);
+    lookAndFeel.setColour(juce::ScrollBar::backgroundColourId, Colours::veryDark);
+
+    // custom components
+    lookAndFeel.setColour(effectComponentBackgroundColourId, juce::Colours::transparentBlack);
+    lookAndFeel.setColour(effectComponentHandleColourId, Colours::veryDark);
+
+    // code editor
+    lookAndFeel.setColour(juce::CodeEditorComponent::backgroundColourId, Colours::darker);
+    lookAndFeel.setColour(juce::CodeEditorComponent::defaultTextColourId, Dracula::foreground);
+    lookAndFeel.setColour(juce::CodeEditorComponent::lineNumberBackgroundId, Colours::veryDark);
+    lookAndFeel.setColour(juce::CodeEditorComponent::lineNumberTextId, Dracula::foreground);
+    lookAndFeel.setColour(juce::CodeEditorComponent::highlightColourId, Colours::grey);
+
+    // envelope
+    lookAndFeel.setColour(EnvelopeComponent::Node, Colours::veryDark);
+    lookAndFeel.setColour(EnvelopeComponent::ReleaseNode, Colours::veryDark);
+    lookAndFeel.setColour(EnvelopeComponent::LoopNode, Colours::veryDark);
+    lookAndFeel.setColour(EnvelopeComponent::NodeOutline, juce::Colours::white);
+    lookAndFeel.setColour(EnvelopeComponent::Line, juce::Colours::white);
+    lookAndFeel.setColour(EnvelopeComponent::LoopLine, juce::Colours::white);
+    lookAndFeel.setColour(EnvelopeComponent::Background, Colours::veryDark);
+    lookAndFeel.setColour(EnvelopeComponent::GridLine, Colours::dark);
+    lookAndFeel.setColour(EnvelopeComponent::LegendText, juce::Colours::white);
+    lookAndFeel.setColour(EnvelopeComponent::LegendBackground, Colours::veryDark);
+    lookAndFeel.setColour(EnvelopeComponent::LineBackground, juce::Colours::white);
+
+    // midi keyboard
+    lookAndFeel.setColour(juce::MidiKeyboardComponent::blackNoteColourId, Colours::veryDark);
+    lookAndFeel.setColour(juce::MidiKeyboardComponent::whiteNoteColourId, juce::Colours::white);
+    lookAndFeel.setColour(juce::MidiKeyboardComponent::mouseOverKeyOverlayColourId, Colours::accentColor.withAlpha(0.3f));
+    lookAndFeel.setColour(juce::MidiKeyboardComponent::keyDownOverlayColourId, Colours::accentColor.withAlpha(0.7f));
+    lookAndFeel.setColour(juce::MidiKeyboardComponent::shadowColourId, juce::Colours::transparentBlack);
+    lookAndFeel.setColour(juce::MidiKeyboardComponent::upDownButtonBackgroundColourId, Colours::veryDark);
+    lookAndFeel.setColour(juce::MidiKeyboardComponent::upDownButtonArrowColourId, juce::Colours::white);
+
+    // progress bar
+    lookAndFeel.setColour(juce::ProgressBar::backgroundColourId, juce::Colours::transparentBlack);
+    lookAndFeel.setColour(juce::ProgressBar::foregroundColourId, Colours::accentColor);
+}
+
+void OscirenderLookAndFeel::drawOscirenderComboBox(juce::Graphics& g, int width, int height, juce::ComboBox& box) {
+    juce::Rectangle<int> boxBounds{0, 0, width, height};
+
+    g.setColour(box.findColour(juce::ComboBox::backgroundColourId));
+    g.fillRoundedRectangle(boxBounds.toFloat(), (float)RECT_RADIUS);
+
+    juce::Rectangle<int> arrowZone{width - 15, 0, 10, height};
+    juce::Path path;
+    path.startNewSubPath((float)arrowZone.getX(), (float)arrowZone.getCentreY() - 3.0f);
+    path.lineTo((float)arrowZone.getCentreX(), (float)arrowZone.getCentreY() + 4.0f);
+    path.lineTo((float)arrowZone.getRight(), (float)arrowZone.getCentreY() - 3.0f);
+    path.closeSubPath();
+
+    g.setColour(box.findColour(juce::ComboBox::arrowColourId).withAlpha(box.isEnabled() ? 1.0f : 0.5f));
+    g.fillPath(path);
+}
+
+void OscirenderLookAndFeel::positionOscirenderComboBoxText(juce::LookAndFeel& lookAndFeel, juce::ComboBox& box, juce::Label& label) {
+    label.setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    label.setBounds(1, 1, box.getWidth() - 15, box.getHeight() - 2);
+    label.setFont(lookAndFeel.getComboBoxFont(box));
 }
 
 void OscirenderLookAndFeel::drawLabel(juce::Graphics& g, juce::Label& label) {
@@ -171,26 +199,11 @@ void OscirenderLookAndFeel::drawTextEditorOutline(juce::Graphics& g, int width, 
 }
 
 void OscirenderLookAndFeel::drawComboBox(juce::Graphics& g, int width, int height, bool, int, int, int, int, juce::ComboBox& box) {
-    juce::Rectangle<int> boxBounds{0, 0, width, height};
-
-    g.setColour(box.findColour(juce::ComboBox::backgroundColourId));
-    g.fillRoundedRectangle(boxBounds.toFloat(), RECT_RADIUS);
-
-    juce::Rectangle<int> arrowZone{width - 15, 0, 10, height};
-    juce::Path path;
-    path.startNewSubPath((float)arrowZone.getX(), (float)arrowZone.getCentreY() - 3.0f);
-    path.lineTo((float)arrowZone.getCentreX(), (float)arrowZone.getCentreY() + 4.0f);
-    path.lineTo((float)arrowZone.getRight(), (float)arrowZone.getCentreY() - 3.0f);
-    path.closeSubPath();
-
-    g.setColour(box.findColour(juce::ComboBox::arrowColourId).withAlpha(box.isEnabled() ? 1.0f : 0.5f));
-    g.fillPath(path);
+    drawOscirenderComboBox(g, width, height, box);
 }
 
 void OscirenderLookAndFeel::positionComboBoxText(juce::ComboBox& box, juce::Label& label) {
-    label.setMouseCursor(juce::MouseCursor::PointingHandCursor);
-    label.setBounds(1, 1, box.getWidth() - 15, box.getHeight() - 2);
-    label.setFont(getComboBoxFont(box));
+    positionOscirenderComboBoxText(*this, box, label);
 }
 
 void OscirenderLookAndFeel::drawTickBox(juce::Graphics& g, juce::Component& component,

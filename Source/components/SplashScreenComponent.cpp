@@ -2,13 +2,11 @@
 
 #include <array>
 
-namespace {
-constexpr int defaultSplashWidth = 640;
-constexpr int defaultSplashHeight = 420;
-}
+static constexpr int kDefaultSplashWidth = 640;
+static constexpr int kDefaultSplashHeight = 420;
 
 SplashScreenComponent::SplashScreenComponent()
-    : juce::SplashScreen("osci-render", defaultSplashWidth, defaultSplashHeight, false) {
+    : juce::SplashScreen("osci-render", kDefaultSplashWidth, kDefaultSplashHeight, false) {
     setOpaque(false);
     setAlwaysOnTop(true);
     setInterceptsMouseClicks(true, true);
