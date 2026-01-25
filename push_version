@@ -1,0 +1,305 @@
+#!/usr/bin/env python3
+"""Bump project/package versions, commit, then push.
+
+Default behavior: bump the 4th version field (build/revision) for both products,
+update packaging versions, commit the changes, then push the current branch
+to its configured upstream.
+
+Usage:
+    ./push_version [--major|--minor|--patch|--build] [--message MSG] [--] [git-push-args...]
+
+Examples:
+  ./push_version
+  ./push_version --patch
+    ./push_version -- --force-with-lease
+
+Notes:
+- Requires a clean working tree.
+- For Windows, run: python push_version (or use push_version.cmd).
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import re
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Iterable, Sequence
+
+REPO_ROOT = Path(__file__).resolve().parent
+
+
+class FatalError(RuntimeError):
+    pass
+
+
+def run_git(args: Sequence[str], *, capture: bool = True) -> str:
+    proc = subprocess.run(
+        ["git", *args],
+        cwd=REPO_ROOT,
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE if capture else None,
+        stderr=subprocess.STDOUT if capture else None,
+        env={**os.environ, "LC_ALL": "C"},
+    )
+    if proc.returncode != 0:
+        raise FatalError(f"git {' '.join(args)} failed (exit {proc.returncode})\n{proc.stdout or ''}")
+    return proc.stdout.strip() if capture else ""
+
+
+@dataclass(frozen=True)
+class Version:
+    major: int
+    minor: int
+    patch: int
+    build: int
+
+    @staticmethod
+    def parse(text: str) -> "Version":
+        parts = text.strip().split(".")
+        if len(parts) != 4:
+            raise FatalError(f"Expected 4-part version like 1.2.3.4, got: {text!r}")
+        try:
+            m, n, p, b = (int(x) for x in parts)
+        except ValueError as e:
+            raise FatalError(f"Version contains non-integers: {text!r}") from e
+        if min(m, n, p, b) < 0:
+            raise FatalError(f"Version parts must be >= 0: {text!r}")
+        return Version(m, n, p, b)
+
+    def bump(self, kind: str) -> "Version":
+        if kind == "major":
+            return Version(self.major + 1, 0, 0, 0)
+        if kind == "minor":
+            return Version(self.major, self.minor + 1, 0, 0)
+        if kind == "patch":
+            return Version(self.major, self.minor, self.patch + 1, 0)
+        if kind == "build":
+            return Version(self.major, self.minor, self.patch, self.build + 1)
+        raise FatalError(f"Unknown bump kind: {kind}")
+
+    def __str__(self) -> str:
+        return f"{self.major}.{self.minor}.{self.patch}.{self.build}"
+
+
+def read_text_preserve_newlines(path: Path) -> str:
+    # Read as UTF-8 (JUCE XML / Inno Setup scripts are UTF-8-friendly here)
+    return path.read_text(encoding="utf-8", newline="")
+
+
+def write_text_preserve_newlines(path: Path, content: str) -> None:
+    path.write_text(content, encoding="utf-8", newline="")
+
+
+_JUCER_VERSION_RE = re.compile(r'(\bversion=")([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)(")')
+
+
+def get_jucer_version(path: Path) -> Version:
+    text = read_text_preserve_newlines(path)
+    m = _JUCER_VERSION_RE.search(text)
+    if not m:
+        raise FatalError(f"Could not find 4-part version attribute in {path}")
+    return Version.parse(m.group(2))
+
+
+def set_jucer_version(path: Path, new_version: Version) -> bool:
+    text = read_text_preserve_newlines(path)
+
+    def _sub(match: re.Match[str]) -> str:
+        return f"{match.group(1)}{new_version}{match.group(3)}"
+
+    new_text, n = _JUCER_VERSION_RE.subn(_sub, text, count=1)
+    if n != 1:
+        raise FatalError(f"Expected to update exactly 1 version attribute in {path}, updated {n}")
+    if new_text != text:
+        write_text_preserve_newlines(path, new_text)
+        return True
+    return False
+
+
+_ISS_VERSION_RE = re.compile(r'(^\s*#define\s+MyAppVersion\s+")([^\"]+)("\s*$)', re.MULTILINE)
+
+
+def set_iss_version(path: Path, new_version: Version) -> bool:
+    text = read_text_preserve_newlines(path)
+
+    def _sub(match: re.Match[str]) -> str:
+        return f"{match.group(1)}{new_version}{match.group(3)}"
+
+    new_text, n = _ISS_VERSION_RE.subn(_sub, text, count=1)
+    if n != 1:
+        raise FatalError(f"Expected to update exactly 1 MyAppVersion in {path}, updated {n}")
+    if new_text != text:
+        write_text_preserve_newlines(path, new_text)
+        return True
+    return False
+
+
+# pkgproj is a plist-ish XML. We only update VERSION string values, not VERSION integers.
+_PKGPROJ_VERSION_STRING_RE = re.compile(
+    r'(<key>VERSION</key>\s*<string>)([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)(</string>)'
+)
+
+
+def set_pkgproj_versions(path: Path, new_version: Version) -> bool:
+    text = read_text_preserve_newlines(path)
+
+    def _sub(match: re.Match[str]) -> str:
+        return f"{match.group(1)}{new_version}{match.group(3)}"
+
+    new_text, n = _PKGPROJ_VERSION_STRING_RE.subn(_sub, text)
+    if n == 0:
+        raise FatalError(f"No <key>VERSION</key><string>... found to update in {path}")
+    if new_text != text:
+        write_text_preserve_newlines(path, new_text)
+        return True
+    return False
+
+
+def ensure_clean_working_tree() -> None:
+    out = run_git(["status", "--porcelain"])
+    if out.strip():
+        raise FatalError(
+            "Working tree is not clean. Commit or stash changes before running push_version.\n"
+            "(This tool makes a version bump commit.)"
+        )
+
+
+def stage_files(paths: Iterable[Path]) -> None:
+    rels = [str(p.relative_to(REPO_ROOT)) for p in paths]
+    run_git(["add", "--", *rels], capture=True)
+
+
+def commit(message: str) -> None:
+    # If nothing staged, fail with a clear message.
+    diff = run_git(["diff", "--cached", "--name-only"])
+    if not diff.strip():
+        raise FatalError("Nothing staged to commit (no version changes?).")
+    run_git(["commit", "-m", message], capture=True)
+
+
+def get_current_branch() -> str:
+    name = run_git(["rev-parse", "--abbrev-ref", "HEAD"]).strip()
+    if name == "HEAD":
+        raise FatalError("Detached HEAD; use --remote/--branch to specify a push target.")
+    return name
+
+
+def has_upstream() -> bool:
+    try:
+        run_git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
+        return True
+    except FatalError:
+        return False
+
+
+def push_current_branch(*, fallback_remote: str, extra_push_args: Sequence[str]) -> None:
+    # If the current branch has an upstream, `git push` with no args is the
+    # most compatible cross-platform behavior.
+    if has_upstream():
+        run_git(["push", *extra_push_args], capture=False)
+        return
+
+    # No upstream set: default to pushing the current branch to origin/<branch>
+    # and setting upstream, so subsequent runs can use plain `git push`.
+    branch = get_current_branch()
+    run_git(["push", *extra_push_args, "--set-upstream", fallback_remote, branch], capture=False)
+
+
+def parse_args(argv: Sequence[str]) -> tuple[argparse.Namespace, list[str]]:
+    parser = argparse.ArgumentParser(prog="push_version", add_help=True)
+    bump = parser.add_mutually_exclusive_group()
+    bump.add_argument("--major", action="store_true", help="Bump major (X+1.0.0.0)")
+    bump.add_argument("--minor", action="store_true", help="Bump minor (X.Y+1.0.0)")
+    bump.add_argument("--patch", action="store_true", help="Bump patch (X.Y.Z+1.0)")
+    bump.add_argument("--build", action="store_true", help="Bump build/revision (X.Y.Z.B+1) [default]")
+
+    parser.add_argument(
+        "--message",
+        default=None,
+        help="Commit message override (default: chore: bump versions ...)",
+    )
+
+    # Allow passing raw git push args after --
+    if "--" in argv:
+        idx = argv.index("--")
+        known = argv[:idx]
+        rest = list(argv[idx + 1 :])
+    else:
+        known = list(argv)
+        rest = []
+
+    ns = parser.parse_args(known)
+    return ns, rest
+
+
+def bump_kind_from_ns(ns: argparse.Namespace) -> str:
+    if ns.major:
+        return "major"
+    if ns.minor:
+        return "minor"
+    if ns.patch:
+        return "patch"
+    # default
+    return "build"
+
+
+def main(argv: Sequence[str]) -> int:
+    ns, extra_push_args = parse_args(list(argv))
+    kind = bump_kind_from_ns(ns)
+
+    ensure_clean_working_tree()
+
+    osci_jucer = REPO_ROOT / "osci-render.jucer"
+    sosci_jucer = REPO_ROOT / "sosci.jucer"
+    osci_iss = REPO_ROOT / "packaging" / "osci-render.iss"
+    sosci_iss = REPO_ROOT / "packaging" / "sosci.iss"
+    osci_pkgproj = REPO_ROOT / "packaging" / "osci-render.pkgproj"
+    sosci_pkgproj = REPO_ROOT / "packaging" / "sosci.pkgproj"
+
+    osci_old = get_jucer_version(osci_jucer)
+    sosci_old = get_jucer_version(sosci_jucer)
+
+    osci_new = osci_old.bump(kind)
+    sosci_new = sosci_old.bump(kind)
+
+    changed: list[Path] = []
+
+    if set_jucer_version(osci_jucer, osci_new):
+        changed.append(osci_jucer)
+    if set_jucer_version(sosci_jucer, sosci_new):
+        changed.append(sosci_jucer)
+
+    if set_iss_version(osci_iss, osci_new):
+        changed.append(osci_iss)
+    if set_iss_version(sosci_iss, sosci_new):
+        changed.append(sosci_iss)
+
+    if set_pkgproj_versions(osci_pkgproj, osci_new):
+        changed.append(osci_pkgproj)
+    if set_pkgproj_versions(sosci_pkgproj, sosci_new):
+        changed.append(sosci_pkgproj)
+
+    stage_files(changed)
+
+    msg = ns.message
+    if not msg:
+        msg = f"chore: bump versions (osci-render {osci_old}->{osci_new}, sosci {sosci_old}->{sosci_new})"
+
+    commit(msg)
+
+    push_current_branch(fallback_remote="origin", extra_push_args=extra_push_args)
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main(sys.argv[1:]))
+    except FatalError as e:
+        print(f"push_version: {e}", file=sys.stderr)
+        return_code = 2
+        raise SystemExit(return_code)
