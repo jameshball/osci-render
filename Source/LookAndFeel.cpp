@@ -1,5 +1,6 @@
 #include "LookAndFeel.h"
 #include "components/SwitchButton.h"
+#include "components/EnvelopeComponent.h"
 
 OscirenderLookAndFeel::OscirenderLookAndFeel() {
     applyOscirenderColours(*this);

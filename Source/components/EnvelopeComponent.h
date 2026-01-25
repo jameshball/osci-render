@@ -42,6 +42,7 @@
 
 #include <JuceHeader.h>
 #include <array>
+#include <memory>
 #include "../audio/DahdsrEnvelope.h"
 
 
@@ -142,12 +143,15 @@ public:
 	void setGrid(const GridMode display, const GridMode quantise, const double domain = 0.0, const double value = 0.0);
 	
 	void paint(juce::Graphics& g);
+	void paintOverChildren(juce::Graphics& g) override;
 	void paintBackground(juce::Graphics& g);
 	void resized();
 	void timerCallback() override;
+	void lookAndFeelChanged() override;
 		
 	void mouseMove         (const juce::MouseEvent& e);
     void mouseEnter        (const juce::MouseEvent& e);
+	void mouseExit         (const juce::MouseEvent& e);
 	void mouseDown         (const juce::MouseEvent& e);
 	void mouseDrag         (const juce::MouseEvent& e);
 	void mouseUp           (const juce::MouseEvent& e);
@@ -156,6 +160,8 @@ public:
 	void sendChangeMessage();
 	void sendStartDrag();
 	void sendEndDrag();
+	void setHoverHandleFromChild(EnvelopeHandleComponent* handle);
+	void clearHoverHandleFromChild(EnvelopeHandleComponent* handle);
 	
     void clear();
     
@@ -220,6 +226,9 @@ public:
 	
 private:
 	static constexpr int kDahdsrNumHandles = 6;
+	class EnvelopeGridRenderer;
+	class EnvelopeFlowTrailRenderer;
+	class EnvelopeInteraction;
 
 	struct ScopedStructuralEdit
 	{
@@ -250,29 +259,25 @@ private:
 	double valueMin, valueMax;
 	double valueGrid, domainGrid;
 	GridMode gridDisplayMode, gridQuantiseMode;
-	EnvelopeHandleComponent* draggingHandle;
-	EnvelopeHandleComponent* adjustingHandle;
 	EnvelopeHandleComponent* activeHandle;
 	EnvelopeHandleComponent* activeCurveHandle;
-	bool adjustable = false;
-	double prevCurveValue = 0.0;
 	int curvePoints;
 
 	int structuralEditDepth = 0;
 
-	int numFlowMarkers = 0;
-	std::vector<double> flowMarkerTimesSeconds;
-	std::vector<double> flowTrailLastSeenMs; // per-x timestamp; 0 means "never"
-	std::vector<float> prevFlowMarkerX;
-	std::vector<char> prevFlowMarkerValid;
-	std::vector<double> prevFlowMarkerTimeSeconds;
-	double flowTrailNewestMs = 0.0;
+	std::unique_ptr<EnvelopeGridRenderer> gridRenderer;
+	std::unique_ptr<EnvelopeFlowTrailRenderer> flowTrailRenderer;
+	std::unique_ptr<EnvelopeInteraction> interaction;
 
-	// Tunables (time-based, independent of envelope domain range)
-	float flowTrailTauMs = 140.0f; // decay time constant
-	float flowTrailMaxAlpha = 0.38f;
-	float flowTrailMaxBridgeTimeSeconds = 0.05f; // don't connect jumps larger than this
-	int flowTrailPaintStepPx = 2; // reduce overdraw in paint()
+	static constexpr double kFlowTrailMaxBridgeTimeSeconds = 0.05; // don't connect jumps larger than this
+	static constexpr float kCurveStrokeThickness = 1.75f;
+	static constexpr float kCurveHandleRadius = 3.0f;
+	static constexpr float kHandleOutlineThickness = kCurveStrokeThickness;
+	static constexpr float kHoverRingRadius = 10.0f;
+	static constexpr float kHoverRingThickness = 1.5f;
+	static constexpr float kHoverOuterRingThickness = 4.5f;
+	static constexpr float kHoverRingAlpha = 0.85f;
+	static constexpr float kHoverOuterRingAlpha = 0.35f;
 };
 
 class EnvelopeLegendComponent : public juce::Component

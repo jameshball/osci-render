@@ -1,7 +1,6 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "envelope/ugen_JuceEnvelopeComponent.h"
 
 enum ColourIds {
     groupComponentBackgroundColourId,

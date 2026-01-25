@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <cmath>
 
 // Centralized constants for audio/MIDI quirks.
 namespace osci_audio
@@ -17,6 +18,29 @@ inline constexpr float kDahdsrTimeStepSeconds = 0.00001f;
 // Envelope time-axis zoom bounds (seconds).
 inline constexpr double kEnvelopeZoomMinSeconds = 0.05;
 inline constexpr double kEnvelopeZoomMaxSeconds = 30.0;
+
+inline float evalCurve01(float curveValue, float pos)
+{
+    pos = juce::jlimit(0.0f, 1.0f, pos);
+
+    if (std::abs(curveValue) <= 0.001f)
+        return pos;
+
+    const float denom = 1.0f - std::exp(curveValue);
+    const float numer = 1.0f - std::exp(pos * curveValue);
+    return (denom != 0.0f) ? (numer / denom) : pos;
+}
+
+inline float lerp(float a, float b, float t) { return a + (b - a) * t; }
+
+inline float evalSegment(float start, float end, double elapsed, double duration, float curve)
+{
+    if (duration <= 0.0)
+        return end;
+    const float pos = (float) juce::jlimit(0.0, 1.0, elapsed / duration);
+    const float shaped = evalCurve01(curve, pos);
+    return lerp(start, end, shaped);
+}
 }
 
 struct DahdsrParams
@@ -86,7 +110,7 @@ public:
                 break;
 
             case Stage::Attack:
-                envValue = evalSegment(0.0f, 1.0f, stageElapsed, params.attackSeconds, params.attackCurve);
+                envValue = osci_audio::evalSegment(0.0f, 1.0f, stageElapsed, params.attackSeconds, params.attackCurve);
                 stageElapsed += dtSeconds;
                 if (stageElapsed >= params.attackSeconds)
                 {
@@ -106,7 +130,7 @@ public:
                 break;
 
             case Stage::Decay:
-                envValue = evalSegment(1.0f, (float) params.sustainLevel, stageElapsed, params.decaySeconds, params.decayCurve);
+                envValue = osci_audio::evalSegment(1.0f, (float) params.sustainLevel, stageElapsed, params.decaySeconds, params.decayCurve);
                 stageElapsed += dtSeconds;
                 if (stageElapsed >= params.decaySeconds)
                 {
@@ -120,7 +144,7 @@ public:
                 break;
 
             case Stage::Release:
-                envValue = evalSegment(releaseStartValue, 0.0f, stageElapsed, params.releaseSeconds, params.releaseCurve);
+                envValue = osci_audio::evalSegment(releaseStartValue, 0.0f, stageElapsed, params.releaseSeconds, params.releaseCurve);
                 stageElapsed += dtSeconds;
                 if (stageElapsed >= params.releaseSeconds)
                 {
@@ -165,29 +189,6 @@ public:
     float getCurrentValue() const { return currentValue; }
 
 private:
-    static inline float evalCurve01(float curveValue, float pos)
-    {
-        pos = juce::jlimit(0.0f, 1.0f, pos);
-
-        if (std::abs(curveValue) <= 0.001f)
-            return pos;
-
-        const float denom = 1.0f - std::exp(curveValue);
-        const float numer = 1.0f - std::exp(pos * curveValue);
-        return (denom != 0.0f) ? (numer / denom) : pos;
-    }
-
-    static inline float lerp(float a, float b, float t) { return a + (b - a) * t; }
-
-    static inline float evalSegment(float start, float end, double elapsed, double duration, float curve)
-    {
-        if (duration <= 0.0)
-            return end;
-        const float pos = (float) juce::jlimit(0.0, 1.0, elapsed / duration);
-        const float shaped = evalCurve01(curve, pos);
-        return lerp(start, end, shaped);
-    }
-
     DahdsrParams params;
     Stage stage = Stage::Delay;
     double stageElapsed = 0.0;
