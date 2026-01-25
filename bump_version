@@ -95,12 +95,14 @@ class Version:
 
 
 def read_text_preserve_newlines(path: Path) -> str:
-    # Read as UTF-8 (JUCE XML / Inno Setup scripts are UTF-8-friendly here)
-    return path.read_text(encoding="utf-8", newline="")
+    # Read as UTF-8 while preserving newlines exactly as-is.
+    with path.open("r", encoding="utf-8", newline="") as f:
+        return f.read()
 
 
 def write_text_preserve_newlines(path: Path, content: str) -> None:
-    path.write_text(content, encoding="utf-8", newline="")
+    with path.open("w", encoding="utf-8", newline="") as f:
+        f.write(content)
 
 
 _JUCER_VERSION_RE = re.compile(r'(\bversion=")([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)(")')
