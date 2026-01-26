@@ -153,6 +153,7 @@ public:
     void mouseEnter        (const juce::MouseEvent& e);
 	void mouseExit         (const juce::MouseEvent& e);
 	void mouseDown         (const juce::MouseEvent& e);
+	void mouseDoubleClick  (const juce::MouseEvent& e) override;
 	void mouseDrag         (const juce::MouseEvent& e);
 	void mouseUp           (const juce::MouseEvent& e);
 	void mouseWheelMove    (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;

@@ -521,6 +521,28 @@ public:
 		}
 	}
 
+	void mouseDoubleClick(const juce::MouseEvent& e)
+	{
+		EnvelopeHandleComponent* nearestNode = nullptr;
+		float nearestNodeDist = 0.0f;
+		int nearestCurve = -1;
+		float nearestCurveDist = 0.0f;
+		getClosestTargets(e.getPosition(), nearestNode, nearestNodeDist, nearestCurve, nearestCurveDist);
+
+		if (nearestCurve < 1 || nearestCurveDist > nearestNodeDist)
+			return;
+
+		auto* curveHandle = env.handles.getUnchecked(nearestCurve);
+		env.setActiveCurveHandle(curveHandle);
+		env.setActiveHandle(nullptr);
+		env.sendStartDrag();
+		curveHandle->setCurve(0.0f);
+		env.sendChangeMessage();
+		env.sendEndDrag();
+		env.setActiveCurveHandle(nullptr);
+		env.setMouseCursor(juce::MouseCursor::NormalCursor);
+	}
+
 	void mouseDrag(const juce::MouseEvent& e)
 	{
 		if (activeCurveHandleIndex >= 1 && activeCurveHandleIndex < env.handles.size())
@@ -1588,6 +1610,12 @@ void EnvelopeComponent::mouseDown(const juce::MouseEvent& e)
 #endif
 	if (interaction)
 		interaction->mouseDown(e);
+}
+
+void EnvelopeComponent::mouseDoubleClick(const juce::MouseEvent& e)
+{
+	if (interaction)
+		interaction->mouseDoubleClick(e);
 }
 
 void EnvelopeComponent::mouseDrag(const juce::MouseEvent& e)
