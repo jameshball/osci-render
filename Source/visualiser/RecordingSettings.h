@@ -45,6 +45,7 @@ public:
         "brightness",
         VERSION_HINT, 0.7, 0.0, 1.0
     );
+    osci::BooleanParameter losslessAudio = osci::BooleanParameter("Lossless Audio", "losslessAudio", VERSION_HINT, false, "Record video in a lossless format. TODO precedence w vp9");
     osci::BooleanParameter losslessVideo = osci::BooleanParameter("Lossless Video", "losslessVideo", VERSION_HINT, false, "Record video in a lossless format. WARNING: This is not supported by all media players.");
     std::shared_ptr<osci::Effect> qualityEffect = std::make_shared<osci::SimpleEffect>(&qualityParameter);
 
@@ -92,6 +93,9 @@ public:
     // opt to not change any values if not found
     void load(juce::XmlElement* xml) {
         if (auto* settingsXml = xml->getChildByName("recordingSettings")) {
+            if (auto* losslessAudioXml = settingsXml->getChildByName("losslessAudio")) {
+                losslessAudio.load(losslessAudioXml);
+            }
             if (auto* losslessVideoXml = settingsXml->getChildByName("losslessVideo")) {
                 losslessVideo.load(losslessVideoXml);
             }
@@ -179,13 +183,37 @@ public:
         switch (parameters.videoCodec) {
 #if JUCE_MAC
             case VideoCodec::ProRes:
-                return "mov";
 #endif
             case VideoCodec::H264:
             case VideoCodec::H265:
+                return "mov";
             case VideoCodec::VP9:
             default:
                 return "mp4";
+        }
+    }
+
+    juce::String getAudioCodecSettings()
+    {
+        bool canRecordLossless = false;
+        if (parameters.losslessAudio.getBoolValue()) {
+            switch (parameters.videoCodec) {
+                #if JUCE_MAC
+                case VideoCodec::ProRes:
+                    #endif
+                case VideoCodec::H264:
+                case VideoCodec::H265:
+                    canRecordLossless = true;
+                    break;
+                case VideoCodec::VP9:
+                default:
+                    canRecordLossless = false;
+            }
+        }
+        if (canRecordLossless) {
+            return "-c:a pcm_s16le";
+        } else {
+            return "-c:a aac -b:a 384k";
         }
     }
 
@@ -196,6 +224,7 @@ private:
     EffectComponent resolution{*parameters.resolutionEffect};
     EffectComponent frameRate{*parameters.frameRateEffect};
 
+    jux::SwitchButton losslessAudio{ &parameters.losslessAudio };
     jux::SwitchButton losslessVideo{&parameters.losslessVideo};
     jux::SwitchButton recordAudio{&parameters.recordAudio};
     jux::SwitchButton recordVideo{&parameters.recordVideo};

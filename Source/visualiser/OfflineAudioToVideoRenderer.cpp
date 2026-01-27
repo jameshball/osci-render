@@ -41,7 +41,7 @@ bool OfflineAudioToVideoRendererComponent::runFfmpegMux(const juce::File& ffmpeg
     args.addArray({"-i", videoInput.getFullPathName()});
     args.addArray({"-i", audioInput.getFullPathName()});
     args.addArray({"-c:v", "copy"});
-    args.addArray({"-c:a", "aac"});
+    args.addArray({"-c:a", "aac"}); // TODO incorporate lossless audio changes
     args.addArray({"-b:a", "384k"});
     args.addArray({"-shortest"});
     args.addArray({"-y", output.getFullPathName()});
