@@ -128,10 +128,10 @@
   </MODULES>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1"/>
   <EXPORTFORMATS>
-    <LINUX_MAKE targetFolder="Builds/Test/LinuxMakefile" extraCompilerFlags="-mavx">
+            <LINUX_MAKE targetFolder="Builds/Test/LinuxMakefile">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render-test" customXcodeFlags="CLANG_X86_VECTOR_INSTRUCTIONS=avx"/>
-        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render-test" customXcodeFlags="CLANG_X86_VECTOR_INSTRUCTIONS=avx"/>
+                        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render-test"/>
+                        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render-test"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
@@ -148,7 +148,7 @@
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
-    <VS2022 targetFolder="Builds/Test/VisualStudio2022" extraCompilerFlags="/arch:AVX">
+            <VS2022 targetFolder="Builds/Test/VisualStudio2022">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render-test"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="osci-render-test"/>
