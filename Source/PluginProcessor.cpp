@@ -199,6 +199,32 @@ void OscirenderAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
     }
 }
 
+void OscirenderAudioProcessor::renderNextBlockWithSynth(juce::AudioBuffer<float>& outputBuffer3d, juce::MidiBuffer& midiMessages, int numSamples) {
+    juce::SpinLock::ScopedLockType lock1(parsersLock);
+    juce::SpinLock::ScopedLockType lock2(effectsLock);
+    synth.renderNextBlock(outputBuffer3d, midiMessages, 0, numSamples);
+}
+
+void OscirenderAudioProcessor::applyDirectBufferGlobalEffects(juce::AudioBuffer<float>& outputBuffer3d, const juce::MidiBuffer& midiMessages, int totalNumInputChannels, int numSamples) {
+    // Keep synth MIDI state in sync even when not using synth voices
+    auto midiIterator = midiMessages.cbegin();
+    std::for_each(midiIterator,
+        midiMessages.cend(),
+        [&] (const juce::MidiMessageMetadata& meta) { synth.publicHandleMidiEvent(meta.getMessage()); }
+    );
+
+    // Apply toggleable effects directly (no synth voices involved)
+    {
+        juce::SpinLock::ScopedLockType lock(effectsLock);
+
+        inputFrequencyBuffer.setSize(1, numSamples, false, false, true);
+        juce::FloatVectorOperations::fill(inputFrequencyBuffer.getWritePointer(0), (float)frequency.load(), numSamples);
+
+        juce::AudioBuffer<float>* extInput = (totalNumInputChannels >= 1) ? &inputBuffer : nullptr;
+        applyToggleableEffectsToBuffer(outputBuffer3d, extInput, &currentVolumeBuffer, &inputFrequencyBuffer, nullptr, previewEffect);
+    }
+}
+
 // effectsLock should be held when calling this
 void OscirenderAudioProcessor::addLuaSlider() {
     juce::String sliderName = "";
@@ -640,8 +666,11 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     juce::AudioBuffer<float> outputBuffer3d = juce::AudioBuffer<float>(3, buffer.getNumSamples());
     outputBuffer3d.clear();
 
+    bool usesDirectBufferPath = false;
+
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
     if (syphonInputActive) {
+        usesDirectBufferPath = true;
         for (int sample = 0; sample < outputBuffer3d.getNumSamples(); sample++) {
             osci::Point point = syphonImageParser.getSample();
             outputBuffer3d.setSample(0, sample, point.x);
@@ -650,6 +679,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     } else
 #endif
     if (usingInput && totalNumInputChannels >= 1) {
+        usesDirectBufferPath = true;
         if (totalNumInputChannels >= 2) {
             for (auto channel = 0; channel < juce::jmin(2, totalNumInputChannels); channel++) {
                 outputBuffer3d.copyFrom(channel, 0, inputBuffer, channel, 0, buffer.getNumSamples());
@@ -659,27 +689,13 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             outputBuffer3d.copyFrom(0, 0, inputBuffer, 0, 0, buffer.getNumSamples());
             outputBuffer3d.copyFrom(1, 0, inputBuffer, 0, 0, buffer.getNumSamples());
         }
-
-        // handle all midi messages
-        auto midiIterator = midiMessages.cbegin();
-        std::for_each(midiIterator,
-            midiMessages.cend(),
-            [&] (const juce::MidiMessageMetadata& meta) { synth.publicHandleMidiEvent(meta.getMessage()); }
-        );
-
-		// Apply toggleable effects directly in input mode (no synth voices involved)
-		{
-			juce::SpinLock::ScopedLockType lock(effectsLock);
-
-            inputFrequencyBuffer.setSize(1, numSamples, false, false, true);
-            juce::FloatVectorOperations::fill(inputFrequencyBuffer.getWritePointer(0), (float)frequency.load(), numSamples);
-
-            applyToggleableEffectsToBuffer(outputBuffer3d, &inputBuffer, &currentVolumeBuffer, &inputFrequencyBuffer, nullptr, previewEffect);
-		}
     } else {
-        juce::SpinLock::ScopedLockType lock1(parsersLock);
-        juce::SpinLock::ScopedLockType lock2(effectsLock);
-        synth.renderNextBlock(outputBuffer3d, midiMessages, 0, buffer.getNumSamples());
+        renderNextBlockWithSynth(outputBuffer3d, midiMessages, numSamples);
+    }
+
+    // Direct buffer path (input mode) - apply effects globally
+    if (usesDirectBufferPath) {
+        applyDirectBufferGlobalEffects(outputBuffer3d, midiMessages, totalNumInputChannels, numSamples);
     }
 
     midiMessages.clear();
