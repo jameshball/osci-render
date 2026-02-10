@@ -195,22 +195,7 @@ public:
 
     juce::String getAudioCodecSettings()
     {
-        bool canRecordLossless = false;
         if (parameters.losslessAudio.getBoolValue()) {
-            switch (parameters.videoCodec) {
-                #if JUCE_MAC
-                case VideoCodec::ProRes:
-                    #endif
-                case VideoCodec::H264:
-                case VideoCodec::H265:
-                    canRecordLossless = true;
-                    break;
-                case VideoCodec::VP9:
-                default:
-                    canRecordLossless = false;
-            }
-        }
-        if (canRecordLossless) {
             return "-c:a pcm_s16le";
         } else {
             return "-c:a aac -b:a 384k";
@@ -224,7 +209,7 @@ private:
     EffectComponent resolution{*parameters.resolutionEffect};
     EffectComponent frameRate{*parameters.frameRateEffect};
 
-    jux::SwitchButton losslessAudio{ &parameters.losslessAudio };
+    jux::SwitchButton losslessAudio{&parameters.losslessAudio};
     jux::SwitchButton losslessVideo{&parameters.losslessVideo};
     jux::SwitchButton recordAudio{&parameters.recordAudio};
     jux::SwitchButton recordVideo{&parameters.recordVideo};

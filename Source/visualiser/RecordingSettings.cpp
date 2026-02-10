@@ -7,6 +7,7 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
     addAndMakeVisible(quality);
     addAndMakeVisible(resolution);
     addAndMakeVisible(frameRate);
+    addAndMakeVisible(losslessAudio);
     addAndMakeVisible(losslessVideo);
     addAndMakeVisible(recordAudio);
     addAndMakeVisible(recordVideo);
@@ -52,6 +53,13 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
     videoCodecSelector.setSelectedId(static_cast<int>(parameters.videoCodec) + 1);
     videoCodecSelector.onChange = [this] {
         parameters.videoCodec = static_cast<VideoCodec>(videoCodecSelector.getSelectedId() - 1);
+        if (parameters.videoCodec == VideoCodec::VP9) {
+            losslessAudio.setToggleState(false, juce::NotificationType::sendNotification);
+            losslessAudio.setEnabled(false);
+
+        } else {
+            losslessAudio.setEnabled(true);
+        }
     };
     videoCodecLabel.setTooltip("The video codec to use when recording. Different codecs offer different trade-offs between quality, file size, and compatibility.");
     
@@ -82,6 +90,7 @@ void RecordingSettings::resized() {
     double rowHeight = 30;
     
 #if OSCI_PREMIUM
+    losslessAudio.setBounds(area.removeFromTop(rowHeight));
     losslessVideo.setBounds(area.removeFromTop(rowHeight));
     quality.setBounds(area.removeFromTop(rowHeight).expanded(6, 0));
     resolution.setBounds(area.removeFromTop(rowHeight).expanded(6, 0));
