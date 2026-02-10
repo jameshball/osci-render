@@ -106,6 +106,10 @@
             file="Source/CustomStandalone.cpp"/>
       <FILE id="TFmWW0" name="CustomStandaloneFilterWindow.h" compile="0"
             resource="0" file="Source/CustomStandaloneFilterWindow.h"/>
+      <FILE id="C5aY6T" name="CustomAudioDeviceSelectorComponent.h" compile="0"
+            resource="0" file="Source/CustomAudioDeviceSelectorComponent.h"/>
+      <FILE id="Yp4s2V" name="CustomAudioDeviceSelectorComponent.cpp" compile="1"
+            resource="0" file="Source/CustomAudioDeviceSelectorComponent.cpp"/>
       <GROUP id="{C63A0AA5-8550-16AC-EE89-C05416216534}" name="wav">
         <FILE id="jxAiTf" name="WavParser.cpp" compile="1" resource="0" file="Source/wav/WavParser.cpp"/>
         <FILE id="Q6iTsL" name="WavParser.h" compile="0" resource="0" file="Source/wav/WavParser.h"/>
@@ -127,6 +131,14 @@
               file="Source/audio/SampleRateManager.h"/>
         <FILE id="GSnwBW" name="SmoothEffect.h" compile="0" resource="0" file="Source/audio/SmoothEffect.h"/>
         <FILE id="jq3EXV" name="StereoEffect.h" compile="0" resource="0" file="Source/audio/StereoEffect.h"/>
+        <FILE id="PrAuD1" name="ProcessAudioDeviceType.h" compile="0" resource="0"
+              file="Source/audio/ProcessAudioDeviceType.h"/>
+        <FILE id="PrAuD2" name="ProcessAudioDeviceType.mm" compile="1" resource="0"
+              file="Source/audio/ProcessAudioDeviceType.mm"/>
+        <FILE id="PrAuD3" name="ProcessAudioPermissions.h" compile="0" resource="0"
+              file="Source/audio/ProcessAudioPermissions.h"/>
+        <FILE id="PrAuD4" name="ProcessAudioPermissions.mm" compile="1" resource="0"
+              file="Source/audio/ProcessAudioPermissions.mm"/>
       </GROUP>
       <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
         <FILE id="URb7Ok" name="AboutComponent.cpp" compile="1" resource="0"
@@ -199,10 +211,10 @@
               file="Source/visualiser/RecordingSettings.cpp"/>
         <FILE id="dAhaYq" name="RecordingSettings.h" compile="0" resource="0"
               file="Source/visualiser/RecordingSettings.h"/>
-        <FILE id="oAVr2a" name="OfflineAudioToVideoRenderer.cpp" compile="1" resource="0"
-              file="Source/visualiser/OfflineAudioToVideoRenderer.cpp"/>
-        <FILE id="oAVr2b" name="OfflineAudioToVideoRenderer.h" compile="0" resource="0"
-              file="Source/visualiser/OfflineAudioToVideoRenderer.h"/>
+        <FILE id="oAVr2a" name="OfflineAudioToVideoRenderer.cpp" compile="1"
+              resource="0" file="Source/visualiser/OfflineAudioToVideoRenderer.cpp"/>
+        <FILE id="oAVr2b" name="OfflineAudioToVideoRenderer.h" compile="0"
+              resource="0" file="Source/visualiser/OfflineAudioToVideoRenderer.h"/>
         <FILE id="ePJ1g0" name="SimpleFragmentShader.glsl" compile="0" resource="0"
               file="Source/visualiser/SimpleFragmentShader.glsl"/>
         <FILE id="GFGIEu" name="SimpleVertexShader.glsl" compile="0" resource="0"
@@ -320,7 +332,7 @@
                microphonePermissionNeeded="1" extraCustomFrameworks="/Library/Frameworks/Syphon.framework"
                frameworkSearchPaths="/Library/Frameworks" hardenedRuntime="1"
                hardenedRuntimeOptions="com.apple.security.cs.disable-library-validation,com.apple.security.device.audio-input"
-               iosDevelopmentTeamID="D86A3M3H2L">
+               iosDevelopmentTeamID="D86A3M3H2L" customPList="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&#10;&#10;&lt;!DOCTYPE plist PUBLIC &quot;-//Apple//DTD PLIST 1.0//EN&quot; &quot;http://www.apple.com/DTDs/PropertyList-1.0.dtd&quot;&gt;&#10;&lt;plist&gt;&#10;  &lt;dict&gt;&#10;    &lt;key&gt;NSAudioCaptureUsageDescription&lt;/key&gt;&#10;    &lt;string&gt;sosci needs permission to capture audio from other applications for visualization.&lt;/string&gt;&#10;  &lt;/dict&gt;&#10;&lt;/plist&gt;&#10;">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="sosci" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>

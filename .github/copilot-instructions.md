@@ -54,10 +54,52 @@ Source/
 cd Builds/osci-render/MacOSX && xcodebuild -configuration Debug
 ```
 
+### Fast iteration (macOS Standalone Debug)
+For quickest local iteration, build just the Standalone app (arm64) in Debug:
+
+```bash
+cd /Users/james/osci-render \
+    && ~/JUCE/Projucer.app/Contents/MacOS/Projucer --resave osci-render.jucer \
+    && cd Builds/osci-render/MacOSX \
+    && xcodebuild -project osci-render.xcodeproj \
+             -scheme "osci-render - Standalone Plugin" \
+             -configuration Debug \
+             -arch arm64 \
+             build
+```
+
+Resulting app:
+- `Builds/osci-render/MacOSX/build/Debug/osci-render.app`
+
 ### Configuration
 - `.jucer` files define project structure and build settings
 - `OSCI_PREMIUM=1/0` preprocessor flag toggles premium features
 - Version is in `.jucer` file's `version` attribute
+
+### Version bumping (`bump_version`)
+
+This repo uses a 4-part version string: `A.B.C.D`.
+
+- `A` is treated as a fixed epoch/compat digit (the script never increments it).
+- `--major` increments `B` and resets `C.D` to `0.0`.
+- `--minor` increments `C` and resets `D` to `0`.
+- `--patch` increments `D`.
+
+The script updates and commits version changes for both products across:
+- `.jucer` versions: [osci-render.jucer](../osci-render.jucer) and [sosci.jucer](../sosci.jucer)
+- Windows installers: `packaging/osci-render.iss` and `packaging/sosci.iss`
+- macOS packages: `packaging/osci-render.pkgproj` and `packaging/sosci.pkgproj`
+
+Important behavior:
+- Requires a clean working tree (it will refuse to run otherwise)
+- Creates a git commit for the bump
+
+Usage examples:
+```bash
+./bump_version --osci minor --sosci patch
+./bump_version --osci patch --sosci none
+./bump_version --osci minor --sosci major --message "chore: bump versions"
+```
 
 ## Code Patterns
 
