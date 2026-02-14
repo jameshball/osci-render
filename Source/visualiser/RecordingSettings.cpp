@@ -22,9 +22,16 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
     resolution.setRangeEnabled(false);
     frameRate.setRangeEnabled(false);
     
+    losslessAudio.setEnabled(recordAudio.getToggleState()
+                             && parameters.videoCodec != VideoCodec::VP9);
     recordAudio.onClick = [this] {
-        if (!recordAudio.getToggleState() && !recordVideo.getToggleState()) {
-            recordVideo.setToggleState(true, juce::NotificationType::sendNotification);
+        if (!recordAudio.getToggleState()) {
+            losslessAudio.setEnabled(false);
+            if (!recordVideo.getToggleState()) {
+                recordVideo.setToggleState(true, juce::NotificationType::sendNotification);
+            }
+        } else if (parameters.videoCodec != VideoCodec::VP9) {
+            losslessAudio.setEnabled(true);
         }
     };
     recordVideo.onClick = [this] {
@@ -54,10 +61,12 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
     videoCodecSelector.onChange = [this] {
         parameters.videoCodec = static_cast<VideoCodec>(videoCodecSelector.getSelectedId() - 1);
         if (parameters.videoCodec == VideoCodec::VP9) {
+            // setToggleState() doesn't work if the button was already disabled beforehand
+            losslessAudio.setEnabled(true);
             losslessAudio.setToggleState(false, juce::NotificationType::sendNotification);
             losslessAudio.setEnabled(false);
 
-        } else {
+        } else if (recordAudio.getToggleState()){
             losslessAudio.setEnabled(true);
         }
     };

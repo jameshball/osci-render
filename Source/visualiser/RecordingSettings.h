@@ -45,7 +45,7 @@ public:
         "brightness",
         VERSION_HINT, 0.7, 0.0, 1.0
     );
-    osci::BooleanParameter losslessAudio = osci::BooleanParameter("Lossless Audio", "losslessAudio", VERSION_HINT, false, "Record video in a lossless format. TODO precedence w vp9");
+    osci::BooleanParameter losslessAudio = osci::BooleanParameter("Lossless Audio", "losslessAudio", VERSION_HINT, false, "Record audio in a lossless format.");
     osci::BooleanParameter losslessVideo = osci::BooleanParameter("Lossless Video", "losslessVideo", VERSION_HINT, false, "Record video in a lossless format. WARNING: This is not supported by all media players.");
     std::shared_ptr<osci::Effect> qualityEffect = std::make_shared<osci::SimpleEffect>(&qualityParameter);
 
