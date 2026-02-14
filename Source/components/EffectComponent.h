@@ -130,17 +130,17 @@ public:
         
         void sliderDragStarted(juce::Slider* slider) override {
             if (slider == &lfoStartSlider && parameter->lfoStartPercent != nullptr) {
-                parameter->lfoStartPercent->beginChangeGesture();
+                EffectComponent::beginGestureIfPossible (parameter->lfoStartPercent);
             } else if (slider == &lfoEndSlider && parameter->lfoEndPercent != nullptr) {
-                parameter->lfoEndPercent->beginChangeGesture();
+                EffectComponent::beginGestureIfPossible (parameter->lfoEndPercent);
             }
         }
         
         void sliderDragEnded(juce::Slider* slider) override {
             if (slider == &lfoStartSlider && parameter->lfoStartPercent != nullptr) {
-                parameter->lfoStartPercent->endChangeGesture();
+                EffectComponent::endGestureIfPossible (parameter->lfoStartPercent);
             } else if (slider == &lfoEndSlider && parameter->lfoEndPercent != nullptr) {
-                parameter->lfoEndPercent->endChangeGesture();
+                EffectComponent::endGestureIfPossible (parameter->lfoEndPercent);
             }
         }
 
@@ -165,6 +165,18 @@ private:
 
     const int TEXT_WIDTH = 120;
     const int SMALL_TEXT_WIDTH = 90;
+
+    static void beginGestureIfPossible (juce::AudioProcessorParameter* parameter)
+    {
+        if (parameter != nullptr && parameter->getParameterIndex() >= 0)
+            parameter->beginChangeGesture();
+    }
+
+    static void endGestureIfPossible (juce::AudioProcessorParameter* parameter)
+    {
+        if (parameter != nullptr && parameter->getParameterIndex() >= 0)
+            parameter->endChangeGesture();
+    }
 
     void setSliderValueIfChanged(osci::FloatParameter* parameter, juce::Slider& slider);
     void setupComponent();

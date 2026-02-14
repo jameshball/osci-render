@@ -241,18 +241,18 @@ void EffectComponent::sliderDragStarted(juce::Slider* sliderThatChanged) {
     // Notify the host that a gesture (parameter change) is starting
     // This is critical for MIDI learn functionality in DAWs like Logic and Ableton
     if (sliderThatChanged == &slider) {
-        effect.parameters[index]->beginChangeGesture();
+        beginGestureIfPossible (effect.parameters[index]);
         
         // Also begin gesture for linked parameters
         if (effect.linked != nullptr && effect.linked->getBoolValue()) {
             for (int i = 0; i < effect.parameters.size(); i++) {
                 if (i != index) {
-                    effect.parameters[i]->beginChangeGesture();
+                    beginGestureIfPossible (effect.parameters[i]);
                 }
             }
         }
     } else if (sliderThatChanged == &lfoSlider && effect.parameters[index]->lfoRate != nullptr) {
-        effect.parameters[index]->lfoRate->beginChangeGesture();
+        beginGestureIfPossible (effect.parameters[index]->lfoRate);
     }
 }
 
@@ -260,18 +260,18 @@ void EffectComponent::sliderDragEnded(juce::Slider* sliderThatChanged) {
     // Notify the host that a gesture (parameter change) has ended
     // This is critical for MIDI learn functionality in DAWs like Logic and Ableton
     if (sliderThatChanged == &slider) {
-        effect.parameters[index]->endChangeGesture();
+        endGestureIfPossible (effect.parameters[index]);
         
         // Also end gesture for linked parameters
         if (effect.linked != nullptr && effect.linked->getBoolValue()) {
             for (int i = 0; i < effect.parameters.size(); i++) {
                 if (i != index) {
-                    effect.parameters[i]->endChangeGesture();
+                    endGestureIfPossible (effect.parameters[i]);
                 }
             }
         }
     } else if (sliderThatChanged == &lfoSlider && effect.parameters[index]->lfoRate != nullptr) {
-        effect.parameters[index]->lfoRate->endChangeGesture();
+        endGestureIfPossible (effect.parameters[index]->lfoRate);
     }
 }
 

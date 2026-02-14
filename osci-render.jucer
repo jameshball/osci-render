@@ -4,7 +4,7 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginCharacteristicsValue="pluginWantsMidiIn"
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
-              version="2.8.0.1" companyName="James H Ball" companyWebsite="https://osci-render.com"
+              version="2.8.1.0" companyName="James H Ball" companyWebsite="https://osci-render.com"
               companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1"
               pluginAUMainType="'aumf'" postExportShellCommandPosix="echo &quot;Building LuaJIT for $OSTYPE...&quot; &amp;&amp; DIR=%%1%% %%1%%/luajit_linux_macos.sh ">
   <MAINGROUP id="j5Ge2T" name="osci-render">
@@ -226,6 +226,14 @@
         <FILE id="Be21D0" name="VectorCancellingEffect.h" compile="0" resource="0"
               file="Source/audio/VectorCancellingEffect.h"/>
         <FILE id="sgdTlo" name="WobbleEffect.h" compile="0" resource="0" file="Source/audio/WobbleEffect.h"/>
+        <FILE id="PrAuD1" name="ProcessAudioDeviceType.h" compile="0" resource="0"
+              file="Source/audio/ProcessAudioDeviceType.h"/>
+        <FILE id="PrAuD2" name="ProcessAudioDeviceType.mm" compile="1" resource="0"
+              file="Source/audio/ProcessAudioDeviceType.mm"/>
+        <FILE id="PrAuD3" name="ProcessAudioPermissions.h" compile="0" resource="0"
+              file="Source/audio/ProcessAudioPermissions.h"/>
+        <FILE id="PrAuD4" name="ProcessAudioPermissions.mm" compile="1" resource="0"
+              file="Source/audio/ProcessAudioPermissions.mm"/>
       </GROUP>
       <GROUP id="{2A41BAF3-5E83-B018-5668-39D89ABFA00C}" name="chinese_postman">
         <FILE id="LcDpwe" name="BinaryHeap.cpp" compile="1" resource="0" file="Source/chinese_postman/BinaryHeap.cpp"/>
@@ -731,6 +739,10 @@
             file="Source/CustomStandalone.cpp"/>
       <FILE id="J0sbNw" name="CustomStandaloneFilterWindow.h" compile="0"
             resource="0" file="Source/CustomStandaloneFilterWindow.h"/>
+      <FILE id="m7xE3R" name="CustomAudioDeviceSelectorComponent.h" compile="0"
+            resource="0" file="Source/CustomAudioDeviceSelectorComponent.h"/>
+      <FILE id="tCwz6G" name="CustomAudioDeviceSelectorComponent.cpp" compile="1"
+            resource="0" file="Source/CustomAudioDeviceSelectorComponent.cpp"/>
       <FILE id="I44EdJ" name="EffectsComponent.cpp" compile="1" resource="0"
             file="Source/EffectsComponent.cpp"/>
       <FILE id="qxxNX3" name="EffectsComponent.h" compile="0" resource="0"
@@ -857,7 +869,7 @@
                microphonePermissionNeeded="1" frameworkSearchPaths="/Library/Frameworks"
                extraCustomFrameworks="/Library/Frameworks/Syphon.framework"
                hardenedRuntime="1" hardenedRuntimeOptions="com.apple.security.cs.allow-jit,com.apple.security.cs.allow-unsigned-executable-memory,com.apple.security.cs.disable-library-validation,com.apple.security.device.audio-input"
-               externalLibraries="luajit" userNotes="D86A3M3H2L">
+               externalLibraries="luajit" userNotes="D86A3M3H2L" customPList="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&#10;&#10;&lt;!DOCTYPE plist PUBLIC &quot;-//Apple//DTD PLIST 1.0//EN&quot; &quot;http://www.apple.com/DTDs/PropertyList-1.0.dtd&quot;&gt;&#10;&lt;plist&gt;&#10;  &lt;dict&gt;&#10;    &lt;key&gt;NSAudioCaptureUsageDescription&lt;/key&gt;&#10;    &lt;string&gt;osci-render needs permission to capture audio from other applications for visualization.&lt;/string&gt;&#10;  &lt;/dict&gt;&#10;&lt;/plist&gt;&#10;">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
                        headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"

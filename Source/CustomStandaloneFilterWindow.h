@@ -38,6 +38,13 @@
  #include <juce_audio_plugin_client/detail/juce_CreatePluginFilter.h>
 #endif
 
+#if JUCE_MAC && OSCI_PREMIUM
+ #include "audio/ProcessAudioDeviceType.h"
+ #include "audio/ProcessAudioPermissions.h"
+#endif
+
+#include "CustomAudioDeviceSelectorComponent.h"
+
 namespace juce
 {
 
@@ -343,7 +350,7 @@ public:
             savedState = settings->getXmlValue ("audioSetup");
 
            #if ! (JUCE_IOS || JUCE_ANDROID)
-            shouldMuteInput.setValue (settings->getBoolValue ("shouldMuteInput", true));
+                     shouldMuteInput.setValue (settings->getBoolValue ("shouldMuteInput", true));
            #endif
         }
 
@@ -576,6 +583,11 @@ private:
 
             addAndMakeVisible (deviceSelector);
 
+#if JUCE_MAC && OSCI_PREMIUM
+            // Process audio controls are handled inside the custom selector.
+            // Audio Capture permission is requested at app start (see CustomStandalone.cpp).
+#endif
+
             if (owner.getProcessorHasPotentialFeedbackLoop())
             {
                 addAndMakeVisible (shouldMuteButton);
@@ -595,17 +607,18 @@ private:
             const ScopedValueSetter<bool> scope (isResizing, true);
 
             auto r = getLocalBounds();
+            const int itemHeight = deviceSelector.getItemHeight();
 
             if (owner.getProcessorHasPotentialFeedbackLoop())
             {
-                auto itemHeight = deviceSelector.getItemHeight();
-                auto extra = r.removeFromTop (itemHeight);
+                const auto separatorHeight = (itemHeight >> 1);
+                auto row = r.removeFromTop (itemHeight + separatorHeight);
 
-                auto seperatorHeight = (itemHeight >> 1);
-                shouldMuteButton.setBounds (Rectangle<int> (extra.proportionOfWidth (0.35f), seperatorHeight,
-                                                            extra.proportionOfWidth (0.60f), deviceSelector.getItemHeight()));
-
-                r.removeFromTop (seperatorHeight);
+                auto buttonRow = row.removeFromBottom (itemHeight);
+                shouldMuteButton.setBounds (Rectangle<int> (buttonRow.getX() + buttonRow.proportionOfWidth (0.35f),
+                                                           buttonRow.getY(),
+                                                           buttonRow.proportionOfWidth (0.60f),
+                                                           itemHeight));
             }
 
             deviceSelector.setBounds (r);
@@ -635,7 +648,7 @@ private:
     private:
         //==============================================================================
         StandalonePluginHolder& owner;
-        AudioDeviceSelectorComponent deviceSelector;
+        CustomAudioDeviceSelectorComponent deviceSelector;
         Label shouldMuteLabel;
         ToggleButton shouldMuteButton;
         bool isResizing = false;
@@ -668,6 +681,21 @@ private:
 
     void audioDeviceAboutToStart (AudioIODevice* device) override
     {
+#if JUCE_MAC && OSCI_PREMIUM
+        if (device != nullptr && device->getTypeName() == "Process Audio")
+        {
+            // Process capture is not a microphone feedback path in the usual sense.
+            // If we leave the standalone wrapper's input-mute default enabled,
+            // the tap audio will never reach the processor.
+            muteInput.store (false);
+
+            if (MessageManager::getInstance()->isThisTheMessageThread())
+                shouldMuteInput.setValue (false);
+            else
+                MessageManager::callAsync ([v = Value (shouldMuteInput)]() mutable { v.setValue (false); });
+        }
+#endif
+
         emptyBuffer.setSize (device->getActiveInputChannels().countNumberOfSetBits(), device->getCurrentBufferSizeSamples());
         emptyBuffer.clear();
 
@@ -689,6 +717,16 @@ private:
     {
         deviceManager.addAudioCallback (&maxSizeEnforcer);
         deviceManager.addMidiInputDeviceCallback ({}, &player);
+
+       #if JUCE_MAC && OSCI_PREMIUM
+        if (ProcessAudioPermissions::isProcessTapAvailable())
+        {
+            // Ensure default device types (CoreAudio etc.) are created first
+            deviceManager.getAvailableDeviceTypes();
+            // Register process audio capture as an additional device type
+            deviceManager.addAudioDeviceType (std::make_unique<ProcessAudioDeviceType>());
+        }
+       #endif
 
         reloadAudioDeviceState (enableAudioInput, preferredDefaultDeviceName, preferredSetupOptions);
     }
