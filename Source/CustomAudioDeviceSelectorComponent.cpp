@@ -425,6 +425,7 @@ public:
 
         if (updateOutputDevice || updateInputDevice)
         {
+#if JUCE_MAC && OSCI_PREMIUM
             if (type.getTypeName() == "Process Audio")
             {
                 auto procName = inputDeviceDropDown != nullptr && inputDeviceDropDown->getSelectedId() >= 0
@@ -436,6 +437,7 @@ public:
                 config.inputDeviceName = config.outputDeviceName;
             }
             else
+#endif
             {
                 if (outputDeviceDropDown != nullptr)
                     config.outputDeviceName = outputDeviceDropDown->getSelectedId() < 0 ? String()
@@ -606,6 +608,7 @@ public:
                     inputDeviceDropDown->setSelectedId (-1, dontSendNotification);
             }
 
+#if JUCE_MAC && OSCI_PREMIUM
             // Intermittent startup race: Process Audio may fail to open on the first
             // attempt during type switch/startup (stale device names or timing).
             // If that happens, apply a concrete combined selection once.
@@ -635,6 +638,7 @@ public:
 
                 setup.manager->setAudioDeviceSetup (config, true);
             }
+#endif
         }
 
         sendLookAndFeelChange();

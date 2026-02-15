@@ -354,6 +354,40 @@ public:
            #endif
         }
 
+       #if JUCE_MAC && OSCI_PREMIUM
+        // If a newer macOS saved "Process Audio" as the active device type,
+        // discard that state on older macOS versions where process taps are unavailable.
+        if (savedState != nullptr && ! ProcessAudioPermissions::isProcessTapAvailable())
+        {
+            auto usesProcessAudio = [] (const XmlElement& root) -> bool
+            {
+                Array<const XmlElement*> toVisit;
+                toVisit.add (&root);
+
+                while (! toVisit.isEmpty())
+                {
+                    auto* e = toVisit.getLast();
+                    toVisit.removeLast();
+
+                    if (e->getStringAttribute ("deviceType").containsIgnoreCase ("Process Audio")
+                        || e->getStringAttribute ("audioDeviceType").containsIgnoreCase ("Process Audio")
+                        || e->getStringAttribute ("currentDeviceType").containsIgnoreCase ("Process Audio"))
+                        return true;
+
+                    forEachXmlChildElement (*e, child)
+                    {
+                        toVisit.add (&child);
+                    }
+                }
+
+                return false;
+            };
+
+            if (usesProcessAudio (*savedState))
+                savedState.reset();
+        }
+       #endif
+
         auto inputChannels  = getNumInputChannels();
         auto outputChannels = getNumOutputChannels();
 
@@ -744,12 +778,14 @@ private:
             setToRecommendedSize();
             resized();
         }
+#endif
 
         void changeListenerCallback (ChangeBroadcaster*) override
         {
+#if JUCE_MAC && OSCI_PREMIUM
             updateProcessAudioButtonVisibility();
-        }
 #endif
+        }
 
         //==============================================================================
         StandalonePluginHolder& owner;
