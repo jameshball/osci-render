@@ -43,6 +43,10 @@
  #include "audio/ProcessAudioPermissions.h"
 #endif
 
+#if JUCE_WINDOWS && OSCI_PREMIUM
+ #include "audio/WindowsLoopbackAudioDeviceType.h"
+#endif
+
 #include "CustomAudioDeviceSelectorComponent.h"
 
 namespace juce
@@ -354,38 +358,54 @@ public:
            #endif
         }
 
+        const auto xmlContainsDeviceTypeName = [] (const XmlElement& root, const String& deviceTypeName) -> bool
+        {
+            Array<const XmlElement*> toVisit;
+            toVisit.add (&root);
+
+            while (! toVisit.isEmpty())
+            {
+                auto* e = toVisit.getLast();
+                toVisit.removeLast();
+
+                if (e->getStringAttribute ("deviceType").containsIgnoreCase (deviceTypeName)
+                    || e->getStringAttribute ("audioDeviceType").containsIgnoreCase (deviceTypeName)
+                    || e->getStringAttribute ("currentDeviceType").containsIgnoreCase (deviceTypeName))
+                    return true;
+
+                forEachXmlChildElement (*e, child)
+                    toVisit.add (child);
+            }
+
+            return false;
+        };
+
+        const auto hasAudioDeviceType = [&] (const String& typeName) -> bool
+        {
+            const auto& types = deviceManager.getAvailableDeviceTypes();
+            for (auto* t : types)
+                if (t != nullptr && t->getTypeName() == typeName)
+                    return true;
+
+            return false;
+        };
+
        #if JUCE_MAC && OSCI_PREMIUM
         // If a newer macOS saved "Process Audio" as the active device type,
         // discard that state on older macOS versions where process taps are unavailable.
-        if (savedState != nullptr && ! ProcessAudioPermissions::isProcessTapAvailable())
-        {
-            auto usesProcessAudio = [] (const XmlElement& root) -> bool
-            {
-                Array<const XmlElement*> toVisit;
-                toVisit.add (&root);
+        if (savedState != nullptr
+            && ! ProcessAudioPermissions::isProcessTapAvailable()
+            && xmlContainsDeviceTypeName (*savedState, "Process Audio"))
+            savedState.reset();
+       #endif
 
-                while (! toVisit.isEmpty())
-                {
-                    auto* e = toVisit.getLast();
-                    toVisit.removeLast();
-
-                    if (e->getStringAttribute ("deviceType").containsIgnoreCase ("Process Audio")
-                        || e->getStringAttribute ("audioDeviceType").containsIgnoreCase ("Process Audio")
-                        || e->getStringAttribute ("currentDeviceType").containsIgnoreCase ("Process Audio"))
-                        return true;
-
-                    forEachXmlChildElement (*e, child)
-                    {
-                        toVisit.add (child);
-                    }
-                }
-
-                return false;
-            };
-
-            if (usesProcessAudio (*savedState))
-                savedState.reset();
-        }
+       #if JUCE_WINDOWS
+        // If a saved state references Windows Loopback but this build/runtime
+        // doesn't expose the type, discard stale state to avoid failed opens.
+        if (savedState != nullptr
+            && xmlContainsDeviceTypeName (*savedState, "Windows Loopback")
+            && ! hasAudioDeviceType ("Windows Loopback"))
+            savedState.reset();
        #endif
 
         auto inputChannels  = getNumInputChannels();
@@ -689,14 +709,7 @@ private:
             const int itemHeight = deviceSelector.getItemHeight();
 
 #if JUCE_MAC && OSCI_PREMIUM
-            if (shouldShowProcessAudioButton)
-            {
-                auto row = r.removeFromTop (itemHeight);
-                const int buttonX = row.getX() + roundToInt (row.getWidth() * 0.35f);
-                const int buttonW = roundToInt (row.getWidth() * 0.60f);
-                enableSystemAudioCaptureButton.setBounds (buttonX, row.getY(), buttonW, itemHeight);
-                r.removeFromTop (itemHeight >> 2);
-            }
+            layoutProcessAudioCaptureButtonRow (r, itemHeight);
 #endif
 
             if (owner.getProcessorHasPotentialFeedbackLoop())
@@ -733,9 +746,7 @@ private:
             }();
 
 #if JUCE_MAC && OSCI_PREMIUM
-            const auto processAudioButtonExtra = shouldShowProcessAudioButton
-                ? (deviceSelector.getItemHeight() + (deviceSelector.getItemHeight() >> 2))
-                : 0;
+            const auto processAudioButtonExtra = getProcessAudioButtonExtraHeight (deviceSelector.getItemHeight());
 #else
             const auto processAudioButtonExtra = 0;
 #endif
@@ -745,6 +756,23 @@ private:
 
     private:
 #if JUCE_MAC && OSCI_PREMIUM
+        int getProcessAudioButtonExtraHeight (int itemHeight) const
+        {
+            return shouldShowProcessAudioButton ? (itemHeight + (itemHeight >> 2)) : 0;
+        }
+
+        void layoutProcessAudioCaptureButtonRow (Rectangle<int>& bounds, int itemHeight)
+        {
+            if (! shouldShowProcessAudioButton)
+                return;
+
+            auto row = bounds.removeFromTop (itemHeight);
+            const int buttonX = row.getX() + roundToInt (row.getWidth() * 0.35f);
+            const int buttonW = roundToInt (row.getWidth() * 0.60f);
+            enableSystemAudioCaptureButton.setBounds (buttonX, row.getY(), buttonW, itemHeight);
+            bounds.removeFromTop (itemHeight >> 2);
+        }
+
         bool isProcessAudioTypeAvailable() const
         {
             if (! ProcessAudioPermissions::isProcessTapAvailable())
@@ -827,12 +855,20 @@ private:
 
     void audioDeviceAboutToStart (AudioIODevice* device) override
     {
-#if JUCE_MAC && OSCI_PREMIUM
-        if (device != nullptr && device->getTypeName() == "Process Audio")
+       #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+        const auto typeName = device != nullptr ? device->getTypeName() : String();
+        const bool isCapturePathType =
+           #if JUCE_MAC
+            typeName == "Process Audio"
+           #elif JUCE_WINDOWS
+            typeName == "Windows Loopback"
+           #else
+            false
+           #endif
+            ;
+
+        if (isCapturePathType)
         {
-            // Process capture is not a microphone feedback path in the usual sense.
-            // If we leave the standalone wrapper's input-mute default enabled,
-            // the tap audio will never reach the processor.
             muteInput.store (false);
 
             if (MessageManager::getInstance()->isThisTheMessageThread())
@@ -840,7 +876,7 @@ private:
             else
                 MessageManager::callAsync ([v = Value (shouldMuteInput)]() mutable { v.setValue (false); });
         }
-#endif
+       #endif
 
         emptyBuffer.setSize (device->getActiveInputChannels().countNumberOfSetBits(), device->getCurrentBufferSizeSamples());
         emptyBuffer.clear();
@@ -864,14 +900,18 @@ private:
         deviceManager.addAudioCallback (&maxSizeEnforcer);
         deviceManager.addMidiInputDeviceCallback ({}, &player);
 
+       #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+        // Ensure default device types (CoreAudio/WASAPI/ASIO/etc.) are created first.
+        deviceManager.getAvailableDeviceTypes();
+       #endif
+
        #if JUCE_MAC && OSCI_PREMIUM
         if (ProcessAudioPermissions::isProcessTapAvailable())
-        {
-            // Ensure default device types (CoreAudio etc.) are created first
-            deviceManager.getAvailableDeviceTypes();
-            // Register process audio capture as an additional device type
             deviceManager.addAudioDeviceType (std::make_unique<ProcessAudioDeviceType>());
-        }
+       #endif
+
+       #if JUCE_WINDOWS && OSCI_PREMIUM
+        deviceManager.addAudioDeviceType (std::make_unique<WindowsLoopbackAudioDeviceType>());
        #endif
 
         reloadAudioDeviceState (enableAudioInput, preferredDefaultDeviceName, preferredSetupOptions);
