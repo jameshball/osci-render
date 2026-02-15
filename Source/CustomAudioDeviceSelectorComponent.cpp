@@ -533,6 +533,9 @@ public:
 
         if (auto* currentDevice = setup.manager->getCurrentAudioDevice())
         {
+            if (type.getTypeName() == "Process Audio")
+                hasAttemptedProcessAudioRecovery = false;
+
             if (setup.maxNumOutputChannels > 0
                  && setup.minNumOutputChannels < setup.manager->getCurrentAudioDevice()->getOutputChannelNames().size())
             {
@@ -596,7 +599,42 @@ public:
                 outputDeviceDropDown->setSelectedId (-1, dontSendNotification);
 
             if (inputDeviceDropDown != nullptr)
-                inputDeviceDropDown->setSelectedId (-1, dontSendNotification);
+            {
+                if (type.getTypeName() == "Process Audio" && inputDeviceDropDown->getNumItems() > 0)
+                    inputDeviceDropDown->setSelectedId (1, dontSendNotification);
+                else
+                    inputDeviceDropDown->setSelectedId (-1, dontSendNotification);
+            }
+
+            // Intermittent startup race: Process Audio may fail to open on the first
+            // attempt during type switch/startup (stale device names or timing).
+            // If that happens, apply a concrete combined selection once.
+            if (type.getTypeName() == "Process Audio"
+                && ! attemptingProcessAudioRecovery
+                && ! hasAttemptedProcessAudioRecovery)
+            {
+                hasAttemptedProcessAudioRecovery = true;
+                const ScopedValueSetter<bool> recoveryScope (attemptingProcessAudioRecovery, true);
+
+                auto config = setup.manager->getAudioDeviceSetup();
+
+                const auto procName = (inputDeviceDropDown != nullptr && inputDeviceDropDown->getNumItems() > 0)
+                                        ? inputDeviceDropDown->getText()
+                                        : String ("System Audio");
+
+                const auto outName = (outputDeviceDropDown != nullptr
+                                      && outputDeviceDropDown->getText().isNotEmpty()
+                                      && outputDeviceDropDown->getText() != getNoDeviceString())
+                                       ? outputDeviceDropDown->getText()
+                                       : String ("<< none >>");
+
+                config.outputDeviceName = ProcessAudioDeviceType::makeCombinedDeviceName (procName, outName);
+                config.inputDeviceName = config.outputDeviceName;
+                config.useDefaultInputChannels = true;
+                config.useDefaultOutputChannels = true;
+
+                setup.manager->setAudioDeviceSetup (config, true);
+            }
         }
 
         sendLookAndFeelChange();
@@ -625,6 +663,8 @@ private:
     std::unique_ptr<TextButton> testButton;
     std::unique_ptr<Component> inputLevelMeter;
     std::unique_ptr<TextButton> showUIButton, showAdvancedSettingsButton, resetDeviceButton;
+    bool attemptingProcessAudioRecovery = false;
+    bool hasAttemptedProcessAudioRecovery = false;
 
     int findSelectedDeviceIndex (bool isInput) const
     {
@@ -644,6 +684,13 @@ private:
                     return isInput ? processType->getProcessChoiceNames().indexOf (procName)
                                    : processType->getOutputChoiceNames().indexOf (outName);
                 }
+
+                // Fallback for non-combined or stale names while switching device types.
+                if (isInput)
+                    return processType->getProcessChoiceNames().indexOf ("System Audio");
+
+                const int noneIndex = processType->getOutputChoiceNames().indexOf ("<< none >>");
+                return noneIndex >= 0 ? noneIndex : processType->getOutputChoiceNames().indexOf ("Default Output");
             }
 #endif
             return -1;
@@ -807,8 +854,19 @@ private:
             for (int i = 0; i < devs.size(); ++i)
                 combo.addItem (devs[i], i + 1);
 
-            combo.addItem (getNoDeviceString(), -1);
-            combo.setSelectedId (-1, dontSendNotification);
+            if (isInputs)
+            {
+                const int systemAudioIndex = devs.indexOf ("System Audio");
+                if (systemAudioIndex >= 0)
+                    combo.setSelectedId (systemAudioIndex + 1, dontSendNotification);
+                else if (devs.size() > 0)
+                    combo.setSelectedId (1, dontSendNotification);
+            }
+            else
+            {
+                combo.addItem (getNoDeviceString(), -1);
+                combo.setSelectedId (-1, dontSendNotification);
+            }
         }
         else
         {

@@ -788,10 +788,13 @@ struct ProcessTapBackend
     int getDefaultBufferSize()
     {
         auto sizes = getAvailableBufferSizes();
+
+        // Prefer a low-latency default if the device supports it.
         for (auto s : sizes)
-            if (s >= 512)
+            if (s >= 128)
                 return s;
-        return sizes.isEmpty() ? 512 : sizes[0];
+
+        return sizes.isEmpty() ? 128 : sizes[0];
     }
 
     //==============================================================================
@@ -1183,6 +1186,11 @@ bool ProcessAudioDeviceType::hasSeparateInputsAndOutputs() const
 AudioIODevice* ProcessAudioDeviceType::createDevice (const String& outputDeviceName,
                                                      const String& inputDeviceName)
 {
+    // Defensive: JUCE may call createDevice with stale names while type switching.
+    // Ensure we have a fresh snapshot of process/output choices.
+    if (inputChoiceNames.isEmpty() || inputChoices.isEmpty() || outputChoiceNames.isEmpty() || outputChoiceIDs.isEmpty())
+        scanForDevices();
+
     // Backwards compatibility: older saved configs used a combined device name.
     String procName = inputDeviceName;
     String outName  = outputDeviceName;
@@ -1214,8 +1222,24 @@ AudioIODevice* ProcessAudioDeviceType::createDevice (const String& outputDeviceN
     if (isNoneChoice (outName))
         outName = "Default Output";
 
-    const int procIndex = inputChoiceNames.indexOf (procName);
-    const int outIndex  = outputChoiceNames.indexOf (outName);
+    int procIndex = inputChoiceNames.indexOf (procName);
+
+    if (procIndex < 0)
+        procIndex = inputChoiceNames.indexOf ("System Audio");
+
+    if (procIndex < 0 && ! inputChoices.isEmpty())
+        procIndex = 0;
+
+    int outIndex = outputChoiceNames.indexOf (outName);
+    if (outIndex < 0)
+    {
+        outName = "Default Output";
+        outIndex = outputChoiceNames.indexOf (outName);
+    }
+
+    if (outIndex < 0 && ! outputChoiceIDs.isEmpty())
+        outIndex = 0;
+
     if (procIndex < 0 || outIndex < 0)
     {
         return nullptr;

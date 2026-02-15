@@ -559,7 +559,8 @@ private:
     CallbackMaxSizeEnforcer maxSizeEnforcer { *this };
 
     //==============================================================================
-    class SettingsComponent : public Component
+    class SettingsComponent : public Component,
+                              private ChangeListener
     {
     public:
         SettingsComponent (StandalonePluginHolder& pluginHolder,
@@ -572,16 +573,55 @@ private:
                               0, maxAudioOutputChannels,
                               true,
                               (pluginHolder.processor.get() != nullptr && pluginHolder.processor->producesMidi()),
-                              true, false),
+                              false, false),
               shouldMuteLabel  ("Feedback Loop:", "Feedback Loop:"),
               shouldMuteButton ("Mute audio input")
         {
             setOpaque (true);
 
+            owner.deviceManager.addChangeListener (this);
+
             shouldMuteButton.setClickingTogglesState (true);
             shouldMuteButton.getToggleStateValue().referTo (owner.shouldMuteInput);
 
             addAndMakeVisible (deviceSelector);
+
+#if JUCE_MAC && OSCI_PREMIUM
+            enableSystemAudioCaptureButton.setButtonText ("Enable System Audio Capture");
+            enableSystemAudioCaptureButton.onClick = [this]
+            {
+                owner.deviceManager.setCurrentAudioDeviceType ("Process Audio", true);
+
+                auto setup = owner.deviceManager.getAudioDeviceSetup();
+                const auto combined = ProcessAudioDeviceType::makeCombinedDeviceName ("System Audio", "<< none >>");
+                setup.outputDeviceName = combined;
+                setup.inputDeviceName = combined;
+                setup.useDefaultInputChannels = true;
+                setup.useDefaultOutputChannels = true;
+                owner.deviceManager.setAudioDeviceSetup (setup, true);
+
+                // Match the UI mic-toggle behavior by forcing input mode on.
+                if (owner.processor != nullptr)
+                {
+                    for (auto* parameter : owner.processor->getParameters())
+                    {
+                        if (auto* parameterWithID = dynamic_cast<AudioProcessorParameterWithID*> (parameter))
+                        {
+                            if (parameterWithID->getParameterID() == "inputEnabled")
+                            {
+                                parameterWithID->setValueNotifyingHost (1.0f);
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                updateProcessAudioButtonVisibility();
+            };
+
+            addChildComponent (enableSystemAudioCaptureButton);
+            updateProcessAudioButtonVisibility();
+#endif
 
 #if JUCE_MAC && OSCI_PREMIUM
             // Process audio controls are handled inside the custom selector.
@@ -597,6 +637,11 @@ private:
             }
         }
 
+        ~SettingsComponent() override
+        {
+            owner.deviceManager.removeChangeListener (this);
+        }
+
         void paint (Graphics& g) override
         {
             g.fillAll (getLookAndFeel().findColour (ResizableWindow::backgroundColourId));
@@ -608,6 +653,17 @@ private:
 
             auto r = getLocalBounds();
             const int itemHeight = deviceSelector.getItemHeight();
+
+#if JUCE_MAC && OSCI_PREMIUM
+            if (shouldShowProcessAudioButton)
+            {
+                auto row = r.removeFromTop (itemHeight);
+                const int buttonX = row.getX() + roundToInt (row.getWidth() * 0.35f);
+                const int buttonW = roundToInt (row.getWidth() * 0.60f);
+                enableSystemAudioCaptureButton.setBounds (buttonX, row.getY(), buttonW, itemHeight);
+                r.removeFromTop (itemHeight >> 2);
+            }
+#endif
 
             if (owner.getProcessorHasPotentialFeedbackLoop())
             {
@@ -642,16 +698,70 @@ private:
                 return itemHeight + separatorHeight;
             }();
 
-            setSize (getWidth(), deviceSelector.getHeight() + extraHeight);
+#if JUCE_MAC && OSCI_PREMIUM
+            const auto processAudioButtonExtra = shouldShowProcessAudioButton
+                ? (deviceSelector.getItemHeight() + (deviceSelector.getItemHeight() >> 2))
+                : 0;
+#else
+            const auto processAudioButtonExtra = 0;
+#endif
+
+            setSize (getWidth(), deviceSelector.getHeight() + extraHeight + processAudioButtonExtra);
         }
 
     private:
+#if JUCE_MAC && OSCI_PREMIUM
+        bool isProcessAudioTypeAvailable() const
+        {
+            if (! ProcessAudioPermissions::isProcessTapAvailable())
+                return false;
+
+            const auto& types = owner.deviceManager.getAvailableDeviceTypes();
+            for (auto* t : types)
+                if (t != nullptr && t->getTypeName() == "Process Audio")
+                    return true;
+
+            return false;
+        }
+
+        bool shouldShowProcessAudioEnableButton() const
+        {
+            if (! isProcessAudioTypeAvailable())
+                return false;
+
+            return owner.deviceManager.getCurrentAudioDeviceType() != "Process Audio";
+        }
+
+        void updateProcessAudioButtonVisibility()
+        {
+            const auto visible = shouldShowProcessAudioEnableButton();
+
+            if (visible == shouldShowProcessAudioButton)
+                return;
+
+            shouldShowProcessAudioButton = visible;
+            enableSystemAudioCaptureButton.setVisible (visible);
+            setToRecommendedSize();
+            resized();
+        }
+
+        void changeListenerCallback (ChangeBroadcaster*) override
+        {
+            updateProcessAudioButtonVisibility();
+        }
+#endif
+
         //==============================================================================
         StandalonePluginHolder& owner;
         CustomAudioDeviceSelectorComponent deviceSelector;
         Label shouldMuteLabel;
         ToggleButton shouldMuteButton;
         bool isResizing = false;
+
+#if JUCE_MAC && OSCI_PREMIUM
+        TextButton enableSystemAudioCaptureButton;
+        bool shouldShowProcessAudioButton = false;
+#endif
 
         //==============================================================================
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SettingsComponent)
