@@ -359,16 +359,26 @@ public:
         // discard that state on older macOS versions where process taps are unavailable.
         if (savedState != nullptr && ! ProcessAudioPermissions::isProcessTapAvailable())
         {
-            const std::function<bool (const XmlElement&)> usesProcessAudio = [&] (const XmlElement& e) -> bool
+            auto usesProcessAudio = [] (const XmlElement& root) -> bool
             {
-                if (e.getStringAttribute ("deviceType").containsIgnoreCase ("Process Audio")
-                    || e.getStringAttribute ("audioDeviceType").containsIgnoreCase ("Process Audio")
-                    || e.getStringAttribute ("currentDeviceType").containsIgnoreCase ("Process Audio"))
-                    return true;
+                Array<const XmlElement*> toVisit;
+                toVisit.add (&root);
 
-                for (auto* child : e.getChildIterator())
-                    if (child != nullptr && usesProcessAudio (*child))
+                while (! toVisit.isEmpty())
+                {
+                    auto* e = toVisit.getLast();
+                    toVisit.removeLast();
+
+                    if (e->getStringAttribute ("deviceType").containsIgnoreCase ("Process Audio")
+                        || e->getStringAttribute ("audioDeviceType").containsIgnoreCase ("Process Audio")
+                        || e->getStringAttribute ("currentDeviceType").containsIgnoreCase ("Process Audio"))
                         return true;
+
+                    forEachXmlChildElement (*e, child)
+                    {
+                        toVisit.add (&child);
+                    }
+                }
 
                 return false;
             };
