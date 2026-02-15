@@ -376,7 +376,7 @@ public:
 
                     forEachXmlChildElement (*e, child)
                     {
-                        toVisit.add (&child);
+                        toVisit.add (child);
                     }
                 }
 
