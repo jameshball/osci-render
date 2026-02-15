@@ -354,6 +354,30 @@ public:
            #endif
         }
 
+       #if JUCE_MAC && OSCI_PREMIUM
+        // If a newer macOS saved "Process Audio" as the active device type,
+        // discard that state on older macOS versions where process taps are unavailable.
+        if (savedState != nullptr && ! ProcessAudioPermissions::isProcessTapAvailable())
+        {
+            const std::function<bool (const XmlElement&)> usesProcessAudio = [&] (const XmlElement& e) -> bool
+            {
+                if (e.getStringAttribute ("deviceType").containsIgnoreCase ("Process Audio")
+                    || e.getStringAttribute ("audioDeviceType").containsIgnoreCase ("Process Audio")
+                    || e.getStringAttribute ("currentDeviceType").containsIgnoreCase ("Process Audio"))
+                    return true;
+
+                for (auto* child : e.getChildIterator())
+                    if (child != nullptr && usesProcessAudio (*child))
+                        return true;
+
+                return false;
+            };
+
+            if (usesProcessAudio (*savedState))
+                savedState.reset();
+        }
+       #endif
+
         auto inputChannels  = getNumInputChannels();
         auto outputChannels = getNumOutputChannels();
 
