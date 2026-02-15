@@ -432,7 +432,11 @@ public:
                 auto outName = outputDeviceDropDown != nullptr && outputDeviceDropDown->getSelectedId() >= 0
                                   ? outputDeviceDropDown->getText() : String ("<< none >>");
 
+               #if JUCE_MAC && OSCI_PREMIUM
                 config.outputDeviceName = ProcessAudioDeviceType::makeCombinedDeviceName (procName, outName);
+               #else
+                config.outputDeviceName = procName + " -> " + outName;
+               #endif
                 config.inputDeviceName = config.outputDeviceName;
             }
             else
@@ -628,7 +632,11 @@ public:
                                        ? outputDeviceDropDown->getText()
                                        : String ("<< none >>");
 
+               #if JUCE_MAC && OSCI_PREMIUM
                 config.outputDeviceName = ProcessAudioDeviceType::makeCombinedDeviceName (procName, outName);
+               #else
+                config.outputDeviceName = procName + " -> " + outName;
+               #endif
                 config.inputDeviceName = config.outputDeviceName;
                 config.useDefaultInputChannels = true;
                 config.useDefaultOutputChannels = true;

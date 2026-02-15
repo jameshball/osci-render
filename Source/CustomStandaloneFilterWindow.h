@@ -744,12 +744,14 @@ private:
             setToRecommendedSize();
             resized();
         }
+#endif
 
         void changeListenerCallback (ChangeBroadcaster*) override
         {
+#if JUCE_MAC && OSCI_PREMIUM
             updateProcessAudioButtonVisibility();
-        }
 #endif
+        }
 
         //==============================================================================
         StandalonePluginHolder& owner;
