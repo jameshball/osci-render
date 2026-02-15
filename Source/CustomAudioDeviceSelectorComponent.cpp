@@ -425,6 +425,7 @@ public:
 
         if (updateOutputDevice || updateInputDevice)
         {
+#if JUCE_MAC && OSCI_PREMIUM
             if (type.getTypeName() == "Process Audio")
             {
                 auto procName = inputDeviceDropDown != nullptr && inputDeviceDropDown->getSelectedId() >= 0
@@ -432,14 +433,11 @@ public:
                 auto outName = outputDeviceDropDown != nullptr && outputDeviceDropDown->getSelectedId() >= 0
                                   ? outputDeviceDropDown->getText() : String ("<< none >>");
 
-                #if JUCE_MAC && OSCI_PREMIUM
                 config.outputDeviceName = ProcessAudioDeviceType::makeCombinedDeviceName (procName, outName);
-                #else
-                config.outputDeviceName = procName + " -> " + outName;
-                #endif
                 config.inputDeviceName = config.outputDeviceName;
             }
             else
+#endif
             {
                 if (outputDeviceDropDown != nullptr)
                     config.outputDeviceName = outputDeviceDropDown->getSelectedId() < 0 ? String()
@@ -610,6 +608,7 @@ public:
                     inputDeviceDropDown->setSelectedId (-1, dontSendNotification);
             }
 
+#if JUCE_MAC && OSCI_PREMIUM
             // Intermittent startup race: Process Audio may fail to open on the first
             // attempt during type switch/startup (stale device names or timing).
             // If that happens, apply a concrete combined selection once.
@@ -632,17 +631,14 @@ public:
                                        ? outputDeviceDropDown->getText()
                                        : String ("<< none >>");
 
-                #if JUCE_MAC && OSCI_PREMIUM
                 config.outputDeviceName = ProcessAudioDeviceType::makeCombinedDeviceName (procName, outName);
-                #else
-                config.outputDeviceName = procName + " -> " + outName;
-                #endif
                 config.inputDeviceName = config.outputDeviceName;
                 config.useDefaultInputChannels = true;
                 config.useDefaultOutputChannels = true;
 
                 setup.manager->setAudioDeviceSetup (config, true);
             }
+#endif
         }
 
         sendLookAndFeelChange();
