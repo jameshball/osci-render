@@ -34,6 +34,10 @@
  #include "audio/ProcessAudioDeviceType.h"
 #endif
 
+#if JUCE_WINDOWS && OSCI_PREMIUM
+ #include "audio/WindowsLoopbackAudioDeviceType.h"
+#endif
+
 #define AudioDeviceSelectorComponent CustomAudioDeviceSelectorComponent
 
 namespace juce
@@ -425,15 +429,19 @@ public:
 
         if (updateOutputDevice || updateInputDevice)
         {
-            if (type.getTypeName() == "Process Audio")
+            if (isCombinedSelectionType())
             {
-                auto procName = inputDeviceDropDown != nullptr && inputDeviceDropDown->getSelectedId() >= 0
-                                  ? inputDeviceDropDown->getText() : String ("System Audio");
-                auto outName = outputDeviceDropDown != nullptr && outputDeviceDropDown->getSelectedId() >= 0
-                                  ? outputDeviceDropDown->getText() : String ("<< none >>");
+                const auto inputName = inputDeviceDropDown != nullptr && inputDeviceDropDown->getSelectedId() >= 0
+                                         ? inputDeviceDropDown->getText()
+                                         : getCombinedDefaultInputName();
 
-                config.outputDeviceName = ProcessAudioDeviceType::makeCombinedDeviceName (procName, outName);
-                config.inputDeviceName = config.outputDeviceName;
+                const auto outputName = outputDeviceDropDown != nullptr && outputDeviceDropDown->getSelectedId() >= 0
+                                          ? outputDeviceDropDown->getText()
+                                          : getCombinedDefaultOutputName();
+
+                const auto combinedName = makeCombinedDeviceName (inputName, outputName);
+                config.outputDeviceName = combinedName;
+                config.inputDeviceName = combinedName;
             }
             else
             {
@@ -533,6 +541,9 @@ public:
 
         if (auto* currentDevice = setup.manager->getCurrentAudioDevice())
         {
+            if (isCombinedSelectionType())
+                hasAttemptedCombinedTypeRecovery = false;
+
             if (setup.maxNumOutputChannels > 0
                  && setup.minNumOutputChannels < setup.manager->getCurrentAudioDevice()->getOutputChannelNames().size())
             {
@@ -596,7 +607,44 @@ public:
                 outputDeviceDropDown->setSelectedId (-1, dontSendNotification);
 
             if (inputDeviceDropDown != nullptr)
-                inputDeviceDropDown->setSelectedId (-1, dontSendNotification);
+            {
+                if (isCombinedSelectionType() && inputDeviceDropDown->getNumItems() > 0)
+                    inputDeviceDropDown->setSelectedId (1, dontSendNotification);
+                else
+                    inputDeviceDropDown->setSelectedId (-1, dontSendNotification);
+            }
+
+            // Intermittent startup race: combined capture device types may fail
+            // to open on first attempt during type switch/startup. Apply a
+            // concrete combined selection once.
+            if (isCombinedSelectionType()
+                && ! attemptingCombinedTypeRecovery
+                && ! hasAttemptedCombinedTypeRecovery)
+            {
+                hasAttemptedCombinedTypeRecovery = true;
+                const ScopedValueSetter<bool> recoveryScope (attemptingCombinedTypeRecovery, true);
+
+                auto config = setup.manager->getAudioDeviceSetup();
+
+                const auto inputName = (inputDeviceDropDown != nullptr && inputDeviceDropDown->getNumItems() > 0)
+                                         ? inputDeviceDropDown->getText()
+                                         : getCombinedDefaultInputName();
+
+                auto outputName = getCombinedDefaultOutputName();
+                if (outputDeviceDropDown != nullptr)
+                {
+                    const auto selected = outputDeviceDropDown->getText();
+                    if (selected.isNotEmpty() && selected != getNoDeviceString())
+                        outputName = selected;
+                }
+
+                config.outputDeviceName = makeCombinedDeviceName (inputName, outputName);
+                config.inputDeviceName = config.outputDeviceName;
+                config.useDefaultInputChannels = true;
+                config.useDefaultOutputChannels = true;
+
+                setup.manager->setAudioDeviceSetup (config, true);
+            }
         }
 
         sendLookAndFeelChange();
@@ -625,29 +673,128 @@ private:
     std::unique_ptr<TextButton> testButton;
     std::unique_ptr<Component> inputLevelMeter;
     std::unique_ptr<TextButton> showUIButton, showAdvancedSettingsButton, resetDeviceButton;
+    bool attemptingCombinedTypeRecovery = false;
+    bool hasAttemptedCombinedTypeRecovery = false;
+
+    bool isCombinedSelectionType() const
+    {
+        const auto typeName = type.getTypeName();
+        return typeName == "Process Audio" || typeName == "Windows Loopback";
+    }
+
+    juce::String getCombinedDefaultInputName() const
+    {
+        return "System Audio";
+    }
+
+    juce::String getCombinedDefaultOutputName() const
+    {
+        if (type.getTypeName() == "Process Audio")
+            return "<< none >>";
+
+        if (type.getTypeName() == "Windows Loopback")
+            return "Default Output";
+
+        return {};
+    }
+
+    juce::String makeCombinedDeviceName (const juce::String& inputName, const juce::String& outputName) const
+    {
+#if JUCE_MAC && OSCI_PREMIUM
+        if (type.getTypeName() == "Process Audio")
+            return ProcessAudioDeviceType::makeCombinedDeviceName (inputName, outputName);
+#endif
+
+#if JUCE_WINDOWS && OSCI_PREMIUM
+        if (type.getTypeName() == "Windows Loopback")
+            return WindowsLoopbackAudioDeviceType::makeCombinedDeviceName (inputName, outputName);
+#endif
+
+        return {};
+    }
+
+    juce::StringArray getCombinedChoiceNames (bool isInput) const
+    {
+#if JUCE_MAC && OSCI_PREMIUM
+        if (auto* processType = dynamic_cast<ProcessAudioDeviceType*> (&type))
+            return isInput ? processType->getProcessChoiceNames()
+                           : processType->getOutputChoiceNames();
+#endif
+
+#if JUCE_WINDOWS && OSCI_PREMIUM
+        if (auto* loopbackType = dynamic_cast<WindowsLoopbackAudioDeviceType*> (&type))
+            return isInput ? loopbackType->getInputChoiceNames()
+                           : loopbackType->getOutputChoiceNames();
+#endif
+
+        return {};
+    }
+
+    void addCombinedNamesToDeviceBox (ComboBox& combo, bool isInputs)
+    {
+        const auto devs = getCombinedChoiceNames (isInputs);
+
+        if (devs.isEmpty())
+        {
+            addNamesToDeviceBox (combo, isInputs);
+            return;
+        }
+
+        combo.clear (dontSendNotification);
+
+        for (int i = 0; i < devs.size(); ++i)
+            combo.addItem (devs[i], i + 1);
+
+        if (isInputs)
+        {
+            const int defaultInputIndex = devs.indexOf (getCombinedDefaultInputName());
+            if (defaultInputIndex >= 0)
+                combo.setSelectedId (defaultInputIndex + 1, dontSendNotification);
+            else
+                combo.setSelectedId (1, dontSendNotification);
+
+            return;
+        }
+
+        if (type.getTypeName() == "Process Audio")
+        {
+            combo.addItem (getNoDeviceString(), -1);
+            combo.setSelectedId (-1, dontSendNotification);
+            return;
+        }
+
+        const int defaultOutputIndex = devs.indexOf (getCombinedDefaultOutputName());
+        if (defaultOutputIndex >= 0)
+            combo.setSelectedId (defaultOutputIndex + 1, dontSendNotification);
+        else
+            combo.setSelectedId (1, dontSendNotification);
+    }
+
+    int findCombinedSelectedDeviceIndex (bool isInput, const juce::String& deviceName) const
+    {
+        const auto choices = getCombinedChoiceNames (isInput);
+        if (choices.isEmpty())
+            return -1;
+
+        const auto arrowPos = deviceName.indexOf (" -> ");
+        if (arrowPos > 0)
+        {
+            const auto inputName = deviceName.substring (0, arrowPos).trim();
+            const auto outputName = deviceName.substring (arrowPos + 4).trim();
+            return choices.indexOf (isInput ? inputName : outputName);
+        }
+
+        return choices.indexOf (isInput ? getCombinedDefaultInputName()
+                                        : getCombinedDefaultOutputName());
+    }
 
     int findSelectedDeviceIndex (bool isInput) const
     {
         const auto device = setup.manager->getAudioDeviceSetup();
         const auto deviceName = isInput ? device.inputDeviceName : device.outputDeviceName;
 
-        if (type.getTypeName() == "Process Audio")
-        {
-#if JUCE_MAC && OSCI_PREMIUM
-            if (auto* processType = dynamic_cast<ProcessAudioDeviceType*> (&type))
-            {
-                const auto arrowPos = deviceName.indexOf (" -> ");
-                if (arrowPos > 0)
-                {
-                    const auto procName = deviceName.substring (0, arrowPos).trim();
-                    const auto outName  = deviceName.substring (arrowPos + 4).trim();
-                    return isInput ? processType->getProcessChoiceNames().indexOf (procName)
-                                   : processType->getOutputChoiceNames().indexOf (outName);
-                }
-            }
-#endif
-            return -1;
-        }
+        if (isCombinedSelectionType())
+            return findCombinedSelectedDeviceIndex (isInput, deviceName);
 
         return type.getDeviceNames (isInput).indexOf (deviceName);
     }
@@ -747,7 +894,8 @@ private:
 
                 addAndMakeVisible (outputDeviceDropDown.get());
 
-                outputDeviceLabel = std::make_unique<Label> (String{}, (type.getTypeName() == "Process Audio" || type.hasSeparateInputsAndOutputs())
+                outputDeviceLabel = std::make_unique<Label> (String{}, (isCombinedSelectionType()
+                                                                        || type.hasSeparateInputsAndOutputs())
                                                                                                           ? TRANS ("Output:")
                                                                                                           : TRANS ("Device:"));
                 outputDeviceLabel->attachToComponent (outputDeviceDropDown.get(), true);
@@ -760,8 +908,8 @@ private:
                 }
             }
 
-            if (type.getTypeName() == "Process Audio")
-                addProcessAudioNamesToDeviceBox (*outputDeviceDropDown, false);
+            if (isCombinedSelectionType())
+                addCombinedNamesToDeviceBox (*outputDeviceDropDown, false);
             else
                 addNamesToDeviceBox (*outputDeviceDropDown, false);
         }
@@ -771,7 +919,8 @@ private:
 
     void updateInputsComboBox()
     {
-        if (setup.maxNumInputChannels > 0 && (type.hasSeparateInputsAndOutputs() || type.getTypeName() == "Process Audio"))
+        if (setup.maxNumInputChannels > 0
+            && (type.hasSeparateInputsAndOutputs() || isCombinedSelectionType()))
         {
             if (inputDeviceDropDown == nullptr)
             {
@@ -786,37 +935,12 @@ private:
                 addAndMakeVisible (inputLevelMeter.get());
             }
 
-            if (type.getTypeName() == "Process Audio")
-                addProcessAudioNamesToDeviceBox (*inputDeviceDropDown, true);
+            if (isCombinedSelectionType())
+                addCombinedNamesToDeviceBox (*inputDeviceDropDown, true);
             else
                 addNamesToDeviceBox (*inputDeviceDropDown, true);
         }
         updateSelectedInput();
-    }
-
-    void addProcessAudioNamesToDeviceBox (ComboBox& combo, bool isInputs)
-    {
-#if JUCE_MAC && OSCI_PREMIUM
-        if (auto* processType = dynamic_cast<ProcessAudioDeviceType*> (&type))
-        {
-            const auto devs = isInputs ? processType->getProcessChoiceNames()
-                                       : processType->getOutputChoiceNames();
-
-            combo.clear (dontSendNotification);
-
-            for (int i = 0; i < devs.size(); ++i)
-                combo.addItem (devs[i], i + 1);
-
-            combo.addItem (getNoDeviceString(), -1);
-            combo.setSelectedId (-1, dontSendNotification);
-        }
-        else
-        {
-            addNamesToDeviceBox (combo, isInputs);
-        }
-#else
-        addNamesToDeviceBox (combo, isInputs);
-#endif
     }
 
     void updateSampleRateComboBox (AudioIODevice* currentDevice)
