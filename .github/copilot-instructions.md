@@ -165,9 +165,28 @@ Lua scripts in `Resources/lua/` receive global variables:
 
 ## Testing
 
-Run via CI script: `./ci/test.sh`
+Test files live in `tests/`. Test configuration is defined in `osci-render-test.jucer`.
 
-Test configuration defined in `osci-render-test.jucer`.
+### Running tests locally
+
+Use `run_tests.sh` for the quickest local iteration:
+
+```bash
+# Run all tests
+./run_tests.sh
+
+# Run only LFO stress tests
+./run_tests.sh --category LFO
+
+# Build and run in Release mode
+./run_tests.sh --release
+```
+
+### Running via CI
+
+```bash
+./ci/test.sh
+```
 
 ## Key Files Reference
 
