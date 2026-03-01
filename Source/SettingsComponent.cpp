@@ -1,8 +1,12 @@
 #include "SettingsComponent.h"
 
 #include "PluginEditor.h"
+#include "components/EffectComponent.h"
 
-SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
+SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor)
+    : audioProcessor(p), pluginEditor(editor),
+      envelope(p), lfo(p),
+      keyboard(p.keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard) {
     addAndMakeVisible(effects);
     addAndMakeVisible(fileControls);
     addAndMakeVisible(perspective);
@@ -11,6 +15,39 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     addAndMakeVisible(midi);
     addChildComponent(frame);
     addChildComponent(examples);
+
+    // Envelope setup
+    addAndMakeVisible(envelope);
+    envelope.setDahdsrParams(audioProcessor.getCurrentDahdsrParams());
+    envelope.setGrid(EnvelopeComponent::GridBoth, EnvelopeComponent::GridNone, 0.1, 0.25);
+
+    // LFO setup
+    addAndMakeVisible(lfo);
+    lfo.onDragActiveChanged = [](bool isDragging) {
+        EffectComponent::lfoAnyDragActive.store(isDragging, std::memory_order_relaxed);
+        juce::MessageManager::callAsync([] {
+            auto& desktop = juce::Desktop::getInstance();
+            for (int i = 0; i < desktop.getNumComponents(); ++i)
+                desktop.getComponent(i)->repaint();
+        });
+    };
+
+    // Keyboard
+    addAndMakeVisible(keyboard);
+
+    // DAHDSR parameter listeners (for envelope display updates)
+    audioProcessor.attackTime->addListener(&dahdsrListener);
+    audioProcessor.delayTime->addListener(&dahdsrListener);
+    audioProcessor.attackShape->addListener(&dahdsrListener);
+    audioProcessor.holdTime->addListener(&dahdsrListener);
+    audioProcessor.decayTime->addListener(&dahdsrListener);
+    audioProcessor.decayShape->addListener(&dahdsrListener);
+    audioProcessor.sustainLevel->addListener(&dahdsrListener);
+    audioProcessor.releaseTime->addListener(&dahdsrListener);
+    audioProcessor.releaseShape->addListener(&dahdsrListener);
+
+    // Envelope flow-marker animation
+    startTimerHz(60);
 
     examples.onClosed = [this]() {
         showExamples(false);
@@ -59,6 +96,16 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
 }
 
 SettingsComponent::~SettingsComponent() {
+    stopTimer();
+    audioProcessor.attackTime->removeListener(&dahdsrListener);
+    audioProcessor.delayTime->removeListener(&dahdsrListener);
+    audioProcessor.attackShape->removeListener(&dahdsrListener);
+    audioProcessor.holdTime->removeListener(&dahdsrListener);
+    audioProcessor.decayTime->removeListener(&dahdsrListener);
+    audioProcessor.decayShape->removeListener(&dahdsrListener);
+    audioProcessor.sustainLevel->removeListener(&dahdsrListener);
+    audioProcessor.releaseTime->removeListener(&dahdsrListener);
+    audioProcessor.releaseShape->removeListener(&dahdsrListener);
     audioProcessor.visualiserParameters.visualiserFullScreen->removeListener(this);
 }
 
@@ -86,10 +133,26 @@ void SettingsComponent::resized() {
         return;
     }
 
-    // 5-component horizontal layout: visColumn | resizer | effectsColumn | resizer2 | midiColumn
-    juce::Component visColumn, effectsColumn;
-    juce::Component* columns[] = { &visColumn, &mainResizerBar, &effectsColumn, &midiResizerBar, &midi };
+    // 5-component horizontal layout: visColumn | resizer | effectsColumn | resizer2 | rightColumn
+    juce::Component visColumn, effectsColumn, rightColumn;
+    juce::Component* columns[] = { &visColumn, &mainResizerBar, &effectsColumn, &midiResizerBar, &rightColumn };
     mainLayout.layOutComponents(columns, 5, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
+
+    // --- Keyboard at bottom, spanning effects + resizer + right columns ---
+    static constexpr int keyboardHeight = 50;
+    auto effectsBounds = effectsColumn.getBounds();
+    auto rightBounds = rightColumn.getBounds();
+
+    auto keyboardBounds = juce::Rectangle<int>(
+        effectsBounds.getX(),
+        area.getBottom() - keyboardHeight,
+        rightBounds.getRight() - effectsBounds.getX(),
+        keyboardHeight);
+    keyboard.setBounds(keyboardBounds);
+
+    // Trim columns to exclude keyboard + gap
+    effectsBounds.removeFromBottom(keyboardHeight + padding);
+    rightBounds.removeFromBottom(keyboardHeight + padding);
 
     // --- Left column: file controls, volume, visualiser ---
     auto visBounds = visColumn.getBounds();
@@ -114,8 +177,6 @@ void SettingsComponent::resized() {
     }
 
     // --- Middle column: effects, perspective, frame settings ---
-    auto effectsBounds = effectsColumn.getBounds();
-
     if (!examplesVisible) {
         if (frame.isVisible()) {
             int preferredHeight = frame.getPreferredHeight();
@@ -139,8 +200,16 @@ void SettingsComponent::resized() {
         effects.setBounds(effectsBounds);
     }
 
-    // --- Right column: midi (already positioned by layOutComponents) ---
-    midi.setBounds(midi.getBounds());
+    // --- Right column: MIDI settings (compact), envelope, LFO ---
+    static constexpr int midiGroupHeight = 60;
+    midi.setBounds(rightBounds.removeFromTop(midiGroupHeight));
+    rightBounds.removeFromTop(padding);
+
+    // Split remaining: top 55% envelope, bottom 45% LFO
+    auto lfoArea = rightBounds.removeFromBottom(rightBounds.getHeight() * 45 / 100);
+    rightBounds.removeFromBottom(5);
+    envelope.setBounds(rightBounds);
+    lfo.setBounds(lfoArea);
 
     if (isVisible() && getWidth() > 0 && getHeight() > 0) {
         audioProcessor.setProperty("mainLayoutVisSize", mainLayout.getItemCurrentRelativeSize(0));
@@ -208,4 +277,36 @@ void SettingsComponent::showExamples(bool shouldShow) {
 }
 
 void SettingsComponent::mouseDown(const juce::MouseEvent& event) {
+}
+
+// --- Envelope flow-marker animation (moved from MidiComponent) ---
+
+void SettingsComponent::timerCallback() {
+    if (!audioProcessor.midiEnabled->getBoolValue()) {
+        envelope.getEnvelopeComponent()->resetFlowPersistenceForUi();
+        return;
+    }
+
+    constexpr int kMax = OscirenderAudioProcessor::kMaxUiVoices;
+    double times[kMax];
+    bool anyActive = false;
+    for (int i = 0; i < kMax; ++i) {
+        if (audioProcessor.uiVoiceActive[i].load(std::memory_order_relaxed)) {
+            times[i] = audioProcessor.uiVoiceEnvelopeTimeSeconds[i].load(std::memory_order_relaxed);
+            anyActive = true;
+        } else {
+            times[i] = -1.0;
+        }
+    }
+
+    if (!anyActive) {
+        envelope.getEnvelopeComponent()->clearFlowMarkerTimesForUi();
+        return;
+    }
+
+    envelope.getEnvelopeComponent()->setFlowMarkerTimesForUi(times, kMax);
+}
+
+void SettingsComponent::DahdsrListener::handleAsyncUpdate() {
+    owner.envelope.setDahdsrParams(owner.audioProcessor.getCurrentDahdsrParams());
 }

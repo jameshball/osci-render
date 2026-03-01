@@ -1,8 +1,10 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <melatonin_blur/melatonin_blur.h>
 #include "NodeGraphComponent.h"
-#include "../audio/LfoState.h"
+#include "LfoRateComponent.h"
+#include "../../audio/LfoState.h"
 
 class OscirenderAudioProcessor;
 
@@ -39,7 +41,7 @@ public:
     static juce::Colour getLfoColour(int lfoIndex);
 
     // Force-refresh all depth indicators from processor assignments.
-    void refreshAllDepthIndicators();
+    void refreshAllDepthIndicators(const std::vector<LfoAssignment>& assignments);
 
     // Sync UI state from processor after a state load (presets, waveforms, active tab).
     void syncFromProcessorState();
@@ -75,6 +77,7 @@ private:
         void showValuePopup();
         void hideValuePopup();
         void startTextEdit();
+        void removeAndRefresh();
 
         LfoComponent& owner;
         int lfoIndex;
@@ -98,10 +101,12 @@ private:
         void mouseDown(const juce::MouseEvent& e) override;
         void mouseDrag(const juce::MouseEvent& e) override;
         void mouseUp(const juce::MouseEvent& e) override;
+        void mouseEnter(const juce::MouseEvent& e) override;
+        void mouseExit(const juce::MouseEvent& e) override;
         void resized() override;
 
         // Rebuild depth indicators from current assignments.
-        void refreshDepthIndicators();
+        void refreshDepthIndicators(const std::vector<LfoAssignment>& assignments);
 
         // Update the LFO value indicator (called from timer)
         void setLfoValue(float value01) {
@@ -115,6 +120,7 @@ private:
         int lfoIndex;
         LfoComponent& owner;
         bool isDragging = false;
+        bool isHovering = false;
         float lfoValue = 0.0f;  // current LFO output 0..1
         float lfoDelta = 0.0f;  // change since last update
 
@@ -141,8 +147,19 @@ private:
         juce::Rectangle<int> leftArrowArea, rightArrowArea;
     };
     PresetSelector presetSelector;
-    juce::Slider rateSlider;
-    juce::Label rateLabel;
+    LfoRateComponent rateControl;
+
+    // --- Layout constants ---
+    static constexpr int kTabWidth         = 75;
+    static constexpr int kTabGap           = 1;
+    static constexpr int kContentInset     = 4;
+    static constexpr int kTopBarHeight     = 22;
+    static constexpr int kTopBarGap        = 4;
+    static constexpr int kRateHeight       = 40;
+    static constexpr int kRateGap          = 4;
+    static constexpr int kMaxPresetWidth   = 180;
+    static constexpr int kMaxRateWidth     = 130;
+    static constexpr int kSeamShadowWidth  = 10;
 
     // --- Internal methods ---
     void switchToLfo(int index);
@@ -152,6 +169,9 @@ private:
     void applyPreset(LfoPreset preset);
     void updatePresetLabel();
     void applyLfoConstraints(int nodeIndex, double& time, double& value);
+
+    // Cached drop shadow for the panel edge onto the tab area
+    melatonin::DropShadow panelEdgeShadow { juce::Colours::black.withAlpha(0.35f), 6, { -2, 0 } };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LfoComponent)
 };

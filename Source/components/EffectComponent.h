@@ -4,6 +4,8 @@
 #include "LabelledTextBox.h"
 #include "SvgButton.h"
 
+class OscirenderAudioProcessor;
+
 class EffectComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater, public juce::SettableTooltipClient, private juce::Slider::Listener, public juce::DragAndDropTarget {
 public:
     EffectComponent(osci::Effect& effect, int index);
@@ -19,8 +21,8 @@ public:
 
     // LFO range highlight: when hovering a depth indicator, show the modulated range on the slider
     static juce::String lfoRangeParamId;
-    static float lfoRangeDepth;
-    static bool lfoRangeBipolar;
+    static std::atomic<float> lfoRangeDepth;
+    static std::atomic<bool> lfoRangeBipolar;
 
     void resized() override;
     void paint(juce::Graphics& g) override;
@@ -47,6 +49,25 @@ public:
     // Callback invoked when an LFO is dropped on this slider.
     // Parameters: lfoIndex, paramId
     std::function<void(int, const juce::String&)> onLfoDropped;
+
+    // Struct returned by the LFO modulation query callback.
+    struct LfoModInfo {
+        bool active = false;           // true if any LFO is assigned to this param
+        float modulatedPos = 0.0f;     // pixel position of the current modulated value
+        juce::Colour colour;           // blended colour from all assigned LFOs
+    };
+
+    // Callback: given a paramId, returns LFO modulation info.
+    // Set by the parent that has access to the processor.
+    std::function<LfoModInfo(const juce::String& paramId, juce::Slider& slider)> queryLfoModulation;
+
+    // Shared implementation of LFO modulation query.
+    static LfoModInfo computeLfoModulation(OscirenderAudioProcessor& processor,
+                                           const juce::String& paramId,
+                                           juce::Slider& slider);
+
+    // Update LFO modulation display (call from a parent timer, not per-instance).
+    void updateLfoModulation();
 
     juce::Slider slider;
     juce::Slider lfoSlider;

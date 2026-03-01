@@ -123,8 +123,16 @@ public:
     // === Global LFO system ===
     osci::FloatParameter* lfoRate[NUM_LFOS];
 
+    // DAW or standalone BPM – updated every processBlock
+    std::atomic<double> currentBpm{120.0};
+
+    // Standalone-only BPM parameter (automatable)
+    osci::FloatParameter* standaloneBpm = new osci::FloatParameter("Tempo", "standaloneBpm", VERSION_HINT, 120.0f, 20.0f, 300.0f, 0.1f);
+
     // UI-persisted LFO state (preset type + active tab)
     LfoPreset lfoPresets[NUM_LFOS] = { LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle };
+    LfoRateMode lfoRateModes[NUM_LFOS] = { LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds };
+    int lfoTempoDivisions[NUM_LFOS] = { 8, 8, 8, 8 };  // index into getTempoDivisions(), default 1/4
     int activeLfoTab = 0;
 
     void lfoWaveformChanged(int index, const LfoWaveform& waveform);
@@ -135,6 +143,14 @@ public:
 
     // Get the current LFO output value (0..1) for visualization
     float getLfoCurrentValue(int lfoIndex) const;
+
+    // Thread-safe setters for LFO rate mode/division (acquires lfoWaveformLock)
+    void setLfoRateMode(int lfoIndex, LfoRateMode mode);
+    void setLfoTempoDivision(int lfoIndex, int divisionIndex);
+
+    // Thread-safe getters for LFO rate mode/division
+    LfoRateMode getLfoRateMode(int lfoIndex) const;
+    int getLfoTempoDivision(int lfoIndex) const;
 
     juce::MidiKeyboardState keyboardState;
 
@@ -320,6 +336,9 @@ private:
     juce::SpinLock lfoAssignmentLock;
     LfoAudioState lfoAudioStates[NUM_LFOS];
     std::array<std::vector<float>, NUM_LFOS> lfoBlockBuffer;
+
+    // Thread-safe snapshot of most recent LFO output for UI visualization
+    std::atomic<float> lfoCurrentValues[NUM_LFOS] = {};
 
     void applyGlobalLfoModulation(int numSamples, double sampleRate);
 

@@ -314,9 +314,11 @@ public:
 	explicit EnvelopeContainerComponent(OscirenderAudioProcessor& processor, juce::String defaultText = juce::String());
 	~EnvelopeContainerComponent();
 	void resized();
+	void paint(juce::Graphics& g) override;
+	void paintOverChildren(juce::Graphics& g) override;
 	
-	EnvelopeComponent* getEnvelopeComponent() const		{ return envelope; }
-	EnvelopeLegendComponent* getLegendComponent() const	{ return legend;   }
+	EnvelopeComponent* getEnvelopeComponent() const		{ return envelope.get(); }
+	EnvelopeLegendComponent* getLegendComponent() const	{ return legend.get();   }
 
 
 	
@@ -333,8 +335,8 @@ public:
 
 
 private:
-	EnvelopeComponent*			envelope;
-	EnvelopeLegendComponent*	legend;
+	std::unique_ptr<EnvelopeComponent>		envelope;
+	std::unique_ptr<EnvelopeLegendComponent>	legend;
 };
 
 #endif // gpl

@@ -1,5 +1,5 @@
 #include "NodeGraphComponent.h"
-#include "../LookAndFeel.h"
+#include "../../LookAndFeel.h"
 
 // ============================================================================
 // HandleComponent
@@ -115,27 +115,7 @@ int NodeGraphComponent::getNumNodes() const {
 // --- Evaluation ---
 
 float NodeGraphComponent::lookup(float time) const {
-    if (nodes.empty()) return 0.0f;
-    if (nodes.size() == 1) return (float)nodes[0].value;
-
-    // Before first node
-    if (time <= (float)nodes.front().time) return (float)nodes.front().value;
-    // After last node
-    if (time >= (float)nodes.back().time) return (float)nodes.back().value;
-
-    // Find the segment
-    for (size_t i = 1; i < nodes.size(); ++i) {
-        if (time <= (float)nodes[i].time) {
-            float start = (float)nodes[i - 1].value;
-            float end = (float)nodes[i].value;
-            double elapsed = (double)time - nodes[i - 1].time;
-            double duration = nodes[i].time - nodes[i - 1].time;
-            float curve = nodes[i].curve;
-            return osci_audio::evalSegment(start, end, elapsed, duration, curve);
-        }
-    }
-
-    return (float)nodes.back().value;
+    return evaluateGraphCurve(nodes, time);
 }
 
 // --- Coordinate Conversion ---

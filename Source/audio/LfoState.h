@@ -3,17 +3,16 @@
 #include <JuceHeader.h>
 #include <vector>
 #include <cmath>
-#include "DahdsrEnvelope.h"
+#include "GraphNode.h"
 
 // Number of global LFOs available.
-static constexpr int NUM_LFOS = 4;
+namespace lfo {
+    inline constexpr int NUM_LFOS = 4;
+}
+using lfo::NUM_LFOS;
 
-// A single node in an LFO waveform (one cycle, domain [0,1], value [0,1]).
-struct LfoNode {
-    double time = 0.0;   // [0, 1]
-    double value = 0.0;  // [0, 1]
-    float curve = 0.0f;  // Exponential curvature for incoming segment (-50 to +50)
-};
+// LfoNode is the same struct as GraphNode.
+using LfoNode = GraphNode;
 
 // Represents a single LFO waveform as a set of breakpoints over one normalized cycle.
 struct LfoWaveform {
@@ -21,29 +20,8 @@ struct LfoWaveform {
 
     // Evaluate the waveform at a given phase [0, 1] -> value [0, 1].
     float evaluate(float phase) const {
-        if (nodes.empty()) return 0.0f;
-        if (nodes.size() == 1) return (float)nodes[0].value;
-
-        // Wrap phase to [0, 1]
         phase = phase - std::floor(phase);
-
-        // Before first node
-        if (phase <= (float)nodes.front().time) return (float)nodes.front().value;
-        // After last node
-        if (phase >= (float)nodes.back().time) return (float)nodes.back().value;
-
-        // Find segment
-        for (size_t i = 1; i < nodes.size(); ++i) {
-            if (phase <= (float)nodes[i].time) {
-                float start = (float)nodes[i - 1].value;
-                float end = (float)nodes[i].value;
-                double elapsed = (double)phase - nodes[i - 1].time;
-                double duration = nodes[i].time - nodes[i - 1].time;
-                return osci_audio::evalSegment(start, end, elapsed, duration, nodes[i].curve);
-            }
-        }
-
-        return (float)nodes.back().value;
+        return evaluateGraphCurve(nodes, phase);
     }
 
     void saveToXml(juce::XmlElement* parent) const {
@@ -185,3 +163,85 @@ struct LfoAudioState {
         phase = 0.0f;
     }
 };
+
+// ============================================================================
+// LFO Rate Modes — Hz, Tempo, Tempo Dotted, Tempo Triplets
+// ============================================================================
+
+enum class LfoRateMode {
+    Seconds,       // Free-running Hz
+    Tempo,         // Synced to BPM (straight)
+    TempoDotted,   // Synced to BPM (dotted = 1.5× duration)
+    TempoTriplets  // Synced to BPM (triplet = 2/3× duration)
+};
+
+inline juce::String lfoRateModeToString(LfoRateMode mode) {
+    switch (mode) {
+        case LfoRateMode::Seconds:       return "Seconds";
+        case LfoRateMode::Tempo:         return "Tempo";
+        case LfoRateMode::TempoDotted:   return "Dotted";
+        case LfoRateMode::TempoTriplets: return "Triplets";
+    }
+    return "Seconds";
+}
+
+inline LfoRateMode stringToLfoRateMode(const juce::String& s) {
+    if (s == "Seconds")  return LfoRateMode::Seconds;
+    if (s == "Tempo")    return LfoRateMode::Tempo;
+    if (s == "Dotted")   return LfoRateMode::TempoDotted;
+    if (s == "Triplets") return LfoRateMode::TempoTriplets;
+    return LfoRateMode::Seconds;
+}
+
+// Tempo division: represents a note duration as numerator/denominator (e.g. 1/4 = quarter note).
+// "Freeze" is encoded as 0/1.
+struct TempoDivision {
+    int numerator;
+    int denominator;
+
+    juce::String toString() const {
+        if (numerator == 0) return "Freeze";
+        return juce::String(numerator) + "/" + juce::String(denominator);
+    }
+
+    // Duration in beats (e.g. 1/4 = 1 beat in 4/4 time, 4/1 = 16 beats)
+    double durationInBeats() const {
+        if (denominator == 0 || numerator == 0) return 0.0;
+        return 4.0 * (double)numerator / (double)denominator;
+    }
+
+    // Convert to Hz given BPM.
+    // For straight: Hz = bpm / (60 * durationInBeats)
+    // For dotted:   multiply duration by 1.5
+    // For triplet:  multiply duration by 2/3
+    double toHz(double bpm, LfoRateMode mode) const {
+        if (numerator == 0 || bpm <= 0.0) return 0.0;
+        double beats = durationInBeats();
+        if (mode == LfoRateMode::TempoDotted)   beats *= 1.5;
+        if (mode == LfoRateMode::TempoTriplets)  beats *= 2.0 / 3.0;
+        double seconds = beats * 60.0 / bpm;
+        return (seconds > 0.0) ? (1.0 / seconds) : 0.0;
+    }
+
+    bool operator==(const TempoDivision& o) const { return numerator == o.numerator && denominator == o.denominator; }
+};
+
+// All available tempo divisions in order.
+inline const std::vector<TempoDivision>& getTempoDivisions() {
+    static const std::vector<TempoDivision> divisions = {
+        { 0,  1 },   // Freeze
+        { 32, 1 },
+        { 16, 1 },
+        { 8,  1 },
+        { 4,  1 },
+        { 2,  1 },
+        { 1,  1 },
+        { 1,  2 },
+        { 1,  4 },
+        { 1,  8 },
+        { 1,  16 },
+        { 1,  32 },
+        { 1,  64 },
+    };
+    return divisions;
+}

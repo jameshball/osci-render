@@ -1,7 +1,8 @@
 #include "LfoComponent.h"
-#include "EffectComponent.h"
-#include "../PluginProcessor.h"
-#include "../LookAndFeel.h"
+#include "../EffectComponent.h"
+#include "../../PluginProcessor.h"
+#include "../../LookAndFeel.h"
+#include "InlineEditorHelper.h"
 
 // ============================================================================
 // DepthIndicator – small arc knob for a single LFO→param connection
@@ -65,17 +66,13 @@ void LfoComponent::DepthIndicator::mouseDrag(const juce::MouseEvent& e) {
     float dy = (float)(e.getPosition().y - e.getMouseDownPosition().y);
     float delta = -dy / 80.0f;
     float newDepth = dragStartDepth + delta;
-    if (bipolar)
-        depth = juce::jlimit(-1.0f, 1.0f, newDepth);
-    else
-        depth = juce::jlimit(0.0f, 1.0f, newDepth);
+    depth = juce::jlimit(-1.0f, 1.0f, newDepth);
     owner.audioProcessor.addLfoAssignment({ lfoIndex, paramId, depth, bipolar });
     // Keep the slider range overlay in sync during drag
     EffectComponent::lfoRangeDepth = depth;
     showValuePopup();
     repaint();
-    if (auto* topLevel = getTopLevelComponent())
-        topLevel->repaint();
+    owner.repaint();
 }
 
 void LfoComponent::DepthIndicator::mouseUp(const juce::MouseEvent&) {
@@ -91,8 +88,7 @@ void LfoComponent::DepthIndicator::mouseEnter(const juce::MouseEvent&) {
     EffectComponent::lfoRangeBipolar = bipolar;
     showValuePopup();
     repaint();
-    if (auto* topLevel = getTopLevelComponent())
-        topLevel->repaint();
+    owner.repaint();
 }
 
 void LfoComponent::DepthIndicator::mouseExit(const juce::MouseEvent&) {
@@ -102,14 +98,24 @@ void LfoComponent::DepthIndicator::mouseExit(const juce::MouseEvent&) {
     if (!dragging)
         hideValuePopup();
     repaint();
-    if (auto* topLevel = getTopLevelComponent())
-        topLevel->repaint();
+    owner.repaint();
 }
 
 void LfoComponent::DepthIndicator::mouseDoubleClick(const juce::MouseEvent&) {
-    // Double-click removes the connection
+    removeAndRefresh();
+}
+
+void LfoComponent::DepthIndicator::removeAndRefresh() {
     owner.audioProcessor.removeLfoAssignment(lfoIndex, paramId);
-    // The next timer tick will rebuild indicators
+
+    // Async to avoid mutating component hierarchy mid-callback
+    juce::Component::SafePointer<LfoComponent> safeOwner(&owner);
+    juce::MessageManager::callAsync([safeOwner]() {
+        if (safeOwner == nullptr)
+            return;
+        safeOwner->refreshAllDepthIndicators(safeOwner->audioProcessor.getLfoAssignments());
+        safeOwner->repaint();
+    });
 }
 
 void LfoComponent::DepthIndicator::showRightClickMenu() {
@@ -122,11 +128,9 @@ void LfoComponent::DepthIndicator::showRightClickMenu() {
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this),
         [this](int result) {
             if (result == 1) {
-                owner.audioProcessor.removeLfoAssignment(lfoIndex, paramId);
+                removeAndRefresh();
             } else if (result == 2) {
                 bipolar = !bipolar;
-                if (!bipolar && depth < 0.0f)
-                    depth = -depth;
                 owner.audioProcessor.addLfoAssignment({ lfoIndex, paramId, depth, bipolar });
                 repaint();
             } else if (result == 3) {
@@ -137,37 +141,25 @@ void LfoComponent::DepthIndicator::showRightClickMenu() {
 
 void LfoComponent::DepthIndicator::startTextEdit() {
     if (inlineEditor) return;
-    inlineEditor = std::make_unique<juce::TextEditor>();
-    inlineEditor->setFont(juce::Font(11.0f, juce::Font::bold));
-    inlineEditor->setText(juce::String((int)(depth * 100.0f)), false);
-    inlineEditor->setJustification(juce::Justification::centred);
-    inlineEditor->setColour(juce::TextEditor::backgroundColourId, Dracula::background);
-    inlineEditor->setColour(juce::TextEditor::textColourId, Dracula::foreground);
-    inlineEditor->setColour(juce::TextEditor::outlineColourId, LfoComponent::getLfoColour(lfoIndex));
-    inlineEditor->setColour(juce::TextEditor::focusedOutlineColourId, LfoComponent::getLfoColour(lfoIndex));
-    inlineEditor->setBounds(getLocalBounds().expanded(8, 2));
-    addAndMakeVisible(inlineEditor.get());
-    inlineEditor->selectAll();
-    inlineEditor->grabKeyboardFocus();
-
-    inlineEditor->onReturnKey = [this]() {
-        float val = inlineEditor->getText().getFloatValue() / 100.0f;
-        if (bipolar)
-            depth = juce::jlimit(-1.0f, 1.0f, val);
-        else
-            depth = juce::jlimit(0.0f, 1.0f, val);
+    auto commitFn = [this](const juce::String& text) {
+        float val = text.getFloatValue() / 100.0f;
+        depth = juce::jlimit(-1.0f, 1.0f, val);
         owner.audioProcessor.addLfoAssignment({ lfoIndex, paramId, depth, bipolar });
         inlineEditor.reset();
         repaint();
     };
-    inlineEditor->onEscapeKey = [this]() {
+    auto cancelFn = [this]() {
         inlineEditor.reset();
         repaint();
     };
-    inlineEditor->onFocusLost = [this]() {
-        inlineEditor.reset();
-        repaint();
-    };
+    inlineEditor = InlineEditorHelper::create(
+        juce::String((int)(depth * 100.0f)),
+        getLocalBounds().expanded(8, 2),
+        { commitFn, cancelFn },
+        Dracula::background, Dracula::foreground,
+        LfoComponent::getLfoColour(lfoIndex), 11.0f);
+    addAndMakeVisible(inlineEditor.get());
+    inlineEditor->grabKeyboardFocus();
 }
 
 void LfoComponent::DepthIndicator::showValuePopup() {
@@ -213,20 +205,36 @@ void LfoComponent::DepthIndicator::hideValuePopup() {
 // ============================================================================
 
 LfoComponent::LfoTabHandle::LfoTabHandle(const juce::String& l, int index, LfoComponent& o)
-    : label(l), lfoIndex(index), owner(o) {}
+    : label(l), lfoIndex(index), owner(o) {
+    setMouseCursor(juce::MouseCursor::DraggingHandCursor);
+}
 
 void LfoComponent::LfoTabHandle::paint(juce::Graphics& g) {
     bool active = (lfoIndex == owner.activeLfoIndex);
     auto colour = LfoComponent::getLfoColour(lfoIndex);
+    auto bounds = getLocalBounds().toFloat();
+    constexpr float radius = 4.0f;
+
+    // Tab shape: rounded on left side only (flat right edge connects to panel)
+    juce::Path tabShape;
+    tabShape.addRoundedRectangle(bounds.getX(), bounds.getY(),
+                                  bounds.getWidth(), bounds.getHeight(),
+                                  radius, radius,
+                                  true,  false,   // top-left, top-right
+                                  true,  false);   // bottom-left, bottom-right
 
     if (active) {
-        g.setColour(colour.withAlpha(0.12f));
-        g.fillRoundedRectangle(getLocalBounds().toFloat(), 3.0f);
-        g.setColour(colour.withAlpha(0.5f));
-        g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(0.5f), 3.0f, 1.0f);
+        g.setColour(Colours::darker);
+        g.fillPath(tabShape);
     } else {
-        g.setColour(juce::Colours::white.withAlpha(0.03f));
-        g.fillRoundedRectangle(getLocalBounds().toFloat(), 3.0f);
+        g.setColour(Colours::darker.darker(0.5f));
+        g.fillPath(tabShape);
+
+        // Subtle inner shadow (darker at the right edge, toward the panel)
+        juce::ColourGradient shadow(juce::Colours::black.withAlpha(0.2f), bounds.getRight(), bounds.getCentreY(),
+                                     juce::Colours::transparentBlack, bounds.getRight() - 12.0f, bounds.getCentreY(), false);
+        g.setGradientFill(shadow);
+        g.fillPath(tabShape);
     }
 
     // Separate LFO value track on the left — full height of tab
@@ -235,28 +243,26 @@ void LfoComponent::LfoTabHandle::paint(juce::Graphics& g) {
     float trackX = trackPad;
     float trackY = trackPad;
     float trackH = (float)getHeight() - trackPad * 2.0f;
-    bool hasTrack = !depthIndicators.isEmpty();
+    bool hasAttachment = !depthIndicators.isEmpty();
 
     // Label centred in the remaining area (to the right of the track)
     {
-        int labelLeft = hasTrack ? (int)(trackX + trackWidth + 2.0f) : 0;
-        auto labelBounds = getLocalBounds().removeFromTop(16);
+        int labelLeft = (int)(trackX + trackWidth + 2.0f);
+        auto labelBounds = getLocalBounds().removeFromTop(20);
         labelBounds.setLeft(labelLeft);
-        g.setColour(active ? colour : juce::Colours::white.withAlpha(0.5f));
-        g.setFont(juce::Font(10.0f, juce::Font::bold));
+        g.setColour(active ? juce::Colours::white : juce::Colours::white.withAlpha(0.35f));
+        g.setFont(juce::Font(13.0f));
         g.drawText(label, labelBounds, juce::Justification::centred);
     }
 
-    if (hasTrack) {
+    // Always draw the value track (cutout-style rail)
+    auto trackRect = juce::Rectangle<float>(trackX, trackY, (float)trackWidth, trackH);
+    g.setColour(juce::Colours::black.withAlpha(0.32f));
+    g.fillRoundedRectangle(trackRect, (float)trackWidth * 0.5f);
+    g.setColour(juce::Colours::white.withAlpha(0.05f));
+    g.drawRoundedRectangle(trackRect, (float)trackWidth * 0.5f, 0.5f);
 
-        // Draw the track background (rounded rect rail)
-        auto trackRect = juce::Rectangle<float>(trackX, trackY, (float)trackWidth, trackH);
-        g.setColour(colour.withAlpha(0.08f));
-        g.fillRoundedRectangle(trackRect, (float)trackWidth * 0.5f);
-        g.setColour(colour.withAlpha(0.2f));
-        g.drawRoundedRectangle(trackRect, (float)trackWidth * 0.5f, 0.5f);
-
-        // Draw the pill marker inside the track
+    if (hasAttachment) {
         constexpr float pillBaseH = 5.0f;
         constexpr float pillMaxStretch = 14.0f;
         float stretch = juce::jlimit(0.0f, pillMaxStretch, std::abs(lfoDelta) * 80.0f);
@@ -270,6 +276,19 @@ void LfoComponent::LfoTabHandle::paint(juce::Graphics& g) {
         juce::Rectangle<float> pill(pillX, pillCentreY - pillH * 0.5f, pillW, pillH);
         g.setColour(colour.withAlpha(0.9f));
         g.fillRoundedRectangle(pill, pillW * 0.5f);
+    } else if (isHovering) {
+        // No connections — draw the drag hint icon on hover only
+        int labelH = 20;
+        int trackW = (int)(trackX + trackWidth + 2.0f);
+        auto emptyArea = getLocalBounds().withTrimmedTop(labelH).withTrimmedLeft(trackW).reduced(2);
+
+        if (auto svg = juce::Drawable::createFromImageData(BinaryData::drag_svg, BinaryData::drag_svgSize)) {
+            float iconSize = juce::jmin((float)emptyArea.getWidth(), (float)emptyArea.getHeight()) * 0.45f;
+            iconSize = juce::jmax(iconSize, 10.0f);
+            auto iconBounds = emptyArea.toFloat().withSizeKeepingCentre(iconSize, iconSize)
+                                  .translated(0.0f, -3.0f);
+            svg->drawWithin(g, iconBounds, juce::RectanglePlacement::centred, active ? 0.2f : 0.15f);
+        }
     }
 }
 
@@ -317,6 +336,16 @@ void LfoComponent::LfoTabHandle::mouseUp(const juce::MouseEvent&) {
     }
 }
 
+void LfoComponent::LfoTabHandle::mouseEnter(const juce::MouseEvent&) {
+    isHovering = true;
+    repaint();
+}
+
+void LfoComponent::LfoTabHandle::mouseExit(const juce::MouseEvent&) {
+    isHovering = false;
+    repaint();
+}
+
 void LfoComponent::LfoTabHandle::resized() {
     // Lay out depth indicators in a grid below the label, to the right of the track
     int n = depthIndicators.size();
@@ -327,9 +356,9 @@ void LfoComponent::LfoTabHandle::resized() {
     int availW = getWidth() - trackW - 1;
     int availH = getHeight() - labelH - 1;
 
-    int maxSize = 14;
+    int maxSize = juce::jmin(28, juce::jmax(14, juce::jmin(availW, availH) / juce::jmax(1, n)));
     int minSize = 8;
-    int spacing = 1;
+    int spacing = 2;
 
     int cols = juce::jmax(1, (availW + spacing) / (maxSize + spacing));
     int rows = (n + cols - 1) / cols;
@@ -355,8 +384,7 @@ void LfoComponent::LfoTabHandle::resized() {
     }
 }
 
-void LfoComponent::LfoTabHandle::refreshDepthIndicators() {
-    auto assignments = owner.audioProcessor.getLfoAssignments();
+void LfoComponent::LfoTabHandle::refreshDepthIndicators(const std::vector<LfoAssignment>& assignments) {
 
     // Build list of assignments for this LFO
     std::vector<LfoAssignment> myAssignments;
@@ -429,17 +457,20 @@ void LfoComponent::LfoTabHandle::refreshDepthIndicators() {
 // PresetSelector – Vital-style dark bar with arrows
 // ============================================================================
 
-LfoComponent::PresetSelector::PresetSelector() {}
+LfoComponent::PresetSelector::PresetSelector() {
+    setRepaintsOnMouseActivity(true);
+}
 
 void LfoComponent::PresetSelector::paint(juce::Graphics& g) {
     auto bounds = getLocalBounds().toFloat();
 
-    // Dark rounded background
-    g.setColour(juce::Colour(0xFF222222));
+    // Dark rounded background (matches LfoRateComponent)
+    g.setColour(Colours::veryDark);
     g.fillRoundedRectangle(bounds, 4.0f);
 
     // Subtle border
-    g.setColour(juce::Colours::white.withAlpha(0.06f));
+    bool hovering = isMouseOver(true);
+    g.setColour(juce::Colours::white.withAlpha(hovering ? 0.12f : 0.06f));
     g.drawRoundedRectangle(bounds.reduced(0.5f), 4.0f, 1.0f);
 
     // Left arrow
@@ -453,7 +484,7 @@ void LfoComponent::PresetSelector::paint(juce::Graphics& g) {
 
     // Preset name centered
     g.setColour(juce::Colours::white.withAlpha(0.9f));
-    g.setFont(juce::Font(13.0f, juce::Font::bold));
+    g.setFont(juce::Font(12.0f, juce::Font::bold));
     auto textArea = bounds.toNearestInt();
     textArea.removeFromLeft(leftArrowArea.getWidth());
     textArea.removeFromRight(rightArrowArea.getWidth());
@@ -493,7 +524,7 @@ juce::Colour LfoComponent::getLfoColour(int lfoIndex) {
 }
 
 LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
-    : audioProcessor(processor) {
+    : audioProcessor(processor), rateControl(processor, 0) {
     // Initialize all LFOs with default triangle preset
     for (int i = 0; i < NUM_LFOS; ++i) {
         lfoData[i].preset = LfoPreset::Triangle;
@@ -533,26 +564,9 @@ LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
     presetSelector.onNext = [this]() { cyclePreset(1); };
     addAndMakeVisible(presetSelector);
 
-    // Rate slider
-    rateSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    rateSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 16);
-    rateSlider.setRange(0.01, 100.0, 0.01);
-    rateSlider.setValue(1.0);
-    rateSlider.setSkewFactorFromMidPoint(5.0);
-    rateSlider.setTextValueSuffix(" Hz");
-    addAndMakeVisible(rateSlider);
-
-    rateLabel.setText("RATE", juce::dontSendNotification);
-    rateLabel.setJustificationType(juce::Justification::centred);
-    rateLabel.setFont(juce::Font(10.0f, juce::Font::bold));
-    rateLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.6f));
-    addAndMakeVisible(rateLabel);
-
-    // Wire rate slider to the processor parameter
-    rateSlider.onValueChange = [this]() {
-        if (audioProcessor.lfoRate[activeLfoIndex] != nullptr)
-            audioProcessor.lfoRate[activeLfoIndex]->setUnnormalisedValueNotifyingHost((float)rateSlider.getValue());
-    };
+    // Rate control (Vital-style multi-mode)
+    rateControl.setLfoIndex(activeLfoIndex);
+    addAndMakeVisible(rateControl);
 
     // Timer for refreshing depth indicators and LFO value bars
     startTimerHz(60);
@@ -570,7 +584,7 @@ LfoComponent::~LfoComponent() {
 }
 
 void LfoComponent::timerCallback() {
-    refreshAllDepthIndicators();
+    refreshAllDepthIndicators(audioProcessor.getLfoAssignments());
     // Update LFO value bars
     for (int i = 0; i < NUM_LFOS; ++i) {
         float val = audioProcessor.getLfoCurrentValue(i);
@@ -587,41 +601,77 @@ void LfoComponent::changeListenerCallback(juce::ChangeBroadcaster* source) {
 void LfoComponent::resized() {
     auto bounds = getLocalBounds();
 
-    // Tab handles on the left
-    static constexpr int tabWidth = 75;
-    auto tabArea = bounds.removeFromLeft(tabWidth);
-    int tabHeight = tabArea.getHeight() / NUM_LFOS;
-    for (auto* tab : tabHandles) {
-        tab->setBounds(tabArea.removeFromTop(tabHeight).reduced(2, 2));
+    // Tab handles on the left — flush with component edges, small gap between tabs
+    auto tabArea = bounds.removeFromLeft(kTabWidth);
+    int totalGaps = kTabGap * (NUM_LFOS - 1);
+    int availH = tabArea.getHeight() - totalGaps;
+    int tabH = availH / NUM_LFOS;
+    int extra = availH - tabH * NUM_LFOS;
+    for (int i = 0; i < tabHandles.size(); i++) {
+        int h = tabH + (i < extra ? 1 : 0);
+        tabHandles[i]->setBounds(tabArea.removeFromTop(h));
+        if (i < tabHandles.size() - 1)
+            tabArea.removeFromTop(kTabGap);
     }
 
-    // Top bar: preset selector + rate knob above the graph
-    static constexpr int topBarHeight = 32;
-    auto topBar = bounds.removeFromTop(topBarHeight);
-    auto presetArea = topBar.removeFromLeft(juce::jmin(200, topBar.getWidth() / 2)).reduced(2, 4);
-    presetSelector.setBounds(presetArea);
+    // Inset the main content area uniformly
+    bounds.reduce(kContentInset, kContentInset);
 
-    auto rateArea = topBar.removeFromLeft(80);
-    rateLabel.setBounds(rateArea.removeFromBottom(14));
-    rateSlider.setBounds(rateArea.reduced(4, 2));
+    // Top bar: preset selector right-aligned above the graph (no label)
+    auto topBar = bounds.removeFromTop(kTopBarHeight);
+    bounds.removeFromTop(kTopBarGap);
+    int presetW = juce::jmin(kMaxPresetWidth, topBar.getWidth() / 3);
+    presetSelector.setBounds(topBar.removeFromRight(presetW));
+
+    // Bottom bar: rate control below the graph
+    auto rateRow = bounds.removeFromBottom(kRateHeight);
+    bounds.removeFromBottom(kRateGap);
+    int rateW = juce::jmin(kMaxRateWidth, rateRow.getWidth() / 3);
+    rateControl.setBounds(rateRow.removeFromLeft(rateW));
 
     // Graph gets the remaining space
-    graph.setBounds(bounds.reduced(4));
+    graph.setBounds(bounds);
 }
 
 void LfoComponent::paint(juce::Graphics& g) {
-    auto colour = getLfoColour(activeLfoIndex);
-
-    // Panel background – slightly lighter than the graph for depth
-    g.setColour(juce::Colour(0xFF1A1A1A));
-    g.fillRoundedRectangle(getLocalBounds().toFloat(), OscirenderLookAndFeel::RECT_RADIUS);
-
-    // Subtle LFO-coloured hairline border
-    g.setColour(colour.withAlpha(0.15f));
-    g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(0.5f), OscirenderLookAndFeel::RECT_RADIUS, 1.0f);
+    // Panel background — only the main content area (right of tabs)
+    // Rounded on the right side only (flat left edge where tabs connect)
+    auto panelBounds = getLocalBounds().toFloat().withTrimmedLeft((float)kTabWidth);
+    float r = OscirenderLookAndFeel::RECT_RADIUS;
+    juce::Path panelPath;
+    panelPath.addRoundedRectangle(panelBounds.getX(), panelBounds.getY(),
+                                   panelBounds.getWidth(), panelBounds.getHeight(),
+                                   r, r,
+                                   false, true,   // top-left, top-right
+                                   false, true);   // bottom-left, bottom-right
+    g.setColour(Colours::darker);
+    g.fillPath(panelPath);
 }
 
 void LfoComponent::paintOverChildren(juce::Graphics& g) {
+    // Drop shadow from panel edge onto inactive tabs using melatonin blur.
+    // Build a path for the panel shape.
+    auto panelBounds = getLocalBounds().toFloat().withTrimmedLeft((float)kTabWidth);
+    juce::Path panelPath;
+    panelPath.addRoundedRectangle(panelBounds.getX(), panelBounds.getY(),
+                                   panelBounds.getWidth(), panelBounds.getHeight(),
+                                   OscirenderLookAndFeel::RECT_RADIUS, OscirenderLookAndFeel::RECT_RADIUS,
+                                   false, true, false, true);
+
+    // Clip to a narrow strip on the tab side of the seam only,
+    // and exclude the active tab so it stays connected to the panel.
+    if (tabHandles.isEmpty() || activeLfoIndex < 0 || activeLfoIndex >= tabHandles.size())
+        return;
+    auto activeTabBounds = tabHandles[activeLfoIndex]->getBounds();
+    juce::RectangleList<int> clipRegion;
+    clipRegion.add(kTabWidth - kSeamShadowWidth, 0, kSeamShadowWidth, getHeight());
+    clipRegion.subtract(activeTabBounds);
+
+    g.saveState();
+    g.reduceClipRegion(clipRegion);
+    panelEdgeShadow.render(g, panelPath);
+    g.restoreState();
+
     // Draw an LFO-coloured rounded border around the graph area
     auto colour = getLfoColour(activeLfoIndex);
     auto graphBounds = graph.getBounds().toFloat();
@@ -638,9 +688,9 @@ void LfoComponent::switchToLfo(int index) {
     syncGraphToActiveLfo();
     updatePresetLabel();
 
-    // Update rate slider to match this LFO's rate
-    if (audioProcessor.lfoRate[index] != nullptr)
-        rateSlider.setValue(audioProcessor.lfoRate[index]->getValueUnnormalised(), juce::dontSendNotification);
+    // Update rate control to match this LFO's rate mode and value
+    rateControl.setLfoIndex(index);
+    rateControl.syncFromProcessor();
 
     for (auto* tab : tabHandles)
         tab->repaint();
@@ -649,12 +699,7 @@ void LfoComponent::switchToLfo(int index) {
 
 void LfoComponent::syncGraphToActiveLfo() {
     auto& waveform = lfoData[activeLfoIndex].waveform;
-    std::vector<GraphNode> graphNodes;
-    graphNodes.reserve(waveform.nodes.size());
-    for (const auto& n : waveform.nodes) {
-        graphNodes.push_back({ n.time, n.value, n.curve });
-    }
-    graph.setNodes(graphNodes);
+    graph.setNodes(waveform.nodes);
 
     // Update graph line colour to match LFO
     auto colour = getLfoColour(activeLfoIndex);
@@ -664,20 +709,14 @@ void LfoComponent::syncGraphToActiveLfo() {
 }
 
 void LfoComponent::syncActiveLfoFromGraph() {
-    auto graphNodes = graph.getNodes();
-    auto& waveform = lfoData[activeLfoIndex].waveform;
-    waveform.nodes.clear();
-    waveform.nodes.reserve(graphNodes.size());
-    for (const auto& gn : graphNodes) {
-        waveform.nodes.push_back({ gn.time, gn.value, gn.curve });
-    }
+    lfoData[activeLfoIndex].waveform.nodes = graph.getNodes();
 
     // Mark as custom if nodes were manually edited
     lfoData[activeLfoIndex].preset = LfoPreset::Custom;
     updatePresetLabel();
 
     // Notify processor
-    audioProcessor.lfoWaveformChanged(activeLfoIndex, waveform);
+    audioProcessor.lfoWaveformChanged(activeLfoIndex, lfoData[activeLfoIndex].waveform);
     audioProcessor.lfoPresets[activeLfoIndex] = LfoPreset::Custom;
 }
 
@@ -761,8 +800,8 @@ void LfoComponent::syncFromProcessorState() {
     syncGraphToActiveLfo();
     updatePresetLabel();
 
-    if (audioProcessor.lfoRate[activeLfoIndex] != nullptr)
-        rateSlider.setValue(audioProcessor.lfoRate[activeLfoIndex]->getValueUnnormalised(), juce::dontSendNotification);
+    rateControl.setLfoIndex(activeLfoIndex);
+    rateControl.syncFromProcessor();
 
     for (auto* tab : tabHandles)
         tab->repaint();
@@ -798,8 +837,8 @@ void LfoComponent::applyLfoConstraints(int nodeIndex, double& time, double& valu
     value = juce::jlimit(0.0, 1.0, value);
 }
 
-void LfoComponent::refreshAllDepthIndicators() {
+void LfoComponent::refreshAllDepthIndicators(const std::vector<LfoAssignment>& assignments) {
     for (auto* tab : tabHandles) {
-        tab->refreshDepthIndicators();
+        tab->refreshDepthIndicators(assignments);
     }
 }

@@ -2,14 +2,7 @@
 
 #include <JuceHeader.h>
 #include <vector>
-#include "../audio/DahdsrEnvelope.h"
-
-// A single node in the breakpoint graph.
-struct GraphNode {
-    double time = 0.0;   // Domain position
-    double value = 0.0;  // Value position
-    float curve = 0.0f;  // Exponential curvature for incoming segment (-50 to +50, 0 = linear)
-};
+#include "../../audio/GraphNode.h"
 
 // A reusable breakpoint graph component with draggable nodes and per-segment curve editing.
 // Designed to be used by both the DAHDSR envelope and LFO waveform editors.

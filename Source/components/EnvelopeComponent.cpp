@@ -965,26 +965,15 @@ void EnvelopeHandleComponent::mouseUp(const juce::MouseEvent& e)
 #ifdef MYDEBUG
 	printf("MyEnvelopeHandleComponent::mouseUp\n");
 #endif
-	
-	if (!shouldDraw) {
-		goto exit;
-    }
 
-	if(ignoreDrag)
+	if (shouldDraw && !ignoreDrag)
 	{
-		ignoreDrag = false;
-		goto exit;
-	}
-		
-//	if(e.mods.isCtrlDown() == false)
-//	{
 		env->quantiseHandle(this);
-//	}
-	
-	offsetX = 0;
-	offsetY = 0;
-    
-exit:
+		offsetX = 0;
+		offsetY = 0;
+	}
+
+	ignoreDrag = false;
 	getParentComponent()->sendEndDrag();
 	getParentComponent()->setActiveHandle(nullptr);
 }
@@ -2140,27 +2129,51 @@ double EnvelopeLegendComponent::mapTime(double time)
 
 EnvelopeContainerComponent::EnvelopeContainerComponent(OscirenderAudioProcessor& processor, juce::String defaultText)
 {
-	addAndMakeVisible(legend = new EnvelopeLegendComponent(defaultText));
-	addAndMakeVisible(envelope = new EnvelopeComponent(processor));
+	setOpaque(false);
+	legend = std::make_unique<EnvelopeLegendComponent>(defaultText);
+	addAndMakeVisible(legend.get());
+	envelope = std::make_unique<EnvelopeComponent>(processor);
+	addAndMakeVisible(envelope.get());
 }
 
-EnvelopeContainerComponent::~EnvelopeContainerComponent()
+EnvelopeContainerComponent::~EnvelopeContainerComponent() = default;
+
+void EnvelopeContainerComponent::paint(juce::Graphics& g)
 {
-	deleteAllChildren();
+	auto bounds = getLocalBounds().toFloat();
+	g.setColour(envelope->findColour(EnvelopeComponent::Background));
+	g.fillRoundedRectangle(bounds, 6.0f);
+}
+
+void EnvelopeContainerComponent::paintOverChildren(juce::Graphics& g)
+{
+	auto bounds = getLocalBounds().toFloat();
+	float r = 6.0f;
+
+	// Mask the sharp corners of children by painting over corner regions
+	// outside the rounded rect with the surrounding background colour.
+	// Even-odd fill: outer rect XOR inner rounded rect = just the corners.
+	juce::Path cornerMask;
+	cornerMask.setUsingNonZeroWinding(false);
+	cornerMask.addRectangle(bounds);
+	cornerMask.addRoundedRectangle(bounds, r);
+	g.setColour(findColour(juce::ResizableWindow::backgroundColourId));
+	g.fillPath(cornerMask);
+
+	// Subtle rounded border
+	g.setColour(juce::Colours::white.withAlpha(0.06f));
+	g.drawRoundedRectangle(bounds.reduced(0.5f), r, 1.0f);
 }
 
 void EnvelopeContainerComponent::resized()
 {
 	int legendHeight = legend->getHeight();
-	
-	envelope->setBounds(0, 
-						0, 
-						getWidth(),
-						getHeight()-legendHeight);
-	legend->setBounds(0, 
-					  getHeight()-legendHeight, 
-					  getWidth(), 
-					  legend->getHeight());
+	auto area = getLocalBounds();
+
+	// Clip children to rounded rect via component bounds (no manual clip needed;
+	// the container paints the rounded bg behind them).
+	envelope->setBounds(area.removeFromTop(area.getHeight() - legendHeight));
+	legend->setBounds(area);
 }
 
 #endif // gpl

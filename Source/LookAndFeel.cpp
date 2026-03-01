@@ -29,7 +29,7 @@ void OscirenderLookAndFeel::applyOscirenderColours(juce::LookAndFeel& lookAndFee
     lookAndFeel.setColour(jux::SwitchButton::switchOffBackgroundColour, Colours::grey);
 
     // windows & menus
-    lookAndFeel.setColour(juce::ResizableWindow::backgroundColourId, Colours::grey);
+    lookAndFeel.setColour(juce::ResizableWindow::backgroundColourId, Colours::veryDark.brighter(0.1f));
     lookAndFeel.setColour(groupComponentBackgroundColourId, Colours::darker);
     lookAndFeel.setColour(scrollFadeOverlayBackgroundColourId, Colours::darker);
     lookAndFeel.setColour(groupComponentHeaderColourId, Colours::veryDark);
@@ -279,8 +279,38 @@ void OscirenderLookAndFeel::drawGroupComponentOutline(juce::Graphics& g, int wid
 }
 
 void OscirenderLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, int width, int height, float sliderPos, float minSliderPos, float maxSliderPos, const juce::Slider::SliderStyle style, juce::Slider& slider) {
+    // --- LFO modulated value indicator (drawn BEFORE the base slider so it sits under the thumb) ---
+    auto& props = slider.getProperties();
+    bool lfoActive = (bool)props.getWithDefault("lfo_active", false);
+
+    if (lfoActive && slider.isHorizontal()) {
+        float modPos = (float)(double)props.getWithDefault("lfo_mod_pos", 0.0);
+        juce::uint32 colourArgb = (juce::uint32)(juce::int64)props.getWithDefault("lfo_colour", (juce::int64)0xFF00E5FF);
+        auto lfoColour = juce::Colour(colourArgb);
+
+        // Match the JUCE V4 track geometry: 6px tall, centred vertically
+        float trackHeight = 6.0f;
+        float trackY = (float)y + (float)height * 0.5f - trackHeight * 0.5f;
+        float trackRadius = trackHeight * 0.5f;
+
+        // Draw a coloured bar from the unmodulated thumb position to the modulated position
+        float barLeft = juce::jmin(sliderPos, modPos);
+        float barRight = juce::jmax(sliderPos, modPos);
+        float barWidth = barRight - barLeft;
+
+        if (barWidth > 0.5f) {
+            auto modRect = juce::Rectangle<float>(barLeft, trackY, barWidth, trackHeight);
+
+            // Outer soft glow
+            g.setColour(lfoColour.withAlpha(0.2f));
+            g.fillRoundedRectangle(modRect.expanded(1.5f, 2.0f), trackRadius + 1.5f);
+        }
+    }
+
+    // --- Base slider (track + value fill + thumb) — drawn on top of LFO bar ---
     juce::LookAndFeel_V4::drawLinearSlider(g, x, y, width, height, sliderPos, minSliderPos, maxSliderPos, style, slider);
     
+    // --- Thumb outline ring ---
     auto kx = slider.isHorizontal() ? sliderPos : ((float)x + (float)width * 0.5f);
     auto ky = slider.isHorizontal() ? ((float)y + (float)height * 0.5f) : sliderPos;
 

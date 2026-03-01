@@ -2,12 +2,11 @@
 
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
-#include "components/EnvelopeComponent.h"
 #include "components/SwitchButton.h"
-#include "components/LfoComponent.h"
+#include "components/lfo/TempoComponent.h"
 
 class OscirenderAudioProcessorEditor;
-class MidiComponent : public juce::GroupComponent, public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater, private juce::Timer {
+class MidiComponent : public juce::GroupComponent, public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater {
 public:
 	MidiComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
 	~MidiComponent() override;
@@ -15,7 +14,6 @@ public:
 	void parameterValueChanged(int parameterIndex, float newValue) override;
 	void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
 	void handleAsyncUpdate() override;
-	void timerCallback() override;
 
 	void resized() override;
 	void paint(juce::Graphics& g) override;
@@ -27,10 +25,7 @@ private:
 	juce::Slider voicesSlider;
 	juce::Label voicesLabel;
 	juce::TextButton midiSettingsButton{"Audio/MIDI Settings..."};
-	juce::MidiKeyboardComponent keyboard{audioProcessor.keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard};
-
-	EnvelopeContainerComponent envelope;
-	LfoComponent lfo;
+	TempoComponent tempoComponent;
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MidiComponent)
 };

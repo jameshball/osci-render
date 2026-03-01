@@ -22,6 +22,11 @@ effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
             assignment.depth = 0.5f;
             audioProcessor.addLfoAssignment(assignment);
         };
+
+        // Wire LFO modulation query for animated slider track
+        effectComponent->queryLfoModulation = [this](const juce::String& paramId, juce::Slider& sl) -> EffectComponent::LfoModInfo {
+            return EffectComponent::computeLfoModulation(audioProcessor, paramId, sl);
+        };
         
         list.setEnabled(enabled.getToggleState());
         enabled.onClick = [this, weakEffectComponent] {

@@ -133,6 +133,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     floatParameters.push_back(releaseShape);
     floatParameters.push_back(animationRate);
     floatParameters.push_back(animationOffset);
+    floatParameters.push_back(standaloneBpm);
 
     // Initialize global LFO rate parameters and default waveforms
     for (int i = 0; i < NUM_LFOS; ++i) {
@@ -629,6 +630,14 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         }
     }
 
+    // In standalone mode, use the standaloneBpm parameter as the tempo source
+    if (juce::JUCEApplicationBase::isStandaloneApp()) {
+        bpm = (double)standaloneBpm->getValueUnnormalised();
+    }
+
+    // Publish BPM for UI components (LFO rate display, etc.)
+    currentBpm.store(bpm, std::memory_order_relaxed);
+
     // Calculated number of beats
     // TODO: To make this more resilient to changing BPMs, we should change how this is calculated
     // or use another property of the AudioPlayHead::PositionInfo
@@ -925,11 +934,16 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
     // Save global LFO waveforms
     auto lfosXml = xml->createNewChildElement("lfos");
     lfosXml->setAttribute("activeTab", activeLfoTab);
-    for (int i = 0; i < NUM_LFOS; ++i) {
-        auto lfoXml = lfosXml->createNewChildElement("lfo");
-        lfoXml->setAttribute("index", i);
-        lfoXml->setAttribute("preset", lfoPresetToString(lfoPresets[i]));
-        lfoWaveforms[i].saveToXml(lfoXml);
+    {
+        juce::SpinLock::ScopedLockType wfLock(lfoWaveformLock);
+        for (int i = 0; i < NUM_LFOS; ++i) {
+            auto lfoXml = lfosXml->createNewChildElement("lfo");
+            lfoXml->setAttribute("index", i);
+            lfoXml->setAttribute("preset", lfoPresetToString(lfoPresets[i]));
+            lfoXml->setAttribute("rateMode", lfoRateModeToString(lfoRateModes[i]));
+            lfoXml->setAttribute("tempoDivision", lfoTempoDivisions[i]);
+            lfoWaveforms[i].saveToXml(lfoXml);
+        }
     }
 
     // Save LFO assignments
@@ -1093,6 +1107,8 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
                 if (idx >= 0 && idx < NUM_LFOS) {
                     lfoWaveforms[idx].loadFromXml(lfoXml);
                     lfoPresets[idx] = stringToLfoPreset(lfoXml->getStringAttribute("preset", "Custom"));
+                    lfoRateModes[idx] = stringToLfoRateMode(lfoXml->getStringAttribute("rateMode", "Seconds"));
+                    lfoTempoDivisions[idx] = lfoXml->getIntAttribute("tempoDivision", 8);
                 }
             }
         }
@@ -1159,11 +1175,14 @@ void OscirenderAudioProcessor::lfoWaveformChanged(int index, const LfoWaveform& 
 
 void OscirenderAudioProcessor::addLfoAssignment(const LfoAssignment& assignment) {
     juce::SpinLock::ScopedLockType lock(lfoAssignmentLock);
-    // Remove existing assignment for same lfo+param combo
-    lfoAssignments.erase(
-        std::remove_if(lfoAssignments.begin(), lfoAssignments.end(),
-            [&](const LfoAssignment& a) { return a.lfoIndex == assignment.lfoIndex && a.paramId == assignment.paramId; }),
-        lfoAssignments.end());
+    // Update existing assignment in-place to preserve ordering
+    for (auto& a : lfoAssignments) {
+        if (a.lfoIndex == assignment.lfoIndex && a.paramId == assignment.paramId) {
+            a.depth = assignment.depth;
+            a.bipolar = assignment.bipolar;
+            return;
+        }
+    }
     lfoAssignments.push_back(assignment);
 }
 
@@ -1188,82 +1207,91 @@ LfoWaveform OscirenderAudioProcessor::getLfoWaveform(int index) const {
 
 float OscirenderAudioProcessor::getLfoCurrentValue(int lfoIndex) const {
     if (lfoIndex < 0 || lfoIndex >= NUM_LFOS) return 0.0f;
-    // Read last sample from the block buffer (most recent value)
-    if (!lfoBlockBuffer[lfoIndex].empty())
-        return lfoBlockBuffer[lfoIndex].back();
-    return 0.0f;
+    return lfoCurrentValues[lfoIndex].load(std::memory_order_relaxed);
+}
+
+void OscirenderAudioProcessor::setLfoRateMode(int lfoIndex, LfoRateMode mode) {
+    juce::SpinLock::ScopedLockType lock(lfoWaveformLock);
+    lfoRateModes[lfoIndex] = mode;
+}
+
+void OscirenderAudioProcessor::setLfoTempoDivision(int lfoIndex, int divisionIndex) {
+    juce::SpinLock::ScopedLockType lock(lfoWaveformLock);
+    lfoTempoDivisions[lfoIndex] = divisionIndex;
+}
+
+LfoRateMode OscirenderAudioProcessor::getLfoRateMode(int lfoIndex) const {
+    juce::SpinLock::ScopedLockType lock(const_cast<juce::SpinLock&>(lfoWaveformLock));
+    return lfoRateModes[lfoIndex];
+}
+
+int OscirenderAudioProcessor::getLfoTempoDivision(int lfoIndex) const {
+    juce::SpinLock::ScopedLockType lock(const_cast<juce::SpinLock&>(lfoWaveformLock));
+    return lfoTempoDivisions[lfoIndex];
 }
 
 void OscirenderAudioProcessor::applyGlobalLfoModulation(int numSamples, double sampleRate) {
-    // Compute LFO output for all 4 LFOs
+    // Compute LFO samples for this block
     {
         juce::SpinLock::ScopedLockType wfLock(lfoWaveformLock);
+        double bpm = currentBpm.load(std::memory_order_relaxed);
+        auto& divisions = getTempoDivisions();
         for (int l = 0; l < NUM_LFOS; ++l) {
             if ((int)lfoBlockBuffer[l].size() < numSamples)
                 lfoBlockBuffer[l].resize(numSamples);
-            float rate = lfoRate[l]->getValueUnnormalised();
+            float rate;
+            if (lfoRateModes[l] == LfoRateMode::Seconds) {
+                rate = lfoRate[l]->getValueUnnormalised();
+            } else {
+                int idx = juce::jlimit(0, (int)divisions.size() - 1, lfoTempoDivisions[l]);
+                rate = (float)divisions[idx].toHz(bpm, lfoRateModes[l]);
+            }
             float sr = (float)sampleRate;
             for (int s = 0; s < numSamples; ++s) {
                 lfoBlockBuffer[l][s] = lfoAudioStates[l].advance(rate, sr, lfoWaveforms[l]);
             }
+            // Publish most recent value for thread-safe UI reads
+            lfoCurrentValues[l].store(lfoBlockBuffer[l][numSamples - 1], std::memory_order_relaxed);
         }
     }
 
-    // Apply modulation to assigned parameters
+    // Apply modulation: scan effects directly — assignment lists are tiny in practice
     juce::SpinLock::ScopedLockType assnLock(lfoAssignmentLock);
     for (const auto& assignment : lfoAssignments) {
         if (assignment.lfoIndex < 0 || assignment.lfoIndex >= NUM_LFOS) continue;
         const float* lfoData = lfoBlockBuffer[assignment.lfoIndex].data();
 
-        auto applyModulation = [&](osci::EffectParameter* param, float* buf) {
-            float paramMin = param->min;
-            float paramMax = param->max;
-            float range = paramMax - paramMin;
-            float depth = assignment.depth;
-            if (assignment.bipolar) {
-                // Bipolar: LFO oscillates symmetrically around current value
-                for (int s = 0; s < numSamples; ++s) {
-                    float bipolarLfo = lfoData[s] * 2.0f - 1.0f;
-                    buf[s] = juce::jlimit(paramMin, paramMax, buf[s] + bipolarLfo * depth * range * 0.5f);
-                }
-            } else {
-                // Unipolar: LFO adds to current value (0..depth*range)
-                for (int s = 0; s < numSamples; ++s) {
-                    buf[s] = juce::jlimit(paramMin, paramMax, buf[s] + lfoData[s] * depth * range);
-                }
-            }
-        };
-
-        // Search for the target parameter across all effects
-        bool found = false;
-        for (auto& effect : toggleableEffects) {
-            for (int p = 0; p < (int)effect->parameters.size(); ++p) {
-                if (effect->parameters[p]->paramID == assignment.paramId) {
-                    float* buf = effect->getAnimatedValuesWritePointer(p, numSamples);
-                    if (buf != nullptr)
-                        applyModulation(effect->parameters[p], buf);
-                    found = true;
-                    break;
-                }
-            }
-            if (found) break;
-        }
-
-        if (!found) {
-            // Also check permanent effects (frequency, perspective, etc.)
-            for (auto& effect : permanentEffects) {
-                for (int p = 0; p < (int)effect->parameters.size(); ++p) {
-                    if (effect->parameters[p]->paramID == assignment.paramId) {
-                        float* buf = effect->getAnimatedValuesWritePointer(p, numSamples);
-                        if (buf != nullptr)
-                            applyModulation(effect->parameters[p], buf);
-                        found = true;
-                        break;
+        auto applyToEffect = [&](osci::Effect& effect) -> bool {
+            for (int p = 0; p < (int)effect.parameters.size(); ++p) {
+                if (effect.parameters[p]->paramID != assignment.paramId) continue;
+                float* buf = effect.getAnimatedValuesWritePointer(p, numSamples);
+                if (buf == nullptr) return true; // found but not animatable
+                float paramMin = effect.parameters[p]->min;
+                float paramMax = effect.parameters[p]->max;
+                float range = paramMax - paramMin;
+                float depth = assignment.depth;
+                if (assignment.bipolar) {
+                    for (int s = 0; s < numSamples; ++s) {
+                        buf[s] = juce::jlimit(paramMin, paramMax,
+                            buf[s] + (lfoData[s] * 2.0f - 1.0f) * depth * range * 0.5f);
+                    }
+                } else {
+                    for (int s = 0; s < numSamples; ++s) {
+                        buf[s] = juce::jlimit(paramMin, paramMax,
+                            buf[s] + lfoData[s] * depth * range);
                     }
                 }
-                if (found) break;
+                return true;
             }
-        }
+            return false;
+        };
+
+        bool found = false;
+        for (auto& effect : toggleableEffects)
+            if ((found = applyToEffect(*effect))) break;
+        if (!found)
+            for (auto& effect : permanentEffects)
+                if (applyToEffect(*effect)) break;
     }
 }
 

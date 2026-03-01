@@ -32,6 +32,11 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
         audioProcessor.addLfoAssignment(assignment);
     };
 
+    // Wire LFO modulation query for the frequency slider
+    frequency.queryLfoModulation = [this](const juce::String& paramId, juce::Slider& sl) -> EffectComponent::LfoModInfo {
+        return EffectComponent::computeLfoModulation(audioProcessor, paramId, sl);
+    };
+
     frequency.slider.setSkewFactorFromMidPoint(500.0);
     frequency.slider.setTextValueSuffix("Hz");
     frequency.slider.setValue(audioProcessor.frequencyEffect->getValue(), juce::dontSendNotification);
@@ -128,9 +133,13 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
         listBox.setVisible(true);
         listBox.updateContent();
     }
+
+    // Single 30Hz timer drives LFO modulation display for all child EffectComponents
+    startTimerHz(30);
 }
 
 EffectsComponent::~EffectsComponent() {
+    stopTimer();
     juce::MessageManagerLock lock;
     audioProcessor.broadcaster.removeChangeListener(this);
 }
@@ -183,4 +192,21 @@ void EffectsComponent::changeListenerCallback(juce::ChangeBroadcaster* source) {
     // Ensure layout updates after visibility changes
     resized();
     repaint();
+}
+
+void EffectsComponent::timerCallback() {
+    // Update the frequency slider
+    frequency.updateLfoModulation();
+
+    // Recursively update all visible EffectComponents in the list
+    std::function<void(juce::Component*)> updateChildren = [&](juce::Component* parent) {
+        for (int i = 0; i < parent->getNumChildComponents(); ++i) {
+            auto* child = parent->getChildComponent(i);
+            if (auto* ec = dynamic_cast<EffectComponent*>(child))
+                ec->updateLfoModulation();
+            else
+                updateChildren(child);
+        }
+    };
+    updateChildren(&listBox);
 }

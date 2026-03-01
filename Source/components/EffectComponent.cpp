@@ -1,12 +1,15 @@
 #include "EffectComponent.h"
 
 #include "../LookAndFeel.h"
+#include "../PluginProcessor.h"
+#include "lfo/LfoComponent.h"
+#include "lfo/LfoModulationHelper.h"
 
 std::atomic<bool> EffectComponent::lfoAnyDragActive{false};
 juce::String EffectComponent::highlightedParamId;
 juce::String EffectComponent::lfoRangeParamId;
-float EffectComponent::lfoRangeDepth = 0.0f;
-bool EffectComponent::lfoRangeBipolar = false;
+std::atomic<float> EffectComponent::lfoRangeDepth{0.0f};
+std::atomic<bool> EffectComponent::lfoRangeBipolar{false};
 
 EffectComponent::EffectComponent(osci::Effect& effect, int index) : effect(effect), index(index) {
     addAndMakeVisible(slider);
@@ -253,20 +256,20 @@ void EffectComponent::paintOverChildren(juce::Graphics& g) {
         g.drawRoundedRectangle(bounds, 4.0f, 1.5f);
 
         // Draw the LFO modulation range on the slider track
-        if (lfoRangeParamId == highlightedParamId && lfoRangeDepth > 0.0f) {
+        if (lfoRangeParamId == highlightedParamId && lfoRangeDepth.load() > 0.0f) {
             auto currentVal = slider.getValue();
             auto sliderMin = slider.getMinimum();
             auto sliderMax = slider.getMaximum();
             auto range = sliderMax - sliderMin;
 
             double rangeStart, rangeEnd;
-            if (lfoRangeBipolar) {
-                double halfSpan = lfoRangeDepth * range * 0.5;
+            if (lfoRangeBipolar.load()) {
+                double halfSpan = lfoRangeDepth.load() * range * 0.5;
                 rangeStart = currentVal - halfSpan;
                 rangeEnd = currentVal + halfSpan;
             } else {
                 rangeStart = currentVal;
-                rangeEnd = currentVal + lfoRangeDepth * range;
+                rangeEnd = currentVal + lfoRangeDepth.load() * range;
             }
 
             // Clamp to slider range
@@ -348,8 +351,35 @@ void EffectComponent::handleAsyncUpdate() {
     }
 }
 
+void EffectComponent::updateLfoModulation() {
+    if (!queryLfoModulation)
+        return;
+
+    juce::String paramId = effect.parameters[index]->paramID;
+    auto info = queryLfoModulation(paramId, slider);
+
+    auto& props = slider.getProperties();
+    if (info.active) {
+        props.set("lfo_active", true);
+        props.set("lfo_mod_pos", info.modulatedPos);
+        props.set("lfo_colour", (juce::int64)info.colour.getARGB());
+        slider.repaint();
+    } else if ((bool)props.getWithDefault("lfo_active", false)) {
+        props.set("lfo_active", false);
+        slider.repaint();
+    }
+}
+
 void EffectComponent::setRangeEnabled(bool enabled) {
     settingsButton.setVisible(enabled);
+}
+
+EffectComponent::LfoModInfo EffectComponent::computeLfoModulation(
+        OscirenderAudioProcessor& processor,
+        const juce::String& paramId,
+        juce::Slider& sl) {
+    auto h = LfoModulationHelper::compute(processor, paramId, sl);
+    return { h.active, h.modulatedPos, h.colour };
 }
 
 void EffectComponent::setComponent(std::shared_ptr<juce::Component> component) {
