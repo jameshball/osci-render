@@ -1,8 +1,9 @@
 #include "MidiComponent.h"
 #include "PluginEditor.h"
 #include "audio/DahdsrEnvelope.h"
+#include "components/EffectComponent.h"
 
-MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor), envelope(p) {
+MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor), envelope(p), lfo(p) {
     setText("MIDI Settings");
 
     addAndMakeVisible(midiToggle);
@@ -27,6 +28,21 @@ MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
     addAndMakeVisible(envelope);
     envelope.setDahdsrParams(audioProcessor.getCurrentDahdsrParams());
     envelope.setGrid(EnvelopeComponent::GridBoth, EnvelopeComponent::GridNone, 0.1, 0.25);
+
+    addAndMakeVisible(lfo);
+
+    // When an LFO drag starts/ends, highlight all effect sliders as valid drop targets
+    lfo.onDragActiveChanged = [](bool isDragging) {
+        EffectComponent::lfoAnyDragActive.store(isDragging, std::memory_order_relaxed);
+        // Trigger repaint on all visible components
+        juce::MessageManager::callAsync([] {
+            // The repaint will happen naturally during the drag via DnD callbacks,
+            // but we ensure the initial highlight appears immediately.
+            auto& desktop = juce::Desktop::getInstance();
+            for (int i = 0; i < desktop.getNumComponents(); ++i)
+                desktop.getComponent(i)->repaint();
+        });
+    };
 
     // UI-only animation for note flow markers.
     startTimerHz(60);
@@ -109,7 +125,7 @@ void MidiComponent::handleAsyncUpdate() {
 }
 
 void MidiComponent::resized() {
-    auto area = getLocalBounds().withTrimmedTop(20).reduced(20);
+    auto area = getLocalBounds().withTrimmedTop(20).reduced(5);
     auto topRow = area.removeFromTop(30);
     midiToggle.setBounds(topRow.removeFromLeft(120).translated(0, 1));
     topRow.removeFromLeft(80);
@@ -119,7 +135,12 @@ void MidiComponent::resized() {
     }
     area.removeFromTop(5);
     keyboard.setBounds(area.removeFromBottom(50));
+
+    // Split remaining space: top 55% envelope, bottom 45% LFO
+    auto lfoArea = area.removeFromBottom(area.getHeight() * 45 / 100);
+    area.removeFromBottom(5);
     envelope.setBounds(area);
+    lfo.setBounds(lfoArea);
 }
 
 void MidiComponent::paint(juce::Graphics& g) {

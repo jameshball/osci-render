@@ -16,10 +16,12 @@
 #include "components/SplashScreenComponent.h"
 #include "visualiser/VisualiserSettings.h"
 
-class OscirenderAudioProcessorEditor : public CommonPluginEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener, public juce::FileDragAndDropTarget {
+class OscirenderAudioProcessorEditor : public CommonPluginEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer {
 public:
     OscirenderAudioProcessorEditor(OscirenderAudioProcessor&);
     ~OscirenderAudioProcessorEditor() override;
+
+    void dragOperationEnded(const juce::DragAndDropTarget::SourceDetails&) override;
 
     void paint(juce::Graphics&) override;
     void resized() override;

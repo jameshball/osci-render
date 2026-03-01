@@ -4,14 +4,27 @@
 #include "LabelledTextBox.h"
 #include "SvgButton.h"
 
-class EffectComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater, public juce::SettableTooltipClient, private juce::Slider::Listener {
+class EffectComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater, public juce::SettableTooltipClient, private juce::Slider::Listener, public juce::DragAndDropTarget {
 public:
     EffectComponent(osci::Effect& effect, int index);
     EffectComponent(osci::Effect& effect);
     ~EffectComponent();
 
+    // Global flag: when true, all EffectComponents draw a highlight border
+    // to indicate they are valid LFO drop targets.
+    static std::atomic<bool> lfoAnyDragActive;
+
+    // When non-empty, the EffectComponent with this paramId draws a hover highlight.
+    static juce::String highlightedParamId;
+
+    // LFO range highlight: when hovering a depth indicator, show the modulated range on the slider
+    static juce::String lfoRangeParamId;
+    static float lfoRangeDepth;
+    static bool lfoRangeBipolar;
+
     void resized() override;
     void paint(juce::Graphics& g) override;
+    void paintOverChildren(juce::Graphics& g) override;
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void handleAsyncUpdate() override;
@@ -24,6 +37,16 @@ public:
     void setRangeEnabled(bool enabled);
 
     void setComponent(std::shared_ptr<juce::Component> component);
+
+    // DragAndDropTarget overrides for LFO assignment
+    bool isInterestedInDragSource(const SourceDetails& dragSourceDetails) override;
+    void itemDragEnter(const SourceDetails& dragSourceDetails) override;
+    void itemDragExit(const SourceDetails& dragSourceDetails) override;
+    void itemDropped(const SourceDetails& dragSourceDetails) override;
+
+    // Callback invoked when an LFO is dropped on this slider.
+    // Parameters: lfoIndex, paramId
+    std::function<void(int, const juce::String&)> onLfoDropped;
 
     juce::Slider slider;
     juce::Slider lfoSlider;
@@ -182,6 +205,7 @@ private:
     void setupComponent();
     bool lfoEnabled = true;
     bool sidechainEnabled = true;
+    bool lfoDropHighlight = false;
     std::shared_ptr<juce::Component> component;
 
     std::unique_ptr<SvgButton> sidechainButton;

@@ -4,6 +4,7 @@
 #include "PluginProcessor.h"
 #include "components/EnvelopeComponent.h"
 #include "components/SwitchButton.h"
+#include "components/LfoComponent.h"
 
 class OscirenderAudioProcessorEditor;
 class MidiComponent : public juce::GroupComponent, public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater, private juce::Timer {
@@ -29,6 +30,7 @@ private:
 	juce::MidiKeyboardComponent keyboard{audioProcessor.keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard};
 
 	EnvelopeContainerComponent envelope;
+	LfoComponent lfo;
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MidiComponent)
 };

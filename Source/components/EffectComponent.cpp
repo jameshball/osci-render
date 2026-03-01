@@ -2,6 +2,12 @@
 
 #include "../LookAndFeel.h"
 
+std::atomic<bool> EffectComponent::lfoAnyDragActive{false};
+juce::String EffectComponent::highlightedParamId;
+juce::String EffectComponent::lfoRangeParamId;
+float EffectComponent::lfoRangeDepth = 0.0f;
+bool EffectComponent::lfoRangeBipolar = false;
+
 EffectComponent::EffectComponent(osci::Effect& effect, int index) : effect(effect), index(index) {
     addAndMakeVisible(slider);
     addChildComponent(lfoSlider);
@@ -225,6 +231,66 @@ void EffectComponent::paint(juce::Graphics& g) {
     g.fillRect(getLocalBounds());
 }
 
+void EffectComponent::paintOverChildren(juce::Graphics& g) {
+    if (lfoDropHighlight) {
+        auto bounds = getLocalBounds().toFloat().reduced(1.0f);
+        g.setColour(juce::Colour(0xFF00FF00).withAlpha(0.18f));
+        g.fillRoundedRectangle(bounds, 4.0f);
+        g.setColour(juce::Colour(0xFF00FF00).withAlpha(0.8f));
+        g.drawRoundedRectangle(bounds, 4.0f, 2.0f);
+    } else if (lfoAnyDragActive.load(std::memory_order_relaxed)) {
+        auto bounds = getLocalBounds().toFloat().reduced(1.0f);
+        g.setColour(juce::Colour(0xFF00FF00).withAlpha(0.06f));
+        g.fillRoundedRectangle(bounds, 4.0f);
+        g.setColour(juce::Colour(0xFF00FF00).withAlpha(0.25f));
+        g.drawRoundedRectangle(bounds, 4.0f, 1.0f);
+    } else if (highlightedParamId.isNotEmpty() && effect.parameters[index]->paramID == highlightedParamId) {
+        auto bounds = getLocalBounds().toFloat().reduced(1.0f);
+        auto colour = juce::Colour(0xFF00FF00);
+        g.setColour(colour.withAlpha(0.12f));
+        g.fillRoundedRectangle(bounds, 4.0f);
+        g.setColour(colour.withAlpha(0.5f));
+        g.drawRoundedRectangle(bounds, 4.0f, 1.5f);
+
+        // Draw the LFO modulation range on the slider track
+        if (lfoRangeParamId == highlightedParamId && lfoRangeDepth > 0.0f) {
+            auto currentVal = slider.getValue();
+            auto sliderMin = slider.getMinimum();
+            auto sliderMax = slider.getMaximum();
+            auto range = sliderMax - sliderMin;
+
+            double rangeStart, rangeEnd;
+            if (lfoRangeBipolar) {
+                double halfSpan = lfoRangeDepth * range * 0.5;
+                rangeStart = currentVal - halfSpan;
+                rangeEnd = currentVal + halfSpan;
+            } else {
+                rangeStart = currentVal;
+                rangeEnd = currentVal + lfoRangeDepth * range;
+            }
+
+            // Clamp to slider range
+            rangeStart = juce::jlimit(sliderMin, sliderMax, rangeStart);
+            rangeEnd = juce::jlimit(sliderMin, sliderMax, rangeEnd);
+
+            // Convert to pixel positions using slider's coordinate mapping
+            auto startPx = (float)slider.getPositionOfValue(rangeStart);
+            auto endPx = (float)slider.getPositionOfValue(rangeEnd);
+
+            if (startPx > endPx)
+                std::swap(startPx, endPx);
+
+            // Get slider bounds in our coordinate space
+            auto sliderBounds = slider.getBounds().toFloat();
+            auto trackY = sliderBounds.getCentreY() - 3.0f;
+            auto trackHeight = 6.0f;
+
+            g.setColour(colour.withAlpha(0.35f));
+            g.fillRoundedRectangle(startPx + sliderBounds.getX(), trackY, endPx - startPx, trackHeight, 2.0f);
+        }
+    }
+}
+
 void EffectComponent::parameterValueChanged(int parameterIndex, float newValue) {
     triggerAsyncUpdate();
 }
@@ -289,4 +355,34 @@ void EffectComponent::setRangeEnabled(bool enabled) {
 void EffectComponent::setComponent(std::shared_ptr<juce::Component> component) {
     this->component = component;
     addAndMakeVisible(component.get());
+}
+
+// === DragAndDropTarget for LFO assignment ===
+
+bool EffectComponent::isInterestedInDragSource(const SourceDetails& dragSourceDetails) {
+    return dragSourceDetails.description.toString().startsWith("LFO:");
+}
+
+void EffectComponent::itemDragEnter(const SourceDetails&) {
+    lfoDropHighlight = true;
+    repaint();
+}
+
+void EffectComponent::itemDragExit(const SourceDetails&) {
+    lfoDropHighlight = false;
+    repaint();
+}
+
+void EffectComponent::itemDropped(const SourceDetails& dragSourceDetails) {
+    lfoDropHighlight = false;
+    lfoAnyDragActive.store(false, std::memory_order_relaxed);
+    repaint();
+
+    juce::String desc = dragSourceDetails.description.toString();
+    if (desc.startsWith("LFO:")) {
+        int lfoIndex = desc.fromFirstOccurrenceOf("LFO:", false, false).getIntValue();
+        juce::String paramId = effect.parameters[index]->paramID;
+        if (onLfoDropped)
+            onLfoDropped(lfoIndex, paramId);
+    }
 }

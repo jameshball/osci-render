@@ -134,6 +134,16 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     floatParameters.push_back(animationRate);
     floatParameters.push_back(animationOffset);
 
+    // Initialize global LFO rate parameters and default waveforms
+    for (int i = 0; i < NUM_LFOS; ++i) {
+        lfoRate[i] = new osci::FloatParameter(
+            "LFO " + juce::String(i + 1) + " Rate",
+            "lfo" + juce::String(i + 1) + "Rate",
+            VERSION_HINT, 1.0f, 0.01f, 100.0f, 0.01f, "Hz");
+        floatParameters.push_back(lfoRate[i]);
+        lfoWaveforms[i] = createLfoPreset(LfoPreset::Triangle);
+    }
+
     for (int i = 0; i < voices->getValueUnnormalised(); i++) {
         uiVoiceActive[i].store(false, std::memory_order_relaxed);
         uiVoiceEnvelopeTimeSeconds[i].store(0.0, std::memory_order_relaxed);
@@ -710,6 +720,9 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         for (auto& effect : luaEffects) {
             effect->animateValues(numSamples, &currentVolumeBuffer);
         }
+
+        // Apply global LFO modulation on top of animated values
+        applyGlobalLfoModulation(numSamples, sampleRate);
     }
 
     juce::AudioBuffer<float> outputBuffer3d = juce::AudioBuffer<float>(3, buffer.getNumSamples());
@@ -909,6 +922,26 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
         parameter->save(parameterXml);
     }
 
+    // Save global LFO waveforms
+    auto lfosXml = xml->createNewChildElement("lfos");
+    lfosXml->setAttribute("activeTab", activeLfoTab);
+    for (int i = 0; i < NUM_LFOS; ++i) {
+        auto lfoXml = lfosXml->createNewChildElement("lfo");
+        lfoXml->setAttribute("index", i);
+        lfoXml->setAttribute("preset", lfoPresetToString(lfoPresets[i]));
+        lfoWaveforms[i].saveToXml(lfoXml);
+    }
+
+    // Save LFO assignments
+    {
+        auto lfoAssignmentsXml = xml->createNewChildElement("lfoAssignments");
+        juce::SpinLock::ScopedLockType lock(lfoAssignmentLock);
+        for (const auto& assignment : lfoAssignments) {
+            auto assignXml = lfoAssignmentsXml->createNewChildElement("assignment");
+            assignment.saveToXml(assignXml);
+        }
+    }
+
     auto customFunction = xml->createNewChildElement("customFunction");
     customFunction->addTextElement(juce::Base64::toBase64(luaEffectState->getCode()));
 
@@ -1050,6 +1083,30 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         }
         changeCurrentFile(xml->getIntAttribute("currentFile", -1));
 
+        // Load global LFO waveforms
+        auto lfosXml = xml->getChildByName("lfos");
+        if (lfosXml != nullptr) {
+            activeLfoTab = lfosXml->getIntAttribute("activeTab", 0);
+            juce::SpinLock::ScopedLockType wfLock(lfoWaveformLock);
+            for (auto* lfoXml : lfosXml->getChildWithTagNameIterator("lfo")) {
+                int idx = lfoXml->getIntAttribute("index", -1);
+                if (idx >= 0 && idx < NUM_LFOS) {
+                    lfoWaveforms[idx].loadFromXml(lfoXml);
+                    lfoPresets[idx] = stringToLfoPreset(lfoXml->getStringAttribute("preset", "Custom"));
+                }
+            }
+        }
+
+        // Load LFO assignments
+        auto lfoAssignmentsXml = xml->getChildByName("lfoAssignments");
+        if (lfoAssignmentsXml != nullptr) {
+            juce::SpinLock::ScopedLockType assnLock(lfoAssignmentLock);
+            lfoAssignments.clear();
+            for (auto* assignXml : lfoAssignmentsXml->getChildWithTagNameIterator("assignment")) {
+                lfoAssignments.push_back(LfoAssignment::loadFromXml(assignXml));
+            }
+        }
+
         recordingParameters.load(xml.get());
 
         loadProperties(*xml);
@@ -1091,6 +1148,124 @@ void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float n
 }
 
 void OscirenderAudioProcessor::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
+
+// === Global LFO system ===
+
+void OscirenderAudioProcessor::lfoWaveformChanged(int index, const LfoWaveform& waveform) {
+    if (index < 0 || index >= NUM_LFOS) return;
+    juce::SpinLock::ScopedLockType lock(lfoWaveformLock);
+    lfoWaveforms[index] = waveform;
+}
+
+void OscirenderAudioProcessor::addLfoAssignment(const LfoAssignment& assignment) {
+    juce::SpinLock::ScopedLockType lock(lfoAssignmentLock);
+    // Remove existing assignment for same lfo+param combo
+    lfoAssignments.erase(
+        std::remove_if(lfoAssignments.begin(), lfoAssignments.end(),
+            [&](const LfoAssignment& a) { return a.lfoIndex == assignment.lfoIndex && a.paramId == assignment.paramId; }),
+        lfoAssignments.end());
+    lfoAssignments.push_back(assignment);
+}
+
+void OscirenderAudioProcessor::removeLfoAssignment(int lfoIndex, const juce::String& paramId) {
+    juce::SpinLock::ScopedLockType lock(lfoAssignmentLock);
+    lfoAssignments.erase(
+        std::remove_if(lfoAssignments.begin(), lfoAssignments.end(),
+            [&](const LfoAssignment& a) { return a.lfoIndex == lfoIndex && a.paramId == paramId; }),
+        lfoAssignments.end());
+}
+
+std::vector<LfoAssignment> OscirenderAudioProcessor::getLfoAssignments() const {
+    juce::SpinLock::ScopedLockType lock(lfoAssignmentLock);
+    return lfoAssignments;
+}
+
+LfoWaveform OscirenderAudioProcessor::getLfoWaveform(int index) const {
+    if (index < 0 || index >= NUM_LFOS) return {};
+    juce::SpinLock::ScopedLockType lock(lfoWaveformLock);
+    return lfoWaveforms[index];
+}
+
+float OscirenderAudioProcessor::getLfoCurrentValue(int lfoIndex) const {
+    if (lfoIndex < 0 || lfoIndex >= NUM_LFOS) return 0.0f;
+    // Read last sample from the block buffer (most recent value)
+    if (!lfoBlockBuffer[lfoIndex].empty())
+        return lfoBlockBuffer[lfoIndex].back();
+    return 0.0f;
+}
+
+void OscirenderAudioProcessor::applyGlobalLfoModulation(int numSamples, double sampleRate) {
+    // Compute LFO output for all 4 LFOs
+    {
+        juce::SpinLock::ScopedLockType wfLock(lfoWaveformLock);
+        for (int l = 0; l < NUM_LFOS; ++l) {
+            if ((int)lfoBlockBuffer[l].size() < numSamples)
+                lfoBlockBuffer[l].resize(numSamples);
+            float rate = lfoRate[l]->getValueUnnormalised();
+            float sr = (float)sampleRate;
+            for (int s = 0; s < numSamples; ++s) {
+                lfoBlockBuffer[l][s] = lfoAudioStates[l].advance(rate, sr, lfoWaveforms[l]);
+            }
+        }
+    }
+
+    // Apply modulation to assigned parameters
+    juce::SpinLock::ScopedLockType assnLock(lfoAssignmentLock);
+    for (const auto& assignment : lfoAssignments) {
+        if (assignment.lfoIndex < 0 || assignment.lfoIndex >= NUM_LFOS) continue;
+        const float* lfoData = lfoBlockBuffer[assignment.lfoIndex].data();
+
+        auto applyModulation = [&](osci::EffectParameter* param, float* buf) {
+            float paramMin = param->min;
+            float paramMax = param->max;
+            float range = paramMax - paramMin;
+            float depth = assignment.depth;
+            if (assignment.bipolar) {
+                // Bipolar: LFO oscillates symmetrically around current value
+                for (int s = 0; s < numSamples; ++s) {
+                    float bipolarLfo = lfoData[s] * 2.0f - 1.0f;
+                    buf[s] = juce::jlimit(paramMin, paramMax, buf[s] + bipolarLfo * depth * range * 0.5f);
+                }
+            } else {
+                // Unipolar: LFO adds to current value (0..depth*range)
+                for (int s = 0; s < numSamples; ++s) {
+                    buf[s] = juce::jlimit(paramMin, paramMax, buf[s] + lfoData[s] * depth * range);
+                }
+            }
+        };
+
+        // Search for the target parameter across all effects
+        bool found = false;
+        for (auto& effect : toggleableEffects) {
+            for (int p = 0; p < (int)effect->parameters.size(); ++p) {
+                if (effect->parameters[p]->paramID == assignment.paramId) {
+                    float* buf = effect->getAnimatedValuesWritePointer(p, numSamples);
+                    if (buf != nullptr)
+                        applyModulation(effect->parameters[p], buf);
+                    found = true;
+                    break;
+                }
+            }
+            if (found) break;
+        }
+
+        if (!found) {
+            // Also check permanent effects (frequency, perspective, etc.)
+            for (auto& effect : permanentEffects) {
+                for (int p = 0; p < (int)effect->parameters.size(); ++p) {
+                    if (effect->parameters[p]->paramID == assignment.paramId) {
+                        float* buf = effect->getAnimatedValuesWritePointer(p, numSamples);
+                        if (buf != nullptr)
+                            applyModulation(effect->parameters[p], buf);
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) break;
+            }
+        }
+    }
+}
 
 DahdsrParams OscirenderAudioProcessor::getCurrentDahdsrParams() const
 {

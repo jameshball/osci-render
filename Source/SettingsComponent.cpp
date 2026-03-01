@@ -6,8 +6,8 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     addAndMakeVisible(effects);
     addAndMakeVisible(fileControls);
     addAndMakeVisible(perspective);
-    addAndMakeVisible(midiResizerBar);
     addAndMakeVisible(mainResizerBar);
+    addAndMakeVisible(midiResizerBar);
     addAndMakeVisible(midi);
     addChildComponent(frame);
     addChildComponent(examples);
@@ -20,16 +20,15 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
         pluginEditor.fileUpdated(fileName, shouldOpenEditor);
     };
 
-    double midiLayoutPreferredSize = std::any_cast<double>(audioProcessor.getProperty("midiLayoutPreferredSize", pluginEditor.CLOSED_PREF_SIZE));
-    double mainLayoutPreferredSize = std::any_cast<double>(audioProcessor.getProperty("mainLayoutPreferredSize", -0.5));
+    double mainLayoutVisSize = std::any_cast<double>(audioProcessor.getProperty("mainLayoutVisSize", -0.25));
+    double mainLayoutMidiSize = std::any_cast<double>(audioProcessor.getProperty("mainLayoutMidiSize", -0.35));
 
-    midiLayout.setItemLayout(0, -0.1, -1.0, -(1.0 + midiLayoutPreferredSize));
-    midiLayout.setItemLayout(1, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE);
-    midiLayout.setItemLayout(2, pluginEditor.CLOSED_PREF_SIZE, -0.9, midiLayoutPreferredSize);
-
-    mainLayout.setItemLayout(0, -0.1, -0.9, mainLayoutPreferredSize);
-    mainLayout.setItemLayout(1, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE);
-    mainLayout.setItemLayout(2, -0.1, -0.9, -(1.0 + mainLayoutPreferredSize));
+    // 5-component horizontal layout: vis | resizer | effects | resizer | midi
+    mainLayout.setItemLayout(0, -0.1, -0.5, mainLayoutVisSize);                    // vis column
+    mainLayout.setItemLayout(1, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE); // resizer
+    mainLayout.setItemLayout(2, -0.1, -0.6, -(1.0 + mainLayoutVisSize + mainLayoutMidiSize)); // effects column
+    mainLayout.setItemLayout(3, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE); // resizer2
+    mainLayout.setItemLayout(4, -0.1, -0.6, mainLayoutMidiSize);                   // midi column
 
     addAndMakeVisible(editor.volume);
 
@@ -87,69 +86,65 @@ void SettingsComponent::resized() {
         return;
     }
 
-    juce::Component dummy;
-    juce::Component dummy2;
+    // 5-component horizontal layout: visColumn | resizer | effectsColumn | resizer2 | midiColumn
+    juce::Component visColumn, effectsColumn;
+    juce::Component* columns[] = { &visColumn, &mainResizerBar, &effectsColumn, &midiResizerBar, &midi };
+    mainLayout.layOutComponents(columns, 5, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
 
-    juce::Component* midiComponents[] = {&dummy, &midiResizerBar, &midi};
-    midiLayout.layOutComponents(midiComponents, 3, area.getX(), area.getY(), area.getWidth(), area.getHeight(), true, true);
-    midi.setBounds(midi.getBounds());
+    // --- Left column: file controls, volume, visualiser ---
+    auto visBounds = visColumn.getBounds();
+    auto row = visBounds.removeFromTop(30);
+    fileControls.setBounds(row.removeFromLeft(visBounds.getWidth()));
+    visBounds.removeFromTop(padding);
 
-    juce::Component* columns[] = {&dummy2, &mainResizerBar, &dummy};
-    mainLayout.layOutComponents(columns, 3, dummy.getX(), dummy.getY(), dummy.getWidth(), dummy.getHeight(), false, true);
+    volumeVisualiserBounds = visBounds;
+    visBounds.reduce(5, 5);
 
-    auto bounds = dummy2.getBounds();
-    auto row = bounds.removeFromTop(30);
-    fileControls.setBounds(row.removeFromLeft(bounds.getWidth()));
-    bounds.removeFromTop(padding);
-
-    volumeVisualiserBounds = bounds;
-    bounds.reduce(5, 5);
-
-    auto volumeArea = bounds.removeFromLeft(30);
+    auto volumeArea = visBounds.removeFromLeft(30);
     pluginEditor.volume.setBounds(volumeArea.withSizeKeepingCentre(volumeArea.getWidth(), juce::jmin(volumeArea.getHeight(), 300)));
 
     if (!audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
-        auto minDim = juce::jmin(bounds.getWidth(), bounds.getHeight());
-        juce::Point<int> localTopLeft = {bounds.getX(), bounds.getY()};
+        auto minDim = juce::jmin(visBounds.getWidth(), visBounds.getHeight());
+        juce::Point<int> localTopLeft = {visBounds.getX(), visBounds.getY()};
         juce::Point<int> topLeft = pluginEditor.getLocalPoint(this, localTopLeft);
-        auto shiftedBounds = bounds;
+        auto shiftedBounds = visBounds;
         shiftedBounds.setX(topLeft.getX());
         shiftedBounds.setY(topLeft.getY());
         pluginEditor.visualiser.setBounds(shiftedBounds);
     }
 
-    juce::Component* effectSettings = nullptr;
-    auto dummyBounds = dummy.getBounds();
+    // --- Middle column: effects, perspective, frame settings ---
+    auto effectsBounds = effectsColumn.getBounds();
 
-    // Only reserve space for effect settings panel when not showing the Open Files panel
     if (!examplesVisible) {
         if (frame.isVisible()) {
-            effectSettings = &frame;
             int preferredHeight = frame.getPreferredHeight();
-            effectSettings->setBounds(dummyBounds.removeFromBottom(preferredHeight));
-            dummyBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
+            frame.setBounds(effectsBounds.removeFromBottom(preferredHeight));
+            effectsBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
         }
     }
 
     if (examplesVisible) {
-        // Hide other panels while examples are visible
         perspective.setVisible(false);
         effects.setVisible(false);
         frame.setVisible(false);
         examples.setVisible(true);
-        examples.setBounds(dummyBounds);
+        examples.setBounds(effectsBounds);
     } else {
         examples.setVisible(false);
         perspective.setVisible(true);
         effects.setVisible(true);
-        perspective.setBounds(dummyBounds.removeFromBottom(120));
-        dummyBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
-        effects.setBounds(dummyBounds);
+        perspective.setBounds(effectsBounds.removeFromBottom(120));
+        effectsBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
+        effects.setBounds(effectsBounds);
     }
 
+    // --- Right column: midi (already positioned by layOutComponents) ---
+    midi.setBounds(midi.getBounds());
+
     if (isVisible() && getWidth() > 0 && getHeight() > 0) {
-        audioProcessor.setProperty("midiLayoutPreferredSize", midiLayout.getItemCurrentRelativeSize(2));
-        audioProcessor.setProperty("mainLayoutPreferredSize", mainLayout.getItemCurrentRelativeSize(0));
+        audioProcessor.setProperty("mainLayoutVisSize", mainLayout.getItemCurrentRelativeSize(0));
+        audioProcessor.setProperty("mainLayoutMidiSize", mainLayout.getItemCurrentRelativeSize(4));
     }
 
     repaint();
@@ -199,12 +194,6 @@ void SettingsComponent::update() {
 }
 
 void SettingsComponent::mouseMove(const juce::MouseEvent& event) {
-    for (int i = 0; i < 1; i++) {
-        if (toggleComponents[i]->getBounds().removeFromTop(pluginEditor.CLOSED_PREF_SIZE).contains(event.getPosition())) {
-            setMouseCursor(juce::MouseCursor::PointingHandCursor);
-            return;
-        }
-    }
     setMouseCursor(juce::MouseCursor::NormalCursor);
 }
 
@@ -219,11 +208,4 @@ void SettingsComponent::showExamples(bool shouldShow) {
 }
 
 void SettingsComponent::mouseDown(const juce::MouseEvent& event) {
-    for (int i = 0; i < 1; i++) {
-        if (toggleComponents[i]->getBounds().removeFromTop(pluginEditor.CLOSED_PREF_SIZE).contains(event.getPosition())) {
-            pluginEditor.toggleLayout(*toggleLayouts[i], prefSizes[i]);
-            resized();
-            return;
-        }
-    }
 }

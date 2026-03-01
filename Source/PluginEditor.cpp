@@ -5,6 +5,7 @@
 #include "../modules/juce_sharedtexture/SharedTexture.h"
 #include "CustomStandaloneFilterWindow.h"
 #include "PluginProcessor.h"
+#include "components/EffectComponent.h"
 #include "components/SyphonInputSelectorComponent.h"
 
 void OscirenderAudioProcessorEditor::registerFileRemovedCallback() {
@@ -199,6 +200,11 @@ void OscirenderAudioProcessorEditor::initialiseCodeEditors() {
     }
     bool codeEditorVisible = std::any_cast<bool>(audioProcessor.getProperty("codeEditorVisible", false));
     fileUpdated(audioProcessor.getCurrentFileName(), codeEditorVisible);
+}
+
+void OscirenderAudioProcessorEditor::dragOperationEnded(const juce::DragAndDropTarget::SourceDetails&) {
+    EffectComponent::lfoAnyDragActive.store(false, std::memory_order_relaxed);
+    repaint();
 }
 
 void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {

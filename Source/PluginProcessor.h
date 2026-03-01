@@ -24,6 +24,7 @@
 #include "audio/ShapeSound.h"
 #include "audio/ShapeVoice.h"
 #include "audio/DahdsrEnvelope.h"
+#include "audio/LfoState.h"
 #include "obj/ObjectServer.h"
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
@@ -118,6 +119,22 @@ public:
     osci::FloatParameter* attackShape = new osci::FloatParameter("Attack Shape", "attackShape", VERSION_HINT, 5.0f, -50.0f, 50.0f, 0.00001f);
     osci::FloatParameter* decayShape = new osci::FloatParameter("Decay Shape", "decayShape", VERSION_HINT, -20.0f, -50.0f, 50.0f, 0.00001f);
     osci::FloatParameter* releaseShape = new osci::FloatParameter("Release Shape", "releaseShape", VERSION_HINT, -5.0f, -50.0f, 50.0f, 0.00001f);
+
+    // === Global LFO system ===
+    osci::FloatParameter* lfoRate[NUM_LFOS];
+
+    // UI-persisted LFO state (preset type + active tab)
+    LfoPreset lfoPresets[NUM_LFOS] = { LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle };
+    int activeLfoTab = 0;
+
+    void lfoWaveformChanged(int index, const LfoWaveform& waveform);
+    void addLfoAssignment(const LfoAssignment& assignment);
+    void removeLfoAssignment(int lfoIndex, const juce::String& paramId);
+    std::vector<LfoAssignment> getLfoAssignments() const;
+    LfoWaveform getLfoWaveform(int index) const;
+
+    // Get the current LFO output value (0..1) for visualization
+    float getLfoCurrentValue(int lfoIndex) const;
 
     juce::MidiKeyboardState keyboardState;
 
@@ -295,6 +312,16 @@ private:
     }
 
     juce::AudioPlayHead* playHead;
+
+    // Global LFO audio-thread state
+    LfoWaveform lfoWaveforms[NUM_LFOS];
+    juce::SpinLock lfoWaveformLock;
+    std::vector<LfoAssignment> lfoAssignments;
+    juce::SpinLock lfoAssignmentLock;
+    LfoAudioState lfoAudioStates[NUM_LFOS];
+    std::array<std::vector<float>, NUM_LFOS> lfoBlockBuffer;
+
+    void applyGlobalLfoModulation(int numSamples, double sampleRate);
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
 public:

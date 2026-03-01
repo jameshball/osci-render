@@ -42,14 +42,10 @@ private:
 
     bool examplesVisible = false;
 
-    juce::StretchableLayoutManager midiLayout;
-    juce::StretchableLayoutResizerBar midiResizerBar{&midiLayout, 1, false};
+    // Three-column horizontal layout: visColumn | resizer | effectsColumn | resizer2 | midiColumn
     juce::StretchableLayoutManager mainLayout;
     juce::StretchableLayoutResizerBar mainResizerBar{&mainLayout, 1, true};
-
-    juce::Component* toggleComponents[1] = {&midi};
-    juce::StretchableLayoutManager* toggleLayouts[1] = {&midiLayout};
-    double prefSizes[1] = {300};
+    juce::StretchableLayoutResizerBar midiResizerBar{&mainLayout, 3, true};
 
     juce::Rectangle<int> volumeVisualiserBounds;
 

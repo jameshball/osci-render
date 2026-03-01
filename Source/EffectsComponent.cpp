@@ -1,5 +1,6 @@
 #include "EffectsComponent.h"
 #include "audio/BitCrushEffect.h"
+#include "audio/LfoState.h"
 #include "PluginEditor.h"
 
 bool EffectsComponent::hasAnySelectedEffects() const {
@@ -22,6 +23,14 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
 	setText("Audio Effects");
 
     addAndMakeVisible(frequency);
+
+    frequency.onLfoDropped = [this](int lfoIndex, const juce::String& paramId) {
+        LfoAssignment assignment;
+        assignment.lfoIndex = lfoIndex;
+        assignment.paramId = paramId;
+        assignment.depth = 0.5f;
+        audioProcessor.addLfoAssignment(assignment);
+    };
 
     frequency.slider.setSkewFactorFromMidPoint(500.0);
     frequency.slider.setTextValueSuffix("Hz");

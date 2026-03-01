@@ -178,6 +178,7 @@
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
         <FILE id="Y1Qska" name="DahdsrEnvelope.h" compile="0" resource="0"
               file="Source/audio/DahdsrEnvelope.h"/>
+        <FILE id="LfStH1" name="LfoState.h" compile="0" resource="0" file="Source/audio/LfoState.h"/>
         <FILE id="EjkbRe" name="PolygonizerEffect.h" compile="0" resource="0"
               file="Source/audio/PolygonizerEffect.h"/>
         <FILE id="XSUjDz" name="KaleidoscopeEffect.h" compile="0" resource="0"
@@ -234,12 +235,11 @@
               file="Source/audio/ProcessAudioPermissions.h"/>
         <FILE id="PrAuD4" name="ProcessAudioPermissions.mm" compile="1" resource="0"
               file="Source/audio/ProcessAudioPermissions.mm"/>
-        <FILE id="WlLpH1" name="WindowsLoopbackAudioDeviceType.h" compile="0" resource="0"
-              file="Source/audio/WindowsLoopbackAudioDeviceType.h"/>
-        <FILE id="WlLpC1" name="WindowsLoopbackAudioDeviceType.cpp" compile="1" resource="0"
-              file="Source/audio/WindowsLoopbackAudioDeviceType.cpp"/>
-        <FILE id="mAhd01" name="miniaudio.h" compile="0" resource="0"
-              file="Source/audio/miniaudio/miniaudio.h"/>
+        <FILE id="WlLpH1" name="WindowsLoopbackAudioDeviceType.h" compile="0"
+              resource="0" file="Source/audio/WindowsLoopbackAudioDeviceType.h"/>
+        <FILE id="WlLpC1" name="WindowsLoopbackAudioDeviceType.cpp" compile="1"
+              resource="0" file="Source/audio/WindowsLoopbackAudioDeviceType.cpp"/>
+        <FILE id="mAhd01" name="miniaudio.h" compile="0" resource="0" file="Source/audio/miniaudio/miniaudio.h"/>
       </GROUP>
       <GROUP id="{2A41BAF3-5E83-B018-5668-39D89ABFA00C}" name="chinese_postman">
         <FILE id="LcDpwe" name="BinaryHeap.cpp" compile="1" resource="0" file="Source/chinese_postman/BinaryHeap.cpp"/>
@@ -363,6 +363,13 @@
               file="Source/components/EnvelopeComponent.cpp"/>
         <FILE id="A8OllZ" name="EnvelopeComponent.h" compile="0" resource="0"
               file="Source/components/EnvelopeComponent.h"/>
+        <FILE id="NdGrC1" name="NodeGraphComponent.h" compile="0" resource="0"
+              file="Source/components/NodeGraphComponent.h"/>
+        <FILE id="NdGrC2" name="NodeGraphComponent.cpp" compile="1" resource="0"
+              file="Source/components/NodeGraphComponent.cpp"/>
+        <FILE id="LfCmH1" name="LfoComponent.h" compile="0" resource="0" file="Source/components/LfoComponent.h"/>
+        <FILE id="LfCmC2" name="LfoComponent.cpp" compile="1" resource="0"
+              file="Source/components/LfoComponent.cpp"/>
       </GROUP>
       <GROUP id="{A3E24187-62A5-AB8D-8837-14043B89A640}" name="gpla">
         <FILE id="KvDV8j" name="LineArtParser.cpp" compile="1" resource="0"
