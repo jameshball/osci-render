@@ -35,11 +35,7 @@ void TempoComponent::paint(juce::Graphics& g) {
     g.setFont(juce::Font(13.0f));
     g.setColour(juce::Colours::white.withAlpha(0.9f));
 
-    juce::String text;
-    if (bpm == std::round(bpm))
-        text = juce::String((int)bpm) + " BPM";
-    else
-        text = juce::String(bpm, 1) + " BPM";
+    juce::String text = juce::String(bpm, 1) + " BPM";
 
     g.drawText(text, bounds.reduced(6.0f, 0), juce::Justification::centred);
 }

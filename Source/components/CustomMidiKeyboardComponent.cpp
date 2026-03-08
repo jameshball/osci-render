@@ -54,6 +54,7 @@ CustomMidiKeyboardComponent::CustomMidiKeyboardComponent (MidiKeyboardState& sta
 
     colourChanged();
     setWantsKeyboardFocus (true);
+    setOpaque (false);
 
     startTimerHz (20);
 }
@@ -235,6 +236,23 @@ void CustomMidiKeyboardComponent::mouseUp (const MouseEvent& e)
         mouseUpOnKey (note, e);
 }
 
+void CustomMidiKeyboardComponent::mouseWheelMove (const MouseEvent& e, const MouseWheelDetails& wheel)
+{
+    if (auto* viewport = findParentComponentOfClass<Viewport>())
+    {
+        const auto dominantDelta = std::abs (wheel.deltaX) > std::abs (wheel.deltaY) ? wheel.deltaX : wheel.deltaY;
+
+        if (std::abs (dominantDelta) > 0.0f)
+        {
+            const auto pixelDelta = roundToInt (-dominantDelta * (wheel.isSmooth ? 180.0f : 72.0f));
+            viewport->setViewPosition (viewport->getViewPositionX() + pixelDelta, viewport->getViewPositionY());
+            return;
+        }
+    }
+
+    Component::mouseWheelMove (e, wheel);
+}
+
 void CustomMidiKeyboardComponent::mouseEnter (const MouseEvent& e)
 {
     updateNoteUnderMouse (e, false);
@@ -304,164 +322,74 @@ void CustomMidiKeyboardComponent::focusLost (FocusChangeType)
 }
 
 //==============================================================================
-void CustomMidiKeyboardComponent::drawKeyboardBackground (Graphics& g, Rectangle<float> area)
+void CustomMidiKeyboardComponent::drawKeyboardBackground (Graphics& g, Rectangle<float> /*area*/)
 {
-    g.fillAll (findColour (whiteNoteColourId));
-
-    auto width = area.getWidth();
-    auto height = area.getHeight();
-    auto currentOrientation = getOrientation();
-    Point<float> shadowGradientStart, shadowGradientEnd;
-
-    if (currentOrientation == verticalKeyboardFacingLeft)
-    {
-        shadowGradientStart.x = width - 1.0f;
-        shadowGradientEnd.x   = width - 5.0f;
-    }
-    else if (currentOrientation == verticalKeyboardFacingRight)
-    {
-        shadowGradientEnd.x = 5.0f;
-    }
-    else
-    {
-        shadowGradientEnd.y = 5.0f;
-    }
-
-    auto keyboardWidth = getRectangleForKey (getRangeEnd()).getRight();
-    auto shadowColour = findColour (shadowColourId);
-
-    if (! shadowColour.isTransparent())
-    {
-        g.setGradientFill ({ shadowColour, shadowGradientStart,
-                             shadowColour.withAlpha (0.0f), shadowGradientEnd,
-                             false });
-
-        switch (currentOrientation)
-        {
-            case horizontalKeyboard:            g.fillRect (0.0f, 0.0f, keyboardWidth, 5.0f); break;
-            case verticalKeyboardFacingLeft:    g.fillRect (width - 5.0f, 0.0f, 5.0f, keyboardWidth); break;
-            case verticalKeyboardFacingRight:   g.fillRect (0.0f, 0.0f, 5.0f, keyboardWidth); break;
-            default: break;
-        }
-    }
-
-    auto lineColour = findColour (keySeparatorLineColourId);
-
-    if (! lineColour.isTransparent())
-    {
-        g.setColour (lineColour);
-
-        switch (currentOrientation)
-        {
-            case horizontalKeyboard:            g.fillRect (0.0f, height - 1.0f, keyboardWidth, 1.0f); break;
-            case verticalKeyboardFacingLeft:    g.fillRect (0.0f, 0.0f, 1.0f, keyboardWidth); break;
-            case verticalKeyboardFacingRight:   g.fillRect (width - 1.0f, 0.0f, 1.0f, keyboardWidth); break;
-            default: break;
-        }
-    }
+    juce::ignoreUnused (g);
 }
 
 void CustomMidiKeyboardComponent::drawWhiteNote (int midiNoteNumber, Graphics& g, Rectangle<float> area,
-                                                 bool isDown, bool isOver, Colour lineColour, Colour textColour)
+                                                 bool isDown, bool isOver, Colour /*lineColour*/, Colour /*textColour*/)
 {
-    auto c = Colours::transparentWhite;
+    auto c = findColour (whiteNoteColourId);
+    if (isDown)       c = c.overlaidWith (findColour (keyDownOverlayColourId));
+    else if (isOver)  c = c.overlaidWith (findColour (mouseOverKeyOverlayColourId));
 
-    if (isDown)  c = findColour (keyDownOverlayColourId);
-    if (isOver)  c = c.overlaidWith (findColour (mouseOverKeyOverlayColourId));
+    constexpr float cornerRadius = 2.5f;
+    constexpr float gap = 0.5f;
 
+    // Inset horizontally to expose background as 1px separator lines
+    auto keyArea = area.reduced (gap, 0.0f);
+
+    const auto isFirstKey = midiNoteNumber == getRangeStart();
+    const auto isLastKey = midiNoteNumber == getRangeEnd();
+
+    // Outer keys inherit the panel's rounded corners so the whole keyboard reads as one control.
+    Path keyPath;
+    keyPath.addRoundedRectangle (keyArea.getX(), keyArea.getY(),
+                                  keyArea.getWidth(), keyArea.getHeight(),
+                                  cornerRadius, cornerRadius,
+                                  isFirstKey, isLastKey, true, true);
     g.setColour (c);
-    g.fillRect (area);
-
-    const auto currentOrientation = getOrientation();
-
-    auto text = getWhiteNoteText (midiNoteNumber);
-
-    if (text.isNotEmpty())
-    {
-        auto fontHeight = jmin (12.0f, getKeyWidth() * 0.9f);
-
-        g.setColour (textColour);
-        g.setFont (withDefaultMetrics (FontOptions { fontHeight }).withHorizontalScale (0.8f));
-
-        switch (currentOrientation)
-        {
-            case horizontalKeyboard:            g.drawText (text, area.withTrimmedLeft (1.0f).withTrimmedBottom (2.0f), Justification::centredBottom, false); break;
-            case verticalKeyboardFacingLeft:    g.drawText (text, area.reduced (2.0f), Justification::centredLeft,   false); break;
-            case verticalKeyboardFacingRight:   g.drawText (text, area.reduced (2.0f), Justification::centredRight,  false); break;
-            default: break;
-        }
-    }
-
-    if (! lineColour.isTransparent())
-    {
-        g.setColour (lineColour);
-
-        switch (currentOrientation)
-        {
-            case horizontalKeyboard:            g.fillRect (area.withWidth (1.0f)); break;
-            case verticalKeyboardFacingLeft:    g.fillRect (area.withHeight (1.0f)); break;
-            case verticalKeyboardFacingRight:   g.fillRect (area.removeFromBottom (1.0f)); break;
-            default: break;
-        }
-
-        if (midiNoteNumber == getRangeEnd())
-        {
-            switch (currentOrientation)
-            {
-                case horizontalKeyboard:            g.fillRect (area.expanded (1.0f, 0).removeFromRight (1.0f)); break;
-                case verticalKeyboardFacingLeft:    g.fillRect (area.expanded (0, 1.0f).removeFromBottom (1.0f)); break;
-                case verticalKeyboardFacingRight:   g.fillRect (area.expanded (0, 1.0f).removeFromTop (1.0f)); break;
-                default: break;
-            }
-        }
-    }
+    g.fillPath (keyPath);
 }
 
-void CustomMidiKeyboardComponent::drawBlackNote (int /*midiNoteNumber*/, Graphics& g, Rectangle<float> area,
+void CustomMidiKeyboardComponent::drawBlackNote (int midiNoteNumber, Graphics& g, Rectangle<float> area,
                                                  bool isDown, bool isOver, Colour noteFillColour)
 {
     auto c = noteFillColour;
+    if (isDown)       c = c.overlaidWith (findColour (keyDownOverlayColourId));
+    else if (isOver)  c = c.overlaidWith (findColour (mouseOverKeyOverlayColourId));
 
-    if (isDown)  c = c.overlaidWith (findColour (keyDownOverlayColourId));
-    if (isOver)  c = c.overlaidWith (findColour (mouseOverKeyOverlayColourId));
+    constexpr float cornerRadius = 2.5f;
 
+    const auto isFirstKey = midiNoteNumber == getRangeStart();
+    const auto isLastKey = midiNoteNumber == getRangeEnd();
+
+    // Preserve the outer rounded corners at the keyboard edges.
+    Path keyPath;
+    keyPath.addRoundedRectangle (area.getX(), area.getY(),
+                                  area.getWidth(), area.getHeight(),
+                                  cornerRadius, cornerRadius,
+                                  isFirstKey, isLastKey, true, true);
     g.setColour (c);
-    g.fillRect (area);
+    g.fillPath (keyPath);
 
-    if (isDown)
+    // Faint lighter bevel/highlight on top edge
+    if (! isDown)
     {
-        g.setColour (noteFillColour);
-        g.drawRect (area);
-    }
-    else
-    {
-        g.setColour (c.brighter());
-        auto sideIndent = 1.0f / 8.0f;
-        auto topIndent = 7.0f / 8.0f;
-        auto w = area.getWidth();
-        auto h = area.getHeight();
-
-        switch (getOrientation())
-        {
-            case horizontalKeyboard:            g.fillRect (area.reduced (w * sideIndent, 0).removeFromTop   (h * topIndent)); break;
-            case verticalKeyboardFacingLeft:    g.fillRect (area.reduced (0, h * sideIndent).removeFromRight (w * topIndent)); break;
-            case verticalKeyboardFacingRight:   g.fillRect (area.reduced (0, h * sideIndent).removeFromLeft  (w * topIndent)); break;
-            default: break;
-        }
+        g.setColour (Colours::white.withAlpha (0.07f));
+        g.fillRect (area.withHeight (1.0f));
     }
 }
 
-String CustomMidiKeyboardComponent::getWhiteNoteText (int midiNoteNumber)
+String CustomMidiKeyboardComponent::getWhiteNoteText (int /*midiNoteNumber*/)
 {
-    if (midiNoteNumber % 12 == 0)
-        return MidiMessage::getMidiNoteName (midiNoteNumber, true, true, getOctaveForMiddleC());
-
     return {};
 }
 
 void CustomMidiKeyboardComponent::colourChanged()
 {
-    setOpaque (findColour (whiteNoteColourId).isOpaque());
+    setOpaque (false);
     repaint();
 }
 
@@ -493,5 +421,25 @@ void CustomMidiKeyboardComponent::handleNoteOff (MidiKeyboardState*, int /*midiC
 bool CustomMidiKeyboardComponent::mouseDownOnKey    ([[maybe_unused]] int midiNoteNumber, [[maybe_unused]] const MouseEvent& e)  { return true; }
 bool CustomMidiKeyboardComponent::mouseDraggedToKey ([[maybe_unused]] int midiNoteNumber, [[maybe_unused]] const MouseEvent& e)  { return true; }
 void CustomMidiKeyboardComponent::mouseUpOnKey      ([[maybe_unused]] int midiNoteNumber, [[maybe_unused]] const MouseEvent& e)  {}
+
+//==============================================================================
+bool CustomMidiKeyboardComponent::isWhiteMidiKey(int midiNote)
+{
+    switch (midiNote % 12)
+    {
+        case 1: case 3: case 6: case 8: case 10:
+            return false;
+        default:
+            return true;
+    }
+}
+
+int CustomMidiKeyboardComponent::getWhiteKeyCount(int startNote, int endNote)
+{
+    int count = 0;
+    for (int note = startNote; note <= endNote; ++note)
+        count += isWhiteMidiKey(note) ? 1 : 0;
+    return count;
+}
 
 } // namespace juce

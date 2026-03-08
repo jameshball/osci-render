@@ -1,6 +1,7 @@
 #include "EffectsComponent.h"
 #include "audio/BitCrushEffect.h"
 #include "audio/LfoState.h"
+#include "audio/EnvState.h"
 #include "PluginEditor.h"
 
 bool EffectsComponent::hasAnySelectedEffects() const {
@@ -24,18 +25,7 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
 
     addAndMakeVisible(frequency);
 
-    frequency.onLfoDropped = [this](int lfoIndex, const juce::String& paramId) {
-        LfoAssignment assignment;
-        assignment.lfoIndex = lfoIndex;
-        assignment.paramId = paramId;
-        assignment.depth = 0.5f;
-        audioProcessor.addLfoAssignment(assignment);
-    };
-
-    // Wire LFO modulation query for the frequency slider
-    frequency.queryLfoModulation = [this](const juce::String& paramId, juce::Slider& sl) -> EffectComponent::LfoModInfo {
-        return EffectComponent::computeLfoModulation(audioProcessor, paramId, sl);
-    };
+    frequency.wireModulation(audioProcessor);
 
     frequency.slider.setSkewFactorFromMidPoint(500.0);
     frequency.slider.setTextValueSuffix("Hz");
@@ -134,12 +124,9 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
         listBox.updateContent();
     }
 
-    // Single 30Hz timer drives LFO modulation display for all child EffectComponents
-    startTimerHz(30);
 }
 
 EffectsComponent::~EffectsComponent() {
-    stopTimer();
     juce::MessageManagerLock lock;
     audioProcessor.broadcaster.removeChangeListener(this);
 }
@@ -194,19 +181,4 @@ void EffectsComponent::changeListenerCallback(juce::ChangeBroadcaster* source) {
     repaint();
 }
 
-void EffectsComponent::timerCallback() {
-    // Update the frequency slider
-    frequency.updateLfoModulation();
 
-    // Recursively update all visible EffectComponents in the list
-    std::function<void(juce::Component*)> updateChildren = [&](juce::Component* parent) {
-        for (int i = 0; i < parent->getNumChildComponents(); ++i) {
-            auto* child = parent->getChildComponent(i);
-            if (auto* ec = dynamic_cast<EffectComponent*>(child))
-                ec->updateLfoModulation();
-            else
-                updateChildren(child);
-        }
-    };
-    updateChildren(&listBox);
-}

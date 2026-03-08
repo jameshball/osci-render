@@ -42,6 +42,13 @@ void LfoComponent::PresetSelector::mouseDown(const juce::MouseEvent& e) {
         onNext();
 }
 
+void LfoComponent::PresetSelector::mouseMove(const juce::MouseEvent& e) {
+    if (leftArrowArea.contains(e.getPosition()) || rightArrowArea.contains(e.getPosition()))
+        setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    else
+        setMouseCursor(juce::MouseCursor::NormalCursor);
+}
+
 void LfoComponent::PresetSelector::resized() {
     auto bounds = getLocalBounds();
     leftArrowArea = bounds.removeFromLeft(28);
@@ -145,6 +152,7 @@ void LfoComponent::resized() {
     rateControl.setBounds(rateRow.removeFromLeft(rateW));
 
     graph.setBounds(bounds);
+    setOutlineBounds(graph.getBounds());
 }
 
 void LfoComponent::onActiveSourceChanged(int index) {

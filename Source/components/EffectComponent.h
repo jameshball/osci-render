@@ -6,23 +6,23 @@
 
 class OscirenderAudioProcessor;
 
-class EffectComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater, public juce::SettableTooltipClient, private juce::Slider::Listener, public juce::DragAndDropTarget {
+class EffectComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater, public juce::SettableTooltipClient, private juce::Slider::Listener, public juce::DragAndDropTarget, private juce::Timer {
 public:
     EffectComponent(osci::Effect& effect, int index);
     EffectComponent(osci::Effect& effect);
     ~EffectComponent();
 
     // Global flag: when true, all EffectComponents draw a highlight border
-    // to indicate they are valid LFO drop targets.
-    static std::atomic<bool> lfoAnyDragActive;
+    // to indicate they are valid modulation drop targets.
+    static std::atomic<bool> modAnyDragActive;
 
     // When non-empty, the EffectComponent with this paramId draws a hover highlight.
     static juce::String highlightedParamId;
 
-    // LFO range highlight: when hovering a depth indicator, show the modulated range on the slider
-    static juce::String lfoRangeParamId;
-    static std::atomic<float> lfoRangeDepth;
-    static std::atomic<bool> lfoRangeBipolar;
+    // Modulation range highlight: when hovering a depth indicator, show the modulated range on the slider
+    static juce::String modRangeParamId;
+    static std::atomic<float> modRangeDepth;
+    static std::atomic<bool> modRangeBipolar;
 
     void resized() override;
     void paint(juce::Graphics& g) override;
@@ -30,6 +30,7 @@ public:
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void handleAsyncUpdate() override;
+    void timerCallback() override;
     
     // Slider::Listener callbacks for MIDI learn support
     void sliderValueChanged(juce::Slider* slider) override;
@@ -50,6 +51,10 @@ public:
     // Parameters: lfoIndex, paramId
     std::function<void(int, const juce::String&)> onLfoDropped;
 
+    // Callback invoked when an envelope is dropped on this slider.
+    // Parameters: envIndex, paramId
+    std::function<void(int, const juce::String&)> onEnvDropped;
+
     // Struct returned by the LFO modulation query callback.
     struct LfoModInfo {
         bool active = false;           // true if any LFO is assigned to this param
@@ -61,13 +66,25 @@ public:
     // Set by the parent that has access to the processor.
     std::function<LfoModInfo(const juce::String& paramId, juce::Slider& slider)> queryLfoModulation;
 
+    // Callback: given a paramId, returns envelope modulation info.
+    std::function<LfoModInfo(const juce::String& paramId, juce::Slider& slider)> queryEnvModulation;
+
     // Shared implementation of LFO modulation query.
     static LfoModInfo computeLfoModulation(OscirenderAudioProcessor& processor,
                                            const juce::String& paramId,
                                            juce::Slider& slider);
 
+    // Shared implementation of envelope modulation query.
+    static LfoModInfo computeEnvModulation(OscirenderAudioProcessor& processor,
+                                           const juce::String& paramId,
+                                           juce::Slider& slider);
+
     // Update LFO modulation display (call from a parent timer, not per-instance).
     void updateLfoModulation();
+
+    // Wire standard modulation callbacks (LFO + envelope drop, query) to the processor.
+    // Call this after construction to enable modulation for this slider.
+    void wireModulation(OscirenderAudioProcessor& processor);
 
     juce::Slider slider;
     juce::Slider lfoSlider;
@@ -226,7 +243,7 @@ private:
     void setupComponent();
     bool lfoEnabled = true;
     bool sidechainEnabled = true;
-    bool lfoDropHighlight = false;
+    bool modDropHighlight = false;
     std::shared_ptr<juce::Component> component;
 
     std::unique_ptr<SvgButton> sidechainButton;

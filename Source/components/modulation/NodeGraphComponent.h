@@ -3,7 +3,7 @@
 #include <JuceHeader.h>
 #include <vector>
 #include "../../audio/GraphNode.h"
-#include "../FlowTrailRenderer.h"
+#include "FlowTrailRenderer.h"
 
 // A reusable breakpoint graph component with draggable nodes and per-segment curve editing.
 // Designed to be used by both the DAHDSR envelope and LFO waveform editors.

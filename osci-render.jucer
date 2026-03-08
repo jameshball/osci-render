@@ -181,6 +181,8 @@
               file="Source/audio/DahdsrEnvelope.h"/>
         <FILE id="GrNdH1" name="GraphNode.h" compile="0" resource="0" file="Source/audio/GraphNode.h"/>
         <FILE id="LfStH1" name="LfoState.h" compile="0" resource="0" file="Source/audio/LfoState.h"/>
+        <FILE id="EnStH1" name="EnvState.h" compile="0" resource="0" file="Source/audio/EnvState.h"/>
+        <FILE id="MdAsH1" name="ModAssignment.h" compile="0" resource="0" file="Source/audio/ModAssignment.h"/>
         <FILE id="EjkbRe" name="PolygonizerEffect.h" compile="0" resource="0"
               file="Source/audio/PolygonizerEffect.h"/>
         <FILE id="XSUjDz" name="KaleidoscopeEffect.h" compile="0" resource="0"
@@ -368,32 +370,36 @@
         <FILE id="VTbLH1" name="VerticalTabListComponent.h" compile="0" resource="0"
               file="Source/components/VerticalTabListComponent.h"/>
         <FILE id="WHz3FS" name="EnvelopeComponent.cpp" compile="1" resource="0"
-              file="Source/components/EnvelopeComponent.cpp"/>
+              file="Source/components/modulation/EnvelopeComponent.cpp"/>
         <FILE id="A8OllZ" name="EnvelopeComponent.h" compile="0" resource="0"
-              file="Source/components/EnvelopeComponent.h"/>
+              file="Source/components/modulation/EnvelopeComponent.h"/>
+        <FILE id="MdHlH1" name="ModulationHelper.h" compile="0" resource="0"
+              file="Source/components/modulation/ModulationHelper.h"/>
+        <FILE id="MdHlC1" name="ModulationHelper.cpp" compile="1" resource="0"
+              file="Source/components/modulation/ModulationHelper.cpp"/>
+        <FILE id="MdScH1" name="ModulationSourceComponent.h" compile="0" resource="0"
+              file="Source/components/modulation/ModulationSourceComponent.h"/>
+        <FILE id="MdScC1" name="ModulationSourceComponent.cpp" compile="1"
+              resource="0" file="Source/components/modulation/ModulationSourceComponent.cpp"/>
         <FILE id="FlTrH1" name="FlowTrailRenderer.h" compile="0" resource="0"
-              file="Source/components/FlowTrailRenderer.h"/>
+              file="Source/components/modulation/FlowTrailRenderer.h"/>
         <FILE id="NdGrC1" name="NodeGraphComponent.h" compile="0" resource="0"
-              file="Source/components/lfo/NodeGraphComponent.h"/>
+              file="Source/components/modulation/NodeGraphComponent.h"/>
         <FILE id="NdGrC2" name="NodeGraphComponent.cpp" compile="1" resource="0"
-              file="Source/components/lfo/NodeGraphComponent.cpp"/>
-        <FILE id="LfCmH1" name="LfoComponent.h" compile="0" resource="0" file="Source/components/lfo/LfoComponent.h"/>
+              file="Source/components/modulation/NodeGraphComponent.cpp"/>
+        <FILE id="LfCmH1" name="LfoComponent.h" compile="0" resource="0" file="Source/components/modulation/LfoComponent.h"/>
         <FILE id="LfCmC2" name="LfoComponent.cpp" compile="1" resource="0"
-              file="Source/components/lfo/LfoComponent.cpp"/>
+              file="Source/components/modulation/LfoComponent.cpp"/>
         <FILE id="LfRtH1" name="LfoRateComponent.h" compile="0" resource="0"
-              file="Source/components/lfo/LfoRateComponent.h"/>
+              file="Source/components/modulation/LfoRateComponent.h"/>
         <FILE id="LfRtC2" name="LfoRateComponent.cpp" compile="1" resource="0"
-              file="Source/components/lfo/LfoRateComponent.cpp"/>
+              file="Source/components/modulation/LfoRateComponent.cpp"/>
         <FILE id="TmpCH1" name="TempoComponent.h" compile="0" resource="0"
-              file="Source/components/lfo/TempoComponent.h"/>
+              file="Source/components/modulation/TempoComponent.h"/>
         <FILE id="TmpCC2" name="TempoComponent.cpp" compile="1" resource="0"
-              file="Source/components/lfo/TempoComponent.cpp"/>
+              file="Source/components/modulation/TempoComponent.cpp"/>
         <FILE id="InEdH1" name="InlineEditorHelper.h" compile="0" resource="0"
-              file="Source/components/lfo/InlineEditorHelper.h"/>
-        <FILE id="LfMdH1" name="LfoModulationHelper.h" compile="0" resource="0"
-              file="Source/components/lfo/LfoModulationHelper.h"/>
-        <FILE id="LfMdC2" name="LfoModulationHelper.cpp" compile="1" resource="0"
-              file="Source/components/lfo/LfoModulationHelper.cpp"/>
+              file="Source/components/modulation/InlineEditorHelper.h"/>
       </GROUP>
       <GROUP id="{A3E24187-62A5-AB8D-8837-14043B89A640}" name="gpla">
         <FILE id="KvDV8j" name="LineArtParser.cpp" compile="1" resource="0"

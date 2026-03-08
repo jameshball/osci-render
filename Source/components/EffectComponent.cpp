@@ -2,14 +2,15 @@
 
 #include "../LookAndFeel.h"
 #include "../PluginProcessor.h"
-#include "lfo/LfoComponent.h"
-#include "lfo/LfoModulationHelper.h"
+#include "modulation/EnvelopeComponent.h"
+#include "modulation/LfoComponent.h"
+#include "modulation/ModulationHelper.h"
 
-std::atomic<bool> EffectComponent::lfoAnyDragActive{false};
+std::atomic<bool> EffectComponent::modAnyDragActive{false};
 juce::String EffectComponent::highlightedParamId;
-juce::String EffectComponent::lfoRangeParamId;
-std::atomic<float> EffectComponent::lfoRangeDepth{0.0f};
-std::atomic<bool> EffectComponent::lfoRangeBipolar{false};
+juce::String EffectComponent::modRangeParamId;
+std::atomic<float> EffectComponent::modRangeDepth{0.0f};
+std::atomic<bool> EffectComponent::modRangeBipolar{false};
 
 EffectComponent::EffectComponent(osci::Effect& effect, int index) : effect(effect), index(index) {
     addAndMakeVisible(slider);
@@ -188,6 +189,7 @@ void EffectComponent::setupComponent() {
 }
 
 EffectComponent::~EffectComponent() {
+    stopTimer();
     slider.removeListener(this);
     lfoSlider.removeListener(this);
     effect.removeListener(index, this);
@@ -235,41 +237,45 @@ void EffectComponent::paint(juce::Graphics& g) {
 }
 
 void EffectComponent::paintOverChildren(juce::Graphics& g) {
-    if (lfoDropHighlight) {
+    if (modDropHighlight) {
         auto bounds = getLocalBounds().toFloat().reduced(1.0f);
         g.setColour(juce::Colour(0xFF00FF00).withAlpha(0.18f));
         g.fillRoundedRectangle(bounds, 4.0f);
         g.setColour(juce::Colour(0xFF00FF00).withAlpha(0.8f));
         g.drawRoundedRectangle(bounds, 4.0f, 2.0f);
-    } else if (lfoAnyDragActive.load(std::memory_order_relaxed)) {
+    } else if (modAnyDragActive.load(std::memory_order_relaxed)) {
         auto bounds = getLocalBounds().toFloat().reduced(1.0f);
         g.setColour(juce::Colour(0xFF00FF00).withAlpha(0.06f));
         g.fillRoundedRectangle(bounds, 4.0f);
         g.setColour(juce::Colour(0xFF00FF00).withAlpha(0.25f));
         g.drawRoundedRectangle(bounds, 4.0f, 1.0f);
     } else if (highlightedParamId.isNotEmpty() && effect.parameters[index]->paramID == highlightedParamId) {
-        auto bounds = getLocalBounds().toFloat().reduced(1.0f);
         auto colour = juce::Colour(0xFF00FF00);
-        g.setColour(colour.withAlpha(0.12f));
-        g.fillRoundedRectangle(bounds, 4.0f);
-        g.setColour(colour.withAlpha(0.5f));
-        g.drawRoundedRectangle(bounds, 4.0f, 1.5f);
 
-        // Draw the LFO modulation range on the slider track
-        if (lfoRangeParamId == highlightedParamId && lfoRangeDepth.load() > 0.0f) {
+        // Draw a highlight border around this component to show it's the modulation target.
+        {
+            auto highlightBounds = getLocalBounds().toFloat().reduced(1.0f);
+            g.setColour(colour.withAlpha(0.18f));
+            g.fillRoundedRectangle(highlightBounds, 4.0f);
+            g.setColour(colour.withAlpha(0.8f));
+            g.drawRoundedRectangle(highlightBounds, 4.0f, 2.0f);
+        }
+
+        // Draw the modulation range on the slider track.
+        if (modRangeParamId == highlightedParamId && modRangeDepth.load() > 0.0f) {
             auto currentVal = slider.getValue();
             auto sliderMin = slider.getMinimum();
             auto sliderMax = slider.getMaximum();
             auto range = sliderMax - sliderMin;
 
             double rangeStart, rangeEnd;
-            if (lfoRangeBipolar.load()) {
-                double halfSpan = lfoRangeDepth.load() * range * 0.5;
+            if (modRangeBipolar.load()) {
+                double halfSpan = modRangeDepth.load() * range * 0.5;
                 rangeStart = currentVal - halfSpan;
                 rangeEnd = currentVal + halfSpan;
             } else {
                 rangeStart = currentVal;
-                rangeEnd = currentVal + lfoRangeDepth.load() * range;
+                rangeEnd = currentVal + modRangeDepth.load() * range;
             }
 
             // Clamp to slider range
@@ -299,6 +305,17 @@ void EffectComponent::parameterValueChanged(int parameterIndex, float newValue) 
 }
 
 void EffectComponent::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
+
+void EffectComponent::timerCallback() {
+    updateLfoModulation();
+
+    // Repaint the full component (not just the slider) when an overlay is active,
+    // so that paintOverChildren covers the entire bounds including the label.
+    if (modDropHighlight
+        || modAnyDragActive.load(std::memory_order_relaxed)
+        || (highlightedParamId.isNotEmpty() && effect.parameters[index]->paramID == highlightedParamId))
+        repaint();
+}
 
 // Slider::Listener callbacks for MIDI learn support
 void EffectComponent::sliderValueChanged(juce::Slider* sliderThatChanged) {
@@ -352,22 +369,40 @@ void EffectComponent::handleAsyncUpdate() {
 }
 
 void EffectComponent::updateLfoModulation() {
-    if (!queryLfoModulation)
-        return;
-
     juce::String paramId = effect.parameters[index]->paramID;
-    auto info = queryLfoModulation(paramId, slider);
-
     auto& props = slider.getProperties();
-    if (info.active) {
-        props.set("lfo_active", true);
-        props.set("lfo_mod_pos", info.modulatedPos);
-        props.set("lfo_colour", (juce::int64)info.colour.getARGB());
-        slider.repaint();
-    } else if ((bool)props.getWithDefault("lfo_active", false)) {
-        props.set("lfo_active", false);
-        slider.repaint();
+    bool needsRepaint = false;
+
+    // LFO modulation
+    if (queryLfoModulation) {
+        auto info = queryLfoModulation(paramId, slider);
+        if (info.active) {
+            props.set("lfo_active", true);
+            props.set("lfo_mod_pos", info.modulatedPos);
+            props.set("lfo_colour", (juce::int64)info.colour.getARGB());
+            needsRepaint = true;
+        } else if ((bool)props.getWithDefault("lfo_active", false)) {
+            props.set("lfo_active", false);
+            needsRepaint = true;
+        }
     }
+
+    // Envelope modulation
+    if (queryEnvModulation) {
+        auto info = queryEnvModulation(paramId, slider);
+        if (info.active) {
+            props.set("env_active", true);
+            props.set("env_mod_pos", info.modulatedPos);
+            props.set("env_colour", (juce::int64)info.colour.getARGB());
+            needsRepaint = true;
+        } else if ((bool)props.getWithDefault("env_active", false)) {
+            props.set("env_active", false);
+            needsRepaint = true;
+        }
+    }
+
+    if (needsRepaint)
+        slider.repaint();
 }
 
 void EffectComponent::setRangeEnabled(bool enabled) {
@@ -378,7 +413,21 @@ EffectComponent::LfoModInfo EffectComponent::computeLfoModulation(
         OscirenderAudioProcessor& processor,
         const juce::String& paramId,
         juce::Slider& sl) {
-    auto h = LfoModulationHelper::compute(processor, paramId, sl);
+    auto h = ModulationHelper::compute(
+        processor.getLfoAssignments(), paramId, sl,
+        [&](int i) { return processor.getLfoCurrentValue(i); },
+        &LfoComponent::getLfoColour);
+    return { h.active, h.modulatedPos, h.colour };
+}
+
+EffectComponent::LfoModInfo EffectComponent::computeEnvModulation(
+        OscirenderAudioProcessor& processor,
+        const juce::String& paramId,
+        juce::Slider& sl) {
+    auto h = ModulationHelper::compute(
+        processor.getEnvAssignments(), paramId, sl,
+        [&](int i) { return processor.getEnvCurrentValue(i); },
+        &EnvelopeComponent::getEnvColour);
     return { h.active, h.modulatedPos, h.colour };
 }
 
@@ -390,29 +439,58 @@ void EffectComponent::setComponent(std::shared_ptr<juce::Component> component) {
 // === DragAndDropTarget for LFO assignment ===
 
 bool EffectComponent::isInterestedInDragSource(const SourceDetails& dragSourceDetails) {
-    return dragSourceDetails.description.toString().startsWith("LFO:");
+    auto desc = dragSourceDetails.description.toString();
+    return desc.startsWith("LFO:") || desc.startsWith("ENV:");
 }
 
 void EffectComponent::itemDragEnter(const SourceDetails&) {
-    lfoDropHighlight = true;
+    modDropHighlight = true;
     repaint();
 }
 
 void EffectComponent::itemDragExit(const SourceDetails&) {
-    lfoDropHighlight = false;
+    modDropHighlight = false;
     repaint();
 }
 
 void EffectComponent::itemDropped(const SourceDetails& dragSourceDetails) {
-    lfoDropHighlight = false;
-    lfoAnyDragActive.store(false, std::memory_order_relaxed);
+    modDropHighlight = false;
+    modAnyDragActive.store(false, std::memory_order_relaxed);
     repaint();
 
     juce::String desc = dragSourceDetails.description.toString();
+    juce::String paramId = effect.parameters[index]->paramID;
     if (desc.startsWith("LFO:")) {
         int lfoIndex = desc.fromFirstOccurrenceOf("LFO:", false, false).getIntValue();
-        juce::String paramId = effect.parameters[index]->paramID;
         if (onLfoDropped)
             onLfoDropped(lfoIndex, paramId);
+    } else if (desc.startsWith("ENV:")) {
+        int envIndex = desc.fromFirstOccurrenceOf("ENV:", false, false).getIntValue();
+        if (onEnvDropped)
+            onEnvDropped(envIndex, paramId);
     }
+}
+
+void EffectComponent::wireModulation(OscirenderAudioProcessor& processor) {
+    onLfoDropped = [&processor](int lfoIndex, const juce::String& paramId) {
+        LfoAssignment assignment;
+        assignment.sourceIndex = lfoIndex;
+        assignment.paramId = paramId;
+        assignment.depth = 0.5f;
+        processor.addLfoAssignment(assignment);
+    };
+    queryLfoModulation = [&processor](const juce::String& paramId, juce::Slider& sl) -> LfoModInfo {
+        return computeLfoModulation(processor, paramId, sl);
+    };
+    onEnvDropped = [&processor](int envIndex, const juce::String& paramId) {
+        EnvAssignment assignment;
+        assignment.sourceIndex = envIndex;
+        assignment.paramId = paramId;
+        assignment.depth = 0.5f;
+        processor.addEnvAssignment(assignment);
+    };
+    queryEnvModulation = [&processor](const juce::String& paramId, juce::Slider& sl) -> LfoModInfo {
+        return computeEnvModulation(processor, paramId, sl);
+    };
+    startTimerHz(30);
 }

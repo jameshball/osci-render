@@ -6,6 +6,7 @@
 LfoRateComponent::LfoRateComponent(OscirenderAudioProcessor& processor, int index)
     : audioProcessor(processor), lfoIndex(index)
 {
+    setMouseCursor(juce::MouseCursor::UpDownResizeCursor);
     setRepaintsOnMouseActivity(true);
 }
 

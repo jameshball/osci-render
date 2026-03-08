@@ -3,6 +3,7 @@
 #include "../PluginEditor.h"
 #include "../LookAndFeel.h"
 #include "../audio/LfoState.h"
+#include "../audio/EnvState.h"
 
 EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectListBoxItemData& data, int rn, osci::Effect& effect) : DraggableListBoxItem(lb, data, rn),
 effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
@@ -14,19 +15,7 @@ effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
         std::weak_ptr<EffectComponent> weakEffectComponent = effectComponent;
         effectComponent->slider.setValue(parameters[i]->getValueUnnormalised(), juce::dontSendNotification);
 
-        // Wire LFO drop callback
-        effectComponent->onLfoDropped = [this](int lfoIndex, const juce::String& paramId) {
-            LfoAssignment assignment;
-            assignment.lfoIndex = lfoIndex;
-            assignment.paramId = paramId;
-            assignment.depth = 0.5f;
-            audioProcessor.addLfoAssignment(assignment);
-        };
-
-        // Wire LFO modulation query for animated slider track
-        effectComponent->queryLfoModulation = [this](const juce::String& paramId, juce::Slider& sl) -> EffectComponent::LfoModInfo {
-            return EffectComponent::computeLfoModulation(audioProcessor, paramId, sl);
-        };
+        effectComponent->wireModulation(audioProcessor);
         
         list.setEnabled(enabled.getToggleState());
         enabled.onClick = [this, weakEffectComponent] {

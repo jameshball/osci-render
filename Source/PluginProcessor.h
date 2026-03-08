@@ -25,6 +25,7 @@
 #include "audio/ShapeVoice.h"
 #include "audio/DahdsrEnvelope.h"
 #include "audio/LfoState.h"
+#include "audio/EnvState.h"
 #include "obj/ObjectServer.h"
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
@@ -57,11 +58,17 @@ public:
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     DahdsrParams getCurrentDahdsrParams() const;
+    DahdsrParams getCurrentDahdsrParams(int envIndex) const;
 
     // UI telemetry for per-voice envelope visualization (written on audio thread, read on message thread)
     static constexpr int kMaxUiVoices = 16;
     std::atomic<double> uiVoiceEnvelopeTimeSeconds[kMaxUiVoices]{};
     std::atomic<bool> uiVoiceActive[kMaxUiVoices]{};
+    // Per-envelope UI telemetry for flow markers (same as envelope 0 for backward compat)
+    std::atomic<double> uiVoiceEnvTimeSeconds[NUM_ENVELOPES][kMaxUiVoices]{};
+    std::atomic<bool> uiVoiceEnvActive[NUM_ENVELOPES][kMaxUiVoices]{};
+    // Per-voice per-envelope current values for modulation (written by audio-thread voices)
+    std::atomic<float> uiVoiceEnvValue[NUM_ENVELOPES][kMaxUiVoices]{};
 
     std::vector<std::shared_ptr<osci::Effect>> toggleableEffects;
     std::vector<std::shared_ptr<osci::Effect>> luaEffects;
@@ -119,6 +126,34 @@ public:
     osci::FloatParameter* attackShape = new osci::FloatParameter("Attack Shape", "attackShape", VERSION_HINT, 5.0f, -50.0f, 50.0f, 0.00001f);
     osci::FloatParameter* decayShape = new osci::FloatParameter("Decay Shape", "decayShape", VERSION_HINT, -20.0f, -50.0f, 50.0f, 0.00001f);
     osci::FloatParameter* releaseShape = new osci::FloatParameter("Release Shape", "releaseShape", VERSION_HINT, -5.0f, -50.0f, 50.0f, 0.00001f);
+
+    // === Envelopes 1–4 (additional modulation envelopes) ===
+    // Envelope 0 uses the legacy params above. Envelopes 1–4 have indexed IDs.
+    struct EnvelopeParamSet {
+        osci::FloatParameter* delayTime;
+        osci::FloatParameter* attackTime;
+        osci::FloatParameter* holdTime;
+        osci::FloatParameter* decayTime;
+        osci::FloatParameter* sustainLevel;
+        osci::FloatParameter* releaseTime;
+        osci::FloatParameter* attackShape;
+        osci::FloatParameter* decayShape;
+        osci::FloatParameter* releaseShape;
+    };
+    EnvelopeParamSet envParams[NUM_ENVELOPES]; // index 0 points to legacy params
+
+    // === Global Envelope assignment system ===
+    int activeEnvTab = 0;
+
+    void addEnvAssignment(const EnvAssignment& assignment);
+    void removeEnvAssignment(int envIndex, const juce::String& paramId);
+    std::vector<EnvAssignment> getEnvAssignments() const;
+
+    // Get the current envelope output value (0..1) for visualization
+    float getEnvCurrentValue(int envIndex) const;
+
+    // Look up human-readable name for any parameter by ID (searches all effects).
+    juce::String getParamDisplayName(const juce::String& paramId) const;
 
     // === Global LFO system ===
     osci::FloatParameter* lfoRate[NUM_LFOS];
@@ -333,9 +368,9 @@ private:
 
     // Global LFO audio-thread state
     LfoWaveform lfoWaveforms[NUM_LFOS];
-    juce::SpinLock lfoWaveformLock;
+    mutable juce::SpinLock lfoWaveformLock;
     std::vector<LfoAssignment> lfoAssignments;
-    juce::SpinLock lfoAssignmentLock;
+    mutable juce::SpinLock lfoAssignmentLock;
     LfoAudioState lfoAudioStates[NUM_LFOS];
     std::array<std::vector<float>, NUM_LFOS> lfoBlockBuffer;
 
@@ -345,6 +380,26 @@ private:
     std::atomic<float> lfoCurrentPhases[NUM_LFOS] = {};
 
     void applyGlobalLfoModulation(int numSamples, double sampleRate);
+
+    // Global Envelope assignment audio-thread state
+    std::vector<EnvAssignment> envAssignments;
+    mutable juce::SpinLock envAssignmentLock;
+    // Per-envelope global DAHDSR state (triggered on note-on, tracks highest active voice)
+    DahdsrState envGlobalStates[NUM_ENVELOPES];
+    std::atomic<float> envCurrentValues[NUM_ENVELOPES] = {};
+    std::atomic<bool> envNoteOnPending{false}; // Set by MIDI note-on, consumed by audio thread
+    std::atomic<bool> envNoteOffPending{false}; // Set by MIDI note-off
+
+    void applyGlobalEnvModulation(int numSamples, double sampleRate);
+
+    // Precomputed paramId → (effect*, paramIndex) lookup for O(1) modulation target resolution.
+    // Built once after all effects are populated; the effect lists are stable after construction.
+    struct ParamLocation {
+        osci::Effect* effect;
+        int paramIndex;
+    };
+    std::unordered_map<juce::String, ParamLocation> paramLocationMap;
+    void buildParamLocationMap();
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
 public:

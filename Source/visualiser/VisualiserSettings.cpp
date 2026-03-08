@@ -1,5 +1,6 @@
 #include "VisualiserSettings.h"
 #include "VisualiserComponent.h"
+#include "../PluginProcessor.h"
 
 VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels) : parameters(p), numChannels(numChannels) {
     addAndMakeVisible(lineColour);
@@ -56,6 +57,20 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
 
 VisualiserSettings::~VisualiserSettings() {
     parameters.screenOverlay->removeListener(this);
+}
+
+void VisualiserSettings::wireModulation(OscirenderAudioProcessor& processor) {
+    lineColour.wireModulation(processor);
+    lightEffects.wireModulation(processor);
+    videoEffects.wireModulation(processor);
+    lineEffects.wireModulation(processor);
+    sweepMs.wireModulation(processor);
+    triggerValue.wireModulation(processor);
+#if OSCI_PREMIUM
+    screenColour.wireModulation(processor);
+    scale.wireModulation(processor);
+    position.wireModulation(processor);
+#endif
 }
 
 void VisualiserSettings::paint(juce::Graphics& g) {

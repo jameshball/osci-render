@@ -4,6 +4,7 @@
 #include <vector>
 #include <cmath>
 #include "GraphNode.h"
+#include "ModAssignment.h"
 
 // Number of global LFOs available.
 namespace lfo {
@@ -123,29 +124,9 @@ inline LfoWaveform createLfoPreset(LfoPreset preset) {
     return waveform;
 }
 
-// A single modulation assignment: LFO -> parameter.
-struct LfoAssignment {
-    int lfoIndex = 0;          // Which LFO (0–3)
-    juce::String paramId;      // Target parameter ID
-    float depth = 0.5f;        // Modulation depth [0,1] unipolar, [-1,1] bipolar
-    bool bipolar = false;      // If true, LFO modulates symmetrically around current value
-
-    void saveToXml(juce::XmlElement* parent) const {
-        parent->setAttribute("lfo", lfoIndex);
-        parent->setAttribute("param", paramId);
-        parent->setAttribute("depth", (double)depth);
-        parent->setAttribute("bipolar", bipolar);
-    }
-
-    static LfoAssignment loadFromXml(const juce::XmlElement* xml) {
-        LfoAssignment a;
-        a.lfoIndex = xml->getIntAttribute("lfo", 0);
-        a.paramId = xml->getStringAttribute("param");
-        a.depth = (float)xml->getDoubleAttribute("depth", 0.5);
-        a.bipolar = xml->getBoolAttribute("bipolar", false);
-        return a;
-    }
-};
+// LfoAssignment is now a type alias for the generic ModAssignment.
+// XML serialisation uses "lfo" as the index attribute name.
+using LfoAssignment = ModAssignment;
 
 // Audio-thread state for a single LFO.
 struct LfoAudioState {

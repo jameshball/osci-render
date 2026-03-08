@@ -7,6 +7,9 @@ PerspectiveComponent::PerspectiveComponent(OscirenderAudioProcessor& p, Oscirend
 
 	addAndMakeVisible(perspective);
 	addAndMakeVisible(focalLength);
+
+	perspective.wireModulation(p);
+	focalLength.wireModulation(p);
 }
 
 PerspectiveComponent::~PerspectiveComponent() {}

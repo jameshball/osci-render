@@ -10,7 +10,7 @@
 #include "components/EffectTypeGridComponent.h"
 
 class OscirenderAudioProcessorEditor;
-class EffectsComponent : public juce::GroupComponent, public juce::ChangeListener, private juce::Timer {
+class EffectsComponent : public juce::GroupComponent, public juce::ChangeListener {
 public:
 	EffectsComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
 	~EffectsComponent() override;
@@ -36,8 +36,6 @@ private:
 	EffectComponent frequency = EffectComponent(*audioProcessor.frequencyEffect, false);
 
 	bool hasAnySelectedEffects() const;
-
-	void timerCallback() override;
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EffectsComponent)
 };

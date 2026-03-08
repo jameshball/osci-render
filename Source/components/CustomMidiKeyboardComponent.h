@@ -65,6 +65,13 @@ class JUCE_API  CustomMidiKeyboardComponent  : public KeyboardComponentBase,
 {
 public:
     //==============================================================================
+    /** Returns true if the given MIDI note is a white key (natural note). */
+    static bool isWhiteMidiKey(int midiNote);
+
+    /** Counts the number of white keys in the given note range (inclusive). */
+    static int getWhiteKeyCount(int startNote, int endNote);
+
+    //==============================================================================
     /** Creates a CustomMidiKeyboardComponent.
 
         @param state        the midi keyboard model that this component will represent
@@ -240,6 +247,8 @@ public:
     void mouseDown (const MouseEvent&) override;
     /** @internal */
     void mouseUp (const MouseEvent&) override;
+    /** @internal */
+    void mouseWheelMove (const MouseEvent&, const MouseWheelDetails&) override;
     /** @internal */
     void mouseEnter (const MouseEvent&) override;
     /** @internal */

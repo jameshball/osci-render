@@ -71,6 +71,20 @@ cd /Users/james/osci-render \
 Resulting app:
 - `Builds/osci-render/MacOSX/build/Debug/osci-render.app`
 
+### Post-build app relaunch
+After a successful macOS standalone build that changes runtime behavior or UI, always relaunch the standalone app as part of task completion.
+
+Use this workflow:
+```bash
+pkill -x "osci-render" || true
+open -n /Users/james/osci-render/Builds/osci-render/MacOSX/build/Debug/osci-render.app
+```
+
+Requirements:
+- Do this automatically after the build succeeds; do not wait for the user to ask.
+- Run it in the background so the editor session does not block.
+- Ignore `pkill` failure when no app instance is running.
+
 ### Configuration
 - `.jucer` files define project structure and build settings
 - `OSCI_PREMIUM=1/0` preprocessor flag toggles premium features

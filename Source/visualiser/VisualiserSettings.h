@@ -12,6 +12,8 @@
 #include "../components/SwitchButton.h"
 #include "VisualiserParameters.h"
 
+class OscirenderAudioProcessor;
+
 class GroupedSettings : public juce::GroupComponent {
 public:
     GroupedSettings(std::vector<std::shared_ptr<EffectComponent>> effects, juce::String label) : effects(effects), juce::GroupComponent(label, label) {
@@ -20,6 +22,11 @@ public:
         }
 
         setColour(groupComponentBackgroundColourId, Colours::veryDark.withMultipliedBrightness(3.0));
+    }
+
+    void wireModulation(OscirenderAudioProcessor& processor) {
+        for (auto& effect : effects)
+            effect->wireModulation(processor);
     }
 
     void resized() override {
@@ -46,6 +53,8 @@ class VisualiserSettings : public juce::Component, public juce::AudioProcessorPa
 public:
     VisualiserSettings(VisualiserParameters&, int numChannels = 2);
     ~VisualiserSettings();
+
+    void wireModulation(OscirenderAudioProcessor& processor);
 
     void paint(juce::Graphics& g) override;
     void resized() override;

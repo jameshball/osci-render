@@ -38,9 +38,9 @@
 #ifndef UGEN_NOEXTGPL
 
 #include "EnvelopeComponent.h"
-#include "EffectComponent.h"
-#include "../PluginProcessor.h"
-#include "../LookAndFeel.h"
+#include "../EffectComponent.h"
+#include "../../PluginProcessor.h"
+#include "../../LookAndFeel.h"
 
 #include <algorithm>
 #include <cmath>
@@ -389,6 +389,7 @@ void EnvelopeComponent::resized() {
     auto bounds = getContentBounds();
     bounds.reduce(4, 4); // content inset
     graph.setBounds(bounds);
+    setOutlineBounds(graph.getBounds());
 }
 
 // --- Look & Feel colour sync ---

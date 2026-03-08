@@ -3,7 +3,7 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 #include "components/SwitchButton.h"
-#include "components/lfo/TempoComponent.h"
+#include "components/modulation/TempoComponent.h"
 
 class OscirenderAudioProcessorEditor;
 class MidiComponent : public juce::GroupComponent, public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater {

@@ -2,6 +2,8 @@
 
 #include "PluginEditor.h"
 #include "components/EffectComponent.h"
+#include "audio/EnvState.h"
+#include "components/CustomMidiKeyboardComponent.h"
 
 SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor)
     : audioProcessor(p), pluginEditor(editor),
@@ -18,13 +20,21 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
 
     // Envelope setup
     addAndMakeVisible(envelope);
-    envelope.setDahdsrParams(audioProcessor.getCurrentDahdsrParams());
+    envelope.setDahdsrParams(0, audioProcessor.getCurrentDahdsrParams(0));
     envelope.setGrid(EnvelopeComponent::GridBoth, EnvelopeComponent::GridNone, 0.1, 0.25);
+    envelope.onDragActiveChanged = [](bool isDragging) {
+        EffectComponent::modAnyDragActive.store(isDragging, std::memory_order_relaxed);
+        juce::MessageManager::callAsync([] {
+            auto& desktop = juce::Desktop::getInstance();
+            for (int i = 0; i < desktop.getNumComponents(); ++i)
+                desktop.getComponent(i)->repaint();
+        });
+    };
 
     // LFO setup
     addAndMakeVisible(lfo);
     lfo.onDragActiveChanged = [](bool isDragging) {
-        EffectComponent::lfoAnyDragActive.store(isDragging, std::memory_order_relaxed);
+        EffectComponent::modAnyDragActive.store(isDragging, std::memory_order_relaxed);
         juce::MessageManager::callAsync([] {
             auto& desktop = juce::Desktop::getInstance();
             for (int i = 0; i < desktop.getNumComponents(); ++i)
@@ -33,18 +43,31 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     };
 
     // Keyboard
-    addAndMakeVisible(keyboard);
+    addAndMakeVisible(keyboardViewport);
+    keyboardViewport.setViewedComponent(&keyboard, false);
+    keyboardViewport.setScrollBarsShown(false, false, false, true);
+    keyboardViewport.setColour(scrollFadeOverlayBackgroundColourId,
+                               findColour(juce::ResizableWindow::backgroundColourId));
+    keyboardViewport.setSidesEnabled(false, false, true, true);
+    keyboardViewport.setFadeWidth(20);
+    keyboardViewport.setOpaque(false);
+    keyboard.setBlackNoteLengthProportion(0.6f);
+    keyboard.setBlackNoteWidthProportion(0.68f);
+    keyboard.setScrollButtonsVisible(false);
 
     // DAHDSR parameter listeners (for envelope display updates)
-    audioProcessor.attackTime->addListener(&dahdsrListener);
-    audioProcessor.delayTime->addListener(&dahdsrListener);
-    audioProcessor.attackShape->addListener(&dahdsrListener);
-    audioProcessor.holdTime->addListener(&dahdsrListener);
-    audioProcessor.decayTime->addListener(&dahdsrListener);
-    audioProcessor.decayShape->addListener(&dahdsrListener);
-    audioProcessor.sustainLevel->addListener(&dahdsrListener);
-    audioProcessor.releaseTime->addListener(&dahdsrListener);
-    audioProcessor.releaseShape->addListener(&dahdsrListener);
+    for (int e = 0; e < NUM_ENVELOPES; ++e) {
+        const auto& ep = audioProcessor.envParams[e];
+        ep.delayTime->addListener(&dahdsrListener);
+        ep.attackTime->addListener(&dahdsrListener);
+        ep.holdTime->addListener(&dahdsrListener);
+        ep.decayTime->addListener(&dahdsrListener);
+        ep.sustainLevel->addListener(&dahdsrListener);
+        ep.releaseTime->addListener(&dahdsrListener);
+        ep.attackShape->addListener(&dahdsrListener);
+        ep.decayShape->addListener(&dahdsrListener);
+        ep.releaseShape->addListener(&dahdsrListener);
+    }
 
     // Envelope flow-marker animation
     startTimerHz(60);
@@ -97,15 +120,18 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
 
 SettingsComponent::~SettingsComponent() {
     stopTimer();
-    audioProcessor.attackTime->removeListener(&dahdsrListener);
-    audioProcessor.delayTime->removeListener(&dahdsrListener);
-    audioProcessor.attackShape->removeListener(&dahdsrListener);
-    audioProcessor.holdTime->removeListener(&dahdsrListener);
-    audioProcessor.decayTime->removeListener(&dahdsrListener);
-    audioProcessor.decayShape->removeListener(&dahdsrListener);
-    audioProcessor.sustainLevel->removeListener(&dahdsrListener);
-    audioProcessor.releaseTime->removeListener(&dahdsrListener);
-    audioProcessor.releaseShape->removeListener(&dahdsrListener);
+    for (int e = 0; e < NUM_ENVELOPES; ++e) {
+        const auto& ep = audioProcessor.envParams[e];
+        ep.delayTime->removeListener(&dahdsrListener);
+        ep.attackTime->removeListener(&dahdsrListener);
+        ep.holdTime->removeListener(&dahdsrListener);
+        ep.decayTime->removeListener(&dahdsrListener);
+        ep.sustainLevel->removeListener(&dahdsrListener);
+        ep.releaseTime->removeListener(&dahdsrListener);
+        ep.attackShape->removeListener(&dahdsrListener);
+        ep.decayShape->removeListener(&dahdsrListener);
+        ep.releaseShape->removeListener(&dahdsrListener);
+    }
     audioProcessor.visualiserParameters.visualiserFullScreen->removeListener(this);
 }
 
@@ -139,18 +165,38 @@ void SettingsComponent::resized() {
     mainLayout.layOutComponents(columns, 5, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
 
     // --- Keyboard at bottom, spanning effects + resizer + right columns ---
-    static constexpr int keyboardHeight = 50;
+    static constexpr int keyboardHeight = 34;
     auto effectsBounds = effectsColumn.getBounds();
     auto rightBounds = rightColumn.getBounds();
 
-    auto keyboardBounds = juce::Rectangle<int>(
+    // Clip both resizer bars so they stop above the keyboard area.
+    // The keyboard sits at area.getBottom() - keyboardHeight; leave a padding gap above it.
+    {
+        int resizerBottom = area.getBottom() - keyboardHeight - padding;
+        mainResizerBar.setBounds(mainResizerBar.getBounds().withBottom(resizerBottom));
+        midiResizerBar.setBounds(midiResizerBar.getBounds().withBottom(resizerBottom));
+    }
+
+    keyboardPanelBounds = juce::Rectangle<int>(
         effectsBounds.getX(),
         area.getBottom() - keyboardHeight,
         rightBounds.getRight() - effectsBounds.getX(),
         keyboardHeight);
-    keyboard.setBounds(keyboardBounds);
+    keyboardViewport.setBounds(keyboardPanelBounds);
 
-    // Trim columns to exclude keyboard + gap
+    const auto viewportBounds = keyboardViewport.getLocalBounds();
+    const auto whiteKeyCount = juce::CustomMidiKeyboardComponent::getWhiteKeyCount(keyboard.getRangeStart(), keyboard.getRangeEnd());
+    const auto compactKeyWidth = juce::jlimit(9.0f, 14.0f, viewportBounds.getHeight() * 0.38f);
+    const auto stretchedKeyWidth = whiteKeyCount > 0 ? (float) viewportBounds.getWidth() / (float) whiteKeyCount : compactKeyWidth;
+    const auto keyWidth = juce::jmax(compactKeyWidth, stretchedKeyWidth);
+    keyboard.setKeyWidth(keyWidth);
+
+    const auto keyboardContentWidth = juce::jmax(
+        viewportBounds.getWidth(),
+        juce::roundToInt((float) whiteKeyCount * keyboard.getKeyWidth()));
+    keyboard.setBounds(0, 0, keyboardContentWidth, viewportBounds.getHeight());
+
+    // Trim columns to exclude keyboard and restore the gap above it.
     effectsBounds.removeFromBottom(keyboardHeight + padding);
     rightBounds.removeFromBottom(keyboardHeight + padding);
 
@@ -222,6 +268,12 @@ void SettingsComponent::resized() {
 void SettingsComponent::paint(juce::Graphics& g) {
     g.setColour(juce::Colours::black);
     g.fillRoundedRectangle(volumeVisualiserBounds.toFloat(), OscirenderLookAndFeel::RECT_RADIUS);
+
+    if (! keyboardPanelBounds.isEmpty()) {
+        g.setColour(findColour(juce::ResizableWindow::backgroundColourId));
+        g.fillRoundedRectangle(keyboardPanelBounds.toFloat(), (float) OscirenderLookAndFeel::RECT_RADIUS);
+
+    }
 }
 
 // syphonLock must be held when calling this function
@@ -283,16 +335,18 @@ void SettingsComponent::mouseDown(const juce::MouseEvent& event) {
 
 void SettingsComponent::timerCallback() {
     if (!audioProcessor.midiEnabled->getBoolValue()) {
-        envelope.getEnvelopeComponent()->resetFlowPersistenceForUi();
+        envelope.resetFlowPersistenceForUi();
         return;
     }
 
+    // Send flow markers for the currently active envelope tab
+    int activeEnv = envelope.getActiveEnvIndex();
     constexpr int kMax = OscirenderAudioProcessor::kMaxUiVoices;
     double times[kMax];
     bool anyActive = false;
     for (int i = 0; i < kMax; ++i) {
-        if (audioProcessor.uiVoiceActive[i].load(std::memory_order_relaxed)) {
-            times[i] = audioProcessor.uiVoiceEnvelopeTimeSeconds[i].load(std::memory_order_relaxed);
+        if (audioProcessor.uiVoiceEnvActive[activeEnv][i].load(std::memory_order_relaxed)) {
+            times[i] = audioProcessor.uiVoiceEnvTimeSeconds[activeEnv][i].load(std::memory_order_relaxed);
             anyActive = true;
         } else {
             times[i] = -1.0;
@@ -300,13 +354,14 @@ void SettingsComponent::timerCallback() {
     }
 
     if (!anyActive) {
-        envelope.getEnvelopeComponent()->clearFlowMarkerTimesForUi();
+        envelope.clearFlowMarkerTimesForUi();
         return;
     }
 
-    envelope.getEnvelopeComponent()->setFlowMarkerTimesForUi(times, kMax);
+    envelope.setFlowMarkerTimesForUi(times, kMax);
 }
 
 void SettingsComponent::DahdsrListener::handleAsyncUpdate() {
-    owner.envelope.setDahdsrParams(owner.audioProcessor.getCurrentDahdsrParams());
+    for (int e = 0; e < NUM_ENVELOPES; ++e)
+        owner.envelope.setDahdsrParams(e, owner.audioProcessor.getCurrentDahdsrParams(e));
 }

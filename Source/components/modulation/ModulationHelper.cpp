@@ -1,12 +1,12 @@
-#include "LfoModulationHelper.h"
-#include "../../PluginProcessor.h"
+#include "ModulationHelper.h"
 
-LfoModulationHelper::Info LfoModulationHelper::compute(
-        OscirenderAudioProcessor& processor,
+ModulationHelper::Info ModulationHelper::compute(
+        const std::vector<ModAssignment>& assignments,
         const juce::String& paramId,
-        juce::Slider& sl) {
+        juce::Slider& sl,
+        std::function<float(int)> getCurrentValue,
+        std::function<juce::Colour(int)> getSourceColour) {
     Info info;
-    auto assignments = processor.getLfoAssignments();
 
     float totalR = 0, totalG = 0, totalB = 0;
     int count = 0;
@@ -19,17 +19,17 @@ LfoModulationHelper::Info LfoModulationHelper::compute(
     for (const auto& a : assignments) {
         if (a.paramId != paramId) continue;
 
-        float lfoVal = processor.getLfoCurrentValue(a.lfoIndex);
-        auto colour = LfoComponent::getLfoColour(a.lfoIndex);
+        float val = getCurrentValue(a.sourceIndex);
+        auto colour = getSourceColour(a.sourceIndex);
         totalR += colour.getFloatRed();
         totalG += colour.getFloatGreen();
         totalB += colour.getFloatBlue();
         count++;
 
         if (a.bipolar) {
-            totalOffset += (lfoVal * 2.0 - 1.0) * a.depth * range * 0.5;
+            totalOffset += (val * 2.0 - 1.0) * a.depth * range * 0.5;
         } else {
-            totalOffset += lfoVal * a.depth * range;
+            totalOffset += val * a.depth * range;
         }
     }
 

@@ -1,7 +1,7 @@
 #include "LookAndFeel.h"
 #include "components/CustomMidiKeyboardComponent.h"
 #include "components/SwitchButton.h"
-#include "components/EnvelopeComponent.h"
+#include "components/modulation/EnvelopeComponent.h"
 
 OscirenderLookAndFeel::OscirenderLookAndFeel() {
     applyOscirenderColours(*this);
@@ -88,10 +88,11 @@ void OscirenderLookAndFeel::applyOscirenderColours(juce::LookAndFeel& lookAndFee
     lookAndFeel.setColour(EnvelopeComponent::LineBackground, juce::Colours::white);
 
     // midi keyboard
-    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::blackNoteColourId, Colours::veryDark);
-    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::whiteNoteColourId, juce::Colours::white);
-    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::mouseOverKeyOverlayColourId, Colours::accentColor.withAlpha(0.3f));
-    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::keyDownOverlayColourId, Colours::accentColor.withAlpha(0.7f));
+    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::whiteNoteColourId, Colours::dark.brighter(0.12f));
+    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::blackNoteColourId, Colours::veryDark.brighter(0.03f));
+    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::keySeparatorLineColourId, Colours::veryDark.brighter(0.16f));
+    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::mouseOverKeyOverlayColourId, Colours::accentColor.withAlpha(0.28f));
+    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::keyDownOverlayColourId, Colours::accentColor.withAlpha(0.62f));
     lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::shadowColourId, juce::Colours::transparentBlack);
     lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::upDownButtonBackgroundColourId, Colours::veryDark);
     lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::upDownButtonArrowColourId, juce::Colours::white);
@@ -304,6 +305,29 @@ void OscirenderLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, in
 
             // Outer soft glow
             g.setColour(lfoColour.withAlpha(0.2f));
+            g.fillRoundedRectangle(modRect.expanded(1.5f, 2.0f), trackRadius + 1.5f);
+        }
+    }
+
+    // --- Envelope modulated value indicator ---
+    bool envActive = (bool)props.getWithDefault("env_active", false);
+
+    if (envActive && slider.isHorizontal()) {
+        float modPos = (float)(double)props.getWithDefault("env_mod_pos", 0.0);
+        juce::uint32 colourArgb = (juce::uint32)(juce::int64)props.getWithDefault("env_colour", (juce::int64)0xFFFF6E4A);
+        auto envColour = juce::Colour(colourArgb);
+
+        float trackHeight = 6.0f;
+        float trackY = (float)y + (float)height * 0.5f - trackHeight * 0.5f;
+        float trackRadius = trackHeight * 0.5f;
+
+        float barLeft = juce::jmin(sliderPos, modPos);
+        float barRight = juce::jmax(sliderPos, modPos);
+        float barWidth = barRight - barLeft;
+
+        if (barWidth > 0.5f) {
+            auto modRect = juce::Rectangle<float>(barLeft, trackY, barWidth, trackHeight);
+            g.setColour(envColour.withAlpha(0.2f));
             g.fillRoundedRectangle(modRect.expanded(1.5f, 2.0f), trackRadius + 1.5f);
         }
     }

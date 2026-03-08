@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 
 #include "components/CustomMidiKeyboardComponent.h"
+#include "components/ScrollFadeViewport.h"
 
 #include "LookAndFeel.h"
 #include "EffectsComponent.h"
@@ -11,10 +12,10 @@
 #include "MidiComponent.h"
 #include "PerspectiveComponent.h"
 #include "PluginProcessor.h"
-#include "components/EnvelopeComponent.h"
+#include "components/modulation/EnvelopeComponent.h"
 #include "components/OpenFileComponent.h"
 #include "components/FileControlsComponent.h"
-#include "components/lfo/LfoComponent.h"
+#include "components/modulation/LfoComponent.h"
 
 class OscirenderAudioProcessorEditor;
 class SettingsComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, private juce::Timer {
@@ -45,8 +46,9 @@ private:
     OpenFileComponent examples{audioProcessor};
 
     // Free-standing components (previously inside MidiComponent)
-    EnvelopeContainerComponent envelope;
+    EnvelopeComponent envelope;
     LfoComponent lfo;
+    ScrollFadeViewport keyboardViewport;
     juce::CustomMidiKeyboardComponent keyboard;
 
     bool examplesVisible = false;
@@ -57,6 +59,7 @@ private:
     juce::StretchableLayoutResizerBar midiResizerBar{&mainLayout, 3, true};
 
     juce::Rectangle<int> volumeVisualiserBounds;
+    juce::Rectangle<int> keyboardPanelBounds;
 
     // Envelope flow-marker animation timer
     void timerCallback() override;

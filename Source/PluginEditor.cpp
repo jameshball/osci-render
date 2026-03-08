@@ -107,6 +107,8 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     };
 #endif
 
+    visualiserSettings.wireModulation(audioProcessor);
+
 #if JUCE_WINDOWS
     // if not standalone, use native title bar for compatibility with DAWs
     visualiserSettingsWindow.setUsingNativeTitleBar(processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone);
@@ -203,7 +205,7 @@ void OscirenderAudioProcessorEditor::initialiseCodeEditors() {
 }
 
 void OscirenderAudioProcessorEditor::dragOperationEnded(const juce::DragAndDropTarget::SourceDetails&) {
-    EffectComponent::lfoAnyDragActive.store(false, std::memory_order_relaxed);
+    EffectComponent::modAnyDragActive.store(false, std::memory_order_relaxed);
     repaint();
 }
 
