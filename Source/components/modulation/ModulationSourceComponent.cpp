@@ -471,9 +471,9 @@ ModulationSourceComponent::ModulationSourceComponent(const ModulationSourceConfi
     tabList.setTabGap(kTabGap);
     tabList.setMinTabHeight(kMinTabHeight);
     for (int i = 0; i < config.sourceCount; ++i) {
-        auto* tab = new ModTabHandle(config.getLabel(i), i, *this);
-        tabList.addTab(tab);
-        tabHandles.push_back(tab);
+        auto tab = std::make_unique<ModTabHandle>(config.getLabel(i), i, *this);
+        tabHandles.push_back(tab.get());
+        tabList.addTab(std::move(tab));
     }
     tabList.setActiveTabIndexSilent(0);
     tabList.onTabChanged = [this](int index) { switchToSource(index); };

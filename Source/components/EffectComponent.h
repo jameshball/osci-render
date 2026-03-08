@@ -6,7 +6,9 @@
 
 class OscirenderAudioProcessor;
 
-class EffectComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater, public juce::SettableTooltipClient, private juce::Slider::Listener, public juce::DragAndDropTarget, private juce::Timer {
+class ModulationUpdateBroadcaster;
+
+class EffectComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater, public juce::SettableTooltipClient, private juce::Slider::Listener, public juce::DragAndDropTarget {
 public:
     EffectComponent(osci::Effect& effect, int index);
     EffectComponent(osci::Effect& effect);
@@ -30,7 +32,6 @@ public:
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void handleAsyncUpdate() override;
-    void timerCallback() override;
     
     // Slider::Listener callbacks for MIDI learn support
     void sliderValueChanged(juce::Slider* slider) override;
@@ -259,6 +260,8 @@ private:
     juce::Label label;
 
     SvgButton settingsButton = {"settingsButton", BinaryData::cog_svg, juce::Colours::white};
+
+    ModulationUpdateBroadcaster* modBroadcaster = nullptr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EffectComponent)
 };

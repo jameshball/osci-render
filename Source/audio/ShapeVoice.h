@@ -52,7 +52,7 @@ private:
 
 	DahdsrParams dahdsr;
 	DahdsrState envState;
-	// Additional modulation envelopes (1..NUM_ENVELOPES-1); envelope 0 is envState above
+	// Modulation envelopes 1..NUM_ENVELOPES-1; envelope 0 is envState above
 	DahdsrParams envDahdsr[NUM_ENVELOPES];
 	DahdsrState envStates[NUM_ENVELOPES];
 

@@ -1370,8 +1370,54 @@ void OscirenderAudioProcessor::buildParamLocationMap() {
             }
         }
     };
+    auto registerSingle = [&](std::shared_ptr<osci::Effect>& effect) {
+        for (int p = 0; p < (int)effect->parameters.size(); ++p) {
+            const auto& pid = effect->parameters[p]->paramID;
+            if (paramLocationMap.find(pid) == paramLocationMap.end())
+                paramLocationMap[pid] = { effect.get(), p };
+        }
+    };
     registerEffects(toggleableEffects);
     registerEffects(permanentEffects);
+    registerEffects(luaEffects);
+    registerSingle(frequencyEffect);
+    registerSingle(perspective);
+    registerEffects(visualiserParameters.effects);
+    registerEffects(visualiserParameters.audioEffects);
+}
+
+void OscirenderAudioProcessor::applyModulationBuffers(
+    int numSamples,
+    const std::vector<ModAssignment>& assignments,
+    const std::vector<float>* sourceBuffers,
+    int maxSourceIndex)
+{
+    for (const auto& assignment : assignments) {
+        if (assignment.sourceIndex < 0 || assignment.sourceIndex >= maxSourceIndex) continue;
+
+        auto it = paramLocationMap.find(assignment.paramId);
+        if (it == paramLocationMap.end()) continue;
+
+        auto& loc = it->second;
+        float* buf = loc.effect->getAnimatedValuesWritePointer(loc.paramIndex, numSamples);
+        if (buf == nullptr) continue;
+
+        const float* modData = sourceBuffers[assignment.sourceIndex].data();
+        float paramMin = loc.effect->parameters[loc.paramIndex]->min;
+        float paramMax = loc.effect->parameters[loc.paramIndex]->max;
+        float range = paramMax - paramMin;
+        float depth = assignment.depth;
+
+        if (assignment.bipolar) {
+            for (int s = 0; s < numSamples; ++s)
+                buf[s] = juce::jlimit(paramMin, paramMax,
+                    buf[s] + (modData[s] * 2.0f - 1.0f) * depth * range * 0.5f);
+        } else {
+            for (int s = 0; s < numSamples; ++s)
+                buf[s] = juce::jlimit(paramMin, paramMax,
+                    buf[s] + modData[s] * depth * range);
+        }
+    }
 }
 
 void OscirenderAudioProcessor::applyGlobalEnvModulation(int numSamples, double sampleRate) {
@@ -1385,40 +1431,27 @@ void OscirenderAudioProcessor::applyGlobalEnvModulation(int numSamples, double s
             }
         }
         envCurrentValues[e].store(maxVal, std::memory_order_relaxed);
+
+        // Fill per-sample buffer by interpolating from previous block's value
+        float prev = envPrevBlockValues[e];
+        float curr = maxVal;
+        if ((int)envBlockBuffer[e].size() < numSamples)
+            envBlockBuffer[e].resize(numSamples);
+        float invN = 1.0f / (float)numSamples;
+        for (int s = 0; s < numSamples; ++s) {
+            float t = (float)(s + 1) * invN;
+            envBlockBuffer[e][s] = prev + (curr - prev) * t;
+        }
+        envPrevBlockValues[e] = curr;
     }
 
-    // Apply envelope modulation to assigned parameters
+    // Apply envelope modulation via generic helper
     std::vector<EnvAssignment> envAssnCopy;
     {
         juce::SpinLock::ScopedLockType assnLock(envAssignmentLock);
         envAssnCopy = envAssignments;
     }
-    for (const auto& assignment : envAssnCopy) {
-        if (assignment.sourceIndex < 0 || assignment.sourceIndex >= NUM_ENVELOPES) continue;
-
-        auto it = paramLocationMap.find(assignment.paramId);
-        if (it == paramLocationMap.end()) continue;
-
-        auto& loc = it->second;
-        float* buf = loc.effect->getAnimatedValuesWritePointer(loc.paramIndex, numSamples);
-        if (buf == nullptr) continue;
-
-        float envVal = envCurrentValues[assignment.sourceIndex].load(std::memory_order_relaxed);
-        float paramMin = loc.effect->parameters[loc.paramIndex]->min;
-        float paramMax = loc.effect->parameters[loc.paramIndex]->max;
-        float range = paramMax - paramMin;
-        float depth = assignment.depth;
-
-        if (assignment.bipolar) {
-            float offset = (envVal * 2.0f - 1.0f) * depth * range * 0.5f;
-            for (int s = 0; s < numSamples; ++s)
-                buf[s] = juce::jlimit(paramMin, paramMax, buf[s] + offset);
-        } else {
-            float offset = envVal * depth * range;
-            for (int s = 0; s < numSamples; ++s)
-                buf[s] = juce::jlimit(paramMin, paramMax, buf[s] + offset);
-        }
-    }
+    applyModulationBuffers(numSamples, envAssnCopy, envBlockBuffer.data(), NUM_ENVELOPES);
 }
 
 void OscirenderAudioProcessor::applyGlobalLfoModulation(int numSamples, double sampleRate) {
@@ -1447,40 +1480,13 @@ void OscirenderAudioProcessor::applyGlobalLfoModulation(int numSamples, double s
         }
     }
 
-    // Apply modulation using precomputed param location map
+    // Apply LFO modulation via generic helper
     std::vector<LfoAssignment> lfoAssnCopy;
     {
         juce::SpinLock::ScopedLockType assnLock(lfoAssignmentLock);
         lfoAssnCopy = lfoAssignments;
     }
-    for (const auto& assignment : lfoAssnCopy) {
-        if (assignment.sourceIndex < 0 || assignment.sourceIndex >= NUM_LFOS) continue;
-
-        auto it = paramLocationMap.find(assignment.paramId);
-        if (it == paramLocationMap.end()) continue;
-
-        auto& loc = it->second;
-        float* buf = loc.effect->getAnimatedValuesWritePointer(loc.paramIndex, numSamples);
-        if (buf == nullptr) continue;
-
-        const float* lfoData = lfoBlockBuffer[assignment.sourceIndex].data();
-        float paramMin = loc.effect->parameters[loc.paramIndex]->min;
-        float paramMax = loc.effect->parameters[loc.paramIndex]->max;
-        float range = paramMax - paramMin;
-        float depth = assignment.depth;
-
-        if (assignment.bipolar) {
-            for (int s = 0; s < numSamples; ++s) {
-                buf[s] = juce::jlimit(paramMin, paramMax,
-                    buf[s] + (lfoData[s] * 2.0f - 1.0f) * depth * range * 0.5f);
-            }
-        } else {
-            for (int s = 0; s < numSamples; ++s) {
-                buf[s] = juce::jlimit(paramMin, paramMax,
-                    buf[s] + lfoData[s] * depth * range);
-            }
-        }
-    }
+    applyModulationBuffers(numSamples, lfoAssnCopy, lfoBlockBuffer.data(), NUM_LFOS);
 }
 
 DahdsrParams OscirenderAudioProcessor::getCurrentDahdsrParams() const

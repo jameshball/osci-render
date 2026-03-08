@@ -31,11 +31,12 @@ public:
         std::function<void()> activationCallback;
     };
 
-    void addTab(Tab* tab) {
+    void addTab(std::unique_ptr<Tab> tab) {
         int index = tabs.size();
         tab->activationCallback = [this, index]() { setActiveTabIndex(index); };
-        tabs.add(tab);
-        addAndMakeVisible(tab);
+        auto* rawPtr = tab.get();
+        tabs.add(tab.release());
+        addAndMakeVisible(rawPtr);
     }
 
     void setActiveTabIndex(int index) {

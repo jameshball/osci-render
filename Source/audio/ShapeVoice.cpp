@@ -98,8 +98,8 @@ void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesiser
         // Snapshot DAHDSR parameters per-voice (Vital-style; peak fixed at 1.0)
         dahdsr = audioProcessor.getCurrentDahdsrParams();
         envState.reset(dahdsr);
-        // Snapshot all modulation envelopes
-        for (int e = 0; e < NUM_ENVELOPES; ++e) {
+        // Snapshot modulation envelopes 1..N (envelope 0 == envState)
+        for (int e = 1; e < NUM_ENVELOPES; ++e) {
             envDahdsr[e] = audioProcessor.getCurrentDahdsrParams(e);
             envStates[e].reset(envDahdsr[e]);
         }
@@ -226,9 +226,9 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         }
 
         const float envValue = midiEnabled ? envState.advance(dt) : 1.0f;
-        // Advance all modulation envelopes (includes env 0 for modulation use)
+        // Advance modulation envelopes 1..N (envelope 0 == envState)
         if (midiEnabled) {
-            for (int e = 0; e < NUM_ENVELOPES; ++e)
+            for (int e = 1; e < NUM_ENVELOPES; ++e)
                 envStates[e].advance(dt);
         }
         volumeBuffer.setSample(0, i, envValue);
@@ -288,8 +288,12 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     if (voiceIndex >= 0 && voiceIndex < OscirenderAudioProcessor::kMaxUiVoices) {
         audioProcessor.uiVoiceActive[voiceIndex].store(isVoiceActive(), std::memory_order_relaxed);
         audioProcessor.uiVoiceEnvelopeTimeSeconds[voiceIndex].store(midiEnabled ? envState.getUiTimeSeconds() : 0.0, std::memory_order_relaxed);
-        // Per-envelope UI telemetry
-        for (int e = 0; e < NUM_ENVELOPES; ++e) {
+        // Envelope 0 telemetry from envState (it IS envelope 0)
+        audioProcessor.uiVoiceEnvActive[0][voiceIndex].store(isVoiceActive(), std::memory_order_relaxed);
+        audioProcessor.uiVoiceEnvTimeSeconds[0][voiceIndex].store(midiEnabled ? envState.getUiTimeSeconds() : 0.0, std::memory_order_relaxed);
+        audioProcessor.uiVoiceEnvValue[0][voiceIndex].store(midiEnabled ? envState.getCurrentValue() : 0.0f, std::memory_order_relaxed);
+        // Envelopes 1..N telemetry from envStates
+        for (int e = 1; e < NUM_ENVELOPES; ++e) {
             audioProcessor.uiVoiceEnvActive[e][voiceIndex].store(isVoiceActive(), std::memory_order_relaxed);
             audioProcessor.uiVoiceEnvTimeSeconds[e][voiceIndex].store(midiEnabled ? envStates[e].getUiTimeSeconds() : 0.0, std::memory_order_relaxed);
             audioProcessor.uiVoiceEnvValue[e][voiceIndex].store(midiEnabled ? envStates[e].getCurrentValue() : 0.0f, std::memory_order_relaxed);
@@ -323,7 +327,7 @@ void ShapeVoice::stopNote(float velocity, bool allowTailOff) {
     }
 
     envState.beginRelease();
-    for (int e = 0; e < NUM_ENVELOPES; ++e)
+    for (int e = 1; e < NUM_ENVELOPES; ++e)
         envStates[e].beginRelease();
 }
 

@@ -34,6 +34,36 @@
 #endif
 
 //==============================================================================
+
+// Central 60 Hz timer that drives modulation display updates (LFO overlays,
+// envelope overlays, drag-highlight repaints, etc.) for all registered UI
+// components.  Replaces the per-EffectComponent 30 Hz timers.
+class ModulationUpdateBroadcaster : private juce::Timer {
+public:
+    using Callback = std::function<void()>;
+
+    void addListener(void* key, Callback cb) {
+        entries.push_back({key, std::move(cb)});
+        if (!isTimerRunning()) startTimerHz(60);
+    }
+
+    void removeListener(void* key) {
+        entries.erase(
+            std::remove_if(entries.begin(), entries.end(),
+                [key](const Entry& e) { return e.key == key; }),
+            entries.end());
+        if (entries.empty()) stopTimer();
+    }
+
+private:
+    void timerCallback() override {
+        for (auto& e : entries) e.callback();
+    }
+
+    struct Entry { void* key; Callback callback; };
+    std::vector<Entry> entries;
+};
+
 /**
  */
 class OscirenderAudioProcessor : public CommonAudioProcessor, juce::AudioProcessorParameter::Listener
@@ -45,6 +75,10 @@ class OscirenderAudioProcessor : public CommonAudioProcessor, juce::AudioProcess
 public:
     OscirenderAudioProcessor();
     ~OscirenderAudioProcessor() override;
+
+    // Central 60 Hz broadcaster for modulation display updates.
+    // EffectComponents register/unregister via wireModulation / destructor.
+    ModulationUpdateBroadcaster modulationUpdateBroadcaster;
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
@@ -389,8 +423,17 @@ private:
     std::atomic<float> envCurrentValues[NUM_ENVELOPES] = {};
     std::atomic<bool> envNoteOnPending{false}; // Set by MIDI note-on, consumed by audio thread
     std::atomic<bool> envNoteOffPending{false}; // Set by MIDI note-off
+    std::array<std::vector<float>, NUM_ENVELOPES> envBlockBuffer;
+    std::array<float, NUM_ENVELOPES> envPrevBlockValues = {};
 
     void applyGlobalEnvModulation(int numSamples, double sampleRate);
+
+    // Generic helper: applies per-sample modulation from precomputed source buffers
+    // to effect parameters via assignments. Works for any modulation source type.
+    void applyModulationBuffers(int numSamples,
+                                const std::vector<ModAssignment>& assignments,
+                                const std::vector<float>* sourceBuffers,
+                                int maxSourceIndex);
 
     // Precomputed paramId → (effect*, paramIndex) lookup for O(1) modulation target resolution.
     // Built once after all effects are populated; the effect lists are stable after construction.

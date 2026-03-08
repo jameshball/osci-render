@@ -22,25 +22,20 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     addAndMakeVisible(envelope);
     envelope.setDahdsrParams(0, audioProcessor.getCurrentDahdsrParams(0));
     envelope.setGrid(EnvelopeComponent::GridBoth, EnvelopeComponent::GridNone, 0.1, 0.25);
-    envelope.onDragActiveChanged = [](bool isDragging) {
+
+    // Shared drag-active handler: just set the atomic flag.
+    // The central 60Hz ModulationUpdateBroadcaster handles highlight repaints
+    // while dragging. On drag-end, one repaint clears residual highlights.
+    auto dragChanged = [this](bool isDragging) {
         EffectComponent::modAnyDragActive.store(isDragging, std::memory_order_relaxed);
-        juce::MessageManager::callAsync([] {
-            auto& desktop = juce::Desktop::getInstance();
-            for (int i = 0; i < desktop.getNumComponents(); ++i)
-                desktop.getComponent(i)->repaint();
-        });
+        if (!isDragging)
+            repaint();
     };
+    envelope.onDragActiveChanged = dragChanged;
 
     // LFO setup
     addAndMakeVisible(lfo);
-    lfo.onDragActiveChanged = [](bool isDragging) {
-        EffectComponent::modAnyDragActive.store(isDragging, std::memory_order_relaxed);
-        juce::MessageManager::callAsync([] {
-            auto& desktop = juce::Desktop::getInstance();
-            for (int i = 0; i < desktop.getNumComponents(); ++i)
-                desktop.getComponent(i)->repaint();
-        });
-    };
+    lfo.onDragActiveChanged = dragChanged;
 
     // Keyboard
     addAndMakeVisible(keyboardViewport);

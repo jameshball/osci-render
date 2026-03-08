@@ -189,7 +189,8 @@ void EffectComponent::setupComponent() {
 }
 
 EffectComponent::~EffectComponent() {
-    stopTimer();
+    if (modBroadcaster)
+        modBroadcaster->removeListener(this);
     slider.removeListener(this);
     lfoSlider.removeListener(this);
     effect.removeListener(index, this);
@@ -305,17 +306,6 @@ void EffectComponent::parameterValueChanged(int parameterIndex, float newValue) 
 }
 
 void EffectComponent::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
-
-void EffectComponent::timerCallback() {
-    updateLfoModulation();
-
-    // Repaint the full component (not just the slider) when an overlay is active,
-    // so that paintOverChildren covers the entire bounds including the label.
-    if (modDropHighlight
-        || modAnyDragActive.load(std::memory_order_relaxed)
-        || (highlightedParamId.isNotEmpty() && effect.parameters[index]->paramID == highlightedParamId))
-        repaint();
-}
 
 // Slider::Listener callbacks for MIDI learn support
 void EffectComponent::sliderValueChanged(juce::Slider* sliderThatChanged) {
@@ -492,5 +482,12 @@ void EffectComponent::wireModulation(OscirenderAudioProcessor& processor) {
     queryEnvModulation = [&processor](const juce::String& paramId, juce::Slider& sl) -> LfoModInfo {
         return computeEnvModulation(processor, paramId, sl);
     };
-    startTimerHz(30);
+    modBroadcaster = &processor.modulationUpdateBroadcaster;
+    modBroadcaster->addListener(this, [this]() {
+        updateLfoModulation();
+        if (modDropHighlight
+            || modAnyDragActive.load(std::memory_order_relaxed)
+            || (highlightedParamId.isNotEmpty() && effect.parameters[index]->paramID == highlightedParamId))
+            repaint();
+    });
 }
