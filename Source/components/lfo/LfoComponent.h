@@ -5,6 +5,8 @@
 #include "NodeGraphComponent.h"
 #include "LfoRateComponent.h"
 #include "../../audio/LfoState.h"
+#include "../VerticalTabListComponent.h"
+#include "../ScrollFadeViewport.h"
 
 class OscirenderAudioProcessor;
 
@@ -94,7 +96,7 @@ private:
 
     // Tab/drag-handle for a single LFO. The label text IS the drag source,
     // and depth indicators for connections are laid out inside.
-    class LfoTabHandle : public juce::Component {
+    class LfoTabHandle : public VerticalTabListComponent::Tab {
     public:
         LfoTabHandle(const juce::String& label, int index, LfoComponent& owner);
         void paint(juce::Graphics& g) override;
@@ -126,7 +128,8 @@ private:
 
         juce::OwnedArray<DepthIndicator> depthIndicators;
     };
-    juce::OwnedArray<LfoTabHandle> tabHandles;
+    VerticalTabListComponent tabList;
+    ScrollFadeViewport tabViewport;
 
     // The waveform graph
     NodeGraphComponent graph;

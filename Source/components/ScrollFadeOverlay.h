@@ -31,21 +31,25 @@ public:
         showTop = showBottom = false;
         strengthTop = strengthBottom = 0.0f;
 
-        if (enabled && vp != nullptr && vp->getVerticalScrollBar().isVisible()) {
-            auto& sb = vp->getVerticalScrollBar();
-            const double start = sb.getCurrentRangeStart();
-            const double size = sb.getCurrentRangeSize();
-            const double max = sb.getMaximumRangeLimit();
+        if (enabled && vp != nullptr) {
+            auto* viewed = vp->getViewedComponent();
+            bool scrollable = viewed != nullptr && viewed->getHeight() > vp->getHeight();
+            if (scrollable) {
+                auto& sb = vp->getVerticalScrollBar();
+                const double start = sb.getCurrentRangeStart();
+                const double size = sb.getCurrentRangeSize();
+                const double max = sb.getMaximumRangeLimit();
 
-            const bool atTop = start <= 0.5;
-            const double topDist = start;
-            strengthTop = (float) juce::jlimit(0.0, 1.0, topDist / (double) juce::jmax(1, fadeHeightTop));
-            showTop = enableTop && !atTop && strengthTop > 0.01f;
+                const bool atTop = start <= 0.5;
+                const double topDist = start;
+                strengthTop = (float) juce::jlimit(0.0, 1.0, topDist / (double) juce::jmax(1, fadeHeightTop));
+                showTop = enableTop && !atTop && strengthTop > 0.01f;
 
-            const double remaining = (max - (start + size));
-            const bool atBottom = remaining <= 0.5;
-            strengthBottom = (float) juce::jlimit(0.0, 1.0, remaining / (double) juce::jmax(1, fadeHeightBottom));
-            showBottom = enableBottom && !atBottom && strengthBottom > 0.01f;
+                const double remaining = (max - (start + size));
+                const bool atBottom = remaining <= 0.5;
+                strengthBottom = (float) juce::jlimit(0.0, 1.0, remaining / (double) juce::jmax(1, fadeHeightBottom));
+                showBottom = enableBottom && !atBottom && strengthBottom > 0.01f;
+            }
         }
 
         const bool anyVisible = (showTop || showBottom);

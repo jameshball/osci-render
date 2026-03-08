@@ -6,7 +6,7 @@
 SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor)
     : audioProcessor(p), pluginEditor(editor),
       envelope(p), lfo(p),
-      keyboard(p.keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard) {
+    keyboard(p.keyboardState, juce::CustomMidiKeyboardComponent::horizontalKeyboard) {
     addAndMakeVisible(effects);
     addAndMakeVisible(fileControls);
     addAndMakeVisible(perspective);

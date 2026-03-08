@@ -2,6 +2,8 @@
 
 #include <JuceHeader.h>
 
+#include "components/CustomMidiKeyboardComponent.h"
+
 #include "LookAndFeel.h"
 #include "EffectsComponent.h"
 #include "FrameSettingsComponent.h"
@@ -45,7 +47,7 @@ private:
     // Free-standing components (previously inside MidiComponent)
     EnvelopeContainerComponent envelope;
     LfoComponent lfo;
-    juce::MidiKeyboardComponent keyboard;
+    juce::CustomMidiKeyboardComponent keyboard;
 
     bool examplesVisible = false;
 

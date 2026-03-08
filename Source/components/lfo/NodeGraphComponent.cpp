@@ -12,6 +12,10 @@ NodeGraphComponent::HandleComponent::HandleComponent(NodeGraphComponent& o) : ow
 }
 
 void NodeGraphComponent::HandleComponent::paint(juce::Graphics& g) {
+    // Check visibility callback before drawing
+    if (owner.isHandleVisible && nodeIndex >= 0 && !owner.isHandleVisible(nodeIndex))
+        return;
+
     const bool hot = isMouseOverOrDragging(true) || (owner.hoverHandle == this);
     const float scale = hot ? 0.78f : 0.72f;
     const float size = (float)getWidth() * scale;
@@ -100,7 +104,11 @@ void NodeGraphComponent::setAllowNodeAddRemove(bool allow) {
 
 void NodeGraphComponent::setNodes(const std::vector<GraphNode>& newNodes) {
     nodes = newNodes;
-    rebuildHandles();
+    if ((int)newNodes.size() == handles.size()) {
+        repositionHandles();
+    } else {
+        rebuildHandles();
+    }
     repaint();
 }
 
@@ -150,10 +158,69 @@ void NodeGraphComponent::invalidateGrid() {
     gridDirty = true;
 }
 
+void NodeGraphComponent::setGridStyle(GridStyle style) {
+    if (gridStyle != style) {
+        gridStyle = style;
+        invalidateGrid();
+        repaint();
+    }
+}
+
+void NodeGraphComponent::setSnapStyle(SnapStyle style) {
+    snapStyle = style;
+}
+
+// Shared helper for computing logarithmic grid steps and visibility.
+bool NodeGraphComponent::computeLogGridInfo(int widthPx, LogGridInfo& out) const {
+    if (widthPx <= kHandleSize || domainMax <= domainMin)
+        return false;
+
+    const double domainRange = domainMax - domainMin;
+    out.secondsPerPixel = domainRange / (double)(widthPx - kHandleSize);
+    const double targetPx = 70.0;
+    const double idealStep = out.secondsPerPixel * targetPx;
+
+    constexpr double kBaseStep = 8.0;
+    const double ratio = juce::jmax(idealStep / kBaseStep, 1.0e-9);
+    const double level = std::log(ratio) / std::log(0.25);
+    const double lowerIndex = std::floor(level);
+    out.lowerStep = kBaseStep * std::pow(0.25, lowerIndex);
+    out.upperStep = kBaseStep * std::pow(0.25, lowerIndex + 1.0);
+
+    const double stepDelta = juce::jmax(1.0e-9, out.lowerStep - out.upperStep);
+    const float t = (float)juce::jlimit(0.0, 1.0, (out.lowerStep - idealStep) / stepDelta);
+
+    constexpr float kBaseAlpha = 0.42f;
+    out.lowerAlpha = kBaseAlpha;
+    out.upperAlpha = kBaseAlpha * t;
+
+    double lowerPxStep = out.lowerStep / out.secondsPerPixel;
+    double upperPxStep = out.upperStep / out.secondsPerPixel;
+    out.lowerLineVis = (float)juce::jlimit(0.0, 1.0, (lowerPxStep - 40.0) / 40.0);
+    out.upperLineVis = (float)juce::jlimit(0.0, 1.0, (upperPxStep - 40.0) / 40.0);
+
+    return true;
+}
+
 void NodeGraphComponent::paintGrid(juce::Graphics& g) {
     const int w = getWidth();
     const int h = getHeight();
     if (w <= 0 || h <= 0) return;
+
+    // Delegate to custom grid painter if provided
+    if (customGridPainter) {
+        if (gridDirty || gridCacheWidth != w || gridCacheHeight != h || !gridCache.isValid()) {
+            gridCache = juce::Image(juce::Image::ARGB, w, h, true);
+            gridCacheWidth = w;
+            gridCacheHeight = h;
+            gridDirty = false;
+
+            juce::Graphics gg(gridCache);
+            customGridPainter(gg, w, h);
+        }
+        g.drawImageAt(gridCache, 0, 0);
+        return;
+    }
 
     if (gridDirty || gridCacheWidth != w || gridCacheHeight != h || !gridCache.isValid()) {
         gridCache = juce::Image(juce::Image::ARGB, w, h, true);
@@ -162,33 +229,104 @@ void NodeGraphComponent::paintGrid(juce::Graphics& g) {
         gridDirty = false;
 
         juce::Graphics gg(gridCache);
-        gg.setColour(findColour(backgroundColourId));
-        gg.fillRect(0, 0, w, h);
 
-        auto gridColour = findColour(gridLineColourId);
-
-        if (showDomainGrid && domainMax > domainMin && snapDivisions > 0) {
-            double range = domainMax - domainMin;
-            double step = range / (double)snapDivisions;
-            for (double d = domainMin + step; d < domainMax - step * 0.1; d += step) {
-                float x = (float)(convertDomainToPixels(d) + kHandleSize * 0.5);
-                gg.setColour(gridColour);
-                gg.drawVerticalLine((int)x, 0.0f, (float)h);
-            }
-        }
-
-        if (showValueGrid && valueMax > valueMin) {
-            double range = valueMax - valueMin;
-            double step = range / 4.0;
-            for (double v = valueMin + step; v < valueMax - step * 0.1; v += step) {
-                float y = (float)(convertValueToPixels(v) + kHandleSize * 0.5);
-                gg.setColour(gridColour);
-                gg.drawHorizontalLine((int)y, 0.0f, (float)w);
-            }
+        switch (gridStyle) {
+            case GridStyle::LogarithmicTime:
+                paintLogarithmicTimeGrid(gg, w, h);
+                break;
+            case GridStyle::Uniform:
+            default:
+                paintUniformGrid(gg, w, h);
+                break;
         }
     }
 
     g.drawImageAt(gridCache, 0, 0);
+}
+
+void NodeGraphComponent::paintUniformGrid(juce::Graphics& g, int w, int h) {
+    g.setColour(findColour(backgroundColourId));
+    g.fillRect(0, 0, w, h);
+
+    auto gridColour = findColour(gridLineColourId);
+
+    if (showDomainGrid && domainMax > domainMin && snapDivisions > 0) {
+        double range = domainMax - domainMin;
+        double step = range / (double)snapDivisions;
+        for (double d = domainMin + step; d < domainMax - step * 0.1; d += step) {
+            float x = (float)(convertDomainToPixels(d) + kHandleSize * 0.5);
+            g.setColour(gridColour);
+            g.drawVerticalLine((int)x, 0.0f, (float)h);
+        }
+    }
+
+    if (showValueGrid && valueMax > valueMin) {
+        double range = valueMax - valueMin;
+        double step = range / 4.0;
+        for (double v = valueMin + step; v < valueMax - step * 0.1; v += step) {
+            float y = (float)(convertValueToPixels(v) + kHandleSize * 0.5);
+            g.setColour(gridColour);
+            g.drawHorizontalLine((int)y, 0.0f, (float)w);
+        }
+    }
+}
+
+void NodeGraphComponent::paintLogarithmicTimeGrid(juce::Graphics& g, int w, int h) {
+    g.setColour(findColour(backgroundColourId));
+    g.fillRect(0, 0, w, h);
+
+    if (!showDomainGrid) return;
+
+    LogGridInfo info;
+    if (!computeLogGridInfo(w, info)) return;
+
+    auto gridColour = findColour(gridLineColourId);
+
+    auto formatTimeLabel = [](double seconds) -> juce::String {
+        if (seconds >= 1.0) {
+            if (seconds >= 10.0)
+                return juce::String((int)std::round(seconds)) + "s";
+            return juce::String(seconds, 1) + "s";
+        }
+        return juce::String((int)std::round(seconds * 1000.0)) + "ms";
+    };
+
+    auto drawVerticalGrid = [&](double step, float alpha, float lineVis, double majorStep) {
+        if (step <= 0.0 || alpha <= 0.001f)
+            return;
+
+        const double start = std::ceil(domainMin / step) * step;
+        const double end = domainMax + (step * 0.5);
+
+        juce::Font labelFont(11.0f, juce::Font::bold);
+        const float labelY = (float)h - 2.0f - labelFont.getHeight();
+
+        for (double domain = start; domain <= end; domain += step) {
+            if (majorStep > 0.0) {
+                const double rem = std::fmod(domain, majorStep);
+                if (rem < (step * 0.001) || (majorStep - rem) < (step * 0.001))
+                    continue;
+            }
+            const float x = (float)(convertDomainToPixels(domain) + (kHandleSize * 0.5f));
+            if (x < -1.0f || x > (float)w + 1.0f)
+                continue;
+            g.setColour(gridColour.withAlpha(alpha * lineVis));
+            g.drawVerticalLine((int)std::round(x), 0.0f, (float)h);
+
+            if (lineVis > 0.01f) {
+                const juce::String label = formatTimeLabel(domain);
+                g.setFont(labelFont);
+                const float textAlpha = juce::jlimit(0.0f, 1.0f, alpha * 1.25f * lineVis);
+                g.setColour(juce::Colours::black.withAlpha(textAlpha * 0.65f));
+                g.drawText(label, (int)x + 5, (int)labelY + 1, 70, (int)labelFont.getHeight(), juce::Justification::left);
+                g.setColour(gridColour.withAlpha(textAlpha));
+                g.drawText(label, (int)x + 4, (int)labelY, 70, (int)labelFont.getHeight(), juce::Justification::left);
+            }
+        }
+    };
+
+    drawVerticalGrid(info.lowerStep, info.lowerAlpha, info.lowerLineVis, 0.0);
+    drawVerticalGrid(info.upperStep, info.upperAlpha, info.upperLineVis, info.lowerStep);
 }
 
 // --- Handle Management ---
@@ -224,12 +362,29 @@ void NodeGraphComponent::applyConstraints(int nodeIndex) {
 NodeGraphComponent::HandleComponent* NodeGraphComponent::findClosestHandle(juce::Point<int> pos, float& outDist) const {
     HandleComponent* closest = nullptr;
     float bestDist = std::numeric_limits<float>::max();
+    constexpr float kTieEpsilon = 4.0f; // px — treat handles within this distance as tied
+
     for (auto* h : handles) {
+        // Skip hidden handles
+        if (isHandleVisible && h->nodeIndex >= 0 && !isHandleVisible(h->nodeIndex))
+            continue;
         auto center = h->getBoundsInParent().getCentre().toFloat();
         float d = center.getDistanceFrom(pos.toFloat());
-        if (d < bestDist) {
+
+        if (d < bestDist - kTieEpsilon) {
+            // Clearly closer — always wins
             bestDist = d;
             closest = h;
+        } else if (d <= bestDist + kTieEpsilon && closest != nullptr) {
+            // Within epsilon — tiebreaker: prefer the earlier handle if cursor
+            // is to the right of the handles, later handle if cursor is to the left.
+            float handleCenterX = center.x;
+            bool cursorIsRight = (float)pos.x >= handleCenterX;
+            bool newIsLater = h->nodeIndex > closest->nodeIndex;
+            if (cursorIsRight ? newIsLater : !newIsLater) {
+                bestDist = d;
+                closest = h;
+            }
         }
     }
     outDist = bestDist;
@@ -263,6 +418,11 @@ juce::Point<float> NodeGraphComponent::getCurveHandlePosition(int nodeIndex) con
 
 bool NodeGraphComponent::shouldShowCurveHandle(int nodeIndex) const {
     if (nodeIndex <= 0 || nodeIndex >= (int)nodes.size()) return false;
+    // Hide curve handle when the segment is too short to meaningfully adjust curvature.
+    double prevPx = convertDomainToPixels(nodes[nodeIndex - 1].time);
+    double currPx = convertDomainToPixels(nodes[nodeIndex].time);
+    if (std::abs(currPx - prevPx) < 3.0)
+        return false;
     if (hasCurveHandle) return hasCurveHandle(nodeIndex);
     return true; // All segments by default
 }
@@ -325,6 +485,29 @@ void NodeGraphComponent::paint(juce::Graphics& g) {
     g.setColour(findColour(fillColourId));
     g.fillPath(fillPath);
 
+    // Flow trail (between fill and stroke)
+    float trailGlowStrength = 0.0f;
+    if (flowTrailRenderer) {
+        auto trailColour = findColour(lineColourId).interpolatedWith(juce::Colours::white, 0.99f);
+        flowTrailRenderer->paintTrail(g, fillPath, trailColour, trailGlowStrength);
+    }
+
+    // Glow effect from trail
+    if (trailGlowStrength > 0.01f) {
+        const float glow = juce::jlimit(0.0f, 1.0f, trailGlowStrength);
+        const float glowThickness = kCurveStrokeThickness + (2.0f * glow);
+        g.setColour(findColour(lineColourId).withAlpha(0.25f + 0.55f * glow));
+        g.strokePath(path, juce::PathStrokeType(glowThickness));
+    }
+
+    // Marker heads
+    if (flowTrailRenderer) {
+        auto markerColour = flowMarkerColourSet
+            ? flowMarkerColour
+            : findColour(lineColourId).withAlpha(0.7f);
+        flowTrailRenderer->paintMarkerHeads(g, fillPath, markerColour);
+    }
+
     // Stroke curve
     g.setColour(findColour(lineColourId).withAlpha(0.90f));
     g.strokePath(path, juce::PathStrokeType(kCurveStrokeThickness));
@@ -377,6 +560,8 @@ void NodeGraphComponent::paintOverChildren(juce::Graphics& g) {
 void NodeGraphComponent::resized() {
     repositionHandles();
     invalidateGrid();
+    if (flowTrailRenderer)
+        flowTrailRenderer->resized();
 }
 
 // --- Mouse Interaction ---
@@ -410,14 +595,31 @@ void NodeGraphComponent::mouseMove(const juce::MouseEvent& e) {
         hoverCurveIndex = -1;
     }
 
-    if (prevHover != hoverHandle || prevCurveHover != hoverCurveIndex)
+    if (prevHover != hoverHandle || prevCurveHover != hoverCurveIndex) {
+        // Fire hover callback
+        if (onNodeHover) {
+            int hoverIdx = (hoverCurveIndex >= 1) ? hoverCurveIndex
+                         : (hoverHandle != nullptr) ? hoverHandle->nodeIndex : -1;
+            bool isCurve = (hoverCurveIndex >= 1);
+            if (hoverIdx != prevHoverNodeIndex || isCurve != prevHoverIsCurve) {
+                prevHoverNodeIndex = hoverIdx;
+                prevHoverIsCurve = isCurve;
+                onNodeHover(hoverIdx, isCurve);
+            }
+        }
         repaint();
+    }
 }
 
 void NodeGraphComponent::mouseExit(const juce::MouseEvent&) {
     mouseIsOver = false;
     hoverHandle = nullptr;
     hoverCurveIndex = -1;
+    if (onNodeHover && (prevHoverNodeIndex != -1 || prevHoverIsCurve)) {
+        prevHoverNodeIndex = -1;
+        prevHoverIsCurve = false;
+        onNodeHover(-1, false);
+    }
     repaint();
 }
 
@@ -511,24 +713,28 @@ void NodeGraphComponent::mouseDrag(const juce::MouseEvent& e) {
         int maxY = getHeight() - kHandleSize;
         int nodeIdx = activeHandle->nodeIndex;
 
-        // Constrain X to stay ordered between neighboring nodes
+        // Constrain X: can't go left of predecessor (ordering preserved by each
+        // handle's own backward constraint, so no forward cap needed).
         int minX = 0;
         if (nodeIdx > 0 && handles[nodeIdx - 1] != nullptr)
             minX = handles[nodeIdx - 1]->getX();
 
-        int constrainedMaxX = maxX;
-        if (nodeIdx < (int)handles.size() - 1 && handles[nodeIdx + 1] != nullptr)
-            constrainedMaxX = handles[nodeIdx + 1]->getX();
-
-        int clampedX = juce::jlimit(minX, juce::jmax(minX, constrainedMaxX), activeHandle->getX());
+        int clampedX = juce::jlimit(minX, maxX, activeHandle->getX());
         int clampedY = juce::jlimit(0, juce::jmax(0, maxY), activeHandle->getY());
         activeHandle->setTopLeftPosition(clampedX, clampedY);
 
         activeHandle->updateNodeFromPosition();
 
         // Apply grid snapping
-        if (snapDivisions > 0) {
-            nodes[nodeIdx].time = snapToGrid(nodes[nodeIdx].time, domainMin, domainMax);
+        switch (snapStyle) {
+            case SnapStyle::LogarithmicTime:
+                nodes[nodeIdx].time = snapToLogarithmicGrid(nodes[nodeIdx].time);
+                break;
+            case SnapStyle::Uniform:
+            default:
+                if (snapDivisions > 0)
+                    nodes[nodeIdx].time = snapToGrid(nodes[nodeIdx].time, domainMin, domainMax);
+                break;
         }
 
         // Re-clamp position after constraints
@@ -541,14 +747,16 @@ void NodeGraphComponent::mouseDrag(const juce::MouseEvent& e) {
 void NodeGraphComponent::mouseUp(const juce::MouseEvent&) {
     if (activeHandle != nullptr) {
         activeHandle->isDragging = false;
-        activeHandle = nullptr;
+        // Fire callback while active state is still queryable
         if (onDragEnded) onDragEnded();
+        activeHandle = nullptr;
     }
     if (activeCurveIndex >= 1) {
+        // Fire callback while active state is still queryable
+        if (onDragEnded) onDragEnded();
         activeCurveIndex = -1;
         curveDragLastNorm = 0.0;
         setMouseCursor(juce::MouseCursor::NormalCursor);
-        if (onDragEnded) onDragEnded();
     }
 }
 
@@ -614,10 +822,41 @@ double NodeGraphComponent::snapToGrid(double value, double rangeMin, double rang
     double range = rangeMax - rangeMin;
     double step = range / (double)snapDivisions;
     double snapped = std::round((value - rangeMin) / step) * step + rangeMin;
-    // Only snap if close to a grid line (within 20% of a step)
-    if (std::abs(snapped - value) < step * 0.2)
+    // Pixel-based snap threshold — only snap when close enough in screen space
+    constexpr double kSnapPx = 6.0;
+    double domainPerPixel = range / (double)juce::jmax(1, getWidth() - kHandleSize);
+    if (std::abs(snapped - value) < kSnapPx * domainPerPixel)
         return juce::jlimit(rangeMin, rangeMax, snapped);
     return value;
+}
+
+double NodeGraphComponent::snapToLogarithmicGrid(double domainValue) const {
+    LogGridInfo info;
+    if (!computeLogGridInfo(getWidth(), info))
+        return domainValue;
+
+    // Snap threshold in pixels — keep it tight so handles don't feel sticky
+    constexpr double kSnapPx = 6.0;
+    const double snapDomain = kSnapPx * info.secondsPerPixel;
+
+    double bestSnap = domainValue;
+    double bestDist = std::numeric_limits<double>::max();
+
+    auto trySnap = [&](double step, float lineVis) {
+        if (step <= 0.0) return;
+        if (lineVis < 0.5f) return; // only snap when line is sufficiently visible
+
+        double snapped = std::round(domainValue / step) * step;
+        double dist = std::abs(snapped - domainValue);
+        if (dist < snapDomain && dist < bestDist) {
+            bestDist = dist;
+            bestSnap = snapped;
+        }
+    };
+
+    trySnap(info.lowerStep, info.lowerLineVis);
+    trySnap(info.upperStep, info.upperLineVis);
+    return bestSnap;
 }
 
 void NodeGraphComponent::setSnapDivisions(int divisions) {
@@ -637,7 +876,18 @@ void NodeGraphComponent::setLastNodeValue(double value) {
 }
 
 void NodeGraphComponent::mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails& wheel) {
-    // Accumulate scroll with a sensitivity multiplier
+    if (wheel.deltaY == 0.0f) return;
+
+    if (wheelMode == WheelMode::DomainZoom) {
+        // Zoom the domain axis
+        const double base = 0.98;
+        const double zoomFactor = std::pow(base, wheel.deltaY * 20.0);
+        const double newMax = juce::jlimit(domainZoomMin, domainZoomMax, domainMax * zoomFactor);
+        setDomainRange(domainMin, newMax);
+        return;
+    }
+
+    // SnapDivisions mode (default)
     scrollAccumulator += wheel.deltaY * 8.0f;
     int steps = (int)scrollAccumulator;
     if (steps == 0) return;
@@ -645,4 +895,74 @@ void NodeGraphComponent::mouseWheelMove(const juce::MouseEvent&, const juce::Mou
 
     int newDiv = juce::jlimit(2, 64, snapDivisions + steps);
     setSnapDivisions(newDiv);
+}
+
+void NodeGraphComponent::lookAndFeelChanged() {
+    invalidateGrid();
+    repaint();
+}
+
+int NodeGraphComponent::getActiveNodeIndex() const {
+    if (activeHandle != nullptr)
+        return activeHandle->nodeIndex;
+    return -1;
+}
+
+int NodeGraphComponent::getActiveCurveNodeIndex() const {
+    return activeCurveIndex;
+}
+
+// ============================================================================
+// Flow Trail
+// ============================================================================
+
+void NodeGraphComponent::ensureFlowTrailCreated() {
+    if (!flowTrailRenderer) {
+        flowTrailRenderer = std::make_unique<FlowTrailRenderer>(
+            [this](double domainVal) -> float {
+                return (float)convertDomainToPixels(domainVal) + kHandleSize * 0.5f;
+            },
+            [this]() { return getWidth(); },
+            [this]() { return getHeight(); }
+        );
+    }
+}
+
+void NodeGraphComponent::ensureFlowRepaintTimerRunning() {
+    if (!isTimerRunning())
+        startTimerHz(60);
+}
+
+void NodeGraphComponent::setFlowMarkerDomainPositions(const double* positions, int numPositions) {
+    ensureFlowTrailCreated();
+    flowTrailRenderer->setFlowMarkerTimes(positions, numPositions);
+    ensureFlowRepaintTimerRunning();
+    repaint();
+}
+
+void NodeGraphComponent::clearFlowMarkers() {
+    if (flowTrailRenderer)
+        flowTrailRenderer->clear();
+    ensureFlowRepaintTimerRunning();
+    repaint();
+}
+
+void NodeGraphComponent::resetFlowTrail() {
+    if (flowTrailRenderer)
+        flowTrailRenderer->reset();
+    repaint();
+}
+
+void NodeGraphComponent::timerCallback() {
+    if (!flowTrailRenderer || !flowTrailRenderer->hasTrailData()) {
+        stopTimer();
+        return;
+    }
+    const double nowMs = juce::Time::getMillisecondCounterHiRes();
+    if (flowTrailRenderer->shouldStopRepaint(nowMs)) {
+        stopTimer();
+        repaint();
+        return;
+    }
+    repaint();
 }

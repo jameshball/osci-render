@@ -1,4 +1,5 @@
 #include "LookAndFeel.h"
+#include "components/CustomMidiKeyboardComponent.h"
 #include "components/SwitchButton.h"
 #include "components/EnvelopeComponent.h"
 
@@ -87,13 +88,13 @@ void OscirenderLookAndFeel::applyOscirenderColours(juce::LookAndFeel& lookAndFee
     lookAndFeel.setColour(EnvelopeComponent::LineBackground, juce::Colours::white);
 
     // midi keyboard
-    lookAndFeel.setColour(juce::MidiKeyboardComponent::blackNoteColourId, Colours::veryDark);
-    lookAndFeel.setColour(juce::MidiKeyboardComponent::whiteNoteColourId, juce::Colours::white);
-    lookAndFeel.setColour(juce::MidiKeyboardComponent::mouseOverKeyOverlayColourId, Colours::accentColor.withAlpha(0.3f));
-    lookAndFeel.setColour(juce::MidiKeyboardComponent::keyDownOverlayColourId, Colours::accentColor.withAlpha(0.7f));
-    lookAndFeel.setColour(juce::MidiKeyboardComponent::shadowColourId, juce::Colours::transparentBlack);
-    lookAndFeel.setColour(juce::MidiKeyboardComponent::upDownButtonBackgroundColourId, Colours::veryDark);
-    lookAndFeel.setColour(juce::MidiKeyboardComponent::upDownButtonArrowColourId, juce::Colours::white);
+    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::blackNoteColourId, Colours::veryDark);
+    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::whiteNoteColourId, juce::Colours::white);
+    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::mouseOverKeyOverlayColourId, Colours::accentColor.withAlpha(0.3f));
+    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::keyDownOverlayColourId, Colours::accentColor.withAlpha(0.7f));
+    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::shadowColourId, juce::Colours::transparentBlack);
+    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::upDownButtonBackgroundColourId, Colours::veryDark);
+    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::upDownButtonArrowColourId, juce::Colours::white);
 
     // progress bar
     lookAndFeel.setColour(juce::ProgressBar::backgroundColourId, juce::Colours::transparentBlack);

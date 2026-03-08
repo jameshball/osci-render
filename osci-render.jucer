@@ -261,6 +261,10 @@
               file="Source/components/CustomTooltipWindow.cpp"/>
         <FILE id="A4ukex" name="CustomTooltipWindow.h" compile="0" resource="0"
               file="Source/components/CustomTooltipWindow.h"/>
+        <FILE id="CuMkC1" name="CustomMidiKeyboardComponent.cpp" compile="1"
+              resource="0" file="Source/components/CustomMidiKeyboardComponent.cpp"/>
+        <FILE id="CuMkH1" name="CustomMidiKeyboardComponent.h" compile="0"
+              resource="0" file="Source/components/CustomMidiKeyboardComponent.h"/>
         <FILE id="gPTmR4" name="AboutComponent.cpp" compile="1" resource="0"
               file="Source/components/AboutComponent.cpp"/>
         <FILE id="vDlOTn" name="AboutComponent.h" compile="0" resource="0"
@@ -361,10 +365,14 @@
               file="Source/components/VolumeComponent.cpp"/>
         <FILE id="MWkfTv" name="VolumeComponent.h" compile="0" resource="0"
               file="Source/components/VolumeComponent.h"/>
+        <FILE id="VTbLH1" name="VerticalTabListComponent.h" compile="0" resource="0"
+              file="Source/components/VerticalTabListComponent.h"/>
         <FILE id="WHz3FS" name="EnvelopeComponent.cpp" compile="1" resource="0"
               file="Source/components/EnvelopeComponent.cpp"/>
         <FILE id="A8OllZ" name="EnvelopeComponent.h" compile="0" resource="0"
               file="Source/components/EnvelopeComponent.h"/>
+        <FILE id="FlTrH1" name="FlowTrailRenderer.h" compile="0" resource="0"
+              file="Source/components/FlowTrailRenderer.h"/>
         <FILE id="NdGrC1" name="NodeGraphComponent.h" compile="0" resource="0"
               file="Source/components/lfo/NodeGraphComponent.h"/>
         <FILE id="NdGrC2" name="NodeGraphComponent.cpp" compile="1" resource="0"

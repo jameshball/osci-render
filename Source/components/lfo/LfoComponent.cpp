@@ -210,7 +210,7 @@ LfoComponent::LfoTabHandle::LfoTabHandle(const juce::String& l, int index, LfoCo
 }
 
 void LfoComponent::LfoTabHandle::paint(juce::Graphics& g) {
-    bool active = (lfoIndex == owner.activeLfoIndex);
+    bool active = isActiveTab();
     auto colour = LfoComponent::getLfoColour(lfoIndex);
     auto bounds = getLocalBounds().toFloat();
     constexpr float radius = 4.0f;
@@ -293,8 +293,8 @@ void LfoComponent::LfoTabHandle::paint(juce::Graphics& g) {
 }
 
 void LfoComponent::LfoTabHandle::mouseDown(const juce::MouseEvent& e) {
-    // Left click = switch to this LFO
-    owner.switchToLfo(lfoIndex);
+    // Activate this tab via the generic tab list
+    requestActivation();
 
     // Start drag for creating new connections
     isDragging = true;
@@ -514,13 +514,17 @@ void LfoComponent::PresetSelector::setPresetName(const juce::String& name) {
 // ============================================================================
 
 juce::Colour LfoComponent::getLfoColour(int lfoIndex) {
-    switch (lfoIndex) {
-        case 0: return juce::Colour(0xFF00E5FF); // Cyan
-        case 1: return juce::Colour(0xFFFF79C6); // Pink
-        case 2: return juce::Colour(0xFF50FA7B); // Green
-        case 3: return juce::Colour(0xFFFFB86C); // Orange
-        default: return juce::Colour(0xFF00E5FF);
-    }
+    static const juce::Colour colours[] = {
+        juce::Colour(0xFF00E5FF), // 0 Cyan
+        juce::Colour(0xFFFF79C6), // 1 Pink
+        juce::Colour(0xFF50FA7B), // 2 Green
+        juce::Colour(0xFFFFB86C), // 3 Orange
+        juce::Colour(0xFFBD93F9), // 4 Purple
+        juce::Colour(0xFFF1FA8C), // 5 Yellow
+        juce::Colour(0xFFFF5555), // 6 Red
+        juce::Colour(0xFFFFFFFF), // 7 White
+    };
+    return colours[juce::jlimit(0, (int)std::size(colours) - 1, lfoIndex)];
 }
 
 LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
@@ -531,12 +535,24 @@ LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
         lfoData[i].waveform = createLfoPreset(LfoPreset::Triangle);
     }
 
-    // Create tab/drag handles
+    // Create tab/drag handles inside the generic tab list
+    tabList.setTabGap(kTabGap);
+    tabList.setMinTabHeight(55);
     for (int i = 0; i < NUM_LFOS; ++i) {
         auto* tab = new LfoTabHandle("LFO " + juce::String(i + 1), i, *this);
-        addAndMakeVisible(tab);
-        tabHandles.add(tab);
+        tabList.addTab(tab);
     }
+    tabList.setActiveTabIndexSilent(0);
+    tabList.onTabChanged = [this](int index) { switchToLfo(index); };
+
+    // Wrap the tab list in a scrollable viewport
+    tabViewport.setViewedComponent(&tabList, false);
+    tabViewport.setScrollBarsShown(false, false, true, false);
+    tabViewport.setColour(scrollFadeOverlayBackgroundColourId,
+                          findColour(juce::ResizableWindow::backgroundColourId));
+    tabViewport.setSidesEnabled(true, true);
+    tabViewport.setFadeHeight(20);
+    addAndMakeVisible(tabViewport);
 
     // Setup graph
     graph.setDomainRange(0.0, 1.0);
@@ -588,8 +604,13 @@ void LfoComponent::timerCallback() {
     // Update LFO value bars
     for (int i = 0; i < NUM_LFOS; ++i) {
         float val = audioProcessor.getLfoCurrentValue(i);
-        tabHandles[i]->setLfoValue(val);
+        static_cast<LfoTabHandle*>(tabList.getTab(i))->setLfoValue(val);
     }
+
+    // Flow trail disabled for now — LFO phase moves too fast to be useful.
+    // float phase = audioProcessor.getLfoCurrentPhase(activeLfoIndex);
+    // double phaseD = (double)phase;
+    // graph.setFlowMarkerDomainPositions(&phaseD, 1);
 }
 
 void LfoComponent::changeListenerCallback(juce::ChangeBroadcaster* source) {
@@ -601,18 +622,15 @@ void LfoComponent::changeListenerCallback(juce::ChangeBroadcaster* source) {
 void LfoComponent::resized() {
     auto bounds = getLocalBounds();
 
-    // Tab handles on the left — flush with component edges, small gap between tabs
+    // Tab viewport on the left
     auto tabArea = bounds.removeFromLeft(kTabWidth);
-    int totalGaps = kTabGap * (NUM_LFOS - 1);
-    int availH = tabArea.getHeight() - totalGaps;
-    int tabH = availH / NUM_LFOS;
-    int extra = availH - tabH * NUM_LFOS;
-    for (int i = 0; i < tabHandles.size(); i++) {
-        int h = tabH + (i < extra ? 1 : 0);
-        tabHandles[i]->setBounds(tabArea.removeFromTop(h));
-        if (i < tabHandles.size() - 1)
-            tabArea.removeFromTop(kTabGap);
-    }
+    tabViewport.setBounds(tabArea);
+
+    // Size the tab list content to fill the viewport width,
+    // using at least the required height for all tabs.
+    int requiredH = tabList.getRequiredHeight();
+    int contentH = juce::jmax(tabArea.getHeight(), requiredH);
+    tabList.setBounds(0, 0, tabArea.getWidth(), contentH);
 
     // Inset the main content area uniformly
     bounds.reduce(kContentInset, kContentInset);
@@ -660,9 +678,11 @@ void LfoComponent::paintOverChildren(juce::Graphics& g) {
 
     // Clip to a narrow strip on the tab side of the seam only,
     // and exclude the active tab so it stays connected to the panel.
-    if (tabHandles.isEmpty() || activeLfoIndex < 0 || activeLfoIndex >= tabHandles.size())
+    if (tabList.getNumTabs() == 0 || activeLfoIndex < 0 || activeLfoIndex >= tabList.getNumTabs())
         return;
-    auto activeTabBounds = tabHandles[activeLfoIndex]->getBounds();
+    // Get active tab bounds in our coordinate space (convert from tabList coords through viewport)
+    auto* activeTab = tabList.getTab(activeLfoIndex);
+    auto activeTabBounds = getLocalArea(&tabList, activeTab->getBounds());
     juce::RectangleList<int> clipRegion;
     clipRegion.add(kTabWidth - kSeamShadowWidth, 0, kSeamShadowWidth, getHeight());
     clipRegion.subtract(activeTabBounds);
@@ -688,12 +708,15 @@ void LfoComponent::switchToLfo(int index) {
     syncGraphToActiveLfo();
     updatePresetLabel();
 
+    // Reset flow trail for the new LFO
+    graph.resetFlowTrail();
+
     // Update rate control to match this LFO's rate mode and value
     rateControl.setLfoIndex(index);
     rateControl.syncFromProcessor();
 
-    for (auto* tab : tabHandles)
-        tab->repaint();
+    for (int i = 0; i < tabList.getNumTabs(); ++i)
+        tabList.getTab(i)->repaint();
     repaint();
 }
 
@@ -803,8 +826,9 @@ void LfoComponent::syncFromProcessorState() {
     rateControl.setLfoIndex(activeLfoIndex);
     rateControl.syncFromProcessor();
 
-    for (auto* tab : tabHandles)
-        tab->repaint();
+    tabList.setActiveTabIndexSilent(activeLfoIndex);
+    for (int i = 0; i < tabList.getNumTabs(); ++i)
+        tabList.getTab(i)->repaint();
     repaint();
 }
 
@@ -838,7 +862,7 @@ void LfoComponent::applyLfoConstraints(int nodeIndex, double& time, double& valu
 }
 
 void LfoComponent::refreshAllDepthIndicators(const std::vector<LfoAssignment>& assignments) {
-    for (auto* tab : tabHandles) {
-        tab->refreshDepthIndicators(assignments);
+    for (int i = 0; i < tabList.getNumTabs(); ++i) {
+        static_cast<LfoTabHandle*>(tabList.getTab(i))->refreshDepthIndicators(assignments);
     }
 }

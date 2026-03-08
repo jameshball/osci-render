@@ -139,18 +139,21 @@
               file="Source/audio/ProcessAudioPermissions.h"/>
         <FILE id="PrAuD4" name="ProcessAudioPermissions.mm" compile="1" resource="0"
               file="Source/audio/ProcessAudioPermissions.mm"/>
-        <FILE id="WlLpH2" name="WindowsLoopbackAudioDeviceType.h" compile="0" resource="0"
-              file="Source/audio/WindowsLoopbackAudioDeviceType.h"/>
-        <FILE id="WlLpC2" name="WindowsLoopbackAudioDeviceType.cpp" compile="1" resource="0"
-              file="Source/audio/WindowsLoopbackAudioDeviceType.cpp"/>
-        <FILE id="mAhd02" name="miniaudio.h" compile="0" resource="0"
-              file="Source/audio/miniaudio/miniaudio.h"/>
+        <FILE id="WlLpH2" name="WindowsLoopbackAudioDeviceType.h" compile="0"
+              resource="0" file="Source/audio/WindowsLoopbackAudioDeviceType.h"/>
+        <FILE id="WlLpC2" name="WindowsLoopbackAudioDeviceType.cpp" compile="1"
+              resource="0" file="Source/audio/WindowsLoopbackAudioDeviceType.cpp"/>
+        <FILE id="mAhd02" name="miniaudio.h" compile="0" resource="0" file="Source/audio/miniaudio/miniaudio.h"/>
       </GROUP>
       <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
         <FILE id="URb7Ok" name="AboutComponent.cpp" compile="1" resource="0"
               file="Source/components/AboutComponent.cpp"/>
         <FILE id="FtOv3F" name="AboutComponent.h" compile="0" resource="0"
               file="Source/components/AboutComponent.h"/>
+        <FILE id="CuMkC2" name="CustomMidiKeyboardComponent.cpp" compile="1"
+              resource="0" file="Source/components/CustomMidiKeyboardComponent.cpp"/>
+        <FILE id="CuMkH2" name="CustomMidiKeyboardComponent.h" compile="0"
+              resource="0" file="Source/components/CustomMidiKeyboardComponent.h"/>
         <FILE id="SKySvH" name="CustomTooltipWindow.cpp" compile="1" resource="0"
               file="Source/components/CustomTooltipWindow.cpp"/>
         <FILE id="kgwbHY" name="CustomTooltipWindow.h" compile="0" resource="0"

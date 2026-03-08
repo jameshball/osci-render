@@ -1210,6 +1210,11 @@ float OscirenderAudioProcessor::getLfoCurrentValue(int lfoIndex) const {
     return lfoCurrentValues[lfoIndex].load(std::memory_order_relaxed);
 }
 
+float OscirenderAudioProcessor::getLfoCurrentPhase(int lfoIndex) const {
+    if (lfoIndex < 0 || lfoIndex >= NUM_LFOS) return 0.0f;
+    return lfoCurrentPhases[lfoIndex].load(std::memory_order_relaxed);
+}
+
 void OscirenderAudioProcessor::setLfoRateMode(int lfoIndex, LfoRateMode mode) {
     juce::SpinLock::ScopedLockType lock(lfoWaveformLock);
     lfoRateModes[lfoIndex] = mode;
@@ -1250,8 +1255,9 @@ void OscirenderAudioProcessor::applyGlobalLfoModulation(int numSamples, double s
             for (int s = 0; s < numSamples; ++s) {
                 lfoBlockBuffer[l][s] = lfoAudioStates[l].advance(rate, sr, lfoWaveforms[l]);
             }
-            // Publish most recent value for thread-safe UI reads
+            // Publish most recent value and phase for thread-safe UI reads
             lfoCurrentValues[l].store(lfoBlockBuffer[l][numSamples - 1], std::memory_order_relaxed);
+            lfoCurrentPhases[l].store(lfoAudioStates[l].phase, std::memory_order_relaxed);
         }
     }
 

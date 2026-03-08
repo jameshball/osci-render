@@ -130,9 +130,9 @@ public:
     osci::FloatParameter* standaloneBpm = new osci::FloatParameter("Tempo", "standaloneBpm", VERSION_HINT, 120.0f, 20.0f, 300.0f, 0.1f);
 
     // UI-persisted LFO state (preset type + active tab)
-    LfoPreset lfoPresets[NUM_LFOS] = { LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle };
-    LfoRateMode lfoRateModes[NUM_LFOS] = { LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds };
-    int lfoTempoDivisions[NUM_LFOS] = { 8, 8, 8, 8 };  // index into getTempoDivisions(), default 1/4
+    LfoPreset lfoPresets[NUM_LFOS] = { LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle };
+    LfoRateMode lfoRateModes[NUM_LFOS] = { LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds };
+    int lfoTempoDivisions[NUM_LFOS] = { 8, 8, 8, 8, 8, 8, 8, 8 };  // index into getTempoDivisions(), default 1/4
     int activeLfoTab = 0;
 
     void lfoWaveformChanged(int index, const LfoWaveform& waveform);
@@ -143,6 +143,8 @@ public:
 
     // Get the current LFO output value (0..1) for visualization
     float getLfoCurrentValue(int lfoIndex) const;
+    // Get the current LFO phase [0,1) for flow marker visualization
+    float getLfoCurrentPhase(int lfoIndex) const;
 
     // Thread-safe setters for LFO rate mode/division (acquires lfoWaveformLock)
     void setLfoRateMode(int lfoIndex, LfoRateMode mode);
@@ -339,6 +341,8 @@ private:
 
     // Thread-safe snapshot of most recent LFO output for UI visualization
     std::atomic<float> lfoCurrentValues[NUM_LFOS] = {};
+    // Thread-safe snapshot of most recent LFO phase [0,1) for UI flow markers
+    std::atomic<float> lfoCurrentPhases[NUM_LFOS] = {};
 
     void applyGlobalLfoModulation(int numSamples, double sampleRate);
 

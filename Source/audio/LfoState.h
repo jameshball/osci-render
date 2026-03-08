@@ -7,7 +7,7 @@
 
 // Number of global LFOs available.
 namespace lfo {
-    inline constexpr int NUM_LFOS = 4;
+    inline constexpr int NUM_LFOS = 8;
 }
 using lfo::NUM_LFOS;
 
