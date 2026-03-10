@@ -93,6 +93,11 @@ public:
 #endif
     }
 
+    // Callback for applying external modulation (LFO/ENV) to animated visualiser
+    // effect buffers. Set by the processor; called by the renderer after
+    // animateValues() but before processBlock().
+    std::function<void(int numSamples)> applyExternalModulation;
+
     double getIntensity() {
         return intensityEffect->getActualValue() / 100;
     }

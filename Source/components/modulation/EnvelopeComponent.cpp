@@ -94,20 +94,24 @@ juce::Colour EnvelopeComponent::getEnvColour(int envIndex) {
 
 static ModulationSourceConfig buildEnvConfig(OscirenderAudioProcessor& proc) {
     ModulationSourceConfig cfg;
-    cfg.sourceCount = NUM_ENVELOPES;
-    cfg.dragPrefix = "ENV";
-    cfg.getLabel = [](int i) { return "ENV " + juce::String(i + 1); };
+    const bool beginner = proc.isBeginnerMode();
+    cfg.sourceCount = beginner ? 1 : NUM_ENVELOPES;
     cfg.getSourceColour = &EnvelopeComponent::getEnvColour;
     cfg.getCurrentValue = [&proc](int i) { return proc.getEnvCurrentValue(i); };
-    cfg.getAssignments = [&proc]() { return proc.getEnvAssignments(); };
-    cfg.addAssignment = [&proc](const ModAssignment& a) { proc.addEnvAssignment(a); };
-    cfg.removeAssignment = [&proc](int idx, const juce::String& pid) { proc.removeEnvAssignment(idx, pid); };
-    cfg.getParamDisplayName = [&proc](const juce::String& pid) -> juce::String {
-        return proc.getParamDisplayName(pid);
-    };
-    cfg.broadcaster = &proc.broadcaster;
-    cfg.getActiveTab = [&proc]() { return proc.activeEnvTab; };
-    cfg.setActiveTab = [&proc](int i) { proc.activeEnvTab = i; };
+    cfg.getLabel = [](int i) { return "ENV " + juce::String(i + 1); };
+
+    if (!beginner) {
+        cfg.dragPrefix = "ENV";
+        cfg.getAssignments = [&proc]() { return proc.getEnvAssignments(); };
+        cfg.addAssignment = [&proc](const ModAssignment& a) { proc.addEnvAssignment(a); };
+        cfg.removeAssignment = [&proc](int idx, const juce::String& pid) { proc.removeEnvAssignment(idx, pid); };
+        cfg.getParamDisplayName = [&proc](const juce::String& pid) -> juce::String {
+            return proc.getParamDisplayName(pid);
+        };
+        cfg.broadcaster = &proc.broadcaster;
+        cfg.getActiveTab = [&proc]() { return proc.activeEnvTab; };
+        cfg.setActiveTab = [&proc](int i) { proc.activeEnvTab = i; };
+    }
     return cfg;
 }
 

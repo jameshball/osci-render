@@ -15,9 +15,15 @@ std::atomic<bool> EffectComponent::modRangeBipolar{false};
 EffectComponent::EffectComponent(osci::Effect& effect, int index) : effect(effect), index(index) {
     addAndMakeVisible(slider);
     addChildComponent(lfoSlider);
-    addAndMakeVisible(lfo);
     addAndMakeVisible(label);
     addAndMakeVisible(settingsButton);
+
+    // LFO ComboBox is only relevant when per-param LFO sub-params exist (beginner mode).
+    // In advanced mode, lfo/lfoRate are nullptr so we skip the combobox entirely.
+    lfoEnabled = effect.parameters[index]->lfo != nullptr && effect.parameters[index]->lfoRate != nullptr;
+    if (lfoEnabled) {
+        addAndMakeVisible(lfo);
+    }
 
     sidechainEnabled = effect.parameters[index]->sidechain != nullptr;
     if (sidechainEnabled) {
@@ -58,21 +64,25 @@ EffectComponent::EffectComponent(osci::Effect& effect, int index) : effect(effec
 
     label.setFont(juce::Font(14.0f));
 
-    lfo.addItem("Static", static_cast<int>(osci::LfoType::Static));
-    lfo.addItem("Sine", static_cast<int>(osci::LfoType::Sine));
-    lfo.addItem("Square", static_cast<int>(osci::LfoType::Square));
-    lfo.addItem("Seesaw", static_cast<int>(osci::LfoType::Seesaw));
-    lfo.addItem("Triangle", static_cast<int>(osci::LfoType::Triangle));
-    lfo.addItem("Sawtooth", static_cast<int>(osci::LfoType::Sawtooth));
-    lfo.addItem("Reverse Sawtooth", static_cast<int>(osci::LfoType::ReverseSawtooth));
-    lfo.addItem("Noise", static_cast<int>(osci::LfoType::Noise));
+    if (lfoEnabled) {
+        lfo.addItem("Static", static_cast<int>(osci::LfoType::Static));
+        lfo.addItem("Sine", static_cast<int>(osci::LfoType::Sine));
+        lfo.addItem("Square", static_cast<int>(osci::LfoType::Square));
+        lfo.addItem("Seesaw", static_cast<int>(osci::LfoType::Seesaw));
+        lfo.addItem("Triangle", static_cast<int>(osci::LfoType::Triangle));
+        lfo.addItem("Sawtooth", static_cast<int>(osci::LfoType::Sawtooth));
+        lfo.addItem("Reverse Sawtooth", static_cast<int>(osci::LfoType::ReverseSawtooth));
+        lfo.addItem("Noise", static_cast<int>(osci::LfoType::Noise));
+    }
 
     settingsButton.setTooltip("Click to change the slider settings, including range.");
 
     settingsButton.onClick = [this] {
         auto settings = std::make_unique<EffectSettingsComponent>(this);
         settings->setLookAndFeel(&getLookAndFeel());
-        settings->setSize(200, 290);
+        // Smaller popup in advanced mode (no LFO start/end sliders)
+        int height = (this->effect.parameters[this->index]->lfoStartPercent != nullptr) ? 290 : 170;
+        settings->setSize(200, height);
         auto& myBox = juce::CallOutBox::launchAsynchronously(std::move(settings), settingsButton.getScreenBounds(), nullptr);
     };
 
@@ -485,6 +495,15 @@ void EffectComponent::wireModulation(OscirenderAudioProcessor& processor) {
     modBroadcaster = &processor.modulationUpdateBroadcaster;
     modBroadcaster->addListener(this, [this]() {
         updateLfoModulation();
+
+        // Disable the per-parameter LFO dropdown when a global modulation
+        // source (LFO panel or envelope) is wired to this parameter.
+        if (lfoEnabled) {
+            bool hasGlobalMod = (bool)slider.getProperties().getWithDefault("lfo_active", false)
+                             || (bool)slider.getProperties().getWithDefault("env_active", false);
+            lfo.setEnabled(!hasGlobalMod);
+        }
+
         if (modDropHighlight
             || modAnyDragActive.load(std::memory_order_relaxed)
             || (highlightedParamId.isNotEmpty() && effect.parameters[index]->paramID == highlightedParamId))

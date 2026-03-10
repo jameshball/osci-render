@@ -516,12 +516,17 @@ void ModulationSourceComponent::changeListenerCallback(juce::ChangeBroadcaster* 
 void ModulationSourceComponent::resized() {
     auto bounds = getLocalBounds();
 
-    auto tabArea = bounds.removeFromLeft(kTabWidth);
-    tabViewport.setBounds(tabArea);
+    if (config.sourceCount > 1) {
+        auto tabArea = bounds.removeFromLeft(kTabWidth);
+        tabViewport.setBounds(tabArea);
+        tabViewport.setVisible(true);
 
-    int requiredH = tabList.getRequiredHeight();
-    int contentH = juce::jmax(tabArea.getHeight(), requiredH);
-    tabList.setBounds(0, 0, tabArea.getWidth(), contentH);
+        int requiredH = tabList.getRequiredHeight();
+        int contentH = juce::jmax(tabArea.getHeight(), requiredH);
+        tabList.setBounds(0, 0, tabArea.getWidth(), contentH);
+    } else {
+        tabViewport.setVisible(false);
+    }
 
     bounds.reduce(kContentInset, kContentInset);
     contentBounds = bounds;
@@ -529,23 +534,31 @@ void ModulationSourceComponent::resized() {
 }
 
 void ModulationSourceComponent::paint(juce::Graphics& g) {
-    auto panelBounds = getLocalBounds().toFloat().withTrimmedLeft((float)kTabWidth);
+    const bool hasTabs = config.sourceCount > 1;
+    const float tabOffset = hasTabs ? (float)kTabWidth : 0.0f;
+    auto panelBounds = getLocalBounds().toFloat().withTrimmedLeft(tabOffset);
     float r = OscirenderLookAndFeel::RECT_RADIUS;
     juce::Path panelPath;
+    // When there are no tabs (beginner), round all four corners; otherwise only the right ones
     panelPath.addRoundedRectangle(panelBounds.getX(), panelBounds.getY(),
                                    panelBounds.getWidth(), panelBounds.getHeight(),
-                                   r, r, false, true, false, true);
+                                   r, r, !hasTabs, true, !hasTabs, true);
     g.setColour(Colours::darker);
     g.fillPath(panelPath);
 }
 
 void ModulationSourceComponent::paintOverChildren(juce::Graphics& g) {
-    auto panelBounds = getLocalBounds().toFloat().withTrimmedLeft((float)kTabWidth);
+    const bool hasTabs = config.sourceCount > 1;
+    const float tabOffset = hasTabs ? (float)kTabWidth : 0.0f;
+    auto panelBounds = getLocalBounds().toFloat().withTrimmedLeft(tabOffset);
     juce::Path panelPath;
     panelPath.addRoundedRectangle(panelBounds.getX(), panelBounds.getY(),
                                    panelBounds.getWidth(), panelBounds.getHeight(),
                                    OscirenderLookAndFeel::RECT_RADIUS, OscirenderLookAndFeel::RECT_RADIUS,
-                                   false, true, false, true);
+                                   !hasTabs, true, !hasTabs, true);
+
+    if (config.sourceCount <= 1)
+        return;
 
     if (tabList.getNumTabs() == 0 || activeSourceIndex < 0 || activeSourceIndex >= tabList.getNumTabs())
         return;

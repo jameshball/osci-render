@@ -76,6 +76,12 @@ public:
     OscirenderAudioProcessor();
     ~OscirenderAudioProcessor() override;
 
+    // Beginner mode: per-parameter LFO dropdowns, mic icon, single amplitude envelope, simplified layout.
+    // Advanced mode: drag-and-drop LFO/ENV module panels, full layout.
+    // Set once at construction from OSCI_PREMIUM; persisted in state XML.
+    // Changing mode requires a plugin reload (parameter tree is fixed at construction).
+    bool isBeginnerMode() const { return beginnerMode; }
+
     // Central 60 Hz broadcaster for modulation display updates.
     // EffectComponents register/unregister via wireModulation / destructor.
     ModulationUpdateBroadcaster modulationUpdateBroadcaster;
@@ -164,15 +170,15 @@ public:
     // === Envelopes 1–4 (additional modulation envelopes) ===
     // Envelope 0 uses the legacy params above. Envelopes 1–4 have indexed IDs.
     struct EnvelopeParamSet {
-        osci::FloatParameter* delayTime;
-        osci::FloatParameter* attackTime;
-        osci::FloatParameter* holdTime;
-        osci::FloatParameter* decayTime;
-        osci::FloatParameter* sustainLevel;
-        osci::FloatParameter* releaseTime;
-        osci::FloatParameter* attackShape;
-        osci::FloatParameter* decayShape;
-        osci::FloatParameter* releaseShape;
+        osci::FloatParameter* delayTime = nullptr;
+        osci::FloatParameter* attackTime = nullptr;
+        osci::FloatParameter* holdTime = nullptr;
+        osci::FloatParameter* decayTime = nullptr;
+        osci::FloatParameter* sustainLevel = nullptr;
+        osci::FloatParameter* releaseTime = nullptr;
+        osci::FloatParameter* attackShape = nullptr;
+        osci::FloatParameter* decayShape = nullptr;
+        osci::FloatParameter* releaseShape = nullptr;
     };
     EnvelopeParamSet envParams[NUM_ENVELOPES]; // index 0 points to legacy params
 
@@ -190,7 +196,7 @@ public:
     juce::String getParamDisplayName(const juce::String& paramId) const;
 
     // === Global LFO system ===
-    osci::FloatParameter* lfoRate[NUM_LFOS];
+    osci::FloatParameter* lfoRate[NUM_LFOS] = {};
 
     // DAW or standalone BPM – updated every processBlock
     std::atomic<double> currentBpm{120.0};
@@ -443,6 +449,10 @@ private:
     };
     std::unordered_map<juce::String, ParamLocation> paramLocationMap;
     void buildParamLocationMap();
+
+    // Beginner/advanced mode flag — read from global settings at construction, immutable after.
+    // Free builds are always beginner; premium reads the persisted preference.
+    bool beginnerMode = true;
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
 public:

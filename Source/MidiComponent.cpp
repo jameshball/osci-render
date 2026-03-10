@@ -2,7 +2,6 @@
 #include "PluginEditor.h"
 
 MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor), tempoComponent(p) {
-    setText("MIDI Settings");
 
     addAndMakeVisible(midiToggle);
     addAndMakeVisible(voicesSlider);
@@ -48,7 +47,7 @@ void MidiComponent::handleAsyncUpdate() {
 }
 
 void MidiComponent::resized() {
-    auto area = getLocalBounds().withTrimmedTop(20).reduced(5);
+    auto area = getLocalBounds().reduced(5);
     auto topRow = area.removeFromTop(30);
     midiToggle.setBounds(topRow.removeFromLeft(120).translated(0, 1));
     topRow.removeFromLeft(80);
@@ -63,5 +62,4 @@ void MidiComponent::resized() {
 }
 
 void MidiComponent::paint(juce::Graphics& g) {
-    juce::GroupComponent::paint(g);
 }

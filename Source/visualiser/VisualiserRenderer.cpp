@@ -66,11 +66,24 @@ void VisualiserRenderer::runTask(const juce::AudioBuffer<float>& buffer) {
         
         // Apply effects to the entire buffer (only first 3 channels for effects)
         juce::AudioBuffer<float> effectBuffer(tempBuffer.getArrayOfWritePointers(), 3, numSamples);
-        for (auto &effect : parameters.audioEffects) {
-            // Pre-animate effect values for this block before processing
+
+        // Animate all visualiser effects (audio + shader)
+        for (auto &effect : parameters.audioEffects)
             effect->animateValues(numSamples, nullptr);
+        for (auto &effect : parameters.effects)
+            effect->animateValues(numSamples, nullptr);
+
+        // Apply external modulation (LFO/ENV) to animated buffers
+        if (parameters.applyExternalModulation)
+            parameters.applyExternalModulation(numSamples);
+
+        // For shader effects, publish modulated values to actualValues
+        for (auto &effect : parameters.effects)
+            effect->publishAnimatedToActual(numSamples);
+
+        // Process audio effects (reads modulated animated buffer, transforms audio)
+        for (auto &effect : parameters.audioEffects)
             effect->processBlock(effectBuffer, midiMessages);
-        }
 
 #if OSCI_PREMIUM
         // Apply horizontal/vertical flip to the entire buffer

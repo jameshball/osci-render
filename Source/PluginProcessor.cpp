@@ -43,6 +43,14 @@
 OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(2), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
     // locking isn't necessary here because we are in the constructor
 
+    // Resolve beginner/advanced mode from persisted global settings.
+    // Free builds are always beginner; premium defaults to advanced.
+#if OSCI_PREMIUM
+    beginnerMode = getGlobalBoolValue("beginnerMode", false);
+#else
+    beginnerMode = true;
+#endif
+
     toggleableEffects.push_back(BitCrushEffect().build());
     toggleableEffects.push_back(BulgeEffect().build());
     toggleableEffects.push_back(VectorCancellingEffect().build());
@@ -115,6 +123,18 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     effects.insert(effects.end(), osciPermanentEffects.begin(), osciPermanentEffects.end());
     effects.insert(effects.end(), luaEffects.begin(), luaEffects.end());
 
+    // --- Advanced mode: strip per-parameter LFO dropdowns and sidechain from all effects ---
+    // These are only used in beginner mode. In advanced mode, modulation is done via
+    // the global LFO/ENV module panels with drag-and-drop assignments.
+    if (!beginnerMode) {
+        for (auto& effect : effects) {
+            for (auto* param : effect->parameters) {
+                param->disableLfo();
+                param->disableSidechain();
+            }
+        }
+    }
+
     booleanParameters.push_back(midiEnabled);
     booleanParameters.push_back(inputEnabled);
     booleanParameters.push_back(animateFrames);
@@ -136,40 +156,45 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     floatParameters.push_back(standaloneBpm);
 
     // Initialize global LFO rate parameters and default waveforms
-    for (int i = 0; i < NUM_LFOS; ++i) {
-        lfoRate[i] = new osci::FloatParameter(
-            "LFO " + juce::String(i + 1) + " Rate",
-            "lfo" + juce::String(i + 1) + "Rate",
-            VERSION_HINT, 1.0f, 0.01f, 100.0f, 0.01f, "Hz");
-        floatParameters.push_back(lfoRate[i]);
-        lfoWaveforms[i] = createLfoPreset(LfoPreset::Triangle);
+    // Only in advanced mode — beginner mode uses per-parameter LFO dropdowns instead.
+    if (!beginnerMode) {
+        for (int i = 0; i < NUM_LFOS; ++i) {
+            lfoRate[i] = new osci::FloatParameter(
+                "LFO " + juce::String(i + 1) + " Rate",
+                "lfo" + juce::String(i + 1) + "Rate",
+                VERSION_HINT, 1.0f, 0.01f, 100.0f, 0.01f, "Hz");
+            floatParameters.push_back(lfoRate[i]);
+            lfoWaveforms[i] = createLfoPreset(LfoPreset::Triangle);
+        }
     }
 
     // Initialize envelope parameter sets
     // Envelope 0 reuses the legacy DAHDSR params
     envParams[0] = { delayTime, attackTime, holdTime, decayTime, sustainLevel, releaseTime, attackShape, decayShape, releaseShape };
-    // Envelopes 1–4 get fresh indexed parameters
-    for (int i = 1; i < NUM_ENVELOPES; ++i) {
-        juce::String idx = juce::String(i + 1);
-        auto* dt = new osci::FloatParameter("Env " + idx + " Delay",   "env" + idx + "Delay",   VERSION_HINT, 0.0f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
-        auto* at = new osci::FloatParameter("Env " + idx + " Attack",  "env" + idx + "Attack",  VERSION_HINT, 0.005f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
-        auto* ht = new osci::FloatParameter("Env " + idx + " Hold",    "env" + idx + "Hold",    VERSION_HINT, 0.0f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
-        auto* dc = new osci::FloatParameter("Env " + idx + " Decay",   "env" + idx + "Decay",   VERSION_HINT, 0.095f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
-        auto* sl = new osci::FloatParameter("Env " + idx + " Sustain", "env" + idx + "Sustain", VERSION_HINT, 0.6f, 0.0f, 1.0f, 0.00001f);
-        auto* rt = new osci::FloatParameter("Env " + idx + " Release", "env" + idx + "Release", VERSION_HINT, 0.4f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
-        auto* as = new osci::FloatParameter("Env " + idx + " Atk Shape", "env" + idx + "AtkShape", VERSION_HINT, 5.0f, -50.0f, 50.0f, 0.00001f);
-        auto* ds = new osci::FloatParameter("Env " + idx + " Dec Shape", "env" + idx + "DecShape", VERSION_HINT, -20.0f, -50.0f, 50.0f, 0.00001f);
-        auto* rs = new osci::FloatParameter("Env " + idx + " Rel Shape", "env" + idx + "RelShape", VERSION_HINT, -5.0f, -50.0f, 50.0f, 0.00001f);
-        envParams[i] = { dt, at, ht, dc, sl, rt, as, ds, rs };
-        floatParameters.push_back(dt);
-        floatParameters.push_back(at);
-        floatParameters.push_back(ht);
-        floatParameters.push_back(dc);
-        floatParameters.push_back(sl);
-        floatParameters.push_back(rt);
-        floatParameters.push_back(as);
-        floatParameters.push_back(ds);
-        floatParameters.push_back(rs);
+    // Envelopes 1–4 get fresh indexed parameters (advanced mode only)
+    if (!beginnerMode) {
+        for (int i = 1; i < NUM_ENVELOPES; ++i) {
+            juce::String idx = juce::String(i + 1);
+            auto* dt = new osci::FloatParameter("Env " + idx + " Delay",   "env" + idx + "Delay",   VERSION_HINT, 0.0f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+            auto* at = new osci::FloatParameter("Env " + idx + " Attack",  "env" + idx + "Attack",  VERSION_HINT, 0.005f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+            auto* ht = new osci::FloatParameter("Env " + idx + " Hold",    "env" + idx + "Hold",    VERSION_HINT, 0.0f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+            auto* dc = new osci::FloatParameter("Env " + idx + " Decay",   "env" + idx + "Decay",   VERSION_HINT, 0.095f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+            auto* sl = new osci::FloatParameter("Env " + idx + " Sustain", "env" + idx + "Sustain", VERSION_HINT, 0.6f, 0.0f, 1.0f, 0.00001f);
+            auto* rt = new osci::FloatParameter("Env " + idx + " Release", "env" + idx + "Release", VERSION_HINT, 0.4f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+            auto* as = new osci::FloatParameter("Env " + idx + " Atk Shape", "env" + idx + "AtkShape", VERSION_HINT, 5.0f, -50.0f, 50.0f, 0.00001f);
+            auto* ds = new osci::FloatParameter("Env " + idx + " Dec Shape", "env" + idx + "DecShape", VERSION_HINT, -20.0f, -50.0f, 50.0f, 0.00001f);
+            auto* rs = new osci::FloatParameter("Env " + idx + " Rel Shape", "env" + idx + "RelShape", VERSION_HINT, -5.0f, -50.0f, 50.0f, 0.00001f);
+            envParams[i] = { dt, at, ht, dc, sl, rt, as, ds, rs };
+            floatParameters.push_back(dt);
+            floatParameters.push_back(at);
+            floatParameters.push_back(ht);
+            floatParameters.push_back(dc);
+            floatParameters.push_back(sl);
+            floatParameters.push_back(rt);
+            floatParameters.push_back(as);
+            floatParameters.push_back(ds);
+            floatParameters.push_back(rs);
+        }
     }
 
     for (int i = 0; i < voices->getValueUnnormalised(); i++) {
@@ -205,6 +230,61 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     addAllParameters();
 
     buildParamLocationMap();
+
+    // Wire up renderer-side modulation for visualiser effects.
+    // The renderer calls this after animateValues() to apply LFO/ENV modulation.
+    visualiserParameters.applyExternalModulation = [this](int numSamples) {
+        auto applyAssignments = [&](const auto& assignments, auto getValueFn, int maxIndex) {
+            for (const auto& assignment : assignments) {
+                if (assignment.sourceIndex < 0 || assignment.sourceIndex >= maxIndex) continue;
+
+                auto findAndApply = [&](std::vector<std::shared_ptr<osci::Effect>>& effectList) {
+                    for (auto& effect : effectList) {
+                        for (int p = 0; p < (int)effect->parameters.size(); ++p) {
+                            if (effect->parameters[p]->paramID != assignment.paramId) continue;
+
+                            float* buf = effect->getAnimatedValuesWritePointer(p, numSamples);
+                            if (buf == nullptr) continue;
+
+                            float val = getValueFn(assignment.sourceIndex);
+                            float paramMin = effect->parameters[p]->min;
+                            float paramMax = effect->parameters[p]->max;
+                            float range = paramMax - paramMin;
+                            float depth = assignment.depth;
+
+                            if (assignment.bipolar) {
+                                float offset = (val * 2.0f - 1.0f) * depth * range * 0.5f;
+                                for (int s = 0; s < numSamples; ++s)
+                                    buf[s] = juce::jlimit(paramMin, paramMax, buf[s] + offset);
+                            } else {
+                                float offset = val * depth * range;
+                                for (int s = 0; s < numSamples; ++s)
+                                    buf[s] = juce::jlimit(paramMin, paramMax, buf[s] + offset);
+                            }
+                        }
+                    }
+                };
+
+                findAndApply(visualiserParameters.effects);
+                findAndApply(visualiserParameters.audioEffects);
+            }
+        };
+
+        // Apply LFO modulation
+        {
+            juce::SpinLock::ScopedLockType assnLock(lfoAssignmentLock);
+            applyAssignments(lfoAssignments,
+                [this](int i) { return lfoCurrentValues[i].load(std::memory_order_relaxed); },
+                NUM_LFOS);
+        }
+        // Apply ENV modulation
+        {
+            juce::SpinLock::ScopedLockType assnLock(envAssignmentLock);
+            applyAssignments(envAssignments,
+                [this](int i) { return envCurrentValues[i].load(std::memory_order_relaxed); },
+                NUM_ENVELOPES);
+        }
+    };
 }
 
 OscirenderAudioProcessor::~OscirenderAudioProcessor() {
@@ -759,11 +839,13 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             effect->animateValues(numSamples, &currentVolumeBuffer);
         }
 
-        // Apply global LFO modulation on top of animated values
-        applyGlobalLfoModulation(numSamples, sampleRate);
+        if (!beginnerMode) {
+            // Apply global LFO modulation on top of animated values
+            applyGlobalLfoModulation(numSamples, sampleRate);
 
-        // Apply global envelope modulation on top of LFO modulation
-        applyGlobalEnvModulation(numSamples, sampleRate);
+            // Apply global envelope modulation on top of LFO modulation
+            applyGlobalEnvModulation(numSamples, sampleRate);
+        }
     }
 
     juce::AudioBuffer<float> outputBuffer3d = juce::AudioBuffer<float>(3, buffer.getNumSamples());
@@ -938,6 +1020,7 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
 
     std::unique_ptr<juce::XmlElement> xml = std::make_unique<juce::XmlElement>("project");
     xml->setAttribute("version", ProjectInfo::versionString);
+    xml->setAttribute("beginnerMode", beginnerMode);
 
     saveStandaloneProjectFilePathToXml(*xml);
     auto effectsXml = xml->createNewChildElement("effects");
@@ -963,40 +1046,40 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
         parameter->save(parameterXml);
     }
 
-    // Save global LFO waveforms
-    auto lfosXml = xml->createNewChildElement("lfos");
-    lfosXml->setAttribute("activeTab", activeLfoTab);
-    {
-        juce::SpinLock::ScopedLockType wfLock(lfoWaveformLock);
-        for (int i = 0; i < NUM_LFOS; ++i) {
-            auto lfoXml = lfosXml->createNewChildElement("lfo");
-            lfoXml->setAttribute("index", i);
-            lfoXml->setAttribute("preset", lfoPresetToString(lfoPresets[i]));
-            lfoXml->setAttribute("rateMode", lfoRateModeToString(lfoRateModes[i]));
-            lfoXml->setAttribute("tempoDivision", lfoTempoDivisions[i]);
-            lfoWaveforms[i].saveToXml(lfoXml);
+    // Save global LFO waveforms & assignments (advanced mode only)
+    if (!beginnerMode) {
+        auto lfosXml = xml->createNewChildElement("lfos");
+        lfosXml->setAttribute("activeTab", activeLfoTab);
+        {
+            juce::SpinLock::ScopedLockType wfLock(lfoWaveformLock);
+            for (int i = 0; i < NUM_LFOS; ++i) {
+                auto lfoXml = lfosXml->createNewChildElement("lfo");
+                lfoXml->setAttribute("index", i);
+                lfoXml->setAttribute("preset", lfoPresetToString(lfoPresets[i]));
+                lfoXml->setAttribute("rateMode", lfoRateModeToString(lfoRateModes[i]));
+                lfoXml->setAttribute("tempoDivision", lfoTempoDivisions[i]);
+                lfoWaveforms[i].saveToXml(lfoXml);
+            }
         }
-    }
 
-    // Save LFO assignments
-    {
         auto lfoAssignmentsXml = xml->createNewChildElement("lfoAssignments");
-        juce::SpinLock::ScopedLockType lock(lfoAssignmentLock);
-        for (const auto& assignment : lfoAssignments) {
-            auto assignXml = lfoAssignmentsXml->createNewChildElement("assignment");
-            assignment.saveToXml(assignXml, "lfo");
+        {
+            juce::SpinLock::ScopedLockType lock(lfoAssignmentLock);
+            for (const auto& assignment : lfoAssignments) {
+                auto assignXml = lfoAssignmentsXml->createNewChildElement("assignment");
+                assignment.saveToXml(assignXml, "lfo");
+            }
         }
-    }
 
-    // Save envelope assignments and active tab
-    {
         auto envXml = xml->createNewChildElement("envelopes");
         envXml->setAttribute("activeTab", activeEnvTab);
         auto envAssignmentsXml = envXml->createNewChildElement("envAssignments");
-        juce::SpinLock::ScopedLockType lock(envAssignmentLock);
-        for (const auto& assignment : envAssignments) {
-            auto assignXml = envAssignmentsXml->createNewChildElement("assignment");
-            assignment.saveToXml(assignXml, "env");
+        {
+            juce::SpinLock::ScopedLockType lock(envAssignmentLock);
+            for (const auto& assignment : envAssignments) {
+                auto assignXml = envAssignmentsXml->createNewChildElement("assignment");
+                assignment.saveToXml(assignXml, "env");
+            }
         }
     }
 
@@ -1141,54 +1224,60 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         }
         changeCurrentFile(xml->getIntAttribute("currentFile", -1));
 
-        // Load global LFO waveforms
-        auto lfosXml = xml->getChildByName("lfos");
-        if (lfosXml != nullptr) {
-            activeLfoTab = lfosXml->getIntAttribute("activeTab", 0);
-            juce::SpinLock::ScopedLockType wfLock(lfoWaveformLock);
-            for (auto* lfoXml : lfosXml->getChildWithTagNameIterator("lfo")) {
-                int idx = lfoXml->getIntAttribute("index", -1);
-                if (idx >= 0 && idx < NUM_LFOS) {
-                    lfoWaveforms[idx].loadFromXml(lfoXml);
-                    lfoPresets[idx] = stringToLfoPreset(lfoXml->getStringAttribute("preset", "Custom"));
-                    lfoRateModes[idx] = stringToLfoRateMode(lfoXml->getStringAttribute("rateMode", "Seconds"));
-                    lfoTempoDivisions[idx] = lfoXml->getIntAttribute("tempoDivision", 8);
+        // Load global LFO waveforms & assignments (only relevant in advanced mode)
+        if (!beginnerMode) {
+            auto lfosXml = xml->getChildByName("lfos");
+            if (lfosXml != nullptr) {
+                activeLfoTab = lfosXml->getIntAttribute("activeTab", 0);
+                juce::SpinLock::ScopedLockType wfLock(lfoWaveformLock);
+                for (auto* lfoXml : lfosXml->getChildWithTagNameIterator("lfo")) {
+                    int idx = lfoXml->getIntAttribute("index", -1);
+                    if (idx >= 0 && idx < NUM_LFOS) {
+                        lfoWaveforms[idx].loadFromXml(lfoXml);
+                        lfoPresets[idx] = stringToLfoPreset(lfoXml->getStringAttribute("preset", "Custom"));
+                        lfoRateModes[idx] = stringToLfoRateMode(lfoXml->getStringAttribute("rateMode", "Seconds"));
+                        lfoTempoDivisions[idx] = lfoXml->getIntAttribute("tempoDivision", 8);
+                    }
                 }
             }
         }
 
-        // Load LFO assignments
-        auto lfoAssignmentsXml = xml->getChildByName("lfoAssignments");
-        if (lfoAssignmentsXml != nullptr) {
-            juce::SpinLock::ScopedLockType assnLock(lfoAssignmentLock);
-            lfoAssignments.clear();
-            for (auto* assignXml : lfoAssignmentsXml->getChildWithTagNameIterator("assignment")) {
-                lfoAssignments.push_back(LfoAssignment::loadFromXml(assignXml, "lfo"));
-            }
-        } else {
-            juce::SpinLock::ScopedLockType assnLock(lfoAssignmentLock);
-            lfoAssignments.clear();
-        }
-
-        // Load envelope assignments
-        auto envelopesXml = xml->getChildByName("envelopes");
-        if (envelopesXml != nullptr) {
-            activeEnvTab = envelopesXml->getIntAttribute("activeTab", 0);
-            auto envAssignmentsXml = envelopesXml->getChildByName("envAssignments");
-            if (envAssignmentsXml != nullptr) {
-                juce::SpinLock::ScopedLockType assnLock(envAssignmentLock);
-                envAssignments.clear();
-                for (auto* assignXml : envAssignmentsXml->getChildWithTagNameIterator("assignment")) {
-                    envAssignments.push_back(EnvAssignment::loadFromXml(assignXml, "env"));
+        // Load LFO assignments (advanced mode only)
+        if (!beginnerMode) {
+            auto lfoAssignmentsXml = xml->getChildByName("lfoAssignments");
+            if (lfoAssignmentsXml != nullptr) {
+                juce::SpinLock::ScopedLockType assnLock(lfoAssignmentLock);
+                lfoAssignments.clear();
+                for (auto* assignXml : lfoAssignmentsXml->getChildWithTagNameIterator("assignment")) {
+                    lfoAssignments.push_back(LfoAssignment::loadFromXml(assignXml, "lfo"));
                 }
             } else {
+                juce::SpinLock::ScopedLockType assnLock(lfoAssignmentLock);
+                lfoAssignments.clear();
+            }
+        }
+
+        // Load envelope assignments (advanced mode only)
+        if (!beginnerMode) {
+            auto envelopesXml = xml->getChildByName("envelopes");
+            if (envelopesXml != nullptr) {
+                activeEnvTab = envelopesXml->getIntAttribute("activeTab", 0);
+                auto envAssignmentsXml = envelopesXml->getChildByName("envAssignments");
+                if (envAssignmentsXml != nullptr) {
+                    juce::SpinLock::ScopedLockType assnLock(envAssignmentLock);
+                    envAssignments.clear();
+                    for (auto* assignXml : envAssignmentsXml->getChildWithTagNameIterator("assignment")) {
+                        envAssignments.push_back(EnvAssignment::loadFromXml(assignXml, "env"));
+                    }
+                } else {
+                    juce::SpinLock::ScopedLockType assnLock(envAssignmentLock);
+                    envAssignments.clear();
+                }
+            } else {
+                activeEnvTab = 0;
                 juce::SpinLock::ScopedLockType assnLock(envAssignmentLock);
                 envAssignments.clear();
             }
-        } else {
-            activeEnvTab = 0;
-            juce::SpinLock::ScopedLockType assnLock(envAssignmentLock);
-            envAssignments.clear();
         }
 
         recordingParameters.load(xml.get());
@@ -1382,8 +1471,9 @@ void OscirenderAudioProcessor::buildParamLocationMap() {
     registerEffects(luaEffects);
     registerSingle(frequencyEffect);
     registerSingle(perspective);
-    registerEffects(visualiserParameters.effects);
-    registerEffects(visualiserParameters.audioEffects);
+    // NOTE: visualiserParameters.effects and .audioEffects are NOT registered here.
+    // They are animated/modulated on the renderer thread, not the audio thread.
+    // See visualiserParameters.applyExternalModulation.
 }
 
 void OscirenderAudioProcessor::applyModulationBuffers(
@@ -1498,6 +1588,7 @@ DahdsrParams OscirenderAudioProcessor::getCurrentDahdsrParams(int envIndex) cons
 {
     jassert(envIndex >= 0 && envIndex < NUM_ENVELOPES);
     const auto& ep = envParams[juce::jlimit(0, NUM_ENVELOPES - 1, envIndex)];
+    if (ep.delayTime == nullptr) return DahdsrParams{};
     return DahdsrParams{
         .delaySeconds = ep.delayTime->getValueUnnormalised(),
         .attackSeconds = ep.attackTime->getValueUnnormalised(),

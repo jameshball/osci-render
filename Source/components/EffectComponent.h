@@ -99,10 +99,16 @@ public:
             addAndMakeVisible(popupLabel);
             addAndMakeVisible(min);
             addAndMakeVisible(max);
-            addAndMakeVisible(lfoStartLabel);
-            addAndMakeVisible(lfoEndLabel);
-            addAndMakeVisible(lfoStartSlider);
-            addAndMakeVisible(lfoEndSlider);
+
+            // LFO start/end sliders only in beginner mode (when per-param LFO sub-params exist)
+            hasLfoParams = parameter->lfoStartPercent != nullptr && parameter->lfoEndPercent != nullptr;
+            if (hasLfoParams) {
+                addAndMakeVisible(lfoStartLabel);
+                addAndMakeVisible(lfoEndLabel);
+                addAndMakeVisible(lfoStartSlider);
+                addAndMakeVisible(lfoEndSlider);
+            }
+
             addAndMakeVisible(smoothValueChangeLabel);
             addAndMakeVisible(smoothValueChangeSlider);
 
@@ -139,21 +145,23 @@ public:
             lfoEndLabel.setJustificationType(juce::Justification::centred);
             lfoEndLabel.setFont(juce::Font(14.0f, juce::Font::bold));
 
-            lfoStartSlider.setRange(parameter->lfoStartPercent->min, parameter->lfoStartPercent->max, parameter->lfoStartPercent->step);
-            lfoStartSlider.setValue(parameter->lfoStartPercent->getValueUnnormalised(), juce::dontSendNotification);
-            lfoStartSlider.setTextValueSuffix("%");
-            lfoStartSlider.addListener(this);
-            lfoStartSlider.onValueChange = [this]() {
-                parameter->lfoStartPercent->setUnnormalisedValueNotifyingHost(lfoStartSlider.getValue());
-            };
+            if (hasLfoParams) {
+                lfoStartSlider.setRange(parameter->lfoStartPercent->min, parameter->lfoStartPercent->max, parameter->lfoStartPercent->step);
+                lfoStartSlider.setValue(parameter->lfoStartPercent->getValueUnnormalised(), juce::dontSendNotification);
+                lfoStartSlider.setTextValueSuffix("%");
+                lfoStartSlider.addListener(this);
+                lfoStartSlider.onValueChange = [this]() {
+                    parameter->lfoStartPercent->setUnnormalisedValueNotifyingHost(lfoStartSlider.getValue());
+                };
 
-            lfoEndSlider.setRange(parameter->lfoEndPercent->min, parameter->lfoEndPercent->max, parameter->lfoEndPercent->step);
-            lfoEndSlider.setValue(parameter->lfoEndPercent->getValueUnnormalised(), juce::dontSendNotification);
-            lfoEndSlider.setTextValueSuffix("%");
-            lfoEndSlider.addListener(this);
-            lfoEndSlider.onValueChange = [this]() {
-                parameter->lfoEndPercent->setUnnormalisedValueNotifyingHost(lfoEndSlider.getValue());
-            };
+                lfoEndSlider.setRange(parameter->lfoEndPercent->min, parameter->lfoEndPercent->max, parameter->lfoEndPercent->step);
+                lfoEndSlider.setValue(parameter->lfoEndPercent->getValueUnnormalised(), juce::dontSendNotification);
+                lfoEndSlider.setTextValueSuffix("%");
+                lfoEndSlider.addListener(this);
+                lfoEndSlider.onValueChange = [this]() {
+                    parameter->lfoEndPercent->setUnnormalisedValueNotifyingHost(lfoEndSlider.getValue());
+                };
+            }
 
             smoothValueChangeLabel.setText("Smooth Value Change Speed", juce::dontSendNotification);
             smoothValueChangeLabel.setJustificationType(juce::Justification::centred);
@@ -171,8 +179,10 @@ public:
         }
         
         ~EffectSettingsComponent() override {
-            lfoStartSlider.removeListener(this);
-            lfoEndSlider.removeListener(this);
+            if (hasLfoParams) {
+                lfoStartSlider.removeListener(this);
+                lfoEndSlider.removeListener(this);
+            }
         }
 
         void resized() override {
@@ -180,10 +190,12 @@ public:
             popupLabel.setBounds(bounds.removeFromTop(30));
             min.setBounds(bounds.removeFromTop(40));
             max.setBounds(bounds.removeFromTop(40));
-            lfoStartLabel.setBounds(bounds.removeFromTop(20));
-            lfoStartSlider.setBounds(bounds.removeFromTop(40));
-            lfoEndLabel.setBounds(bounds.removeFromTop(20));
-            lfoEndSlider.setBounds(bounds.removeFromTop(40));
+            if (hasLfoParams) {
+                lfoStartLabel.setBounds(bounds.removeFromTop(20));
+                lfoStartSlider.setBounds(bounds.removeFromTop(40));
+                lfoEndLabel.setBounds(bounds.removeFromTop(20));
+                lfoEndSlider.setBounds(bounds.removeFromTop(40));
+            }
             smoothValueChangeLabel.setBounds(bounds.removeFromTop(20));
             smoothValueChangeSlider.setBounds(bounds.removeFromTop(40));
         }
@@ -208,6 +220,7 @@ public:
 
     private:
         osci::EffectParameter* parameter;
+        bool hasLfoParams = false;
         juce::Label popupLabel;
         LabelledTextBox min{"Min"};
         LabelledTextBox max{"Max"};

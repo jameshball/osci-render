@@ -6,7 +6,7 @@
 #include "components/modulation/TempoComponent.h"
 
 class OscirenderAudioProcessorEditor;
-class MidiComponent : public juce::GroupComponent, public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater {
+class MidiComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater {
 public:
 	MidiComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
 	~MidiComponent() override;
