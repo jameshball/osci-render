@@ -161,6 +161,10 @@ void SettingsComponent::parameterValueChanged(int parameterIndex, float newValue
 void SettingsComponent::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
 
 void SettingsComponent::resized() {
+    childLayoutUpdater.triggerAsyncUpdate();
+}
+
+void SettingsComponent::layoutChildren() {
     auto padding = 7;
 
     auto area = getLocalBounds();
@@ -228,11 +232,15 @@ void SettingsComponent::resized() {
         // BEGINNER: 3-column layout — vis | resizer | effects
         // Envelope, MIDI, and keyboard stacked at bottom of effects column
         // ============================================================
-        juce::Component visColumn, effectsColumn;
-        juce::Component* columns[] = { &visColumn, &mainResizerBar, &effectsColumn };
+        juce::Component* columns[] = { &layoutVisColumnProxy, &mainResizerBar, &layoutEffectsColumnProxy };
         mainLayout.layOutComponents(columns, 3, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
 
-        auto effectsBounds = effectsColumn.getBounds();
+        if (audioProcessor.midiEnabled->getBoolValue()) {
+            int resizerBottom = area.getBottom() - keyboardHeight - padding;
+            mainResizerBar.setBounds(mainResizerBar.getBounds().withBottom(resizerBottom));
+        }
+
+        auto effectsBounds = layoutEffectsColumnProxy.getBounds();
 
         const bool midiOn = audioProcessor.midiEnabled->getBoolValue();
 
@@ -241,12 +249,6 @@ void SettingsComponent::resized() {
         static constexpr int midiGroupHeight = 30;
 
         if (midiOn) {
-            // Clip resizer bar above keyboard area
-            {
-                int resizerBottom = area.getBottom() - keyboardHeight - padding;
-                mainResizerBar.setBounds(mainResizerBar.getBounds().withBottom(resizerBottom));
-            }
-
             keyboardPanelBounds = juce::Rectangle<int>(
                 effectsBounds.getX(),
                 effectsBounds.getBottom() - keyboardHeight,
@@ -279,7 +281,7 @@ void SettingsComponent::resized() {
         midi.setBounds(effectsBounds.removeFromBottom(midiGroupHeight));
         effectsBounds.removeFromBottom(padding);
 
-        layoutVisColumn(visColumn.getBounds());
+        layoutVisColumn(layoutVisColumnProxy.getBounds());
         layoutEffectsColumn(effectsBounds);
 
         if (isVisible() && getWidth() > 0 && getHeight() > 0) {
@@ -289,19 +291,15 @@ void SettingsComponent::resized() {
         // ============================================================
         // ADVANCED: 5-column layout — vis | resizer | effects | resizer2 | right
         // ============================================================
-        juce::Component visColumn, effectsColumn, rightColumn;
-        juce::Component* columns[] = { &visColumn, &mainResizerBar, &effectsColumn, &midiResizerBar, &rightColumn };
+        juce::Component* columns[] = { &layoutVisColumnProxy, &mainResizerBar, &layoutEffectsColumnProxy, &midiResizerBar, &layoutRightColumnProxy };
         mainLayout.layOutComponents(columns, 5, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
 
-        auto effectsBounds = effectsColumn.getBounds();
-        auto rightBounds = rightColumn.getBounds();
+        int resizerBottom = area.getBottom() - keyboardHeight - padding;
+        mainResizerBar.setBounds(mainResizerBar.getBounds().withBottom(resizerBottom));
+        midiResizerBar.setBounds(midiResizerBar.getBounds().withBottom(resizerBottom));
 
-        // Clip both resizer bars above keyboard area
-        {
-            int resizerBottom = area.getBottom() - keyboardHeight - padding;
-            mainResizerBar.setBounds(mainResizerBar.getBounds().withBottom(resizerBottom));
-            midiResizerBar.setBounds(midiResizerBar.getBounds().withBottom(resizerBottom));
-        }
+        auto effectsBounds = layoutEffectsColumnProxy.getBounds();
+        auto rightBounds   = layoutRightColumnProxy.getBounds();
 
         // Keyboard spans effects + resizer + right columns
         keyboardPanelBounds = juce::Rectangle<int>(
@@ -325,7 +323,7 @@ void SettingsComponent::resized() {
         effectsBounds.removeFromBottom(keyboardHeight + padding);
         rightBounds.removeFromBottom(keyboardHeight + padding);
 
-        layoutVisColumn(visColumn.getBounds());
+        layoutVisColumn(layoutVisColumnProxy.getBounds());
         layoutEffectsColumn(effectsBounds);
 
         // --- Right column: MIDI settings (compact), envelope, LFO ---
@@ -345,6 +343,10 @@ void SettingsComponent::resized() {
     }
 
     repaint();
+}
+
+void SettingsComponent::ChildLayoutUpdater::handleAsyncUpdate() {
+    owner.layoutChildren();
 }
 
 void SettingsComponent::paint(juce::Graphics& g) {
