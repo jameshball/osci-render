@@ -326,7 +326,13 @@ static int luaPrint(lua_State* L) {
     int nargs = lua_gettop(L);
 
     for (int i = 1; i <= nargs; ++i) {
-        LuaParser::onPrint(lua_tolstring(L, i, nullptr));
+        size_t len = 0;
+        const char* str = lua_tolstring(L, i, &len);
+        if (str != nullptr) {
+            LuaParser::onPrint(std::string(str, len));
+        } else {
+            LuaParser::onPrint(lua_typename(L, lua_type(L, i)));
+        }
         lua_pop(L, 1);
     }
 
