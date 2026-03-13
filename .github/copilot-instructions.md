@@ -71,6 +71,22 @@ cd /Users/james/osci-render \
 Resulting app:
 - `Builds/osci-render/MacOSX/build/Debug/osci-render.app`
 
+### VS Code Debugging
+
+The workspace includes VS Code tasks and launch configurations for building and debugging with LLDB. These require the [CodeLLDB](https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb) extension.
+
+**Launch configurations** (`.vscode/launch.json`):
+- **Build & Debug osci-render** — Runs Projucer resave + xcodebuild, then launches the Standalone app under LLDB. Use this for the standard build-and-debug cycle.
+- **Debug osci-render (no build)** — Launches the last-built app under LLDB without rebuilding. Useful when you've already built from the terminal.
+- **Attach to osci-render** — Attaches the debugger to an already-running osci-render process (waits for launch).
+- **Build & Debug sosci** — Same as above but for the sosci product.
+
+**Build tasks** (`.vscode/tasks.json`):
+- **Build osci-render Standalone (Debug)** — Default build task (`Cmd+Shift+B`). Runs Projucer resave then xcodebuild.
+- **Build sosci Standalone (Debug)** — Same for sosci.
+
+When asked to "build and open" or "build and run" osci-render, prefer using the VS Code task runner (`create_and_run_task` or the terminal) so that any crashes are visible in the Debug Console.
+
 ### Configuration
 - `.jucer` files define project structure and build settings
 - `OSCI_PREMIUM=1/0` preprocessor flag toggles premium features
