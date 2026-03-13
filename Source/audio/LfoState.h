@@ -51,6 +51,7 @@ enum class LfoPreset {
     Sine,
     Triangle,
     Sawtooth,
+    ReverseSawtooth,
     Square,
     Custom
 };
@@ -60,6 +61,7 @@ inline juce::String lfoPresetToString(LfoPreset preset) {
         case LfoPreset::Sine: return "Sine";
         case LfoPreset::Triangle: return "Triangle";
         case LfoPreset::Sawtooth: return "Sawtooth";
+        case LfoPreset::ReverseSawtooth: return "Reverse Sawtooth";
         case LfoPreset::Square: return "Square";
         case LfoPreset::Custom: return "Custom";
     }
@@ -70,6 +72,7 @@ inline LfoPreset stringToLfoPreset(const juce::String& s) {
     if (s == "Sine") return LfoPreset::Sine;
     if (s == "Triangle") return LfoPreset::Triangle;
     if (s == "Sawtooth") return LfoPreset::Sawtooth;
+    if (s == "Reverse Sawtooth") return LfoPreset::ReverseSawtooth;
     if (s == "Square") return LfoPreset::Square;
     return LfoPreset::Custom;
 }
@@ -102,6 +105,12 @@ inline LfoWaveform createLfoPreset(LfoPreset preset) {
                 { 1.0,  1.0, 0.0f },
             };
             break;
+        case LfoPreset::ReverseSawtooth:
+            waveform.nodes = {
+                { 0.0,  1.0, 0.0f },
+                { 1.0,  0.0, 0.0f },
+            };
+            break;
         case LfoPreset::Square:
             // Square wave: high for first half, drops to low for second half
             waveform.nodes = {
@@ -124,24 +133,249 @@ inline LfoWaveform createLfoPreset(LfoPreset preset) {
     return waveform;
 }
 
+// Map beginner-mode per-parameter LfoType to global LfoPreset.
+// Returns {preset, negateDepth}.  negateDepth is true for ReverseSawtooth
+// (modelled as a Sawtooth with negative depth in the global system, unless
+// we now have a native ReverseSawtooth preset).
+inline LfoPreset lfoTypeToLfoPreset(osci::LfoType type) {
+    switch (type) {
+        case osci::LfoType::Sine:            return LfoPreset::Sine;
+        case osci::LfoType::Triangle:        return LfoPreset::Triangle;
+        case osci::LfoType::Sawtooth:        return LfoPreset::Sawtooth;
+        case osci::LfoType::ReverseSawtooth: return LfoPreset::ReverseSawtooth;
+        case osci::LfoType::Square:          return LfoPreset::Square;
+        case osci::LfoType::Seesaw:          return LfoPreset::Triangle; // closest match
+        default:                             return LfoPreset::Sine;
+    }
+}
+
 // LfoAssignment is now a type alias for the generic ModAssignment.
 // XML serialisation uses "lfo" as the index attribute name.
 using LfoAssignment = ModAssignment;
 
+// LFO playback modes.
+enum class LfoMode {
+    Free,            // Always running, no note dependency (default)
+    Trigger,         // Reset to phase offset on each note, cycle while note held
+    Sync,            // Lock to host tempo, no reset on note
+    Envelope,        // One-shot from phase offset to end
+    SustainEnvelope, // Play from start to phase offset, hold until release
+    LoopPoint,       // Play from start, then loop between phase offset and end
+    LoopHold         // Play from start, treat phase offset as loop end point (loop 0→offset)
+};
+
+inline juce::String lfoModeToString(LfoMode mode) {
+    switch (mode) {
+        case LfoMode::Free:            return "Free";
+        case LfoMode::Trigger:         return "Trigger";
+        case LfoMode::Sync:            return "Sync";
+        case LfoMode::Envelope:        return "Envelope";
+        case LfoMode::SustainEnvelope: return "Sustain Envelope";
+        case LfoMode::LoopPoint:       return "Loop Point";
+        case LfoMode::LoopHold:        return "Loop Hold";
+    }
+    return "Free";
+}
+
+inline LfoMode stringToLfoMode(const juce::String& s) {
+    if (s == "Free")             return LfoMode::Free;
+    if (s == "Trigger")          return LfoMode::Trigger;
+    if (s == "Sync")             return LfoMode::Sync;
+    if (s == "Envelope")         return LfoMode::Envelope;
+    if (s == "Sustain Envelope") return LfoMode::SustainEnvelope;
+    if (s == "Loop Point")       return LfoMode::LoopPoint;
+    if (s == "Loop Hold")        return LfoMode::LoopHold;
+    return LfoMode::Free;
+}
+
 // Audio-thread state for a single LFO.
 struct LfoAudioState {
-    float phase = 0.0f; // [0, 1)
+    float phase = 0.0f;     // [0, 1)
+    bool finished = false;   // For one-shot modes (Envelope)
+    bool noteHeld = false;   // Tracks whether a note is currently held
+    bool released = false;   // Tracks whether note has been released (for SustainEnvelope)
+    float holdValue = 0.0f;  // Value to hold in SustainEnvelope mode
 
-    // Advance phase by one sample and return the waveform value.
-    float advance(float rateHz, float sampleRate, const LfoWaveform& waveform) {
-        if (sampleRate <= 0.0f) return 0.0f;
-        phase += rateHz / sampleRate;
+    // Fill an output buffer for an entire block, dispatching mode once.
+    // This avoids a per-sample switch in the hot path.
+    void advanceBlock(float* output, int numSamples, float rateHz, float sampleRate,
+                      const LfoWaveform& waveform, LfoMode mode, float phaseOffset) {
+        if (sampleRate <= 0.0f) {
+            std::fill(output, output + numSamples, 0.0f);
+            return;
+        }
+        float phaseInc = rateHz / sampleRate;
+
+        switch (mode) {
+            case LfoMode::Free:
+            case LfoMode::Sync:
+                for (int s = 0; s < numSamples; ++s)
+                    output[s] = advanceFreeOrSync(phaseInc, waveform);
+                return;
+
+            case LfoMode::Trigger:
+                for (int s = 0; s < numSamples; ++s)
+                    output[s] = advanceTrigger(phaseInc, waveform);
+                return;
+
+            case LfoMode::Envelope:
+                for (int s = 0; s < numSamples; ++s)
+                    output[s] = advanceEnvelope(phaseInc, waveform);
+                return;
+
+            case LfoMode::SustainEnvelope:
+                for (int s = 0; s < numSamples; ++s)
+                    output[s] = advanceSustainEnvelope(phaseInc, waveform, phaseOffset);
+                return;
+
+            case LfoMode::LoopPoint:
+                for (int s = 0; s < numSamples; ++s)
+                    output[s] = advanceLoopPoint(phaseInc, waveform, phaseOffset);
+                return;
+
+            case LfoMode::LoopHold:
+                for (int s = 0; s < numSamples; ++s)
+                    output[s] = advanceLoopHold(phaseInc, waveform, phaseOffset);
+                return;
+        }
+    }
+
+private:
+    // Per-mode sample advance helpers — called from the tight inner loop.
+    float advanceFreeOrSync(float phaseInc, const LfoWaveform& waveform) {
+        phase += phaseInc;
         if (phase >= 1.0f) phase -= std::floor(phase);
         return waveform.evaluate(phase);
     }
 
+    float advanceTrigger(float phaseInc, const LfoWaveform& waveform) {
+        if (finished) return holdValue;
+        phase += phaseInc;
+        if (phase >= 1.0f) phase -= std::floor(phase);
+        holdValue = waveform.evaluate(phase);
+        return holdValue;
+    }
+
+    float advanceEnvelope(float phaseInc, const LfoWaveform& waveform) {
+        if (finished) return holdValue;
+        phase += phaseInc;
+        if (phase >= 1.0f) {
+            phase = 1.0f;
+            finished = true;
+            holdValue = 0.0f;
+            return holdValue;
+        }
+        holdValue = waveform.evaluate(phase);
+        return holdValue;
+    }
+
+    float advanceSustainEnvelope(float phaseInc, const LfoWaveform& waveform, float phaseOffset) {
+        if (!released) {
+            if (phase < phaseOffset) {
+                phase += phaseInc;
+                if (phase >= phaseOffset)
+                    phase = phaseOffset;
+                holdValue = waveform.evaluate(phase);
+            }
+            return holdValue;
+        } else {
+            if (finished) return holdValue;
+            phase += phaseInc;
+            if (phase >= 1.0f) {
+                phase = 1.0f;
+                finished = true;
+                holdValue = 0.0f;
+                return holdValue;
+            }
+            return waveform.evaluate(phase);
+        }
+    }
+
+    float advanceLoopPoint(float phaseInc, const LfoWaveform& waveform, float phaseOffset) {
+        if (finished) return holdValue;
+        phase += phaseInc;
+        if (phase >= 1.0f) {
+            float loopLen = 1.0f - phaseOffset;
+            if (loopLen <= 0.0f) return waveform.evaluate(phaseOffset);
+            phase = phaseOffset + std::fmod(phase - phaseOffset, loopLen);
+        }
+        holdValue = waveform.evaluate(phase);
+        return holdValue;
+    }
+
+    float advanceLoopHold(float phaseInc, const LfoWaveform& waveform, float phaseOffset) {
+        if (finished) return holdValue;
+        if (!released) {
+            phase += phaseInc;
+            if (phaseOffset <= 0.0f) { holdValue = waveform.evaluate(0.0f); return holdValue; }
+            if (phase >= phaseOffset)
+                phase = std::fmod(phase, phaseOffset);
+            holdValue = waveform.evaluate(phase);
+            return holdValue;
+        } else {
+            phase += phaseInc;
+            if (phase >= 1.0f) {
+                phase = 1.0f;
+                holdValue = waveform.evaluate(1.0f);
+                return holdValue;
+            }
+            holdValue = waveform.evaluate(phase);
+            return holdValue;
+        }
+    }
+
+public:
+
     void reset() {
         phase = 0.0f;
+        finished = false;
+        released = false;
+        holdValue = 0.0f;
+    }
+
+    void noteOn(LfoMode mode, float phaseOffset) {
+        switch (mode) {
+            case LfoMode::Free:
+            case LfoMode::Sync:
+                break;
+            case LfoMode::Trigger:
+            case LfoMode::Envelope:
+                resetForNoteOn(phaseOffset);
+                break;
+            case LfoMode::SustainEnvelope:
+                resetForNoteOn(0.0f);
+                break;
+            case LfoMode::LoopPoint:
+            case LfoMode::LoopHold:
+                resetForNoteOn(0.0f);
+                break;
+        }
+        noteHeld = true;
+    }
+
+    void noteOff(LfoMode mode) {
+        noteHeld = false;
+        if (mode == LfoMode::Trigger || mode == LfoMode::LoopPoint
+         || mode == LfoMode::LoopHold || mode == LfoMode::SustainEnvelope)
+            released = true;
+    }
+
+    // Call when all synth voices have finished (including release).
+    // Freezes the LFO at zero for modes that depend on voice activity.
+    void voicesFinished(LfoMode mode) {
+        if (!released) return;
+        if (mode == LfoMode::Trigger || mode == LfoMode::LoopPoint || mode == LfoMode::LoopHold) {
+            finished = true;
+            holdValue = 0.0f;
+        }
+    }
+
+private:
+    void resetForNoteOn(float startPhase) {
+        phase = startPhase;
+        finished = false;
+        released = false;
+        holdValue = 0.0f;
     }
 };
 

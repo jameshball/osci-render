@@ -207,27 +207,44 @@ public:
     // UI-persisted LFO state (preset type + active tab)
     LfoPreset lfoPresets[NUM_LFOS] = { LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle };
     LfoRateMode lfoRateModes[NUM_LFOS] = { LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds };
+    LfoMode lfoModes[NUM_LFOS] = { LfoMode::Free, LfoMode::Free, LfoMode::Free, LfoMode::Free, LfoMode::Free, LfoMode::Free, LfoMode::Free, LfoMode::Free };
+    float lfoPhaseOffsets[NUM_LFOS] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
     int lfoTempoDivisions[NUM_LFOS] = { 8, 8, 8, 8, 8, 8, 8, 8 };  // index into getTempoDivisions(), default 1/4
     int activeLfoTab = 0;
 
     void lfoWaveformChanged(int index, const LfoWaveform& waveform);
     void addLfoAssignment(const LfoAssignment& assignment);
     void removeLfoAssignment(int lfoIndex, const juce::String& paramId);
+    void removeAllAssignmentsForEffect(const osci::Effect& effect);
+    void autoAssignLfosForEffect(osci::Effect& effect);
     std::vector<LfoAssignment> getLfoAssignments() const;
+
+    // Preview LFO assignment: temporarily assign LFOs while hovering an effect
+    void autoAssignLfosForPreview(const juce::String& effectId);
+    void clearPreviewLfoAssignments();
+    void promotePreviewLfoAssignments();
     LfoWaveform getLfoWaveform(int index) const;
 
     // Get the current LFO output value (0..1) for visualization
     float getLfoCurrentValue(int lfoIndex) const;
     // Get the current LFO phase [0,1) for flow marker visualization
     float getLfoCurrentPhase(int lfoIndex) const;
+    // Returns true if the LFO is actively modulating (not idle/finished)
+    bool isLfoActive(int lfoIndex) const;
+    // Consumes the retrigger flag (returns true once, then resets). Call from UI thread.
+    bool consumeLfoRetriggered(int lfoIndex) { return lfoRetriggered[lfoIndex].exchange(false, std::memory_order_relaxed); }
 
     // Thread-safe setters for LFO rate mode/division (acquires lfoWaveformLock)
     void setLfoRateMode(int lfoIndex, LfoRateMode mode);
     void setLfoTempoDivision(int lfoIndex, int divisionIndex);
+    void setLfoMode(int lfoIndex, LfoMode mode);
+    void setLfoPhaseOffset(int lfoIndex, float phase);
 
     // Thread-safe getters for LFO rate mode/division
     LfoRateMode getLfoRateMode(int lfoIndex) const;
     int getLfoTempoDivision(int lfoIndex) const;
+    LfoMode getLfoMode(int lfoIndex) const;
+    float getLfoPhaseOffset(int lfoIndex) const;
 
     juce::MidiKeyboardState keyboardState;
 
@@ -412,14 +429,25 @@ private:
     std::vector<LfoAssignment> lfoAssignments;
     mutable juce::SpinLock lfoAssignmentLock;
     LfoAudioState lfoAudioStates[NUM_LFOS];
+    int lfoActiveNoteCount = 0;  // Tracks how many MIDI notes are currently held for LFO triggering
+    bool lfoPrevAnyVoiceActive = false;  // Previous block's effective voice-active state for transition detection
     std::array<std::vector<float>, NUM_LFOS> lfoBlockBuffer;
 
     // Thread-safe snapshot of most recent LFO output for UI visualization
     std::atomic<float> lfoCurrentValues[NUM_LFOS] = {};
     // Thread-safe snapshot of most recent LFO phase [0,1) for UI flow markers
     std::atomic<float> lfoCurrentPhases[NUM_LFOS] = {};
+    // Whether each LFO is actively modulating (not idle/finished) — for UI marker visibility
+    std::atomic<bool> lfoActive[NUM_LFOS] = {};
+    // Pulsed true on a noteOn while the LFO was already running — consumed by UI to reset flow trail
+    std::atomic<bool> lfoRetriggered[NUM_LFOS] = {};
 
-    void applyGlobalLfoModulation(int numSamples, double sampleRate);
+    // Preview LFO assignment state (message-thread only — no lock needed)
+    juce::String previewLfoEffectId;
+    std::vector<std::pair<juce::String, float>> previewSavedParamValues;
+    void clearPreviewLfoAssignmentsInternal();
+
+    void applyGlobalLfoModulation(int numSamples, double sampleRate, const juce::MidiBuffer& midi);
 
     // Global Envelope assignment audio-thread state
     std::vector<EnvAssignment> envAssignments;

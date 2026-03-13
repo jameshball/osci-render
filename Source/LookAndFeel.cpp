@@ -34,8 +34,8 @@ void OscirenderLookAndFeel::applyOscirenderColours(juce::LookAndFeel& lookAndFee
     lookAndFeel.setColour(groupComponentBackgroundColourId, Colours::darker);
     lookAndFeel.setColour(scrollFadeOverlayBackgroundColourId, Colours::darker);
     lookAndFeel.setColour(groupComponentHeaderColourId, Colours::veryDark);
-    lookAndFeel.setColour(juce::PopupMenu::backgroundColourId, Colours::darker);
-    lookAndFeel.setColour(juce::PopupMenu::highlightedBackgroundColourId, Colours::grey);
+    lookAndFeel.setColour(juce::PopupMenu::backgroundColourId, Colours::popupBackground);
+    lookAndFeel.setColour(juce::PopupMenu::highlightedBackgroundColourId, Colours::accentColor);
     lookAndFeel.setColour(juce::TooltipWindow::backgroundColourId, Colours::darker.darker(0.5f));
     lookAndFeel.setColour(juce::TooltipWindow::outlineColourId, Colours::darker);
     lookAndFeel.setColour(juce::TextButton::buttonOnColourId, Colours::darker);
@@ -561,4 +561,108 @@ void OscirenderLookAndFeel::drawStretchableLayoutResizerBar(juce::Graphics& g, i
         g.setColour(Colours::accentColor.withAlpha(0.5f));
         g.fillRoundedRectangle(0, 0, w, h, 4.0f);
     }
+}
+
+// ============================================================================
+// PopupMenu — modern rounded design
+// ============================================================================
+
+void OscirenderLookAndFeel::drawPopupMenuBackground(juce::Graphics& g, int width, int height) {
+    auto bounds = juce::Rectangle<int>(0, 0, width, height).toFloat();
+    constexpr float radius = 8.0f;
+
+    // Background fill — draw edge-to-edge to avoid double border from window inset gap
+    g.setColour(Colours::popupBackground);
+    g.fillRoundedRectangle(bounds, radius);
+
+    // Subtle border
+    g.setColour(juce::Colours::white.withAlpha(0.10f));
+    g.drawRoundedRectangle(bounds.reduced(0.5f), radius, 1.0f);
+}
+
+void OscirenderLookAndFeel::drawPopupMenuItem(juce::Graphics& g, const juce::Rectangle<int>& area,
+                                               bool isSeparator, bool isActive, bool isHighlighted,
+                                               bool isTicked, bool hasSubMenu,
+                                               const juce::String& text, const juce::String& shortcutKeyText,
+                                               const juce::Drawable* icon, const juce::Colour* textColour) {
+    if (isSeparator) {
+        auto sepArea = area.reduced(8, 0);
+        g.setColour(juce::Colours::white.withAlpha(0.08f));
+        g.fillRect(sepArea.getX(), area.getCentreY(), sepArea.getWidth(), 1);
+        return;
+    }
+
+    auto r = area.reduced(5, 1);
+    constexpr float itemRadius = 4.0f;
+
+    if (isHighlighted && isActive) {
+        // Vital-style: accent colour highlight
+        g.setColour(Colours::accentColor.withAlpha(0.6f));
+        g.fillRoundedRectangle(r.toFloat(), itemRadius);
+    }
+
+    auto textColourToUse = isHighlighted && isActive
+                         ? juce::Colours::white
+                         : (isActive ? juce::Colours::white.withAlpha(0.88f)
+                                     : juce::Colours::white.withAlpha(0.35f));
+    if (textColour != nullptr)
+        textColourToUse = *textColour;
+
+    auto font = juce::Font(13.0f);
+    g.setFont(font);
+    g.setColour(textColourToUse);
+
+    auto textArea = r.reduced(10, 0);
+
+    // Tick column — always reserve space so text is aligned across all items
+    constexpr int tickW = 10;
+    auto tickArea = textArea.removeFromLeft(tickW).toFloat();
+    if (isTicked) {
+        // Draw a simple checkmark
+        auto cx = tickArea.getCentreX() - 1.0f;
+        auto cy = tickArea.getCentreY();
+        juce::Path tick;
+        tick.startNewSubPath(cx - 4.0f, cy);
+        tick.lineTo(cx - 1.0f, cy + 3.5f);
+        tick.lineTo(cx + 5.0f, cy - 4.0f);
+        g.setColour(textColourToUse);
+        g.strokePath(tick, juce::PathStrokeType(1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+
+    if (hasSubMenu) {
+        auto arrowArea = textArea.removeFromRight(14).toFloat();
+        juce::Path arrow;
+        auto ay = arrowArea.getCentreY();
+        auto ax = arrowArea.getCentreX();
+        arrow.startNewSubPath(ax - 2.0f, ay - 4.0f);
+        arrow.lineTo(ax + 2.0f, ay);
+        arrow.lineTo(ax - 2.0f, ay + 4.0f);
+        g.strokePath(arrow, juce::PathStrokeType(1.5f));
+    }
+
+    if (text.isNotEmpty())
+        g.drawFittedText(text, textArea, juce::Justification::centredLeft, 1);
+
+    if (shortcutKeyText.isNotEmpty()) {
+        g.setColour(textColourToUse.withAlpha(0.5f));
+        g.setFont(juce::Font(11.0f));
+        g.drawText(shortcutKeyText, textArea, juce::Justification::centredRight, true);
+    }
+}
+
+void OscirenderLookAndFeel::getIdealPopupMenuItemSize(const juce::String& text, bool isSeparator,
+                                                       int standardMenuItemHeight, int& idealWidth, int& idealHeight) {
+    if (isSeparator) {
+        idealWidth = 50;
+        idealHeight = 8;
+        return;
+    }
+
+    auto font = juce::Font(13.0f);
+    idealWidth = font.getStringWidth(text) + 40;
+    idealHeight = 28;
+}
+
+int OscirenderLookAndFeel::getPopupMenuBorderSize() {
+    return 4;
 }

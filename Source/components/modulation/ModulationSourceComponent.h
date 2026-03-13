@@ -19,6 +19,7 @@ struct ModulationSourceConfig {
     std::function<juce::String(int)> getLabel;        // "LFO 1", "ENV 1"
     std::function<juce::Colour(int)> getSourceColour;
     std::function<float(int)> getCurrentValue;        // 0..1 output for value bar
+    std::function<bool(int)> isSourceActive;          // whether the pill should be visible
 
     // Assignment CRUD
     std::function<std::vector<ModAssignment>()> getAssignments;
@@ -166,6 +167,13 @@ private:
             repaint();
         }
 
+        void setSourceActive(bool active) {
+            if (active != sourceActive) {
+                sourceActive = active;
+                repaint();
+            }
+        }
+
         juce::String label;
         int sourceIndex;
         ModulationSourceComponent& owner;
@@ -173,6 +181,7 @@ private:
         bool isHovering = false;
         float sourceValue = 0.0f;
         float sourceDelta = 0.0f;
+        bool sourceActive = false;
 
         juce::OwnedArray<DepthIndicator> depthIndicators;
 

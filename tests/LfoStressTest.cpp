@@ -17,7 +17,7 @@ public:
     void addAssignment(const LfoAssignment& assignment) {
         juce::SpinLock::ScopedLockType lock(spinLock);
         for (auto& a : assignments) {
-            if (a.lfoIndex == assignment.lfoIndex && a.paramId == assignment.paramId) {
+            if (a.sourceIndex == assignment.sourceIndex && a.paramId == assignment.paramId) {
                 a.depth = assignment.depth;
                 a.bipolar = assignment.bipolar;
                 return;
@@ -30,7 +30,7 @@ public:
         juce::SpinLock::ScopedLockType lock(spinLock);
         assignments.erase(
             std::remove_if(assignments.begin(), assignments.end(),
-                [&](const LfoAssignment& a) { return a.lfoIndex == lfoIndex && a.paramId == paramId; }),
+                [&](const LfoAssignment& a) { return a.sourceIndex == lfoIndex && a.paramId == paramId; }),
             assignments.end());
     }
 
@@ -157,7 +157,7 @@ public:
         // Store should be in a consistent state
         auto final_assignments = store.getAssignments();
         for (const auto& a : final_assignments) {
-            expect(a.lfoIndex >= 0 && a.lfoIndex < NUM_LFOS, "LFO index in valid range");
+            expect(a.sourceIndex >= 0 && a.sourceIndex < NUM_LFOS, "LFO index in valid range");
             expect(a.depth >= -1.0f && a.depth <= 1.0f, "Depth in valid range");
         }
     }
@@ -283,10 +283,9 @@ public:
                     for (int l = 0; l < NUM_LFOS; ++l) {
                         auto wf = wfStore.getWaveform(l);
                         float rate = 2.0f + (float)l;
+                        states[l].advanceBlock(blockBuf[l].data(), 512, rate, sampleRate, wf, LfoMode::Free, 0.0f);
                         for (int s = 0; s < 512; ++s) {
-                            float val = states[l].advance(rate, sampleRate, wf);
-                            blockBuf[l][(size_t)s] = val;
-                            if (val < -0.01f || val > 1.01f)
+                            if (blockBuf[l][(size_t)s] < -0.01f || blockBuf[l][(size_t)s] > 1.01f)
                                 anyBadValue.store(true);
                         }
                     }
@@ -443,17 +442,16 @@ public:
                     // Advance LFOs
                     for (int l = 0; l < NUM_LFOS; ++l) {
                         auto wf = wfStore.getWaveform(l);
-                        float lastVal = 0.0f;
-                        for (int s = 0; s < blockSize; ++s)
-                            lastVal = states[l].advance(2.0f, sampleRate, wf);
-                        currentValues[l].store(lastVal, std::memory_order_relaxed);
+                        std::vector<float> buf((size_t)blockSize);
+                        states[l].advanceBlock(buf.data(), blockSize, 2.0f, sampleRate, wf, LfoMode::Free, 0.0f);
+                        currentValues[l].store(buf[(size_t)(blockSize - 1)], std::memory_order_relaxed);
                     }
 
                     // Read assignments and do fake modulation work
                     auto assignments = assignStore.getAssignments();
                     float accumulator = 0.0f;
                     for (const auto& a : assignments) {
-                        float lfoVal = currentValues[a.lfoIndex].load(std::memory_order_relaxed);
+                        float lfoVal = currentValues[a.sourceIndex].load(std::memory_order_relaxed);
                         if (a.bipolar)
                             accumulator += (lfoVal * 2.0f - 1.0f) * a.depth * 0.5f;
                         else
@@ -525,7 +523,7 @@ public:
                 while (running.load()) {
                     auto assignments = assignStore.getAssignments();
                     for (const auto& a : assignments) {
-                        float val = currentValues[a.lfoIndex].load(std::memory_order_relaxed);
+                        float val = currentValues[a.sourceIndex].load(std::memory_order_relaxed);
                         (void)val;
                     }
                     juce::Thread::sleep(16); // ~60fps
@@ -620,8 +618,9 @@ public:
             LfoAudioState state;
             auto wf = createLfoPreset(LfoPreset::Sawtooth);
             // Advance through many cycles, phase should always stay in [0, 1)
+            float val;
             for (int i = 0; i < 100000; ++i) {
-                float val = state.advance(440.0f, 44100.0f, wf);
+                state.advanceBlock(&val, 1, 440.0f, 44100.0f, wf, LfoMode::Free, 0.0f);
                 expect(val >= -0.01f && val <= 1.01f,
                        "LFO value out of range at sample " + juce::String(i));
                 expect(state.phase >= 0.0f && state.phase < 1.0f,
@@ -644,10 +643,10 @@ public:
         {
             LfoAssignment original{2, "bitcrush_amount", -0.75f, true};
             auto xml = std::make_unique<juce::XmlElement>("assignment");
-            original.saveToXml(xml.get());
-            auto loaded = LfoAssignment::loadFromXml(xml.get());
+            original.saveToXml(xml.get(), "lfo");
+            auto loaded = LfoAssignment::loadFromXml(xml.get(), "lfo");
 
-            expectEquals(loaded.lfoIndex, original.lfoIndex);
+            expectEquals(loaded.sourceIndex, original.sourceIndex);
             expectEquals(loaded.paramId, original.paramId);
             expectWithinAbsoluteError((double)loaded.depth, (double)original.depth, 0.001);
             expect(loaded.bipolar == original.bipolar, "bipolar flag should round-trip");
@@ -674,8 +673,8 @@ public:
         {
             LfoAssignment original{1, "frequency", -0.42f, false};
             auto xml = std::make_unique<juce::XmlElement>("assignment");
-            original.saveToXml(xml.get());
-            auto loaded = LfoAssignment::loadFromXml(xml.get());
+            original.saveToXml(xml.get(), "lfo");
+            auto loaded = LfoAssignment::loadFromXml(xml.get(), "lfo");
 
             expectWithinAbsoluteError((double)loaded.depth, -0.42, 0.001);
             expect(!loaded.bipolar, "Bipolar should be false");

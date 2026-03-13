@@ -3,8 +3,10 @@
 #include <JuceHeader.h>
 #include "NodeGraphComponent.h"
 #include "LfoRateComponent.h"
+#include "LfoModeComponent.h"
 #include "../../audio/LfoState.h"
 #include "ModulationSourceComponent.h"
+#include "../PhaseSliderComponent.h"
 
 class OscirenderAudioProcessor;
 
@@ -15,6 +17,7 @@ public:
     LfoComponent(OscirenderAudioProcessor& processor);
 
     void resized() override;
+    void timerCallback() override;
 
     int getActiveLfoIndex() const { return getActiveSourceIndex(); }
 
@@ -60,14 +63,21 @@ private:
     };
     PresetSelector presetSelector;
     LfoRateComponent rateControl;
+    LfoModeComponent modeControl;
+    PhaseSliderComponent phaseSlider;
 
     // --- Layout constants ---
     static constexpr int kTopBarHeight   = 22;
     static constexpr int kTopBarGap      = 4;
+    static constexpr int kPhaseHeight    = 14;
+    static constexpr int kPhaseGap       = 4;
     static constexpr int kRateHeight     = 40;
     static constexpr int kRateGap        = 4;
     static constexpr int kMaxPresetWidth = 180;
     static constexpr int kMaxRateWidth   = 130;
+    static constexpr int kMaxModeWidth   = 130;
+
+    bool wasLfoActive = false; // Tracks previous active state for flow trail reset
 
     // --- Internal methods ---
     void syncGraphToActiveLfo();

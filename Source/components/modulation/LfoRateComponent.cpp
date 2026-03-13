@@ -2,6 +2,7 @@
 #include "../../PluginProcessor.h"
 #include "../../LookAndFeel.h"
 #include "InlineEditorHelper.h"
+#include "../DarkBarPainter.h"
 
 LfoRateComponent::LfoRateComponent(OscirenderAudioProcessor& processor, int index)
     : audioProcessor(processor), lfoIndex(index)
@@ -193,39 +194,8 @@ void LfoRateComponent::pushRateToProcessor(float hz) {
 void LfoRateComponent::paint(juce::Graphics& g) {
     auto bounds = getLocalBounds().toFloat();
     bool hovering = isMouseOver(true);
-    float r = 4.0f;
 
-    // Background
-    g.setColour(Colours::veryDark);
-    g.fillRoundedRectangle(bounds, r);
-
-    // Label strip at bottom — lighter shade
-    if (!labelArea.isEmpty()) {
-        auto labelBounds = labelArea.toFloat();
-        // Clip to bottom rounded corners
-        juce::Path labelPath;
-        labelPath.addRoundedRectangle(bounds.getX(), labelBounds.getY(),
-                                       bounds.getWidth(), labelBounds.getHeight(),
-                                       r, r, false, false, true, true);
-        g.saveState();
-        g.reduceClipRegion(labelPath);
-        g.setColour(juce::Colour(0xFF222222));
-        g.fillRect(labelBounds);
-        g.restoreState();
-
-        // Horizontal divider between value and label
-        g.setColour(juce::Colours::white.withAlpha(0.10f));
-        g.drawHorizontalLine((int)labelBounds.getY(), bounds.getX() + 1.0f, bounds.getRight() - 1.0f);
-
-        // Label text
-        g.setColour(juce::Colours::white.withAlpha(0.55f));
-        g.setFont(juce::Font(9.0f, juce::Font::bold));
-        g.drawText(getLabelText(), labelBounds, juce::Justification::centred);
-    }
-
-    // Border
-    g.setColour(juce::Colours::white.withAlpha(hovering ? 0.12f : 0.06f));
-    g.drawRoundedRectangle(bounds.reduced(0.5f), r, 1.0f);
+    DarkBarPainter::paintBackground(g, bounds, labelArea, getLabelText(), hovering);
 
     // Value text (centre of value area)
     g.setColour(juce::Colours::white.withAlpha(0.9f));
@@ -302,10 +272,13 @@ void LfoRateComponent::mouseDrag(const juce::MouseEvent& e) {
         if (newIdx != tempoDivisionIndex)
             setTempoDivisionIndex(newIdx);
     }
+
+    valuePopup.show(*this, getDisplayText());
 }
 
 void LfoRateComponent::mouseUp(const juce::MouseEvent&) {
     isDragging = false;
+    valuePopup.hide();
 }
 
 void LfoRateComponent::mouseDoubleClick(const juce::MouseEvent& e) {
@@ -375,4 +348,13 @@ void LfoRateComponent::commitInlineEditor() {
     val = juce::jlimit(0.01f, 100.0f, val);
     pushRateToProcessor(val);
     repaint();
+}
+
+void LfoRateComponent::mouseEnter(const juce::MouseEvent&) {
+    valuePopup.show(*this, getDisplayText());
+}
+
+void LfoRateComponent::mouseExit(const juce::MouseEvent&) {
+    if (!isDragging)
+        valuePopup.hide();
 }

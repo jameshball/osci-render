@@ -841,7 +841,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
         if (!beginnerMode) {
             // Apply global LFO modulation on top of animated values
-            applyGlobalLfoModulation(numSamples, sampleRate);
+            applyGlobalLfoModulation(numSamples, sampleRate, midiMessages);
 
             // Apply global envelope modulation on top of LFO modulation
             applyGlobalEnvModulation(numSamples, sampleRate);
@@ -1058,6 +1058,8 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
                 lfoXml->setAttribute("preset", lfoPresetToString(lfoPresets[i]));
                 lfoXml->setAttribute("rateMode", lfoRateModeToString(lfoRateModes[i]));
                 lfoXml->setAttribute("tempoDivision", lfoTempoDivisions[i]);
+                lfoXml->setAttribute("mode", lfoModeToString(lfoModes[i]));
+                lfoXml->setAttribute("phaseOffset", (double)lfoPhaseOffsets[i]);
                 lfoWaveforms[i].saveToXml(lfoXml);
             }
         }
@@ -1237,10 +1239,18 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
                         lfoPresets[idx] = stringToLfoPreset(lfoXml->getStringAttribute("preset", "Custom"));
                         lfoRateModes[idx] = stringToLfoRateMode(lfoXml->getStringAttribute("rateMode", "Seconds"));
                         lfoTempoDivisions[idx] = lfoXml->getIntAttribute("tempoDivision", 8);
+                        lfoModes[idx] = stringToLfoMode(lfoXml->getStringAttribute("mode", "Free"));
+                        lfoPhaseOffsets[idx] = (float)lfoXml->getDoubleAttribute("phaseOffset", 0.0);
                     }
                 }
             }
         }
+
+        // Reset LFO audio-thread state so stale note counts don't carry over
+        lfoActiveNoteCount = 0;
+        lfoPrevAnyVoiceActive = false;
+        for (int i = 0; i < NUM_LFOS; ++i)
+            lfoAudioStates[i].reset();
 
         // Load LFO assignments (advanced mode only)
         if (!beginnerMode) {
@@ -1372,6 +1382,11 @@ float OscirenderAudioProcessor::getLfoCurrentPhase(int lfoIndex) const {
     return lfoCurrentPhases[lfoIndex].load(std::memory_order_relaxed);
 }
 
+bool OscirenderAudioProcessor::isLfoActive(int lfoIndex) const {
+    if (lfoIndex < 0 || lfoIndex >= NUM_LFOS) return false;
+    return lfoActive[lfoIndex].load(std::memory_order_relaxed);
+}
+
 void OscirenderAudioProcessor::setLfoRateMode(int lfoIndex, LfoRateMode mode) {
     juce::SpinLock::ScopedLockType lock(lfoWaveformLock);
     lfoRateModes[lfoIndex] = mode;
@@ -1390,6 +1405,34 @@ LfoRateMode OscirenderAudioProcessor::getLfoRateMode(int lfoIndex) const {
 int OscirenderAudioProcessor::getLfoTempoDivision(int lfoIndex) const {
     juce::SpinLock::ScopedLockType lock(lfoWaveformLock);
     return lfoTempoDivisions[lfoIndex];
+}
+
+void OscirenderAudioProcessor::setLfoMode(int lfoIndex, LfoMode mode) {
+    jassert(lfoIndex >= 0 && lfoIndex < NUM_LFOS);
+    if (lfoIndex < 0 || lfoIndex >= NUM_LFOS) return;
+    juce::SpinLock::ScopedLockType lock(lfoWaveformLock);
+    lfoModes[lfoIndex] = mode;
+}
+
+void OscirenderAudioProcessor::setLfoPhaseOffset(int lfoIndex, float phase) {
+    jassert(lfoIndex >= 0 && lfoIndex < NUM_LFOS);
+    if (lfoIndex < 0 || lfoIndex >= NUM_LFOS) return;
+    juce::SpinLock::ScopedLockType lock(lfoWaveformLock);
+    lfoPhaseOffsets[lfoIndex] = juce::jlimit(0.0f, 1.0f, phase);
+}
+
+LfoMode OscirenderAudioProcessor::getLfoMode(int lfoIndex) const {
+    jassert(lfoIndex >= 0 && lfoIndex < NUM_LFOS);
+    if (lfoIndex < 0 || lfoIndex >= NUM_LFOS) return LfoMode::Free;
+    juce::SpinLock::ScopedLockType lock(lfoWaveformLock);
+    return lfoModes[lfoIndex];
+}
+
+float OscirenderAudioProcessor::getLfoPhaseOffset(int lfoIndex) const {
+    jassert(lfoIndex >= 0 && lfoIndex < NUM_LFOS);
+    if (lfoIndex < 0 || lfoIndex >= NUM_LFOS) return 0.0f;
+    juce::SpinLock::ScopedLockType lock(lfoWaveformLock);
+    return lfoPhaseOffsets[lfoIndex];
 }
 
 // === Global Envelope assignment system ===
@@ -1419,9 +1462,186 @@ std::vector<EnvAssignment> OscirenderAudioProcessor::getEnvAssignments() const {
     return envAssignments;
 }
 
+void OscirenderAudioProcessor::removeAllAssignmentsForEffect(const osci::Effect& effect) {
+    auto belongsToEffect = [&](const juce::String& paramId) {
+        for (auto* p : effect.parameters)
+            if (p->paramID == paramId) return true;
+        return false;
+    };
+
+    {
+        juce::SpinLock::ScopedLockType lock(lfoAssignmentLock);
+        lfoAssignments.erase(
+            std::remove_if(lfoAssignments.begin(), lfoAssignments.end(),
+                [&](const LfoAssignment& a) { return belongsToEffect(a.paramId); }),
+            lfoAssignments.end());
+    }
+    {
+        juce::SpinLock::ScopedLockType lock(envAssignmentLock);
+        envAssignments.erase(
+            std::remove_if(envAssignments.begin(), envAssignments.end(),
+                [&](const EnvAssignment& a) { return belongsToEffect(a.paramId); }),
+            envAssignments.end());
+    }
+}
+
+void OscirenderAudioProcessor::autoAssignLfosForEffect(osci::Effect& effect) {
+
+    // Snapshot current assignments (message thread, safe to take lock briefly)
+    std::vector<LfoAssignment> currentAssignments;
+    {
+        juce::SpinLock::ScopedLockType lock(lfoAssignmentLock);
+        currentAssignments = lfoAssignments;
+    }
+
+    // Count assignments per LFO index
+    int assignmentCount[NUM_LFOS] = {};
+    for (const auto& a : currentAssignments)
+        if (a.sourceIndex >= 0 && a.sourceIndex < NUM_LFOS)
+            assignmentCount[a.sourceIndex]++;
+
+    // Helper: rate similarity (within 25%)
+    auto ratesSimilar = [](float a, float b) -> bool {
+        if (a <= 0.0f || b <= 0.0f) return false;
+        float ratio = (a > b) ? a / b : b / a;
+        return ratio < 1.25f;
+    };
+
+    // Single-pass LFO selection scoring: higher score = better match.
+    // Score 4: already linked, matching preset + similar rate (exact reuse)
+    // Score 3: idle, matching preset (not Custom)
+    // Score 2: idle, factory preset (not Custom) — will reconfigure
+    // Score 1: idle, any (including Custom) — will reconfigure
+    auto findBestLfo = [&](LfoPreset desiredPreset, float desiredRate) -> int {
+        int bestLfo = -1;
+        int bestScore = 0;
+        for (int i = 0; i < NUM_LFOS; ++i) {
+            int score = 0;
+            bool idle = assignmentCount[i] == 0;
+            if (!idle && lfoPresets[i] == desiredPreset) {
+                float currentRate = (lfoRate[i] != nullptr) ? lfoRate[i]->getValueUnnormalised() : 1.0f;
+                if (ratesSimilar(currentRate, desiredRate))
+                    score = 4;
+            } else if (idle && lfoPresets[i] == desiredPreset && lfoPresets[i] != LfoPreset::Custom) {
+                score = 3;
+            } else if (idle && lfoPresets[i] != LfoPreset::Custom) {
+                score = 2;
+            } else if (idle) {
+                score = 1;
+            }
+            if (score > bestScore) {
+                bestScore = score;
+                bestLfo = i;
+                if (score == 4) break; // Can't do better
+            }
+        }
+        return bestLfo;
+    };
+
+    auto configureLfo = [&](int lfoIdx, LfoPreset desiredPreset, float desiredRate, int score) {
+        if (score <= 2) {
+            // Need to reconfigure waveform
+            juce::SpinLock::ScopedLockType lock(lfoWaveformLock);
+            lfoPresets[lfoIdx] = desiredPreset;
+            lfoWaveforms[lfoIdx] = createLfoPreset(desiredPreset);
+        }
+        if (score <= 3 && lfoRate[lfoIdx] != nullptr) {
+            lfoRate[lfoIdx]->setUnnormalisedValueNotifyingHost(desiredRate);
+        }
+    };
+
+    for (auto* param : effect.parameters) {
+        if (param->lfoTypeDefault == osci::LfoType::Static)
+            continue;
+
+        LfoPreset desiredPreset = lfoTypeToLfoPreset(param->lfoTypeDefault);
+        float desiredRate = param->lfoRateDefault_;
+
+        int chosenLfo = findBestLfo(desiredPreset, desiredRate);
+        if (chosenLfo < 0)
+            continue;
+
+        // Determine the score again to decide what to configure
+        int score = 0;
+        {
+            bool idle = assignmentCount[chosenLfo] == 0;
+            if (!idle) score = 4;
+            else if (lfoPresets[chosenLfo] == desiredPreset && lfoPresets[chosenLfo] != LfoPreset::Custom) score = 3;
+            else if (lfoPresets[chosenLfo] != LfoPreset::Custom) score = 2;
+            else score = 1;
+        }
+        configureLfo(chosenLfo, desiredPreset, desiredRate, score);
+
+        // Set the parameter value to its minimum so the LFO sweeps the full range
+        param->setUnnormalisedValueNotifyingHost(param->min.load());
+
+        // Create the assignment
+        LfoAssignment assignment;
+        assignment.sourceIndex = chosenLfo;
+        assignment.paramId = param->paramID;
+        assignment.depth = 1.0f;
+        assignment.bipolar = false;
+        addLfoAssignment(assignment);
+
+        // Track locally so subsequent params see the updated count
+        assignmentCount[chosenLfo]++;
+    }
+}
+
 float OscirenderAudioProcessor::getEnvCurrentValue(int envIndex) const {
     if (envIndex < 0 || envIndex >= NUM_ENVELOPES) return 0.0f;
     return envCurrentValues[envIndex].load(std::memory_order_relaxed);
+}
+
+void OscirenderAudioProcessor::autoAssignLfosForPreview(const juce::String& effectId) {
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    clearPreviewLfoAssignmentsInternal();
+    for (auto& eff : toggleableEffects) {
+        if (eff->getId() == effectId) {
+            // Save current parameter values before modifying them
+            previewSavedParamValues.clear();
+            for (auto* param : eff->parameters) {
+                if (param->lfoTypeDefault != osci::LfoType::Static)
+                    previewSavedParamValues.emplace_back(param->paramID, param->getValueUnnormalised());
+            }
+            autoAssignLfosForEffect(*eff);
+            previewLfoEffectId = effectId;
+            break;
+        }
+    }
+}
+
+void OscirenderAudioProcessor::clearPreviewLfoAssignments() {
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    clearPreviewLfoAssignmentsInternal();
+}
+
+void OscirenderAudioProcessor::clearPreviewLfoAssignmentsInternal() {
+    if (previewLfoEffectId.isEmpty()) return;
+    for (auto& eff : toggleableEffects) {
+        if (eff->getId() == previewLfoEffectId) {
+            removeAllAssignmentsForEffect(*eff);
+            // Restore saved parameter values
+            for (const auto& [paramId, savedValue] : previewSavedParamValues) {
+                for (auto* param : eff->parameters) {
+                    if (param->paramID == paramId) {
+                        param->setUnnormalisedValueNotifyingHost(savedValue);
+                        break;
+                    }
+                }
+            }
+            break;
+        }
+    }
+    previewSavedParamValues.clear();
+    previewLfoEffectId = juce::String();
+}
+
+void OscirenderAudioProcessor::promotePreviewLfoAssignments() {
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    // Keep the parameter values and assignments; just clear the preview tracking
+    previewSavedParamValues.clear();
+    previewLfoEffectId = juce::String();
 }
 
 juce::String OscirenderAudioProcessor::getParamDisplayName(const juce::String& paramId) const {
@@ -1544,12 +1764,64 @@ void OscirenderAudioProcessor::applyGlobalEnvModulation(int numSamples, double s
     applyModulationBuffers(numSamples, envAssnCopy, envBlockBuffer.data(), NUM_ENVELOPES);
 }
 
-void OscirenderAudioProcessor::applyGlobalLfoModulation(int numSamples, double sampleRate) {
+void OscirenderAudioProcessor::applyGlobalLfoModulation(int numSamples, double sampleRate, const juce::MidiBuffer& midi) {
+    // Process MIDI note events to drive LFO triggering for non-Free modes
+    bool hadNoteOnThisBlock = false;
+    for (const auto metadata : midi) {
+        auto msg = metadata.getMessage();
+        if (msg.isNoteOn()) {
+            hadNoteOnThisBlock = true;
+            lfoActiveNoteCount++;
+            for (int l = 0; l < NUM_LFOS; ++l) {
+                LfoMode mode = lfoModes[l];
+                if (mode != LfoMode::Free && mode != LfoMode::Sync) {
+                    // If the LFO was already running, flag a retrigger so the UI can reset the trail
+                    if (!lfoAudioStates[l].finished)
+                        lfoRetriggered[l].store(true, std::memory_order_relaxed);
+                    lfoAudioStates[l].noteOn(mode, lfoPhaseOffsets[l]);
+                }
+            }
+        } else if (msg.isNoteOff()) {
+            lfoActiveNoteCount = std::max(0, lfoActiveNoteCount - 1);
+            if (lfoActiveNoteCount == 0) {
+                for (int l = 0; l < NUM_LFOS; ++l) {
+                    LfoMode mode = lfoModes[l];
+                    if (mode != LfoMode::Free && mode != LfoMode::Sync) {
+                        lfoAudioStates[l].noteOff(mode);
+                    }
+                }
+            }
+        } else if (msg.isAllNotesOff() || msg.isAllSoundOff()) {
+            lfoActiveNoteCount = 0;
+            for (int l = 0; l < NUM_LFOS; ++l) {
+                LfoMode mode = lfoModes[l];
+                if (mode != LfoMode::Free && mode != LfoMode::Sync) {
+                    lfoAudioStates[l].noteOff(mode);
+                }
+            }
+        }
+    }
+
     // Compute LFO samples for this block
     {
         juce::SpinLock::ScopedLockType wfLock(lfoWaveformLock);
         double bpm = currentBpm.load(std::memory_order_relaxed);
         auto& divisions = getTempoDivisions();
+
+        // Check if any synth voices are still active (including release tails).
+        // Uses previous block's state which is fine — one block latency is inaudible.
+        bool anyVoiceActive = false;
+        for (int v = 0; v < kMaxUiVoices; ++v) {
+            if (uiVoiceActive[v].load(std::memory_order_relaxed)) {
+                anyVoiceActive = true;
+                break;
+            }
+        }
+
+        // Treat a noteOn in this block as "voice will be active" since the synth
+        // hasn't rendered yet (voice activation lags by one block).
+        bool effectiveVoiceActive = anyVoiceActive || hadNoteOnThisBlock;
+
         for (int l = 0; l < NUM_LFOS; ++l) {
             if ((int)lfoBlockBuffer[l].size() < numSamples)
                 lfoBlockBuffer[l].resize(numSamples);
@@ -1561,13 +1833,42 @@ void OscirenderAudioProcessor::applyGlobalLfoModulation(int numSamples, double s
                 rate = (float)divisions[idx].toHz(bpm, lfoRateModes[l]);
             }
             float sr = (float)sampleRate;
-            for (int s = 0; s < numSamples; ++s) {
-                lfoBlockBuffer[l][s] = lfoAudioStates[l].advance(rate, sr, lfoWaveforms[l]);
+            LfoMode mode = lfoModes[l];
+            float phaseOff = lfoPhaseOffsets[l];
+
+            // Determine if this LFO is actively modulating
+            bool isActive;
+            if (mode == LfoMode::Free) {
+                isActive = true;  // Free is always active
+            } else if (mode == LfoMode::Sync) {
+                // Sync: phase always advances, but modulation only applies when voices are active
+                isActive = effectiveVoiceActive;
+            } else {
+                // Note-dependent modes: active until voicesFinished sets finished=true
+                isActive = !lfoAudioStates[l].finished;
             }
-            // Publish most recent value and phase for thread-safe UI reads
+
+            lfoAudioStates[l].advanceBlock(lfoBlockBuffer[l].data(), numSamples,
+                                           rate, sr, lfoWaveforms[l], mode, phaseOff);
+            // For Sync mode: zero modulation when no voice is active
+            if (mode == LfoMode::Sync && !effectiveVoiceActive) {
+                for (int s = 0; s < numSamples; ++s)
+                    lfoBlockBuffer[l][s] = 0.0f;
+            }
+
+            // Only call voicesFinished on the transition from active to inactive.
+            // This prevents premature LFO stop when voice activation lags MIDI by one block.
+            if (!effectiveVoiceActive && lfoPrevAnyVoiceActive) {
+                lfoAudioStates[l].voicesFinished(mode);
+            }
+
+            // Publish most recent value, phase, and active state for thread-safe UI reads
             lfoCurrentValues[l].store(lfoBlockBuffer[l][numSamples - 1], std::memory_order_relaxed);
             lfoCurrentPhases[l].store(lfoAudioStates[l].phase, std::memory_order_relaxed);
+            lfoActive[l].store(isActive, std::memory_order_relaxed);
         }
+
+        lfoPrevAnyVoiceActive = effectiveVoiceActive;
     }
 
     // Apply LFO modulation via generic helper

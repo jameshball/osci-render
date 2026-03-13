@@ -369,6 +369,10 @@
               file="Source/components/VolumeComponent.h"/>
         <FILE id="VTbLH1" name="VerticalTabListComponent.h" compile="0" resource="0"
               file="Source/components/VerticalTabListComponent.h"/>
+        <FILE id="VPpHlp" name="ValuePopupHelper.h" compile="0" resource="0"
+              file="Source/components/ValuePopupHelper.h"/>
+        <FILE id="PhSldr" name="PhaseSliderComponent.h" compile="0" resource="0"
+              file="Source/components/PhaseSliderComponent.h"/>
         <FILE id="WHz3FS" name="EnvelopeComponent.cpp" compile="1" resource="0"
               file="Source/components/modulation/EnvelopeComponent.cpp"/>
         <FILE id="A8OllZ" name="EnvelopeComponent.h" compile="0" resource="0"
@@ -394,6 +398,10 @@
               file="Source/components/modulation/LfoRateComponent.h"/>
         <FILE id="LfRtC2" name="LfoRateComponent.cpp" compile="1" resource="0"
               file="Source/components/modulation/LfoRateComponent.cpp"/>
+        <FILE id="LfMdH1" name="LfoModeComponent.h" compile="0" resource="0"
+              file="Source/components/modulation/LfoModeComponent.h"/>
+        <FILE id="LfMdC2" name="LfoModeComponent.cpp" compile="1" resource="0"
+              file="Source/components/modulation/LfoModeComponent.cpp"/>
         <FILE id="TmpCH1" name="TempoComponent.h" compile="0" resource="0"
               file="Source/components/modulation/TempoComponent.h"/>
         <FILE id="TmpCC2" name="TempoComponent.cpp" compile="1" resource="0"

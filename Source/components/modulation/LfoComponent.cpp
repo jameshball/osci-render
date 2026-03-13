@@ -85,6 +85,7 @@ static ModulationSourceConfig buildLfoConfig(OscirenderAudioProcessor& proc) {
     cfg.getLabel = [](int i) { return "LFO " + juce::String(i + 1); };
     cfg.getSourceColour = &LfoComponent::getLfoColour;
     cfg.getCurrentValue = [&proc](int i) { return proc.getLfoCurrentValue(i); };
+    cfg.isSourceActive = [&proc](int i) { return proc.isLfoActive(i); };
     cfg.getAssignments = [&proc]() { return proc.getLfoAssignments(); };
     cfg.addAssignment = [&proc](const ModAssignment& a) { proc.addLfoAssignment(a); };
     cfg.removeAssignment = [&proc](int idx, const juce::String& pid) { proc.removeLfoAssignment(idx, pid); };
@@ -100,7 +101,8 @@ static ModulationSourceConfig buildLfoConfig(OscirenderAudioProcessor& proc) {
 LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
     : ModulationSourceComponent(buildLfoConfig(processor)),
       audioProcessor(processor),
-      rateControl(processor, 0) {
+      rateControl(processor, 0),
+      modeControl(processor, 0) {
     // Initialize all LFOs with default triangle preset
     for (int i = 0; i < NUM_LFOS; ++i) {
         lfoData[i].preset = LfoPreset::Triangle;
@@ -115,6 +117,7 @@ LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
     graph.setAllowNodeAddRemove(true);
     graph.setHoverThreshold(20.0f);
     graph.setCornerRadius(6.0f);
+    graph.setFlowTrailWrapping(true, 0.0, 1.0);
 
     graph.constrainNode = [this](int nodeIndex, double& time, double& value) {
         applyLfoConstraints(nodeIndex, time, value);
@@ -132,8 +135,42 @@ LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
     rateControl.setLfoIndex(getActiveSourceIndex());
     addAndMakeVisible(rateControl);
 
+    // Mode control
+    modeControl.setLfoIndex(getActiveSourceIndex());
+    addAndMakeVisible(modeControl);
+
+    // Phase slider
+    phaseSlider.setDefaultValue(0.0f);
+    phaseSlider.onValueChanged = [this](float val) {
+        int idx = getActiveSourceIndex();
+        audioProcessor.setLfoPhaseOffset(idx, val);
+    };
+    addAndMakeVisible(phaseSlider);
+
     // Restore state
     syncFromProcessorState();
+}
+
+void LfoComponent::timerCallback() {
+    ModulationSourceComponent::timerCallback();
+
+    int idx = getActiveSourceIndex();
+    bool active = audioProcessor.isLfoActive(idx);
+
+    if (active) {
+        // Reset the flow trail when transitioning from inactive to active, or when
+        // the LFO was retriggered (new note played while already running) so the
+        // old trail doesn't linger at the previous position
+        if (!wasLfoActive || audioProcessor.consumeLfoRetriggered(idx))
+            graph.resetFlowTrail();
+
+        double phase = (double)audioProcessor.getLfoCurrentPhase(idx);
+        graph.setFlowMarkerDomainPositions(&phase, 1);
+    } else {
+        graph.clearFlowMarkers();
+    }
+
+    wasLfoActive = active;
 }
 
 void LfoComponent::resized() {
@@ -146,10 +183,21 @@ void LfoComponent::resized() {
     int presetW = juce::jmin(kMaxPresetWidth, topBar.getWidth() / 3);
     presetSelector.setBounds(topBar.removeFromRight(presetW));
 
-    auto rateRow = bounds.removeFromBottom(kRateHeight);
+    // Bottom row: mode + rate controls
+    auto bottomRow = bounds.removeFromBottom(kRateHeight);
     bounds.removeFromBottom(kRateGap);
-    int rateW = juce::jmin(kMaxRateWidth, rateRow.getWidth() / 3);
-    rateControl.setBounds(rateRow.removeFromLeft(rateW));
+
+    // Phase slider above the bottom row
+    auto phaseRow = bounds.removeFromBottom(kPhaseHeight);
+    bounds.removeFromBottom(kPhaseGap);
+    phaseSlider.setBounds(phaseRow);
+
+    // Layout mode and rate side by side
+    int modeW = juce::jmin(kMaxModeWidth, bottomRow.getWidth() / 3);
+    int rateW = juce::jmin(kMaxRateWidth, bottomRow.getWidth() / 3);
+    modeControl.setBounds(bottomRow.removeFromLeft(modeW));
+    bottomRow.removeFromLeft(kRateGap);
+    rateControl.setBounds(bottomRow.removeFromLeft(rateW));
 
     graph.setBounds(bounds);
     setOutlineBounds(graph.getBounds());
@@ -161,6 +209,10 @@ void LfoComponent::onActiveSourceChanged(int index) {
     graph.resetFlowTrail();
     rateControl.setLfoIndex(index);
     rateControl.syncFromProcessor();
+    modeControl.setLfoIndex(index);
+    modeControl.syncFromProcessor();
+    phaseSlider.setValue(audioProcessor.getLfoPhaseOffset(index));
+    phaseSlider.setAccentColour(getLfoColour(index));
 }
 
 void LfoComponent::syncGraphToActiveLfo() {
@@ -213,8 +265,8 @@ LfoPreset LfoComponent::getLfoPreset(int lfoIndex) const {
 }
 
 void LfoComponent::cyclePreset(int direction) {
-    static const std::array<LfoPreset, 5> presets = {
-        LfoPreset::Sine, LfoPreset::Triangle, LfoPreset::Sawtooth, LfoPreset::Square, LfoPreset::Custom
+    static const std::array<LfoPreset, 6> presets = {
+        LfoPreset::Sine, LfoPreset::Triangle, LfoPreset::Sawtooth, LfoPreset::ReverseSawtooth, LfoPreset::Square, LfoPreset::Custom
     };
 
     int idx = getActiveSourceIndex();
@@ -263,6 +315,10 @@ void LfoComponent::syncFromProcessorState() {
 
     rateControl.setLfoIndex(getActiveSourceIndex());
     rateControl.syncFromProcessor();
+    modeControl.setLfoIndex(getActiveSourceIndex());
+    modeControl.syncFromProcessor();
+    phaseSlider.setValue(audioProcessor.getLfoPhaseOffset(getActiveSourceIndex()));
+    phaseSlider.setAccentColour(getLfoColour(getActiveSourceIndex()));
 }
 
 void LfoComponent::applyLfoConstraints(int nodeIndex, double& time, double& value) {

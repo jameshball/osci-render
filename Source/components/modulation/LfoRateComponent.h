@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include "../../audio/LfoState.h"
+#include "../ValuePopupHelper.h"
 
 class OscirenderAudioProcessor;
 
@@ -19,6 +20,8 @@ public:
     void mouseDrag(const juce::MouseEvent& e) override;
     void mouseUp(const juce::MouseEvent& e) override;
     void mouseDoubleClick(const juce::MouseEvent& e) override;
+    void mouseEnter(const juce::MouseEvent& e) override;
+    void mouseExit(const juce::MouseEvent& e) override;
 
     // Switch which LFO this control targets.
     void setLfoIndex(int index);
@@ -62,6 +65,8 @@ private:
 
     // Inline text editor for direct entry
     std::unique_ptr<juce::TextEditor> inlineEditor;
+
+    ValuePopupHelper valuePopup;
 
     // Hit areas
     juce::Rectangle<int> valueArea;

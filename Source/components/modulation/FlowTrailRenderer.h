@@ -84,20 +84,22 @@ public:
                 const int xi = (int)juce::jlimit(0.0f, (float)(w - 1), x);
 
                 const bool canBridge = prevFlowMarkerValid[(size_t)i] != 0
-                    && (t >= prevFlowMarkerTimeSeconds[(size_t)i])
-                    && ((t - prevFlowMarkerTimeSeconds[(size_t)i]) <= maxBridgeTimeSeconds);
+                    && (wrapping || (t >= prevFlowMarkerTimeSeconds[(size_t)i]))
+                    && (wrapping || ((t - prevFlowMarkerTimeSeconds[(size_t)i]) <= maxBridgeTimeSeconds));
 
                 if (canBridge) {
                     const double prevUpdateMs = prevFlowMarkerUpdateMs[(size_t)i] > 0.0
                         ? prevFlowMarkerUpdateMs[(size_t)i] : nowMs;
                     const float prevX = prevFlowMarkerX[(size_t)i];
-                    const int a = (int)juce::jlimit(0.0f, (float)(w - 1), juce::jmin(prevX, x));
-                    const int b = (int)juce::jlimit(0.0f, (float)(w - 1), juce::jmax(prevX, x));
-                    const int denom = juce::jmax(1, b - a);
-                    for (int xx = a; xx <= b; ++xx) {
-                        const double u = (double)(xx - a) / (double)denom;
-                        const double tMs = prevUpdateMs + u * (nowMs - prevUpdateMs);
-                        flowTrailLastSeenMs[(size_t)xx] = juce::jmax(flowTrailLastSeenMs[(size_t)xx], tMs);
+
+                    if (wrapping && t < prevFlowMarkerTimeSeconds[(size_t)i]) {
+                        // Phase wrapped: bridge prev→max, then min→current
+                        const float maxX = domainToPixel(wrapDomainMax);
+                        const float minX = domainToPixel(wrapDomainMin);
+                        bridgePixels(prevX, maxX, w, nowMs);
+                        bridgePixels(minX, x, w, nowMs);
+                    } else {
+                        bridgePixelsInterpolated(prevX, x, w, prevUpdateMs, nowMs);
                     }
                 } else {
                     flowTrailLastSeenMs[(size_t)xi] = juce::jmax(flowTrailLastSeenMs[(size_t)xi], nowMs);
@@ -112,6 +114,15 @@ public:
     }
 
     void clear() { numFlowMarkers = 0; }
+
+    // Set wrapping mode for cyclic domains (e.g. LFO phase 0–1).
+    // When enabled, backward jumps in position are treated as domain wrapping
+    // and the trail bridges across the wrap boundary.
+    void setWrapping(bool shouldWrap, double domainMin = 0.0, double domainMax = 1.0) {
+        wrapping = shouldWrap;
+        wrapDomainMin = domainMin;
+        wrapDomainMax = domainMax;
+    }
 
     void reset() {
         numFlowMarkers = 0;
@@ -128,7 +139,7 @@ public:
                     juce::Colour trailColour, float& outGlowStrength,
                     double tauMs = kDefaultTauMs) {
         const float maxTrailAlpha = 1.0f;
-        const float alphaFloor = 0.10f;
+        const float alphaFloor = 0.0f;
 
         juce::Graphics::ScopedSaveState state(g);
         g.reduceClipRegion(fillPath);
@@ -219,4 +230,28 @@ private:
     double flowTrailNewestMs = 0.0;
     juce::Image flowTrailStrip;
     int flowTrailStripWidth = 0;
+
+    bool wrapping = false;
+    double wrapDomainMin = 0.0;
+    double wrapDomainMax = 1.0;
+
+    // Bridge a pixel range with a uniform timestamp.
+    void bridgePixels(float x1, float x2, int w, double timestampMs) {
+        const int a = (int)juce::jlimit(0.0f, (float)(w - 1), juce::jmin(x1, x2));
+        const int b = (int)juce::jlimit(0.0f, (float)(w - 1), juce::jmax(x1, x2));
+        for (int xx = a; xx <= b; ++xx)
+            flowTrailLastSeenMs[(size_t)xx] = juce::jmax(flowTrailLastSeenMs[(size_t)xx], timestampMs);
+    }
+
+    // Bridge a pixel range with linearly interpolated timestamps.
+    void bridgePixelsInterpolated(float x1, float x2, int w, double startMs, double endMs) {
+        const int a = (int)juce::jlimit(0.0f, (float)(w - 1), juce::jmin(x1, x2));
+        const int b = (int)juce::jlimit(0.0f, (float)(w - 1), juce::jmax(x1, x2));
+        const int denom = juce::jmax(1, b - a);
+        for (int xx = a; xx <= b; ++xx) {
+            const double u = (double)(xx - a) / (double)denom;
+            const double tMs = startMs + u * (endMs - startMs);
+            flowTrailLastSeenMs[(size_t)xx] = juce::jmax(flowTrailLastSeenMs[(size_t)xx], tMs);
+        }
+    }
 };

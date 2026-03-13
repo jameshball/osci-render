@@ -63,6 +63,9 @@ effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
             editor.editCustomFunction(false);
         }
 
+        // Remove all LFO/envelope assignments targeting this effect's parameters
+        audioProcessor.removeAllAssignmentsForEffect(this->effect);
+
         // Flip flags under lock
         {
             juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);

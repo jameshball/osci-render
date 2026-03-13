@@ -260,7 +260,7 @@ void ModulationSourceComponent::ModTabHandle::paint(juce::Graphics& g) {
     g.setColour(juce::Colours::white.withAlpha(0.05f));
     g.drawRoundedRectangle(trackRect, (float)trackWidth * 0.5f, 0.5f);
 
-    if (hasAttachment) {
+    if (hasAttachment && sourceActive) {
         constexpr float pillBaseH = 5.0f;
         constexpr float pillMaxStretch = 14.0f;
         float stretch = juce::jlimit(0.0f, pillMaxStretch, std::abs(sourceDelta) * 80.0f);
@@ -503,8 +503,11 @@ void ModulationSourceComponent::timerCallback() {
         refreshAllDepthIndicators();
 
     if (config.getCurrentValue) {
-        for (int i = 0; i < (int)tabHandles.size(); ++i)
+        for (int i = 0; i < (int)tabHandles.size(); ++i) {
             tabHandles[i]->setSourceValue(config.getCurrentValue(i));
+            if (config.isSourceActive)
+                tabHandles[i]->setSourceActive(config.isSourceActive(i));
+        }
     }
 }
 

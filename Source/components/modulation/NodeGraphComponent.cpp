@@ -953,6 +953,11 @@ void NodeGraphComponent::resetFlowTrail() {
     repaint();
 }
 
+void NodeGraphComponent::setFlowTrailWrapping(bool shouldWrap, double domainMin, double domainMax) {
+    ensureFlowTrailCreated();
+    flowTrailRenderer->setWrapping(shouldWrap, domainMin, domainMax);
+}
+
 void NodeGraphComponent::timerCallback() {
     if (!flowTrailRenderer || !flowTrailRenderer->hasTrailData()) {
         stopTimer();

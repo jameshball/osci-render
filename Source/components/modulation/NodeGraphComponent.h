@@ -134,6 +134,9 @@ public:
     void clearFlowMarkers();
     void resetFlowTrail();
 
+    // Enable wrapping mode for cyclic domains (e.g. LFO phase 0–1).
+    void setFlowTrailWrapping(bool shouldWrap, double domainMin = 0.0, double domainMax = 1.0);
+
     // Colour used for the marker head gradient. Defaults to the line colour.
     void setFlowMarkerColour(juce::Colour c) { flowMarkerColour = c; flowMarkerColourSet = true; }
 

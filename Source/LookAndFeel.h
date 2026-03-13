@@ -17,6 +17,8 @@ namespace Colours {
     const juce::Colour veryDark{0xff111111};
     const juce::Colour grey{0xff6c6c6c};
     const juce::Colour accentColor{0xff00cc00};
+    const juce::Colour popupBackground{0xFF1a1a1a};
+    const juce::Colour darkBarLabel{0xFF222222};
 }
 
 namespace Dracula {
@@ -110,4 +112,15 @@ public:
     void customDrawLinearProgressBar(juce::Graphics& g, const juce::ProgressBar& progressBar, int width, int height, double progress, const juce::String& textToShow);
     juce::Typeface::Ptr getTypefaceForFont(const juce::Font& font) override;
     void drawStretchableLayoutResizerBar(juce::Graphics& g, int w, int h, bool isVerticalBar, bool isMouseOver, bool isMouseDragging) override;
+
+    // PopupMenu
+    void drawPopupMenuBackground(juce::Graphics& g, int width, int height) override;
+    void drawPopupMenuItem(juce::Graphics& g, const juce::Rectangle<int>& area,
+                           bool isSeparator, bool isActive, bool isHighlighted,
+                           bool isTicked, bool hasSubMenu,
+                           const juce::String& text, const juce::String& shortcutKeyText,
+                           const juce::Drawable* icon, const juce::Colour* textColour) override;
+    void getIdealPopupMenuItemSize(const juce::String& text, bool isSeparator,
+                                   int standardMenuItemHeight, int& idealWidth, int& idealHeight) override;
+    int getPopupMenuBorderSize() override;
 };
