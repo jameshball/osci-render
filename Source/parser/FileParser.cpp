@@ -15,7 +15,7 @@ void FileParser::showFileSizeWarning(juce::String fileName, int64_t totalBytes, 
 	}
 
 	const double fileSizeMB = totalBytes / (1024.0 * 1024.0);
-	juce::String message = "The " + fileType + " file '" + fileName + "' you're trying to open is " + juce::String(fileSizeMB, 2) + " MB in size, and may time a long time to open.\n\nWould you like to continue loading it?";
+	juce::String message = "The " + fileType + " file '" + fileName + "' you're trying to open is " + juce::String(fileSizeMB, 2) + " MB in size, and may take a long time to open.\n\nWould you like to continue loading it?";
 	
 	juce::MessageManager::callAsync([this, message, callback]() {
 		juce::AlertWindow::showOkCancelBox(
