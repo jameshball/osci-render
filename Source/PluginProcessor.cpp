@@ -628,6 +628,14 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     double sTimeSec = 1.f / sampleRate;
     double sTimeBeats = bpm * sTimeSec / 60;
 
+    // Store DAW transport for Lua access from voices
+    luaBpm.store(bpm, std::memory_order_relaxed);
+    luaPlayTime.store(playTimeSeconds, std::memory_order_relaxed);
+    luaPlayTimeBeats.store(playTimeBeats, std::memory_order_relaxed);
+    luaIsPlaying.store(isPlaying, std::memory_order_relaxed);
+    luaTimeSigNum.store(timeSig.numerator, std::memory_order_relaxed);
+    luaTimeSigDen.store(timeSig.denominator, std::memory_order_relaxed);
+
     // merge keyboard state and midi messages
     keyboardState.processNextMidiBuffer(midiMessages, 0, buffer.getNumSamples(), true);
 
@@ -712,7 +720,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         }
     }
 
-    juce::AudioBuffer<float> outputBuffer3d = juce::AudioBuffer<float>(3, buffer.getNumSamples());
+    juce::AudioBuffer<float> outputBuffer3d = juce::AudioBuffer<float>(6, buffer.getNumSamples());
     outputBuffer3d.clear();
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM

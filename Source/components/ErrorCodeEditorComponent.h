@@ -2,6 +2,7 @@
 #include <JuceHeader.h>
 #include "../lua/LuaParser.h"
 #include "../PluginProcessor.h"
+#include "SvgButton.h"
 
 class ErrorCodeEditorComponent : public juce::CodeEditorComponent, public ErrorListener, public juce::AsyncUpdater {
  public:
@@ -110,6 +111,7 @@ public:
         setTextLabelPosition(juce::Justification::centred);
         setColour(groupComponentBackgroundColourId, Colours::veryDark);
         
+        editor.setScrollbarThickness(8);
         addAndMakeVisible(editor);
         
         audioProcessor.addErrorListener(&editor);
@@ -121,7 +123,12 @@ public:
 
     void resized() override {
         auto bounds = getLocalBounds();
-        bounds.removeFromTop(30);
+        auto headerArea = bounds.removeFromTop(30);
+        
+        if (helpButton != nullptr && helpButton->isVisible()) {
+            helpButton->setBounds(headerArea.removeFromRight(30).reduced(5));
+        }
+        
         bounds.removeFromBottom(5);
         editor.setBounds(bounds);
     }
@@ -130,8 +137,17 @@ public:
         return editor;
     }
 
+    void setHelpButton(SvgButton* button) {
+        if (helpButton == button) return;
+        helpButton = button;
+        if (helpButton != nullptr) {
+            addAndMakeVisible(helpButton);
+        }
+    }
+
 private:
 
     ErrorCodeEditorComponent editor;
     OscirenderAudioProcessor& audioProcessor;
+    SvgButton* helpButton = nullptr;
 };

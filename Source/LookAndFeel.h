@@ -100,7 +100,7 @@ public:
     void drawMenuBarBackground(juce::Graphics& g, int width, int height, bool, juce::MenuBarComponent& menuBar) override;
     juce::TextLayout layoutTooltipText(const juce::String& text, juce::Colour colour);
     juce::Rectangle<int> getTooltipBounds(const juce::String& tipText, juce::Point<int> screenPos, juce::Rectangle<int> parentArea) override;
-    juce::CodeEditorComponent::ColourScheme getDefaultColourScheme();
+    static juce::CodeEditorComponent::ColourScheme getDefaultColourScheme();
     void drawTooltip(juce::Graphics& g, const juce::String& text, int width, int height) override;
     void drawCornerResizer(juce::Graphics&, int w, int h, bool isMouseOver, bool isMouseDragging) override;
     void drawToggleButton(juce::Graphics&, juce::ToggleButton&, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override;

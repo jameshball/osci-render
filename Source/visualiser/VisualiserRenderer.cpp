@@ -111,10 +111,10 @@ void VisualiserRenderer::runTask(const juce::AudioBuffer<float>& buffer) {
                 if (mode == RenderMode::XYZ) {
                     zSamples.push_back(1.0f); // legacy: third component treated as brightness
                 } else if (mode == RenderMode::XYRGB) {
-                    // colour provided (if not, upstream logic should have set defaults)
-                    rSamples.push_back(numChannels > 3 ? channelData[3][i] : 1.0f);
-                    gSamples.push_back(numChannels > 4 ? channelData[4][i] : 0.0f);
-                    bSamples.push_back(numChannels > 5 ? channelData[5][i] : 0.0f);
+                    // no colour specified — sentinel -1 flows through
+                    rSamples.push_back(numChannels > 3 ? channelData[3][i] : -1.0f);
+                    gSamples.push_back(numChannels > 4 ? channelData[4][i] : -1.0f);
+                    bSamples.push_back(numChannels > 5 ? channelData[5][i] : -1.0f);
                 }
 
                 sampleCount++;
@@ -174,9 +174,9 @@ void VisualiserRenderer::runTask(const juce::AudioBuffer<float>& buffer) {
             if (mode == RenderMode::XYZ) {
                 copyOrFillChannel(zSamples, 2, 1.0f);
             } else if (mode == RenderMode::XYRGB) {
-                copyOrFillChannel(rSamples, 3, 1.0f);
-                copyOrFillChannel(gSamples, 4, 0.0f);
-                copyOrFillChannel(bSamples, 5, 0.0f);
+                copyOrFillChannel(rSamples, 3, -1.0f);
+                copyOrFillChannel(gSamples, 4, -1.0f);
+                copyOrFillChannel(bSamples, 5, -1.0f);
             }
         }
 
@@ -832,7 +832,12 @@ void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::
             float r = rPoints[i];
             float g = gPoints[i];
             float b = bPoints[i];
-            brightness = std::max(r, std::max(g, b));
+            if (r < 0.0f) {
+                // Sentinel: no colour specified, use full brightness and fall back to uLineColor
+                brightness = 1.0f;
+            } else {
+                brightness = std::max(r, std::max(g, b));
+            }
         }
         for (int k = 0; k < 4; ++k) {
             positionData[p + 3 * k] = x;

@@ -611,7 +611,8 @@ void VisualiserComponent::childUpdated() {
 void VisualiserComponent::updateRenderModeFromProcessor() {
     // Called on message thread
     if (!visualiserOnly) {
-        setRenderMode(RenderMode::XY);
+        // osci-render always provides 6 channels (x, y, z, r, g, b)
+        setRenderMode(RenderMode::XYRGB);
         return;
     }
     // Determine based on whether brightness and RGB are enabled and not force-disabled

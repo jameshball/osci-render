@@ -1,18 +1,6 @@
 local SCALE = 1.0
 local ANIMATION_SPEED = 1.0
 
-local function rotateX(x, y, z, angle)
-    return x,
-           y * math.cos(angle) - z * math.sin(angle),
-           y * math.sin(angle) + z * math.cos(angle)
-end
-
-local function rotateY(x, y, z, angle)
-    return x * math.cos(angle) + z * math.sin(angle),
-           y,
-           -x * math.sin(angle) + z * math.cos(angle)
-end
-
 local vertices = {
     -- Head
     {-0.2, 0.7, -0.2},   -- 1
@@ -108,7 +96,7 @@ if current_edge <= NUM_EDGES then
     end
 
     if edges[current_edge][1] <= 8 then
-        x, y, z = rotateY(x, y, z, 0.5 * walk_cycle)
+        x, y, z = unpack(osci_rotate({x, y, z}, 0, 0.5 * walk_cycle, 0))
     end
     
     x = x * SCALE

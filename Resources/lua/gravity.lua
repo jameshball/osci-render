@@ -4,18 +4,6 @@ local GRID_LINES = 25
 local WELL_RADIUS = 0.5
 local ROTATION_SPEED = 0.4
 
-local function rotateY(x, y, z, angle)
-    return x * math.cos(angle) + z * math.sin(angle),
-           y,
-           -x * math.sin(angle) + z * math.cos(angle)
-end
-
-local function rotateX(x, y, z, angle)
-    return x,
-           y * math.cos(angle) - z * math.sin(angle),
-           y * math.sin(angle) + z * math.cos(angle)
-end
-
 local function calculate_depth(x, z)
     local distance = math.sqrt(x * x + z * z)
     if distance > WELL_RADIUS then
@@ -53,6 +41,4 @@ else
     y = calculate_depth(x_pos, z_pos)
 end
 
-x, y, z = rotateX(x, y, z, -0.3)
-
-return {x, y, z}
+return osci_rotate({x, y, z}, -0.3, 0, 0)

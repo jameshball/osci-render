@@ -53,7 +53,14 @@ void main() {
     vec2 xy = uvl.xy;
     float brightness;
     // Determine base color: either per-vertex RGB, or a color from the settings
-    vec3 baseColor = uUseVertexColor > 0.5 ? vColor : uLineColor;
+    // Sentinel r < 0 means no colour was specified — fall back to uLineColor.
+    // Explicit (0,0,0) means intentional black.
+    vec3 baseColor;
+    if (uUseVertexColor > 0.5 && vColor.r >= 0.0) {
+        baseColor = vColor;
+    } else {
+        baseColor = uLineColor;
+    }
     baseColor = clamp(baseColor, 0.0, 1.0);
     
     float sigma = vSize/5.0;

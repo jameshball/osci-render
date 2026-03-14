@@ -4,7 +4,7 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginCharacteristicsValue="pluginWantsMidiIn"
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
-              version="2.8.2.0" companyName="James H Ball" companyWebsite="https://osci-render.com"
+              version="2.8.3.0" companyName="James H Ball" companyWebsite="https://osci-render.com"
               companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1"
               pluginAUMainType="'aumf'" postExportShellCommandPosix="echo &quot;Building LuaJIT for $OSTYPE...&quot; &amp;&amp; DIR=%%1%% %%1%%/luajit_linux_macos.sh ">
   <MAINGROUP id="j5Ge2T" name="osci-render">
@@ -103,6 +103,7 @@
         <FILE id="VegGHd" name="graph.svg" compile="0" resource="1" file="Resources/svg/graph.svg"/>
         <FILE id="dYYqKr" name="gravity.svg" compile="0" resource="1" file="Resources/svg/gravity.svg"/>
         <FILE id="dYl3l5" name="greek.svg" compile="0" resource="1" file="Resources/svg/greek.svg"/>
+        <FILE id="hElP01" name="help.svg" compile="0" resource="1" file="Resources/svg/help.svg"/>
         <FILE id="QbK0Sj" name="helix.svg" compile="0" resource="1" file="Resources/svg/helix.svg"/>
         <FILE id="tsCJdD" name="hello.svg" compile="0" resource="1" file="Resources/svg/hello.svg"/>
         <FILE id="F3cjtn" name="human-handsdown.svg" compile="0" resource="1"
@@ -133,6 +134,7 @@
         <FILE id="iHiXPh" name="polygonizer.svg" compile="0" resource="1" file="Resources/svg/polygonizer.svg"/>
         <FILE id="f0yiwT" name="puzzle.svg" compile="0" resource="1" file="Resources/svg/puzzle.svg"/>
         <FILE id="ElMcEN" name="pyramid.svg" compile="0" resource="1" file="Resources/svg/pyramid.svg"/>
+        <FILE id="qU3sTn" name="question.svg" compile="0" resource="1" file="Resources/svg/question.svg"/>
         <FILE id="PFc2q2" name="random.svg" compile="0" resource="1" file="Resources/svg/random.svg"/>
         <FILE id="CE6di2" name="range.svg" compile="0" resource="1" file="Resources/svg/range.svg"/>
         <FILE id="n79IAy" name="record.svg" compile="0" resource="1" file="Resources/svg/record.svg"/>
@@ -330,6 +332,14 @@
               file="Source/components/SplashScreenComponent.cpp"/>
         <FILE id="M38ypx" name="SplashScreenComponent.h" compile="0" resource="0"
               file="Source/components/SplashScreenComponent.h"/>
+        <FILE id="oVrlYc" name="OverlayComponent.h" compile="0" resource="0"
+              file="Source/components/OverlayComponent.h"/>
+        <FILE id="lDhHlp" name="LuaDocumentationComponent.cpp" compile="1"
+              resource="0" file="Source/components/LuaDocumentationComponent.cpp"/>
+        <FILE id="lDhHlq" name="LuaDocumentationComponent.h" compile="0" resource="0"
+              file="Source/components/LuaDocumentationComponent.h"/>
+        <FILE id="LcSnp1" name="LuaCodeSnippet.h" compile="0" resource="0"
+              file="Source/components/LuaCodeSnippet.h"/>
         <FILE id="rA7fII" name="SyphonInputSelectorComponent.h" compile="0"
               resource="0" file="Source/components/SyphonInputSelectorComponent.h"/>
         <FILE id="WfUlLH" name="TimelineComponent.cpp" compile="1" resource="0"
@@ -535,6 +545,8 @@
               file="Source/ixwebsocket/IXWebSocketVersion.h"/>
       </GROUP>
       <GROUP id="{90BFF2D8-C8EE-510F-7993-421FDEEFA277}" name="lua">
+        <FILE id="aLb1Rc" name="LuaLibrary.cpp" compile="1" resource="0" file="Source/lua/LuaLibrary.cpp"/>
+        <FILE id="aLb1Rh" name="LuaLibrary.h" compile="0" resource="0" file="Source/lua/LuaLibrary.h"/>
         <FILE id="WKSBg8" name="LuaParser.cpp" compile="1" resource="0" file="Source/lua/LuaParser.cpp"/>
         <FILE id="E4ORpe" name="LuaParser.h" compile="0" resource="0" file="Source/lua/LuaParser.h"/>
       </GROUP>

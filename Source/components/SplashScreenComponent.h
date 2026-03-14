@@ -2,26 +2,21 @@
 
 #include <JuceHeader.h>
 
-#include "../LookAndFeel.h"
+#include "OverlayComponent.h"
 #include "GridComponent.h"
 
-class SplashScreenComponent : public juce::SplashScreen {
+class SplashScreenComponent : public OverlayComponent {
 public:
     SplashScreenComponent();
     ~SplashScreenComponent() override = default;
 
     std::function<void()> onUpgradeClicked;
-    std::function<void()> onDismissRequested;
 
-    void resized() override;
-    void paint(juce::Graphics& g) override;
+protected:
+    void resizeContent(juce::Rectangle<int> contentArea) override;
 
 private:
-    void configureLabel(juce::Label& label, const juce::Font& font, juce::Justification justification);
-    void dismiss();
     void buildBenefitTiles();
-
-    juce::Rectangle<int> panelBounds;
 
     juce::Label titleLabel;
     juce::Label subtitleLabel;

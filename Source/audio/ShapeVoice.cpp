@@ -95,6 +95,7 @@ void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesiser
             tries++;
         }
         pendingFrameStart = true;
+        pendingNoteOn = true;
         // Snapshot DAHDSR parameters per-voice (Vital-style; peak fixed at 1.0)
         dahdsr = audioProcessor.getCurrentDahdsrParams();
         envState.reset(dahdsr);
@@ -173,6 +174,14 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     const bool midiEnabled = audioProcessor.midiEnabled->getBoolValue();
     const double dt = 1.0 / audioProcessor.currentSampleRate;
 
+    // Snapshot DAW transport once per block (constant within a processBlock call)
+    const double blockBpm = audioProcessor.luaBpm.load(std::memory_order_relaxed);
+    const double blockPlayTime = audioProcessor.luaPlayTime.load(std::memory_order_relaxed);
+    const double blockPlayTimeBeats = audioProcessor.luaPlayTimeBeats.load(std::memory_order_relaxed);
+    const bool blockIsPlaying = audioProcessor.luaIsPlaying.load(std::memory_order_relaxed);
+    const int blockTimeSigNum = audioProcessor.luaTimeSigNum.load(std::memory_order_relaxed);
+    const int blockTimeSigDen = audioProcessor.luaTimeSigDen.load(std::memory_order_relaxed);
+
     // First pass: generate raw audio samples (without gain) and fill frequency buffer + per-sample envelope
     for (int i = 0; i < numSamples; ++i) {
         if (pendingFrameStart) {
@@ -193,6 +202,24 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
                 vars.frequency = actualFrequency;
                 vars.ext_x = 0;
                 vars.ext_y = 0;
+
+                // MIDI context
+                vars.midiNote = getCurrentlyPlayingNote();
+                vars.velocity = velocity;
+                vars.voiceIndex = voiceIndex;
+                vars.noteOn = (i == 0 && pendingNoteOn);
+
+                // DAW transport (snapshotted once per block)
+                vars.bpm = blockBpm;
+                vars.playTime = blockPlayTime;
+                vars.playTimeBeats = blockPlayTimeBeats;
+                vars.isPlaying = blockIsPlaying;
+                vars.timeSigNumerator = blockTimeSigNum;
+                vars.timeSigDenominator = blockTimeSigDen;
+
+                // Envelope
+                vars.envelope = envState.getCurrentValue();
+                vars.envelopeStage = static_cast<int>(envState.getStage());
                 
                 if (externalAudio.getNumSamples() >= 1) {
                     double sampleIndex = sample % externalAudio.getNumSamples();
@@ -213,6 +240,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
                 double drawingProgress = length == 0.0 ? 1 : shapeDrawn / length;
                 channels = shape->nextVector(drawingProgress);
             }
+            if (pendingNoteOn) pendingNoteOn = false;
         }
 
         const float envValue = midiEnabled ? envState.advance(dt) : 1.0f;
@@ -227,6 +255,9 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
                 if (numChannels >= 1) juce::FloatVectorOperations::clear(voiceBuffer.getWritePointer(0) + startSample2, remainingSamples);
                 if (numChannels >= 2) juce::FloatVectorOperations::clear(voiceBuffer.getWritePointer(1) + startSample2, remainingSamples);
                 if (numChannels >= 3) juce::FloatVectorOperations::clear(voiceBuffer.getWritePointer(2) + startSample2, remainingSamples);
+                if (numChannels >= 4) juce::FloatVectorOperations::clear(voiceBuffer.getWritePointer(3) + startSample2, remainingSamples);
+                if (numChannels >= 5) juce::FloatVectorOperations::clear(voiceBuffer.getWritePointer(4) + startSample2, remainingSamples);
+                if (numChannels >= 6) juce::FloatVectorOperations::clear(voiceBuffer.getWritePointer(5) + startSample2, remainingSamples);
                 juce::FloatVectorOperations::fill(frequencyBuffer.getWritePointer(0) + startSample2, (float) actualFrequency, remainingSamples);
                 juce::FloatVectorOperations::clear(volumeBuffer.getWritePointer(0) + startSample2, remainingSamples);
             }
@@ -235,16 +266,12 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         }
 
         // NOTE: gain is applied AFTER effects (host-visible behavior).
-        if (numChannels >= 3) {
-            voiceBuffer.setSample(0, i, channels.x);
-            voiceBuffer.setSample(1, i, channels.y);
-            voiceBuffer.setSample(2, i, channels.z);
-        } else if (numChannels == 2) {
-            voiceBuffer.setSample(0, i, channels.x);
-            voiceBuffer.setSample(1, i, channels.y);
-        } else if (numChannels == 1) {
-            voiceBuffer.setSample(0, i, channels.x);
-        }
+        if (numChannels >= 1) voiceBuffer.setSample(0, i, channels.x);
+        if (numChannels >= 2) voiceBuffer.setSample(1, i, channels.y);
+        if (numChannels >= 3) voiceBuffer.setSample(2, i, channels.z);
+        if (numChannels >= 4) voiceBuffer.setSample(3, i, channels.r);
+        if (numChannels >= 5) voiceBuffer.setSample(4, i, channels.g);
+        if (numChannels >= 6) voiceBuffer.setSample(5, i, channels.b);
 
         // Fill frequency buffer with per-sample frequency
         frequencyBuffer.setSample(0, i, (float) actualFrequency);
@@ -281,16 +308,14 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     for (int i = 0; i < numSamples; ++i) {
         const float gain = (float)velocity * volumeBuffer.getSample(0, i);
         int sample = startSample + i;
-        if (numChannels >= 3) {
-            outputBuffer.addSample(0, sample, voiceBuffer.getSample(0, i) * gain);
-            outputBuffer.addSample(1, sample, voiceBuffer.getSample(1, i) * gain);
-            outputBuffer.addSample(2, sample, voiceBuffer.getSample(2, i) * gain);
-        } else if (numChannels == 2) {
-            outputBuffer.addSample(0, sample, voiceBuffer.getSample(0, i) * gain);
-            outputBuffer.addSample(1, sample, voiceBuffer.getSample(1, i) * gain);
-        } else if (numChannels == 1) {
-            outputBuffer.addSample(0, sample, voiceBuffer.getSample(0, i) * gain);
-        }
+        // Spatial channels are scaled by gain
+        if (numChannels >= 1) outputBuffer.addSample(0, sample, voiceBuffer.getSample(0, i) * gain);
+        if (numChannels >= 2) outputBuffer.addSample(1, sample, voiceBuffer.getSample(1, i) * gain);
+        if (numChannels >= 3) outputBuffer.addSample(2, sample, voiceBuffer.getSample(2, i) * gain);
+        // Colour channels: no gain scaling
+        if (numChannels >= 4) outputBuffer.addSample(3, sample, voiceBuffer.getSample(3, i));
+        if (numChannels >= 5) outputBuffer.addSample(4, sample, voiceBuffer.getSample(4, i));
+        if (numChannels >= 6) outputBuffer.addSample(5, sample, voiceBuffer.getSample(5, i));
     }
 }
 

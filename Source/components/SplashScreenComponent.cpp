@@ -2,15 +2,7 @@
 
 #include <array>
 
-static constexpr int kDefaultSplashWidth = 640;
-static constexpr int kDefaultSplashHeight = 420;
-
-SplashScreenComponent::SplashScreenComponent()
-    : juce::SplashScreen("osci-render", kDefaultSplashWidth, kDefaultSplashHeight, false) {
-    setOpaque(false);
-    setAlwaysOnTop(true);
-    setInterceptsMouseClicks(true, true);
-
+SplashScreenComponent::SplashScreenComponent() {
     const auto headingFont = juce::Font(26.0f, juce::Font::bold);
     const auto subtitleFont = juce::Font(17.0f, juce::Font::plain);
     configureLabel(titleLabel, headingFont, juce::Justification::centred);
@@ -58,27 +50,7 @@ SplashScreenComponent::SplashScreenComponent()
     addAndMakeVisible(continueButton);
 }
 
-void SplashScreenComponent::configureLabel(juce::Label& label, const juce::Font& font, juce::Justification justification) {
-    label.setColour(juce::Label::textColourId, juce::Colours::white);
-    label.setFont(font);
-    label.setJustificationType(justification);
-    label.setEditable(false, false, false);
-    label.setInterceptsMouseClicks(false, false);
-}
-
-void SplashScreenComponent::dismiss() {
-    if (onDismissRequested) {
-        onDismissRequested();
-    }
-}
-
-void SplashScreenComponent::resized() {
-    auto bounds = getLocalBounds();
-    auto horizontalMargin = juce::jmax(40, bounds.getWidth() / 6);
-    auto verticalMargin = juce::jmax(40, bounds.getHeight() / 6);
-    panelBounds = bounds.reduced(horizontalMargin, verticalMargin);
-
-    auto contentArea = panelBounds.reduced(28);
+void SplashScreenComponent::resizeContent(juce::Rectangle<int> contentArea) {
 
     auto titleArea = contentArea.removeFromTop(40);
     titleLabel.setBounds(titleArea);
@@ -119,19 +91,6 @@ void SplashScreenComponent::resized() {
     buttonsFlex.items.add(juce::FlexItem().withWidth(12.0f));
     buttonsFlex.items.add(juce::FlexItem(continueButton).withMinWidth(140.0f).withFlex(1.0f).withHeight(40.0f));
     buttonsFlex.performLayout(buttonsArea.toFloat());
-}
-
-void SplashScreenComponent::paint(juce::Graphics& g) {
-    g.fillAll(juce::Colours::black.withAlpha(0.6f));
-
-    auto cornerRadius = 12.0f;
-    auto panelFloat = panelBounds.toFloat();
-
-    g.setColour(Colours::veryDark);
-    g.fillRoundedRectangle(panelFloat, cornerRadius);
-
-    g.setColour(Colours::accentColor.withAlpha(0.6f));
-    g.drawRoundedRectangle(panelFloat.reduced(0.5f), cornerRadius, 1.5f);
 }
 
 void SplashScreenComponent::buildBenefitTiles()

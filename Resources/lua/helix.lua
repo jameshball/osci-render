@@ -43,8 +43,8 @@ else
     if not is_start then
         local start_x = RADIUS * math.cos(angle)
         local start_z = RADIUS * math.sin(angle)
-        x = x * (1 - segment_phase) + start_x * segment_phase
-        z = z * (1 - segment_phase) + start_z * segment_phase
+        x = osci_lerp(x, start_x, segment_phase)
+        z = osci_lerp(z, start_z, segment_phase)
     end
 end
 

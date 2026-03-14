@@ -96,6 +96,14 @@ public:
     osci::BooleanParameter* inputEnabled = new osci::BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false, "Enable to use input audio, instead of the generated audio.");
     std::atomic<double> frequency = 220.0;
 
+    // DAW transport state (updated in processBlock, read by voices for Lua)
+    std::atomic<double> luaBpm = 120.0;
+    std::atomic<double> luaPlayTime = 0.0;
+    std::atomic<double> luaPlayTimeBeats = 0.0;
+    std::atomic<bool> luaIsPlaying = false;
+    std::atomic<int> luaTimeSigNum = 4;
+    std::atomic<int> luaTimeSigDen = 4;
+
     juce::SpinLock parsersLock;
     std::vector<std::shared_ptr<FileParser>> parsers;
     std::vector<ShapeSound::Ptr> sounds;
