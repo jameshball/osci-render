@@ -33,6 +33,7 @@ VisualiserRenderer::VisualiserRenderer(
 }
 
 VisualiserRenderer::~VisualiserRenderer() {
+    mirrorTimer.reset();
     openGLContext.detach();
     setShouldBeRunning(false, [this] { renderingSemaphore.release(); });
 }
@@ -353,6 +354,11 @@ void VisualiserRenderer::newOpenGLContextCreated() {
 void VisualiserRenderer::openGLContextClosing() {
     using namespace juce::gl;
 
+    if (mirrorTexture != 0) {
+        glDeleteTextures(1, &mirrorTexture);
+        mirrorTexture = 0;
+    }
+
     glDeleteBuffers(1, &quadIndexBuffer);
     glDeleteBuffers(1, &vertexIndexBuffer);
     glDeleteBuffers(1, &vertexBuffer);
@@ -394,6 +400,67 @@ void VisualiserRenderer::renderOpenGL() {
     if (openGLContext.isActive()) {
         juce::OpenGLHelpers::clear(juce::Colours::black);
 
+        // Mirror mode: display the parent's captured frame
+        auto* source = mirrorSource.load();
+        if (source != nullptr) {
+            renderScale = (float)openGLContext.getRenderingScale();
+
+            // Use full component bounds (ignore toolbar) for mirror mode
+            float totalW = getWidth() * renderScale;
+            float totalH = getHeight() * renderScale;
+
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glViewport(0, 0, juce::roundToInt(totalW), juce::roundToInt(totalH));
+
+            int w = 0, h = 0;
+            {
+                juce::SpinLock::ScopedLockType lock(source->capturedPixelsLock);
+                if (source->capturedPixels.empty())
+                    return;
+                w = source->capturedWidth;
+                h = source->capturedHeight;
+                mirrorPixelBuffer.assign(source->capturedPixels.begin(), source->capturedPixels.end());
+            }
+
+            // Create or re-use mirror texture in OUR GL context
+            if (mirrorTexture == 0) {
+                glGenTextures(1, &mirrorTexture);
+                glBindTexture(GL_TEXTURE_2D, mirrorTexture);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, mirrorPixelBuffer.data());
+                mirrorTextureWidth = w;
+                mirrorTextureHeight = h;
+            } else {
+                glBindTexture(GL_TEXTURE_2D, mirrorTexture);
+                if (w == mirrorTextureWidth && h == mirrorTextureHeight) {
+                    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, mirrorPixelBuffer.data());
+                } else {
+                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, mirrorPixelBuffer.data());
+                    mirrorTextureWidth = w;
+                    mirrorTextureHeight = h;
+                }
+            }
+
+            // Centered square viewport using full component size (not viewportArea)
+            float minDim = juce::jmin(totalW, totalH);
+            float x = (totalW - minDim) / 2.0f;
+            float y = (totalH - minDim) / 2.0f;
+            glViewport(juce::roundToInt(x), juce::roundToInt(y),
+                       juce::roundToInt(minDim), juce::roundToInt(minDim));
+
+            setShader(texturedShader.get());
+            texturedShader->setUniform("uResizeForCanvas", 1.0f);
+            texturedShader->setUniform("uCropEnabled", 0.0f);
+
+            Texture mirrorTex { mirrorTexture, w, h };
+            targetTexture = std::nullopt;
+            drawTexture({ mirrorTex });
+            return;
+        }
+
         // we have a new buffer to render
         if (sampleBufferCount != prevSampleBufferCount) {
             prevSampleBufferCount = sampleBufferCount;
@@ -421,6 +488,30 @@ void VisualiserRenderer::renderOpenGL() {
         activateTargetTexture(std::nullopt);
         setShader(texturedShader.get());
         drawTexture({renderTexture});
+
+        // Capture frame for mirror consumer (child window)
+        if (hasMirrorConsumer.load()) {
+            int w = renderTexture.width;
+            int h = renderTexture.height;
+            size_t numBytes = (size_t)w * h * 4;
+
+            // Read pixels into a local buffer (outside lock) to avoid stalling the child
+            if (captureReadbackBuffer.size() != numBytes)
+                captureReadbackBuffer.resize(numBytes);
+
+            glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, renderTexture.id, 0);
+            glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, captureReadbackBuffer.data());
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+            // Brief lock to swap data to the shared buffer
+            {
+                juce::SpinLock::ScopedLockType lock(capturedPixelsLock);
+                std::swap(capturedPixels, captureReadbackBuffer);
+                capturedWidth = w;
+                capturedHeight = h;
+            }
+        }
     }
 }
 

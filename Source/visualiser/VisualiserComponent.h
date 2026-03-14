@@ -150,14 +150,14 @@ private:
 
 class VisualiserWindow : public juce::DocumentWindow {
 public:
-    VisualiserWindow(juce::String name, VisualiserComponent* parent) : parent(parent), wasPaused(parent->isPaused()), juce::DocumentWindow(name, juce::Colours::black, juce::DocumentWindow::TitleBarButtons::allButtons) {
+    VisualiserWindow(juce::String name, VisualiserComponent* parent) : parent(parent), juce::DocumentWindow(name, juce::Colours::black, juce::DocumentWindow::TitleBarButtons::allButtons) {
         setAlwaysOnTop(true);
     }
 
     void closeButtonPressed() override {
         // local copy of parent so that we can safely delete the child
         VisualiserComponent* parent = this->parent;
-        parent->setPaused(wasPaused);
+        parent->setHasMirrorConsumer(false);
         parent->child = nullptr;
         parent->popout.reset();
         parent->childUpdated();
@@ -166,5 +166,4 @@ public:
 
 private:
     VisualiserComponent* parent;
-    bool wasPaused;
 };

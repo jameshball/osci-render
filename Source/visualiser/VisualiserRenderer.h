@@ -47,6 +47,22 @@ public:
     int getRenderHeight() const { return renderTexture.height; }
     Texture getRenderTexture() const { return renderTexture; }
 
+    // Mirror mode: child displays parent's rendered frame instead of its own pipeline
+    void setMirrorSource(VisualiserRenderer* source) {
+        mirrorSource.store(source);
+        if (source != nullptr) {
+            setShouldBeRunning(false);
+            openGLContext.setContinuousRepainting(true);
+            mirrorTimer = std::make_unique<MirrorTimer>(*this);
+            mirrorTimer->startTimerHz(60);
+        } else {
+            mirrorTimer.reset();
+            openGLContext.setContinuousRepainting(false);
+        }
+    }
+    void setHasMirrorConsumer(bool has) { hasMirrorConsumer.store(has); }
+    bool isMirrorMode() const { return mirrorSource.load() != nullptr; }
+
     void getFrame(std::vector<unsigned char>& frame);
     void drawFrame();    juce::Rectangle<int> getViewportArea() const { return viewportArea; }
     void setViewportArea(juce::Rectangle<int> area) {
@@ -150,6 +166,27 @@ private:
     std::unique_ptr<juce::OpenGLShaderProgram> glowShader;
     std::unique_ptr<juce::OpenGLShaderProgram> afterglowShader;
 #endif
+
+    // Mirror mode state
+    std::atomic<VisualiserRenderer*> mirrorSource{nullptr};
+    std::atomic<bool> hasMirrorConsumer{false};
+    std::vector<unsigned char> capturedPixels;
+    int capturedWidth = 0;
+    int capturedHeight = 0;
+    juce::SpinLock capturedPixelsLock;
+    GLuint mirrorTexture = 0;
+    int mirrorTextureWidth = 0;
+    int mirrorTextureHeight = 0;
+    std::vector<unsigned char> mirrorPixelBuffer; // child's local copy to avoid allocation under lock
+    std::vector<unsigned char> captureReadbackBuffer; // parent's local readback buffer (no lock needed)
+
+    // Timer to drive the child's GL rendering independently of the audio thread
+    struct MirrorTimer : public juce::Timer {
+        VisualiserRenderer& owner;
+        MirrorTimer(VisualiserRenderer& o) : owner(o) {}
+        void timerCallback() override { owner.openGLContext.triggerRepaint(); }
+    };
+    std::unique_ptr<MirrorTimer> mirrorTimer;
 
     std::unique_ptr<juce::OpenGLShaderProgram> simpleShader;
     std::unique_ptr<juce::OpenGLShaderProgram> texturedShader;
