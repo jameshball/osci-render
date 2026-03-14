@@ -123,7 +123,7 @@ int NodeGraphComponent::getNumNodes() const {
 // --- Evaluation ---
 
 float NodeGraphComponent::lookup(float time) const {
-    return evaluateGraphCurve(nodes, time);
+    return evaluateGraphCurve(nodes, time, useBezierInterpolation);
 }
 
 // --- Coordinate Conversion ---
@@ -332,6 +332,9 @@ void NodeGraphComponent::paintLogarithmicTimeGrid(juce::Graphics& g, int w, int 
 // --- Handle Management ---
 
 void NodeGraphComponent::rebuildHandles() {
+    hoverHandle = nullptr;
+    activeHandle = nullptr;
+    clearCurvesForOverlappingNodes();
     handles.clear();
     for (int i = 0; i < (int)nodes.size(); ++i) {
         auto* h = new HandleComponent(*this);
@@ -339,6 +342,15 @@ void NodeGraphComponent::rebuildHandles() {
         addAndMakeVisible(h);
         h->updateFromNode();
         handles.add(h);
+    }
+}
+
+void NodeGraphComponent::clearCurvesForOverlappingNodes() {
+    for (int i = 1; i < (int)nodes.size(); ++i) {
+        double prevPx = convertDomainToPixels(nodes[i - 1].time);
+        double currPx = convertDomainToPixels(nodes[i].time);
+        if (std::abs(currPx - prevPx) < (double)kHandleSize)
+            nodes[i].curve = 0.0f;
     }
 }
 
@@ -624,6 +636,23 @@ void NodeGraphComponent::mouseExit(const juce::MouseEvent&) {
 }
 
 void NodeGraphComponent::mouseDown(const juce::MouseEvent& e) {
+    // Paint mode: start painting
+    if (paintMode) {
+        double domain = convertPixelsToDomain(e.x - kHandleSize / 2);
+        double value = convertPixelsToValue(e.y - kHandleSize / 2);
+        domain = juce::jlimit(domainMin, domainMax, domain);
+        value = juce::jlimit(valueMin, valueMax, value);
+        isPainting = true;
+        paintLastDomain = domain;
+        paintLastValue = value;
+        if (onDragStarted) onDragStarted();
+        paintAtPosition(domain, value);
+        rebuildHandles();
+        if (onNodesChanged) onNodesChanged();
+        repaint();
+        return;
+    }
+
     float nodeDist = 0, curveDist = 0;
     auto* closestNode = findClosestHandle(e.getPosition(), nodeDist);
     int closestCurve = findClosestCurveHandle(e.getPosition(), curveDist);
@@ -674,31 +703,67 @@ void NodeGraphComponent::mouseDown(const juce::MouseEvent& e) {
 }
 
 void NodeGraphComponent::mouseDrag(const juce::MouseEvent& e) {
+    // Paint mode: continue painting
+    if (paintMode && isPainting) {
+        double domain = convertPixelsToDomain(e.x - kHandleSize / 2);
+        double value = convertPixelsToValue(e.y - kHandleSize / 2);
+        domain = juce::jlimit(domainMin, domainMax, domain);
+        value = juce::jlimit(valueMin, valueMax, value);
+
+        if (paintLastDomain >= 0.0) {
+            applyPaintStroke(paintLastDomain, domain, paintLastValue, value);
+        } else {
+            paintAtPosition(domain, value);
+            rebuildHandles();
+            if (onNodesChanged) onNodesChanged();
+            repaint();
+        }
+        paintLastDomain = domain;
+        paintLastValue = value;
+        return;
+    }
+
     // Curve handle dragging
     if (activeCurveIndex >= 1 && activeCurveIndex < (int)nodes.size()) {
-        constexpr double kCurveRange = 50.0;
-        constexpr double kMinSpeed = 0.22;
-        constexpr double kMaxSpeed = 3.2;
-        constexpr double kExpK = 3.0;
-        constexpr double kBase = 65.0;
+        if (useBezierInterpolation) {
+            // In bezier mode, map the mouse Y directly to the desired midpoint
+            // value and compute the curve parameter from it.
+            double mouseValue = convertPixelsToValue(e.y - kHandleSize / 2);
+            mouseValue = juce::jlimit(valueMin, valueMax, mouseValue);
+            double v0 = nodes[activeCurveIndex - 1].value;
+            double v1 = nodes[activeCurveIndex].value;
+            double linearMid = (v0 + v1) * 0.5;
+            // B(0.5) = linearMid + (curve/kBezierCurveScale)*0.25
+            // curve = (B(0.5) - linearMid) * kBezierCurveScale * 4
+            double curve = (mouseValue - linearMid) * (double)osci_audio::kBezierCurveScale * 4.0;
+            curve = juce::jlimit(-(double)osci_audio::kMaxBezierCurve, (double)osci_audio::kMaxBezierCurve, curve);
+            nodes[activeCurveIndex].curve = (float)curve;
+        } else {
+            constexpr double kCurveRange = (double)osci_audio::kMaxBezierCurve;
+            constexpr double kMinSpeed = 0.22;
+            constexpr double kMaxSpeed = 3.2;
+            constexpr double kExpK = 3.0;
+            constexpr double kBase = 65.0;
 
-        double distNorm = e.getDistanceFromDragStartY() / (double)getHeight();
-        double dy = distNorm - curveDragLastNorm;
-        curveDragLastNorm = distNorm;
+            double distNorm = e.getDistanceFromDragStartY() / (double)getHeight();
+            double dy = distNorm - curveDragLastNorm;
+            curveDragLastNorm = distNorm;
 
-        double currentCurve = (double)nodes[activeCurveIndex].curve;
-        double curviness = juce::jlimit(0.0, 1.0, std::abs(currentCurve) / kCurveRange);
-        double expNorm = (std::exp(kExpK * curviness) - 1.0) / (std::exp(kExpK) - 1.0);
-        double speed = kMinSpeed + (kMaxSpeed - kMinSpeed) * expNorm;
+            double currentCurve = (double)nodes[activeCurveIndex].curve;
+            double curviness = juce::jlimit(0.0, 1.0, std::abs(currentCurve) / kCurveRange);
+            double expNorm = (std::exp(kExpK * curviness) - 1.0) / (std::exp(kExpK) - 1.0);
+            double speed = kMinSpeed + (kMaxSpeed - kMinSpeed) * expNorm;
 
-        double delta = dy * kBase * speed;
+            double delta = dy * kBase * speed;
 
-        // Invert if segment slopes downward
-        if (activeCurveIndex > 0 && nodes[activeCurveIndex - 1].value > nodes[activeCurveIndex].value)
-            delta = -delta;
+            // Invert if segment slopes downward
+            if (activeCurveIndex > 0 && nodes[activeCurveIndex - 1].value > nodes[activeCurveIndex].value)
+                delta = -delta;
 
-        double next = juce::jlimit(-50.0, 50.0, currentCurve + delta);
-        nodes[activeCurveIndex].curve = (float)next;
+            double next = juce::jlimit(-kCurveRange, kCurveRange, currentCurve + delta);
+            nodes[activeCurveIndex].curve = (float)next;
+        }
+        clearCurvesForOverlappingNodes();
         if (onNodesChanged) onNodesChanged();
         repaint();
         return;
@@ -713,11 +778,12 @@ void NodeGraphComponent::mouseDrag(const juce::MouseEvent& e) {
         int maxY = getHeight() - kHandleSize;
         int nodeIdx = activeHandle->nodeIndex;
 
-        // Constrain X: can't go left of predecessor (ordering preserved by each
-        // handle's own backward constraint, so no forward cap needed).
+        // Constrain X: can't go left of predecessor or right of successor.
         int minX = 0;
         if (nodeIdx > 0 && handles[nodeIdx - 1] != nullptr)
             minX = handles[nodeIdx - 1]->getX();
+        if (nodeIdx < (int)handles.size() - 1 && handles[nodeIdx + 1] != nullptr)
+            maxX = handles[nodeIdx + 1]->getX();
 
         int clampedX = juce::jlimit(minX, maxX, activeHandle->getX());
         int clampedY = juce::jlimit(0, juce::jmax(0, maxY), activeHandle->getY());
@@ -739,12 +805,19 @@ void NodeGraphComponent::mouseDrag(const juce::MouseEvent& e) {
 
         // Re-clamp position after constraints
         activeHandle->updateFromNode();
+        clearCurvesForOverlappingNodes();
         if (onNodesChanged) onNodesChanged();
         repaint();
     }
 }
 
 void NodeGraphComponent::mouseUp(const juce::MouseEvent&) {
+    if (paintMode && isPainting) {
+        isPainting = false;
+        paintLastDomain = -1.0;
+        if (onDragEnded) onDragEnded();
+        return;
+    }
     if (activeHandle != nullptr) {
         activeHandle->isDragging = false;
         // Fire callback while active state is still queryable
@@ -761,6 +834,8 @@ void NodeGraphComponent::mouseUp(const juce::MouseEvent&) {
 }
 
 void NodeGraphComponent::mouseDoubleClick(const juce::MouseEvent& e) {
+    if (paintMode) return; // No double-click actions in paint mode
+
     // Double-click on a curve handle resets its curve to 0
     float nodeDist = 0, curveDist = 0;
     findClosestHandle(e.getPosition(), nodeDist);
@@ -899,6 +974,190 @@ void NodeGraphComponent::mouseWheelMove(const juce::MouseEvent&, const juce::Mou
 
 void NodeGraphComponent::lookAndFeelChanged() {
     invalidateGrid();
+    repaint();
+}
+
+// ============================================================================
+// Paint Mode
+// ============================================================================
+
+void NodeGraphComponent::setPaintMode(bool enabled) {
+    if (paintMode != enabled) {
+        paintMode = enabled;
+        isPainting = false;
+        paintLastDomain = -1.0;
+        repaint();
+    }
+}
+
+void NodeGraphComponent::setBezierMode(bool bezier) {
+    if (useBezierInterpolation == bezier) return;
+    useBezierInterpolation = bezier;
+    // Zero out all curves when switching to straight-line mode
+    if (!bezier) {
+        for (auto& node : nodes)
+            node.curve = 0.0f;
+        rebuildHandles();
+        if (onNodesChanged) onNodesChanged();
+    }
+    repaint();
+}
+
+void NodeGraphComponent::setPaintShape(PaintShape shape) {
+    paintShape = shape;
+}
+
+float NodeGraphComponent::evaluatePaintShape(PaintShape shape, float t) {
+    t = juce::jlimit(0.0f, 1.0f, t);
+    switch (shape) {
+        case PaintShape::Step:
+            return 1.0f;
+        case PaintShape::Half:
+            return t < 0.5f ? 1.0f : 0.0f;
+        case PaintShape::Down:
+            return 1.0f - t;
+        case PaintShape::Up:
+            return t;
+        case PaintShape::Tri:
+            return t < 0.5f ? (t * 2.0f) : (2.0f - t * 2.0f);
+        case PaintShape::Bump: {
+            // Sine-like bump for preview (actual shape uses bezier curves on 0-valued nodes)
+            return std::sin(t * juce::MathConstants<float>::pi);
+        }
+    }
+    return 1.0f;
+}
+
+void NodeGraphComponent::paintAtPosition(double domain, double value) {
+    if (snapDivisions <= 0) return;
+
+    double range = domainMax - domainMin;
+    double step = range / (double)snapDivisions;
+
+    // Find which grid cell this position falls in
+    int cellIndex = (int)std::floor((domain - domainMin) / step);
+    cellIndex = juce::jlimit(0, snapDivisions - 1, cellIndex);
+    double cellLeft = domainMin + cellIndex * step;
+    double cellRight = juce::jmin(domainMax, cellLeft + step);
+
+    if (cellLeft >= domainMax) return;
+
+    double snappedValue = juce::jlimit(valueMin, valueMax, value);
+
+    constexpr double kEps = 1e-9;
+
+    // Offset the rightmost node slightly inward so adjacent cells don't
+    // overwrite each other's peaks/valleys at shared boundaries.
+    double boundaryEps = step * 0.002;
+    double cellRightInner = cellRight - boundaryEps;
+
+    // Remove all interior nodes strictly within the cell (keeps boundary nodes)
+    nodes.erase(std::remove_if(nodes.begin(), nodes.end(), [&](const GraphNode& n) {
+        return n.time > cellLeft + kEps && n.time < cellRight - kEps;
+    }), nodes.end());
+
+    // Helper: find a node at a given time (within epsilon)
+    auto findAt = [&](double t) -> GraphNode* {
+        for (auto& n : nodes)
+            if (std::abs(n.time - t) < kEps) return &n;
+        return nullptr;
+    };
+
+    // Helper: insert or update a node at a given time with optional curve
+    auto setNodeAt = [&](double t, double v, float curveVal = 0.0f) {
+        auto* existing = findAt(t);
+        if (existing) {
+            existing->value = v;
+            existing->curve = curveVal;
+        } else {
+            GraphNode newNode{ t, v, curveVal };
+            if (constrainNode)
+                constrainNode(-1, newNode.time, newNode.value);
+            newNode.time = juce::jlimit(domainMin, domainMax, newNode.time);
+            newNode.value = juce::jlimit(valueMin, valueMax, newNode.value);
+            auto pos = std::lower_bound(nodes.begin(), nodes.end(), newNode,
+                [](const GraphNode& a, const GraphNode& b) { return a.time < b.time; });
+            nodes.insert(pos, newNode);
+        }
+    };
+
+    // Insert the minimum nodes needed per shape.
+    if (paintShape == PaintShape::Step) {
+        setNodeAt(cellLeft, snappedValue);
+        setNodeAt(cellRightInner, snappedValue);
+    } else if (paintShape == PaintShape::Up) {
+        setNodeAt(cellLeft, valueMin);
+        setNodeAt(cellRightInner, snappedValue);
+    } else if (paintShape == PaintShape::Down) {
+        setNodeAt(cellLeft, snappedValue);
+        setNodeAt(cellRightInner, valueMin);
+    } else if (paintShape == PaintShape::Tri) {
+        double cellMid = (cellLeft + cellRight) * 0.5;
+        setNodeAt(cellLeft, valueMin);
+        setNodeAt(cellMid, snappedValue);
+        setNodeAt(cellRightInner, valueMin);
+    } else if (paintShape == PaintShape::Half) {
+        double cellMid = (cellLeft + cellRight) * 0.5;
+        setNodeAt(cellLeft, valueMin);
+        setNodeAt(cellLeft + boundaryEps, snappedValue);
+        setNodeAt(cellMid, snappedValue);
+        setNodeAt(cellMid + boundaryEps, valueMin);
+        setNodeAt(cellRightInner, valueMin);
+    } else if (paintShape == PaintShape::Bump) {
+        // Bump uses bezier curves: boundary nodes at valueMin, curve creates the hump.
+        // B(0.5) = linearMid + (curve/kBezierCurveScale)*0.25
+        // For nodes at valueMin: linearMid = valueMin, so B(0.5) = valueMin + curve/(kBezierCurveScale*4)
+        // Solving for curve: curve = (snappedValue - valueMin) * kBezierCurveScale * 4
+        float curveStrength = (float)((snappedValue - valueMin) / (valueMax - valueMin))
+                              * osci_audio::kBezierCurveScale * 4.0f;
+        // Preserve existing left node curve so adjacent bumps stay seamless
+        auto* leftNode = findAt(cellLeft);
+        if (leftNode)
+            leftNode->value = valueMin;
+        else
+            setNodeAt(cellLeft, valueMin, 0.0f);
+        setNodeAt(cellRight, valueMin, curveStrength);
+    }
+
+    // Ensure we still have boundary nodes
+    if (nodes.empty() || nodes.front().time > domainMin + kEps)
+        setNodeAt(domainMin, valueMin);
+    if (nodes.back().time < domainMax - kEps)
+        setNodeAt(domainMax, valueMin);
+
+    // Enforce first/last node constraints for LFO looping
+    if (constrainNode) {
+        constrainNode(0, nodes.front().time, nodes.front().value);
+        constrainNode((int)nodes.size() - 1, nodes.back().time, nodes.back().value);
+    }
+}
+
+void NodeGraphComponent::applyPaintStroke(double domainStart, double domainEnd,
+                                           double valueAtStart, double valueAtEnd) {
+    if (snapDivisions <= 0) return;
+
+    double range = domainMax - domainMin;
+    double step = range / (double)snapDivisions;
+
+    // Determine the cells covered by this stroke
+    double startCell = std::floor((domainStart - domainMin) / step) * step + domainMin;
+    double endCell = std::floor((domainEnd - domainMin) / step) * step + domainMin;
+
+    if (startCell > endCell) std::swap(startCell, endCell);
+
+    // Paint each cell in the range
+    for (double cell = startCell; cell <= endCell + step * 0.5; cell += step) {
+        double cellDomain = juce::jlimit(domainMin, domainMax, cell);
+        double t = (domainEnd != domainStart) ?
+            (cellDomain - domainStart) / (domainEnd - domainStart) : 0.5;
+        t = juce::jlimit(0.0, 1.0, t);
+        double value = valueAtStart + t * (valueAtEnd - valueAtStart);
+        paintAtPosition(cellDomain, value);
+    }
+
+    // Rebuild once after all cells are painted
+    rebuildHandles();
+    if (onNodesChanged) onNodesChanged();
     repaint();
 }
 

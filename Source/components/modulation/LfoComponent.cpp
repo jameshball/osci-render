@@ -61,6 +61,97 @@ void LfoComponent::PresetSelector::setPresetName(const juce::String& name) {
 }
 
 // ============================================================================
+// PaintShapePreview – mini waveform + click to open menu
+// ============================================================================
+
+LfoComponent::PaintShapePreview::PaintShapePreview() {
+    setRepaintsOnMouseActivity(true);
+}
+
+void LfoComponent::PaintShapePreview::paint(juce::Graphics& g) {
+    auto bounds = getLocalBounds().toFloat().reduced(2.0f);
+    bool hovering = isMouseOver(true);
+
+    // Draw the shape waveform
+    juce::Path path;
+    float x0 = bounds.getX() + 2.0f;
+    float x1 = bounds.getRight() - 2.0f;
+    float yBottom = bounds.getBottom() - 2.0f;
+    float yTop = bounds.getY() + 2.0f;
+    float width = x1 - x0;
+    float height = yBottom - yTop;
+
+    // Always start at zero
+    path.startNewSubPath(x0, yBottom);
+
+    int steps = 48;
+    for (int i = 0; i <= steps; ++i) {
+        float t = (float)i / (float)steps;
+        float val = NodeGraphComponent::evaluatePaintShape(shape, t);
+        float x = x0 + t * width;
+        float y = yBottom - val * height;
+        path.lineTo(x, y);
+    }
+
+    // Always end at zero
+    path.lineTo(x1, yBottom);
+
+    juce::Colour lineColour = paintEnabled ? accent : juce::Colours::white.withAlpha(0.5f);
+    g.setColour(lineColour.withAlpha(hovering ? 1.0f : (paintEnabled ? 0.8f : 0.5f)));
+    g.strokePath(path, juce::PathStrokeType(2.0f));
+}
+
+void LfoComponent::PaintShapePreview::mouseDown(const juce::MouseEvent&) {
+    if (onClick) onClick();
+}
+
+// ============================================================================
+// BezierToggle – S-curve / straight line toggle icon
+// ============================================================================
+
+LfoComponent::BezierToggle::BezierToggle() {
+    setRepaintsOnMouseActivity(true);
+}
+
+void LfoComponent::BezierToggle::paint(juce::Graphics& g) {
+    auto bounds = getLocalBounds().toFloat().reduced(3.0f);
+    bool hovering = isMouseOver(true);
+
+    if (hovering) {
+        g.setColour(juce::Colours::white.withAlpha(0.08f));
+        g.fillRoundedRectangle(getLocalBounds().toFloat().reduced(1.0f), 3.0f);
+    }
+
+    juce::Path path;
+    float x0 = bounds.getX();
+    float x1 = bounds.getRight();
+    float yTop = bounds.getY();
+    float yBot = bounds.getBottom();
+
+    if (bezier) {
+        // S-shaped bezier curve
+        path.startNewSubPath(x0, yBot);
+        path.cubicTo(x0 + (x1 - x0) * 0.5f, yBot,
+                     x0 + (x1 - x0) * 0.5f, yTop,
+                     x1, yTop);
+    } else {
+        // Straight diagonal line
+        path.startNewSubPath(x0, yBot);
+        path.lineTo(x1, yTop);
+    }
+
+    float alpha = hovering ? 1.0f : 0.65f;
+    g.setColour(bezier ? accent.withAlpha(alpha) : juce::Colours::white.withAlpha(alpha * 0.7f));
+    g.strokePath(path, juce::PathStrokeType(2.0f, juce::PathStrokeType::curved));
+}
+
+void LfoComponent::BezierToggle::mouseDown(const juce::MouseEvent&) {
+    bezier = !bezier;
+    repaint();
+    if (onToggle) onToggle(bezier);
+}
+
+// ============================================================================
 // LfoComponent
 // ============================================================================
 
@@ -123,6 +214,12 @@ static ModulationModeConfig buildLfoModeConfig(OscirenderAudioProcessor& proc) {
 LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
     : ModulationSourceComponent(buildLfoConfig(processor)),
       audioProcessor(processor),
+      paintToggle("paint", juce::String(BinaryData::brush_svg, BinaryData::brush_svgSize),
+                  juce::Colours::white.withAlpha(0.5f), getLfoColour(0)),
+      copyButton("copy", juce::String(BinaryData::copy_svg, BinaryData::copy_svgSize),
+                 juce::Colours::white.withAlpha(0.5f), juce::Colours::white.withAlpha(0.5f)),
+      pasteButton("paste", juce::String(BinaryData::paste_svg, BinaryData::paste_svgSize),
+                  juce::Colours::white.withAlpha(0.5f), juce::Colours::white.withAlpha(0.5f)),
       rateControl(buildLfoRateConfig(processor), 0),
       modeControl(buildLfoModeConfig(processor), 0) {
     // Initialize all LFOs with default triangle preset
@@ -140,18 +237,57 @@ LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
     graph.setHoverThreshold(20.0f);
     graph.setCornerRadius(6.0f);
     graph.setFlowTrailWrapping(true, 0.0, 1.0);
+    graph.setBezierMode(true);
 
     graph.constrainNode = [this](int nodeIndex, double& time, double& value) {
         applyLfoConstraints(nodeIndex, time, value);
     };
     graph.hasCurveHandle = [](int) { return true; };
-    graph.onNodesChanged = [this]() { syncActiveLfoFromGraph(); };
+    graph.onNodesChanged = [this]() { if (!isSyncingGraph) syncActiveLfoFromGraph(); };
     addAndMakeVisible(graph);
 
     // Preset selector
+    presetSelector.setTooltip("LFO waveform preset - click arrows to cycle");
     presetSelector.onPrev = [this]() { cyclePreset(-1); };
     presetSelector.onNext = [this]() { cyclePreset(1); };
     addAndMakeVisible(presetSelector);
+
+    // Paint brush toggle
+    paintToggle.setClickingTogglesState(true);
+    paintToggle.setTooltip("Paint mode - draw waveform shapes with the brush");
+    paintToggle.onClick = [this]() {
+        bool on = paintToggle.getToggleState();
+        graph.setPaintMode(on);
+        shapePreview.setEnabled(on);
+        resized();
+    };
+    addAndMakeVisible(paintToggle);
+
+    // Paint shape preview (always visible, greyed out when paint mode is off)
+    shapePreview.setShape(NodeGraphComponent::PaintShape::Step);
+    shapePreview.setTooltip("Paint shape - click to change");
+    shapePreview.setAccentColour(getLfoColour(0));
+    shapePreview.onClick = [this]() { showPaintShapeMenu(); };
+    shapePreview.setEnabled(false);
+    addAndMakeVisible(shapePreview);
+
+    // Bezier/straight toggle
+    bezierToggle.setAccentColour(getLfoColour(0));
+    bezierToggle.setTooltip("Toggle bezier / straight line interpolation");
+    bezierToggle.onToggle = [this](bool bezier) {
+        graph.setBezierMode(bezier);
+        syncActiveLfoFromGraph();
+    };
+    addAndMakeVisible(bezierToggle);
+
+    // Copy/paste buttons
+    copyButton.setTooltip("Copy LFO waveform to clipboard as JSON");
+    copyButton.onClick = [this]() { copyWaveformToClipboard(); };
+    addAndMakeVisible(copyButton);
+
+    pasteButton.setTooltip("Paste LFO waveform from clipboard JSON");
+    pasteButton.onClick = [this]() { pasteWaveformFromClipboard(); };
+    addAndMakeVisible(pasteButton);
 
     // Rate control
     rateControl.setSourceIndex(getActiveSourceIndex());
@@ -195,6 +331,16 @@ void LfoComponent::timerCallback() {
     wasLfoActive = active;
 }
 
+void LfoComponent::paint(juce::Graphics& g) {
+    ModulationSourceComponent::paint(g);
+
+    // Dark rounded background behind paint + preview controls
+    if (!paintControlsBg.isEmpty()) {
+        g.setColour(Colours::veryDark.brighter(0.15f));
+        g.fillRoundedRectangle(paintControlsBg.toFloat(), 4.0f);
+    }
+}
+
 void LfoComponent::resized() {
     ModulationSourceComponent::resized();
 
@@ -202,8 +348,32 @@ void LfoComponent::resized() {
 
     auto topBar = bounds.removeFromTop(kTopBarHeight);
     bounds.removeFromTop(kTopBarGap);
-    int presetW = juce::jmin(kMaxPresetWidth, topBar.getWidth() / 3);
-    presetSelector.setBounds(topBar.removeFromRight(presetW));
+
+    // Top bar layout: [paintToggle][shapePreview] (dark bg) [bezierToggle][gap][presetSelector]
+    auto paintControlsLeft = topBar.getX();
+    paintToggle.setBounds(topBar.removeFromLeft(kIconSize));
+
+    shapePreview.setBounds(topBar.removeFromLeft(kShapePreviewWidth));
+    auto paintControlsRight = topBar.getX();
+
+    // Store background rect for the paint + preview group only
+    paintControlsBg = juce::Rectangle<int>(paintControlsLeft, topBar.getY(),
+                                            paintControlsRight - paintControlsLeft,
+                                            topBar.getHeight());
+
+    topBar.removeFromLeft(6);
+    bezierToggle.setBounds(topBar.removeFromLeft(kIconSize));
+    topBar.removeFromLeft(6);
+
+    // Copy/paste buttons on the right
+    auto pasteArea = topBar.removeFromRight(kIconSize);
+    topBar.removeFromRight(2);
+    auto copyArea = topBar.removeFromRight(kIconSize);
+    topBar.removeFromRight(4);
+    copyButton.setBounds(copyArea);
+    pasteButton.setBounds(pasteArea);
+
+    presetSelector.setBounds(topBar);
 
     // Bottom row: mode + rate controls
     auto bottomRow = bounds.removeFromBottom(kRateHeight);
@@ -234,13 +404,21 @@ void LfoComponent::onActiveSourceChanged(int index) {
     modeControl.setSourceIndex(index);
     modeControl.syncFromProcessor();
     phaseSlider.setValue(audioProcessor.getLfoPhaseOffset(index));
-    phaseSlider.setAccentColour(getLfoColour(index));
+
+    auto colour = getLfoColour(index);
+    phaseSlider.setAccentColour(colour);
+    shapePreview.setAccentColour(colour);
+    paintToggle.setOnColour(colour);
+    bezierToggle.setAccentColour(colour);
 }
 
 void LfoComponent::syncGraphToActiveLfo() {
     int idx = getActiveSourceIndex();
     auto& waveform = lfoData[idx].waveform;
+    juce::ScopedValueSetter<bool> guard(isSyncingGraph, true);
     graph.setNodes(waveform.nodes);
+    graph.setBezierMode(waveform.useBezier);
+    bezierToggle.setBezier(waveform.useBezier);
 
     auto colour = getLfoColour(idx);
     graph.setColour(NodeGraphComponent::lineColourId, colour);
@@ -251,6 +429,7 @@ void LfoComponent::syncGraphToActiveLfo() {
 void LfoComponent::syncActiveLfoFromGraph() {
     int idx = getActiveSourceIndex();
     lfoData[idx].waveform.nodes = graph.getNodes();
+    lfoData[idx].waveform.useBezier = graph.isBezierMode();
     lfoData[idx].preset = LfoPreset::Custom;
     updatePresetLabel();
 
@@ -287,19 +466,17 @@ LfoPreset LfoComponent::getLfoPreset(int lfoIndex) const {
 }
 
 void LfoComponent::cyclePreset(int direction) {
-    static const std::array<LfoPreset, 6> presets = {
-        LfoPreset::Sine, LfoPreset::Triangle, LfoPreset::Sawtooth, LfoPreset::ReverseSawtooth, LfoPreset::Square, LfoPreset::Custom
-    };
+    auto& registry = getLfoPresetRegistry();
 
     int idx = getActiveSourceIndex();
     auto current = lfoData[idx].preset;
     int currentIdx = -1;
-    for (int i = 0; i < (int)presets.size(); ++i) {
-        if (presets[i] == current) { currentIdx = i; break; }
+    for (int i = 0; i < (int)registry.size(); ++i) {
+        if (registry[i].preset == current) { currentIdx = i; break; }
     }
     if (currentIdx < 0) currentIdx = (direction > 0) ? -1 : 0;
-    int newIdx = (currentIdx + direction + (int)presets.size()) % (int)presets.size();
-    applyPreset(presets[newIdx]);
+    int newIdx = (currentIdx + direction + (int)registry.size()) % (int)registry.size();
+    applyPreset(registry[newIdx].preset);
 }
 
 void LfoComponent::applyPreset(LfoPreset preset) {
@@ -313,6 +490,13 @@ void LfoComponent::applyPreset(LfoPreset preset) {
         lfoData[idx].waveform = lfoData[idx].customWaveform;
     else
         lfoData[idx].waveform = createLfoPreset(preset);
+
+    // Disable paint mode when switching to a preset
+    if (paintToggle.getToggleState()) {
+        paintToggle.setToggleState(false, juce::dontSendNotification);
+        graph.setPaintMode(false);
+        shapePreview.setEnabled(false);
+    }
 
     syncGraphToActiveLfo();
     updatePresetLabel();
@@ -339,8 +523,11 @@ void LfoComponent::syncFromProcessorState() {
     rateControl.syncFromProcessor();
     modeControl.setSourceIndex(getActiveSourceIndex());
     modeControl.syncFromProcessor();
+
+    auto colour = getLfoColour(getActiveSourceIndex());
     phaseSlider.setValue(audioProcessor.getLfoPhaseOffset(getActiveSourceIndex()));
-    phaseSlider.setAccentColour(getLfoColour(getActiveSourceIndex()));
+    phaseSlider.setAccentColour(colour);
+    shapePreview.setAccentColour(colour);
 }
 
 void LfoComponent::applyLfoConstraints(int nodeIndex, double& time, double& value) {
@@ -360,6 +547,35 @@ void LfoComponent::applyLfoConstraints(int nodeIndex, double& time, double& valu
     value = juce::jlimit(0.0, 1.0, value);
 }
 
+void LfoComponent::showPaintShapeMenu() {
+    juce::PopupMenu menu;
+    using PS = NodeGraphComponent::PaintShape;
+    auto current = graph.getPaintShape();
+
+    auto addItem = [&](const juce::String& name, PS shape) {
+        menu.addItem(name, true, shape == current, [this, shape]() {
+            graph.setPaintShape(shape);
+            shapePreview.setShape(shape);
+            // Bump shape requires bezier interpolation (nodes at 0, curves create shape)
+            if (shape == PS::Bump) {
+                graph.setBezierMode(true);
+                bezierToggle.setBezier(true);
+            }
+        });
+    };
+
+    addItem("Step", PS::Step);
+    addItem("Half", PS::Half);
+    addItem("Down", PS::Down);
+    addItem("Up", PS::Up);
+    addItem("Tri", PS::Tri);
+    addItem("Bump", PS::Bump);
+
+    menu.showMenuAsync(juce::PopupMenu::Options()
+        .withTargetComponent(&shapePreview)
+        .withMinimumWidth(80));
+}
+
 void LfoComponent::setMidiEnabled(bool enabled) {
     if (enabled) {
         modeControl.setModes(getAllLfoModePairs());
@@ -374,4 +590,80 @@ void LfoComponent::setMidiEnabled(bool enabled) {
                 audioProcessor.setLfoMode(i, LfoMode::Free);
         }
     }
+}
+
+void LfoComponent::copyWaveformToClipboard() {
+    int idx = getActiveSourceIndex();
+    auto& waveform = lfoData[idx].waveform;
+
+    auto* root = new juce::DynamicObject();
+    root->setProperty("bezier", waveform.useBezier);
+
+    juce::Array<juce::var> nodesArray;
+    for (auto& n : waveform.nodes) {
+        auto* nodeObj = new juce::DynamicObject();
+        nodeObj->setProperty("t", n.time);
+        nodeObj->setProperty("v", n.value);
+        nodeObj->setProperty("c", (double)n.curve);
+        nodesArray.add(juce::var(nodeObj));
+    }
+    root->setProperty("nodes", nodesArray);
+
+    juce::SystemClipboard::copyTextToClipboard(juce::JSON::toString(juce::var(root)));
+}
+
+void LfoComponent::pasteWaveformFromClipboard() {
+    auto text = juce::SystemClipboard::getTextFromClipboard().trim();
+    if (text.isEmpty()) return;
+
+    auto parsed = juce::JSON::parse(text);
+    if (!parsed.isObject()) return;
+
+    auto* obj = parsed.getDynamicObject();
+    if (obj == nullptr) return;
+
+    auto nodesVar = obj->getProperty("nodes");
+    if (!nodesVar.isArray()) return;
+
+    auto* nodesArray = nodesVar.getArray();
+    if (nodesArray == nullptr || nodesArray->size() < 2) return;
+
+    std::vector<LfoNode> nodes;
+    for (auto& item : *nodesArray) {
+        if (!item.isObject()) return;
+        auto* nodeObj = item.getDynamicObject();
+        if (nodeObj == nullptr) return;
+
+        LfoNode node;
+        node.time = (double)nodeObj->getProperty("t");
+        node.value = (double)nodeObj->getProperty("v");
+        node.curve = (float)(double)nodeObj->getProperty("c");
+
+        if (std::isnan(node.time) || std::isinf(node.time) ||
+            std::isnan(node.value) || std::isinf(node.value) ||
+            std::isnan(node.curve) || std::isinf(node.curve))
+            return;
+
+        node.time = juce::jlimit(0.0, 1.0, node.time);
+        node.value = juce::jlimit(0.0, 1.0, node.value);
+        node.curve = juce::jlimit(-osci_audio::kMaxBezierCurve, osci_audio::kMaxBezierCurve, node.curve);
+        nodes.push_back(node);
+    }
+
+    if (nodes.size() < 2) return;
+
+    std::sort(nodes.begin(), nodes.end(),
+              [](const LfoNode& a, const LfoNode& b) { return a.time < b.time; });
+
+    bool bezier = obj->getProperty("bezier");
+
+    int idx = getActiveSourceIndex();
+    lfoData[idx].waveform.nodes = std::move(nodes);
+    lfoData[idx].waveform.useBezier = bezier;
+    lfoData[idx].preset = LfoPreset::Custom;
+    audioProcessor.lfoWaveformChanged(idx, lfoData[idx].waveform);
+    audioProcessor.lfoPresets[idx] = LfoPreset::Custom;
+
+    syncGraphToActiveLfo();
+    updatePresetLabel();
 }

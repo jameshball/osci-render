@@ -77,6 +77,7 @@
         <FILE id="laB1fX" name="bit-crush.svg" compile="0" resource="1" file="Resources/svg/bit-crush.svg"/>
         <FILE id="LJpyE5" name="blender.svg" compile="0" resource="1" file="Resources/svg/blender.svg"/>
         <FILE id="Rs9Xr6" name="bounce.svg" compile="0" resource="1" file="Resources/svg/bounce.svg"/>
+        <FILE id="bR5h1v" name="brush.svg" compile="0" resource="1" file="Resources/svg/brush.svg"/>
         <FILE id="rQlbqP" name="bulge.svg" compile="0" resource="1" file="Resources/svg/bulge.svg"/>
         <FILE id="hwlzvW" name="card.svg" compile="0" resource="1" file="Resources/svg/card.svg"/>
         <FILE id="GQM3jZ" name="cash.svg" compile="0" resource="1" file="Resources/svg/cash.svg"/>
@@ -84,6 +85,7 @@
         <FILE id="y9tCpG" name="clippy.svg" compile="0" resource="1" file="Resources/svg/clippy.svg"/>
         <FILE id="jYG5GY" name="close.svg" compile="0" resource="1" file="Resources/svg/close.svg"/>
         <FILE id="rl17ZK" name="cog.svg" compile="0" resource="1" file="Resources/svg/cog.svg"/>
+        <FILE id="cPySvg" name="copy.svg" compile="0" resource="1" file="Resources/svg/copy.svg"/>
         <FILE id="pTnUPp" name="cube.svg" compile="0" resource="1" file="Resources/svg/cube.svg"/>
         <FILE id="toeDbG" name="dash.svg" compile="0" resource="1" file="Resources/svg/dash.svg"/>
         <FILE id="bH7fkX" name="delay.svg" compile="0" resource="1" file="Resources/svg/delay.svg"/>
@@ -126,6 +128,7 @@
         <FILE id="pSc1mq" name="osci.svg" compile="0" resource="1" file="Resources/svg/osci.svg"/>
         <FILE id="rotjUT" name="oscilloscope.svg" compile="0" resource="1"
               file="Resources/svg/oscilloscope.svg"/>
+        <FILE id="pStSvg" name="paste.svg" compile="0" resource="1" file="Resources/svg/paste.svg"/>
         <FILE id="f2D5tv" name="pause.svg" compile="0" resource="1" file="Resources/svg/pause.svg"/>
         <FILE id="D2AI1b" name="pencil.svg" compile="0" resource="1" file="Resources/svg/pencil.svg"/>
         <FILE id="zFdUYi" name="planet.svg" compile="0" resource="1" file="Resources/svg/planet.svg"/>
@@ -181,6 +184,7 @@
               file="Source/audio/DahdsrEnvelope.h"/>
         <FILE id="GrNdH1" name="GraphNode.h" compile="0" resource="0" file="Source/audio/GraphNode.h"/>
         <FILE id="LfStH1" name="LfoState.h" compile="0" resource="0" file="Source/audio/LfoState.h"/>
+        <FILE id="LfStC1" name="LfoState.cpp" compile="1" resource="0" file="Source/audio/LfoState.cpp"/>
         <FILE id="EnStH1" name="EnvState.h" compile="0" resource="0" file="Source/audio/EnvState.h"/>
         <FILE id="MdAsH1" name="ModAssignment.h" compile="0" resource="0" file="Source/audio/ModAssignment.h"/>
         <FILE id="EjkbRe" name="PolygonizerEffect.h" compile="0" resource="0"

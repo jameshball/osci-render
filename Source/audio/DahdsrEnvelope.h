@@ -41,6 +41,30 @@ inline float evalSegment(float start, float end, double elapsed, double duration
     const float shaped = evalCurve01(curve, pos);
     return lerp(start, end, shaped);
 }
+
+// Maximum absolute curve value for bezier segments.
+// The bezier control point offset scales as (curve / kBezierCurveScale) * 0.5,
+// so at ±kMaxBezierCurve the control point is 2.0 units from the linear midpoint.
+inline constexpr float kMaxBezierCurve = 200.0f;
+
+// Denominator used to normalise the curve parameter in the bezier formula.
+inline constexpr float kBezierCurveScale = 50.0f;
+
+// Quadratic bezier segment evaluation.
+// The curve parameter [-kMaxBezierCurve, +kMaxBezierCurve] offsets the bezier
+// control point from the linear midpoint:
+//   cp = (start+end)/2 + (curve / kBezierCurveScale) * 0.5
+// curve=0 gives a straight line; positive bows upward, negative downward.
+inline float evalBezierSegment(float start, float end, double elapsed, double duration, float curve)
+{
+    if (duration <= 0.0)
+        return end;
+    const float t = (float) juce::jlimit(0.0, 1.0, elapsed / duration);
+    const float linearMid = (start + end) * 0.5f;
+    const float cp = linearMid + (curve / kBezierCurveScale) * 0.5f;
+    const float omt = 1.0f - t;
+    return omt * omt * start + 2.0f * omt * t * cp + t * t * end;
+}
 }
 
 struct DahdsrParams

@@ -18,14 +18,16 @@ using LfoNode = GraphNode;
 // Represents a single LFO waveform as a set of breakpoints over one normalized cycle.
 struct LfoWaveform {
     std::vector<LfoNode> nodes;
+    bool useBezier = true;
 
     // Evaluate the waveform at a given phase [0, 1] -> value [0, 1].
     float evaluate(float phase) const {
         phase = phase - std::floor(phase);
-        return evaluateGraphCurve(nodes, phase);
+        return juce::jlimit(0.0f, 1.0f, evaluateGraphCurve(nodes, phase, useBezier));
     }
 
     void saveToXml(juce::XmlElement* parent) const {
+        parent->setAttribute("useBezier", useBezier);
         for (const auto& node : nodes) {
             auto* nodeXml = parent->createNewChildElement("node");
             nodeXml->setAttribute("time", node.time);
@@ -35,6 +37,7 @@ struct LfoWaveform {
     }
 
     void loadFromXml(const juce::XmlElement* parent) {
+        useBezier = parent->getBoolAttribute("useBezier", true);
         nodes.clear();
         for (auto* nodeXml : parent->getChildWithTagNameIterator("node")) {
             LfoNode node;
@@ -53,85 +56,69 @@ enum class LfoPreset {
     Sawtooth,
     ReverseSawtooth,
     Square,
+    // Creative presets
+    Exponential,
+    Logarithmic,
+    Pulse,
+    Staircase,
+    SmoothRandom,
+    Bounce,
+    Elastic,
+    WarmSaw,
+    Shark,
+    PulseTrain,
+    Sidechain,
+    TranceGate,
     Custom
 };
 
+// Canonical preset registry: maps enum values to display strings.
+// Order here defines the cycling order in the UI.
+struct LfoPresetEntry {
+    LfoPreset preset;
+    const char* name;
+};
+
+inline const std::vector<LfoPresetEntry>& getLfoPresetRegistry() {
+    static const std::vector<LfoPresetEntry> registry = {
+        { LfoPreset::Sine,            "Sine" },
+        { LfoPreset::Triangle,        "Triangle" },
+        { LfoPreset::Sawtooth,        "Sawtooth" },
+        { LfoPreset::ReverseSawtooth, "Reverse Sawtooth" },
+        { LfoPreset::Square,          "Square" },
+        { LfoPreset::Exponential,     "Exponential" },
+        { LfoPreset::Logarithmic,     "Logarithmic" },
+        { LfoPreset::Pulse,           "Pulse" },
+        { LfoPreset::Staircase,       "Staircase" },
+        { LfoPreset::SmoothRandom,    "Smooth Random" },
+        { LfoPreset::Bounce,          "Bounce" },
+        { LfoPreset::Elastic,         "Elastic" },
+        { LfoPreset::WarmSaw,         "Warm Saw" },
+        { LfoPreset::Shark,           "Shark" },
+        { LfoPreset::PulseTrain,      "Pulse Train" },
+        { LfoPreset::Sidechain,       "Sidechain" },
+        { LfoPreset::TranceGate,      "Trance Gate" },
+        { LfoPreset::Custom,          "Custom" },
+    };
+    return registry;
+}
+
 inline juce::String lfoPresetToString(LfoPreset preset) {
-    switch (preset) {
-        case LfoPreset::Sine: return "Sine";
-        case LfoPreset::Triangle: return "Triangle";
-        case LfoPreset::Sawtooth: return "Sawtooth";
-        case LfoPreset::ReverseSawtooth: return "Reverse Sawtooth";
-        case LfoPreset::Square: return "Square";
-        case LfoPreset::Custom: return "Custom";
-    }
+    for (auto& entry : getLfoPresetRegistry())
+        if (entry.preset == preset) return entry.name;
     return "Custom";
 }
 
 inline LfoPreset stringToLfoPreset(const juce::String& s) {
-    if (s == "Sine") return LfoPreset::Sine;
-    if (s == "Triangle") return LfoPreset::Triangle;
-    if (s == "Sawtooth") return LfoPreset::Sawtooth;
-    if (s == "Reverse Sawtooth") return LfoPreset::ReverseSawtooth;
-    if (s == "Square") return LfoPreset::Square;
+    for (auto& entry : getLfoPresetRegistry())
+        if (s == entry.name) return entry.preset;
+    // Legacy aliases for renamed/removed presets
+    if (s == "Rounded Square") return LfoPreset::WarmSaw;
     return LfoPreset::Custom;
 }
 
-// Generate preset waveform node sets.
-inline LfoWaveform createLfoPreset(LfoPreset preset) {
-    LfoWaveform waveform;
-    switch (preset) {
-        case LfoPreset::Sine:
-            // Approximate sine with 5 nodes + curve shaping.
-            // curve ≈ ±1.75 closely matches sin(π/2 · t) via the exponential shaper.
-            waveform.nodes = {
-                { 0.0,  0.5,  0.0f },
-                { 0.25, 1.0, -1.75f },
-                { 0.5,  0.5,  1.75f },
-                { 0.75, 0.0, -1.75f },
-                { 1.0,  0.5,  1.75f },
-            };
-            break;
-        case LfoPreset::Triangle:
-            waveform.nodes = {
-                { 0.0,  0.0, 0.0f },
-                { 0.5,  1.0, 0.0f },
-                { 1.0,  0.0, 0.0f },
-            };
-            break;
-        case LfoPreset::Sawtooth:
-            waveform.nodes = {
-                { 0.0,  0.0, 0.0f },
-                { 1.0,  1.0, 0.0f },
-            };
-            break;
-        case LfoPreset::ReverseSawtooth:
-            waveform.nodes = {
-                { 0.0,  1.0, 0.0f },
-                { 1.0,  0.0, 0.0f },
-            };
-            break;
-        case LfoPreset::Square:
-            // Square wave: high for first half, drops to low for second half
-            waveform.nodes = {
-                { 0.0,    1.0, 0.0f },
-                { 0.499,  1.0, 0.0f },
-                { 0.5,    0.0, 0.0f },
-                { 0.999,  0.0, 0.0f },
-                { 1.0,    1.0, 0.0f },
-            };
-            break;
-        case LfoPreset::Custom:
-            // Default to triangle
-            waveform.nodes = {
-                { 0.0,  0.0, 0.0f },
-                { 0.5,  1.0, 0.0f },
-                { 1.0,  0.0, 0.0f },
-            };
-            break;
-    }
-    return waveform;
-}
+// Generate preset waveform node sets (defined in LfoState.cpp).
+LfoWaveform createLfoPreset(LfoPreset preset);
 
 // Map beginner-mode per-parameter LfoType to global LfoPreset.
 // Returns {preset, negateDepth}.  negateDepth is true for ReverseSawtooth

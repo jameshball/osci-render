@@ -84,6 +84,29 @@ public:
     // Receives the Graphics context, component width and height.
     std::function<void(juce::Graphics&, int w, int h)> customGridPainter;
 
+    // --- Paint mode ---
+    // Paint shapes used when painting with the brush tool.
+    enum class PaintShape {
+        Step,   // Flat stepped waveform
+        Half,   // Half-sine wave pattern
+        Down,   // Descending ramp
+        Up,     // Ascending ramp
+        Tri,    // Triangle wave
+        Bump    // Bezier bump (nodes at 0, curve creates rounded hump)
+    };
+
+    void setPaintMode(bool enabled);
+    bool isPaintMode() const { return paintMode; }
+
+    void setBezierMode(bool bezier);
+    bool isBezierMode() const { return useBezierInterpolation; }
+
+    void setPaintShape(PaintShape shape);
+    PaintShape getPaintShape() const { return paintShape; }
+
+    // Evaluate a paint shape at normalised position t [0,1] -> value [0,1]
+    static float evaluatePaintShape(PaintShape shape, float t);
+
     // --- Colour IDs ---
     enum ColourIds {
         backgroundColourId = 0x7001000,
@@ -178,6 +201,7 @@ private:
     void rebuildHandles();
     void repositionHandles();
     void applyConstraints(int nodeIndex);
+    void clearCurvesForOverlappingNodes();
     HandleComponent* findClosestHandle(juce::Point<int> pos, float& outDist) const;
     int findClosestCurveHandle(juce::Point<int> pos, float& outDist) const;
     juce::Point<float> getCurveHandlePosition(int nodeIndex) const;
@@ -233,6 +257,16 @@ private:
     // --- Hover tracking ---
     int prevHoverNodeIndex = -1;
     bool prevHoverIsCurve = false;
+
+    // --- Paint mode ---
+    bool paintMode = false;
+    bool useBezierInterpolation = false;
+    PaintShape paintShape = PaintShape::Step;
+    bool isPainting = false;
+    double paintLastDomain = -1.0;  // last painted domain position
+    double paintLastValue = 0.0;    // last painted value position
+    void paintAtPosition(double domain, double value);
+    void applyPaintStroke(double domainStart, double domainEnd, double valueAtStart, double valueAtEnd);
 
     // --- Flow Trail ---
     std::unique_ptr<FlowTrailRenderer> flowTrailRenderer;
