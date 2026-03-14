@@ -394,14 +394,25 @@
         <FILE id="LfCmH1" name="LfoComponent.h" compile="0" resource="0" file="Source/components/modulation/LfoComponent.h"/>
         <FILE id="LfCmC2" name="LfoComponent.cpp" compile="1" resource="0"
               file="Source/components/modulation/LfoComponent.cpp"/>
-        <FILE id="LfRtH1" name="LfoRateComponent.h" compile="0" resource="0"
-              file="Source/components/modulation/LfoRateComponent.h"/>
-        <FILE id="LfRtC2" name="LfoRateComponent.cpp" compile="1" resource="0"
-              file="Source/components/modulation/LfoRateComponent.cpp"/>
-        <FILE id="LfMdH1" name="LfoModeComponent.h" compile="0" resource="0"
-              file="Source/components/modulation/LfoModeComponent.h"/>
-        <FILE id="LfMdC2" name="LfoModeComponent.cpp" compile="1" resource="0"
-              file="Source/components/modulation/LfoModeComponent.cpp"/>
+        <FILE id="LfRtH1" name="ModulationRateComponent.h" compile="0" resource="0"
+              file="Source/components/modulation/ModulationRateComponent.h"/>
+        <FILE id="LfRtC2" name="ModulationRateComponent.cpp" compile="1" resource="0"
+              file="Source/components/modulation/ModulationRateComponent.cpp"/>
+        <FILE id="LfMdH1" name="ModulationModeComponent.h" compile="0" resource="0"
+              file="Source/components/modulation/ModulationModeComponent.h"/>
+        <FILE id="LfMdC2" name="ModulationModeComponent.cpp" compile="1" resource="0"
+              file="Source/components/modulation/ModulationModeComponent.cpp"/>
+        <FILE id="RnGrH1" name="RandomGraphComponent.h" compile="0" resource="0"
+              file="Source/components/modulation/RandomGraphComponent.h"/>
+        <FILE id="RnGrC2" name="RandomGraphComponent.cpp" compile="1" resource="0"
+              file="Source/components/modulation/RandomGraphComponent.cpp"/>
+        <FILE id="RnCmH1" name="RandomComponent.h" compile="0" resource="0"
+              file="Source/components/modulation/RandomComponent.h"/>
+        <FILE id="RnCmC2" name="RandomComponent.cpp" compile="1" resource="0"
+              file="Source/components/modulation/RandomComponent.cpp"/>
+        <FILE id="RnStH1" name="RandomState.h" compile="0" resource="0" file="Source/audio/RandomState.h"/>
+        <FILE id="MdTyH1" name="ModulationTypes.h" compile="0" resource="0"
+              file="Source/audio/ModulationTypes.h"/>
         <FILE id="TmpCH1" name="TempoComponent.h" compile="0" resource="0"
               file="Source/components/modulation/TempoComponent.h"/>
         <FILE id="TmpCC2" name="TempoComponent.cpp" compile="1" resource="0"

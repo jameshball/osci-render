@@ -98,11 +98,33 @@ static ModulationSourceConfig buildLfoConfig(OscirenderAudioProcessor& proc) {
     return cfg;
 }
 
+static ModulationRateConfig buildLfoRateConfig(OscirenderAudioProcessor& proc) {
+    ModulationRateConfig cfg;
+    cfg.getRateParam = [&proc](int i) -> osci::FloatParameter* { return proc.lfoRate[i]; };
+    cfg.getRateMode = [&proc](int i) { return proc.getLfoRateMode(i); };
+    cfg.setRateMode = [&proc](int i, LfoRateMode m) { proc.setLfoRateMode(i, m); };
+    cfg.getTempoDivision = [&proc](int i) { return proc.getLfoTempoDivision(i); };
+    cfg.setTempoDivision = [&proc](int i, int d) { proc.setLfoTempoDivision(i, d); };
+    cfg.getCurrentBpm = [&proc]() { return proc.currentBpm.load(std::memory_order_relaxed); };
+    cfg.maxIndex = NUM_LFOS;
+    return cfg;
+}
+
+static ModulationModeConfig buildLfoModeConfig(OscirenderAudioProcessor& proc) {
+    ModulationModeConfig cfg;
+    cfg.modes = getAllLfoModePairs();
+    cfg.getMode = [&proc](int i) { return static_cast<int>(proc.getLfoMode(i)); };
+    cfg.setMode = [&proc](int i, int m) { proc.setLfoMode(i, static_cast<LfoMode>(m)); };
+    cfg.labelText = "MODE";
+    cfg.maxIndex = NUM_LFOS;
+    return cfg;
+}
+
 LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
     : ModulationSourceComponent(buildLfoConfig(processor)),
       audioProcessor(processor),
-      rateControl(processor, 0),
-      modeControl(processor, 0) {
+      rateControl(buildLfoRateConfig(processor), 0),
+      modeControl(buildLfoModeConfig(processor), 0) {
     // Initialize all LFOs with default triangle preset
     for (int i = 0; i < NUM_LFOS; ++i) {
         lfoData[i].preset = LfoPreset::Triangle;
@@ -132,11 +154,11 @@ LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
     addAndMakeVisible(presetSelector);
 
     // Rate control
-    rateControl.setLfoIndex(getActiveSourceIndex());
+    rateControl.setSourceIndex(getActiveSourceIndex());
     addAndMakeVisible(rateControl);
 
     // Mode control
-    modeControl.setLfoIndex(getActiveSourceIndex());
+    modeControl.setSourceIndex(getActiveSourceIndex());
     addAndMakeVisible(modeControl);
 
     // Phase slider
@@ -207,9 +229,9 @@ void LfoComponent::onActiveSourceChanged(int index) {
     syncGraphToActiveLfo();
     updatePresetLabel();
     graph.resetFlowTrail();
-    rateControl.setLfoIndex(index);
+    rateControl.setSourceIndex(index);
     rateControl.syncFromProcessor();
-    modeControl.setLfoIndex(index);
+    modeControl.setSourceIndex(index);
     modeControl.syncFromProcessor();
     phaseSlider.setValue(audioProcessor.getLfoPhaseOffset(index));
     phaseSlider.setAccentColour(getLfoColour(index));
@@ -313,9 +335,9 @@ void LfoComponent::syncFromProcessorState() {
     syncGraphToActiveLfo();
     updatePresetLabel();
 
-    rateControl.setLfoIndex(getActiveSourceIndex());
+    rateControl.setSourceIndex(getActiveSourceIndex());
     rateControl.syncFromProcessor();
-    modeControl.setLfoIndex(getActiveSourceIndex());
+    modeControl.setSourceIndex(getActiveSourceIndex());
     modeControl.syncFromProcessor();
     phaseSlider.setValue(audioProcessor.getLfoPhaseOffset(getActiveSourceIndex()));
     phaseSlider.setAccentColour(getLfoColour(getActiveSourceIndex()));
@@ -336,4 +358,20 @@ void LfoComponent::applyLfoConstraints(int nodeIndex, double& time, double& valu
 
     time = juce::jlimit(0.0, 1.0, time);
     value = juce::jlimit(0.0, 1.0, value);
+}
+
+void LfoComponent::setMidiEnabled(bool enabled) {
+    if (enabled) {
+        modeControl.setModes(getAllLfoModePairs());
+    } else {
+        // Only Free mode when MIDI is off
+        modeControl.setModes({
+            { static_cast<int>(LfoMode::Free), "Free" },
+        });
+        // Force Free mode on ALL LFO sources, not just the visible one
+        for (int i = 0; i < NUM_LFOS; ++i) {
+            if (audioProcessor.getLfoMode(i) != LfoMode::Free)
+                audioProcessor.setLfoMode(i, LfoMode::Free);
+        }
+    }
 }

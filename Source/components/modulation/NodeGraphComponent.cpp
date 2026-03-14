@@ -497,7 +497,7 @@ void NodeGraphComponent::paint(juce::Graphics& g) {
         const float glow = juce::jlimit(0.0f, 1.0f, trailGlowStrength);
         const float glowThickness = kCurveStrokeThickness + (2.0f * glow);
         g.setColour(findColour(lineColourId).withAlpha(0.25f + 0.55f * glow));
-        g.strokePath(path, juce::PathStrokeType(glowThickness));
+        g.strokePath(path, juce::PathStrokeType(glowThickness, juce::PathStrokeType::beveled, juce::PathStrokeType::rounded));
     }
 
     // Marker heads
@@ -510,7 +510,7 @@ void NodeGraphComponent::paint(juce::Graphics& g) {
 
     // Stroke curve
     g.setColour(findColour(lineColourId).withAlpha(0.90f));
-    g.strokePath(path, juce::PathStrokeType(kCurveStrokeThickness));
+    g.strokePath(path, juce::PathStrokeType(kCurveStrokeThickness, juce::PathStrokeType::beveled, juce::PathStrokeType::rounded));
 }
 
 void NodeGraphComponent::paintOverChildren(juce::Graphics& g) {

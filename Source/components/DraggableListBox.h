@@ -1,6 +1,7 @@
 #pragma once
 #include "JuceHeader.h"
 #include "VListBox.h"
+#include "../audio/ModulationTypes.h"
 
 // Your item-data container must inherit from this, and override at least the first
 // four member functions.
@@ -28,7 +29,9 @@ public:
     using VListBox::VListBox;
 
     // DragAndDropTarget
-    bool isInterestedInDragSource(const SourceDetails&) override { return true; }
+    bool isInterestedInDragSource(const SourceDetails& details) override {
+        return !ModDrag::isModDrag(details.description.toString());
+    }
     void itemDragEnter(const SourceDetails& details) override { updateDropIndicator(details); }
     void itemDragMove(const SourceDetails& details) override { updateDropIndicator(details); }
     void itemDragExit(const SourceDetails&) override { clearDropIndicator(); }
@@ -63,7 +66,9 @@ public:
     void mouseDrag(const juce::MouseEvent&) override;
 
     // DragAndDropTarget
-    bool isInterestedInDragSource(const SourceDetails&) override { return true; }
+    bool isInterestedInDragSource(const SourceDetails& details) override {
+        return !ModDrag::isModDrag(details.description.toString());
+    }
     void itemDragEnter(const SourceDetails&) override;
     void itemDragMove(const SourceDetails&) override;
     void itemDragExit(const SourceDetails&) override;

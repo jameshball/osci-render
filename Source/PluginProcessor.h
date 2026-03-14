@@ -26,6 +26,7 @@
 #include "audio/DahdsrEnvelope.h"
 #include "audio/LfoState.h"
 #include "audio/EnvState.h"
+#include "audio/RandomState.h"
 #include "obj/ObjectServer.h"
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
@@ -246,6 +247,34 @@ public:
     LfoMode getLfoMode(int lfoIndex) const;
     float getLfoPhaseOffset(int lfoIndex) const;
 
+    // === Global Random modulation system ===
+    osci::FloatParameter* randomRate[NUM_RANDOM_SOURCES] = {};
+
+    // UI-persisted Random state
+    RandomStyle randomStyles[NUM_RANDOM_SOURCES] = { RandomStyle::Perlin, RandomStyle::Perlin, RandomStyle::Perlin };
+    LfoRateMode randomRateModes[NUM_RANDOM_SOURCES] = { LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds };
+    int randomTempoDivisions[NUM_RANDOM_SOURCES] = { 8, 8, 8 };
+    int activeRandomTab = 0;
+
+    void addRandomAssignment(const RandomAssignment& assignment);
+    void removeRandomAssignment(int randomIndex, const juce::String& paramId);
+    std::vector<RandomAssignment> getRandomAssignments() const;
+
+    float getRandomCurrentValue(int randomIndex) const;
+    bool isRandomActive(int randomIndex) const;
+    bool consumeRandomRetriggered(int randomIndex) { return randomRetriggered[randomIndex].exchange(false, std::memory_order_relaxed); }
+
+    // UI thread drains subsampled values from the audio thread ring buffer.
+    int drainRandomUIBuffer(int randomIndex, RandomUIRingBuffer::Entry* out, int maxEntries);
+
+    void setRandomRateMode(int randomIndex, LfoRateMode mode);
+    void setRandomTempoDivision(int randomIndex, int divisionIndex);
+    void setRandomStyle(int randomIndex, RandomStyle style);
+
+    LfoRateMode getRandomRateMode(int randomIndex) const;
+    int getRandomTempoDivision(int randomIndex) const;
+    RandomStyle getRandomStyle(int randomIndex) const;
+
     juce::MidiKeyboardState keyboardState;
 
     osci::IntParameter* voices = new osci::IntParameter("Voices", "voices", VERSION_HINT, 4, 1, 16);
@@ -461,6 +490,23 @@ private:
     std::array<float, NUM_ENVELOPES> envPrevBlockValues = {};
 
     void applyGlobalEnvModulation(int numSamples, double sampleRate);
+
+    // Global Random modulation audio-thread state
+    std::vector<RandomAssignment> randomAssignments;
+    mutable juce::SpinLock randomAssignmentLock;
+    RandomAudioState randomAudioStates[NUM_RANDOM_SOURCES];
+    int randomActiveNoteCount = 0;
+    bool randomPrevAnyVoiceActive = false;
+    std::array<std::vector<float>, NUM_RANDOM_SOURCES> randomBlockBuffer;
+
+    std::atomic<float> randomCurrentValues[NUM_RANDOM_SOURCES] = {};
+    std::atomic<bool> randomActive[NUM_RANDOM_SOURCES] = {};
+    std::atomic<bool> randomRetriggered[NUM_RANDOM_SOURCES] = {};
+
+    RandomUIRingBuffer randomUIBuffers[NUM_RANDOM_SOURCES];
+    static constexpr int kRandomUISubsampleInterval = 64;
+
+    void applyGlobalRandomModulation(int numSamples, double sampleRate, const juce::MidiBuffer& midi);
 
     // Generic helper: applies per-sample modulation from precomputed source buffers
     // to effect parameters via assignments. Works for any modulation source type.

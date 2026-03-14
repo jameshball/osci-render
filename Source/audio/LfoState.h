@@ -188,6 +188,20 @@ inline LfoMode stringToLfoMode(const juce::String& s) {
     return LfoMode::Free;
 }
 
+// Canonical list of all LFO modes with display names, used by UI components.
+inline const std::vector<std::pair<int, juce::String>>& getAllLfoModePairs() {
+    static const std::vector<std::pair<int, juce::String>> modes = {
+        { static_cast<int>(LfoMode::Free),            "Free" },
+        { static_cast<int>(LfoMode::Trigger),         "Trigger" },
+        { static_cast<int>(LfoMode::Sync),            "Sync" },
+        { static_cast<int>(LfoMode::Envelope),        "Envelope" },
+        { static_cast<int>(LfoMode::SustainEnvelope), "Sustain Envelope" },
+        { static_cast<int>(LfoMode::LoopPoint),       "Loop Point" },
+        { static_cast<int>(LfoMode::LoopHold),        "Loop Hold" },
+    };
+    return modes;
+}
+
 // Audio-thread state for a single LFO.
 struct LfoAudioState {
     float phase = 0.0f;     // [0, 1)

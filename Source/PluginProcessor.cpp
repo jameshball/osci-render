@@ -197,6 +197,18 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
         }
     }
 
+    // Initialize global Random rate parameters (advanced mode only)
+    if (!beginnerMode) {
+        for (int i = 0; i < NUM_RANDOM_SOURCES; ++i) {
+            randomRate[i] = new osci::FloatParameter(
+                "Random " + juce::String(i + 1) + " Rate",
+                "random" + juce::String(i + 1) + "Rate",
+                VERSION_HINT, 1.0f, 0.01f, 1000.0f, 0.01f, "Hz");
+            floatParameters.push_back(randomRate[i]);
+            randomAudioStates[i].seed(0x12345678u + (uint32_t)i * 0x9E3779B9u);
+        }
+    }
+
     for (int i = 0; i < voices->getValueUnnormalised(); i++) {
         uiVoiceActive[i].store(false, std::memory_order_relaxed);
         uiVoiceEnvelopeTimeSeconds[i].store(0.0, std::memory_order_relaxed);
@@ -845,6 +857,9 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
             // Apply global envelope modulation on top of LFO modulation
             applyGlobalEnvModulation(numSamples, sampleRate);
+
+            // Apply global random modulation
+            applyGlobalRandomModulation(numSamples, sampleRate, midiMessages);
         }
     }
 
@@ -1083,6 +1098,25 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
                 assignment.saveToXml(assignXml, "env");
             }
         }
+
+        // Save global Random modulators & assignments
+        auto randomsXml = xml->createNewChildElement("randoms");
+        randomsXml->setAttribute("activeTab", activeRandomTab);
+        for (int i = 0; i < NUM_RANDOM_SOURCES; ++i) {
+            auto rndXml = randomsXml->createNewChildElement("random");
+            rndXml->setAttribute("index", i);
+            rndXml->setAttribute("style", randomStyleToString(randomStyles[i]));
+            rndXml->setAttribute("rateMode", lfoRateModeToString(randomRateModes[i]));
+            rndXml->setAttribute("tempoDivision", randomTempoDivisions[i]);
+        }
+        auto randomAssignmentsXml = randomsXml->createNewChildElement("randomAssignments");
+        {
+            juce::SpinLock::ScopedLockType lock(randomAssignmentLock);
+            for (const auto& assignment : randomAssignments) {
+                auto assignXml = randomAssignmentsXml->createNewChildElement("assignment");
+                assignment.saveToXml(assignXml, "rng");
+            }
+        }
     }
 
     auto customFunction = xml->createNewChildElement("customFunction");
@@ -1290,6 +1324,37 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
             }
         }
 
+        // Load random modulator state (advanced mode only)
+        if (!beginnerMode) {
+            auto randomsXml = xml->getChildByName("randoms");
+            if (randomsXml != nullptr) {
+                activeRandomTab = randomsXml->getIntAttribute("activeTab", 0);
+                for (auto* rndXml : randomsXml->getChildWithTagNameIterator("random")) {
+                    int idx = rndXml->getIntAttribute("index", -1);
+                    if (idx >= 0 && idx < NUM_RANDOM_SOURCES) {
+                        randomStyles[idx] = stringToRandomStyle(rndXml->getStringAttribute("style", "Perlin"));
+                        randomRateModes[idx] = stringToLfoRateMode(rndXml->getStringAttribute("rateMode", "Seconds"));
+                        randomTempoDivisions[idx] = rndXml->getIntAttribute("tempoDivision", 8);
+                    }
+                }
+                auto randomAssignmentsXml = randomsXml->getChildByName("randomAssignments");
+                if (randomAssignmentsXml != nullptr) {
+                    juce::SpinLock::ScopedLockType assnLock(randomAssignmentLock);
+                    randomAssignments.clear();
+                    for (auto* assignXml : randomAssignmentsXml->getChildWithTagNameIterator("assignment")) {
+                        randomAssignments.push_back(RandomAssignment::loadFromXml(assignXml, "rng"));
+                    }
+                } else {
+                    juce::SpinLock::ScopedLockType assnLock(randomAssignmentLock);
+                    randomAssignments.clear();
+                }
+            } else {
+                activeRandomTab = 0;
+                juce::SpinLock::ScopedLockType assnLock(randomAssignmentLock);
+                randomAssignments.clear();
+            }
+        }
+
         recordingParameters.load(xml.get());
 
         loadProperties(*xml);
@@ -1483,6 +1548,13 @@ void OscirenderAudioProcessor::removeAllAssignmentsForEffect(const osci::Effect&
                 [&](const EnvAssignment& a) { return belongsToEffect(a.paramId); }),
             envAssignments.end());
     }
+    {
+        juce::SpinLock::ScopedLockType lock(randomAssignmentLock);
+        randomAssignments.erase(
+            std::remove_if(randomAssignments.begin(), randomAssignments.end(),
+                [&](const RandomAssignment& a) { return belongsToEffect(a.paramId); }),
+            randomAssignments.end());
+    }
 }
 
 void OscirenderAudioProcessor::autoAssignLfosForEffect(osci::Effect& effect) {
@@ -1591,6 +1663,84 @@ void OscirenderAudioProcessor::autoAssignLfosForEffect(osci::Effect& effect) {
 float OscirenderAudioProcessor::getEnvCurrentValue(int envIndex) const {
     if (envIndex < 0 || envIndex >= NUM_ENVELOPES) return 0.0f;
     return envCurrentValues[envIndex].load(std::memory_order_relaxed);
+}
+
+// === Global Random assignment system ===
+
+void OscirenderAudioProcessor::addRandomAssignment(const RandomAssignment& assignment) {
+    juce::SpinLock::ScopedLockType lock(randomAssignmentLock);
+    for (auto& a : randomAssignments) {
+        if (a.sourceIndex == assignment.sourceIndex && a.paramId == assignment.paramId) {
+            a.depth = assignment.depth;
+            a.bipolar = assignment.bipolar;
+            return;
+        }
+    }
+    randomAssignments.push_back(assignment);
+}
+
+void OscirenderAudioProcessor::removeRandomAssignment(int randomIndex, const juce::String& paramId) {
+    juce::SpinLock::ScopedLockType lock(randomAssignmentLock);
+    randomAssignments.erase(
+        std::remove_if(randomAssignments.begin(), randomAssignments.end(),
+            [&](const RandomAssignment& a) { return a.sourceIndex == randomIndex && a.paramId == paramId; }),
+        randomAssignments.end());
+}
+
+std::vector<RandomAssignment> OscirenderAudioProcessor::getRandomAssignments() const {
+    juce::SpinLock::ScopedLockType lock(randomAssignmentLock);
+    return randomAssignments;
+}
+
+float OscirenderAudioProcessor::getRandomCurrentValue(int randomIndex) const {
+    if (randomIndex < 0 || randomIndex >= NUM_RANDOM_SOURCES) return 0.0f;
+    return randomCurrentValues[randomIndex].load(std::memory_order_relaxed);
+}
+
+bool OscirenderAudioProcessor::isRandomActive(int randomIndex) const {
+    if (randomIndex < 0 || randomIndex >= NUM_RANDOM_SOURCES) return false;
+    return randomActive[randomIndex].load(std::memory_order_relaxed);
+}
+
+int OscirenderAudioProcessor::drainRandomUIBuffer(int randomIndex, RandomUIRingBuffer::Entry* out, int maxEntries) {
+    if (randomIndex < 0 || randomIndex >= NUM_RANDOM_SOURCES) return 0;
+    return randomUIBuffers[randomIndex].drain(out, maxEntries);
+}
+
+void OscirenderAudioProcessor::setRandomRateMode(int randomIndex, LfoRateMode mode) {
+    if (randomIndex < 0 || randomIndex >= NUM_RANDOM_SOURCES) return;
+    juce::SpinLock::ScopedLockType lock(randomAssignmentLock);
+    randomRateModes[randomIndex] = mode;
+}
+
+void OscirenderAudioProcessor::setRandomTempoDivision(int randomIndex, int divisionIndex) {
+    if (randomIndex < 0 || randomIndex >= NUM_RANDOM_SOURCES) return;
+    juce::SpinLock::ScopedLockType lock(randomAssignmentLock);
+    randomTempoDivisions[randomIndex] = divisionIndex;
+}
+
+void OscirenderAudioProcessor::setRandomStyle(int randomIndex, RandomStyle style) {
+    if (randomIndex < 0 || randomIndex >= NUM_RANDOM_SOURCES) return;
+    juce::SpinLock::ScopedLockType lock(randomAssignmentLock);
+    randomStyles[randomIndex] = style;
+}
+
+LfoRateMode OscirenderAudioProcessor::getRandomRateMode(int randomIndex) const {
+    if (randomIndex < 0 || randomIndex >= NUM_RANDOM_SOURCES) return LfoRateMode::Seconds;
+    juce::SpinLock::ScopedLockType lock(randomAssignmentLock);
+    return randomRateModes[randomIndex];
+}
+
+int OscirenderAudioProcessor::getRandomTempoDivision(int randomIndex) const {
+    if (randomIndex < 0 || randomIndex >= NUM_RANDOM_SOURCES) return 8;
+    juce::SpinLock::ScopedLockType lock(randomAssignmentLock);
+    return randomTempoDivisions[randomIndex];
+}
+
+RandomStyle OscirenderAudioProcessor::getRandomStyle(int randomIndex) const {
+    if (randomIndex < 0 || randomIndex >= NUM_RANDOM_SOURCES) return RandomStyle::Perlin;
+    juce::SpinLock::ScopedLockType lock(randomAssignmentLock);
+    return randomStyles[randomIndex];
 }
 
 void OscirenderAudioProcessor::autoAssignLfosForPreview(const juce::String& effectId) {
@@ -1878,6 +2028,98 @@ void OscirenderAudioProcessor::applyGlobalLfoModulation(int numSamples, double s
         lfoAssnCopy = lfoAssignments;
     }
     applyModulationBuffers(numSamples, lfoAssnCopy, lfoBlockBuffer.data(), NUM_LFOS);
+}
+
+void OscirenderAudioProcessor::applyGlobalRandomModulation(int numSamples, double sampleRate, const juce::MidiBuffer& midi) {
+    // Process MIDI note events to drive Random triggering (always note-dependent)
+    bool hadNoteOnThisBlock = false;
+    for (const auto metadata : midi) {
+        auto msg = metadata.getMessage();
+        if (msg.isNoteOn()) {
+            hadNoteOnThisBlock = true;
+            randomActiveNoteCount++;
+            for (int r = 0; r < NUM_RANDOM_SOURCES; ++r) {
+                if (!randomAudioStates[r].finished)
+                    randomRetriggered[r].store(true, std::memory_order_relaxed);
+                randomAudioStates[r].noteOn();
+            }
+        } else if (msg.isNoteOff()) {
+            randomActiveNoteCount = std::max(0, randomActiveNoteCount - 1);
+            if (randomActiveNoteCount == 0) {
+                for (int r = 0; r < NUM_RANDOM_SOURCES; ++r) {
+                    randomAudioStates[r].noteOff();
+                }
+            }
+        } else if (msg.isAllNotesOff() || msg.isAllSoundOff()) {
+            randomActiveNoteCount = 0;
+            for (int r = 0; r < NUM_RANDOM_SOURCES; ++r) {
+                randomAudioStates[r].noteOff();
+            }
+        }
+    }
+
+    // Compute Random samples for this block
+    {
+        double bpm = currentBpm.load(std::memory_order_relaxed);
+        auto& divisions = getTempoDivisions();
+
+        bool anyVoiceActive = false;
+        for (int v = 0; v < kMaxUiVoices; ++v) {
+            if (uiVoiceActive[v].load(std::memory_order_relaxed)) {
+                anyVoiceActive = true;
+                break;
+            }
+        }
+        bool effectiveVoiceActive = anyVoiceActive || hadNoteOnThisBlock;
+
+        for (int r = 0; r < NUM_RANDOM_SOURCES; ++r) {
+            if ((int)randomBlockBuffer[r].size() < numSamples)
+                randomBlockBuffer[r].resize(numSamples);
+
+            float rate;
+            if (randomRateModes[r] == LfoRateMode::Seconds) {
+                rate = randomRate[r] ? randomRate[r]->getValueUnnormalised() : 1.0f;
+            } else {
+                int idx = juce::jlimit(0, (int)divisions.size() - 1, randomTempoDivisions[r]);
+                rate = (float)divisions[idx].toHz(bpm, randomRateModes[r]);
+            }
+
+            randomAudioStates[r].style = randomStyles[r];
+            bool isActive = !randomAudioStates[r].finished;
+
+            randomAudioStates[r].advanceBlock(randomBlockBuffer[r].data(), numSamples,
+                                              rate, (float)sampleRate);
+
+            if (!effectiveVoiceActive && randomPrevAnyVoiceActive) {
+                randomAudioStates[r].voicesFinished();
+            }
+
+            // Subsample the block into the UI ring buffer.
+            // This gives the UI thread many intermediate points for smooth graphs.
+            for (int s = kRandomUISubsampleInterval - 1; s < numSamples; s += kRandomUISubsampleInterval) {
+                randomUIBuffers[r].push(randomBlockBuffer[r][s], isActive);
+            }
+            // Always push the last sample so the UI sees the final state.
+            if (numSamples > 0) {
+                int lastPushed = ((numSamples - 1) / kRandomUISubsampleInterval) * kRandomUISubsampleInterval + kRandomUISubsampleInterval - 1;
+                if (lastPushed != numSamples - 1)
+                    randomUIBuffers[r].push(randomBlockBuffer[r][numSamples - 1], isActive);
+            }
+
+            randomCurrentValues[r].store(randomBlockBuffer[r][numSamples - 1], std::memory_order_relaxed);
+            randomActive[r].store(isActive, std::memory_order_relaxed);
+        }
+
+        randomPrevAnyVoiceActive = effectiveVoiceActive;
+    }
+
+    // Apply Random modulation via generic helper
+    std::vector<RandomAssignment> randomAssnCopy;
+    {
+        juce::SpinLock::ScopedLockType assnLock(randomAssignmentLock);
+        randomAssnCopy = randomAssignments;
+    }
+    applyModulationBuffers(numSamples, randomAssnCopy, randomBlockBuffer.data(), NUM_RANDOM_SOURCES);
 }
 
 DahdsrParams OscirenderAudioProcessor::getCurrentDahdsrParams() const

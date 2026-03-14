@@ -41,6 +41,10 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
         lfo = std::make_unique<LfoComponent>(p);
         addAndMakeVisible(*lfo);
         lfo->onDragActiveChanged = dragChanged;
+
+        random = std::make_unique<RandomComponent>(p);
+        addAndMakeVisible(*random);
+        random->onDragActiveChanged = dragChanged;
     }
 
     // Keyboard
@@ -294,47 +298,69 @@ void SettingsComponent::layoutChildren() {
         juce::Component* columns[] = { &layoutVisColumnProxy, &mainResizerBar, &layoutEffectsColumnProxy, &midiResizerBar, &layoutRightColumnProxy };
         mainLayout.layOutComponents(columns, 5, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
 
-        int resizerBottom = area.getBottom() - keyboardHeight - padding;
-        mainResizerBar.setBounds(mainResizerBar.getBounds().withBottom(resizerBottom));
-        midiResizerBar.setBounds(midiResizerBar.getBounds().withBottom(resizerBottom));
+        const bool midiOn = audioProcessor.midiEnabled->getBoolValue();
+
+        if (midiOn) {
+            int resizerBottom = area.getBottom() - keyboardHeight - padding;
+            mainResizerBar.setBounds(mainResizerBar.getBounds().withBottom(resizerBottom));
+            midiResizerBar.setBounds(midiResizerBar.getBounds().withBottom(resizerBottom));
+        }
 
         auto effectsBounds = layoutEffectsColumnProxy.getBounds();
         auto rightBounds   = layoutRightColumnProxy.getBounds();
 
-        // Keyboard spans effects + resizer + right columns
-        keyboardPanelBounds = juce::Rectangle<int>(
-            effectsBounds.getX(),
-            area.getBottom() - keyboardHeight,
-            rightBounds.getRight() - effectsBounds.getX(),
-            keyboardHeight);
-        keyboardViewport.setBounds(keyboardPanelBounds);
+        if (midiOn) {
+            // Keyboard spans effects + resizer + right columns
+            keyboardPanelBounds = juce::Rectangle<int>(
+                effectsBounds.getX(),
+                area.getBottom() - keyboardHeight,
+                rightBounds.getRight() - effectsBounds.getX(),
+                keyboardHeight);
+            keyboardViewport.setBounds(keyboardPanelBounds);
 
-        const auto viewportBounds = keyboardViewport.getLocalBounds();
-        const auto whiteKeyCount = juce::CustomMidiKeyboardComponent::getWhiteKeyCount(keyboard.getRangeStart(), keyboard.getRangeEnd());
-        const auto compactKeyWidth = juce::jlimit(9.0f, 14.0f, viewportBounds.getHeight() * 0.38f);
-        const auto stretchedKeyWidth = whiteKeyCount > 0 ? (float) viewportBounds.getWidth() / (float) whiteKeyCount : compactKeyWidth;
-        keyboard.setKeyWidth(juce::jmax(compactKeyWidth, stretchedKeyWidth));
-        const auto keyboardContentWidth = juce::jmax(
-            viewportBounds.getWidth(),
-            juce::roundToInt((float) whiteKeyCount * keyboard.getKeyWidth()));
-        keyboard.setBounds(0, 0, keyboardContentWidth, viewportBounds.getHeight());
+            const auto viewportBounds = keyboardViewport.getLocalBounds();
+            const auto whiteKeyCount = juce::CustomMidiKeyboardComponent::getWhiteKeyCount(keyboard.getRangeStart(), keyboard.getRangeEnd());
+            const auto compactKeyWidth = juce::jlimit(9.0f, 14.0f, viewportBounds.getHeight() * 0.38f);
+            const auto stretchedKeyWidth = whiteKeyCount > 0 ? (float) viewportBounds.getWidth() / (float) whiteKeyCount : compactKeyWidth;
+            keyboard.setKeyWidth(juce::jmax(compactKeyWidth, stretchedKeyWidth));
+            const auto keyboardContentWidth = juce::jmax(
+                viewportBounds.getWidth(),
+                juce::roundToInt((float) whiteKeyCount * keyboard.getKeyWidth()));
+            keyboard.setBounds(0, 0, keyboardContentWidth, viewportBounds.getHeight());
 
-        // Trim columns to exclude keyboard
-        effectsBounds.removeFromBottom(keyboardHeight + padding);
-        rightBounds.removeFromBottom(keyboardHeight + padding);
+            // Trim columns to exclude keyboard
+            effectsBounds.removeFromBottom(keyboardHeight + padding);
+            rightBounds.removeFromBottom(keyboardHeight + padding);
+        }
+
+        keyboardViewport.setVisible(midiOn);
 
         layoutVisColumn(layoutVisColumnProxy.getBounds());
         layoutEffectsColumn(effectsBounds);
 
-        // --- Right column: MIDI settings (compact), envelope, LFO ---
+        // --- Right column: MIDI settings (compact), envelope, LFO, random ---
         static constexpr int midiGroupHeight = 60;
         midi.setBounds(rightBounds.removeFromTop(midiGroupHeight));
-        rightBounds.removeFromTop(padding);
+        rightBounds.removeFromBottom(padding);
 
-        auto lfoArea = rightBounds.removeFromBottom(rightBounds.getHeight() * 45 / 100);
-        rightBounds.removeFromBottom(5);
-        envelope.setBounds(rightBounds);
-        lfo->setBounds(lfoArea);
+        lfo->setMidiEnabled(midiOn);
+
+        int modAreaHeight = rightBounds.getHeight();
+        int randomPct = midiOn ? 15 : 25;
+        auto randomArea = rightBounds.removeFromBottom(modAreaHeight * randomPct / 100);
+        rightBounds.removeFromBottom(3);
+
+        if (midiOn) {
+            auto envelopeArea = rightBounds.removeFromBottom(modAreaHeight * 25 / 100);
+            rightBounds.removeFromBottom(3);
+            envelope.setBounds(envelopeArea);
+            envelope.setVisible(true);
+        } else {
+            envelope.setVisible(false);
+        }
+
+        lfo->setBounds(rightBounds);
+        random->setBounds(randomArea);
 
         if (isVisible() && getWidth() > 0 && getHeight() > 0) {
             audioProcessor.setProperty("mainLayoutVisSize", mainLayout.getItemCurrentRelativeSize(0));

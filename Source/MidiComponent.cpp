@@ -20,6 +20,7 @@ MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
     };
 
     audioProcessor.voices->addListener(this);
+    audioProcessor.midiEnabled->addListener(this);
 
     if (juce::JUCEApplicationBase::isStandaloneApp()) {
         addAndMakeVisible(midiSettingsButton);
@@ -34,6 +35,7 @@ MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 
 MidiComponent::~MidiComponent() {
     audioProcessor.voices->removeListener(this);
+    audioProcessor.midiEnabled->removeListener(this);
 }
 
 void MidiComponent::parameterValueChanged(int parameterIndex, float newValue) {
@@ -44,6 +46,10 @@ void MidiComponent::parameterGestureChanged(int parameterIndex, bool gestureIsSt
 
 void MidiComponent::handleAsyncUpdate() {
     voicesSlider.setValue(audioProcessor.voices->getValueUnnormalised(), juce::dontSendNotification);
+
+    const bool midiOn = audioProcessor.midiEnabled->getBoolValue();
+    voicesSlider.setVisible(midiOn);
+    voicesLabel.setVisible(midiOn);
 }
 
 void MidiComponent::resized() {

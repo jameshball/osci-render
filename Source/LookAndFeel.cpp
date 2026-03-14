@@ -1,4 +1,5 @@
 #include "LookAndFeel.h"
+#include "audio/ModulationTypes.h"
 #include "components/CustomMidiKeyboardComponent.h"
 #include "components/SwitchButton.h"
 #include "components/modulation/EnvelopeComponent.h"
@@ -34,7 +35,10 @@ void OscirenderLookAndFeel::applyOscirenderColours(juce::LookAndFeel& lookAndFee
     lookAndFeel.setColour(groupComponentBackgroundColourId, Colours::darker);
     lookAndFeel.setColour(scrollFadeOverlayBackgroundColourId, Colours::darker);
     lookAndFeel.setColour(groupComponentHeaderColourId, Colours::veryDark);
-    lookAndFeel.setColour(juce::PopupMenu::backgroundColourId, Colours::popupBackground);
+    // Alpha 0xFE (not 0xFF) forces JUCE to treat the window as non-opaque,
+    // enabling compositor transparency so rounded corners don't show the
+    // native window background colour behind them.
+    lookAndFeel.setColour(juce::PopupMenu::backgroundColourId, Colours::popupBackground.withAlpha((juce::uint8)0xFE));
     lookAndFeel.setColour(juce::PopupMenu::highlightedBackgroundColourId, Colours::accentColor);
     lookAndFeel.setColour(juce::TooltipWindow::backgroundColourId, Colours::darker.darker(0.5f));
     lookAndFeel.setColour(juce::TooltipWindow::outlineColourId, Colours::darker);
@@ -281,54 +285,36 @@ void OscirenderLookAndFeel::drawGroupComponentOutline(juce::Graphics& g, int wid
 }
 
 void OscirenderLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, int width, int height, float sliderPos, float minSliderPos, float maxSliderPos, const juce::Slider::SliderStyle style, juce::Slider& slider) {
-    // --- LFO modulated value indicator (drawn BEFORE the base slider so it sits under the thumb) ---
+    // --- Modulated value indicators (drawn BEFORE the base slider so they sit under the thumb) ---
+    // All modulation source types use the same property naming convention:
+    //   {prefix}_active, {prefix}_mod_pos, {prefix}_colour
     auto& props = slider.getProperties();
-    bool lfoActive = (bool)props.getWithDefault("lfo_active", false);
 
-    if (lfoActive && slider.isHorizontal()) {
-        float modPos = (float)(double)props.getWithDefault("lfo_mod_pos", 0.0);
-        juce::uint32 colourArgb = (juce::uint32)(juce::int64)props.getWithDefault("lfo_colour", (juce::int64)0xFF00E5FF);
-        auto lfoColour = juce::Colour(colourArgb);
+    if (slider.isHorizontal()) {
+        const auto& modTypes = getModulationTypes();
 
-        // Match the JUCE V4 track geometry: 6px tall, centred vertically
-        float trackHeight = 6.0f;
-        float trackY = (float)y + (float)height * 0.5f - trackHeight * 0.5f;
-        float trackRadius = trackHeight * 0.5f;
+        for (const auto& modType : modTypes) {
+            if (!(bool)props.getWithDefault(modType.propPrefix + "_active", false))
+                continue;
 
-        // Draw a coloured bar from the unmodulated thumb position to the modulated position
-        float barLeft = juce::jmin(sliderPos, modPos);
-        float barRight = juce::jmax(sliderPos, modPos);
-        float barWidth = barRight - barLeft;
+            float modPos = (float)(double)props.getWithDefault(modType.propPrefix + "_mod_pos", 0.0);
+            juce::uint32 colourArgb = (juce::uint32)(juce::int64)props.getWithDefault(
+                modType.propPrefix + "_colour", (juce::int64)modType.defaultColour);
+            auto modColour = juce::Colour(colourArgb);
 
-        if (barWidth > 0.5f) {
-            auto modRect = juce::Rectangle<float>(barLeft, trackY, barWidth, trackHeight);
+            float trackHeight = 6.0f;
+            float trackY = (float)y + (float)height * 0.5f - trackHeight * 0.5f;
+            float trackRadius = trackHeight * 0.5f;
 
-            // Outer soft glow
-            g.setColour(lfoColour.withAlpha(0.2f));
-            g.fillRoundedRectangle(modRect.expanded(1.5f, 2.0f), trackRadius + 1.5f);
-        }
-    }
+            float barLeft = juce::jmin(sliderPos, modPos);
+            float barRight = juce::jmax(sliderPos, modPos);
+            float barWidth = barRight - barLeft;
 
-    // --- Envelope modulated value indicator ---
-    bool envActive = (bool)props.getWithDefault("env_active", false);
-
-    if (envActive && slider.isHorizontal()) {
-        float modPos = (float)(double)props.getWithDefault("env_mod_pos", 0.0);
-        juce::uint32 colourArgb = (juce::uint32)(juce::int64)props.getWithDefault("env_colour", (juce::int64)0xFFFF6E4A);
-        auto envColour = juce::Colour(colourArgb);
-
-        float trackHeight = 6.0f;
-        float trackY = (float)y + (float)height * 0.5f - trackHeight * 0.5f;
-        float trackRadius = trackHeight * 0.5f;
-
-        float barLeft = juce::jmin(sliderPos, modPos);
-        float barRight = juce::jmax(sliderPos, modPos);
-        float barWidth = barRight - barLeft;
-
-        if (barWidth > 0.5f) {
-            auto modRect = juce::Rectangle<float>(barLeft, trackY, barWidth, trackHeight);
-            g.setColour(envColour.withAlpha(0.2f));
-            g.fillRoundedRectangle(modRect.expanded(1.5f, 2.0f), trackRadius + 1.5f);
+            if (barWidth > 0.5f) {
+                auto modRect = juce::Rectangle<float>(barLeft, trackY, barWidth, trackHeight);
+                g.setColour(modColour.withAlpha(0.2f));
+                g.fillRoundedRectangle(modRect.expanded(1.5f, 2.0f), trackRadius + 1.5f);
+            }
         }
     }
 
@@ -571,7 +557,10 @@ void OscirenderLookAndFeel::drawPopupMenuBackground(juce::Graphics& g, int width
     auto bounds = juce::Rectangle<int>(0, 0, width, height).toFloat();
     constexpr float radius = 8.0f;
 
-    // Background fill — draw edge-to-edge to avoid double border from window inset gap
+    // Clear to transparent so rounded corners don't show the window background
+    g.fillAll(juce::Colours::transparentBlack);
+
+    // Background fill
     g.setColour(Colours::popupBackground);
     g.fillRoundedRectangle(bounds, radius);
 

@@ -1,6 +1,7 @@
 #include "ModulationSourceComponent.h"
 #include "../EffectComponent.h"
 #include "../../LookAndFeel.h"
+#include "../../audio/ModulationTypes.h"
 #include "InlineEditorHelper.h"
 
 // ============================================================================
@@ -300,7 +301,7 @@ void ModulationSourceComponent::ModTabHandle::mouseDrag(const juce::MouseEvent& 
     if (!isDragging) return;
 
     if (e.getDistanceFromDragStart() > 4) {
-        juce::String desc = owner.config.dragPrefix + ":" + juce::String(sourceIndex);
+        juce::String desc = ModDrag::make(owner.config.dragPrefix, sourceIndex);
 
         juce::Image dragImage(juce::Image::ARGB, 50, 20, true);
         {

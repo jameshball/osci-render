@@ -48,40 +48,27 @@ public:
     void itemDragExit(const SourceDetails& dragSourceDetails) override;
     void itemDropped(const SourceDetails& dragSourceDetails) override;
 
-    // Callback invoked when an LFO is dropped on this slider.
-    // Parameters: lfoIndex, paramId
-    std::function<void(int, const juce::String&)> onLfoDropped;
-
-    // Callback invoked when an envelope is dropped on this slider.
-    // Parameters: envIndex, paramId
-    std::function<void(int, const juce::String&)> onEnvDropped;
-
-    // Struct returned by the LFO modulation query callback.
-    struct LfoModInfo {
-        bool active = false;           // true if any LFO is assigned to this param
+    // Modulation display info returned by query callbacks.
+    struct ModInfo {
+        bool active = false;           // true if any source is assigned to this param
         float modulatedPos = 0.0f;     // pixel position of the current modulated value
-        juce::Colour colour;           // blended colour from all assigned LFOs
+        juce::Colour colour;           // blended colour from all assigned sources
     };
 
-    // Callback: given a paramId, returns LFO modulation info.
-    // Set by the parent that has access to the processor.
-    std::function<LfoModInfo(const juce::String& paramId, juce::Slider& slider)> queryLfoModulation;
+    // Describes one modulation source type (LFO, Envelope, Random, etc.)
+    // All source types are handled identically via these bindings.
+    struct ModBinding {
+        juce::String dragPrefix;       // "LFO", "ENV", "RNG" — matched in "MOD:LFO:0" drag descriptions
+        juce::String propPrefix;       // "lfo", "env", "rng" — used as slider property key prefix
+        std::function<void(int, const juce::String&)> onDropped;  // add assignment callback
+        std::function<ModInfo(const juce::String& paramId, juce::Slider& slider)> query;  // query callback
+    };
 
-    // Callback: given a paramId, returns envelope modulation info.
-    std::function<LfoModInfo(const juce::String& paramId, juce::Slider& slider)> queryEnvModulation;
+    // All registered modulation bindings — populated by wireModulation().
+    std::vector<ModBinding> modBindings;
 
-    // Shared implementation of LFO modulation query.
-    static LfoModInfo computeLfoModulation(OscirenderAudioProcessor& processor,
-                                           const juce::String& paramId,
-                                           juce::Slider& slider);
-
-    // Shared implementation of envelope modulation query.
-    static LfoModInfo computeEnvModulation(OscirenderAudioProcessor& processor,
-                                           const juce::String& paramId,
-                                           juce::Slider& slider);
-
-    // Update LFO modulation display (call from a parent timer, not per-instance).
-    void updateLfoModulation();
+    // Update all modulation displays (call from a parent timer, not per-instance).
+    void updateModulationDisplay();
 
     // Wire standard modulation callbacks (LFO + envelope drop, query) to the processor.
     // Call this after construction to enable modulation for this slider.

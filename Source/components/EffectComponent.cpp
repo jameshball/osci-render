@@ -5,6 +5,8 @@
 #include "modulation/EnvelopeComponent.h"
 #include "modulation/LfoComponent.h"
 #include "modulation/ModulationHelper.h"
+#include "modulation/RandomComponent.h"
+#include "../audio/ModulationTypes.h"
 
 std::atomic<bool> EffectComponent::modAnyDragActive{false};
 juce::String EffectComponent::highlightedParamId;
@@ -368,36 +370,24 @@ void EffectComponent::handleAsyncUpdate() {
     }
 }
 
-void EffectComponent::updateLfoModulation() {
+void EffectComponent::updateModulationDisplay() {
     juce::String paramId = effect.parameters[index]->paramID;
     auto& props = slider.getProperties();
     bool needsRepaint = false;
 
-    // LFO modulation
-    if (queryLfoModulation) {
-        auto info = queryLfoModulation(paramId, slider);
-        if (info.active) {
-            props.set("lfo_active", true);
-            props.set("lfo_mod_pos", info.modulatedPos);
-            props.set("lfo_colour", (juce::int64)info.colour.getARGB());
-            needsRepaint = true;
-        } else if ((bool)props.getWithDefault("lfo_active", false)) {
-            props.set("lfo_active", false);
-            needsRepaint = true;
-        }
-    }
-
-    // Envelope modulation
-    if (queryEnvModulation) {
-        auto info = queryEnvModulation(paramId, slider);
-        if (info.active) {
-            props.set("env_active", true);
-            props.set("env_mod_pos", info.modulatedPos);
-            props.set("env_colour", (juce::int64)info.colour.getARGB());
-            needsRepaint = true;
-        } else if ((bool)props.getWithDefault("env_active", false)) {
-            props.set("env_active", false);
-            needsRepaint = true;
+    for (auto& binding : modBindings) {
+        juce::String activeKey = binding.propPrefix + "_active";
+        if (binding.query) {
+            auto info = binding.query(paramId, slider);
+            if (info.active) {
+                props.set(activeKey, true);
+                props.set(binding.propPrefix + "_mod_pos", info.modulatedPos);
+                props.set(binding.propPrefix + "_colour", (juce::int64)info.colour.getARGB());
+                needsRepaint = true;
+            } else if ((bool)props.getWithDefault(activeKey, false)) {
+                props.set(activeKey, false);
+                needsRepaint = true;
+            }
         }
     }
 
@@ -409,28 +399,6 @@ void EffectComponent::setRangeEnabled(bool enabled) {
     settingsButton.setVisible(enabled);
 }
 
-EffectComponent::LfoModInfo EffectComponent::computeLfoModulation(
-        OscirenderAudioProcessor& processor,
-        const juce::String& paramId,
-        juce::Slider& sl) {
-    auto h = ModulationHelper::compute(
-        processor.getLfoAssignments(), paramId, sl,
-        [&](int i) { return processor.getLfoCurrentValue(i); },
-        &LfoComponent::getLfoColour);
-    return { h.active, h.modulatedPos, h.colour };
-}
-
-EffectComponent::LfoModInfo EffectComponent::computeEnvModulation(
-        OscirenderAudioProcessor& processor,
-        const juce::String& paramId,
-        juce::Slider& sl) {
-    auto h = ModulationHelper::compute(
-        processor.getEnvAssignments(), paramId, sl,
-        [&](int i) { return processor.getEnvCurrentValue(i); },
-        &EnvelopeComponent::getEnvColour);
-    return { h.active, h.modulatedPos, h.colour };
-}
-
 void EffectComponent::setComponent(std::shared_ptr<juce::Component> component) {
     this->component = component;
     addAndMakeVisible(component.get());
@@ -439,8 +407,7 @@ void EffectComponent::setComponent(std::shared_ptr<juce::Component> component) {
 // === DragAndDropTarget for LFO assignment ===
 
 bool EffectComponent::isInterestedInDragSource(const SourceDetails& dragSourceDetails) {
-    auto desc = dragSourceDetails.description.toString();
-    return desc.startsWith("LFO:") || desc.startsWith("ENV:");
+    return ModDrag::isModDrag(dragSourceDetails.description.toString());
 }
 
 void EffectComponent::itemDragEnter(const SourceDetails&) {
@@ -460,47 +427,76 @@ void EffectComponent::itemDropped(const SourceDetails& dragSourceDetails) {
 
     juce::String desc = dragSourceDetails.description.toString();
     juce::String paramId = effect.parameters[index]->paramID;
-    if (desc.startsWith("LFO:")) {
-        int lfoIndex = desc.fromFirstOccurrenceOf("LFO:", false, false).getIntValue();
-        if (onLfoDropped)
-            onLfoDropped(lfoIndex, paramId);
-    } else if (desc.startsWith("ENV:")) {
-        int envIndex = desc.fromFirstOccurrenceOf("ENV:", false, false).getIntValue();
-        if (onEnvDropped)
-            onEnvDropped(envIndex, paramId);
+
+    auto parsed = ModDrag::parse(desc);
+    if (!parsed.valid) return;
+
+    for (auto& binding : modBindings) {
+        if (binding.dragPrefix == parsed.type && binding.onDropped) {
+            binding.onDropped(parsed.index, paramId);
+            return;
+        }
     }
 }
 
 void EffectComponent::wireModulation(OscirenderAudioProcessor& processor) {
-    onLfoDropped = [&processor](int lfoIndex, const juce::String& paramId) {
-        LfoAssignment assignment;
-        assignment.sourceIndex = lfoIndex;
-        assignment.paramId = paramId;
-        assignment.depth = 0.5f;
-        processor.addLfoAssignment(assignment);
+    // Define all modulation bindings generically — adding a new source type
+    // only requires appending one entry here.
+    auto makeBinding = [](const juce::String& dragPfx, const juce::String& propPfx,
+                          std::function<void(const ModAssignment&)> addAssignment,
+                          std::function<std::vector<ModAssignment>()> getAssignments,
+                          std::function<float(int)> getCurrentValue,
+                          std::function<juce::Colour(int)> getColour) -> ModBinding {
+        ModBinding b;
+        b.dragPrefix = dragPfx;
+        b.propPrefix = propPfx;
+        b.onDropped = [addAssignment](int index, const juce::String& paramId) {
+            ModAssignment assignment;
+            assignment.sourceIndex = index;
+            assignment.paramId = paramId;
+            assignment.depth = 0.5f;
+            addAssignment(assignment);
+        };
+        b.query = [getAssignments, getCurrentValue, getColour](
+                      const juce::String& paramId, juce::Slider& sl) -> ModInfo {
+            auto h = ModulationHelper::compute(getAssignments(), paramId, sl, getCurrentValue, getColour);
+            return { h.active, h.modulatedPos, h.colour };
+        };
+        return b;
     };
-    queryLfoModulation = [&processor](const juce::String& paramId, juce::Slider& sl) -> LfoModInfo {
-        return computeLfoModulation(processor, paramId, sl);
+
+    modBindings = {
+        makeBinding("LFO", "lfo",
+            [&processor](const ModAssignment& a) { processor.addLfoAssignment(a); },
+            [&processor]() { return processor.getLfoAssignments(); },
+            [&processor](int i) { return processor.getLfoCurrentValue(i); },
+            &LfoComponent::getLfoColour),
+        makeBinding("ENV", "env",
+            [&processor](const ModAssignment& a) { processor.addEnvAssignment(a); },
+            [&processor]() { return processor.getEnvAssignments(); },
+            [&processor](int i) { return processor.getEnvCurrentValue(i); },
+            &EnvelopeComponent::getEnvColour),
+        makeBinding("RNG", "rng",
+            [&processor](const ModAssignment& a) { processor.addRandomAssignment(a); },
+            [&processor]() { return processor.getRandomAssignments(); },
+            [&processor](int i) { return processor.getRandomCurrentValue(i); },
+            &RandomComponent::getRandomColour),
     };
-    onEnvDropped = [&processor](int envIndex, const juce::String& paramId) {
-        EnvAssignment assignment;
-        assignment.sourceIndex = envIndex;
-        assignment.paramId = paramId;
-        assignment.depth = 0.5f;
-        processor.addEnvAssignment(assignment);
-    };
-    queryEnvModulation = [&processor](const juce::String& paramId, juce::Slider& sl) -> LfoModInfo {
-        return computeEnvModulation(processor, paramId, sl);
-    };
+
     modBroadcaster = &processor.modulationUpdateBroadcaster;
     modBroadcaster->addListener(this, [this]() {
-        updateLfoModulation();
+        updateModulationDisplay();
 
-        // Disable the per-parameter LFO dropdown when a global modulation
-        // source (LFO panel or envelope) is wired to this parameter.
+        // Disable the per-parameter LFO dropdown when any global modulation
+        // source is wired to this parameter.
         if (lfoEnabled) {
-            bool hasGlobalMod = (bool)slider.getProperties().getWithDefault("lfo_active", false)
-                             || (bool)slider.getProperties().getWithDefault("env_active", false);
+            bool hasGlobalMod = false;
+            for (auto& binding : modBindings) {
+                if ((bool)slider.getProperties().getWithDefault(binding.propPrefix + "_active", false)) {
+                    hasGlobalMod = true;
+                    break;
+                }
+            }
             lfo.setEnabled(!hasGlobalMod);
         }
 

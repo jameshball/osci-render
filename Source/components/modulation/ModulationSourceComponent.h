@@ -14,7 +14,7 @@ class EffectComponent;
 // (LFO, Envelope, Random, Step Sequencer, etc.) to the processor.
 struct ModulationSourceConfig {
     int sourceCount = 1;
-    juce::String dragPrefix;  // "LFO", "ENV", "RNG" — used as "LFO:0" drag description
+    juce::String dragPrefix;  // "LFO", "ENV", "RNG" — used as "MOD:LFO:0" drag description
 
     std::function<juce::String(int)> getLabel;        // "LFO 1", "ENV 1"
     std::function<juce::Colour(int)> getSourceColour;
@@ -103,11 +103,11 @@ private:
     ModulationSourceConfig config;
 
     // --- Layout constants ---
-    static constexpr int kTabWidth        = 75;
+    static constexpr int kTabWidth        = 55;
     static constexpr int kTabGap          = 1;
     static constexpr int kContentInset    = 4;
     static constexpr int kSeamShadowWidth = 10;
-    static constexpr int kMinTabHeight    = 55;
+    static constexpr int kMinTabHeight    = 40;
 
     juce::Rectangle<int> contentBounds;
     juce::Rectangle<int> outlineBounds;

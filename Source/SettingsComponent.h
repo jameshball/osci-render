@@ -16,6 +16,7 @@
 #include "components/OpenFileComponent.h"
 #include "components/FileControlsComponent.h"
 #include "components/modulation/LfoComponent.h"
+#include "components/modulation/RandomComponent.h"
 
 class OscirenderAudioProcessorEditor;
 class SettingsComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, private juce::Timer {
@@ -49,6 +50,7 @@ private:
     // Free-standing components (previously inside MidiComponent)
     EnvelopeComponent envelope;
     std::unique_ptr<LfoComponent> lfo;
+    std::unique_ptr<RandomComponent> random;
     ScrollFadeViewport keyboardViewport;
     juce::CustomMidiKeyboardComponent keyboard;
 

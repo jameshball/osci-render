@@ -2,8 +2,8 @@
 
 #include <JuceHeader.h>
 #include "NodeGraphComponent.h"
-#include "LfoRateComponent.h"
-#include "LfoModeComponent.h"
+#include "ModulationRateComponent.h"
+#include "ModulationModeComponent.h"
 #include "../../audio/LfoState.h"
 #include "ModulationSourceComponent.h"
 #include "../PhaseSliderComponent.h"
@@ -27,6 +27,9 @@ public:
     LfoPreset getLfoPreset(int lfoIndex) const;
 
     static juce::Colour getLfoColour(int lfoIndex);
+
+    // Restrict LFO features when MIDI is disabled (only Free mode available)
+    void setMidiEnabled(bool enabled);
 
     void syncFromProcessorState() override;
 
@@ -62,8 +65,8 @@ private:
         juce::Rectangle<int> leftArrowArea, rightArrowArea;
     };
     PresetSelector presetSelector;
-    LfoRateComponent rateControl;
-    LfoModeComponent modeControl;
+    ModulationRateComponent rateControl;
+    ModulationModeComponent modeControl;
     PhaseSliderComponent phaseSlider;
 
     // --- Layout constants ---

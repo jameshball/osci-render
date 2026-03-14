@@ -1,104 +1,79 @@
-#include "LfoRateComponent.h"
-#include "../../PluginProcessor.h"
+#include "ModulationRateComponent.h"
 #include "../../LookAndFeel.h"
 #include "InlineEditorHelper.h"
 #include "../DarkBarPainter.h"
 
-LfoRateComponent::LfoRateComponent(OscirenderAudioProcessor& processor, int index)
-    : audioProcessor(processor), lfoIndex(index)
+ModulationRateComponent::ModulationRateComponent(const ModulationRateConfig& cfg, int index)
+    : config(cfg), sourceIndex(index)
 {
     setMouseCursor(juce::MouseCursor::UpDownResizeCursor);
     setRepaintsOnMouseActivity(true);
 }
 
-LfoRateComponent::~LfoRateComponent() {}
-
-// ============================================================================
-// Display helpers
-// ============================================================================
+ModulationRateComponent::~ModulationRateComponent() {}
 
 // ============================================================================
 // Icon drawing helpers
 // ============================================================================
 
-// Draw a single filled note head + stem (crotchet / quarter note style).
-// headCx/headCy = centre of the head ellipse. stemHeight = upward stem length.
 static void drawStemmedNote(juce::Graphics& g, float headCx, float headCy,
                             float headRx, float headRy, float stemHeight, float stemW) {
-    // Head
     g.fillEllipse(headCx - headRx, headCy - headRy, headRx * 2.0f, headRy * 2.0f);
-    // Stem (right edge of head, going up)
     float stemX = headCx + headRx - stemW * 0.5f - 0.3f;
     g.fillRect(stemX, headCy - stemHeight, stemW, stemHeight);
 }
 
-void LfoRateComponent::drawHzIcon(juce::Graphics& g, juce::Rectangle<float> area) {
+void ModulationRateComponent::drawHzIcon(juce::Graphics& g, juce::Rectangle<float> area) {
     g.setFont(juce::Font(11.0f, juce::Font::bold));
     g.drawText("Hz", area, juce::Justification::centred);
 }
 
-void LfoRateComponent::drawNoteIcon(juce::Graphics& g, juce::Rectangle<float> area) {
-    // Simple quarter note: small head + stem, no flag
+void ModulationRateComponent::drawNoteIcon(juce::Graphics& g, juce::Rectangle<float> area) {
     float cx = area.getCentreX();
     float cy = area.getCentreY();
     float s = juce::jmin(area.getWidth(), area.getHeight()) * 0.42f;
-
     float headRx = s * 0.32f;
     float headRy = s * 0.24f;
     float headCy = cy + s * 0.4f;
-
     drawStemmedNote(g, cx, headCy, headRx, headRy, s * 1.1f, 1.2f);
 }
 
-void LfoRateComponent::drawDottedNoteIcon(juce::Graphics& g, juce::Rectangle<float> area) {
-    // Same-sized quarter note (drawn in full area) + augmentation dot
+void ModulationRateComponent::drawDottedNoteIcon(juce::Graphics& g, juce::Rectangle<float> area) {
     drawNoteIcon(g, area);
-
     float cx = area.getCentreX();
     float cy = area.getCentreY();
     float s = juce::jmin(area.getWidth(), area.getHeight()) * 0.42f;
     float dotR = s * 0.13f;
-    // Dot to the right and slightly above the head centre
     float dotX = cx + s * 0.55f;
     float dotY = cy + s * 0.35f;
     g.fillEllipse(dotX - dotR, dotY - dotR, dotR * 2.0f, dotR * 2.0f);
 }
 
-void LfoRateComponent::drawTripletNoteIcon(juce::Graphics& g, juce::Rectangle<float> area) {
-    // Three beamed notes with "3" above the beam
+void ModulationRateComponent::drawTripletNoteIcon(juce::Graphics& g, juce::Rectangle<float> area) {
     float s = juce::jmin(area.getWidth(), area.getHeight()) * 0.42f;
     float cy = area.getCentreY();
-
     float headRx = s * 0.22f;
     float headRy = s * 0.17f;
     float stemH = s * 0.8f;
     float stemW = 1.0f;
-
-    // Three evenly spaced note positions
     float spacing = s * 0.55f;
     float baseCx = area.getCentreX();
     float headCy = cy + s * 0.45f;
     float xs[3] = { baseCx - spacing, baseCx, baseCx + spacing };
-
-    // Draw three stemmed notes
     for (int i = 0; i < 3; ++i)
         drawStemmedNote(g, xs[i], headCy, headRx, headRy, stemH, stemW);
-
-    // Beam connecting the tops of the stems
     float beamY = headCy - stemH;
     float beamH = 1.5f;
     float beamLeft = xs[0] + headRx - stemW * 0.5f;
     float beamRight = xs[2] + headRx + stemW * 0.5f;
     g.fillRect(beamLeft, beamY, beamRight - beamLeft, beamH);
-
-    // "3" above the beam
     float labelY = beamY - 8.0f;
     g.setFont(juce::Font(7.5f, juce::Font::bold));
     g.drawText("3", juce::Rectangle<float>(beamLeft, labelY, beamRight - beamLeft, 8.0f),
                juce::Justification::centred);
 }
 
-void LfoRateComponent::drawModeIcon(juce::Graphics& g, juce::Rectangle<float> area) const {
+void ModulationRateComponent::drawModeIcon(juce::Graphics& g, juce::Rectangle<float> area) const {
     switch (rateMode) {
         case LfoRateMode::Seconds:       drawHzIcon(g, area);          break;
         case LfoRateMode::Tempo:         drawNoteIcon(g, area);        break;
@@ -107,38 +82,38 @@ void LfoRateComponent::drawModeIcon(juce::Graphics& g, juce::Rectangle<float> ar
     }
 }
 
-double LfoRateComponent::getCurrentBpm() const {
-    return audioProcessor.currentBpm.load(std::memory_order_relaxed);
+double ModulationRateComponent::getCurrentBpm() const {
+    return config.getCurrentBpm();
 }
 
-double LfoRateComponent::getEffectiveRateHz() const {
+double ModulationRateComponent::getEffectiveRateHz() const {
     if (rateMode == LfoRateMode::Seconds) {
-        if (audioProcessor.lfoRate[lfoIndex] != nullptr)
-            return (double)audioProcessor.lfoRate[lfoIndex]->getValueUnnormalised();
+        auto* param = config.getRateParam(sourceIndex);
+        if (param != nullptr)
+            return (double)param->getValueUnnormalised();
         return 1.0;
     }
-    // Tempo modes
     auto& divisions = getTempoDivisions();
     int idx = juce::jlimit(0, (int)divisions.size() - 1, tempoDivisionIndex);
     return divisions[idx].toHz(getCurrentBpm(), rateMode);
 }
 
-juce::String LfoRateComponent::getDisplayText() const {
+juce::String ModulationRateComponent::getDisplayText() const {
     if (rateMode == LfoRateMode::Seconds) {
         float hz = 1.0f;
-        if (audioProcessor.lfoRate[lfoIndex] != nullptr)
-            hz = audioProcessor.lfoRate[lfoIndex]->getValueUnnormalised();
+        auto* param = config.getRateParam(sourceIndex);
+        if (param != nullptr)
+            hz = param->getValueUnnormalised();
         if (hz >= 10.0f)
             return juce::String(hz, 1) + " Hz";
         return juce::String(hz, 2) + " Hz";
     }
-    // Tempo modes — show the division name
     auto& divisions = getTempoDivisions();
     int idx = juce::jlimit(0, (int)divisions.size() - 1, tempoDivisionIndex);
     return divisions[idx].toString();
 }
 
-juce::String LfoRateComponent::getLabelText() const {
+juce::String ModulationRateComponent::getLabelText() const {
     return rateMode == LfoRateMode::Seconds ? "FREQUENCY" : "TEMPO";
 }
 
@@ -146,29 +121,27 @@ juce::String LfoRateComponent::getLabelText() const {
 // State
 // ============================================================================
 
-void LfoRateComponent::setLfoIndex(int index) {
-    lfoIndex = juce::jlimit(0, NUM_LFOS - 1, index);
+void ModulationRateComponent::setSourceIndex(int index) {
+    sourceIndex = juce::jlimit(0, config.maxIndex - 1, index);
     repaint();
 }
 
-void LfoRateComponent::setRateMode(LfoRateMode mode) {
+void ModulationRateComponent::setRateMode(LfoRateMode mode) {
     if (rateMode == mode) return;
     rateMode = mode;
-    audioProcessor.setLfoRateMode(lfoIndex, mode);
-    // When switching to a tempo mode, push the computed Hz to the processor
+    config.setRateMode(sourceIndex, mode);
     if (rateMode != LfoRateMode::Seconds) {
         float hz = (float)getEffectiveRateHz();
         pushRateToProcessor(hz);
     }
-    // Repaint self and parent so the label text updates immediately
     repaint();
     if (auto* p = getParentComponent()) p->repaint();
 }
 
-void LfoRateComponent::setTempoDivisionIndex(int index) {
+void ModulationRateComponent::setTempoDivisionIndex(int index) {
     auto& divisions = getTempoDivisions();
     tempoDivisionIndex = juce::jlimit(0, (int)divisions.size() - 1, index);
-    audioProcessor.setLfoTempoDivision(lfoIndex, tempoDivisionIndex);
+    config.setTempoDivision(sourceIndex, tempoDivisionIndex);
     if (rateMode != LfoRateMode::Seconds) {
         float hz = (float)getEffectiveRateHz();
         pushRateToProcessor(hz);
@@ -176,41 +149,37 @@ void LfoRateComponent::setTempoDivisionIndex(int index) {
     repaint();
 }
 
-void LfoRateComponent::syncFromProcessor() {
-    rateMode = audioProcessor.getLfoRateMode(lfoIndex);
-    tempoDivisionIndex = audioProcessor.getLfoTempoDivision(lfoIndex);
+void ModulationRateComponent::syncFromProcessor() {
+    rateMode = config.getRateMode(sourceIndex);
+    tempoDivisionIndex = config.getTempoDivision(sourceIndex);
     repaint();
 }
 
-void LfoRateComponent::pushRateToProcessor(float hz) {
-    if (audioProcessor.lfoRate[lfoIndex] != nullptr)
-        audioProcessor.lfoRate[lfoIndex]->setUnnormalisedValueNotifyingHost(juce::jmax(0.0001f, hz));
+void ModulationRateComponent::pushRateToProcessor(float hz) {
+    auto* param = config.getRateParam(sourceIndex);
+    if (param != nullptr)
+        param->setUnnormalisedValueNotifyingHost(juce::jmax(0.0001f, hz));
 }
 
 // ============================================================================
-// Paint — Vital-inspired dark rounded bar with value + mode icon
+// Paint
 // ============================================================================
 
-void LfoRateComponent::paint(juce::Graphics& g) {
+void ModulationRateComponent::paint(juce::Graphics& g) {
     auto bounds = getLocalBounds().toFloat();
     bool hovering = isMouseOver(true);
 
     DarkBarPainter::paintBackground(g, bounds, labelArea, getLabelText(), hovering);
 
-    // Value text (centre of value area)
     g.setColour(juce::Colours::white.withAlpha(0.9f));
     g.setFont(juce::Font(14.0f, juce::Font::bold));
     auto textBounds = valueArea.toFloat();
     g.drawText(getDisplayText(), textBounds, juce::Justification::centred);
 
-    // Mode icon button (right portion) — separator + icon
     auto iconBounds = modeButtonArea.toFloat();
-
-    // Separator line — brighter
     g.setColour(juce::Colours::white.withAlpha(0.15f));
     g.drawVerticalLine((int)iconBounds.getX(), iconBounds.getY() + 3.0f, iconBounds.getBottom() - 3.0f);
 
-    // Mode icon — brighter colors
     bool iconHover = modeButtonArea.contains(getMouseXYRelative());
     g.setColour(iconHover ? juce::Colours::white.withAlpha(0.7f) : Colours::grey);
     drawModeIcon(g, iconBounds.reduced(2.0f, 2.0f));
@@ -220,7 +189,7 @@ void LfoRateComponent::paint(juce::Graphics& g) {
 // Layout
 // ============================================================================
 
-void LfoRateComponent::resized() {
+void ModulationRateComponent::resized() {
     auto bounds = getLocalBounds();
     static constexpr int labelH = 14;
     labelArea = bounds.removeFromBottom(labelH);
@@ -233,8 +202,7 @@ void LfoRateComponent::resized() {
 // Mouse interaction
 // ============================================================================
 
-void LfoRateComponent::mouseDown(const juce::MouseEvent& e) {
-    // Right-click or mode icon click → show mode popup
+void ModulationRateComponent::mouseDown(const juce::MouseEvent& e) {
     if (e.mods.isPopupMenu() || modeButtonArea.contains(e.getPosition())) {
         showModePopup();
         return;
@@ -244,8 +212,9 @@ void LfoRateComponent::mouseDown(const juce::MouseEvent& e) {
     isDragging = true;
 
     if (rateMode == LfoRateMode::Seconds) {
-        if (audioProcessor.lfoRate[lfoIndex] != nullptr)
-            dragStartValue = audioProcessor.lfoRate[lfoIndex]->getValueUnnormalised();
+        auto* param = config.getRateParam(sourceIndex);
+        if (param != nullptr)
+            dragStartValue = param->getValueUnnormalised();
         else
             dragStartValue = 1.0f;
     } else {
@@ -253,20 +222,18 @@ void LfoRateComponent::mouseDown(const juce::MouseEvent& e) {
     }
 }
 
-void LfoRateComponent::mouseDrag(const juce::MouseEvent& e) {
+void ModulationRateComponent::mouseDrag(const juce::MouseEvent& e) {
     if (!isDragging) return;
 
     if (rateMode == LfoRateMode::Seconds) {
         float dy = (float)(dragStartY - e.getPosition().y);
-        // Logarithmic drag: work in log space for consistent feel across 0.01–100 Hz
         float logNewVal = std::log(dragStartValue) + dy * 0.02f;
         float newVal = juce::jlimit(0.01f, 100.0f, std::exp(logNewVal));
         pushRateToProcessor(newVal);
         repaint();
     } else {
-        // Tempo modes: drag up = higher index (faster division), drag down = lower
         float dy = (float)(dragStartY - e.getPosition().y);
-        int steps = (int)(dy / 12.0f); // 12 px per division step
+        int steps = (int)(dy / 12.0f);
         auto& divisions = getTempoDivisions();
         int newIdx = juce::jlimit(0, (int)divisions.size() - 1, dragStartDivision + steps);
         if (newIdx != tempoDivisionIndex)
@@ -276,12 +243,12 @@ void LfoRateComponent::mouseDrag(const juce::MouseEvent& e) {
     valuePopup.show(*this, getDisplayText());
 }
 
-void LfoRateComponent::mouseUp(const juce::MouseEvent&) {
+void ModulationRateComponent::mouseUp(const juce::MouseEvent&) {
     isDragging = false;
     valuePopup.hide();
 }
 
-void LfoRateComponent::mouseDoubleClick(const juce::MouseEvent& e) {
+void ModulationRateComponent::mouseDoubleClick(const juce::MouseEvent& e) {
     if (modeButtonArea.contains(e.getPosition())) return;
 
     if (rateMode == LfoRateMode::Seconds) {
@@ -293,7 +260,7 @@ void LfoRateComponent::mouseDoubleClick(const juce::MouseEvent& e) {
 // Mode popup
 // ============================================================================
 
-void LfoRateComponent::showModePopup() {
+void ModulationRateComponent::showModePopup() {
     juce::PopupMenu menu;
     menu.addItem(1, "Seconds (Hz)",    true, rateMode == LfoRateMode::Seconds);
     menu.addItem(2, "Tempo",           true, rateMode == LfoRateMode::Tempo);
@@ -316,10 +283,11 @@ void LfoRateComponent::showModePopup() {
 // Inline text editor for Hz mode
 // ============================================================================
 
-void LfoRateComponent::showInlineEditor() {
+void ModulationRateComponent::showInlineEditor() {
     float hz = 1.0f;
-    if (audioProcessor.lfoRate[lfoIndex] != nullptr)
-        hz = audioProcessor.lfoRate[lfoIndex]->getValueUnnormalised();
+    auto* param = config.getRateParam(sourceIndex);
+    if (param != nullptr)
+        hz = param->getValueUnnormalised();
 
     auto commitFn = [this](const juce::String& text) {
         float val = text.getFloatValue();
@@ -341,7 +309,7 @@ void LfoRateComponent::showInlineEditor() {
     inlineEditor->grabKeyboardFocus();
 }
 
-void LfoRateComponent::commitInlineEditor() {
+void ModulationRateComponent::commitInlineEditor() {
     auto editor = std::move(inlineEditor);
     if (!editor) return;
     float val = editor->getText().getFloatValue();
@@ -350,11 +318,11 @@ void LfoRateComponent::commitInlineEditor() {
     repaint();
 }
 
-void LfoRateComponent::mouseEnter(const juce::MouseEvent&) {
+void ModulationRateComponent::mouseEnter(const juce::MouseEvent&) {
     valuePopup.show(*this, getDisplayText());
 }
 
-void LfoRateComponent::mouseExit(const juce::MouseEvent&) {
+void ModulationRateComponent::mouseExit(const juce::MouseEvent&) {
     if (!isDragging)
         valuePopup.hide();
 }
