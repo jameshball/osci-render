@@ -155,6 +155,8 @@ public:
     }
 
     void closeButtonPressed() override {
+        if (isFullScreen)
+            toggleFullScreen();
         // local copy of parent so that we can safely delete the child
         VisualiserComponent* parent = this->parent;
         parent->setHasMirrorConsumer(false);
@@ -164,6 +166,32 @@ public:
         parent->resized();
     }
 
+    void toggleFullScreen() {
+        isFullScreen = !isFullScreen;
+        setAlwaysOnTop(!isFullScreen);
+#if JUCE_WINDOWS
+        if (isFullScreen) {
+            windowedBounds = getBounds();
+            auto& displays = juce::Desktop::getInstance().getDisplays();
+            auto* display = displays.getDisplayForRect(getBounds());
+            if (display != nullptr) {
+                setFullScreen(true);
+                setBounds(display->totalArea);
+            }
+        } else {
+            setFullScreen(false);
+            if (!windowedBounds.isEmpty())
+                setBounds(windowedBounds);
+        }
+#else
+        setFullScreen(isFullScreen);
+#endif
+    }
+
+    bool getIsFullScreen() const { return isFullScreen; }
+
 private:
     VisualiserComponent* parent;
+    bool isFullScreen = false;
+    juce::Rectangle<int> windowedBounds;
 };
