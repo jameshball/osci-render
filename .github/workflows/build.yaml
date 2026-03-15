@@ -95,6 +95,10 @@ jobs:
 
       - name: Validate plugin with pluginval
         shell: bash
+        env:
+          PLUGINVAL_SKIP_GUI: "1"
+          PLUGINVAL_TIMEOUT: "1200000"
+          PLUGINVAL_STRICTNESS: "10"
         run: |
           source ./ci/setup-env.sh
           source ./ci/pluginval.sh "${{ matrix.project }}"

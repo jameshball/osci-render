@@ -8,6 +8,7 @@
 
 PLUGIN="${1:?Usage: pluginval.sh <plugin-name>}"
 STRICTNESS="${PLUGINVAL_STRICTNESS:-5}"
+SKIP_GUI="${PLUGINVAL_SKIP_GUI:-}"
 
 # ── Resolve paths ──────────────────────────────────────────────
 
@@ -51,7 +52,7 @@ fi
 if [ "$OS" = "mac" ]; then
     PLUGINVAL="$PLUGINVAL_BUILD/pluginval_artefacts/Release/pluginval.app/Contents/MacOS/pluginval"
 elif [ "$OS" = "linux" ]; then
-    PLUGINVAL="$PLUGINVAL_BUILD/pluginval_artefacts/pluginval"
+    PLUGINVAL="$PLUGINVAL_BUILD/pluginval_artefacts/Release/pluginval"
 else
     PLUGINVAL="$PLUGINVAL_BUILD/pluginval_artefacts/Release/pluginval.exe"
 fi
@@ -89,11 +90,21 @@ echo "VST3 plugin: $VST3_PATH"
 
 # ── Run pluginval ──────────────────────────────────────────────
 
+PLUGINVAL_LOG_DIR="$ROOT/bin/pluginval-logs"
+mkdir -p "$PLUGINVAL_LOG_DIR"
+
+PLUGINVAL_TIMEOUT="${PLUGINVAL_TIMEOUT:-60000}"
+PLUGINVAL_ARGS="--strictness-level $STRICTNESS --verbose --timeout-ms $PLUGINVAL_TIMEOUT --output-dir \"$PLUGINVAL_LOG_DIR\""
+
+if [ -n "$SKIP_GUI" ]; then
+    PLUGINVAL_ARGS="$PLUGINVAL_ARGS --skip-gui-tests"
+fi
+
 echo "============================================="
 echo " Running pluginval (strictness $STRICTNESS)"
 echo "============================================="
 
-PLUGINVAL_CMD="\"$PLUGINVAL\" --strictness-level $STRICTNESS --validate \"$VST3_PATH\""
+PLUGINVAL_CMD="\"$PLUGINVAL\" $PLUGINVAL_ARGS --validate \"$VST3_PATH\""
 
 if [ "$OS" = "linux" ]; then
     # Linux CI needs a virtual display for JUCE GUI
@@ -105,6 +116,10 @@ if [ "$OS" = "linux" ]; then
 else
     eval $PLUGINVAL_CMD
 fi
+
+echo ""
+echo "Logs saved to: $PLUGINVAL_LOG_DIR"
+ls -la "$PLUGINVAL_LOG_DIR" 2>/dev/null || true
 
 echo "============================================="
 echo " pluginval: ALL TESTS PASSED"

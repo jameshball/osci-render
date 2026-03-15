@@ -58,18 +58,27 @@ if not exist "%VST3_PATH%" (
 echo VST3 plugin: %VST3_PATH%
 
 REM ── Run pluginval ───────────────────────────────────────────────
+set "PLUGINVAL_LOG_DIR=%ROOT%\bin\pluginval-logs"
+if not exist "%PLUGINVAL_LOG_DIR%" mkdir "%PLUGINVAL_LOG_DIR%"
+
+set "PLUGINVAL_ARGS=--strictness-level %STRICTNESS% --verbose --output-dir "%PLUGINVAL_LOG_DIR%""
+
 echo =============================================
 echo  Running pluginval (strictness %STRICTNESS%)
 echo =============================================
 
-"%PLUGINVAL%" --strictness-level %STRICTNESS% --validate "%VST3_PATH%"
+"%PLUGINVAL%" %PLUGINVAL_ARGS% --validate "%VST3_PATH%"
 if %ERRORLEVEL% neq 0 (
+    echo.
+    echo Logs saved to: %PLUGINVAL_LOG_DIR%
     echo =============================================
     echo  pluginval: VALIDATION FAILED
     echo =============================================
     exit /b 1
 )
 
+echo.
+echo Logs saved to: %PLUGINVAL_LOG_DIR%
 echo =============================================
 echo  pluginval: ALL TESTS PASSED
 echo =============================================

@@ -1,7 +1,5 @@
 #!/bin/bash -e
 
-ls -R
-
 # linux specific stiff
 if [ $OS = "linux" ]; then
   sudo apt-get update
