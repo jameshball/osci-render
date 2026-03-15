@@ -1,29 +1,13 @@
 /*
   ==============================================================================
 
-   JUCE is an open source framework subject to commercial or open source
-   licensing.
+   Customised version of JUCE's AudioDeviceSelectorComponent.
+   Original code copyright (c) Raw Material Software Limited, licensed under
+   the AGPLv3: https://www.gnu.org/licenses/agpl-3.0.en.html
 
-   JUCE framework with any other source code, object code, content or any other
-   copyrightable work, you agree to the terms of the JUCE End User Licence
-   Agreement, and all incorporated terms including the JUCE Privacy Policy and
-   the JUCE Website Terms of Service, as applicable, which will bind you. If you
-   do not agree to the terms of these agreements, we will not license the JUCE
-   framework to you, and you must discontinue the installation or download
-   process and cease use of the JUCE framework.
-
-   JUCE End User Licence Agreement: https://juce.com/legal/juce-8-licence/
-   JUCE Privacy Policy: https://juce.com/juce-privacy-policy
-   JUCE Website Terms of Service: https://juce.com/juce-website-terms-of-service/
-
-   Or:
-
-   You may also use this code under the terms of the AGPLv3:
-   https://www.gnu.org/licenses/agpl-3.0.en.html
-
-   THE JUCE FRAMEWORK IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL
-   WARRANTIES, WHETHER EXPRESSED OR IMPLIED, INCLUDING WARRANTY OF
-   MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, ARE DISCLAIMED.
+   All types are prefixed with "Custom" and placed inside namespace juce.
+   The Custom prefix prevents ODR violations with JUCE's identically-named
+   originals that are compiled via the amalgamated include_juce_audio_utils.cpp.
 
   ==============================================================================
 */
@@ -38,15 +22,16 @@
  #include "audio/WindowsLoopbackAudioDeviceType.h"
 #endif
 
-#define AudioDeviceSelectorComponent CustomAudioDeviceSelectorComponent
-
 namespace juce
 {
 
-struct SimpleDeviceManagerInputLevelMeter final : public Component,
-                                                  public Timer
+namespace
 {
-    SimpleDeviceManagerInputLevelMeter (AudioDeviceManager& m)  : manager (m)
+
+struct CustomSimpleDeviceManagerInputLevelMeter final : public Component,
+                                                        public Timer
+{
+    CustomSimpleDeviceManagerInputLevelMeter (AudioDeviceManager& m) : manager (m)
     {
         startTimerHz (20);
         inputLevelGetter = manager.getInputLevelGetter();
@@ -72,7 +57,6 @@ struct SimpleDeviceManagerInputLevelMeter final : public Component,
 
     void paint (Graphics& g) override
     {
-        // (add a bit of a skew to make the level more obvious)
         getLookAndFeel().drawLevelMeter (g, getWidth(), getHeight(),
                                          (float) std::exp (std::log (level) / 3.0));
     }
@@ -81,10 +65,10 @@ struct SimpleDeviceManagerInputLevelMeter final : public Component,
     AudioDeviceManager::LevelMeter::Ptr inputLevelGetter;
     float level = 0;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SimpleDeviceManagerInputLevelMeter)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CustomSimpleDeviceManagerInputLevelMeter)
 };
 
-static void drawTextLayout (Graphics& g, Component& owner, StringRef text, const Rectangle<int>& textBounds, bool enabled)
+void customDrawTextLayout (Graphics& g, Component& owner, StringRef text, const Rectangle<int>& textBounds, bool enabled)
 {
     const auto textColour = owner.findColour (ListBox::textColourId, true).withMultipliedAlpha (enabled ? 1.0f : 0.6f);
 
@@ -101,13 +85,27 @@ static void drawTextLayout (Graphics& g, Component& owner, StringRef text, const
     textLayout.draw (g, textBounds.toFloat());
 }
 
+String customGetNoDeviceString() { return "<< " + TRANS ("none") + " >>"; }
+
+} // anonymous namespace
+
 
 //==============================================================================
-class AudioDeviceSelectorComponent::MidiInputSelectorComponentListBox final : public ListBox,
-                                                                              private ListBoxModel
+struct CustomAudioDeviceSetupDetails
+{
+    AudioDeviceManager* manager;
+    int minNumInputChannels, maxNumInputChannels;
+    int minNumOutputChannels, maxNumOutputChannels;
+    bool useStereoPairs;
+};
+
+
+//==============================================================================
+class CustomAudioDeviceSelectorComponent::CustomMidiInputSelectorComponentListBox final : public ListBox,
+                                                                                          private ListBoxModel
 {
 public:
-    MidiInputSelectorComponentListBox (AudioDeviceManager& dm, const String& noItems)
+    CustomMidiInputSelectorComponentListBox (AudioDeviceManager& dm, const String& noItems)
         : ListBox ({}, nullptr),
           deviceManager (dm),
           noItemsMessage (noItems)
@@ -144,7 +142,7 @@ public:
             getLookAndFeel().drawTickBox (g, *this, (float) x - tickW, ((float) height - tickW) * 0.5f, tickW, tickW,
                                           enabled, true, true, false);
 
-            drawTextLayout (g, *this, item.name, { x + 5, 0, width - x - 5, height }, enabled);
+            customDrawTextLayout (g, *this, item.name, { x + 5, 0, width - x - 5, height }, enabled);
         }
     }
 
@@ -190,7 +188,6 @@ public:
     }
 
 private:
-    //==============================================================================
     AudioDeviceManager& deviceManager;
     const String noItemsMessage;
     Array<MidiDeviceInfo> items;
@@ -209,27 +206,16 @@ private:
         return getRowHeight();
     }
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MidiInputSelectorComponentListBox)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CustomMidiInputSelectorComponentListBox)
 };
 
 
 //==============================================================================
-struct AudioDeviceSetupDetails
-{
-    AudioDeviceManager* manager;
-    int minNumInputChannels, maxNumInputChannels;
-    int minNumOutputChannels, maxNumOutputChannels;
-    bool useStereoPairs;
-};
-
-static String getNoDeviceString()   { return "<< " + TRANS ("none") + " >>"; }
-
-//==============================================================================
-class AudioDeviceSelectorComponent::MidiOutputSelector final : public Component,
-                                                               private ChangeListener
+class CustomAudioDeviceSelectorComponent::CustomMidiOutputSelector final : public Component,
+                                                                           private ChangeListener
 {
 public:
-    explicit MidiOutputSelector (AudioDeviceManager& dm)
+    explicit CustomMidiOutputSelector (AudioDeviceManager& dm)
         : deviceManager (dm)
     {
         deviceManager.addChangeListener (this);
@@ -248,7 +234,7 @@ public:
         addAndMakeVisible (selector);
     }
 
-    ~MidiOutputSelector() final
+    ~CustomMidiOutputSelector() final
     {
         deviceManager.removeChangeListener (this);
     }
@@ -262,7 +248,7 @@ private:
 
         const auto midiOutputs = MidiOutput::getAvailableDevices();
 
-        selector.addItem (getNoDeviceString(), -1);
+        selector.addItem (customGetNoDeviceString(), -1);
         selector.setSelectedId (-1, dontSendNotification);
         selector.addSeparator();
 
@@ -281,19 +267,20 @@ private:
     AudioDeviceManager& deviceManager;
 };
 
+
 //==============================================================================
-class AudioDeviceSettingsPanel : public Component,
-                                 private ChangeListener
+class CustomAudioDeviceSettingsPanel : public Component,
+                                       private ChangeListener
 {
 public:
-    AudioDeviceSettingsPanel (AudioIODeviceType& t, AudioDeviceSetupDetails& setupDetails,
-                              const bool hideAdvancedOptionsWithButton,
-                              AudioDeviceSelectorComponent& p)
+    CustomAudioDeviceSettingsPanel (AudioIODeviceType& t, CustomAudioDeviceSetupDetails& setupDetails,
+                                    const bool hideAdvancedOptionsWithButton,
+                                    CustomAudioDeviceSelectorComponent& p)
         : type (t), setup (setupDetails), parent (p)
     {
         if (hideAdvancedOptionsWithButton)
         {
-            showAdvancedSettingsButton = std::make_unique <TextButton> (TRANS ("Show advanced settings..."));
+            showAdvancedSettingsButton = std::make_unique<TextButton> (TRANS ("Show advanced settings..."));
             addAndMakeVisible (showAdvancedSettingsButton.get());
             showAdvancedSettingsButton->setClickingTogglesState (true);
             showAdvancedSettingsButton->onClick = [this] { toggleAdvancedSettings(); };
@@ -306,7 +293,7 @@ public:
         updateAllControls();
     }
 
-    ~AudioDeviceSettingsPanel() override
+    ~CustomAudioDeviceSettingsPanel() override
     {
         setup.manager->removeChangeListener (this);
     }
@@ -549,8 +536,8 @@ public:
             {
                 if (outputChanList == nullptr)
                 {
-                    outputChanList = std::make_unique<ChannelSelectorListBox> (setup, ChannelSelectorListBox::audioOutputType,
-                                                                               TRANS ("(no audio output channels found)"));
+                    outputChanList = std::make_unique<CustomChannelSelectorListBox> (setup, CustomChannelSelectorListBox::audioOutputType,
+                                                                                     TRANS ("(no audio output channels found)"));
                     addAndMakeVisible (outputChanList.get());
                     outputChanLabel = std::make_unique<Label> (String{}, TRANS ("Active output channels:"));
                     outputChanLabel->setJustificationType (Justification::centredRight);
@@ -570,8 +557,8 @@ public:
             {
                 if (inputChanList == nullptr)
                 {
-                    inputChanList = std::make_unique<ChannelSelectorListBox> (setup, ChannelSelectorListBox::audioInputType,
-                                                                              TRANS ("(no audio input channels found)"));
+                    inputChanList = std::make_unique<CustomChannelSelectorListBox> (setup, CustomChannelSelectorListBox::audioInputType,
+                                                                                    TRANS ("(no audio input channels found)"));
                     addAndMakeVisible (inputChanList.get());
                     inputChanLabel = std::make_unique<Label> (String{}, TRANS ("Active input channels:"));
                     inputChanLabel->setJustificationType (Justification::centredRight);
@@ -634,7 +621,7 @@ public:
                 if (outputDeviceDropDown != nullptr)
                 {
                     const auto selected = outputDeviceDropDown->getText();
-                    if (selected.isNotEmpty() && selected != getNoDeviceString())
+                    if (selected.isNotEmpty() && selected != customGetNoDeviceString())
                         outputName = selected;
                 }
 
@@ -665,8 +652,8 @@ public:
 
 private:
     AudioIODeviceType& type;
-    const AudioDeviceSetupDetails setup;
-    AudioDeviceSelectorComponent& parent;
+    const CustomAudioDeviceSetupDetails setup;
+    CustomAudioDeviceSelectorComponent& parent;
 
     std::unique_ptr<ComboBox> outputDeviceDropDown, inputDeviceDropDown, sampleRateDropDown, bufferSizeDropDown;
     std::unique_ptr<Label> outputDeviceLabel, inputDeviceLabel, sampleRateLabel, bufferSizeLabel, inputChanLabel, outputChanLabel;
@@ -682,12 +669,12 @@ private:
         return typeName == "Process Audio" || typeName == "Windows Loopback";
     }
 
-    juce::String getCombinedDefaultInputName() const
+    String getCombinedDefaultInputName() const
     {
         return "System Audio";
     }
 
-    juce::String getCombinedDefaultOutputName() const
+    String getCombinedDefaultOutputName() const
     {
         if (type.getTypeName() == "Process Audio")
             return "<< none >>";
@@ -698,7 +685,7 @@ private:
         return {};
     }
 
-    juce::String makeCombinedDeviceName (const juce::String& inputName, const juce::String& outputName) const
+    String makeCombinedDeviceName (const String& inputName, const String& outputName) const
     {
 #if JUCE_MAC && OSCI_PREMIUM
         if (type.getTypeName() == "Process Audio")
@@ -713,7 +700,7 @@ private:
         return {};
     }
 
-    juce::StringArray getCombinedChoiceNames (bool isInput) const
+    StringArray getCombinedChoiceNames (bool isInput) const
     {
 #if JUCE_MAC && OSCI_PREMIUM
         if (auto* processType = dynamic_cast<ProcessAudioDeviceType*> (&type))
@@ -758,7 +745,7 @@ private:
 
         if (type.getTypeName() == "Process Audio")
         {
-            combo.addItem (getNoDeviceString(), -1);
+            combo.addItem (customGetNoDeviceString(), -1);
             combo.setSelectedId (-1, dontSendNotification);
             return;
         }
@@ -770,7 +757,7 @@ private:
             combo.setSelectedId (1, dontSendNotification);
     }
 
-    int findCombinedSelectedDeviceIndex (bool isInput, const juce::String& deviceName) const
+    int findCombinedSelectedDeviceIndex (bool isInput, const String& deviceName) const
     {
         const auto choices = getCombinedChoiceNames (isInput);
         if (choices.isEmpty())
@@ -831,7 +818,7 @@ private:
         for (int i = 0; i < devs.size(); ++i)
             combo.addItem (devs[i], i + 1);
 
-        combo.addItem (getNoDeviceString(), -1);
+        combo.addItem (customGetNoDeviceString(), -1);
         combo.setSelectedId (-1, dontSendNotification);
     }
 
@@ -931,7 +918,7 @@ private:
                 inputDeviceLabel = std::make_unique<Label> (String{}, TRANS ("Input:"));
                 inputDeviceLabel->attachToComponent (inputDeviceDropDown.get(), true);
 
-                inputLevelMeter = std::make_unique<SimpleDeviceManagerInputLevelMeter> (*setup.manager);
+                inputLevelMeter = std::make_unique<CustomSimpleDeviceManagerInputLevelMeter> (*setup.manager);
                 addAndMakeVisible (inputLevelMeter.get());
             }
 
@@ -1010,8 +997,8 @@ private:
 
 public:
     //==============================================================================
-    class ChannelSelectorListBox final : public ListBox,
-                                         private ListBoxModel
+    class CustomChannelSelectorListBox final : public ListBox,
+                                                private ListBoxModel
     {
     public:
         enum BoxType
@@ -1020,8 +1007,7 @@ public:
             audioOutputType
         };
 
-        //==============================================================================
-        ChannelSelectorListBox (const AudioDeviceSetupDetails& setupDetails, BoxType boxType, const String& noItemsText)
+        CustomChannelSelectorListBox (const CustomAudioDeviceSetupDetails& setupDetails, BoxType boxType, const String& noItemsText)
            : ListBox ({}, nullptr), setup (setupDetails), type (boxType), noItemsMessage (noItemsText)
         {
             refresh();
@@ -1098,7 +1084,7 @@ public:
                 getLookAndFeel().drawTickBox (g, *this, (float) x - tickW, ((float) height - tickW) * 0.5f, tickW, tickW,
                                               enabled, true, true, false);
 
-                drawTextLayout (g, *this, item, { x + 5, 0, width - x - 5, height }, enabled);
+                customDrawTextLayout (g, *this, item, { x + 5, 0, width - x - 5, height }, enabled);
             }
         }
 
@@ -1142,8 +1128,7 @@ public:
         }
 
     private:
-        //==============================================================================
-        const AudioDeviceSetupDetails setup;
+        const CustomAudioDeviceSetupDetails setup;
         const BoxType type;
         const String noItemsMessage;
         StringArray items;
@@ -1156,8 +1141,6 @@ public:
                 if (name1.substring (0, j).equalsIgnoreCase (name2.substring (0, j)))
                     commonBit = name1.substring (0, j);
 
-            // Make sure we only split the name at a space, because otherwise, things
-            // like "input 11" + "input 12" would become "input 11 + 2"
             while (commonBit.isNotEmpty() && ! CharacterFunctions::isWhitespace (commonBit.getLastCharacter()))
                 commonBit = commonBit.dropLastCharacters (1);
 
@@ -1239,27 +1222,27 @@ public:
             return getRowHeight();
         }
 
-        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChannelSelectorListBox)
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CustomChannelSelectorListBox)
     };
 
 private:
-    std::unique_ptr<ChannelSelectorListBox> inputChanList, outputChanList;
+    std::unique_ptr<CustomChannelSelectorListBox> inputChanList, outputChanList;
     ScopedMessageBox messageBox;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioDeviceSettingsPanel)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CustomAudioDeviceSettingsPanel)
 };
 
 
 //==============================================================================
-AudioDeviceSelectorComponent::AudioDeviceSelectorComponent (AudioDeviceManager& dm,
-                                                            int minInputChannelsToUse,
-                                                            int maxInputChannelsToUse,
-                                                            int minOutputChannelsToUse,
-                                                            int maxOutputChannelsToUse,
-                                                            bool showMidiInputOptions,
-                                                            bool showMidiOutputSelector,
-                                                            bool showChannelsAsStereoPairsToUse,
-                                                            bool hideAdvancedOptionsWithButtonToUse)
+CustomAudioDeviceSelectorComponent::CustomAudioDeviceSelectorComponent (AudioDeviceManager& dm,
+                                                                        int minInputChannelsToUse,
+                                                                        int maxInputChannelsToUse,
+                                                                        int minOutputChannelsToUse,
+                                                                        int maxOutputChannelsToUse,
+                                                                        bool showMidiInputOptions,
+                                                                        bool showMidiOutputSelector,
+                                                                        bool showChannelsAsStereoPairsToUse,
+                                                                        bool hideAdvancedOptionsWithButtonToUse)
     : deviceManager (dm),
       itemHeight (24),
       minOutputChannels (minOutputChannelsToUse),
@@ -1291,8 +1274,8 @@ AudioDeviceSelectorComponent::AudioDeviceSelectorComponent (AudioDeviceManager& 
 
     if (showMidiInputOptions)
     {
-        midiInputsList = std::make_unique <MidiInputSelectorComponentListBox> (deviceManager,
-                                                                               "(" + TRANS ("No MIDI inputs available") + ")");
+        midiInputsList = std::make_unique<CustomMidiInputSelectorComponentListBox> (deviceManager,
+                                                                                     "(" + TRANS ("No MIDI inputs available") + ")");
         addAndMakeVisible (midiInputsList.get());
 
         midiInputsLabel = std::make_unique<Label> (String{}, TRANS ("Active MIDI inputs:"));
@@ -1315,7 +1298,7 @@ AudioDeviceSelectorComponent::AudioDeviceSelectorComponent (AudioDeviceManager& 
 
     if (showMidiOutputSelector)
     {
-        midiOutputSelector = std::make_unique<MidiOutputSelector> (deviceManager);
+        midiOutputSelector = std::make_unique<CustomMidiOutputSelector> (deviceManager);
         addAndMakeVisible (midiOutputSelector.get());
 
         midiOutputLabel = std::make_unique<Label> ("lm", TRANS ("MIDI Output:"));
@@ -1331,18 +1314,18 @@ AudioDeviceSelectorComponent::AudioDeviceSelectorComponent (AudioDeviceManager& 
     updateAllControls();
 }
 
-AudioDeviceSelectorComponent::~AudioDeviceSelectorComponent()
+CustomAudioDeviceSelectorComponent::~CustomAudioDeviceSelectorComponent()
 {
     deviceManager.removeChangeListener (this);
 }
 
-void AudioDeviceSelectorComponent::setItemHeight (int newItemHeight)
+void CustomAudioDeviceSelectorComponent::setItemHeight (int newItemHeight)
 {
     itemHeight = newItemHeight;
     resized();
 }
 
-void AudioDeviceSelectorComponent::resized()
+void CustomAudioDeviceSelectorComponent::resized()
 {
     Rectangle<int> r (proportionOfWidth (0.35f), 15, proportionOfWidth (0.6f), 3000);
     auto space = itemHeight / 4;
@@ -1382,13 +1365,13 @@ void AudioDeviceSelectorComponent::resized()
     setSize (getWidth(), r.getY());
 }
 
-void AudioDeviceSelectorComponent::childBoundsChanged (Component* child)
+void CustomAudioDeviceSelectorComponent::childBoundsChanged (Component* child)
 {
     if (child == audioDeviceSettingsComp.get())
         resized();
 }
 
-void AudioDeviceSelectorComponent::updateDeviceType()
+void CustomAudioDeviceSelectorComponent::updateDeviceType()
 {
     if (auto* type = deviceManager.getAvailableDeviceTypes() [deviceTypeDropDown->getSelectedId() - 1])
     {
@@ -1398,12 +1381,12 @@ void AudioDeviceSelectorComponent::updateDeviceType()
     }
 }
 
-void AudioDeviceSelectorComponent::changeListenerCallback (ChangeBroadcaster*)
+void CustomAudioDeviceSelectorComponent::changeListenerCallback (ChangeBroadcaster*)
 {
     updateAllControls();
 }
 
-void AudioDeviceSelectorComponent::updateAllControls()
+void CustomAudioDeviceSelectorComponent::updateAllControls()
 {
     if (deviceTypeDropDown != nullptr)
         deviceTypeDropDown->setText (deviceManager.getCurrentAudioDeviceType(), dontSendNotification);
@@ -1417,7 +1400,7 @@ void AudioDeviceSelectorComponent::updateAllControls()
         if (auto* type = deviceManager.getAvailableDeviceTypes() [deviceTypeDropDown == nullptr
                                                                    ? 0 : deviceTypeDropDown->getSelectedId() - 1])
         {
-            AudioDeviceSetupDetails details;
+            CustomAudioDeviceSetupDetails details;
             details.manager = &deviceManager;
             details.minNumInputChannels = minInputChannels;
             details.maxNumInputChannels = maxInputChannels;
@@ -1425,7 +1408,7 @@ void AudioDeviceSelectorComponent::updateAllControls()
             details.maxNumOutputChannels = maxOutputChannels;
             details.useStereoPairs = showChannelsAsStereoPairs;
 
-            audioDeviceSettingsComp = std::make_unique<AudioDeviceSettingsPanel> (*type, details, hideAdvancedOptionsWithButton, *this);
+            audioDeviceSettingsComp = std::make_unique<CustomAudioDeviceSettingsPanel> (*type, details, hideAdvancedOptionsWithButton, *this);
             addAndMakeVisible (audioDeviceSettingsComp.get());
         }
     }
@@ -1440,7 +1423,7 @@ void AudioDeviceSelectorComponent::updateAllControls()
     resized();
 }
 
-void AudioDeviceSelectorComponent::handleBluetoothButton()
+void CustomAudioDeviceSelectorComponent::handleBluetoothButton()
 {
     if (RuntimePermissions::isGranted (RuntimePermissions::bluetoothMidi))
     {
@@ -1456,11 +1439,9 @@ void AudioDeviceSelectorComponent::handleBluetoothButton()
     }
 }
 
-ListBox* AudioDeviceSelectorComponent::getMidiInputSelectorListBox() const noexcept
+ListBox* CustomAudioDeviceSelectorComponent::getMidiInputSelectorListBox() const noexcept
 {
     return midiInputsList.get();
 }
 
 } // namespace juce
-
-#undef AudioDeviceSelectorComponent

@@ -71,9 +71,56 @@ cd /Users/james/osci-render \
 Resulting app:
 - `Builds/osci-render/MacOSX/build/Debug/osci-render.app`
 
-### VS Code Debugging
+### Building (Windows)
 
-The workspace includes VS Code tasks and launch configurations for building and debugging with LLDB. These require the [CodeLLDB](https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb) extension.
+MSBuild must run from a Visual Studio Developer environment so that `luajit_win.bat` can find the MSVC toolchain. In a plain PowerShell session, import the environment first:
+
+```powershell
+# 1. Import Visual Studio 2022 environment variables into PowerShell
+$vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+cmd /c "`"$vsPath\VC\Auxiliary\Build\vcvars64.bat`" >nul 2>&1 && set" |
+    ForEach-Object { if ($_ -match '^([^=]+)=(.*)$') {
+        [System.Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process') } }
+
+# 2. Resave the .jucer project (regenerates VS solution/project files)
+C:\JUCE\Projucer.exe --resave osci-render.jucer
+
+# 3. Build
+MSBuild Builds\osci-render\VisualStudio2022\osci-render.sln /p:Configuration=Debug /p:Platform=x64 /m
+```
+
+### Fast iteration (Windows Standalone Debug)
+
+To close any running instance, rebuild, and launch the new build:
+
+```powershell
+# Kill any running osci-render instance (ignore errors if not running)
+Stop-Process -Name "osci-render" -ErrorAction SilentlyContinue
+
+# Build (assumes vcvars64 already imported in this session)
+MSBuild Builds\osci-render\VisualStudio2022\osci-render.sln /p:Configuration=Debug /p:Platform=x64 /m
+
+# Launch the standalone app
+Start-Process "Builds\osci-render\VisualStudio2022\x64\Debug\Standalone Plugin\osci-render.exe"
+```
+
+Resulting exe:
+- `Builds/osci-render/VisualStudio2022/x64/Debug/Standalone Plugin/osci-render.exe`
+
+### VS Code Debugging (Windows)
+
+**Launch configurations** (`.vscode/launch.json`):
+- **Debug Standalone** — Runs the "Build Debug" task then launches the Standalone exe under the VS debugger (`cppvsdbg`).
+
+**Build tasks** (`.vscode/tasks.json`):
+- **Build Debug** — Default build task (`Ctrl+Shift+B`). Runs MSBuild Debug x64. Requires that the terminal has vcvars64 environment loaded.
+- **Build Release** — Same for Release.
+
+> **Note:** The VS Code tasks call `MSBuild` directly without importing vcvars. If MSBuild is not on `PATH`, either run VS Code from a Developer Command Prompt, or add the vcvars import as a pre-task.
+
+### VS Code Debugging (macOS)
+
+The macOS workspace includes VS Code tasks and launch configurations for building and debugging with LLDB. These require the [CodeLLDB](https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb) extension.
 
 **Launch configurations** (`.vscode/launch.json`):
 - **Build & Debug osci-render** — Runs Projucer resave + xcodebuild, then launches the Standalone app under LLDB. Use this for the standard build-and-debug cycle.
@@ -178,6 +225,15 @@ Lua scripts in `Resources/lua/` receive global variables:
 - Use `juce::SpinLock` for audio-thread-safe data (see `parsersLock` in PluginProcessor)
 - `std::atomic` for simple values shared between threads
 - Avoid allocations in `processBlock()`
+
+### Forking / Copying JUCE Components
+
+When copying a JUCE component to customise it (e.g. `CustomAudioDeviceSelectorComponent`):
+
+- **Never reuse original type names** inside `namespace juce` — JUCE's amalgamated builds already define the original classes. Defining a class with the same name causes an **ODR (One Definition Rule) violation**: the linker picks one class size, and if your version has extra members the object is allocated too small, corrupting memory.
+- **Prefix all types** with `Custom` (or similar) — this applies to every internal/helper class in the copied file (settings panels, list boxes, structs, free functions), not just the top-level component.
+- Keep the custom types **inside `namespace juce`** — JUCE's `juce_IncludeModuleHeaders.h` `#define`s symbols like `Component` to `juce::Component` to handle platform name conflicts. Headers included from files that use these macros (e.g. `CustomStandalone.cpp`) will break if they try to use `juce::Component` explicitly (it becomes `juce::juce::Component`). Unqualified names inside `namespace juce {}` avoid this.
+- See `Source/CustomAudioDeviceSelectorComponent.cpp` for the correct pattern.
 
 ## Testing
 

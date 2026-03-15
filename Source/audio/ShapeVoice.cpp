@@ -255,9 +255,11 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
                 if (numChannels >= 1) juce::FloatVectorOperations::clear(voiceBuffer.getWritePointer(0) + startSample2, remainingSamples);
                 if (numChannels >= 2) juce::FloatVectorOperations::clear(voiceBuffer.getWritePointer(1) + startSample2, remainingSamples);
                 if (numChannels >= 3) juce::FloatVectorOperations::clear(voiceBuffer.getWritePointer(2) + startSample2, remainingSamples);
-                if (numChannels >= 4) juce::FloatVectorOperations::clear(voiceBuffer.getWritePointer(3) + startSample2, remainingSamples);
-                if (numChannels >= 5) juce::FloatVectorOperations::clear(voiceBuffer.getWritePointer(4) + startSample2, remainingSamples);
-                if (numChannels >= 6) juce::FloatVectorOperations::clear(voiceBuffer.getWritePointer(5) + startSample2, remainingSamples);
+                // Fill colour channels with the "no colour" sentinel so the
+                // tail samples are not interpreted as explicit black.
+                if (numChannels >= 4) juce::FloatVectorOperations::fill(voiceBuffer.getWritePointer(3) + startSample2, -1.0f, remainingSamples);
+                if (numChannels >= 5) juce::FloatVectorOperations::fill(voiceBuffer.getWritePointer(4) + startSample2, -1.0f, remainingSamples);
+                if (numChannels >= 6) juce::FloatVectorOperations::fill(voiceBuffer.getWritePointer(5) + startSample2, -1.0f, remainingSamples);
                 juce::FloatVectorOperations::fill(frequencyBuffer.getWritePointer(0) + startSample2, (float) actualFrequency, remainingSamples);
                 juce::FloatVectorOperations::clear(volumeBuffer.getWritePointer(0) + startSample2, remainingSamples);
             }
@@ -312,10 +314,18 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         if (numChannels >= 1) outputBuffer.addSample(0, sample, voiceBuffer.getSample(0, i) * gain);
         if (numChannels >= 2) outputBuffer.addSample(1, sample, voiceBuffer.getSample(1, i) * gain);
         if (numChannels >= 3) outputBuffer.addSample(2, sample, voiceBuffer.getSample(2, i) * gain);
-        // Colour channels: no gain scaling
-        if (numChannels >= 4) outputBuffer.addSample(3, sample, voiceBuffer.getSample(3, i));
-        if (numChannels >= 5) outputBuffer.addSample(4, sample, voiceBuffer.getSample(4, i));
-        if (numChannels >= 6) outputBuffer.addSample(5, sample, voiceBuffer.getSample(5, i));
+        // Colour channels: override (not additive) — only write when the
+        // voice carries an explicit colour (r >= 0).  When r < 0 the
+        // sentinel means "no colour" and we leave the output buffer's
+        // existing value (initialised to -1 by processBlock) intact.
+        if (numChannels >= 4) {
+            float voiceR = voiceBuffer.getSample(3, i);
+            if (voiceR >= 0.0f) {
+                outputBuffer.setSample(3, sample, voiceR);
+                if (numChannels >= 5) outputBuffer.setSample(4, sample, voiceBuffer.getSample(4, i));
+                if (numChannels >= 6) outputBuffer.setSample(5, sample, voiceBuffer.getSample(5, i));
+            }
+        }
     }
 }
 

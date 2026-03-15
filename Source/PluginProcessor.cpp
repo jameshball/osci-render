@@ -723,6 +723,13 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     juce::AudioBuffer<float> outputBuffer3d = juce::AudioBuffer<float>(6, buffer.getNumSamples());
     outputBuffer3d.clear();
 
+    // Initialise colour channels to the "no colour" sentinel (-1) so that
+    // samples untouched by any voice fall back to the default line colour
+    // rather than being interpreted as explicit black (0,0,0).
+    juce::FloatVectorOperations::fill(outputBuffer3d.getWritePointer(3), -1.0f, buffer.getNumSamples());
+    juce::FloatVectorOperations::fill(outputBuffer3d.getWritePointer(4), -1.0f, buffer.getNumSamples());
+    juce::FloatVectorOperations::fill(outputBuffer3d.getWritePointer(5), -1.0f, buffer.getNumSamples());
+
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
     if (syphonInputActive) {
         for (int sample = 0; sample < outputBuffer3d.getNumSamples(); sample++) {

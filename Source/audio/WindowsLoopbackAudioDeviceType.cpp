@@ -16,10 +16,12 @@
 
 #include <atomic>
 #include <cstring>
+#include <memory>
 #include <thread>
 
 namespace
 {
+
 juce::MemoryBlock serializeDeviceId (const ma_device_id& id)
 {
     return { &id, sizeof (ma_device_id) };
@@ -39,9 +41,11 @@ struct WindowsLoopbackBackend
 {
     ma_context context {};
     ma_device device {};
+    ma_device silenceDevice {};
 
     bool contextInitialised = false;
     bool deviceInitialised = false;
+    bool silenceDeviceInitialised = false;
     bool isDeviceOpen = false;
 
     bool useDefaultEndpoint = true;
@@ -61,6 +65,17 @@ struct WindowsLoopbackBackend
 
     juce::AudioBuffer<float> inputBuffer;
     juce::HeapBlock<const float*> inputChannelPointers;
+
+    // Tiny playback callback that renders silence.  Keeps the WASAPI audio
+    // engine active on the target endpoint so that the loopback capture
+    // client always receives buffers — even when no other app is playing.
+    static void silenceDataCallback (ma_device* pDevice, void* pOutput,
+                                     const void* /*pInput*/, ma_uint32 frameCount)
+    {
+        std::memset (pOutput, 0, (size_t) frameCount
+                     * ma_get_bytes_per_frame (pDevice->playback.format,
+                                               pDevice->playback.channels));
+    }
 
     static void dataCallback (ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount)
     {
@@ -151,6 +166,13 @@ struct WindowsLoopbackBackend
     void closeDevice()
     {
         stopDevice();
+
+        if (silenceDeviceInitialised)
+        {
+            ma_device_stop (&silenceDevice);
+            ma_device_uninit (&silenceDevice);
+            silenceDeviceInitialised = false;
+        }
 
         if (deviceInitialised)
         {
@@ -282,6 +304,28 @@ juce::String WindowsLoopbackAudioDevice::open (const juce::BigInteger& inputChan
     backend->inputBuffer.clear();
     backend->inputChannelPointers.malloc ((size_t) backend->activeInputChannels);
 
+    // Open a silent playback stream on the same endpoint so that the WASAPI
+    // audio engine keeps rendering.  Without this, loopback capture blocks
+    // indefinitely when no other application is producing audio.
+    {
+        auto silenceCfg = ma_device_config_init (ma_device_type_playback);
+        silenceCfg.playback.format   = ma_format_f32;
+        silenceCfg.playback.channels = 1;
+        silenceCfg.sampleRate        = config.sampleRate;
+        silenceCfg.periodSizeInFrames = config.periodSizeInFrames;
+        silenceCfg.dataCallback      = WindowsLoopbackBackend::silenceDataCallback;
+        silenceCfg.pUserData         = backend.get();
+
+        if (! backend->useDefaultEndpoint)
+            silenceCfg.playback.pDeviceID = &backend->endpointId;
+
+        if (ma_device_init (&backend->context, &silenceCfg, &backend->silenceDevice) == MA_SUCCESS)
+        {
+            backend->silenceDeviceInitialised = true;
+            ma_device_start (&backend->silenceDevice);
+        }
+    }
+
     return {};
 }
 
@@ -388,8 +432,12 @@ void WindowsLoopbackAudioDeviceType::scanForDevices()
     const ma_backend backends[] = { ma_backend_wasapi };
     auto contextConfig = ma_context_config_init();
 
-    ma_context context {};
-    if (ma_context_init (backends, 1, &contextConfig, &context) != MA_SUCCESS)
+    // Heap-allocate ma_context to avoid large stack usage and potential
+    // heap corruption from miniaudio's COM/WASAPI operations.
+    auto context = std::make_unique<ma_context>();
+    std::memset (context.get(), 0, sizeof (ma_context));
+
+    if (ma_context_init (backends, 1, &contextConfig, context.get()) != MA_SUCCESS)
     {
         outputChoiceNames.add ("Default Output");
         outputChoiceDeviceIds.add (juce::MemoryBlock());
@@ -399,7 +447,7 @@ void WindowsLoopbackAudioDeviceType::scanForDevices()
 
     ma_device_info* playbackInfos = nullptr;
     ma_uint32 playbackCount = 0;
-    if (ma_context_get_devices (&context, &playbackInfos, &playbackCount, nullptr, nullptr) == MA_SUCCESS)
+    if (ma_context_get_devices (context.get(), &playbackInfos, &playbackCount, nullptr, nullptr) == MA_SUCCESS)
     {
         outputChoiceNames.add ("Default Output");
         outputChoiceDeviceIds.add (juce::MemoryBlock());
@@ -426,7 +474,7 @@ void WindowsLoopbackAudioDeviceType::scanForDevices()
     for (const auto& outputName : outputChoiceNames)
         combinedDeviceNames.add (makeCombinedDeviceName ("System Audio", outputName));
 
-    ma_context_uninit (&context);
+    ma_context_uninit (context.get());
 }
 
 juce::StringArray WindowsLoopbackAudioDeviceType::getDeviceNames (bool wantInputNames) const
