@@ -32,6 +32,7 @@ Source/
 - **chowdsp_utils** - DSP utilities from chowdsp
 - **LuaJIT** - Embedded Lua scripting engine
 - **juce_sharedtexture** - Syphon/Spout texture sharing
+- **pluginval** - Plugin validation tool (builds via CMake, used in CI and locally)
 
 ### Data Flow
 
@@ -237,9 +238,40 @@ When copying a JUCE component to customise it (e.g. `CustomAudioDeviceSelectorCo
 
 ## Testing
 
-Run via CI script: `./ci/test.sh`
+Run unit tests via CI script: `./ci/test.sh`
 
 Test configuration defined in `osci-render-test.jucer`.
+
+### Plugin Validation (pluginval)
+
+pluginval validates the built VST3 plugin for host compatibility and stability.
+
+**When to run pluginval:**
+- In CI: runs automatically after every build for **both osci-render and sosci**, on **all three platforms** (Windows, macOS, Linux)
+- Locally: only run when explicitly requested, or after **major changes** — new effects, parameter additions/removals, audio processing changes, UI refactors, JUCE upgrades. Do **not** run automatically after small or incremental changes (typo fixes, minor UI tweaks, comment updates, refactors unlikely to affect plugin host compatibility) as it takes several minutes to build and run.
+
+**Run locally (Windows):**
+```bash
+ci\pluginval.bat                    # validates osci-render (Debug or Release)
+ci\pluginval.bat osci-render 5      # explicit plugin name and strictness
+ci\pluginval.bat sosci 5            # validate sosci
+```
+
+**Run locally (macOS):**
+```bash
+ROOT=$(pwd) OS=mac ./ci/pluginval.sh osci-render
+ROOT=$(pwd) OS=mac ./ci/pluginval.sh sosci
+```
+
+**Run locally (Linux):**
+```bash
+ROOT=$(pwd) OS=linux ./ci/pluginval.sh osci-render
+ROOT=$(pwd) OS=linux ./ci/pluginval.sh sosci
+```
+
+**Strictness levels:** 1–10. Level 5 is the recommended minimum for host compatibility. Lower levels check for crashes; higher levels include parameter fuzzing and state restoration.
+
+The pluginval source is at `modules/pluginval` (git submodule). It is built from source via CMake automatically.
 
 ## Key Files Reference
 

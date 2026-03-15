@@ -18,3 +18,7 @@
 [submodule "Source/chinese_postman"]
 	path = Source/chinese_postman
 	url = git@github.com:jameshball/chinese-postman.git
+[submodule "modules/pluginval"]
+	path = modules/pluginval
+	url = https://github.com/Tracktion/pluginval.git
+	branch = develop
