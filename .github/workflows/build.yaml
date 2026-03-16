@@ -100,7 +100,6 @@ jobs:
           PLUGINVAL_TIMEOUT: "1200000"
           PLUGINVAL_STRICTNESS: "10"
         run: |
-          source ./ci/setup-env.sh
           source ./ci/pluginval.sh "${{ matrix.project }}"
 
       # macOS packaging & notarization
