@@ -12,7 +12,7 @@ SKIP_GUI="${PLUGINVAL_SKIP_GUI:-}"
 
 # ── Resolve paths ──────────────────────────────────────────────
 
-ROOT="${ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+ROOT="${ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 PLUGINVAL_SRC="$ROOT/modules/pluginval"
 PLUGINVAL_BUILD="$PLUGINVAL_SRC/Builds"
 
