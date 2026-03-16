@@ -102,6 +102,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     osciPermanentEffects.push_back(frequencyEffect);
     osciPermanentEffects.push_back(imageThreshold);
     osciPermanentEffects.push_back(imageStride);
+    osciPermanentEffects.push_back(fractalIterationsEffect);
 
     for (int i = 0; i < 26; i++) {
         addLuaSlider();

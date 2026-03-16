@@ -168,6 +168,20 @@
         <FILE id="SkgUSk" name="wobble.svg" compile="0" resource="1" file="Resources/svg/wobble.svg"/>
         <FILE id="HCK5B8" name="yinyang.svg" compile="0" resource="1" file="Resources/svg/yinyang.svg"/>
       </GROUP>
+      <GROUP id="{FC8A1D3E-7B92-4F01-A3D6-E12B5C8F9A00}" name="fractal">
+        <FILE id="Fr1001" name="binary_tree.fractal" compile="0" resource="1"
+              file="Resources/fractal/binary_tree.fractal"/>
+        <FILE id="Fr1002" name="dragon_curve.fractal" compile="0" resource="1"
+              file="Resources/fractal/dragon_curve.fractal"/>
+        <FILE id="Fr1003" name="hilbert_curve.fractal" compile="0" resource="1"
+              file="Resources/fractal/hilbert_curve.fractal"/>
+        <FILE id="Fr1004" name="koch_island.fractal" compile="0" resource="1"
+              file="Resources/fractal/koch_island.fractal"/>
+        <FILE id="Fr1005" name="koch_snowflake.fractal" compile="0" resource="1"
+              file="Resources/fractal/koch_snowflake.fractal"/>
+        <FILE id="Fr1006" name="sierpinski_triangle.fractal" compile="0" resource="1"
+              file="Resources/fractal/sierpinski_triangle.fractal"/>
+      </GROUP>
       <GROUP id="{F8A3D32C-4187-9A2F-5D78-040259957E9B}" name="text">
         <FILE id="N9Q6Zg" name="greek.txt" compile="0" resource="1" file="Resources/text/greek.txt"/>
         <FILE id="OABuJy" name="helloworld.txt" compile="0" resource="1" file="Resources/text/helloworld.txt"/>
@@ -368,6 +382,10 @@
               file="Source/components/VolumeComponent.cpp"/>
         <FILE id="MWkfTv" name="VolumeComponent.h" compile="0" resource="0"
               file="Source/components/VolumeComponent.h"/>
+        <FILE id="Fr3001" name="FractalComponent.cpp" compile="1" resource="0"
+              file="Source/components/FractalComponent.cpp"/>
+        <FILE id="Fr3002" name="FractalComponent.h" compile="0" resource="0"
+              file="Source/components/FractalComponent.h"/>
         <FILE id="WHz3FS" name="EnvelopeComponent.cpp" compile="1" resource="0"
               file="Source/components/EnvelopeComponent.cpp"/>
         <FILE id="A8OllZ" name="EnvelopeComponent.h" compile="0" resource="0"
@@ -656,6 +674,11 @@
               file="Source/obj/tiny_obj_loader.h"/>
         <FILE id="YNsbe9" name="WorldObject.cpp" compile="1" resource="0" file="Source/obj/WorldObject.cpp"/>
         <FILE id="SZBVI9" name="WorldObject.h" compile="0" resource="0" file="Source/obj/WorldObject.h"/>
+      </GROUP>
+      <GROUP id="{FC8A1D3F-7B92-4F01-A3D6-E12B5C8F9A01}" name="fractal">
+        <FILE id="Fr2001" name="FractalParser.cpp" compile="1" resource="0"
+              file="Source/fractal/FractalParser.cpp"/>
+        <FILE id="Fr2002" name="FractalParser.h" compile="0" resource="0" file="Source/fractal/FractalParser.h"/>
       </GROUP>
       <GROUP id="{2AE40B10-2C85-6401-644A-D5F36BCC5BC1}" name="parser">
         <FILE id="q22Fiw" name="FileParser.cpp" compile="1" resource="0" file="Source/parser/FileParser.cpp"/>

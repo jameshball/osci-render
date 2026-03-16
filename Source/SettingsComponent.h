@@ -11,6 +11,7 @@
 #include "PluginProcessor.h"
 #include "components/OpenFileComponent.h"
 #include "components/FileControlsComponent.h"
+#include "components/FractalComponent.h"
 
 class OscirenderAudioProcessorEditor;
 class SettingsComponent : public juce::Component, public juce::AudioProcessorParameter::Listener {
@@ -38,6 +39,7 @@ private:
     FrameSettingsComponent frame{audioProcessor, pluginEditor};
     EffectsComponent effects{audioProcessor, pluginEditor};
     MidiComponent midi{audioProcessor, pluginEditor};
+    FractalComponent fractalEditor{audioProcessor, pluginEditor};
     OpenFileComponent examples{audioProcessor};
 
     bool examplesVisible = false;

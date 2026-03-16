@@ -58,6 +58,7 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 	lua = nullptr;
 	img = nullptr;
 	wav = nullptr;
+	fractal = nullptr;
 	
 	if (extension == ".obj") {
 		const int64_t fileSize = stream->getTotalLength();
@@ -100,6 +101,8 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
                 sampleSource = true;
 			}
 		);
+	} else if (extension == ".fractal") {
+		fractal = std::make_shared<FractalParser>(stream->readEntireStreamAsString());
 	} else if (extension == ".wav" || extension == ".aiff" || extension == ".flac" || extension == ".ogg" || extension == ".mp3") {
 		wav = std::make_shared<WavParser>(audioProcessor);
 		if (!wav->parse(std::move(stream))) {
@@ -126,6 +129,9 @@ std::vector<std::unique_ptr<osci::Shape>> FileParser::nextFrame() {
         return text->draw();
     } else if (gpla != nullptr) {
         return gpla->draw();
+    } else if (fractal != nullptr) {
+        fractal->setIterations(audioProcessor.fractalIterations.load(std::memory_order_relaxed));
+        return fractal->draw();
     }
     auto tempShapes = std::vector<std::unique_ptr<osci::Shape>>();
     // return a square
@@ -203,6 +209,10 @@ std::shared_ptr<ImageParser> FileParser::getImg() {
 
 std::shared_ptr<WavParser> FileParser::getWav() {
     return wav;
+}
+
+std::shared_ptr<FractalParser> FileParser::getFractal() {
+    return fractal;
 }
 
 int FileParser::getNumFrames() {

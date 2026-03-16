@@ -1,0 +1,10 @@
+{
+  "axiom": "X",
+  "angle": 90,
+  "rules": [
+    {
+      "variable": "X",
+      "replacement": "XF-F+F-XF+F+XF-F+F-X"
+    }
+  ]
+}
