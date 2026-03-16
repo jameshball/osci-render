@@ -347,25 +347,27 @@ public:
 				flowTrailStripWidth = w;
 			}
 
-			juce::Image::BitmapData bd(flowTrailStrip, juce::Image::BitmapData::writeOnly);
-			for (int x = 0; x < w; ++x)
 			{
-				const double lastSeen = flowTrailLastSeenMs[(size_t) x];
-				if (lastSeen <= 0.0)
+				juce::Image::BitmapData bd(flowTrailStrip, juce::Image::BitmapData::writeOnly);
+				for (int x = 0; x < w; ++x)
 				{
-					bd.setPixelColour(x, 0, juce::Colours::transparentBlack);
-					continue;
+					const double lastSeen = flowTrailLastSeenMs[(size_t) x];
+					if (lastSeen <= 0.0)
+					{
+						bd.setPixelColour(x, 0, juce::Colours::transparentBlack);
+						continue;
+					}
+					const double ageMs = nowMs - lastSeen;
+					const float a = (ageMs <= 0.0)
+						? 1.0f
+						: juce::jlimit(0.0f, 1.0f, 1.0f - ((float) ageMs * invTau));
+					// Cheap easing to soften the tail without pow().
+					const float shaped = a * (2.0f - a);
+					const float finalA = juce::jlimit(0.0f, 1.0f, maxTrailAlpha * (alphaFloor + (1.0f - alphaFloor) * shaped));
+					outGlowStrength = juce::jmax(outGlowStrength, finalA);
+					bd.setPixelColour(x, 0, trailColour.withAlpha(finalA));
 				}
-				const double ageMs = nowMs - lastSeen;
-				const float a = (ageMs <= 0.0)
-					? 1.0f
-					: juce::jlimit(0.0f, 1.0f, 1.0f - ((float) ageMs * invTau));
-				// Cheap easing to soften the tail without pow().
-				const float shaped = a * (2.0f - a);
-				const float finalA = juce::jlimit(0.0f, 1.0f, maxTrailAlpha * (alphaFloor + (1.0f - alphaFloor) * shaped));
-				outGlowStrength = juce::jmax(outGlowStrength, finalA);
-				bd.setPixelColour(x, 0, trailColour.withAlpha(finalA));
-			}
+			} // BitmapData released before drawImage
 
 			g.drawImage(flowTrailStrip,
 				0, 0, w, env.getHeight(),

@@ -93,6 +93,15 @@ jobs:
           source ./ci/test.sh
           source ./ci/build.sh "${{ matrix.project }}" "${{ matrix.version }}"
 
+      - name: Validate plugin with pluginval
+        shell: bash
+        env:
+          PLUGINVAL_SKIP_GUI: "1"
+          PLUGINVAL_TIMEOUT: "1200000"
+          PLUGINVAL_STRICTNESS: "10"
+        run: |
+          source ./ci/pluginval.sh "${{ matrix.project }}"
+
       # macOS packaging & notarization
       - name: Download Packages installer build tool
         if: matrix.os == 'macos-latest'

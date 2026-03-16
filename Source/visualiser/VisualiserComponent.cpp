@@ -58,7 +58,7 @@ VisualiserComponent::VisualiserComponent(
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
     setWantsKeyboardFocus(true);
 
-    if (parent == nullptr) {
+    if (parent == nullptr || juce::JUCEApplicationBase::isStandaloneApp()) {
         addAndMakeVisible(fullScreenButton);
         fullScreenButton.setTooltip("Toggles fullscreen mode.");
     }
@@ -91,7 +91,14 @@ VisualiserComponent::VisualiserComponent(
 #endif
 
     fullScreenButton.onClick = [this]() {
-        enableFullScreen();
+        if (this->parent != nullptr) {
+#if OSCI_PREMIUM
+            if (auto* window = dynamic_cast<VisualiserWindow*>(getTopLevelComponent()))
+                window->toggleFullScreen();
+#endif
+        } else {
+            enableFullScreen();
+        }
     };
 
     settingsButton.onClick = [this]() {
@@ -322,9 +329,29 @@ bool VisualiserComponent::keyPressed(const juce::KeyPress &key) {
     if (!audioProcessor.getAcceptsKeys()) return false;
 
     if (key.isKeyCode(juce::KeyPress::escapeKey)) {
-        if (fullScreenCallback) {
+        // In popout mode, exit popout fullscreen first
+        if (parent != nullptr) {
+#if OSCI_PREMIUM
+            if (auto* window = dynamic_cast<VisualiserWindow*>(getTopLevelComponent())) {
+                if (window->getIsFullScreen()) {
+                    window->toggleFullScreen();
+                    return true;
+                }
+            }
+#endif
+        } else if (fullScreenCallback) {
             fullScreenCallback(FullScreenMode::MAIN_COMPONENT);
         }
+        return true;
+    } else if (key.isKeyCode(juce::KeyPress::F11Key) && juce::JUCEApplicationBase::isStandaloneApp()) {
+#if OSCI_PREMIUM
+        if (parent != nullptr) {
+            if (auto* window = dynamic_cast<VisualiserWindow*>(getTopLevelComponent()))
+                window->toggleFullScreen();
+        } else {
+            enableFullScreen();
+        }
+#endif
         return true;
     } else if (key.isKeyCode(juce::KeyPress::spaceKey)) {
         if (isMirrorMode() && parent != nullptr) {
@@ -502,7 +529,7 @@ void VisualiserComponent::resized() {
         buttonRow = area.removeFromBottom(25);
     }
     auto buttons = buttonRow;
-    if (parent == nullptr) {
+    if (parent == nullptr || juce::JUCEApplicationBase::isStandaloneApp()) {
         fullScreenButton.setBounds(buttons.removeFromRight(30));
     }
     if (child == nullptr && parent == nullptr) {
