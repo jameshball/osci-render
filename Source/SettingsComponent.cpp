@@ -201,7 +201,7 @@ void SettingsComponent::layoutChildren() {
             auto shiftedBounds = visBounds;
             shiftedBounds.setX(topLeft.getX());
             shiftedBounds.setY(topLeft.getY());
-            visualiserBoundsUpdater.update(shiftedBounds);
+            pluginEditor.visualiser.setBounds(shiftedBounds);
         }
     };
 
@@ -469,13 +469,6 @@ void SettingsComponent::timerCallback() {
     }
 
     envelope.setFlowMarkerTimesForUi(times, kMax);
-}
-
-void SettingsComponent::VisualiserBoundsUpdater::handleAsyncUpdate() {
-    if (hasPending) {
-        hasPending = false;
-        owner.pluginEditor.visualiser.setBounds(pendingBounds);
-    }
 }
 
 void SettingsComponent::DahdsrListener::handleAsyncUpdate() {

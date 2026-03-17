@@ -85,24 +85,6 @@ private:
 
     void layoutChildren();
 
-    // Deferred visualiser bounds updater – coalesces rapid resize events
-    // so that the expensive OpenGL handleResize runs at most once per
-    // message-loop iteration instead of on every drag pixel.
-    struct VisualiserBoundsUpdater : public juce::AsyncUpdater {
-        SettingsComponent& owner;
-        juce::Rectangle<int> pendingBounds;
-        bool hasPending = false;
-
-        VisualiserBoundsUpdater(SettingsComponent& o) : owner(o) {}
-        void update(juce::Rectangle<int> bounds) {
-            pendingBounds = bounds;
-            hasPending = true;
-            triggerAsyncUpdate();
-        }
-        void handleAsyncUpdate() override;
-    };
-    VisualiserBoundsUpdater visualiserBoundsUpdater{*this};
-
     // DAHDSR parameter listener helper
     struct DahdsrListener : public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater {
         SettingsComponent& owner;
