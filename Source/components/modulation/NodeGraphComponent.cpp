@@ -107,7 +107,16 @@ void NodeGraphComponent::setNodes(const std::vector<GraphNode>& newNodes) {
     if ((int)newNodes.size() == handles.size()) {
         repositionHandles();
     } else {
-        rebuildHandles();
+        hoverHandle = nullptr;
+        activeHandle = nullptr;
+        handles.clear();
+        for (int i = 0; i < (int)nodes.size(); ++i) {
+            auto* h = new HandleComponent(*this);
+            h->nodeIndex = i;
+            addAndMakeVisible(h);
+            h->updateFromNode();
+            handles.add(h);
+        }
     }
     repaint();
 }
@@ -123,7 +132,7 @@ int NodeGraphComponent::getNumNodes() const {
 // --- Evaluation ---
 
 float NodeGraphComponent::lookup(float time) const {
-    return evaluateGraphCurve(nodes, time, useBezierInterpolation);
+    return evaluateGraphCurve(nodes, time, useSmoothInterpolation);
 }
 
 // --- Coordinate Conversion ---
@@ -636,6 +645,9 @@ void NodeGraphComponent::mouseExit(const juce::MouseEvent&) {
 }
 
 void NodeGraphComponent::mouseDown(const juce::MouseEvent& e) {
+    if (e.mods.isRightButtonDown())
+        return;
+
     // Paint mode: start painting
     if (paintMode) {
         double domain = convertPixelsToDomain(e.x - kHandleSize / 2);
@@ -725,43 +737,25 @@ void NodeGraphComponent::mouseDrag(const juce::MouseEvent& e) {
 
     // Curve handle dragging
     if (activeCurveIndex >= 1 && activeCurveIndex < (int)nodes.size()) {
-        if (useBezierInterpolation) {
-            // In bezier mode, map the mouse Y directly to the desired midpoint
-            // value and compute the curve parameter from it.
-            double mouseValue = convertPixelsToValue(e.y - kHandleSize / 2);
-            mouseValue = juce::jlimit(valueMin, valueMax, mouseValue);
-            double v0 = nodes[activeCurveIndex - 1].value;
-            double v1 = nodes[activeCurveIndex].value;
-            double linearMid = (v0 + v1) * 0.5;
-            // B(0.5) = linearMid + (curve/kBezierCurveScale)*0.25
-            // curve = (B(0.5) - linearMid) * kBezierCurveScale * 4
-            double curve = (mouseValue - linearMid) * (double)osci_audio::kBezierCurveScale * 4.0;
-            curve = juce::jlimit(-(double)osci_audio::kMaxBezierCurve, (double)osci_audio::kMaxBezierCurve, curve);
-            nodes[activeCurveIndex].curve = (float)curve;
-        } else {
-            constexpr double kCurveRange = (double)osci_audio::kMaxBezierCurve;
-            constexpr double kMinSpeed = 0.22;
-            constexpr double kMaxSpeed = 3.2;
-            constexpr double kExpK = 3.0;
-            constexpr double kBase = 65.0;
+        {
+            // Vital-style delta-based power curve dragging.
+            // Identical behavior for both smooth and straight modes.
+            constexpr double kPowerMouseMultiplier = 9.0;
 
             double distNorm = e.getDistanceFromDragStartY() / (double)getHeight();
             double dy = distNorm - curveDragLastNorm;
             curveDragLastNorm = distNorm;
 
-            double currentCurve = (double)nodes[activeCurveIndex].curve;
-            double curviness = juce::jlimit(0.0, 1.0, std::abs(currentCurve) / kCurveRange);
-            double expNorm = (std::exp(kExpK * curviness) - 1.0) / (std::exp(kExpK) - 1.0);
-            double speed = kMinSpeed + (kMaxSpeed - kMinSpeed) * expNorm;
+            double deltaAmount = dy * kPowerMouseMultiplier;
 
-            double delta = dy * kBase * speed;
+            // Invert if segment slopes downward (matches Vital's convention)
+            if (nodes[activeCurveIndex - 1].value > nodes[activeCurveIndex].value)
+                deltaAmount = -deltaAmount;
 
-            // Invert if segment slopes downward
-            if (activeCurveIndex > 0 && nodes[activeCurveIndex - 1].value > nodes[activeCurveIndex].value)
-                delta = -delta;
-
-            double next = juce::jlimit(-kCurveRange, kCurveRange, currentCurve + delta);
-            nodes[activeCurveIndex].curve = (float)next;
+            double power = (double)nodes[activeCurveIndex].curve;
+            power += deltaAmount;
+            power = juce::jlimit(-(double)osci_audio::kMaxPower, (double)osci_audio::kMaxPower, power);
+            nodes[activeCurveIndex].curve = (float)power;
         }
         clearCurvesForOverlappingNodes();
         if (onNodesChanged) onNodesChanged();
@@ -990,11 +984,11 @@ void NodeGraphComponent::setPaintMode(bool enabled) {
     }
 }
 
-void NodeGraphComponent::setBezierMode(bool bezier) {
-    if (useBezierInterpolation == bezier) return;
-    useBezierInterpolation = bezier;
+void NodeGraphComponent::setSmoothMode(bool smooth) {
+    if (useSmoothInterpolation == smooth) return;
+    useSmoothInterpolation = smooth;
     // Zero out all curves when switching to straight-line mode
-    if (!bezier) {
+    if (!smooth) {
         for (auto& node : nodes)
             node.curve = 0.0f;
         rebuildHandles();
@@ -1021,7 +1015,7 @@ float NodeGraphComponent::evaluatePaintShape(PaintShape shape, float t) {
         case PaintShape::Tri:
             return t < 0.5f ? (t * 2.0f) : (2.0f - t * 2.0f);
         case PaintShape::Bump: {
-            // Sine-like bump for preview (actual shape uses bezier curves on 0-valued nodes)
+            // Sine-like bump for preview (actual shape uses a peak node)
             return std::sin(t * juce::MathConstants<float>::pi);
         }
     }
@@ -1104,19 +1098,11 @@ void NodeGraphComponent::paintAtPosition(double domain, double value) {
         setNodeAt(cellMid + boundaryEps, valueMin);
         setNodeAt(cellRightInner, valueMin);
     } else if (paintShape == PaintShape::Bump) {
-        // Bump uses bezier curves: boundary nodes at valueMin, curve creates the hump.
-        // B(0.5) = linearMid + (curve/kBezierCurveScale)*0.25
-        // For nodes at valueMin: linearMid = valueMin, so B(0.5) = valueMin + curve/(kBezierCurveScale*4)
-        // Solving for curve: curve = (snappedValue - valueMin) * kBezierCurveScale * 4
-        float curveStrength = (float)((snappedValue - valueMin) / (valueMax - valueMin))
-                              * osci_audio::kBezierCurveScale * 4.0f;
-        // Preserve existing left node curve so adjacent bumps stay seamless
-        auto* leftNode = findAt(cellLeft);
-        if (leftNode)
-            leftNode->value = valueMin;
-        else
-            setNodeAt(cellLeft, valueMin, 0.0f);
-        setNodeAt(cellRight, valueMin, curveStrength);
+        // Bump uses a peak node at the midpoint; smooth curve creates the hump.
+        double cellMid = (cellLeft + cellRight) * 0.5;
+        setNodeAt(cellLeft, valueMin, 0.0f);
+        setNodeAt(cellMid, snappedValue, 0.0f);
+        setNodeAt(cellRightInner, valueMin, 0.0f);
     }
 
     // Ensure we still have boundary nodes

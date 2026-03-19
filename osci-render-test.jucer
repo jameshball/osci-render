@@ -111,6 +111,8 @@
             file="tests/BenchmarkAnimateValues.cpp"/>
       <FILE id="LfoStr" name="LfoStressTest.cpp" compile="1" resource="0"
             file="tests/LfoStressTest.cpp"/>
+      <FILE id="LfStH2" name="LfoState.h" compile="0" resource="0" file="Source/audio/LfoState.h"/>
+      <FILE id="LfStC2" name="LfoState.cpp" compile="1" resource="0" file="Source/audio/LfoState.cpp"/>
     </GROUP>
   </MAINGROUP>
   <MODULES>

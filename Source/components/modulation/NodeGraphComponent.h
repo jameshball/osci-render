@@ -92,14 +92,14 @@ public:
         Down,   // Descending ramp
         Up,     // Ascending ramp
         Tri,    // Triangle wave
-        Bump    // Bezier bump (nodes at 0, curve creates rounded hump)
+        Bump    // Smooth bump (peak node creates rounded hump)
     };
 
     void setPaintMode(bool enabled);
     bool isPaintMode() const { return paintMode; }
 
-    void setBezierMode(bool bezier);
-    bool isBezierMode() const { return useBezierInterpolation; }
+    void setSmoothMode(bool smooth);
+    bool isSmoothMode() const { return useSmoothInterpolation; }
 
     void setPaintShape(PaintShape shape);
     PaintShape getPaintShape() const { return paintShape; }
@@ -260,7 +260,7 @@ private:
 
     // --- Paint mode ---
     bool paintMode = false;
-    bool useBezierInterpolation = false;
+    bool useSmoothInterpolation = false;
     PaintShape paintShape = PaintShape::Step;
     bool isPainting = false;
     double paintLastDomain = -1.0;  // last painted domain position

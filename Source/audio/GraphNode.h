@@ -14,9 +14,10 @@ struct GraphNode {
 // Evaluate a piecewise breakpoint curve at a given domain position.
 // Uses binary search for O(log n) segment lookup.
 // Nodes must be sorted by time.
-// When bezier=true, uses quadratic bezier interpolation (curve in [-kMaxBezierCurve, +kMaxBezierCurve]).
-// When bezier=false, uses exponential shaping (curve acts as exp-curve parameter).
-inline float evaluateGraphCurve(const std::vector<GraphNode>& nodes, float time, bool bezier = false) {
+// When smooth=true, applies sinusoidal S-curve before power scaling (curves into nodes).
+// When smooth=false, uses power scaling only (straight lines at power=0).
+// Both modes use the same Vital-style powerScale function.
+inline float evaluateGraphCurve(const std::vector<GraphNode>& nodes, float time, bool smooth = false) {
     if (nodes.empty()) return 0.0f;
     if (nodes.size() == 1) return (float)nodes[0].value;
 
@@ -32,7 +33,5 @@ inline float evaluateGraphCurve(const std::vector<GraphNode>& nodes, float time,
     const auto& next = *it;
     double elapsed = (double)time - prev.time;
     double duration = next.time - prev.time;
-    return bezier
-        ? osci_audio::evalBezierSegment((float)prev.value, (float)next.value, elapsed, duration, next.curve)
-        : osci_audio::evalSegment((float)prev.value, (float)next.value, elapsed, duration, next.curve);
+    return osci_audio::evalSmoothPowerSegment((float)prev.value, (float)next.value, elapsed, duration, next.curve, smooth);
 }

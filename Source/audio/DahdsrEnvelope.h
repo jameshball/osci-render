@@ -42,28 +42,40 @@ inline float evalSegment(float start, float end, double elapsed, double duration
     return lerp(start, end, shaped);
 }
 
-// Maximum absolute curve value for bezier segments.
-// The bezier control point offset scales as (curve / kBezierCurveScale) * 0.5,
-// so at ±kMaxBezierCurve the control point is 2.0 units from the linear midpoint.
-inline constexpr float kMaxBezierCurve = 200.0f;
+// Maximum absolute power value for smooth/power segments (matches Vital's kMaxPower).
+inline constexpr float kMaxPower = 20.0f;
 
-// Denominator used to normalise the curve parameter in the bezier formula.
-inline constexpr float kBezierCurveScale = 50.0f;
+// Sinusoidal smooth transition (same as Vital's smoothTransition).
+// Maps t in [0,1] through an S-curve: 0.5 * sin((t - 0.5) * PI) + 0.5
+inline float smoothTransition(float t) {
+    return 0.5f * std::sin((t - 0.5f) * juce::MathConstants<float>::pi) + 0.5f;
+}
 
-// Quadratic bezier segment evaluation.
-// The curve parameter [-kMaxBezierCurve, +kMaxBezierCurve] offsets the bezier
-// control point from the linear midpoint:
-//   cp = (start+end)/2 + (curve / kBezierCurveScale) * 0.5
-// curve=0 gives a straight line; positive bows upward, negative downward.
-inline float evalBezierSegment(float start, float end, double elapsed, double duration, float curve)
+// Exponential power scaling (same as Vital's futils::powerScale).
+// When power ~= 0, returns t unchanged (linear).
+// Positive power accelerates the curve; negative power decelerates.
+inline float powerScale(float t, float power) {
+    constexpr float kMinPower = 0.01f;
+    if (std::abs(power) < kMinPower)
+        return t;
+    float numerator = std::exp(power * t) - 1.0f;
+    float denominator = std::exp(power) - 1.0f;
+    return (denominator != 0.0f) ? (numerator / denominator) : t;
+}
+
+// Vital-style smooth+power segment evaluation.
+// When smooth=true, applies sinusoidal S-curve to t before power scaling.
+// The power parameter shapes the interpolation curve between start and end.
+// power=0 gives linear (or smooth S-curve if smooth=true).
+inline float evalSmoothPowerSegment(float start, float end, double elapsed, double duration, float power, bool smooth)
 {
     if (duration <= 0.0)
         return end;
-    const float t = (float) juce::jlimit(0.0, 1.0, elapsed / duration);
-    const float linearMid = (start + end) * 0.5f;
-    const float cp = linearMid + (curve / kBezierCurveScale) * 0.5f;
-    const float omt = 1.0f - t;
-    return omt * omt * start + 2.0f * omt * t * cp + t * t * end;
+    float t = (float) juce::jlimit(0.0, 1.0, elapsed / duration);
+    if (smooth)
+        t = smoothTransition(t);
+    t = juce::jlimit(0.0f, 1.0f, powerScale(t, power));
+    return start + t * (end - start);
 }
 }
 

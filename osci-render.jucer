@@ -187,6 +187,10 @@
         <FILE id="GrNdH1" name="GraphNode.h" compile="0" resource="0" file="Source/audio/GraphNode.h"/>
         <FILE id="LfStH1" name="LfoState.h" compile="0" resource="0" file="Source/audio/LfoState.h"/>
         <FILE id="LfStC1" name="LfoState.cpp" compile="1" resource="0" file="Source/audio/LfoState.cpp"/>
+        <FILE id="LfPmH1" name="LfoPresetManager.h" compile="0" resource="0"
+              file="Source/audio/LfoPresetManager.h"/>
+        <FILE id="LfPmC1" name="LfoPresetManager.cpp" compile="1" resource="0"
+              file="Source/audio/LfoPresetManager.cpp"/>
         <FILE id="EnStH1" name="EnvState.h" compile="0" resource="0" file="Source/audio/EnvState.h"/>
         <FILE id="MdAsH1" name="ModAssignment.h" compile="0" resource="0" file="Source/audio/ModAssignment.h"/>
         <FILE id="EjkbRe" name="PolygonizerEffect.h" compile="0" resource="0"
@@ -408,6 +412,10 @@
         <FILE id="LfCmH1" name="LfoComponent.h" compile="0" resource="0" file="Source/components/modulation/LfoComponent.h"/>
         <FILE id="LfCmC2" name="LfoComponent.cpp" compile="1" resource="0"
               file="Source/components/modulation/LfoComponent.cpp"/>
+        <FILE id="LfPbH1" name="LfoPresetBrowserOverlay.h" compile="0" resource="0"
+              file="Source/components/modulation/LfoPresetBrowserOverlay.h"/>
+        <FILE id="LfPbC2" name="LfoPresetBrowserOverlay.cpp" compile="1" resource="0"
+              file="Source/components/modulation/LfoPresetBrowserOverlay.cpp"/>
         <FILE id="LfRtH1" name="ModulationRateComponent.h" compile="0" resource="0"
               file="Source/components/modulation/ModulationRateComponent.h"/>
         <FILE id="LfRtC2" name="ModulationRateComponent.cpp" compile="1" resource="0"

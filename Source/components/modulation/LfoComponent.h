@@ -4,7 +4,9 @@
 #include "NodeGraphComponent.h"
 #include "ModulationRateComponent.h"
 #include "ModulationModeComponent.h"
+#include "LfoPresetBrowserOverlay.h"
 #include "../../audio/LfoState.h"
+#include "../../audio/LfoPresetManager.h"
 #include "ModulationSourceComponent.h"
 #include "../PhaseSliderComponent.h"
 #include "../SvgButton.h"
@@ -13,7 +15,8 @@ class OscirenderAudioProcessor;
 
 // LFO panel: subclass of ModulationSourceComponent that adds a waveform
 // graph editor, preset selector, and rate knob.
-class LfoComponent : public ModulationSourceComponent {
+class LfoComponent : public ModulationSourceComponent,
+                     public LfoPresetBrowserOverlay::Listener {
 public:
     LfoComponent(OscirenderAudioProcessor& processor);
 
@@ -35,6 +38,13 @@ public:
 
     void syncFromProcessorState() override;
 
+    // LfoPresetBrowserOverlay::Listener
+    void presetBrowserFactorySelected(LfoPreset preset) override;
+    void presetBrowserUserSelected(const juce::File& file) override;
+    void presetBrowserUserDeleted(const juce::File& file) override;
+    void presetBrowserSaveRequested(const juce::String& name) override;
+    void presetBrowserImportRequested() override;
+
 protected:
     void onActiveSourceChanged(int newIndex) override;
 
@@ -46,6 +56,7 @@ private:
         LfoWaveform waveform;
         LfoWaveform customWaveform;
         LfoPreset preset = LfoPreset::Triangle;
+        juce::String userPresetName; // Non-empty when a user preset is loaded
     };
     std::array<LfoData, NUM_LFOS> lfoData;
 
@@ -57,11 +68,11 @@ private:
         PresetSelector();
         void paint(juce::Graphics& g) override;
         void mouseDown(const juce::MouseEvent& e) override;
-        void mouseMove(const juce::MouseEvent& e) override;
         void resized() override;
         void setPresetName(const juce::String& name);
         std::function<void()> onPrev;
         std::function<void()> onNext;
+        std::function<void()> onNameClick;
     private:
         juce::String presetName;
         juce::Rectangle<int> leftArrowArea, rightArrowArea;
@@ -87,25 +98,28 @@ private:
     PresetSelector presetSelector;
     SvgButton paintToggle;
 
-    // Custom S-curve toggle for bezier/straight interpolation mode.
-    class BezierToggle : public juce::Component, public juce::SettableTooltipClient {
+    // Custom S-curve toggle for smooth/straight interpolation mode.
+    class SmoothToggle : public juce::Component, public juce::SettableTooltipClient {
     public:
-        BezierToggle();
+        SmoothToggle();
         void paint(juce::Graphics& g) override;
         void mouseDown(const juce::MouseEvent& e) override;
-        void setBezier(bool b) { bezier = b; repaint(); }
-        bool isBezier() const { return bezier; }
+        void setSmooth(bool b) { smooth = b; repaint(); }
+        bool isSmooth() const { return smooth; }
         void setAccentColour(juce::Colour c) { accent = c; repaint(); }
         std::function<void(bool)> onToggle;
     private:
-        bool bezier = true;
+        bool smooth = true;
         juce::Colour accent { juce::Colours::transparentBlack };
     };
 
-    BezierToggle bezierToggle;
+    SmoothToggle smoothToggle;
     PaintShapePreview shapePreview;
     SvgButton copyButton;
     SvgButton pasteButton;
+    LfoPresetManager presetManager;
+    std::unique_ptr<juce::FileChooser> fileChooser;
+    juce::Component::SafePointer<LfoPresetBrowserOverlay> presetBrowserOverlay;
     ModulationRateComponent rateControl;
     ModulationModeComponent modeControl;
     PhaseSliderComponent phaseSlider;
@@ -135,6 +149,10 @@ private:
     void updatePresetLabel();
     void applyLfoConstraints(int nodeIndex, double& time, double& value);
     void showPaintShapeMenu();
+    void showPresetBrowser();
+    void dismissPresetBrowser();
+    void importVitalLfo();
+    void loadUserPreset(const juce::File& file);
     void copyWaveformToClipboard();
     void pasteWaveformFromClipboard();
 

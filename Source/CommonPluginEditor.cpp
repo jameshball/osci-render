@@ -119,6 +119,51 @@ void CommonPluginEditor::handleCommandLine(const juce::String& commandLine) {
 void CommonPluginEditor::resized() {
     audioProcessor.setProperty("appWidth", getWidth());
     audioProcessor.setProperty("appHeight", getHeight());
+
+    if (!activeOverlays.empty()) {
+        for (auto& overlay : activeOverlays) {
+            overlay->setBounds(getLocalBounds());
+            overlay->toFront(false);
+        }
+    }
+}
+
+void CommonPluginEditor::showOverlay(std::unique_ptr<OverlayComponent> overlay) {
+    bool anyHeavy = false;
+    for (auto& o : activeOverlays)
+        if (!o->lightweight) anyHeavy = true;
+
+    if (!anyHeavy && !overlay->lightweight) {
+        visualiserWasVisibleBeforeOverlay = visualiser.isVisible();
+        visualiser.setVisible(false);
+    }
+
+    auto* ptr = overlay.get();
+    overlay->onDismissRequested = [this, ptr] { dismissOverlay(ptr); };
+    overlay->setBounds(getLocalBounds());
+    addAndMakeVisible(*overlay);
+    overlay->toFront(true);
+    activeOverlays.push_back(std::move(overlay));
+    resized();
+}
+
+void CommonPluginEditor::dismissOverlay(OverlayComponent* overlay) {
+    for (auto it = activeOverlays.begin(); it != activeOverlays.end(); ++it) {
+        if (it->get() == overlay) {
+            removeChildComponent(overlay);
+            activeOverlays.erase(it);
+            break;
+        }
+    }
+
+    bool anyHeavy = false;
+    for (auto& o : activeOverlays)
+        if (!o->lightweight) anyHeavy = true;
+
+    if (!anyHeavy) {
+        visualiser.setVisible(visualiserWasVisibleBeforeOverlay);
+    }
+    resized();
 }
 
 void CommonPluginEditor::initialiseMenuBar(juce::MenuBarModel& menuBarModel) {

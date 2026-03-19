@@ -19,7 +19,11 @@ public:
     // Called when the user requests to close the overlay.
     std::function<void()> onDismissRequested;
 
+    // When true, the editor won't hide the visualiser or dim the background.
+    bool lightweight = false;
+
     void paint(juce::Graphics& g) override {
+        if (lightweight) return;
         g.fillAll(juce::Colours::black.withAlpha(0.6f));
 
         auto cornerRadius = 12.0f;

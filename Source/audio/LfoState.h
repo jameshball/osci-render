@@ -18,16 +18,16 @@ using LfoNode = GraphNode;
 // Represents a single LFO waveform as a set of breakpoints over one normalized cycle.
 struct LfoWaveform {
     std::vector<LfoNode> nodes;
-    bool useBezier = true;
+    bool smooth = true;
 
     // Evaluate the waveform at a given phase [0, 1] -> value [0, 1].
     float evaluate(float phase) const {
         phase = phase - std::floor(phase);
-        return juce::jlimit(0.0f, 1.0f, evaluateGraphCurve(nodes, phase, useBezier));
+        return juce::jlimit(0.0f, 1.0f, evaluateGraphCurve(nodes, phase, smooth));
     }
 
     void saveToXml(juce::XmlElement* parent) const {
-        parent->setAttribute("useBezier", useBezier);
+        parent->setAttribute("smooth", smooth);
         for (const auto& node : nodes) {
             auto* nodeXml = parent->createNewChildElement("node");
             nodeXml->setAttribute("time", node.time);
@@ -37,7 +37,7 @@ struct LfoWaveform {
     }
 
     void loadFromXml(const juce::XmlElement* parent) {
-        useBezier = parent->getBoolAttribute("useBezier", true);
+        smooth = parent->getBoolAttribute("smooth", true);
         nodes.clear();
         for (auto* nodeXml : parent->getChildWithTagNameIterator("node")) {
             LfoNode node;
