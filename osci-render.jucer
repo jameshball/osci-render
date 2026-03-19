@@ -74,6 +74,7 @@
         <FILE id="vvlgxu" name="air-horn.svg" compile="0" resource="1" file="Resources/svg/air-horn.svg"/>
         <FILE id="CT0UuW" name="alien.svg" compile="0" resource="1" file="Resources/svg/alien.svg"/>
         <FILE id="EBwPoM" name="bicycle.svg" compile="0" resource="1" file="Resources/svg/bicycle.svg"/>
+        <FILE id="Fr2001" name="binary_tree.svg" compile="0" resource="1" file="Resources/svg/binary_tree.svg"/>
         <FILE id="laB1fX" name="bit-crush.svg" compile="0" resource="1" file="Resources/svg/bit-crush.svg"/>
         <FILE id="LJpyE5" name="blender.svg" compile="0" resource="1" file="Resources/svg/blender.svg"/>
         <FILE id="Rs9Xr6" name="bounce.svg" compile="0" resource="1" file="Resources/svg/bounce.svg"/>
@@ -90,6 +91,8 @@
         <FILE id="sDajXu" name="delete.svg" compile="0" resource="1" file="Resources/svg/delete.svg"/>
         <FILE id="IqXIZW" name="demo.svg" compile="0" resource="1" file="Resources/svg/demo.svg"/>
         <FILE id="J9H3kV" name="desktop.svg" compile="0" resource="1" file="Resources/svg/desktop.svg"/>
+        <FILE id="Fr2002" name="dragon_curve.svg" compile="0" resource="1"
+              file="Resources/svg/dragon_curve.svg"/>
         <FILE id="KTXUuA" name="diamond.svg" compile="0" resource="1" file="Resources/svg/diamond.svg"/>
         <FILE id="ATrDxb" name="distort.svg" compile="0" resource="1" file="Resources/svg/distort.svg"/>
         <FILE id="Z2xdIc" name="dodecahedron.svg" compile="0" resource="1"
@@ -105,6 +108,8 @@
         <FILE id="dYl3l5" name="greek.svg" compile="0" resource="1" file="Resources/svg/greek.svg"/>
         <FILE id="hElP01" name="help.svg" compile="0" resource="1" file="Resources/svg/help.svg"/>
         <FILE id="QbK0Sj" name="helix.svg" compile="0" resource="1" file="Resources/svg/helix.svg"/>
+        <FILE id="Fr2003" name="hilbert_curve.svg" compile="0" resource="1"
+              file="Resources/svg/hilbert_curve.svg"/>
         <FILE id="tsCJdD" name="hello.svg" compile="0" resource="1" file="Resources/svg/hello.svg"/>
         <FILE id="F3cjtn" name="human-handsdown.svg" compile="0" resource="1"
               file="Resources/svg/human-handsdown.svg"/>
@@ -144,6 +149,8 @@
         <FILE id="Gxscyd" name="rotate.svg" compile="0" resource="1" file="Resources/svg/rotate.svg"/>
         <FILE id="cUDYOM" name="scale.svg" compile="0" resource="1" file="Resources/svg/scale.svg"/>
         <FILE id="X2NZYP" name="shapes.svg" compile="0" resource="1" file="Resources/svg/shapes.svg"/>
+        <FILE id="Fr2006" name="sierpinski_triangle.svg" compile="0" resource="1"
+              file="Resources/svg/sierpinski_triangle.svg"/>
         <FILE id="kElsj1" name="shuttle.svg" compile="0" resource="1" file="Resources/svg/shuttle.svg"/>
         <FILE id="GzW5ze" name="skew.svg" compile="0" resource="1" file="Resources/svg/skew.svg"/>
         <FILE id="OiOWD6" name="skull.svg" compile="0" resource="1" file="Resources/svg/skull.svg"/>
@@ -175,8 +182,6 @@
               file="Resources/fractal/dragon_curve.fractal"/>
         <FILE id="Fr1003" name="hilbert_curve.fractal" compile="0" resource="1"
               file="Resources/fractal/hilbert_curve.fractal"/>
-        <FILE id="Fr1004" name="koch_island.fractal" compile="0" resource="1"
-              file="Resources/fractal/koch_island.fractal"/>
         <FILE id="Fr1005" name="koch_snowflake.fractal" compile="0" resource="1"
               file="Resources/fractal/koch_snowflake.fractal"/>
         <FILE id="Fr1006" name="sierpinski_triangle.fractal" compile="0" resource="1"

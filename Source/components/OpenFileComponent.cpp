@@ -171,12 +171,11 @@ void OpenFileComponent::populate()
     addExample(svgsCat, "snowflake.svg", "Snowflake", BinaryData::snowflake_svg, BinaryData::snowflake_svgSize, BinaryData::snowflake_svg, BinaryData::snowflake_svgSize);
     addExample(svgsCat, "yinyang.svg", "Yin Yang", BinaryData::yinyang_svg, BinaryData::yinyang_svgSize, BinaryData::yinyang_svg, BinaryData::yinyang_svgSize);
 
-    addExample(fractalCat, "koch_snowflake.fractal", "Koch Snowflake", BinaryData::koch_snowflake_fractal, BinaryData::koch_snowflake_fractalSize, nullptr, 0);
-    addExample(fractalCat, "sierpinski_triangle.fractal", "Sierpinski Triangle", BinaryData::sierpinski_triangle_fractal, BinaryData::sierpinski_triangle_fractalSize, nullptr, 0);
-    addExample(fractalCat, "dragon_curve.fractal", "Dragon Curve", BinaryData::dragon_curve_fractal, BinaryData::dragon_curve_fractalSize, nullptr, 0);
-    addExample(fractalCat, "binary_tree.fractal", "Binary Tree", BinaryData::binary_tree_fractal, BinaryData::binary_tree_fractalSize, nullptr, 0);
-    addExample(fractalCat, "koch_island.fractal", "Koch Island", BinaryData::koch_island_fractal, BinaryData::koch_island_fractalSize, nullptr, 0);
-    addExample(fractalCat, "hilbert_curve.fractal", "Hilbert Curve", BinaryData::hilbert_curve_fractal, BinaryData::hilbert_curve_fractalSize, nullptr, 0);
+    addExample(fractalCat, "koch_snowflake.fractal", "Koch Snowflake", BinaryData::koch_snowflake_fractal, BinaryData::koch_snowflake_fractalSize, BinaryData::snowflake_svg, BinaryData::snowflake_svgSize);
+    addExample(fractalCat, "sierpinski_triangle.fractal", "Sierpinski Triangle", BinaryData::sierpinski_triangle_fractal, BinaryData::sierpinski_triangle_fractalSize, BinaryData::sierpinski_triangle_svg, BinaryData::sierpinski_triangle_svgSize);
+    addExample(fractalCat, "dragon_curve.fractal", "Dragon Curve", BinaryData::dragon_curve_fractal, BinaryData::dragon_curve_fractalSize, BinaryData::dragon_curve_svg, BinaryData::dragon_curve_svgSize);
+    addExample(fractalCat, "binary_tree.fractal", "Binary Tree", BinaryData::binary_tree_fractal, BinaryData::binary_tree_fractalSize, BinaryData::binary_tree_svg, BinaryData::binary_tree_svgSize);
+    addExample(fractalCat, "hilbert_curve.fractal", "Hilbert Curve", BinaryData::hilbert_curve_fractal, BinaryData::hilbert_curve_fractalSize, BinaryData::hilbert_curve_svg, BinaryData::hilbert_curve_svgSize);
 }
 
 void OpenFileComponent::openFileChooser()
