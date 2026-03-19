@@ -169,7 +169,7 @@ public:
 
     std::shared_ptr<osci::Effect> fractalIterationsEffect = std::make_shared<osci::SimpleEffect>(
         [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {
-            fractalIterations.store((int)values[0].load(), std::memory_order_relaxed);
+            fractalIterations.store(juce::roundToInt(values[0].load()), std::memory_order_relaxed);
             return input;
         },
         new osci::EffectParameter(

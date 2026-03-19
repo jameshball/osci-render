@@ -25,12 +25,16 @@ enum class FractalCmd : uint8_t {
 };
 
 // A single shape representing an entire fractal turtle path.
-// Uses a streaming cursor for O(1) per-sample sequential access.
+// All draw positions are precomputed at construction time, so
+// nextVector() is an O(1) table lookup with no trig.
 class FractalPath : public osci::Shape {
 public:
-    FractalPath(std::shared_ptr<const std::vector<FractalCmd>> commands,
-                int numDraws, float baseAngle,
-                float normCX, float normCY, float normScale);
+    struct DrawSegment {
+        float x, y;   // normalized start position
+        float dx, dy;  // normalized direction vector
+    };
+
+    FractalPath(std::shared_ptr<const std::vector<DrawSegment>> segments);
 
     osci::Point nextVector(float drawingProgress) override;
     float length() override;
@@ -40,20 +44,7 @@ public:
     std::string type() override { return "FractalPath"; }
 
 private:
-    std::shared_ptr<const std::vector<FractalCmd>> commands;
-    int numDraws;
-    float baseAngle;
-    float normCX, normCY, normScale;
-
-    // Mutable streaming cursor state (O(1) for sequential access)
-    struct SavedState { float x, y, heading; };
-    mutable int cursorCmdPos = 0;
-    mutable int cursorDrawCount = 0;
-    mutable float cursorX = 0.0f, cursorY = 0.0f, cursorHeading = 90.0f;
-    mutable std::vector<SavedState> cursorStack;
-
-    void resetCursor(float angle) const;
-    void advancePastOneDraw(float angle) const;
+    std::shared_ptr<const std::vector<DrawSegment>> segments;
 };
 
 class FractalParser {
@@ -63,6 +54,10 @@ public:
     std::vector<std::unique_ptr<osci::Shape>> draw();
 
     void setIterations(int iterations);
+
+    // Returns true (and atomically clears) if parameters have changed
+    // since the last call.  Drives the queue-flush path in FrameProducer.
+    bool consumeDirty();
 
     juce::String getAxiom() const { return axiom; }
     float getBaseAngle() const { return baseAngleDegrees; }
@@ -78,31 +73,32 @@ private:
     std::vector<FractalRule> rules;
 
     std::atomic<int> currentIterations{3};
+    std::atomic<bool> frameDirty{false};
+
+    struct NormParams { float cx, cy, scale; };
 
     // Per-level cached data
     struct LevelData {
         std::shared_ptr<std::vector<FractalCmd>> commands;
         int numDraws = 0;
+        NormParams norm{0, 0, 1.0f};
+        std::shared_ptr<const std::vector<FractalPath::DrawSegment>> segments;
     };
 
     std::vector<LevelData> levels;
     int maxCachedLevel = -1;
     bool commandsDirty = true;
 
-    // Smoothed normalisation state (updated each frame in draw())
-    float smoothCX = 0.0f, smoothCY = 0.0f, smoothScale = 1.0f;
-    bool smoothInitialised = false;
-    int smoothLevel = -1; // tracks which level the smooth state was computed for
-
-    struct NormParams { float cx, cy, scale; };
-    static NormParams traceNorm(const std::vector<FractalCmd>& cmds, float angleDeg);
+    static NormParams traceNormAndBuildSegments(
+        const std::vector<FractalCmd>& cmds, float angleDeg,
+        std::shared_ptr<const std::vector<FractalPath::DrawSegment>>& outSegments);
 
     std::string applyRules(const std::string& input) const;
     std::shared_ptr<std::vector<FractalCmd>> stringToCommands(const std::string& lsystemString) const;
     void rebuildAllLevels();
 
     static constexpr int MAX_ITERATIONS = 16;
-    static constexpr int MAX_STRING_LENGTH = 2000000;
+    static constexpr int MAX_STRING_LENGTH = 3000000;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FractalParser)
 };

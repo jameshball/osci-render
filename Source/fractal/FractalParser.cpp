@@ -5,127 +5,29 @@
 
 // ==== FractalPath implementation ====
 
-FractalPath::FractalPath(std::shared_ptr<const std::vector<FractalCmd>> commands,
-                         int numDraws, float baseAngle,
-                         float normCX, float normCY, float normScale)
-    : commands(std::move(commands)), numDraws(numDraws), baseAngle(baseAngle),
-      normCX(normCX), normCY(normCY), normScale(normScale) {
-    cursorStack.reserve(64);
-}
+FractalPath::FractalPath(std::shared_ptr<const std::vector<DrawSegment>> segments)
+    : segments(std::move(segments)) {}
 
 float FractalPath::length() {
-    if (len < 0) len = (float)numDraws;
+    if (len < 0) len = (float)segments->size();
     return len;
 }
 
 std::unique_ptr<osci::Shape> FractalPath::clone() {
-    return std::make_unique<FractalPath>(commands, numDraws, baseAngle,
-                                         normCX, normCY, normScale);
-}
-
-void FractalPath::resetCursor(float angle) const {
-    cursorCmdPos = 0;
-    cursorDrawCount = 0;
-    cursorX = cursorY = 0.0f;
-    cursorHeading = 90.0f;
-    cursorStack.clear();
-
-    // Process any non-draw commands before the first Draw
-    const auto& cmds = *commands;
-    while (cursorCmdPos < (int)cmds.size() && cmds[cursorCmdPos] != FractalCmd::Draw) {
-        FractalCmd cmd = cmds[cursorCmdPos++];
-        switch (cmd) {
-            case FractalCmd::Move: {
-                float rad = cursorHeading * (juce::MathConstants<float>::pi / 180.0f);
-                cursorX += std::cos(rad);
-                cursorY += std::sin(rad);
-                break;
-            }
-            case FractalCmd::TurnRight: cursorHeading += angle; break;
-            case FractalCmd::TurnLeft:  cursorHeading -= angle; break;
-            case FractalCmd::Push: cursorStack.push_back({cursorX, cursorY, cursorHeading}); break;
-            case FractalCmd::Pop:
-                if (!cursorStack.empty()) {
-                    cursorX = cursorStack.back().x;
-                    cursorY = cursorStack.back().y;
-                    cursorHeading = cursorStack.back().heading;
-                    cursorStack.pop_back();
-                }
-                break;
-            default: break;
-        }
-    }
-}
-
-void FractalPath::advancePastOneDraw(float angle) const {
-    const auto& cmds = *commands;
-    if (cursorCmdPos >= (int)cmds.size()) return;
-
-    // Execute the Draw command at the current position
-    if (cmds[cursorCmdPos] == FractalCmd::Draw) {
-        float rad = cursorHeading * (juce::MathConstants<float>::pi / 180.0f);
-        cursorX += std::cos(rad);
-        cursorY += std::sin(rad);
-        cursorCmdPos++;
-        cursorDrawCount++;
-    }
-
-    // Process non-draw commands until the next Draw (or end)
-    while (cursorCmdPos < (int)cmds.size() && cmds[cursorCmdPos] != FractalCmd::Draw) {
-        FractalCmd cmd = cmds[cursorCmdPos++];
-        switch (cmd) {
-            case FractalCmd::Move: {
-                float rad = cursorHeading * (juce::MathConstants<float>::pi / 180.0f);
-                cursorX += std::cos(rad);
-                cursorY += std::sin(rad);
-                break;
-            }
-            case FractalCmd::TurnRight: cursorHeading += angle; break;
-            case FractalCmd::TurnLeft:  cursorHeading -= angle; break;
-            case FractalCmd::Push: cursorStack.push_back({cursorX, cursorY, cursorHeading}); break;
-            case FractalCmd::Pop:
-                if (!cursorStack.empty()) {
-                    cursorX = cursorStack.back().x;
-                    cursorY = cursorStack.back().y;
-                    cursorHeading = cursorStack.back().heading;
-                    cursorStack.pop_back();
-                }
-                break;
-            default: break;
-        }
-    }
+    return std::make_unique<FractalPath>(segments);
 }
 
 osci::Point FractalPath::nextVector(float drawingProgress) {
+    const int numDraws = (int)segments->size();
     if (numDraws == 0) return osci::Point();
 
-    float angle = baseAngle;
-
     float segFloat = drawingProgress * numDraws;
-    int targetDraw = (int)segFloat;
-    float localT = segFloat - targetDraw;
-    targetDraw = juce::jlimit(0, numDraws - 1, targetDraw);
+    int idx = (int)segFloat;
+    float t = segFloat - idx;
+    idx = juce::jlimit(0, numDraws - 1, idx);
 
-    // Reset cursor on frame restart (progress went backwards)
-    if (targetDraw < cursorDrawCount) {
-        resetCursor(angle);
-    }
-
-    // Advance cursor to the target draw segment
-    while (cursorDrawCount < targetDraw) {
-        advancePastOneDraw(angle);
-    }
-
-    // Interpolate within the current draw segment
-    float rad = cursorHeading * (juce::MathConstants<float>::pi / 180.0f);
-    float px = cursorX + localT * std::cos(rad);
-    float py = cursorY + localT * std::sin(rad);
-
-    // Apply smoothed normalisation
-    px = (px - normCX) * normScale;
-    py = (py - normCY) * normScale;
-
-    return osci::Point(px, py, 0.0f);
+    const auto& seg = (*segments)[idx];
+    return osci::Point(seg.x + t * seg.dx, seg.y + t * seg.dy, 0.0f);
 }
 
 // ==== FractalParser implementation ====
@@ -162,6 +64,7 @@ void FractalParser::parse(const juce::String& jsonContent) {
     }
 
     commandsDirty = true;
+    frameDirty.store(true, std::memory_order_release);
 }
 
 juce::String FractalParser::toJson() const {
@@ -204,7 +107,15 @@ juce::String FractalParser::defaultJson() {
 }
 
 void FractalParser::setIterations(int iterations) {
-    currentIterations.store(juce::jlimit(0, MAX_ITERATIONS, iterations), std::memory_order_relaxed);
+    int clamped = juce::jlimit(0, MAX_ITERATIONS, iterations);
+    int prev = currentIterations.exchange(clamped, std::memory_order_relaxed);
+    if (prev != clamped) {
+        frameDirty.store(true, std::memory_order_release);
+    }
+}
+
+bool FractalParser::consumeDirty() {
+    return frameDirty.exchange(false, std::memory_order_acq_rel);
 }
 
 // ---- String rewriting ----
@@ -226,8 +137,6 @@ std::string FractalParser::applyRules(const std::string& input) const {
         if (!replaced) {
             result.push_back(ch);
         }
-        if ((int)result.size() > MAX_STRING_LENGTH)
-            break;
     }
 
     return result;
@@ -275,41 +184,63 @@ void FractalParser::rebuildAllLevels() {
             if (cmd == FractalCmd::Draw) drawCount++;
         }
         levels[level].numDraws = drawCount;
+        levels[level].norm = traceNormAndBuildSegments(*levels[level].commands, baseAngleDegrees, levels[level].segments);
         maxCachedLevel = level;
 
-        if (level < MAX_ITERATIONS && (int)current.size() <= MAX_STRING_LENGTH) {
-            current = applyRules(current);
-        } else if (level < MAX_ITERATIONS) {
-            for (int rest = level + 1; rest <= MAX_ITERATIONS; ++rest) {
-                levels[rest].commands = levels[level].commands;
-                levels[rest].numDraws = levels[level].numDraws;
+        if (level < MAX_ITERATIONS) {
+            std::string next = applyRules(current);
+            if ((int)next.size() > MAX_STRING_LENGTH) {
+                // String exceeded limit — keep this clean level as the cap
+                for (int rest = level + 1; rest <= MAX_ITERATIONS; ++rest) {
+                    levels[rest].commands = levels[level].commands;
+                    levels[rest].numDraws = levels[level].numDraws;
+                    levels[rest].norm = levels[level].norm;
+                    levels[rest].segments = levels[level].segments;
+                }
+                maxCachedLevel = MAX_ITERATIONS;
+                break;
             }
-            maxCachedLevel = MAX_ITERATIONS;
-            break;
+            current = std::move(next);
         }
     }
 
     commandsDirty = false;
 }
 
-// ---- Trace bounding box at a given angle and return norm params ----
+// ---- Single-pass turtle walk: compute bounding box and build normalised segments ----
+//
+// Walks the command list once, collecting raw (unnormalised) draw segments
+// and tracking the bounding box simultaneously.  After the walk the segments
+// are normalised in-place.
 
-FractalParser::NormParams FractalParser::traceNorm(const std::vector<FractalCmd>& cmds, float angleDeg) {
-    float x = 0, y = 0, heading = 90.0f;
-    float minX = 0, maxX = 0, minY = 0, maxY = 0;
+FractalParser::NormParams FractalParser::traceNormAndBuildSegments(
+        const std::vector<FractalCmd>& cmds, float angleDeg,
+        std::shared_ptr<const std::vector<FractalPath::DrawSegment>>& outSegments) {
+    const int cmdCount = static_cast<int>(cmds.size());
 
-    struct State { float x, y, heading; };
-    std::vector<State> stack;
+    auto segs = std::make_shared<std::vector<FractalPath::DrawSegment>>();
+    // Rough upper-bound reserve — most commands are draws in typical fractals
+    segs->reserve(cmdCount);
+
+    float x = 0.0f, y = 0.0f, heading = 90.0f;
+    float minX = 0.0f, maxX = 0.0f, minY = 0.0f, maxY = 0.0f;
+
+    struct StackEntry { float x, y, heading; };
+    std::vector<StackEntry> stack;
     stack.reserve(64);
 
-    for (FractalCmd cmd : cmds) {
-        switch (cmd) {
+    for (int i = 0; i < cmdCount; ++i) {
+        switch (cmds[i]) {
             case FractalCmd::Draw: {
                 minX = std::min(minX, x); maxX = std::max(maxX, x);
                 minY = std::min(minY, y); maxY = std::max(maxY, y);
                 float rad = heading * (juce::MathConstants<float>::pi / 180.0f);
-                x += std::cos(rad);
-                y += std::sin(rad);
+                float cosVal = std::cos(rad);
+                float sinVal = std::sin(rad);
+                // Store raw (unnormalised) segment — will be normalised below
+                segs->push_back({x, y, cosVal, sinVal});
+                x += cosVal;
+                y += sinVal;
                 minX = std::min(minX, x); maxX = std::max(maxX, x);
                 minY = std::min(minY, y); maxY = std::max(maxY, y);
                 break;
@@ -332,20 +263,31 @@ FractalParser::NormParams FractalParser::traceNorm(const std::vector<FractalCmd>
         }
     }
 
+    // Compute norm params from bounding box
     float w = maxX - minX;
     float h = maxY - minY;
     float maxDim = std::max(w, h);
 
-    NormParams p;
+    NormParams norm;
     if (maxDim < 1e-8f) {
-        p.cx = p.cy = 0;
-        p.scale = 1.0f;
+        norm.cx = norm.cy = 0;
+        norm.scale = 1.0f;
     } else {
-        p.cx = (minX + maxX) * 0.5f;
-        p.cy = (minY + maxY) * 0.5f;
-        p.scale = 2.0f / maxDim;
+        norm.cx = (minX + maxX) * 0.5f;
+        norm.cy = (minY + maxY) * 0.5f;
+        norm.scale = 2.0f / maxDim;
     }
-    return p;
+
+    // Normalise segments in-place
+    for (auto& seg : *segs) {
+        seg.x  = (seg.x - norm.cx) * norm.scale;
+        seg.y  = (seg.y - norm.cy) * norm.scale;
+        seg.dx *= norm.scale;
+        seg.dy *= norm.scale;
+    }
+
+    outSegments = std::move(segs);
+    return norm;
 }
 
 // ---- Main draw: returns a single FractalPath shape ----
@@ -360,36 +302,9 @@ std::vector<std::unique_ptr<osci::Shape>> FractalParser::draw() {
     int level = juce::jlimit(0, maxCachedLevel, iters);
     auto& data = levels[level];
 
-    // Reset smooth state when switching iteration levels
-    if (level != smoothLevel) {
-        smoothInitialised = false;
-        smoothLevel = level;
-    }
-
-    // Compute ideal norm at the current base angle
-    auto ideal = traceNorm(*data.commands, baseAngleDegrees);
-
-    if (!smoothInitialised) {
-        smoothCX = ideal.cx;
-        smoothCY = ideal.cy;
-        smoothScale = ideal.scale;
-        smoothInitialised = true;
-    } else {
-        // Asymmetric smoothing: fast when scaling down (prevent clipping),
-        // slower when scaling up (aesthetic expansion)
-        constexpr float alphaDown = 0.4f;
-        constexpr float alphaUp   = 0.1f;
-        float scaleAlpha = (ideal.scale < smoothScale) ? alphaDown : alphaUp;
-        smoothCX    += 0.2f * (ideal.cx - smoothCX);
-        smoothCY    += 0.2f * (ideal.cy - smoothCY);
-        smoothScale += scaleAlpha * (ideal.scale - smoothScale);
-    }
-
     std::vector<std::unique_ptr<osci::Shape>> shapes;
     if (data.numDraws > 0) {
-        shapes.push_back(std::make_unique<FractalPath>(
-            data.commands, data.numDraws, baseAngleDegrees,
-            smoothCX, smoothCY, smoothScale));
+        shapes.push_back(std::make_unique<FractalPath>(data.segments));
     }
     return shapes;
 }

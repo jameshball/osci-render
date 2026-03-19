@@ -80,7 +80,8 @@ void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesiser
         clearPreviewEffect();
     }
 
-    auto parser = this->sound.load() != nullptr ? this->sound.load()->parser : nullptr;
+    auto* currentSound = this->sound.load();
+    auto parser = currentSound != nullptr ? currentSound->parser : nullptr;
     renderingSample = parser != nullptr && parser->isSample();
 
     if (shapeSound != nullptr) {
@@ -91,7 +92,9 @@ void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesiser
         frameDrawn = 0.0;
         int tries = 0;
         while (frame.empty() && tries < 50) {
-            frameLength = shapeSound->updateFrame(frame);
+            if (shapeSound->updateFrame(frame)) {
+                frameLength = shapeSound->getFrameLength();
+            }
             tries++;
         }
         pendingFrameStart = true;
@@ -182,6 +185,22 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     const int blockTimeSigNum = audioProcessor.luaTimeSigNum.load(std::memory_order_relaxed);
     const int blockTimeSigDen = audioProcessor.luaTimeSigDen.load(std::memory_order_relaxed);
 
+    // Snapshot the sound pointer once per block.  The underlying ShapeSound
+    // is ref-counted so it stays alive even if another thread swaps it out.
+    auto* currentSound = sound.load();
+
+    // If the producer flushed stale frames and pushed a fresh one, grab it
+    // immediately instead of waiting until the current frame finishes.
+    if (!renderingSample && currentSound != nullptr && currentlyPlaying && currentSound->consumeFreshFrame()) {
+        if (currentSound->updateFrame(frame)) {
+            frameLength = currentSound->getFrameLength();
+            currentShape = 0;
+            frameDrawn = 0;
+            shapeDrawn = 0;
+            pendingFrameStart = true;
+        }
+    }
+
     // First pass: generate raw audio samples (without gain) and fill frequency buffer + per-sample envelope
     for (int i = 0; i < numSamples; ++i) {
         if (pendingFrameStart) {
@@ -194,8 +213,8 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
 
         osci::Point channels;
 
-        if (sound.load() != nullptr) {
-            auto parser = sound.load()->parser;
+        if (currentSound != nullptr) {
+            auto parser = currentSound->parser;
 
             if (renderingSample) {
                 vars.sampleRate = audioProcessor.currentSampleRate;
@@ -283,15 +302,12 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         }
 
         if (!renderingSample && frameDrawn >= frameLength) {
-            double currentShapeLength = 0;
-            if (currentShape < frame.size()) {
-                currentShapeLength = frame[currentShape]->len;
+            if (currentSound != nullptr && currentlyPlaying) {
+                if (currentSound->updateFrame(frame)) {
+                    frameLength = currentSound->getFrameLength();
+                }
             }
-            if (sound.load() != nullptr && currentlyPlaying) {
-                frameLength = sound.load()->updateFrame(frame);
-            }
-            double prevFrameLength = frameLength;
-            frameDrawn -= prevFrameLength;
+            frameDrawn -= frameLength;
             currentShape = 0;
 
             // The first sample of the new frame is the *next* sample.

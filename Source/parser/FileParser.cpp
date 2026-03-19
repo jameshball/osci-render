@@ -183,6 +183,12 @@ void FileParser::enable() {
     active = true;
 }
 
+bool FileParser::consumeDirty() {
+    juce::SpinLock::ScopedLockType scope(lock);
+    if (fractal != nullptr) return fractal->consumeDirty();
+    return false;
+}
+
 std::shared_ptr<WorldObject> FileParser::getObject() {
     return object;
 }

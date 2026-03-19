@@ -24,6 +24,7 @@ public:
 	bool isActive();
 	void disable();
 	void enable();
+	bool consumeDirty();
     
     int getNumFrames();
     int getCurrentFrame();

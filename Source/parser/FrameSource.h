@@ -12,4 +12,9 @@ public:
 	virtual bool isActive() = 0;
 	virtual void disable() = 0;
 	virtual void enable() = 0;
+
+	// Returns true (and atomically clears the flag) if the source's
+	// parameters have changed since the last call.  Used by FrameProducer
+	// to decide whether to flush stale frames from the queue.
+	virtual bool consumeDirty() { return false; }
 };
