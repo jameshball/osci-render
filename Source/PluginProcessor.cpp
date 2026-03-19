@@ -768,6 +768,14 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     double sTimeSec = 1.f / sampleRate;
     double sTimeBeats = bpm * sTimeSec / 60;
 
+    // Store DAW transport for Lua access from voices
+    luaBpm.store(bpm, std::memory_order_relaxed);
+    luaPlayTime.store(playTimeSeconds, std::memory_order_relaxed);
+    luaPlayTimeBeats.store(playTimeBeats, std::memory_order_relaxed);
+    luaIsPlaying.store(isPlaying, std::memory_order_relaxed);
+    luaTimeSigNum.store(timeSig.numerator, std::memory_order_relaxed);
+    luaTimeSigDen.store(timeSig.denominator, std::memory_order_relaxed);
+
     // merge keyboard state and midi messages
     keyboardState.processNextMidiBuffer(midiMessages, 0, buffer.getNumSamples(), true);
 
@@ -863,8 +871,15 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         }
     }
 
-    juce::AudioBuffer<float> outputBuffer3d = juce::AudioBuffer<float>(3, buffer.getNumSamples());
+    juce::AudioBuffer<float> outputBuffer3d = juce::AudioBuffer<float>(6, buffer.getNumSamples());
     outputBuffer3d.clear();
+
+    // Initialise colour channels to the "no colour" sentinel (-1) so that
+    // samples untouched by any voice fall back to the default line colour
+    // rather than being interpreted as explicit black (0,0,0).
+    juce::FloatVectorOperations::fill(outputBuffer3d.getWritePointer(3), -1.0f, buffer.getNumSamples());
+    juce::FloatVectorOperations::fill(outputBuffer3d.getWritePointer(4), -1.0f, buffer.getNumSamples());
+    juce::FloatVectorOperations::fill(outputBuffer3d.getWritePointer(5), -1.0f, buffer.getNumSamples());
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
     if (syphonInputActive) {

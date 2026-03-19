@@ -15,7 +15,7 @@ void FileParser::showFileSizeWarning(juce::String fileName, int64_t totalBytes, 
 	}
 
 	const double fileSizeMB = totalBytes / (1024.0 * 1024.0);
-	juce::String message = "The " + fileType + " file '" + fileName + "' you're trying to open is " + juce::String(fileSizeMB, 2) + " MB in size, and may time a long time to open.\n\nWould you like to continue loading it?";
+	juce::String message = "The " + fileType + " file '" + fileName + "' you're trying to open is " + juce::String(fileSizeMB, 2) + " MB in size, and may take a long time to open.\n\nWould you like to continue loading it?";
 	
 	juce::MessageManager::callAsync([this, message, callback]() {
 		juce::AlertWindow::showOkCancelBox(
@@ -141,10 +141,12 @@ osci::Point FileParser::nextSample(lua_State*& L, LuaVariables& vars) {
 
     if (lua != nullptr) {
         auto values = lua->run(L, vars);
-        if (values.size() == 2) {
-            return osci::Point(values[0], values[1], 0);
-        } else if (values.size() > 2) {
+        if (values.size() >= 6) {
+            return osci::Point(values[0], values[1], values[2], values[3], values[4], values[5]);
+        } else if (values.size() >= 3) {
             return osci::Point(values[0], values[1], values[2]);
+        } else if (values.size() == 2) {
+            return osci::Point(values[0], values[1]);
         }
     } else if (img != nullptr) {
         return img->getSample();

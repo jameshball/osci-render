@@ -23,6 +23,10 @@ osci::Point CustomEffect::apply(int index, osci::Point input, osci::Point extern
 	auto x = input.x;
 	auto y = input.y;
 	auto z = input.z;
+	auto r = input.r;
+	auto g = input.g;
+	auto b = input.b;
+	bool resultHasColour = (input.r >= 0.0f);
 
 	{
 		juce::SpinLock::ScopedLockType lock(luaState.codeLock);
@@ -39,21 +43,45 @@ osci::Point CustomEffect::apply(int index, osci::Point input, osci::Point extern
 			std::copy(luaValues, luaValues + 26, std::begin(vars.sliders));
 
 			auto result = luaState.parser->run(L, vars);
-			if (result.size() >= 2) {
+			if (result.size() >= 6) {
 				x = result[0];
 				y = result[1];
-				if (result.size() >= 3) {
-					z = result[2];
-				}
+				z = result[2];
+				r = result[3];
+				g = result[4];
+				b = result[5];
+				resultHasColour = true;
+			} else if (result.size() >= 3) {
+				x = result[0];
+				y = result[1];
+				z = result[2];
+			} else if (result.size() >= 2) {
+				x = result[0];
+				y = result[1];
 			}
 		} else {
 			luaState.parser->resetErrors();
 		}
 	}
 
-	return osci::Point(
+	osci::Point blended(
 		(1 - effectScale) * input.x + effectScale * x,
 		(1 - effectScale) * input.y + effectScale * y,
 		(1 - effectScale) * input.z + effectScale * z
 	);
+
+	lastRunHadColour = resultHasColour;
+
+	if (resultHasColour) {
+		float inR = input.r >= 0.0f ? input.r : 0.0f;
+		float inG = input.r >= 0.0f ? input.g : 0.0f;
+		float inB = input.r >= 0.0f ? input.b : 0.0f;
+		blended = blended.withColour(
+			(1 - effectScale) * inR + effectScale * r,
+			(1 - effectScale) * inG + effectScale * g,
+			(1 - effectScale) * inB + effectScale * b
+		);
+	}
+
+	return blended;
 }

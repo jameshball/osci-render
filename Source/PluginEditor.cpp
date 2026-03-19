@@ -51,6 +51,12 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
         console.clear();
     };
 
+    luaHelpButton.setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    luaHelpButton.setTooltip("Lua Scripting Reference");
+    luaHelpButton.onClick = [this] {
+        showLuaDocumentation();
+    };
+
     addAndMakeVisible(collapseButton);
     collapseButton.onClick = [this] {
         setCodeEditorVisible(std::nullopt);
@@ -279,6 +285,7 @@ void OscirenderAudioProcessorEditor::resized() {
                     auto dummy3Bounds = dummy3.getBounds();
                     console.setBounds(dummy3Bounds.removeFromBottom(console.getConsoleOpen() ? 200 : 30));
                     dummy3Bounds.removeFromBottom(RESIZER_BAR_SIZE);
+                    codeEditors[index]->setHelpButton(&luaHelpButton);
                     codeEditors[index]->setBounds(dummy3Bounds);
                     luaFileOpen = true;
                 } else {
@@ -330,13 +337,12 @@ void OscirenderAudioProcessorEditor::resized() {
 
     repaint();
 
-#if !OSCI_PREMIUM
-    if (premiumSplashScreen != nullptr) {
-        visualiser.setVisible(false);
-        premiumSplashScreen->setBounds(getLocalBounds());
-        premiumSplashScreen->toFront(false);
+    if (!activeOverlays.empty()) {
+        for (auto& overlay : activeOverlays) {
+            overlay->setBounds(getLocalBounds());
+            overlay->toFront(false);
+        }
     }
-#endif
 }
 
 void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
@@ -603,33 +609,63 @@ void OscirenderAudioProcessorEditor::openRecordingSettings() {
 
 void OscirenderAudioProcessorEditor::showPremiumSplashScreen() {
 #if !OSCI_PREMIUM
-    if (premiumSplashScreen != nullptr) {
-        premiumSplashScreen->toFront(true);
+    if (findActiveOverlay<SplashScreenComponent>() != nullptr)
         return;
-    }
 
-    auto openUpgradePage = [] {
+    auto splash = std::make_unique<SplashScreenComponent>();
+    splash->onUpgradeClicked = [] {
         juce::URL("https://osci-render.com/#purchase").launchInDefaultBrowser();
     };
-
-    premiumSplashScreen = std::make_unique<SplashScreenComponent>();
-    premiumSplashScreen->onUpgradeClicked = openUpgradePage;
-    premiumSplashScreen->onDismissRequested = [this] {
-        if (premiumSplashScreen != nullptr) {
-            visualiser.setVisible(visualiserWasVisibleBeforeSplash);
-            removeChildComponent(premiumSplashScreen.get());
-            premiumSplashScreen.reset();
-            resized();
-        }
-    };
-
-    visualiserWasVisibleBeforeSplash = visualiser.isVisible();
-    visualiser.setVisible(false);
-    premiumSplashScreen->setBounds(getLocalBounds());
-    addAndMakeVisible(*premiumSplashScreen);
-    premiumSplashScreen->toFront(true);
-    resized();
+    showOverlay(std::move(splash));
 #endif
+}
+
+void OscirenderAudioProcessorEditor::showLuaDocumentation() {
+    if (findActiveOverlay<LuaDocumentationComponent>() != nullptr)
+        return;
+
+    if (!cachedLuaDocs) {
+        cachedLuaDocs = std::make_unique<LuaDocumentationComponent>();
+    }
+
+    std::unique_ptr<OverlayComponent> overlay(cachedLuaDocs.release());
+    showOverlay(std::move(overlay));
+}
+
+void OscirenderAudioProcessorEditor::showOverlay(std::unique_ptr<OverlayComponent> overlay) {
+    if (activeOverlays.empty()) {
+        visualiserWasVisibleBeforeOverlay = visualiser.isVisible();
+        visualiser.setVisible(false);
+    }
+
+    auto* ptr = overlay.get();
+    overlay->onDismissRequested = [this, ptr] { dismissOverlay(ptr); };
+    overlay->setBounds(getLocalBounds());
+    addAndMakeVisible(*overlay);
+    overlay->toFront(true);
+    activeOverlays.push_back(std::move(overlay));
+    resized();
+}
+
+void OscirenderAudioProcessorEditor::dismissOverlay(OverlayComponent* overlay) {
+    for (auto it = activeOverlays.begin(); it != activeOverlays.end(); ++it) {
+        if (it->get() == overlay) {
+            removeChildComponent(overlay);
+            // Reclaim LuaDocumentationComponent for reuse
+            if (dynamic_cast<LuaDocumentationComponent*>(overlay)) {
+                auto* reclaimed = static_cast<LuaDocumentationComponent*>(it->release());
+                reclaimed->onDismissRequested = nullptr;
+                cachedLuaDocs.reset(reclaimed);
+            }
+            activeOverlays.erase(it);
+            break;
+        }
+    }
+
+    if (activeOverlays.empty()) {
+        visualiser.setVisible(visualiserWasVisibleBeforeOverlay);
+    }
+    resized();
 }
 
 void OscirenderAudioProcessorEditor::updateTimelineController() {

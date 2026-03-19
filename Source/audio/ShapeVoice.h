@@ -69,6 +69,7 @@ private:
 	juce::AudioBuffer<float> volumeBuffer;
 	juce::AudioBuffer<float> frameSyncBuffer;
 	bool pendingFrameStart = true;
+	bool pendingNoteOn = false;
 
 	void noteStopped();
 };

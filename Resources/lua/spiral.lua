@@ -10,11 +10,14 @@
 -- e.g. Lua Slider A is in a variable called
 -- slider_a.
 
+-- Globals persist across samples, so we only
+-- need to initialise them once.
+if not lfo then
+    lfo = 0
+    t = 0
+    dir = 1
+end
 
-
--- Create a new variable called lfo, that
--- initially has the value 0.
-lfo = lfo or 0
 -- Increment lfo using the value of slider_b
 -- to control how quickly it increases.
 lfo = lfo + slider_b / sample_rate + 0.1 / sample_rate
@@ -22,19 +25,11 @@ lfo = lfo + slider_b / sample_rate + 0.1 / sample_rate
 -- Use slider_a along with lfo to define a
 -- variable that controls the length of
 -- the spiral
-spiral_length = (slider_a + 0.5) * 10 * math.sin(lfo)
--- This controls the direction that we are
--- moving along the spiral, i.e. outwards or
--- inwards.
-dir = dir or 1
+local spiral_length = (slider_a + 0.5) * 10 * math.sin(lfo)
 
--- t controls the point on the spiral that we are
--- currently drawing. As t increases, the spiral
--- moves outwards.
-t = t or 0
 -- This is the correct increment for t to use such
 -- that we hear the right frequency.
-increment = 4 * math.pi * frequency / sample_rate
+local increment = 4 * math.pi * frequency / sample_rate
 
 -- If we get to the end of the spiral, flip the
 -- direction to go back.

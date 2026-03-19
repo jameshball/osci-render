@@ -21,3 +21,7 @@
 [submodule "modules/melatonin_blur"]
 	path = modules/melatonin_blur
 	url = https://github.com/sudara/melatonin_blur.git
+[submodule "modules/pluginval"]
+	path = modules/pluginval
+	url = https://github.com/Tracktion/pluginval.git
+	branch = develop

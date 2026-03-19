@@ -11,6 +11,7 @@
 #include "components/AnimationTimelineController.h"
 #include "components/ErrorCodeEditorComponent.h"
 #include "components/LuaConsole.h"
+#include "components/LuaDocumentationComponent.h"
 #include "components/OscirenderAudioTimelineController.h"
 #include "components/OsciMainMenuBarModel.h"
 #include "components/SplashScreenComponent.h"
@@ -59,8 +60,6 @@ public:
 
 #if !OSCI_PREMIUM
     juce::TextButton upgradeButton{"Upgrade to premium!"};
-    std::unique_ptr<SplashScreenComponent> premiumSplashScreen;
-    bool visualiserWasVisibleBeforeSplash = true;
 #endif
 
     juce::ComponentAnimator codeEditorAnimator;
@@ -70,6 +69,8 @@ public:
     SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings", visualiserSettings, 550, 500, 1500, VISUALISER_SETTINGS_HEIGHT);
 
     LuaConsole console;
+
+    SvgButton luaHelpButton { "luaHelp", juce::String(BinaryData::help_svg), juce::Colours::white };
 
     std::vector<std::shared_ptr<juce::CodeDocument>> codeDocuments;
     std::vector<std::shared_ptr<OscirenderCodeEditorComponent>> codeEditors;
@@ -115,6 +116,24 @@ public:
     juce::SpinLock syphonLock;
     std::unique_ptr<SyphonFrameGrabber> syphonFrameGrabber;
 #endif
+
+private:
+    // Overlay management
+    void showLuaDocumentation();
+    void showOverlay(std::unique_ptr<OverlayComponent> overlay);
+    void dismissOverlay(OverlayComponent* overlay);
+
+    template<typename T>
+    T* findActiveOverlay() {
+        for (auto& o : activeOverlays)
+            if (auto* found = dynamic_cast<T*>(o.get()))
+                return found;
+        return nullptr;
+    }
+
+    std::unique_ptr<LuaDocumentationComponent> cachedLuaDocs;
+    std::vector<std::unique_ptr<OverlayComponent>> activeOverlays;
+    bool visualiserWasVisibleBeforeOverlay = true;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OscirenderAudioProcessorEditor)
 };

@@ -58,7 +58,7 @@ VisualiserComponent::VisualiserComponent(
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
     setWantsKeyboardFocus(true);
 
-    if (parent == nullptr) {
+    if (parent == nullptr || juce::JUCEApplicationBase::isStandaloneApp()) {
         addAndMakeVisible(fullScreenButton);
         fullScreenButton.setTooltip("Toggles fullscreen mode.");
     }
@@ -91,7 +91,14 @@ VisualiserComponent::VisualiserComponent(
 #endif
 
     fullScreenButton.onClick = [this]() {
-        enableFullScreen();
+        if (this->parent != nullptr) {
+#if OSCI_PREMIUM
+            if (auto* window = dynamic_cast<VisualiserWindow*>(getTopLevelComponent()))
+                window->toggleFullScreen();
+#endif
+        } else {
+            enableFullScreen();
+        }
     };
 
     settingsButton.onClick = [this]() {
@@ -223,10 +230,7 @@ void VisualiserComponent::setPaused(bool paused, bool affectAudio) {
         audioProcessor.wavParser.setPaused(paused);
     }
     
-    // Update the parameter only for primary visualiser with no child window
-    // When a child window exists, the parent is temporarily paused but we don't 
-    // want to save this state to the parameter
-    if (isPrimaryVisualiser() && child == nullptr) {
+    if (isPrimaryVisualiser()) {
         bool currentParamValue = audioProcessor.visualiserParameters.visualiserPaused->getBoolValue();
         if (currentParamValue != paused) {
             audioProcessor.visualiserParameters.visualiserPaused->setBoolValueNotifyingHost(paused);
@@ -234,6 +238,9 @@ void VisualiserComponent::setPaused(bool paused, bool affectAudio) {
     }
     
     repaint();
+    if (child != nullptr) {
+        child->repaint();
+    }
 }
 
 bool VisualiserComponent::isPaused() const {
@@ -245,8 +252,7 @@ bool VisualiserComponent::isPrimaryVisualiser() const {
 }
 
 void VisualiserComponent::updatePausedState() {
-    // Called when the parameter changes - only relevant for primary visualiser with no child
-    if (isPrimaryVisualiser() && child == nullptr) {
+    if (isPrimaryVisualiser()) {
         bool shouldBePaused = audioProcessor.visualiserParameters.visualiserPaused->getBoolValue();
         if (active == shouldBePaused) { // active and paused are opposites
             setPaused(shouldBePaused, true);
@@ -273,6 +279,8 @@ void VisualiserComponent::mouseMove(const juce::MouseEvent &event) {
     if (event.getScreenX() == lastMouseX && event.getScreenY() == lastMouseY) {
         return;
     }
+    if (isMirrorMode())
+        return;
     hideButtonRow = false;
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
 
@@ -306,8 +314,12 @@ void VisualiserComponent::mouseMove(const juce::MouseEvent &event) {
 
 void VisualiserComponent::mouseDown(const juce::MouseEvent &event) {
     if (event.originalComponent == this) {
-        if (event.mods.isLeftButtonDown() && child == nullptr && !record.getToggleState()) {
-            setPaused(active);
+        if (event.mods.isLeftButtonDown() && !record.getToggleState()) {
+            if (isMirrorMode() && parent != nullptr) {
+                parent->setPaused(parent->active);
+            } else {
+                setPaused(active);
+            }
         }
     }
 }
@@ -317,12 +329,36 @@ bool VisualiserComponent::keyPressed(const juce::KeyPress &key) {
     if (!audioProcessor.getAcceptsKeys()) return false;
 
     if (key.isKeyCode(juce::KeyPress::escapeKey)) {
-        if (fullScreenCallback) {
+        // In popout mode, exit popout fullscreen first
+        if (parent != nullptr) {
+#if OSCI_PREMIUM
+            if (auto* window = dynamic_cast<VisualiserWindow*>(getTopLevelComponent())) {
+                if (window->getIsFullScreen()) {
+                    window->toggleFullScreen();
+                    return true;
+                }
+            }
+#endif
+        } else if (fullScreenCallback) {
             fullScreenCallback(FullScreenMode::MAIN_COMPONENT);
         }
         return true;
+    } else if (key.isKeyCode(juce::KeyPress::F11Key) && juce::JUCEApplicationBase::isStandaloneApp()) {
+#if OSCI_PREMIUM
+        if (parent != nullptr) {
+            if (auto* window = dynamic_cast<VisualiserWindow*>(getTopLevelComponent()))
+                window->toggleFullScreen();
+        } else {
+            enableFullScreen();
+        }
+#endif
+        return true;
     } else if (key.isKeyCode(juce::KeyPress::spaceKey)) {
-        setPaused(active);
+        if (isMirrorMode() && parent != nullptr) {
+            parent->setPaused(parent->active);
+        } else {
+            setPaused(active);
+        }
         return true;
     }
 
@@ -479,11 +515,21 @@ void VisualiserComponent::resized() {
     // Apply hideButtonRow logic to both fullscreen and pop-out modes
     if ((fullScreen || parent != nullptr) && hideButtonRow) {
         buttonRow = area.removeFromBottom(0);
+        fullScreenButton.setVisible(false);
+        popOutButton.setVisible(false);
+        settingsButton.setVisible(false);
+        audioInputButton.setVisible(false);
+        sharedTextureButton.setVisible(false);
+        record.setVisible(false);
+        stopwatch.setVisible(false);
+        timeline.setVisible(false);
+        setViewportArea(area);
+        return;
     } else {
         buttonRow = area.removeFromBottom(25);
     }
     auto buttons = buttonRow;
-    if (parent == nullptr) {
+    if (parent == nullptr || juce::JUCEApplicationBase::isStandaloneApp()) {
         fullScreenButton.setBounds(buttons.removeFromRight(30));
     }
     if (child == nullptr && parent == nullptr) {
@@ -562,7 +608,12 @@ void VisualiserComponent::popoutWindow() {
     popout->setResizable(true, false);
     popout->setVisible(true);
     popout->centreWithSize(350, 350);
-    setPaused(true, false);
+    // Hide all buttons on the popout and set up mirror mode
+    visualiser->hideButtonRow = true;
+    visualiser->resized();
+    // Set up mirror mode AFTER the window is visible so the GL context is active
+    visualiser->setMirrorSource(this);
+    setHasMirrorConsumer(true);
     resized();
 }
 
@@ -587,7 +638,8 @@ void VisualiserComponent::childUpdated() {
 void VisualiserComponent::updateRenderModeFromProcessor() {
     // Called on message thread
     if (!visualiserOnly) {
-        setRenderMode(RenderMode::XY);
+        // osci-render always provides 6 channels (x, y, z, r, g, b)
+        setRenderMode(RenderMode::XYRGB);
         return;
     }
     // Determine based on whether brightness and RGB are enabled and not force-disabled
@@ -657,6 +709,18 @@ void VisualiserComponent::setTimelineController(std::shared_ptr<TimelineControll
 }
 
 void VisualiserComponent::paint(juce::Graphics &g) {
+    // Mirror mode: draw paused overlay over GL content
+    if (isMirrorMode()) {
+        if (parent != nullptr && parent->isPaused()) {
+            g.setColour(juce::Colours::black.withAlpha(0.5f));
+            g.fillRect(getLocalBounds());
+            g.setColour(juce::Colours::white);
+            g.setFont(30.0f);
+            g.drawText("Paused", getLocalBounds(), juce::Justification::centred);
+        }
+        return;
+    }
+
     bool colourSpecified = isColourSpecified(buttonRowColourId);
     auto buttonRowColour = Colours::veryDark;
     if (colourSpecified) {
@@ -671,7 +735,6 @@ void VisualiserComponent::paint(juce::Graphics &g) {
 
         g.setColour(juce::Colours::white);
         g.setFont(30.0f);
-        juce::String text = child == nullptr ? "Paused" : "Open in another window";
-        g.drawText(text, getViewportArea(), juce::Justification::centred);
+        g.drawText("Paused", getViewportArea(), juce::Justification::centred);
     }
 }

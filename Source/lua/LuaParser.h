@@ -59,6 +59,25 @@ struct LuaVariables {
 	
     double ext_x = 0;
 	double ext_y = 0;
+
+	// MIDI context
+	int midiNote = 60;
+	double velocity = 1.0;
+	int voiceIndex = 0;
+	bool noteOn = false;
+
+	// DAW transport
+	double bpm = 120.0;
+	double playTime = 0.0;
+	double playTimeBeats = 0.0;
+	bool isPlaying = false;
+	int timeSigNumerator = 4;
+	int timeSigDenominator = 4;
+
+	// Envelope
+	double envelope = 1.0;
+	int envelopeStage = 0;  // 0=delay, 1=attack, 2=hold, 3=decay, 4=sustain, 5=release, 6=done
+
 };
 
 struct lua_State;
@@ -85,6 +104,7 @@ private:
 	void parse(lua_State*& L);
 	void setGlobalVariable(lua_State*& L, const char* name, double value);
 	void setGlobalVariable(lua_State*& L, const char* name, int value);
+	void setGlobalVariable(lua_State*& L, const char* name, bool value);
 	void setGlobalVariables(lua_State*& L, LuaVariables& vars);
 	void incrementVars(LuaVariables& vars);
 	void clearStack(lua_State*& L);
