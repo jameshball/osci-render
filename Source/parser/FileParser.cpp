@@ -101,7 +101,7 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
                 sampleSource = true;
 			}
 		);
-	} else if (extension == ".fractal") {
+	} else if (extension == ".lsystem") {
 		fractal = std::make_shared<FractalParser>(stream->readEntireStreamAsString());
 	} else if (extension == ".wav" || extension == ".aiff" || extension == ".flac" || extension == ".ogg" || extension == ".mp3") {
 		wav = std::make_shared<WavParser>(audioProcessor);

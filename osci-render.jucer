@@ -176,16 +176,16 @@
         <FILE id="HCK5B8" name="yinyang.svg" compile="0" resource="1" file="Resources/svg/yinyang.svg"/>
       </GROUP>
       <GROUP id="{FC8A1D3E-7B92-4F01-A3D6-E12B5C8F9A00}" name="fractal">
-        <FILE id="Fr1001" name="binary_tree.fractal" compile="0" resource="1"
-              file="Resources/fractal/binary_tree.fractal"/>
-        <FILE id="Fr1002" name="dragon_curve.fractal" compile="0" resource="1"
-              file="Resources/fractal/dragon_curve.fractal"/>
-        <FILE id="Fr1003" name="hilbert_curve.fractal" compile="0" resource="1"
-              file="Resources/fractal/hilbert_curve.fractal"/>
-        <FILE id="Fr1005" name="koch_snowflake.fractal" compile="0" resource="1"
-              file="Resources/fractal/koch_snowflake.fractal"/>
-        <FILE id="Fr1006" name="sierpinski_triangle.fractal" compile="0" resource="1"
-              file="Resources/fractal/sierpinski_triangle.fractal"/>
+        <FILE id="Fr1001" name="binary_tree.lsystem" compile="0" resource="1"
+              file="Resources/fractal/binary_tree.lsystem"/>
+        <FILE id="Fr1002" name="dragon_curve.lsystem" compile="0" resource="1"
+              file="Resources/fractal/dragon_curve.lsystem"/>
+        <FILE id="Fr1003" name="hilbert_curve.lsystem" compile="0" resource="1"
+              file="Resources/fractal/hilbert_curve.lsystem"/>
+        <FILE id="Fr1005" name="koch_snowflake.lsystem" compile="0" resource="1"
+              file="Resources/fractal/koch_snowflake.lsystem"/>
+        <FILE id="Fr1006" name="sierpinski_triangle.lsystem" compile="0" resource="1"
+              file="Resources/fractal/sierpinski_triangle.lsystem"/>
       </GROUP>
       <GROUP id="{F8A3D32C-4187-9A2F-5D78-040259957E9B}" name="text">
         <FILE id="N9Q6Zg" name="greek.txt" compile="0" resource="1" file="Resources/text/greek.txt"/>

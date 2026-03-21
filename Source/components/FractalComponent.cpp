@@ -175,25 +175,27 @@ void FractalComponent::resized() {
 
     const int rowHeight = 20;
     const int sliderHeight = 30;
+    const int labelWidth = 125; // 5px pad + 120px label inside EffectComponent
 
-    // Axiom row
+    // Axiom row — indented to align with slider track
     auto axiomRow = area.removeFromTop(rowHeight);
-    axiomLabel.setBounds(axiomRow.removeFromLeft(60));
+    axiomLabel.setBounds(axiomRow.removeFromLeft(labelWidth));
     axiomEditor.setBounds(axiomRow);
     area.removeFromTop(5);
 
-    // Base angle row
+    // Base angle row — indented to align with slider track
     auto angleRow = area.removeFromTop(rowHeight);
-    angleLabel.setBounds(angleRow.removeFromLeft(60));
+    angleLabel.setBounds(angleRow.removeFromLeft(labelWidth));
     angleEditor.setBounds(angleRow);
     area.removeFromTop(5);
 
     // Effect sliders (same height as FrameSettingsComponent: 30px each, no extra spacing)
-    depthSlider.setBounds(area.removeFromTop(sliderHeight));
+    depthSlider.setBounds(area.removeFromTop(sliderHeight).withLeft(area.getX() - 5));
     area.removeFromTop(5);
 
     // Rules label
-    rulesLabel.setBounds(area.removeFromTop(rowHeight));
+    auto rulesRow = area.removeFromTop(rowHeight);
+    rulesLabel.setBounds(rulesRow);
     area.removeFromTop(2);
 
     // Rules viewport fills remaining space

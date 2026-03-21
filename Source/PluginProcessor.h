@@ -254,7 +254,7 @@ public:
         "ogg",
         "flac",
         "mp3",
-        "fractal",
+        "lsystem",
 #if OSCI_PREMIUM
         "mp4",
         "mov",

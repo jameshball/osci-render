@@ -192,7 +192,7 @@ bool OscirenderAudioProcessorEditor::isBinaryFile(juce::String name) {
         // doesn't really make sense to edit SVG or OBJ files as text in this context
         || name.endsWith(".svg")
         || name.endsWith(".obj")
-        || name.endsWith(".fractal");
+        || name.endsWith(".lsystem");
 }
 
 // parsersLock and syphonLock must be held

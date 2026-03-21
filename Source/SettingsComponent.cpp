@@ -190,7 +190,7 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
 
     if (skipProcessing) {
         // do nothing
-    } else if (extension == ".fractal") {
+    } else if (extension == ".lsystem") {
         int fileIndex = audioProcessor.getCurrentFileIndex();
         if (fileIndex >= 0) {
             auto parser = audioProcessor.getCurrentFileParser();

@@ -40,8 +40,8 @@ namespace LookAndFeelHelpers
         const float sat = hasKeyboardFocus ? 1.3f : 0.9f;
         const juce::Colour baseColour(buttonColour.withMultipliedSaturation(sat).withMultipliedAlpha(isEnabled ? 1.0f : 0.5f));
 
-        if (shouldDrawButtonAsDown) return baseColour.contrasting (0.3f);
-        if (shouldDrawButtonAsHighlighted) return baseColour.contrasting (0.15f);
+        if (shouldDrawButtonAsDown) return baseColour.contrasting (0.15f);
+        if (shouldDrawButtonAsHighlighted) return baseColour.contrasting (0.05f);
 
         return baseColour;
     }
