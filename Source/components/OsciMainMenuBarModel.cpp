@@ -75,11 +75,12 @@ void OsciMainMenuBarModel::resetMenuItems() {
                                                        "DJ_Level_3, for contributing several features to osci-render\n"
                                                        "Anthony Hall, for adding many new effects, and improving existing ones\n"
                                                        "BUS ERROR Collective, for providing the source code for the Hilligoss encoder\n"
+                                                       "Ener-G, for providing his L-system fractal script that formed the basis for the L-system implementation\n"
                                                        "TheDumbDude, for contributing several example Lua files\n"
                                                        "All the community, for suggesting features and reporting issues!",
                                                    std::any_cast<int>(audioProcessor.getProperty("objectServerPort")));
         options.content.setOwned(about);
-        options.content->setSize(500, 300);
+        options.content->setSize(500, 320);
         options.dialogTitle = "About";
         options.dialogBackgroundColour = Colours::dark;
         options.escapeKeyTriggersCloseButton = true;
