@@ -887,6 +887,8 @@ juce::AudioProcessorEditor* OscirenderAudioProcessor::createEditor() {
 
 //==============================================================================
 void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
+    juce::Logger::writeToLog("getStateInformation: saving state (version " + juce::String(ProjectInfo::versionString) + ")");
+
     // we need to stop recording the visualiser when saving the state, otherwise
     // there are issues. This is the only place we can do this because there is
     // no callback when closing the standalone app except for this.
@@ -948,10 +950,15 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
     saveProperties(*xml);
 
     copyXmlToBinary(*xml, destData);
+    juce::Logger::writeToLog("getStateInformation: saved " + juce::String(effects.size()) + " effects, "
+        + juce::String(fileBlocks.size()) + " files, " + juce::String((int)destData.getSize()) + " bytes");
 }
 
 void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
+    juce::Logger::writeToLog("setStateInformation: loading state (" + juce::String(sizeInBytes) + " bytes)");
+
     if (juce::JUCEApplicationBase::isStandaloneApp() && programCrashedAndUserWantsToReset()) {
+        juce::Logger::writeToLog("setStateInformation: user chose to reset after crash, skipping restore");
         return;
     }
 
@@ -966,28 +973,25 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         xml = juce::XmlDocument::parse(juce::String((const char*)data, sizeInBytes));
     }
 
-    if (xml.get() != nullptr && xml->hasTagName("project")) {
-        restoreStandaloneProjectFilePathFromXml(*xml);
+    if (xml.get() == nullptr || !xml->hasTagName("project")) {
+        juce::Logger::writeToLog("setStateInformation: failed to parse XML from state data");
+        return;
+    }
+
+    restoreStandaloneProjectFilePathFromXml(*xml);
 
         auto versionXml = xml->getChildByName("version");
         if (versionXml != nullptr && versionXml->getAllSubText().startsWith("v1.")) {
-            // this is an old version of osci-render, ignore it
+            juce::Logger::writeToLog("setStateInformation: ignoring v1.x state format");
             return;
         }
         auto version = xml->hasAttribute("version") ? xml->getStringAttribute("version") : "2.0.0";
+        juce::Logger::writeToLog("setStateInformation: restoring state version " + version);
 
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
 
-        auto effectsXml = xml->getChildByName("effects");
-        if (effectsXml != nullptr) {
-            for (auto effectXml : effectsXml->getChildIterator()) {
-                auto effect = getEffect(effectXml->getStringAttribute("id"));
-                if (effect != nullptr) {
-                    effect->load(effectXml);
-                }
-            }
-        }
+        loadEffectsFromXml(xml->getChildByName("effects"));
         updateEffectPrecedence();
 
         auto booleanParametersXml = xml->getChildByName("booleanParameters");
@@ -1028,6 +1032,7 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
             auto stream = juce::MemoryOutputStream();
             juce::Base64::convertFromBase64(stream, customFunction->getAllSubText());
             luaEffectState->updateCode(stream.toString());
+            juce::Logger::writeToLog("setStateInformation: restored custom Lua function (" + juce::String((int)stream.getDataSize()) + " bytes)");
         }
 
         auto fontXml = xml->getChildByName("font");
@@ -1046,6 +1051,7 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
 
         auto filesXml = xml->getChildByName("files");
         if (filesXml != nullptr) {
+            int fileCount = 0;
             for (auto fileXml : filesXml->getChildIterator()) {
                 auto fileName = fileXml->getStringAttribute("name");
                 auto text = fileXml->getAllSubText();
@@ -1062,7 +1068,11 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
                 }
 
                 addFile(fileName, fileBlock);
+                fileCount++;
             }
+            juce::Logger::writeToLog("setStateInformation: restored " + juce::String(fileCount) + " files");
+        } else {
+            juce::Logger::writeToLog("setStateInformation: no files section found");
         }
         changeCurrentFile(xml->getIntAttribute("currentFile", -1));
 
@@ -1073,7 +1083,7 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
 
         broadcaster.sendChangeMessage();
         prevMidiEnabled = !midiEnabled->getBoolValue();
-    }
+        juce::Logger::writeToLog("setStateInformation: state restore complete");
 }
 
 void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float newValue) {

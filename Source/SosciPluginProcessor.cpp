@@ -166,6 +166,8 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 }
 
 void SosciAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
+    juce::Logger::writeToLog("getStateInformation: saving state (version " + juce::String(ProjectInfo::versionString) + ")");
+
     // we need to stop recording the visualiser when saving the state, otherwise
     // there are issues. This is the only place we can do this because there is
     // no callback when closing the standalone app except for this.
@@ -208,10 +210,14 @@ void SosciAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
     saveProperties(*xml);
 
     copyXmlToBinary(*xml, destData);
+    juce::Logger::writeToLog("getStateInformation: saved " + juce::String(effects.size()) + " effects, " + juce::String((int)destData.getSize()) + " bytes");
 }
 
 void SosciAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
+    juce::Logger::writeToLog("setStateInformation: loading state (" + juce::String(sizeInBytes) + " bytes)");
+
     if (juce::JUCEApplicationBase::isStandaloneApp() && programCrashedAndUserWantsToReset()) {
+        juce::Logger::writeToLog("setStateInformation: user chose to reset after crash, skipping restore");
         return;
     }
 
@@ -226,20 +232,18 @@ void SosciAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
         xml = juce::XmlDocument::parse(juce::String((const char*)data, sizeInBytes));
     }
 
-    if (xml.get() != nullptr && xml->hasTagName("project")) {
-        restoreStandaloneProjectFilePathFromXml(*xml);
+    if (xml.get() == nullptr || !xml->hasTagName("project")) {
+        juce::Logger::writeToLog("setStateInformation: failed to parse XML from state data");
+        return;
+    }
+
+    auto version = xml->hasAttribute("version") ? xml->getStringAttribute("version") : "unknown";
+    juce::Logger::writeToLog("setStateInformation: restoring state version " + version);
+    restoreStandaloneProjectFilePathFromXml(*xml);
 
         juce::SpinLock::ScopedLockType lock2(effectsLock);
 
-        auto effectsXml = xml->getChildByName("effects");
-        if (effectsXml != nullptr) {
-            for (auto effectXml : effectsXml->getChildIterator()) {
-                auto effect = getEffect(effectXml->getStringAttribute("id"));
-                if (effect != nullptr) {
-                    effect->load(effectXml);
-                }
-            }
-        }
+        loadEffectsFromXml(xml->getChildByName("effects"));
 
         auto booleanParametersXml = xml->getChildByName("booleanParameters");
         if (booleanParametersXml != nullptr) {
@@ -274,7 +278,7 @@ void SosciAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
         recordingParameters.load(xml.get());
         
         loadProperties(*xml);
-    }
+        juce::Logger::writeToLog("setStateInformation: state restore complete");
 }
 
 juce::AudioProcessorEditor* SosciAudioProcessor::createEditor() {

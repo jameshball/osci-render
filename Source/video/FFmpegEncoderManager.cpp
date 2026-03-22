@@ -82,6 +82,7 @@ bool FFmpegEncoderManager::isHardwareEncoderAvailable(const juce::String& encode
 }
 
 juce::String FFmpegEncoderManager::getBestEncoderForCodec(VideoCodec codec) {
+    juce::Logger::writeToLog("FFmpeg: selecting best encoder for codec " + juce::String((int)codec));
     auto encoders = getAvailableEncodersForCodec(codec);
 
     // Define priority lists for each codec type
@@ -126,20 +127,23 @@ juce::String FFmpegEncoderManager::getBestEncoderForCodec(VideoCodec codec) {
     }
 
     // Return default software encoder if no hardware encoder is available or working
+    juce::String fallback;
     switch (codec) {
         case VideoCodec::H264:
-            return "libx264";
+            fallback = "libx264"; break;
         case VideoCodec::H265:
-            return "libx265";
+            fallback = "libx265"; break;
         case VideoCodec::VP9:
-            return "libvpx-vp9";
+            fallback = "libvpx-vp9"; break;
 #if JUCE_MAC
         case VideoCodec::ProRes:
-            return "prores";
+            fallback = "prores"; break;
 #endif
         default:
-            return "libx264";
+            fallback = "libx264"; break;
     }
+    juce::Logger::writeToLog("FFmpeg: no tested encoder worked, falling back to '" + fallback + "'");
+    return fallback;
 }
 
 void FFmpegEncoderManager::queryAvailableEncoders() {
@@ -374,6 +378,7 @@ juce::String FFmpegEncoderManager::buildProResEncodingCommand(
 #endif
 
 bool FFmpegEncoderManager::testEncoderWorks(const juce::String& encoderName) {
+    juce::Logger::writeToLog("FFmpeg: testing encoder '" + encoderName + "'");
     juce::ChildProcess process;
     juce::StringArray command;
 
@@ -401,12 +406,15 @@ bool FFmpegEncoderManager::testEncoderWorks(const juce::String& encoderName) {
     // Start the process
     bool started = process.start(command, juce::ChildProcess::wantStdErr);
 
-    if (!started)
+    if (!started) {
+        juce::Logger::writeToLog("FFmpeg: failed to start test process for encoder '" + encoderName + "'");
         return false;
+    }
 
     // Wait for the process to finish with a timeout
     if (!process.waitForProcessToFinish(5000)) { // 5 seconds timeout
         process.kill();
+        juce::Logger::writeToLog("FFmpeg: encoder test timed out for '" + encoderName + "'");
         return false;
     }
 
@@ -414,6 +422,12 @@ bool FFmpegEncoderManager::testEncoderWorks(const juce::String& encoderName) {
     int exitCode = process.getExitCode();
     juce::String errorOutput = process.readAllProcessOutput();
 
-    // If exit code is 0 and there's no error output, the encoder works
-    return exitCode == 0 && errorOutput.isEmpty();
+    bool works = exitCode == 0 && errorOutput.isEmpty();
+    if (works) {
+        juce::Logger::writeToLog("FFmpeg: encoder '" + encoderName + "' works");
+    } else {
+        juce::Logger::writeToLog("FFmpeg: encoder '" + encoderName + "' failed (exit=" + juce::String(exitCode)
+            + (errorOutput.isNotEmpty() ? ", stderr: " + errorOutput.substring(0, 200) : "") + ")");
+    }
+    return works;
 }

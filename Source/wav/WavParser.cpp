@@ -9,6 +9,7 @@ WavParser::~WavParser() {}
 bool WavParser::parse(std::unique_ptr<juce::InputStream> stream) {
     initialised = false;
     if (stream == nullptr) {
+        juce::Logger::writeToLog("WavParser::parse: stream is null");
         return false;
     }
     currentSample = 0;
@@ -16,6 +17,7 @@ bool WavParser::parse(std::unique_ptr<juce::InputStream> stream) {
     formatManager.registerBasicFormats();
     juce::AudioFormatReader* reader = formatManager.createReaderFor(std::move(stream));
     if (reader == nullptr) {
+        juce::Logger::writeToLog("WavParser::parse: no suitable audio format reader found");
         return false;
     }
     afSource = std::make_unique<juce::AudioFormatReaderSource>(reader, true);
@@ -24,8 +26,12 @@ bool WavParser::parse(std::unique_ptr<juce::InputStream> stream) {
     // afSource is owned by this class (unique_ptr), so ResamplingAudioSource must NOT delete it.
     source = std::make_unique<juce::ResamplingAudioSource>(afSource.get(), false, reader->numChannels);
     if (source == nullptr) {
+        juce::Logger::writeToLog("WavParser::parse: failed to create ResamplingAudioSource");
         return false;
     }
+    juce::Logger::writeToLog("WavParser::parse: loaded audio - sampleRate=" + juce::String(reader->sampleRate)
+        + " channels=" + juce::String(reader->numChannels)
+        + " samples=" + juce::String(afSource->getTotalLength()));
     fileSampleRate = reader->sampleRate;
     numChannels = (int) reader->numChannels;
     audioBuffer.setSize(reader->numChannels, 1);
