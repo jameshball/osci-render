@@ -1,5 +1,9 @@
 # osci-render Development Guide
 
+## Important Guidelines
+
+- **Backwards compatibility**: Always ask the user before adding backwards compatibility when changing or refactoring something. Do not assume it is needed.
+
 ## Project Overview
 
 osci-render is a JUCE-based audio plugin (VST3/AU/Standalone) that renders 2D/3D graphics to audio for oscilloscope displays. It supports `.obj`, `.svg`, `.txt`, `.lua`, and Blender scene rendering with real-time audio effects and DAW automation.

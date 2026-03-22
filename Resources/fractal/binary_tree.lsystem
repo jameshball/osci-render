@@ -1,0 +1,14 @@
+{
+  "axiom": "X",
+  "angle": 25,
+  "rules": [
+    {
+      "variable": "X",
+      "replacement": "F[-X][+X]"
+    },
+    {
+      "variable": "F",
+      "replacement": "FF"
+    }
+  ]
+}

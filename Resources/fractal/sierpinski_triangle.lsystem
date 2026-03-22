@@ -1,0 +1,14 @@
+{
+  "axiom": "F-G-G",
+  "angle": 120,
+  "rules": [
+    {
+      "variable": "F",
+      "replacement": "F-G+F+G-F"
+    },
+    {
+      "variable": "G",
+      "replacement": "GG"
+    }
+  ]
+}

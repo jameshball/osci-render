@@ -35,6 +35,7 @@ OpenFileComponent::OpenFileComponent(OscirenderAudioProcessor& processor)
     addCat(luaCat);
     addCat(modelsCat);
     addCat(svgsCat);
+    addCat(fractalCat);
 
     populate();
 }
@@ -82,6 +83,7 @@ void OpenFileComponent::resized()
     layCat(modelsCat);
     layCat(luaCat);
     layCat(svgsCat);
+    layCat(fractalCat);
     layCat(textCat);
 
     content.setSize(contentArea.getWidth(), y);
@@ -168,6 +170,12 @@ void OpenFileComponent::populate()
     addExample(svgsCat, "skull.svg", "Skull", BinaryData::skull_svg, BinaryData::skull_svgSize, BinaryData::skull_svg, BinaryData::skull_svgSize);
     addExample(svgsCat, "snowflake.svg", "Snowflake", BinaryData::snowflake_svg, BinaryData::snowflake_svgSize, BinaryData::snowflake_svg, BinaryData::snowflake_svgSize);
     addExample(svgsCat, "yinyang.svg", "Yin Yang", BinaryData::yinyang_svg, BinaryData::yinyang_svgSize, BinaryData::yinyang_svg, BinaryData::yinyang_svgSize);
+
+    addExample(fractalCat, "koch_snowflake.lsystem", "Koch Snowflake", BinaryData::koch_snowflake_lsystem, BinaryData::koch_snowflake_lsystemSize, BinaryData::snowflake_svg, BinaryData::snowflake_svgSize);
+    addExample(fractalCat, "sierpinski_triangle.lsystem", "Sierpinski Triangle", BinaryData::sierpinski_triangle_lsystem, BinaryData::sierpinski_triangle_lsystemSize, BinaryData::sierpinski_triangle_svg, BinaryData::sierpinski_triangle_svgSize);
+    addExample(fractalCat, "dragon_curve.lsystem", "Dragon Curve", BinaryData::dragon_curve_lsystem, BinaryData::dragon_curve_lsystemSize, BinaryData::dragon_curve_svg, BinaryData::dragon_curve_svgSize);
+    addExample(fractalCat, "binary_tree.lsystem", "Binary Tree", BinaryData::binary_tree_lsystem, BinaryData::binary_tree_lsystemSize, BinaryData::binary_tree_svg, BinaryData::binary_tree_svgSize);
+    addExample(fractalCat, "hilbert_curve.lsystem", "Hilbert Curve", BinaryData::hilbert_curve_lsystem, BinaryData::hilbert_curve_lsystemSize, BinaryData::hilbert_curve_svg, BinaryData::hilbert_curve_svgSize);
 }
 
 void OpenFileComponent::openFileChooser()

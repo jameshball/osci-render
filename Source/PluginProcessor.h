@@ -164,6 +164,20 @@ public:
             "imageStride",
             VERSION_HINT, 4, 1, 50, 1));
 
+    // Fractal L-system parameters
+    std::atomic<int> fractalIterations{3};
+
+    std::shared_ptr<osci::Effect> fractalIterationsEffect = std::make_shared<osci::SimpleEffect>(
+        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {
+            fractalIterations.store(juce::roundToInt(values[0].load()), std::memory_order_relaxed);
+            return input;
+        },
+        new osci::EffectParameter(
+            "Fractal Depth",
+            "Controls the recursion depth of the L-system fractal. Higher values produce more detail but require more processing.",
+            "fractalIterations",
+            VERSION_HINT, 3.0, 0.0, 15.0, 1.0));
+
     std::atomic<double> animationFrame = 0.f;
 
     const double FONT_SIZE = 1.0f;
@@ -240,6 +254,7 @@ public:
         "ogg",
         "flac",
         "mp3",
+        "lsystem",
 #if OSCI_PREMIUM
         "mp4",
         "mov",
