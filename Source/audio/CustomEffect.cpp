@@ -43,21 +43,21 @@ osci::Point CustomEffect::apply(int index, osci::Point input, osci::Point extern
 			std::copy(luaValues, luaValues + 26, std::begin(vars.sliders));
 
 			auto result = luaState.parser->run(L, vars);
-			if (result.size() >= 6) {
-				x = result[0];
-				y = result[1];
-				z = result[2];
-				r = result[3];
-				g = result[4];
-				b = result[5];
+			if (result.count >= 6) {
+				x = result.values[0];
+				y = result.values[1];
+				z = result.values[2];
+				r = result.values[3];
+				g = result.values[4];
+				b = result.values[5];
 				resultHasColour = true;
-			} else if (result.size() >= 3) {
-				x = result[0];
-				y = result[1];
-				z = result[2];
-			} else if (result.size() >= 2) {
-				x = result[0];
-				y = result[1];
+			} else if (result.count >= 3) {
+				x = result.values[0];
+				y = result.values[1];
+				z = result.values[2];
+			} else if (result.count >= 2) {
+				x = result.values[0];
+				y = result.values[1];
 			}
 		} else {
 			luaState.parser->resetErrors();

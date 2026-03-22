@@ -19,6 +19,7 @@ When asked to do a code review, follow this workflow:
 ## Important Guidelines
 
 - **Backwards compatibility**: Always ask the user before adding backwards compatibility when changing or refactoring something. Do not assume it is needed.
+- **Recommendations and proposals**: When presenting optimization recommendations, refactoring suggestions, architectural changes, or any list of proposed improvements, **always present each one as a numbered question** using `vscode_askQuestions`. Each question should include a clear description of the proposed change, its rationale, and expected impact. This allows the user to approve, reject, or request more context on each item individually. Never present recommendations as a flat list in chat — always use the structured question UI so the user can comment against each one.
 
 ## Project Overview
 

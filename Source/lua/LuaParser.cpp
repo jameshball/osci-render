@@ -5,6 +5,7 @@
 // On all platforms, this should be done automatically when you run the export.
 // If not, use the luajit_win.bat or luajit_linux_macos.sh scripts in the git root from the dev environment.
 #include <lua.hpp>
+#include <cstring>
 
 std::function<void(const std::string&)> LuaParser::onPrint;
 std::function<void()> LuaParser::onClear;
@@ -22,16 +23,14 @@ void LuaParser::setMaximumInstructions(lua_State*& L, int count) {
     lua_sethook(L, LuaParser::maximumInstructionsReached, LUA_MASKCOUNT, count);
 }
 
-void LuaParser::resetMaximumInstructions(lua_State*& L) {
-    lua_sethook(L, LuaParser::maximumInstructionsReached, 0, 0);
-}
-
 LuaParser::LuaParser(juce::String fileName, juce::String script, std::function<void(int, juce::String, juce::String)> errorCallback, juce::String fallbackScript) : script(script), fallbackScript(fallbackScript), errorCallback(errorCallback), fileName(fileName) {}
 
 void LuaParser::reset(lua_State*& L, juce::String script) {
     functionRef = -1;
 
     if (L != nullptr) {
+        seenStates.erase(std::remove(seenStates.begin(), seenStates.end(), L), seenStates.end());
+        if (lastSeenState == L) lastSeenState = nullptr;
         lua_close(L);
     }
     
@@ -77,7 +76,53 @@ void LuaParser::parse(lua_State*& L) {
         revertToFallback(L);
     } else {
         functionRef = luaL_ref(L, LUA_REGISTRYINDEX);
+        detectUsedVariables(script);
     }
+}
+
+void LuaParser::detectUsedVariables(const juce::String& scriptText) {
+    uint64_t mask = 0;
+    auto text = scriptText.toRawUTF8();
+
+    // If script uses dynamic global access or loads external code, conservatively enable all variables
+    if (strstr(text, "_G") || strstr(text, "getfenv") || strstr(text, "rawget")
+        || strstr(text, "require") || strstr(text, "dofile") || strstr(text, "loadfile")) {
+        usedVarMask = ~uint64_t(0);
+        return;
+    }
+
+    if (strstr(text, "step"))               mask |= (1ULL << LuaVar_step);
+    if (strstr(text, "sample_rate"))        mask |= (1ULL << LuaVar_sampleRate);
+    if (strstr(text, "frequency"))          mask |= (1ULL << LuaVar_frequency);
+    if (strstr(text, "phase"))              mask |= (1ULL << LuaVar_phase);
+    if (strstr(text, "cycle_count"))        mask |= (1ULL << LuaVar_cycleCount);
+
+    for (int i = 0; i < NUM_SLIDERS; i++) {
+        if (strstr(text, SLIDER_NAMES[i]))  mask |= (1ULL << (LuaVar_sliderFirst + i));
+    }
+
+    if (strstr(text, "x"))                  mask |= (1ULL << LuaVar_x);
+    if (strstr(text, "y"))                  mask |= (1ULL << LuaVar_y);
+    if (strstr(text, "z"))                  mask |= (1ULL << LuaVar_z);
+    if (strstr(text, "ext_x"))              mask |= (1ULL << LuaVar_extX);
+    if (strstr(text, "ext_y"))              mask |= (1ULL << LuaVar_extY);
+
+    if (strstr(text, "midi_note"))          mask |= (1ULL << LuaVar_midiNote);
+    if (strstr(text, "velocity"))           mask |= (1ULL << LuaVar_velocity);
+    if (strstr(text, "voice_index"))        mask |= (1ULL << LuaVar_voiceIndex);
+    if (strstr(text, "note_on"))            mask |= (1ULL << LuaVar_noteOn);
+
+    if (strstr(text, "bpm"))                mask |= (1ULL << LuaVar_bpm);
+    if (strstr(text, "play_time"))          mask |= (1ULL << LuaVar_playTime);
+    if (strstr(text, "play_time_beats"))    mask |= (1ULL << LuaVar_playTimeBeats);
+    if (strstr(text, "is_playing"))         mask |= (1ULL << LuaVar_isPlaying);
+    if (strstr(text, "time_sig_num"))       mask |= (1ULL << LuaVar_timeSigNum);
+    if (strstr(text, "time_sig_den"))       mask |= (1ULL << LuaVar_timeSigDen);
+
+    if (strstr(text, "envelope"))           mask |= (1ULL << LuaVar_envelope);
+    if (strstr(text, "envelope_stage"))     mask |= (1ULL << LuaVar_envelopeStage);
+
+    usedVarMask = mask;
 }
 
 void LuaParser::setGlobalVariable(lua_State*& L, const char* name, double value) {
@@ -96,42 +141,46 @@ void LuaParser::setGlobalVariable(lua_State*& L, const char* name, bool value) {
 }
 
 void LuaParser::setGlobalVariables(lua_State*& L, LuaVariables& vars) {
-	setGlobalVariable(L, "step", vars.step);
-	setGlobalVariable(L, "sample_rate", vars.sampleRate);
-	setGlobalVariable(L, "frequency", vars.frequency);
-	setGlobalVariable(L, "phase", vars.phase);
-    setGlobalVariable(L, "cycle_count", vars.cycle);
+    auto set = [&](LuaVarBit bit, const char* name, auto value) {
+        if (usedVarMask & (1ULL << bit))
+            setGlobalVariable(L, name, value);
+    };
 
-    for (int i = 0; i < NUM_SLIDERS; i++) {
-		setGlobalVariable(L, SLIDER_NAMES[i], vars.sliders[i]);
-    }
+    set(LuaVar_step,       "step",        vars.step);
+    set(LuaVar_sampleRate, "sample_rate", vars.sampleRate);
+    set(LuaVar_frequency,  "frequency",   vars.frequency);
+    set(LuaVar_phase,      "phase",       vars.phase);
+    set(LuaVar_cycleCount, "cycle_count", vars.cycle);
+
+    for (int i = 0; i < NUM_SLIDERS; i++)
+        set((LuaVarBit)(LuaVar_sliderFirst + i), SLIDER_NAMES[i], vars.sliders[i]);
 
     if (vars.isEffect) {
-		setGlobalVariable(L, "x", vars.x);
-		setGlobalVariable(L, "y", vars.y);
-		setGlobalVariable(L, "z", vars.z);
+        set(LuaVar_x, "x", vars.x);
+        set(LuaVar_y, "y", vars.y);
+        set(LuaVar_z, "z", vars.z);
     }
 
-    setGlobalVariable(L, "ext_x", vars.ext_x);
-    setGlobalVariable(L, "ext_y", vars.ext_y);
+    set(LuaVar_extX, "ext_x", vars.ext_x);
+    set(LuaVar_extY, "ext_y", vars.ext_y);
 
     // MIDI context
-    setGlobalVariable(L, "midi_note", vars.midiNote);
-    setGlobalVariable(L, "velocity", vars.velocity);
-    setGlobalVariable(L, "voice_index", vars.voiceIndex);
-    setGlobalVariable(L, "note_on", vars.noteOn);
+    set(LuaVar_midiNote,   "midi_note",   vars.midiNote);
+    set(LuaVar_velocity,   "velocity",    vars.velocity);
+    set(LuaVar_voiceIndex, "voice_index", vars.voiceIndex);
+    set(LuaVar_noteOn,     "note_on",     vars.noteOn);
 
     // DAW transport
-    setGlobalVariable(L, "bpm", vars.bpm);
-    setGlobalVariable(L, "play_time", vars.playTime);
-    setGlobalVariable(L, "play_time_beats", vars.playTimeBeats);
-    setGlobalVariable(L, "is_playing", vars.isPlaying);
-    setGlobalVariable(L, "time_sig_num", vars.timeSigNumerator);
-    setGlobalVariable(L, "time_sig_den", vars.timeSigDenominator);
+    set(LuaVar_bpm,           "bpm",             vars.bpm);
+    set(LuaVar_playTime,      "play_time",        vars.playTime);
+    set(LuaVar_playTimeBeats, "play_time_beats",  vars.playTimeBeats);
+    set(LuaVar_isPlaying,     "is_playing",       vars.isPlaying);
+    set(LuaVar_timeSigNum,    "time_sig_num",     vars.timeSigNumerator);
+    set(LuaVar_timeSigDen,    "time_sig_den",     vars.timeSigDenominator);
 
     // Envelope
-    setGlobalVariable(L, "envelope", vars.envelope);
-    setGlobalVariable(L, "envelope_stage", vars.envelopeStage);
+    set(LuaVar_envelope,      "envelope",       vars.envelope);
+    set(LuaVar_envelopeStage, "envelope_stage", vars.envelopeStage);
 }
 
 void LuaParser::incrementVars(LuaVariables& vars) {
@@ -152,38 +201,42 @@ void LuaParser::revertToFallback(lua_State*& L) {
     usingFallbackScript = true;
     if (script != fallbackScript) {
         reset(L, fallbackScript);
+        seenStates.push_back(L);
+        lastSeenState = L;
     }
 }
 
-void LuaParser::readTable(lua_State*& L, std::vector<float>& values) {
-    auto length = lua_objlen(L, -1);
+void LuaParser::readTable(lua_State*& L, LuaResult& result) {
+    int length = std::min((int)lua_objlen(L, -1), MAX_LUA_RESULT_VALUES);
+    result.count = length;
 
     for (int i = 1; i <= length; i++) {
-        lua_pushinteger(L, i);
-        lua_gettable(L, -2);
-        float value = lua_tonumber(L, -1);
+        lua_rawgeti(L, -1, i);
+        result.values[i - 1] = (float)lua_tonumber(L, -1);
         lua_pop(L, 1);
-        values.push_back(value);
     }
 }
 
 // only the audio thread runs this fuction
-std::vector<float> LuaParser::run(lua_State*& L, LuaVariables& vars) {
+LuaResult LuaParser::run(lua_State*& L, LuaVariables& vars) {
     // if we haven't seen this state before, reset it
-    int stateIndex = std::find(seenStates.begin(), seenStates.end(), L) - seenStates.begin();
-    if (stateIndex == seenStates.size()) {
-        reset(L, script);
-        seenStates.push_back(L);
+    if (L == nullptr || L != lastSeenState) {
+        if (std::find(seenStates.begin(), seenStates.end(), L) == seenStates.end()) {
+            reset(L, script);
+            seenStates.push_back(L);
+        }
+        lastSeenState = L;
     }
 
-    std::vector<float> values;
+    LuaResult result;
+
+    // Reset instruction counter before setting globals and calling pcall.
+    setMaximumInstructions(L, 5000000);
 	
 	setGlobalVariables(L, vars);
     
 	// Get the function from the registry
 	lua_rawgeti(L, LUA_REGISTRYINDEX, functionRef);
-
-    setMaximumInstructions(L, 5000000);
     
     if (lua_isfunction(L, -1)) {
         const int ret = lua_pcall(L, 0, LUA_MULTRET, 0);
@@ -193,14 +246,12 @@ std::vector<float> LuaParser::run(lua_State*& L, LuaVariables& vars) {
             revertToFallback(L);
         } else {            
             if (lua_istable(L, -1)) {
-                readTable(L, values);
+                readTable(L, result);
             }
         }
     } else {
         revertToFallback(L);
     }
-
-    resetMaximumInstructions(L);
 
     if (functionRef != -1 && !usingFallbackScript) {
         resetErrors();
@@ -210,7 +261,7 @@ std::vector<float> LuaParser::run(lua_State*& L, LuaVariables& vars) {
     
 	incrementVars(vars);
     
-	return values;
+	return result;
 }
 
 bool LuaParser::isFunctionValid() {
@@ -228,6 +279,7 @@ void LuaParser::resetErrors() {
 void LuaParser::close(lua_State*& L) {
     if (L != nullptr) {
         seenStates.erase(std::remove(seenStates.begin(), seenStates.end(), L), seenStates.end());
+        if (lastSeenState == L) lastSeenState = nullptr;
         lua_close(L);
     }
 }

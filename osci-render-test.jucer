@@ -106,13 +106,37 @@
         <FILE id="V3Q6n2" name="Frustum.cpp" compile="1" resource="0" file="Source/obj/Frustum.cpp"/>
         <FILE id="m9wauB" name="Frustum.h" compile="0" resource="0" file="Source/obj/Frustum.h"/>
       </GROUP>
+      <GROUP id="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}" name="audio">
+        <FILE id="LfStH2" name="LfoState.h" compile="0" resource="0" file="Source/audio/LfoState.h"/>
+        <FILE id="LfStC2" name="LfoState.cpp" compile="1" resource="0" file="Source/audio/LfoState.cpp"/>
+      </GROUP>
+      <GROUP id="{B2C3D4E5-F6A7-8901-BCDE-F12345678901}" name="lua">
+        <FILE id="LuaPCp" name="LuaParser.cpp" compile="1" resource="0" file="Source/lua/LuaParser.cpp"/>
+        <FILE id="LuaPHd" name="LuaParser.h" compile="0" resource="0" file="Source/lua/LuaParser.h"/>
+        <FILE id="LuaLCp" name="LuaLibrary.cpp" compile="1" resource="0" file="Source/lua/LuaLibrary.cpp"/>
+        <FILE id="LuaLHd" name="LuaLibrary.h" compile="0" resource="0" file="Source/lua/LuaLibrary.h"/>
+      </GROUP>
+    </GROUP>
+    <GROUP id="{C3D4E5F6-A7B8-9012-CDEF-123456789012}" name="Tests">
       <FILE id="bQ1rDR" name="TestMain.cpp" compile="1" resource="0" file="tests/TestMain.cpp"/>
       <FILE id="H4tQvH" name="BenchmarkAnimateValues.cpp" compile="1" resource="0"
             file="tests/BenchmarkAnimateValues.cpp"/>
       <FILE id="LfoStr" name="LfoStressTest.cpp" compile="1" resource="0"
             file="tests/LfoStressTest.cpp"/>
-      <FILE id="LfStH2" name="LfoState.h" compile="0" resource="0" file="Source/audio/LfoState.h"/>
-      <FILE id="LfStC2" name="LfoState.cpp" compile="1" resource="0" file="Source/audio/LfoState.cpp"/>
+      <FILE id="LuaCor" name="LuaCorrectnessTests.cpp" compile="1" resource="0"
+            file="tests/LuaCorrectnessTests.cpp"/>
+      <FILE id="LuBnH" name="LuaBenchmarkHelpers.h" compile="0" resource="0"
+            file="tests/LuaBenchmarkHelpers.h"/>
+      <FILE id="LuBn1" name="LuaRunBenchmarkTest.cpp" compile="1" resource="0"
+            file="tests/LuaRunBenchmarkTest.cpp"/>
+      <FILE id="LuBn2" name="LuaVariableBenchmarkTest.cpp" compile="1" resource="0"
+            file="tests/LuaVariableBenchmarkTest.cpp"/>
+      <FILE id="LuBn3" name="LuaStdlibBenchmarkTest.cpp" compile="1" resource="0"
+            file="tests/LuaStdlibBenchmarkTest.cpp"/>
+      <FILE id="LuBn4" name="LuaOverheadBenchmarkTests.cpp" compile="1" resource="0"
+            file="tests/LuaOverheadBenchmarkTests.cpp"/>
+      <FILE id="LuBn5" name="LuaBeforeAfterBenchmarkTest.cpp" compile="1"
+            resource="0" file="tests/LuaBeforeAfterBenchmarkTest.cpp"/>
     </GROUP>
   </MAINGROUP>
   <MODULES>
@@ -132,10 +156,13 @@
   </MODULES>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1"/>
   <EXPORTFORMATS>
-    <LINUX_MAKE targetFolder="Builds/Test/LinuxMakefile" extraCompilerFlags="-mavx">
+    <LINUX_MAKE targetFolder="Builds/Test/LinuxMakefile" extraCompilerFlags="-mavx"
+                externalLibraries="luajit">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render-test" customXcodeFlags="CLANG_X86_VECTOR_INSTRUCTIONS=avx"/>
-        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render-test" customXcodeFlags="CLANG_X86_VECTOR_INSTRUCTIONS=avx"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render-test" headerPath="../../../modules/LuaJIT/src"
+                       libraryPath="../../../modules/LuaJIT/src" customXcodeFlags="CLANG_X86_VECTOR_INSTRUCTIONS=avx"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render-test" headerPath="../../../modules/LuaJIT/src"
+                       libraryPath="../../../modules/LuaJIT/src" customXcodeFlags="CLANG_X86_VECTOR_INSTRUCTIONS=avx"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
@@ -152,10 +179,13 @@
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
-    <VS2022 targetFolder="Builds/Test/VisualStudio2022" extraCompilerFlags="/arch:AVX">
+    <VS2022 targetFolder="Builds/Test/VisualStudio2022" extraCompilerFlags="/arch:AVX"
+            extraLinkerFlags="/IGNORE:4006" externalLibraries="luajit51.lib">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render-test"/>
-        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render-test"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render-test" headerPath="..\..\..\modules\LuaJIT\src"
+                       libraryPath="..\..\..\modules\LuaJIT\src"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render-test" headerPath="..\..\..\modules\LuaJIT\src"
+                       libraryPath="..\..\..\modules\LuaJIT\src"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
@@ -172,10 +202,12 @@
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
       </MODULEPATHS>
     </VS2022>
-    <XCODE_MAC targetFolder="Builds/Test/MacOSX">
+    <XCODE_MAC targetFolder="Builds/Test/MacOSX" externalLibraries="luajit">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render-test"/>
-        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render-test"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render-test" headerPath="../../../modules/LuaJIT/src"
+                       libraryPath="../../../modules/LuaJIT/src"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render-test" headerPath="../../../modules/LuaJIT/src"
+                       libraryPath="../../../modules/LuaJIT/src"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
