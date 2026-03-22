@@ -4,7 +4,9 @@
 #include "LabelledTextBox.h"
 #include "SvgButton.h"
 
+#ifndef SOSCI
 class OscirenderAudioProcessor;
+#endif
 
 class ModulationUpdateBroadcaster;
 
@@ -72,7 +74,9 @@ public:
 
     // Wire standard modulation callbacks (LFO + envelope drop, query) to the processor.
     // Call this after construction to enable modulation for this slider.
+#ifndef SOSCI
     void wireModulation(OscirenderAudioProcessor& processor);
+#endif
 
     juce::Slider slider;
     juce::Slider lfoSlider;

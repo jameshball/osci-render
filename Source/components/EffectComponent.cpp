@@ -1,12 +1,14 @@
 #include "EffectComponent.h"
 
 #include "../LookAndFeel.h"
+#ifndef SOSCI
 #include "../PluginProcessor.h"
 #include "modulation/EnvelopeComponent.h"
 #include "modulation/LfoComponent.h"
 #include "modulation/ModulationHelper.h"
 #include "modulation/RandomComponent.h"
 #include "../audio/ModulationTypes.h"
+#endif
 
 std::atomic<bool> EffectComponent::modAnyDragActive{false};
 juce::String EffectComponent::highlightedParamId;
@@ -506,9 +508,5 @@ void EffectComponent::wireModulation(OscirenderAudioProcessor& processor) {
             || (highlightedParamId.isNotEmpty() && effect.parameters[index]->paramID == highlightedParamId))
             repaint();
     });
-}
-#else
-void EffectComponent::wireModulation(OscirenderAudioProcessor& processor) {
-    juce::ignoreUnused(processor);
 }
 #endif
