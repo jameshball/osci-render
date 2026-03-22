@@ -115,8 +115,8 @@ namespace LookAndFeelHelpers
     static juce::Colour createBaseColour(juce::Colour buttonColour, bool hasKeyboardFocus, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown, bool isEnabled) noexcept {
         const juce::Colour baseColour(buttonColour.withMultipliedAlpha(isEnabled ? 1.0f : 0.5f));
 
-        if (shouldDrawButtonAsDown) return baseColour.brighter(0.25f);
-        if (shouldDrawButtonAsHighlighted) return baseColour.brighter(0.12f);
+        if (shouldDrawButtonAsDown) return baseColour.contrasting (0.15f);
+        if (shouldDrawButtonAsHighlighted) return baseColour.contrasting (0.05f);
 
         return baseColour;
     }

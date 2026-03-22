@@ -27,8 +27,17 @@ elif [ "$OS" = "mac" ]; then
   PROJUCER_OS="osx"
 fi
 
-curl -s -S -L "https://api.juce.com/api/v1/download/juce/latest/$PROJUCER_OS" -o Projucer.zip
-# curl -s -S -L "https://github.com/juce-framework/JUCE/releases/download/8.0.4/juce-8.0.4-$PROJUCER_OS.zip" -o Projucer.zip
+CURL_OPTS=(-s -S -L)
+if [ -n "$GITHUB_TOKEN" ]; then
+  CURL_OPTS+=(-H "Authorization: Bearer $GITHUB_TOKEN")
+fi
+JUCE_TAG=$(curl "${CURL_OPTS[@]}" "https://api.github.com/repos/juce-framework/JUCE/releases/latest" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/' || true)
+if [ -z "$JUCE_TAG" ]; then
+  echo "Warning: Could not determine latest JUCE version from GitHub API, using fallback"
+  JUCE_TAG="8.0.12"
+fi
+echo "Latest JUCE release: $JUCE_TAG"
+curl -f -s -S -L --retry 3 --retry-delay 5 "https://github.com/juce-framework/JUCE/releases/download/$JUCE_TAG/juce-${JUCE_TAG}-$PROJUCER_OS.zip" -o Projucer.zip
 unzip -q Projucer.zip
 
 # Set Projucer path based on OS

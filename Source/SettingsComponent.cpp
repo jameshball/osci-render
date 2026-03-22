@@ -19,6 +19,7 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     }
     addAndMakeVisible(midi);
     addChildComponent(frame);
+    addChildComponent(fractalEditor);
     addChildComponent(examples);
 
     // Envelope setup
@@ -212,6 +213,10 @@ void SettingsComponent::layoutChildren() {
                 int preferredHeight = frame.getPreferredHeight();
                 frame.setBounds(effectsBounds.removeFromBottom(preferredHeight));
                 effectsBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
+            } else if (fractalEditor.isVisible()) {
+                int preferredHeight = juce::jmin(300, effectsBounds.getHeight() / 2);
+                fractalEditor.setBounds(effectsBounds.removeFromBottom(preferredHeight));
+                effectsBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
             }
         }
 
@@ -390,6 +395,7 @@ void SettingsComponent::paint(juce::Graphics& g) {
 void SettingsComponent::fileUpdated(juce::String fileName) {
     juce::String extension = fileName.fromLastOccurrenceOf(".", true, false).toLowerCase();
     frame.setVisible(false);
+    fractalEditor.setVisible(false);
 
     // Check if the file is an image based on extension or Syphon/Spout input
     bool isSyphonActive = false;
@@ -410,6 +416,15 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
 
     if (skipProcessing) {
         // do nothing
+    } else if (extension == ".lsystem") {
+        int fileIndex = audioProcessor.getCurrentFileIndex();
+        if (fileIndex >= 0) {
+            auto parser = audioProcessor.getCurrentFileParser();
+            if (parser != nullptr) {
+                fractalEditor.setParser(parser->getFractal(), fileIndex);
+                fractalEditor.setVisible(true);
+            }
+        }
     } else if (extension == ".gpla" || isImage) {
         frame.setVisible(true);
         frame.setAnimated(extension == ".gpla" || extension == ".gif" || extension == ".mov" || extension == ".mp4");

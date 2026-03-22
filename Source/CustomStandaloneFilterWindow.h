@@ -233,10 +233,15 @@ public:
 
             if (! fc.getResult().replaceWithData (data.getData(), data.getSize()))
             {
+                Logger::writeToLog ("Standalone save failed: could not write to '" + fc.getResult().getFullPathName() + "'");
                 auto opts = MessageBoxOptions::makeOptionsOk (AlertWindow::WarningIcon,
                                                               TRANS ("Error whilst saving"),
                                                               TRANS ("Couldn't write to the specified file!"));
                 messageBox = AlertWindow::showScopedAsync (opts, nullptr);
+            }
+            else
+            {
+                Logger::writeToLog ("Standalone save: wrote " + String ((int) data.getSize()) + " bytes to '" + fc.getResult().getFullPathName() + "'");
             }
         });
     }
@@ -261,10 +266,12 @@ public:
 
             if (fc.getResult().loadFileAsData (data))
             {
+                Logger::writeToLog ("Standalone load: read " + String ((int) data.getSize()) + " bytes from '" + fc.getResult().getFullPathName() + "'");
                 processor->setStateInformation (data.getData(), (int) data.getSize());
             }
             else
             {
+                Logger::writeToLog ("Standalone load failed: could not read '" + fc.getResult().getFullPathName() + "'");
                 auto opts = MessageBoxOptions::makeOptionsOk (AlertWindow::WarningIcon,
                                                               TRANS ("Error whilst loading"),
                                                               TRANS ("Couldn't read from the specified file!"));

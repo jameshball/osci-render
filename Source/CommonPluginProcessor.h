@@ -209,12 +209,19 @@ protected:
     
     void saveProperties(juce::XmlElement& xml);
     void loadProperties(juce::XmlElement& xml);
+
+    // Loads effects from an <effects> XML element, logging counts of loaded/skipped.
+    // Caller must hold effectsLock.
+    void loadEffectsFromXml(const juce::XmlElement* effectsXml);
     
     juce::SpinLock propertiesLock;
     std::unordered_map<std::string, std::any> properties;
     
     // Global settings that persist across plugin instances
     std::unique_ptr<juce::PropertiesFile> globalSettings;
+
+    // File logger for writing diagnostics to the application data folder
+    std::unique_ptr<juce::FileLogger> fileLogger;
 
     juce::RecentlyOpenedFilesList recentProjectFiles;
 

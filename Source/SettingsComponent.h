@@ -15,6 +15,7 @@
 #include "components/modulation/EnvelopeComponent.h"
 #include "components/OpenFileComponent.h"
 #include "components/FileControlsComponent.h"
+#include "components/FractalComponent.h"
 #include "components/modulation/LfoComponent.h"
 #include "components/modulation/RandomComponent.h"
 
@@ -45,6 +46,7 @@ private:
     FrameSettingsComponent frame{audioProcessor, pluginEditor};
     EffectsComponent effects{audioProcessor, pluginEditor};
     MidiComponent midi{audioProcessor, pluginEditor};
+    FractalComponent fractalEditor{audioProcessor, pluginEditor};
     OpenFileComponent examples{audioProcessor};
 
     // Free-standing components (previously inside MidiComponent)

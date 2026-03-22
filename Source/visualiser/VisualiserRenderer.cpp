@@ -241,8 +241,21 @@ void VisualiserRenderer::runTask(const juce::AudioBuffer<float>& buffer) {
     triggerAsyncUpdate();
     // wait for rendering on the OpenGLRenderer thread to complete
     if (!renderingSemaphore.acquire()) {
-        // If acquire times out, log a message or handle it as appropriate
-        juce::Logger::writeToLog("Rendering semaphore acquisition timed out");
+        juce::String info;
+        info << "=== Rendering semaphore acquisition timed out ===" << juce::newLine;
+        info << "Time: " << juce::Time::getCurrentTime().toString(true, true, true, true) << juce::newLine;
+        info << "Thread: " << getThreadName() << " (ID: " << juce::String::toHexString((juce::pointer_sized_int)juce::Thread::getCurrentThreadId()) << ")" << juce::newLine;
+        info << "Semaphore available: " << juce::String((int)renderingSemaphore.available()) << juce::newLine;
+        info << "OpenGL context active: " << (openGLContext.isActive() ? "yes" : "no") << juce::newLine;
+        info << "OpenGL context attached: " << (openGLContext.isAttached() ? "yes" : "no") << juce::newLine;
+        info << "sampleBufferCount: " << juce::String(sampleBufferCount.load()) << juce::newLine;
+        info << "prevSampleBufferCount: " << juce::String(prevSampleBufferCount) << juce::newLine;
+        info << "Component visible: " << (isVisible() ? "yes" : "no") << juce::newLine;
+        info << "Component size: " << juce::String(getWidth()) << "x" << juce::String(getHeight()) << juce::newLine;
+        info << "--- Stack trace (waiting thread) ---" << juce::newLine;
+        info << juce::SystemStats::getStackBacktrace() << juce::newLine;
+        info << "=== End semaphore timeout info ===" << juce::newLine;
+        juce::Logger::writeToLog(info);
     }
 }
 

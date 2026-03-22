@@ -77,6 +77,7 @@ void OsciMainMenuBarModel::resetMenuItems() {
             { "DJ_Level_3",          "Contributed several features to osci-render" },
             { "Anthony Hall",        "Added many new effects, and improved existing ones" },
             { "BUS ERROR Collective", "Provided source code for the Hilligoss encoder" },
+            { "Ener-G",             "Provided his L-system fractal script that formed the basis for the L-system implementation" },
             { "TheDumbDude",         "Contributed several example Lua files" },
         };
         aboutInfo.blenderPort = std::any_cast<int>(audioProcessor.getProperty("objectServerPort"));

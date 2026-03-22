@@ -194,7 +194,8 @@ bool OscirenderAudioProcessorEditor::isBinaryFile(juce::String name) {
         || name.endsWith(".mov")
         // doesn't really make sense to edit SVG or OBJ files as text in this context
         || name.endsWith(".svg")
-        || name.endsWith(".obj");
+        || name.endsWith(".obj")
+        || name.endsWith(".lsystem");
 }
 
 // parsersLock and syphonLock must be held
@@ -683,6 +684,7 @@ void OscirenderAudioProcessorEditor::openSyphonInputDialog() {
 void OscirenderAudioProcessorEditor::connectSyphonInput(const juce::String& server, const juce::String& app) {
     juce::SpinLock::ScopedLockType lock(syphonLock);
     if (!syphonFrameGrabber) {
+        juce::Logger::writeToLog("Syphon: connecting to server='" + server + "' app='" + app + "'");
         syphonFrameGrabber = std::make_unique<SyphonFrameGrabber>(sharedTextureManager, server, app, audioProcessor.syphonImageParser);
         audioProcessor.syphonInputActive = true;
         model.resetMenuItems();
@@ -691,6 +693,7 @@ void OscirenderAudioProcessorEditor::connectSyphonInput(const juce::String& serv
             juce::MessageManagerLock lock;
             audioProcessor.fileChangeBroadcaster.sendChangeMessage();
         }
+        juce::Logger::writeToLog("Syphon: connected successfully");
     }
 }
 
@@ -699,6 +702,7 @@ void OscirenderAudioProcessorEditor::disconnectSyphonInput() {
     if (!syphonFrameGrabber) {
         return;
     }
+    juce::Logger::writeToLog("Syphon: disconnecting from '" + syphonFrameGrabber->getSourceName() + "'");
     audioProcessor.syphonInputActive = false;
     syphonFrameGrabber.reset();
     model.resetMenuItems();

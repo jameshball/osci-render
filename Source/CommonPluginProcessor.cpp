@@ -20,6 +20,14 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
         applicationFolder.createDirectory();
     }
 
+    // Set up a global file logger so that juce::Logger::writeToLog() writes to disk
+    fileLogger = std::make_unique<juce::FileLogger>(
+        applicationFolder.getChildFile(juce::String(JucePlugin_Name) + ".log"),
+        "Log started: " + juce::Time::getCurrentTime().toString(true, true, true, true),
+        1024 * 1024  // max 1 MB before rotating
+    );
+    juce::Logger::setCurrentLogger(fileLogger.get());
+
     // Initialize the global settings with the plugin name
     juce::PropertiesFile::Options options;
     options.applicationName = JucePlugin_Name + juce::String("_globals");
@@ -191,6 +199,7 @@ CommonAudioProcessor::~CommonAudioProcessor()
     setGlobalValue("endTime", juce::Time::getCurrentTime().toISO8601(true));
     saveGlobalSettings();
     stopHeartbeat();
+    juce::Logger::setCurrentLogger(nullptr);
 }
 
 const juce::String CommonAudioProcessor::getName() const {
@@ -244,6 +253,10 @@ const juce::String CommonAudioProcessor::getProgramName(int index) {
 void CommonAudioProcessor::changeProgramName(int index, const juce::String& newName) {}
 
 void CommonAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
+    juce::Logger::writeToLog("prepareToPlay: sampleRate=" + juce::String(sampleRate)
+        + " samplesPerBlock=" + juce::String(samplesPerBlock)
+        + " effects=" + juce::String(effects.size()));
+
 	currentSampleRate = sampleRate;
     
     for (auto& effect : effects) {
@@ -374,6 +387,27 @@ std::any CommonAudioProcessor::getProperty(const std::string& key, std::any defa
 void CommonAudioProcessor::setProperty(const std::string& key, std::any value) {
     juce::SpinLock::ScopedLockType lock(propertiesLock);
     properties[key] = value;
+}
+
+void CommonAudioProcessor::loadEffectsFromXml(const juce::XmlElement* effectsXml) {
+    if (effectsXml == nullptr) {
+        juce::Logger::writeToLog("setStateInformation: no effects section found");
+        return;
+    }
+    int loadedEffects = 0, skippedEffects = 0;
+    for (auto effectXml : effectsXml->getChildIterator()) {
+        auto id = effectXml->getStringAttribute("id");
+        auto effect = getEffect(id);
+        if (effect != nullptr) {
+            effect->load(effectXml);
+            loadedEffects++;
+        } else {
+            juce::Logger::writeToLog("setStateInformation: unknown effect id '" + id + "', skipping");
+            skippedEffects++;
+        }
+    }
+    juce::Logger::writeToLog("setStateInformation: loaded " + juce::String(loadedEffects) + " effects"
+        + (skippedEffects > 0 ? ", skipped " + juce::String(skippedEffects) : ""));
 }
 
 void CommonAudioProcessor::saveProperties(juce::XmlElement& xml) {
