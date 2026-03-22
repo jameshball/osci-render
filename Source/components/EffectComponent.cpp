@@ -439,6 +439,7 @@ void EffectComponent::itemDropped(const SourceDetails& dragSourceDetails) {
     }
 }
 
+#ifndef SOSCI
 void EffectComponent::wireModulation(OscirenderAudioProcessor& processor) {
     // Define all modulation bindings generically — adding a new source type
     // only requires appending one entry here.
@@ -506,3 +507,8 @@ void EffectComponent::wireModulation(OscirenderAudioProcessor& processor) {
             repaint();
     });
 }
+#else
+void EffectComponent::wireModulation(OscirenderAudioProcessor& processor) {
+    juce::ignoreUnused(processor);
+}
+#endif
