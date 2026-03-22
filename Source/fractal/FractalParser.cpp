@@ -45,7 +45,9 @@ void FractalParser::parse(const juce::String& jsonContent) {
 
     if (auto* obj = result.getDynamicObject()) {
         axiom = obj->getProperty("axiom").toString();
-        baseAngleDegrees = (float)obj->getProperty("angle");
+        auto angleVar = obj->getProperty("angle");
+        if (angleVar.isDouble() || angleVar.isInt())
+            baseAngleDegrees = (float) angleVar;
 
         if (auto* rulesArray = obj->getProperty("rules").getArray()) {
             for (const auto& ruleVar : *rulesArray) {
@@ -127,7 +129,8 @@ std::string FractalParser::applyRules(const std::string& input) const {
     for (char ch : input) {
         bool replaced = false;
         for (const auto& rule : rules) {
-            if (rule.variable.isNotEmpty() && ch == (char)rule.variable[0]) {
+            // Only match rules whose variable is exactly one character long.
+            if (rule.variable.length() == 1 && ch == (char)rule.variable[0]) {
                 auto rep = rule.replacement.toStdString();
                 result.append(rep);
                 replaced = true;

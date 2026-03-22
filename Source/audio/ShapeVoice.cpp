@@ -302,12 +302,13 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         }
 
         if (!renderingSample && frameDrawn >= frameLength) {
+            double prevFrameLength = frameLength;
             if (currentSound != nullptr && currentlyPlaying) {
                 if (currentSound->updateFrame(frame)) {
                     frameLength = currentSound->getFrameLength();
                 }
             }
-            frameDrawn -= frameLength;
+            frameDrawn -= prevFrameLength;
             currentShape = 0;
 
             // The first sample of the new frame is the *next* sample.
