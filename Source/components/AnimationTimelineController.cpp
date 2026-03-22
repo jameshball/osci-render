@@ -1,5 +1,6 @@
 #include "AnimationTimelineController.h"
 #include "../PluginProcessor.h"
+#include "../parser/FileParser.h"
 
 AnimationTimelineController::AnimationTimelineController(OscirenderAudioProcessor& processor)
     : audioProcessor(processor)

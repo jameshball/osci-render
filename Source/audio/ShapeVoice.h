@@ -3,6 +3,7 @@
 #include "ShapeSound.h"
 #include "DahdsrEnvelope.h"
 #include "EnvState.h"
+#include "../lua/LuaParser.h"
 
 class OscirenderAudioProcessor;
 class ShapeVoice : public juce::SynthesiserVoice {

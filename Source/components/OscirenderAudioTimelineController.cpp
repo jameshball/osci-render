@@ -1,4 +1,5 @@
 #include "OscirenderAudioTimelineController.h"
+#include "../parser/FileParser.h"
 
 OscirenderAudioTimelineController::OscirenderAudioTimelineController(OscirenderAudioProcessor& processor)
     : audioProcessor(processor)

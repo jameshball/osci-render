@@ -1,5 +1,6 @@
 #include "ShapeVoice.h"
 #include "../PluginProcessor.h"
+#include "../parser/FileParser.h"
 
 ShapeVoice::ShapeVoice(OscirenderAudioProcessor& p, juce::AudioSampleBuffer& externalAudio, int voiceIndex)
     : audioProcessor(p), voiceIndex(voiceIndex), externalAudio(externalAudio) {

@@ -1,9 +1,9 @@
 #pragma once
 #include <JuceHeader.h>
-#include "../parser/FileParser.h"
-#include "../parser/FrameProducer.h"
 #include "../parser/FrameConsumer.h"
 
+class FileParser;
+class FrameProducer;
 class OscirenderAudioProcessor;
 class ShapeSound : public juce::SynthesiserSound, public FrameConsumer {
 public:

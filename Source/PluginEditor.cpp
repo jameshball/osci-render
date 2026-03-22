@@ -5,6 +5,7 @@
 #include "../modules/juce_sharedtexture/SharedTexture.h"
 #include "CustomStandaloneFilterWindow.h"
 #include "PluginProcessor.h"
+#include "parser/FileParser.h"
 #include "components/EffectComponent.h"
 #include "components/SyphonInputSelectorComponent.h"
 

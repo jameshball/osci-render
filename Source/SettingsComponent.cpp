@@ -3,6 +3,7 @@
 #include "PluginEditor.h"
 #include "components/EffectComponent.h"
 #include "audio/EnvState.h"
+#include "parser/FileParser.h"
 #include "components/CustomMidiKeyboardComponent.h"
 
 SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor)

@@ -29,7 +29,10 @@
 #include "audio/RandomState.h"
 #include "obj/ObjectServer.h"
 
+class FileParser;
+
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
+#include "img/ImageParser.h"
 #include "../modules/juce_sharedtexture/SharedTexture.h"
 #include "video/SyphonFrameGrabber.h"
 #endif
@@ -435,7 +438,7 @@ private:
     juce::SpinLock errorListenersLock;
     std::vector<ErrorListener*> errorListeners;
 
-    ShapeSound::Ptr defaultSound = new ShapeSound(*this, std::make_shared<FileParser>(*this));
+    ShapeSound::Ptr defaultSound;
     PublicSynthesiser synth;
     bool retriggerMidi = true;
 
