@@ -1,13 +1,12 @@
 #include "ModulationRateComponent.h"
 #include "../../LookAndFeel.h"
 #include "InlineEditorHelper.h"
-#include "../DarkBarPainter.h"
 
 ModulationRateComponent::ModulationRateComponent(const ModulationRateConfig& cfg, int index)
-    : config(cfg), sourceIndex(index)
+    : config(cfg)
 {
-    setMouseCursor(juce::MouseCursor::UpDownResizeCursor);
-    setRepaintsOnMouseActivity(true);
+    sourceIndex = index;
+    maxIndex = cfg.maxIndex;
 }
 
 ModulationRateComponent::~ModulationRateComponent() {}
@@ -82,6 +81,10 @@ void ModulationRateComponent::drawModeIcon(juce::Graphics& g, juce::Rectangle<fl
     }
 }
 
+void ModulationRateComponent::drawIcon(juce::Graphics& g, juce::Rectangle<float> area) const {
+    drawModeIcon(g, area);
+}
+
 double ModulationRateComponent::getCurrentBpm() const {
     return config.getCurrentBpm();
 }
@@ -121,11 +124,6 @@ juce::String ModulationRateComponent::getLabelText() const {
 // State
 // ============================================================================
 
-void ModulationRateComponent::setSourceIndex(int index) {
-    sourceIndex = juce::jlimit(0, config.maxIndex - 1, index);
-    repaint();
-}
-
 void ModulationRateComponent::setRateMode(LfoRateMode mode) {
     if (rateMode == mode) return;
     rateMode = mode;
@@ -162,48 +160,13 @@ void ModulationRateComponent::pushRateToProcessor(float hz) {
 }
 
 // ============================================================================
-// Paint
-// ============================================================================
-
-void ModulationRateComponent::paint(juce::Graphics& g) {
-    auto bounds = getLocalBounds().toFloat();
-    bool hovering = isMouseOver(true);
-
-    DarkBarPainter::paintBackground(g, bounds, labelArea, getLabelText(), hovering);
-
-    g.setColour(juce::Colours::white.withAlpha(0.9f));
-    g.setFont(juce::Font(14.0f, juce::Font::bold));
-    auto textBounds = valueArea.toFloat();
-    g.drawText(getDisplayText(), textBounds, juce::Justification::centred);
-
-    auto iconBounds = modeButtonArea.toFloat();
-    g.setColour(juce::Colours::white.withAlpha(0.15f));
-    g.drawVerticalLine((int)iconBounds.getX(), iconBounds.getY() + 3.0f, iconBounds.getBottom() - 3.0f);
-
-    bool iconHover = modeButtonArea.contains(getMouseXYRelative());
-    g.setColour(iconHover ? juce::Colours::white.withAlpha(0.7f) : Colours::grey);
-    drawModeIcon(g, iconBounds.reduced(2.0f, 2.0f));
-}
-
-// ============================================================================
-// Layout
-// ============================================================================
-
-void ModulationRateComponent::resized() {
-    auto bounds = getLocalBounds();
-    static constexpr int labelH = 14;
-    labelArea = bounds.removeFromBottom(labelH);
-    int iconW = 26;
-    modeButtonArea = bounds.removeFromRight(iconW);
-    valueArea = bounds;
-}
-
-// ============================================================================
 // Mouse interaction
 // ============================================================================
 
 void ModulationRateComponent::mouseDown(const juce::MouseEvent& e) {
-    if (e.mods.isPopupMenu() || modeButtonArea.contains(e.getPosition())) {
+    if (!contentArea.contains(e.getPosition())) return;
+
+    if (e.mods.isPopupMenu() || iconArea.contains(e.getPosition())) {
         showModePopup();
         return;
     }
@@ -239,8 +202,6 @@ void ModulationRateComponent::mouseDrag(const juce::MouseEvent& e) {
         if (newIdx != tempoDivisionIndex)
             setTempoDivisionIndex(newIdx);
     }
-
-    valuePopup.show(*this, getDisplayText());
 }
 
 void ModulationRateComponent::mouseUp(const juce::MouseEvent&) {
@@ -249,7 +210,7 @@ void ModulationRateComponent::mouseUp(const juce::MouseEvent&) {
 }
 
 void ModulationRateComponent::mouseDoubleClick(const juce::MouseEvent& e) {
-    if (modeButtonArea.contains(e.getPosition())) return;
+    if (iconArea.contains(e.getPosition())) return;
 
     if (rateMode == LfoRateMode::Seconds) {
         showInlineEditor();
@@ -302,7 +263,7 @@ void ModulationRateComponent::showInlineEditor() {
     };
     inlineEditor = InlineEditorHelper::create(
         juce::String(hz, 2), valueArea, { commitFn, cancelFn },
-        Colours::veryDark, juce::Colours::white,
+        Colours::veryDark(), juce::Colours::white,
         juce::Colours::white.withAlpha(0.3f), 12.0f);
     inlineEditor->setJustification(juce::Justification::centredLeft);
     addAndMakeVisible(inlineEditor.get());
@@ -318,11 +279,25 @@ void ModulationRateComponent::commitInlineEditor() {
     repaint();
 }
 
-void ModulationRateComponent::mouseEnter(const juce::MouseEvent&) {
-    valuePopup.show(*this, getDisplayText());
+juce::MouseCursor ModulationRateComponent::getMouseCursor() {
+    auto pos = getMouseXYRelative();
+    if (!iconArea.isEmpty() && iconArea.contains(pos))
+        return juce::MouseCursor::PointingHandCursor;
+    if (valueArea.contains(pos))
+        return juce::MouseCursor::UpDownResizeCursor;
+    return juce::MouseCursor::NormalCursor;
 }
 
-void ModulationRateComponent::mouseExit(const juce::MouseEvent&) {
+void ModulationRateComponent::mouseEnter(const juce::MouseEvent& e) {
+    ModulationControlComponent::mouseMove(e);
+}
+
+void ModulationRateComponent::mouseExit(const juce::MouseEvent& e) {
+    ModulationControlComponent::mouseExit(e);
     if (!isDragging)
         valuePopup.hide();
+}
+
+void ModulationRateComponent::mouseMove(const juce::MouseEvent& e) {
+    ModulationControlComponent::mouseMove(e);
 }

@@ -66,12 +66,12 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
     
     recordVideoWarning.setText("Recording video is only available in osci-render premium or sosci.");
     recordVideoWarning.setJustification(juce::Justification::centred);
-    recordVideoWarning.setColour(juce::TextEditor::textColourId, Colours::accentColor);
+    recordVideoWarning.setColour(juce::TextEditor::textColourId, Colours::accentColor());
     recordVideoWarning.setMultiLine(true);
     recordVideoWarning.setReadOnly(true);
     recordVideoWarning.setInterceptsMouseClicks(false, false);
     
-    sosciLink.setColour(juce::HyperlinkButton::textColourId, Colours::accentColor);
+    sosciLink.setColour(juce::HyperlinkButton::textColourId, Colours::accentColor());
 #endif
 }
 

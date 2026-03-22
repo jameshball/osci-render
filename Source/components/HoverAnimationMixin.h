@@ -17,7 +17,7 @@ public:
 
 protected:
     // Customization hooks
-    virtual int getHoverAnimationDurationMs() const { return 200; }
+    virtual int getHoverAnimationDurationMs() const { return 120; }
     virtual std::function<float(float)> getEasingFunction() const { return juce::Easings::createEaseOut(); }
 
 public:

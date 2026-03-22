@@ -19,6 +19,8 @@
               file="Resources/fonts/FiraSans-Italic.ttf"/>
         <FILE id="uStS0H" name="FiraSans-Regular.ttf" compile="0" resource="1"
               file="Resources/fonts/FiraSans-Regular.ttf"/>
+        <FILE id="SBWt7K" name="FiraSans-SemiBold.ttf" compile="0" resource="1"
+              file="Resources/fonts/FiraSans-SemiBold.ttf"/>
       </GROUP>
       <GROUP id="{F3815953-00C0-3876-5552-BDE98F3233D9}" name="gpla">
         <FILE id="euGQq0" name="fallback.gpla" compile="0" resource="1" file="Resources/gpla/fallback.gpla"/>
@@ -391,6 +393,14 @@
               file="Source/components/ValuePopupHelper.h"/>
         <FILE id="PhSldr" name="PhaseSliderComponent.h" compile="0" resource="0"
               file="Source/components/PhaseSliderComponent.h"/>
+        <FILE id="RtKnbC" name="RotaryKnobComponent.h" compile="0" resource="0"
+              file="Source/components/RotaryKnobComponent.h"/>
+        <FILE id="KnbCnt" name="KnobContainerComponent.h" compile="0" resource="0"
+              file="Source/components/KnobContainerComponent.h"/>
+        <FILE id="DkBrPt" name="DarkBarPainter.h" compile="0" resource="0"
+              file="Source/components/DarkBarPainter.h"/>
+        <FILE id="LbBrCm" name="LabelledBarComponent.h" compile="0" resource="0"
+              file="Source/components/LabelledBarComponent.h"/>
         <FILE id="WHz3FS" name="EnvelopeComponent.cpp" compile="1" resource="0"
               file="Source/components/modulation/EnvelopeComponent.cpp"/>
         <FILE id="A8OllZ" name="EnvelopeComponent.h" compile="0" resource="0"
@@ -420,6 +430,8 @@
               file="Source/components/modulation/ModulationRateComponent.h"/>
         <FILE id="LfRtC2" name="ModulationRateComponent.cpp" compile="1" resource="0"
               file="Source/components/modulation/ModulationRateComponent.cpp"/>
+        <FILE id="MdCtH1" name="ModulationControlComponent.h" compile="0" resource="0"
+              file="Source/components/modulation/ModulationControlComponent.h"/>
         <FILE id="LfMdH1" name="ModulationModeComponent.h" compile="0" resource="0"
               file="Source/components/modulation/ModulationModeComponent.h"/>
         <FILE id="LfMdC2" name="ModulationModeComponent.cpp" compile="1" resource="0"

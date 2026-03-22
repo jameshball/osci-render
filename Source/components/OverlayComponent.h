@@ -29,10 +29,10 @@ public:
         auto cornerRadius = 12.0f;
         auto panelFloat = panelBounds.toFloat();
 
-        g.setColour(Colours::veryDark);
+        g.setColour(Colours::veryDark());
         g.fillRoundedRectangle(panelFloat, cornerRadius);
 
-        g.setColour(Colours::accentColor.withAlpha(0.6f));
+        g.setColour(Colours::accentColor().withAlpha(0.6f));
         g.drawRoundedRectangle(panelFloat.reduced(0.5f), cornerRadius, 1.5f);
     }
 

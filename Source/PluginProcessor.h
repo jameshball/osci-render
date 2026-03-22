@@ -217,7 +217,9 @@ public:
     LfoPreset lfoPresets[NUM_LFOS] = { LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle };
     LfoRateMode lfoRateModes[NUM_LFOS] = { LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds };
     LfoMode lfoModes[NUM_LFOS] = { LfoMode::Free, LfoMode::Free, LfoMode::Free, LfoMode::Free, LfoMode::Free, LfoMode::Free, LfoMode::Free, LfoMode::Free };
-    float lfoPhaseOffsets[NUM_LFOS] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+    std::atomic<float> lfoPhaseOffsets[NUM_LFOS] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+    std::atomic<float> lfoSmoothAmounts[NUM_LFOS] = { 0.005f, 0.005f, 0.005f, 0.005f, 0.005f, 0.005f, 0.005f, 0.005f }; // seconds
+    std::atomic<float> lfoDelayAmounts[NUM_LFOS] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f }; // seconds
     int lfoTempoDivisions[NUM_LFOS] = { 8, 8, 8, 8, 8, 8, 8, 8 };  // index into getTempoDivisions(), default 1/4
     int activeLfoTab = 0;
 
@@ -248,12 +250,16 @@ public:
     void setLfoTempoDivision(int lfoIndex, int divisionIndex);
     void setLfoMode(int lfoIndex, LfoMode mode);
     void setLfoPhaseOffset(int lfoIndex, float phase);
+    void setLfoSmoothAmount(int lfoIndex, float seconds);
+    void setLfoDelayAmount(int lfoIndex, float seconds);
 
     // Thread-safe getters for LFO rate mode/division
     LfoRateMode getLfoRateMode(int lfoIndex) const;
     int getLfoTempoDivision(int lfoIndex) const;
     LfoMode getLfoMode(int lfoIndex) const;
     float getLfoPhaseOffset(int lfoIndex) const;
+    float getLfoSmoothAmount(int lfoIndex) const;
+    float getLfoDelayAmount(int lfoIndex) const;
 
     // === Global Random modulation system ===
     osci::FloatParameter* randomRate[NUM_RANDOM_SOURCES] = {};
@@ -466,6 +472,8 @@ private:
     std::vector<LfoAssignment> lfoAssignments;
     mutable juce::SpinLock lfoAssignmentLock;
     LfoAudioState lfoAudioStates[NUM_LFOS];
+    float lfoSmoothedOutput[NUM_LFOS] = {}; // One-pole filter state for LFO output smoothing
+    float lfoDelayElapsed[NUM_LFOS] = {}; // Seconds elapsed since LFO trigger (for startup delay)
     int lfoActiveNoteCount = 0;  // Tracks how many MIDI notes are currently held for LFO triggering
     bool lfoPrevAnyVoiceActive = false;  // Previous block's effective voice-active state for transition detection
     std::array<std::vector<float>, NUM_LFOS> lfoBlockBuffer;

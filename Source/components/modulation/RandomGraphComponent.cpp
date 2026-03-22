@@ -5,7 +5,7 @@ RandomGraphComponent::RandomGraphComponent() {
     history.resize(kMaxHistory, 0.5f);
     activeHistory.resize(kMaxHistory, false);
 
-    setColour(backgroundColourId, Colours::veryDark);
+    setColour(backgroundColourId, Colours::veryDark());
     setColour(gridLineColourId, juce::Colours::white.withAlpha(0.1f));
     setColour(lineColourId, juce::Colour(0xFF00E5FF));
     setColour(fillColourId, juce::Colour(0xFF00E5FF).withAlpha(0.15f));

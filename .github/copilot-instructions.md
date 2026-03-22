@@ -1,5 +1,21 @@
 # osci-render Development Guide
 
+## Communication
+
+**NEVER ask clarifying questions inline in chat.** Always use the `vscode_askQuestions` tool to present questions to the user. This provides a structured UI with selectable options and keeps the conversation focused on code.
+
+## Code Reviews
+
+When asked to do a code review, follow this workflow:
+
+1. **Review all unstaged changes.** Focus on: code quality, duplication, code structure, reusability, folder structure, performance, and potential for bugs.
+2. **List every issue** you find, numbered, with a clear description and the relevant file/line.
+3. **For each issue**, use `vscode_askQuestions` to ask whether to:
+   - **Implement the fix** — you will apply the suggested change immediately
+   - **Provide more context** — the user can explain intent before you decide
+   - **Skip** — do not implement the change
+4. **Implement all accepted fixes** within the same session, building and verifying after all changes are applied.
+
 ## Project Overview
 
 osci-render is a JUCE-based audio plugin (VST3/AU/Standalone) that renders 2D/3D graphics to audio for oscilloscope displays. It supports `.obj`, `.svg`, `.txt`, `.lua`, and Blender scene rendering with real-time audio effects and DAW automation.

@@ -10,6 +10,7 @@
 #include "ModulationSourceComponent.h"
 #include "../PhaseSliderComponent.h"
 #include "../SvgButton.h"
+#include "../KnobContainerComponent.h"
 
 class OscirenderAudioProcessor;
 
@@ -123,17 +124,20 @@ private:
     ModulationRateComponent rateControl;
     ModulationModeComponent modeControl;
     PhaseSliderComponent phaseSlider;
+    KnobContainerComponent smoothKnob { "SMOOTH" };
+    KnobContainerComponent delayKnob { "DELAY" };
 
     // --- Layout constants ---
     static constexpr int kTopBarHeight   = 20;
     static constexpr int kTopBarGap      = 4;
-    static constexpr int kPhaseHeight    = 14;
+    static constexpr int kPhaseHeight    = 8;
     static constexpr int kPhaseGap       = 4;
-    static constexpr int kRateHeight     = 40;
+    static constexpr int kRateHeight     = 48;
     static constexpr int kRateGap        = 4;
     static constexpr int kMaxPresetWidth = 180;
     static constexpr int kMaxRateWidth   = 130;
     static constexpr int kMaxModeWidth   = 130;
+    static constexpr int kMaxKnobWidth   = 120;
     static constexpr int kIconSize       = 20;
     static constexpr int kShapePreviewWidth = 38;
 
@@ -148,6 +152,9 @@ private:
     void applyPreset(LfoPreset preset);
     void updatePresetLabel();
     void applyLfoConstraints(int nodeIndex, double& time, double& value);
+    void configureKnob(KnobContainerComponent& container, double maxVal, double skewCentre,
+                        double defaultVal, const juce::String& suffix,
+                        std::function<void(float)> onChange);
     void showPaintShapeMenu();
     void showPresetBrowser();
     void dismissPresetBrowser();

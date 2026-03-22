@@ -2,16 +2,19 @@
 
 #include <JuceHeader.h>
 #include "../../PluginProcessor.h"
+#include "../LabelledBarComponent.h"
 
 // A compact draggable BPM display for standalone mode.
 // Drag vertically to change tempo; double-click to type a value.
-class TempoComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater {
+// Uses LabelledBarComponent for consistent dark-bar styling.
+class TempoComponent : public LabelledBarComponent, public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater {
 public:
     TempoComponent(OscirenderAudioProcessor& p);
     ~TempoComponent() override;
 
-    void paint(juce::Graphics& g) override;
-    void resized() override;
+    juce::String getLabelText() const override { return "BPM"; }
+    void paintContent(juce::Graphics& g, juce::Rectangle<int> area) override;
+    void resizedContent(juce::Rectangle<int> area) override;
 
     void mouseDown(const juce::MouseEvent& e) override;
     void mouseDrag(const juce::MouseEvent& e) override;

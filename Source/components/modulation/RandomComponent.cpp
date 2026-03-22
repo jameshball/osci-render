@@ -125,8 +125,12 @@ void RandomComponent::resized() {
     bounds.removeFromBottom(kRateGap);
 
     // Layout style and rate side by side
-    int styleW = juce::jmin(kMaxStyleWidth, bottomRow.getWidth() / 3);
-    int rateW = juce::jmin(kMaxRateWidth, bottomRow.getWidth() / 3);
+    int availW = bottomRow.getWidth() - kRateGap;
+    int styleW = juce::jmin(kMaxStyleWidth, availW / 2);
+    int rateW = juce::jmin(kMaxRateWidth, availW / 2);
+    int totalW = styleW + rateW + kRateGap;
+    int leftPad = (bottomRow.getWidth() - totalW) / 2;
+    if (leftPad > 0) bottomRow.removeFromLeft(leftPad);
     styleControl.setBounds(bottomRow.removeFromLeft(styleW));
     bottomRow.removeFromLeft(kRateGap);
     rateControl.setBounds(bottomRow.removeFromLeft(rateW));

@@ -16,18 +16,36 @@ LfoComponent::PresetSelector::PresetSelector() {
 void LfoComponent::PresetSelector::paint(juce::Graphics& g) {
     auto bounds = getLocalBounds().toFloat();
 
-    g.setColour(Colours::veryDark);
-    g.fillRoundedRectangle(bounds, 4.0f);
+    g.setColour(Colours::evenDarker());
+    g.fillRoundedRectangle(bounds, Colours::kPillRadius);
 
-    bool hovering = isMouseOver(true);
-    g.setColour(juce::Colours::white.withAlpha(hovering ? 0.12f : 0.06f));
-    g.drawRoundedRectangle(bounds.reduced(0.5f), 4.0f, 1.0f);
+    // Left chevron
+    {
+        auto area = leftArrowArea.toFloat();
+        float cx = area.getCentreX(), cy = area.getCentreY();
+        float hw = 3.0f, hh = 4.5f;
+        juce::Path chevron;
+        chevron.startNewSubPath(cx + hw, cy - hh);
+        chevron.lineTo(cx - hw, cy);
+        chevron.lineTo(cx + hw, cy + hh);
+        g.setColour(juce::Colours::white.withAlpha(0.7f));
+        g.strokePath(chevron, juce::PathStrokeType(1.5f, juce::PathStrokeType::curved,
+                                                    juce::PathStrokeType::rounded));
+    }
 
-    g.setColour(juce::Colours::white.withAlpha(0.7f));
-    auto arrowFont = juce::Font(14.0f, juce::Font::bold);
-    g.setFont(arrowFont);
-    g.drawText("<", leftArrowArea.toFloat(), juce::Justification::centred);
-    g.drawText(">", rightArrowArea.toFloat(), juce::Justification::centred);
+    // Right chevron
+    {
+        auto area = rightArrowArea.toFloat();
+        float cx = area.getCentreX(), cy = area.getCentreY();
+        float hw = 3.0f, hh = 4.5f;
+        juce::Path chevron;
+        chevron.startNewSubPath(cx - hw, cy - hh);
+        chevron.lineTo(cx + hw, cy);
+        chevron.lineTo(cx - hw, cy + hh);
+        g.setColour(juce::Colours::white.withAlpha(0.7f));
+        g.strokePath(chevron, juce::PathStrokeType(1.5f, juce::PathStrokeType::curved,
+                                                    juce::PathStrokeType::rounded));
+    }
 
     g.setColour(juce::Colours::white.withAlpha(0.9f));
     g.setFont(juce::Font(12.0f, juce::Font::bold));
@@ -297,12 +315,24 @@ LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
     addAndMakeVisible(modeControl);
 
     // Phase slider
-    phaseSlider.setDefaultValue(0.0f);
-    phaseSlider.onValueChanged = [this](float val) {
+    phaseSlider.setTextValueSuffix(" phase");
+    phaseSlider.onValueChange = [this]() {
         int idx = getActiveSourceIndex();
-        audioProcessor.setLfoPhaseOffset(idx, val);
+        audioProcessor.setLfoPhaseOffset(idx, (float)phaseSlider.getValue());
     };
     addAndMakeVisible(phaseSlider);
+
+    // Smooth amount knob (0-16 seconds, default 0.005, skew midpoint 1.0)
+    configureKnob(smoothKnob, 16.0, 1.0, 0.005, " secs", [this](float val) {
+        audioProcessor.setLfoSmoothAmount(getActiveSourceIndex(), val);
+    });
+    addAndMakeVisible(smoothKnob);
+
+    // Delay knob (0-4 seconds, default 0)
+    configureKnob(delayKnob, 4.0, 0.5, 0.0, " secs", [this](float val) {
+        audioProcessor.setLfoDelayAmount(getActiveSourceIndex(), val);
+    });
+    addAndMakeVisible(delayKnob);
 
     // Restore state
     syncFromProcessorState();
@@ -335,8 +365,8 @@ void LfoComponent::paint(juce::Graphics& g) {
 
     // Dark rounded background behind paint + preview controls
     if (!paintControlsBg.isEmpty()) {
-        g.setColour(Colours::veryDark.brighter(0.15f));
-        g.fillRoundedRectangle(paintControlsBg.toFloat(), 4.0f);
+        g.setColour(Colours::darkerer());
+        g.fillRoundedRectangle(paintControlsBg.toFloat(), Colours::kPillRadius);
     }
 }
 
@@ -383,12 +413,20 @@ void LfoComponent::resized() {
     bounds.removeFromBottom(kPhaseGap);
     phaseSlider.setBounds(phaseRow);
 
-    // Layout mode and rate side by side
-    int modeW = juce::jmin(kMaxModeWidth, bottomRow.getWidth() / 3);
-    int rateW = juce::jmin(kMaxRateWidth, bottomRow.getWidth() / 3);
+    // Layout mode and rate side by side, then smooth + delay knobs
+    int modeW = juce::jmin(kMaxModeWidth, bottomRow.getWidth() / 4);
+    int rateW = juce::jmin(kMaxRateWidth, bottomRow.getWidth() / 4);
+    int knobW = juce::jmin(kMaxKnobWidth, bottomRow.getWidth() / 4);
+    int totalW = modeW + rateW + knobW * 2 + kRateGap * 3;
+    int leftPad = (bottomRow.getWidth() - totalW) / 2;
+    if (leftPad > 0) bottomRow.removeFromLeft(leftPad);
     modeControl.setBounds(bottomRow.removeFromLeft(modeW));
     bottomRow.removeFromLeft(kRateGap);
     rateControl.setBounds(bottomRow.removeFromLeft(rateW));
+    bottomRow.removeFromLeft(kRateGap);
+    smoothKnob.setBounds(bottomRow.removeFromLeft(knobW));
+    bottomRow.removeFromLeft(kRateGap);
+    delayKnob.setBounds(bottomRow.removeFromLeft(knobW));
 
     graph.setBounds(bounds);
     setOutlineBounds(graph.getBounds());
@@ -402,13 +440,17 @@ void LfoComponent::onActiveSourceChanged(int index) {
     rateControl.syncFromProcessor();
     modeControl.setSourceIndex(index);
     modeControl.syncFromProcessor();
-    phaseSlider.setValue(audioProcessor.getLfoPhaseOffset(index));
+    phaseSlider.setValue(audioProcessor.getLfoPhaseOffset(index), juce::dontSendNotification);
 
     auto colour = getLfoColour(index);
     phaseSlider.setAccentColour(colour);
     shapePreview.setAccentColour(colour);
     paintToggle.setOnColour(colour);
     smoothToggle.setAccentColour(colour);
+    smoothKnob.setAccentColour(colour);
+    smoothKnob.getKnob().setValue(audioProcessor.getLfoSmoothAmount(index), juce::dontSendNotification);
+    delayKnob.setAccentColour(colour);
+    delayKnob.getKnob().setValue(audioProcessor.getLfoDelayAmount(index), juce::dontSendNotification);
 }
 
 void LfoComponent::syncGraphToActiveLfo() {
@@ -530,9 +572,30 @@ void LfoComponent::syncFromProcessorState() {
     modeControl.syncFromProcessor();
 
     auto colour = getLfoColour(getActiveSourceIndex());
-    phaseSlider.setValue(audioProcessor.getLfoPhaseOffset(getActiveSourceIndex()));
+    phaseSlider.setValue(audioProcessor.getLfoPhaseOffset(getActiveSourceIndex()), juce::dontSendNotification);
     phaseSlider.setAccentColour(colour);
     shapePreview.setAccentColour(colour);
+    smoothKnob.setAccentColour(colour);
+    smoothKnob.getKnob().setValue(audioProcessor.getLfoSmoothAmount(getActiveSourceIndex()), juce::dontSendNotification);
+    delayKnob.setAccentColour(colour);
+    delayKnob.getKnob().setValue(audioProcessor.getLfoDelayAmount(getActiveSourceIndex()), juce::dontSendNotification);
+}
+
+void LfoComponent::configureKnob(KnobContainerComponent& container, double maxVal, double skewCentre,
+                                  double defaultVal, const juce::String& suffix,
+                                  std::function<void(float)> onChange) {
+    auto& knob = container.getKnob();
+    juce::NormalisableRange<double> range(0.0, maxVal);
+    range.setSkewForCentre(skewCentre);
+    knob.setNormalisableRange(range);
+    knob.setDoubleClickReturnValue(true, defaultVal);
+    knob.setTextValueSuffix(suffix);
+    knob.setNumDecimalPlacesToDisplay(3);
+    knob.setAccentColour(getLfoColour(0));
+    knob.onValueChange = [&knob, cb = std::move(onChange)]() {
+        cb((float)knob.getValue());
+    };
+    container.setAccentColour(getLfoColour(0));
 }
 
 void LfoComponent::applyLfoConstraints(int nodeIndex, double& time, double& value) {

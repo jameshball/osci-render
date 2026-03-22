@@ -111,7 +111,7 @@ private:
 
     juce::Rectangle<int> contentBounds;
     juce::Rectangle<int> outlineBounds;
-    melatonin::DropShadow panelEdgeShadow { juce::Colours::black, 8, {-2, 0}, 0 };
+    melatonin::DropShadow panelEdgeShadow { juce::Colours::black.withAlpha(0.5f), 5, {-2, 0}, 0 };
 
     // DepthIndicator – small arc knob for a single source→param connection.
     class DepthIndicator : public HoverAnimationMixin {

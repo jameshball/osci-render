@@ -15,34 +15,23 @@ void TempoComponent::handleAsyncUpdate() {
     repaint();
 }
 
-void TempoComponent::paint(juce::Graphics& g) {
-    auto bounds = getLocalBounds().toFloat();
-
-    // Dark rounded bar background
-    g.setColour(juce::Colour(0xFF1A1A1A));
-    g.fillRoundedRectangle(bounds, 4.0f);
-
-    // Subtle border
-    g.setColour(juce::Colours::white.withAlpha(0.08f));
-    g.drawRoundedRectangle(bounds.reduced(0.5f), 4.0f, 1.0f);
-
+void TempoComponent::paintContent(juce::Graphics& g, juce::Rectangle<int> area) {
     if (inlineEditor != nullptr)
         return;
 
     float bpm = audioProcessor.standaloneBpm->getValueUnnormalised();
 
-    // BPM value
     g.setFont(juce::Font(13.0f));
     g.setColour(juce::Colours::white.withAlpha(0.9f));
 
-    juce::String text = juce::String(bpm, 1) + " BPM";
+    juce::String text = juce::String(bpm, 1);
 
-    g.drawText(text, bounds.reduced(6.0f, 0), juce::Justification::centred);
+    g.drawText(text, area.toFloat(), juce::Justification::centred);
 }
 
-void TempoComponent::resized() {
+void TempoComponent::resizedContent(juce::Rectangle<int> area) {
     if (inlineEditor != nullptr) {
-        inlineEditor->setBounds(getLocalBounds().reduced(2));
+        inlineEditor->setBounds(area.reduced(2));
     }
 }
 
@@ -84,9 +73,9 @@ void TempoComponent::showInlineEditor() {
         repaint();
     };
     inlineEditor = InlineEditorHelper::create(
-        juce::String(bpm, 1), getLocalBounds().reduced(2),
+        juce::String(bpm, 1), getContentArea().reduced(2),
         { commitFn, cancelFn },
-        juce::Colour(0xFF1A1A1A), juce::Colours::white,
+        Colours::evenDarker(), juce::Colours::white,
         juce::Colours::transparentBlack, 13.0f);
     addAndMakeVisible(*inlineEditor);
     inlineEditor->grabKeyboardFocus();

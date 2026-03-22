@@ -23,8 +23,8 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
             juce::TopLevelWindow* w = juce::TopLevelWindow::getTopLevelWindow(0);
             juce::DocumentWindow* dw = dynamic_cast<juce::DocumentWindow*>(w);
             if (dw != nullptr) {
-                dw->setBackgroundColour(Colours::veryDark);
-                dw->setColour(juce::ResizableWindow::backgroundColourId, Colours::veryDark);
+                dw->setBackgroundColour(Colours::veryDark());
+                dw->setColour(juce::ResizableWindow::backgroundColourId, Colours::veryDark());
                 dw->setTitleBarButtonsRequired(juce::DocumentWindow::allButtons, false);
                 dw->setUsingNativeTitleBar(true);
             }
@@ -48,7 +48,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
 
     visualiserSettings.setLookAndFeel(&getLookAndFeel());
     visualiserSettings.setSize(550, VISUALISER_SETTINGS_HEIGHT);
-    visualiserSettings.setColour(juce::ResizableWindow::backgroundColourId, Colours::dark);
+    visualiserSettings.setColour(juce::ResizableWindow::backgroundColourId, Colours::dark());
 
     recordingSettings.setLookAndFeel(&getLookAndFeel());
     recordingSettings.setSize(300, 330);
@@ -403,7 +403,7 @@ void CommonPluginEditor::renderAudioFileToVideo() {
 
             juce::DialogWindow::LaunchOptions options;
             options.dialogTitle = "Render Audio File to Video";
-            options.dialogBackgroundColour = Colours::dark;
+            options.dialogBackgroundColour = Colours::dark();
             options.content.setOwned(content.release());
             options.componentToCentreAround = safeThis.getComponent();
             options.escapeKeyTriggersCloseButton = true;

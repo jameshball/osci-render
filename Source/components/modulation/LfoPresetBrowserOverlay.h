@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <melatonin_blur/melatonin_blur.h>
 #include "../../audio/LfoState.h"
 #include "../../audio/LfoPresetManager.h"
 #include "../../LookAndFeel.h"
@@ -57,6 +58,8 @@ private:
         juce::TextButton saveButton;
         juce::TextButton importButton;
         int contentHeight = 0;
+
+        melatonin::DropShadow shadow { juce::Colours::black.withAlpha(0.6f), 10, {0, 2}, 0 };
     };
 
     BrowserPanel browserPanel;

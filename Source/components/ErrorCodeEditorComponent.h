@@ -109,7 +109,7 @@ public:
     OscirenderCodeEditorComponent(juce::CodeDocument& document, juce::CodeTokeniser* codeTokeniser, OscirenderAudioProcessor& p, juce::String id, juce::String fileName) : editor(document, codeTokeniser, id), audioProcessor(p) {
         setText(fileName);
         setTextLabelPosition(juce::Justification::centred);
-        setColour(groupComponentBackgroundColourId, Colours::veryDark);
+        setColour(groupComponentBackgroundColourId, Colours::veryDark());
         
         editor.setScrollbarThickness(8);
         addAndMakeVisible(editor);

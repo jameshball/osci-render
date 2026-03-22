@@ -1,16 +1,19 @@
 #include "ModulationModeComponent.h"
-#include "../../LookAndFeel.h"
-#include "../DarkBarPainter.h"
 
 ModulationModeComponent::ModulationModeComponent(const ModulationModeConfig& cfg, int index)
-    : config(cfg), sourceIndex(index)
+    : config(cfg)
 {
-    setMouseCursor(juce::MouseCursor::PointingHandCursor);
-    setRepaintsOnMouseActivity(true);
+    sourceIndex = index;
+    maxIndex = cfg.maxIndex;
 
-    // Set initial mode from config if available
     if (!config.modes.empty())
         mode = config.modes[0].first;
+}
+
+juce::MouseCursor ModulationModeComponent::getMouseCursor() {
+    if (contentArea.contains(getMouseXYRelative()))
+        return juce::MouseCursor::PointingHandCursor;
+    return juce::MouseCursor::NormalCursor;
 }
 
 juce::String ModulationModeComponent::getDisplayText() const {
@@ -21,9 +24,8 @@ juce::String ModulationModeComponent::getDisplayText() const {
     return config.modes.empty() ? "" : config.modes[0].second;
 }
 
-void ModulationModeComponent::setSourceIndex(int index) {
-    sourceIndex = juce::jlimit(0, config.maxIndex - 1, index);
-    repaint();
+juce::String ModulationModeComponent::getLabelText() const {
+    return config.labelText;
 }
 
 void ModulationModeComponent::setMode(int m) {
@@ -40,34 +42,16 @@ void ModulationModeComponent::syncFromProcessor() {
 }
 
 // ============================================================================
-// Paint — matches ModulationRateComponent style
-// ============================================================================
-
-void ModulationModeComponent::paint(juce::Graphics& g) {
-    auto bounds = getLocalBounds().toFloat();
-    bool hovering = isMouseOver(true);
-
-    DarkBarPainter::paintBackground(g, bounds, labelArea, config.labelText, hovering);
-
-    // Value text
-    g.setColour(juce::Colours::white.withAlpha(0.9f));
-    g.setFont(juce::Font(12.0f, juce::Font::bold));
-    g.drawText(getDisplayText(), valueArea.toFloat(), juce::Justification::centred);
-}
-
-void ModulationModeComponent::resized() {
-    auto bounds = getLocalBounds();
-    static constexpr int labelH = 14;
-    labelArea = bounds.removeFromBottom(labelH);
-    valueArea = bounds;
-}
-
-// ============================================================================
 // Mouse interaction
 // ============================================================================
 
-void ModulationModeComponent::mouseDown(const juce::MouseEvent&) {
+void ModulationModeComponent::mouseDown(const juce::MouseEvent& e) {
+    if (!contentArea.contains(e.getPosition())) return;
     showModePopup();
+}
+
+void ModulationModeComponent::mouseMove(const juce::MouseEvent& e) {
+    ModulationControlComponent::mouseMove(e);
 }
 
 void ModulationModeComponent::showModePopup() {
@@ -86,7 +70,6 @@ void ModulationModeComponent::showModePopup() {
 void ModulationModeComponent::setModes(std::vector<std::pair<int, juce::String>> newModes) {
     config.modes = std::move(newModes);
 
-    // If the current mode is no longer in the new list, reset to the first valid mode.
     bool found = false;
     for (const auto& [value, name] : config.modes) {
         if (value == mode) { found = true; break; }

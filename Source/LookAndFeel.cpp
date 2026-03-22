@@ -8,7 +8,7 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     applyOscirenderColours(*this);
 
     // UI colours
-    getCurrentColourScheme().setUIColour(ColourScheme::widgetBackground, Colours::veryDark);
+    getCurrentColourScheme().setUIColour(ColourScheme::widgetBackground, Colours::veryDark());
 
     // I have to do this, otherwise components are initialised before the look and feel is set
     juce::LookAndFeel::setDefaultLookAndFeel(this);
@@ -16,101 +16,101 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
 
 void OscirenderLookAndFeel::applyOscirenderColours(juce::LookAndFeel& lookAndFeel) {
     // slider
-    lookAndFeel.setColour(juce::Slider::thumbColourId, Colours::veryDark);
-    lookAndFeel.setColour(juce::Slider::textBoxOutlineColourId, Colours::veryDark);
-    lookAndFeel.setColour(juce::Slider::textBoxBackgroundColourId, Colours::veryDark);
-    lookAndFeel.setColour(juce::Slider::textBoxHighlightColourId, Colours::accentColor.withMultipliedAlpha(0.5f));
-    lookAndFeel.setColour(juce::Slider::trackColourId, juce::Colours::grey);
-    lookAndFeel.setColour(juce::Slider::backgroundColourId, Colours::dark);
+    lookAndFeel.setColour(juce::Slider::thumbColourId, Colours::veryDark());
+    lookAndFeel.setColour(juce::Slider::textBoxOutlineColourId, Colours::veryDark());
+    lookAndFeel.setColour(juce::Slider::textBoxBackgroundColourId, Colours::veryDark());
+    lookAndFeel.setColour(juce::Slider::textBoxHighlightColourId, Colours::accentColor().withMultipliedAlpha(0.5f));
+    lookAndFeel.setColour(juce::Slider::trackColourId, Colours::grey());
+    lookAndFeel.setColour(juce::Slider::backgroundColourId, Colours::dark());
     lookAndFeel.setColour(sliderThumbOutlineColourId, juce::Colours::white);
 
     // buttons
-    lookAndFeel.setColour(juce::TextButton::buttonColourId, Colours::veryDark);
+    lookAndFeel.setColour(juce::TextButton::buttonColourId, Colours::veryDark());
     lookAndFeel.setColour(jux::SwitchButton::switchColour, juce::Colours::white);
-    lookAndFeel.setColour(jux::SwitchButton::switchOnBackgroundColour, Colours::accentColor);
-    lookAndFeel.setColour(jux::SwitchButton::switchOffBackgroundColour, Colours::grey);
+    lookAndFeel.setColour(jux::SwitchButton::switchOnBackgroundColour, Colours::accentColor());
+    lookAndFeel.setColour(jux::SwitchButton::switchOffBackgroundColour, Colours::grey());
 
     // windows & menus
-    lookAndFeel.setColour(juce::ResizableWindow::backgroundColourId, Colours::veryDark.brighter(0.1f));
-    lookAndFeel.setColour(groupComponentBackgroundColourId, Colours::darker);
-    lookAndFeel.setColour(scrollFadeOverlayBackgroundColourId, Colours::darker);
-    lookAndFeel.setColour(groupComponentHeaderColourId, Colours::veryDark);
+    lookAndFeel.setColour(juce::ResizableWindow::backgroundColourId, Colours::veryDark().brighter(0.1f));
+    lookAndFeel.setColour(groupComponentBackgroundColourId, Colours::darker());
+    lookAndFeel.setColour(scrollFadeOverlayBackgroundColourId, Colours::darker());
+    lookAndFeel.setColour(groupComponentHeaderColourId, Colours::veryDark());
     // Alpha 0xFE (not 0xFF) forces JUCE to treat the window as non-opaque,
     // enabling compositor transparency so rounded corners don't show the
     // native window background colour behind them.
-    lookAndFeel.setColour(juce::PopupMenu::backgroundColourId, Colours::popupBackground.withAlpha((juce::uint8)0xFE));
-    lookAndFeel.setColour(juce::PopupMenu::highlightedBackgroundColourId, Colours::accentColor);
-    lookAndFeel.setColour(juce::TooltipWindow::backgroundColourId, Colours::darker.darker(0.5f));
-    lookAndFeel.setColour(juce::TooltipWindow::outlineColourId, Colours::darker);
-    lookAndFeel.setColour(juce::TextButton::buttonOnColourId, Colours::darker);
-    lookAndFeel.setColour(juce::AlertWindow::outlineColourId, Colours::darker);
-    lookAndFeel.setColour(juce::AlertWindow::backgroundColourId, Colours::darker);
-    lookAndFeel.setColour(juce::ColourSelector::backgroundColourId, Colours::darker);
+    lookAndFeel.setColour(juce::PopupMenu::backgroundColourId, Colours::veryDark().withAlpha((juce::uint8)0xFE));
+    lookAndFeel.setColour(juce::PopupMenu::highlightedBackgroundColourId, Colours::accentColor());
+    lookAndFeel.setColour(juce::TooltipWindow::backgroundColourId, Colours::darker().darker(0.5f));
+    lookAndFeel.setColour(juce::TooltipWindow::outlineColourId, Colours::darker());
+    lookAndFeel.setColour(juce::TextButton::buttonOnColourId, Colours::darker());
+    lookAndFeel.setColour(juce::AlertWindow::outlineColourId, Colours::darker());
+    lookAndFeel.setColour(juce::AlertWindow::backgroundColourId, Colours::darker());
+    lookAndFeel.setColour(juce::ColourSelector::backgroundColourId, Colours::darker());
 
     // combo box
-    lookAndFeel.setColour(juce::ComboBox::backgroundColourId, Colours::veryDark);
-    lookAndFeel.setColour(juce::ComboBox::outlineColourId, Colours::veryDark);
+    lookAndFeel.setColour(juce::ComboBox::backgroundColourId, Colours::veryDark());
+    lookAndFeel.setColour(juce::ComboBox::outlineColourId, Colours::veryDark());
     lookAndFeel.setColour(juce::ComboBox::arrowColourId, juce::Colours::white);
 
     // text box
-    lookAndFeel.setColour(juce::TextEditor::backgroundColourId, Colours::veryDark);
-    lookAndFeel.setColour(juce::TextEditor::outlineColourId, Colours::veryDark);
-    lookAndFeel.setColour(juce::TextEditor::focusedOutlineColourId, Colours::accentColor);
+    lookAndFeel.setColour(juce::TextEditor::backgroundColourId, Colours::veryDark());
+    lookAndFeel.setColour(juce::TextEditor::outlineColourId, Colours::veryDark());
+    lookAndFeel.setColour(juce::TextEditor::focusedOutlineColourId, Colours::accentColor());
     lookAndFeel.setColour(juce::CaretComponent::caretColourId, Dracula::foreground);
-    lookAndFeel.setColour(juce::TextEditor::highlightColourId, Colours::grey);
+    lookAndFeel.setColour(juce::TextEditor::highlightColourId, Colours::grey());
 
     // list box
-    lookAndFeel.setColour(juce::ListBox::backgroundColourId, Colours::darker);
+    lookAndFeel.setColour(juce::ListBox::backgroundColourId, Colours::darker());
 
     // scroll bar
     lookAndFeel.setColour(juce::ScrollBar::thumbColourId, juce::Colours::white);
-    lookAndFeel.setColour(juce::ScrollBar::trackColourId, Colours::veryDark);
-    lookAndFeel.setColour(juce::ScrollBar::backgroundColourId, Colours::veryDark);
+    lookAndFeel.setColour(juce::ScrollBar::trackColourId, Colours::veryDark());
+    lookAndFeel.setColour(juce::ScrollBar::backgroundColourId, Colours::veryDark());
 
     // custom components
     lookAndFeel.setColour(effectComponentBackgroundColourId, juce::Colours::transparentBlack);
-    lookAndFeel.setColour(effectComponentHandleColourId, Colours::veryDark);
+    lookAndFeel.setColour(effectComponentHandleColourId, Colours::veryDark());
 
     // code editor
-    lookAndFeel.setColour(juce::CodeEditorComponent::backgroundColourId, Colours::darker);
+    lookAndFeel.setColour(juce::CodeEditorComponent::backgroundColourId, Colours::darker());
     lookAndFeel.setColour(juce::CodeEditorComponent::defaultTextColourId, Dracula::foreground);
-    lookAndFeel.setColour(juce::CodeEditorComponent::lineNumberBackgroundId, Colours::veryDark);
+    lookAndFeel.setColour(juce::CodeEditorComponent::lineNumberBackgroundId, Colours::veryDark());
     lookAndFeel.setColour(juce::CodeEditorComponent::lineNumberTextId, Dracula::foreground);
-    lookAndFeel.setColour(juce::CodeEditorComponent::highlightColourId, Colours::grey);
+    lookAndFeel.setColour(juce::CodeEditorComponent::highlightColourId, Colours::grey());
 
     // envelope
-    lookAndFeel.setColour(EnvelopeComponent::Node, Colours::veryDark);
-    lookAndFeel.setColour(EnvelopeComponent::ReleaseNode, Colours::veryDark);
-    lookAndFeel.setColour(EnvelopeComponent::LoopNode, Colours::veryDark);
+    lookAndFeel.setColour(EnvelopeComponent::Node, Colours::veryDark());
+    lookAndFeel.setColour(EnvelopeComponent::ReleaseNode, Colours::veryDark());
+    lookAndFeel.setColour(EnvelopeComponent::LoopNode, Colours::veryDark());
     lookAndFeel.setColour(EnvelopeComponent::NodeOutline, juce::Colours::white);
     lookAndFeel.setColour(EnvelopeComponent::Line, juce::Colours::white);
     lookAndFeel.setColour(EnvelopeComponent::LoopLine, juce::Colours::white);
-    lookAndFeel.setColour(EnvelopeComponent::Background, Colours::veryDark);
-    lookAndFeel.setColour(EnvelopeComponent::GridLine, Colours::dark);
+    lookAndFeel.setColour(EnvelopeComponent::Background, Colours::veryDark());
+    lookAndFeel.setColour(EnvelopeComponent::GridLine, Colours::dark());
     lookAndFeel.setColour(EnvelopeComponent::LegendText, juce::Colours::white);
-    lookAndFeel.setColour(EnvelopeComponent::LegendBackground, Colours::veryDark);
+    lookAndFeel.setColour(EnvelopeComponent::LegendBackground, Colours::veryDark());
     lookAndFeel.setColour(EnvelopeComponent::LineBackground, juce::Colours::white);
 
     // midi keyboard
-    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::whiteNoteColourId, Colours::dark.brighter(0.12f));
-    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::blackNoteColourId, Colours::veryDark.brighter(0.03f));
-    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::keySeparatorLineColourId, Colours::veryDark.brighter(0.16f));
-    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::mouseOverKeyOverlayColourId, Colours::accentColor.withAlpha(0.28f));
-    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::keyDownOverlayColourId, Colours::accentColor.withAlpha(0.62f));
+    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::whiteNoteColourId, Colours::dark().brighter(0.12f));
+    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::blackNoteColourId, Colours::veryDark().brighter(0.03f));
+    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::keySeparatorLineColourId, Colours::veryDark().brighter(0.16f));
+    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::mouseOverKeyOverlayColourId, Colours::accentColor().withAlpha(0.28f));
+    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::keyDownOverlayColourId, Colours::accentColor().withAlpha(0.62f));
     lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::shadowColourId, juce::Colours::transparentBlack);
-    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::upDownButtonBackgroundColourId, Colours::veryDark);
+    lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::upDownButtonBackgroundColourId, Colours::veryDark());
     lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::upDownButtonArrowColourId, juce::Colours::white);
 
     // progress bar
     lookAndFeel.setColour(juce::ProgressBar::backgroundColourId, juce::Colours::transparentBlack);
-    lookAndFeel.setColour(juce::ProgressBar::foregroundColourId, Colours::accentColor);
+    lookAndFeel.setColour(juce::ProgressBar::foregroundColourId, Colours::accentColor());
 }
 
 void OscirenderLookAndFeel::drawOscirenderComboBox(juce::Graphics& g, int width, int height, juce::ComboBox& box) {
     juce::Rectangle<int> boxBounds{0, 0, width, height};
 
     g.setColour(box.findColour(juce::ComboBox::backgroundColourId));
-    g.fillRoundedRectangle(boxBounds.toFloat(), (float)RECT_RADIUS);
+    g.fillRoundedRectangle(boxBounds.toFloat(), Colours::kPillRadius);
 
     juce::Rectangle<int> arrowZone{width - 15, 0, 10, height};
     juce::Path path;
@@ -136,7 +136,7 @@ void OscirenderLookAndFeel::drawLabel(juce::Graphics& g, juce::Label& label) {
         baseColour = LookAndFeelHelpers::createBaseColour(baseColour, false, label.isMouseOver(true), false, label.isEnabled());
     }
     g.setColour(baseColour);
-    g.fillRoundedRectangle(label.getLocalBounds().toFloat(), RECT_RADIUS);
+    g.fillRoundedRectangle(label.getLocalBounds().toFloat(), Colours::kPillRadius);
 
     if (! label.isBeingEdited())
     {
@@ -161,7 +161,7 @@ void OscirenderLookAndFeel::drawLabel(juce::Graphics& g, juce::Label& label) {
             outlineColour = LookAndFeelHelpers::createBaseColour(outlineColour, false, label.isMouseOver(true), false, label.isEnabled());
         }
         g.setColour(outlineColour);
-        g.drawRoundedRectangle(label.getLocalBounds().toFloat(), RECT_RADIUS, 1);
+        g.drawRoundedRectangle(label.getLocalBounds().toFloat(), Colours::kPillRadius, 1);
     }
 }
 
@@ -180,7 +180,7 @@ void OscirenderLookAndFeel::fillTextEditorBackground(juce::Graphics& g, int widt
         auto backgroundColour = textEditor.findColour (juce::TextEditor::backgroundColourId);
         auto baseColour = LookAndFeelHelpers::createBaseColour(backgroundColour, false, textEditor.isMouseOver(true), false, textEditor.isEnabled());
         g.setColour(baseColour);
-        g.fillRoundedRectangle(textEditor.getLocalBounds().toFloat(), RECT_RADIUS);
+        g.fillRoundedRectangle(textEditor.getLocalBounds().toFloat(), Colours::kPillRadius);
     }
 }
 
@@ -192,14 +192,14 @@ void OscirenderLookAndFeel::drawTextEditorOutline(juce::Graphics& g, int width, 
             const int border = 2;
 
             g.setColour (textEditor.findColour (juce::TextEditor::focusedOutlineColourId));
-            g.drawRoundedRectangle(0, 0, width, height, RECT_RADIUS, border);
+            g.drawRoundedRectangle(0, 0, width, height, Colours::kPillRadius, border);
         }
         else
         {
             auto outlineColour = textEditor.findColour(juce::TextEditor::outlineColourId);
             outlineColour = LookAndFeelHelpers::createBaseColour(outlineColour, false, textEditor.isMouseOver(true), false, textEditor.isEnabled());
             g.setColour(outlineColour);
-            g.drawRoundedRectangle(0, 0, width, height, RECT_RADIUS, 1.0f);
+            g.drawRoundedRectangle(0, 0, width, height, Colours::kPillRadius, 1.0f);
         }
     }
 }
@@ -221,7 +221,7 @@ void OscirenderLookAndFeel::drawTickBox(juce::Graphics& g, juce::Component& comp
     juce::Rectangle<float> tickBounds(x, y, w, h);
 
     g.setColour(component.findColour(juce::TextButton::buttonColourId));
-    g.fillRoundedRectangle(tickBounds, RECT_RADIUS);
+    g.fillRoundedRectangle(tickBounds, Colours::kPillRadius);
 
     if (ticked) {
         g.setColour(component.findColour(juce::ToggleButton::tickColourId));
@@ -336,13 +336,79 @@ void OscirenderLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, in
 	g.strokePath(thumb, juce::PathStrokeType(1.0f));
 }
 
+void OscirenderLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height,
+                                              float sliderPos, float rotaryStartAngle, float rotaryEndAngle,
+                                              juce::Slider& slider) {
+    auto bounds = juce::Rectangle<int>(x, y, width, height).toFloat();
+    float diameter = juce::jmin(bounds.getWidth(), bounds.getHeight());
+    auto centre = bounds.getCentre();
+
+    bool hovered = slider.isMouseOverOrDragging();
+
+    float baseTrackWidth = diameter * 0.09f;
+    float trackWidth = hovered ? baseTrackWidth * 1.2f : baseTrackWidth;
+
+    float baseMarkerWidth = diameter * 0.08f;
+    float markerWidth = hovered ? baseMarkerWidth * 1.2f : baseMarkerWidth;
+
+    float radius = (diameter - trackWidth) * 0.5f - 4.0f;
+    float valueAngle = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle);
+
+    // Dark circle background
+    {
+        float bgRadius = radius + trackWidth * 0.5f + 3.0f;
+        g.setColour(Colours::veryDark());
+        g.fillEllipse(centre.x - bgRadius, centre.y - bgRadius,
+                      bgRadius * 2.0f, bgRadius * 2.0f);
+    }
+
+    // Background track (matches the panel behind the knob)
+    {
+        juce::Path bgTrack;
+        bgTrack.addCentredArc(centre.x, centre.y, radius, radius,
+                              0.0f, rotaryStartAngle, rotaryEndAngle, true);
+        g.setColour(Colours::darker());
+        g.strokePath(bgTrack, juce::PathStrokeType(trackWidth, juce::PathStrokeType::curved,
+                                                    juce::PathStrokeType::rounded));
+    }
+
+    // Filled arc (accent colour)
+    if (sliderPos > 0.001f) {
+        juce::Path filledArc;
+        filledArc.addCentredArc(centre.x, centre.y, radius, radius,
+                                0.0f, rotaryStartAngle, valueAngle, true);
+        g.setColour(slider.findColour(juce::Slider::rotarySliderFillColourId));
+        g.strokePath(filledArc, juce::PathStrokeType(trackWidth, juce::PathStrokeType::curved,
+                                                      juce::PathStrokeType::rounded));
+    }
+
+    // Marker (rounded rect pointing toward centre)
+    {
+        float markerLength = diameter * 0.30f;
+        float markerRadius = markerWidth * 0.5f;
+        float outerR = radius + trackWidth * 0.5f;
+
+        juce::Rectangle<float> markerRect(-markerWidth * 0.5f, -outerR,
+                                           markerWidth, markerLength);
+        juce::Path marker;
+        marker.addRoundedRectangle(markerRect, markerRadius);
+
+        auto transform = juce::AffineTransform::rotation(valueAngle)
+                            .translated(centre.x, centre.y);
+        marker.applyTransform(transform);
+
+        g.setColour(juce::Colours::white);
+        g.fillPath(marker);
+    }
+}
+
 void OscirenderLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& button, const juce::Colour& backgroundColour, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) {
     auto bounds = button.getLocalBounds().toFloat().reduced(0.5f, 0.5f);
 
     auto baseColour = LookAndFeelHelpers::createBaseColour(backgroundColour, button.hasKeyboardFocus(true), shouldDrawButtonAsHighlighted, shouldDrawButtonAsDown, button.isEnabled());
 
     g.setColour(baseColour);
-    g.fillRoundedRectangle(bounds, RECT_RADIUS);
+    g.fillRoundedRectangle(bounds, Colours::kPillRadius);
 }
 
 void OscirenderLookAndFeel::drawMenuBarBackground(juce::Graphics& g, int width, int height, bool, juce::MenuBarComponent& menuBar) {
@@ -450,7 +516,7 @@ void OscirenderLookAndFeel::drawCallOutBoxBackground(juce::CallOutBox& box, juce
     g.setColour(juce::Colours::black);
     g.drawImageAt(cachedImage, 0, 0);
 
-    g.setColour(Colours::darker);
+    g.setColour(Colours::darker());
     g.fillPath(path);
 
     g.setColour(juce::Colours::black);
@@ -544,9 +610,15 @@ juce::Typeface::Ptr OscirenderLookAndFeel::getTypefaceForFont(const juce::Font& 
 
 void OscirenderLookAndFeel::drawStretchableLayoutResizerBar(juce::Graphics& g, int w, int h, bool isVerticalBar, bool isMouseOver, bool isMouseDragging) {
     if (isMouseOver || isMouseDragging) {
-        g.setColour(Colours::accentColor.withAlpha(0.5f));
+        g.setColour(Colours::accentColor().withAlpha(0.5f));
         g.fillRoundedRectangle(0, 0, w, h, 4.0f);
     }
+}
+
+void OscirenderLookAndFeel::drawBubble(juce::Graphics& g, juce::BubbleComponent&,
+                                        const juce::Point<float>&, const juce::Rectangle<float>& body) {
+    g.setColour(Colours::veryDark());
+    g.fillRoundedRectangle(body, 4.0f);
 }
 
 // ============================================================================
@@ -561,7 +633,7 @@ void OscirenderLookAndFeel::drawPopupMenuBackground(juce::Graphics& g, int width
     g.fillAll(juce::Colours::transparentBlack);
 
     // Background fill
-    g.setColour(Colours::popupBackground);
+    g.setColour(Colours::veryDark());
     g.fillRoundedRectangle(bounds, radius);
 
     // Subtle border
@@ -586,7 +658,7 @@ void OscirenderLookAndFeel::drawPopupMenuItem(juce::Graphics& g, const juce::Rec
 
     if (isHighlighted && isActive) {
         // Vital-style: accent colour highlight
-        g.setColour(Colours::accentColor.withAlpha(0.6f));
+        g.setColour(Colours::accentColor().withAlpha(0.6f));
         g.fillRoundedRectangle(r.toFloat(), itemRadius);
     }
 

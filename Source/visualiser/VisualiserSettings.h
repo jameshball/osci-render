@@ -21,7 +21,7 @@ public:
             addAndMakeVisible(effect.get());
         }
 
-        setColour(groupComponentBackgroundColourId, Colours::veryDark.withMultipliedBrightness(3.0));
+        setColour(groupComponentBackgroundColourId, Colours::veryDark().withMultipliedBrightness(3.0));
     }
 
     void wireModulation(OscirenderAudioProcessor& processor) {
@@ -159,7 +159,7 @@ public:
     }
 
     void paint(juce::Graphics& g) override {
-        g.fillAll(Colours::darker);
+        g.fillAll(Colours::darker());
     }
 
     void resized() override {
@@ -173,7 +173,7 @@ private:
 
 class SettingsWindow : public juce::DialogWindow {
 public:
-    SettingsWindow(juce::String name, juce::Component& component, int windowWidth, int windowHeight, int componentWidth, int componentHeight) : juce::DialogWindow(name, Colours::darker, true, true), component(component), componentHeight(componentHeight) {
+    SettingsWindow(juce::String name, juce::Component& component, int windowWidth, int windowHeight, int componentWidth, int componentHeight) : juce::DialogWindow(name, Colours::darker(), true, true), component(component), componentHeight(componentHeight) {
         setContentComponent(&viewport);
         centreWithSize(windowWidth, windowHeight);
         setResizeLimits(windowWidth, windowHeight, componentWidth, componentHeight);

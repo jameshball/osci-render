@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include "../../audio/LfoState.h"
 #include "../ValuePopupHelper.h"
+#include "ModulationControlComponent.h"
 
 class OscirenderAudioProcessor;
 
@@ -31,23 +32,26 @@ struct ModulationRateConfig {
 // Supports: Hz (seconds), Tempo, Tempo Dotted, Tempo Triplets.
 // Mode is chosen via a popup triggered by clicking the mode icon on the right.
 // Generic version — works for LFO, Random, or any rate-based modulator.
-class ModulationRateComponent : public juce::Component {
+class ModulationRateComponent : public ModulationControlComponent {
 public:
     ModulationRateComponent(const ModulationRateConfig& config, int sourceIndex);
     ~ModulationRateComponent() override;
 
-    void paint(juce::Graphics& g) override;
-    void resized() override;
     void mouseDown(const juce::MouseEvent& e) override;
     void mouseDrag(const juce::MouseEvent& e) override;
     void mouseUp(const juce::MouseEvent& e) override;
     void mouseDoubleClick(const juce::MouseEvent& e) override;
     void mouseEnter(const juce::MouseEvent& e) override;
     void mouseExit(const juce::MouseEvent& e) override;
+    void mouseMove(const juce::MouseEvent& e) override;
+    juce::MouseCursor getMouseCursor() override;
 
-    // Switch which source this control targets.
-    void setSourceIndex(int index);
-    int getSourceIndex() const { return sourceIndex; }
+    // --- ModulationControlComponent overrides ---
+    juce::String getDisplayText() const override;
+    juce::String getLabelText() const override;
+    bool hasIconArea() const override { return true; }
+    void drawIcon(juce::Graphics& g, juce::Rectangle<float> area) const override;
+    void syncFromProcessor() override;
 
     // Get/set the current rate mode.
     LfoRateMode getRateMode() const { return rateMode; }
@@ -57,24 +61,14 @@ public:
     int getTempoDivisionIndex() const { return tempoDivisionIndex; }
     void setTempoDivisionIndex(int index);
 
-    // Sync the display from the processor's current parameter value.
-    void syncFromProcessor();
-
     // Get the effective rate in Hz (accounting for mode and BPM).
     double getEffectiveRateHz() const;
 
     // Get the current BPM.
     double getCurrentBpm() const;
 
-    // Display string for the current value.
-    juce::String getDisplayText() const;
-
-    // Label text ("FREQUENCY" for Hz, "TEMPO" for tempo modes).
-    juce::String getLabelText() const;
-
 private:
     ModulationRateConfig config;
-    int sourceIndex = 0;
 
     LfoRateMode rateMode = LfoRateMode::Seconds;
     int tempoDivisionIndex = 8; // Default: 1/4
@@ -89,11 +83,6 @@ private:
     std::unique_ptr<juce::TextEditor> inlineEditor;
 
     ValuePopupHelper valuePopup;
-
-    // Hit areas
-    juce::Rectangle<int> valueArea;
-    juce::Rectangle<int> modeButtonArea;
-    juce::Rectangle<int> labelArea;
 
     void showModePopup();
     void showInlineEditor();

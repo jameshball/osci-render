@@ -95,8 +95,8 @@ void GridItemComponent::paint(juce::Graphics& g)
     }
 
     // Draw background with rounded corners - interpolate between normal and hover colors
-    juce::Colour normalBgColour = description.isNotEmpty() ? Colours::veryDark.brighter(0.1f)
-                                                          : Colours::veryDark;
+    juce::Colour normalBgColour = description.isNotEmpty() ? Colours::veryDark().brighter(0.1f)
+                                                          : Colours::veryDark();
     juce::Colour hoverBgColour = normalBgColour.brighter(0.05f);
     juce::Colour bgColour = normalBgColour.interpolatedWith(hoverBgColour, animationProgress);
 
@@ -105,7 +105,7 @@ void GridItemComponent::paint(juce::Graphics& g)
 
     // Draw colored outline
     juce::Colour outlineColour = description.isNotEmpty()
-        ? Colours::accentColor
+        ? Colours::accentColor()
         : juce::Colour::fromRGB(160, 160, 160);
     g.setColour(outlineColour.withAlpha(description.isNotEmpty() ? 0.8f : 0.9f));
     g.drawRoundedRectangle(bounds.toFloat(), CORNER_RADIUS, 1.0f);

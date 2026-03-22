@@ -48,7 +48,7 @@ void NodeGraphComponent::HandleComponent::updateNodeFromPosition() {
 // ============================================================================
 
 NodeGraphComponent::NodeGraphComponent() {
-    setColour(backgroundColourId, Colours::veryDark);
+    setColour(backgroundColourId, Colours::veryDark());
     setColour(gridLineColourId, juce::Colours::white.withAlpha(0.1f));
     setColour(lineColourId, juce::Colour(0xFF00E5FF));
     setColour(fillColourId, juce::Colour(0xFF00E5FF).withAlpha(0.15f));

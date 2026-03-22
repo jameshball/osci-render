@@ -59,12 +59,12 @@ void HoverAnimationMixin::mouseExit(const juce::MouseEvent&)
 
 void HoverAnimationMixin::mouseDown(const juce::MouseEvent&)
 {
-    animateHover(false);
+    // Keep hover animation active during drag
 }
 
 void HoverAnimationMixin::mouseUp(const juce::MouseEvent& event)
 {
-    // Only animate hover if the mouse is still within the component bounds
-    if (getLocalBounds().contains(event.getEventRelativeTo(this).getPosition()))
-        animateHover(true);
+    // Un-hover only if the mouse left during the drag
+    if (!getLocalBounds().contains(event.getEventRelativeTo(this).getPosition()))
+        animateHover(false);
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "ModulationControlComponent.h"
 
 // Configuration for a generic modulation mode selector.
 // Provides mode names and callbacks for get/set operations.
@@ -19,21 +20,16 @@ struct ModulationModeConfig {
     int maxIndex = 1;
 };
 
-// Vital-inspired dark-bar selector for modulation modes.
-// Layout mirrors ModulationRateComponent: value text + bottom label strip.
-// Click the value area to show a popup menu of available modes.
-// Generic version — works for LFO modes, Random styles, or any mode selector.
-class ModulationModeComponent : public juce::Component {
+// Click-to-select mode control built on ModulationControlComponent.
+// Works for LFO modes, Random styles, or any popup-based selector.
+class ModulationModeComponent : public ModulationControlComponent {
 public:
     ModulationModeComponent(const ModulationModeConfig& config, int sourceIndex);
     ~ModulationModeComponent() override = default;
 
-    void paint(juce::Graphics& g) override;
-    void resized() override;
     void mouseDown(const juce::MouseEvent& e) override;
-
-    void setSourceIndex(int index);
-    int getSourceIndex() const { return sourceIndex; }
+    void mouseMove(const juce::MouseEvent& e) override;
+    juce::MouseCursor getMouseCursor() override;
 
     int getMode() const { return mode; }
     void setMode(int m);
@@ -41,17 +37,13 @@ public:
     // Replace the available modes list (e.g. to restrict when MIDI is off)
     void setModes(std::vector<std::pair<int, juce::String>> newModes);
 
-    void syncFromProcessor();
-
-    juce::String getDisplayText() const;
+    juce::String getDisplayText() const override;
+    juce::String getLabelText() const override;
+    void syncFromProcessor() override;
 
 private:
     ModulationModeConfig config;
-    int sourceIndex = 0;
     int mode = 0;
-
-    juce::Rectangle<int> valueArea;
-    juce::Rectangle<int> labelArea;
 
     void showModePopup();
 

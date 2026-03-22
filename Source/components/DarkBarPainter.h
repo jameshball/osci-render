@@ -3,50 +3,48 @@
 #include <JuceHeader.h>
 #include "../LookAndFeel.h"
 
-// Shared paint routine for Vital-inspired dark rounded-bar controls
-// (LfoRateComponent, LfoModeComponent, etc.).
+// Shared paint routine for Vital-inspired dark rounded-bar controls.
 namespace DarkBarPainter {
 
-// Paint the common elements: background, label strip, border.
-// Call this first, then add component-specific rendering (value text, icons).
+static constexpr int kLabelHeight = Colours::kLabelHeight;
+
+// Paint the common elements: content background and label strip.
 inline void paintBackground(juce::Graphics& g,
                             juce::Rectangle<float> bounds,
                             juce::Rectangle<int> labelArea,
                             const juce::String& labelText,
                             bool hovering,
-                            float cornerRadius = 4.0f) {
-    // Background
-    g.setColour(Colours::veryDark);
-    g.fillRoundedRectangle(bounds, cornerRadius);
+                            float /*cornerRadius*/ = 4.0f) {
+    juce::ignoreUnused(hovering);
 
-    // Label strip at bottom
+    float radius = Colours::kPillRadius;
+
     if (!labelArea.isEmpty()) {
+        // Content area (rounded top corners, flat bottom)
+        auto contentBounds = bounds.withBottom(labelArea.toFloat().getY());
+        juce::Path contentPath;
+        contentPath.addRoundedRectangle(contentBounds.getX(), contentBounds.getY(),
+                                        contentBounds.getWidth(), contentBounds.getHeight(),
+                                        radius, radius, true, true, false, false);
+        g.setColour(Colours::evenDarker());
+        g.fillPath(contentPath);
+
+        // Label strip (flat top, rounded bottom corners) — same width as content
         auto labelBounds = labelArea.toFloat();
         juce::Path labelPath;
-        labelPath.addRoundedRectangle(bounds.getX(), labelBounds.getY(),
-                                       bounds.getWidth(), labelBounds.getHeight(),
-                                       cornerRadius, cornerRadius, false, false, true, true);
-        g.saveState();
-        g.reduceClipRegion(labelPath);
-        g.setColour(Colours::darkBarLabel);
-        g.fillRect(labelBounds);
-        g.restoreState();
+        labelPath.addRoundedRectangle(labelBounds.getX(), labelBounds.getY(),
+                                       labelBounds.getWidth(), labelBounds.getHeight(),
+                                       radius, radius, false, false, true, true);
+        g.setColour(Colours::darkerer());
+        g.fillPath(labelPath);
 
-        g.setColour(juce::Colours::white.withAlpha(0.10f));
-        g.drawHorizontalLine((int)labelBounds.getY(),
-                             bounds.getX() + 1.0f, bounds.getRight() - 1.0f);
-
-        g.setColour(juce::Colours::white.withAlpha(0.55f));
-        g.setFont(juce::Font(9.0f, juce::Font::bold));
+        g.setColour(juce::Colours::white);
+        g.setFont(juce::Font(10.0f));
         g.drawText(labelText, labelBounds, juce::Justification::centred);
+    } else {
+        g.setColour(Colours::evenDarker());
+        g.fillRoundedRectangle(bounds, radius);
     }
-
-    // Border
-    g.setColour(juce::Colours::white.withAlpha(hovering ? 0.12f : 0.06f));
-    g.drawRoundedRectangle(bounds.reduced(0.5f), cornerRadius, 1.0f);
 }
-
-// Standard label height and layout helper.
-static constexpr int kLabelHeight = 14;
 
 } // namespace DarkBarPainter

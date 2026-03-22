@@ -16,9 +16,9 @@ public:
 
         editor->setColourScheme(OscirenderLookAndFeel::getDefaultColourScheme());
 
-        editor->setColour(juce::CodeEditorComponent::backgroundColourId, Colours::veryDark);
+        editor->setColour(juce::CodeEditorComponent::backgroundColourId, Colours::veryDark());
         editor->setColour(juce::CodeEditorComponent::defaultTextColourId, Dracula::foreground);
-        editor->setColour(juce::CodeEditorComponent::lineNumberBackgroundId, Colours::veryDark);
+        editor->setColour(juce::CodeEditorComponent::lineNumberBackgroundId, Colours::veryDark());
         editor->setColour(juce::CaretComponent::caretColourId, juce::Colours::transparentBlack);
 
         addAndMakeVisible(*editor);
@@ -32,7 +32,7 @@ public:
     void paint(juce::Graphics& g) override {
         auto bounds = getLocalBounds().toFloat();
         // Fill rounded background so the editor's rectangular bg doesn't peek through corners
-        g.setColour(Colours::veryDark);
+        g.setColour(Colours::veryDark());
         g.fillRoundedRectangle(bounds, 6.0f);
         // Draw the border
         g.setColour(juce::Colours::white.withAlpha(0.15f));

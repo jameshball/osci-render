@@ -18,9 +18,9 @@ LfoPresetBrowserOverlay::LfoPresetBrowserOverlay(LfoPresetManager& manager, List
 
     saveEditor.setFont(juce::Font(13.0f));
     saveEditor.setTextToShowWhenEmpty("Preset name...", juce::Colours::white.withAlpha(0.3f));
-    saveEditor.setColour(juce::TextEditor::backgroundColourId, Colours::veryDark);
-    saveEditor.setColour(juce::TextEditor::outlineColourId, juce::Colours::white.withAlpha(0.15f));
-    saveEditor.setColour(juce::TextEditor::focusedOutlineColourId, juce::Colours::white.withAlpha(0.3f));
+    saveEditor.setColour(juce::TextEditor::backgroundColourId, Colours::veryDark());
+    saveEditor.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
+    saveEditor.setColour(juce::TextEditor::focusedOutlineColourId, juce::Colours::transparentBlack);
     saveEditor.setColour(juce::TextEditor::textColourId, juce::Colours::white);
     saveEditor.setJustification(juce::Justification::centredLeft);
     saveEditor.onReturnKey = [this]() { doSave(); };
@@ -34,7 +34,7 @@ LfoPresetBrowserOverlay::LfoPresetBrowserOverlay(LfoPresetManager& manager, List
     browserPanel.addAndMakeVisible(saveButton);
 
     importButton.setButtonText("Import .vitallfo");
-    importButton.setColour(juce::TextButton::buttonColourId, Colours::veryDark.brighter(0.15f));
+    importButton.setColour(juce::TextButton::buttonColourId, Colours::veryDark().brighter(0.15f));
     importButton.setColour(juce::TextButton::textColourOnId, juce::Colours::white.withAlpha(0.8f));
     importButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white.withAlpha(0.8f));
     importButton.onClick = [this]() {
@@ -77,8 +77,11 @@ void LfoPresetBrowserOverlay::repositionPanel() {
     if (y + tooltipH > getHeight())
         y = anchorBounds.getY() - tooltipH - 4;
 
-    browserPanel.setBounds(x, y, tooltipW, tooltipH);
-    panelBounds = browserPanel.getBounds();
+    // Expand component bounds to accommodate shadow rendering outside the visual panel
+    constexpr int shadowMargin = 14;
+    browserPanel.setBounds(x - shadowMargin, y - shadowMargin,
+                           tooltipW + shadowMargin * 2, tooltipH + shadowMargin * 2);
+    panelBounds = juce::Rectangle<int>(x, y, tooltipW, tooltipH);
 }
 
 void LfoPresetBrowserOverlay::refresh(LfoPreset currentFactoryPreset, const juce::String& currentUserName) {
@@ -108,20 +111,22 @@ bool LfoPresetBrowserOverlay::keyPressed(const juce::KeyPress& key) {
 // ============================================================================
 
 void LfoPresetBrowserOverlay::BrowserPanel::paint(juce::Graphics& g) {
-    auto bounds = getLocalBounds().toFloat();
+    constexpr int shadowMargin = 14;
+    auto bounds = getLocalBounds().reduced(shadowMargin).toFloat();
+    constexpr float radius = 6.0f;
 
-    juce::DropShadow shadow(juce::Colours::black.withAlpha(0.5f), 8, {0, 2});
-    shadow.drawForRectangle(g, getLocalBounds());
+    juce::Path panelPath;
+    panelPath.addRoundedRectangle(bounds, radius);
 
-    g.setColour(Colours::veryDark.brighter(0.08f));
-    g.fillRoundedRectangle(bounds, 6.0f);
+    shadow.render(g, panelPath);
 
-    g.setColour(juce::Colours::white.withAlpha(0.12f));
-    g.drawRoundedRectangle(bounds.reduced(0.5f), 6.0f, 1.0f);
+    g.setColour(Colours::veryDark().brighter(0.08f));
+    g.fillPath(panelPath);
 }
 
 void LfoPresetBrowserOverlay::BrowserPanel::resized() {
-    auto inner = getLocalBounds().reduced(6);
+    constexpr int shadowMargin = 14;
+    auto inner = getLocalBounds().reduced(shadowMargin).reduced(6);
 
     auto bottomBar = inner.removeFromBottom(26);
     saveButton.setBounds(bottomBar.removeFromRight(48));
@@ -163,15 +168,6 @@ void LfoPresetBrowserOverlay::PresetRow::paint(juce::Graphics& g) {
     g.setColour(isActive ? juce::Colours::white : juce::Colours::white.withAlpha(0.75f));
     g.setFont(juce::Font(12.5f));
     g.drawText(name, textBounds, juce::Justification::centredLeft);
-
-    if (isActive) {
-        g.setColour(juce::Colours::white.withAlpha(0.5f));
-        float checkX = textBounds.getRight() - 14.0f;
-        if (!isUserPreset)
-            g.drawText(juce::CharPointer_UTF8("\xe2\x9c\x93"),
-                       juce::Rectangle<float>(checkX, bounds.getY(), 14.0f, bounds.getHeight()),
-                       juce::Justification::centred);
-    }
 }
 
 void LfoPresetBrowserOverlay::PresetRow::mouseDown(const juce::MouseEvent& e) {

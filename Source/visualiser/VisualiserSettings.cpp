@@ -24,8 +24,8 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
 #endif
 #if !OSCI_PREMIUM
     addAndMakeVisible(upgradeButton);
-    upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor);
-    upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark);
+    upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor());
+    upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark());
     upgradeButton.onClick = [this] {
         if (onUpgradeRequested) {
             onUpgradeRequested();
@@ -74,7 +74,7 @@ void VisualiserSettings::wireModulation(OscirenderAudioProcessor& processor) {
 }
 
 void VisualiserSettings::paint(juce::Graphics& g) {
-    g.fillAll(Colours::darker);
+    g.fillAll(Colours::darker());
 }
 
 void VisualiserSettings::resized() {

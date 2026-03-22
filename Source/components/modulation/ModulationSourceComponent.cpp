@@ -22,7 +22,7 @@ void ModulationSourceComponent::DepthIndicator::paint(juce::Graphics& g) {
 
     auto colour = owner.config.getSourceColour(sourceIndex);
 
-    g.setColour(Colours::veryDark);
+    g.setColour(Colours::veryDark());
     g.fillEllipse(bounds);
 
     g.setColour(colour.withAlpha(0.2f));
@@ -225,10 +225,10 @@ void ModulationSourceComponent::ModTabHandle::paint(juce::Graphics& g) {
                                   true, false, true, false);
 
     if (active) {
-        g.setColour(Colours::darker);
+        g.setColour(Colours::darker());
         g.fillPath(tabShape);
     } else {
-        g.setColour(Colours::darker.darker(0.5f));
+        g.setColour(Colours::darker().darker(0.5f));
         g.fillPath(tabShape);
 
         juce::ColourGradient shadow(juce::Colours::black.withAlpha(0.2f), bounds.getRight(), bounds.getCentreY(),
@@ -547,7 +547,7 @@ void ModulationSourceComponent::paint(juce::Graphics& g) {
     panelPath.addRoundedRectangle(panelBounds.getX(), panelBounds.getY(),
                                    panelBounds.getWidth(), panelBounds.getHeight(),
                                    r, r, !hasTabs, true, !hasTabs, true);
-    g.setColour(Colours::darker);
+    g.setColour(Colours::darker());
     g.fillPath(panelPath);
 }
 

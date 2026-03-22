@@ -56,7 +56,7 @@ SosciPluginEditor::~SosciPluginEditor() {
 }
 
 void SosciPluginEditor::paint(juce::Graphics& g) {
-    g.fillAll(Colours::veryDark);
+    g.fillAll(Colours::veryDark());
 }
 
 void SosciPluginEditor::resized() {

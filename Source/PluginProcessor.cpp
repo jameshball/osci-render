@@ -1090,6 +1090,8 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
                 lfoXml->setAttribute("tempoDivision", lfoTempoDivisions[i]);
                 lfoXml->setAttribute("mode", lfoModeToString(lfoModes[i]));
                 lfoXml->setAttribute("phaseOffset", (double)lfoPhaseOffsets[i]);
+                lfoXml->setAttribute("smoothAmount", (double)lfoSmoothAmounts[i]);
+                lfoXml->setAttribute("delayAmount", (double)lfoDelayAmounts[i]);
                 lfoWaveforms[i].saveToXml(lfoXml);
             }
         }
@@ -1290,6 +1292,8 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
                         lfoTempoDivisions[idx] = lfoXml->getIntAttribute("tempoDivision", 8);
                         lfoModes[idx] = stringToLfoMode(lfoXml->getStringAttribute("mode", "Free"));
                         lfoPhaseOffsets[idx] = (float)lfoXml->getDoubleAttribute("phaseOffset", 0.0);
+                        lfoSmoothAmounts[idx] = (float)lfoXml->getDoubleAttribute("smoothAmount", 0.005);
+                        lfoDelayAmounts[idx] = (float)lfoXml->getDoubleAttribute("delayAmount", 0.0);
                     }
                 }
             }
@@ -1499,6 +1503,30 @@ void OscirenderAudioProcessor::setLfoPhaseOffset(int lfoIndex, float phase) {
     if (lfoIndex < 0 || lfoIndex >= NUM_LFOS) return;
     juce::SpinLock::ScopedLockType lock(lfoWaveformLock);
     lfoPhaseOffsets[lfoIndex] = juce::jlimit(0.0f, 1.0f, phase);
+}
+
+void OscirenderAudioProcessor::setLfoSmoothAmount(int lfoIndex, float seconds) {
+    jassert(lfoIndex >= 0 && lfoIndex < NUM_LFOS);
+    if (lfoIndex < 0 || lfoIndex >= NUM_LFOS) return;
+    lfoSmoothAmounts[lfoIndex].store(juce::jlimit(0.0f, 16.0f, seconds), std::memory_order_relaxed);
+}
+
+float OscirenderAudioProcessor::getLfoSmoothAmount(int lfoIndex) const {
+    jassert(lfoIndex >= 0 && lfoIndex < NUM_LFOS);
+    if (lfoIndex < 0 || lfoIndex >= NUM_LFOS) return 0.005f;
+    return lfoSmoothAmounts[lfoIndex].load(std::memory_order_relaxed);
+}
+
+void OscirenderAudioProcessor::setLfoDelayAmount(int lfoIndex, float seconds) {
+    jassert(lfoIndex >= 0 && lfoIndex < NUM_LFOS);
+    if (lfoIndex < 0 || lfoIndex >= NUM_LFOS) return;
+    lfoDelayAmounts[lfoIndex].store(juce::jlimit(0.0f, 4.0f, seconds), std::memory_order_relaxed);
+}
+
+float OscirenderAudioProcessor::getLfoDelayAmount(int lfoIndex) const {
+    jassert(lfoIndex >= 0 && lfoIndex < NUM_LFOS);
+    if (lfoIndex < 0 || lfoIndex >= NUM_LFOS) return 0.0f;
+    return lfoDelayAmounts[lfoIndex].load(std::memory_order_relaxed);
 }
 
 LfoMode OscirenderAudioProcessor::getLfoMode(int lfoIndex) const {
@@ -1944,6 +1972,7 @@ void OscirenderAudioProcessor::applyGlobalLfoModulation(int numSamples, double s
                     if (!lfoAudioStates[l].finished)
                         lfoRetriggered[l].store(true, std::memory_order_relaxed);
                     lfoAudioStates[l].noteOn(mode, lfoPhaseOffsets[l]);
+                    lfoDelayElapsed[l] = 0.0f; // Reset delay timer on retrigger
                 }
             }
         } else if (msg.isNoteOff()) {
@@ -2013,12 +2042,47 @@ void OscirenderAudioProcessor::applyGlobalLfoModulation(int numSamples, double s
                 isActive = !lfoAudioStates[l].finished;
             }
 
-            lfoAudioStates[l].advanceBlock(lfoBlockBuffer[l].data(), numSamples,
-                                           rate, sr, lfoWaveforms[l], mode, phaseOff);
+            // Apply startup delay: freeze phase until delay time has elapsed
+            int delaySkipSamples = 0;
+            float delaySecs = lfoDelayAmounts[l];
+            if (delaySecs > 1e-6f) {
+                float elapsed = lfoDelayElapsed[l];
+                if (elapsed < delaySecs) {
+                    float remainingSec = delaySecs - elapsed;
+                    delaySkipSamples = juce::jmin(numSamples, (int)std::ceil(remainingSec * sr));
+                    // Fill delay portion with the waveform value at the frozen phase
+                    float heldValue = lfoWaveforms[l].evaluate(lfoAudioStates[l].phase);
+                    for (int s = 0; s < delaySkipSamples; ++s)
+                        lfoBlockBuffer[l][s] = heldValue;
+                }
+                float blockTimeSec = (float)numSamples / sr;
+                lfoDelayElapsed[l] = elapsed + blockTimeSec;
+            }
+
+            // Only advance phase for the non-delay portion of the block
+            int advanceSamples = numSamples - delaySkipSamples;
+            if (advanceSamples > 0) {
+                lfoAudioStates[l].advanceBlock(lfoBlockBuffer[l].data() + delaySkipSamples, advanceSamples,
+                                               rate, sr, lfoWaveforms[l], mode, phaseOff);
+            }
             // For Sync mode: zero modulation when no voice is active
             if (mode == LfoMode::Sync && !effectiveVoiceActive) {
                 for (int s = 0; s < numSamples; ++s)
                     lfoBlockBuffer[l][s] = 0.0f;
+            }
+
+            // Apply exponential output smoothing (one-pole low-pass filter)
+            float smoothSecs = lfoSmoothAmounts[l];
+            if (smoothSecs > 1e-6f) {
+                float alpha = 1.0f - std::exp(-1.0f / (smoothSecs * sr));
+                float prev = lfoSmoothedOutput[l];
+                for (int s = 0; s < numSamples; ++s) {
+                    prev += alpha * (lfoBlockBuffer[l][s] - prev);
+                    lfoBlockBuffer[l][s] = prev;
+                }
+                lfoSmoothedOutput[l] = prev;
+            } else {
+                lfoSmoothedOutput[l] = lfoBlockBuffer[l][numSamples - 1];
             }
 
             // Only call voicesFinished on the transition from active to inactive.

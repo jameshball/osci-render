@@ -60,28 +60,31 @@ void OsciMainMenuBarModel::resetMenuItems() {
 
     addMenuItem(1, "About osci-render", [this] {
         juce::DialogWindow::LaunchOptions options;
-        AboutComponent* about = new AboutComponent(BinaryData::logo_png, BinaryData::logo_pngSize,
-                                                   juce::String(ProjectInfo::projectName) + " by " + ProjectInfo::companyName +
-                                                       "\n"
+        AboutComponent::Info aboutInfo;
+        aboutInfo.imageData = BinaryData::logo_png;
+        aboutInfo.imageSize = BinaryData::logo_pngSize;
+        aboutInfo.productName = ProjectInfo::projectName;
+        aboutInfo.companyName = ProjectInfo::companyName;
+        aboutInfo.versionString = ProjectInfo::versionString;
 #if OSCI_PREMIUM
-                                                       "Thank you for purchasing osci-render premium!\n"
+        aboutInfo.isPremium = true;
 #else
-            "Free version\n"
+        aboutInfo.isPremium = false;
 #endif
-                                                       "Version " +
-                                                       ProjectInfo::versionString +
-                                                       "\n\n"
-                                                       "A huge thank you to:\n"
-                                                       "DJ_Level_3, for contributing several features to osci-render\n"
-                                                       "Anthony Hall, for adding many new effects, and improving existing ones\n"
-                                                       "BUS ERROR Collective, for providing the source code for the Hilligoss encoder\n"
-                                                       "TheDumbDude, for contributing several example Lua files\n"
-                                                       "All the community, for suggesting features and reporting issues!",
-                                                   std::any_cast<int>(audioProcessor.getProperty("objectServerPort")));
+        aboutInfo.websiteUrl = "https://osci-render.com";
+        aboutInfo.githubUrl = "https://github.com/jameshball/osci-render";
+        aboutInfo.credits = {
+            { "DJ_Level_3",          "Contributed several features to osci-render" },
+            { "Anthony Hall",        "Added many new effects, and improved existing ones" },
+            { "BUS ERROR Collective", "Provided source code for the Hilligoss encoder" },
+            { "TheDumbDude",         "Contributed several example Lua files" },
+        };
+        aboutInfo.blenderPort = std::any_cast<int>(audioProcessor.getProperty("objectServerPort"));
+
+        AboutComponent* about = new AboutComponent(aboutInfo);
         options.content.setOwned(about);
-        options.content->setSize(500, 300);
         options.dialogTitle = "About";
-        options.dialogBackgroundColour = Colours::dark;
+        options.dialogBackgroundColour = AboutComponent::dialogBackground();
         options.escapeKeyTriggersCloseButton = true;
 #if JUCE_WINDOWS
         // if not standalone, use native title bar for compatibility with DAWs
