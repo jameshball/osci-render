@@ -20,7 +20,7 @@ void OscirenderLookAndFeel::applyOscirenderColours(juce::LookAndFeel& lookAndFee
     lookAndFeel.setColour(juce::Slider::textBoxOutlineColourId, Colours::veryDark());
     lookAndFeel.setColour(juce::Slider::textBoxBackgroundColourId, Colours::veryDark());
     lookAndFeel.setColour(juce::Slider::textBoxHighlightColourId, Colours::accentColor().withMultipliedAlpha(0.5f));
-    lookAndFeel.setColour(juce::Slider::trackColourId, Colours::grey());
+    lookAndFeel.setColour(juce::Slider::trackColourId, Colours::grey().brighter(0.3f));
     lookAndFeel.setColour(juce::Slider::backgroundColourId, Colours::dark());
     lookAndFeel.setColour(sliderThumbOutlineColourId, juce::Colours::white);
 
