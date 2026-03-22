@@ -234,6 +234,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
         luaEffects[i]->parameters[0]->addListener(this);
     }
 
+    defaultSound = new ShapeSound(*this, std::make_shared<FileParser>(*this));
     synth.addSound(defaultSound);
 
     activeShapeSound.store(defaultSound.get(), std::memory_order_release);

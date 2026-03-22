@@ -1,6 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 
+#include "../img/ImageParser.h"
 #include "InvisibleOpenGLContextComponent.h"
 
 class SyphonFrameGrabber : public juce::Component, public juce::OpenGLRenderer {

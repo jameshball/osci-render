@@ -68,6 +68,23 @@ Source/
 - JUCE framework with Projucer
 - Xcode (macOS), Visual Studio 2022 (Windows), or GCC (Linux)
 - LuaJIT (built automatically via `luajit_linux_macos.sh` or `luajit_win.bat`)
+- ccache (macOS): `brew install ccache` — required for fast incremental builds (see below)
+
+### Build speed: ccache + PCH
+
+The Debug configuration uses two compile-time optimisations that are already wired into the `.jucer` files:
+
+- **Precompiled header (PCH)** — `Source/pch.h` pre-parses `<JuceHeader.h>` once. All Debug TUs load the binary snapshot instead of re-parsing JUCE every time. Halves clean build time (~2m49s → ~1m12s). Active automatically; no per-build action needed.
+- **ccache** — compiler output is cached by preprocessed-source hash. Cache hits return the stored `.o` in milliseconds. Wired via `ci/ccache-clang` / `ci/ccache-clang++` wrapper scripts in `customXcodeFlags`.
+
+**One-time machine setup (macOS) — required on a new machine:**
+```bash
+brew install ccache
+# Allow ccache to cache PCH-using translation units:
+ccache --set-config sloppiness=pch_defines,time_macros,include_file_mtime,include_file_ctime
+```
+
+Without the sloppiness config, every build will report "uncacheable" for all TUs and the cache will never be used.
 
 ### Building (macOS example)
 ```bash

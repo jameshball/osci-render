@@ -1,0 +1,8 @@
+#!/bin/sh
+# ccache wrapper for Xcode C compiler
+# Used by customXcodeFlags CC= setting in .jucer files
+if command -v ccache >/dev/null 2>&1; then
+    exec ccache clang "$@"
+else
+    exec clang "$@"
+fi

@@ -1,12 +1,14 @@
 #include "EffectComponent.h"
 
 #include "../LookAndFeel.h"
+#ifndef SOSCI
 #include "../PluginProcessor.h"
 #include "modulation/EnvelopeComponent.h"
 #include "modulation/LfoComponent.h"
 #include "modulation/ModulationHelper.h"
 #include "modulation/RandomComponent.h"
 #include "../audio/ModulationTypes.h"
+#endif
 
 std::atomic<bool> EffectComponent::modAnyDragActive{false};
 juce::String EffectComponent::highlightedParamId;
@@ -201,8 +203,10 @@ void EffectComponent::setupComponent() {
 }
 
 EffectComponent::~EffectComponent() {
+#ifndef SOSCI
     if (modBroadcaster)
         modBroadcaster->removeListener(this);
+#endif
     slider.removeListener(this);
     lfoSlider.removeListener(this);
     effect.removeListener(index, this);
@@ -370,6 +374,7 @@ void EffectComponent::handleAsyncUpdate() {
     }
 }
 
+#ifndef SOSCI
 void EffectComponent::updateModulationDisplay() {
     juce::String paramId = effect.parameters[index]->paramID;
     auto& props = slider.getProperties();
@@ -394,6 +399,9 @@ void EffectComponent::updateModulationDisplay() {
     if (needsRepaint)
         slider.repaint();
 }
+#else
+void EffectComponent::updateModulationDisplay() {}
+#endif
 
 void EffectComponent::setRangeEnabled(bool enabled) {
     settingsButton.setVisible(enabled);
@@ -407,7 +415,11 @@ void EffectComponent::setComponent(std::shared_ptr<juce::Component> component) {
 // === DragAndDropTarget for LFO assignment ===
 
 bool EffectComponent::isInterestedInDragSource(const SourceDetails& dragSourceDetails) {
+#ifndef SOSCI
     return ModDrag::isModDrag(dragSourceDetails.description.toString());
+#else
+    return false;
+#endif
 }
 
 void EffectComponent::itemDragEnter(const SourceDetails&) {
@@ -425,6 +437,7 @@ void EffectComponent::itemDropped(const SourceDetails& dragSourceDetails) {
     modAnyDragActive.store(false, std::memory_order_relaxed);
     repaint();
 
+#ifndef SOSCI
     juce::String desc = dragSourceDetails.description.toString();
     juce::String paramId = effect.parameters[index]->paramID;
 
@@ -437,8 +450,10 @@ void EffectComponent::itemDropped(const SourceDetails& dragSourceDetails) {
             return;
         }
     }
+#endif
 }
 
+#ifndef SOSCI
 void EffectComponent::wireModulation(OscirenderAudioProcessor& processor) {
     // Define all modulation bindings generically — adding a new source type
     // only requires appending one entry here.
@@ -506,3 +521,4 @@ void EffectComponent::wireModulation(OscirenderAudioProcessor& processor) {
             repaint();
     });
 }
+#endif

@@ -12,7 +12,9 @@
 #include "../components/SwitchButton.h"
 #include "VisualiserParameters.h"
 
+#ifndef SOSCI
 class OscirenderAudioProcessor;
+#endif
 
 class GroupedSettings : public juce::GroupComponent {
 public:
@@ -24,10 +26,12 @@ public:
         setColour(groupComponentBackgroundColourId, Colours::veryDark().withMultipliedBrightness(3.0));
     }
 
+#ifndef SOSCI
     void wireModulation(OscirenderAudioProcessor& processor) {
         for (auto& effect : effects)
             effect->wireModulation(processor);
     }
+#endif
 
     void resized() override {
         auto area = getLocalBounds();
@@ -54,7 +58,9 @@ public:
     VisualiserSettings(VisualiserParameters&, int numChannels = 2);
     ~VisualiserSettings();
 
+#ifndef SOSCI
     void wireModulation(OscirenderAudioProcessor& processor);
+#endif
 
     void paint(juce::Graphics& g) override;
     void resized() override;
