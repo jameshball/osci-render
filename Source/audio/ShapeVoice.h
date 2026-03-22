@@ -2,6 +2,7 @@
 #include <JuceHeader.h>
 #include "ShapeSound.h"
 #include "DahdsrEnvelope.h"
+#include "EnvState.h"
 
 class OscirenderAudioProcessor;
 class ShapeVoice : public juce::SynthesiserVoice {
@@ -51,6 +52,9 @@ private:
 
 	DahdsrParams dahdsr;
 	DahdsrState envState;
+	// Modulation envelopes 1..NUM_ENVELOPES-1; envelope 0 is envState above
+	DahdsrParams envDahdsr[NUM_ENVELOPES];
+	DahdsrState envStates[NUM_ENVELOPES];
 
 	juce::AudioSampleBuffer& externalAudio;
 

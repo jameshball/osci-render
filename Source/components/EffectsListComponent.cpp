@@ -2,6 +2,8 @@
 #include "SvgButton.h"
 #include "../PluginEditor.h"
 #include "../LookAndFeel.h"
+#include "../audio/LfoState.h"
+#include "../audio/EnvState.h"
 
 EffectsListComponent::EffectsListComponent(DraggableListBox& lb, AudioEffectListBoxItemData& data, int rn, osci::Effect& effect) : DraggableListBoxItem(lb, data, rn),
 effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
@@ -12,6 +14,8 @@ effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
         // using weak_ptr to avoid circular reference and memory leak
         std::weak_ptr<EffectComponent> weakEffectComponent = effectComponent;
         effectComponent->slider.setValue(parameters[i]->getValueUnnormalised(), juce::dontSendNotification);
+
+        effectComponent->wireModulation(audioProcessor);
         
         list.setEnabled(enabled.getToggleState());
         enabled.onClick = [this, weakEffectComponent] {
@@ -58,6 +62,9 @@ effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
         if (isCustomEffect && editor.editingCustomFunction) {
             editor.editCustomFunction(false);
         }
+
+        // Remove all LFO/envelope assignments targeting this effect's parameters
+        audioProcessor.removeAllAssignmentsForEffect(this->effect);
 
         // Flip flags under lock
         {

@@ -23,8 +23,8 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
             juce::TopLevelWindow* w = juce::TopLevelWindow::getTopLevelWindow(0);
             juce::DocumentWindow* dw = dynamic_cast<juce::DocumentWindow*>(w);
             if (dw != nullptr) {
-                dw->setBackgroundColour(Colours::veryDark);
-                dw->setColour(juce::ResizableWindow::backgroundColourId, Colours::veryDark);
+                dw->setBackgroundColour(Colours::veryDark());
+                dw->setColour(juce::ResizableWindow::backgroundColourId, Colours::veryDark());
                 dw->setTitleBarButtonsRequired(juce::DocumentWindow::allButtons, false);
                 dw->setUsingNativeTitleBar(true);
             }
@@ -48,7 +48,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
 
     visualiserSettings.setLookAndFeel(&getLookAndFeel());
     visualiserSettings.setSize(550, VISUALISER_SETTINGS_HEIGHT);
-    visualiserSettings.setColour(juce::ResizableWindow::backgroundColourId, Colours::dark);
+    visualiserSettings.setColour(juce::ResizableWindow::backgroundColourId, Colours::dark());
 
     recordingSettings.setLookAndFeel(&getLookAndFeel());
     recordingSettings.setSize(300, 330);
@@ -119,6 +119,51 @@ void CommonPluginEditor::handleCommandLine(const juce::String& commandLine) {
 void CommonPluginEditor::resized() {
     audioProcessor.setProperty("appWidth", getWidth());
     audioProcessor.setProperty("appHeight", getHeight());
+
+    if (!activeOverlays.empty()) {
+        for (auto& overlay : activeOverlays) {
+            overlay->setBounds(getLocalBounds());
+            overlay->toFront(false);
+        }
+    }
+}
+
+void CommonPluginEditor::showOverlay(std::unique_ptr<OverlayComponent> overlay) {
+    bool anyHeavy = false;
+    for (auto& o : activeOverlays)
+        if (!o->lightweight) anyHeavy = true;
+
+    if (!anyHeavy && !overlay->lightweight) {
+        visualiserWasVisibleBeforeOverlay = visualiser.isVisible();
+        visualiser.setVisible(false);
+    }
+
+    auto* ptr = overlay.get();
+    overlay->onDismissRequested = [this, ptr] { dismissOverlay(ptr); };
+    overlay->setBounds(getLocalBounds());
+    addAndMakeVisible(*overlay);
+    overlay->toFront(true);
+    activeOverlays.push_back(std::move(overlay));
+    resized();
+}
+
+void CommonPluginEditor::dismissOverlay(OverlayComponent* overlay) {
+    for (auto it = activeOverlays.begin(); it != activeOverlays.end(); ++it) {
+        if (it->get() == overlay) {
+            removeChildComponent(overlay);
+            activeOverlays.erase(it);
+            break;
+        }
+    }
+
+    bool anyHeavy = false;
+    for (auto& o : activeOverlays)
+        if (!o->lightweight) anyHeavy = true;
+
+    if (!anyHeavy) {
+        visualiser.setVisible(visualiserWasVisibleBeforeOverlay);
+    }
+    resized();
 }
 
 void CommonPluginEditor::initialiseMenuBar(juce::MenuBarModel& menuBarModel) {
@@ -358,7 +403,7 @@ void CommonPluginEditor::renderAudioFileToVideo() {
 
             juce::DialogWindow::LaunchOptions options;
             options.dialogTitle = "Render Audio File to Video";
-            options.dialogBackgroundColour = Colours::dark;
+            options.dialogBackgroundColour = Colours::dark();
             options.content.setOwned(content.release());
             options.componentToCentreAround = safeThis.getComponent();
             options.escapeKeyTriggersCloseButton = true;

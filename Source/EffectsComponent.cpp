@@ -1,5 +1,7 @@
 #include "EffectsComponent.h"
 #include "audio/BitCrushEffect.h"
+#include "audio/LfoState.h"
+#include "audio/EnvState.h"
 #include "PluginEditor.h"
 
 bool EffectsComponent::hasAnySelectedEffects() const {
@@ -23,6 +25,8 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
 
     addAndMakeVisible(frequency);
 
+    frequency.wireModulation(audioProcessor);
+
     frequency.slider.setSkewFactorFromMidPoint(500.0);
     frequency.slider.setTextValueSuffix("Hz");
     frequency.slider.setValue(audioProcessor.frequencyEffect->getValue(), juce::dontSendNotification);
@@ -35,6 +39,13 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
 		itemData.randomise();
 		listBox.updateContent();
 	};
+
+	autoLinkButton.setTooltip("Auto-link LFOs to new effects based on their default animation settings.");
+	autoLinkButton.setToggleState(audioProcessor.getGlobalBoolValue("autoLinkLfos", true), juce::dontSendNotification);
+	autoLinkButton.onClick = [this] {
+		audioProcessor.setGlobalValue("autoLinkLfos", autoLinkButton.getToggleState());
+	};
+	addAndMakeVisible(autoLinkButton);
 
     {
         juce::MessageManagerLock lock;
@@ -55,10 +66,10 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
     const bool anySelected = hasAnySelectedEffects();
     showingGrid = !anySelected;
     grid.onEffectSelected = [this](const juce::String& effectId) {
+        std::shared_ptr<osci::Effect> chosen;
         {
             juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
             // Mark the chosen effect as selected and enabled, and move it to the end
-            std::shared_ptr<osci::Effect> chosen;
             for (auto& eff : audioProcessor.toggleableEffects) {
                 if (eff->getId() == effectId) {
                     eff->selected->setBoolValueNotifyingHost(true);
@@ -76,6 +87,13 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
                 chosen->setPrecedence(idx++);
                 audioProcessor.updateEffectPrecedence();
             }
+        }
+        // Promote any preview LFO assignments so hover-end won't remove them
+        audioProcessor.promotePreviewLfoAssignments();
+        // Auto-assign LFOs if the toggle is enabled (always on in beginner mode)
+        if (chosen != nullptr && (audioProcessor.isBeginnerMode() || audioProcessor.getGlobalBoolValue("autoLinkLfos", true))) {
+            audioProcessor.autoAssignLfosForEffect(*chosen);
+            audioProcessor.broadcaster.sendChangeMessage();
         }
         // Refresh list content to include newly selected
         itemData.resetData();
@@ -119,6 +137,7 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
         listBox.setVisible(true);
         listBox.updateContent();
     }
+
 }
 
 EffectsComponent::~EffectsComponent() {
@@ -132,6 +151,8 @@ void EffectsComponent::resized() {
     titleBar.removeFromLeft(100);
     
 	randomiseButton.setBounds(titleBar.removeFromLeft(20));
+	titleBar.removeFromLeft(4);
+	autoLinkButton.setBounds(titleBar.removeFromLeft(20));
     area = area.reduced(20);
     frequency.setBounds(area.removeFromTop(30));
 
@@ -151,16 +172,14 @@ void EffectsComponent::resized() {
 }
 
 void EffectsComponent::changeListenerCallback(juce::ChangeBroadcaster* source) {
-    // Recompute whether any effects are currently selected in the new project
-    // Show the grid only when there are no selected effects in the project
-    showingGrid = ! hasAnySelectedEffects();
-
-    if (showingGrid) {
+    // Auto-show the grid when no effects are selected (e.g. fresh project load),
+    // but never auto-hide it — the grid gets hidden only by explicit user action
+    // (selecting an effect or pressing Cancel). This prevents hover preview
+    // broadcasts from closing the grid while the user is browsing.
+    if (!showingGrid && !hasAnySelectedEffects()) {
+        showingGrid = true;
         grid.setVisible(true);
         listBox.setVisible(false);
-    } else {
-        grid.setVisible(false);
-        listBox.setVisible(true);
     }
 
     // Always refresh disabled states so opened projects immediately reflect which
@@ -175,3 +194,5 @@ void EffectsComponent::changeListenerCallback(juce::ChangeBroadcaster* source) {
     resized();
     repaint();
 }
+
+

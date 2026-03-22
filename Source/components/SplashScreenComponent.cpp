@@ -15,11 +15,11 @@ SplashScreenComponent::SplashScreenComponent() {
     benefitsGrid.setUseCenteringPlaceholders(true);
     benefitsGrid.setItemsInteractive(false);
     benefitsGrid.setItemHeight(120);
-    benefitsGrid.setColour(ColourIds::scrollFadeOverlayBackgroundColourId, Colours::veryDark);
+    benefitsGrid.setColour(ColourIds::scrollFadeOverlayBackgroundColourId, Colours::veryDark());
     addAndMakeVisible(benefitsGrid);
 
     configureLabel(supportLabel, juce::Font(14.5f, juce::Font::italic), juce::Justification::centred);
-    supportLabel.setColour(juce::Label::textColourId, Colours::accentColor.brighter(0.2f));
+    supportLabel.setColour(juce::Label::textColourId, Colours::accentColor().brighter(0.2f));
     supportLabel.setText("Purchasing premium directly supports ongoing development. Thank you!", juce::NotificationType::dontSendNotification);
     addAndMakeVisible(supportLabel);
 
@@ -36,11 +36,11 @@ SplashScreenComponent::SplashScreenComponent() {
         dismiss();
     };
 
-    upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor);
-    upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark);
-    upgradeButton.setColour(juce::TextButton::textColourOnId, Colours::veryDark);
+    upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor());
+    upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark());
+    upgradeButton.setColour(juce::TextButton::textColourOnId, Colours::veryDark());
 
-    continueButton.setColour(juce::TextButton::buttonColourId, Colours::darker.withAlpha(0.8f));
+    continueButton.setColour(juce::TextButton::buttonColourId, Colours::darker().withAlpha(0.8f));
     continueButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
     continueButton.setColour(juce::TextButton::textColourOnId, juce::Colours::white);
 
@@ -119,7 +119,7 @@ void SplashScreenComponent::buildBenefitTiles()
     for (const auto& benefit : benefits)
     {
         auto iconSvg = juce::String::createStringFromData(benefit.iconData, benefit.iconSize);
-        auto* tile = new GridItemComponent(benefit.title, iconSvg, benefit.title, Colours::accentColor);
+        auto* tile = new GridItemComponent(benefit.title, iconSvg, benefit.title, Colours::accentColor());
         tile->setDescription(benefit.description);
         tile->setInteractive(false);
         benefitsGrid.addItem(tile);

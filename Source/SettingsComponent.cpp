@@ -1,17 +1,86 @@
 #include "SettingsComponent.h"
 
 #include "PluginEditor.h"
+#include "components/EffectComponent.h"
+#include "audio/EnvState.h"
+#include "components/CustomMidiKeyboardComponent.h"
 
-SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
+SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor)
+    : audioProcessor(p), pluginEditor(editor),
+      beginnerMode(p.isBeginnerMode()),
+      envelope(p),
+    keyboard(p.keyboardState, juce::CustomMidiKeyboardComponent::horizontalKeyboard) {
     addAndMakeVisible(effects);
     addAndMakeVisible(fileControls);
     addAndMakeVisible(perspective);
-    addAndMakeVisible(midiResizerBar);
     addAndMakeVisible(mainResizerBar);
+    if (!beginnerMode) {
+        addAndMakeVisible(midiResizerBar);
+    }
     addAndMakeVisible(midi);
     addChildComponent(frame);
     addChildComponent(fractalEditor);
     addChildComponent(examples);
+
+    // Envelope setup
+    addAndMakeVisible(envelope);
+    envelope.setDahdsrParams(0, audioProcessor.getCurrentDahdsrParams(0));
+    envelope.setGrid(EnvelopeComponent::GridBoth, EnvelopeComponent::GridNone, 0.1, 0.25);
+
+    // Shared drag-active handler: just set the atomic flag.
+    // The central 60Hz ModulationUpdateBroadcaster handles highlight repaints
+    // while dragging. On drag-end, one repaint clears residual highlights.
+    auto dragChanged = [this](bool isDragging) {
+        EffectComponent::modAnyDragActive.store(isDragging, std::memory_order_relaxed);
+        if (!isDragging)
+            repaint();
+    };
+    envelope.onDragActiveChanged = dragChanged;
+
+    // LFO setup — only in advanced mode
+    if (!beginnerMode) {
+        lfo = std::make_unique<LfoComponent>(p);
+        addAndMakeVisible(*lfo);
+        lfo->onDragActiveChanged = dragChanged;
+
+        random = std::make_unique<RandomComponent>(p);
+        addAndMakeVisible(*random);
+        random->onDragActiveChanged = dragChanged;
+    }
+
+    // Keyboard
+    addAndMakeVisible(keyboardViewport);
+    keyboardViewport.setViewedComponent(&keyboard, false);
+    keyboardViewport.setScrollBarsShown(false, false, false, true);
+    keyboardViewport.setColour(scrollFadeOverlayBackgroundColourId,
+                               findColour(juce::ResizableWindow::backgroundColourId));
+    keyboardViewport.setSidesEnabled(false, false, true, true);
+    keyboardViewport.setFadeWidth(20);
+    keyboardViewport.setOpaque(false);
+    keyboard.setBlackNoteLengthProportion(0.6f);
+    keyboard.setBlackNoteWidthProportion(0.68f);
+    keyboard.setScrollButtonsVisible(false);
+
+    // Listen to midiEnabled so we can show/hide keyboard+envelope in beginner mode
+    audioProcessor.midiEnabled->addListener(this);
+
+    // DAHDSR parameter listeners (for envelope display updates)
+    const int numEnvListeners = beginnerMode ? 1 : NUM_ENVELOPES;
+    for (int e = 0; e < numEnvListeners; ++e) {
+        const auto& ep = audioProcessor.envParams[e];
+        ep.delayTime->addListener(&dahdsrListener);
+        ep.attackTime->addListener(&dahdsrListener);
+        ep.holdTime->addListener(&dahdsrListener);
+        ep.decayTime->addListener(&dahdsrListener);
+        ep.sustainLevel->addListener(&dahdsrListener);
+        ep.releaseTime->addListener(&dahdsrListener);
+        ep.attackShape->addListener(&dahdsrListener);
+        ep.decayShape->addListener(&dahdsrListener);
+        ep.releaseShape->addListener(&dahdsrListener);
+    }
+
+    // Envelope flow-marker animation
+    startTimerHz(60);
 
     examples.onClosed = [this]() {
         showExamples(false);
@@ -21,16 +90,22 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
         pluginEditor.fileUpdated(fileName, shouldOpenEditor);
     };
 
-    double midiLayoutPreferredSize = std::any_cast<double>(audioProcessor.getProperty("midiLayoutPreferredSize", pluginEditor.CLOSED_PREF_SIZE));
-    double mainLayoutPreferredSize = std::any_cast<double>(audioProcessor.getProperty("mainLayoutPreferredSize", -0.5));
+    double mainLayoutVisSize = std::any_cast<double>(audioProcessor.getProperty("mainLayoutVisSize", -0.25));
+    double mainLayoutMidiSize = std::any_cast<double>(audioProcessor.getProperty("mainLayoutMidiSize", -0.35));
 
-    midiLayout.setItemLayout(0, -0.1, -1.0, -(1.0 + midiLayoutPreferredSize));
-    midiLayout.setItemLayout(1, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE);
-    midiLayout.setItemLayout(2, pluginEditor.CLOSED_PREF_SIZE, -0.9, midiLayoutPreferredSize);
-
-    mainLayout.setItemLayout(0, -0.1, -0.9, mainLayoutPreferredSize);
-    mainLayout.setItemLayout(1, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE);
-    mainLayout.setItemLayout(2, -0.1, -0.9, -(1.0 + mainLayoutPreferredSize));
+    if (beginnerMode) {
+        // 3-component horizontal layout: vis | resizer | effects
+        mainLayout.setItemLayout(0, -0.1, -0.5, mainLayoutVisSize);
+        mainLayout.setItemLayout(1, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE);
+        mainLayout.setItemLayout(2, -0.1, -0.9, -(1.0 + mainLayoutVisSize));
+    } else {
+        // 5-component horizontal layout: vis | resizer | effects | resizer | midi
+        mainLayout.setItemLayout(0, -0.1, -0.5, mainLayoutVisSize);
+        mainLayout.setItemLayout(1, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE);
+        mainLayout.setItemLayout(2, -0.1, -0.6, -(1.0 + mainLayoutVisSize + mainLayoutMidiSize));
+        mainLayout.setItemLayout(3, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE);
+        mainLayout.setItemLayout(4, -0.1, -0.6, mainLayoutMidiSize);
+    }
 
     addAndMakeVisible(editor.volume);
 
@@ -61,7 +136,22 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
 }
 
 SettingsComponent::~SettingsComponent() {
+    stopTimer();
+    const int numEnvListeners = beginnerMode ? 1 : NUM_ENVELOPES;
+    for (int e = 0; e < numEnvListeners; ++e) {
+        const auto& ep = audioProcessor.envParams[e];
+        ep.delayTime->removeListener(&dahdsrListener);
+        ep.attackTime->removeListener(&dahdsrListener);
+        ep.holdTime->removeListener(&dahdsrListener);
+        ep.decayTime->removeListener(&dahdsrListener);
+        ep.sustainLevel->removeListener(&dahdsrListener);
+        ep.releaseTime->removeListener(&dahdsrListener);
+        ep.attackShape->removeListener(&dahdsrListener);
+        ep.decayShape->removeListener(&dahdsrListener);
+        ep.releaseShape->removeListener(&dahdsrListener);
+    }
     audioProcessor.visualiserParameters.visualiserFullScreen->removeListener(this);
+    audioProcessor.midiEnabled->removeListener(this);
 }
 
 void SettingsComponent::parameterValueChanged(int parameterIndex, float newValue) {
@@ -76,6 +166,10 @@ void SettingsComponent::parameterValueChanged(int parameterIndex, float newValue
 void SettingsComponent::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
 
 void SettingsComponent::resized() {
+    childLayoutUpdater.triggerAsyncUpdate();
+}
+
+void SettingsComponent::layoutChildren() {
     auto padding = 7;
 
     auto area = getLocalBounds();
@@ -88,81 +182,213 @@ void SettingsComponent::resized() {
         return;
     }
 
-    juce::Component dummy;
-    juce::Component dummy2;
+    static constexpr int keyboardHeight = 34;
 
-    juce::Component* midiComponents[] = {&dummy, &midiResizerBar, &midi};
-    midiLayout.layOutComponents(midiComponents, 3, area.getX(), area.getY(), area.getWidth(), area.getHeight(), true, true);
-    midi.setBounds(midi.getBounds());
+    // --- Left column (shared by both modes) ---
+    auto layoutVisColumn = [&](juce::Rectangle<int> visBounds) {
+        auto row = visBounds.removeFromTop(30);
+        fileControls.setBounds(row.removeFromLeft(visBounds.getWidth()));
+        visBounds.removeFromTop(padding);
 
-    juce::Component* columns[] = {&dummy2, &mainResizerBar, &dummy};
-    mainLayout.layOutComponents(columns, 3, dummy.getX(), dummy.getY(), dummy.getWidth(), dummy.getHeight(), false, true);
+        volumeVisualiserBounds = visBounds;
+        visBounds.reduce(5, 5);
 
-    auto bounds = dummy2.getBounds();
-    auto row = bounds.removeFromTop(30);
-    fileControls.setBounds(row.removeFromLeft(bounds.getWidth()));
-    bounds.removeFromTop(padding);
+        auto volumeArea = visBounds.removeFromLeft(30);
+        pluginEditor.volume.setBounds(volumeArea.withSizeKeepingCentre(volumeArea.getWidth(), juce::jmin(volumeArea.getHeight(), 300)));
 
-    volumeVisualiserBounds = bounds;
-    bounds.reduce(5, 5);
-
-    auto volumeArea = bounds.removeFromLeft(30);
-    pluginEditor.volume.setBounds(volumeArea.withSizeKeepingCentre(volumeArea.getWidth(), juce::jmin(volumeArea.getHeight(), 300)));
-
-    if (!audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
-        auto minDim = juce::jmin(bounds.getWidth(), bounds.getHeight());
-        juce::Point<int> localTopLeft = {bounds.getX(), bounds.getY()};
-        juce::Point<int> topLeft = pluginEditor.getLocalPoint(this, localTopLeft);
-        auto shiftedBounds = bounds;
-        shiftedBounds.setX(topLeft.getX());
-        shiftedBounds.setY(topLeft.getY());
-        pluginEditor.visualiser.setBounds(shiftedBounds);
-    }
-
-    juce::Component* effectSettings = nullptr;
-    auto dummyBounds = dummy.getBounds();
-
-    // Only reserve space for effect settings panel when not showing the Open Files panel
-    if (!examplesVisible) {
-        if (frame.isVisible()) {
-            effectSettings = &frame;
-            int preferredHeight = frame.getPreferredHeight();
-            effectSettings->setBounds(dummyBounds.removeFromBottom(preferredHeight));
-            dummyBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
-        } else if (fractalEditor.isVisible()) {
-            int preferredHeight = juce::jmin(300, dummyBounds.getHeight() / 2);
-            fractalEditor.setBounds(dummyBounds.removeFromBottom(preferredHeight));
-            dummyBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
+        if (!audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
+            juce::Point<int> localTopLeft = {visBounds.getX(), visBounds.getY()};
+            juce::Point<int> topLeft = pluginEditor.getLocalPoint(this, localTopLeft);
+            auto shiftedBounds = visBounds;
+            shiftedBounds.setX(topLeft.getX());
+            shiftedBounds.setY(topLeft.getY());
+            pluginEditor.visualiser.setBounds(shiftedBounds);
         }
-    }
+    };
 
-    if (examplesVisible) {
-        // Hide other panels while examples are visible
-        perspective.setVisible(false);
-        effects.setVisible(false);
-        frame.setVisible(false);
-        examples.setVisible(true);
-        examples.setBounds(dummyBounds);
+    // --- Effects column (shared by both modes) ---
+    auto layoutEffectsColumn = [&](juce::Rectangle<int> effectsBounds) {
+        if (!examplesVisible) {
+            if (frame.isVisible()) {
+                int preferredHeight = frame.getPreferredHeight();
+                frame.setBounds(effectsBounds.removeFromBottom(preferredHeight));
+                effectsBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
+            } else if (fractalEditor.isVisible()) {
+                int preferredHeight = juce::jmin(300, effectsBounds.getHeight() / 2);
+                fractalEditor.setBounds(effectsBounds.removeFromBottom(preferredHeight));
+                effectsBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
+            }
+        }
+
+        if (examplesVisible) {
+            perspective.setVisible(false);
+            effects.setVisible(false);
+            frame.setVisible(false);
+            examples.setVisible(true);
+            examples.setBounds(effectsBounds);
+        } else {
+            examples.setVisible(false);
+            perspective.setVisible(true);
+            effects.setVisible(true);
+            perspective.setBounds(effectsBounds.removeFromBottom(120));
+            effectsBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
+            effects.setBounds(effectsBounds);
+        }
+    };
+
+    if (beginnerMode) {
+        // ============================================================
+        // BEGINNER: 3-column layout — vis | resizer | effects
+        // Envelope, MIDI, and keyboard stacked at bottom of effects column
+        // ============================================================
+        juce::Component* columns[] = { &layoutVisColumnProxy, &mainResizerBar, &layoutEffectsColumnProxy };
+        mainLayout.layOutComponents(columns, 3, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
+
+        if (audioProcessor.midiEnabled->getBoolValue()) {
+            int resizerBottom = area.getBottom() - keyboardHeight - padding;
+            mainResizerBar.setBounds(mainResizerBar.getBounds().withBottom(resizerBottom));
+        }
+
+        auto effectsBounds = layoutEffectsColumnProxy.getBounds();
+
+        const bool midiOn = audioProcessor.midiEnabled->getBoolValue();
+
+        // Bottom stack (from bottom up): keyboard, envelope, MIDI
+        static constexpr int envelopeHeight = 90;
+        static constexpr int midiGroupHeight = 30;
+
+        if (midiOn) {
+            keyboardPanelBounds = juce::Rectangle<int>(
+                effectsBounds.getX(),
+                effectsBounds.getBottom() - keyboardHeight,
+                effectsBounds.getWidth(),
+                keyboardHeight);
+            keyboardViewport.setBounds(keyboardPanelBounds);
+            keyboardViewport.setVisible(true);
+            effectsBounds.removeFromBottom(keyboardHeight + padding);
+
+            envelope.setBounds(effectsBounds.removeFromBottom(envelopeHeight));
+            envelope.setVisible(true);
+            effectsBounds.removeFromBottom(padding);
+
+            // Keyboard sizing
+            const auto viewportBounds = keyboardViewport.getLocalBounds();
+            const auto whiteKeyCount = juce::CustomMidiKeyboardComponent::getWhiteKeyCount(keyboard.getRangeStart(), keyboard.getRangeEnd());
+            const auto compactKeyWidth = juce::jlimit(9.0f, 14.0f, viewportBounds.getHeight() * 0.38f);
+            const auto stretchedKeyWidth = whiteKeyCount > 0 ? (float) viewportBounds.getWidth() / (float) whiteKeyCount : compactKeyWidth;
+            keyboard.setKeyWidth(juce::jmax(compactKeyWidth, stretchedKeyWidth));
+            const auto keyboardContentWidth = juce::jmax(
+                viewportBounds.getWidth(),
+                juce::roundToInt((float) whiteKeyCount * keyboard.getKeyWidth()));
+            keyboard.setBounds(0, 0, keyboardContentWidth, viewportBounds.getHeight());
+        } else {
+            keyboardPanelBounds = {};
+            keyboardViewport.setVisible(false);
+            envelope.setVisible(false);
+        }
+
+        midi.setBounds(effectsBounds.removeFromBottom(midiGroupHeight));
+        effectsBounds.removeFromBottom(padding);
+
+        layoutVisColumn(layoutVisColumnProxy.getBounds());
+        layoutEffectsColumn(effectsBounds);
+
+        if (isVisible() && getWidth() > 0 && getHeight() > 0) {
+            audioProcessor.setProperty("mainLayoutVisSize", mainLayout.getItemCurrentRelativeSize(0));
+        }
     } else {
-        examples.setVisible(false);
-        perspective.setVisible(true);
-        effects.setVisible(true);
-        perspective.setBounds(dummyBounds.removeFromBottom(120));
-        dummyBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
-        effects.setBounds(dummyBounds);
-    }
+        // ============================================================
+        // ADVANCED: 5-column layout — vis | resizer | effects | resizer2 | right
+        // ============================================================
+        juce::Component* columns[] = { &layoutVisColumnProxy, &mainResizerBar, &layoutEffectsColumnProxy, &midiResizerBar, &layoutRightColumnProxy };
+        mainLayout.layOutComponents(columns, 5, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
 
-    if (isVisible() && getWidth() > 0 && getHeight() > 0) {
-        audioProcessor.setProperty("midiLayoutPreferredSize", midiLayout.getItemCurrentRelativeSize(2));
-        audioProcessor.setProperty("mainLayoutPreferredSize", mainLayout.getItemCurrentRelativeSize(0));
+        const bool midiOn = audioProcessor.midiEnabled->getBoolValue();
+
+        if (midiOn) {
+            int resizerBottom = area.getBottom() - keyboardHeight - padding;
+            mainResizerBar.setBounds(mainResizerBar.getBounds().withBottom(resizerBottom));
+            midiResizerBar.setBounds(midiResizerBar.getBounds().withBottom(resizerBottom));
+        }
+
+        auto effectsBounds = layoutEffectsColumnProxy.getBounds();
+        auto rightBounds   = layoutRightColumnProxy.getBounds();
+
+        if (midiOn) {
+            // Keyboard spans effects + resizer + right columns
+            keyboardPanelBounds = juce::Rectangle<int>(
+                effectsBounds.getX(),
+                area.getBottom() - keyboardHeight,
+                rightBounds.getRight() - effectsBounds.getX(),
+                keyboardHeight);
+            keyboardViewport.setBounds(keyboardPanelBounds);
+
+            const auto viewportBounds = keyboardViewport.getLocalBounds();
+            const auto whiteKeyCount = juce::CustomMidiKeyboardComponent::getWhiteKeyCount(keyboard.getRangeStart(), keyboard.getRangeEnd());
+            const auto compactKeyWidth = juce::jlimit(9.0f, 14.0f, viewportBounds.getHeight() * 0.38f);
+            const auto stretchedKeyWidth = whiteKeyCount > 0 ? (float) viewportBounds.getWidth() / (float) whiteKeyCount : compactKeyWidth;
+            keyboard.setKeyWidth(juce::jmax(compactKeyWidth, stretchedKeyWidth));
+            const auto keyboardContentWidth = juce::jmax(
+                viewportBounds.getWidth(),
+                juce::roundToInt((float) whiteKeyCount * keyboard.getKeyWidth()));
+            keyboard.setBounds(0, 0, keyboardContentWidth, viewportBounds.getHeight());
+
+            // Trim columns to exclude keyboard
+            effectsBounds.removeFromBottom(keyboardHeight + padding);
+            rightBounds.removeFromBottom(keyboardHeight + padding);
+        }
+
+        keyboardViewport.setVisible(midiOn);
+
+        layoutVisColumn(layoutVisColumnProxy.getBounds());
+        layoutEffectsColumn(effectsBounds);
+
+        // --- Right column: MIDI settings (compact), envelope, LFO, random ---
+        static constexpr int midiGroupHeight = 60;
+        midi.setBounds(rightBounds.removeFromTop(midiGroupHeight));
+        rightBounds.removeFromBottom(padding);
+
+        lfo->setMidiEnabled(midiOn);
+
+        int modAreaHeight = rightBounds.getHeight();
+        int randomPct = midiOn ? 15 : 25;
+        auto randomArea = rightBounds.removeFromBottom(modAreaHeight * randomPct / 100);
+        rightBounds.removeFromBottom(3);
+
+        if (midiOn) {
+            auto envelopeArea = rightBounds.removeFromBottom(modAreaHeight * 25 / 100);
+            rightBounds.removeFromBottom(3);
+            envelope.setBounds(envelopeArea);
+            envelope.setVisible(true);
+        } else {
+            envelope.setVisible(false);
+        }
+
+        lfo->setBounds(rightBounds);
+        random->setBounds(randomArea);
+
+        if (isVisible() && getWidth() > 0 && getHeight() > 0) {
+            audioProcessor.setProperty("mainLayoutVisSize", mainLayout.getItemCurrentRelativeSize(0));
+            audioProcessor.setProperty("mainLayoutMidiSize", mainLayout.getItemCurrentRelativeSize(4));
+        }
     }
 
     repaint();
 }
 
+void SettingsComponent::ChildLayoutUpdater::handleAsyncUpdate() {
+    owner.layoutChildren();
+}
+
 void SettingsComponent::paint(juce::Graphics& g) {
     g.setColour(juce::Colours::black);
     g.fillRoundedRectangle(volumeVisualiserBounds.toFloat(), OscirenderLookAndFeel::RECT_RADIUS);
+
+    if (! keyboardPanelBounds.isEmpty()) {
+        g.setColour(findColour(juce::ResizableWindow::backgroundColourId));
+        g.fillRoundedRectangle(keyboardPanelBounds.toFloat(), (float) OscirenderLookAndFeel::RECT_RADIUS);
+
+    }
 }
 
 // syphonLock must be held when calling this function
@@ -214,12 +440,6 @@ void SettingsComponent::update() {
 }
 
 void SettingsComponent::mouseMove(const juce::MouseEvent& event) {
-    for (int i = 0; i < 1; i++) {
-        if (toggleComponents[i]->getBounds().removeFromTop(pluginEditor.CLOSED_PREF_SIZE).contains(event.getPosition())) {
-            setMouseCursor(juce::MouseCursor::PointingHandCursor);
-            return;
-        }
-    }
     setMouseCursor(juce::MouseCursor::NormalCursor);
 }
 
@@ -234,11 +454,40 @@ void SettingsComponent::showExamples(bool shouldShow) {
 }
 
 void SettingsComponent::mouseDown(const juce::MouseEvent& event) {
-    for (int i = 0; i < 1; i++) {
-        if (toggleComponents[i]->getBounds().removeFromTop(pluginEditor.CLOSED_PREF_SIZE).contains(event.getPosition())) {
-            pluginEditor.toggleLayout(*toggleLayouts[i], prefSizes[i]);
-            resized();
-            return;
+}
+
+// --- Envelope flow-marker animation (moved from MidiComponent) ---
+
+void SettingsComponent::timerCallback() {
+    if (!audioProcessor.midiEnabled->getBoolValue()) {
+        envelope.resetFlowPersistenceForUi();
+        return;
+    }
+
+    // Send flow markers for the currently active envelope tab
+    int activeEnv = envelope.getActiveEnvIndex();
+    constexpr int kMax = OscirenderAudioProcessor::kMaxUiVoices;
+    double times[kMax];
+    bool anyActive = false;
+    for (int i = 0; i < kMax; ++i) {
+        if (audioProcessor.uiVoiceEnvActive[activeEnv][i].load(std::memory_order_relaxed)) {
+            times[i] = audioProcessor.uiVoiceEnvTimeSeconds[activeEnv][i].load(std::memory_order_relaxed);
+            anyActive = true;
+        } else {
+            times[i] = -1.0;
         }
     }
+
+    if (!anyActive) {
+        envelope.clearFlowMarkerTimesForUi();
+        return;
+    }
+
+    envelope.setFlowMarkerTimesForUi(times, kMax);
+}
+
+void SettingsComponent::DahdsrListener::handleAsyncUpdate() {
+    const int numEnvs = owner.beginnerMode ? 1 : NUM_ENVELOPES;
+    for (int e = 0; e < numEnvs; ++e)
+        owner.envelope.setDahdsrParams(e, owner.audioProcessor.getCurrentDahdsrParams(e));
 }

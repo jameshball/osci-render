@@ -1,5 +1,6 @@
 #include "VisualiserSettings.h"
 #include "VisualiserComponent.h"
+#include "../PluginProcessor.h"
 
 VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels) : parameters(p), numChannels(numChannels) {
     addAndMakeVisible(lineColour);
@@ -23,8 +24,8 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
 #endif
 #if !OSCI_PREMIUM
     addAndMakeVisible(upgradeButton);
-    upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor);
-    upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark);
+    upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor());
+    upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark());
     upgradeButton.onClick = [this] {
         if (onUpgradeRequested) {
             onUpgradeRequested();
@@ -58,8 +59,22 @@ VisualiserSettings::~VisualiserSettings() {
     parameters.screenOverlay->removeListener(this);
 }
 
+void VisualiserSettings::wireModulation(OscirenderAudioProcessor& processor) {
+    lineColour.wireModulation(processor);
+    lightEffects.wireModulation(processor);
+    videoEffects.wireModulation(processor);
+    lineEffects.wireModulation(processor);
+    sweepMs.wireModulation(processor);
+    triggerValue.wireModulation(processor);
+#if OSCI_PREMIUM
+    screenColour.wireModulation(processor);
+    scale.wireModulation(processor);
+    position.wireModulation(processor);
+#endif
+}
+
 void VisualiserSettings::paint(juce::Graphics& g) {
-    g.fillAll(Colours::darker);
+    g.fillAll(Colours::darker());
 }
 
 void VisualiserSettings::resized() {

@@ -10,6 +10,7 @@
 #include "components/VolumeComponent.h"
 #include "components/DownloaderComponent.h"
 #include "components/CustomTooltipWindow.h"
+#include "components/OverlayComponent.h"
 
 #if DEBUG
     #include "melatonin_inspector/melatonin_inspector.h"
@@ -31,6 +32,18 @@ public:
     void openAudioSettings();
     virtual void openRecordingSettings();
     virtual void showPremiumSplashScreen();
+
+    // Overlay management — any component can show/dismiss full-editor overlays
+    void showOverlay(std::unique_ptr<OverlayComponent> overlay);
+    virtual void dismissOverlay(OverlayComponent* overlay);
+
+    template<typename T>
+    T* findActiveOverlay() {
+        for (auto& o : activeOverlays)
+            if (auto* found = dynamic_cast<T*>(o.get()))
+                return found;
+        return nullptr;
+    }
 
     // Offline render: input audio file -> encoded video using Recording Settings
     void renderAudioFileToVideo();
@@ -98,6 +111,10 @@ public:
 #endif
 
     bool keyPressed(const juce::KeyPress& key) override;
+
+protected:
+    std::vector<std::unique_ptr<OverlayComponent>> activeOverlays;
+    bool visualiserWasVisibleBeforeOverlay = true;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CommonPluginEditor)
 };

@@ -12,6 +12,8 @@
 #include "../components/SwitchButton.h"
 #include "VisualiserParameters.h"
 
+class OscirenderAudioProcessor;
+
 class GroupedSettings : public juce::GroupComponent {
 public:
     GroupedSettings(std::vector<std::shared_ptr<EffectComponent>> effects, juce::String label) : effects(effects), juce::GroupComponent(label, label) {
@@ -19,7 +21,12 @@ public:
             addAndMakeVisible(effect.get());
         }
 
-        setColour(groupComponentBackgroundColourId, Colours::veryDark.withMultipliedBrightness(3.0));
+        setColour(groupComponentBackgroundColourId, Colours::veryDark().withMultipliedBrightness(3.0));
+    }
+
+    void wireModulation(OscirenderAudioProcessor& processor) {
+        for (auto& effect : effects)
+            effect->wireModulation(processor);
     }
 
     void resized() override {
@@ -46,6 +53,8 @@ class VisualiserSettings : public juce::Component, public juce::AudioProcessorPa
 public:
     VisualiserSettings(VisualiserParameters&, int numChannels = 2);
     ~VisualiserSettings();
+
+    void wireModulation(OscirenderAudioProcessor& processor);
 
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -150,7 +159,7 @@ public:
     }
 
     void paint(juce::Graphics& g) override {
-        g.fillAll(Colours::darker);
+        g.fillAll(Colours::darker());
     }
 
     void resized() override {
@@ -164,7 +173,7 @@ private:
 
 class SettingsWindow : public juce::DialogWindow {
 public:
-    SettingsWindow(juce::String name, juce::Component& component, int windowWidth, int windowHeight, int componentWidth, int componentHeight) : juce::DialogWindow(name, Colours::darker, true, true), component(component), componentHeight(componentHeight) {
+    SettingsWindow(juce::String name, juce::Component& component, int windowWidth, int windowHeight, int componentWidth, int componentHeight) : juce::DialogWindow(name, Colours::darker(), true, true), component(component), componentHeight(componentHeight) {
         setContentComponent(&viewport);
         centreWithSize(windowWidth, windowHeight);
         setResizeLimits(windowWidth, windowHeight, componentWidth, componentHeight);

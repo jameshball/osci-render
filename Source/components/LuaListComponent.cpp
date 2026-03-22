@@ -2,6 +2,7 @@
 
 LuaListComponent::LuaListComponent(OscirenderAudioProcessor& p, osci::Effect& effect) {
 	effectComponent = std::make_shared<EffectComponent>(effect);
+	effectComponent->wireModulation(p);
 
 	addAndMakeVisible(*effectComponent);
 }

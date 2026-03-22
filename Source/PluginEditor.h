@@ -17,10 +17,12 @@
 #include "components/SplashScreenComponent.h"
 #include "visualiser/VisualiserSettings.h"
 
-class OscirenderAudioProcessorEditor : public CommonPluginEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener, public juce::FileDragAndDropTarget {
+class OscirenderAudioProcessorEditor : public CommonPluginEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer {
 public:
     OscirenderAudioProcessorEditor(OscirenderAudioProcessor&);
     ~OscirenderAudioProcessorEditor() override;
+
+    void dragOperationEnded(const juce::DragAndDropTarget::SourceDetails&) override;
 
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -116,22 +118,11 @@ public:
 #endif
 
 private:
-    // Overlay management
+    // Overlay management overrides
     void showLuaDocumentation();
-    void showOverlay(std::unique_ptr<OverlayComponent> overlay);
-    void dismissOverlay(OverlayComponent* overlay);
-
-    template<typename T>
-    T* findActiveOverlay() {
-        for (auto& o : activeOverlays)
-            if (auto* found = dynamic_cast<T*>(o.get()))
-                return found;
-        return nullptr;
-    }
+    void dismissOverlay(OverlayComponent* overlay) override;
 
     std::unique_ptr<LuaDocumentationComponent> cachedLuaDocs;
-    std::vector<std::unique_ptr<OverlayComponent>> activeOverlays;
-    bool visualiserWasVisibleBeforeOverlay = true;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OscirenderAudioProcessorEditor)
 };

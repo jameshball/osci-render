@@ -722,7 +722,7 @@ void VisualiserComponent::paint(juce::Graphics &g) {
     }
 
     bool colourSpecified = isColourSpecified(buttonRowColourId);
-    auto buttonRowColour = Colours::veryDark;
+    auto buttonRowColour = Colours::veryDark();
     if (colourSpecified) {
         buttonRowColour = findColour(buttonRowColourId, true);
     }

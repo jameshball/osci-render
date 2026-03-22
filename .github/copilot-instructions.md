@@ -1,5 +1,21 @@
 # osci-render Development Guide
 
+## Communication
+
+**NEVER ask clarifying questions inline in chat.** Always use the `vscode_askQuestions` tool to present questions to the user. This provides a structured UI with selectable options and keeps the conversation focused on code.
+
+## Code Reviews
+
+When asked to do a code review, follow this workflow:
+
+1. **Review all unstaged changes.** Focus on: code quality, duplication, code structure, reusability, folder structure, performance, and potential for bugs.
+2. **List every issue** you find, numbered, with a clear description and the relevant file/line.
+3. **For each issue**, use `vscode_askQuestions` to ask whether to:
+   - **Implement the fix** — you will apply the suggested change immediately
+   - **Provide more context** — the user can explain intent before you decide
+   - **Skip** — do not implement the change
+4. **Implement all accepted fixes** within the same session, building and verifying after all changes are applied.
+
 ## Important Guidelines
 
 - **Backwards compatibility**: Always ask the user before adding backwards compatibility when changing or refactoring something. Do not assume it is needed.
@@ -75,6 +91,20 @@ cd /Users/james/osci-render \
 
 Resulting app:
 - `Builds/osci-render/MacOSX/build/Debug/osci-render.app`
+
+### Post-build app relaunch
+After a successful macOS standalone build that changes runtime behavior or UI, always relaunch the standalone app as part of task completion.
+
+Use this workflow:
+```bash
+pkill -x "osci-render" || true
+open -n /Users/james/osci-render/Builds/osci-render/MacOSX/build/Debug/osci-render.app
+```
+
+Requirements:
+- Do this automatically after the build succeeds; do not wait for the user to ask.
+- Run it in the background so the editor session does not block.
+- Ignore `pkill` failure when no app instance is running.
 
 ### Building (Windows)
 
@@ -244,7 +274,28 @@ When copying a JUCE component to customise it (e.g. `CustomAudioDeviceSelectorCo
 
 Run unit tests via CI script: `./ci/test.sh`
 
-Test configuration defined in `osci-render-test.jucer`.
+Test files live in `tests/`. Test configuration is defined in `osci-render-test.jucer`.
+
+### Running tests locally
+
+Use `run_tests.sh` for the quickest local iteration:
+
+```bash
+# Run all tests
+./run_tests.sh
+
+# Run only LFO stress tests
+./run_tests.sh --category LFO
+
+# Build and run in Release mode
+./run_tests.sh --release
+```
+
+### Running via CI
+
+```bash
+./ci/test.sh
+```
 
 ### Plugin Validation (pluginval)
 

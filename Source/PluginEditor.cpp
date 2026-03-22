@@ -5,6 +5,7 @@
 #include "../modules/juce_sharedtexture/SharedTexture.h"
 #include "CustomStandaloneFilterWindow.h"
 #include "PluginProcessor.h"
+#include "components/EffectComponent.h"
 #include "components/SyphonInputSelectorComponent.h"
 
 void OscirenderAudioProcessorEditor::registerFileRemovedCallback() {
@@ -35,8 +36,8 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     upgradeButton.onClick = [this] {
         showPremiumSplashScreen();
     };
-    upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor);
-    upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark);
+    upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor());
+    upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark());
 #endif
 
     addAndMakeVisible(console);
@@ -111,6 +112,8 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
         showPremiumSplashScreen();
     };
 #endif
+
+    visualiserSettings.wireModulation(audioProcessor);
 
 #if JUCE_WINDOWS
     // if not standalone, use native title bar for compatibility with DAWs
@@ -206,6 +209,11 @@ void OscirenderAudioProcessorEditor::initialiseCodeEditors() {
     }
     bool codeEditorVisible = std::any_cast<bool>(audioProcessor.getProperty("codeEditorVisible", false));
     fileUpdated(audioProcessor.getCurrentFileName(), codeEditorVisible);
+}
+
+void OscirenderAudioProcessorEditor::dragOperationEnded(const juce::DragAndDropTarget::SourceDetails&) {
+    EffectComponent::modAnyDragActive.store(false, std::memory_order_relaxed);
+    repaint();
 }
 
 void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
@@ -329,13 +337,6 @@ void OscirenderAudioProcessorEditor::resized() {
     audioProcessor.setProperty("luaLayoutPreferredSize", luaLayout.getItemCurrentRelativeSize(0));
 
     repaint();
-
-    if (!activeOverlays.empty()) {
-        for (auto& overlay : activeOverlays) {
-            overlay->setBounds(getLocalBounds());
-            overlay->toFront(false);
-        }
-    }
 }
 
 void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
@@ -625,40 +626,18 @@ void OscirenderAudioProcessorEditor::showLuaDocumentation() {
     showOverlay(std::move(overlay));
 }
 
-void OscirenderAudioProcessorEditor::showOverlay(std::unique_ptr<OverlayComponent> overlay) {
-    if (activeOverlays.empty()) {
-        visualiserWasVisibleBeforeOverlay = visualiser.isVisible();
-        visualiser.setVisible(false);
-    }
-
-    auto* ptr = overlay.get();
-    overlay->onDismissRequested = [this, ptr] { dismissOverlay(ptr); };
-    overlay->setBounds(getLocalBounds());
-    addAndMakeVisible(*overlay);
-    overlay->toFront(true);
-    activeOverlays.push_back(std::move(overlay));
-    resized();
-}
-
 void OscirenderAudioProcessorEditor::dismissOverlay(OverlayComponent* overlay) {
-    for (auto it = activeOverlays.begin(); it != activeOverlays.end(); ++it) {
-        if (it->get() == overlay) {
-            removeChildComponent(overlay);
-            // Reclaim LuaDocumentationComponent for reuse
-            if (dynamic_cast<LuaDocumentationComponent*>(overlay)) {
-                auto* reclaimed = static_cast<LuaDocumentationComponent*>(it->release());
-                reclaimed->onDismissRequested = nullptr;
-                cachedLuaDocs.reset(reclaimed);
+    // Reclaim LuaDocumentationComponent for reuse before the base class destroys it
+    if (dynamic_cast<LuaDocumentationComponent*>(overlay)) {
+        for (auto& o : activeOverlays) {
+            if (o.get() == overlay) {
+                cachedLuaDocs.reset(static_cast<LuaDocumentationComponent*>(o.release()));
+                cachedLuaDocs->onDismissRequested = nullptr;
+                break;
             }
-            activeOverlays.erase(it);
-            break;
         }
     }
-
-    if (activeOverlays.empty()) {
-        visualiser.setVisible(visualiserWasVisibleBeforeOverlay);
-    }
-    resized();
+    CommonPluginEditor::dismissOverlay(overlay);
 }
 
 void OscirenderAudioProcessorEditor::updateTimelineController() {

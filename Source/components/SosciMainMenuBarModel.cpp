@@ -91,26 +91,29 @@ void SosciMainMenuBarModel::resetMenuItems() {
 
     addMenuItem(1, "About sosci", [&]() {
         juce::DialogWindow::LaunchOptions options;
-        AboutComponent* about = new AboutComponent(BinaryData::sosci_logo_png, BinaryData::sosci_logo_pngSize,
-                                                   juce::String(ProjectInfo::projectName) + " by " + ProjectInfo::companyName +
-                                                       "\n"
+        AboutComponent::Info aboutInfo;
+        aboutInfo.imageData = BinaryData::sosci_logo_png;
+        aboutInfo.imageSize = BinaryData::sosci_logo_pngSize;
+        aboutInfo.productName = ProjectInfo::projectName;
+        aboutInfo.companyName = ProjectInfo::companyName;
+        aboutInfo.versionString = ProjectInfo::versionString;
 #if OSCI_PREMIUM
-                                                       "Thank you for purchasing sosci!\n"
+        aboutInfo.isPremium = true;
 #else
-            "Free version\n"
+        aboutInfo.isPremium = false;
 #endif
-                                                       "Version " +
-                                                       ProjectInfo::versionString +
-                                                       "\n\n"
-                                                       "A huge thank you to:\n"
-                                                       "Neil Thapen, for allowing me to adapt the brilliant dood.al/oscilloscope\n"
-                                                       "Kevin Kripper, for guiding much of the features and development of sosci\n"
-                                                       "DJ_Level_3, for testing throughout and helping add features\n"
-                                                       "All the community, for suggesting features and reporting issues!");
+        aboutInfo.websiteUrl = "https://osci-render.com";
+        aboutInfo.githubUrl = "https://github.com/jameshball/osci-render";
+        aboutInfo.credits = {
+            { "Neil Thapen",    "Allowing adaptation of the brilliant dood.al/oscilloscope" },
+            { "Kevin Kripper",  "Guiding much of the features and development of sosci" },
+            { "DJ_Level_3",     "Testing throughout and helping add features" },
+        };
+
+        AboutComponent* about = new AboutComponent(aboutInfo);
         options.content.setOwned(about);
-        options.content->setSize(500, 270);
         options.dialogTitle = "About";
-        options.dialogBackgroundColour = Colours::veryDark;
+        options.dialogBackgroundColour = AboutComponent::dialogBackground();
         options.escapeKeyTriggersCloseButton = true;
 #if JUCE_WINDOWS
         // if not standalone, use native title bar for compatibility with DAWs

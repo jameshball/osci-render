@@ -87,12 +87,18 @@ void EffectTypeGridComponent::setupEffectItems()
                     juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
                     audioProcessor.setPreviewEffectId(effectId);
                 }
+                if (audioProcessor.isBeginnerMode() || audioProcessor.getGlobalBoolValue("autoLinkLfos", true)) {
+                    audioProcessor.autoAssignLfosForPreview(effectId);
+                    audioProcessor.broadcaster.sendChangeMessage();
+                }
             };
             item->onHoverEnd = [this]() {
                 if (audioProcessor.getGlobalBoolValue("previewEffectOnHover", true)) {
                     juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
                     audioProcessor.clearPreviewEffect();
                 }
+                audioProcessor.clearPreviewLfoAssignments();
+                audioProcessor.broadcaster.sendChangeMessage();
             };
         }
 

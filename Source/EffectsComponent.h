@@ -22,7 +22,8 @@ private:
 	OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& editor;
 
-	SvgButton randomiseButton{ "randomise", juce::String(BinaryData::random_svg), Colours::accentColor };
+	SvgButton randomiseButton{ "randomise", juce::String(BinaryData::random_svg), Colours::accentColor() };
+	SvgButton autoLinkButton{ "autoLink", juce::String(BinaryData::link_svg), juce::Colours::white.withAlpha(0.5f), Colours::accentColor() };
 
 	AudioEffectListBoxItemData itemData;
 	EffectsListBoxModel listBoxModel;

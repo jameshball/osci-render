@@ -102,6 +102,11 @@ void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesiser
         // Snapshot DAHDSR parameters per-voice (Vital-style; peak fixed at 1.0)
         dahdsr = audioProcessor.getCurrentDahdsrParams();
         envState.reset(dahdsr);
+        // Snapshot modulation envelopes 1..N (envelope 0 == envState)
+        for (int e = 1; e < NUM_ENVELOPES; ++e) {
+            envDahdsr[e] = audioProcessor.getCurrentDahdsrParams(e);
+            envStates[e].reset(envDahdsr[e]);
+        }
         if (audioProcessor.midiEnabled->getBoolValue()) {
             // Match the frequency slider behavior: tiny epsilon prevents a weird mac glitch at certain exact frequencies.
             frequency = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber) + osci_audio::kMacFrequencyEpsilonHz;
@@ -154,6 +159,11 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         if (voiceIndex >= 0 && voiceIndex < OscirenderAudioProcessor::kMaxUiVoices) {
             audioProcessor.uiVoiceActive[voiceIndex].store(false, std::memory_order_relaxed);
             audioProcessor.uiVoiceEnvelopeTimeSeconds[voiceIndex].store(0.0, std::memory_order_relaxed);
+            for (int e = 0; e < NUM_ENVELOPES; ++e) {
+                audioProcessor.uiVoiceEnvActive[e][voiceIndex].store(false, std::memory_order_relaxed);
+                audioProcessor.uiVoiceEnvTimeSeconds[e][voiceIndex].store(0.0, std::memory_order_relaxed);
+                audioProcessor.uiVoiceEnvValue[e][voiceIndex].store(0.0f, std::memory_order_relaxed);
+            }
         }
         return;
     }
@@ -263,6 +273,11 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         }
 
         const float envValue = midiEnabled ? envState.advance(dt) : 1.0f;
+        // Advance modulation envelopes 1..N (envelope 0 == envState)
+        if (midiEnabled) {
+            for (int e = 1; e < NUM_ENVELOPES; ++e)
+                envStates[e].advance(dt);
+        }
         volumeBuffer.setSample(0, i, envValue);
 
         if (midiEnabled && envState.getStage() == DahdsrState::Stage::Done)
@@ -319,6 +334,16 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     if (voiceIndex >= 0 && voiceIndex < OscirenderAudioProcessor::kMaxUiVoices) {
         audioProcessor.uiVoiceActive[voiceIndex].store(isVoiceActive(), std::memory_order_relaxed);
         audioProcessor.uiVoiceEnvelopeTimeSeconds[voiceIndex].store(midiEnabled ? envState.getUiTimeSeconds() : 0.0, std::memory_order_relaxed);
+        // Envelope 0 telemetry from envState (it IS envelope 0)
+        audioProcessor.uiVoiceEnvActive[0][voiceIndex].store(isVoiceActive(), std::memory_order_relaxed);
+        audioProcessor.uiVoiceEnvTimeSeconds[0][voiceIndex].store(midiEnabled ? envState.getUiTimeSeconds() : 0.0, std::memory_order_relaxed);
+        audioProcessor.uiVoiceEnvValue[0][voiceIndex].store(midiEnabled ? envState.getCurrentValue() : 0.0f, std::memory_order_relaxed);
+        // Envelopes 1..N telemetry from envStates
+        for (int e = 1; e < NUM_ENVELOPES; ++e) {
+            audioProcessor.uiVoiceEnvActive[e][voiceIndex].store(isVoiceActive(), std::memory_order_relaxed);
+            audioProcessor.uiVoiceEnvTimeSeconds[e][voiceIndex].store(midiEnabled ? envStates[e].getUiTimeSeconds() : 0.0, std::memory_order_relaxed);
+            audioProcessor.uiVoiceEnvValue[e][voiceIndex].store(midiEnabled ? envStates[e].getCurrentValue() : 0.0f, std::memory_order_relaxed);
+        }
     }
 
     audioProcessor.applyToggleableEffectsToBuffer(voiceBuffer, audioProcessor.getInputBuffer(), &volumeBuffer, &frequencyBuffer, &frameSyncBuffer, &voiceEffectsMap, voicePreviewEffect);
@@ -354,6 +379,8 @@ void ShapeVoice::stopNote(float velocity, bool allowTailOff) {
     }
 
     envState.beginRelease();
+    for (int e = 1; e < NUM_ENVELOPES; ++e)
+        envStates[e].beginRelease();
 }
 
 void ShapeVoice::noteStopped() {
@@ -364,6 +391,11 @@ void ShapeVoice::noteStopped() {
     if (voiceIndex >= 0 && voiceIndex < OscirenderAudioProcessor::kMaxUiVoices) {
         audioProcessor.uiVoiceActive[voiceIndex].store(false, std::memory_order_relaxed);
         audioProcessor.uiVoiceEnvelopeTimeSeconds[voiceIndex].store(0.0, std::memory_order_relaxed);
+        for (int e = 0; e < NUM_ENVELOPES; ++e) {
+            audioProcessor.uiVoiceEnvActive[e][voiceIndex].store(false, std::memory_order_relaxed);
+            audioProcessor.uiVoiceEnvTimeSeconds[e][voiceIndex].store(0.0, std::memory_order_relaxed);
+            audioProcessor.uiVoiceEnvValue[e][voiceIndex].store(0.0f, std::memory_order_relaxed);
+        }
     }
 }
 

@@ -4,14 +4,31 @@
 #include "LabelledTextBox.h"
 #include "SvgButton.h"
 
-class EffectComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater, public juce::SettableTooltipClient, private juce::Slider::Listener {
+class OscirenderAudioProcessor;
+
+class ModulationUpdateBroadcaster;
+
+class EffectComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater, public juce::SettableTooltipClient, private juce::Slider::Listener, public juce::DragAndDropTarget {
 public:
     EffectComponent(osci::Effect& effect, int index);
     EffectComponent(osci::Effect& effect);
     ~EffectComponent();
 
+    // Global flag: when true, all EffectComponents draw a highlight border
+    // to indicate they are valid modulation drop targets.
+    static std::atomic<bool> modAnyDragActive;
+
+    // When non-empty, the EffectComponent with this paramId draws a hover highlight.
+    static juce::String highlightedParamId;
+
+    // Modulation range highlight: when hovering a depth indicator, show the modulated range on the slider
+    static juce::String modRangeParamId;
+    static std::atomic<float> modRangeDepth;
+    static std::atomic<bool> modRangeBipolar;
+
     void resized() override;
     void paint(juce::Graphics& g) override;
+    void paintOverChildren(juce::Graphics& g) override;
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void handleAsyncUpdate() override;
@@ -25,6 +42,38 @@ public:
 
     void setComponent(std::shared_ptr<juce::Component> component);
 
+    // DragAndDropTarget overrides for LFO assignment
+    bool isInterestedInDragSource(const SourceDetails& dragSourceDetails) override;
+    void itemDragEnter(const SourceDetails& dragSourceDetails) override;
+    void itemDragExit(const SourceDetails& dragSourceDetails) override;
+    void itemDropped(const SourceDetails& dragSourceDetails) override;
+
+    // Modulation display info returned by query callbacks.
+    struct ModInfo {
+        bool active = false;           // true if any source is assigned to this param
+        float modulatedPos = 0.0f;     // pixel position of the current modulated value
+        juce::Colour colour;           // blended colour from all assigned sources
+    };
+
+    // Describes one modulation source type (LFO, Envelope, Random, etc.)
+    // All source types are handled identically via these bindings.
+    struct ModBinding {
+        juce::String dragPrefix;       // "LFO", "ENV", "RNG" — matched in "MOD:LFO:0" drag descriptions
+        juce::String propPrefix;       // "lfo", "env", "rng" — used as slider property key prefix
+        std::function<void(int, const juce::String&)> onDropped;  // add assignment callback
+        std::function<ModInfo(const juce::String& paramId, juce::Slider& slider)> query;  // query callback
+    };
+
+    // All registered modulation bindings — populated by wireModulation().
+    std::vector<ModBinding> modBindings;
+
+    // Update all modulation displays (call from a parent timer, not per-instance).
+    void updateModulationDisplay();
+
+    // Wire standard modulation callbacks (LFO + envelope drop, query) to the processor.
+    // Call this after construction to enable modulation for this slider.
+    void wireModulation(OscirenderAudioProcessor& processor);
+
     juce::Slider slider;
     juce::Slider lfoSlider;
     osci::Effect& effect;
@@ -37,10 +86,16 @@ public:
             addAndMakeVisible(popupLabel);
             addAndMakeVisible(min);
             addAndMakeVisible(max);
-            addAndMakeVisible(lfoStartLabel);
-            addAndMakeVisible(lfoEndLabel);
-            addAndMakeVisible(lfoStartSlider);
-            addAndMakeVisible(lfoEndSlider);
+
+            // LFO start/end sliders only in beginner mode (when per-param LFO sub-params exist)
+            hasLfoParams = parameter->lfoStartPercent != nullptr && parameter->lfoEndPercent != nullptr;
+            if (hasLfoParams) {
+                addAndMakeVisible(lfoStartLabel);
+                addAndMakeVisible(lfoEndLabel);
+                addAndMakeVisible(lfoStartSlider);
+                addAndMakeVisible(lfoEndSlider);
+            }
+
             addAndMakeVisible(smoothValueChangeLabel);
             addAndMakeVisible(smoothValueChangeSlider);
 
@@ -77,21 +132,23 @@ public:
             lfoEndLabel.setJustificationType(juce::Justification::centred);
             lfoEndLabel.setFont(juce::Font(14.0f, juce::Font::bold));
 
-            lfoStartSlider.setRange(parameter->lfoStartPercent->min, parameter->lfoStartPercent->max, parameter->lfoStartPercent->step);
-            lfoStartSlider.setValue(parameter->lfoStartPercent->getValueUnnormalised(), juce::dontSendNotification);
-            lfoStartSlider.setTextValueSuffix("%");
-            lfoStartSlider.addListener(this);
-            lfoStartSlider.onValueChange = [this]() {
-                parameter->lfoStartPercent->setUnnormalisedValueNotifyingHost(lfoStartSlider.getValue());
-            };
+            if (hasLfoParams) {
+                lfoStartSlider.setRange(parameter->lfoStartPercent->min, parameter->lfoStartPercent->max, parameter->lfoStartPercent->step);
+                lfoStartSlider.setValue(parameter->lfoStartPercent->getValueUnnormalised(), juce::dontSendNotification);
+                lfoStartSlider.setTextValueSuffix("%");
+                lfoStartSlider.addListener(this);
+                lfoStartSlider.onValueChange = [this]() {
+                    parameter->lfoStartPercent->setUnnormalisedValueNotifyingHost(lfoStartSlider.getValue());
+                };
 
-            lfoEndSlider.setRange(parameter->lfoEndPercent->min, parameter->lfoEndPercent->max, parameter->lfoEndPercent->step);
-            lfoEndSlider.setValue(parameter->lfoEndPercent->getValueUnnormalised(), juce::dontSendNotification);
-            lfoEndSlider.setTextValueSuffix("%");
-            lfoEndSlider.addListener(this);
-            lfoEndSlider.onValueChange = [this]() {
-                parameter->lfoEndPercent->setUnnormalisedValueNotifyingHost(lfoEndSlider.getValue());
-            };
+                lfoEndSlider.setRange(parameter->lfoEndPercent->min, parameter->lfoEndPercent->max, parameter->lfoEndPercent->step);
+                lfoEndSlider.setValue(parameter->lfoEndPercent->getValueUnnormalised(), juce::dontSendNotification);
+                lfoEndSlider.setTextValueSuffix("%");
+                lfoEndSlider.addListener(this);
+                lfoEndSlider.onValueChange = [this]() {
+                    parameter->lfoEndPercent->setUnnormalisedValueNotifyingHost(lfoEndSlider.getValue());
+                };
+            }
 
             smoothValueChangeLabel.setText("Smooth Value Change Speed", juce::dontSendNotification);
             smoothValueChangeLabel.setJustificationType(juce::Justification::centred);
@@ -109,8 +166,10 @@ public:
         }
         
         ~EffectSettingsComponent() override {
-            lfoStartSlider.removeListener(this);
-            lfoEndSlider.removeListener(this);
+            if (hasLfoParams) {
+                lfoStartSlider.removeListener(this);
+                lfoEndSlider.removeListener(this);
+            }
         }
 
         void resized() override {
@@ -118,10 +177,12 @@ public:
             popupLabel.setBounds(bounds.removeFromTop(30));
             min.setBounds(bounds.removeFromTop(40));
             max.setBounds(bounds.removeFromTop(40));
-            lfoStartLabel.setBounds(bounds.removeFromTop(20));
-            lfoStartSlider.setBounds(bounds.removeFromTop(40));
-            lfoEndLabel.setBounds(bounds.removeFromTop(20));
-            lfoEndSlider.setBounds(bounds.removeFromTop(40));
+            if (hasLfoParams) {
+                lfoStartLabel.setBounds(bounds.removeFromTop(20));
+                lfoStartSlider.setBounds(bounds.removeFromTop(40));
+                lfoEndLabel.setBounds(bounds.removeFromTop(20));
+                lfoEndSlider.setBounds(bounds.removeFromTop(40));
+            }
             smoothValueChangeLabel.setBounds(bounds.removeFromTop(20));
             smoothValueChangeSlider.setBounds(bounds.removeFromTop(40));
         }
@@ -146,6 +207,7 @@ public:
 
     private:
         osci::EffectParameter* parameter;
+        bool hasLfoParams = false;
         juce::Label popupLabel;
         LabelledTextBox min{"Min"};
         LabelledTextBox max{"Max"};
@@ -182,6 +244,7 @@ private:
     void setupComponent();
     bool lfoEnabled = true;
     bool sidechainEnabled = true;
+    bool modDropHighlight = false;
     std::shared_ptr<juce::Component> component;
 
     std::unique_ptr<SvgButton> sidechainButton;
@@ -197,6 +260,8 @@ private:
     juce::Label label;
 
     SvgButton settingsButton = {"settingsButton", BinaryData::cog_svg, juce::Colours::white};
+
+    ModulationUpdateBroadcaster* modBroadcaster = nullptr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EffectComponent)
 };

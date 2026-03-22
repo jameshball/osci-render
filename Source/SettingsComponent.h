@@ -2,6 +2,9 @@
 
 #include <JuceHeader.h>
 
+#include "components/CustomMidiKeyboardComponent.h"
+#include "components/ScrollFadeViewport.h"
+
 #include "LookAndFeel.h"
 #include "EffectsComponent.h"
 #include "FrameSettingsComponent.h"
@@ -9,12 +12,15 @@
 #include "MidiComponent.h"
 #include "PerspectiveComponent.h"
 #include "PluginProcessor.h"
+#include "components/modulation/EnvelopeComponent.h"
 #include "components/OpenFileComponent.h"
 #include "components/FileControlsComponent.h"
 #include "components/FractalComponent.h"
+#include "components/modulation/LfoComponent.h"
+#include "components/modulation/RandomComponent.h"
 
 class OscirenderAudioProcessorEditor;
-class SettingsComponent : public juce::Component, public juce::AudioProcessorParameter::Listener {
+class SettingsComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, private juce::Timer {
 public:
     SettingsComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
     ~SettingsComponent() override;
@@ -33,6 +39,7 @@ public:
 private:
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& pluginEditor;
+    bool beginnerMode = false;
 
     FileControlsComponent fileControls{audioProcessor, pluginEditor};
     PerspectiveComponent perspective{audioProcessor, pluginEditor};
@@ -42,18 +49,53 @@ private:
     FractalComponent fractalEditor{audioProcessor, pluginEditor};
     OpenFileComponent examples{audioProcessor};
 
+    // Free-standing components (previously inside MidiComponent)
+    EnvelopeComponent envelope;
+    std::unique_ptr<LfoComponent> lfo;
+    std::unique_ptr<RandomComponent> random;
+    ScrollFadeViewport keyboardViewport;
+    juce::CustomMidiKeyboardComponent keyboard;
+
     bool examplesVisible = false;
 
-    juce::StretchableLayoutManager midiLayout;
-    juce::StretchableLayoutResizerBar midiResizerBar{&midiLayout, 1, false};
+    // Three-column horizontal layout: visColumn | resizer | effectsColumn | resizer2 | rightColumn
     juce::StretchableLayoutManager mainLayout;
     juce::StretchableLayoutResizerBar mainResizerBar{&mainLayout, 1, true};
-
-    juce::Component* toggleComponents[1] = {&midi};
-    juce::StretchableLayoutManager* toggleLayouts[1] = {&midiLayout};
-    double prefSizes[1] = {300};
+    juce::StretchableLayoutResizerBar midiResizerBar{&mainLayout, 3, true};
 
     juce::Rectangle<int> volumeVisualiserBounds;
+    juce::Rectangle<int> keyboardPanelBounds;
+
+    // Envelope flow-marker animation timer
+    void timerCallback() override;
+
+    // Proxy components whose bounds are set by layOutComponents() in resized().
+    // They persist into the deferred layoutChildren() call so the async path
+    // reads the same column geometry that was computed synchronously.
+    juce::Component layoutVisColumnProxy, layoutEffectsColumnProxy, layoutRightColumnProxy;
+
+    // Deferred child-layout updater – coalesces rapid resizer-bar drag events
+    // so that the expensive child setBounds cascade runs at most once per
+    // message-loop iteration (≤60fps) while the resizerbar itself tracks
+    // the cursor synchronously at full rate.
+    struct ChildLayoutUpdater : public juce::AsyncUpdater {
+        SettingsComponent& owner;
+        explicit ChildLayoutUpdater(SettingsComponent& o) : owner(o) {}
+        void handleAsyncUpdate() override;
+    };
+    ChildLayoutUpdater childLayoutUpdater{*this};
+
+    void layoutChildren();
+
+    // DAHDSR parameter listener helper
+    struct DahdsrListener : public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater {
+        SettingsComponent& owner;
+        DahdsrListener(SettingsComponent& o) : owner(o) {}
+        void parameterValueChanged(int, float) override { triggerAsyncUpdate(); }
+        void parameterGestureChanged(int, bool) override {}
+        void handleAsyncUpdate() override;
+    };
+    DahdsrListener dahdsrListener{*this};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SettingsComponent)
 };

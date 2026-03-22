@@ -35,7 +35,7 @@ private:
     SvgButton playButton{"Play", BinaryData::play_svg, juce::Colours::white, juce::Colours::white};
     SvgButton pauseButton{"Pause", BinaryData::pause_svg, juce::Colours::white, juce::Colours::white};
     SvgButton stopButton{"Stop", BinaryData::stop_svg, juce::Colours::white, juce::Colours::white};
-    SvgButton repeatButton{"Repeat", BinaryData::repeat_svg, juce::Colours::white, Colours::accentColor};
+    SvgButton repeatButton{"Repeat", BinaryData::repeat_svg, juce::Colours::white, Colours::accentColor()};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TimelineComponent)
 };

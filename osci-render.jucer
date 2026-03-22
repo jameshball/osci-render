@@ -19,6 +19,8 @@
               file="Resources/fonts/FiraSans-Italic.ttf"/>
         <FILE id="uStS0H" name="FiraSans-Regular.ttf" compile="0" resource="1"
               file="Resources/fonts/FiraSans-Regular.ttf"/>
+        <FILE id="SBWt7K" name="FiraSans-SemiBold.ttf" compile="0" resource="1"
+              file="Resources/fonts/FiraSans-SemiBold.ttf"/>
       </GROUP>
       <GROUP id="{F3815953-00C0-3876-5552-BDE98F3233D9}" name="gpla">
         <FILE id="euGQq0" name="fallback.gpla" compile="0" resource="1" file="Resources/gpla/fallback.gpla"/>
@@ -78,6 +80,7 @@
         <FILE id="laB1fX" name="bit-crush.svg" compile="0" resource="1" file="Resources/svg/bit-crush.svg"/>
         <FILE id="LJpyE5" name="blender.svg" compile="0" resource="1" file="Resources/svg/blender.svg"/>
         <FILE id="Rs9Xr6" name="bounce.svg" compile="0" resource="1" file="Resources/svg/bounce.svg"/>
+        <FILE id="bR5h1v" name="brush.svg" compile="0" resource="1" file="Resources/svg/brush.svg"/>
         <FILE id="rQlbqP" name="bulge.svg" compile="0" resource="1" file="Resources/svg/bulge.svg"/>
         <FILE id="hwlzvW" name="card.svg" compile="0" resource="1" file="Resources/svg/card.svg"/>
         <FILE id="GQM3jZ" name="cash.svg" compile="0" resource="1" file="Resources/svg/cash.svg"/>
@@ -85,6 +88,7 @@
         <FILE id="y9tCpG" name="clippy.svg" compile="0" resource="1" file="Resources/svg/clippy.svg"/>
         <FILE id="jYG5GY" name="close.svg" compile="0" resource="1" file="Resources/svg/close.svg"/>
         <FILE id="rl17ZK" name="cog.svg" compile="0" resource="1" file="Resources/svg/cog.svg"/>
+        <FILE id="cPySvg" name="copy.svg" compile="0" resource="1" file="Resources/svg/copy.svg"/>
         <FILE id="pTnUPp" name="cube.svg" compile="0" resource="1" file="Resources/svg/cube.svg"/>
         <FILE id="toeDbG" name="dash.svg" compile="0" resource="1" file="Resources/svg/dash.svg"/>
         <FILE id="bH7fkX" name="delay.svg" compile="0" resource="1" file="Resources/svg/delay.svg"/>
@@ -98,6 +102,7 @@
         <FILE id="Z2xdIc" name="dodecahedron.svg" compile="0" resource="1"
               file="Resources/svg/dodecahedron.svg"/>
         <FILE id="QkDLXs" name="donut.svg" compile="0" resource="1" file="Resources/svg/donut.svg"/>
+        <FILE id="HsksoZ" name="drag.svg" compile="0" resource="1" file="Resources/svg/drag.svg"/>
         <FILE id="I5dGjs" name="duplicator.svg" compile="0" resource="1" file="Resources/svg/duplicator.svg"/>
         <FILE id="YwkQpy" name="fixed_rotate.svg" compile="0" resource="1"
               file="Resources/svg/fixed_rotate.svg"/>
@@ -131,6 +136,7 @@
         <FILE id="pSc1mq" name="osci.svg" compile="0" resource="1" file="Resources/svg/osci.svg"/>
         <FILE id="rotjUT" name="oscilloscope.svg" compile="0" resource="1"
               file="Resources/svg/oscilloscope.svg"/>
+        <FILE id="pStSvg" name="paste.svg" compile="0" resource="1" file="Resources/svg/paste.svg"/>
         <FILE id="f2D5tv" name="pause.svg" compile="0" resource="1" file="Resources/svg/pause.svg"/>
         <FILE id="D2AI1b" name="pencil.svg" compile="0" resource="1" file="Resources/svg/pencil.svg"/>
         <FILE id="zFdUYi" name="planet.svg" compile="0" resource="1" file="Resources/svg/planet.svg"/>
@@ -199,6 +205,15 @@
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
         <FILE id="Y1Qska" name="DahdsrEnvelope.h" compile="0" resource="0"
               file="Source/audio/DahdsrEnvelope.h"/>
+        <FILE id="GrNdH1" name="GraphNode.h" compile="0" resource="0" file="Source/audio/GraphNode.h"/>
+        <FILE id="LfStH1" name="LfoState.h" compile="0" resource="0" file="Source/audio/LfoState.h"/>
+        <FILE id="LfStC1" name="LfoState.cpp" compile="1" resource="0" file="Source/audio/LfoState.cpp"/>
+        <FILE id="LfPmH1" name="LfoPresetManager.h" compile="0" resource="0"
+              file="Source/audio/LfoPresetManager.h"/>
+        <FILE id="LfPmC1" name="LfoPresetManager.cpp" compile="1" resource="0"
+              file="Source/audio/LfoPresetManager.cpp"/>
+        <FILE id="EnStH1" name="EnvState.h" compile="0" resource="0" file="Source/audio/EnvState.h"/>
+        <FILE id="MdAsH1" name="ModAssignment.h" compile="0" resource="0" file="Source/audio/ModAssignment.h"/>
         <FILE id="EjkbRe" name="PolygonizerEffect.h" compile="0" resource="0"
               file="Source/audio/PolygonizerEffect.h"/>
         <FILE id="XSUjDz" name="KaleidoscopeEffect.h" compile="0" resource="0"
@@ -279,6 +294,10 @@
               file="Source/components/CustomTooltipWindow.cpp"/>
         <FILE id="A4ukex" name="CustomTooltipWindow.h" compile="0" resource="0"
               file="Source/components/CustomTooltipWindow.h"/>
+        <FILE id="CuMkC1" name="CustomMidiKeyboardComponent.cpp" compile="1"
+              resource="0" file="Source/components/CustomMidiKeyboardComponent.cpp"/>
+        <FILE id="CuMkH1" name="CustomMidiKeyboardComponent.h" compile="0"
+              resource="0" file="Source/components/CustomMidiKeyboardComponent.h"/>
         <FILE id="gPTmR4" name="AboutComponent.cpp" compile="1" resource="0"
               file="Source/components/AboutComponent.cpp"/>
         <FILE id="vDlOTn" name="AboutComponent.h" compile="0" resource="0"
@@ -387,14 +406,76 @@
               file="Source/components/VolumeComponent.cpp"/>
         <FILE id="MWkfTv" name="VolumeComponent.h" compile="0" resource="0"
               file="Source/components/VolumeComponent.h"/>
+        <FILE id="VTbLH1" name="VerticalTabListComponent.h" compile="0" resource="0"
+              file="Source/components/VerticalTabListComponent.h"/>
+        <FILE id="VPpHlp" name="ValuePopupHelper.h" compile="0" resource="0"
+              file="Source/components/ValuePopupHelper.h"/>
+        <FILE id="PhSldr" name="PhaseSliderComponent.h" compile="0" resource="0"
+              file="Source/components/PhaseSliderComponent.h"/>
+        <FILE id="RtKnbC" name="RotaryKnobComponent.h" compile="0" resource="0"
+              file="Source/components/RotaryKnobComponent.h"/>
+        <FILE id="KnbCnt" name="KnobContainerComponent.h" compile="0" resource="0"
+              file="Source/components/KnobContainerComponent.h"/>
+        <FILE id="DkBrPt" name="DarkBarPainter.h" compile="0" resource="0"
+              file="Source/components/DarkBarPainter.h"/>
+        <FILE id="LbBrCm" name="LabelledBarComponent.h" compile="0" resource="0"
+              file="Source/components/LabelledBarComponent.h"/>
         <FILE id="Fr3001" name="FractalComponent.cpp" compile="1" resource="0"
               file="Source/components/FractalComponent.cpp"/>
         <FILE id="Fr3002" name="FractalComponent.h" compile="0" resource="0"
               file="Source/components/FractalComponent.h"/>
         <FILE id="WHz3FS" name="EnvelopeComponent.cpp" compile="1" resource="0"
-              file="Source/components/EnvelopeComponent.cpp"/>
+              file="Source/components/modulation/EnvelopeComponent.cpp"/>
         <FILE id="A8OllZ" name="EnvelopeComponent.h" compile="0" resource="0"
-              file="Source/components/EnvelopeComponent.h"/>
+              file="Source/components/modulation/EnvelopeComponent.h"/>
+        <FILE id="MdHlH1" name="ModulationHelper.h" compile="0" resource="0"
+              file="Source/components/modulation/ModulationHelper.h"/>
+        <FILE id="MdHlC1" name="ModulationHelper.cpp" compile="1" resource="0"
+              file="Source/components/modulation/ModulationHelper.cpp"/>
+        <FILE id="MdScH1" name="ModulationSourceComponent.h" compile="0" resource="0"
+              file="Source/components/modulation/ModulationSourceComponent.h"/>
+        <FILE id="MdScC1" name="ModulationSourceComponent.cpp" compile="1"
+              resource="0" file="Source/components/modulation/ModulationSourceComponent.cpp"/>
+        <FILE id="FlTrH1" name="FlowTrailRenderer.h" compile="0" resource="0"
+              file="Source/components/modulation/FlowTrailRenderer.h"/>
+        <FILE id="NdGrC1" name="NodeGraphComponent.h" compile="0" resource="0"
+              file="Source/components/modulation/NodeGraphComponent.h"/>
+        <FILE id="NdGrC2" name="NodeGraphComponent.cpp" compile="1" resource="0"
+              file="Source/components/modulation/NodeGraphComponent.cpp"/>
+        <FILE id="LfCmH1" name="LfoComponent.h" compile="0" resource="0" file="Source/components/modulation/LfoComponent.h"/>
+        <FILE id="LfCmC2" name="LfoComponent.cpp" compile="1" resource="0"
+              file="Source/components/modulation/LfoComponent.cpp"/>
+        <FILE id="LfPbH1" name="LfoPresetBrowserOverlay.h" compile="0" resource="0"
+              file="Source/components/modulation/LfoPresetBrowserOverlay.h"/>
+        <FILE id="LfPbC2" name="LfoPresetBrowserOverlay.cpp" compile="1" resource="0"
+              file="Source/components/modulation/LfoPresetBrowserOverlay.cpp"/>
+        <FILE id="LfRtH1" name="ModulationRateComponent.h" compile="0" resource="0"
+              file="Source/components/modulation/ModulationRateComponent.h"/>
+        <FILE id="LfRtC2" name="ModulationRateComponent.cpp" compile="1" resource="0"
+              file="Source/components/modulation/ModulationRateComponent.cpp"/>
+        <FILE id="MdCtH1" name="ModulationControlComponent.h" compile="0" resource="0"
+              file="Source/components/modulation/ModulationControlComponent.h"/>
+        <FILE id="LfMdH1" name="ModulationModeComponent.h" compile="0" resource="0"
+              file="Source/components/modulation/ModulationModeComponent.h"/>
+        <FILE id="LfMdC2" name="ModulationModeComponent.cpp" compile="1" resource="0"
+              file="Source/components/modulation/ModulationModeComponent.cpp"/>
+        <FILE id="RnGrH1" name="RandomGraphComponent.h" compile="0" resource="0"
+              file="Source/components/modulation/RandomGraphComponent.h"/>
+        <FILE id="RnGrC2" name="RandomGraphComponent.cpp" compile="1" resource="0"
+              file="Source/components/modulation/RandomGraphComponent.cpp"/>
+        <FILE id="RnCmH1" name="RandomComponent.h" compile="0" resource="0"
+              file="Source/components/modulation/RandomComponent.h"/>
+        <FILE id="RnCmC2" name="RandomComponent.cpp" compile="1" resource="0"
+              file="Source/components/modulation/RandomComponent.cpp"/>
+        <FILE id="RnStH1" name="RandomState.h" compile="0" resource="0" file="Source/audio/RandomState.h"/>
+        <FILE id="MdTyH1" name="ModulationTypes.h" compile="0" resource="0"
+              file="Source/audio/ModulationTypes.h"/>
+        <FILE id="TmpCH1" name="TempoComponent.h" compile="0" resource="0"
+              file="Source/components/modulation/TempoComponent.h"/>
+        <FILE id="TmpCC2" name="TempoComponent.cpp" compile="1" resource="0"
+              file="Source/components/modulation/TempoComponent.cpp"/>
+        <FILE id="InEdH1" name="InlineEditorHelper.h" compile="0" resource="0"
+              file="Source/components/modulation/InlineEditorHelper.h"/>
       </GROUP>
       <GROUP id="{A3E24187-62A5-AB8D-8837-14043B89A640}" name="gpla">
         <FILE id="KvDV8j" name="LineArtParser.cpp" compile="1" resource="0"
@@ -863,6 +944,7 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
+        <MODULEPATH id="melatonin_blur" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
@@ -905,6 +987,7 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
+        <MODULEPATH id="melatonin_blur" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
       </MODULEPATHS>
     </VS2022>
@@ -956,6 +1039,7 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
+        <MODULEPATH id="melatonin_blur" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
@@ -990,6 +1074,7 @@
     <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_sharedtexture" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="melatonin_blur" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="melatonin_inspector" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>

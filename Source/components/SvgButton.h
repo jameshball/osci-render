@@ -3,7 +3,7 @@
 
 class SvgButton : public juce::DrawableButton, public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater {
  public:
-    SvgButton(juce::String name, juce::String svg, juce::Colour colour, juce::Colour colourOn, osci::BooleanParameter* toggle = nullptr, juce::String toggledSvg = "") : juce::DrawableButton(name, juce::DrawableButton::ButtonStyle::ImageFitted), toggle(toggle) {
+    SvgButton(juce::String name, juce::String svg, juce::Colour colour, juce::Colour colourOn, osci::BooleanParameter* toggle = nullptr, juce::String toggledSvg = "") : juce::DrawableButton(name, juce::DrawableButton::ButtonStyle::ImageFitted), toggle(toggle), svgSource(svg) {
         auto doc = juce::XmlDocument::parse(svg);
         
         changeSvgColour(doc.get(), colour);
@@ -150,6 +150,8 @@ private:
         })
         .build();
 
+    juce::String svgSource;
+
     void changeSvgColour(juce::XmlElement* xml, juce::Colour colour) {
         forEachXmlChildElement(*xml, xmlnode) {
             xmlnode->setAttribute("fill", '#' + colour.toDisplayString(false));
@@ -170,6 +172,22 @@ public:
     }
 
     juce::AffineTransform getImageTransform() const { return imageTransform; }
+
+    // Rebuild the "on" state images with a new colour.
+    void setOnColour(juce::Colour colourOn) {
+        auto doc = juce::XmlDocument::parse(svgSource);
+        if (doc == nullptr) return;
+        changeSvgColour(doc.get(), colourOn);
+        normalImageOn = juce::Drawable::createFromSVG(*doc);
+        changeSvgColour(doc.get(), colourOn.withBrightness(0.7f));
+        overImageOn = juce::Drawable::createFromSVG(*doc);
+        changeSvgColour(doc.get(), colourOn.withBrightness(0.5f));
+        downImageOn = juce::Drawable::createFromSVG(*doc);
+        changeSvgColour(doc.get(), colourOn.withBrightness(0.3f));
+        disabledImageOn = juce::Drawable::createFromSVG(*doc);
+        setImages(normalImage.get(), overImage.get(), downImage.get(), disabledImage.get(),
+                  normalImageOn.get(), overImageOn.get(), downImageOn.get(), disabledImageOn.get());
+    }
 
 private:
     void applyImageTransform() {

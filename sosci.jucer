@@ -19,6 +19,8 @@
               file="Resources/fonts/FiraSans-Italic.ttf"/>
         <FILE id="arLp4R" name="FiraSans-Regular.ttf" compile="0" resource="1"
               file="Resources/fonts/FiraSans-Regular.ttf"/>
+        <FILE id="SBWt8K" name="FiraSans-SemiBold.ttf" compile="0" resource="1"
+              file="Resources/fonts/FiraSans-SemiBold.ttf"/>
       </GROUP>
       <GROUP id="{525C568C-29E9-D0A2-9773-8A04981C5575}" name="images">
         <FILE id="vNhqT4" name="sosci_logo.png" compile="0" resource="1" file="Resources/images/sosci_logo.png"/>
@@ -150,6 +152,10 @@
               file="Source/components/AboutComponent.cpp"/>
         <FILE id="FtOv3F" name="AboutComponent.h" compile="0" resource="0"
               file="Source/components/AboutComponent.h"/>
+        <FILE id="CuMkC2" name="CustomMidiKeyboardComponent.cpp" compile="1"
+              resource="0" file="Source/components/CustomMidiKeyboardComponent.cpp"/>
+        <FILE id="CuMkH2" name="CustomMidiKeyboardComponent.h" compile="0"
+              resource="0" file="Source/components/CustomMidiKeyboardComponent.h"/>
         <FILE id="SKySvH" name="CustomTooltipWindow.cpp" compile="1" resource="0"
               file="Source/components/CustomTooltipWindow.cpp"/>
         <FILE id="kgwbHY" name="CustomTooltipWindow.h" compile="0" resource="0"

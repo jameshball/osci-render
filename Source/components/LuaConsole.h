@@ -28,7 +28,7 @@ private:
     int consoleLines = 0;
 
     SvgButton clearConsoleButton { "clearConsole", juce::String(BinaryData::delete_svg), juce::Colours::red };
-    SvgButton pauseConsoleButton { "pauseConsole", juce::String(BinaryData::pause_svg), juce::Colours::white, Colours::accentColor };
+    SvgButton pauseConsoleButton { "pauseConsole", juce::String(BinaryData::pause_svg), juce::Colours::white, Colours::accentColor() };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LuaConsole)
 };

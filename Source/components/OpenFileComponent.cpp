@@ -10,7 +10,7 @@ OpenFileComponent::OpenFileComponent(OscirenderAudioProcessor& processor)
 
     addAndMakeVisible(startImportButton);
     startImportButton.onClick = [this]() { openFileChooser(); };
-    startImportButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor);
+    startImportButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor());
     startImportButton.setColour(juce::TextButton::textColourOffId, juce::Colours::black);
 
     addAndMakeVisible(chooseExampleLabel);
@@ -25,7 +25,7 @@ OpenFileComponent::OpenFileComponent(OscirenderAudioProcessor& processor)
     closeButton.onClick = [this]() { if (onClosed) onClosed(); };
 
     auto addCat = [this](CategoryViews& cat) {
-        cat.group.setColour(groupComponentBackgroundColourId, Colours::darker.darker(0.2));
+        cat.group.setColour(groupComponentBackgroundColourId, Colours::darker().darker(0.2));
         content.addAndMakeVisible(cat.group);
         content.addAndMakeVisible(cat.grid);
         cat.grid.setUseViewport(false);

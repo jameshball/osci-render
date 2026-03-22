@@ -106,9 +106,13 @@
         <FILE id="V3Q6n2" name="Frustum.cpp" compile="1" resource="0" file="Source/obj/Frustum.cpp"/>
         <FILE id="m9wauB" name="Frustum.h" compile="0" resource="0" file="Source/obj/Frustum.h"/>
       </GROUP>
-      <FILE id="bQ1rDR" name="TestMain.cpp" compile="1" resource="0" file="Source/TestMain.cpp"/>
+      <FILE id="bQ1rDR" name="TestMain.cpp" compile="1" resource="0" file="tests/TestMain.cpp"/>
       <FILE id="H4tQvH" name="BenchmarkAnimateValues.cpp" compile="1" resource="0"
-            file="Source/BenchmarkAnimateValues.cpp"/>
+            file="tests/BenchmarkAnimateValues.cpp"/>
+      <FILE id="LfoStr" name="LfoStressTest.cpp" compile="1" resource="0"
+            file="tests/LfoStressTest.cpp"/>
+      <FILE id="LfStH2" name="LfoState.h" compile="0" resource="0" file="Source/audio/LfoState.h"/>
+      <FILE id="LfStC2" name="LfoState.cpp" compile="1" resource="0" file="Source/audio/LfoState.cpp"/>
     </GROUP>
   </MAINGROUP>
   <MODULES>
