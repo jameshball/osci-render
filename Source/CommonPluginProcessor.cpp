@@ -53,7 +53,10 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
     // locking isn't necessary here because we are in the constructor
 
     for (auto effect : visualiserParameters.effects) {
-        permanentEffects.push_back(effect);
+        // Only add to effects (for parameter management / save / load).
+        // NOT added to permanentEffects — these are animated and modulated
+        // exclusively on the renderer thread to avoid data races with the
+        // audio thread. They are shader-only effects (no audio processing).
         effects.push_back(effect);
     }
     

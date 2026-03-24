@@ -305,6 +305,14 @@ OscirenderAudioProcessor::~OscirenderAudioProcessor() {
     for (int i = luaEffects.size() - 1; i >= 0; i--) {
         luaEffects[i]->parameters[0]->removeListener(this);
     }
+    // Clear all effect vectors that may reference luaEffectState before it is
+    // destroyed (it's a member of this class, destroyed after the body).
+    // Without this, ~CommonAudioProcessor destroys the vectors AFTER
+    // luaEffectState is freed, causing a use-after-free in ~CustomEffect.
+    luaEffects.clear();
+    toggleableEffects.clear();
+    permanentEffects.clear();
+    effects.clear();
     releaseShape->removeListener(this);
     releaseTime->removeListener(this);
     sustainLevel->removeListener(this);

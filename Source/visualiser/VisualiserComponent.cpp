@@ -172,6 +172,10 @@ VisualiserComponent::VisualiserComponent(
 }
 
 VisualiserComponent::~VisualiserComponent() {
+    // Stop the background thread while VisualiserComponent's vtable is still live.
+    // If deferred to ~VisualiserRenderer, the vptr has already changed and the
+    // running thread's virtual run()/runTask() dispatch becomes a data race.
+    setShouldBeRunning(false, [this] { renderingSemaphore.release(); });
     setRecording(false);
     audioProcessor.removeAudioPlayerListener(this);
     if (isPrimaryVisualiser()) {
@@ -261,9 +265,10 @@ void VisualiserComponent::updatePausedState() {
 }
 
 void VisualiserComponent::parameterValueChanged(int parameterIndex, float newValue) {
-    // Handle parameter changes on the message thread
-    juce::MessageManager::callAsync([this] {
-        updatePausedState();
+    auto safeThis = juce::Component::SafePointer<VisualiserComponent>(this);
+    juce::MessageManager::callAsync([safeThis] {
+        if (safeThis == nullptr) return;
+        safeThis->updatePausedState();
     });
 }
 

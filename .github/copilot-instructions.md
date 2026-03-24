@@ -4,6 +4,22 @@
 
 **NEVER ask clarifying questions inline in chat.** Always use the `vscode_askQuestions` tool to present questions to the user. This provides a structured UI with selectable options and keeps the conversation focused on code.
 
+## Subagents
+
+**Use subagents aggressively to protect the main context window.** Every file read, grep, or codebase exploration that isn't immediately needed in the main conversation should be delegated to a subagent. The main context window is expensive; treat it as a scarce resource.
+
+**Rules:**
+- **Any exploration task** — searching for where something is defined, understanding how a subsystem works, finding all callers of a function, reading a set of files to answer a question — should use the `Explore` subagent rather than running `grep_search`/`read_file`/`semantic_search` directly.
+- **Only bring results back** that are directly needed to implement the next step. Don't paste large file contents into the main conversation.
+- **Multi-file investigations** (e.g. tracing a data flow, auditing all usages of a class) must always go through a subagent.
+- Single-line lookups or a single targeted `grep_search` are fine inline when the answer is trivially small.
+
+Example invocations:
+```
+runSubagent("Explore", "Find all places where permanentEffects is populated. Return the file paths and line numbers only. Thoroughness: quick")
+runSubagent("Explore", "Explain the full destruction order of OscirenderAudioProcessor members and which base class destructors run when. Thoroughness: thorough")
+```
+
 ## Code Reviews
 
 When asked to do a code review, follow this workflow:
@@ -345,6 +361,42 @@ ROOT=$(pwd) OS=linux ./ci/pluginval.sh sosci
 **Strictness levels:** 1–10. Level 5 is the recommended minimum for host compatibility. Lower levels check for crashes; higher levels include parameter fuzzing and state restoration.
 
 The pluginval source is at `modules/pluginval` (git submodule). It is built from source via CMake automatically.
+
+### Sanitizer Validation (`run_sanitizers.sh`) — **preferred over plain pluginval**
+
+`run_sanitizers.sh` is the primary local validation tool. It runs pluginval under **ThreadSanitizer (TSan)** and **AddressSanitizer (ASan)**, which catches data races, heap-use-after-free, use-after-scope, and undefined behaviour that plain pluginval never sees. Always prefer this over a bare `ci/pluginval.sh` run when doing any meaningful validation locally.
+
+**When to run it:**
+- After any threading, audio processing, or lifecycle changes — it will catch races and memory errors that are invisible in normal Debug builds.
+- After adding new effects, parameters, or UI components.
+- Whenever you would have reached for `ci/pluginval.sh` locally.
+- It is **not** run in CI (CI uses plain pluginval); this is a local-only deep-check tool.
+
+**Usage:**
+```bash
+# TSan — catches data races
+bash run_sanitizers.sh --tsan --plugin osci-render --pluginval --strictness 5
+bash run_sanitizers.sh --tsan --plugin sosci --pluginval --strictness 5
+
+# ASan — catches memory errors
+bash run_sanitizers.sh --asan --plugin osci-render --pluginval --strictness 5
+bash run_sanitizers.sh --asan --plugin sosci --pluginval --strictness 5
+
+# Skip rebuild (re-use last sanitizer build)
+bash run_sanitizers.sh --tsan --plugin osci-render --pluginval --no-build
+```
+
+**Key flags:**
+| Flag | Description |
+|------|-------------|
+| `--tsan` / `--asan` | Which sanitizer to use (required) |
+| `--plugin osci-render\|sosci` | Which product to build and test |
+| `--pluginval` | Run pluginval after building |
+| `--strictness N` | pluginval strictness level (default 5) |
+| `--no-build` | Skip rebuild, reuse last sanitizer build |
+| `--tests` | Run unit tests instead of pluginval |
+
+**Output:** Logs are written to `bin/sanitizer-logs/`. The script prints a summary of distinct issues found with file/line references.
 
 ## Key Files Reference
 
