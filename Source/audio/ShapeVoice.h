@@ -67,7 +67,7 @@ private:
 	// Working buffers for per-voice effect processing
 	juce::AudioBuffer<float> voiceBuffer;
 	juce::AudioBuffer<float> frequencyBuffer;
-	juce::AudioBuffer<float> volumeBuffer;
+	juce::AudioBuffer<float> envelopeBuffer;
 	juce::AudioBuffer<float> frameSyncBuffer;
 	bool pendingFrameStart = true;
 	bool pendingNoteOn = false;

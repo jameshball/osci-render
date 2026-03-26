@@ -95,15 +95,12 @@ public:
 		Node              = COLOUR_OFFSET,
 		ReleaseNode       = COLOUR_OFFSET + 1,
 		LoopNode          = COLOUR_OFFSET + 2,
-		NodeOutline       = COLOUR_OFFSET + 3,
-		Line              = COLOUR_OFFSET + 4,
-		LoopLine          = COLOUR_OFFSET + 5,
-		Background        = COLOUR_OFFSET + 6,
-		GridLine          = COLOUR_OFFSET + 7,
-		LegendText        = COLOUR_OFFSET + 8,
-		LegendBackground  = COLOUR_OFFSET + 9,
-		LineBackground    = COLOUR_OFFSET + 10,
-		NumEnvColours     = 11,
+		Line              = COLOUR_OFFSET + 3,
+		LoopLine          = COLOUR_OFFSET + 4,
+		LegendText        = COLOUR_OFFSET + 5,
+		LegendBackground  = COLOUR_OFFSET + 6,
+		LineBackground    = COLOUR_OFFSET + 7,
+		NumEnvColours     = 8,
 	};
 
 protected:

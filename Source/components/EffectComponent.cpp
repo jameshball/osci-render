@@ -3,10 +3,7 @@
 #include "../LookAndFeel.h"
 #ifndef SOSCI
 #include "../PluginProcessor.h"
-#include "modulation/EnvelopeComponent.h"
-#include "modulation/LfoComponent.h"
 #include "modulation/ModulationHelper.h"
-#include "modulation/RandomComponent.h"
 #include "../audio/ModulationTypes.h"
 #endif
 
@@ -455,48 +452,28 @@ void EffectComponent::itemDropped(const SourceDetails& dragSourceDetails) {
 
 #ifndef SOSCI
 void EffectComponent::wireModulation(OscirenderAudioProcessor& processor) {
-    // Define all modulation bindings generically — adding a new source type
-    // only requires appending one entry here.
-    auto makeBinding = [](const juce::String& dragPfx, const juce::String& propPfx,
-                          std::function<void(const ModAssignment&)> addAssignment,
-                          std::function<std::vector<ModAssignment>()> getAssignments,
-                          std::function<float(int)> getCurrentValue,
-                          std::function<juce::Colour(int)> getColour) -> ModBinding {
+    // Build modBindings from the processor's central registry.
+    // Adding a new modulation source type only requires updating
+    // OscirenderAudioProcessor::getModulationSourceBindings().
+    modBindings.clear();
+    for (auto& src : processor.getModulationSourceBindings()) {
         ModBinding b;
-        b.dragPrefix = dragPfx;
-        b.propPrefix = propPfx;
-        b.onDropped = [addAssignment](int index, const juce::String& paramId) {
+        b.dragPrefix = src.dragPrefix;
+        b.propPrefix = src.propPrefix;
+        b.onDropped = [addFn = src.addAssignment](int index, const juce::String& paramId) {
             ModAssignment assignment;
             assignment.sourceIndex = index;
             assignment.paramId = paramId;
             assignment.depth = 0.5f;
-            addAssignment(assignment);
+            addFn(assignment);
         };
-        b.query = [getAssignments, getCurrentValue, getColour](
+        b.query = [getFn = src.getAssignments, valFn = src.getCurrentValue, colFn = src.getColour](
                       const juce::String& paramId, juce::Slider& sl) -> ModInfo {
-            auto h = ModulationHelper::compute(getAssignments(), paramId, sl, getCurrentValue, getColour);
+            auto h = ModulationHelper::compute(getFn(), paramId, sl, valFn, colFn);
             return { h.active, h.modulatedPos, h.colour };
         };
-        return b;
-    };
-
-    modBindings = {
-        makeBinding("LFO", "lfo",
-            [&processor](const ModAssignment& a) { processor.addLfoAssignment(a); },
-            [&processor]() { return processor.getLfoAssignments(); },
-            [&processor](int i) { return processor.getLfoCurrentValue(i); },
-            &LfoComponent::getLfoColour),
-        makeBinding("ENV", "env",
-            [&processor](const ModAssignment& a) { processor.addEnvAssignment(a); },
-            [&processor]() { return processor.getEnvAssignments(); },
-            [&processor](int i) { return processor.getEnvCurrentValue(i); },
-            &EnvelopeComponent::getEnvColour),
-        makeBinding("RNG", "rng",
-            [&processor](const ModAssignment& a) { processor.addRandomAssignment(a); },
-            [&processor]() { return processor.getRandomAssignments(); },
-            [&processor](int i) { return processor.getRandomCurrentValue(i); },
-            &RandomComponent::getRandomColour),
-    };
+        modBindings.push_back(std::move(b));
+    }
 
     modBroadcaster = &processor.modulationUpdateBroadcaster;
     modBroadcaster->addListener(this, [this]() {

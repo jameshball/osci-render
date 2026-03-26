@@ -18,6 +18,7 @@
 #include "components/FractalComponent.h"
 #include "components/modulation/LfoComponent.h"
 #include "components/modulation/RandomComponent.h"
+#include "components/modulation/SidechainComponent.h"
 
 class OscirenderAudioProcessorEditor;
 class SettingsComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, private juce::Timer {
@@ -53,6 +54,7 @@ private:
     EnvelopeComponent envelope;
     std::unique_ptr<LfoComponent> lfo;
     std::unique_ptr<RandomComponent> random;
+    std::unique_ptr<SidechainComponent> sidechain;
     ScrollFadeViewport keyboardViewport;
     juce::CustomMidiKeyboardComponent keyboard;
 

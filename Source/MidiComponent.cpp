@@ -54,16 +54,15 @@ void MidiComponent::handleAsyncUpdate() {
 
 void MidiComponent::resized() {
     auto area = getLocalBounds().reduced(5);
-    auto topRow = area.removeFromTop(30);
-    midiToggle.setBounds(topRow.removeFromLeft(120).translated(0, 1));
-    topRow.removeFromLeft(80);
-    voicesSlider.setBounds(topRow.removeFromLeft(250));
+    midiToggle.setBounds(area.removeFromLeft(120).translated(0, 1));
+    area.removeFromLeft(80);
+    voicesSlider.setBounds(area.removeFromLeft(250));
     if (midiSettingsButton.isVisible()) {
-        midiSettingsButton.setBounds(topRow.removeFromRight(160));
+        midiSettingsButton.setBounds(area.removeFromRight(160));
     }
     if (tempoComponent.isVisible()) {
-        topRow.removeFromRight(8);
-        tempoComponent.setBounds(topRow.removeFromRight(100).reduced(0, 3));
+        area.removeFromRight(8);
+        tempoComponent.setBounds(area.removeFromRight(100).reduced(0, 3));
     }
 }
 

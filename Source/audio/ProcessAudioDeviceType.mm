@@ -493,6 +493,16 @@ struct ProcessTapBackend
         numInputChannels  = jlimit (0, availableInputChans,  activeInputChannels);
         numOutputChannels = jlimit (0, availableOutputChans, activeOutputChannels);
 
+        // Keep getActive*Channels() consistent with the values we actually
+        // allocate and pass to the JUCE callback.  JUCE's internal
+        // CallbackMaxSizeEnforcer sizes its channel-pointer vectors from
+        // getActiveOutputChannels() at audioDeviceAboutToStart time; if those
+        // return a larger count than what we provide in the IO callback,
+        // un-written vector entries remain nullptr and propagate as null output
+        // channel pointers into initialiseIoBuffers, causing a SIGSEGV.
+        activeInputChannels  = numInputChannels;
+        activeOutputChannels = numOutputChannels;
+
         // Pre-allocate temp buffers with generous size to avoid allocation on audio thread.
         // Use at least 8192 samples to cover any reasonable buffer size.
         int preAllocSize = jmax (currentBufferSize * 2, 8192);
@@ -648,6 +658,17 @@ struct ProcessTapBackend
         if (numSamples > maxSamples)
             numSamples = maxSamples;
 
+        // Guard: nothing useful to do with 0 samples, and downstream enforcers
+        // can spin forever (blockLength stays 0) if we pass 0.
+        if (numSamples <= 0)
+        {
+            if (outOutputData != nullptr)
+                for (UInt32 i = 0; i < outOutputData->mNumberBuffers; ++i)
+                    zeromem (outOutputData->mBuffers[i].mData,
+                             outOutputData->mBuffers[i].mDataByteSize);
+            return;
+        }
+
         // Copy input data from CoreAudio buffers to our deinterleaved JUCE buffer
         inputBuffer.clear (0, numSamples);
         if (inInputData != nullptr)
@@ -658,6 +679,14 @@ struct ProcessTapBackend
                 auto& abuf = inInputData->mBuffers[b];
                 const float* src = static_cast<const float*> (abuf.mData);
                 int chansInBuf = (int) abuf.mNumberChannels;
+
+                // Skip buffers with null data (can happen during device
+                // reconfiguration or feedback-loop starvation).
+                if (src == nullptr)
+                {
+                    channelIndex += jmax (1, chansInBuf);
+                    continue;
+                }
 
                 if (chansInBuf == 1)
                 {
@@ -923,19 +952,8 @@ String ProcessAudioDevice::open (const BigInteger& inputChannels,
     if (desiredBufferSize <= 0)
         desiredBufferSize = backend->getDefaultBufferSize();
 
-    // Set sample rate and buffer size on the real output device BEFORE creating
-    // the aggregate device, so the sub-device is configured correctly.
-    if (desiredSampleRate > 0.0)
-    {
-        Float64 sr = (Float64) desiredSampleRate;
-        AudioObjectPropertyAddress addr {
-            kAudioDevicePropertyNominalSampleRate,
-            kAudioObjectPropertyScopeGlobal,
-            kElementMain
-        };
-        AudioObjectSetPropertyData (backend->outputDevice, &addr, 0, nullptr, sizeof (Float64), &sr);
-    }
-
+    // Set buffer size on the real output device BEFORE creating the aggregate
+    // so the sub-device starts at the right block size.
     if (desiredBufferSize > 0)
     {
         UInt32 bs = (UInt32) desiredBufferSize;
@@ -946,6 +964,12 @@ String ProcessAudioDevice::open (const BigInteger& inputChannels,
         };
         AudioObjectSetPropertyData (backend->outputDevice, &addr, 0, nullptr, sizeof (UInt32), &bs);
     }
+
+    // Do NOT set the output device's sample rate yet — we need to learn the
+    // tap's native rate first.  Changing the output device rate at this point
+    // would alter the system-wide audio clock before the aggregate exists,
+    // which can cause other applications (e.g. Spotify) to play at the wrong
+    // speed.
 
     auto error = backend->createTapAndAggregateDevice();
     if (error.isNotEmpty())
@@ -971,8 +995,9 @@ String ProcessAudioDevice::open (const BigInteger& inputChannels,
     if (backend->tapFormat.mSampleRate > 0.0)
         desiredSampleRate = backend->tapFormat.mSampleRate;
 
-    // Also set on the aggregate device
-    if (desiredSampleRate > 0.0 && backend->aggregateDeviceID != kAudioObjectUnknown)
+    // Now set BOTH the output device and aggregate to the tap-derived rate,
+    // so everything runs at the same clock and no system-wide mismatch occurs.
+    if (desiredSampleRate > 0.0)
     {
         Float64 sr = (Float64) desiredSampleRate;
         AudioObjectPropertyAddress addr {
@@ -980,7 +1005,10 @@ String ProcessAudioDevice::open (const BigInteger& inputChannels,
             kAudioObjectPropertyScopeGlobal,
             kElementMain
         };
-        AudioObjectSetPropertyData (backend->aggregateDeviceID, &addr, 0, nullptr, sizeof (Float64), &sr);
+        AudioObjectSetPropertyData (backend->outputDevice, &addr, 0, nullptr, sizeof (Float64), &sr);
+
+        if (backend->aggregateDeviceID != kAudioObjectUnknown)
+            AudioObjectSetPropertyData (backend->aggregateDeviceID, &addr, 0, nullptr, sizeof (Float64), &sr);
     }
 
     if (desiredBufferSize > 0 && backend->aggregateDeviceID != kAudioObjectUnknown)

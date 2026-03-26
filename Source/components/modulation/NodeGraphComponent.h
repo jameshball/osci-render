@@ -21,13 +21,16 @@ public:
     // --- Grid style ---
     enum class GridStyle {
         Uniform,          // Evenly-spaced divisions (default, used by LFO)
-        LogarithmicTime   // Adaptive logarithmic time grid with labels (used by envelope)
+        LogarithmicTime,  // Adaptive logarithmic time grid with labels (used by envelope)
+        Decibel           // Adaptive dB grid with labels (used by sidechain)
     };
 
     // --- Snap style ---
     enum class SnapStyle {
+        None,             // No grid snapping
         Uniform,          // Snap to uniform grid divisions (default)
-        LogarithmicTime   // Snap to logarithmic grid lines when they are sufficiently visible
+        LogarithmicTime,  // Snap to logarithmic grid lines when they are sufficiently visible
+        Decibel           // Snap to dB grid lines when they are sufficiently visible
     };
 
     // --- Configuration ---
@@ -193,6 +196,7 @@ private:
     void paintGrid(juce::Graphics& g);
     void paintUniformGrid(juce::Graphics& g, int w, int h);
     void paintLogarithmicTimeGrid(juce::Graphics& g, int w, int h);
+    void paintDecibelGrid(juce::Graphics& g, int w, int h);
     juce::Image gridCache;
     int gridCacheWidth = 0, gridCacheHeight = 0;
     bool gridDirty = true;
@@ -252,7 +256,10 @@ private:
         float  lowerLineVis, upperLineVis;
         double secondsPerPixel;
     };
-    bool computeLogGridInfo(int widthPx, LogGridInfo& out) const;
+    bool computeLogGridInfo(int widthPx, LogGridInfo& out,
+                            double baseStep = 8.0, double factor = 0.25,
+                            double targetPx = 70.0, float baseAlpha = 0.42f,
+                            double fadeMinPx = 40.0) const;
 
     // --- Hover tracking ---
     int prevHoverNodeIndex = -1;

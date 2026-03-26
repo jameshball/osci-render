@@ -47,6 +47,10 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
         random = std::make_unique<RandomComponent>(p);
         addAndMakeVisible(*random);
         random->onDragActiveChanged = dragChanged;
+
+        sidechain = std::make_unique<SidechainComponent>(p);
+        addAndMakeVisible(*sidechain);
+        sidechain->onDragActiveChanged = dragChanged;
     }
 
     // Keyboard
@@ -344,7 +348,7 @@ void SettingsComponent::layoutChildren() {
         layoutVisColumn(layoutVisColumnProxy.getBounds());
         layoutEffectsColumn(effectsBounds);
 
-        // --- Right column: MIDI settings (compact), envelope, LFO, random ---
+        // --- Right column: MIDI settings (compact), envelope, LFO, random + sidechain ---
         static constexpr int midiGroupHeight = 60;
         midi.setBounds(rightBounds.removeFromTop(midiGroupHeight));
         rightBounds.removeFromBottom(padding);
@@ -352,9 +356,16 @@ void SettingsComponent::layoutChildren() {
         lfo->setMidiEnabled(midiOn);
 
         int modAreaHeight = rightBounds.getHeight();
-        int randomPct = midiOn ? 15 : 25;
-        auto randomArea = rightBounds.removeFromBottom(modAreaHeight * randomPct / 100);
+
+        int bottomPct = midiOn ? 20 : 30;
+        auto bottomRow = rightBounds.removeFromBottom(juce::jmax(130, modAreaHeight * bottomPct / 100));
         rightBounds.removeFromBottom(3);
+
+        // Split bottom row: random (wider, left) | gap | sidechain (narrower, right)
+        int scW = (bottomRow.getWidth() - 3) * (2.0 / 5.0);
+        auto sidechainArea = bottomRow.removeFromRight(scW);
+        bottomRow.removeFromRight(3);
+        auto randomArea = bottomRow;
 
         if (midiOn) {
             auto envelopeArea = rightBounds.removeFromBottom(modAreaHeight * 25 / 100);
@@ -367,6 +378,7 @@ void SettingsComponent::layoutChildren() {
 
         lfo->setBounds(rightBounds);
         random->setBounds(randomArea);
+        sidechain->setBounds(sidechainArea);
 
         if (isVisible() && getWidth() > 0 && getHeight() > 0) {
             audioProcessor.setProperty("mainLayoutVisSize", mainLayout.getItemCurrentRelativeSize(0));

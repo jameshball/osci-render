@@ -399,14 +399,15 @@ void EnvelopeComponent::resized() {
 // --- Look & Feel colour sync ---
 
 void EnvelopeComponent::syncGraphColours() {
-    graph.setColour(NodeGraphComponent::backgroundColourId,  findColour(Background));
-    graph.setColour(NodeGraphComponent::gridLineColourId,    findColour(GridLine));
+    // Override NodeGraphComponent's constructor defaults with LookAndFeel colours
+    graph.setColour(NodeGraphComponent::backgroundColourId,  getLookAndFeel().findColour(NodeGraphComponent::backgroundColourId));
+    graph.setColour(NodeGraphComponent::gridLineColourId,    getLookAndFeel().findColour(NodeGraphComponent::gridLineColourId));
+    graph.setColour(NodeGraphComponent::nodeOutlineColourId, getLookAndFeel().findColour(NodeGraphComponent::nodeOutlineColourId));
 
     auto colour = getEnvColour(getActiveSourceIndex());
     graph.setColour(NodeGraphComponent::lineColourId,        colour);
     graph.setColour(NodeGraphComponent::fillColourId,        colour.withAlpha(0.15f));
     graph.setColour(NodeGraphComponent::nodeColourId,        colour);
-    graph.setColour(NodeGraphComponent::nodeOutlineColourId, findColour(NodeOutline));
 }
 
 #endif // UGEN_NOEXTGPL

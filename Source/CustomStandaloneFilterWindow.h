@@ -659,6 +659,7 @@ private:
                 setup.inputDeviceName = combined;
                 setup.useDefaultInputChannels = true;
                 setup.useDefaultOutputChannels = true;
+                setup.sampleRate = 0; // let ProcessAudioDevice pick the tap's native rate
                 owner.deviceManager.setAudioDeviceSetup (setup, true);
 
                 // Match the UI mic-toggle behavior by forcing input mode on.

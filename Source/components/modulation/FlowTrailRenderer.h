@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <limits>
 
 // Generic flow trail / marker renderer for node graph components.
 // Renders decaying "flow" markers that sweep across a graph fill region,
@@ -16,6 +17,7 @@ public:
     // Configuration
     static constexpr double kDefaultTauMs = 180.0;
     static constexpr double kDefaultMaxBridgeTimeSeconds = 0.05;
+    static constexpr double kInvalidMarkerTime = -std::numeric_limits<double>::infinity();
 
     // domainToPixelFn: converts a domain value to pixel X coordinate (including handle offset)
     // componentWidthFn / componentHeightFn: return current component dimensions
@@ -53,7 +55,7 @@ public:
                             double maxBridgeTimeSeconds = kDefaultMaxBridgeTimeSeconds) {
         numFlowMarkers = juce::jmax(0, numTimes);
         if ((int)flowMarkerTimesSeconds.size() < numFlowMarkers)
-            flowMarkerTimesSeconds.resize((size_t)numFlowMarkers, -1.0);
+            flowMarkerTimesSeconds.resize((size_t)numFlowMarkers, kInvalidMarkerTime);
         for (int i = 0; i < numFlowMarkers; ++i)
             flowMarkerTimesSeconds[(size_t)i] = timesSeconds[i];
 
@@ -73,7 +75,7 @@ public:
             flowTrailNewestMs = juce::jmax(flowTrailNewestMs, nowMs);
             for (int i = 0; i < numFlowMarkers; ++i) {
                 const double t = flowMarkerTimesSeconds[i];
-                if (t < 0.0) {
+                if (t == kInvalidMarkerTime || std::isinf(t)) {
                     prevFlowMarkerValid[(size_t)i] = 0;
                     prevFlowMarkerTimeSeconds[(size_t)i] = 0.0;
                     prevFlowMarkerUpdateMs[(size_t)i] = 0.0;
@@ -186,7 +188,7 @@ public:
         const int h = getHeight();
         for (int i = 0; i < numFlowMarkers; ++i) {
             const double timeSeconds = flowMarkerTimesSeconds[i];
-            if (timeSeconds < 0.0)
+            if (timeSeconds == kInvalidMarkerTime || std::isinf(timeSeconds))
                 continue;
             const float x = domainToPixel(timeSeconds);
 

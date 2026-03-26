@@ -468,6 +468,12 @@
         <FILE id="RnCmC2" name="RandomComponent.cpp" compile="1" resource="0"
               file="Source/components/modulation/RandomComponent.cpp"/>
         <FILE id="RnStH1" name="RandomState.h" compile="0" resource="0" file="Source/audio/RandomState.h"/>
+        <FILE id="ScCmH1" name="SidechainComponent.h" compile="0" resource="0"
+              file="Source/components/modulation/SidechainComponent.h"/>
+        <FILE id="ScCmC2" name="SidechainComponent.cpp" compile="1" resource="0"
+              file="Source/components/modulation/SidechainComponent.cpp"/>
+        <FILE id="ScStH1" name="SidechainState.h" compile="0" resource="0"
+              file="Source/audio/SidechainState.h"/>
         <FILE id="MdTyH1" name="ModulationTypes.h" compile="0" resource="0"
               file="Source/audio/ModulationTypes.h"/>
         <FILE id="TmpCH1" name="TempoComponent.h" compile="0" resource="0"

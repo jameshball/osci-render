@@ -520,7 +520,8 @@ void ModulationSourceComponent::changeListenerCallback(juce::ChangeBroadcaster* 
 void ModulationSourceComponent::resized() {
     auto bounds = getLocalBounds();
 
-    if (config.sourceCount > 1) {
+    const bool showTabs = config.sourceCount > 1 || config.alwaysShowTabs;
+    if (showTabs) {
         auto tabArea = bounds.removeFromLeft(kTabWidth);
         tabViewport.setBounds(tabArea);
         tabViewport.setVisible(true);
@@ -538,7 +539,7 @@ void ModulationSourceComponent::resized() {
 }
 
 void ModulationSourceComponent::paint(juce::Graphics& g) {
-    const bool hasTabs = config.sourceCount > 1;
+    const bool hasTabs = config.sourceCount > 1 || config.alwaysShowTabs;
     const float tabOffset = hasTabs ? (float)kTabWidth : 0.0f;
     auto panelBounds = getLocalBounds().toFloat().withTrimmedLeft(tabOffset);
     float r = OscirenderLookAndFeel::RECT_RADIUS;
@@ -552,7 +553,7 @@ void ModulationSourceComponent::paint(juce::Graphics& g) {
 }
 
 void ModulationSourceComponent::paintOverChildren(juce::Graphics& g) {
-    const bool hasTabs = config.sourceCount > 1;
+    const bool hasTabs = config.sourceCount > 1 || config.alwaysShowTabs;
     const float tabOffset = hasTabs ? (float)kTabWidth : 0.0f;
     auto panelBounds = getLocalBounds().toFloat().withTrimmedLeft(tabOffset);
     juce::Path panelPath;
@@ -561,8 +562,16 @@ void ModulationSourceComponent::paintOverChildren(juce::Graphics& g) {
                                    OscirenderLookAndFeel::RECT_RADIUS, OscirenderLookAndFeel::RECT_RADIUS,
                                    !hasTabs, true, !hasTabs, true);
 
-    if (config.sourceCount <= 1)
+    if (!hasTabs) {
+        // No tabs — just draw the source outline
+        if (config.getSourceColour) {
+            auto colour = config.getSourceColour(activeSourceIndex);
+            auto graphBounds = outlineBounds.toFloat();
+            g.setColour(colour.withAlpha(0.25f));
+            g.drawRoundedRectangle(graphBounds, 6.0f, 1.0f);
+        }
         return;
+    }
 
     if (tabList.getNumTabs() == 0 || activeSourceIndex < 0 || activeSourceIndex >= tabList.getNumTabs())
         return;

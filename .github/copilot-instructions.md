@@ -12,7 +12,6 @@ When asked to do a code review, follow this workflow:
 2. **List every issue** you find, numbered, with a clear description and the relevant file/line.
 3. **For each issue**, use `vscode_askQuestions` to ask whether to:
    - **Implement the fix** — you will apply the suggested change immediately
-   - **Provide more context** — the user can explain intent before you decide
    - **Skip** — do not implement the change
 4. **Implement all accepted fixes** within the same session, building and verifying after all changes are applied.
 

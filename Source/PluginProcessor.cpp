@@ -9,6 +9,10 @@
 #include "PluginProcessor.h"
 
 #include "PluginEditor.h"
+#include "components/modulation/LfoComponent.h"
+#include "components/modulation/EnvelopeComponent.h"
+#include "components/modulation/RandomComponent.h"
+#include "components/modulation/SidechainComponent.h"
 #include "audio/BitCrushEffect.h"
 #include "audio/BulgeEffect.h"
 #include "audio/TwistEffect.h"
@@ -210,6 +214,12 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
         }
     }
 
+    // Initialize sidechain transfer curve (default: linear in dB space, -60dB → 0dB)
+    if (!beginnerMode) {
+        sidechainTransferCurve = sidechain::defaultTransferCurve();
+        rebuildSidechainFullCurve();
+    }
+
     for (int i = 0; i < voices->getValueUnnormalised(); i++) {
         uiVoiceActive[i].store(false, std::memory_order_relaxed);
         uiVoiceEnvelopeTimeSeconds[i].store(0.0, std::memory_order_relaxed);
@@ -298,6 +308,13 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
                 [this](int i) { return envCurrentValues[i].load(std::memory_order_relaxed); },
                 NUM_ENVELOPES);
         }
+        // Apply Sidechain modulation
+        {
+            juce::SpinLock::ScopedLockType assnLock(sidechainAssignmentLock);
+            applyAssignments(sidechainAssignments,
+                [this](int i) { return sidechainCurrentValues[i].load(std::memory_order_relaxed); },
+                NUM_SIDECHAINS);
+        }
     };
 }
 
@@ -377,7 +394,7 @@ void OscirenderAudioProcessor::setAudioThreadCallback(std::function<void(const j
 void OscirenderAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
     CommonAudioProcessor::prepareToPlay(sampleRate, samplesPerBlock);
 
-    currentVolume = 0.0;
+    defaultEnvelopeState.smoothedLevel = 0.0f;
     synth.setCurrentPlaybackSampleRate(sampleRate);
     retriggerMidi = true;
     
@@ -810,36 +827,37 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         inputBuffer.copyFrom(channel, 0, buffer, channel, 0, buffer.getNumSamples());
     }
 
-    // Calculate per-sample volume buffer BEFORE synth rendering (needed for effect pre-animation)
-    currentVolumeBuffer.setSize(1, numSamples, false, false, false);
-    auto* volumeData = currentVolumeBuffer.getWritePointer(0);
-    
-    // Calculate instantaneous squared magnitude using vectorized operations
-    if (totalNumInputChannels >= 2) {
-        const float* leftData = inputBuffer.getReadPointer(0);
-        const float* rightData = inputBuffer.getReadPointer(1);
-        
-        // L² + R² using SIMD operations
-        juce::FloatVectorOperations::multiply(volumeData, leftData, leftData, numSamples);
-        juce::FloatVectorOperations::addWithMultiply(volumeData, rightData, rightData, numSamples);
-        // Divide by 2: (L² + R²) / 2
-        juce::FloatVectorOperations::multiply(volumeData, 0.5f, numSamples);
-    } else if (totalNumInputChannels == 1) {
-        const float* monoData = inputBuffer.getReadPointer(0);
-        // mono²
-        juce::FloatVectorOperations::multiply(volumeData, monoData, monoData, numSamples);
-    } else {
-        juce::FloatVectorOperations::clear(volumeData, numSamples);
+    // Step 1: Peak-rectify the input audio into rectifiedInputBuffer.
+    // This is the raw per-sample amplitude: max(|L|, |R|) for stereo, |x| for mono.
+    // No smoothing — envelope followers downstream apply their own attack/release.
+    rectifiedInputBuffer.setSize(1, numSamples, false, false, false);
+    {
+        auto* rectData = rectifiedInputBuffer.getWritePointer(0);
+        if (totalNumInputChannels >= 2) {
+            const float* leftData = inputBuffer.getReadPointer(0);
+            const float* rightData = inputBuffer.getReadPointer(1);
+            for (int i = 0; i < numSamples; ++i)
+                rectData[i] = juce::jmax(std::abs(leftData[i]), std::abs(rightData[i]));
+        } else if (totalNumInputChannels == 1) {
+            const float* monoData = inputBuffer.getReadPointer(0);
+            juce::FloatVectorOperations::abs(rectData, monoData, numSamples);
+        } else {
+            juce::FloatVectorOperations::clear(rectData, numSamples);
+        }
     }
-    
-    // Apply exponential moving average for smoothing
-    const float smoothingCoeff = 1.0f - std::exp(-1.0f / (float)(VOLUME_BUFFER_SECONDS * sampleRate));
-    
-    for (int i = 0; i < numSamples; ++i) {
-        // EMA: smoothed = smoothed + coeff * (new - smoothed)
-        currentVolume += smoothingCoeff * (volumeData[i] - currentVolume);
-        // Take square root and clamp to get final volume
-        volumeData[i] = juce::jlimit(0.0f, 1.0f, std::sqrt((float)currentVolume));
+
+    // Step 2: Produce the smoothed volume buffer for beginner-mode per-parameter sidechain
+    // and for effects that receive volumeInput. Uses a default envelope follower with
+    // fixed attack/release (same time constant as the old 100ms EMA).
+    currentVolumeBuffer.setSize(1, numSamples, false, false, false);
+    {
+        defaultEnvelopeState.advanceBlock(
+            currentVolumeBuffer.getWritePointer(0),
+            rectifiedInputBuffer.getReadPointer(0),
+            numSamples,
+            kDefaultEnvelopeAttack, kDefaultEnvelopeRelease,
+            (float)sampleRate,
+            kIdentityCurve);
     }
 
     // Pre-animate all effects for this block BEFORE rendering
@@ -870,7 +888,12 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
             // Apply global random modulation
             applyGlobalRandomModulation(numSamples, sampleRate, midiMessages);
+
         }
+
+        // Always run the sidechain envelope follower so the UI display
+        // (graph marker + output pill) stays current in both modes.
+        applyGlobalSidechainModulation(numSamples, sampleRate, rectifiedInputBuffer.getReadPointer(0));
     }
 
     juce::AudioBuffer<float> outputBuffer3d = juce::AudioBuffer<float>(6, buffer.getNumSamples());
@@ -1138,6 +1161,30 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
                 assignment.saveToXml(assignXml, "rng");
             }
         }
+
+        // Save global Sidechain modulator & assignments
+        auto sidechainXml = xml->createNewChildElement("sidechain");
+        sidechainXml->setAttribute("activeTab", activeSidechainTab);
+        sidechainXml->setAttribute("attack", (double)sidechainAttack.load());
+        sidechainXml->setAttribute("release", (double)sidechainRelease.load());
+        {
+            juce::SpinLock::ScopedLockType lock(sidechainCurveLock);
+            auto curveXml = sidechainXml->createNewChildElement("transferCurve");
+            for (const auto& node : sidechainTransferCurve) {
+                auto nodeXml = curveXml->createNewChildElement("node");
+                nodeXml->setAttribute("time", node.time);
+                nodeXml->setAttribute("value", node.value);
+                nodeXml->setAttribute("curve", (double)node.curve);
+            }
+        }
+        auto scAssignmentsXml = sidechainXml->createNewChildElement("sidechainAssignments");
+        {
+            juce::SpinLock::ScopedLockType lock(sidechainAssignmentLock);
+            for (const auto& assignment : sidechainAssignments) {
+                auto assignXml = scAssignmentsXml->createNewChildElement("assignment");
+                assignment.saveToXml(assignXml, "sc");
+            }
+        }
     }
 
     auto customFunction = xml->createNewChildElement("customFunction");
@@ -1386,6 +1433,62 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
             }
         }
 
+        // Load sidechain modulator state (advanced mode only)
+        if (!beginnerMode) {
+            auto sidechainXml = xml->getChildByName("sidechain");
+            if (sidechainXml != nullptr) {
+                activeSidechainTab = sidechainXml->getIntAttribute("activeTab", 0);
+                sidechainAttack.store((float)sidechainXml->getDoubleAttribute("attack", 0.3), std::memory_order_relaxed);
+                sidechainRelease.store((float)sidechainXml->getDoubleAttribute("release", 0.3), std::memory_order_relaxed);
+
+                auto curveXml = sidechainXml->getChildByName("transferCurve");
+                if (curveXml != nullptr) {
+                    juce::SpinLock::ScopedLockType lock(sidechainCurveLock);
+                    sidechainTransferCurve.clear();
+                    for (auto* nodeXml : curveXml->getChildWithTagNameIterator("node")) {
+                        GraphNode n;
+                        n.time = nodeXml->getDoubleAttribute("time", 0.0);
+                        n.value = nodeXml->getDoubleAttribute("value", 0.0);
+                        n.curve = (float)nodeXml->getDoubleAttribute("curve", 0.0);
+                        sidechainTransferCurve.push_back(n);
+                    }
+                    if (sidechainTransferCurve.size() < 2) {
+                        sidechainTransferCurve = sidechain::defaultTransferCurve();
+                    } else if (sidechainTransferCurve.front().time >= 0.0 && sidechainTransferCurve.back().time <= 1.0) {
+                        // Migrate old linear [0,1] curve nodes to dB space
+                        for (auto& node : sidechainTransferCurve) {
+                            float linear = (float)juce::jlimit(0.0, 1.0, node.time);
+                            node.time = (double)sidechain::linearToDb(linear);
+                        }
+                    }
+                    rebuildSidechainFullCurve();
+                }
+
+                auto scAssignmentsXml = sidechainXml->getChildByName("sidechainAssignments");
+                if (scAssignmentsXml != nullptr) {
+                    juce::SpinLock::ScopedLockType assnLock(sidechainAssignmentLock);
+                    sidechainAssignments.clear();
+                    for (auto* assignXml : scAssignmentsXml->getChildWithTagNameIterator("assignment")) {
+                        sidechainAssignments.push_back(SidechainAssignment::loadFromXml(assignXml, "sc"));
+                    }
+                } else {
+                    juce::SpinLock::ScopedLockType assnLock(sidechainAssignmentLock);
+                    sidechainAssignments.clear();
+                }
+            } else {
+                activeSidechainTab = 0;
+                sidechainAttack.store(0.3f, std::memory_order_relaxed);
+                sidechainRelease.store(0.3f, std::memory_order_relaxed);
+                juce::SpinLock::ScopedLockType lock(sidechainCurveLock);
+                sidechainTransferCurve = sidechain::defaultTransferCurve();
+                rebuildSidechainFullCurve();
+            }
+            {
+                juce::SpinLock::ScopedLockType assnLock(sidechainAssignmentLock);
+                sidechainAssignments.clear();
+            }
+        }
+
         recordingParameters.load(xml.get());
 
         loadProperties(*xml);
@@ -1610,6 +1713,38 @@ void OscirenderAudioProcessor::removeAllAssignmentsForEffect(const osci::Effect&
                 [&](const RandomAssignment& a) { return belongsToEffect(a.paramId); }),
             randomAssignments.end());
     }
+    {
+        juce::SpinLock::ScopedLockType lock(sidechainAssignmentLock);
+        sidechainAssignments.erase(
+            std::remove_if(sidechainAssignments.begin(), sidechainAssignments.end(),
+                [&](const SidechainAssignment& a) { return belongsToEffect(a.paramId); }),
+            sidechainAssignments.end());
+    }
+}
+
+std::vector<ModulationSourceBinding> OscirenderAudioProcessor::getModulationSourceBindings() {
+    return {
+        { "LFO", "lfo",
+            [this](const ModAssignment& a) { addLfoAssignment(a); },
+            [this]() { return getLfoAssignments(); },
+            [this](int i) { return getLfoCurrentValue(i); },
+            &LfoComponent::getLfoColour },
+        { "ENV", "env",
+            [this](const ModAssignment& a) { addEnvAssignment(a); },
+            [this]() { return getEnvAssignments(); },
+            [this](int i) { return getEnvCurrentValue(i); },
+            &EnvelopeComponent::getEnvColour },
+        { "RNG", "rng",
+            [this](const ModAssignment& a) { addRandomAssignment(a); },
+            [this]() { return getRandomAssignments(); },
+            [this](int i) { return getRandomCurrentValue(i); },
+            &RandomComponent::getRandomColour },
+        { "SC", "sc",
+            [this](const ModAssignment& a) { addSidechainAssignment(a); },
+            [this]() { return getSidechainAssignments(); },
+            [this](int i) { return getSidechainCurrentValue(i); },
+            &SidechainComponent::getSidechainColour },
+    };
 }
 
 void OscirenderAudioProcessor::autoAssignLfosForEffect(osci::Effect& effect) {
@@ -1796,6 +1931,86 @@ RandomStyle OscirenderAudioProcessor::getRandomStyle(int randomIndex) const {
     if (randomIndex < 0 || randomIndex >= NUM_RANDOM_SOURCES) return RandomStyle::Perlin;
     juce::SpinLock::ScopedLockType lock(randomAssignmentLock);
     return randomStyles[randomIndex];
+}
+
+// === Global Sidechain assignment system ===
+
+void OscirenderAudioProcessor::addSidechainAssignment(const SidechainAssignment& assignment) {
+    juce::SpinLock::ScopedLockType lock(sidechainAssignmentLock);
+    for (auto& a : sidechainAssignments) {
+        if (a.sourceIndex == assignment.sourceIndex && a.paramId == assignment.paramId) {
+            a.depth = assignment.depth;
+            a.bipolar = assignment.bipolar;
+            return;
+        }
+    }
+    sidechainAssignments.push_back(assignment);
+}
+
+void OscirenderAudioProcessor::removeSidechainAssignment(int scIndex, const juce::String& paramId) {
+    juce::SpinLock::ScopedLockType lock(sidechainAssignmentLock);
+    sidechainAssignments.erase(
+        std::remove_if(sidechainAssignments.begin(), sidechainAssignments.end(),
+            [&](const SidechainAssignment& a) { return a.sourceIndex == scIndex && a.paramId == paramId; }),
+        sidechainAssignments.end());
+}
+
+std::vector<SidechainAssignment> OscirenderAudioProcessor::getSidechainAssignments() const {
+    juce::SpinLock::ScopedLockType lock(sidechainAssignmentLock);
+    return sidechainAssignments;
+}
+
+float OscirenderAudioProcessor::getSidechainCurrentValue(int scIndex) const {
+    if (scIndex < 0 || scIndex >= NUM_SIDECHAINS) return 0.0f;
+    return sidechainCurrentValues[scIndex].load(std::memory_order_relaxed);
+}
+
+bool OscirenderAudioProcessor::isSidechainActive(int) const {
+    // Sidechain is always active — it follows the audio input level continuously
+    return true;
+}
+
+float OscirenderAudioProcessor::getSidechainInputLevel(int scIndex) const {
+    if (scIndex < 0 || scIndex >= NUM_SIDECHAINS) return 0.0f;
+    return sidechainInputLevels[scIndex].load(std::memory_order_relaxed);
+}
+
+void OscirenderAudioProcessor::setSidechainAttack(int, float seconds) {
+    sidechainAttack.store(seconds, std::memory_order_relaxed);
+}
+
+void OscirenderAudioProcessor::setSidechainRelease(int, float seconds) {
+    sidechainRelease.store(seconds, std::memory_order_relaxed);
+}
+
+float OscirenderAudioProcessor::getSidechainAttack(int) const {
+    return sidechainAttack.load(std::memory_order_relaxed);
+}
+
+float OscirenderAudioProcessor::getSidechainRelease(int) const {
+    return sidechainRelease.load(std::memory_order_relaxed);
+}
+
+void OscirenderAudioProcessor::setSidechainTransferCurve(int, const std::vector<GraphNode>& nodes) {
+    juce::SpinLock::ScopedLockType lock(sidechainCurveLock);
+    sidechainTransferCurve = nodes;
+    rebuildSidechainFullCurve();
+}
+
+std::vector<GraphNode> OscirenderAudioProcessor::getSidechainTransferCurve(int) const {
+    juce::SpinLock::ScopedLockType lock(sidechainCurveLock);
+    return sidechainTransferCurve;
+}
+
+void OscirenderAudioProcessor::rebuildSidechainFullCurve() {
+    // Wraps the user-editable transfer curve nodes with fixed corner nodes so the
+    // DSP evaluates the exact same 4-node curve that the UI displays.
+    sidechainFullCurve.clear();
+    sidechainFullCurve.reserve(sidechainTransferCurve.size() + 2);
+    sidechainFullCurve.push_back({ (double)sidechain::DB_FLOOR, 0.0, 0.0f });
+    for (auto& n : sidechainTransferCurve)
+        sidechainFullCurve.push_back(n);
+    sidechainFullCurve.push_back({ (double)sidechain::DB_CEILING, 1.0, 0.0f });
 }
 
 void OscirenderAudioProcessor::autoAssignLfosForPreview(const juce::String& effectId) {
@@ -2211,6 +2426,41 @@ void OscirenderAudioProcessor::applyGlobalRandomModulation(int numSamples, doubl
         randomAssnCopy = randomAssignments;
     }
     applyModulationBuffers(numSamples, randomAssnCopy, randomBlockBuffer.data(), NUM_RANDOM_SOURCES);
+}
+
+void OscirenderAudioProcessor::applyGlobalSidechainModulation(int numSamples, double sampleRate, const float* rectifiedIn) {
+    if (numSamples <= 0) return;
+
+    const float* volumeIn = rectifiedIn;
+    float attack = sidechainAttack.load(std::memory_order_relaxed);
+    float release = sidechainRelease.load(std::memory_order_relaxed);
+
+    std::vector<GraphNode> fullCurve;
+    {
+        juce::SpinLock::ScopedLockType lock(sidechainCurveLock);
+        fullCurve = sidechainFullCurve;
+    }
+
+    for (int sc = 0; sc < NUM_SIDECHAINS; ++sc) {
+        if ((int)sidechainBlockBuffer[sc].size() < numSamples)
+            sidechainBlockBuffer[sc].resize(numSamples);
+
+        sidechainAudioStates[sc].advanceBlock(
+            sidechainBlockBuffer[sc].data(), volumeIn, numSamples,
+            attack, release, (float)sampleRate,
+            fullCurve);
+
+        sidechainCurrentValues[sc].store(sidechainBlockBuffer[sc][numSamples - 1], std::memory_order_relaxed);
+        // Store the smoothed level in dB so the graph marker matches the dB domain.
+        sidechainInputLevels[sc].store(sidechain::linearToDb(sidechainAudioStates[sc].smoothedLevel), std::memory_order_relaxed);
+    }
+
+    std::vector<SidechainAssignment> assnCopy;
+    {
+        juce::SpinLock::ScopedLockType lock(sidechainAssignmentLock);
+        assnCopy = sidechainAssignments;
+    }
+    applyModulationBuffers(numSamples, assnCopy, sidechainBlockBuffer.data(), NUM_SIDECHAINS);
 }
 
 DahdsrParams OscirenderAudioProcessor::getCurrentDahdsrParams() const

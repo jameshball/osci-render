@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include <vector>
+#include "ModAssignment.h"
 
 // Central registry of modulation source types.
 // Add new modulation types ONLY here — all UI, drag-and-drop, and paint code
@@ -17,9 +18,22 @@ inline const std::vector<ModulationType>& getModulationTypes() {
         { "LFO", "lfo", 0xFF00E5FF },
         { "ENV", "env", 0xFFFF6E4A },
         { "RNG", "rng", 0xFF50FA7B },
+        { "SC",  "sc",  0xFFFF6B6B },
     };
     return types;
 }
+
+// Runtime binding for one modulation source type.
+// Returned by the processor so that EffectComponent can wire
+// drag-and-drop + display generically without knowing each type.
+struct ModulationSourceBinding {
+    juce::String dragPrefix;     // e.g. "LFO", "SC"
+    juce::String propPrefix;     // e.g. "lfo", "sc"
+    std::function<void(const ModAssignment&)>        addAssignment;
+    std::function<std::vector<ModAssignment>()>      getAssignments;
+    std::function<float(int)>                        getCurrentValue;
+    std::function<juce::Colour(int)>                 getColour;
+};
 
 // Drag-and-drop protocol helpers.
 // Drag descriptions follow the format "MOD:TYPE:INDEX", e.g. "MOD:LFO:0".

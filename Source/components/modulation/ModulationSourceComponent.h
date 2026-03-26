@@ -35,6 +35,9 @@ struct ModulationSourceConfig {
     // Active tab persistence
     std::function<int()> getActiveTab;
     std::function<void(int)> setActiveTab;
+
+    // When true, the tab column is shown even with sourceCount == 1.
+    bool alwaysShowTabs = false;
 };
 
 // Generic modulation source panel: vertical tab/drag-handles with per-connection
@@ -99,13 +102,15 @@ protected:
 
     int activeSourceIndex = 0;
 
+protected:
+    static constexpr int kContentInset    = 4;
+
 private:
     ModulationSourceConfig config;
 
     // --- Layout constants ---
     static constexpr int kTabWidth        = 55;
     static constexpr int kTabGap          = 1;
-    static constexpr int kContentInset    = 4;
     static constexpr int kSeamShadowWidth = 10;
     static constexpr int kMinTabHeight    = 40;
 

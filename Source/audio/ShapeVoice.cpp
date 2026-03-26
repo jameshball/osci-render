@@ -181,7 +181,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     voiceBuffer.setSize(numChannels, numSamples, false, false, true);
     voiceBuffer.clear();
     frequencyBuffer.setSize(1, numSamples, false, false, true);
-    volumeBuffer.setSize(1, numSamples, false, false, true);
+    envelopeBuffer.setSize(1, numSamples, false, false, true);
     frameSyncBuffer.setSize(1, numSamples, false, false, true);
     frameSyncBuffer.clear();
 
@@ -279,7 +279,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             for (int e = 1; e < NUM_ENVELOPES; ++e)
                 envStates[e].advance(dt);
         }
-        volumeBuffer.setSample(0, i, envValue);
+        envelopeBuffer.setSample(0, i, envValue);
 
         if (midiEnabled && envState.getStage() == DahdsrState::Stage::Done)
         {
@@ -296,7 +296,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
                 if (numChannels >= 5) juce::FloatVectorOperations::fill(voiceBuffer.getWritePointer(4) + startSample2, -1.0f, remainingSamples);
                 if (numChannels >= 6) juce::FloatVectorOperations::fill(voiceBuffer.getWritePointer(5) + startSample2, -1.0f, remainingSamples);
                 juce::FloatVectorOperations::fill(frequencyBuffer.getWritePointer(0) + startSample2, (float) actualFrequency, remainingSamples);
-                juce::FloatVectorOperations::clear(volumeBuffer.getWritePointer(0) + startSample2, remainingSamples);
+                juce::FloatVectorOperations::clear(envelopeBuffer.getWritePointer(0) + startSample2, remainingSamples);
             }
             noteStopped();
             break;
@@ -347,11 +347,11 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         }
     }
 
-    audioProcessor.applyToggleableEffectsToBuffer(voiceBuffer, audioProcessor.getInputBuffer(), &volumeBuffer, &frequencyBuffer, &frameSyncBuffer, &voiceEffectsMap, voicePreviewEffect);
+    audioProcessor.applyToggleableEffectsToBuffer(voiceBuffer, audioProcessor.getInputBuffer(), &envelopeBuffer, &frequencyBuffer, &frameSyncBuffer, &voiceEffectsMap, voicePreviewEffect);
 
     // Add processed samples to output buffer (apply envelope/velocity gain AFTER effects)
     for (int i = 0; i < numSamples; ++i) {
-        const float gain = (float)velocity * volumeBuffer.getSample(0, i);
+        const float gain = (float)velocity * envelopeBuffer.getSample(0, i);
         int sample = startSample + i;
         // Spatial channels are scaled by gain
         if (numChannels >= 1) outputBuffer.addSample(0, sample, voiceBuffer.getSample(0, i) * gain);

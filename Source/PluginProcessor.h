@@ -27,6 +27,8 @@
 #include "audio/LfoState.h"
 #include "audio/EnvState.h"
 #include "audio/RandomState.h"
+#include "audio/SidechainState.h"
+#include "audio/ModulationTypes.h"
 #include "obj/ObjectServer.h"
 
 class FileParser;
@@ -233,6 +235,9 @@ public:
     void autoAssignLfosForEffect(osci::Effect& effect);
     std::vector<LfoAssignment> getLfoAssignments() const;
 
+    // Returns all modulation source bindings for generic wiring in EffectComponent.
+    std::vector<ModulationSourceBinding> getModulationSourceBindings();
+
     // Preview LFO assignment: temporarily assign LFOs while hovering an effect
     void autoAssignLfosForPreview(const juce::String& effectId);
     void clearPreviewLfoAssignments();
@@ -276,6 +281,30 @@ public:
     void addRandomAssignment(const RandomAssignment& assignment);
     void removeRandomAssignment(int randomIndex, const juce::String& paramId);
     std::vector<RandomAssignment> getRandomAssignments() const;
+
+    // === Global Sidechain modulation system ===
+    int activeSidechainTab = 0;
+
+    void addSidechainAssignment(const SidechainAssignment& assignment);
+    void removeSidechainAssignment(int scIndex, const juce::String& paramId);
+    std::vector<SidechainAssignment> getSidechainAssignments() const;
+
+    float getSidechainCurrentValue(int scIndex) const;
+    bool isSidechainActive(int scIndex) const;
+    float getSidechainInputLevel(int scIndex) const;
+
+    // Attack/release time (seconds)
+    std::atomic<float> sidechainAttack{0.3f};
+    std::atomic<float> sidechainRelease{0.3f};
+
+    void setSidechainAttack(int scIndex, float seconds);
+    void setSidechainRelease(int scIndex, float seconds);
+    float getSidechainAttack(int scIndex) const;
+    float getSidechainRelease(int scIndex) const;
+
+    // Transfer curve (2 nodes: start input min -> end input max)
+    void setSidechainTransferCurve(int scIndex, const std::vector<GraphNode>& nodes);
+    std::vector<GraphNode> getSidechainTransferCurve(int scIndex) const;
 
     float getRandomCurrentValue(int randomIndex) const;
     bool isRandomActive(int randomIndex) const;
@@ -444,8 +473,18 @@ private:
 
     ObjectServer objectServer{*this};
 
-    const double VOLUME_BUFFER_SECONDS = 0.1;
-    double currentVolume = 0.0;
+    // Peak-rectified input audio: per-sample max(|L|, |R|), no smoothing.
+    // Fed into envelope followers (sidechain, beginner-mode per-parameter sidechain).
+    juce::AudioBuffer<float> rectifiedInputBuffer;
+
+    // Default envelope follower for beginner-mode per-parameter sidechain.
+    // Uses fixed attack/release so beginner-mode effects respond to input level.
+    static constexpr float kDefaultEnvelopeAttack  = 0.1f;
+    static constexpr float kDefaultEnvelopeRelease = 0.1f;
+    // Linear identity curve: input [0,1] → output [0,1] unchanged.
+    // Used by the default envelope follower for beginner-mode sidechain.
+    const std::vector<GraphNode> kIdentityCurve = { { 0.0, 0.0, 0.0f }, { 1.0, 1.0, 0.0f } };
+    SidechainAudioState defaultEnvelopeState;
     juce::AudioBuffer<float> currentVolumeBuffer;
 
     std::pair<std::shared_ptr<osci::Effect>, osci::EffectParameter*> effectFromLegacyId(const juce::String& id, bool updatePrecedence = false);
@@ -541,6 +580,22 @@ private:
     static constexpr int kRandomUISubsampleInterval = 64;
 
     void applyGlobalRandomModulation(int numSamples, double sampleRate, const juce::MidiBuffer& midi);
+
+    // Global Sidechain modulation audio-thread state
+    std::vector<SidechainAssignment> sidechainAssignments;
+    mutable juce::SpinLock sidechainAssignmentLock;
+    SidechainAudioState sidechainAudioStates[NUM_SIDECHAINS];
+    std::array<std::vector<float>, NUM_SIDECHAINS> sidechainBlockBuffer;
+    std::atomic<float> sidechainCurrentValues[NUM_SIDECHAINS] = {};
+    std::atomic<float> sidechainInputLevels[NUM_SIDECHAINS] = {};
+    std::vector<GraphNode> sidechainTransferCurve;
+    std::vector<GraphNode> sidechainFullCurve; // cached: corner + transfer + corner
+    mutable juce::SpinLock sidechainCurveLock;
+
+    void applyGlobalSidechainModulation(int numSamples, double sampleRate, const float* rectifiedIn);
+
+    // Rebuild sidechainFullCurve from sidechainTransferCurve. Call while holding sidechainCurveLock.
+    void rebuildSidechainFullCurve();
 
     // Generic helper: applies per-sample modulation from precomputed source buffers
     // to effect parameters via assignments. Works for any modulation source type.
