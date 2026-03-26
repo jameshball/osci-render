@@ -308,16 +308,23 @@ struct ProcessTapBackend
     //==============================================================================
     String createTapAndAggregateDevice()
     {
+        juce::Logger::writeToLog ("ProcessTap: createTapAndAggregateDevice for process='" + process.name + "' pid=" + String (process.pid));
+
         if (! __builtin_available (macOS 14.2, *))
+        {
+            juce::Logger::writeToLog ("ProcessTap: macOS version too old for process taps");
             return "Process audio capture requires macOS 14.2 or later.";
+        }
 
         // Audio Capture permission (macOS) can cause taps to succeed but deliver silence.
         // Preflight/request it explicitly so the user gets a prompt and a clear failure mode.
         {
             const auto status = ProcessAudioPermissions::getAudioCapturePermissionStatus();
+            juce::Logger::writeToLog ("ProcessTap: audio capture permission status=" + String ((int) status));
 
             if (status != ProcessAudioPermissions::AudioCapturePermissionStatus::authorized)
             {
+                juce::Logger::writeToLog ("ProcessTap: permission denied — aborting tap creation");
                 return "Audio Capture permission is required. Enable it in System Settings > Privacy & Security > Audio Capture, then reselect the device.";
             }
         }
@@ -385,11 +392,13 @@ struct ProcessTapBackend
 
         if (err != noErr)
         {
+            juce::Logger::writeToLog ("ProcessTap: AudioHardwareCreateProcessTap failed, error=" + String ((int) err));
             return "Failed to create process tap (error " + String ((int) err) + "). "
                    "You may need to grant audio capture permission in System Settings.";
         }
 
         tapID = newTapID;
+        juce::Logger::writeToLog ("ProcessTap: tap created, tapID=" + String ((int) tapID));
 
         // Read the tap's audio format
         UInt32 formatSize = sizeof (AudioStreamBasicDescription);
@@ -401,9 +410,14 @@ struct ProcessTapBackend
 
         if (AudioObjectGetPropertyData (tapID, &formatAddr, 0, nullptr, &formatSize, &tapFormat) != noErr)
         {
+            juce::Logger::writeToLog ("ProcessTap: failed to read tap audio format");
             destroyAll();
             return "Failed to read tap audio format.";
         }
+
+        juce::Logger::writeToLog ("ProcessTap: tap format: sampleRate=" + String (tapFormat.mSampleRate)
+                                  + " channels=" + String ((int) tapFormat.mChannelsPerFrame)
+                                  + " bitsPerChannel=" + String ((int) tapFormat.mBitsPerChannel));
 
         // Step 2: Get the output device UID
         String outputUID = caGetDeviceUID (outputDevice);
@@ -453,19 +467,27 @@ struct ProcessTapBackend
 
         if (err != noErr)
         {
+            juce::Logger::writeToLog ("ProcessTap: AudioHardwareCreateAggregateDevice failed, error=" + String ((int) err));
             destroyAll();
             return "Failed to create aggregate device (error " + String ((int) err) + ").";
         }
 
         aggregateDeviceID = newAggID;
+        juce::Logger::writeToLog ("ProcessTap: aggregate device created, aggID=" + String ((int) aggregateDeviceID));
         return {}; // success
     }
 
     //==============================================================================
     void startIO (AudioIODeviceCallback* juceCallback, AudioIODevice* ownerDevice)
     {
+        juce::Logger::writeToLog ("ProcessTap: startIO");
+
         if (aggregateDeviceID == kAudioObjectUnknown || juceCallback == nullptr)
+        {
+            juce::Logger::writeToLog ("ProcessTap: startIO aborted — aggID=" + String ((int) aggregateDeviceID)
+                                      + " callback=" + String (juceCallback != nullptr ? "valid" : "null"));
             return;
+        }
 
         callback.store (juceCallback, std::memory_order_release);
 
@@ -492,6 +514,18 @@ struct ProcessTapBackend
         // Use the channel counts requested by JUCE in open() (or all available if unspecified)
         numInputChannels  = jlimit (0, availableInputChans,  activeInputChannels);
         numOutputChannels = jlimit (0, availableOutputChans, activeOutputChannels);
+
+        // Update the reported active channel counts to match reality.
+        // Without this, getActiveInputChannels() may report more channels than
+        // the tap actually provides, causing CallbackMaxSizeEnforcer to read
+        // past the end of the channel pointer array.
+        activeInputChannels  = numInputChannels;
+        activeOutputChannels = numOutputChannels;
+
+        juce::Logger::writeToLog ("ProcessTap: startIO config: sampleRate=" + String (currentSampleRate)
+                                  + " bufferSize=" + String (currentBufferSize)
+                                  + " inChans=" + String (numInputChannels)
+                                  + " outChans=" + String (numOutputChannels));
 
         // Pre-allocate temp buffers with generous size to avoid allocation on audio thread.
         // Use at least 8192 samples to cover any reasonable buffer size.
@@ -531,6 +565,7 @@ struct ProcessTapBackend
         if (err != noErr)
         {
             lastError = "Failed to create IO proc (error " + String ((int) err) + ").";
+            juce::Logger::writeToLog ("ProcessTap: " + lastError);
             return;
         }
 
@@ -558,6 +593,11 @@ struct ProcessTapBackend
                 }
 
                 lastError = "Failed to start audio device (error " + String ((int) startErr) + ").";
+                juce::Logger::writeToLog ("ProcessTap: " + lastError);
+            }
+            else
+            {
+                juce::Logger::writeToLog ("ProcessTap: AudioDeviceStart succeeded");
             }
         });
     }
@@ -567,6 +607,7 @@ struct ProcessTapBackend
         if (! playing)
             return;
 
+        juce::Logger::writeToLog ("ProcessTap: stopIO");
         playing.store (false);
 
         if (aggregateDeviceID != kAudioObjectUnknown && ioProcID != nullptr)
@@ -583,6 +624,7 @@ struct ProcessTapBackend
     //==============================================================================
     void destroyAll()
     {
+        juce::Logger::writeToLog ("ProcessTap: destroyAll");
         stopIO();
 
         if (aggregateDeviceID != kAudioObjectUnknown)
@@ -891,6 +933,10 @@ String ProcessAudioDevice::open (const BigInteger& inputChannels,
                                  double sampleRate,
                                  int bufferSizeSamples)
 {
+    juce::Logger::writeToLog ("ProcessAudioDevice::open: inChans=" + String (inputChannels.countNumberOfSetBits())
+                              + " outChans=" + String (outputChannels.countNumberOfSetBits())
+                              + " sampleRate=" + String (sampleRate)
+                              + " bufferSize=" + String (bufferSizeSamples));
     close();
 
     // Cache requested channel counts (JUCE uses these to represent which
@@ -950,6 +996,7 @@ String ProcessAudioDevice::open (const BigInteger& inputChannels,
     auto error = backend->createTapAndAggregateDevice();
     if (error.isNotEmpty())
     {
+        juce::Logger::writeToLog ("ProcessAudioDevice::open: createTapAndAggregateDevice failed: " + error);
         backend->lastError = error;
         return error;
     }
@@ -1015,11 +1062,16 @@ String ProcessAudioDevice::open (const BigInteger& inputChannels,
         backend->currentSampleRate = 44100.0;
 
     backend->isDeviceOpen = true;
+    juce::Logger::writeToLog ("ProcessAudioDevice::open: success — sampleRate=" + String (backend->currentSampleRate)
+                              + " bufferSize=" + String (backend->currentBufferSize)
+                              + " inChans=" + String (backend->activeInputChannels)
+                              + " outChans=" + String (backend->activeOutputChannels));
     return {};
 }
 
 void ProcessAudioDevice::close()
 {
+    juce::Logger::writeToLog ("ProcessAudioDevice::close");
     stop();
     backend->destroyAll();
     backend->isDeviceOpen = false;
@@ -1032,12 +1084,17 @@ bool ProcessAudioDevice::isOpen()
 
 void ProcessAudioDevice::start (AudioIODeviceCallback* cb)
 {
+    juce::Logger::writeToLog ("ProcessAudioDevice::start");
     if (backend->isDeviceOpen && cb != nullptr)
         backend->startIO (cb, this);
+    else
+        juce::Logger::writeToLog ("ProcessAudioDevice::start: skipped — isOpen=" + String ((int) backend->isDeviceOpen)
+                                  + " callback=" + String (cb != nullptr ? "valid" : "null"));
 }
 
 void ProcessAudioDevice::stop()
 {
+    juce::Logger::writeToLog ("ProcessAudioDevice::stop");
     backend->stopIO();
 }
 
@@ -1111,6 +1168,7 @@ ProcessAudioDeviceType::~ProcessAudioDeviceType()
 
 void ProcessAudioDeviceType::scanForDevices()
 {
+    juce::Logger::writeToLog ("ProcessAudioDeviceType::scanForDevices");
     inputChoiceNames.clear();
     inputChoices.clear();
     outputChoiceNames.clear();
@@ -1153,6 +1211,9 @@ void ProcessAudioDeviceType::scanForDevices()
         for (int o = 0; o < outputChoiceNames.size(); ++o)
             combinedDeviceNames.add (makeCombinedDeviceName (inputChoiceNames[i], outputChoiceNames[o]));
     }
+
+    juce::Logger::writeToLog ("ProcessAudioDeviceType::scanForDevices: found " + String (inputChoices.size())
+                              + " processes, " + String (outputChoiceNames.size()) + " outputs");
 }
 
 StringArray ProcessAudioDeviceType::getDeviceNames (bool wantInputNames) const
@@ -1242,11 +1303,13 @@ AudioIODevice* ProcessAudioDeviceType::createDevice (const String& outputDeviceN
 
     if (procIndex < 0 || outIndex < 0)
     {
+        juce::Logger::writeToLog ("ProcessAudioDeviceType::createDevice: no matching process/output — procIndex=" + String (procIndex) + " outIndex=" + String (outIndex));
         return nullptr;
     }
 
     const auto displayOutName = outputNoneSelected ? String ("<< none >>") : outName;
 
+    juce::Logger::writeToLog ("ProcessAudioDeviceType::createDevice: process='" + procName + "' output='" + displayOutName + "'");
     return new ProcessAudioDevice (displayOutName,
                                    inputChoices.getReference (procIndex),
                                    outputChoiceIDs.getReference (outIndex),
