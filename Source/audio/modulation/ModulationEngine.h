@@ -34,8 +34,13 @@ public:
     void applyAllModulation(int numSamples) {
         for (auto* source : sources) {
             auto assnCopy = source->getAssignments();
-            if (!assnCopy.empty())
-                applyModulationBuffers(numSamples, assnCopy, source->getBlockBuffers(), source->getSourceCount());
+            if (assnCopy.empty()) continue;
+
+            auto* buffers = source->getBlockBuffers();
+            int srcCount = source->getSourceCount();
+            if (buffers == nullptr || srcCount <= 0) continue;
+
+            applyModulationBuffers(numSamples, assnCopy, buffers, srcCount);
         }
     }
 
@@ -54,13 +59,14 @@ public:
     std::vector<ModulationSourceBinding> getModulationSourceBindings() {
         std::vector<ModulationSourceBinding> result;
         for (auto* source : sources) {
+            auto colourFn = source->getColourFunction();
             result.push_back({
                 source->getTypeLabel(),
                 source->getTypeId(),
                 [source](const ModAssignment& a) { source->addAssignment(a); },
                 [source]() { return source->getAssignments(); },
                 [source](int i) { return source->getCurrentValue(i); },
-                source->getColourFunction()
+                colourFn ? colourFn : [](int) { return juce::Colours::grey; }
             });
         }
         return result;

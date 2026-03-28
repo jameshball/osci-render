@@ -11,7 +11,7 @@
 class LfoPresetParameter : public osci::IntParameter {
 public:
     LfoPresetParameter(juce::String name, juce::String id, int versionHint, LfoPreset value)
-        : osci::IntParameter(name, id, versionHint, (int)value, 0, (int)getLfoPresetRegistry().size() - 1) {}
+        : osci::IntParameter(name, id, versionHint, (int)value, 0, juce::jmax(0, (int)getLfoPresetRegistry().size() - 1)) {}
 
     juce::String getText(float value, int maximumStringLength = 100) const override {
         return lfoPresetToString((LfoPreset)(int)getUnnormalisedValue(value));
@@ -53,7 +53,7 @@ public:
 class TempoDivisionParameter : public osci::IntParameter {
 public:
     TempoDivisionParameter(juce::String name, juce::String id, int versionHint, int value)
-        : osci::IntParameter(name, id, versionHint, value, 0, (int)getTempoDivisions().size() - 1) {}
+        : osci::IntParameter(name, id, versionHint, value, 0, juce::jmax(0, (int)getTempoDivisions().size() - 1)) {}
 
     juce::String getText(float value, int maximumStringLength = 100) const override {
         int idx = (int)getUnnormalisedValue(value);
@@ -68,7 +68,11 @@ public:
         for (int i = 0; i < (int)divs.size(); ++i)
             if (divs[i].toString() == text)
                 return getNormalisedValue(i);
-        return getNormalisedValue(8); // default 1/4
+        // Find "1/4" by name; fall back to 0 if not present
+        for (int i = 0; i < (int)divs.size(); ++i)
+            if (divs[i].toString() == "1/4")
+                return getNormalisedValue(i);
+        return getNormalisedValue(0);
     }
 };
 
