@@ -22,17 +22,17 @@ static ModulationSourceConfig buildSidechainConfig(OscirenderAudioProcessor& pro
     cfg.dragPrefix = "SC";
     cfg.getLabel = [](int) { return juce::String("INPUT"); };
     cfg.getSourceColour = &SidechainComponent::getSidechainColour;
-    cfg.getCurrentValue = [&proc](int i) { return proc.getSidechainCurrentValue(i); };
-    cfg.isSourceActive = [&proc](int i) { return proc.isSidechainActive(i); };
-    cfg.getAssignments = [&proc]() { return proc.getSidechainAssignments(); };
-    cfg.addAssignment = [&proc](const ModAssignment& a) { proc.addSidechainAssignment(a); };
-    cfg.removeAssignment = [&proc](int idx, const juce::String& pid) { proc.removeSidechainAssignment(idx, pid); };
+    cfg.getCurrentValue = [&proc](int i) { return proc.sidechainParameters.getCurrentValue(i); };
+    cfg.isSourceActive = [&proc](int i) { return proc.sidechainParameters.isActive(i); };
+    cfg.getAssignments = [&proc]() { return proc.sidechainParameters.getAssignments(); };
+    cfg.addAssignment = [&proc](const ModAssignment& a) { proc.sidechainParameters.addAssignment(a); };
+    cfg.removeAssignment = [&proc](int idx, const juce::String& pid) { proc.sidechainParameters.removeAssignment(idx, pid); };
     cfg.getParamDisplayName = [&proc](const juce::String& pid) -> juce::String {
         return proc.getParamDisplayName(pid);
     };
     cfg.broadcaster = &proc.broadcaster;
-    cfg.getActiveTab = [&proc]() { return proc.activeSidechainTab; };
-    cfg.setActiveTab = [&proc](int i) { proc.activeSidechainTab = i; };
+    cfg.getActiveTab = [&proc]() { return proc.sidechainParameters.activeTab; };
+    cfg.setActiveTab = [&proc](int i) { proc.sidechainParameters.activeTab = i; };
     return cfg;
 }
 
@@ -112,13 +112,13 @@ SidechainComponent::SidechainComponent(OscirenderAudioProcessor& processor)
 
     // Attack knob (0-2 seconds, default 0.3s, skew centre 0.3)
     configureKnob(attackKnob, 2.0, 0.3, 0.3, " s", [this](float val) {
-        audioProcessor.setSidechainAttack(0, val);
+        audioProcessor.sidechainParameters.setAttack(0, val);
     });
     addAndMakeVisible(attackKnob);
 
     // Release knob (0-2 seconds, default 0.3s, skew centre 0.3)
     configureKnob(releaseKnob, 2.0, 0.3, 0.3, " s", [this](float val) {
-        audioProcessor.setSidechainRelease(0, val);
+        audioProcessor.sidechainParameters.setRelease(0, val);
     });
     addAndMakeVisible(releaseKnob);
 
@@ -132,8 +132,8 @@ void SidechainComponent::timerCallback() {
     ModulationSourceComponent::timerCallback();
 
     // Show the current input level as a vertical marker on the graph
-    float inputLevel = audioProcessor.getSidechainInputLevel(0);
-    bool active = audioProcessor.isSidechainActive(0);
+    float inputLevel = audioProcessor.sidechainParameters.getInputLevel(0);
+    bool active = audioProcessor.sidechainParameters.isActive(0);
 
     if (active) {
         double pos = (double)inputLevel;
@@ -246,7 +246,7 @@ void SidechainComponent::syncGraphColours() {
 void SidechainComponent::syncGraphFromProcessor() {
     juce::ScopedValueSetter<bool> guard(isSyncingGraph, true);
 
-    auto curveNodes = audioProcessor.getSidechainTransferCurve(0);
+    auto curveNodes = audioProcessor.sidechainParameters.getTransferCurve(0);
 
     // Wrap the 2 processor nodes with invisible corner nodes for extension lines
     std::vector<GraphNode> displayNodes;
@@ -268,7 +268,7 @@ void SidechainComponent::syncProcessorFromGraph() {
     // Strip the first and last corner nodes — processor only stores the 2 handles
     if (allNodes.size() >= 4) {
         std::vector<GraphNode> curveNodes(allNodes.begin() + 1, allNodes.end() - 1);
-        audioProcessor.setSidechainTransferCurve(0, curveNodes);
+        audioProcessor.sidechainParameters.setTransferCurve(0, curveNodes);
     }
 }
 
@@ -297,7 +297,7 @@ void SidechainComponent::syncFromProcessorState() {
 
     auto colour = getSidechainColour(0);
     attackKnob.setAccentColour(colour);
-    attackKnob.getKnob().setValue(audioProcessor.getSidechainAttack(0), juce::dontSendNotification);
+    attackKnob.getKnob().setValue(audioProcessor.sidechainParameters.getAttack(0), juce::dontSendNotification);
     releaseKnob.setAccentColour(colour);
-    releaseKnob.getKnob().setValue(audioProcessor.getSidechainRelease(0), juce::dontSendNotification);
+    releaseKnob.getKnob().setValue(audioProcessor.sidechainParameters.getRelease(0), juce::dontSendNotification);
 }

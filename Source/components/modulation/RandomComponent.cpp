@@ -26,27 +26,27 @@ static ModulationSourceConfig buildRandomConfig(OscirenderAudioProcessor& proc) 
     cfg.dragPrefix = "RNG";
     cfg.getLabel = [](int i) { return "RAND " + juce::String(i + 1); };
     cfg.getSourceColour = &RandomComponent::getRandomColour;
-    cfg.getCurrentValue = [&proc](int i) { return proc.getRandomCurrentValue(i); };
-    cfg.isSourceActive = [&proc](int i) { return proc.isRandomActive(i); };
-    cfg.getAssignments = [&proc]() { return proc.getRandomAssignments(); };
-    cfg.addAssignment = [&proc](const ModAssignment& a) { proc.addRandomAssignment(a); };
-    cfg.removeAssignment = [&proc](int idx, const juce::String& pid) { proc.removeRandomAssignment(idx, pid); };
+    cfg.getCurrentValue = [&proc](int i) { return proc.randomParameters.getCurrentValue(i); };
+    cfg.isSourceActive = [&proc](int i) { return proc.randomParameters.isActive(i); };
+    cfg.getAssignments = [&proc]() { return proc.randomParameters.getAssignments(); };
+    cfg.addAssignment = [&proc](const ModAssignment& a) { proc.randomParameters.addAssignment(a); };
+    cfg.removeAssignment = [&proc](int idx, const juce::String& pid) { proc.randomParameters.removeAssignment(idx, pid); };
     cfg.getParamDisplayName = [&proc](const juce::String& pid) -> juce::String {
         return proc.getParamDisplayName(pid);
     };
     cfg.broadcaster = &proc.broadcaster;
-    cfg.getActiveTab = [&proc]() { return proc.activeRandomTab; };
-    cfg.setActiveTab = [&proc](int i) { proc.activeRandomTab = i; };
+    cfg.getActiveTab = [&proc]() { return proc.randomParameters.activeTab; };
+    cfg.setActiveTab = [&proc](int i) { proc.randomParameters.activeTab = i; };
     return cfg;
 }
 
 static ModulationRateConfig buildRandomRateConfig(OscirenderAudioProcessor& proc) {
     ModulationRateConfig cfg;
-    cfg.getRateParam = [&proc](int i) -> osci::FloatParameter* { return proc.randomRate[i]; };
-    cfg.getRateMode = [&proc](int i) { return proc.getRandomRateMode(i); };
-    cfg.setRateMode = [&proc](int i, LfoRateMode m) { proc.setRandomRateMode(i, m); };
-    cfg.getTempoDivision = [&proc](int i) { return proc.getRandomTempoDivision(i); };
-    cfg.setTempoDivision = [&proc](int i, int d) { proc.setRandomTempoDivision(i, d); };
+    cfg.getRateParam = [&proc](int i) -> osci::FloatParameter* { return proc.randomParameters.rate[i]; };
+    cfg.getRateMode = [&proc](int i) { return proc.randomParameters.getRateMode(i); };
+    cfg.setRateMode = [&proc](int i, LfoRateMode m) { proc.randomParameters.setRateMode(i, m); };
+    cfg.getTempoDivision = [&proc](int i) { return proc.randomParameters.getTempoDivision(i); };
+    cfg.setTempoDivision = [&proc](int i, int d) { proc.randomParameters.setTempoDivision(i, d); };
     cfg.getCurrentBpm = [&proc]() { return proc.currentBpm.load(std::memory_order_relaxed); };
     cfg.maxIndex = NUM_RANDOM_SOURCES;
     return cfg;
@@ -59,8 +59,8 @@ static ModulationModeConfig buildRandomStyleConfig(OscirenderAudioProcessor& pro
         { static_cast<int>(RandomStyle::SampleAndHold),    "Sample & Hold" },
         { static_cast<int>(RandomStyle::SineInterpolate),  "Sine Interpolate" },
     };
-    cfg.getMode = [&proc](int i) { return static_cast<int>(proc.getRandomStyle(i)); };
-    cfg.setMode = [&proc](int i, int m) { proc.setRandomStyle(i, static_cast<RandomStyle>(m)); };
+    cfg.getMode = [&proc](int i) { return static_cast<int>(proc.randomParameters.getStyle(i)); };
+    cfg.setMode = [&proc](int i, int m) { proc.randomParameters.setStyle(i, static_cast<RandomStyle>(m)); };
     cfg.labelText = "STYLE";
     cfg.maxIndex = NUM_RANDOM_SOURCES;
     return cfg;
@@ -99,7 +99,7 @@ void RandomComponent::timerCallback() {
 
     // Drain all subsampled values from the audio thread ring buffer.
     RandomUIRingBuffer::Entry entries[256];
-    int count = audioProcessor.drainRandomUIBuffer(idx, entries, 256);
+    int count = audioProcessor.randomParameters.drainUIBuffer(idx, entries, 256);
 
     if (count > 0) {
         for (int i = 0; i < count; ++i)
@@ -107,12 +107,12 @@ void RandomComponent::timerCallback() {
         graph.repaint();
     } else {
         // No audio data available — push current snapshot to keep scrolling.
-        bool isActive = audioProcessor.isRandomActive(idx);
-        float value = audioProcessor.getRandomCurrentValue(idx);
+        bool isActive = audioProcessor.randomParameters.isActive(idx);
+        float value = audioProcessor.randomParameters.getCurrentValue(idx);
         graph.pushValue(value, isActive);
     }
 
-    wasActive = audioProcessor.isRandomActive(idx);
+    wasActive = audioProcessor.randomParameters.isActive(idx);
 }
 
 void RandomComponent::resized() {

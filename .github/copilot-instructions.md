@@ -256,6 +256,21 @@ new osci::FloatParameter("Name", "id", VERSION_HINT, defaultVal, min, max);
 new osci::BooleanParameter("Name", "id", VERSION_HINT, false, "tooltip");
 ```
 
+**CRITICAL: ALL plugin state MUST be DAW-automatable parameters.**
+
+Every piece of state that affects audio output or modulation behaviour — including modulation modes, rate modes, tempo divisions, styles, phase offsets, smooth amounts, delay amounts, attack/release times — **must** be stored as an `osci::FloatParameter`, `osci::IntParameter`, or `osci::BooleanParameter` and registered in the processor's `floatParameters`, `intParameters`, or `booleanParameters` vectors.
+
+**Never** store modulation/audio state as raw `std::atomic<float>`, plain `int`, or enum arrays. These are invisible to DAW hosts and cannot be automated, recorded, or modulated externally.
+
+When adding new modulation parameters:
+1. Declare as `osci::FloatParameter*` / `osci::IntParameter*` / `osci::BooleanParameter*` in the processor header
+2. Create with `new` in the constructor and push to the appropriate vector (`floatParameters`, `intParameters`, or `booleanParameters`)
+3. Access on the audio thread via `getValueUnnormalised()` (atomic, lock-free)
+4. Set from the UI via `setUnnormalisedValueNotifyingHost()` (notifies the DAW for automation recording)
+5. Provide getter/setter methods on the processor for UI components to use
+
+For enum-style parameters, use `osci::IntParameter` with min=0 and max=(numValues-1), and cast to/from the enum type in getter/setter methods.
+
 ### Points and Shapes
 
 `osci::Point` represents a sample with position (x,y,z) and color (r,g,b):
@@ -276,15 +291,6 @@ Lua scripts in `Resources/lua/` receive global variables:
 - Use `juce::SpinLock` for audio-thread-safe data (see `parsersLock` in PluginProcessor)
 - `std::atomic` for simple values shared between threads
 - Avoid allocations in `processBlock()`
-
-### Forking / Copying JUCE Components
-
-When copying a JUCE component to customise it (e.g. `CustomAudioDeviceSelectorComponent`):
-
-- **Never reuse original type names** inside `namespace juce` — JUCE's amalgamated builds already define the original classes. Defining a class with the same name causes an **ODR (One Definition Rule) violation**: the linker picks one class size, and if your version has extra members the object is allocated too small, corrupting memory.
-- **Prefix all types** with `Custom` (or similar) — this applies to every internal/helper class in the copied file (settings panels, list boxes, structs, free functions), not just the top-level component.
-- Keep the custom types **inside `namespace juce`** — JUCE's `juce_IncludeModuleHeaders.h` `#define`s symbols like `Component` to `juce::Component` to handle platform name conflicts. Headers included from files that use these macros (e.g. `CustomStandalone.cpp`) will break if they try to use `juce::Component` explicitly (it becomes `juce::juce::Component`). Unqualified names inside `namespace juce {}` avoid this.
-- See `Source/CustomAudioDeviceSelectorComponent.cpp` for the correct pattern.
 
 ## Testing
 

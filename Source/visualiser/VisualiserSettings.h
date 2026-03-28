@@ -1,7 +1,5 @@
 #pragma once
 
-#define VERSION_HINT 2
-
 #include <JuceHeader.h>
 
 #include "../LookAndFeel.h"

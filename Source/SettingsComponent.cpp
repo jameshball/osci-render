@@ -71,18 +71,8 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
 
     // DAHDSR parameter listeners (for envelope display updates)
     const int numEnvListeners = beginnerMode ? 1 : NUM_ENVELOPES;
-    for (int e = 0; e < numEnvListeners; ++e) {
-        const auto& ep = audioProcessor.envParams[e];
-        ep.delayTime->addListener(&dahdsrListener);
-        ep.attackTime->addListener(&dahdsrListener);
-        ep.holdTime->addListener(&dahdsrListener);
-        ep.decayTime->addListener(&dahdsrListener);
-        ep.sustainLevel->addListener(&dahdsrListener);
-        ep.releaseTime->addListener(&dahdsrListener);
-        ep.attackShape->addListener(&dahdsrListener);
-        ep.decayShape->addListener(&dahdsrListener);
-        ep.releaseShape->addListener(&dahdsrListener);
-    }
+    for (int e = 0; e < numEnvListeners; ++e)
+        audioProcessor.envelopeParameters.params[e].addListenerToAll(&dahdsrListener);
 
     // Envelope flow-marker animation
     startTimerHz(60);
@@ -143,18 +133,8 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
 SettingsComponent::~SettingsComponent() {
     stopTimer();
     const int numEnvListeners = beginnerMode ? 1 : NUM_ENVELOPES;
-    for (int e = 0; e < numEnvListeners; ++e) {
-        const auto& ep = audioProcessor.envParams[e];
-        ep.delayTime->removeListener(&dahdsrListener);
-        ep.attackTime->removeListener(&dahdsrListener);
-        ep.holdTime->removeListener(&dahdsrListener);
-        ep.decayTime->removeListener(&dahdsrListener);
-        ep.sustainLevel->removeListener(&dahdsrListener);
-        ep.releaseTime->removeListener(&dahdsrListener);
-        ep.attackShape->removeListener(&dahdsrListener);
-        ep.decayShape->removeListener(&dahdsrListener);
-        ep.releaseShape->removeListener(&dahdsrListener);
-    }
+    for (int e = 0; e < numEnvListeners; ++e)
+        audioProcessor.envelopeParameters.params[e].removeListenerFromAll(&dahdsrListener);
     audioProcessor.visualiserParameters.visualiserFullScreen->removeListener(this);
     audioProcessor.midiEnabled->removeListener(this);
 }

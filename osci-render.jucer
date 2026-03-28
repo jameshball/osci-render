@@ -214,6 +214,17 @@
               file="Source/audio/LfoPresetManager.cpp"/>
         <FILE id="EnStH1" name="EnvState.h" compile="0" resource="0" file="Source/audio/EnvState.h"/>
         <FILE id="MdAsH1" name="ModAssignment.h" compile="0" resource="0" file="Source/audio/ModAssignment.h"/>
+        <FILE id="MdAsS1" name="ModulationAssignmentStore.h" compile="0" resource="0"
+              file="Source/audio/ModulationAssignmentStore.h"/>
+        <FILE id="MdSrH1" name="ModulationSource.h" compile="0" resource="0"
+              file="Source/audio/ModulationSource.h"/>
+        <FILE id="MdEnH1" name="ModulationEngine.h" compile="0" resource="0"
+              file="Source/audio/ModulationEngine.h"/>
+        <FILE id="MdPtH1" name="ModulationParameterTypes.h" compile="0" resource="0"
+              file="Source/audio/ModulationParameterTypes.h"/>
+        <FILE id="LfPrH1" name="LfoParameters.h" compile="0" resource="0" file="Source/audio/LfoParameters.h"/>
+        <FILE id="EnPrH1" name="EnvelopeParameters.h" compile="0" resource="0"
+              file="Source/audio/EnvelopeParameters.h"/>
         <FILE id="EjkbRe" name="PolygonizerEffect.h" compile="0" resource="0"
               file="Source/audio/PolygonizerEffect.h"/>
         <FILE id="XSUjDz" name="KaleidoscopeEffect.h" compile="0" resource="0"
@@ -468,12 +479,16 @@
         <FILE id="RnCmC2" name="RandomComponent.cpp" compile="1" resource="0"
               file="Source/components/modulation/RandomComponent.cpp"/>
         <FILE id="RnStH1" name="RandomState.h" compile="0" resource="0" file="Source/audio/RandomState.h"/>
+        <FILE id="RnPrH1" name="RandomParameters.h" compile="0" resource="0"
+              file="Source/audio/RandomParameters.h"/>
         <FILE id="ScCmH1" name="SidechainComponent.h" compile="0" resource="0"
               file="Source/components/modulation/SidechainComponent.h"/>
         <FILE id="ScCmC2" name="SidechainComponent.cpp" compile="1" resource="0"
               file="Source/components/modulation/SidechainComponent.cpp"/>
         <FILE id="ScStH1" name="SidechainState.h" compile="0" resource="0"
               file="Source/audio/SidechainState.h"/>
+        <FILE id="ScPrH1" name="SidechainParameters.h" compile="0" resource="0"
+              file="Source/audio/SidechainParameters.h"/>
         <FILE id="MdTyH1" name="ModulationTypes.h" compile="0" resource="0"
               file="Source/audio/ModulationTypes.h"/>
         <FILE id="TmpCH1" name="TempoComponent.h" compile="0" resource="0"

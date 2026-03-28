@@ -44,8 +44,10 @@
 #include <array>
 #include "../../audio/DahdsrEnvelope.h"
 #include "../../audio/EnvState.h"
+#include "../../audio/EnvelopeParameters.h"
 #include "NodeGraphComponent.h"
 #include "ModulationSourceComponent.h"
+#include "../KnobContainerComponent.h"
 
 class OscirenderAudioProcessor;
 
@@ -130,6 +132,25 @@ private:
 	GridMode gridDisplayMode = GridNone;
 
 	NodeGraphComponent graph;
+
+	// --- Knobs for DAHDSR parameters ---
+	KnobContainerComponent delayKnob   { "DELAY" };
+	KnobContainerComponent attackKnob  { "ATTACK" };
+	KnobContainerComponent holdKnob    { "HOLD" };
+	KnobContainerComponent decayKnob   { "DECAY" };
+	KnobContainerComponent sustainKnob { "SUSTAIN" };
+	KnobContainerComponent releaseKnob { "RELEASE" };
+
+	static constexpr int kKnobRowHeight = 48;
+	static constexpr int kKnobGap = 4;
+	static constexpr int kMaxKnobWidth = 90;
+
+	// Bind a KnobContainerComponent to an osci::FloatParameter*.
+	// Sets range, default, suffix, accent colour, and bidirectional sync.
+	void bindKnobToParam(KnobContainerComponent& container, osci::FloatParameter* param,
+	                     double skewCentre, const juce::String& suffix = {});
+	void syncKnobsToActiveEnv();
+	void updateKnobValues();
 
 	void syncGraphToActiveEnv();
 	void syncActiveEnvFromGraph();

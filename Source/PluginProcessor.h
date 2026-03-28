@@ -25,9 +25,14 @@
 #include "audio/ShapeVoice.h"
 #include "audio/DahdsrEnvelope.h"
 #include "audio/LfoState.h"
+#include "audio/LfoParameters.h"
 #include "audio/EnvState.h"
+#include "audio/EnvelopeParameters.h"
 #include "audio/RandomState.h"
+#include "audio/RandomParameters.h"
 #include "audio/SidechainState.h"
+#include "audio/SidechainParameters.h"
+#include "audio/ModulationEngine.h"
 #include "audio/ModulationTypes.h"
 #include "obj/ObjectServer.h"
 
@@ -171,46 +176,15 @@ public:
     std::atomic<bool> objectServerRendering = false;
     juce::ChangeBroadcaster fileChangeBroadcaster;
 
-    osci::FloatParameter* delayTime = new osci::FloatParameter("Delay Time", "delayTime", VERSION_HINT, 0.0f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
-    osci::FloatParameter* attackTime = new osci::FloatParameter("Attack Time", "attackTime", VERSION_HINT, 0.005f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
-    osci::FloatParameter* holdTime = new osci::FloatParameter("Hold Time", "holdTime", VERSION_HINT, 0.0f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
-    osci::FloatParameter* decayTime = new osci::FloatParameter("Decay Time", "decayTime", VERSION_HINT, 0.095f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
-    osci::FloatParameter* sustainLevel = new osci::FloatParameter("Sustain Level", "sustainLevel", VERSION_HINT, 0.6f, 0.0f, 1.0f, 0.00001f);
-    osci::FloatParameter* releaseTime = new osci::FloatParameter("Release Time", "releaseTime", VERSION_HINT, 0.4f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
-    osci::FloatParameter* attackShape = new osci::FloatParameter("Attack Shape", "attackShape", VERSION_HINT, 5.0f, -50.0f, 50.0f, 0.00001f);
-    osci::FloatParameter* decayShape = new osci::FloatParameter("Decay Shape", "decayShape", VERSION_HINT, -20.0f, -50.0f, 50.0f, 0.00001f);
-    osci::FloatParameter* releaseShape = new osci::FloatParameter("Release Shape", "releaseShape", VERSION_HINT, -5.0f, -50.0f, 50.0f, 0.00001f);
+    // Beginner/advanced mode flag — read from global settings at construction, immutable after.
+    // Free builds are always beginner; premium reads the persisted preference.
+    bool beginnerMode = true;
 
-    // === Envelopes 1–4 (additional modulation envelopes) ===
-    // Envelope 0 uses the legacy params above. Envelopes 1–4 have indexed IDs.
-    struct EnvelopeParamSet {
-        osci::FloatParameter* delayTime = nullptr;
-        osci::FloatParameter* attackTime = nullptr;
-        osci::FloatParameter* holdTime = nullptr;
-        osci::FloatParameter* decayTime = nullptr;
-        osci::FloatParameter* sustainLevel = nullptr;
-        osci::FloatParameter* releaseTime = nullptr;
-        osci::FloatParameter* attackShape = nullptr;
-        osci::FloatParameter* decayShape = nullptr;
-        osci::FloatParameter* releaseShape = nullptr;
-    };
-    EnvelopeParamSet envParams[NUM_ENVELOPES]; // index 0 points to legacy params
-
-    // === Global Envelope assignment system ===
-    int activeEnvTab = 0;
-
-    void addEnvAssignment(const EnvAssignment& assignment);
-    void removeEnvAssignment(int envIndex, const juce::String& paramId);
-    std::vector<EnvAssignment> getEnvAssignments() const;
-
-    // Get the current envelope output value (0..1) for visualization
-    float getEnvCurrentValue(int envIndex) const;
+    // === Envelope modulation state ===
+    EnvelopeParameters envelopeParameters;
 
     // Look up human-readable name for any parameter by ID (searches all effects).
     juce::String getParamDisplayName(const juce::String& paramId) const;
-
-    // === Global LFO system ===
-    osci::FloatParameter* lfoRate[NUM_LFOS] = {};
 
     // DAW or standalone BPM – updated every processBlock
     std::atomic<double> currentBpm{120.0};
@@ -218,108 +192,22 @@ public:
     // Standalone-only BPM parameter (automatable)
     osci::FloatParameter* standaloneBpm = new osci::FloatParameter("Tempo", "standaloneBpm", VERSION_HINT, 120.0f, 20.0f, 300.0f, 0.1f);
 
-    // UI-persisted LFO state (preset type + active tab)
-    LfoPreset lfoPresets[NUM_LFOS] = { LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle, LfoPreset::Triangle };
-    LfoRateMode lfoRateModes[NUM_LFOS] = { LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds };
-    LfoMode lfoModes[NUM_LFOS] = { LfoMode::Free, LfoMode::Free, LfoMode::Free, LfoMode::Free, LfoMode::Free, LfoMode::Free, LfoMode::Free, LfoMode::Free };
-    std::atomic<float> lfoPhaseOffsets[NUM_LFOS] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
-    std::atomic<float> lfoSmoothAmounts[NUM_LFOS] = { 0.005f, 0.005f, 0.005f, 0.005f, 0.005f, 0.005f, 0.005f, 0.005f }; // seconds
-    std::atomic<float> lfoDelayAmounts[NUM_LFOS] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f }; // seconds
-    int lfoTempoDivisions[NUM_LFOS] = { 8, 8, 8, 8, 8, 8, 8, 8 };  // index into getTempoDivisions(), default 1/4
-    int activeLfoTab = 0;
+    // === Global modulation state classes ===
+    LfoParameters lfoParameters;
+    RandomParameters randomParameters;
+    SidechainParameters sidechainParameters;
 
-    void lfoWaveformChanged(int index, const LfoWaveform& waveform);
-    void addLfoAssignment(const LfoAssignment& assignment);
-    void removeLfoAssignment(int lfoIndex, const juce::String& paramId);
+    // Cross-modulation-source operations (delegated to modulationEngine declared below)
     void removeAllAssignmentsForEffect(const osci::Effect& effect);
+
+    // LFO auto-assignment (delegates to lfoParameters)
     void autoAssignLfosForEffect(osci::Effect& effect);
-    std::vector<LfoAssignment> getLfoAssignments() const;
-
-    // Returns all modulation source bindings for generic wiring in EffectComponent.
-    std::vector<ModulationSourceBinding> getModulationSourceBindings();
-
-    // Preview LFO assignment: temporarily assign LFOs while hovering an effect
     void autoAssignLfosForPreview(const juce::String& effectId);
     void clearPreviewLfoAssignments();
     void promotePreviewLfoAssignments();
-    LfoWaveform getLfoWaveform(int index) const;
 
-    // Get the current LFO output value (0..1) for visualization
-    float getLfoCurrentValue(int lfoIndex) const;
-    // Get the current LFO phase [0,1) for flow marker visualization
-    float getLfoCurrentPhase(int lfoIndex) const;
-    // Returns true if the LFO is actively modulating (not idle/finished)
-    bool isLfoActive(int lfoIndex) const;
-    // Consumes the retrigger flag (returns true once, then resets). Call from UI thread.
-    bool consumeLfoRetriggered(int lfoIndex) { return lfoRetriggered[lfoIndex].exchange(false, std::memory_order_relaxed); }
-
-    // Thread-safe setters for LFO rate mode/division (acquires lfoWaveformLock)
-    void setLfoRateMode(int lfoIndex, LfoRateMode mode);
-    void setLfoTempoDivision(int lfoIndex, int divisionIndex);
-    void setLfoMode(int lfoIndex, LfoMode mode);
-    void setLfoPhaseOffset(int lfoIndex, float phase);
-    void setLfoSmoothAmount(int lfoIndex, float seconds);
-    void setLfoDelayAmount(int lfoIndex, float seconds);
-
-    // Thread-safe getters for LFO rate mode/division
-    LfoRateMode getLfoRateMode(int lfoIndex) const;
-    int getLfoTempoDivision(int lfoIndex) const;
-    LfoMode getLfoMode(int lfoIndex) const;
-    float getLfoPhaseOffset(int lfoIndex) const;
-    float getLfoSmoothAmount(int lfoIndex) const;
-    float getLfoDelayAmount(int lfoIndex) const;
-
-    // === Global Random modulation system ===
-    osci::FloatParameter* randomRate[NUM_RANDOM_SOURCES] = {};
-
-    // UI-persisted Random state
-    RandomStyle randomStyles[NUM_RANDOM_SOURCES] = { RandomStyle::Perlin, RandomStyle::Perlin, RandomStyle::Perlin };
-    LfoRateMode randomRateModes[NUM_RANDOM_SOURCES] = { LfoRateMode::Seconds, LfoRateMode::Seconds, LfoRateMode::Seconds };
-    int randomTempoDivisions[NUM_RANDOM_SOURCES] = { 8, 8, 8 };
-    int activeRandomTab = 0;
-
-    void addRandomAssignment(const RandomAssignment& assignment);
-    void removeRandomAssignment(int randomIndex, const juce::String& paramId);
-    std::vector<RandomAssignment> getRandomAssignments() const;
-
-    // === Global Sidechain modulation system ===
-    int activeSidechainTab = 0;
-
-    void addSidechainAssignment(const SidechainAssignment& assignment);
-    void removeSidechainAssignment(int scIndex, const juce::String& paramId);
-    std::vector<SidechainAssignment> getSidechainAssignments() const;
-
-    float getSidechainCurrentValue(int scIndex) const;
-    bool isSidechainActive(int scIndex) const;
-    float getSidechainInputLevel(int scIndex) const;
-
-    // Attack/release time (seconds)
-    std::atomic<float> sidechainAttack{0.3f};
-    std::atomic<float> sidechainRelease{0.3f};
-
-    void setSidechainAttack(int scIndex, float seconds);
-    void setSidechainRelease(int scIndex, float seconds);
-    float getSidechainAttack(int scIndex) const;
-    float getSidechainRelease(int scIndex) const;
-
-    // Transfer curve (2 nodes: start input min -> end input max)
-    void setSidechainTransferCurve(int scIndex, const std::vector<GraphNode>& nodes);
-    std::vector<GraphNode> getSidechainTransferCurve(int scIndex) const;
-
-    float getRandomCurrentValue(int randomIndex) const;
-    bool isRandomActive(int randomIndex) const;
-    bool consumeRandomRetriggered(int randomIndex) { return randomRetriggered[randomIndex].exchange(false, std::memory_order_relaxed); }
-
-    // UI thread drains subsampled values from the audio thread ring buffer.
-    int drainRandomUIBuffer(int randomIndex, RandomUIRingBuffer::Entry* out, int maxEntries);
-
-    void setRandomRateMode(int randomIndex, LfoRateMode mode);
-    void setRandomTempoDivision(int randomIndex, int divisionIndex);
-    void setRandomStyle(int randomIndex, RandomStyle style);
-
-    LfoRateMode getRandomRateMode(int randomIndex) const;
-    int getRandomTempoDivision(int randomIndex) const;
-    RandomStyle getRandomStyle(int randomIndex) const;
+    // Returns all modulation source bindings for generic wiring in EffectComponent.
+    std::vector<ModulationSourceBinding> getModulationSourceBindings();
 
     juce::MidiKeyboardState keyboardState;
 
@@ -523,99 +411,14 @@ private:
 
     juce::AudioPlayHead* playHead;
 
-    // Global LFO audio-thread state
-    LfoWaveform lfoWaveforms[NUM_LFOS];
-    mutable juce::SpinLock lfoWaveformLock;
-    std::vector<LfoAssignment> lfoAssignments;
-    mutable juce::SpinLock lfoAssignmentLock;
-    LfoAudioState lfoAudioStates[NUM_LFOS];
-    float lfoSmoothedOutput[NUM_LFOS] = {}; // One-pole filter state for LFO output smoothing
-    float lfoDelayElapsed[NUM_LFOS] = {}; // Seconds elapsed since LFO trigger (for startup delay)
-    int lfoActiveNoteCount = 0;  // Tracks how many MIDI notes are currently held for LFO triggering
-    bool lfoPrevAnyVoiceActive = false;  // Previous block's effective voice-active state for transition detection
-    std::array<std::vector<float>, NUM_LFOS> lfoBlockBuffer;
-
-    // Thread-safe snapshot of most recent LFO output for UI visualization
-    std::atomic<float> lfoCurrentValues[NUM_LFOS] = {};
-    // Thread-safe snapshot of most recent LFO phase [0,1) for UI flow markers
-    std::atomic<float> lfoCurrentPhases[NUM_LFOS] = {};
-    // Whether each LFO is actively modulating (not idle/finished) — for UI marker visibility
-    std::atomic<bool> lfoActive[NUM_LFOS] = {};
-    // Pulsed true on a noteOn while the LFO was already running — consumed by UI to reset flow trail
-    std::atomic<bool> lfoRetriggered[NUM_LFOS] = {};
-
-    // Preview LFO assignment state (message-thread only — no lock needed)
-    juce::String previewLfoEffectId;
-    std::vector<std::pair<juce::String, float>> previewSavedParamValues;
-    void clearPreviewLfoAssignmentsInternal();
-
-    void applyGlobalLfoModulation(int numSamples, double sampleRate, const juce::MidiBuffer& midi);
-
-    // Global Envelope assignment audio-thread state
-    std::vector<EnvAssignment> envAssignments;
-    mutable juce::SpinLock envAssignmentLock;
-    // Per-envelope global DAHDSR state (triggered on note-on, tracks highest active voice)
-    DahdsrState envGlobalStates[NUM_ENVELOPES];
-    std::atomic<float> envCurrentValues[NUM_ENVELOPES] = {};
-    std::atomic<bool> envNoteOnPending{false}; // Set by MIDI note-on, consumed by audio thread
-    std::atomic<bool> envNoteOffPending{false}; // Set by MIDI note-off
-    std::array<std::vector<float>, NUM_ENVELOPES> envBlockBuffer;
-    std::array<float, NUM_ENVELOPES> envPrevBlockValues = {};
-
-    void applyGlobalEnvModulation(int numSamples, double sampleRate);
-
-    // Global Random modulation audio-thread state
-    std::vector<RandomAssignment> randomAssignments;
-    mutable juce::SpinLock randomAssignmentLock;
-    RandomAudioState randomAudioStates[NUM_RANDOM_SOURCES];
-    int randomActiveNoteCount = 0;
-    bool randomPrevAnyVoiceActive = false;
-    std::array<std::vector<float>, NUM_RANDOM_SOURCES> randomBlockBuffer;
-
-    std::atomic<float> randomCurrentValues[NUM_RANDOM_SOURCES] = {};
-    std::atomic<bool> randomActive[NUM_RANDOM_SOURCES] = {};
-    std::atomic<bool> randomRetriggered[NUM_RANDOM_SOURCES] = {};
-
-    RandomUIRingBuffer randomUIBuffers[NUM_RANDOM_SOURCES];
-    static constexpr int kRandomUISubsampleInterval = 64;
-
-    void applyGlobalRandomModulation(int numSamples, double sampleRate, const juce::MidiBuffer& midi);
-
-    // Global Sidechain modulation audio-thread state
-    std::vector<SidechainAssignment> sidechainAssignments;
-    mutable juce::SpinLock sidechainAssignmentLock;
-    SidechainAudioState sidechainAudioStates[NUM_SIDECHAINS];
-    std::array<std::vector<float>, NUM_SIDECHAINS> sidechainBlockBuffer;
-    std::atomic<float> sidechainCurrentValues[NUM_SIDECHAINS] = {};
-    std::atomic<float> sidechainInputLevels[NUM_SIDECHAINS] = {};
-    std::vector<GraphNode> sidechainTransferCurve;
-    std::vector<GraphNode> sidechainFullCurve; // cached: corner + transfer + corner
-    mutable juce::SpinLock sidechainCurveLock;
-
-    void applyGlobalSidechainModulation(int numSamples, double sampleRate, const float* rectifiedIn);
-
-    // Rebuild sidechainFullCurve from sidechainTransferCurve. Call while holding sidechainCurveLock.
-    void rebuildSidechainFullCurve();
-
-    // Generic helper: applies per-sample modulation from precomputed source buffers
-    // to effect parameters via assignments. Works for any modulation source type.
-    void applyModulationBuffers(int numSamples,
-                                const std::vector<ModAssignment>& assignments,
-                                const std::vector<float>* sourceBuffers,
-                                int maxSourceIndex);
-
     // Precomputed paramId → (effect*, paramIndex) lookup for O(1) modulation target resolution.
     // Built once after all effects are populated; the effect lists are stable after construction.
-    struct ParamLocation {
-        osci::Effect* effect;
-        int paramIndex;
-    };
     std::unordered_map<juce::String, ParamLocation> paramLocationMap;
     void buildParamLocationMap();
 
-    // Beginner/advanced mode flag — read from global settings at construction, immutable after.
-    // Free builds are always beginner; premium reads the persisted preference.
-    bool beginnerMode = true;
+    // Modulation engine: operates on all sources via common ModulationSource interface.
+    // Must be declared after paramLocationMap (it holds a reference to it).
+    ModulationEngine modulationEngine{paramLocationMap};
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
 public:

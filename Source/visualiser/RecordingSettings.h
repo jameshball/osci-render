@@ -6,8 +6,6 @@
 #include "../LookAndFeel.h"
 #include "../components/SwitchButton.h"
 
-#define VERSION_HINT 2
-
 // Define codec options
 enum class VideoCodec {
     H264,
