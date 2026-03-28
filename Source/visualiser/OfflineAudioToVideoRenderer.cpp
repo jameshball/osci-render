@@ -14,6 +14,7 @@ bool OfflineAudioToVideoRendererComponent::runFfmpegMux(const juce::File& ffmpeg
                                                        const juce::File& videoInput,
                                                        const juce::File& audioInput,
                                                        const juce::File& output,
+                                                       const juce::StringArray& audioCodecArgs,
                                                        const std::atomic<bool>& cancelRequested,
                                                        juce::String& outError)
 {
@@ -41,8 +42,7 @@ bool OfflineAudioToVideoRendererComponent::runFfmpegMux(const juce::File& ffmpeg
     args.addArray({"-i", videoInput.getFullPathName()});
     args.addArray({"-i", audioInput.getFullPathName()});
     args.addArray({"-c:v", "copy"});
-    args.addArray({"-c:a", "aac"});
-    args.addArray({"-b:a", "384k"});
+    args.addArray(audioCodecArgs);
     args.addArray({"-shortest"});
     args.addArray({"-y", output.getFullPathName()});
 
@@ -487,7 +487,7 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
     if (recordingSettings.recordingAudio())
     {
         juce::String muxError;
-        if (!runFfmpegMux(ffmpegFile, tempVideoFile, inputAudioFile, tempFinal.getFile(), cancelRequested, muxError))
+        if (!runFfmpegMux(ffmpegFile, tempVideoFile, inputAudioFile, tempFinal.getFile(), recordingSettings.getAudioCodecArgs(), cancelRequested, muxError))
         {
             tempFinal.getFile().deleteFile();
             tempVideoFile.deleteFile();
