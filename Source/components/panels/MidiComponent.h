@@ -3,7 +3,7 @@
 #include <JuceHeader.h>
 #include "../../PluginProcessor.h"
 #include "../SwitchButton.h"
-#include "../modulation/TempoComponent.h"
+#include "../ParameterBarComponent.h"
 
 class OscirenderAudioProcessorEditor;
 class MidiComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater {
@@ -22,10 +22,9 @@ private:
 	OscirenderAudioProcessorEditor& pluginEditor;
 
     jux::SwitchButton midiToggle = jux::SwitchButton(audioProcessor.midiEnabled);
-	juce::Slider voicesSlider;
-	juce::Label voicesLabel;
+	ParameterBarComponent voicesBar{audioProcessor.voices, "VOICES"};
 	juce::TextButton midiSettingsButton{"Audio/MIDI Settings..."};
-	TempoComponent tempoComponent;
+	ParameterBarComponent tempoBar{audioProcessor.standaloneBpm, "BPM"};
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MidiComponent)
 };

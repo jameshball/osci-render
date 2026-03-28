@@ -386,6 +386,8 @@
               file="Source/components/DarkBarPainter.h"/>
         <FILE id="LbBrCm" name="LabelledBarComponent.h" compile="0" resource="0"
               file="Source/components/LabelledBarComponent.h"/>
+        <FILE id="PrBrCm" name="ParameterBarComponent.h" compile="0" resource="0"
+              file="Source/components/ParameterBarComponent.h"/>
         <FILE id="Fr3001" name="FractalComponent.cpp" compile="1" resource="0"
               file="Source/components/FractalComponent.cpp"/>
         <FILE id="Fr3002" name="FractalComponent.h" compile="0" resource="0"
@@ -438,10 +440,6 @@
                 file="Source/components/modulation/SidechainComponent.h"/>
           <FILE id="ScCmC2" name="SidechainComponent.cpp" compile="1" resource="0"
                 file="Source/components/modulation/SidechainComponent.cpp"/>
-          <FILE id="TmpCH1" name="TempoComponent.h" compile="0" resource="0"
-                file="Source/components/modulation/TempoComponent.h"/>
-          <FILE id="TmpCC2" name="TempoComponent.cpp" compile="1" resource="0"
-                file="Source/components/modulation/TempoComponent.cpp"/>
           <FILE id="InEdH1" name="InlineEditorHelper.h" compile="0" resource="0"
                 file="Source/components/modulation/InlineEditorHelper.h"/>
         </GROUP>

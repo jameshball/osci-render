@@ -275,7 +275,7 @@ void SettingsComponent::layoutChildren() {
         }
 
         midi.setBounds(effectsBounds.removeFromBottom(midiGroupHeight));
-        effectsBounds.removeFromBottom(padding);
+        effectsBounds.removeFromTop(3);
 
         layoutVisColumn(layoutVisColumnProxy.getBounds());
         layoutEffectsColumn(effectsBounds);
@@ -333,7 +333,7 @@ void SettingsComponent::layoutChildren() {
         // --- Right column: MIDI settings (compact), envelope, LFO, random + sidechain ---
         static constexpr int midiGroupHeight = 60;
         midi.setBounds(rightBounds.removeFromTop(midiGroupHeight));
-        rightBounds.removeFromBottom(padding);
+        rightBounds.removeFromTop(3);
 
         lfo->setMidiEnabled(midiOn);
 
