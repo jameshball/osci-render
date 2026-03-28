@@ -59,6 +59,7 @@ public:
 class VolumeComponent : public juce::Component, public juce::AsyncUpdater, public osci::AudioBackgroundThread {
 public:
 	VolumeComponent(CommonAudioProcessor& p);
+	~VolumeComponent() override;
 
     void paint(juce::Graphics&) override;
     void handleAsyncUpdate() override;

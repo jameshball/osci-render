@@ -140,11 +140,13 @@ SettingsComponent::~SettingsComponent() {
 }
 
 void SettingsComponent::parameterValueChanged(int parameterIndex, float newValue) {
-    juce::MessageManager::callAsync([this] {
-        pluginEditor.resized();
-        pluginEditor.repaint();
-        resized();
-        repaint();
+    auto safeThis = juce::Component::SafePointer<SettingsComponent>(this);
+    juce::MessageManager::callAsync([safeThis] {
+        if (safeThis == nullptr) return;
+        safeThis->pluginEditor.resized();
+        safeThis->pluginEditor.repaint();
+        safeThis->resized();
+        safeThis->repaint();
     });
 }
 

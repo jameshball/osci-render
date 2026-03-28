@@ -2,6 +2,18 @@
 
 PLUGIN="osci-render-test"
 
+# Build LuaJIT before Projucer resave (the test project needs it but can't
+# use Projucer postExportShellCommand because of its 60-second timeout)
+if [ "$OS" = "win" ]; then
+  eval "$($(cygpath "$COMSPEC") /c$(cygpath -w "$ROOT/ci/vcvars_export.bat"))"
+  cd "$ROOT/modules/LuaJIT/src"
+  cmd //c msvcbuild.bat static
+  cp lua51.lib luajit51.lib
+  cd "$ROOT"
+else
+  "$ROOT/luajit_linux_macos.sh"
+fi
+
 # Resave jucer file
 RESAVE_COMMAND="$PROJUCER_PATH --resave '$ROOT/$PLUGIN.jucer'"
 eval "$RESAVE_COMMAND"

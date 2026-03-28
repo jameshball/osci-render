@@ -52,6 +52,11 @@ VolumeComponent::VolumeComponent(CommonAudioProcessor& p)
     };
 }
 
+VolumeComponent::~VolumeComponent() {
+    // Stop the background thread before the derived vptr is destroyed.
+    setShouldBeRunning(false);
+}
+
 void VolumeComponent::paint(juce::Graphics& g) {
     g.setColour(juce::Colours::transparentBlack);
     g.fillAll();
@@ -130,6 +135,9 @@ void VolumeComponent::paint(juce::Graphics& g) {
 }
 
 void VolumeComponent::handleAsyncUpdate() {
+    // Update SmoothedValue targets on the message thread (they are not thread-safe).
+    leftVolumeSmoothed.setTargetValue(leftVolume.load());
+    rightVolumeSmoothed.setTargetValue(rightVolume.load());
     repaint();
     volumeSlider.setValue(audioProcessor.volumeEffect->getValue(), juce::NotificationType::dontSendNotification);
     thresholdSlider.setValue(audioProcessor.thresholdEffect->getValue(), juce::NotificationType::dontSendNotification);
@@ -155,9 +163,6 @@ void VolumeComponent::runTask(const juce::AudioBuffer<float>& buffer) {
     this->leftVolume = leftVolume;
     this->rightVolume = rightVolume;
 
-    leftVolumeSmoothed.setTargetValue(leftVolume);
-    rightVolumeSmoothed.setTargetValue(rightVolume);
-    
     triggerAsyncUpdate();
 }
 

@@ -33,9 +33,15 @@ VisualiserRenderer::VisualiserRenderer(
 }
 
 VisualiserRenderer::~VisualiserRenderer() {
+    // Stop the background thread FIRST, before any member destruction or vptr change.
+    // The thread may still be calling virtual runTask()/stopTask(); stopping here
+    // ensures it exits while the VisualiserRenderer vtable is still intact.
+    // Note: derived classes (e.g. VisualiserComponent) may have already stopped the
+    // thread in their own destructor. setShouldBeRunning is idempotent, so this is a
+    // safe defense-in-depth for direct VisualiserRenderer use or future subclasses.
+    setShouldBeRunning(false, [this] { renderingSemaphore.release(); });
     mirrorTimer.reset();
     openGLContext.detach();
-    setShouldBeRunning(false, [this] { renderingSemaphore.release(); });
 }
 
 void VisualiserRenderer::runTask(const juce::AudioBuffer<float>& buffer) {

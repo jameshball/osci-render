@@ -146,13 +146,13 @@ osci::Point FileParser::nextSample(lua_State*& L, LuaVariables& vars) {
     juce::SpinLock::ScopedLockType scope(lock);
 
     if (lua != nullptr) {
-        auto values = lua->run(L, vars);
-        if (values.size() >= 6) {
-            return osci::Point(values[0], values[1], values[2], values[3], values[4], values[5]);
-        } else if (values.size() >= 3) {
-            return osci::Point(values[0], values[1], values[2]);
-        } else if (values.size() == 2) {
-            return osci::Point(values[0], values[1]);
+        auto result = lua->run(L, vars);
+        if (result.count >= 6) {
+            return osci::Point(result.values[0], result.values[1], result.values[2], result.values[3], result.values[4], result.values[5]);
+        } else if (result.count >= 3) {
+            return osci::Point(result.values[0], result.values[1], result.values[2]);
+        } else if (result.count == 2) {
+            return osci::Point(result.values[0], result.values[1]);
         }
     } else if (img != nullptr) {
         return img->getSample();

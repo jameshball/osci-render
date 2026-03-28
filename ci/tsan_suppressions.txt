@@ -1,0 +1,29 @@
+# TSan suppression file for osci-render / sosci
+# https://github.com/google/sanitizers/wiki/ThreadSanitizerSuppressions
+#
+# Add entries here for known benign races that are not worth fixing.
+# Format:
+#   race:<function_or_global_name>
+#   mutex:<function_name>
+#   deadlock:<function_name>
+#
+# Wildcards (*) are supported.
+#
+# ── Third-party / system suppressions ──────────────────────────────────
+
+# macOS system libraries (not our code)
+race:libsystem_*
+race:_os_unfair_lock*
+
+# CoreAudio / AudioToolbox internals
+race:AudioToolbox*
+race:CoreAudio*
+
+# OpenGL driver internals
+race:libGPUSupportMercury*
+race:GLEngine*
+
+# JUCE OpenGL render thread vs MessageManager::Lock
+# Race in juce::MessageManager::Lock::setAcquired during OpenGL context teardown.
+# Entirely inside JUCE's OpenGLContext::CachedImage::RenderThread.
+race:juce::MessageManager::Lock::setAcquired*

@@ -156,15 +156,18 @@ struct WindowsLoopbackBackend
         if (result != MA_SUCCESS)
         {
             lastError = "Failed to initialize WASAPI context (" + juce::String ((int) result) + ").";
+            juce::Logger::writeToLog ("WinLoopback: " + lastError);
             return false;
         }
 
         contextInitialised = true;
+        juce::Logger::writeToLog ("WinLoopback: WASAPI context initialised");
         return true;
     }
 
     void closeDevice()
     {
+        juce::Logger::writeToLog ("WinLoopback: closeDevice");
         stopDevice();
 
         if (silenceDeviceInitialised)
@@ -197,6 +200,7 @@ struct WindowsLoopbackBackend
         if (! playing.load())
             return;
 
+        juce::Logger::writeToLog ("WinLoopback: stopDevice");
         callback.store (nullptr, std::memory_order_release);
 
         // miniaudio (WASAPI) warns against calling stop from inside the callback
@@ -262,6 +266,9 @@ juce::String WindowsLoopbackAudioDevice::open (const juce::BigInteger& inputChan
                                                int bufferSizeSamples)
 {
     juce::ignoreUnused (outputChannels);
+    juce::Logger::writeToLog ("WinLoopbackDevice::open: endpoint='" + selectedEndpointName
+                              + "' sampleRate=" + juce::String (sampleRate)
+                              + " bufferSize=" + juce::String (bufferSizeSamples));
     close();
 
     if (! backend->initContext())
@@ -283,6 +290,7 @@ juce::String WindowsLoopbackAudioDevice::open (const juce::BigInteger& inputChan
     if (result != MA_SUCCESS)
     {
         backend->lastError = "Failed to initialize loopback device (" + juce::String ((int) result) + ").";
+        juce::Logger::writeToLog ("WinLoopbackDevice::open: " + backend->lastError);
         return backend->lastError;
     }
 
@@ -323,14 +331,23 @@ juce::String WindowsLoopbackAudioDevice::open (const juce::BigInteger& inputChan
         {
             backend->silenceDeviceInitialised = true;
             ma_device_start (&backend->silenceDevice);
+            juce::Logger::writeToLog ("WinLoopbackDevice::open: silence playback device started");
+        }
+        else
+        {
+            juce::Logger::writeToLog ("WinLoopbackDevice::open: failed to init silence playback device");
         }
     }
 
+    juce::Logger::writeToLog ("WinLoopbackDevice::open: success — sampleRate=" + juce::String (backend->currentSampleRate)
+                              + " bufferSize=" + juce::String (backend->currentBufferSize)
+                              + " inChans=" + juce::String (backend->activeInputChannels));
     return {};
 }
 
 void WindowsLoopbackAudioDevice::close()
 {
+    juce::Logger::writeToLog ("WinLoopbackDevice::close");
     backend->closeDevice();
 }
 
@@ -342,8 +359,13 @@ bool WindowsLoopbackAudioDevice::isOpen()
 void WindowsLoopbackAudioDevice::start (juce::AudioIODeviceCallback* callback)
 {
     if (! backend->isDeviceOpen || callback == nullptr)
+    {
+        juce::Logger::writeToLog ("WinLoopbackDevice::start: skipped — isOpen=" + juce::String ((int) backend->isDeviceOpen)
+                                  + " callback=" + juce::String (callback != nullptr ? "valid" : "null"));
         return;
+    }
 
+    juce::Logger::writeToLog ("WinLoopbackDevice::start");
     backend->callback.store (callback, std::memory_order_release);
     callback->audioDeviceAboutToStart (this);
 
@@ -353,14 +375,17 @@ void WindowsLoopbackAudioDevice::start (juce::AudioIODeviceCallback* callback)
         backend->callback.store (nullptr, std::memory_order_release);
         callback->audioDeviceStopped();
         backend->lastError = "Failed to start loopback device (" + juce::String ((int) result) + ").";
+        juce::Logger::writeToLog ("WinLoopbackDevice::start: " + backend->lastError);
         return;
     }
 
     backend->playing.store (true, std::memory_order_release);
+    juce::Logger::writeToLog ("WinLoopbackDevice::start: playing");
 }
 
 void WindowsLoopbackAudioDevice::stop()
 {
+    juce::Logger::writeToLog ("WinLoopbackDevice::stop");
     auto* cb = backend->callback.exchange (nullptr, std::memory_order_acq_rel);
     backend->stopDevice();
 
@@ -424,6 +449,7 @@ WindowsLoopbackAudioDeviceType::~WindowsLoopbackAudioDeviceType() = default;
 
 void WindowsLoopbackAudioDeviceType::scanForDevices()
 {
+    juce::Logger::writeToLog ("WinLoopbackDeviceType::scanForDevices");
     inputChoiceNames = { "System Audio" };
     outputChoiceNames.clear();
     outputChoiceDeviceIds.clear();
@@ -439,6 +465,7 @@ void WindowsLoopbackAudioDeviceType::scanForDevices()
 
     if (ma_context_init (backends, 1, &contextConfig, context.get()) != MA_SUCCESS)
     {
+        juce::Logger::writeToLog ("WinLoopbackDeviceType::scanForDevices: context init failed, using default");
         outputChoiceNames.add ("Default Output");
         outputChoiceDeviceIds.add (juce::MemoryBlock());
         combinedDeviceNames.add (makeCombinedDeviceName ("System Audio", "Default Output"));
@@ -474,6 +501,7 @@ void WindowsLoopbackAudioDeviceType::scanForDevices()
     for (const auto& outputName : outputChoiceNames)
         combinedDeviceNames.add (makeCombinedDeviceName ("System Audio", outputName));
 
+    juce::Logger::writeToLog ("WinLoopbackDeviceType::scanForDevices: found " + juce::String (outputChoiceNames.size()) + " outputs");
     ma_context_uninit (context.get());
 }
 
@@ -539,6 +567,7 @@ juce::AudioIODevice* WindowsLoopbackAudioDeviceType::createDevice (const juce::S
     const auto& endpointId = outputChoiceDeviceIds.getReference (outputIndex);
     const bool useDefaultEndpoint = endpointId.getSize() == 0;
 
+    juce::Logger::writeToLog ("WinLoopbackDeviceType::createDevice: output='" + displayOutput + "' useDefault=" + juce::String ((int) useDefaultEndpoint));
     return new WindowsLoopbackAudioDevice (displayOutput, endpointId, useDefaultEndpoint);
 }
 
