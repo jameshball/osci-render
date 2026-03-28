@@ -1,5 +1,5 @@
 #include "RandomComponent.h"
-#include "../EffectComponent.h"
+#include "../effects/EffectComponent.h"
 #include "../../PluginProcessor.h"
 #include "../../LookAndFeel.h"
 

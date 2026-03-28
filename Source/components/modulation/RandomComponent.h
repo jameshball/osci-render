@@ -4,7 +4,7 @@
 #include "RandomGraphComponent.h"
 #include "ModulationRateComponent.h"
 #include "ModulationModeComponent.h"
-#include "../../audio/RandomState.h"
+#include "../../audio/modulation/RandomState.h"
 #include "ModulationSourceComponent.h"
 
 class OscirenderAudioProcessor;

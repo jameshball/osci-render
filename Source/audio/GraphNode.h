@@ -2,7 +2,7 @@
 
 #include <vector>
 #include <algorithm>
-#include "DahdsrEnvelope.h"
+#include "modulation/DahdsrEnvelope.h"
 
 // A single node in a breakpoint graph (used by both the visual NodeGraphComponent and LFO/envelope data).
 struct GraphNode {

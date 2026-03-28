@@ -1,6 +1,6 @@
 #include "CommonPluginProcessor.h"
 #include "CommonPluginEditor.h"
-#include "CustomStandaloneFilterWindow.h"
+#include "standalone/CustomStandaloneFilterWindow.h"
 
 #if OSCI_PREMIUM
 #include "visualiser/OfflineAudioToVideoRenderer.h"

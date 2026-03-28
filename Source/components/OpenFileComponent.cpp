@@ -1,6 +1,6 @@
 #include "OpenFileComponent.h"
 #include "GridItemComponent.h"
-#include "../JuceLibraryCode/BinaryData.h"
+#include "../../JuceLibraryCode/BinaryData.h"
 
 OpenFileComponent::OpenFileComponent(OscirenderAudioProcessor& processor)
     : audioProcessor(processor)

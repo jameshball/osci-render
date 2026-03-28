@@ -203,102 +203,109 @@
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
-        <FILE id="Y1Qska" name="DahdsrEnvelope.h" compile="0" resource="0"
-              file="Source/audio/DahdsrEnvelope.h"/>
         <FILE id="GrNdH1" name="GraphNode.h" compile="0" resource="0" file="Source/audio/GraphNode.h"/>
-        <FILE id="LfStH1" name="LfoState.h" compile="0" resource="0" file="Source/audio/LfoState.h"/>
-        <FILE id="LfStC1" name="LfoState.cpp" compile="1" resource="0" file="Source/audio/LfoState.cpp"/>
-        <FILE id="LfPmH1" name="LfoPresetManager.h" compile="0" resource="0"
-              file="Source/audio/LfoPresetManager.h"/>
-        <FILE id="LfPmC1" name="LfoPresetManager.cpp" compile="1" resource="0"
-              file="Source/audio/LfoPresetManager.cpp"/>
-        <FILE id="EnStH1" name="EnvState.h" compile="0" resource="0" file="Source/audio/EnvState.h"/>
-        <FILE id="MdAsH1" name="ModAssignment.h" compile="0" resource="0" file="Source/audio/ModAssignment.h"/>
-        <FILE id="MdAsS1" name="ModulationAssignmentStore.h" compile="0" resource="0"
-              file="Source/audio/ModulationAssignmentStore.h"/>
-        <FILE id="MdSrH1" name="ModulationSource.h" compile="0" resource="0"
-              file="Source/audio/ModulationSource.h"/>
-        <FILE id="MdEnH1" name="ModulationEngine.h" compile="0" resource="0"
-              file="Source/audio/ModulationEngine.h"/>
-        <FILE id="MdPtH1" name="ModulationParameterTypes.h" compile="0" resource="0"
-              file="Source/audio/ModulationParameterTypes.h"/>
-        <FILE id="LfPrH1" name="LfoParameters.h" compile="0" resource="0" file="Source/audio/LfoParameters.h"/>
-        <FILE id="EnPrH1" name="EnvelopeParameters.h" compile="0" resource="0"
-              file="Source/audio/EnvelopeParameters.h"/>
-        <FILE id="EjkbRe" name="PolygonizerEffect.h" compile="0" resource="0"
-              file="Source/audio/PolygonizerEffect.h"/>
-        <FILE id="XSUjDz" name="KaleidoscopeEffect.h" compile="0" resource="0"
-              file="Source/audio/KaleidoscopeEffect.h"/>
-        <FILE id="mREEpc" name="UnfoldEffect.h" compile="0" resource="0" file="Source/audio/UnfoldEffect.h"/>
-        <FILE id="jfRtxu" name="VortexEffect.h" compile="0" resource="0" file="Source/audio/VortexEffect.h"/>
-        <FILE id="de5H36" name="GodRayEffect.h" compile="0" resource="0" file="Source/audio/GodRayEffect.h"/>
-        <FILE id="tU2pQl" name="SkewEffect.h" compile="0" resource="0" file="Source/audio/SkewEffect.h"/>
-        <FILE id="yxWOsR" name="DuplicatorEffect.h" compile="0" resource="0"
-              file="Source/audio/DuplicatorEffect.h"/>
-        <FILE id="GbAmhn" name="SpiralBitCrushEffect.h" compile="0" resource="0"
-              file="Source/audio/SpiralBitCrushEffect.h"/>
         <FILE id="HE3dFE" name="AudioRecorder.h" compile="0" resource="0" file="Source/audio/AudioRecorder.h"/>
-        <FILE id="Bc8UeW" name="BitCrushEffect.h" compile="0" resource="0"
-              file="Source/audio/BitCrushEffect.h"/>
-        <FILE id="lOXxYe" name="BulgeEffect.h" compile="0" resource="0" file="Source/audio/BulgeEffect.h"/>
-        <FILE id="uvMCNC" name="CustomEffect.cpp" compile="1" resource="0"
-              file="Source/audio/CustomEffect.cpp"/>
-        <FILE id="qFZDUh" name="CustomEffect.h" compile="0" resource="0" file="Source/audio/CustomEffect.h"/>
-        <FILE id="I7B78q" name="DashedLineEffect.h" compile="0" resource="0"
-              file="Source/audio/DashedLineEffect.h"/>
-        <FILE id="kpI9pv" name="DelayEffect.h" compile="0" resource="0" file="Source/audio/DelayEffect.h"/>
-        <FILE id="ux2dO2" name="DistortEffect.h" compile="0" resource="0" file="Source/audio/DistortEffect.h"/>
-        <FILE id="SWC0tN" name="MultiplexEffect.h" compile="0" resource="0"
-              file="Source/audio/MultiplexEffect.h"/>
-        <FILE id="bNcEfx" name="BounceEffect.h" compile="0" resource="0" file="Source/audio/BounceEffect.h"/>
-        <FILE id="h0dMim" name="PerspectiveEffect.h" compile="0" resource="0"
-              file="Source/audio/PerspectiveEffect.h"/>
-        <FILE id="t5g8pf" name="PublicSynthesiser.h" compile="0" resource="0"
-              file="Source/audio/PublicSynthesiser.h"/>
-        <FILE id="L01ZLi" name="RippleEffect.h" compile="0" resource="0" file="Source/audio/RippleEffect.h"/>
-        <FILE id="bXcQHc" name="RotateEffect.h" compile="0" resource="0" file="Source/audio/RotateEffect.h"/>
-        <FILE id="Q5kjpU" name="SampleRateManager.h" compile="0" resource="0"
-              file="Source/audio/SampleRateManager.h"/>
-        <FILE id="Cffx3f" name="ScaleEffect.h" compile="0" resource="0" file="Source/audio/ScaleEffect.h"/>
-        <FILE id="dBaZAV" name="ShapeSound.cpp" compile="1" resource="0" file="Source/audio/ShapeSound.cpp"/>
-        <FILE id="VKBirB" name="ShapeSound.h" compile="0" resource="0" file="Source/audio/ShapeSound.h"/>
-        <FILE id="UcPZ09" name="ShapeVoice.cpp" compile="1" resource="0" file="Source/audio/ShapeVoice.cpp"/>
-        <FILE id="WId4vx" name="ShapeVoice.h" compile="0" resource="0" file="Source/audio/ShapeVoice.h"/>
-        <FILE id="Vwjht7" name="SmoothEffect.h" compile="0" resource="0" file="Source/audio/SmoothEffect.h"/>
-        <FILE id="WACNMe" name="StereoEffect.h" compile="0" resource="0" file="Source/audio/StereoEffect.h"/>
-        <FILE id="yiIupB" name="SwirlEffect.h" compile="0" resource="0" file="Source/audio/SwirlEffect.h"/>
-        <FILE id="qZkeZC" name="TranslateEffect.h" compile="0" resource="0"
-              file="Source/audio/TranslateEffect.h"/>
-        <FILE id="RsHWPN" name="TwistEffect.h" compile="0" resource="0" file="Source/audio/TwistEffect.h"/>
-        <FILE id="Be21D0" name="VectorCancellingEffect.h" compile="0" resource="0"
-              file="Source/audio/VectorCancellingEffect.h"/>
-        <FILE id="sgdTlo" name="WobbleEffect.h" compile="0" resource="0" file="Source/audio/WobbleEffect.h"/>
-        <FILE id="PrAuD1" name="ProcessAudioDeviceType.h" compile="0" resource="0"
-              file="Source/audio/ProcessAudioDeviceType.h"/>
-        <FILE id="PrAuD2" name="ProcessAudioDeviceType.mm" compile="1" resource="0"
-              file="Source/audio/ProcessAudioDeviceType.mm"/>
-        <FILE id="PrAuD3" name="ProcessAudioPermissions.h" compile="0" resource="0"
-              file="Source/audio/ProcessAudioPermissions.h"/>
-        <FILE id="PrAuD4" name="ProcessAudioPermissions.mm" compile="1" resource="0"
-              file="Source/audio/ProcessAudioPermissions.mm"/>
-        <FILE id="WlLpH1" name="WindowsLoopbackAudioDeviceType.h" compile="0"
-              resource="0" file="Source/audio/WindowsLoopbackAudioDeviceType.h"/>
-        <FILE id="WlLpC1" name="WindowsLoopbackAudioDeviceType.cpp" compile="1"
-              resource="0" file="Source/audio/WindowsLoopbackAudioDeviceType.cpp"/>
-        <FILE id="mAhd01" name="miniaudio.h" compile="0" resource="0" file="Source/audio/miniaudio/miniaudio.h"/>
-      </GROUP>
-      <GROUP id="{2A41BAF3-5E83-B018-5668-39D89ABFA00C}" name="chinese_postman">
-        <FILE id="LcDpwe" name="BinaryHeap.cpp" compile="1" resource="0" file="Source/chinese_postman/BinaryHeap.cpp"/>
-        <FILE id="UYdaXR" name="BinaryHeap.h" compile="0" resource="0" file="Source/chinese_postman/BinaryHeap.h"/>
-        <FILE id="UnjMQ4" name="ChinesePostman.h" compile="0" resource="0"
-              file="Source/chinese_postman/ChinesePostman.h"/>
-        <FILE id="ItJWxN" name="Dijkstra.h" compile="0" resource="0" file="Source/chinese_postman/Dijkstra.h"/>
-        <FILE id="r66okI" name="Globals.h" compile="0" resource="0" file="Source/chinese_postman/Globals.h"/>
-        <FILE id="GN3vkN" name="Graph.cpp" compile="1" resource="0" file="Source/chinese_postman/Graph.cpp"/>
-        <FILE id="tpPZBV" name="Graph.h" compile="0" resource="0" file="Source/chinese_postman/Graph.h"/>
-        <FILE id="rAjVkN" name="LICENSE" compile="0" resource="1" file="Source/chinese_postman/LICENSE"/>
-        <FILE id="hz1Tov" name="Matching.cpp" compile="1" resource="0" file="Source/chinese_postman/Matching.cpp"/>
-        <FILE id="CdKZCg" name="Matching.h" compile="0" resource="0" file="Source/chinese_postman/Matching.h"/>
+        <GROUP id="{AUD_EFFECTS}" name="effects">
+          <FILE id="EjkbRe" name="PolygonizerEffect.h" compile="0" resource="0"
+                file="Source/audio/effects/PolygonizerEffect.h"/>
+          <FILE id="XSUjDz" name="KaleidoscopeEffect.h" compile="0" resource="0"
+                file="Source/audio/effects/KaleidoscopeEffect.h"/>
+          <FILE id="mREEpc" name="UnfoldEffect.h" compile="0" resource="0" file="Source/audio/effects/UnfoldEffect.h"/>
+          <FILE id="jfRtxu" name="VortexEffect.h" compile="0" resource="0" file="Source/audio/effects/VortexEffect.h"/>
+          <FILE id="de5H36" name="GodRayEffect.h" compile="0" resource="0" file="Source/audio/effects/GodRayEffect.h"/>
+          <FILE id="tU2pQl" name="SkewEffect.h" compile="0" resource="0" file="Source/audio/effects/SkewEffect.h"/>
+          <FILE id="yxWOsR" name="DuplicatorEffect.h" compile="0" resource="0"
+                file="Source/audio/effects/DuplicatorEffect.h"/>
+          <FILE id="GbAmhn" name="SpiralBitCrushEffect.h" compile="0" resource="0"
+                file="Source/audio/effects/SpiralBitCrushEffect.h"/>
+          <FILE id="Bc8UeW" name="BitCrushEffect.h" compile="0" resource="0"
+                file="Source/audio/effects/BitCrushEffect.h"/>
+          <FILE id="lOXxYe" name="BulgeEffect.h" compile="0" resource="0" file="Source/audio/effects/BulgeEffect.h"/>
+          <FILE id="uvMCNC" name="CustomEffect.cpp" compile="1" resource="0"
+                file="Source/audio/effects/CustomEffect.cpp"/>
+          <FILE id="qFZDUh" name="CustomEffect.h" compile="0" resource="0" file="Source/audio/effects/CustomEffect.h"/>
+          <FILE id="I7B78q" name="DashedLineEffect.h" compile="0" resource="0"
+                file="Source/audio/effects/DashedLineEffect.h"/>
+          <FILE id="kpI9pv" name="DelayEffect.h" compile="0" resource="0" file="Source/audio/effects/DelayEffect.h"/>
+          <FILE id="ux2dO2" name="DistortEffect.h" compile="0" resource="0" file="Source/audio/effects/DistortEffect.h"/>
+          <FILE id="SWC0tN" name="MultiplexEffect.h" compile="0" resource="0"
+                file="Source/audio/effects/MultiplexEffect.h"/>
+          <FILE id="bNcEfx" name="BounceEffect.h" compile="0" resource="0" file="Source/audio/effects/BounceEffect.h"/>
+          <FILE id="h0dMim" name="PerspectiveEffect.h" compile="0" resource="0"
+                file="Source/audio/effects/PerspectiveEffect.h"/>
+          <FILE id="L01ZLi" name="RippleEffect.h" compile="0" resource="0" file="Source/audio/effects/RippleEffect.h"/>
+          <FILE id="bXcQHc" name="RotateEffect.h" compile="0" resource="0" file="Source/audio/effects/RotateEffect.h"/>
+          <FILE id="Cffx3f" name="ScaleEffect.h" compile="0" resource="0" file="Source/audio/effects/ScaleEffect.h"/>
+          <FILE id="Vwjht7" name="SmoothEffect.h" compile="0" resource="0" file="Source/audio/effects/SmoothEffect.h"/>
+          <FILE id="WACNMe" name="StereoEffect.h" compile="0" resource="0" file="Source/audio/effects/StereoEffect.h"/>
+          <FILE id="yiIupB" name="SwirlEffect.h" compile="0" resource="0" file="Source/audio/effects/SwirlEffect.h"/>
+          <FILE id="qZkeZC" name="TranslateEffect.h" compile="0" resource="0"
+                file="Source/audio/effects/TranslateEffect.h"/>
+          <FILE id="RsHWPN" name="TwistEffect.h" compile="0" resource="0" file="Source/audio/effects/TwistEffect.h"/>
+          <FILE id="Be21D0" name="VectorCancellingEffect.h" compile="0" resource="0"
+                file="Source/audio/effects/VectorCancellingEffect.h"/>
+          <FILE id="sgdTlo" name="WobbleEffect.h" compile="0" resource="0" file="Source/audio/effects/WobbleEffect.h"/>
+        </GROUP>
+        <GROUP id="{AUD_MODULATION}" name="modulation">
+          <FILE id="Y1Qska" name="DahdsrEnvelope.h" compile="0" resource="0"
+                file="Source/audio/modulation/DahdsrEnvelope.h"/>
+          <FILE id="LfStH1" name="LfoState.h" compile="0" resource="0" file="Source/audio/modulation/LfoState.h"/>
+          <FILE id="LfStC1" name="LfoState.cpp" compile="1" resource="0" file="Source/audio/modulation/LfoState.cpp"/>
+          <FILE id="LfPmH1" name="LfoPresetManager.h" compile="0" resource="0"
+                file="Source/audio/modulation/LfoPresetManager.h"/>
+          <FILE id="LfPmC1" name="LfoPresetManager.cpp" compile="1" resource="0"
+                file="Source/audio/modulation/LfoPresetManager.cpp"/>
+          <FILE id="EnStH1" name="EnvState.h" compile="0" resource="0" file="Source/audio/modulation/EnvState.h"/>
+          <FILE id="MdAsH1" name="ModAssignment.h" compile="0" resource="0" file="Source/audio/modulation/ModAssignment.h"/>
+          <FILE id="MdAsS1" name="ModulationAssignmentStore.h" compile="0" resource="0"
+                file="Source/audio/modulation/ModulationAssignmentStore.h"/>
+          <FILE id="MdSrH1" name="ModulationSource.h" compile="0" resource="0"
+                file="Source/audio/modulation/ModulationSource.h"/>
+          <FILE id="MdEnH1" name="ModulationEngine.h" compile="0" resource="0"
+                file="Source/audio/modulation/ModulationEngine.h"/>
+          <FILE id="MdPtH1" name="ModulationParameterTypes.h" compile="0" resource="0"
+                file="Source/audio/modulation/ModulationParameterTypes.h"/>
+          <FILE id="LfPrH1" name="LfoParameters.h" compile="0" resource="0" file="Source/audio/modulation/LfoParameters.h"/>
+          <FILE id="EnPrH1" name="EnvelopeParameters.h" compile="0" resource="0"
+                file="Source/audio/modulation/EnvelopeParameters.h"/>
+          <FILE id="RnStH1" name="RandomState.h" compile="0" resource="0" file="Source/audio/modulation/RandomState.h"/>
+          <FILE id="RnPrH1" name="RandomParameters.h" compile="0" resource="0"
+                file="Source/audio/modulation/RandomParameters.h"/>
+          <FILE id="ScStH1" name="SidechainState.h" compile="0" resource="0"
+                file="Source/audio/modulation/SidechainState.h"/>
+          <FILE id="ScPrH1" name="SidechainParameters.h" compile="0" resource="0"
+                file="Source/audio/modulation/SidechainParameters.h"/>
+          <FILE id="MdTyH2" name="ModulationTypes.h" compile="0" resource="0"
+                file="Source/audio/modulation/ModulationTypes.h"/>
+        </GROUP>
+        <GROUP id="{AUD_SYNTHESIS}" name="synthesis">
+          <FILE id="t5g8pf" name="PublicSynthesiser.h" compile="0" resource="0"
+                file="Source/audio/synthesis/PublicSynthesiser.h"/>
+          <FILE id="dBaZAV" name="ShapeSound.cpp" compile="1" resource="0" file="Source/audio/synthesis/ShapeSound.cpp"/>
+          <FILE id="VKBirB" name="ShapeSound.h" compile="0" resource="0" file="Source/audio/synthesis/ShapeSound.h"/>
+          <FILE id="UcPZ09" name="ShapeVoice.cpp" compile="1" resource="0" file="Source/audio/synthesis/ShapeVoice.cpp"/>
+          <FILE id="WId4vx" name="ShapeVoice.h" compile="0" resource="0" file="Source/audio/synthesis/ShapeVoice.h"/>
+        </GROUP>
+        <GROUP id="{AUD_PLATFORM}" name="platform">
+          <FILE id="Q5kjpU" name="SampleRateManager.h" compile="0" resource="0"
+                file="Source/audio/platform/SampleRateManager.h"/>
+          <FILE id="PrAuD1" name="ProcessAudioDeviceType.h" compile="0" resource="0"
+                file="Source/audio/platform/ProcessAudioDeviceType.h"/>
+          <FILE id="PrAuD2" name="ProcessAudioDeviceType.mm" compile="1" resource="0"
+                file="Source/audio/platform/ProcessAudioDeviceType.mm"/>
+          <FILE id="PrAuD3" name="ProcessAudioPermissions.h" compile="0" resource="0"
+                file="Source/audio/platform/ProcessAudioPermissions.h"/>
+          <FILE id="PrAuD4" name="ProcessAudioPermissions.mm" compile="1" resource="0"
+                file="Source/audio/platform/ProcessAudioPermissions.mm"/>
+          <FILE id="WlLpH1" name="WindowsLoopbackAudioDeviceType.h" compile="0"
+                resource="0" file="Source/audio/platform/WindowsLoopbackAudioDeviceType.h"/>
+          <FILE id="WlLpC1" name="WindowsLoopbackAudioDeviceType.cpp" compile="1"
+                resource="0" file="Source/audio/platform/WindowsLoopbackAudioDeviceType.cpp"/>
+        </GROUP>
+        <GROUP id="{AUD_WAV}" name="wav">
+          <FILE id="WvPrC1" name="WavParser.cpp" compile="1" resource="0" file="Source/audio/wav/WavParser.cpp"/>
+          <FILE id="WvPrH1" name="WavParser.h" compile="0" resource="0" file="Source/audio/wav/WavParser.h"/>
+        </GROUP>
       </GROUP>
       <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
         <FILE id="kzXVmm" name="CustomTooltipWindow.cpp" compile="1" resource="0"
@@ -325,18 +332,6 @@
               file="Source/components/DraggableListBox.cpp"/>
         <FILE id="Y9NEGn" name="DraggableListBox.h" compile="0" resource="0"
               file="Source/components/DraggableListBox.h"/>
-        <FILE id="xLAEHK" name="EffectComponent.cpp" compile="1" resource="0"
-              file="Source/components/EffectComponent.cpp"/>
-        <FILE id="u4UCwb" name="EffectComponent.h" compile="0" resource="0"
-              file="Source/components/EffectComponent.h"/>
-        <FILE id="JG4NCF" name="EffectsListComponent.cpp" compile="1" resource="0"
-              file="Source/components/EffectsListComponent.cpp"/>
-        <FILE id="dcLchL" name="EffectsListComponent.h" compile="0" resource="0"
-              file="Source/components/EffectsListComponent.h"/>
-        <FILE id="xQQo5D" name="EffectTypeGridComponent.cpp" compile="1" resource="0"
-              file="Source/components/EffectTypeGridComponent.cpp"/>
-        <FILE id="Fb2Qci" name="EffectTypeGridComponent.h" compile="0" resource="0"
-              file="Source/components/EffectTypeGridComponent.h"/>
         <FILE id="aEprcE" name="ErrorCodeEditorComponent.h" compile="0" resource="0"
               file="Source/components/ErrorCodeEditorComponent.h"/>
         <FILE id="oGIcdI" name="FileControlsComponent.cpp" compile="1" resource="0"
@@ -356,24 +351,10 @@
               file="Source/components/HoverAnimationMixin.h"/>
         <FILE id="L9DIT2" name="LabelledTextBox.h" compile="0" resource="0"
               file="Source/components/LabelledTextBox.h"/>
-        <FILE id="tpNWJ3" name="LuaConsole.cpp" compile="1" resource="0" file="Source/components/LuaConsole.cpp"/>
-        <FILE id="e3ZteP" name="LuaConsole.h" compile="0" resource="0" file="Source/components/LuaConsole.h"/>
-        <FILE id="qIxm1z" name="LuaListComponent.cpp" compile="1" resource="0"
-              file="Source/components/LuaListComponent.cpp"/>
-        <FILE id="x0Syav" name="LuaListComponent.h" compile="0" resource="0"
-              file="Source/components/LuaListComponent.h"/>
-        <FILE id="CfBFAE" name="MainMenuBarModel.cpp" compile="1" resource="0"
-              file="Source/components/MainMenuBarModel.cpp"/>
-        <FILE id="ubDcnO" name="MainMenuBarModel.h" compile="0" resource="0"
-              file="Source/components/MainMenuBarModel.h"/>
         <FILE id="yhsLOr" name="OpenFileComponent.cpp" compile="1" resource="0"
               file="Source/components/OpenFileComponent.cpp"/>
         <FILE id="LBoxwR" name="OpenFileComponent.h" compile="0" resource="0"
               file="Source/components/OpenFileComponent.h"/>
-        <FILE id="FbaaC9" name="OsciMainMenuBarModel.cpp" compile="1" resource="0"
-              file="Source/components/OsciMainMenuBarModel.cpp"/>
-        <FILE id="qAklil" name="OsciMainMenuBarModel.h" compile="0" resource="0"
-              file="Source/components/OsciMainMenuBarModel.h"/>
         <FILE id="QQzSwh" name="SliderTextBox.h" compile="0" resource="0" file="Source/components/SliderTextBox.h"/>
         <FILE id="QrDKRZ" name="SvgButton.h" compile="0" resource="0" file="Source/components/SvgButton.h"/>
         <FILE id="qzfstC" name="SwitchButton.h" compile="0" resource="0" file="Source/components/SwitchButton.h"/>
@@ -383,34 +364,8 @@
               file="Source/components/SplashScreenComponent.h"/>
         <FILE id="oVrlYc" name="OverlayComponent.h" compile="0" resource="0"
               file="Source/components/OverlayComponent.h"/>
-        <FILE id="lDhHlp" name="LuaDocumentationComponent.cpp" compile="1"
-              resource="0" file="Source/components/LuaDocumentationComponent.cpp"/>
-        <FILE id="lDhHlq" name="LuaDocumentationComponent.h" compile="0" resource="0"
-              file="Source/components/LuaDocumentationComponent.h"/>
-        <FILE id="LcSnp1" name="LuaCodeSnippet.h" compile="0" resource="0"
-              file="Source/components/LuaCodeSnippet.h"/>
         <FILE id="rA7fII" name="SyphonInputSelectorComponent.h" compile="0"
               resource="0" file="Source/components/SyphonInputSelectorComponent.h"/>
-        <FILE id="WfUlLH" name="TimelineComponent.cpp" compile="1" resource="0"
-              file="Source/components/TimelineComponent.cpp"/>
-        <FILE id="fsckjw" name="TimelineComponent.h" compile="0" resource="0"
-              file="Source/components/TimelineComponent.h"/>
-        <FILE id="tlCtrl" name="TimelineController.h" compile="0" resource="0"
-              file="Source/components/TimelineController.h"/>
-        <FILE id="audTlC" name="AudioTimelineController.cpp" compile="1" resource="0"
-              file="Source/components/AudioTimelineController.cpp"/>
-        <FILE id="audTlH" name="AudioTimelineController.h" compile="0" resource="0"
-              file="Source/components/AudioTimelineController.h"/>
-        <FILE id="aniTlC" name="AnimationTimelineController.cpp" compile="1"
-              resource="0" file="Source/components/AnimationTimelineController.cpp"/>
-        <FILE id="aniTlH" name="AnimationTimelineController.h" compile="0"
-              resource="0" file="Source/components/AnimationTimelineController.h"/>
-        <FILE id="oscAuC" name="OscirenderAudioTimelineController.cpp" compile="1"
-              resource="0" file="Source/components/OscirenderAudioTimelineController.cpp"/>
-        <FILE id="oscAuH" name="OscirenderAudioTimelineController.h" compile="0"
-              resource="0" file="Source/components/OscirenderAudioTimelineController.h"/>
-        <FILE id="t9xeSp" name="TimelineLookAndFeel.h" compile="0" resource="0"
-              file="Source/components/TimelineLookAndFeel.h"/>
         <FILE id="icFMpl" name="VListBox.cpp" compile="1" resource="0" file="Source/components/VListBox.cpp"/>
         <FILE id="mvp8je" name="VListBox.h" compile="0" resource="0" file="Source/components/VListBox.h"/>
         <FILE id="s8EVcE" name="VolumeComponent.cpp" compile="1" resource="0"
@@ -435,239 +390,152 @@
               file="Source/components/FractalComponent.cpp"/>
         <FILE id="Fr3002" name="FractalComponent.h" compile="0" resource="0"
               file="Source/components/FractalComponent.h"/>
-        <FILE id="WHz3FS" name="EnvelopeComponent.cpp" compile="1" resource="0"
-              file="Source/components/modulation/EnvelopeComponent.cpp"/>
-        <FILE id="A8OllZ" name="EnvelopeComponent.h" compile="0" resource="0"
-              file="Source/components/modulation/EnvelopeComponent.h"/>
-        <FILE id="MdHlH1" name="ModulationHelper.h" compile="0" resource="0"
-              file="Source/components/modulation/ModulationHelper.h"/>
-        <FILE id="MdHlC1" name="ModulationHelper.cpp" compile="1" resource="0"
-              file="Source/components/modulation/ModulationHelper.cpp"/>
-        <FILE id="MdScH1" name="ModulationSourceComponent.h" compile="0" resource="0"
-              file="Source/components/modulation/ModulationSourceComponent.h"/>
-        <FILE id="MdScC1" name="ModulationSourceComponent.cpp" compile="1"
-              resource="0" file="Source/components/modulation/ModulationSourceComponent.cpp"/>
-        <FILE id="FlTrH1" name="FlowTrailRenderer.h" compile="0" resource="0"
-              file="Source/components/modulation/FlowTrailRenderer.h"/>
-        <FILE id="NdGrC1" name="NodeGraphComponent.h" compile="0" resource="0"
-              file="Source/components/modulation/NodeGraphComponent.h"/>
-        <FILE id="NdGrC2" name="NodeGraphComponent.cpp" compile="1" resource="0"
-              file="Source/components/modulation/NodeGraphComponent.cpp"/>
-        <FILE id="LfCmH1" name="LfoComponent.h" compile="0" resource="0" file="Source/components/modulation/LfoComponent.h"/>
-        <FILE id="LfCmC2" name="LfoComponent.cpp" compile="1" resource="0"
-              file="Source/components/modulation/LfoComponent.cpp"/>
-        <FILE id="LfPbH1" name="LfoPresetBrowserOverlay.h" compile="0" resource="0"
-              file="Source/components/modulation/LfoPresetBrowserOverlay.h"/>
-        <FILE id="LfPbC2" name="LfoPresetBrowserOverlay.cpp" compile="1" resource="0"
-              file="Source/components/modulation/LfoPresetBrowserOverlay.cpp"/>
-        <FILE id="LfRtH1" name="ModulationRateComponent.h" compile="0" resource="0"
-              file="Source/components/modulation/ModulationRateComponent.h"/>
-        <FILE id="LfRtC2" name="ModulationRateComponent.cpp" compile="1" resource="0"
-              file="Source/components/modulation/ModulationRateComponent.cpp"/>
-        <FILE id="MdCtH1" name="ModulationControlComponent.h" compile="0" resource="0"
-              file="Source/components/modulation/ModulationControlComponent.h"/>
-        <FILE id="LfMdH1" name="ModulationModeComponent.h" compile="0" resource="0"
-              file="Source/components/modulation/ModulationModeComponent.h"/>
-        <FILE id="LfMdC2" name="ModulationModeComponent.cpp" compile="1" resource="0"
-              file="Source/components/modulation/ModulationModeComponent.cpp"/>
-        <FILE id="RnGrH1" name="RandomGraphComponent.h" compile="0" resource="0"
-              file="Source/components/modulation/RandomGraphComponent.h"/>
-        <FILE id="RnGrC2" name="RandomGraphComponent.cpp" compile="1" resource="0"
-              file="Source/components/modulation/RandomGraphComponent.cpp"/>
-        <FILE id="RnCmH1" name="RandomComponent.h" compile="0" resource="0"
-              file="Source/components/modulation/RandomComponent.h"/>
-        <FILE id="RnCmC2" name="RandomComponent.cpp" compile="1" resource="0"
-              file="Source/components/modulation/RandomComponent.cpp"/>
-        <FILE id="RnStH1" name="RandomState.h" compile="0" resource="0" file="Source/audio/RandomState.h"/>
-        <FILE id="RnPrH1" name="RandomParameters.h" compile="0" resource="0"
-              file="Source/audio/RandomParameters.h"/>
-        <FILE id="ScCmH1" name="SidechainComponent.h" compile="0" resource="0"
-              file="Source/components/modulation/SidechainComponent.h"/>
-        <FILE id="ScCmC2" name="SidechainComponent.cpp" compile="1" resource="0"
-              file="Source/components/modulation/SidechainComponent.cpp"/>
-        <FILE id="ScStH1" name="SidechainState.h" compile="0" resource="0"
-              file="Source/audio/SidechainState.h"/>
-        <FILE id="ScPrH1" name="SidechainParameters.h" compile="0" resource="0"
-              file="Source/audio/SidechainParameters.h"/>
-        <FILE id="MdTyH1" name="ModulationTypes.h" compile="0" resource="0"
-              file="Source/audio/ModulationTypes.h"/>
-        <FILE id="TmpCH1" name="TempoComponent.h" compile="0" resource="0"
-              file="Source/components/modulation/TempoComponent.h"/>
-        <FILE id="TmpCC2" name="TempoComponent.cpp" compile="1" resource="0"
-              file="Source/components/modulation/TempoComponent.cpp"/>
-        <FILE id="InEdH1" name="InlineEditorHelper.h" compile="0" resource="0"
-              file="Source/components/modulation/InlineEditorHelper.h"/>
-      </GROUP>
-      <GROUP id="{A3E24187-62A5-AB8D-8837-14043B89A640}" name="gpla">
-        <FILE id="KvDV8j" name="LineArtParser.cpp" compile="1" resource="0"
-              file="Source/gpla/LineArtParser.cpp"/>
-        <FILE id="t008RG" name="LineArtParser.h" compile="0" resource="0" file="Source/gpla/LineArtParser.h"/>
-      </GROUP>
-      <GROUP id="{8AC1A0A6-6E5E-D533-33A6-76002E1DD885}" name="img">
-        <FILE id="xwx39V" name="gifdec.c" compile="1" resource="0" file="Source/img/gifdec.c"/>
-        <FILE id="PkBzDR" name="gifdec.h" compile="0" resource="0" file="Source/img/gifdec.h"/>
-        <FILE id="w6xTAH" name="ImageParser.cpp" compile="1" resource="0" file="Source/img/ImageParser.cpp"/>
-        <FILE id="ibvT5B" name="ImageParser.h" compile="0" resource="0" file="Source/img/ImageParser.h"/>
-        <FILE id="e1dNTX" name="qoixx.hpp" compile="0" resource="0" file="Source/img/qoixx.hpp"/>
-      </GROUP>
-      <GROUP id="{D0D95F57-3D9D-46D9-C126-25C3C7459AC5}" name="ixwebsocket">
-        <FILE id="pPOkoj" name="IXBase64.h" compile="0" resource="0" file="Source/ixwebsocket/IXBase64.h"/>
-        <FILE id="qVI3x2" name="IXBench.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXBench.cpp"/>
-        <FILE id="syb80Q" name="IXBench.h" compile="0" resource="0" file="Source/ixwebsocket/IXBench.h"/>
-        <FILE id="RpJzkB" name="IXCancellationRequest.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXCancellationRequest.cpp"/>
-        <FILE id="kdXAKI" name="IXCancellationRequest.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXCancellationRequest.h"/>
-        <FILE id="aamZdO" name="IXConnectionState.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXConnectionState.cpp"/>
-        <FILE id="BtXbWW" name="IXConnectionState.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXConnectionState.h"/>
-        <FILE id="RxeRZi" name="IXDNSLookup.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXDNSLookup.cpp"/>
-        <FILE id="Fz6v9l" name="IXDNSLookup.h" compile="0" resource="0" file="Source/ixwebsocket/IXDNSLookup.h"/>
-        <FILE id="Fhe5e2" name="IXExponentialBackoff.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXExponentialBackoff.cpp"/>
-        <FILE id="IaNSzp" name="IXExponentialBackoff.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXExponentialBackoff.h"/>
-        <FILE id="h7oBry" name="IXGetFreePort.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXGetFreePort.cpp"/>
-        <FILE id="Q6cGBn" name="IXGetFreePort.h" compile="0" resource="0" file="Source/ixwebsocket/IXGetFreePort.h"/>
-        <FILE id="pSqWe3" name="IXGzipCodec.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXGzipCodec.cpp"/>
-        <FILE id="t0Zcs0" name="IXGzipCodec.h" compile="0" resource="0" file="Source/ixwebsocket/IXGzipCodec.h"/>
-        <FILE id="ddCdsp" name="IXHttp.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXHttp.cpp"/>
-        <FILE id="WkOHup" name="IXHttp.h" compile="0" resource="0" file="Source/ixwebsocket/IXHttp.h"/>
-        <FILE id="aHrUkJ" name="IXHttpClient.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXHttpClient.cpp"/>
-        <FILE id="O3ifPl" name="IXHttpClient.h" compile="0" resource="0" file="Source/ixwebsocket/IXHttpClient.h"/>
-        <FILE id="eFGxxE" name="IXHttpServer.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXHttpServer.cpp"/>
-        <FILE id="IaxJJ6" name="IXHttpServer.h" compile="0" resource="0" file="Source/ixwebsocket/IXHttpServer.h"/>
-        <FILE id="o7gWn7" name="IXNetSystem.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXNetSystem.cpp"/>
-        <FILE id="R5LFhQ" name="IXNetSystem.h" compile="0" resource="0" file="Source/ixwebsocket/IXNetSystem.h"/>
-        <FILE id="zi85pc" name="IXProgressCallback.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXProgressCallback.h"/>
-        <FILE id="pa8Kbj" name="IXSelectInterrupt.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXSelectInterrupt.cpp"/>
-        <FILE id="VZuUWe" name="IXSelectInterrupt.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXSelectInterrupt.h"/>
-        <FILE id="j84Mkc" name="IXSelectInterruptEvent.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXSelectInterruptEvent.cpp"/>
-        <FILE id="RUBIuY" name="IXSelectInterruptEvent.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXSelectInterruptEvent.h"/>
-        <FILE id="HXwmGn" name="IXSelectInterruptFactory.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXSelectInterruptFactory.cpp"/>
-        <FILE id="J7G90T" name="IXSelectInterruptFactory.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXSelectInterruptFactory.h"/>
-        <FILE id="DjhB8v" name="IXSelectInterruptPipe.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXSelectInterruptPipe.cpp"/>
-        <FILE id="cOe5ug" name="IXSelectInterruptPipe.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXSelectInterruptPipe.h"/>
-        <FILE id="iYEr5X" name="IXSetThreadName.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXSetThreadName.cpp"/>
-        <FILE id="lV9mJB" name="IXSetThreadName.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXSetThreadName.h"/>
-        <FILE id="Z3cko8" name="IXSocket.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXSocket.cpp"/>
-        <FILE id="K89iuz" name="IXSocket.h" compile="0" resource="0" file="Source/ixwebsocket/IXSocket.h"/>
-        <FILE id="UW4XZp" name="IXSocketAppleSSL.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXSocketAppleSSL.cpp"/>
-        <FILE id="goEr40" name="IXSocketAppleSSL.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXSocketAppleSSL.h"/>
-        <FILE id="ZG0dAO" name="IXSocketConnect.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXSocketConnect.cpp"/>
-        <FILE id="H8btLh" name="IXSocketConnect.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXSocketConnect.h"/>
-        <FILE id="Q8y3eR" name="IXSocketFactory.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXSocketFactory.cpp"/>
-        <FILE id="DgZ0NJ" name="IXSocketFactory.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXSocketFactory.h"/>
-        <FILE id="vA7xBJ" name="IXSocketMbedTLS.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXSocketMbedTLS.cpp"/>
-        <FILE id="NBsVY7" name="IXSocketMbedTLS.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXSocketMbedTLS.h"/>
-        <FILE id="vffym1" name="IXSocketOpenSSL.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXSocketOpenSSL.cpp"/>
-        <FILE id="rq1L43" name="IXSocketOpenSSL.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXSocketOpenSSL.h"/>
-        <FILE id="DP4x6I" name="IXSocketServer.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXSocketServer.cpp"/>
-        <FILE id="U62vhR" name="IXSocketServer.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXSocketServer.h"/>
-        <FILE id="DK2PKa" name="IXSocketTLSOptions.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXSocketTLSOptions.cpp"/>
-        <FILE id="R2ahd8" name="IXSocketTLSOptions.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXSocketTLSOptions.h"/>
-        <FILE id="IrGHMo" name="IXStrCaseCompare.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXStrCaseCompare.cpp"/>
-        <FILE id="fmXfd5" name="IXStrCaseCompare.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXStrCaseCompare.h"/>
-        <FILE id="vrPgrU" name="IXUdpSocket.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXUdpSocket.cpp"/>
-        <FILE id="C4kXEa" name="IXUdpSocket.h" compile="0" resource="0" file="Source/ixwebsocket/IXUdpSocket.h"/>
-        <FILE id="ljkhdF" name="IXUniquePtr.h" compile="0" resource="0" file="Source/ixwebsocket/IXUniquePtr.h"/>
-        <FILE id="q3UHD4" name="IXUrlParser.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXUrlParser.cpp"/>
-        <FILE id="JbS05r" name="IXUrlParser.h" compile="0" resource="0" file="Source/ixwebsocket/IXUrlParser.h"/>
-        <FILE id="gCWgUe" name="IXUserAgent.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXUserAgent.cpp"/>
-        <FILE id="ZXs1Pm" name="IXUserAgent.h" compile="0" resource="0" file="Source/ixwebsocket/IXUserAgent.h"/>
-        <FILE id="GQ7boW" name="IXUtf8Validator.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXUtf8Validator.h"/>
-        <FILE id="NkmVRB" name="IXWebSocketOpenInfo.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXWebSocketOpenInfo.h"/>
-        <FILE id="rnALh0" name="IXUuid.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXUuid.cpp"/>
-        <FILE id="WcfqnP" name="IXUuid.h" compile="0" resource="0" file="Source/ixwebsocket/IXUuid.h"/>
-        <FILE id="P6VcmE" name="IXWebSocket.cpp" compile="1" resource="0" file="Source/ixwebsocket/IXWebSocket.cpp"/>
-        <FILE id="sf7P1K" name="IXWebSocket.h" compile="0" resource="0" file="Source/ixwebsocket/IXWebSocket.h"/>
-        <FILE id="npib4p" name="IXWebSocketCloseConstants.cpp" compile="1"
-              resource="0" file="Source/ixwebsocket/IXWebSocketCloseConstants.cpp"/>
-        <FILE id="vsumjK" name="IXWebSocketCloseConstants.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXWebSocketCloseConstants.h"/>
-        <FILE id="T9bjry" name="IXWebSocketCloseInfo.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXWebSocketCloseInfo.h"/>
-        <FILE id="LQoyiX" name="IXWebSocketErrorInfo.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXWebSocketErrorInfo.h"/>
-        <FILE id="eL17m7" name="IXWebSocketHandshake.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXWebSocketHandshake.cpp"/>
-        <FILE id="ArSjWc" name="IXWebSocketHandshake.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXWebSocketHandshake.h"/>
-        <FILE id="EI9MD8" name="IXWebSocketHandshakeKeyGen.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXWebSocketHandshakeKeyGen.h"/>
-        <FILE id="jE9vTw" name="IXWebSocketHttpHeaders.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXWebSocketHttpHeaders.cpp"/>
-        <FILE id="h6BRFe" name="IXWebSocketHttpHeaders.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXWebSocketHttpHeaders.h"/>
-        <FILE id="LBmQUe" name="IXWebSocketInitResult.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXWebSocketInitResult.h"/>
-        <FILE id="FJf0OS" name="IXWebSocketMessage.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXWebSocketMessage.h"/>
-        <FILE id="Zibknu" name="IXWebSocketMessageType.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXWebSocketMessageType.h"/>
-        <FILE id="ulTERZ" name="IXWebSocketPerMessageDeflate.cpp" compile="1"
-              resource="0" file="Source/ixwebsocket/IXWebSocketPerMessageDeflate.cpp"/>
-        <FILE id="k27DKW" name="IXWebSocketPerMessageDeflate.h" compile="0"
-              resource="0" file="Source/ixwebsocket/IXWebSocketPerMessageDeflate.h"/>
-        <FILE id="M8scBP" name="IXWebSocketPerMessageDeflateCodec.cpp" compile="1"
-              resource="0" file="Source/ixwebsocket/IXWebSocketPerMessageDeflateCodec.cpp"/>
-        <FILE id="tBlaUn" name="IXWebSocketPerMessageDeflateCodec.h" compile="0"
-              resource="0" file="Source/ixwebsocket/IXWebSocketPerMessageDeflateCodec.h"/>
-        <FILE id="rKyoIb" name="IXWebSocketPerMessageDeflateOptions.cpp" compile="1"
-              resource="0" file="Source/ixwebsocket/IXWebSocketPerMessageDeflateOptions.cpp"/>
-        <FILE id="Ge5VH2" name="IXWebSocketPerMessageDeflateOptions.h" compile="0"
-              resource="0" file="Source/ixwebsocket/IXWebSocketPerMessageDeflateOptions.h"/>
-        <FILE id="A8DdNw" name="IXWebSocketProxyServer.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXWebSocketProxyServer.cpp"/>
-        <FILE id="sUAP23" name="IXWebSocketProxyServer.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXWebSocketProxyServer.h"/>
-        <FILE id="tYUG47" name="IXWebSocketSendData.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXWebSocketSendData.h"/>
-        <FILE id="ndmbFI" name="IXWebSocketSendInfo.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXWebSocketSendInfo.h"/>
-        <FILE id="IsH7aV" name="IXWebSocketServer.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXWebSocketServer.cpp"/>
-        <FILE id="m5MS1R" name="IXWebSocketServer.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXWebSocketServer.h"/>
-        <FILE id="nb98Ow" name="IXWebSocketTransport.cpp" compile="1" resource="0"
-              file="Source/ixwebsocket/IXWebSocketTransport.cpp"/>
-        <FILE id="fFHF70" name="IXWebSocketTransport.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXWebSocketTransport.h"/>
-        <FILE id="eAqAle" name="IXWebSocketVersion.h" compile="0" resource="0"
-              file="Source/ixwebsocket/IXWebSocketVersion.h"/>
+        <GROUP id="{CMP_MODULATION}" name="modulation">
+          <FILE id="WHz3FS" name="EnvelopeComponent.cpp" compile="1" resource="0"
+                file="Source/components/modulation/EnvelopeComponent.cpp"/>
+          <FILE id="A8OllZ" name="EnvelopeComponent.h" compile="0" resource="0"
+                file="Source/components/modulation/EnvelopeComponent.h"/>
+          <FILE id="MdHlH1" name="ModulationHelper.h" compile="0" resource="0"
+                file="Source/components/modulation/ModulationHelper.h"/>
+          <FILE id="MdHlC1" name="ModulationHelper.cpp" compile="1" resource="0"
+                file="Source/components/modulation/ModulationHelper.cpp"/>
+          <FILE id="MdScH1" name="ModulationSourceComponent.h" compile="0" resource="0"
+                file="Source/components/modulation/ModulationSourceComponent.h"/>
+          <FILE id="MdScC1" name="ModulationSourceComponent.cpp" compile="1"
+                resource="0" file="Source/components/modulation/ModulationSourceComponent.cpp"/>
+          <FILE id="FlTrH1" name="FlowTrailRenderer.h" compile="0" resource="0"
+                file="Source/components/modulation/FlowTrailRenderer.h"/>
+          <FILE id="NdGrC1" name="NodeGraphComponent.h" compile="0" resource="0"
+                file="Source/components/modulation/NodeGraphComponent.h"/>
+          <FILE id="NdGrC2" name="NodeGraphComponent.cpp" compile="1" resource="0"
+                file="Source/components/modulation/NodeGraphComponent.cpp"/>
+          <FILE id="LfCmH1" name="LfoComponent.h" compile="0" resource="0" file="Source/components/modulation/LfoComponent.h"/>
+          <FILE id="LfCmC2" name="LfoComponent.cpp" compile="1" resource="0"
+                file="Source/components/modulation/LfoComponent.cpp"/>
+          <FILE id="LfPbH1" name="LfoPresetBrowserOverlay.h" compile="0" resource="0"
+                file="Source/components/modulation/LfoPresetBrowserOverlay.h"/>
+          <FILE id="LfPbC2" name="LfoPresetBrowserOverlay.cpp" compile="1" resource="0"
+                file="Source/components/modulation/LfoPresetBrowserOverlay.cpp"/>
+          <FILE id="LfRtH1" name="ModulationRateComponent.h" compile="0" resource="0"
+                file="Source/components/modulation/ModulationRateComponent.h"/>
+          <FILE id="LfRtC2" name="ModulationRateComponent.cpp" compile="1" resource="0"
+                file="Source/components/modulation/ModulationRateComponent.cpp"/>
+          <FILE id="MdCtH1" name="ModulationControlComponent.h" compile="0" resource="0"
+                file="Source/components/modulation/ModulationControlComponent.h"/>
+          <FILE id="LfMdH1" name="ModulationModeComponent.h" compile="0" resource="0"
+                file="Source/components/modulation/ModulationModeComponent.h"/>
+          <FILE id="LfMdC2" name="ModulationModeComponent.cpp" compile="1" resource="0"
+                file="Source/components/modulation/ModulationModeComponent.cpp"/>
+          <FILE id="RnGrH1" name="RandomGraphComponent.h" compile="0" resource="0"
+                file="Source/components/modulation/RandomGraphComponent.h"/>
+          <FILE id="RnGrC2" name="RandomGraphComponent.cpp" compile="1" resource="0"
+                file="Source/components/modulation/RandomGraphComponent.cpp"/>
+          <FILE id="RnCmH1" name="RandomComponent.h" compile="0" resource="0"
+                file="Source/components/modulation/RandomComponent.h"/>
+          <FILE id="RnCmC2" name="RandomComponent.cpp" compile="1" resource="0"
+                file="Source/components/modulation/RandomComponent.cpp"/>
+          <FILE id="ScCmH1" name="SidechainComponent.h" compile="0" resource="0"
+                file="Source/components/modulation/SidechainComponent.h"/>
+          <FILE id="ScCmC2" name="SidechainComponent.cpp" compile="1" resource="0"
+                file="Source/components/modulation/SidechainComponent.cpp"/>
+          <FILE id="TmpCH1" name="TempoComponent.h" compile="0" resource="0"
+                file="Source/components/modulation/TempoComponent.h"/>
+          <FILE id="TmpCC2" name="TempoComponent.cpp" compile="1" resource="0"
+                file="Source/components/modulation/TempoComponent.cpp"/>
+          <FILE id="InEdH1" name="InlineEditorHelper.h" compile="0" resource="0"
+                file="Source/components/modulation/InlineEditorHelper.h"/>
+        </GROUP>
+        <GROUP id="{CMP_EFFECTS}" name="effects">
+          <FILE id="xLAEHK" name="EffectComponent.cpp" compile="1" resource="0"
+                file="Source/components/effects/EffectComponent.cpp"/>
+          <FILE id="u4UCwb" name="EffectComponent.h" compile="0" resource="0"
+                file="Source/components/effects/EffectComponent.h"/>
+          <FILE id="JG4NCF" name="EffectsListComponent.cpp" compile="1" resource="0"
+                file="Source/components/effects/EffectsListComponent.cpp"/>
+          <FILE id="dcLchL" name="EffectsListComponent.h" compile="0" resource="0"
+                file="Source/components/effects/EffectsListComponent.h"/>
+          <FILE id="xQQo5D" name="EffectTypeGridComponent.cpp" compile="1" resource="0"
+                file="Source/components/effects/EffectTypeGridComponent.cpp"/>
+          <FILE id="Fb2Qci" name="EffectTypeGridComponent.h" compile="0" resource="0"
+                file="Source/components/effects/EffectTypeGridComponent.h"/>
+        </GROUP>
+        <GROUP id="{CMP_LUA}" name="lua">
+          <FILE id="tpNWJ3" name="LuaConsole.cpp" compile="1" resource="0" file="Source/components/lua/LuaConsole.cpp"/>
+          <FILE id="e3ZteP" name="LuaConsole.h" compile="0" resource="0" file="Source/components/lua/LuaConsole.h"/>
+          <FILE id="qIxm1z" name="LuaListComponent.cpp" compile="1" resource="0"
+                file="Source/components/lua/LuaListComponent.cpp"/>
+          <FILE id="x0Syav" name="LuaListComponent.h" compile="0" resource="0"
+                file="Source/components/lua/LuaListComponent.h"/>
+          <FILE id="lDhHlp" name="LuaDocumentationComponent.cpp" compile="1"
+                resource="0" file="Source/components/lua/LuaDocumentationComponent.cpp"/>
+          <FILE id="lDhHlq" name="LuaDocumentationComponent.h" compile="0" resource="0"
+                file="Source/components/lua/LuaDocumentationComponent.h"/>
+          <FILE id="LcSnp1" name="LuaCodeSnippet.h" compile="0" resource="0"
+                file="Source/components/lua/LuaCodeSnippet.h"/>
+        </GROUP>
+        <GROUP id="{CMP_TIMELINE}" name="timeline">
+          <FILE id="WfUlLH" name="TimelineComponent.cpp" compile="1" resource="0"
+                file="Source/components/timeline/TimelineComponent.cpp"/>
+          <FILE id="fsckjw" name="TimelineComponent.h" compile="0" resource="0"
+                file="Source/components/timeline/TimelineComponent.h"/>
+          <FILE id="tlCtrl" name="TimelineController.h" compile="0" resource="0"
+                file="Source/components/timeline/TimelineController.h"/>
+          <FILE id="audTlC" name="AudioTimelineController.cpp" compile="1" resource="0"
+                file="Source/components/timeline/AudioTimelineController.cpp"/>
+          <FILE id="audTlH" name="AudioTimelineController.h" compile="0" resource="0"
+                file="Source/components/timeline/AudioTimelineController.h"/>
+          <FILE id="aniTlC" name="AnimationTimelineController.cpp" compile="1"
+                resource="0" file="Source/components/timeline/AnimationTimelineController.cpp"/>
+          <FILE id="aniTlH" name="AnimationTimelineController.h" compile="0"
+                resource="0" file="Source/components/timeline/AnimationTimelineController.h"/>
+          <FILE id="oscAuC" name="OscirenderAudioTimelineController.cpp" compile="1"
+                resource="0" file="Source/components/timeline/OscirenderAudioTimelineController.cpp"/>
+          <FILE id="oscAuH" name="OscirenderAudioTimelineController.h" compile="0"
+                resource="0" file="Source/components/timeline/OscirenderAudioTimelineController.h"/>
+          <FILE id="t9xeSp" name="TimelineLookAndFeel.h" compile="0" resource="0"
+                file="Source/components/timeline/TimelineLookAndFeel.h"/>
+        </GROUP>
+        <GROUP id="{CMP_MENU}" name="menu">
+          <FILE id="CfBFAE" name="MainMenuBarModel.cpp" compile="1" resource="0"
+                file="Source/components/menu/MainMenuBarModel.cpp"/>
+          <FILE id="ubDcnO" name="MainMenuBarModel.h" compile="0" resource="0"
+                file="Source/components/menu/MainMenuBarModel.h"/>
+          <FILE id="FbaaC9" name="OsciMainMenuBarModel.cpp" compile="1" resource="0"
+                file="Source/components/menu/OsciMainMenuBarModel.cpp"/>
+          <FILE id="qAklil" name="OsciMainMenuBarModel.h" compile="0" resource="0"
+                file="Source/components/menu/OsciMainMenuBarModel.h"/>
+        </GROUP>
+        <GROUP id="{CMP_PANELS}" name="panels">
+          <FILE id="I44EdJ" name="EffectsComponent.cpp" compile="1" resource="0"
+                file="Source/components/panels/EffectsComponent.cpp"/>
+          <FILE id="qxxNX3" name="EffectsComponent.h" compile="0" resource="0"
+                file="Source/components/panels/EffectsComponent.h"/>
+          <FILE id="lZGoG9" name="FrameSettingsComponent.cpp" compile="1" resource="0"
+                file="Source/components/panels/FrameSettingsComponent.cpp"/>
+          <FILE id="lzBNS1" name="FrameSettingsComponent.h" compile="0" resource="0"
+                file="Source/components/panels/FrameSettingsComponent.h"/>
+          <FILE id="X26RjJ" name="LuaComponent.cpp" compile="1" resource="0"
+                file="Source/components/panels/LuaComponent.cpp"/>
+          <FILE id="g5xRHT" name="LuaComponent.h" compile="0" resource="0" file="Source/components/panels/LuaComponent.h"/>
+          <FILE id="eB92KJ" name="MidiComponent.cpp" compile="1" resource="0"
+                file="Source/components/panels/MidiComponent.cpp"/>
+          <FILE id="GJqoJa" name="MidiComponent.h" compile="0" resource="0" file="Source/components/panels/MidiComponent.h"/>
+          <FILE id="RHHuXP" name="PerspectiveComponent.cpp" compile="1" resource="0"
+                file="Source/components/panels/PerspectiveComponent.cpp"/>
+          <FILE id="mliVoS" name="PerspectiveComponent.h" compile="0" resource="0"
+                file="Source/components/panels/PerspectiveComponent.h"/>
+          <FILE id="x57ccs" name="SettingsComponent.cpp" compile="1" resource="0"
+                file="Source/components/panels/SettingsComponent.cpp"/>
+          <FILE id="Vlmozi" name="SettingsComponent.h" compile="0" resource="0"
+                file="Source/components/panels/SettingsComponent.h"/>
+          <FILE id="UxZu4n" name="TxtComponent.cpp" compile="1" resource="0"
+                file="Source/components/panels/TxtComponent.cpp"/>
+          <FILE id="kxPbsL" name="TxtComponent.h" compile="0" resource="0" file="Source/components/panels/TxtComponent.h"/>
+        </GROUP>
+        <FILE id="m7xE3R" name="CustomAudioDeviceSelectorComponent.h" compile="0"
+              resource="0" file="Source/components/CustomAudioDeviceSelectorComponent.h"/>
+        <FILE id="tCwz6G" name="CustomAudioDeviceSelectorComponent.cpp" compile="1"
+              resource="0" file="Source/components/CustomAudioDeviceSelectorComponent.cpp"/>
       </GROUP>
       <GROUP id="{90BFF2D8-C8EE-510F-7993-421FDEEFA277}" name="lua">
         <FILE id="aLb1Rc" name="LuaLibrary.cpp" compile="1" resource="0" file="Source/lua/LuaLibrary.cpp"/>
@@ -675,97 +543,27 @@
         <FILE id="WKSBg8" name="LuaParser.cpp" compile="1" resource="0" file="Source/lua/LuaParser.cpp"/>
         <FILE id="E4ORpe" name="LuaParser.h" compile="0" resource="0" file="Source/lua/LuaParser.h"/>
       </GROUP>
-      <GROUP id="{50F56072-D264-AC8C-EAC9-A073059CDE27}" name="mathter">
-        <GROUP id="{60CE44FE-26F8-4CE0-3BFF-5475F8E0BD75}" name="Common">
-          <FILE id="XY4AlJ" name="Approx.hpp" compile="0" resource="0" file="Source/mathter/Common/Approx.hpp"/>
-          <FILE id="LeuGwE" name="Definitions.hpp" compile="0" resource="0" file="Source/mathter/Common/Definitions.hpp"/>
-          <FILE id="HcUnQp" name="DeterministicInitializer.hpp" compile="0" resource="0"
-                file="Source/mathter/Common/DeterministicInitializer.hpp"/>
-          <FILE id="qvzdH7" name="MathUtil.hpp" compile="0" resource="0" file="Source/mathter/Common/MathUtil.hpp"/>
-          <FILE id="wy5V3L" name="Range.hpp" compile="0" resource="0" file="Source/mathter/Common/Range.hpp"/>
-          <FILE id="hsfx9V" name="Traits.hpp" compile="0" resource="0" file="Source/mathter/Common/Traits.hpp"/>
-        </GROUP>
-        <GROUP id="{AA5719C4-2684-8629-96C2-ACCCC846741E}" name="Decompositions">
-          <FILE id="mqUNTZ" name="DecomposeLU.hpp" compile="0" resource="0" file="Source/mathter/Decompositions/DecomposeLU.hpp"/>
-          <FILE id="bajVyN" name="DecomposeQR.hpp" compile="0" resource="0" file="Source/mathter/Decompositions/DecomposeQR.hpp"/>
-          <FILE id="LVojfW" name="DecomposeSVD.hpp" compile="0" resource="0"
-                file="Source/mathter/Decompositions/DecomposeSVD.hpp"/>
-        </GROUP>
-        <GROUP id="{5223A16D-BBB0-7277-2DA2-5F83E36AF6D7}" name="Matrix">
-          <FILE id="NiMdHn" name="MatrixArithmetic.hpp" compile="0" resource="0"
-                file="Source/mathter/Matrix/MatrixArithmetic.hpp"/>
-          <FILE id="OG3XE0" name="MatrixCast.hpp" compile="0" resource="0" file="Source/mathter/Matrix/MatrixCast.hpp"/>
-          <FILE id="hzHEZU" name="MatrixCompare.hpp" compile="0" resource="0"
-                file="Source/mathter/Matrix/MatrixCompare.hpp"/>
-          <FILE id="TKewDV" name="MatrixFunction.hpp" compile="0" resource="0"
-                file="Source/mathter/Matrix/MatrixFunction.hpp"/>
-          <FILE id="az9Zbs" name="MatrixImpl.hpp" compile="0" resource="0" file="Source/mathter/Matrix/MatrixImpl.hpp"/>
-          <FILE id="ZApObW" name="MatrixVectorArithmetic.hpp" compile="0" resource="0"
-                file="Source/mathter/Matrix/MatrixVectorArithmetic.hpp"/>
-        </GROUP>
-        <GROUP id="{9ED17B79-C8AF-B25C-1B0D-01C8A868E93B}" name="Quaternion">
-          <FILE id="Pg5bBV" name="QuaternionArithmetic.hpp" compile="0" resource="0"
-                file="Source/mathter/Quaternion/QuaternionArithmetic.hpp"/>
-          <FILE id="Q40Fdf" name="QuaternionCompare.hpp" compile="0" resource="0"
-                file="Source/mathter/Quaternion/QuaternionCompare.hpp"/>
-          <FILE id="lnp7Lb" name="QuaternionFunction.hpp" compile="0" resource="0"
-                file="Source/mathter/Quaternion/QuaternionFunction.hpp"/>
-          <FILE id="qDNOvo" name="QuaternionImpl.hpp" compile="0" resource="0"
-                file="Source/mathter/Quaternion/QuaternionImpl.hpp"/>
-          <FILE id="eXgZ46" name="QuaternionLiterals.hpp" compile="0" resource="0"
-                file="Source/mathter/Quaternion/QuaternionLiterals.hpp"/>
-          <FILE id="oMB7Jr" name="QuaternionVectorArithmetic.hpp" compile="0"
-                resource="0" file="Source/mathter/Quaternion/QuaternionVectorArithmetic.hpp"/>
-        </GROUP>
-        <GROUP id="{D82CFD72-F5BE-1024-94AB-5C2503423E4D}" name="Swizzle">
-          <FILE id="CeOGVV" name="Swizzle_1.inc.hpp" compile="0" resource="0"
-                file="Source/mathter/Swizzle/Swizzle_1.inc.hpp"/>
-          <FILE id="jwhhIz" name="Swizzle_2.inc.hpp" compile="0" resource="0"
-                file="Source/mathter/Swizzle/Swizzle_2.inc.hpp"/>
-          <FILE id="fPNnzc" name="Swizzle_3.inc.hpp" compile="0" resource="0"
-                file="Source/mathter/Swizzle/Swizzle_3.inc.hpp"/>
-          <FILE id="gU43mt" name="Swizzle_4.inc.hpp" compile="0" resource="0"
-                file="Source/mathter/Swizzle/Swizzle_4.inc.hpp"/>
-        </GROUP>
-        <GROUP id="{2F08F8FD-A6D7-6DE3-CAD4-564E35A9F0B9}" name="Transforms">
-          <FILE id="pltHW9" name="IdentityBuilder.hpp" compile="0" resource="0"
-                file="Source/mathter/Transforms/IdentityBuilder.hpp"/>
-          <FILE id="g2kgGu" name="OrthographicBuilder.hpp" compile="0" resource="0"
-                file="Source/mathter/Transforms/OrthographicBuilder.hpp"/>
-          <FILE id="DBDXmX" name="PerspectiveBuilder.hpp" compile="0" resource="0"
-                file="Source/mathter/Transforms/PerspectiveBuilder.hpp"/>
-          <FILE id="Gj9MnE" name="Rotation2DBuilder.hpp" compile="0" resource="0"
-                file="Source/mathter/Transforms/Rotation2DBuilder.hpp"/>
-          <FILE id="Hq0ZLD" name="Rotation3DBuilder.hpp" compile="0" resource="0"
-                file="Source/mathter/Transforms/Rotation3DBuilder.hpp"/>
-          <FILE id="An6eDN" name="ScaleBuilder.hpp" compile="0" resource="0"
-                file="Source/mathter/Transforms/ScaleBuilder.hpp"/>
-          <FILE id="xzgGHN" name="ShearBuilder.hpp" compile="0" resource="0"
-                file="Source/mathter/Transforms/ShearBuilder.hpp"/>
-          <FILE id="OVvc6Z" name="TranslationBuilder.hpp" compile="0" resource="0"
-                file="Source/mathter/Transforms/TranslationBuilder.hpp"/>
-          <FILE id="TzGfIt" name="ViewBuilder.hpp" compile="0" resource="0" file="Source/mathter/Transforms/ViewBuilder.hpp"/>
-          <FILE id="VTTCpk" name="ZeroBuilder.hpp" compile="0" resource="0" file="Source/mathter/Transforms/ZeroBuilder.hpp"/>
-        </GROUP>
-        <GROUP id="{BA088AC1-AC2B-B70C-582E-EDF9E38ABC20}" name="Vector">
-          <FILE id="KDVsvP" name="VectorArithmetic.hpp" compile="0" resource="0"
-                file="Source/mathter/Vector/VectorArithmetic.hpp"/>
-          <FILE id="qBpF7X" name="VectorCompare.hpp" compile="0" resource="0"
-                file="Source/mathter/Vector/VectorCompare.hpp"/>
-          <FILE id="IinHSU" name="VectorConcat.hpp" compile="0" resource="0"
-                file="Source/mathter/Vector/VectorConcat.hpp"/>
-          <FILE id="aVRyP9" name="VectorFunction.hpp" compile="0" resource="0"
-                file="Source/mathter/Vector/VectorFunction.hpp"/>
-          <FILE id="af10kl" name="VectorImpl.hpp" compile="0" resource="0" file="Source/mathter/Vector/VectorImpl.hpp"/>
-        </GROUP>
-        <FILE id="vOLhwO" name="CMakeLists.txt" compile="0" resource="1" file="Source/mathter/CMakeLists.txt"/>
-        <FILE id="d4t0xm" name="Geometry.hpp" compile="0" resource="0" file="Source/mathter/Geometry.hpp"/>
-        <FILE id="AZxH75" name="IoStream.hpp" compile="0" resource="0" file="Source/mathter/IoStream.hpp"/>
-        <FILE id="ev6gxl" name="Mathter.natvis" compile="0" resource="1" file="Source/mathter/Mathter.natvis"/>
-        <FILE id="VBewvB" name="Matrix.hpp" compile="0" resource="0" file="Source/mathter/Matrix.hpp"/>
-        <FILE id="vlSQrm" name="Quaternion.hpp" compile="0" resource="0" file="Source/mathter/Quaternion.hpp"/>
-        <FILE id="Aos8s3" name="Utility.hpp" compile="0" resource="0" file="Source/mathter/Utility.hpp"/>
-        <FILE id="T6rqIo" name="Vector.hpp" compile="0" resource="0" file="Source/mathter/Vector.hpp"/>
+      <GROUP id="{2A41BAF3-5E83-B018-5668-39D89ABFA00C}" name="chinese_postman">
+        <FILE id="LcDpwe" name="BinaryHeap.cpp" compile="1" resource="0" file="modules/chinese_postman/BinaryHeap.cpp"/>
+        <FILE id="UYdaXR" name="BinaryHeap.h" compile="0" resource="0" file="modules/chinese_postman/BinaryHeap.h"/>
+        <FILE id="UnjMQ4" name="ChinesePostman.h" compile="0" resource="0"
+              file="modules/chinese_postman/ChinesePostman.h"/>
+        <FILE id="ItJWxN" name="Dijkstra.h" compile="0" resource="0" file="modules/chinese_postman/Dijkstra.h"/>
+        <FILE id="r66okI" name="Globals.h" compile="0" resource="0" file="modules/chinese_postman/Globals.h"/>
+        <FILE id="GN3vkN" name="Graph.cpp" compile="1" resource="0" file="modules/chinese_postman/Graph.cpp"/>
+        <FILE id="tpPZBV" name="Graph.h" compile="0" resource="0" file="modules/chinese_postman/Graph.h"/>
+        <FILE id="hz1Tov" name="Matching.cpp" compile="1" resource="0" file="modules/chinese_postman/Matching.cpp"/>
+        <FILE id="CdKZCg" name="Matching.h" compile="0" resource="0" file="modules/chinese_postman/Matching.h"/>
+      </GROUP>
+      <GROUP id="{B1C2D3E4-5F67-8901-2345-678901234567}" name="gifdec">
+        <FILE id="xwx39V" name="gifdec.c" compile="1" resource="0" file="modules/gifdec/gifdec.c"/>
+        <FILE id="PkBzDR" name="gifdec.h" compile="0" resource="0" file="modules/gifdec/gifdec.h"/>
+      </GROUP>
+      <GROUP id="{C2D3E4F5-6A78-9012-3456-789012345678}" name="tinyobjloader">
+        <FILE id="a4ILpa" name="tiny_obj_loader.cc" compile="1" resource="0"
+              file="modules/tinyobjloader/tiny_obj_loader.cc"/>
+        <FILE id="YdfYbM" name="tiny_obj_loader.h" compile="0" resource="0"
+              file="modules/tinyobjloader/tiny_obj_loader.h"/>
       </GROUP>
       <GROUP id="{E6ED85A9-3843-825F-EF48-BCF81E38F8AD}" name="obj">
         <FILE id="ahOy0q" name="Camera.cpp" compile="1" resource="0" file="Source/obj/Camera.cpp"/>
@@ -775,17 +573,8 @@
         <FILE id="Yfpzzn" name="ObjectServer.cpp" compile="1" resource="0"
               file="Source/obj/ObjectServer.cpp"/>
         <FILE id="CqYgqM" name="ObjectServer.h" compile="0" resource="0" file="Source/obj/ObjectServer.h"/>
-        <FILE id="a4ILpa" name="tiny_obj_loader.cpp" compile="1" resource="0"
-              file="Source/obj/tiny_obj_loader.cpp"/>
-        <FILE id="YdfYbM" name="tiny_obj_loader.h" compile="0" resource="0"
-              file="Source/obj/tiny_obj_loader.h"/>
         <FILE id="YNsbe9" name="WorldObject.cpp" compile="1" resource="0" file="Source/obj/WorldObject.cpp"/>
         <FILE id="SZBVI9" name="WorldObject.h" compile="0" resource="0" file="Source/obj/WorldObject.h"/>
-      </GROUP>
-      <GROUP id="{FC8A1D3F-7B92-4F01-A3D6-E12B5C8F9A01}" name="fractal">
-        <FILE id="Fr2001" name="FractalParser.cpp" compile="1" resource="0"
-              file="Source/fractal/FractalParser.cpp"/>
-        <FILE id="Fr2002" name="FractalParser.h" compile="0" resource="0" file="Source/fractal/FractalParser.h"/>
       </GROUP>
       <GROUP id="{2AE40B10-2C85-6401-644A-D5F36BCC5BC1}" name="parser">
         <FILE id="q22Fiw" name="FileParser.cpp" compile="1" resource="0" file="Source/parser/FileParser.cpp"/>
@@ -795,14 +584,28 @@
               file="Source/parser/FrameProducer.cpp"/>
         <FILE id="JEcNPP" name="FrameProducer.h" compile="0" resource="0" file="Source/parser/FrameProducer.h"/>
         <FILE id="hCrVUD" name="FrameSource.h" compile="0" resource="0" file="Source/parser/FrameSource.h"/>
-      </GROUP>
-      <GROUP id="{56A27063-1FE7-31C3-8263-98389240A8CB}" name="svg">
-        <FILE id="cTec1H" name="SvgParser.cpp" compile="1" resource="0" file="Source/svg/SvgParser.cpp"/>
-        <FILE id="gvkrDH" name="SvgParser.h" compile="0" resource="0" file="Source/svg/SvgParser.h"/>
-      </GROUP>
-      <GROUP id="{E81B1D7B-B0F7-1967-B271-71B3F838720F}" name="txt">
-        <FILE id="vIYWRG" name="TextParser.cpp" compile="1" resource="0" file="Source/txt/TextParser.cpp"/>
-        <FILE id="LlefOK" name="TextParser.h" compile="0" resource="0" file="Source/txt/TextParser.h"/>
+        <GROUP id="{A3E24187-62A5-AB8D-8837-14043B89A640}" name="gpla">
+          <FILE id="KvDV8j" name="LineArtParser.cpp" compile="1" resource="0"
+                file="Source/parser/gpla/LineArtParser.cpp"/>
+          <FILE id="t008RG" name="LineArtParser.h" compile="0" resource="0" file="Source/parser/gpla/LineArtParser.h"/>
+        </GROUP>
+        <GROUP id="{8AC1A0A6-6E5E-D533-33A6-76002E1DD885}" name="img">
+          <FILE id="w6xTAH" name="ImageParser.cpp" compile="1" resource="0" file="Source/parser/img/ImageParser.cpp"/>
+          <FILE id="ibvT5B" name="ImageParser.h" compile="0" resource="0" file="Source/parser/img/ImageParser.h"/>
+        </GROUP>
+        <GROUP id="{FC8A1D3F-7B92-4F01-A3D6-E12B5C8F9A01}" name="fractal">
+          <FILE id="Fr2001" name="FractalParser.cpp" compile="1" resource="0"
+                file="Source/parser/fractal/FractalParser.cpp"/>
+          <FILE id="Fr2002" name="FractalParser.h" compile="0" resource="0" file="Source/parser/fractal/FractalParser.h"/>
+        </GROUP>
+        <GROUP id="{56A27063-1FE7-31C3-8263-98389240A8CB}" name="svg">
+          <FILE id="cTec1H" name="SvgParser.cpp" compile="1" resource="0" file="Source/parser/svg/SvgParser.cpp"/>
+          <FILE id="gvkrDH" name="SvgParser.h" compile="0" resource="0" file="Source/parser/svg/SvgParser.h"/>
+        </GROUP>
+        <GROUP id="{E81B1D7B-B0F7-1967-B271-71B3F838720F}" name="txt">
+          <FILE id="vIYWRG" name="TextParser.cpp" compile="1" resource="0" file="Source/parser/txt/TextParser.cpp"/>
+          <FILE id="LlefOK" name="TextParser.h" compile="0" resource="0" file="Source/parser/txt/TextParser.h"/>
+        </GROUP>
       </GROUP>
       <GROUP id="{0F62E77C-5385-0C56-69A1-3C8866A6E6E3}" name="video">
         <FILE id="DniMew" name="FFmpegEncoderManager.cpp" compile="1" resource="0"
@@ -870,10 +673,6 @@
         <FILE id="mSCsyS" name="WideBlurVertexShader.glsl" compile="0" resource="0"
               file="Source/visualiser/WideBlurVertexShader.glsl"/>
       </GROUP>
-      <GROUP id="{DC345620-B6F6-F3B9-D359-C265590B0F00}" name="wav">
-        <FILE id="vYzJlF" name="WavParser.cpp" compile="1" resource="0" file="Source/wav/WavParser.cpp"/>
-        <FILE id="ZRT5Xk" name="WavParser.h" compile="0" resource="0" file="Source/wav/WavParser.h"/>
-      </GROUP>
       <FILE id="fWbyS1" name="CommonPluginEditor.cpp" compile="1" resource="0"
             file="Source/CommonPluginEditor.cpp"/>
       <FILE id="nKwxzJ" name="CommonPluginEditor.h" compile="0" resource="0"
@@ -882,35 +681,8 @@
             file="Source/CommonPluginProcessor.cpp"/>
       <FILE id="PGeV6d" name="CommonPluginProcessor.h" compile="0" resource="0"
             file="Source/CommonPluginProcessor.h"/>
-      <FILE id="TPGMru" name="CustomStandalone.cpp" compile="1" resource="0"
-            file="Source/CustomStandalone.cpp"/>
-      <FILE id="J0sbNw" name="CustomStandaloneFilterWindow.h" compile="0"
-            resource="0" file="Source/CustomStandaloneFilterWindow.h"/>
-      <FILE id="m7xE3R" name="CustomAudioDeviceSelectorComponent.h" compile="0"
-            resource="0" file="Source/CustomAudioDeviceSelectorComponent.h"/>
-      <FILE id="tCwz6G" name="CustomAudioDeviceSelectorComponent.cpp" compile="1"
-            resource="0" file="Source/CustomAudioDeviceSelectorComponent.cpp"/>
-      <FILE id="I44EdJ" name="EffectsComponent.cpp" compile="1" resource="0"
-            file="Source/EffectsComponent.cpp"/>
-      <FILE id="qxxNX3" name="EffectsComponent.h" compile="0" resource="0"
-            file="Source/EffectsComponent.h"/>
-      <FILE id="lZGoG9" name="FrameSettingsComponent.cpp" compile="1" resource="0"
-            file="Source/FrameSettingsComponent.cpp"/>
-      <FILE id="lzBNS1" name="FrameSettingsComponent.h" compile="0" resource="0"
-            file="Source/FrameSettingsComponent.h"/>
       <FILE id="d2zFqF" name="LookAndFeel.cpp" compile="1" resource="0" file="Source/LookAndFeel.cpp"/>
       <FILE id="TJDqWs" name="LookAndFeel.h" compile="0" resource="0" file="Source/LookAndFeel.h"/>
-      <FILE id="X26RjJ" name="LuaComponent.cpp" compile="1" resource="0"
-            file="Source/LuaComponent.cpp"/>
-      <FILE id="g5xRHT" name="LuaComponent.h" compile="0" resource="0" file="Source/LuaComponent.h"/>
-      <FILE id="cFVaxu" name="MathUtil.h" compile="0" resource="0" file="Source/MathUtil.h"/>
-      <FILE id="eB92KJ" name="MidiComponent.cpp" compile="1" resource="0"
-            file="Source/MidiComponent.cpp"/>
-      <FILE id="GJqoJa" name="MidiComponent.h" compile="0" resource="0" file="Source/MidiComponent.h"/>
-      <FILE id="RHHuXP" name="PerspectiveComponent.cpp" compile="1" resource="0"
-            file="Source/PerspectiveComponent.cpp"/>
-      <FILE id="mliVoS" name="PerspectiveComponent.h" compile="0" resource="0"
-            file="Source/PerspectiveComponent.h"/>
       <FILE id="GF4uFx" name="PluginEditor.cpp" compile="1" resource="0"
             file="Source/PluginEditor.cpp"/>
       <FILE id="iySMgE" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
@@ -918,13 +690,15 @@
             file="Source/PluginProcessor.cpp"/>
       <FILE id="G4mTsK" name="PluginProcessor.h" compile="0" resource="0"
             file="Source/PluginProcessor.h"/>
-      <FILE id="x57ccs" name="SettingsComponent.cpp" compile="1" resource="0"
-            file="Source/SettingsComponent.cpp"/>
-      <FILE id="Vlmozi" name="SettingsComponent.h" compile="0" resource="0"
-            file="Source/SettingsComponent.h"/>
-      <FILE id="UxZu4n" name="TxtComponent.cpp" compile="1" resource="0"
-            file="Source/TxtComponent.cpp"/>
-      <FILE id="kxPbsL" name="TxtComponent.h" compile="0" resource="0" file="Source/TxtComponent.h"/>
+      <GROUP id="{STANDALONE}" name="standalone">
+        <FILE id="TPGMru" name="CustomStandalone.cpp" compile="1" resource="0"
+              file="Source/standalone/CustomStandalone.cpp"/>
+        <FILE id="J0sbNw" name="CustomStandaloneFilterWindow.h" compile="0"
+              resource="0" file="Source/standalone/CustomStandaloneFilterWindow.h"/>
+      </GROUP>
+      <GROUP id="{UTIL}" name="util">
+        <FILE id="cFVaxu" name="MathUtil.h" compile="0" resource="0" file="Source/util/MathUtil.h"/>
+      </GROUP>
     </GROUP>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"

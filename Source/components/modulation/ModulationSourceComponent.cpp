@@ -1,7 +1,7 @@
 #include "ModulationSourceComponent.h"
-#include "../EffectComponent.h"
+#include "../effects/EffectComponent.h"
 #include "../../LookAndFeel.h"
-#include "../../audio/ModulationTypes.h"
+#include "../../audio/modulation/ModulationTypes.h"
 #include "InlineEditorHelper.h"
 
 // ============================================================================

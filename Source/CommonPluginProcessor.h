@@ -11,10 +11,10 @@
 
 #include <JuceHeader.h>
 #include <any>
-#include "audio/SampleRateManager.h"
+#include "audio/platform/SampleRateManager.h"
 #include "visualiser/VisualiserSettings.h"
 #include "visualiser/RecordingSettings.h"
-#include "wav/WavParser.h"
+#include "audio/wav/WavParser.h"
 
 class AudioPlayerListener {
 public:

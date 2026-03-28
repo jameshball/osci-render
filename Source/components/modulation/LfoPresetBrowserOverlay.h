@@ -2,8 +2,8 @@
 
 #include <JuceHeader.h>
 #include <melatonin_blur/melatonin_blur.h>
-#include "../../audio/LfoState.h"
-#include "../../audio/LfoPresetManager.h"
+#include "../../audio/modulation/LfoState.h"
+#include "../../audio/modulation/LfoPresetManager.h"
 #include "../../LookAndFeel.h"
 #include "../OverlayComponent.h"
 

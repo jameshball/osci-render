@@ -2,7 +2,7 @@
 
 #include <JuceHeader.h>
 #include <melatonin_blur/melatonin_blur.h>
-#include "../../audio/ModAssignment.h"
+#include "../../audio/modulation/ModAssignment.h"
 #include "../VerticalTabListComponent.h"
 #include "../ScrollFadeViewport.h"
 #include "../HoverAnimationMixin.h"

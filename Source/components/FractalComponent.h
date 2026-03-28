@@ -2,8 +2,8 @@
 
 #include <JuceHeader.h>
 #include "../PluginProcessor.h"
-#include "../fractal/FractalParser.h"
-#include "EffectComponent.h"
+#include "../parser/fractal/FractalParser.h"
+#include "effects/EffectComponent.h"
 #include "ScrollFadeViewport.h"
 
 class OscirenderAudioProcessorEditor;

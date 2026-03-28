@@ -1,5 +1,5 @@
 #include "LookAndFeel.h"
-#include "audio/ModulationTypes.h"
+#include "audio/modulation/ModulationTypes.h"
 #include "components/CustomMidiKeyboardComponent.h"
 #include "components/SwitchButton.h"
 #include "components/modulation/EnvelopeComponent.h"

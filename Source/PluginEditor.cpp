@@ -3,10 +3,10 @@
 #include <memory>
 
 #include "../modules/juce_sharedtexture/SharedTexture.h"
-#include "CustomStandaloneFilterWindow.h"
+#include "standalone/CustomStandaloneFilterWindow.h"
 #include "PluginProcessor.h"
 #include "parser/FileParser.h"
-#include "components/EffectComponent.h"
+#include "components/effects/EffectComponent.h"
 #include "components/SyphonInputSelectorComponent.h"
 
 void OscirenderAudioProcessorEditor::registerFileRemovedCallback() {

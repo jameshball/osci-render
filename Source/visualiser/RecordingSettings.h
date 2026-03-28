@@ -1,7 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "../components/EffectComponent.h"
+#include "../components/effects/EffectComponent.h"
 #include "../components/SvgButton.h"
 #include "../LookAndFeel.h"
 #include "../components/SwitchButton.h"

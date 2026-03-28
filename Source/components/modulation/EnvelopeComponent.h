@@ -42,9 +42,9 @@
 
 #include <JuceHeader.h>
 #include <array>
-#include "../../audio/DahdsrEnvelope.h"
-#include "../../audio/EnvState.h"
-#include "../../audio/EnvelopeParameters.h"
+#include "../../audio/modulation/DahdsrEnvelope.h"
+#include "../../audio/modulation/EnvState.h"
+#include "../../audio/modulation/EnvelopeParameters.h"
 #include "NodeGraphComponent.h"
 #include "ModulationSourceComponent.h"
 #include "../KnobContainerComponent.h"

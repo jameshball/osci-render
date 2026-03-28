@@ -4,7 +4,7 @@
 #include "NodeGraphComponent.h"
 #include "ModulationSourceComponent.h"
 #include "../KnobContainerComponent.h"
-#include "../../audio/SidechainState.h"
+#include "../../audio/modulation/SidechainState.h"
 
 class OscirenderAudioProcessor;
 
