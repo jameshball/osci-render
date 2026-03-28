@@ -5,8 +5,7 @@
               cppLanguageStandard="20" projectLineFeed="&#10;" companyName="James H Ball"
               companyWebsite="https://osci-render.com" companyEmail="james@ball.sh"
               defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1"
-              headerPath="./include"
-              postExportShellCommandPosix="echo &quot;Building LuaJIT for $OSTYPE...&quot; &amp;&amp; DIR=%%1%% %%1%%/luajit_linux_macos.sh ">
+              headerPath="./include">
   <MAINGROUP id="ztPpnM" name="osci-render-test">
     <GROUP id="{4373FA2A-1E20-AAA6-40E0-740C13D88B75}" name="Source">
       <GROUP id="{DB7C86A4-CC9B-5846-B0C3-6EB553450542}" name="mathter">
@@ -184,11 +183,9 @@
             extraLinkerFlags="/IGNORE:4006" externalLibraries="luajit51.lib">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render-test" headerPath="..\..\..\modules\LuaJIT\src"
-                       libraryPath="..\..\..\modules\LuaJIT\src"
-                       prebuildCommand="call ..\..\..\luajit_win.bat"/>
+                       libraryPath="..\..\..\modules\LuaJIT\src"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="osci-render-test" headerPath="..\..\..\modules\LuaJIT\src"
-                       libraryPath="..\..\..\modules\LuaJIT\src"
-                       prebuildCommand="call ..\..\..\luajit_win.bat"/>
+                       libraryPath="..\..\..\modules\LuaJIT\src"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>

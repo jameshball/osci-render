@@ -6,7 +6,7 @@ if "%VisualStudioVersion%"=="" (
 )
 
 if /I "%VSTEL_MSBuildProjectFullPath:~-18%" neq "SharedCode.vcxproj" (
-  if exist ..\..\..\modules\LuaJIT\src\luajit51.lib goto finish_luajit
+  goto finish_luajit
 )
 
 cd ..\..\..\modules\LuaJIT\src
