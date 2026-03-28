@@ -1,5 +1,5 @@
 #include <JuceHeader.h>
-#include "../Source/audio/LfoState.h"
+#include "../Source/audio/modulation/LfoState.h"
 
 // ============================================================================
 // LFO Stress Tests — focus on data races, deadlocks, and thread-safety of
