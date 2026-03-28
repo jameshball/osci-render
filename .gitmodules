@@ -30,7 +30,7 @@
 	url = https://github.com/lecram/gifdec
 [submodule "modules/tinyobjloader"]
 	path = modules/tinyobjloader
-	url = https://github.com/tinyobjloader/tinyobjloader
+	url = https://github.com/jameshball/tinyobjloader
 [submodule "modules/Mathter"]
 	path = modules/Mathter
 	url = https://github.com/petiaccja/Mathter
