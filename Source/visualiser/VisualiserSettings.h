@@ -1,13 +1,11 @@
 #pragma once
 
-#define VERSION_HINT 2
-
 #include <JuceHeader.h>
 
 #include "../LookAndFeel.h"
-#include "../audio/SmoothEffect.h"
-#include "../audio/StereoEffect.h"
-#include "../components/EffectComponent.h"
+#include "../audio/effects/SmoothEffect.h"
+#include "../audio/effects/StereoEffect.h"
+#include "../components/effects/EffectComponent.h"
 #include "../components/SvgButton.h"
 #include "../components/SwitchButton.h"
 #include "VisualiserParameters.h"

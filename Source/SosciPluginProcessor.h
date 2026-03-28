@@ -10,9 +10,9 @@
 
 #include <JuceHeader.h>
 #include "CommonPluginProcessor.h"
-#include "audio/SampleRateManager.h"
+#include "audio/platform/SampleRateManager.h"
 #include "visualiser/VisualiserSettings.h"
-#include "wav/WavParser.h"
+#include "audio/wav/WavParser.h"
 
 //==============================================================================
 /**

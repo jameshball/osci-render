@@ -1,8 +1,9 @@
 #include "LookAndFeel.h"
-#include "audio/ModulationTypes.h"
+#include "audio/modulation/ModulationTypes.h"
 #include "components/CustomMidiKeyboardComponent.h"
 #include "components/SwitchButton.h"
 #include "components/modulation/EnvelopeComponent.h"
+#include "components/modulation/NodeGraphComponent.h"
 
 OscirenderLookAndFeel::OscirenderLookAndFeel() {
     applyOscirenderColours(*this);
@@ -82,14 +83,16 @@ void OscirenderLookAndFeel::applyOscirenderColours(juce::LookAndFeel& lookAndFee
     lookAndFeel.setColour(EnvelopeComponent::Node, Colours::veryDark());
     lookAndFeel.setColour(EnvelopeComponent::ReleaseNode, Colours::veryDark());
     lookAndFeel.setColour(EnvelopeComponent::LoopNode, Colours::veryDark());
-    lookAndFeel.setColour(EnvelopeComponent::NodeOutline, juce::Colours::white);
     lookAndFeel.setColour(EnvelopeComponent::Line, juce::Colours::white);
     lookAndFeel.setColour(EnvelopeComponent::LoopLine, juce::Colours::white);
-    lookAndFeel.setColour(EnvelopeComponent::Background, Colours::veryDark());
-    lookAndFeel.setColour(EnvelopeComponent::GridLine, Colours::dark());
     lookAndFeel.setColour(EnvelopeComponent::LegendText, juce::Colours::white);
     lookAndFeel.setColour(EnvelopeComponent::LegendBackground, Colours::veryDark());
     lookAndFeel.setColour(EnvelopeComponent::LineBackground, juce::Colours::white);
+
+    // node graph (shared by envelope, LFO, sidechain graphs)
+    lookAndFeel.setColour(NodeGraphComponent::backgroundColourId, Colours::veryDark());
+    lookAndFeel.setColour(NodeGraphComponent::gridLineColourId, Colours::dark());
+    lookAndFeel.setColour(NodeGraphComponent::nodeOutlineColourId, juce::Colours::white);
 
     // midi keyboard
     lookAndFeel.setColour(juce::CustomMidiKeyboardComponent::whiteNoteColourId, Colours::dark().brighter(0.12f));

@@ -1,7 +1,7 @@
 #pragma once
 #include "JuceHeader.h"
 #include "VListBox.h"
-#include "../audio/ModulationTypes.h"
+#include "../audio/modulation/ModulationTypes.h"
 
 // Your item-data container must inherit from this, and override at least the first
 // four member functions.

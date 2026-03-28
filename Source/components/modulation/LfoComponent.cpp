@@ -1,5 +1,5 @@
 #include "LfoComponent.h"
-#include "../EffectComponent.h"
+#include "../effects/EffectComponent.h"
 #include "../../PluginProcessor.h"
 #include "../../CommonPluginEditor.h"
 #include "../../LookAndFeel.h"
@@ -190,27 +190,27 @@ static ModulationSourceConfig buildLfoConfig(OscirenderAudioProcessor& proc) {
     cfg.dragPrefix = "LFO";
     cfg.getLabel = [](int i) { return "LFO " + juce::String(i + 1); };
     cfg.getSourceColour = &LfoComponent::getLfoColour;
-    cfg.getCurrentValue = [&proc](int i) { return proc.getLfoCurrentValue(i); };
-    cfg.isSourceActive = [&proc](int i) { return proc.isLfoActive(i); };
-    cfg.getAssignments = [&proc]() { return proc.getLfoAssignments(); };
-    cfg.addAssignment = [&proc](const ModAssignment& a) { proc.addLfoAssignment(a); };
-    cfg.removeAssignment = [&proc](int idx, const juce::String& pid) { proc.removeLfoAssignment(idx, pid); };
+    cfg.getCurrentValue = [&proc](int i) { return proc.lfoParameters.getCurrentValue(i); };
+    cfg.isSourceActive = [&proc](int i) { return proc.lfoParameters.isActive(i); };
+    cfg.getAssignments = [&proc]() { return proc.lfoParameters.getAssignments(); };
+    cfg.addAssignment = [&proc](const ModAssignment& a) { proc.lfoParameters.addAssignment(a); };
+    cfg.removeAssignment = [&proc](int idx, const juce::String& pid) { proc.lfoParameters.removeAssignment(idx, pid); };
     cfg.getParamDisplayName = [&proc](const juce::String& pid) -> juce::String {
         return proc.getParamDisplayName(pid);
     };
     cfg.broadcaster = &proc.broadcaster;
-    cfg.getActiveTab = [&proc]() { return proc.activeLfoTab; };
-    cfg.setActiveTab = [&proc](int i) { proc.activeLfoTab = i; };
+    cfg.getActiveTab = [&proc]() { return proc.lfoParameters.activeTab; };
+    cfg.setActiveTab = [&proc](int i) { proc.lfoParameters.activeTab = i; };
     return cfg;
 }
 
 static ModulationRateConfig buildLfoRateConfig(OscirenderAudioProcessor& proc) {
     ModulationRateConfig cfg;
-    cfg.getRateParam = [&proc](int i) -> osci::FloatParameter* { return proc.lfoRate[i]; };
-    cfg.getRateMode = [&proc](int i) { return proc.getLfoRateMode(i); };
-    cfg.setRateMode = [&proc](int i, LfoRateMode m) { proc.setLfoRateMode(i, m); };
-    cfg.getTempoDivision = [&proc](int i) { return proc.getLfoTempoDivision(i); };
-    cfg.setTempoDivision = [&proc](int i, int d) { proc.setLfoTempoDivision(i, d); };
+    cfg.getRateParam = [&proc](int i) -> osci::FloatParameter* { return proc.lfoParameters.rate[i]; };
+    cfg.getRateMode = [&proc](int i) { return proc.lfoParameters.getRateMode(i); };
+    cfg.setRateMode = [&proc](int i, LfoRateMode m) { proc.lfoParameters.setRateMode(i, m); };
+    cfg.getTempoDivision = [&proc](int i) { return proc.lfoParameters.getTempoDivision(i); };
+    cfg.setTempoDivision = [&proc](int i, int d) { proc.lfoParameters.setTempoDivision(i, d); };
     cfg.getCurrentBpm = [&proc]() { return proc.currentBpm.load(std::memory_order_relaxed); };
     cfg.maxIndex = NUM_LFOS;
     return cfg;
@@ -219,8 +219,8 @@ static ModulationRateConfig buildLfoRateConfig(OscirenderAudioProcessor& proc) {
 static ModulationModeConfig buildLfoModeConfig(OscirenderAudioProcessor& proc) {
     ModulationModeConfig cfg;
     cfg.modes = getAllLfoModePairs();
-    cfg.getMode = [&proc](int i) { return static_cast<int>(proc.getLfoMode(i)); };
-    cfg.setMode = [&proc](int i, int m) { proc.setLfoMode(i, static_cast<LfoMode>(m)); };
+    cfg.getMode = [&proc](int i) { return static_cast<int>(proc.lfoParameters.getMode(i)); };
+    cfg.setMode = [&proc](int i, int m) { proc.lfoParameters.setMode(i, static_cast<LfoMode>(m)); };
     cfg.labelText = "MODE";
     cfg.maxIndex = NUM_LFOS;
     return cfg;
@@ -318,19 +318,19 @@ LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
     phaseSlider.setTextValueSuffix(" phase");
     phaseSlider.onValueChange = [this]() {
         int idx = getActiveSourceIndex();
-        audioProcessor.setLfoPhaseOffset(idx, (float)phaseSlider.getValue());
+        audioProcessor.lfoParameters.setPhaseOffset(idx, (float)phaseSlider.getValue());
     };
     addAndMakeVisible(phaseSlider);
 
     // Smooth amount knob (0-16 seconds, default 0.005, skew midpoint 1.0)
     configureKnob(smoothKnob, 16.0, 1.0, 0.005, " secs", [this](float val) {
-        audioProcessor.setLfoSmoothAmount(getActiveSourceIndex(), val);
+        audioProcessor.lfoParameters.setSmoothAmount(getActiveSourceIndex(), val);
     });
     addAndMakeVisible(smoothKnob);
 
     // Delay knob (0-4 seconds, default 0)
     configureKnob(delayKnob, 4.0, 0.5, 0.0, " secs", [this](float val) {
-        audioProcessor.setLfoDelayAmount(getActiveSourceIndex(), val);
+        audioProcessor.lfoParameters.setDelayAmount(getActiveSourceIndex(), val);
     });
     addAndMakeVisible(delayKnob);
 
@@ -342,16 +342,16 @@ void LfoComponent::timerCallback() {
     ModulationSourceComponent::timerCallback();
 
     int idx = getActiveSourceIndex();
-    bool active = audioProcessor.isLfoActive(idx);
+    bool active = audioProcessor.lfoParameters.isActive(idx);
 
     if (active) {
         // Reset the flow trail when transitioning from inactive to active, or when
         // the LFO was retriggered (new note played while already running) so the
         // old trail doesn't linger at the previous position
-        if (!wasLfoActive || audioProcessor.consumeLfoRetriggered(idx))
+        if (!wasLfoActive || audioProcessor.lfoParameters.consumeRetriggered(idx))
             graph.resetFlowTrail();
 
-        double phase = (double)audioProcessor.getLfoCurrentPhase(idx);
+        double phase = (double)audioProcessor.lfoParameters.getCurrentPhase(idx);
         graph.setFlowMarkerDomainPositions(&phase, 1);
     } else {
         graph.clearFlowMarkers();
@@ -440,7 +440,7 @@ void LfoComponent::onActiveSourceChanged(int index) {
     rateControl.syncFromProcessor();
     modeControl.setSourceIndex(index);
     modeControl.syncFromProcessor();
-    phaseSlider.setValue(audioProcessor.getLfoPhaseOffset(index), juce::dontSendNotification);
+    phaseSlider.setValue(audioProcessor.lfoParameters.getPhaseOffset(index), juce::dontSendNotification);
 
     auto colour = getLfoColour(index);
     phaseSlider.setAccentColour(colour);
@@ -448,9 +448,9 @@ void LfoComponent::onActiveSourceChanged(int index) {
     paintToggle.setOnColour(colour);
     smoothToggle.setAccentColour(colour);
     smoothKnob.setAccentColour(colour);
-    smoothKnob.getKnob().setValue(audioProcessor.getLfoSmoothAmount(index), juce::dontSendNotification);
+    smoothKnob.getKnob().setValue(audioProcessor.lfoParameters.getSmoothAmount(index), juce::dontSendNotification);
     delayKnob.setAccentColour(colour);
-    delayKnob.getKnob().setValue(audioProcessor.getLfoDelayAmount(index), juce::dontSendNotification);
+    delayKnob.getKnob().setValue(audioProcessor.lfoParameters.getDelayAmount(index), juce::dontSendNotification);
 }
 
 void LfoComponent::syncGraphToActiveLfo() {
@@ -475,8 +475,8 @@ void LfoComponent::syncActiveLfoFromGraph() {
     lfoData[idx].userPresetName.clear();
     updatePresetLabel();
 
-    audioProcessor.lfoWaveformChanged(idx, lfoData[idx].waveform);
-    audioProcessor.lfoPresets[idx] = LfoPreset::Custom;
+    audioProcessor.lfoParameters.waveformChanged(idx, lfoData[idx].waveform);
+    audioProcessor.lfoParameters.setPreset(idx, LfoPreset::Custom);
 }
 
 void LfoComponent::setLfoWaveform(int lfoIndex, const LfoWaveform& waveform) {
@@ -499,7 +499,7 @@ void LfoComponent::setLfoPreset(int lfoIndex, LfoPreset preset) {
         syncGraphToActiveLfo();
         updatePresetLabel();
     }
-    audioProcessor.lfoWaveformChanged(lfoIndex, lfoData[lfoIndex].waveform);
+    audioProcessor.lfoParameters.waveformChanged(lfoIndex, lfoData[lfoIndex].waveform);
 }
 
 LfoPreset LfoComponent::getLfoPreset(int lfoIndex) const {
@@ -543,8 +543,8 @@ void LfoComponent::applyPreset(LfoPreset preset) {
 
     syncGraphToActiveLfo();
     updatePresetLabel();
-    audioProcessor.lfoWaveformChanged(idx, lfoData[idx].waveform);
-    audioProcessor.lfoPresets[idx] = preset;
+    audioProcessor.lfoParameters.waveformChanged(idx, lfoData[idx].waveform);
+    audioProcessor.lfoParameters.setPreset(idx, preset);
 }
 
 void LfoComponent::updatePresetLabel() {
@@ -557,8 +557,8 @@ void LfoComponent::updatePresetLabel() {
 
 void LfoComponent::syncFromProcessorState() {
     for (int i = 0; i < NUM_LFOS; ++i) {
-        lfoData[i].waveform = audioProcessor.getLfoWaveform(i);
-        lfoData[i].preset = audioProcessor.lfoPresets[i];
+        lfoData[i].waveform = audioProcessor.lfoParameters.getWaveform(i);
+        lfoData[i].preset = audioProcessor.lfoParameters.getPreset(i);
     }
 
     ModulationSourceComponent::syncFromProcessorState();
@@ -572,13 +572,13 @@ void LfoComponent::syncFromProcessorState() {
     modeControl.syncFromProcessor();
 
     auto colour = getLfoColour(getActiveSourceIndex());
-    phaseSlider.setValue(audioProcessor.getLfoPhaseOffset(getActiveSourceIndex()), juce::dontSendNotification);
+    phaseSlider.setValue(audioProcessor.lfoParameters.getPhaseOffset(getActiveSourceIndex()), juce::dontSendNotification);
     phaseSlider.setAccentColour(colour);
     shapePreview.setAccentColour(colour);
     smoothKnob.setAccentColour(colour);
-    smoothKnob.getKnob().setValue(audioProcessor.getLfoSmoothAmount(getActiveSourceIndex()), juce::dontSendNotification);
+    smoothKnob.getKnob().setValue(audioProcessor.lfoParameters.getSmoothAmount(getActiveSourceIndex()), juce::dontSendNotification);
     delayKnob.setAccentColour(colour);
-    delayKnob.getKnob().setValue(audioProcessor.getLfoDelayAmount(getActiveSourceIndex()), juce::dontSendNotification);
+    delayKnob.getKnob().setValue(audioProcessor.lfoParameters.getDelayAmount(getActiveSourceIndex()), juce::dontSendNotification);
 }
 
 void LfoComponent::configureKnob(KnobContainerComponent& container, double maxVal, double skewCentre,
@@ -654,8 +654,8 @@ void LfoComponent::setMidiEnabled(bool enabled) {
         });
         // Force Free mode on ALL LFO sources, not just the visible one
         for (int i = 0; i < NUM_LFOS; ++i) {
-            if (audioProcessor.getLfoMode(i) != LfoMode::Free)
-                audioProcessor.setLfoMode(i, LfoMode::Free);
+            if (audioProcessor.lfoParameters.getMode(i) != LfoMode::Free)
+                audioProcessor.lfoParameters.setMode(i, LfoMode::Free);
         }
     }
 }
@@ -683,8 +683,8 @@ void LfoComponent::pasteWaveformFromClipboard() {
     lfoData[idx].waveform = std::move(waveform);
     lfoData[idx].preset = LfoPreset::Custom;
     lfoData[idx].userPresetName.clear();
-    audioProcessor.lfoWaveformChanged(idx, lfoData[idx].waveform);
-    audioProcessor.lfoPresets[idx] = LfoPreset::Custom;
+    audioProcessor.lfoParameters.waveformChanged(idx, lfoData[idx].waveform);
+    audioProcessor.lfoParameters.setPreset(idx, LfoPreset::Custom);
 
     syncGraphToActiveLfo();
     updatePresetLabel();
@@ -799,8 +799,8 @@ void LfoComponent::loadUserPreset(const juce::File& file) {
     lfoData[idx].preset = LfoPreset::Custom;
     lfoData[idx].userPresetName = name;
 
-    audioProcessor.lfoWaveformChanged(idx, lfoData[idx].waveform);
-    audioProcessor.lfoPresets[idx] = LfoPreset::Custom;
+    audioProcessor.lfoParameters.waveformChanged(idx, lfoData[idx].waveform);
+    audioProcessor.lfoParameters.setPreset(idx, LfoPreset::Custom);
 
     syncGraphToActiveLfo();
     updatePresetLabel();

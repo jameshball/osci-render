@@ -1,6 +1,6 @@
 #include "SosciPluginProcessor.h"
 #include "SosciPluginEditor.h"
-#include "CustomStandaloneFilterWindow.h"
+#include "standalone/CustomStandaloneFilterWindow.h"
 
 SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p) : CommonPluginEditor(p, "sosci", "sosci", 1180, 750), audioProcessor(p) {
     // Create timeline controller for audio playback

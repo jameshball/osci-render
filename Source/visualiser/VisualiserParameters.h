@@ -1,10 +1,8 @@
 #pragma once
 
-#define VERSION_HINT 2
-
 #include <JuceHeader.h>
-#include "../audio/SmoothEffect.h"
-#include "../audio/StereoEffect.h"
+#include "../audio/effects/SmoothEffect.h"
+#include "../audio/effects/StereoEffect.h"
 
 enum class ScreenOverlay : int {
     INVALID = -1,

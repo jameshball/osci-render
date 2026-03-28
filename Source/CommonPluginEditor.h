@@ -5,7 +5,7 @@
 #include "visualiser/VisualiserComponent.h"
 #include "LookAndFeel.h"
 #include "visualiser/VisualiserSettings.h"
-#include "components/SosciMainMenuBarModel.h"
+#include "components/menu/SosciMainMenuBarModel.h"
 #include "components/SvgButton.h"
 #include "components/VolumeComponent.h"
 #include "components/DownloaderComponent.h"

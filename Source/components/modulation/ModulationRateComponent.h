@@ -1,7 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "../../audio/LfoState.h"
+#include "../../audio/modulation/LfoState.h"
 #include "../ValuePopupHelper.h"
 #include "ModulationControlComponent.h"
 

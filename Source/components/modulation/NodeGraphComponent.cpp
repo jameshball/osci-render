@@ -180,33 +180,33 @@ void NodeGraphComponent::setSnapStyle(SnapStyle style) {
 }
 
 // Shared helper for computing logarithmic grid steps and visibility.
-bool NodeGraphComponent::computeLogGridInfo(int widthPx, LogGridInfo& out) const {
+bool NodeGraphComponent::computeLogGridInfo(int widthPx, LogGridInfo& out,
+                                             double baseStep, double factor,
+                                             double targetPx, float baseAlpha,
+                                             double fadeMinPx) const {
     if (widthPx <= kHandleSize || domainMax <= domainMin)
         return false;
 
     const double domainRange = domainMax - domainMin;
     out.secondsPerPixel = domainRange / (double)(widthPx - kHandleSize);
-    const double targetPx = 70.0;
     const double idealStep = out.secondsPerPixel * targetPx;
 
-    constexpr double kBaseStep = 8.0;
-    const double ratio = juce::jmax(idealStep / kBaseStep, 1.0e-9);
-    const double level = std::log(ratio) / std::log(0.25);
+    const double ratio = juce::jmax(idealStep / baseStep, 1.0e-9);
+    const double level = std::log(ratio) / std::log(factor);
     const double lowerIndex = std::floor(level);
-    out.lowerStep = kBaseStep * std::pow(0.25, lowerIndex);
-    out.upperStep = kBaseStep * std::pow(0.25, lowerIndex + 1.0);
+    out.lowerStep = baseStep * std::pow(factor, lowerIndex);
+    out.upperStep = baseStep * std::pow(factor, lowerIndex + 1.0);
 
     const double stepDelta = juce::jmax(1.0e-9, out.lowerStep - out.upperStep);
     const float t = (float)juce::jlimit(0.0, 1.0, (out.lowerStep - idealStep) / stepDelta);
 
-    constexpr float kBaseAlpha = 0.42f;
-    out.lowerAlpha = kBaseAlpha;
-    out.upperAlpha = kBaseAlpha * t;
+    out.lowerAlpha = baseAlpha;
+    out.upperAlpha = baseAlpha * t;
 
     double lowerPxStep = out.lowerStep / out.secondsPerPixel;
     double upperPxStep = out.upperStep / out.secondsPerPixel;
-    out.lowerLineVis = (float)juce::jlimit(0.0, 1.0, (lowerPxStep - 40.0) / 40.0);
-    out.upperLineVis = (float)juce::jlimit(0.0, 1.0, (upperPxStep - 40.0) / 40.0);
+    out.lowerLineVis = (float)juce::jlimit(0.0, 1.0, (lowerPxStep - fadeMinPx) / fadeMinPx);
+    out.upperLineVis = (float)juce::jlimit(0.0, 1.0, (upperPxStep - fadeMinPx) / fadeMinPx);
 
     return true;
 }
@@ -216,32 +216,43 @@ void NodeGraphComponent::paintGrid(juce::Graphics& g) {
     const int h = getHeight();
     if (w <= 0 || h <= 0) return;
 
+    // Compute display scale for retina-aware caching
+    float displayScale = g.getInternalContext().getPhysicalPixelScaleFactor();
+    if (displayScale < 1.0f) displayScale = 1.0f;
+    const int scaledW = (int)std::ceil(w * displayScale);
+    const int scaledH = (int)std::ceil(h * displayScale);
+
     // Delegate to custom grid painter if provided
     if (customGridPainter) {
-        if (gridDirty || gridCacheWidth != w || gridCacheHeight != h || !gridCache.isValid()) {
-            gridCache = juce::Image(juce::Image::ARGB, w, h, true);
-            gridCacheWidth = w;
-            gridCacheHeight = h;
+        if (gridDirty || gridCacheWidth != scaledW || gridCacheHeight != scaledH || !gridCache.isValid()) {
+            gridCache = juce::Image(juce::Image::ARGB, scaledW, scaledH, true);
+            gridCacheWidth = scaledW;
+            gridCacheHeight = scaledH;
             gridDirty = false;
 
             juce::Graphics gg(gridCache);
+            gg.addTransform(juce::AffineTransform::scale(displayScale));
             customGridPainter(gg, w, h);
         }
-        g.drawImageAt(gridCache, 0, 0);
+        g.drawImageTransformed(gridCache, juce::AffineTransform::scale(1.0f / displayScale));
         return;
     }
 
-    if (gridDirty || gridCacheWidth != w || gridCacheHeight != h || !gridCache.isValid()) {
-        gridCache = juce::Image(juce::Image::ARGB, w, h, true);
-        gridCacheWidth = w;
-        gridCacheHeight = h;
+    if (gridDirty || gridCacheWidth != scaledW || gridCacheHeight != scaledH || !gridCache.isValid()) {
+        gridCache = juce::Image(juce::Image::ARGB, scaledW, scaledH, true);
+        gridCacheWidth = scaledW;
+        gridCacheHeight = scaledH;
         gridDirty = false;
 
         juce::Graphics gg(gridCache);
+        gg.addTransform(juce::AffineTransform::scale(displayScale));
 
         switch (gridStyle) {
             case GridStyle::LogarithmicTime:
                 paintLogarithmicTimeGrid(gg, w, h);
+                break;
+            case GridStyle::Decibel:
+                paintDecibelGrid(gg, w, h);
                 break;
             case GridStyle::Uniform:
             default:
@@ -250,7 +261,7 @@ void NodeGraphComponent::paintGrid(juce::Graphics& g) {
         }
     }
 
-    g.drawImageAt(gridCache, 0, 0);
+    g.drawImageTransformed(gridCache, juce::AffineTransform::scale(1.0f / displayScale));
 }
 
 void NodeGraphComponent::paintUniformGrid(juce::Graphics& g, int w, int h) {
@@ -336,6 +347,70 @@ void NodeGraphComponent::paintLogarithmicTimeGrid(juce::Graphics& g, int w, int 
 
     drawVerticalGrid(info.lowerStep, info.lowerAlpha, info.lowerLineVis, 0.0);
     drawVerticalGrid(info.upperStep, info.upperAlpha, info.upperLineVis, info.lowerStep);
+}
+
+void NodeGraphComponent::paintDecibelGrid(juce::Graphics& g, int w, int h) {
+    g.setColour(findColour(backgroundColourId));
+    g.fillRect(0, 0, w, h);
+
+    if (!showDomainGrid) return;
+
+    auto gridColour = findColour(gridLineColourId);
+
+    auto formatDbLabel = [](double db) -> juce::String {
+        int dbInt = (int)std::round(db);
+        if (dbInt == 0) return juce::String("0 dB");
+        return juce::String(dbInt) + " dB";
+    };
+
+    const float step20Px = (float)std::abs(convertDomainToPixels(-20.0) - convertDomainToPixels(-40.0));
+    const float minorLineVis = juce::jlimit(0.0f, 1.0f, (step20Px - 44.0f) / 24.0f);
+    const float minorLabelVis = juce::jlimit(0.0f, 1.0f, (step20Px - 58.0f) / 18.0f);
+    const float baseAlpha = 0.42f;
+
+    auto drawVerticalGrid = [&](std::initializer_list<double> domains, float alpha, float lineVis, float textVis) {
+        if (alpha <= 0.001f || lineVis <= 0.001f)
+            return;
+
+        juce::Font labelFont(11.0f, juce::Font::bold);
+        const float labelH = labelFont.getHeight();
+        const float labelY = (float)h - 2.0f - labelH;
+        const int labelW = 70;
+
+        for (double domain : domains) {
+            if (domain < domainMin - 0.001 || domain > domainMax + 0.001)
+                continue;
+
+            const float x = (float)(convertDomainToPixels(domain) + (kHandleSize * 0.5f));
+            if (x < -1.0f || x > (float)w + 1.0f)
+                continue;
+
+            g.setColour(gridColour.withAlpha(alpha * lineVis));
+            g.drawVerticalLine((int)std::round(x), 0.0f, (float)h);
+
+            if (textVis > 0.01f) {
+                const juce::String label = formatDbLabel(domain);
+                g.setFont(labelFont);
+                const float textAlpha = juce::jlimit(0.0f, 1.0f, alpha * 1.25f * textVis);
+
+                const bool nearRightEdge = (x + labelW + 6) > (float)w;
+                if (nearRightEdge) {
+                    g.setColour(juce::Colours::black.withAlpha(textAlpha * 0.65f));
+                    g.drawText(label, (int)x - labelW - 3, (int)labelY + 1, labelW, (int)labelH, juce::Justification::right);
+                    g.setColour(gridColour.withAlpha(textAlpha));
+                    g.drawText(label, (int)x - labelW - 4, (int)labelY, labelW, (int)labelH, juce::Justification::right);
+                } else {
+                    g.setColour(juce::Colours::black.withAlpha(textAlpha * 0.65f));
+                    g.drawText(label, (int)x + 5, (int)labelY + 1, labelW, (int)labelH, juce::Justification::left);
+                    g.setColour(gridColour.withAlpha(textAlpha));
+                    g.drawText(label, (int)x + 4, (int)labelY, labelW, (int)labelH, juce::Justification::left);
+                }
+            }
+        }
+    };
+
+    drawVerticalGrid({ -40.0, 0.0 }, baseAlpha, 1.0f, 1.0f);
+    drawVerticalGrid({ -60.0, -20.0 }, baseAlpha, minorLineVis, minorLabelVis);
 }
 
 // --- Handle Management ---
@@ -787,7 +862,10 @@ void NodeGraphComponent::mouseDrag(const juce::MouseEvent& e) {
 
         // Apply grid snapping
         switch (snapStyle) {
+            case SnapStyle::None:
+                break;
             case SnapStyle::LogarithmicTime:
+            case SnapStyle::Decibel:
                 nodes[nodeIdx].time = snapToLogarithmicGrid(nodes[nodeIdx].time);
                 break;
             case SnapStyle::Uniform:

@@ -104,18 +104,6 @@
         <FILE id="oKPzgR" name="FFmpegEncoderManager.h" compile="0" resource="0"
               file="Source/video/FFmpegEncoderManager.h"/>
       </GROUP>
-      <FILE id="fqqP0r" name="CustomStandalone.cpp" compile="1" resource="0"
-            file="Source/CustomStandalone.cpp"/>
-      <FILE id="TFmWW0" name="CustomStandaloneFilterWindow.h" compile="0"
-            resource="0" file="Source/CustomStandaloneFilterWindow.h"/>
-      <FILE id="C5aY6T" name="CustomAudioDeviceSelectorComponent.h" compile="0"
-            resource="0" file="Source/CustomAudioDeviceSelectorComponent.h"/>
-      <FILE id="Yp4s2V" name="CustomAudioDeviceSelectorComponent.cpp" compile="1"
-            resource="0" file="Source/CustomAudioDeviceSelectorComponent.cpp"/>
-      <GROUP id="{C63A0AA5-8550-16AC-EE89-C05416216534}" name="wav">
-        <FILE id="jxAiTf" name="WavParser.cpp" compile="1" resource="0" file="Source/wav/WavParser.cpp"/>
-        <FILE id="Q6iTsL" name="WavParser.h" compile="0" resource="0" file="Source/wav/WavParser.h"/>
-      </GROUP>
       <FILE id="qJ122J" name="CommonPluginEditor.cpp" compile="1" resource="0"
             file="Source/CommonPluginEditor.cpp"/>
       <FILE id="ANZRtQ" name="CommonPluginEditor.h" compile="0" resource="0"
@@ -124,28 +112,32 @@
             file="Source/CommonPluginProcessor.cpp"/>
       <FILE id="r2FzhS" name="CommonPluginProcessor.h" compile="0" resource="0"
             file="Source/CommonPluginProcessor.h"/>
-      <GROUP id="{14EE14E4-7A22-160E-CA5B-BD291DB4B4A3}" name="img">
-        <FILE id="Zum0qz" name="qoixx.hpp" compile="0" resource="0" file="Source/img/qoixx.hpp"/>
-      </GROUP>
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
         <FILE id="UVcqLN" name="AudioRecorder.h" compile="0" resource="0" file="Source/audio/AudioRecorder.h"/>
-        <FILE id="aziWU2" name="SampleRateManager.h" compile="0" resource="0"
-              file="Source/audio/SampleRateManager.h"/>
-        <FILE id="GSnwBW" name="SmoothEffect.h" compile="0" resource="0" file="Source/audio/SmoothEffect.h"/>
-        <FILE id="jq3EXV" name="StereoEffect.h" compile="0" resource="0" file="Source/audio/StereoEffect.h"/>
-        <FILE id="PrAuD1" name="ProcessAudioDeviceType.h" compile="0" resource="0"
-              file="Source/audio/ProcessAudioDeviceType.h"/>
-        <FILE id="PrAuD2" name="ProcessAudioDeviceType.mm" compile="1" resource="0"
-              file="Source/audio/ProcessAudioDeviceType.mm"/>
-        <FILE id="PrAuD3" name="ProcessAudioPermissions.h" compile="0" resource="0"
-              file="Source/audio/ProcessAudioPermissions.h"/>
-        <FILE id="PrAuD4" name="ProcessAudioPermissions.mm" compile="1" resource="0"
-              file="Source/audio/ProcessAudioPermissions.mm"/>
-        <FILE id="WlLpH2" name="WindowsLoopbackAudioDeviceType.h" compile="0"
-              resource="0" file="Source/audio/WindowsLoopbackAudioDeviceType.h"/>
-        <FILE id="WlLpC2" name="WindowsLoopbackAudioDeviceType.cpp" compile="1"
-              resource="0" file="Source/audio/WindowsLoopbackAudioDeviceType.cpp"/>
-        <FILE id="mAhd02" name="miniaudio.h" compile="0" resource="0" file="Source/audio/miniaudio/miniaudio.h"/>
+        <GROUP id="{AUD_EFFECTS}" name="effects">
+          <FILE id="GSnwBW" name="SmoothEffect.h" compile="0" resource="0" file="Source/audio/effects/SmoothEffect.h"/>
+          <FILE id="jq3EXV" name="StereoEffect.h" compile="0" resource="0" file="Source/audio/effects/StereoEffect.h"/>
+        </GROUP>
+        <GROUP id="{AUD_PLATFORM}" name="platform">
+          <FILE id="aziWU2" name="SampleRateManager.h" compile="0" resource="0"
+                file="Source/audio/platform/SampleRateManager.h"/>
+          <FILE id="PrAuD1" name="ProcessAudioDeviceType.h" compile="0" resource="0"
+                file="Source/audio/platform/ProcessAudioDeviceType.h"/>
+          <FILE id="PrAuD2" name="ProcessAudioDeviceType.mm" compile="1" resource="0"
+                file="Source/audio/platform/ProcessAudioDeviceType.mm"/>
+          <FILE id="PrAuD3" name="ProcessAudioPermissions.h" compile="0" resource="0"
+                file="Source/audio/platform/ProcessAudioPermissions.h"/>
+          <FILE id="PrAuD4" name="ProcessAudioPermissions.mm" compile="1" resource="0"
+                file="Source/audio/platform/ProcessAudioPermissions.mm"/>
+          <FILE id="WlLpH2" name="WindowsLoopbackAudioDeviceType.h" compile="0"
+                resource="0" file="Source/audio/platform/WindowsLoopbackAudioDeviceType.h"/>
+          <FILE id="WlLpC2" name="WindowsLoopbackAudioDeviceType.cpp" compile="1"
+                resource="0" file="Source/audio/platform/WindowsLoopbackAudioDeviceType.cpp"/>
+        </GROUP>
+        <GROUP id="{AUD_WAV_S}" name="wav">
+          <FILE id="WvPrC2" name="WavParser.cpp" compile="1" resource="0" file="Source/audio/wav/WavParser.cpp"/>
+          <FILE id="WvPrH2" name="WavParser.h" compile="0" resource="0" file="Source/audio/wav/WavParser.h"/>
+        </GROUP>
       </GROUP>
       <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
         <FILE id="URb7Ok" name="AboutComponent.cpp" compile="1" resource="0"
@@ -164,38 +156,48 @@
               file="Source/components/DownloaderComponent.cpp"/>
         <FILE id="wBQEfb" name="DownloaderComponent.h" compile="0" resource="0"
               file="Source/components/DownloaderComponent.h"/>
-        <FILE id="xLAEHK" name="EffectComponent.cpp" compile="1" resource="0"
-              file="Source/components/EffectComponent.cpp"/>
-        <FILE id="u4UCwb" name="EffectComponent.h" compile="0" resource="0"
-              file="Source/components/EffectComponent.h"/>
-        <FILE id="ka6rAh" name="MainMenuBarModel.cpp" compile="1" resource="0"
-              file="Source/components/MainMenuBarModel.cpp"/>
-        <FILE id="t6oUhv" name="MainMenuBarModel.h" compile="0" resource="0"
-              file="Source/components/MainMenuBarModel.h"/>
-        <FILE id="eaHM09" name="SosciMainMenuBarModel.cpp" compile="1" resource="0"
-              file="Source/components/SosciMainMenuBarModel.cpp"/>
-        <FILE id="EymEr3" name="SosciMainMenuBarModel.h" compile="0" resource="0"
-              file="Source/components/SosciMainMenuBarModel.h"/>
         <FILE id="Ft2WnP" name="StopwatchComponent.h" compile="0" resource="0"
               file="Source/components/StopwatchComponent.h"/>
         <FILE id="f2kkHV" name="SvgButton.h" compile="0" resource="0" file="Source/components/SvgButton.h"/>
         <FILE id="qzfstC" name="SwitchButton.h" compile="0" resource="0" file="Source/components/SwitchButton.h"/>
-        <FILE id="eCxWbl" name="TimelineComponent.cpp" compile="1" resource="0"
-              file="Source/components/TimelineComponent.cpp"/>
-        <FILE id="fkK0KF" name="TimelineComponent.h" compile="0" resource="0"
-              file="Source/components/TimelineComponent.h"/>
-        <FILE id="sTlCtr" name="TimelineController.h" compile="0" resource="0"
-              file="Source/components/TimelineController.h"/>
-        <FILE id="sAuTlC" name="AudioTimelineController.cpp" compile="1" resource="0"
-              file="Source/components/AudioTimelineController.cpp"/>
-        <FILE id="sAuTlH" name="AudioTimelineController.h" compile="0" resource="0"
-              file="Source/components/AudioTimelineController.h"/>
-        <FILE id="mtvQQS" name="TimelineLookAndFeel.h" compile="0" resource="0"
-              file="Source/components/TimelineLookAndFeel.h"/>
         <FILE id="HC8nNY" name="VolumeComponent.cpp" compile="1" resource="0"
               file="Source/components/VolumeComponent.cpp"/>
         <FILE id="qwpGcH" name="VolumeComponent.h" compile="0" resource="0"
               file="Source/components/VolumeComponent.h"/>
+        <GROUP id="{CMP_EFFECTS}" name="effects">
+          <FILE id="xLAEHK" name="EffectComponent.cpp" compile="1" resource="0"
+                file="Source/components/effects/EffectComponent.cpp"/>
+          <FILE id="u4UCwb" name="EffectComponent.h" compile="0" resource="0"
+                file="Source/components/effects/EffectComponent.h"/>
+        </GROUP>
+        <GROUP id="{CMP_TIMELINE}" name="timeline">
+          <FILE id="eCxWbl" name="TimelineComponent.cpp" compile="1" resource="0"
+                file="Source/components/timeline/TimelineComponent.cpp"/>
+          <FILE id="fkK0KF" name="TimelineComponent.h" compile="0" resource="0"
+                file="Source/components/timeline/TimelineComponent.h"/>
+          <FILE id="sTlCtr" name="TimelineController.h" compile="0" resource="0"
+                file="Source/components/timeline/TimelineController.h"/>
+          <FILE id="sAuTlC" name="AudioTimelineController.cpp" compile="1" resource="0"
+                file="Source/components/timeline/AudioTimelineController.cpp"/>
+          <FILE id="sAuTlH" name="AudioTimelineController.h" compile="0" resource="0"
+                file="Source/components/timeline/AudioTimelineController.h"/>
+          <FILE id="mtvQQS" name="TimelineLookAndFeel.h" compile="0" resource="0"
+                file="Source/components/timeline/TimelineLookAndFeel.h"/>
+        </GROUP>
+        <GROUP id="{CMP_MENU}" name="menu">
+          <FILE id="ka6rAh" name="MainMenuBarModel.cpp" compile="1" resource="0"
+                file="Source/components/menu/MainMenuBarModel.cpp"/>
+          <FILE id="t6oUhv" name="MainMenuBarModel.h" compile="0" resource="0"
+                file="Source/components/menu/MainMenuBarModel.h"/>
+          <FILE id="eaHM09" name="SosciMainMenuBarModel.cpp" compile="1" resource="0"
+                file="Source/components/menu/SosciMainMenuBarModel.cpp"/>
+          <FILE id="EymEr3" name="SosciMainMenuBarModel.h" compile="0" resource="0"
+                file="Source/components/menu/SosciMainMenuBarModel.h"/>
+        </GROUP>
+        <FILE id="C5aY6T" name="CustomAudioDeviceSelectorComponent.h" compile="0"
+              resource="0" file="Source/components/CustomAudioDeviceSelectorComponent.h"/>
+        <FILE id="Yp4s2V" name="CustomAudioDeviceSelectorComponent.cpp" compile="1"
+              resource="0" file="Source/components/CustomAudioDeviceSelectorComponent.cpp"/>
       </GROUP>
       <GROUP id="{04ACA01B-2ADE-8356-BF1E-32942E0F3CFA}" name="visualiser">
         <FILE id="O444rE" name="AfterglowFragmentShader.glsl" compile="0" resource="0"
@@ -259,6 +261,12 @@
             file="Source/SosciPluginProcessor.cpp"/>
       <FILE id="nSDgxn" name="SosciPluginProcessor.h" compile="0" resource="0"
             file="Source/SosciPluginProcessor.h"/>
+      <GROUP id="{STANDALONE}" name="standalone">
+        <FILE id="fqqP0r" name="CustomStandalone.cpp" compile="1" resource="0"
+              file="Source/standalone/CustomStandalone.cpp"/>
+        <FILE id="TFmWW0" name="CustomStandaloneFilterWindow.h" compile="0"
+              resource="0" file="Source/standalone/CustomStandaloneFilterWindow.h"/>
+      </GROUP>
     </GROUP>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"

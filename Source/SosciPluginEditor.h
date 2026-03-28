@@ -6,8 +6,8 @@
 #include "visualiser/VisualiserComponent.h"
 #include "LookAndFeel.h"
 #include "visualiser/VisualiserSettings.h"
-#include "components/AudioTimelineController.h"
-#include "components/SosciMainMenuBarModel.h"
+#include "components/timeline/AudioTimelineController.h"
+#include "components/menu/SosciMainMenuBarModel.h"
 #include "components/SvgButton.h"
 
 class SosciPluginEditor : public CommonPluginEditor, public juce::FileDragAndDropTarget, public juce::AudioProcessorParameter::Listener, public juce::ChangeListener, public AudioPlayerListener {

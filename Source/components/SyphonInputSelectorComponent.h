@@ -2,7 +2,7 @@
 
 #include <JuceHeader.h>
 
-#include "../modules/juce_sharedtexture/SharedTexture.h"
+#include "../../modules/juce_sharedtexture/SharedTexture.h"
 
 class SyphonInputSelectorComponent : public juce::Component, private juce::Button::Listener {
 public:

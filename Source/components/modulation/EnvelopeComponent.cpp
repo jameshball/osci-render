@@ -38,7 +38,7 @@
 #ifndef UGEN_NOEXTGPL
 
 #include "EnvelopeComponent.h"
-#include "../EffectComponent.h"
+#include "../effects/EffectComponent.h"
 #include "../../PluginProcessor.h"
 #include "../../LookAndFeel.h"
 
@@ -97,20 +97,20 @@ static ModulationSourceConfig buildEnvConfig(OscirenderAudioProcessor& proc) {
     const bool beginner = proc.isBeginnerMode();
     cfg.sourceCount = beginner ? 1 : NUM_ENVELOPES;
     cfg.getSourceColour = &EnvelopeComponent::getEnvColour;
-    cfg.getCurrentValue = [&proc](int i) { return proc.getEnvCurrentValue(i); };
+    cfg.getCurrentValue = [&proc](int i) { return proc.envelopeParameters.getCurrentValue(i); };
     cfg.getLabel = [](int i) { return "ENV " + juce::String(i + 1); };
 
     if (!beginner) {
         cfg.dragPrefix = "ENV";
-        cfg.getAssignments = [&proc]() { return proc.getEnvAssignments(); };
-        cfg.addAssignment = [&proc](const ModAssignment& a) { proc.addEnvAssignment(a); };
-        cfg.removeAssignment = [&proc](int idx, const juce::String& pid) { proc.removeEnvAssignment(idx, pid); };
+        cfg.getAssignments = [&proc]() { return proc.envelopeParameters.getAssignments(); };
+        cfg.addAssignment = [&proc](const ModAssignment& a) { proc.envelopeParameters.addAssignment(a); };
+        cfg.removeAssignment = [&proc](int idx, const juce::String& pid) { proc.envelopeParameters.removeAssignment(idx, pid); };
         cfg.getParamDisplayName = [&proc](const juce::String& pid) -> juce::String {
             return proc.getParamDisplayName(pid);
         };
         cfg.broadcaster = &proc.broadcaster;
-        cfg.getActiveTab = [&proc]() { return proc.activeEnvTab; };
-        cfg.setActiveTab = [&proc](int i) { proc.activeEnvTab = i; };
+        cfg.getActiveTab = [&proc]() { return proc.envelopeParameters.activeTab; };
+        cfg.setActiveTab = [&proc](int i) { proc.envelopeParameters.activeTab = i; };
     }
     return cfg;
 }
@@ -124,6 +124,14 @@ EnvelopeComponent::EnvelopeComponent(OscirenderAudioProcessor& processorToUse)
 
     addAndMakeVisible(graph);
     setupDahdsrConstraints();
+
+    // Add knobs
+    addAndMakeVisible(delayKnob);
+    addAndMakeVisible(attackKnob);
+    addAndMakeVisible(holdKnob);
+    addAndMakeVisible(decayKnob);
+    addAndMakeVisible(sustainKnob);
+    addAndMakeVisible(releaseKnob);
 
     syncFromProcessorState();
 }
@@ -187,6 +195,7 @@ void EnvelopeComponent::initEnvelopeData(int envIndex) {
 void EnvelopeComponent::onActiveSourceChanged(int index) {
     envData[activeSourceIndex].nodes = graph.getNodes();
     syncGraphToActiveEnv();
+    syncKnobsToActiveEnv();
     graph.resetFlowTrail();
 }
 
@@ -241,23 +250,35 @@ DahdsrParams EnvelopeComponent::getDahdsrParams(int envIndex) const {
 void EnvelopeComponent::onGraphNodesChanged() {
     syncActiveEnvFromGraph();
     pushDahdsrToHost();
+    updateKnobValues();
+}
+
+void EnvelopeComponent::updateKnobValues() {
+    int idx = getActiveSourceIndex();
+    const auto& ep = audioProcessor.envelopeParameters.params[idx];
+    delayKnob.getKnob().setValue(ep.delayTime->getValueUnnormalised(), juce::dontSendNotification);
+    attackKnob.getKnob().setValue(ep.attackTime->getValueUnnormalised(), juce::dontSendNotification);
+    holdKnob.getKnob().setValue(ep.holdTime->getValueUnnormalised(), juce::dontSendNotification);
+    decayKnob.getKnob().setValue(ep.decayTime->getValueUnnormalised(), juce::dontSendNotification);
+    sustainKnob.getKnob().setValue(ep.sustainLevel->getValueUnnormalised(), juce::dontSendNotification);
+    releaseKnob.getKnob().setValue(ep.releaseTime->getValueUnnormalised(), juce::dontSendNotification);
 }
 
 std::array<osci::FloatParameter*, EnvelopeComponent::kDahdsrNumHandles>
 EnvelopeComponent::getTimeParams(int envIndex) const {
-    const auto& ep = audioProcessor.envParams[envIndex];
+    const auto& ep = audioProcessor.envelopeParameters.params[envIndex];
     return { nullptr, ep.delayTime, ep.attackTime, ep.holdTime, ep.decayTime, ep.releaseTime };
 }
 
 std::array<osci::FloatParameter*, EnvelopeComponent::kDahdsrNumHandles>
 EnvelopeComponent::getValueParams(int envIndex) const {
-    const auto& ep = audioProcessor.envParams[envIndex];
+    const auto& ep = audioProcessor.envelopeParameters.params[envIndex];
     return { nullptr, nullptr, nullptr, nullptr, ep.sustainLevel, nullptr };
 }
 
 std::array<osci::FloatParameter*, EnvelopeComponent::kDahdsrNumHandles>
 EnvelopeComponent::getCurveParams(int envIndex) const {
-    const auto& ep = audioProcessor.envParams[envIndex];
+    const auto& ep = audioProcessor.envelopeParameters.params[envIndex];
     return { nullptr, nullptr, ep.attackShape, nullptr, ep.decayShape, ep.releaseShape };
 }
 
@@ -381,8 +402,49 @@ void EnvelopeComponent::syncFromProcessorState() {
 
     ModulationSourceComponent::syncFromProcessorState();
 
+    syncKnobsToActiveEnv();
     syncGraphToActiveEnv();
     repaint();
+}
+
+void EnvelopeComponent::bindKnobToParam(KnobContainerComponent& container, osci::FloatParameter* param,
+                                          double skewCentre, const juce::String& suffix) {
+    auto& knob = container.getKnob();
+    double minVal = param->min.load();
+    double maxVal = param->max.load();
+    juce::NormalisableRange<double> range(minVal, maxVal);
+    if (skewCentre > minVal && skewCentre < maxVal)
+        range.setSkewForCentre(skewCentre);
+    knob.setNormalisableRange(range);
+    knob.setDoubleClickReturnValue(true, (double)param->defaultValue.load());
+    if (suffix.isNotEmpty())
+        knob.setTextValueSuffix(suffix);
+    knob.setNumDecimalPlacesToDisplay(3);
+    knob.setValue((double)param->getValueUnnormalised(), juce::dontSendNotification);
+
+    knob.onValueChange = [this, &knob, param]() {
+        param->setUnnormalisedValueNotifyingHost((float)knob.getValue());
+        // Rebuild the graph nodes from the updated parameter values
+        int idx = getActiveSourceIndex();
+        envData[idx].nodes = buildDahdsrNodes(audioProcessor.getCurrentDahdsrParams(idx));
+        graph.setNodes(envData[idx].nodes);
+    };
+
+    auto colour = getEnvColour(getActiveSourceIndex());
+    knob.setAccentColour(colour);
+    container.setAccentColour(colour);
+}
+
+void EnvelopeComponent::syncKnobsToActiveEnv() {
+    int idx = getActiveSourceIndex();
+    const auto& ep = audioProcessor.envelopeParameters.params[idx];
+
+    bindKnobToParam(delayKnob,    ep.delayTime,     0.5,  " s");
+    bindKnobToParam(attackKnob,   ep.attackTime,     0.5,  " s");
+    bindKnobToParam(holdKnob,     ep.holdTime,       0.5,  " s");
+    bindKnobToParam(decayKnob,    ep.decayTime,      0.5,  " s");
+    bindKnobToParam(sustainKnob,  ep.sustainLevel,   0.5,  {});
+    bindKnobToParam(releaseKnob,  ep.releaseTime,    0.5,  " s");
 }
 
 // --- Layout ---
@@ -392,6 +454,30 @@ void EnvelopeComponent::resized() {
 
     auto bounds = getContentBounds();
     bounds.reduce(4, 4); // content inset
+
+    // Bottom row: DAHDSR knobs
+    auto bottomRow = bounds.removeFromBottom(kKnobRowHeight);
+    bounds.removeFromBottom(kKnobGap);
+
+    {
+        int knobW = juce::jmin(kMaxKnobWidth, bottomRow.getWidth() / 6);
+        int totalW = knobW * 6 + kKnobGap * 5;
+        int leftPad = (bottomRow.getWidth() - totalW) / 2;
+        if (leftPad > 0) bottomRow.removeFromLeft(leftPad);
+
+        delayKnob.setBounds(bottomRow.removeFromLeft(knobW));
+        bottomRow.removeFromLeft(kKnobGap);
+        attackKnob.setBounds(bottomRow.removeFromLeft(knobW));
+        bottomRow.removeFromLeft(kKnobGap);
+        holdKnob.setBounds(bottomRow.removeFromLeft(knobW));
+        bottomRow.removeFromLeft(kKnobGap);
+        decayKnob.setBounds(bottomRow.removeFromLeft(knobW));
+        bottomRow.removeFromLeft(kKnobGap);
+        sustainKnob.setBounds(bottomRow.removeFromLeft(knobW));
+        bottomRow.removeFromLeft(kKnobGap);
+        releaseKnob.setBounds(bottomRow.removeFromLeft(knobW));
+    }
+
     graph.setBounds(bounds);
     setOutlineBounds(graph.getBounds());
 }
@@ -399,14 +485,15 @@ void EnvelopeComponent::resized() {
 // --- Look & Feel colour sync ---
 
 void EnvelopeComponent::syncGraphColours() {
-    graph.setColour(NodeGraphComponent::backgroundColourId,  findColour(Background));
-    graph.setColour(NodeGraphComponent::gridLineColourId,    findColour(GridLine));
+    // Override NodeGraphComponent's constructor defaults with LookAndFeel colours
+    graph.setColour(NodeGraphComponent::backgroundColourId,  getLookAndFeel().findColour(NodeGraphComponent::backgroundColourId));
+    graph.setColour(NodeGraphComponent::gridLineColourId,    getLookAndFeel().findColour(NodeGraphComponent::gridLineColourId));
+    graph.setColour(NodeGraphComponent::nodeOutlineColourId, getLookAndFeel().findColour(NodeGraphComponent::nodeOutlineColourId));
 
     auto colour = getEnvColour(getActiveSourceIndex());
     graph.setColour(NodeGraphComponent::lineColourId,        colour);
     graph.setColour(NodeGraphComponent::fillColourId,        colour.withAlpha(0.15f));
     graph.setColour(NodeGraphComponent::nodeColourId,        colour);
-    graph.setColour(NodeGraphComponent::nodeOutlineColourId, findColour(NodeOutline));
 }
 
 #endif // UGEN_NOEXTGPL

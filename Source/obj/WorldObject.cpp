@@ -1,7 +1,7 @@
 #include "WorldObject.h"
-#include "../chinese_postman/ChinesePostman.h"
-#include "tiny_obj_loader.h"
-#include "../MathUtil.h"
+#include "../../modules/chinese_postman/ChinesePostman.h"
+#include "../../modules/tinyobjloader/tiny_obj_loader.h"
+#include "../util/MathUtil.h"
 #include <unordered_set>
 
 struct pair_hash {

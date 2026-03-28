@@ -9,7 +9,7 @@
 
 #include "../CommonPluginProcessor.h"
 #include "../video/FFmpegEncoderManager.h"
-#include "../wav/WavParser.h"
+#include "../audio/wav/WavParser.h"
 
 class OfflineAudioToVideoRendererComponent;
 

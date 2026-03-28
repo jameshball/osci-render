@@ -1,7 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "../../audio/ModAssignment.h"
+#include "../../audio/modulation/ModAssignment.h"
 
 // Generic helper for computing modulation info for slider display.
 // Works with any modulation source type (LFO, Envelope, Random, etc.)

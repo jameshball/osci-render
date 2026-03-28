@@ -42,10 +42,12 @@
 
 #include <JuceHeader.h>
 #include <array>
-#include "../../audio/DahdsrEnvelope.h"
-#include "../../audio/EnvState.h"
+#include "../../audio/modulation/DahdsrEnvelope.h"
+#include "../../audio/modulation/EnvState.h"
+#include "../../audio/modulation/EnvelopeParameters.h"
 #include "NodeGraphComponent.h"
 #include "ModulationSourceComponent.h"
+#include "../KnobContainerComponent.h"
 
 class OscirenderAudioProcessor;
 
@@ -95,15 +97,12 @@ public:
 		Node              = COLOUR_OFFSET,
 		ReleaseNode       = COLOUR_OFFSET + 1,
 		LoopNode          = COLOUR_OFFSET + 2,
-		NodeOutline       = COLOUR_OFFSET + 3,
-		Line              = COLOUR_OFFSET + 4,
-		LoopLine          = COLOUR_OFFSET + 5,
-		Background        = COLOUR_OFFSET + 6,
-		GridLine          = COLOUR_OFFSET + 7,
-		LegendText        = COLOUR_OFFSET + 8,
-		LegendBackground  = COLOUR_OFFSET + 9,
-		LineBackground    = COLOUR_OFFSET + 10,
-		NumEnvColours     = 11,
+		Line              = COLOUR_OFFSET + 3,
+		LoopLine          = COLOUR_OFFSET + 4,
+		LegendText        = COLOUR_OFFSET + 5,
+		LegendBackground  = COLOUR_OFFSET + 6,
+		LineBackground    = COLOUR_OFFSET + 7,
+		NumEnvColours     = 8,
 	};
 
 protected:
@@ -133,6 +132,25 @@ private:
 	GridMode gridDisplayMode = GridNone;
 
 	NodeGraphComponent graph;
+
+	// --- Knobs for DAHDSR parameters ---
+	KnobContainerComponent delayKnob   { "DELAY" };
+	KnobContainerComponent attackKnob  { "ATTACK" };
+	KnobContainerComponent holdKnob    { "HOLD" };
+	KnobContainerComponent decayKnob   { "DECAY" };
+	KnobContainerComponent sustainKnob { "SUSTAIN" };
+	KnobContainerComponent releaseKnob { "RELEASE" };
+
+	static constexpr int kKnobRowHeight = 48;
+	static constexpr int kKnobGap = 4;
+	static constexpr int kMaxKnobWidth = 90;
+
+	// Bind a KnobContainerComponent to an osci::FloatParameter*.
+	// Sets range, default, suffix, accent colour, and bidirectional sync.
+	void bindKnobToParam(KnobContainerComponent& container, osci::FloatParameter* param,
+	                     double skewCentre, const juce::String& suffix = {});
+	void syncKnobsToActiveEnv();
+	void updateKnobValues();
 
 	void syncGraphToActiveEnv();
 	void syncActiveEnvFromGraph();

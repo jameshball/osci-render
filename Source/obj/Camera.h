@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../mathter/Matrix.hpp"
+#include "../../modules/Mathter/include/Mathter/Matrix.hpp"
 #include "Frustum.h"
 
 using Matrix = mathter::Matrix<float, 4, 4, mathter::eMatrixOrder::PRECEDE_VECTOR, mathter::eMatrixLayout::ROW_MAJOR, false>;
