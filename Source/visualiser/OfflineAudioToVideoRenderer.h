@@ -50,6 +50,7 @@ private:
                              const juce::File& videoInput,
                              const juce::File& audioInput,
                              const juce::File& output,
+                             const juce::StringArray& audioCodecArgs,
                              const std::atomic<bool>& cancelRequested,
                              juce::String& outError);
 
