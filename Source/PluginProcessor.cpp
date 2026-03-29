@@ -178,17 +178,16 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
             floatParameters.push_back(p);
     }
 
-    for (int i = 0; i < voices->getValueUnnormalised(); i++) {
-        uiVoiceActive[i].store(false, std::memory_order_relaxed);
-        uiVoiceEnvelopeTimeSeconds[i].store(0.0, std::memory_order_relaxed);
-        synth.addVoice(new ShapeVoice(*this, inputBuffer, i));
-    }
-
     intParameters.push_back(voices);
     intParameters.push_back(fileSelect);
 
     voices->addListener(this);
     envelopeParameters.params[0].addListenerToAll(this);
+
+    // Start the background voice builder thread.
+    voiceBuilder = std::make_unique<VoiceBuilder>(*this);
+    voiceBuilder->setTargetVoiceCount(voices->getValueUnnormalised());
+    voiceBuilder->startThread(juce::Thread::Priority::low);
 
     for (int i = 0; i < luaEffects.size(); i++) {
         luaEffects[i]->parameters[0]->addListener(this);
@@ -282,7 +281,50 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     };
 }
 
+// ---------------------------------------------------------------------------
+// VoiceBuilder::run() — defined here because it needs the full
+// OscirenderAudioProcessor definition (header is forward-declared).
+// ---------------------------------------------------------------------------
+
+void VoiceBuilder::run() {
+    while (!threadShouldExit()) {
+        wait(-1);
+        if (threadShouldExit()) break;
+
+        // Build or remove voices one at a time, re-checking the target
+        // between each operation to handle rapid slider changes.
+        while (!threadShouldExit()) {
+            const int target = targetCount.load(std::memory_order_acquire);
+            const int current = processor.synth.getNumVoices();
+
+            if (current == target)
+                break;
+
+            if (current < target) {
+                // Build one voice (the expensive part — runs off the
+                // message and audio threads).
+                auto* voice = new ShapeVoice(processor, processor.inputBuffer, current);
+
+                // Re-check: is this voice still needed?
+                if (targetCount.load(std::memory_order_acquire) > current) {
+                    processor.synth.addVoice(voice); // internally locked
+                } else {
+                    delete voice;
+                }
+            } else {
+                // Removal is cheap — just do it directly.
+                processor.synth.removeVoice(current - 1); // internally locked
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+
 OscirenderAudioProcessor::~OscirenderAudioProcessor() {
+    // Stop the voice builder before tearing down any processor state it references.
+    voiceBuilder.reset();
+
     for (int i = luaEffects.size() - 1; i >= 0; i--) {
         luaEffects[i]->parameters[0]->removeListener(this);
     }
@@ -1259,29 +1301,18 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
 }
 
 void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float newValue) {
-    // TODO: Figure out why below code was needed and if it is still needed
-    // for (auto effect : luaEffects) {
-    //     if (parameterIndex == effect->parameters[0]->getParameterIndex()) {
-    //         effect->apply();
-    //     }
-    // }
     if (parameterIndex == voices->getParameterIndex()) {
         int numVoices = voices->getValueUnnormalised();
-        // if the number of voices has changed, update the synth without clearing all the voices
         if (numVoices != synth.getNumVoices()) {
-            if (numVoices > synth.getNumVoices()) {
-                for (int i = synth.getNumVoices(); i < numVoices; i++) {
-                    uiVoiceActive[i].store(false, std::memory_order_relaxed);
-                    uiVoiceEnvelopeTimeSeconds[i].store(0.0, std::memory_order_relaxed);
-                    synth.addVoice(new ShapeVoice(*this, inputBuffer, i));
-                }
-            } else {
-                for (int i = synth.getNumVoices() - 1; i >= numVoices; i--) {
-                    uiVoiceActive[i].store(false, std::memory_order_relaxed);
-                    uiVoiceEnvelopeTimeSeconds[i].store(0.0, std::memory_order_relaxed);
-                    synth.removeVoice(i);
-                }
+            // Reset UI telemetry for voices that are about to be added/removed.
+            for (int i = std::min(numVoices, synth.getNumVoices());
+                 i < std::max(numVoices, synth.getNumVoices()); i++) {
+                uiVoiceActive[i].store(false, std::memory_order_relaxed);
+                uiVoiceEnvelopeTimeSeconds[i].store(0.0, std::memory_order_relaxed);
             }
+            // Delegate construction / removal to the background thread so we
+            // never block the message or audio thread with heavy allocations.
+            voiceBuilder->setTargetVoiceCount(numVoices);
         }
     }
 

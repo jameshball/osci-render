@@ -19,10 +19,11 @@
 #include "audio/effects/DelayEffect.h"
 #include "audio/modulation/LuaEffectState.h"
 #include "audio/effects/PerspectiveEffect.h"
-#include "audio/synthesis/PublicSynthesiser.h"
+#include "audio/synth/PublicSynthesiser.h"
 #include "audio/platform/SampleRateManager.h"
-#include "audio/synthesis/ShapeSound.h"
-#include "audio/synthesis/ShapeVoice.h"
+#include "audio/synth/ShapeSound.h"
+#include "audio/synth/ShapeVoice.h"
+#include "audio/synth/VoiceBuilder.h"
 #include "audio/modulation/DahdsrEnvelope.h"
 #include "audio/modulation/LfoState.h"
 #include "audio/modulation/LfoParameters.h"
@@ -83,6 +84,7 @@ class OscirenderAudioProcessor : public CommonAudioProcessor, juce::AudioProcess
                                  public juce::AudioProcessorARAExtension
 #endif
 {
+    friend class VoiceBuilder;
 public:
     OscirenderAudioProcessor();
     ~OscirenderAudioProcessor() override;
@@ -358,6 +360,8 @@ private:
     ShapeSound::Ptr defaultSound;
     PublicSynthesiser synth;
     bool retriggerMidi = true;
+
+    std::unique_ptr<VoiceBuilder> voiceBuilder;
 
     ObjectServer objectServer{*this};
 
