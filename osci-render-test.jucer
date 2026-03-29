@@ -31,6 +31,8 @@
       <FILE id="bQ1rDR" name="TestMain.cpp" compile="1" resource="0" file="tests/TestMain.cpp"/>
       <FILE id="H4tQvH" name="BenchmarkAnimateValues.cpp" compile="1" resource="0"
             file="tests/BenchmarkAnimateValues.cpp"/>
+      <FILE id="VcBnch" name="BenchmarkVoiceCloning.cpp" compile="1" resource="0"
+            file="tests/BenchmarkVoiceCloning.cpp"/>
       <FILE id="LfoStr" name="LfoStressTest.cpp" compile="1" resource="0"
             file="tests/LfoStressTest.cpp"/>
       <FILE id="LuaCor" name="LuaCorrectnessTests.cpp" compile="1" resource="0"

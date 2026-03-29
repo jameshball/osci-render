@@ -55,7 +55,7 @@ public:
 	}
 
 private:
-	const static int MAX_DELAY = 192000 * 10;
+	const static int MAX_DELAY = 192000 * 2;
 	std::vector<osci::Point> delayBuffer = std::vector<osci::Point>(MAX_DELAY);
 	int head = 0;
 	int position = 0;

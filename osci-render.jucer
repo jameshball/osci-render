@@ -278,13 +278,14 @@
           <FILE id="MdTyH2" name="ModulationTypes.h" compile="0" resource="0"
                 file="Source/audio/modulation/ModulationTypes.h"/>
         </GROUP>
-        <GROUP id="{AUD_SYNTHESIS}" name="synthesis">
+        <GROUP id="{AUD_SYNTHESIS}" name="synth">
           <FILE id="t5g8pf" name="PublicSynthesiser.h" compile="0" resource="0"
-                file="Source/audio/synthesis/PublicSynthesiser.h"/>
-          <FILE id="dBaZAV" name="ShapeSound.cpp" compile="1" resource="0" file="Source/audio/synthesis/ShapeSound.cpp"/>
-          <FILE id="VKBirB" name="ShapeSound.h" compile="0" resource="0" file="Source/audio/synthesis/ShapeSound.h"/>
-          <FILE id="UcPZ09" name="ShapeVoice.cpp" compile="1" resource="0" file="Source/audio/synthesis/ShapeVoice.cpp"/>
-          <FILE id="WId4vx" name="ShapeVoice.h" compile="0" resource="0" file="Source/audio/synthesis/ShapeVoice.h"/>
+                file="Source/audio/synth/PublicSynthesiser.h"/>
+          <FILE id="dBaZAV" name="ShapeSound.cpp" compile="1" resource="0" file="Source/audio/synth/ShapeSound.cpp"/>
+          <FILE id="VKBirB" name="ShapeSound.h" compile="0" resource="0" file="Source/audio/synth/ShapeSound.h"/>
+          <FILE id="UcPZ09" name="ShapeVoice.cpp" compile="1" resource="0" file="Source/audio/synth/ShapeVoice.cpp"/>
+          <FILE id="WId4vx" name="ShapeVoice.h" compile="0" resource="0" file="Source/audio/synth/ShapeVoice.h"/>
+          <FILE id="VcBldr" name="VoiceBuilder.h" compile="0" resource="0" file="Source/audio/synth/VoiceBuilder.h"/>
         </GROUP>
         <GROUP id="{AUD_PLATFORM}" name="platform">
           <FILE id="Q5kjpU" name="SampleRateManager.h" compile="0" resource="0"
