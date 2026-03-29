@@ -180,6 +180,13 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
 
     intParameters.push_back(voices);
     intParameters.push_back(fileSelect);
+    intParameters.push_back(pitchBendRange);
+    floatParameters.push_back(velocityTracking);
+    floatParameters.push_back(glideTime);
+    floatParameters.push_back(glideSlope);
+    booleanParameters.push_back(alwaysGlide);
+    booleanParameters.push_back(legato);
+    booleanParameters.push_back(octaveScale);
 
     voices->addListener(this);
     envelopeParameters.params[0].addListenerToAll(this);

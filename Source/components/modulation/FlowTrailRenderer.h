@@ -42,10 +42,24 @@ public:
     }
 
     void resized() {
+        const int oldWidth = (int)flowTrailLastSeenMs.size();
         const int width = getWidth();
-        if (width > 0)
-            flowTrailLastSeenMs.assign((size_t)width, 0.0);
-        flowTrailNewestMs = 0.0;
+        if (width > 0) {
+            if (oldWidth > 0 && flowTrailNewestMs > 0.0) {
+                // Remap old pixel timestamps to new width to preserve
+                // trail continuity and avoid a single-frame flicker.
+                std::vector<double> old = std::move(flowTrailLastSeenMs);
+                flowTrailLastSeenMs.resize((size_t)width);
+                for (int x = 0; x < width; ++x) {
+                    int src = juce::jlimit(0, oldWidth - 1,
+                                           (int)std::round((double)x * (double)(oldWidth - 1) / (double)(width - 1)));
+                    flowTrailLastSeenMs[(size_t)x] = old[(size_t)src];
+                }
+            } else {
+                flowTrailLastSeenMs.assign((size_t)width, 0.0);
+            }
+        }
+        // Preserve flowTrailNewestMs so the trail decays naturally.
         std::fill(prevFlowMarkerValid.begin(), prevFlowMarkerValid.end(), 0);
         std::fill(prevFlowMarkerTimeSeconds.begin(), prevFlowMarkerTimeSeconds.end(), 0.0);
         std::fill(prevFlowMarkerUpdateMs.begin(), prevFlowMarkerUpdateMs.end(), 0.0);

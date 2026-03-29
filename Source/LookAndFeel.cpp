@@ -346,7 +346,7 @@ void OscirenderLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, in
     float diameter = juce::jmin(bounds.getWidth(), bounds.getHeight());
     auto centre = bounds.getCentre();
 
-    bool hovered = slider.isMouseOverOrDragging();
+    bool hovered = slider.isEnabled() && slider.isMouseOverOrDragging();
 
     float baseTrackWidth = diameter * 0.09f;
     float trackWidth = hovered ? baseTrackWidth * 1.2f : baseTrackWidth;

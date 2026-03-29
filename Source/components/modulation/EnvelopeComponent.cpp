@@ -409,22 +409,14 @@ void EnvelopeComponent::syncFromProcessorState() {
 
 void EnvelopeComponent::bindKnobToParam(KnobContainerComponent& container, osci::FloatParameter* param,
                                           double skewCentre, const juce::String& suffix) {
+    container.bindToParam(param, skewCentre, 3);
     auto& knob = container.getKnob();
-    double minVal = param->min.load();
-    double maxVal = param->max.load();
-    juce::NormalisableRange<double> range(minVal, maxVal);
-    if (skewCentre > minVal && skewCentre < maxVal)
-        range.setSkewForCentre(skewCentre);
-    knob.setNormalisableRange(range);
-    knob.setDoubleClickReturnValue(true, (double)param->defaultValue.load());
     if (suffix.isNotEmpty())
         knob.setTextValueSuffix(suffix);
-    knob.setNumDecimalPlacesToDisplay(3);
-    knob.setValue((double)param->getValueUnnormalised(), juce::dontSendNotification);
 
-    knob.onValueChange = [this, &knob, param]() {
-        param->setUnnormalisedValueNotifyingHost((float)knob.getValue());
-        // Rebuild the graph nodes from the updated parameter values
+    auto baseChange = knob.onValueChange;
+    knob.onValueChange = [this, baseChange]() {
+        if (baseChange) baseChange();
         int idx = getActiveSourceIndex();
         envData[idx].nodes = buildDahdsrNodes(audioProcessor.getCurrentDahdsrParams(idx));
         graph.setNodes(envData[idx].nodes);
@@ -460,22 +452,28 @@ void EnvelopeComponent::resized() {
     bounds.removeFromBottom(kKnobGap);
 
     {
-        int knobW = juce::jmin(kMaxKnobWidth, bottomRow.getWidth() / 6);
-        int totalW = knobW * 6 + kKnobGap * 5;
-        int leftPad = (bottomRow.getWidth() - totalW) / 2;
+        constexpr int numKnobs = 6;
+        int gapTotal = kKnobGap * (numKnobs - 1);
+        int avail = bottomRow.getWidth() - gapTotal;
+        float knobW = juce::jmin((float)kMaxKnobWidth, (float)avail / (float)numKnobs);
+        float totalW = knobW * numKnobs + (float)gapTotal;
+        int leftPad = juce::roundToInt(((float)bottomRow.getWidth() - totalW) * 0.5f);
         if (leftPad > 0) bottomRow.removeFromLeft(leftPad);
 
-        delayKnob.setBounds(bottomRow.removeFromLeft(knobW));
-        bottomRow.removeFromLeft(kKnobGap);
-        attackKnob.setBounds(bottomRow.removeFromLeft(knobW));
-        bottomRow.removeFromLeft(kKnobGap);
-        holdKnob.setBounds(bottomRow.removeFromLeft(knobW));
-        bottomRow.removeFromLeft(kKnobGap);
-        decayKnob.setBounds(bottomRow.removeFromLeft(knobW));
-        bottomRow.removeFromLeft(kKnobGap);
-        sustainKnob.setBounds(bottomRow.removeFromLeft(knobW));
-        bottomRow.removeFromLeft(kKnobGap);
-        releaseKnob.setBounds(bottomRow.removeFromLeft(knobW));
+        int startX = bottomRow.getX();
+        int y = bottomRow.getY();
+        int h = bottomRow.getHeight();
+        float cum = 0.0f;
+        int gapsSoFar = 0;
+
+        juce::Component* knobs[] = { &delayKnob, &attackKnob, &holdKnob, &decayKnob, &sustainKnob, &releaseKnob };
+        for (int i = 0; i < numKnobs; ++i) {
+            int left = startX + juce::roundToInt(cum) + gapsSoFar;
+            cum += knobW;
+            int right = startX + juce::roundToInt(cum) + gapsSoFar;
+            knobs[i]->setBounds(left, y, right - left, h);
+            if (i < numKnobs - 1) gapsSoFar += kKnobGap;
+        }
     }
 
     graph.setBounds(bounds);

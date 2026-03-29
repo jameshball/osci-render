@@ -175,10 +175,10 @@ void SidechainComponent::resized() {
     ModulationSourceComponent::resized();
 
     auto tabColBounds = tabViewport.getBounds(); // full left column from base
-    int totalH = tabColBounds.getHeight();
+    float totalH = (float)tabColBounds.getHeight();
 
     // Tab: allow up to kMaxTabHeight when there's space
-    int tabH = juce::jmin(kMaxTabHeight, totalH / 3);
+    int tabH = juce::jmin(kMaxTabHeight, juce::roundToInt(totalH / 3.0f));
     tabH = juce::jmax(tabH, kMinTabHeight);
     tabViewport.setBounds(tabColBounds.withHeight(tabH));
     tabList.setBounds(0, 0, tabColBounds.getWidth(), tabH);
@@ -199,13 +199,14 @@ void SidechainComponent::resized() {
     int knobLayoutH = juce::jmax(0, knobRegionH - knobOuterPad * 2);
 
     // Dynamic gap between knobs — grows with available space, capped
-    int knobH = juce::jmin(kKnobSize, (knobLayoutH - kKnobGap) / 2);
+    float knobHf = juce::jmin((float)kKnobSize, ((float)knobLayoutH - (float)kKnobGap) / 2.0f);
+    int knobH = juce::roundToInt(knobHf);
     int knobGap = juce::jmin(kMaxKnobGap, knobLayoutH - knobH * 2);
     if (knobGap < kKnobGap) knobGap = kKnobGap;
 
     // Centre the two knobs + gap vertically in the knob region
     int totalKnobs = knobH * 2 + knobGap;
-    int topPad = (knobLayoutH - totalKnobs) / 2;
+    int topPad = juce::roundToInt(((float)knobLayoutH - (float)totalKnobs) / 2.0f);
     if (topPad < 0) topPad = 0;
 
     // Centre knobs within the widened background (accounts for rounded left corners)

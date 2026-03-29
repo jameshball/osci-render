@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include "RotaryKnobComponent.h"
 #include "../LookAndFeel.h"
+#include <osci_render_core/effect/osci_EffectParameter.h>
 
 // Generic container that draws a dark rounded-rectangle background behind a
 // RotaryKnobComponent with a label underneath. Reusable for any knob that
@@ -17,6 +18,28 @@ public:
 
     void setLabel(const juce::String& text) { label = text; repaint(); }
     void setAccentColour(juce::Colour c) { knob.setAccentColour(c); }
+
+    // Bind the internal knob to a FloatParameter: sets range, skew, default,
+    // initial value, and a default onValueChange that updates the parameter.
+    // Callers can override onValueChange afterwards for additional behaviour.
+    void bindToParam(osci::FloatParameter* param, double skewCentre = 0.0, int decimalPlaces = 2) {
+        double minVal = param->min.load();
+        double maxVal = param->max.load();
+        juce::NormalisableRange<double> range(minVal, maxVal);
+        if (skewCentre > minVal && skewCentre < maxVal)
+            range.setSkewForCentre(skewCentre);
+        knob.setNormalisableRange(range);
+        knob.setDoubleClickReturnValue(true, (double)param->defaultValue.load());
+        knob.setNumDecimalPlacesToDisplay(decimalPlaces);
+        knob.setValue((double)param->getValueUnnormalised(), juce::dontSendNotification);
+        knob.onValueChange = [this, param]() {
+            param->setUnnormalisedValueNotifyingHost((float)knob.getValue());
+        };
+    }
+
+    void enablementChanged() override {
+        knob.setEnabled(isEnabled());
+    }
 
     void paint(juce::Graphics& g) override {
         auto bounds = getLocalBounds().toFloat();

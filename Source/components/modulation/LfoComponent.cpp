@@ -414,19 +414,32 @@ void LfoComponent::resized() {
     phaseSlider.setBounds(phaseRow);
 
     // Layout mode and rate side by side, then smooth + delay knobs
-    int modeW = juce::jmin(kMaxModeWidth, bottomRow.getWidth() / 4);
-    int rateW = juce::jmin(kMaxRateWidth, bottomRow.getWidth() / 4);
-    int knobW = juce::jmin(kMaxKnobWidth, bottomRow.getWidth() / 4);
-    int totalW = modeW + rateW + knobW * 2 + kRateGap * 3;
-    int leftPad = (bottomRow.getWidth() - totalW) / 2;
+    float quarter = (float)(bottomRow.getWidth() - kRateGap * 3) / 4.0f;
+    float modeW = juce::jmin((float)kMaxModeWidth, quarter);
+    float rateW = juce::jmin((float)kMaxRateWidth, quarter);
+    float knobW = juce::jmin((float)kMaxKnobWidth, quarter);
+    float totalW = modeW + rateW + knobW * 2.0f + (float)kRateGap * 3.0f;
+    int leftPad = juce::roundToInt(((float)bottomRow.getWidth() - totalW) * 0.5f);
     if (leftPad > 0) bottomRow.removeFromLeft(leftPad);
-    modeControl.setBounds(bottomRow.removeFromLeft(modeW));
-    bottomRow.removeFromLeft(kRateGap);
-    rateControl.setBounds(bottomRow.removeFromLeft(rateW));
-    bottomRow.removeFromLeft(kRateGap);
-    smoothKnob.setBounds(bottomRow.removeFromLeft(knobW));
-    bottomRow.removeFromLeft(kRateGap);
-    delayKnob.setBounds(bottomRow.removeFromLeft(knobW));
+
+    int startX = bottomRow.getX();
+    int y = bottomRow.getY();
+    int h = bottomRow.getHeight();
+    float cum = 0.0f;
+    int gapsSoFar = 0;
+
+    auto nextLfoCol = [&](float w) -> juce::Rectangle<int> {
+        int left = startX + juce::roundToInt(cum) + gapsSoFar;
+        cum += w;
+        int right = startX + juce::roundToInt(cum) + gapsSoFar;
+        gapsSoFar += kRateGap;
+        return { left, y, right - left, h };
+    };
+
+    modeControl.setBounds(nextLfoCol(modeW));
+    rateControl.setBounds(nextLfoCol(rateW));
+    smoothKnob.setBounds(nextLfoCol(knobW));
+    delayKnob.setBounds(nextLfoCol(knobW));
 
     graph.setBounds(bounds);
     setOutlineBounds(graph.getBounds());

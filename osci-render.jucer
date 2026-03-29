@@ -389,6 +389,10 @@
               file="Source/components/LabelledBarComponent.h"/>
         <FILE id="PrBrCm" name="ParameterBarComponent.h" compile="0" resource="0"
               file="Source/components/ParameterBarComponent.h"/>
+        <FILE id="TgLbCm" name="ToggleLabelComponent.h" compile="0" resource="0"
+              file="Source/components/ToggleLabelComponent.h"/>
+        <FILE id="SlGrCm" name="SlopeGraphComponent.h" compile="0" resource="0"
+              file="Source/components/SlopeGraphComponent.h"/>
         <FILE id="Fr3001" name="FractalComponent.cpp" compile="1" resource="0"
               file="Source/components/FractalComponent.cpp"/>
         <FILE id="Fr3002" name="FractalComponent.h" compile="0" resource="0"

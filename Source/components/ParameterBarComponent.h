@@ -64,12 +64,14 @@ public:
     }
 
     void mouseDown(const juce::MouseEvent& e) override {
+        if (!isEnabled()) return;
         dragStartValue = getValue();
         dragStartPos = e.getPosition();
         dragging = false;
     }
 
     void mouseDrag(const juce::MouseEvent& e) override {
+        if (!isEnabled()) return;
         dragging = true;
         int dy = dragStartPos.getY() - e.getPosition().getY();
         float minVal = getMin();
@@ -86,12 +88,13 @@ public:
     }
 
     void mouseDoubleClick(const juce::MouseEvent&) override {
+        if (!isEnabled()) return;
         showInlineEditor();
     }
 
 private:
     void init() {
-        setMouseCursor(juce::MouseCursor::UpDownResizeCursor);
+        setDraggable(true);
         rawParam->addListener(this);
         float range = getMax() - getMin();
         sensitivity = range / 200.0f;

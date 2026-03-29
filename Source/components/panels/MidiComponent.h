@@ -4,6 +4,9 @@
 #include "../../PluginProcessor.h"
 #include "../SwitchButton.h"
 #include "../ParameterBarComponent.h"
+#include "../KnobContainerComponent.h"
+#include "../ToggleLabelComponent.h"
+#include "../SlopeGraphComponent.h"
 
 class OscirenderAudioProcessorEditor;
 class MidiComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater {
@@ -17,14 +20,27 @@ public:
 
 	void resized() override;
 	void paint(juce::Graphics& g) override;
+	void paintOverChildren(juce::Graphics& g) override;
 private:
 	OscirenderAudioProcessor& audioProcessor;
 	OscirenderAudioProcessorEditor& pluginEditor;
 
-    jux::SwitchButton midiToggle = jux::SwitchButton(audioProcessor.midiEnabled);
+    jux::SwitchButton midiToggle{audioProcessor.midiEnabled};
 	ParameterBarComponent voicesBar{audioProcessor.voices, "VOICES"};
-	juce::TextButton midiSettingsButton{"Audio/MIDI Settings..."};
+	ParameterBarComponent bendBar{audioProcessor.pitchBendRange, "BEND"};
+
+	KnobContainerComponent velTrkKnob{"VELOCITY"};
+	KnobContainerComponent glideKnob{"GLIDE"};
+
+	SlopeGraphComponent slopeGraph{audioProcessor.glideSlope, "SLOPE"};
+
+	ToggleLabelComponent alwaysGlideToggle{audioProcessor.alwaysGlide};
+	ToggleLabelComponent legatoToggle{audioProcessor.legato};
+	ToggleLabelComponent octaveScaleToggle{audioProcessor.octaveScale};
+
 	ParameterBarComponent tempoBar{audioProcessor.standaloneBpm, "BPM"};
+
+	void updateEnabledState();
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MidiComponent)
 };

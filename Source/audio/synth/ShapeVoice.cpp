@@ -55,7 +55,7 @@ bool ShapeVoice::canPlaySound(juce::SynthesiserSound* sound) {
 
 void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::SynthesiserSound* sound, int currentPitchWheelPosition) {
     this->velocity = velocity;
-    pitchWheelMoved(currentPitchWheelPosition);
+    rawPitchWheelValue = currentPitchWheelPosition;
 
     // Don't rely on JUCE's Synthesiser sound list for routing; use the processor's
     // active sound so we can switch files on the audio thread without mutating
@@ -65,6 +65,8 @@ void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesiser
         shapeSound = dynamic_cast<ShapeSound*>(sound);
     }
 
+    const bool wasPlaying = currentlyPlaying || voiceWasStolen;
+    voiceWasStolen = false;
     currentlyPlaying = true;
     this->sound = shapeSound;
 
@@ -85,6 +87,10 @@ void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesiser
     auto parser = currentSound != nullptr ? currentSound->parser : nullptr;
     renderingSample = parser != nullptr && parser->isSample();
 
+    const bool isLegato = audioProcessor.legato->getBoolValue()
+                          && audioProcessor.voices->getValueUnnormalised() == 1
+                          && wasPlaying && hadPreviousNote;
+
     if (shapeSound != nullptr) {
         frame.clear();
         frameLength = 0.0;
@@ -100,17 +106,40 @@ void ShapeVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesiser
         }
         pendingFrameStart = true;
         pendingNoteOn = true;
-        // Snapshot DAHDSR parameters per-voice (Vital-style; peak fixed at 1.0)
-        dahdsr = audioProcessor.getCurrentDahdsrParams();
-        envState.reset(dahdsr);
-        // Snapshot modulation envelopes 1..N (envelope 0 == envState)
-        for (int e = 1; e < NUM_ENVELOPES; ++e) {
-            envDahdsr[e] = audioProcessor.getCurrentDahdsrParams(e);
-            envStates[e].reset(envDahdsr[e]);
+
+        // Legato: don't retrigger envelopes when playing mono legato
+        if (!isLegato) {
+            dahdsr = audioProcessor.getCurrentDahdsrParams();
+            envState.reset(dahdsr);
+            for (int e = 1; e < NUM_ENVELOPES; ++e) {
+                envDahdsr[e] = audioProcessor.getCurrentDahdsrParams(e);
+                envStates[e].reset(envDahdsr[e]);
+            }
         }
+
         if (audioProcessor.midiEnabled->getBoolValue()) {
-            // Match the frequency slider behavior: tiny epsilon prevents a weird mac glitch at certain exact frequencies.
-            frequency = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber) + osci_audio::kMacFrequencyEpsilonHz;
+            double newFreq = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber) + osci_audio::kMacFrequencyEpsilonHz;
+            double glideTimeSec = audioProcessor.glideTime->getValueUnnormalised();
+            bool shouldGlide = glideTimeSec > 0.0
+                               && hadPreviousNote
+                               && (audioProcessor.alwaysGlide->getBoolValue() || wasPlaying);
+
+            if (shouldGlide) {
+                glideSourceFreq = frequency;
+                glideTargetFreq = newFreq;
+                glideElapsed = 0.0;
+                glideDuration = glideTimeSec;
+                if (audioProcessor.octaveScale->getBoolValue()) {
+                    double octaves = std::abs(std::log2(newFreq / frequency));
+                    glideDuration *= octaves;
+                }
+                glideSlopePower = audioProcessor.glideSlope->getValueUnnormalised();
+                glideActive = true;
+            } else {
+                frequency = newFreq;
+                glideActive = false;
+            }
+            hadPreviousNote = true;
         }
     }
 }
@@ -171,8 +200,14 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
 
     int numChannels = outputBuffer.getNumChannels();
 
+    // Recompute pitch wheel adjustment using current bend range parameter
+    pitchWheelMoved(rawPitchWheelValue);
+
     if (audioProcessor.midiEnabled->getBoolValue()) {
-        actualFrequency = frequency * pitchWheelAdjustment;
+        // Glide is advanced per-sample below; set initial frequency here
+        if (!glideActive) {
+            actualFrequency = frequency * pitchWheelAdjustment;
+        }
     } else {
         actualFrequency = audioProcessor.frequency.load();
     }
@@ -217,6 +252,24 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         if (pendingFrameStart) {
             frameSyncBuffer.setSample(0, i, 1.0f);
             pendingFrameStart = false;
+        }
+
+        // Advance glide (portamento) per sample
+        if (glideActive && midiEnabled) {
+            glideElapsed += dt;
+            if (glideElapsed >= glideDuration) {
+                frequency = glideTargetFreq;
+                glideActive = false;
+            } else {
+                float t = osci_audio::powerScale(
+                    (float)juce::jlimit(0.0, 1.0, glideElapsed / glideDuration),
+                    glideSlopePower);
+                // Glide in log-frequency space for perceptually uniform pitch transition
+                double logSource = std::log(glideSourceFreq);
+                double logTarget = std::log(glideTargetFreq);
+                frequency = std::exp(logSource + t * (logTarget - logSource));
+            }
+            actualFrequency = frequency * pitchWheelAdjustment;
         }
 
         int sample = startSample + i;
@@ -350,8 +403,13 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     audioProcessor.applyToggleableEffectsToBuffer(voiceBuffer, audioProcessor.getInputBuffer(), &envelopeBuffer, &frequencyBuffer, &frameSyncBuffer, &voiceEffectsMap, voicePreviewEffect);
 
     // Add processed samples to output buffer (apply envelope/velocity gain AFTER effects)
+    // Velocity tracking: at 0% velocity has no effect (gain=1), at 100% full velocity,
+    // at -100% inverted velocity
+    const float velTrack = audioProcessor.velocityTracking->getValueUnnormalised();
+    const float velGain = 1.0f + velTrack * ((float)velocity - 1.0f);
+
     for (int i = 0; i < numSamples; ++i) {
-        const float gain = (float)velocity * envelopeBuffer.getSample(0, i);
+        const float gain = velGain * envelopeBuffer.getSample(0, i);
         int sample = startSample + i;
         // Spatial channels are scaled by gain
         if (numChannels >= 1) outputBuffer.addSample(0, sample, voiceBuffer.getSample(0, i) * gain);
@@ -374,6 +432,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
 
 void ShapeVoice::stopNote(float velocity, bool allowTailOff) {
     if (!allowTailOff || !audioProcessor.midiEnabled->getBoolValue()) {
+        voiceWasStolen = currentlyPlaying;
         currentlyPlaying = false;
         noteStopped();
         return;
@@ -401,7 +460,12 @@ void ShapeVoice::noteStopped() {
 }
 
 void ShapeVoice::pitchWheelMoved(int newPitchWheelValue) {
-    pitchWheelAdjustment = 1.0 + (newPitchWheelValue - 8192.0) / 65536.0;
+    rawPitchWheelValue = newPitchWheelValue;
+    // Bend range in semitones from parameter; convert to frequency ratio
+    int bendSemitones = audioProcessor.pitchBendRange->getValueUnnormalised();
+    double bendNorm = (newPitchWheelValue - 8192.0) / 8192.0; // -1..+1
+    double bendInSemitones = bendNorm * bendSemitones;
+    pitchWheelAdjustment = std::pow(2.0, bendInSemitones / 12.0);
 }
 
 void ShapeVoice::controllerMoved(int controllerNumber, int newControllerValue) {}

@@ -47,6 +47,17 @@ private:
 	std::atomic<double> actualFrequency = 1.0;
     double velocity = 1.0;
 	double pitchWheelAdjustment = 1.0;
+	int rawPitchWheelValue = 8192;
+
+	// Glide (portamento) state
+	double glideSourceFreq = 0.0;
+	double glideTargetFreq = 0.0;
+	double glideElapsed = 0.0;
+	double glideDuration = 0.0;
+	float glideSlopePower = 0.0f;
+	bool glideActive = false;
+	bool hadPreviousNote = false;
+	bool voiceWasStolen = false;
 
 	lua_State* L = nullptr;
 	LuaVariables vars;
