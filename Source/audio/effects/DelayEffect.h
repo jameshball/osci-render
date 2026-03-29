@@ -7,7 +7,16 @@ public:
 		return std::make_shared<DelayEffect>();
 	}
 
+	void prepareToPlay(float sampleRate) override {
+		delayBuffer.resize((int)sampleRate);
+		head = 0;
+		position = 0;
+		samplesSinceLastDelay = 0;
+	}
+
 	osci::Point apply(int index, osci::Point vector, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
+		if (delayBuffer.empty()) return vector;
+
 		double decay = values[0];
 		double decayLength = values[1];
 		int delayBufferLength = (int)(sampleRate * decayLength);
@@ -55,8 +64,7 @@ public:
 	}
 
 private:
-	const static int MAX_DELAY = 192000 * 2;
-	std::vector<osci::Point> delayBuffer = std::vector<osci::Point>(MAX_DELAY);
+	std::vector<osci::Point> delayBuffer;
 	int head = 0;
 	int position = 0;
 	int samplesSinceLastDelay = 0;

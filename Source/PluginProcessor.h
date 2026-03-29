@@ -348,6 +348,7 @@ public:
 private:
     juce::AudioBuffer<float> inputBuffer;
     juce::AudioBuffer<float> inputFrequencyBuffer;
+    juce::AudioBuffer<float> outputBuffer3d;
 
     std::atomic<bool> prevMidiEnabled = !midiEnabled->getBoolValue();
 

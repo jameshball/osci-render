@@ -1110,10 +1110,16 @@ Texture VisualiserRenderer::createReflectionTexture() {
     using namespace juce::gl;
 
     if (parameters.getScreenOverlay() == ScreenOverlay::VectorDisplay) {
+        if (vectorDisplayReflectionImage.isNull())
+            vectorDisplayReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::vector_display_reflection_png, BinaryData::vector_display_reflection_pngSize);
         reflectionOpenGLTexture.loadImage(vectorDisplayReflectionImage);
     } else if (parameters.getScreenOverlay() == ScreenOverlay::Real) {
+        if (oscilloscopeReflectionImage.isNull())
+            oscilloscopeReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::real_reflection_png, BinaryData::real_reflection_pngSize);
         reflectionOpenGLTexture.loadImage(oscilloscopeReflectionImage);
     } else {
+        if (emptyReflectionImage.isNull())
+            emptyReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::no_reflection_jpg, BinaryData::no_reflection_jpgSize);
         reflectionOpenGLTexture.loadImage(emptyReflectionImage);
     }
 
@@ -1127,18 +1133,26 @@ Texture VisualiserRenderer::createScreenTexture() {
     using namespace juce::gl;
 
     if (screenOverlay == ScreenOverlay::Smudged || screenOverlay == ScreenOverlay::SmudgedGraticule) {
+        if (screenTextureImage.isNull())
+            screenTextureImage = juce::ImageFileFormat::loadFrom(BinaryData::noise_jpg, BinaryData::noise_jpgSize);
         screenOpenGLTexture.loadImage(screenTextureImage);
 #if OSCI_PREMIUM
     } else if (screenOverlay == ScreenOverlay::Real) {
+        if (oscilloscopeImage.isNull())
+            oscilloscopeImage = juce::ImageFileFormat::loadFrom(BinaryData::real_png, BinaryData::real_pngSize);
         screenOpenGLTexture.loadImage(oscilloscopeImage);
     } else if (screenOverlay == ScreenOverlay::VectorDisplay) {
+        if (vectorDisplayImage.isNull())
+            vectorDisplayImage = juce::ImageFileFormat::loadFrom(BinaryData::vector_display_png, BinaryData::vector_display_pngSize);
         screenOpenGLTexture.loadImage(vectorDisplayImage);
 #endif
     } else {
+        if (emptyScreenImage.isNull())
+            emptyScreenImage = juce::ImageFileFormat::loadFrom(BinaryData::empty_jpg, BinaryData::empty_jpgSize);
         screenOpenGLTexture.loadImage(emptyScreenImage);
     }
     checkGLErrors(__FILE__, __LINE__);
-    Texture texture = {screenOpenGLTexture.getTextureID(), screenTextureImage.getWidth(), screenTextureImage.getHeight()};
+    Texture texture = {screenOpenGLTexture.getTextureID(), screenOpenGLTexture.getWidth(), screenOpenGLTexture.getHeight()};
 
     if (screenOverlay == ScreenOverlay::Graticule || screenOverlay == ScreenOverlay::SmudgedGraticule) {
         activateTargetTexture(texture);

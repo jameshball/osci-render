@@ -63,4 +63,6 @@ private:
 	juce::String fallbackLuaScript = "return { 0.0, 0.0 }";
 
 	std::function<void(int, juce::String, juce::String)> errorCallback;
+
+	juce::AudioBuffer<float> wavPointBuffer{3, 1};
 };

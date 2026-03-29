@@ -3,11 +3,19 @@ on:
   push:
     branches:
       - develop
+    paths:
+      - osci-render.jucer
+      - sosci.jucer
+      - packaging/osci-render.iss
+      - packaging/sosci.iss
+      - packaging/osci-render.pkgproj
+      - packaging/sosci.pkgproj
   workflow_dispatch:
 
 jobs:
   build:
     name: Build (${{ matrix.project }} ${{ matrix.version }} @ ${{ matrix.os }})
+    if: github.event_name == 'workflow_dispatch' || contains(join(github.event.commits.*.message, '\n'), '[trigger-ci:bump-version]')
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:

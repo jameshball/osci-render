@@ -828,7 +828,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
     const double EPSILON = 0.00001;
 
-    inputBuffer = juce::AudioBuffer<float>(totalNumInputChannels, buffer.getNumSamples());
+    inputBuffer.setSize(totalNumInputChannels, buffer.getNumSamples(), false, false, true);
     for (auto channel = 0; channel < totalNumInputChannels; channel++) {
         inputBuffer.copyFrom(channel, 0, buffer, channel, 0, buffer.getNumSamples());
     }
@@ -836,7 +836,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     // Step 1: Peak-rectify the input audio into rectifiedInputBuffer.
     // This is the raw per-sample amplitude: max(|L|, |R|) for stereo, |x| for mono.
     // No smoothing — envelope followers downstream apply their own attack/release.
-    rectifiedInputBuffer.setSize(1, numSamples, false, false, false);
+    rectifiedInputBuffer.setSize(1, numSamples, false, false, true);
     {
         auto* rectData = rectifiedInputBuffer.getWritePointer(0);
         if (totalNumInputChannels >= 2) {
@@ -855,7 +855,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     // Step 2: Produce the smoothed volume buffer for beginner-mode per-parameter sidechain
     // and for effects that receive volumeInput. Uses a default envelope follower with
     // fixed attack/release (same time constant as the old 100ms EMA).
-    currentVolumeBuffer.setSize(1, numSamples, false, false, false);
+    currentVolumeBuffer.setSize(1, numSamples, false, false, true);
     {
         defaultEnvelopeState.advanceBlock(
             currentVolumeBuffer.getWritePointer(0),
@@ -902,7 +902,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         modulationEngine.applyAllModulation(numSamples);
     }
 
-    juce::AudioBuffer<float> outputBuffer3d = juce::AudioBuffer<float>(6, buffer.getNumSamples());
+    outputBuffer3d.setSize(6, buffer.getNumSamples(), false, false, true);
     outputBuffer3d.clear();
 
     // Initialise colour channels to the "no colour" sentinel (-1) so that

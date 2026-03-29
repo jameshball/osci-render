@@ -36,7 +36,7 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     bool readingFromWav = wavParser.isInitialised();
 
     if (readingFromWav) {
-        wavBuffer.setSize(6, numSamples, false, true, false);
+        wavBuffer.setSize(6, numSamples, false, true, true);
         wavBuffer.clear();
         wavParser.processBlock(wavBuffer);
         sourceBuffer = juce::AudioBuffer<float>(wavBuffer.getArrayOfWritePointers(), wavBuffer.getNumChannels(), numSamples);
@@ -45,7 +45,7 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     }
 
     // Resize working buffer with 6 channels: x, y, z/brightness, r, g, b
-    workBuffer.setSize(6, numSamples, false, true, false);
+    workBuffer.setSize(6, numSamples, false, true, true);
     auto sourceArray = sourceBuffer.getArrayOfReadPointers();
     auto workArray = workBuffer.getArrayOfWritePointers();
     

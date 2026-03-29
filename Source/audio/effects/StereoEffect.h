@@ -7,11 +7,14 @@ public:
 		return std::make_shared<StereoEffect>();
 	}
 
+	void prepareToPlay(float sr) override {
+		sampleRate = sr;
+		initialiseBuffer(sr);
+	}
+
 	osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
-		if (this->sampleRate != sampleRate) {
-			this->sampleRate = sampleRate;
-			initialiseBuffer(sampleRate);
-		}
+		if (buffer.empty()) return input;
+
 		double sampleOffset = values[0].load() / 10;
 		sampleOffset = juce::jlimit(0.0, 1.0, sampleOffset);
 		sampleOffset *= buffer.size();

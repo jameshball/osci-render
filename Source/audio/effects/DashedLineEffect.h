@@ -7,12 +7,20 @@ public:
 		return std::make_shared<DashedLineEffect>();
 	}
 
+	void prepareToPlay(float sampleRate) override {
+		buffer.resize((int)std::ceil(sampleRate));
+		bufferIndex = 0;
+		samplesSinceFrameStart = 0;
+	}
+
 	void onFrameStart() override {
 		bufferIndex = 0;
 		samplesSinceFrameStart = 0;
 	}
 
 	osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
+		if (buffer.empty()) return input;
+
 		// if only 2 parameters are provided, this is being used as a 'trace effect'
 		// where the dash count is 1.
 		double dashCount = 1.0;
@@ -26,7 +34,7 @@ public:
 		double dashCoverage = juce::jlimit(0.0f, 1.0f, values[i++].load());
 
 		const double safeFrequency = juce::jmax(1.0, (double)frequency);
-		const int cycleSamples = juce::jlimit(1, MAX_BUFFER, (int)std::ceil(sampleRate / safeFrequency));
+		const int cycleSamples = juce::jlimit(1, (int)buffer.size(), (int)std::ceil(sampleRate / safeFrequency));
 
 		// Fallback for contexts where we don't get explicit frame sync pulses
 		if (samplesSinceFrameStart >= cycleSamples) {
@@ -73,8 +81,7 @@ public:
 	}
 
 private:
-	const static int MAX_BUFFER = 192000;
-	std::vector<osci::Point> buffer = std::vector<osci::Point>(MAX_BUFFER);
+	std::vector<osci::Point> buffer;
 	int bufferIndex = 0;
 	int samplesSinceFrameStart = 0;
 };

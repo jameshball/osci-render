@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 REPO_ROOT = Path(__file__).resolve().parent
+CI_TRIGGER_MARKER = "[trigger-ci:bump-version]"
 
 
 class FatalError(RuntimeError):
@@ -189,6 +190,13 @@ def commit(message: str) -> None:
     run_git(["commit", "-m", message], capture=True)
 
 
+def add_ci_trigger_marker(message: str) -> str:
+    message = message.rstrip()
+    if CI_TRIGGER_MARKER in message:
+        return message
+    return f"{message}\n\n{CI_TRIGGER_MARKER}"
+
+
 def parse_args(argv: Sequence[str]) -> tuple[argparse.Namespace, list[str]]:
     parser = argparse.ArgumentParser(prog="bump_version", add_help=True)
     parser.add_argument(
@@ -260,7 +268,7 @@ def main(argv: Sequence[str]) -> int:
     if not msg:
         msg = f"chore: bump versions (osci-render {osci_old}->{osci_new}, sosci {sosci_old}->{sosci_new})"
 
-    commit(msg)
+    commit(add_ci_trigger_marker(msg))
 
     return 0
 

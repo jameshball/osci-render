@@ -157,10 +157,9 @@ osci::Point FileParser::nextSample(lua_State*& L, LuaVariables& vars) {
     } else if (img != nullptr) {
         return img->getSample();
     } else if (wav != nullptr) {
-        juce::AudioBuffer<float> pointBuffer(3, 1);
-        pointBuffer.clear();
-        wav->processBlock(pointBuffer);
-        auto* data = pointBuffer.getReadPointer(0);
+        wavPointBuffer.clear();
+        wav->processBlock(wavPointBuffer);
+        auto* data = wavPointBuffer.getReadPointer(0);
 		return osci::Point(data[0], data[1], data[2]);
     }
 

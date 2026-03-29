@@ -9,8 +9,15 @@ public:
         return std::make_shared<MultiplexEffect>();
     }
 
+    void prepareToPlay(float sampleRate) override {
+        buffer.resize((int)sampleRate);
+        head = 0;
+    }
+
     osci::Point apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) override {
         jassert(values.size() == 5);
+
+        if (buffer.empty()) return input;
 
         double gridX = values[0].load();
         double gridY = values[1].load();
@@ -102,7 +109,6 @@ private:
     }
 
     double phase = 0.0; // Normalised 0..1 phase for multiplex traversal
-    const static int MAX_DELAY = 192000 * 10;
-    std::vector<osci::Point> buffer = std::vector<osci::Point>(MAX_DELAY);
+    std::vector<osci::Point> buffer;
     int head = 0;
 };
