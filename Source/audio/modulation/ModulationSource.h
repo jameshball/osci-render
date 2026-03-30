@@ -23,11 +23,20 @@ public:
     void removeAssignment(int sourceIndex, const juce::String& paramId) { assignments.remove(sourceIndex, paramId); }
     std::vector<ModAssignment> getAssignments() const { return assignments.getAll(); }
 
+    // Allocation-free version for the audio thread. Reuses a pre-grown buffer.
+    const std::vector<ModAssignment>& getAssignmentsAudioThread() {
+        assignments.copyInto(cachedAssignments);
+        return cachedAssignments;
+    }
+
     template<typename Pred>
     void removeAssignmentsIf(Pred pred) { assignments.removeIf(pred); }
 
     // === Block buffers (filled by type-specific code each processBlock) ===
     virtual const std::vector<float>* getBlockBuffers() const = 0;
+
+    // === Prepare for playback (pre-allocate block buffers) ===
+    virtual void prepareToPlay(double /*sampleRate*/, int /*samplesPerBlock*/) {}
 
     // === UI snapshot ===
     virtual float getCurrentValue(int sourceIndex) const = 0;
@@ -52,4 +61,14 @@ protected:
     std::vector<osci::FloatParameter*> floatParameters;
     std::vector<osci::IntParameter*>   intParameters;
     ColourFn colourFunction = nullptr;
+
+private:
+    // Pre-allocated to avoid audio-thread heap allocation when assignments grow.
+    // 32 is a generous upper bound for typical usage.
+    static constexpr int kMaxExpectedAssignments = 32;
+    std::vector<ModAssignment> cachedAssignments = [] {
+        std::vector<ModAssignment> v;
+        v.reserve(kMaxExpectedAssignments);
+        return v;
+    }();
 };

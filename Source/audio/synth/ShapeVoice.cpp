@@ -1,6 +1,7 @@
 #include "ShapeVoice.h"
 #include "../../PluginProcessor.h"
 #include "../../parser/FileParser.h"
+#include "../AudioThreadGuard.h"
 
 ShapeVoice::ShapeVoice(OscirenderAudioProcessor& p, juce::AudioSampleBuffer& externalAudio, int voiceIndex)
     : audioProcessor(p), voiceIndex(voiceIndex), externalAudio(externalAudio) {
@@ -153,6 +154,7 @@ void ShapeVoice::updateSound(juce::SynthesiserSound* sound) {
 
 void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int startSample, int numSamples) {
     juce::ScopedNoDenormals noDenormals;
+    AudioThreadGuard::ScopedAudioThread audioThreadGuard;
 
     // Early exit if voice is not active - this shouldn't normally be called for inactive voices
     // but we check just in case to avoid unnecessary processing

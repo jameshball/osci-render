@@ -48,6 +48,15 @@ public:
     int getSourceCount() const override { return NUM_SIDECHAINS; }
     const std::vector<float>* getBlockBuffers() const override { return blockBuffer.data(); }
 
+    void prepareToPlay(double /*sampleRate*/, int samplesPerBlock) override {
+        for (int sc = 0; sc < NUM_SIDECHAINS; ++sc)
+            blockBuffer[sc].resize(samplesPerBlock);
+        {
+            juce::SpinLock::ScopedLockType lock(curveLock);
+            cachedFullCurve = fullCurve;
+        }
+    }
+
     // === Parameter getters ===
 
     float getAttack(int /*scIndex*/) const {
@@ -104,10 +113,9 @@ public:
         float attackVal = attack ? attack->getValueUnnormalised() : 0.3f;
         float releaseVal = release ? release->getValueUnnormalised() : 0.3f;
 
-        std::vector<GraphNode> curve;
         {
             juce::SpinLock::ScopedLockType lock(curveLock);
-            curve = fullCurve;
+            cachedFullCurve = fullCurve; // no alloc if capacity >= size
         }
 
         for (int sc = 0; sc < NUM_SIDECHAINS; ++sc) {
@@ -117,7 +125,7 @@ public:
             audioStates[sc].advanceBlock(
                 blockBuffer[sc].data(), rectifiedIn, numSamples,
                 attackVal, releaseVal, (float)sampleRate,
-                curve);
+                cachedFullCurve);
 
             currentValues[sc].store(blockBuffer[sc][numSamples - 1], std::memory_order_relaxed);
             inputLevels[sc].store(sidechain::linearToDb(audioStates[sc].smoothedLevel), std::memory_order_relaxed);
@@ -200,6 +208,9 @@ public:
     }
 
 private:
+    // Pre-allocated copy of fullCurve for the audio thread (avoids per-block allocation)
+    std::vector<GraphNode> cachedFullCurve;
+
     // Rebuild fullCurve from transferCurve. Call while holding curveLock.
     void rebuildFullCurve() {
         fullCurve.clear();

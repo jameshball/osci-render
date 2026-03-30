@@ -8,6 +8,7 @@
 
 #include "PluginProcessor.h"
 
+#include "audio/AudioThreadGuard.h"
 #include "PluginEditor.h"
 #include "components/modulation/LfoComponent.h"
 #include "components/modulation/EnvelopeComponent.h"
@@ -403,6 +404,8 @@ void OscirenderAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
     defaultEnvelopeState.smoothedLevel = 0.0f;
     synth.setCurrentPlaybackSampleRate(sampleRate);
     retriggerMidi = true;
+
+    modulationEngine.prepareToPlay(sampleRate, samplesPerBlock);
     
     // Update sample rate for all effects so they have correct timing
     {
@@ -744,6 +747,7 @@ void OscirenderAudioProcessor::applyToggleableEffectsToBuffer(
 
 void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
     juce::ScopedNoDenormals noDenormals;
+    AudioThreadGuard::ScopedAudioThread audioThreadGuard;
 
     if (isOfflineRenderActive()) {
         midiMessages.clear();

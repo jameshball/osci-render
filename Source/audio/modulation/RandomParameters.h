@@ -61,6 +61,11 @@ public:
     int getSourceCount() const override { return NUM_RANDOM_SOURCES; }
     const std::vector<float>* getBlockBuffers() const override { return blockBuffer.data(); }
 
+    void prepareToPlay(double /*sampleRate*/, int samplesPerBlock) override {
+        for (int r = 0; r < NUM_RANDOM_SOURCES; ++r)
+            blockBuffer[r].resize(samplesPerBlock);
+    }
+
     // === Parameter getters ===
 
     RandomStyle getStyle(int i) const {

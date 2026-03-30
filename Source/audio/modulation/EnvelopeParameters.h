@@ -139,6 +139,11 @@ public:
     int getSourceCount() const override { return NUM_ENVELOPES; }
     const std::vector<float>* getBlockBuffers() const override { return blockBuffer.data(); }
 
+    void prepareToPlay(double /*sampleRate*/, int samplesPerBlock) override {
+        for (int e = 0; e < NUM_ENVELOPES; ++e)
+            blockBuffer[e].resize(samplesPerBlock);
+    }
+
     // === UI snapshot access ===
 
     float getCurrentValue(int envIndex) const override {

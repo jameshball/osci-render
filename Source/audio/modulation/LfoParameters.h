@@ -77,6 +77,11 @@ public:
     int getSourceCount() const override { return NUM_LFOS; }
     const std::vector<float>* getBlockBuffers() const override { return blockBuffer.data(); }
 
+    void prepareToPlay(double /*sampleRate*/, int samplesPerBlock) override {
+        for (int l = 0; l < NUM_LFOS; ++l)
+            blockBuffer[l].resize(samplesPerBlock);
+    }
+
     // === Waveform access ===
 
     void waveformChanged(int index, const LfoWaveform& waveform) {

@@ -39,6 +39,12 @@ struct ModulationAssignmentStore {
         return items;
     }
 
+    // Copy into a pre-allocated vector (no allocation if dest.capacity() >= items.size())
+    void copyInto(std::vector<AssignmentType>& dest) const {
+        juce::SpinLock::ScopedLockType scopedLock(lock);
+        dest = items;
+    }
+
     // Remove all assignments matching a predicate
     template<typename Pred>
     void removeIf(Pred pred) {

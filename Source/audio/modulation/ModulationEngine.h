@@ -29,11 +29,17 @@ public:
     // (first registered is applied first).
     void addSource(ModulationSource* source) { sources.push_back(source); }
 
+    // Pre-allocate block buffers in each source for the given block size.
+    void prepareToPlay(double sampleRate, int samplesPerBlock) {
+        for (auto* source : sources)
+            source->prepareToPlay(sampleRate, samplesPerBlock);
+    }
+
     // Apply all sources' block buffers to animated values.
     // Call once per processBlock, AFTER all type-specific buffer-fill methods.
     void applyAllModulation(int numSamples) {
         for (auto* source : sources) {
-            auto assnCopy = source->getAssignments();
+            const auto& assnCopy = source->getAssignmentsAudioThread();
             if (assnCopy.empty()) continue;
 
             auto* buffers = source->getBlockBuffers();

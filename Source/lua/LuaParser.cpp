@@ -23,7 +23,11 @@ void LuaParser::setMaximumInstructions(lua_State*& L, int count) {
     lua_sethook(L, LuaParser::maximumInstructionsReached, LUA_MASKCOUNT, count);
 }
 
-LuaParser::LuaParser(juce::String fileName, juce::String script, std::function<void(int, juce::String, juce::String)> errorCallback, juce::String fallbackScript) : script(script), fallbackScript(fallbackScript), errorCallback(errorCallback), fileName(fileName) {}
+LuaParser::LuaParser(juce::String fileName, juce::String script, std::function<void(int, juce::String, juce::String)> errorCallback, juce::String fallbackScript) : script(script), fallbackScript(fallbackScript), errorCallback(errorCallback), fileName(fileName) {
+    // Pre-allocate to avoid audio-thread heap allocation when voices first call run().
+    // 32 covers 16 ShapeVoice + 16 CustomEffect lua_State pointers.
+    seenStates.reserve(32);
+}
 
 void LuaParser::reset(lua_State*& L, juce::String script) {
     functionRef = -1;

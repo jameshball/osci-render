@@ -114,6 +114,10 @@
             file="Source/CommonPluginProcessor.h"/>
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
         <FILE id="UVcqLN" name="AudioRecorder.h" compile="0" resource="0" file="Source/audio/AudioRecorder.h"/>
+        <FILE id="ATGrd3" name="AudioThreadGuard.h" compile="0" resource="0"
+              file="Source/audio/AudioThreadGuard.h"/>
+        <FILE id="ATGrd4" name="AudioThreadGuard.cpp" compile="1" resource="0"
+              file="Source/audio/AudioThreadGuard.cpp"/>
         <GROUP id="{AUD_EFFECTS}" name="effects">
           <FILE id="GSnwBW" name="SmoothEffect.h" compile="0" resource="0" file="Source/audio/effects/SmoothEffect.h"/>
           <FILE id="jq3EXV" name="StereoEffect.h" compile="0" resource="0" file="Source/audio/effects/StereoEffect.h"/>

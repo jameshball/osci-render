@@ -1,4 +1,5 @@
 #include "SosciPluginProcessor.h"
+#include "audio/AudioThreadGuard.h"
 #include "SosciPluginEditor.h"
 
 SosciAudioProcessor::SosciAudioProcessor() : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(5), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
@@ -15,6 +16,7 @@ SosciAudioProcessor::~SosciAudioProcessor() {}
 
 void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
     juce::ScopedNoDenormals noDenormals;
+    AudioThreadGuard::ScopedAudioThread audioThreadGuard;
 
     if (isOfflineRenderActive()) {
         midiMessages.clear();

@@ -189,7 +189,8 @@ build_pluginval() {
     local PLUGINVAL_SRC="$ROOT/modules/pluginval"
     local CMAKELISTS="$PLUGINVAL_SRC/CMakeLists.txt"
 
-    echo "==> Building pluginval with $SAN_LABEL..."
+    echo "==> Building pluginval (without sanitizer instrumentation)..."
+    echo "    (pluginval is the test harness; only the plugin VST3 needs sanitizer flags)"
     echo "    (rtcheck disabled — its interceptors conflict with sanitizer runtimes)"
 
     # Temporarily disable rtcheck: its system-call interceptors (stat, malloc, etc.)
@@ -202,12 +203,16 @@ build_pluginval() {
     fi
 
     cd "$PLUGINVAL_SRC"
+    # Don't instrument pluginval itself — Apple Clang can crash (segfault) when
+    # compiling large JUCE ObjC++ files with sanitizer flags.  The sanitizer
+    # runtime is injected at launch via DYLD_INSERT_LIBRARIES, so it still
+    # monitors the instrumented plugin code loaded by pluginval.
     cmake -B Builds \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
           -DPLUGINVAL_VST3_VALIDATOR=OFF \
           -Dpluginval_IS_TOP_LEVEL=ON \
-          -DWITH_THREAD_SANITIZER=$([[ "$SANITIZER" == "tsan" ]] && echo ON || echo OFF) \
-          -DWITH_ADDRESS_SANITIZER=$([[ "$SANITIZER" == "asan" ]] && echo ON || echo OFF) \
+          -DWITH_THREAD_SANITIZER=OFF \
+          -DWITH_ADDRESS_SANITIZER=OFF \
           .
     cmake --build Builds --config RelWithDebInfo --parallel
     cd "$ROOT"
