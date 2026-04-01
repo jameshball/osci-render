@@ -279,8 +279,9 @@
                 file="Source/audio/modulation/ModulationTypes.h"/>
         </GROUP>
         <GROUP id="{AUD_SYNTHESIS}" name="synth">
-          <FILE id="t5g8pf" name="PublicSynthesiser.h" compile="0" resource="0"
-                file="Source/audio/synth/PublicSynthesiser.h"/>
+          <FILE id="VmHd01" name="VoiceManager.h" compile="0" resource="0" file="Source/audio/synth/VoiceManager.h"/>
+          <FILE id="VmCp01" name="VoiceManager.cpp" compile="1" resource="0"
+                file="Source/audio/synth/VoiceManager.cpp"/>
           <FILE id="dBaZAV" name="ShapeSound.cpp" compile="1" resource="0" file="Source/audio/synth/ShapeSound.cpp"/>
           <FILE id="VKBirB" name="ShapeSound.h" compile="0" resource="0" file="Source/audio/synth/ShapeSound.h"/>
           <FILE id="UcPZ09" name="ShapeVoice.cpp" compile="1" resource="0" file="Source/audio/synth/ShapeVoice.cpp"/>

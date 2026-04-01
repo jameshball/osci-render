@@ -6,9 +6,9 @@ LfoWaveform createLfoPreset(LfoPreset preset) {
         case LfoPreset::Sine: {
             waveform.smooth = true;
             waveform.nodes = {
-                { 0.0,  1.0,  0.0f },
-                { 0.5,  0.0,  0.0f },
-                { 1.0,  1.0,  0.0f },
+                { 0.0,  0.0,  0.0f },
+                { 0.5,  1.0,  0.0f },
+                { 1.0,  0.0,  0.0f },
             };
             break;
         }

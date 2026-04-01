@@ -19,6 +19,10 @@
           <FILE id="LfStH2" name="LfoState.h" compile="0" resource="0" file="Source/audio/modulation/LfoState.h"/>
           <FILE id="LfStC2" name="LfoState.cpp" compile="1" resource="0" file="Source/audio/modulation/LfoState.cpp"/>
         </GROUP>
+        <GROUP id="{E3F4A5B6-C7D8-9012-ABCD-EF3456789012}" name="synth">
+          <FILE id="VmH3" name="VoiceManager.h" compile="0" resource="0" file="Source/audio/synth/VoiceManager.h"/>
+          <FILE id="VmC3" name="VoiceManager.cpp" compile="1" resource="0" file="Source/audio/synth/VoiceManager.cpp"/>
+        </GROUP>
       </GROUP>
       <GROUP id="{B2C3D4E5-F6A7-8901-BCDE-F12345678901}" name="lua">
         <FILE id="LuaPCp" name="LuaParser.cpp" compile="1" resource="0" file="Source/lua/LuaParser.cpp"/>
@@ -49,6 +53,8 @@
             file="tests/LuaOverheadBenchmarkTests.cpp"/>
       <FILE id="LuBn5" name="LuaBeforeAfterBenchmarkTest.cpp" compile="1"
             resource="0" file="tests/LuaBeforeAfterBenchmarkTest.cpp"/>
+      <FILE id="VmT1" name="VoiceManagerTest.cpp" compile="1" resource="0"
+            file="tests/VoiceManagerTest.cpp"/>
     </GROUP>
   </MAINGROUP>
   <MODULES>

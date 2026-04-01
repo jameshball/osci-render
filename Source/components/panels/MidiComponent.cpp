@@ -21,7 +21,7 @@ MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 
     // Velocity: show as percentage
     velTrkKnob.getKnob().setTextValueSuffix("%");
-    velTrkKnob.getKnob().textFromValueFunction = [](double v) { return juce::String(v * 100.0, 0); };
+    velTrkKnob.getKnob().textFromValueFunction = [](double v) { return juce::String(v * 100.0, 1); };
     velTrkKnob.getKnob().valueFromTextFunction = [](const juce::String& s) { return s.getDoubleValue() / 100.0; };
 
     // Glide: show as seconds
