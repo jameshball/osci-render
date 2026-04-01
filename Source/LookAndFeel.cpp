@@ -15,6 +15,11 @@ OscirenderLookAndFeel::OscirenderLookAndFeel() {
     juce::LookAndFeel::setDefaultLookAndFeel(this);
 }
 
+OscirenderLookAndFeel& OscirenderLookAndFeel::getSharedInstance() {
+    static OscirenderLookAndFeel instance;
+    return instance;
+}
+
 void OscirenderLookAndFeel::applyOscirenderColours(juce::LookAndFeel& lookAndFeel) {
     // slider
     lookAndFeel.setColour(juce::Slider::thumbColourId, Colours::veryDark());
@@ -44,8 +49,9 @@ void OscirenderLookAndFeel::applyOscirenderColours(juce::LookAndFeel& lookAndFee
     lookAndFeel.setColour(juce::TooltipWindow::backgroundColourId, Colours::darker().darker(0.5f));
     lookAndFeel.setColour(juce::TooltipWindow::outlineColourId, Colours::darker());
     lookAndFeel.setColour(juce::TextButton::buttonOnColourId, Colours::darker());
-    lookAndFeel.setColour(juce::AlertWindow::outlineColourId, Colours::darker());
-    lookAndFeel.setColour(juce::AlertWindow::backgroundColourId, Colours::darker());
+    lookAndFeel.setColour(juce::AlertWindow::outlineColourId, Colours::grey().withAlpha(0.5f));
+    lookAndFeel.setColour(juce::AlertWindow::backgroundColourId, Colours::darkerer());
+    lookAndFeel.setColour(juce::AlertWindow::textColourId, Dracula::foreground);
     lookAndFeel.setColour(juce::ColourSelector::backgroundColourId, Colours::darker());
 
     // combo box
@@ -609,6 +615,86 @@ juce::Typeface::Ptr OscirenderLookAndFeel::getTypefaceForFont(const juce::Font& 
     }
 
     return juce::Font::getDefaultTypefaceForFont(font);
+}
+
+void OscirenderLookAndFeel::drawAlertBox(juce::Graphics& g, juce::AlertWindow& alert,
+                                          const juce::Rectangle<int>& textArea, juce::TextLayout& textLayout) {
+    auto cornerSize = static_cast<float>(RECT_RADIUS);
+    auto bounds = alert.getLocalBounds().toFloat();
+
+    // Fill background
+    g.setColour(alert.findColour(juce::AlertWindow::backgroundColourId));
+    g.fillRoundedRectangle(bounds, cornerSize);
+
+    // Subtle border
+    g.setColour(alert.findColour(juce::AlertWindow::outlineColourId));
+    g.drawRoundedRectangle(bounds.reduced(0.5f), cornerSize, 1.0f);
+
+    auto iconSpaceUsed = 0;
+    auto iconWidth = 80;
+    auto iconSize = juce::jmin(iconWidth + 50, alert.getHeight() + 20);
+
+    if (alert.containsAnyExtraComponents() || alert.getNumButtons() > 2)
+        iconSize = juce::jmin(iconSize, textArea.getHeight() + 50);
+
+    juce::Rectangle<int> iconRect(iconSize / -10, iconSize / -10, iconSize, iconSize);
+
+    if (alert.getAlertType() != juce::AlertWindow::NoIcon) {
+        juce::Path icon;
+        char character;
+        juce::Colour iconColour;
+
+        if (alert.getAlertType() == juce::AlertWindow::WarningIcon) {
+            character = '!';
+
+            icon.addTriangle(
+                (float)iconRect.getX() + (float)iconRect.getWidth() * 0.5f, (float)iconRect.getY(),
+                static_cast<float>(iconRect.getRight()), static_cast<float>(iconRect.getBottom()),
+                static_cast<float>(iconRect.getX()), static_cast<float>(iconRect.getBottom()));
+
+            icon = icon.createPathWithRoundedCorners(5.0f);
+            iconColour = Dracula::red.withAlpha(0.5f);
+        } else {
+            iconColour = Colours::accentColor().withAlpha(0.4f);
+            character = alert.getAlertType() == juce::AlertWindow::InfoIcon ? 'i' : '?';
+            icon.addEllipse(iconRect.toFloat());
+        }
+
+        juce::GlyphArrangement ga;
+        ga.addFittedText(juce::Font((float)iconRect.getHeight() * 0.9f, juce::Font::bold),
+                         juce::String::charToString((juce::juce_wchar)(juce::uint8)character),
+                         static_cast<float>(iconRect.getX()), static_cast<float>(iconRect.getY()),
+                         static_cast<float>(iconRect.getWidth()), static_cast<float>(iconRect.getHeight()),
+                         juce::Justification::centred, false);
+        ga.createPath(icon);
+
+        icon.setUsingNonZeroWinding(false);
+        g.setColour(iconColour);
+        g.fillPath(icon);
+
+        iconSpaceUsed = iconWidth;
+    }
+
+    g.setColour(alert.findColour(juce::AlertWindow::textColourId));
+
+    juce::Rectangle<int> alertBounds(alert.getLocalBounds().getX() + iconSpaceUsed, 30,
+                                      alert.getLocalBounds().getWidth(), alert.getLocalBounds().getHeight() - getAlertWindowButtonHeight() - 20);
+
+    textLayout.draw(g, alertBounds.toFloat());
+}
+
+int OscirenderLookAndFeel::getAlertWindowButtonHeight() { return 40; }
+
+juce::Font OscirenderLookAndFeel::getAlertWindowTitleFont() {
+    return juce::Font(boldTypeface).withHeight(18.0f);
+}
+
+juce::Font OscirenderLookAndFeel::getAlertWindowMessageFont() {
+    return juce::Font(regularTypeface).withHeight(15.0f);
+}
+
+juce::Font OscirenderLookAndFeel::getAlertWindowFont() {
+    return juce::Font(regularTypeface).withHeight(14.0f);
 }
 
 void OscirenderLookAndFeel::drawStretchableLayoutResizerBar(juce::Graphics& g, int w, int h, bool isVerticalBar, bool isMouseOver, bool isMouseDragging) {
