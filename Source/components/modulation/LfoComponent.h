@@ -152,9 +152,6 @@ private:
     void applyPreset(LfoPreset preset);
     void updatePresetLabel();
     void applyLfoConstraints(int nodeIndex, double& time, double& value);
-    void configureKnob(KnobContainerComponent& container, double maxVal, double skewCentre,
-                        double defaultVal, const juce::String& suffix,
-                        std::function<void(float)> onChange);
     void showPaintShapeMenu();
     void showPresetBrowser();
     void dismissPresetBrowser();

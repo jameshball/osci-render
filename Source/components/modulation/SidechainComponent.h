@@ -60,9 +60,6 @@ private:
     void syncGraphFromProcessor();
     void syncGraphColours();
     void syncProcessorFromGraph();
-    void configureKnob(KnobContainerComponent& container, double maxVal, double skewCentre,
-                       double defaultVal, const juce::String& suffix,
-                       std::function<void(float)> onChange);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SidechainComponent)
 };

@@ -19,6 +19,10 @@ MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
     velTrkKnob.bindToParam(audioProcessor.velocityTracking);
     glideKnob.bindToParam(audioProcessor.glideTime, 1.0);
 
+    // Wire modulation for knobs
+    velTrkKnob.wireModulation(audioProcessor);
+    glideKnob.wireModulation(audioProcessor);
+
     // Velocity: show as percentage
     velTrkKnob.getKnob().setTextValueSuffix("%");
     velTrkKnob.getKnob().textFromValueFunction = [](double v) { return juce::String(v * 100.0, 1); };

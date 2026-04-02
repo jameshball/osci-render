@@ -3,6 +3,7 @@
 
 #include "../LabelledTextBox.h"
 #include "../SvgButton.h"
+#include "../ModulationState.h"
 
 #ifndef SOSCI
 class OscirenderAudioProcessor;
@@ -16,17 +17,12 @@ public:
     EffectComponent(osci::Effect& effect);
     ~EffectComponent();
 
-    // Global flag: when true, all EffectComponents draw a highlight border
-    // to indicate they are valid modulation drop targets.
-    static std::atomic<bool> modAnyDragActive;
-
-    // When non-empty, the EffectComponent with this paramId draws a hover highlight.
-    static juce::String highlightedParamId;
-
-    // Modulation range highlight: when hovering a depth indicator, show the modulated range on the slider
-    static juce::String modRangeParamId;
-    static std::atomic<float> modRangeDepth;
-    static std::atomic<bool> modRangeBipolar;
+    // Backwards-compatible aliases — these now delegate to ModulationState.
+    static inline std::atomic<bool>& modAnyDragActive = ModulationState::anyDragActive;
+    static inline juce::String&      highlightedParamId = ModulationState::highlightedParamId;
+    static inline juce::String&      modRangeParamId = ModulationState::rangeParamId;
+    static inline std::atomic<float>& modRangeDepth = ModulationState::rangeDepth;
+    static inline std::atomic<bool>&  modRangeBipolar = ModulationState::rangeBipolar;
 
     void resized() override;
     void paint(juce::Graphics& g) override;

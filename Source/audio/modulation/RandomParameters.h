@@ -102,7 +102,7 @@ public:
         return currentValues[i].load(std::memory_order_relaxed);
     }
 
-    bool isActive(int i) const {
+    bool isActive(int i) const override {
         if (i < 0 || i >= NUM_RANDOM_SOURCES) return false;
         return active[i].load(std::memory_order_relaxed);
     }

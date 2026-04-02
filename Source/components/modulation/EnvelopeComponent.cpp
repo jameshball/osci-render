@@ -98,6 +98,7 @@ static ModulationSourceConfig buildEnvConfig(OscirenderAudioProcessor& proc) {
     cfg.sourceCount = beginner ? 1 : NUM_ENVELOPES;
     cfg.getSourceColour = &EnvelopeComponent::getEnvColour;
     cfg.getCurrentValue = [&proc](int i) { return proc.envelopeParameters.getCurrentValue(i); };
+    cfg.isSourceActive = [&proc](int i) { return proc.envelopeParameters.isActive(i); };
     cfg.getLabel = [](int i) { return "ENV " + juce::String(i + 1); };
 
     if (!beginner) {
@@ -142,6 +143,7 @@ void EnvelopeComponent::setupDahdsrConstraints() {
     graph.setWheelMode(NodeGraphComponent::WheelMode::DomainZoom);
     graph.setDomainZoomLimits(osci_audio::kEnvelopeZoomMinSeconds,
                               osci_audio::kEnvelopeZoomMaxSeconds);
+    graph.setDomainRange(0.0, 1.3);
     graph.setSnapDivisions(0);
     graph.setGridStyle(NodeGraphComponent::GridStyle::LogarithmicTime);
     graph.setSnapStyle(NodeGraphComponent::SnapStyle::LogarithmicTime);

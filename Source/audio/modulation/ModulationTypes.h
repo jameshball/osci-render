@@ -33,6 +33,7 @@ struct ModulationSourceBinding {
     std::function<std::vector<ModAssignment>()>      getAssignments;
     std::function<float(int)>                        getCurrentValue;
     std::function<juce::Colour(int)>                 getColour;
+    std::function<bool(int)>                         isActive;
 };
 
 // Drag-and-drop protocol helpers.

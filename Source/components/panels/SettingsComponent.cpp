@@ -13,7 +13,7 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     keyboard(p.keyboardState, juce::CustomMidiKeyboardComponent::horizontalKeyboard) {
     addAndMakeVisible(effects);
     addAndMakeVisible(fileControls);
-    addAndMakeVisible(perspective);
+    addAndMakeVisible(quickControls);
     addAndMakeVisible(mainResizerBar);
     if (!beginnerMode) {
         addAndMakeVisible(midiResizerBar);
@@ -158,6 +158,7 @@ void SettingsComponent::resized() {
 
 void SettingsComponent::layoutChildren() {
     auto padding = 7;
+    static constexpr int kGap = 3; // small gap between stacked panels
 
     auto area = getLocalBounds();
     area.removeFromLeft(5);
@@ -175,7 +176,7 @@ void SettingsComponent::layoutChildren() {
     auto layoutVisColumn = [&](juce::Rectangle<int> visBounds) {
         auto row = visBounds.removeFromTop(30);
         fileControls.setBounds(row.removeFromLeft(visBounds.getWidth()));
-        visBounds.removeFromTop(padding);
+        visBounds.removeFromTop(kGap);
 
         volumeVisualiserBounds = visBounds;
         visBounds.reduce(5, 5);
@@ -208,17 +209,18 @@ void SettingsComponent::layoutChildren() {
         }
 
         if (examplesVisible) {
-            perspective.setVisible(false);
+            quickControls.setVisible(false);
             effects.setVisible(false);
             frame.setVisible(false);
             examples.setVisible(true);
             examples.setBounds(effectsBounds);
         } else {
             examples.setVisible(false);
-            perspective.setVisible(true);
+            quickControls.setVisible(true);
             effects.setVisible(true);
-            perspective.setBounds(effectsBounds.removeFromBottom(120));
-            effectsBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
+            static constexpr int quickControlsHeight = 60;
+            quickControls.setBounds(effectsBounds.removeFromBottom(quickControlsHeight));
+            effectsBounds.removeFromBottom(kGap);
             effects.setBounds(effectsBounds);
         }
     };
@@ -230,11 +232,6 @@ void SettingsComponent::layoutChildren() {
         // ============================================================
         juce::Component* columns[] = { &layoutVisColumnProxy, &mainResizerBar, &layoutEffectsColumnProxy };
         mainLayout.layOutComponents(columns, 3, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
-
-        if (audioProcessor.midiEnabled->getBoolValue()) {
-            int resizerBottom = area.getBottom() - keyboardHeight - padding;
-            mainResizerBar.setBounds(mainResizerBar.getBounds().withBottom(resizerBottom));
-        }
 
         auto effectsBounds = layoutEffectsColumnProxy.getBounds();
 
@@ -252,7 +249,7 @@ void SettingsComponent::layoutChildren() {
                 keyboardHeight);
             keyboardViewport.setBounds(keyboardPanelBounds);
             keyboardViewport.setVisible(true);
-            effectsBounds.removeFromBottom(keyboardHeight + padding);
+            effectsBounds.removeFromBottom(keyboardHeight + kGap);
 
             envelope.setBounds(effectsBounds.removeFromBottom(envelopeHeight));
             envelope.setVisible(true);
@@ -275,7 +272,7 @@ void SettingsComponent::layoutChildren() {
         }
 
         midi.setBounds(effectsBounds.removeFromBottom(midiGroupHeight));
-        effectsBounds.removeFromTop(3);
+        effectsBounds.removeFromBottom(kGap);
 
         layoutVisColumn(layoutVisColumnProxy.getBounds());
         layoutEffectsColumn(effectsBounds);
@@ -294,7 +291,6 @@ void SettingsComponent::layoutChildren() {
 
         if (midiOn) {
             int resizerBottom = area.getBottom() - keyboardHeight - padding;
-            mainResizerBar.setBounds(mainResizerBar.getBounds().withBottom(resizerBottom));
             midiResizerBar.setBounds(midiResizerBar.getBounds().withBottom(resizerBottom));
         }
 
@@ -321,8 +317,8 @@ void SettingsComponent::layoutChildren() {
             keyboard.setBounds(0, 0, keyboardContentWidth, viewportBounds.getHeight());
 
             // Trim columns to exclude keyboard
-            effectsBounds.removeFromBottom(keyboardHeight + padding);
-            rightBounds.removeFromBottom(keyboardHeight + padding);
+            effectsBounds.removeFromBottom(keyboardHeight + kGap);
+            rightBounds.removeFromBottom(keyboardHeight + kGap);
         }
 
         keyboardViewport.setVisible(midiOn);
@@ -330,10 +326,10 @@ void SettingsComponent::layoutChildren() {
         layoutVisColumn(layoutVisColumnProxy.getBounds());
         layoutEffectsColumn(effectsBounds);
 
-        // --- Right column: MIDI settings (compact), envelope, LFO, random + sidechain ---
+        // --- Right column: MIDI settings (compact), LFO, envelope, random + sidechain ---
         static constexpr int midiGroupHeight = 60;
         midi.setBounds(rightBounds.removeFromTop(midiGroupHeight));
-        rightBounds.removeFromTop(3);
+        rightBounds.removeFromTop(kGap);
 
         lfo->setMidiEnabled(midiOn);
 
@@ -341,17 +337,17 @@ void SettingsComponent::layoutChildren() {
 
         int bottomPct = midiOn ? 20 : 30;
         auto bottomRow = rightBounds.removeFromBottom(juce::jmax(130, modAreaHeight * bottomPct / 100));
-        rightBounds.removeFromBottom(3);
+        rightBounds.removeFromBottom(kGap);
 
         // Split bottom row: random (wider, left) | gap | sidechain (narrower, right)
-        int scW = (bottomRow.getWidth() - 3) * (2.0 / 5.0);
+        int scW = (bottomRow.getWidth() - kGap) * (2.0 / 5.0);
         auto sidechainArea = bottomRow.removeFromRight(scW);
-        bottomRow.removeFromRight(3);
+        bottomRow.removeFromRight(kGap);
         auto randomArea = bottomRow;
 
         if (midiOn) {
             auto envelopeArea = rightBounds.removeFromBottom(modAreaHeight * 25 / 100);
-            rightBounds.removeFromBottom(3);
+            rightBounds.removeFromBottom(kGap);
             envelope.setBounds(envelopeArea);
             envelope.setVisible(true);
         } else {

@@ -111,15 +111,17 @@ SidechainComponent::SidechainComponent(OscirenderAudioProcessor& processor)
     addAndMakeVisible(graph);
 
     // Attack knob (0-2 seconds, default 0.3s, skew centre 0.3)
-    configureKnob(attackKnob, 2.0, 0.3, 0.3, " s", [this](float val) {
-        audioProcessor.sidechainParameters.setAttack(0, val);
-    });
+    attackKnob.bindToParam(audioProcessor.sidechainParameters.attack, 0.3, 3);
+    attackKnob.getKnob().setTextValueSuffix(" s");
+    attackKnob.setAccentColour(getSidechainColour(0));
+    attackKnob.wireModulation(audioProcessor);
     addAndMakeVisible(attackKnob);
 
     // Release knob (0-2 seconds, default 0.3s, skew centre 0.3)
-    configureKnob(releaseKnob, 2.0, 0.3, 0.3, " s", [this](float val) {
-        audioProcessor.sidechainParameters.setRelease(0, val);
-    });
+    releaseKnob.bindToParam(audioProcessor.sidechainParameters.release, 0.3, 3);
+    releaseKnob.getKnob().setTextValueSuffix(" s");
+    releaseKnob.setAccentColour(getSidechainColour(0));
+    releaseKnob.wireModulation(audioProcessor);
     addAndMakeVisible(releaseKnob);
 
     // Disable scroll fade overlays — single tab is always fully visible
@@ -271,24 +273,6 @@ void SidechainComponent::syncProcessorFromGraph() {
         std::vector<GraphNode> curveNodes(allNodes.begin() + 1, allNodes.end() - 1);
         audioProcessor.sidechainParameters.setTransferCurve(0, curveNodes);
     }
-}
-
-void SidechainComponent::configureKnob(KnobContainerComponent& container, double maxVal, double skewCentre,
-                                        double defaultVal, const juce::String& suffix,
-                                        std::function<void(float)> onChange) {
-    auto& knob = container.getKnob();
-    juce::NormalisableRange<double> range(0.0, maxVal);
-    range.setSkewForCentre(skewCentre);
-    knob.setNormalisableRange(range);
-    knob.setDoubleClickReturnValue(true, defaultVal);
-    knob.setTextValueSuffix(suffix);
-    knob.setNumDecimalPlacesToDisplay(3);
-    auto colour = getSidechainColour(0);
-    knob.setAccentColour(colour);
-    knob.onValueChange = [&knob, cb = std::move(onChange)]() {
-        cb((float)knob.getValue());
-    };
-    container.setAccentColour(colour);
 }
 
 void SidechainComponent::syncFromProcessorState() {

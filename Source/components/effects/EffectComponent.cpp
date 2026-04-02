@@ -7,12 +7,6 @@
 #include "../../audio/modulation/ModulationTypes.h"
 #endif
 
-std::atomic<bool> EffectComponent::modAnyDragActive{false};
-juce::String EffectComponent::highlightedParamId;
-juce::String EffectComponent::modRangeParamId;
-std::atomic<float> EffectComponent::modRangeDepth{0.0f};
-std::atomic<bool> EffectComponent::modRangeBipolar{false};
-
 EffectComponent::EffectComponent(osci::Effect& effect, int index) : effect(effect), index(index) {
     addAndMakeVisible(slider);
     addChildComponent(lfoSlider);
@@ -251,66 +245,46 @@ void EffectComponent::paint(juce::Graphics& g) {
 }
 
 void EffectComponent::paintOverChildren(juce::Graphics& g) {
-    if (modDropHighlight) {
-        auto bounds = getLocalBounds().toFloat().reduced(1.0f);
-        g.setColour(juce::Colour(0xFF00FF00).withAlpha(0.18f));
-        g.fillRoundedRectangle(bounds, 4.0f);
-        g.setColour(juce::Colour(0xFF00FF00).withAlpha(0.8f));
-        g.drawRoundedRectangle(bounds, 4.0f, 2.0f);
-    } else if (modAnyDragActive.load(std::memory_order_relaxed)) {
-        auto bounds = getLocalBounds().toFloat().reduced(1.0f);
-        g.setColour(juce::Colour(0xFF00FF00).withAlpha(0.06f));
-        g.fillRoundedRectangle(bounds, 4.0f);
-        g.setColour(juce::Colour(0xFF00FF00).withAlpha(0.25f));
-        g.drawRoundedRectangle(bounds, 4.0f, 1.0f);
-    } else if (highlightedParamId.isNotEmpty() && effect.parameters[index]->paramID == highlightedParamId) {
+    juce::String paramId = effect.parameters[index]->paramID;
+    bool drew = ModulationState::paintModHighlight(g, *this, modDropHighlight, paramId);
+
+    // Additional: draw the modulation range on the slider track when highlighted.
+    if (drew && ModulationState::highlightedParamId == paramId
+        && ModulationState::rangeParamId == paramId && ModulationState::rangeDepth.load() > 0.0f) {
         auto colour = juce::Colour(0xFF00FF00);
+        auto currentVal = slider.getValue();
+        auto sliderMin = slider.getMinimum();
+        auto sliderMax = slider.getMaximum();
+        auto range = sliderMax - sliderMin;
 
-        // Draw a highlight border around this component to show it's the modulation target.
-        {
-            auto highlightBounds = getLocalBounds().toFloat().reduced(1.0f);
-            g.setColour(colour.withAlpha(0.18f));
-            g.fillRoundedRectangle(highlightBounds, 4.0f);
-            g.setColour(colour.withAlpha(0.8f));
-            g.drawRoundedRectangle(highlightBounds, 4.0f, 2.0f);
+        double rangeStart, rangeEnd;
+        if (ModulationState::rangeBipolar.load()) {
+            double halfSpan = ModulationState::rangeDepth.load() * range * 0.5;
+            rangeStart = currentVal - halfSpan;
+            rangeEnd = currentVal + halfSpan;
+        } else {
+            rangeStart = currentVal;
+            rangeEnd = currentVal + ModulationState::rangeDepth.load() * range;
         }
 
-        // Draw the modulation range on the slider track.
-        if (modRangeParamId == highlightedParamId && modRangeDepth.load() > 0.0f) {
-            auto currentVal = slider.getValue();
-            auto sliderMin = slider.getMinimum();
-            auto sliderMax = slider.getMaximum();
-            auto range = sliderMax - sliderMin;
+        // Clamp to slider range
+        rangeStart = juce::jlimit(sliderMin, sliderMax, rangeStart);
+        rangeEnd = juce::jlimit(sliderMin, sliderMax, rangeEnd);
 
-            double rangeStart, rangeEnd;
-            if (modRangeBipolar.load()) {
-                double halfSpan = modRangeDepth.load() * range * 0.5;
-                rangeStart = currentVal - halfSpan;
-                rangeEnd = currentVal + halfSpan;
-            } else {
-                rangeStart = currentVal;
-                rangeEnd = currentVal + modRangeDepth.load() * range;
-            }
+        // Convert to pixel positions using slider's coordinate mapping
+        auto startPx = (float)slider.getPositionOfValue(rangeStart);
+        auto endPx = (float)slider.getPositionOfValue(rangeEnd);
 
-            // Clamp to slider range
-            rangeStart = juce::jlimit(sliderMin, sliderMax, rangeStart);
-            rangeEnd = juce::jlimit(sliderMin, sliderMax, rangeEnd);
+        if (startPx > endPx)
+            std::swap(startPx, endPx);
 
-            // Convert to pixel positions using slider's coordinate mapping
-            auto startPx = (float)slider.getPositionOfValue(rangeStart);
-            auto endPx = (float)slider.getPositionOfValue(rangeEnd);
+        // Get slider bounds in our coordinate space
+        auto sliderBounds = slider.getBounds().toFloat();
+        auto trackY = sliderBounds.getCentreY() - 3.0f;
+        auto trackHeight = 6.0f;
 
-            if (startPx > endPx)
-                std::swap(startPx, endPx);
-
-            // Get slider bounds in our coordinate space
-            auto sliderBounds = slider.getBounds().toFloat();
-            auto trackY = sliderBounds.getCentreY() - 3.0f;
-            auto trackHeight = 6.0f;
-
-            g.setColour(colour.withAlpha(0.35f));
-            g.fillRoundedRectangle(startPx + sliderBounds.getX(), trackY, endPx - startPx, trackHeight, 2.0f);
-        }
+        g.setColour(colour.withAlpha(0.35f));
+        g.fillRoundedRectangle(startPx + sliderBounds.getX(), trackY, endPx - startPx, trackHeight, 2.0f);
     }
 }
 
@@ -493,8 +467,7 @@ void EffectComponent::wireModulation(OscirenderAudioProcessor& processor) {
         }
 
         if (modDropHighlight
-            || modAnyDragActive.load(std::memory_order_relaxed)
-            || (highlightedParamId.isNotEmpty() && effect.parameters[index]->paramID == highlightedParamId))
+            || ModulationState::needsHighlightRepaint(false, effect.parameters[index]->paramID))
             repaint();
     });
 }

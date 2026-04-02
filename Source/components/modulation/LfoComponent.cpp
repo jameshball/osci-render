@@ -323,15 +323,17 @@ LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
     addAndMakeVisible(phaseSlider);
 
     // Smooth amount knob (0-16 seconds, default 0.005, skew midpoint 1.0)
-    configureKnob(smoothKnob, 16.0, 1.0, 0.005, " secs", [this](float val) {
-        audioProcessor.lfoParameters.setSmoothAmount(getActiveSourceIndex(), val);
-    });
+    smoothKnob.bindToParam(audioProcessor.lfoParameters.smoothAmount[0], 1.0, 3);
+    smoothKnob.getKnob().setTextValueSuffix(" secs");
+    smoothKnob.setAccentColour(getLfoColour(0));
+    smoothKnob.wireModulation(audioProcessor);
     addAndMakeVisible(smoothKnob);
 
     // Delay knob (0-4 seconds, default 0)
-    configureKnob(delayKnob, 4.0, 0.5, 0.0, " secs", [this](float val) {
-        audioProcessor.lfoParameters.setDelayAmount(getActiveSourceIndex(), val);
-    });
+    delayKnob.bindToParam(audioProcessor.lfoParameters.delayAmount[0], 0.5, 3);
+    delayKnob.getKnob().setTextValueSuffix(" secs");
+    delayKnob.setAccentColour(getLfoColour(0));
+    delayKnob.wireModulation(audioProcessor);
     addAndMakeVisible(delayKnob);
 
     // Restore state
@@ -461,9 +463,9 @@ void LfoComponent::onActiveSourceChanged(int index) {
     paintToggle.setOnColour(colour);
     smoothToggle.setAccentColour(colour);
     smoothKnob.setAccentColour(colour);
-    smoothKnob.getKnob().setValue(audioProcessor.lfoParameters.getSmoothAmount(index), juce::dontSendNotification);
+    smoothKnob.rebindParam(audioProcessor.lfoParameters.smoothAmount[index]);
     delayKnob.setAccentColour(colour);
-    delayKnob.getKnob().setValue(audioProcessor.lfoParameters.getDelayAmount(index), juce::dontSendNotification);
+    delayKnob.rebindParam(audioProcessor.lfoParameters.delayAmount[index]);
 }
 
 void LfoComponent::syncGraphToActiveLfo() {
@@ -589,26 +591,9 @@ void LfoComponent::syncFromProcessorState() {
     phaseSlider.setAccentColour(colour);
     shapePreview.setAccentColour(colour);
     smoothKnob.setAccentColour(colour);
-    smoothKnob.getKnob().setValue(audioProcessor.lfoParameters.getSmoothAmount(getActiveSourceIndex()), juce::dontSendNotification);
+    smoothKnob.rebindParam(audioProcessor.lfoParameters.smoothAmount[getActiveSourceIndex()]);
     delayKnob.setAccentColour(colour);
-    delayKnob.getKnob().setValue(audioProcessor.lfoParameters.getDelayAmount(getActiveSourceIndex()), juce::dontSendNotification);
-}
-
-void LfoComponent::configureKnob(KnobContainerComponent& container, double maxVal, double skewCentre,
-                                  double defaultVal, const juce::String& suffix,
-                                  std::function<void(float)> onChange) {
-    auto& knob = container.getKnob();
-    juce::NormalisableRange<double> range(0.0, maxVal);
-    range.setSkewForCentre(skewCentre);
-    knob.setNormalisableRange(range);
-    knob.setDoubleClickReturnValue(true, defaultVal);
-    knob.setTextValueSuffix(suffix);
-    knob.setNumDecimalPlacesToDisplay(3);
-    knob.setAccentColour(getLfoColour(0));
-    knob.onValueChange = [&knob, cb = std::move(onChange)]() {
-        cb((float)knob.getValue());
-    };
-    container.setAccentColour(getLfoColour(0));
+    delayKnob.rebindParam(audioProcessor.lfoParameters.delayAmount[getActiveSourceIndex()]);
 }
 
 void LfoComponent::applyLfoConstraints(int nodeIndex, double& time, double& value) {

@@ -683,7 +683,7 @@ void OscirenderAudioProcessor::setPreviewEffectId(const juce::String& effectId) 
     auto simplePreview = std::dynamic_pointer_cast<osci::SimpleEffect>(previewEffect);
     for (int i = 0; i < synth.getNumVoices(); i++) {
         auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
-        if (voice && voice->isVoiceActive()) {
+        if (voice && !voice->isSilent()) {
             voice->setPreviewEffect(simplePreview);
         }
     }
@@ -694,7 +694,7 @@ void OscirenderAudioProcessor::clearPreviewEffect() {
     // Clear preview effect from active voices
     for (int i = 0; i < synth.getNumVoices(); i++) {
         auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
-        if (voice && voice->isVoiceActive()) {
+        if (voice && !voice->isSilent()) {
             voice->clearPreviewEffect();
         }
     }

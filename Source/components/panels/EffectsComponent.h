@@ -33,8 +33,6 @@ private:
 	bool showingGrid = true; // show grid by default
 
 	const int LIST_SPACER = 4; // Space above the list to show drop indicator
-	
-	EffectComponent frequency = EffectComponent(*audioProcessor.frequencyEffect, false);
 
 	bool hasAnySelectedEffects() const;
 

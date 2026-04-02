@@ -384,6 +384,12 @@
               file="Source/components/RotaryKnobComponent.h"/>
         <FILE id="KnbCnt" name="KnobContainerComponent.h" compile="0" resource="0"
               file="Source/components/KnobContainerComponent.h"/>
+        <FILE id="KnbCnC" name="KnobContainerComponent.cpp" compile="1" resource="0"
+              file="Source/components/KnobContainerComponent.cpp"/>
+        <FILE id="ModStH" name="ModulationState.h" compile="0" resource="0"
+              file="Source/components/ModulationState.h"/>
+        <FILE id="ModStC" name="ModulationState.cpp" compile="1" resource="0"
+              file="Source/components/ModulationState.cpp"/>
         <FILE id="DkBrPt" name="DarkBarPainter.h" compile="0" resource="0"
               file="Source/components/DarkBarPainter.h"/>
         <FILE id="LbBrCm" name="LabelledBarComponent.h" compile="0" resource="0"
@@ -524,10 +530,10 @@
           <FILE id="eB92KJ" name="MidiComponent.cpp" compile="1" resource="0"
                 file="Source/components/panels/MidiComponent.cpp"/>
           <FILE id="GJqoJa" name="MidiComponent.h" compile="0" resource="0" file="Source/components/panels/MidiComponent.h"/>
-          <FILE id="RHHuXP" name="PerspectiveComponent.cpp" compile="1" resource="0"
-                file="Source/components/panels/PerspectiveComponent.cpp"/>
-          <FILE id="mliVoS" name="PerspectiveComponent.h" compile="0" resource="0"
-                file="Source/components/panels/PerspectiveComponent.h"/>
+          <FILE id="QkCtBr" name="QuickControlsBar.cpp" compile="1" resource="0"
+                file="Source/components/panels/QuickControlsBar.cpp"/>
+          <FILE id="QkCtBH" name="QuickControlsBar.h" compile="0" resource="0"
+                file="Source/components/panels/QuickControlsBar.h"/>
           <FILE id="x57ccs" name="SettingsComponent.cpp" compile="1" resource="0"
                 file="Source/components/panels/SettingsComponent.cpp"/>
           <FILE id="Vlmozi" name="SettingsComponent.h" compile="0" resource="0"

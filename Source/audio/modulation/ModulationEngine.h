@@ -66,7 +66,8 @@ public:
                 [source](const ModAssignment& a) { source->addAssignment(a); },
                 [source]() { return source->getAssignments(); },
                 [source](int i) { return source->getCurrentValue(i); },
-                colourFn ? colourFn : [](int) { return juce::Colours::grey; }
+                colourFn ? colourFn : [](int) { return juce::Colours::grey; },
+                [source](int i) { return source->isActive(i); }
             });
         }
         return result;

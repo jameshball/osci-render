@@ -371,6 +371,40 @@ void OscirenderLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, in
                       bgRadius * 2.0f, bgRadius * 2.0f);
     }
 
+    // --- Modulation arcs (drawn BEFORE the value arc so they sit underneath) ---
+    {
+        auto& props = slider.getProperties();
+        const auto& modTypes = getModulationTypes();
+        float angleRange = rotaryEndAngle - rotaryStartAngle;
+
+        for (const auto& modType : modTypes) {
+            if (!(bool)props.getWithDefault(modType.propPrefix + "_active", false))
+                continue;
+
+            // Compute the modulated angle from the normalised modulated position.
+            // The mod_pos property stores a pixel position for linear sliders; for rotary
+            // knobs we store a normalised 0..1 value in "mod_pos_norm" instead.
+            float modNorm = (float)(double)props.getWithDefault(modType.propPrefix + "_mod_pos_norm", (double)sliderPos);
+            float modAngle = rotaryStartAngle + modNorm * angleRange;
+
+            juce::uint32 colourArgb = (juce::uint32)(juce::int64)props.getWithDefault(
+                modType.propPrefix + "_colour", (juce::int64)modType.defaultColour);
+            auto modColour = juce::Colour(colourArgb);
+
+            float arcStart = juce::jmin(valueAngle, modAngle);
+            float arcEnd = juce::jmax(valueAngle, modAngle);
+
+            if (arcEnd - arcStart > 0.01f) {
+                juce::Path modArc;
+                modArc.addCentredArc(centre.x, centre.y, radius, radius,
+                                     0.0f, arcStart, arcEnd, true);
+                g.setColour(modColour.withAlpha(0.35f));
+                g.strokePath(modArc, juce::PathStrokeType(trackWidth + 4.0f, juce::PathStrokeType::curved,
+                                                           juce::PathStrokeType::rounded));
+            }
+        }
+    }
+
     // Background track (matches the panel behind the knob)
     {
         juce::Path bgTrack;

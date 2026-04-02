@@ -53,6 +53,7 @@ public:
     // Audio-thread state
     DahdsrState globalStates[NUM_ENVELOPES];
     std::atomic<float> currentValues[NUM_ENVELOPES] = {};
+    std::atomic<bool> active[NUM_ENVELOPES] = {};
     std::atomic<bool> noteOnPending{false};
     std::atomic<bool> noteOffPending{false};
     std::array<std::vector<float>, NUM_ENVELOPES> blockBuffer;
@@ -68,10 +69,10 @@ public:
         // Envelope 0: legacy parameter IDs for backwards compatibility
         params[0].delayTime    = new osci::FloatParameter("Delay Time",    "delayTime",    VERSION_HINT, 0.0f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
         params[0].attackTime   = new osci::FloatParameter("Attack Time",   "attackTime",   VERSION_HINT, 0.005f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
-        params[0].holdTime     = new osci::FloatParameter("Hold Time",     "holdTime",     VERSION_HINT, 0.0f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
-        params[0].decayTime    = new osci::FloatParameter("Decay Time",    "decayTime",    VERSION_HINT, 0.095f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
-        params[0].sustainLevel = new osci::FloatParameter("Sustain Level", "sustainLevel", VERSION_HINT, 0.6f, 0.0f, 1.0f, 0.00001f);
-        params[0].releaseTime  = new osci::FloatParameter("Release Time",  "releaseTime",  VERSION_HINT, 0.4f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+        params[0].holdTime     = new osci::FloatParameter("Hold Time",     "holdTime",     VERSION_HINT, 1.0f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+        params[0].decayTime    = new osci::FloatParameter("Decay Time",    "decayTime",    VERSION_HINT, 0.0f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+        params[0].sustainLevel = new osci::FloatParameter("Sustain Level", "sustainLevel", VERSION_HINT, 1.0f, 0.0f, 1.0f, 0.00001f);
+        params[0].releaseTime  = new osci::FloatParameter("Release Time",  "releaseTime",  VERSION_HINT, 0.1f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
         params[0].attackShape  = new osci::FloatParameter("Attack Shape",  "attackShape",  VERSION_HINT, 5.0f,  -50.0f, 50.0f, 0.00001f);
         params[0].decayShape   = new osci::FloatParameter("Decay Shape",   "decayShape",   VERSION_HINT, -20.0f, -50.0f, 50.0f, 0.00001f);
         params[0].releaseShape = new osci::FloatParameter("Release Shape", "releaseShape", VERSION_HINT, -5.0f,  -50.0f, 50.0f, 0.00001f);
@@ -93,10 +94,10 @@ public:
                 juce::String idx = juce::String(i + 1);
                 params[i].delayTime    = new osci::FloatParameter("Env " + idx + " Delay",     "env" + idx + "Delay",    VERSION_HINT, 0.0f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
                 params[i].attackTime   = new osci::FloatParameter("Env " + idx + " Attack",    "env" + idx + "Attack",   VERSION_HINT, 0.005f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
-                params[i].holdTime     = new osci::FloatParameter("Env " + idx + " Hold",      "env" + idx + "Hold",     VERSION_HINT, 0.0f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
-                params[i].decayTime    = new osci::FloatParameter("Env " + idx + " Decay",     "env" + idx + "Decay",    VERSION_HINT, 0.095f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
-                params[i].sustainLevel = new osci::FloatParameter("Env " + idx + " Sustain",   "env" + idx + "Sustain",  VERSION_HINT, 0.6f, 0.0f, 1.0f, 0.00001f);
-                params[i].releaseTime  = new osci::FloatParameter("Env " + idx + " Release",   "env" + idx + "Release",  VERSION_HINT, 0.4f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+                params[i].holdTime     = new osci::FloatParameter("Env " + idx + " Hold",      "env" + idx + "Hold",     VERSION_HINT, 1.0f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+                params[i].decayTime    = new osci::FloatParameter("Env " + idx + " Decay",     "env" + idx + "Decay",    VERSION_HINT, 0.0f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+                params[i].sustainLevel = new osci::FloatParameter("Env " + idx + " Sustain",   "env" + idx + "Sustain",  VERSION_HINT, 1.0f, 0.0f, 1.0f, 0.00001f);
+                params[i].releaseTime  = new osci::FloatParameter("Env " + idx + " Release",   "env" + idx + "Release",  VERSION_HINT, 0.1f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
                 params[i].attackShape  = new osci::FloatParameter("Env " + idx + " Atk Shape", "env" + idx + "AtkShape", VERSION_HINT, 5.0f,  -50.0f, 50.0f, 0.00001f);
                 params[i].decayShape   = new osci::FloatParameter("Env " + idx + " Dec Shape", "env" + idx + "DecShape", VERSION_HINT, -20.0f, -50.0f, 50.0f, 0.00001f);
                 params[i].releaseShape = new osci::FloatParameter("Env " + idx + " Rel Shape", "env" + idx + "RelShape", VERSION_HINT, -5.0f,  -50.0f, 50.0f, 0.00001f);
@@ -146,6 +147,11 @@ public:
         return currentValues[envIndex].load(std::memory_order_relaxed);
     }
 
+    bool isActive(int envIndex) const override {
+        if (envIndex < 0 || envIndex >= NUM_ENVELOPES) return false;
+        return active[envIndex].load(std::memory_order_relaxed);
+    }
+
     // === Block buffer generation (called from audio thread each processBlock) ===
     // Aggregates per-voice envelope values and fills interpolated per-sample buffers.
     template<int MaxVoices>
@@ -163,6 +169,7 @@ public:
                 }
             }
             currentValues[e].store(maxVal, std::memory_order_relaxed);
+            active[e].store(maxVal > 0.0f, std::memory_order_relaxed);
 
             float prev = prevBlockValues[e];
             float curr = maxVal;

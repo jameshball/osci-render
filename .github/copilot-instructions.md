@@ -2,7 +2,8 @@
 
 ## Communication
 
-**NEVER ask clarifying questions inline in chat.** Always use the `vscode_askQuestions` tool for structured UI with selectable options.
+- **NEVER ask clarifying questions inline in chat.** Always use the `vscode_askQuestions` tool for structured UI with selectable options.
+- After each completed task, **YOU MUST** ask the user if the changes are satisfactory or if further modifications are needed using the `vscode_askQuestions` tool. Do not assume completion until the user confirms.
 
 ## Subagents
 
@@ -18,7 +19,7 @@
 ## Guidelines
 
 - **Backwards compatibility**: Always ask before adding it. Do not assume it is needed.
-- **Recommendations/proposals**: Always present each as a numbered question using `vscode_askQuestions` so the user can approve/reject individually.
+- **Recommendations/proposals**: Always first write your findings, and then for each finding, present it as a numbered question using `vscode_askQuestions` so the user can approve/reject individually.
 
 ## Project Overview
 
