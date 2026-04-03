@@ -58,14 +58,15 @@ effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
             editor.editCustomFunction(false);
         }
 
-        // Remove all LFO/envelope assignments targeting this effect's parameters
-        audioProcessor.removeAllAssignmentsForEffect(this->effect);
-
         // Group the removal into a single undo transaction
         auto& um = audioProcessor.getUndoManager();
         um.beginNewTransaction("Remove Effect");
         {
         CommonAudioProcessor::ScopedFlag grouping(audioProcessor.undoGrouping);
+
+        // Remove all LFO/envelope assignments targeting this effect's parameters
+        // (inside the grouping scope so removals are part of the same undo transaction)
+        audioProcessor.removeAllAssignmentsForEffect(this->effect);
 
         // Set parameters OUTSIDE the SpinLock (they now do ValueTree/UndoManager work)
         if (this->effect.enabled) this->effect.enabled->setBoolValueNotifyingHost(false);

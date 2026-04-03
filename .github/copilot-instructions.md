@@ -19,7 +19,7 @@
 ## Guidelines
 
 - **Backwards compatibility**: Always ask before adding it. Do not assume it is needed.
-- **Recommendations/proposals**: Always present each as a numbered question using `vscode_askQuestions` so the user can approve/reject individually.
+- **Recommendations/proposals**: Always first write your findings, and then for each finding, present it as a numbered question using `vscode_askQuestions` so the user can approve/reject individually.
 
 ## Project Overview
 

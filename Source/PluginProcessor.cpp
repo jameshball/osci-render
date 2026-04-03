@@ -181,13 +181,25 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
 
     intParameters.push_back(voices);
     intParameters.push_back(fileSelect);
+    intParameters.push_back(pitchBendRange);
+    floatParameters.push_back(velocityTracking);
+    floatParameters.push_back(glideTime);
+    floatParameters.push_back(glideSlope);
+    booleanParameters.push_back(alwaysGlide);
+    booleanParameters.push_back(legato);
+    booleanParameters.push_back(octaveScale);
 
     voices->addListener(this);
+    legato->addListener(this);
     envelopeParameters.params[0].addListenerToAll(this);
 
     // Start the background voice builder thread.
     voiceBuilder = std::make_unique<VoiceBuilder>(*this);
-    voiceBuilder->setTargetVoiceCount(voices->getValueUnnormalised());
+    int initialVoices = voices->getValueUnnormalised();
+    synth.setClient(this);
+    synth.setPolyphony(initialVoices);
+    synth.setLegato(legato->getBoolValue());
+    voiceBuilder->setTargetVoiceCount(initialVoices + 1); // +1 overlap voice for kill-fade
     voiceBuilder->startThread(juce::Thread::Priority::low);
 
     for (int i = 0; i < luaEffects.size(); i++) {
@@ -195,7 +207,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     }
 
     defaultSound = new ShapeSound(*this, std::make_shared<FileParser>(*this));
-    synth.addSound(defaultSound);
+    synth.addSound(defaultSound.get());
 
     activeShapeSound.store(defaultSound.get(), std::memory_order_release);
 
@@ -352,6 +364,7 @@ OscirenderAudioProcessor::~OscirenderAudioProcessor() {
     permanentEffects.clear();
     effects.clear();
     envelopeParameters.params[0].removeListenerFromAll(this);
+    legato->removeListener(this);
     voices->removeListener(this);
 }
 
@@ -713,7 +726,7 @@ void OscirenderAudioProcessor::setPreviewEffectId(const juce::String& effectId) 
     auto simplePreview = std::dynamic_pointer_cast<osci::SimpleEffect>(previewEffect);
     for (int i = 0; i < synth.getNumVoices(); i++) {
         auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
-        if (voice && voice->isVoiceActive()) {
+        if (voice && !voice->isSilent()) {
             voice->setPreviewEffect(simplePreview);
         }
     }
@@ -724,7 +737,7 @@ void OscirenderAudioProcessor::clearPreviewEffect() {
     // Clear preview effect from active voices
     for (int i = 0; i < synth.getNumVoices(); i++) {
         auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
-        if (voice && voice->isVoiceActive()) {
+        if (voice && !voice->isSilent()) {
             voice->clearPreviewEffect();
         }
     }
@@ -980,7 +993,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         auto midiIterator = midiMessages.cbegin();
         std::for_each(midiIterator,
             midiMessages.cend(),
-            [&] (const juce::MidiMessageMetadata& meta) { synth.publicHandleMidiEvent(meta.getMessage()); }
+            [&] (const juce::MidiMessageMetadata& meta) { synth.handleMidiEvent(meta.getMessage()); }
         );
 
 		// Apply toggleable effects directly in input mode (no synth voices involved)
@@ -1348,6 +1361,7 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
 void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float newValue) {
     if (parameterIndex == voices->getParameterIndex()) {
         int numVoices = voices->getValueUnnormalised();
+        synth.setPolyphony(numVoices);
         if (numVoices != synth.getNumVoices()) {
             // Reset UI telemetry for voices that are about to be added/removed.
             for (int i = std::min(numVoices, synth.getNumVoices());
@@ -1355,10 +1369,10 @@ void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float n
                 uiVoiceActive[i].store(false, std::memory_order_relaxed);
                 uiVoiceEnvelopeTimeSeconds[i].store(0.0, std::memory_order_relaxed);
             }
-            // Delegate construction / removal to the background thread so we
-            // never block the message or audio thread with heavy allocations.
-            voiceBuilder->setTargetVoiceCount(numVoices);
+            voiceBuilder->setTargetVoiceCount(numVoices + 1); // +1 overlap voice for kill-fade
         }
+    } else if (parameterIndex == legato->getParameterIndex()) {
+        synth.setLegato(legato->getBoolValue());
     }
 
     // Envelope UI listens to these parameters.
@@ -1454,6 +1468,57 @@ DahdsrParams OscirenderAudioProcessor::getCurrentDahdsrParams() const
 DahdsrParams OscirenderAudioProcessor::getCurrentDahdsrParams(int envIndex) const
 {
     return envelopeParameters.getDahdsrParams(envIndex);
+}
+
+int OscirenderAudioProcessor::getNumPressedNotes() const {
+    return synth.getNumPressedNotes();
+}
+
+double OscirenderAudioProcessor::getLastPlayedNoteFreq() const {
+    return synth.getLastPlayedNoteFreq();
+}
+
+// ==========================================================================
+// VoiceManagerClient implementation
+// ==========================================================================
+
+void OscirenderAudioProcessor::voiceActivated(ManagedVoice& mv, bool isLegato) {
+    if (auto* sv = dynamic_cast<ShapeVoice*>(mv.getJuceVoice()))
+        sv->voiceActivated(mv.getState(), isLegato);
+}
+
+void OscirenderAudioProcessor::voiceDeactivated(ManagedVoice& mv) {
+    if (auto* sv = dynamic_cast<ShapeVoice*>(mv.getJuceVoice()))
+        sv->voiceDeactivated();
+}
+
+void OscirenderAudioProcessor::voiceKilled(ManagedVoice& mv) {
+    if (auto* sv = dynamic_cast<ShapeVoice*>(mv.getJuceVoice()))
+        sv->voiceKilled();
+}
+
+bool OscirenderAudioProcessor::isVoiceSilent(ManagedVoice& mv) const {
+    if (auto* sv = dynamic_cast<ShapeVoice*>(mv.getJuceVoice()))
+        return sv->isSilent();
+    return true;
+}
+
+double OscirenderAudioProcessor::getVoiceFrequency(const ManagedVoice& mv) const {
+    if (auto* sv = dynamic_cast<ShapeVoice*>(mv.getJuceVoice()))
+        return sv->getFrequency();
+    return 0.0;
+}
+
+void OscirenderAudioProcessor::captureDrawingState(ManagedVoice& mv) {
+    if (auto* sv = dynamic_cast<ShapeVoice*>(mv.getJuceVoice()))
+        sv->captureDrawingState();
+}
+
+void OscirenderAudioProcessor::restoreDrawingState(ManagedVoice& target, const ManagedVoice& source) {
+    auto* targetVoice = dynamic_cast<ShapeVoice*>(target.getJuceVoice());
+    auto* sourceVoice = dynamic_cast<ShapeVoice*>(source.getJuceVoice());
+    if (targetVoice != nullptr)
+        targetVoice->restoreDrawingState(sourceVoice);
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {

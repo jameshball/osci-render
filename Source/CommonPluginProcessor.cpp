@@ -586,6 +586,10 @@ bool CommonAudioProcessor::programCrashedAndUserWantsToReset() {
         bool heartbeatStale = (now.toMilliseconds() - heartbeat.toMilliseconds()) > 3000;
         if ((startTime.isNotEmpty() && endTime.isNotEmpty()) || (startTime.isNotEmpty() && endTime.isEmpty())) {
             if (((start > end || end == juce::Time()) && heartbeatStale) && juce::MessageManager::getInstance()->isThisTheMessageThread()) {
+                // Ensure the custom look and feel is set before showing the dialog,
+                // since the editor (which normally creates it) hasn't been opened yet.
+                OscirenderLookAndFeel::getSharedInstance();
+
                 juce::String message = "It appears that " + juce::String(ProjectInfo::projectName) + " did not close properly during your last session. This may indicate a problem with your project or session.";
                 bool userPressedReset = juce::AlertWindow::showOkCancelBox(
                     juce::AlertWindow::WarningIcon,

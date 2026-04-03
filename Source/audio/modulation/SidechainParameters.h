@@ -97,7 +97,7 @@ public:
         return currentValues[i].load(std::memory_order_relaxed);
     }
 
-    bool isActive(int /*scIndex*/) const {
+    bool isActive(int /*scIndex*/) const override {
         return true; // Sidechain is always active
     }
 

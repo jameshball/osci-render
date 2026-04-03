@@ -36,11 +36,31 @@ public:
         juce::ignoreUnused(area);
     }
 
+    // --- Mouse ---
+
+    bool hitTest(int x, int y) override {
+        // Only respond to mouse in the content area (not the label strip)
+        return contentArea.contains(x, y);
+    }
+
+    void setDraggable(bool d) { draggable = d; }
+
+    void mouseEnter(const juce::MouseEvent&) override {
+        if (draggable && isEnabled())
+            setMouseCursor(juce::MouseCursor::UpDownResizeCursor);
+        else
+            setMouseCursor(juce::MouseCursor::NormalCursor);
+    }
+
+    void mouseExit(const juce::MouseEvent&) override {
+        setMouseCursor(juce::MouseCursor::NormalCursor);
+    }
+
     // --- Paint ---
 
     void paint(juce::Graphics& g) override {
         auto bounds = getLocalBounds().toFloat();
-        bool hovering = isMouseOver(true);
+        bool hovering = isEnabled() && isMouseOver(true);
         DarkBarPainter::paintBackground(g, bounds, labelArea, getLabelText(), hovering);
         paintContent(g, contentArea);
     }
@@ -60,6 +80,7 @@ public:
 protected:
     juce::Rectangle<int> contentArea;
     juce::Rectangle<int> labelArea;
+    bool draggable = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LabelledBarComponent)
 };

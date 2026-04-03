@@ -37,8 +37,10 @@ ModulationHelper::Info ModulationHelper::compute(
         double modulatedVal = juce::jlimit(sliderMin, sliderMax, currentVal + totalOffset);
         info.active = true;
         info.modulatedPos = (float)sl.getPositionOfValue(modulatedVal);
+        info.modulatedNorm = (range > 0.0) ? (float)((modulatedVal - sliderMin) / range) : 0.0f;
         info.colour = juce::Colour::fromFloatRGBA(
             totalR / count, totalG / count, totalB / count, 1.0f);
     }
     return info;
 }
+

@@ -140,6 +140,9 @@ class OscirenderLookAndFeel : public juce::LookAndFeel_V4 {
 public:
     OscirenderLookAndFeel();
 
+    // Shared instance that can be used before the editor is created
+    static OscirenderLookAndFeel& getSharedInstance();
+
     static void applyOscirenderColours(juce::LookAndFeel& lookAndFeel);
     static void drawOscirenderComboBox(juce::Graphics& g, int width, int height, juce::ComboBox& box);
     static void positionOscirenderComboBoxText(juce::LookAndFeel& lookAndFeel, juce::ComboBox& box, juce::Label& label);
@@ -187,6 +190,13 @@ public:
     void drawProgressBar(juce::Graphics& g, juce::ProgressBar& progressBar, int width, int height, double progress, const juce::String& textToShow) override;
     void customDrawLinearProgressBar(juce::Graphics& g, const juce::ProgressBar& progressBar, int width, int height, double progress, const juce::String& textToShow);
     juce::Typeface::Ptr getTypefaceForFont(const juce::Font& font) override;
+
+    // AlertWindow overrides
+    void drawAlertBox(juce::Graphics& g, juce::AlertWindow& alert, const juce::Rectangle<int>& textArea, juce::TextLayout& textLayout) override;
+    int getAlertWindowButtonHeight() override;
+    juce::Font getAlertWindowTitleFont() override;
+    juce::Font getAlertWindowMessageFont() override;
+    juce::Font getAlertWindowFont() override;
     void drawStretchableLayoutResizerBar(juce::Graphics& g, int w, int h, bool isVerticalBar, bool isMouseOver, bool isMouseDragging) override;
     void drawBubble(juce::Graphics& g, juce::BubbleComponent& bubble,
                     const juce::Point<float>& tip, const juce::Rectangle<float>& body) override;

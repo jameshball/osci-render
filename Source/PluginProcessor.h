@@ -19,7 +19,7 @@
 #include "audio/effects/DelayEffect.h"
 #include "audio/modulation/LuaEffectState.h"
 #include "audio/effects/PerspectiveEffect.h"
-#include "audio/synth/PublicSynthesiser.h"
+#include "audio/synth/VoiceManager.h"
 #include "audio/platform/SampleRateManager.h"
 #include "audio/synth/ShapeSound.h"
 #include "audio/synth/ShapeVoice.h"
@@ -78,7 +78,7 @@ private:
 
 /**
  */
-class OscirenderAudioProcessor : public CommonAudioProcessor, juce::AudioProcessorParameter::Listener
+class OscirenderAudioProcessor : public CommonAudioProcessor, juce::AudioProcessorParameter::Listener, public VoiceManagerClient
 #if JucePlugin_Enable_ARA
     ,
                                  public juce::AudioProcessorARAExtension
@@ -88,6 +88,15 @@ class OscirenderAudioProcessor : public CommonAudioProcessor, juce::AudioProcess
 public:
     OscirenderAudioProcessor();
     ~OscirenderAudioProcessor() override;
+
+    // VoiceManagerClient interface
+    void voiceActivated(ManagedVoice& mv, bool isLegato) override;
+    void voiceDeactivated(ManagedVoice& mv) override;
+    void voiceKilled(ManagedVoice& mv) override;
+    bool isVoiceSilent(ManagedVoice& mv) const override;
+    double getVoiceFrequency(const ManagedVoice& mv) const override;
+    void captureDrawingState(ManagedVoice& mv) override;
+    void restoreDrawingState(ManagedVoice& target, const ManagedVoice& source) override;
 
     // Beginner mode: per-parameter LFO dropdowns, mic icon, single amplitude envelope, simplified layout.
     // Advanced mode: drag-and-drop LFO/ENV module panels, full layout.
@@ -217,6 +226,22 @@ public:
 
     // 1..100 maps to file index with a 1-based offset (1 = first file, 2 = second, ...). Intended for DAW automation.
     osci::IntParameter* fileSelect = new osci::IntParameter("File Select", "fileSelect", VERSION_HINT, 1, 1, 100);
+
+    // --- Note settings ---
+    osci::IntParameter* pitchBendRange = new osci::IntParameter("Bend", "pitchBendRange", VERSION_HINT, 2, 0, 48);
+    osci::FloatParameter* velocityTracking = new osci::FloatParameter("Velocity", "velocityTracking", VERSION_HINT, 1.0f, -1.0f, 1.0f, 0.01f);
+    osci::FloatParameter* glideTime = new osci::FloatParameter("Glide", "glideTime", VERSION_HINT, 0.0f, 0.0f, 16.0f, 0.001f);
+    osci::FloatParameter* glideSlope = new osci::FloatParameter("Slope", "glideSlope", VERSION_HINT, 0.0f, -8.0f, 8.0f, 0.01f);
+    osci::BooleanParameter* alwaysGlide = new osci::BooleanParameter("Always Glide", "alwaysGlide", VERSION_HINT, false, "When enabled, glide is always active, even when notes are played staccato.");
+    osci::BooleanParameter* legato = new osci::BooleanParameter("Legato", "legato", VERSION_HINT, false, "When enabled with mono voice, successive notes do not retrigger the envelope.");
+    osci::BooleanParameter* octaveScale = new osci::BooleanParameter("Octave Scale", "octaveScale", VERSION_HINT, false, "When enabled, the glide time scales with the pitch interval between notes.");
+
+    // Number of MIDI notes currently held. Audio-thread only.
+    int getNumPressedNotes() const;
+
+    // Frequency of the globally-last-played note (before the current noteOn).
+    // Used as glide source so any voice can portamento from the last note.
+    double getLastPlayedNoteFreq() const;
 
     // Audio-thread readable pointer to the currently selected sound.
     // Lifetime is owned by defaultSound/objectServerSound/sounds[].
@@ -362,7 +387,7 @@ private:
     std::vector<ErrorListener*> errorListeners;
 
     ShapeSound::Ptr defaultSound;
-    PublicSynthesiser synth;
+    VoiceManager synth;
     bool retriggerMidi = true;
 
     std::unique_ptr<VoiceBuilder> voiceBuilder;

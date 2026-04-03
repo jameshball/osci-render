@@ -10,6 +10,7 @@ struct ModulationHelper {
     struct Info {
         bool active = false;
         float modulatedPos = 0.0f;
+        float modulatedNorm = 0.0f;  // normalised 0..1 modulated value (for rotary knobs)
         juce::Colour colour;
     };
 

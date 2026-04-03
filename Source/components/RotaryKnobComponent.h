@@ -5,6 +5,7 @@
 
 // Rotary knob that extends juce::Slider with RotaryHorizontalVerticalDrag style.
 // Custom arc + marker rendering is handled by the LookAndFeel's drawRotarySlider.
+// Supports modulation display via slider properties (same convention as linear sliders).
 class RotaryKnobComponent : public juce::Slider {
 public:
     RotaryKnobComponent() {

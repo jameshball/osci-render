@@ -23,14 +23,6 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
     : audioProcessor(p), editor(editorRef), itemData(p, editorRef), listBoxModel(listBox, itemData), grid(audioProcessor, editor) {
 	setText("Audio Effects");
 
-    addAndMakeVisible(frequency);
-
-    frequency.wireModulation(audioProcessor);
-
-    frequency.slider.setSkewFactorFromMidPoint(500.0);
-    frequency.slider.setTextValueSuffix("Hz");
-    frequency.slider.setValue(audioProcessor.frequencyEffect->getValue(), juce::dontSendNotification);
-
     addAndMakeVisible(randomiseButton);
 
 	randomiseButton.setTooltip("Randomise all effect parameter values, randomise which effects are enabled, and randomise their order.");
@@ -173,9 +165,6 @@ void EffectsComponent::resized() {
 	titleBar.removeFromLeft(4);
 	autoLinkButton.setBounds(titleBar.removeFromLeft(20));
     area = area.reduced(20);
-    frequency.setBounds(area.removeFromTop(30));
-
-    area.removeFromTop(6);
     if (showingGrid) {
         grid.setBounds(area);
         addEffectButton.setVisible(false);

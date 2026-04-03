@@ -71,6 +71,11 @@ public:
     // === UI snapshot ===
     virtual float getCurrentValue(int sourceIndex) const = 0;
 
+    // Whether a source index is actively producing output.
+    // Default returns true; subclasses (LFO, Random, Envelope) override
+    // based on audio-thread state.
+    virtual bool isActive(int /*sourceIndex*/) const { return true; }
+
     // === Colour callback for UI indicators ===
     using ColourFn = juce::Colour(*)(int);
     virtual ColourFn getColourFunction() const { return colourFunction; }

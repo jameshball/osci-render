@@ -596,12 +596,12 @@ public:
         beginTest("Sine preset mid-points");
         {
             auto wf = createLfoPreset(LfoPreset::Sine);
-            // At phase 0, should be ~0.5 (midpoint of sine)
-            expectWithinAbsoluteError(wf.evaluate(0.0f), 0.5f, 0.05f);
-            // At phase 0.25, should be ~1.0 (peak)
-            expectWithinAbsoluteError(wf.evaluate(0.25f), 1.0f, 0.05f);
-            // At phase 0.75, should be ~0.0 (trough)
-            expectWithinAbsoluteError(wf.evaluate(0.75f), 0.0f, 0.05f);
+            // At phase 0, should be 0 (start of sine)
+            expectWithinAbsoluteError(wf.evaluate(0.0f), 0.0f, 0.05f);
+            // At phase 0.5, should be ~1.0 (peak)
+            expectWithinAbsoluteError(wf.evaluate(0.5f), 1.0f, 0.05f);
+            // At phase 1.0, should be ~0.0 (back to start)
+            expectWithinAbsoluteError(wf.evaluate(1.0f), 0.0f, 0.05f);
         }
 
         beginTest("Evaluate wraps phase correctly");

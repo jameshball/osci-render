@@ -10,7 +10,7 @@
 #include "FrameSettingsComponent.h"
 #include "LuaComponent.h"
 #include "MidiComponent.h"
-#include "PerspectiveComponent.h"
+#include "QuickControlsBar.h"
 #include "../../PluginProcessor.h"
 #include "../modulation/EnvelopeComponent.h"
 #include "../OpenFileComponent.h"
@@ -43,7 +43,7 @@ private:
     bool beginnerMode = false;
 
     FileControlsComponent fileControls{audioProcessor, pluginEditor};
-    PerspectiveComponent perspective{audioProcessor, pluginEditor};
+    QuickControlsBar quickControls{audioProcessor, pluginEditor};
     FrameSettingsComponent frame{audioProcessor, pluginEditor};
     EffectsComponent effects{audioProcessor, pluginEditor};
     MidiComponent midi{audioProcessor, pluginEditor};

@@ -51,7 +51,7 @@ public:
 
             rate[i] = new osci::FloatParameter("LFO " + idx + " Rate", pfx + "Rate", VERSION_HINT, 1.0f, 0.01f, 100.0f, 0.01f, "Hz");
             phaseOffset[i] = new osci::FloatParameter("LFO " + idx + " Phase Offset", pfx + "PhaseOffset", VERSION_HINT, 0.0f, 0.0f, 1.0f, 0.0001f);
-            smoothAmount[i] = new osci::FloatParameter("LFO " + idx + " Smooth", pfx + "SmoothAmount", VERSION_HINT, 0.005f, 0.0f, 16.0f, 0.0001f, "s");
+            smoothAmount[i] = new osci::FloatParameter("LFO " + idx + " Smooth", pfx + "SmoothAmount", VERSION_HINT, 0.0f, 0.0f, 16.0f, 0.0001f, "s");
             delayAmount[i] = new osci::FloatParameter("LFO " + idx + " Delay", pfx + "DelayAmount", VERSION_HINT, 0.0f, 0.0f, 4.0f, 0.0001f, "s");
             mode[i] = new LfoModeParameter("LFO " + idx + " Mode", pfx + "Mode", VERSION_HINT, LfoMode::Free);
             preset[i] = new LfoPresetParameter("LFO " + idx + " Preset", pfx + "Preset", VERSION_HINT, LfoPreset::Triangle);
@@ -182,7 +182,7 @@ public:
         return currentPhases[i].load(std::memory_order_relaxed);
     }
 
-    bool isActive(int i) const {
+    bool isActive(int i) const override {
         if (i < 0 || i >= NUM_LFOS) return false;
         return active[i].load(std::memory_order_relaxed);
     }

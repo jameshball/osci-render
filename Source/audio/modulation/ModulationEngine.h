@@ -51,14 +51,19 @@ public:
     }
 
     // Remove every assignment (across all sources) that targets a parameter of the given effect.
+    // Uses the undo-aware removeAssignment() so removals can be undone.
     void removeAllAssignmentsForEffect(const osci::Effect& effect) {
         auto belongsToEffect = [&](const juce::String& paramId) {
             for (auto* p : effect.parameters)
                 if (p->paramID == paramId) return true;
             return false;
         };
-        for (auto* source : sources)
-            source->removeAssignmentsIf([&](const ModAssignment& a) { return belongsToEffect(a.paramId); });
+        for (auto* source : sources) {
+            auto all = source->getAssignments();
+            for (const auto& a : all)
+                if (belongsToEffect(a.paramId))
+                    source->removeAssignment(a.sourceIndex, a.paramId);
+        }
     }
 
     // Build the generic binding list consumed by EffectComponent for drag-and-drop.
@@ -72,7 +77,8 @@ public:
                 [source](const ModAssignment& a) { source->addAssignment(a); },
                 [source]() { return source->getAssignments(); },
                 [source](int i) { return source->getCurrentValue(i); },
-                colourFn ? colourFn : [](int) { return juce::Colours::grey; }
+                colourFn ? colourFn : [](int) { return juce::Colours::grey; },
+                [source](int i) { return source->isActive(i); }
             });
         }
         return result;

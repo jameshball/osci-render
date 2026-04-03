@@ -4,15 +4,11 @@ LfoWaveform createLfoPreset(LfoPreset preset) {
     LfoWaveform waveform;
     switch (preset) {
         case LfoPreset::Sine: {
-            // With smooth=true and power=0, the sinusoidal transition
-            // naturally produces a sine-like shape between evenly-spaced nodes.
             waveform.smooth = true;
             waveform.nodes = {
-                { 0.0,  0.5,  0.0f },
-                { 0.25, 1.0,  0.0f },
-                { 0.5,  0.5,  0.0f },
-                { 0.75, 0.0,  0.0f },
-                { 1.0,  0.5,  0.0f },
+                { 0.0,  0.0,  0.0f },
+                { 0.5,  1.0,  0.0f },
+                { 1.0,  0.0,  0.0f },
             };
             break;
         }
