@@ -254,6 +254,7 @@ LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
     graph.setCornerRadius(6.0f);
     graph.setFlowTrailWrapping(true, 0.0, 1.0);
     graph.setSmoothMode(true);
+    graph.setUndoManager(&audioProcessor.getUndoManager());
 
     graph.constrainNode = [this](int nodeIndex, double& time, double& value) {
         applyLfoConstraints(nodeIndex, time, value);
@@ -322,20 +323,36 @@ LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
     };
     addAndMakeVisible(phaseSlider);
 
-    // Smooth amount knob (0-16 seconds, default 0.005, skew midpoint 1.0)
-    configureKnob(smoothKnob, 16.0, 1.0, 0.005, " secs", [this](float val) {
-        audioProcessor.lfoParameters.setSmoothAmount(getActiveSourceIndex(), val);
-    });
+    // Smooth amount knob
+    smoothKnob.bindToParameter(audioProcessor.lfoParameters.smoothAmount[0], 1.0);
+    smoothKnob.getKnob().onValueChange = [this]() {
+        audioProcessor.lfoParameters.setSmoothAmount(getActiveSourceIndex(), (float)smoothKnob.getKnob().getValue());
+    };
     addAndMakeVisible(smoothKnob);
 
-    // Delay knob (0-4 seconds, default 0)
-    configureKnob(delayKnob, 4.0, 0.5, 0.0, " secs", [this](float val) {
-        audioProcessor.lfoParameters.setDelayAmount(getActiveSourceIndex(), val);
-    });
+    // Delay knob
+    delayKnob.bindToParameter(audioProcessor.lfoParameters.delayAmount[0], 0.5);
+    delayKnob.getKnob().onValueChange = [this]() {
+        audioProcessor.lfoParameters.setDelayAmount(getActiveSourceIndex(), (float)delayKnob.getKnob().getValue());
+    };
     addAndMakeVisible(delayKnob);
+
+    // Register as listener on all LFO parameters so undo/redo triggers a UI sync
+    for (int i = 0; i < NUM_LFOS; ++i) {
+        paramSync.track(audioProcessor.lfoParameters.rate[i]);
+        paramSync.track(audioProcessor.lfoParameters.mode[i]);
+        paramSync.track(audioProcessor.lfoParameters.phaseOffset[i]);
+        paramSync.track(audioProcessor.lfoParameters.smoothAmount[i]);
+        paramSync.track(audioProcessor.lfoParameters.delayAmount[i]);
+        paramSync.track(audioProcessor.lfoParameters.rateMode[i]);
+        paramSync.track(audioProcessor.lfoParameters.tempoDivision[i]);
+    }
 
     // Restore state
     syncFromProcessorState();
+}
+
+LfoComponent::~LfoComponent() {
 }
 
 void LfoComponent::timerCallback() {
@@ -494,12 +511,15 @@ LfoWaveform LfoComponent::getLfoWaveform(int lfoIndex) const {
 void LfoComponent::setLfoPreset(int lfoIndex, LfoPreset preset) {
     if (lfoIndex < 0 || lfoIndex >= NUM_LFOS) return;
     lfoData[lfoIndex].preset = preset;
+    auto waveformBefore = audioProcessor.lfoParameters.getWaveform(lfoIndex);
     lfoData[lfoIndex].waveform = createLfoPreset(preset);
+    audioProcessor.lfoParameters.waveformChanged(lfoIndex, lfoData[lfoIndex].waveform);
     if (lfoIndex == getActiveSourceIndex()) {
+        auto nodesBefore = graph.getNodes();
         syncGraphToActiveLfo();
+        recordLfoUndoableChange(nodesBefore, waveformBefore, lfoIndex);
         updatePresetLabel();
     }
-    audioProcessor.lfoParameters.waveformChanged(lfoIndex, lfoData[lfoIndex].waveform);
 }
 
 LfoPreset LfoComponent::getLfoPreset(int lfoIndex) const {
@@ -541,9 +561,12 @@ void LfoComponent::applyPreset(LfoPreset preset) {
         shapePreview.setEnabled(false);
     }
 
-    syncGraphToActiveLfo();
-    updatePresetLabel();
+    auto waveformBefore = audioProcessor.lfoParameters.getWaveform(idx);
     audioProcessor.lfoParameters.waveformChanged(idx, lfoData[idx].waveform);
+    auto nodesBefore = graph.getNodes();
+    syncGraphToActiveLfo();
+    recordLfoUndoableChange(nodesBefore, waveformBefore, idx);
+    updatePresetLabel();
     audioProcessor.lfoParameters.setPreset(idx, preset);
 }
 
@@ -581,21 +604,21 @@ void LfoComponent::syncFromProcessorState() {
     delayKnob.getKnob().setValue(audioProcessor.lfoParameters.getDelayAmount(getActiveSourceIndex()), juce::dontSendNotification);
 }
 
-void LfoComponent::configureKnob(KnobContainerComponent& container, double maxVal, double skewCentre,
-                                  double defaultVal, const juce::String& suffix,
-                                  std::function<void(float)> onChange) {
-    auto& knob = container.getKnob();
-    juce::NormalisableRange<double> range(0.0, maxVal);
-    range.setSkewForCentre(skewCentre);
-    knob.setNormalisableRange(range);
-    knob.setDoubleClickReturnValue(true, defaultVal);
-    knob.setTextValueSuffix(suffix);
-    knob.setNumDecimalPlacesToDisplay(3);
-    knob.setAccentColour(getLfoColour(0));
-    knob.onValueChange = [&knob, cb = std::move(onChange)]() {
-        cb((float)knob.getValue());
-    };
-    container.setAccentColour(getLfoColour(0));
+void LfoComponent::recordLfoUndoableChange(const std::vector<GraphNode>& nodesBefore,
+                                            const LfoWaveform& waveformBefore, int lfoIndex) {
+    // Record the UI-level graph node change (no-op after editor destroy/recreate)
+    graph.recordUndoableChange(nodesBefore);
+
+    // Also record the processor-side waveform change so undo works even if
+    // the editor has been destroyed and reopened.
+    auto& um = audioProcessor.getUndoManager();
+    auto waveformAfter = audioProcessor.lfoParameters.getWaveform(lfoIndex);
+    if (waveformBefore != waveformAfter) {
+        um.perform(new LfoWaveformChangeAction(
+            audioProcessor.lfoParameters.waveforms,
+            audioProcessor.lfoParameters.waveformLock,
+            lfoIndex, waveformBefore, waveformAfter));
+    }
 }
 
 void LfoComponent::applyLfoConstraints(int nodeIndex, double& time, double& value) {
@@ -683,10 +706,13 @@ void LfoComponent::pasteWaveformFromClipboard() {
     lfoData[idx].waveform = std::move(waveform);
     lfoData[idx].preset = LfoPreset::Custom;
     lfoData[idx].userPresetName.clear();
+    auto waveformBefore = audioProcessor.lfoParameters.getWaveform(idx);
     audioProcessor.lfoParameters.waveformChanged(idx, lfoData[idx].waveform);
     audioProcessor.lfoParameters.setPreset(idx, LfoPreset::Custom);
 
+    auto nodesBefore = graph.getNodes();
     syncGraphToActiveLfo();
+    recordLfoUndoableChange(nodesBefore, waveformBefore, idx);
     updatePresetLabel();
 }
 
@@ -799,9 +825,12 @@ void LfoComponent::loadUserPreset(const juce::File& file) {
     lfoData[idx].preset = LfoPreset::Custom;
     lfoData[idx].userPresetName = name;
 
+    auto waveformBefore = audioProcessor.lfoParameters.getWaveform(idx);
     audioProcessor.lfoParameters.waveformChanged(idx, lfoData[idx].waveform);
     audioProcessor.lfoParameters.setPreset(idx, LfoPreset::Custom);
 
+    auto nodesBefore = graph.getNodes();
     syncGraphToActiveLfo();
+    recordLfoUndoableChange(nodesBefore, waveformBefore, idx);
     updatePresetLabel();
 }

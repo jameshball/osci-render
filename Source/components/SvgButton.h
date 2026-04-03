@@ -24,7 +24,7 @@ class SvgButton : public juce::DrawableButton, public juce::AudioProcessorParame
             overImageOn = juce::Drawable::createFromSVG(*toggledDoc);
             changeSvgColour(toggledDoc.get(), colourOn.withBrightness(0.5f));
             downImageOn = juce::Drawable::createFromSVG(*toggledDoc);
-            changeSvgColour(toggledDoc.get(), colourOn.withBrightness(0.3f));
+            changeSvgColour(toggledDoc.get(), colourOn.withBrightness(0.15f));
             disabledImageOn = juce::Drawable::createFromSVG(*toggledDoc);
         } else {
             changeSvgColour(doc.get(), colourOn);
@@ -33,7 +33,7 @@ class SvgButton : public juce::DrawableButton, public juce::AudioProcessorParame
             overImageOn = juce::Drawable::createFromSVG(*doc);
             changeSvgColour(doc.get(), colourOn.withBrightness(0.5f));
             downImageOn = juce::Drawable::createFromSVG(*doc);
-            changeSvgColour(doc.get(), colourOn.withBrightness(0.3f));
+            changeSvgColour(doc.get(), colourOn.withBrightness(0.15f));
             disabledImageOn = juce::Drawable::createFromSVG(*doc);
         }
         
@@ -76,15 +76,14 @@ class SvgButton : public juce::DrawableButton, public juce::AudioProcessorParame
 
     void mouseEnter(const juce::MouseEvent& e) override {
         juce::DrawableButton::mouseEnter(e);
-
-        if (isEnabled()) {
-            setMouseCursor(juce::MouseCursor::PointingHandCursor);
-        }
     }
 
     void mouseExit(const juce::MouseEvent& e) override {
         juce::DrawableButton::mouseExit(e);
-        setMouseCursor(juce::MouseCursor::NormalCursor);
+    }
+
+    bool hitTest(int x, int y) override {
+        return isEnabled() && juce::DrawableButton::hitTest(x, y);
     }
     
     void setPulseAnimation(bool pulseUsed) {

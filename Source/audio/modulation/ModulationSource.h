@@ -4,6 +4,7 @@
 #include <vector>
 #include "ModAssignment.h"
 #include "ModulationAssignmentStore.h"
+#include "ModulationUndoActions.h"
 
 // Abstract base class for all modulation source types (LFO, Envelope, Random, Sidechain).
 // Provides a unified interface for assignment management, block-buffer access,
@@ -18,9 +19,38 @@ public:
     virtual juce::String getTypeLabel() const = 0;    // UI drag prefix: "LFO", "ENV", "RNG", "SC"
     virtual int getSourceCount() const = 0;           // NUM_LFOS, NUM_ENVELOPES, etc.
 
+    // === Undo support ===
+    void setUndoManager(juce::UndoManager* um) { undoManager = um; }
+    void setUndoSuppressedFlag(bool* flag) { undoSuppressedFlag = flag; }
+    void setUndoGroupingFlag(bool* flag) { undoGroupingFlag = flag; }
+
     // === Assignment management (non-virtual — delegates to the store) ===
-    void addAssignment(const ModAssignment& a) { assignments.add(a); }
-    void removeAssignment(int sourceIndex, const juce::String& paramId) { assignments.remove(sourceIndex, paramId); }
+    void addAssignment(const ModAssignment& a) {
+        auto* um = (undoSuppressedFlag != nullptr && *undoSuppressedFlag) ? nullptr : undoManager;
+        if (um != nullptr) {
+            if (undoGroupingFlag == nullptr || !*undoGroupingFlag)
+                um->beginNewTransaction("Add Modulation");
+            um->perform(new AddAssignmentAction(assignments, a));
+        } else {
+            assignments.add(a);
+        }
+    }
+    void removeAssignment(int sourceIndex, const juce::String& paramId) {
+        auto* um = (undoSuppressedFlag != nullptr && *undoSuppressedFlag) ? nullptr : undoManager;
+        if (um != nullptr) {
+            // Capture the existing assignment for undo
+            auto all = assignments.getAll();
+            for (const auto& a : all) {
+                if (a.sourceIndex == sourceIndex && a.paramId == paramId) {
+                    if (undoGroupingFlag == nullptr || !*undoGroupingFlag)
+                        um->beginNewTransaction("Remove Modulation");
+                    um->perform(new RemoveAssignmentAction(assignments, a));
+                    return;
+                }
+            }
+        }
+        assignments.remove(sourceIndex, paramId);
+    }
     std::vector<ModAssignment> getAssignments() const { return assignments.getAll(); }
 
     // Allocation-free version for the audio thread. Reuses a pre-grown buffer.
@@ -61,6 +91,9 @@ protected:
     std::vector<osci::FloatParameter*> floatParameters;
     std::vector<osci::IntParameter*>   intParameters;
     ColourFn colourFunction = nullptr;
+    juce::UndoManager* undoManager = nullptr;
+    bool* undoSuppressedFlag = nullptr;
+    bool* undoGroupingFlag = nullptr;
 
 private:
     // Pre-allocated to avoid audio-thread heap allocation when assignments grow.

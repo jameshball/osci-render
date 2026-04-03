@@ -37,6 +37,8 @@
             file="tests/LfoStressTest.cpp"/>
       <FILE id="LuaCor" name="LuaCorrectnessTests.cpp" compile="1" resource="0"
             file="tests/LuaCorrectnessTests.cpp"/>
+      <FILE id="UndoRedo" name="UndoRedoTests.cpp" compile="1" resource="0"
+            file="tests/UndoRedoTests.cpp"/>
       <FILE id="LuBnH" name="LuaBenchmarkHelpers.h" compile="0" resource="0"
             file="tests/LuaBenchmarkHelpers.h"/>
       <FILE id="LuBn1" name="LuaRunBenchmarkTest.cpp" compile="1" resource="0"

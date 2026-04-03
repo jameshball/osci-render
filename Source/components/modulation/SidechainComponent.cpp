@@ -110,22 +110,34 @@ SidechainComponent::SidechainComponent(OscirenderAudioProcessor& processor)
 
     addAndMakeVisible(graph);
 
-    // Attack knob (0-2 seconds, default 0.3s, skew centre 0.3)
-    configureKnob(attackKnob, 2.0, 0.3, 0.3, " s", [this](float val) {
-        audioProcessor.sidechainParameters.setAttack(0, val);
-    });
+    // Attack knob
+    attackKnob.bindToParameter(audioProcessor.sidechainParameters.attack, 0.3);
+    attackKnob.getKnob().onValueChange = [this]() {
+        audioProcessor.sidechainParameters.setAttack(0, (float)attackKnob.getKnob().getValue());
+    };
     addAndMakeVisible(attackKnob);
 
-    // Release knob (0-2 seconds, default 0.3s, skew centre 0.3)
-    configureKnob(releaseKnob, 2.0, 0.3, 0.3, " s", [this](float val) {
-        audioProcessor.sidechainParameters.setRelease(0, val);
-    });
+    // Release knob
+    releaseKnob.bindToParameter(audioProcessor.sidechainParameters.release, 0.3);
+    releaseKnob.getKnob().onValueChange = [this]() {
+        audioProcessor.sidechainParameters.setRelease(0, (float)releaseKnob.getKnob().getValue());
+    };
     addAndMakeVisible(releaseKnob);
+
+    // Wire up the graph's undo manager so node changes are undoable
+    graph.setUndoManager(&audioProcessor.getUndoManager());
 
     // Disable scroll fade overlays — single tab is always fully visible
     tabViewport.setSidesEnabled(false, false);
 
+    // Register as listener on sidechain parameters so undo/redo triggers a UI sync
+    paramSync.track(audioProcessor.sidechainParameters.attack);
+    paramSync.track(audioProcessor.sidechainParameters.release);
+
     syncFromProcessorState();
+}
+
+SidechainComponent::~SidechainComponent() {
 }
 
 void SidechainComponent::timerCallback() {
@@ -270,24 +282,6 @@ void SidechainComponent::syncProcessorFromGraph() {
         std::vector<GraphNode> curveNodes(allNodes.begin() + 1, allNodes.end() - 1);
         audioProcessor.sidechainParameters.setTransferCurve(0, curveNodes);
     }
-}
-
-void SidechainComponent::configureKnob(KnobContainerComponent& container, double maxVal, double skewCentre,
-                                        double defaultVal, const juce::String& suffix,
-                                        std::function<void(float)> onChange) {
-    auto& knob = container.getKnob();
-    juce::NormalisableRange<double> range(0.0, maxVal);
-    range.setSkewForCentre(skewCentre);
-    knob.setNormalisableRange(range);
-    knob.setDoubleClickReturnValue(true, defaultVal);
-    knob.setTextValueSuffix(suffix);
-    knob.setNumDecimalPlacesToDisplay(3);
-    auto colour = getSidechainColour(0);
-    knob.setAccentColour(colour);
-    knob.onValueChange = [&knob, cb = std::move(onChange)]() {
-        cb((float)knob.getValue());
-    };
-    container.setAccentColour(colour);
 }
 
 void SidechainComponent::syncFromProcessorState() {

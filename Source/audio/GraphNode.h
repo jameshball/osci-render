@@ -9,6 +9,11 @@ struct GraphNode {
     double time = 0.0;   // Domain position
     double value = 0.0;  // Value position
     float curve = 0.0f;  // Curvature for incoming segment (0 = linear, range depends on mode)
+
+    bool operator==(const GraphNode& other) const {
+        return time == other.time && value == other.value && curve == other.curve;
+    }
+    bool operator!=(const GraphNode& other) const { return !(*this == other); }
 };
 
 // Evaluate a piecewise breakpoint curve at a given domain position.

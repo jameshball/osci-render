@@ -17,6 +17,24 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     setLookAndFeel(&lookAndFeel);
 
     addAndMakeVisible(menuBar);
+    addAndMakeVisible(undoButton);
+    addAndMakeVisible(redoButton);
+    addAndMakeVisible(undoLabel);
+    undoLabel.setJustificationType(juce::Justification::centredRight);
+    undoLabel.setFont(juce::Font(12.0f));
+    undoLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.7f));
+    redoButton.setTooltip("Redo");
+    undoButton.setEnabled(false);
+    redoButton.setEnabled(false);
+    undoButton.onClick = [this] {
+        audioProcessor.getUndoManager().undo();
+        updateUndoRedoState();
+    };
+    redoButton.onClick = [this] {
+        audioProcessor.getUndoManager().redo();
+        updateUndoRedoState();
+    };
+    startTimer(100);
 
     if (juce::JUCEApplicationBase::isStandaloneApp()) {
         if (juce::TopLevelWindow::getNumTopLevelWindows() > 0) {
@@ -59,6 +77,10 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     recordingSettingsWindow.setUsingNativeTitleBar(true);
 #endif
     
+    // Register as KeyListener on settings windows so undo/redo shortcuts
+    // work when those separate top-level windows have focus.
+    recordingSettingsWindow.addKeyListener(this);
+
     menuBar.toFront(true);
 
     setSize(width, height);
@@ -89,6 +111,26 @@ void CommonPluginEditor::parentHierarchyChanged()
 {
     // Refresh the title when the editor is attached/detached.
     updateTitle();
+
+    if (getPeer() != nullptr) {
+        // Register as KeyListener on the top-level component so that
+        // shortcuts are received even when no child component has focus
+        // (the top-level component is the fallback key target in JUCE).
+        auto* tl = getTopLevelComponent();
+        if (tl != nullptr && tl != topLevelKeyTarget) {
+            if (topLevelKeyTarget != nullptr)
+                topLevelKeyTarget->removeKeyListener(this);
+            tl->addKeyListener(this);
+            topLevelKeyTarget = tl;
+        }
+
+        // Grab keyboard focus so that shortcuts are received immediately.
+        juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
+        juce::MessageManager::callAsync([safeThis] {
+            if (safeThis != nullptr && safeThis->getPeer() != nullptr)
+                safeThis->grabKeyboardFocus();
+        });
+    }
 }
 
 void CommonPluginEditor::handleCommandLine(const juce::String& commandLine) {
@@ -171,6 +213,11 @@ void CommonPluginEditor::initialiseMenuBar(juce::MenuBarModel& menuBarModel) {
 }
 
 CommonPluginEditor::~CommonPluginEditor() {
+    stopTimer();
+    recordingSettingsWindow.removeKeyListener(this);
+    if (topLevelKeyTarget != nullptr)
+        topLevelKeyTarget->removeKeyListener(this);
+
     if (audioProcessor.haltRecording != nullptr) {
         audioProcessor.haltRecording();
     }
@@ -188,29 +235,72 @@ CommonPluginEditor::~CommonPluginEditor() {
     juce::Desktop::getInstance().setDefaultLookAndFeel(nullptr);
 }
 
-bool CommonPluginEditor::keyPressed(const juce::KeyPress& key) {
-    // If we're not accepting special keys, end early
-    if (!audioProcessor.getAcceptsKeys()) return false;
+// Shared handler for standard OS shortcuts (undo, redo, save, open).
+// These always work regardless of getAcceptsKeys() — they are fundamental
+// editor operations, not "special keys" like j/k for file switching.
 
-    if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'S') {
+void CommonPluginEditor::updateUndoRedoState() {
+    auto& um = audioProcessor.getUndoManager();
+
+    undoButton.setEnabled(um.canUndo());
+    redoButton.setEnabled(um.canRedo());
+
+    auto undoDesc = um.getUndoDescription();
+    undoLabel.setText(undoDesc.isNotEmpty() ? "Undo " + undoDesc : "",
+                      juce::dontSendNotification);
+
+    auto redoDesc = um.getRedoDescription();
+    redoButton.setTooltip(redoDesc.isNotEmpty() ? "Redo " + redoDesc : "Redo");
+}
+
+bool CommonPluginEditor::handleShortcut(const juce::KeyPress& key) {
+    if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'Z') {
+        audioProcessor.getUndoManager().redo();
+        updateUndoRedoState();
+        return true;
+    } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'Z') {
+        audioProcessor.getUndoManager().undo();
+        updateUndoRedoState();
+        return true;
+    } else if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'S') {
         saveProjectAs();
+        return true;
     } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'S') {
         saveProject();
+        return true;
     } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'O') {
         openProject();
-    } else if (key.isKeyCode(juce::KeyPress::F11Key) && juce::JUCEApplicationBase::isStandaloneApp()) {
+        return true;
+    }
+    return false;
+}
+
+bool CommonPluginEditor::keyPressed(const juce::KeyPress& key) {
+    // Standard OS shortcuts always work (not gated by getAcceptsKeys)
+    if (handleShortcut(key))
+        return true;
+
+    // Other special keys gated by user preference
+    if (!audioProcessor.getAcceptsKeys()) return false;
+
+    if (key.isKeyCode(juce::KeyPress::F11Key) && juce::JUCEApplicationBase::isStandaloneApp()) {
 #if OSCI_PREMIUM
         toggleFullScreen();
+        return true;
 #endif
     } else if (key.isKeyCode(juce::KeyPress::escapeKey) && juce::JUCEApplicationBase::isStandaloneApp()) {
-        // exit fullscreen if we're in fullscreen mode
-        // Return true to consume the event and prevent it from reaching child components
         if (fullScreen) {
             toggleFullScreen();
+            return true;
         }
     }
 
     return false;
+}
+
+// KeyListener callback — fires on the top-level component when no child has focus
+bool CommonPluginEditor::keyPressed(const juce::KeyPress& key, juce::Component*) {
+    return handleShortcut(key);
 }
 
 void CommonPluginEditor::openProject(const juce::File& file) {

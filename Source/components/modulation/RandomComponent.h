@@ -6,6 +6,7 @@
 #include "ModulationModeComponent.h"
 #include "../../audio/modulation/RandomState.h"
 #include "ModulationSourceComponent.h"
+#include "../ParameterSyncHelper.h"
 
 class OscirenderAudioProcessor;
 
@@ -14,6 +15,7 @@ class OscirenderAudioProcessor;
 class RandomComponent : public ModulationSourceComponent {
 public:
     RandomComponent(OscirenderAudioProcessor& processor);
+    ~RandomComponent() override;
 
     void resized() override;
     void timerCallback() override;
@@ -41,6 +43,8 @@ private:
     static constexpr int kMaxStyleWidth = 130;
 
     bool wasActive = false;
+
+    ParameterSyncHelper paramSync { [this] { syncFromProcessorState(); } };
 
     void syncGraphColours();
 

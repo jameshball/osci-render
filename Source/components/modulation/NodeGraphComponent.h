@@ -66,6 +66,19 @@ public:
     std::function<void()> onDragStarted;
     std::function<void()> onDragEnded;
 
+    // --- Undo support ---
+    // When set, node edits (drag, paint, add, remove) are recorded as undoable actions.
+    void setUndoManager(juce::UndoManager* um) { undoManager = um; }
+
+    // Record the current nodes as an undoable action against a previous snapshot.
+    // Call this around programmatic node changes (presets, paste, etc.).
+    void recordUndoableChange(const std::vector<GraphNode>& nodesBefore) {
+        if (undoManager != nullptr && nodesBefore != nodes) {
+            undoManager->beginNewTransaction("Edit Graph");
+            undoManager->perform(new NodeChangeAction(*this, nodesBefore, nodes));
+        }
+    }
+
     // Called after a node is moved/added/removed to allow the consumer to
     // apply constraints (e.g. lock first/last node position).
     // Parameters: nodeIndex, time (in/out), value (in/out)
@@ -281,6 +294,39 @@ private:
     bool flowMarkerColourSet = false;
     void ensureFlowTrailCreated();
     void ensureFlowRepaintTimerRunning();
+
+    // --- Undo ---
+    juce::UndoManager* undoManager = nullptr;
+    std::vector<GraphNode> nodesBeforeDrag;   // snapshot taken at drag start
+    bool hasPendingDragUndo = false;
+    void captureUndoSnapshot();
+    void commitUndoSnapshot();
+
+    // UndoableAction that restores/applies a set of nodes.
+    // Uses SafePointer so undo after an editor close/reopen is a no-op
+    // instead of a use-after-free crash.
+    struct NodeChangeAction : public juce::UndoableAction {
+        NodeChangeAction(NodeGraphComponent& graph,
+                         std::vector<GraphNode> before,
+                         std::vector<GraphNode> after)
+            : graphPtr(&graph), beforeNodes(std::move(before)), afterNodes(std::move(after)) {}
+
+        bool perform() override {
+            if (graphPtr == nullptr) return true;
+            graphPtr->setNodes(afterNodes);
+            if (graphPtr->onNodesChanged) graphPtr->onNodesChanged();
+            return true;
+        }
+        bool undo() override {
+            if (graphPtr == nullptr) return true;
+            graphPtr->setNodes(beforeNodes);
+            if (graphPtr->onNodesChanged) graphPtr->onNodesChanged();
+            return true;
+        }
+
+        juce::Component::SafePointer<NodeGraphComponent> graphPtr;
+        std::vector<GraphNode> beforeNodes, afterNodes;
+    };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(NodeGraphComponent)
 };

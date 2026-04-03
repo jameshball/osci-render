@@ -52,6 +52,12 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
         audioProcessor.broadcaster.addChangeListener(this);
     }
 
+    // Listen to each effect's selected/enabled parameters so undo/redo refreshes the list
+    for (auto& effect : audioProcessor.toggleableEffects) {
+        paramSync.track(effect->selected);
+        paramSync.track(effect->enabled);
+    }
+
     // Wire list model to notify when user wants to add
     itemData.onAddNewEffectRequested = [this]() {
         showingGrid = true;
@@ -67,26 +73,38 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
     showingGrid = !anySelected;
     grid.onEffectSelected = [this](const juce::String& effectId) {
         std::shared_ptr<osci::Effect> chosen;
+
+        // Group all changes from adding an effect into a single undo transaction:
+        // selected, enabled, LFO auto-assign, and precedence update.
+        auto& um = audioProcessor.getUndoManager();
+        um.beginNewTransaction("Add Effect");
+        {
+        CommonAudioProcessor::ScopedFlag grouping(audioProcessor.undoGrouping);
+
+        // Find the chosen effect (read-only under lock)
         {
             juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-            // Mark the chosen effect as selected and enabled, and move it to the end
             for (auto& eff : audioProcessor.toggleableEffects) {
                 if (eff->getId() == effectId) {
-                    eff->selected->setBoolValueNotifyingHost(true);
-                    eff->enabled->setBoolValueNotifyingHost(true);
                     chosen = eff;
                     break;
                 }
             }
-            // Place chosen effect at the end of the visible (selected) list and update precedence
-            if (chosen != nullptr) {
-                int idx = 0;
-                for (auto& e : itemData.data) {
-                    if (e != chosen) e->setPrecedence(idx++);
-                }
-                chosen->setPrecedence(idx++);
-                audioProcessor.updateEffectPrecedence();
+        }
+        // Set parameters OUTSIDE the SpinLock (they do ValueTree/UndoManager work)
+        if (chosen != nullptr) {
+            chosen->selected->setBoolValueNotifyingHost(true);
+            chosen->enabled->setBoolValueNotifyingHost(true);
+        }
+        // Place chosen effect at the end of the visible (selected) list and update precedence
+        if (chosen != nullptr) {
+            juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+            int idx = 0;
+            for (auto& e : itemData.data) {
+                if (e != chosen) e->setPrecedence(idx++);
             }
+            chosen->setPrecedence(idx++);
+            audioProcessor.updateEffectPrecedence();
         }
         // Promote any preview LFO assignments so hover-end won't remove them
         audioProcessor.promotePreviewLfoAssignments();
@@ -94,6 +112,7 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
         if (chosen != nullptr && (audioProcessor.isBeginnerMode() || audioProcessor.getGlobalBoolValue("autoLinkLfos", true))) {
             audioProcessor.autoAssignLfosForEffect(*chosen);
             audioProcessor.broadcaster.sendChangeMessage();
+        }
         }
         // Refresh list content to include newly selected
         itemData.resetData();
@@ -191,6 +210,26 @@ void EffectsComponent::changeListenerCallback(juce::ChangeBroadcaster* source) {
     listBox.updateContent();
 
     // Ensure layout updates after visibility changes
+    resized();
+    repaint();
+}
+
+void EffectsComponent::refreshListFromParams() {
+    // An effect's selected or enabled parameter changed (e.g. via undo/redo).
+    // Refresh the list just like changeListenerCallback does.
+    bool anySelected = hasAnySelectedEffects();
+    if (!showingGrid && !anySelected) {
+        showingGrid = true;
+        grid.setVisible(true);
+        listBox.setVisible(false);
+    } else if (showingGrid && anySelected) {
+        showingGrid = false;
+        grid.setVisible(false);
+        listBox.setVisible(true);
+    }
+    grid.refreshDisabledStates();
+    itemData.resetData();
+    listBox.updateContent();
     resized();
     repaint();
 }

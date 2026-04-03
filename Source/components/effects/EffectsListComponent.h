@@ -8,6 +8,7 @@
 #include "EffectTypeGridComponent.h"
 #include "../SvgButton.h"
 #include <random>
+#include <unordered_map>
 
 // Application-specific data container
 class OscirenderAudioProcessorEditor;
@@ -26,44 +27,56 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
         std::random_device rd;
         std::mt19937 g(rd());
         
+        // Group the entire randomise into a single undo transaction
+        audioProcessor.getUndoManager().beginNewTransaction("Randomise Effects");
+        CommonAudioProcessor::ScopedFlag grouping(audioProcessor.undoGrouping);
+
+        // Decide which effects to pick (indices into toggleableEffects)
+        int total;
+        std::vector<int> pickedIndices;
         {
             juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-            // Decide how many effects to select (1..5 or up to available)
-            int total = (int) audioProcessor.toggleableEffects.size();
-            int maxPick = juce::jmin(5, total);
-            int numPick = juce::jmax(1, juce::Random::getSystemRandom().nextInt({1, maxPick + 1}));
+            total = (int)audioProcessor.toggleableEffects.size();
+        }
+        int maxPick = juce::jmin(5, total);
+        int numPick = juce::jmax(1, juce::Random::getSystemRandom().nextInt({1, maxPick + 1}));
+        std::vector<int> indices(total);
+        std::iota(indices.begin(), indices.end(), 0);
+        std::shuffle(indices.begin(), indices.end(), g);
+        for (int k = 0; k < numPick && k < (int)indices.size(); ++k)
+            pickedIndices.push_back(indices[k]);
+        std::sort(pickedIndices.begin(), pickedIndices.end());
+
+        // Deselect and disable ALL effects (outside lock — ValueTree/UndoManager alloc)
+        for (auto& effect : audioProcessor.toggleableEffects) {
+            if (effect->selected != nullptr)
+                effect->selected->setBoolValueNotifyingHost(false);
+            if (effect->enabled != nullptr)
+                effect->enabled->setBoolValueNotifyingHost(false);
+        }
+        
+        // Enable the picked effects and randomise their params (outside lock)
+        for (int k : pickedIndices) {
+            auto& effect = audioProcessor.toggleableEffects[k];
+            if (effect->selected != nullptr)
+                effect->selected->setBoolValueNotifyingHost(true);
+            if (effect->enabled != nullptr)
+                effect->enabled->setBoolValueNotifyingHost(true);
             
-            // Build indices [0..total)
-            std::vector<int> indices(total);
-            std::iota(indices.begin(), indices.end(), 0);
-            std::shuffle(indices.begin(), indices.end(), g);
+            auto id = effect->getId().toLowerCase();
+            if (id.contains("scale") || id.contains("translate") || id.contains("trace"))
+                continue;
             
-            // First, deselect and disable all
-            for (auto& effect : audioProcessor.toggleableEffects) {
-                effect->markSelectable(false);
-                effect->markEnableable(false);
-            }
-            
-            // Pick numPick to select & enable, and randomise params
-            for (int k = 0; k < numPick && k < indices.size(); ++k) {
-                auto& effect = audioProcessor.toggleableEffects[indices[k]];
-                effect->markSelectable(true);
-                effect->markEnableable(true);
-                
-                auto id = effect->getId().toLowerCase();
-                if (id.contains("scale") || id.contains("translate") || id.contains("trace")) {
-                    continue;
-                }
-                
-                for (auto& parameter : effect->parameters) {
-                    parameter->setValueNotifyingHost(juce::Random::getSystemRandom().nextFloat());
-                    if (parameter->lfo != nullptr) {
-                        parameter->lfo->setUnnormalisedValueNotifyingHost((int) osci::LfoType::Static);
-                        parameter->lfoRate->setUnnormalisedValueNotifyingHost(1);
-                        if (juce::Random::getSystemRandom().nextFloat() > 0.8) {
-                            parameter->lfo->setUnnormalisedValueNotifyingHost((int)(juce::Random::getSystemRandom().nextFloat() * (int) osci::LfoType::Noise));
-                            parameter->lfoRate->setValueNotifyingHost(juce::Random::getSystemRandom().nextFloat() * 0.1);
-                        }
+            for (auto& parameter : effect->parameters) {
+                float normVal = juce::Random::getSystemRandom().nextFloat();
+                parameter->setUnnormalisedValueNotifyingHost(parameter->getUnnormalisedValue(normVal));
+                if (parameter->lfo != nullptr) {
+                    parameter->lfo->setUnnormalisedValueNotifyingHost((int) osci::LfoType::Static);
+                    parameter->lfoRate->setUnnormalisedValueNotifyingHost(1);
+                    if (juce::Random::getSystemRandom().nextFloat() > 0.8) {
+                        parameter->lfo->setUnnormalisedValueNotifyingHost((int)(juce::Random::getSystemRandom().nextFloat() * (int) osci::LfoType::Noise));
+                        float normRate = juce::Random::getSystemRandom().nextFloat() * 0.1f;
+                        parameter->lfoRate->setUnnormalisedValueNotifyingHost(parameter->lfoRate->getUnnormalisedValue(normRate));
                     }
                 }
             }
@@ -76,7 +89,7 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
             juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
             // shuffle precedence of the selected subset
             std::shuffle(data.begin(), data.end(), g);
-            for (int i = 0; i < data.size(); i++) {
+            for (int i = 0; i < (int)data.size(); i++) {
                 data[i]->setPrecedence(i);
             }
             audioProcessor.updateEffectPrecedence();
@@ -91,13 +104,16 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
 #if !OSCI_PREMIUM
             if (effect->isPremiumOnly()) continue; // skip premium effects in free version
 #endif
-            effect->setValue(effect->getValue());
             // Ensure 'selected' exists and defaults to true for older projects
             effect->markSelectable(effect->selected == nullptr ? true : effect->selected->getBoolValue());
             if (effect->selected == nullptr || effect->selected->getBoolValue()) {
                 data.push_back(effect);
             }
         }
+        // Sort by precedence so the list matches the user's custom ordering
+        std::sort(data.begin(), data.end(), [](const auto& a, const auto& b) {
+            return a->getPrecedence() < b->getPrecedence();
+        });
     }
 
     int getNumItems() override {
@@ -115,40 +131,65 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
         // data.push_back(juce::String("Yahoo"));
     }
 
+    // Capture current ordering as a vector of effect IDs
+    std::vector<juce::String> captureOrder() const {
+        std::vector<juce::String> order;
+        for (auto& e : data)
+            order.push_back(e->getId());
+        return order;
+    }
+
+    // Apply a saved ordering (updates local data + processor precedences)
+    void applyOrder(const std::vector<juce::String>& order) {
+        audioProcessor.applyEffectOrder(order);
+        resetData();
+    }
+
+    // UndoableAction for effect reordering — references the processor (which
+    // always outlives the UndoManager it owns) rather than the editor-scoped
+    // AudioEffectListBoxItemData, so undo after editor close is safe.
+    struct PrecedenceChangeAction : public juce::UndoableAction {
+        PrecedenceChangeAction(OscirenderAudioProcessor& p,
+                               std::vector<juce::String> before,
+                               std::vector<juce::String> after)
+            : processor(p), beforeOrder(std::move(before)), afterOrder(std::move(after)) {}
+
+        bool perform() override {
+            processor.applyEffectOrder(afterOrder);
+            return true;
+        }
+        bool undo() override {
+            processor.applyEffectOrder(beforeOrder);
+            return true;
+        }
+
+        OscirenderAudioProcessor& processor;
+        std::vector<juce::String> beforeOrder, afterOrder;
+    };
+
+    void performReorder(int fromIndex, int toIndex) {
+        auto beforeOrder = captureOrder();
+        auto dataCopy = data;
+        move(dataCopy, fromIndex, toIndex);
+        std::vector<juce::String> afterOrder;
+        for (auto& e : dataCopy)
+            afterOrder.push_back(e->getId());
+        audioProcessor.getUndoManager().beginNewTransaction("Reorder Effects");
+        audioProcessor.getUndoManager().perform(new PrecedenceChangeAction(audioProcessor, std::move(beforeOrder), std::move(afterOrder)));
+    }
+
     void moveBefore(int indexOfItemToMove, int indexOfItemToPlaceBefore) override {
-        juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-
-        auto effect = data[indexOfItemToMove];
-
-        if (indexOfItemToMove < indexOfItemToPlaceBefore) {
-            move(data, indexOfItemToMove, indexOfItemToPlaceBefore - 1);
-        } else {
-            move(data, indexOfItemToMove, indexOfItemToPlaceBefore);
-        }
-        
-        for (int i = 0; i < data.size(); i++) {
-            data[i]->setPrecedence(i);
-        }
-
-        audioProcessor.updateEffectPrecedence();
+        int dest = (indexOfItemToMove < indexOfItemToPlaceBefore)
+                       ? indexOfItemToPlaceBefore - 1
+                       : indexOfItemToPlaceBefore;
+        performReorder(indexOfItemToMove, dest);
     }
 
     void moveAfter(int indexOfItemToMove, int indexOfItemToPlaceAfter) override {
-        juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-
-        auto temp = data[indexOfItemToMove];
-        
-        if (indexOfItemToMove <= indexOfItemToPlaceAfter) {
-            move(data, indexOfItemToMove, indexOfItemToPlaceAfter);
-        } else {
-            move(data, indexOfItemToMove, indexOfItemToPlaceAfter + 1);
-        }
-        
-        for (int i = 0; i < data.size(); i++) {
-            data[i]->setPrecedence(i);
-        }
-
-        audioProcessor.updateEffectPrecedence();
+        int dest = (indexOfItemToMove <= indexOfItemToPlaceAfter)
+                       ? indexOfItemToPlaceAfter
+                       : indexOfItemToPlaceAfter + 1;
+        performReorder(indexOfItemToMove, dest);
     }
 
     template <typename t> void move(std::vector<t>& v, size_t oldIndex, size_t newIndex) {
@@ -160,11 +201,7 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
     }
     
     void setSelected(int itemIndex, bool selected) {
-        if (selected) {
-            data[itemIndex]->enabled->setValueNotifyingHost(true);
-        } else {
-            data[itemIndex]->enabled->setValueNotifyingHost(false);
-        }
+        data[itemIndex]->enabled->setBoolValueNotifyingHost(selected);
     }
 
     std::shared_ptr<osci::Effect> getEffect(int itemIndex) {

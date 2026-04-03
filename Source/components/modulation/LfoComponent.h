@@ -12,6 +12,8 @@
 #include "../SvgButton.h"
 #include "../KnobContainerComponent.h"
 
+#include "../ParameterSyncHelper.h"
+
 class OscirenderAudioProcessor;
 
 // LFO panel: subclass of ModulationSourceComponent that adds a waveform
@@ -20,6 +22,7 @@ class LfoComponent : public ModulationSourceComponent,
                      public LfoPresetBrowserOverlay::Listener {
 public:
     LfoComponent(OscirenderAudioProcessor& processor);
+    ~LfoComponent() override;
 
     void resized() override;
     void paint(juce::Graphics& g) override;
@@ -145,6 +148,8 @@ private:
     juce::Rectangle<int> paintControlsBg; // Dark background behind paint controls
     bool isSyncingGraph = false; // Guard against re-entrant onNodesChanged during programmatic sync
 
+    ParameterSyncHelper paramSync { [this] { syncFromProcessorState(); } };
+
     // --- Internal methods ---
     void syncGraphToActiveLfo();
     void syncActiveLfoFromGraph();
@@ -152,9 +157,11 @@ private:
     void applyPreset(LfoPreset preset);
     void updatePresetLabel();
     void applyLfoConstraints(int nodeIndex, double& time, double& value);
-    void configureKnob(KnobContainerComponent& container, double maxVal, double skewCentre,
-                        double defaultVal, const juce::String& suffix,
-                        std::function<void(float)> onChange);
+    // Records an undoable change for both the graph nodes and the processor-side
+    // LFO waveform.  The waveform action operates on the processor directly so
+    // that undo works even if the editor is destroyed and recreated.
+    void recordLfoUndoableChange(const std::vector<GraphNode>& nodesBefore,
+                                 const LfoWaveform& waveformBefore, int lfoIndex);
     void showPaintShapeMenu();
     void showPresetBrowser();
     void dismissPresetBrowser();

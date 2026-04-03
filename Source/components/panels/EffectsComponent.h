@@ -8,6 +8,7 @@
 #include "../effects/EffectsListComponent.h"
 #include "../ScrollFadeViewport.h"
 #include "../effects/EffectTypeGridComponent.h"
+#include "../ParameterSyncHelper.h"
 
 class OscirenderAudioProcessorEditor;
 class EffectsComponent : public juce::GroupComponent, public juce::ChangeListener {
@@ -37,6 +38,10 @@ private:
 	EffectComponent frequency = EffectComponent(*audioProcessor.frequencyEffect, false);
 
 	bool hasAnySelectedEffects() const;
+
+	// Syncs the list UI when an effect's selected/enabled param changes (e.g. via undo/redo)
+	void refreshListFromParams();
+	ParameterSyncHelper paramSync { [this] { refreshListFromParams(); } };
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EffectsComponent)
 };

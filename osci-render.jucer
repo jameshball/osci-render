@@ -265,6 +265,8 @@
                 file="Source/audio/modulation/ModulationAssignmentStore.h"/>
           <FILE id="MdSrH1" name="ModulationSource.h" compile="0" resource="0"
                 file="Source/audio/modulation/ModulationSource.h"/>
+          <FILE id="MdUaH1" name="ModulationUndoActions.h" compile="0" resource="0"
+                file="Source/audio/modulation/ModulationUndoActions.h"/>
           <FILE id="MdEnH1" name="ModulationEngine.h" compile="0" resource="0"
                 file="Source/audio/modulation/ModulationEngine.h"/>
           <FILE id="MdPtH1" name="ModulationParameterTypes.h" compile="0" resource="0"
@@ -387,6 +389,8 @@
               file="Source/components/RotaryKnobComponent.h"/>
         <FILE id="KnbCnt" name="KnobContainerComponent.h" compile="0" resource="0"
               file="Source/components/KnobContainerComponent.h"/>
+        <FILE id="PrmSHl" name="ParameterSyncHelper.h" compile="0" resource="0"
+              file="Source/components/ParameterSyncHelper.h"/>
         <FILE id="DkBrPt" name="DarkBarPainter.h" compile="0" resource="0"
               file="Source/components/DarkBarPainter.h"/>
         <FILE id="LbBrCm" name="LabelledBarComponent.h" compile="0" resource="0"

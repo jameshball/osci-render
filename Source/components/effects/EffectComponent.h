@@ -266,6 +266,8 @@ private:
     SvgButton settingsButton = {"settingsButton", BinaryData::cog_svg, juce::Colours::white};
 
     ModulationUpdateBroadcaster* modBroadcaster = nullptr;
+    bool* undoGroupingFlag = nullptr;
+    juce::String* lastChangedParamIdPtr = nullptr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EffectComponent)
 };
