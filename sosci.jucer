@@ -198,6 +198,10 @@
           <FILE id="EymEr3" name="SosciMainMenuBarModel.h" compile="0" resource="0"
                 file="Source/components/menu/SosciMainMenuBarModel.h"/>
         </GROUP>
+        <FILE id="ModStH" name="ModulationState.h" compile="0" resource="0"
+              file="Source/components/ModulationState.h"/>
+        <FILE id="ModStC" name="ModulationState.cpp" compile="1" resource="0"
+              file="Source/components/ModulationState.cpp"/>
         <FILE id="C5aY6T" name="CustomAudioDeviceSelectorComponent.h" compile="0"
               resource="0" file="Source/components/CustomAudioDeviceSelectorComponent.h"/>
         <FILE id="Yp4s2V" name="CustomAudioDeviceSelectorComponent.cpp" compile="1"
