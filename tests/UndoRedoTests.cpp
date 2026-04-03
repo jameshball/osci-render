@@ -395,30 +395,30 @@ public:
         beginTest("Effect.setValue undo/redo via SimpleEffect");
         {
             UndoTestHarness h;
-            auto* param = new osci::EffectParameter("Depth", "", "depth", 2, 0.5f, 0.0f, 1.0f, 0.01f);
-            h.bind(*param);
+            osci::EffectParameter param("Depth", "", "depth", 2, 0.5f, 0.0f, 1.0f, 0.01f);
+            h.bind(param);
 
-            osci::SimpleEffect effect(param);
+            osci::SimpleEffect effect(&param);
 
             effect.setValue(0, 0.8f);
-            expectWithinAbsoluteError(param->getValueUnnormalised(), 0.8f, 1e-4f);
+            expectWithinAbsoluteError(param.getValueUnnormalised(), 0.8f, 1e-4f);
 
             h.undoManager.undo();
-            expectWithinAbsoluteError(param->getValueUnnormalised(), 0.5f, 1e-4f,
+            expectWithinAbsoluteError(param.getValueUnnormalised(), 0.5f, 1e-4f,
                 "Effect.setValue should be undoable");
 
             h.undoManager.redo();
-            expectWithinAbsoluteError(param->getValueUnnormalised(), 0.8f, 1e-4f,
+            expectWithinAbsoluteError(param.getValueUnnormalised(), 0.8f, 1e-4f,
                 "Effect.setValue should be redoable");
         }
 
         beginTest("Effect enabled toggle undo/redo");
         {
             UndoTestHarness h;
-            auto* param = new osci::EffectParameter("Amount", "", "amount", 2, 0.5f, 0.0f, 1.0f, 0.01f);
-            h.bind(*param);
+            osci::EffectParameter param("Amount", "", "amount", 2, 0.5f, 0.0f, 1.0f, 0.01f);
+            h.bind(param);
 
-            osci::SimpleEffect effect(param);
+            osci::SimpleEffect effect(&param);
             effect.markEnableable(true);
             h.bind(*effect.enabled);
 
@@ -445,49 +445,103 @@ class PrecedenceUndoTest : public juce::UnitTest {
 public:
     PrecedenceUndoTest() : juce::UnitTest("Precedence Change Undo", "Undo") {}
 
+    static void applyOrder(std::vector<std::shared_ptr<osci::Effect>>& effects,
+                           const std::vector<juce::String>& order) {
+        std::unordered_map<juce::String, std::shared_ptr<osci::Effect>> idMap;
+        for (auto& effect : effects)
+            idMap[effect->getId()] = effect;
+
+        int idx = 0;
+        for (auto& id : order) {
+            auto it = idMap.find(id);
+            if (it != idMap.end()) {
+                it->second->setPrecedence(idx++);
+                idMap.erase(it);
+            }
+        }
+
+        for (auto& effect : effects) {
+            auto it = idMap.find(effect->getId());
+            if (it != idMap.end()) {
+                effect->setPrecedence(idx++);
+                idMap.erase(it);
+            }
+        }
+
+        std::sort(effects.begin(), effects.end(), [](const auto& a, const auto& b) {
+            return a->getPrecedence() < b->getPrecedence();
+        });
+    }
+
+    struct LocalPrecedenceChangeAction : public juce::UndoableAction {
+        LocalPrecedenceChangeAction(std::vector<std::shared_ptr<osci::Effect>>& effects,
+                                    std::vector<juce::String> before,
+                                    std::vector<juce::String> after)
+            : effects(effects), beforeOrder(std::move(before)), afterOrder(std::move(after)) {}
+
+        bool perform() override {
+            PrecedenceUndoTest::applyOrder(effects, afterOrder);
+            return true;
+        }
+
+        bool undo() override {
+            PrecedenceUndoTest::applyOrder(effects, beforeOrder);
+            return true;
+        }
+
+        std::vector<std::shared_ptr<osci::Effect>>& effects;
+        std::vector<juce::String> beforeOrder;
+        std::vector<juce::String> afterOrder;
+    };
+
     void runTest() override {
         beginTest("Precedence action perform and undo");
         {
-            auto* p1 = new osci::EffectParameter("E1", "", "e1", 2, 0.0f, 0.0f, 1.0f, 0.01f);
-            auto* p2 = new osci::EffectParameter("E2", "", "e2", 2, 0.0f, 0.0f, 1.0f, 0.01f);
-            auto* p3 = new osci::EffectParameter("E3", "", "e3", 2, 0.0f, 0.0f, 1.0f, 0.01f);
-            auto e1 = std::make_shared<osci::SimpleEffect>(p1);
-            auto e2 = std::make_shared<osci::SimpleEffect>(p2);
-            auto e3 = std::make_shared<osci::SimpleEffect>(p3);
-            e1->setName("E1"); e2->setName("E2"); e3->setName("E3");
-            e1->setPrecedence(0); e2->setPrecedence(1); e3->setPrecedence(2);
+            osci::EffectParameter p1("E1", "", "e1", 2, 0.0f, 0.0f, 1.0f, 0.01f);
+            osci::EffectParameter p2("E2", "", "e2", 2, 0.0f, 0.0f, 1.0f, 0.01f);
+            osci::EffectParameter p3("E3", "", "e3", 2, 0.0f, 0.0f, 1.0f, 0.01f);
+            osci::EffectParameter p4("E4", "", "e4", 2, 0.0f, 0.0f, 1.0f, 0.01f);
 
-            std::vector<std::shared_ptr<osci::Effect>> effects = { e1, e2, e3 };
+            auto e1 = std::make_shared<osci::SimpleEffect>(&p1);
+            auto e2 = std::make_shared<osci::SimpleEffect>(&p2);
+            auto e3 = std::make_shared<osci::SimpleEffect>(&p3);
+            auto omitted = std::make_shared<osci::SimpleEffect>(&p4);
 
-            auto captureOrder = [&]() {
-                std::vector<juce::String> order;
-                for (auto& e : effects) order.push_back(e->getId());
-                return order;
-            };
-            auto applyOrder = [&](const std::vector<juce::String>& order) {
-                std::unordered_map<juce::String, std::shared_ptr<osci::Effect>> idMap;
-                for (auto& e : effects) idMap[e->getId()] = e;
-                effects.clear();
-                for (auto& id : order) {
-                    auto it = idMap.find(id);
-                    if (it != idMap.end()) effects.push_back(it->second);
+            std::vector<std::shared_ptr<osci::Effect>> effects { e1, e2, e3, omitted };
+
+            e1->setPrecedence(0);
+            e2->setPrecedence(1);
+            e3->setPrecedence(2);
+            omitted->setPrecedence(1);
+
+            const auto beforeOrder = std::vector<juce::String>{ e1->getId(), e2->getId(), e3->getId() };
+            const auto afterOrder = std::vector<juce::String>{ e3->getId(), e1->getId(), e2->getId() };
+
+            auto positionOf = [&](const juce::String& effectId) {
+                for (int i = 0; i < (int)effects.size(); ++i) {
+                    if (effects[(size_t)i]->getId() == effectId)
+                        return i;
                 }
-                for (int i = 0; i < (int)effects.size(); i++)
-                    effects[i]->setPrecedence(i);
+                return -1;
             };
 
-            auto beforeOrder = captureOrder();
-            auto afterOrder = std::vector<juce::String>{ e3->getId(), e1->getId(), e2->getId() };
+            juce::UndoManager undoManager;
 
-            applyOrder(afterOrder);
-            expectEquals(effects[0]->getName(), juce::String("E3"), "First = E3");
-            expectEquals(effects[1]->getName(), juce::String("E1"), "Second = E1");
-            expectEquals(effects[2]->getName(), juce::String("E2"), "Third = E2");
+            undoManager.beginNewTransaction("Reorder Effects");
+            undoManager.perform(new LocalPrecedenceChangeAction(effects, beforeOrder, afterOrder));
 
-            applyOrder(beforeOrder);
-            expectEquals(effects[0]->getName(), juce::String("E1"), "First = E1 after undo");
-            expectEquals(effects[1]->getName(), juce::String("E2"), "Second = E2 after undo");
-            expectEquals(effects[2]->getName(), juce::String("E3"), "Third = E3 after undo");
+            expect(positionOf(e3->getId()) < positionOf(e1->getId()), "E3 should move before E1");
+            expect(positionOf(e1->getId()) < positionOf(e2->getId()), "E1 should move before E2");
+            expect(positionOf(e2->getId()) < positionOf(omitted->getId()), "Omitted effects should be appended after ordered ones");
+
+            undoManager.undo();
+            expect(positionOf(e1->getId()) < positionOf(e2->getId()), "Undo should restore E1 before E2");
+            expect(positionOf(e2->getId()) < positionOf(e3->getId()), "Undo should restore E2 before E3");
+            expect(positionOf(e3->getId()) < positionOf(omitted->getId()), "Undo should keep omitted effects after the ordered subset");
+
+            undoManager.redo();
+            expect(positionOf(e3->getId()) < positionOf(e1->getId()), "Redo should restore E3 before E1");
+            expect(positionOf(e1->getId()) < positionOf(e2->getId()), "Redo should restore E1 before E2");
         }
     }
 };

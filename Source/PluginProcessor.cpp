@@ -486,8 +486,17 @@ void OscirenderAudioProcessor::applyEffectOrder(const std::vector<juce::String>&
         int idx = 0;
         for (auto& id : order) {
             auto it = idMap.find(id);
-            if (it != idMap.end())
+            if (it != idMap.end()) {
                 it->second->setPrecedence(idx++);
+                idMap.erase(it);
+            }
+        }
+        for (auto& effect : toggleableEffects) {
+            auto it = idMap.find(effect->getId());
+            if (it != idMap.end()) {
+                effect->setPrecedence(idx++);
+                idMap.erase(it);
+            }
         }
         updateEffectPrecedence();
     }
