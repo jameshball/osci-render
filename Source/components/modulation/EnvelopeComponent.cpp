@@ -409,17 +409,10 @@ void EnvelopeComponent::syncFromProcessorState() {
 
 void EnvelopeComponent::bindKnobToParam(KnobContainerComponent& container, osci::FloatParameter* param,
                                           double skewCentre, const juce::String& suffix) {
+    container.bindToParameter(param, skewCentre);
     auto& knob = container.getKnob();
-    double minVal = param->min.load();
-    double maxVal = param->max.load();
-    juce::NormalisableRange<double> range(minVal, maxVal);
-    if (skewCentre > minVal && skewCentre < maxVal)
-        range.setSkewForCentre(skewCentre);
-    knob.setNormalisableRange(range);
-    knob.setDoubleClickReturnValue(true, (double)param->defaultValue.load());
     if (suffix.isNotEmpty())
         knob.setTextValueSuffix(suffix);
-    knob.setNumDecimalPlacesToDisplay(3);
     knob.setValue((double)param->getValueUnnormalised(), juce::dontSendNotification);
 
     knob.onValueChange = [this, &knob, param]() {

@@ -499,7 +499,7 @@ juce::MouseCursor OscirenderLookAndFeel::getMouseCursorFor(juce::Component& comp
     }
     juce::Button* button = dynamic_cast<juce::Button*>(&component);
     if (button != nullptr) {
-        return juce::MouseCursor::PointingHandCursor;
+        return button->isEnabled() ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor;
     }
     juce::ComboBox* comboBox = dynamic_cast<juce::ComboBox*>(&component);
     if (comboBox != nullptr) {

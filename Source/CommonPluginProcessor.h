@@ -21,7 +21,8 @@ public:
     virtual void parserChanged() = 0;
 };
 
-class CommonAudioProcessor  : public juce::AudioProcessor, public SampleRateManager, public juce::Timer
+class CommonAudioProcessor  : public juce::AudioProcessor, public SampleRateManager, public juce::Timer,
+                              public juce::ValueTree::Listener
                             #if JucePlugin_Enable_ARA
                              , public juce::AudioProcessorARAExtension
                             #endif
@@ -31,6 +32,8 @@ public:
     ~CommonAudioProcessor() override;
 
     void addAllParameters();
+
+    juce::UndoManager& getUndoManager() { return undoManager; }
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
@@ -194,6 +197,35 @@ public:
 
     void setOfflineRenderActive(bool active) { offlineRenderActive.store(active); }
     bool isOfflineRenderActive() const { return offlineRenderActive.load(); }
+
+    // ValueTree undo support
+    juce::UndoManager undoManager;
+    juce::ValueTree stateTree { "State" };
+
+    // Tracks which parameter last changed, so we start a new undo transaction
+    // only when a different parameter is modified (slider drags coalesce).
+    juce::String lastUndoParamId;
+
+    // When true, parameter changes and modulation assignment changes bypass the
+    // UndoManager.  Used during preview hover operations.
+    bool undoSuppressed = false;
+
+    // When true, parameter setters and modulation methods skip calling
+    // beginNewTransaction() so multiple changes coalesce into one transaction.
+    bool undoGrouping = false;
+
+    // RAII guard that sets a bool flag to true on construction and false on destruction.
+    struct ScopedFlag {
+        bool& flag;
+        explicit ScopedFlag(bool& f) : flag(f) { flag = true; }
+        ~ScopedFlag() { flag = false; }
+        ScopedFlag(const ScopedFlag&) = delete;
+        ScopedFlag& operator=(const ScopedFlag&) = delete;
+    };
+
+    // ValueTree::Listener override — dispatches undo/redo changes to parameters
+    void valueTreePropertyChanged(juce::ValueTree& treeWhosePropertyHasChanged, const juce::Identifier& property) override;
+
 protected:
     
     std::vector<osci::BooleanParameter*> booleanParameters;
@@ -234,4 +266,7 @@ private:
     void timerCallback() override;
 
     bool heartbeatActive = false;
+
+    // Maps paramID → AudioProcessorParameter* for O(1) lookup in valueTreePropertyChanged
+    std::unordered_map<juce::String, juce::AudioProcessorParameter*> paramIdMap;
 };

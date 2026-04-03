@@ -280,6 +280,7 @@ void SosciAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
         recordingParameters.load(xml.get());
         
         loadProperties(*xml);
+        undoManager.clearUndoHistory();
         juce::Logger::writeToLog("setStateInformation: state restore complete");
 }
 

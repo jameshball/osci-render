@@ -175,6 +175,44 @@ void CommonAudioProcessor::addAllParameters() {
     for (auto parameter : intParameters) {
         addParameter(parameter);
     }
+
+    // Bind all parameters to the ValueTree for undo/redo support
+    stateTree.addListener(this);
+
+    // Parameters that should NOT participate in undo/redo
+    auto isUndoExcluded = [](const juce::String& paramID) {
+        return paramID == "visualiserFullScreen";
+    };
+
+    for (auto* param : getParameters()) {
+        if (auto* bp = dynamic_cast<osci::BooleanParameter*>(param)) {
+            auto* um = isUndoExcluded(bp->paramID) ? nullptr : &undoManager;
+            bp->bindToValueTree(stateTree, um, &lastUndoParamId, &undoSuppressed, &undoGrouping);
+            paramIdMap[bp->paramID] = bp;
+        } else if (auto* ip = dynamic_cast<osci::IntParameter*>(param)) {
+            auto* um = isUndoExcluded(ip->paramID) ? nullptr : &undoManager;
+            ip->bindToValueTree(stateTree, um, &lastUndoParamId, &undoSuppressed, &undoGrouping);
+            paramIdMap[ip->paramID] = ip;
+        } else if (auto* fp = dynamic_cast<osci::FloatParameter*>(param)) {
+            auto* um = isUndoExcluded(fp->paramID) ? nullptr : &undoManager;
+            fp->bindToValueTree(stateTree, um, &lastUndoParamId, &undoSuppressed, &undoGrouping);
+            paramIdMap[fp->paramID] = fp;
+        }
+    }
+    undoManager.clearUndoHistory();
+}
+
+void CommonAudioProcessor::valueTreePropertyChanged(juce::ValueTree& treeWhosePropertyHasChanged, const juce::Identifier& property) {
+    if (treeWhosePropertyHasChanged != stateTree) return;
+    auto it = paramIdMap.find(property.toString());
+    if (it == paramIdMap.end()) return;
+    auto* param = it->second;
+    if (auto* bp = dynamic_cast<osci::BooleanParameter*>(param))
+        bp->applyValueFromTree();
+    else if (auto* ip = dynamic_cast<osci::IntParameter*>(param))
+        ip->applyValueFromTree();
+    else if (auto* fp = dynamic_cast<osci::FloatParameter*>(param))
+        fp->applyValueFromTree();
 }
 
 

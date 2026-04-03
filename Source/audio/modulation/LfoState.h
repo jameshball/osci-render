@@ -20,6 +20,11 @@ struct LfoWaveform {
     std::vector<LfoNode> nodes;
     bool smooth = true;
 
+    bool operator==(const LfoWaveform& other) const {
+        return smooth == other.smooth && nodes == other.nodes;
+    }
+    bool operator!=(const LfoWaveform& other) const { return !(*this == other); }
+
     // Evaluate the waveform at a given phase [0, 1] -> value [0, 1].
     float evaluate(float phase) const {
         phase = phase - std::floor(phase);

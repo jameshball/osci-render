@@ -276,6 +276,9 @@ public:
 
     void addLuaSlider();
     void updateEffectPrecedence();
+    // Apply a saved effect ordering by ID.  Used by undo/redo — safe to call
+    // even if the editor has been destroyed and recreated.
+    void applyEffectOrder(const std::vector<juce::String>& order);
     void updateFileBlock(int index, std::shared_ptr<juce::MemoryBlock> block);
     void addFile(juce::File file);
     void addFile(juce::String fileName, const char* data, const int size);

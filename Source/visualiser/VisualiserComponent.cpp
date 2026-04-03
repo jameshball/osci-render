@@ -611,6 +611,8 @@ void VisualiserComponent::popoutWindow() {
     popout->setContentOwned(visualiser, true);
     popout->setUsingNativeTitleBar(true);
     popout->setResizable(true, false);
+    // Register editor as KeyListener so undo/redo shortcuts work in the popout window
+    popout->addKeyListener(&editor);
     popout->setVisible(true);
     popout->centreWithSize(350, 350);
     // Hide all buttons on the popout and set up mirror mode

@@ -15,6 +15,16 @@ public:
 
     RotaryKnobComponent& getKnob() { return knob; }
 
+    // Configure the knob's range, default, suffix, and decimal places from a FloatParameter.
+    void bindToParameter(osci::FloatParameter* param, double skewCentre) {
+        juce::NormalisableRange<double> range((double)param->min.load(), (double)param->max.load());
+        range.setSkewForCentre(skewCentre);
+        knob.setNormalisableRange(range);
+        knob.setDoubleClickReturnValue(true, (double)param->defaultValue.load());
+        knob.setTextValueSuffix(param->getLabel());
+        knob.setNumDecimalPlacesToDisplay(3);
+    }
+
     void setLabel(const juce::String& text) { label = text; repaint(); }
     void setAccentColour(juce::Colour c) { knob.setAccentColour(c); }
 

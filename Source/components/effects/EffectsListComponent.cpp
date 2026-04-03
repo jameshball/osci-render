@@ -18,13 +18,8 @@ effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
         effectComponent->wireModulation(audioProcessor);
         
         list.setEnabled(enabled.getToggleState());
-        enabled.onClick = [this, weakEffectComponent] {
-            if (auto effectComponent = weakEffectComponent.lock()) {
-                auto data = (AudioEffectListBoxItemData&)modelData;
-                juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-                data.setSelected(rowNum, enabled.getToggleState());
-                list.setEnabled(enabled.getToggleState());
-            }
+        enabled.onClick = [this] {
+            list.setEnabled(enabled.getToggleState());
             repaint();
         };
         effectComponent->updateToggleState = [this, i, weakEffectComponent] {
@@ -66,24 +61,36 @@ effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
         // Remove all LFO/envelope assignments targeting this effect's parameters
         audioProcessor.removeAllAssignmentsForEffect(this->effect);
 
-        // Flip flags under lock
+        // Group the removal into a single undo transaction
+        auto& um = audioProcessor.getUndoManager();
+        um.beginNewTransaction("Remove Effect");
+        {
+        CommonAudioProcessor::ScopedFlag grouping(audioProcessor.undoGrouping);
+
+        // Set parameters OUTSIDE the SpinLock (they now do ValueTree/UndoManager work)
+        if (this->effect.enabled) this->effect.enabled->setBoolValueNotifyingHost(false);
+        if (this->effect.selected) this->effect.selected->setBoolValueNotifyingHost(false);
+
+        // Reset defaults under lock (quick, non-allocating)
         {
             juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-            if (this->effect.enabled) this->effect.enabled->setValueNotifyingHost(false);
-            if (this->effect.selected) this->effect.selected->setValueNotifyingHost(false);
-            // Reset all parameters/flags for this effect back to defaults on removal
             this->effect.resetToDefault();
         }
+        }
+        // Use SafePointer on the listBox (a Component) so the async callback
+        // is a no-op if the parent EffectsComponent is destroyed first.
+        juce::Component::SafePointer<DraggableListBox> safeLb(&this->listBox);
+        auto* dataPtr = &static_cast<AudioEffectListBoxItemData&>(modelData);
         // Defer model reset and outer list refresh to avoid re-entrancy on current row
-        juce::MessageManager::callAsync([this]() {
-            auto& data = static_cast<AudioEffectListBoxItemData&>(modelData);
-            data.resetData();
+        juce::MessageManager::callAsync([safeLb, dataPtr]() {
+            if (safeLb == nullptr) return;
+            dataPtr->resetData();
             // Update the outer DraggableListBox, not the inner parameter list
-            this->listBox.updateContent();
+            safeLb->updateContent();
             // If there are no effects visible, open the grid
-            if (data.getNumItems() == 0) {
-                if (data.onAddNewEffectRequested)
-                    data.onAddNewEffectRequested();
+            if (dataPtr->getNumItems() == 0) {
+                if (dataPtr->onAddNewEffectRequested)
+                    dataPtr->onAddNewEffectRequested();
             }
         });
     };

@@ -13,10 +13,18 @@ void SosciMainMenuBarModel::resetMenuItems() {
     constexpr int RECENT_BASE_ID = 1000;
 
     addTopLevelMenu("File");
+    addTopLevelMenu("Edit");
     addTopLevelMenu("About");
     addTopLevelMenu("Video");
     addTopLevelMenu("Audio");
     addTopLevelMenu("Interface");
+
+    const int fileMenu      = 0;
+    const int editMenu      = 1;
+    const int aboutMenu     = 2;
+    const int videoMenu     = 3;
+    const int audioMenu     = 4;
+    const int interfaceMenu = 5;
 
     std::vector<std::tuple<juce::String, const void*, int>> examples = {
         {"default.sosci", BinaryData::default_sosci, BinaryData::default_sosciSize},
@@ -71,7 +79,7 @@ void SosciMainMenuBarModel::resetMenuItems() {
         return false;
     };
 
-    addMenuItem(0, "Open Audio File", [&]() {
+    addMenuItem(fileMenu, "Open Audio File", [&]() {
         fileChooser = std::make_unique<juce::FileChooser>("Open Audio File", processor.getLastOpenedDirectory(), "*.wav;*.aiff;*.flac;*.ogg;*.mp3");
         auto flags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
         fileChooser->launchAsync(flags, [&](const juce::FileChooser& chooser) {
@@ -82,14 +90,17 @@ void SosciMainMenuBarModel::resetMenuItems() {
             }
         });
     });
-    addMenuItem(0, "Open Project", [&]() { editor.openProject(); });
-    addMenuItem(0, "Save Project", [&]() { editor.saveProject(); });
-    addMenuItem(0, "Save Project As", [&]() { editor.saveProjectAs(); });
+    addMenuItem(fileMenu, "Open Project", [&]() { editor.openProject(); });
+    addMenuItem(fileMenu, "Save Project", [&]() { editor.saveProject(); });
+    addMenuItem(fileMenu, "Save Project As", [&]() { editor.saveProjectAs(); });
     if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-        addMenuItem(0, "Create New Project", [&]() { editor.resetToDefault(); });
+        addMenuItem(fileMenu, "Create New Project", [&]() { editor.resetToDefault(); });
     }
 
-    addMenuItem(1, "About sosci", [&]() {
+    addMenuItem(editMenu, "Undo", [this] { processor.getUndoManager().undo(); }, juce::String::fromUTF8("\xe2\x8c\x98Z"));
+    addMenuItem(editMenu, "Redo", [this] { processor.getUndoManager().redo(); }, juce::String::fromUTF8("\xe2\x87\xa7\xe2\x8c\x98Z"));
+
+    addMenuItem(aboutMenu, "About sosci", [&]() {
         juce::DialogWindow::LaunchOptions options;
         AboutComponent::Info aboutInfo;
         aboutInfo.imageData = BinaryData::sosci_logo_png;
@@ -126,15 +137,15 @@ void SosciMainMenuBarModel::resetMenuItems() {
         juce::DialogWindow* dw = options.launchAsync();
     });
 
-    addMenuItem(2, "Settings...", [this] {
+    addMenuItem(videoMenu, "Settings...", [this] {
         editor.openRecordingSettings();
     });
 
-    addMenuItem(2, "Render Audio File to Video...", [this] {
+    addMenuItem(videoMenu, "Render Audio File to Video...", [this] {
         editor.renderAudioFileToVideo();
     });
 
-    addMenuItem(3, "Force Disable Brightness Input", [&]() {
+    addMenuItem(audioMenu, "Force Disable Brightness Input", [&]() {
         processor.forceDisableBrightnessInput = !processor.forceDisableBrightnessInput;
         if (processor.forceDisableBrightnessInput) {
             // Disabling brightness should also disable RGB
@@ -142,7 +153,7 @@ void SosciMainMenuBarModel::resetMenuItems() {
         }
         menuItemsChanged();
     });
-    addMenuItem(3, "Force Disable RGB Input", [&]() {
+    addMenuItem(audioMenu, "Force Disable RGB Input", [&]() {
         processor.forceDisableRgbInput = !processor.forceDisableRgbInput;
         if (!processor.forceDisableRgbInput) {
             // Enabling RGB implies brightness is allowed too
@@ -152,11 +163,11 @@ void SosciMainMenuBarModel::resetMenuItems() {
     });
 
     if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-        addMenuItem(3, "Settings...", [&]() { editor.openAudioSettings(); });
+        addMenuItem(audioMenu, "Settings...", [&]() { editor.openAudioSettings(); });
     }
 
-    // Interface menu index depends on whether Audio menu exists
-    addToggleMenuItem(4, "Listen for Special Keys", [this] {
+    // Interface menu
+    addToggleMenuItem(interfaceMenu, "Listen for Special Keys", [this] {
         processor.setAcceptsKeys(! processor.getAcceptsKeys());
         resetMenuItems();
     }, [this] { return processor.getAcceptsKeys(); });

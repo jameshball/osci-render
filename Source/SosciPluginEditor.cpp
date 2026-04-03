@@ -66,7 +66,14 @@ void SosciPluginEditor::resized() {
     if (audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
         visualiser.setBounds(area);
     } else {
-        menuBar.setBounds(area.removeFromTop(25));
+        auto topBar = area.removeFromTop(25);
+        menuBar.setBounds(topBar);
+        redoButton.setBounds(topBar.removeFromRight(25).reduced(2, 2));
+        undoButton.setBounds(topBar.removeFromRight(25).reduced(2, 2));
+        undoLabel.setBounds(topBar.removeFromRight(juce::jmin(150, topBar.getWidth())).reduced(2, 2));
+        undoLabel.toFront(false);
+        undoButton.toFront(false);
+        redoButton.toFront(false);
 
         if (juce::JUCEApplication::isStandaloneApp()) {
             auto volumeArea = area.removeFromLeft(35);
@@ -124,6 +131,8 @@ void SosciPluginEditor::visualiserFullScreenChanged() {
     }
     visualiserSettingsWrapper.setVisible(!fullScreen);
     menuBar.setVisible(!fullScreen);
+    undoButton.setVisible(!fullScreen);
+    redoButton.setVisible(!fullScreen);
     resized();
     repaint();
 }

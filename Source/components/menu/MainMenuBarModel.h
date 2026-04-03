@@ -7,7 +7,7 @@ public:
     ~MainMenuBarModel();
 
     void addTopLevelMenu(const juce::String& name);
-    void addMenuItem(int topLevelMenuIndex, const juce::String& name, std::function<void()> action);
+    void addMenuItem(int topLevelMenuIndex, const juce::String& name, std::function<void()> action, const juce::String& shortcutKey = {});
     // Adds a toggle (ticked) menu item whose tick state is provided dynamically via isTicked()
     void addToggleMenuItem(int topLevelMenuIndex, const juce::String& name, std::function<void()> action, std::function<bool()> isTicked);
     void resetMenuItems();
@@ -27,6 +27,7 @@ private:
         std::function<void()> action;
         std::function<bool()> isTicked; // optional tick state
         bool hasTick = false;
+        juce::String shortcutKey;
     };
 
     juce::StringArray topLevelMenuNames;

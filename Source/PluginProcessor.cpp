@@ -219,6 +219,20 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     randomParameters.setColourFunction(&RandomComponent::getRandomColour);
     sidechainParameters.setColourFunction(&SidechainComponent::getSidechainColour);
 
+    // Wire undo manager to modulation sources so assignment changes are undoable.
+    lfoParameters.setUndoManager(&undoManager);
+    lfoParameters.setUndoSuppressedFlag(&undoSuppressed);
+    lfoParameters.setUndoGroupingFlag(&undoGrouping);
+    envelopeParameters.setUndoManager(&undoManager);
+    envelopeParameters.setUndoSuppressedFlag(&undoSuppressed);
+    envelopeParameters.setUndoGroupingFlag(&undoGrouping);
+    randomParameters.setUndoManager(&undoManager);
+    randomParameters.setUndoSuppressedFlag(&undoSuppressed);
+    randomParameters.setUndoGroupingFlag(&undoGrouping);
+    sidechainParameters.setUndoManager(&undoManager);
+    sidechainParameters.setUndoSuppressedFlag(&undoSuppressed);
+    sidechainParameters.setUndoGroupingFlag(&undoGrouping);
+
     // Wire up renderer-side modulation for visualiser effects.
     // The renderer calls this after animateValues() to apply LFO/ENV modulation.
     visualiserParameters.applyExternalModulation = [this](int numSamples) {
@@ -461,6 +475,32 @@ void OscirenderAudioProcessor::updateEffectPrecedence() {
         return a->getPrecedence() < b->getPrecedence();
     };
     std::sort(toggleableEffects.begin(), toggleableEffects.end(), sortFunc);
+}
+
+void OscirenderAudioProcessor::applyEffectOrder(const std::vector<juce::String>& order) {
+    {
+        juce::SpinLock::ScopedLockType lock(effectsLock);
+        std::unordered_map<juce::String, std::shared_ptr<osci::Effect>> idMap;
+        for (auto& e : toggleableEffects)
+            idMap[e->getId()] = e;
+        int idx = 0;
+        for (auto& id : order) {
+            auto it = idMap.find(id);
+            if (it != idMap.end()) {
+                it->second->setPrecedence(idx++);
+                idMap.erase(it);
+            }
+        }
+        for (auto& effect : toggleableEffects) {
+            auto it = idMap.find(effect->getId());
+            if (it != idMap.end()) {
+                effect->setPrecedence(idx++);
+                idMap.erase(it);
+            }
+        }
+        updateEffectPrecedence();
+    }
+    broadcaster.sendChangeMessage();
 }
 
 // parsersLock AND effectsLock must be locked before calling this function
@@ -1301,6 +1341,7 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
 
         broadcaster.sendChangeMessage();
         prevMidiEnabled = !midiEnabled->getBoolValue();
+        undoManager.clearUndoHistory();
         juce::Logger::writeToLog("setStateInformation: state restore complete");
 }
 
@@ -1338,11 +1379,13 @@ void OscirenderAudioProcessor::autoAssignLfosForEffect(osci::Effect& effect) {
 }
 
 void OscirenderAudioProcessor::autoAssignLfosForPreview(const juce::String& effectId) {
+    ScopedFlag suppress(undoSuppressed);
     lfoParameters.startPreview(effectId, toggleableEffects,
                                [this](const osci::Effect& e) { removeAllAssignmentsForEffect(e); });
 }
 
 void OscirenderAudioProcessor::clearPreviewLfoAssignments() {
+    ScopedFlag suppress(undoSuppressed);
     lfoParameters.stopPreview(toggleableEffects,
                               [this](const osci::Effect& e) { removeAllAssignmentsForEffect(e); });
 }

@@ -37,7 +37,16 @@ EffectComponent::EffectComponent(osci::Effect& effect, int index) : effect(effec
         linkButton.setTooltip("When enabled, parameters are linked and changes to one parameter will affect all parameters.");
         linkButton.onClick = [this]() {
             if (this->effect.linked != nullptr) {
-                this->effect.linked->setBoolValueNotifyingHost(!this->effect.linked->getBoolValue());
+                bool newState = !this->effect.linked->getBoolValue();
+                this->effect.linked->setBoolValueNotifyingHost(newState);
+                // When link is toggled on, sync all params to param 0's value
+                if (newState) {
+                    if (undoGroupingFlag) *undoGroupingFlag = true;
+                    for (int i = 1; i < this->effect.parameters.size(); i++) {
+                        this->effect.setValue(i, this->effect.parameters[0]->getValueUnnormalised());
+                    }
+                    if (undoGroupingFlag) *undoGroupingFlag = false;
+                }
             }
         };
         addAndMakeVisible(linkButton);
@@ -94,13 +103,11 @@ EffectComponent::EffectComponent(osci::Effect& effect, int index) : effect(effec
 EffectComponent::EffectComponent(osci::Effect& effect) : EffectComponent(effect, 0) {}
 
 void EffectComponent::setSliderValueIfChanged(osci::FloatParameter* parameter, juce::Slider& slider) {
-    juce::String newSliderValue = juce::String(parameter->getValueUnnormalised(), 3);
-    juce::String oldSliderValue = juce::String((float)slider.getValue(), 3);
+    double paramValue = (double)parameter->getValueUnnormalised();
+    double sliderValue = slider.getValue();
 
-    // only set the slider value if the parameter value is different so that we prefer the more
-    // precise slider value.
-    if (newSliderValue != oldSliderValue) {
-        slider.setValue(parameter->getValueUnnormalised(), juce::dontSendNotification);
+    if (!juce::approximatelyEqual(paramValue, sliderValue)) {
+        slider.setValue(paramValue, juce::dontSendNotification);
     }
 }
 
@@ -111,12 +118,6 @@ void EffectComponent::setupComponent() {
 
     if (effect.linked != nullptr && index == 0) {
         linkButton.setToggleState(effect.linked->getBoolValue(), juce::dontSendNotification);
-
-        if (effect.linked->getBoolValue()) {
-            for (int i = 1; i < effect.parameters.size(); i++) {
-                effect.setValue(i, effect.parameters[0]->getValueUnnormalised());
-            }
-        }
     }
 
     if (updateToggleState != nullptr) {
@@ -137,11 +138,17 @@ void EffectComponent::setupComponent() {
         effect.setValue(index, slider.getValue());
 
         if (effect.linked != nullptr && effect.linked->getBoolValue()) {
+            if (undoGroupingFlag) *undoGroupingFlag = true;
             for (int i = 0; i < effect.parameters.size(); i++) {
                 if (i != index) {
                     effect.setValue(i, slider.getValue());
                 }
             }
+            if (undoGroupingFlag) *undoGroupingFlag = false;
+            // Restore lastChangedParamId to the primary param so consecutive
+            // drag updates for the same slider coalesce into one transaction
+            if (lastChangedParamIdPtr)
+                *lastChangedParamIdPtr = effect.parameters[index]->paramID;
         }
     };
 
@@ -452,6 +459,8 @@ void EffectComponent::itemDropped(const SourceDetails& dragSourceDetails) {
 
 #ifndef SOSCI
 void EffectComponent::wireModulation(OscirenderAudioProcessor& processor) {
+    undoGroupingFlag = &processor.undoGrouping;
+    lastChangedParamIdPtr = &processor.lastUndoParamId;
     // Build modBindings from the processor's central registry.
     // Adding a new modulation source type only requires updating
     // OscirenderAudioProcessor::getModulationSourceBindings().

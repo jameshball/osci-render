@@ -88,8 +88,19 @@ RandomComponent::RandomComponent(OscirenderAudioProcessor& processor)
     styleControl.setSourceIndex(getActiveSourceIndex());
     addAndMakeVisible(styleControl);
 
+    // Register as listener on all Random parameters so undo/redo triggers a UI sync
+    for (int i = 0; i < NUM_RANDOM_SOURCES; ++i) {
+        paramSync.track(audioProcessor.randomParameters.rate[i]);
+        paramSync.track(audioProcessor.randomParameters.style[i]);
+        paramSync.track(audioProcessor.randomParameters.rateMode[i]);
+        paramSync.track(audioProcessor.randomParameters.tempoDivision[i]);
+    }
+
     // Restore state
     syncFromProcessorState();
+}
+
+RandomComponent::~RandomComponent() {
 }
 
 void RandomComponent::timerCallback() {

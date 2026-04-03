@@ -4,6 +4,7 @@
 #include "NodeGraphComponent.h"
 #include "ModulationSourceComponent.h"
 #include "../KnobContainerComponent.h"
+#include "../ParameterSyncHelper.h"
 #include "../../audio/modulation/SidechainState.h"
 
 class OscirenderAudioProcessor;
@@ -23,6 +24,7 @@ class OscirenderAudioProcessor;
 class SidechainComponent : public ModulationSourceComponent {
 public:
     SidechainComponent(OscirenderAudioProcessor& processor);
+    ~SidechainComponent() override;
 
     void resized() override;
     void paint(juce::Graphics& g) override;
@@ -57,12 +59,11 @@ private:
     // Guard against re-entrant onNodesChanged
     bool isSyncingGraph = false;
 
+    ParameterSyncHelper paramSync { [this] { syncFromProcessorState(); } };
+
     void syncGraphFromProcessor();
     void syncGraphColours();
     void syncProcessorFromGraph();
-    void configureKnob(KnobContainerComponent& container, double maxVal, double skewCentre,
-                       double defaultVal, const juce::String& suffix,
-                       std::function<void(float)> onChange);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SidechainComponent)
 };

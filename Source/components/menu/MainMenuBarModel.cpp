@@ -10,8 +10,8 @@ void MainMenuBarModel::addTopLevelMenu(const juce::String& name) {
     menuItemsChanged();
 }
 
-void MainMenuBarModel::addMenuItem(int topLevelMenuIndex, const juce::String& name, std::function<void()> action) {
-    menuItems[topLevelMenuIndex].push_back({ name, std::move(action), {}, false });
+void MainMenuBarModel::addMenuItem(int topLevelMenuIndex, const juce::String& name, std::function<void()> action, const juce::String& shortcutKey) {
+    menuItems[topLevelMenuIndex].push_back({ name, std::move(action), {}, false, shortcutKey });
     menuItemsChanged();
 }
 
@@ -35,6 +35,8 @@ juce::PopupMenu MainMenuBarModel::getMenuForIndex(int topLevelMenuIndex, const j
         auto& mi = menuItems[topLevelMenuIndex][i];
         juce::PopupMenu::Item item(mi.name);
         item.itemID = i + 1;
+        if (mi.shortcutKey.isNotEmpty())
+            item.shortcutKeyDescription = mi.shortcutKey;
         if (mi.hasTick && mi.isTicked)
             item.setTicked(mi.isTicked());
         menu.addItem(item);

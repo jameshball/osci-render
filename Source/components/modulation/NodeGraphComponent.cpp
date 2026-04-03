@@ -719,9 +719,28 @@ void NodeGraphComponent::mouseExit(const juce::MouseEvent&) {
     repaint();
 }
 
+void NodeGraphComponent::captureUndoSnapshot() {
+    if (undoManager != nullptr) {
+        nodesBeforeDrag = nodes;
+        hasPendingDragUndo = true;
+    }
+}
+
+void NodeGraphComponent::commitUndoSnapshot() {
+    if (undoManager != nullptr && hasPendingDragUndo) {
+        hasPendingDragUndo = false;
+        if (nodesBeforeDrag != nodes) {
+            undoManager->beginNewTransaction("Edit Graph");
+            undoManager->perform(new NodeChangeAction(*this, std::move(nodesBeforeDrag), nodes));
+        }
+    }
+}
+
 void NodeGraphComponent::mouseDown(const juce::MouseEvent& e) {
     if (e.mods.isRightButtonDown())
         return;
+
+    captureUndoSnapshot();
 
     // Paint mode: start painting
     if (paintMode) {
@@ -887,16 +906,19 @@ void NodeGraphComponent::mouseUp(const juce::MouseEvent&) {
     if (paintMode && isPainting) {
         isPainting = false;
         paintLastDomain = -1.0;
+        commitUndoSnapshot();
         if (onDragEnded) onDragEnded();
         return;
     }
     if (activeHandle != nullptr) {
         activeHandle->isDragging = false;
+        commitUndoSnapshot();
         // Fire callback while active state is still queryable
         if (onDragEnded) onDragEnded();
         activeHandle = nullptr;
     }
     if (activeCurveIndex >= 1) {
+        commitUndoSnapshot();
         // Fire callback while active state is still queryable
         if (onDragEnded) onDragEnded();
         activeCurveIndex = -1;
@@ -918,8 +940,10 @@ void NodeGraphComponent::mouseDoubleClick(const juce::MouseEvent& e) {
     bool nodeInRange = nodeDist <= effectiveThreshold;
 
     if (curveInRange && (!nodeInRange || curveDist <= nodeDist)) {
+        captureUndoSnapshot();
         if (onDragStarted) onDragStarted();
         nodes[closestCurve].curve = 0.0f;
+        commitUndoSnapshot();
         if (onNodesChanged) onNodesChanged();
         if (onDragEnded) onDragEnded();
         repaint();
@@ -932,11 +956,13 @@ void NodeGraphComponent::mouseDoubleClick(const juce::MouseEvent& e) {
     if (closest != nullptr && allowAddRemove && dist < effectiveThreshold) {
         int idx = closest->nodeIndex;
         if (idx > 0 && idx < (int)nodes.size() - 1 && (int)nodes.size() > minNodes) {
+            captureUndoSnapshot();
             if (onDragStarted) onDragStarted();
             nodes.erase(nodes.begin() + idx);
             activeHandle = nullptr;
             hoverHandle = nullptr;
             rebuildHandles();
+            commitUndoSnapshot();
             if (onNodesChanged) onNodesChanged();
             if (onDragEnded) onDragEnded();
             repaint();
@@ -946,6 +972,7 @@ void NodeGraphComponent::mouseDoubleClick(const juce::MouseEvent& e) {
 
     // Double-click on empty space adds a new node
     if (allowAddRemove && (int)nodes.size() < maxNodes) {
+        captureUndoSnapshot();
         double newTime = convertPixelsToDomain(e.x - kHandleSize / 2);
         double newValue = convertPixelsToValue(e.y - kHandleSize / 2);
         newTime = juce::jlimit(domainMin, domainMax, newTime);
@@ -957,6 +984,7 @@ void NodeGraphComponent::mouseDoubleClick(const juce::MouseEvent& e) {
         nodes.insert(it, newNode);
 
         rebuildHandles();
+        commitUndoSnapshot();
         if (onNodesChanged) onNodesChanged();
         repaint();
     }

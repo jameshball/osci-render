@@ -123,10 +123,13 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     visualiserSettingsWindow.setUsingNativeTitleBar(true);
 #endif
 
+    visualiserSettingsWindow.addKeyListener(this);
+
     initialiseMenuBar(model);
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
+    visualiserSettingsWindow.removeKeyListener(this);
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
     audioProcessor.syphonInputActive = false;
 #endif
@@ -228,15 +231,26 @@ void OscirenderAudioProcessorEditor::resized() {
 
     if (audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
         visualiser.setBounds(area);
+        undoButton.setVisible(false);
+        redoButton.setVisible(false);
         return;
     }
 
+    undoButton.setVisible(true);
+    redoButton.setVisible(true);
+
     if (!usingNativeMenuBar) {
         auto topBar = area.removeFromTop(25);
-        menuBar.setBounds(topBar);
 #if !OSCI_PREMIUM
         upgradeButton.setBounds(topBar.removeFromRight(150).reduced(2, 2));
 #endif
+        menuBar.setBounds(topBar);
+        redoButton.setBounds(topBar.removeFromRight(25).reduced(2, 2));
+        undoButton.setBounds(topBar.removeFromRight(25).reduced(2, 2));
+        undoLabel.setBounds(topBar.removeFromRight(juce::jmin(150, topBar.getWidth())).reduced(2, 2));
+        undoLabel.toFront(false);
+        undoButton.toFront(false);
+        redoButton.toFront(false);
     }
 
     bool editorVisible = false;
@@ -566,7 +580,8 @@ bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
         }
     }
 
-    CommonPluginEditor::keyPressed(key);
+    if (CommonPluginEditor::keyPressed(key))
+        return true;
 
     return consumeKey;
 }

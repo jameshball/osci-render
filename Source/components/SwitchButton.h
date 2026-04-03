@@ -61,9 +61,6 @@ public:
         this->parameter = parameter;
         setToggleState(parameter->getBoolValue(), juce::NotificationType::dontSendNotification);
         parameter->addListener(this);
-        onStateChange = [this]() {
-            this->parameter->setBoolValueNotifyingHost(getToggleState());
-        };
         addAndMakeVisible(label);
         label.setTooltip(parameter->getDescription());
         label.setText(parameter->name, juce::NotificationType::dontSendNotification);
@@ -85,6 +82,11 @@ public:
     }
     
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override {}
+
+    void clicked() override {
+        if (parameter != nullptr)
+            parameter->setBoolValueNotifyingHost(getToggleState());
+    }
 
     void setMillisecondsToSpendMoving (int newValue)
     {
