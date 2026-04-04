@@ -125,7 +125,20 @@ inline LfoPreset stringToLfoPreset(const juce::String& s) {
 // Generate preset waveform node sets (defined in LfoState.cpp).
 LfoWaveform createLfoPreset(LfoPreset preset);
 
-// Map beginner-mode per-parameter LfoType to global LfoPreset.
+// Parse a string (as stored in XML) into an LfoType enum.
+// Uses the same string mapping as LfoTypeParameter::getText / getValueForText.
+inline osci::LfoType stringToLfoType(const juce::String& str) {
+    if (str == "Sine")              return osci::LfoType::Sine;
+    if (str == "Square")            return osci::LfoType::Square;
+    if (str == "Seesaw")            return osci::LfoType::Seesaw;
+    if (str == "Triangle")          return osci::LfoType::Triangle;
+    if (str == "Sawtooth")          return osci::LfoType::Sawtooth;
+    if (str == "Reverse Sawtooth")  return osci::LfoType::ReverseSawtooth;
+    if (str == "Noise")             return osci::LfoType::Noise;
+    return osci::LfoType::Static;
+}
+
+// Map free-version per-parameter LfoType to global LfoPreset.
 // Returns {preset, negateDepth}.  negateDepth is true for ReverseSawtooth
 // (modelled as a Sawtooth with negative depth in the global system, unless
 // we now have a native ReverseSawtooth preset).

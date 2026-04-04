@@ -1,3 +1,5 @@
+#if OSCI_PREMIUM
+
 #include "FractalComponent.h"
 #include "../PluginEditor.h"
 #include "../LookAndFeel.h"
@@ -204,3 +206,5 @@ void FractalComponent::resized() {
 
     layoutRulesContent();
 }
+
+#endif // OSCI_PREMIUM

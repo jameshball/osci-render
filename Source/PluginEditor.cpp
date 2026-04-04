@@ -199,7 +199,10 @@ bool OscirenderAudioProcessorEditor::isBinaryFile(juce::String name) {
         // doesn't really make sense to edit SVG or OBJ files as text in this context
         || name.endsWith(".svg")
         || name.endsWith(".obj")
-        || name.endsWith(".lsystem");
+#if OSCI_PREMIUM
+        || name.endsWith(".lsystem")
+#endif
+        ;
 }
 
 // parsersLock and syphonLock must be held
@@ -222,6 +225,12 @@ void OscirenderAudioProcessorEditor::dragOperationEnded(const juce::DragAndDropT
 
 void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
     g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
+#if !OSCI_PREMIUM
+    if (!usingNativeMenuBar) {
+        g.setColour(getLookAndFeel().findColour(juce::TextButton::buttonColourId));
+        g.fillRect(0, 0, getWidth(), kMenuBarHeight);
+    }
+#endif
 }
 
 void OscirenderAudioProcessorEditor::resized() {
@@ -240,7 +249,7 @@ void OscirenderAudioProcessorEditor::resized() {
     redoButton.setVisible(true);
 
     if (!usingNativeMenuBar) {
-        auto topBar = area.removeFromTop(25);
+        auto topBar = area.removeFromTop(kMenuBarHeight);
 #if !OSCI_PREMIUM
         upgradeButton.setBounds(topBar.removeFromRight(150).reduced(2, 2));
 #endif

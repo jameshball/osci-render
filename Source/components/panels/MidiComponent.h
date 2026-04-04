@@ -27,8 +27,11 @@ private:
 
     jux::SwitchButton midiToggle{audioProcessor.midiEnabled};
 	ParameterBarComponent voicesBar{audioProcessor.voices, "VOICES"};
+#if !OSCI_PREMIUM
+	juce::Label midiLabel{"", "Enable MIDI"};
+#endif
+#if OSCI_PREMIUM
 	ParameterBarComponent bendBar{audioProcessor.pitchBendRange, "BEND"};
-
 	KnobContainerComponent velTrkKnob{"VELOCITY"};
 	KnobContainerComponent glideKnob{"GLIDE"};
 
@@ -37,8 +40,8 @@ private:
 	ToggleLabelComponent alwaysGlideToggle{audioProcessor.alwaysGlide};
 	ToggleLabelComponent legatoToggle{audioProcessor.legato};
 	ToggleLabelComponent octaveScaleToggle{audioProcessor.octaveScale};
-
 	ParameterBarComponent tempoBar{audioProcessor.standaloneBpm, "BPM"};
+#endif
 
 	void updateEnabledState();
 

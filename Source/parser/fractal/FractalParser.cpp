@@ -1,3 +1,5 @@
+#if OSCI_PREMIUM
+
 #include "FractalParser.h"
 #include "../../../modules/osci_render_core/shape/osci_Line.h"
 #include <cmath>
@@ -311,3 +313,5 @@ std::vector<std::unique_ptr<osci::Shape>> FractalParser::draw() {
     }
     return shapes;
 }
+
+#endif // OSCI_PREMIUM

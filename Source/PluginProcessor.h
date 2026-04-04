@@ -98,12 +98,6 @@ public:
     void captureDrawingState(ManagedVoice& mv) override;
     void restoreDrawingState(ManagedVoice& target, const ManagedVoice& source) override;
 
-    // Beginner mode: per-parameter LFO dropdowns, mic icon, single amplitude envelope, simplified layout.
-    // Advanced mode: drag-and-drop LFO/ENV module panels, full layout.
-    // Set once at construction from OSCI_PREMIUM; persisted in state XML.
-    // Changing mode requires a plugin reload (parameter tree is fixed at construction).
-    bool isBeginnerMode() const { return beginnerMode; }
-
     // Central 60 Hz broadcaster for modulation display updates.
     // EffectComponents register/unregister via wireModulation / destructor.
     ModulationUpdateBroadcaster modulationUpdateBroadcaster;
@@ -187,10 +181,6 @@ public:
     std::atomic<bool> objectServerRendering = false;
     juce::ChangeBroadcaster fileChangeBroadcaster;
 
-    // Beginner/advanced mode flag — read from global settings at construction, immutable after.
-    // Free builds are always beginner; premium reads the persisted preference.
-    bool beginnerMode = true;
-
     // === Envelope modulation state ===
     EnvelopeParameters envelopeParameters;
 
@@ -217,6 +207,11 @@ public:
     void clearPreviewLfoAssignments();
     void promotePreviewLfoAssignments();
 
+#if OSCI_PREMIUM
+    // Convert per-parameter LFOs from a free project into global LFO assignments
+    void convertFreeProjectLfos(const juce::XmlElement* effectsXml);
+#endif
+
     // Returns all modulation source bindings for generic wiring in EffectComponent.
     std::vector<ModulationSourceBinding> getModulationSourceBindings();
 
@@ -228,13 +223,17 @@ public:
     osci::IntParameter* fileSelect = new osci::IntParameter("File Select", "fileSelect", VERSION_HINT, 1, 1, 100);
 
     // --- Note settings ---
+#if OSCI_PREMIUM
     osci::IntParameter* pitchBendRange = new osci::IntParameter("Bend", "pitchBendRange", VERSION_HINT, 2, 0, 48);
+#endif
     osci::FloatParameter* velocityTracking = new osci::FloatParameter("Velocity", "velocityTracking", VERSION_HINT, 1.0f, -1.0f, 1.0f, 0.01f);
+#if OSCI_PREMIUM
     osci::FloatParameter* glideTime = new osci::FloatParameter("Glide", "glideTime", VERSION_HINT, 0.0f, 0.0f, 16.0f, 0.001f);
     osci::FloatParameter* glideSlope = new osci::FloatParameter("Slope", "glideSlope", VERSION_HINT, 0.0f, -8.0f, 8.0f, 0.01f);
     osci::BooleanParameter* alwaysGlide = new osci::BooleanParameter("Always Glide", "alwaysGlide", VERSION_HINT, false, "When enabled, glide is always active, even when notes are played staccato.");
     osci::BooleanParameter* legato = new osci::BooleanParameter("Legato", "legato", VERSION_HINT, false, "When enabled with mono voice, successive notes do not retrigger the envelope.");
     osci::BooleanParameter* octaveScale = new osci::BooleanParameter("Octave Scale", "octaveScale", VERSION_HINT, false, "When enabled, the glide time scales with the pitch interval between notes.");
+#endif
 
     // Number of MIDI notes currently held. Audio-thread only.
     int getNumPressedNotes() const;
@@ -273,6 +272,7 @@ public:
             "imageStride",
             VERSION_HINT, 4, 1, 50, 1));
 
+#if OSCI_PREMIUM
     // Fractal L-system parameters
     std::atomic<int> fractalIterations{3};
 
@@ -286,6 +286,7 @@ public:
             "Controls the recursion depth of the L-system fractal. Higher values produce more detail but require more processing.",
             "fractalIterations",
             VERSION_HINT, 3.0, 0.0, 15.0, 1.0));
+#endif
 
     std::atomic<double> animationFrame = 0.f;
 
@@ -366,8 +367,8 @@ public:
         "ogg",
         "flac",
         "mp3",
-        "lsystem",
 #if OSCI_PREMIUM
+        "lsystem",
         "mp4",
         "mov",
 #endif
@@ -395,15 +396,15 @@ private:
     ObjectServer objectServer{*this};
 
     // Peak-rectified input audio: per-sample max(|L|, |R|), no smoothing.
-    // Fed into envelope followers (sidechain, beginner-mode per-parameter sidechain).
+    // Fed into envelope followers (sidechain, free-version per-parameter sidechain).
     juce::AudioBuffer<float> rectifiedInputBuffer;
 
-    // Default envelope follower for beginner-mode per-parameter sidechain.
-    // Uses fixed attack/release so beginner-mode effects respond to input level.
+    // Default envelope follower for free-version per-parameter sidechain.
+    // Uses fixed attack/release so free-version effects respond to input level.
     static constexpr float kDefaultEnvelopeAttack  = 0.1f;
     static constexpr float kDefaultEnvelopeRelease = 0.1f;
     // Linear identity curve: input [0,1] → output [0,1] unchanged.
-    // Used by the default envelope follower for beginner-mode sidechain.
+    // Used by the default envelope follower for free-version sidechain.
     const std::vector<GraphNode> kIdentityCurve = { { 0.0, 0.0, 0.0f }, { 1.0, 1.0, 0.0f } };
     SidechainAudioState defaultEnvelopeState;
     juce::AudioBuffer<float> currentVolumeBuffer;

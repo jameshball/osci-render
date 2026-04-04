@@ -1,5 +1,7 @@
 #pragma once
 
+#if OSCI_PREMIUM
+
 #include <JuceHeader.h>
 #include <vector>
 #include <memory>
@@ -102,3 +104,5 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FractalParser)
 };
+
+#endif // OSCI_PREMIUM

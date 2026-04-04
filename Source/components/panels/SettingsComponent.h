@@ -15,7 +15,9 @@
 #include "../modulation/EnvelopeComponent.h"
 #include "../OpenFileComponent.h"
 #include "../FileControlsComponent.h"
+#if OSCI_PREMIUM
 #include "../FractalComponent.h"
+#endif
 #include "../modulation/LfoComponent.h"
 #include "../modulation/RandomComponent.h"
 #include "../modulation/SidechainComponent.h"
@@ -40,14 +42,15 @@ public:
 private:
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& pluginEditor;
-    bool beginnerMode = false;
 
     FileControlsComponent fileControls{audioProcessor, pluginEditor};
     QuickControlsBar quickControls{audioProcessor, pluginEditor};
     FrameSettingsComponent frame{audioProcessor, pluginEditor};
     EffectsComponent effects{audioProcessor, pluginEditor};
     MidiComponent midi{audioProcessor, pluginEditor};
+#if OSCI_PREMIUM
     FractalComponent fractalEditor{audioProcessor, pluginEditor};
+#endif
     OpenFileComponent examples{audioProcessor};
 
     // Free-standing components (previously inside MidiComponent)

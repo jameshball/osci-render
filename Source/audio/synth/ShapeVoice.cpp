@@ -136,6 +136,7 @@ void ShapeVoice::voiceActivated(const VoiceState& vs, bool isLegato) {
 
     if (audioProcessor.midiEnabled->getBoolValue()) {
         double newFreq = juce::MidiMessage::getMidiNoteInHertz(vs.midiNote) + osci_audio::kMacFrequencyEpsilonHz;
+#if OSCI_PREMIUM
         double glideTimeSec = audioProcessor.glideTime->getValueUnnormalised();
 
         // Determine glide source and whether to glide.
@@ -179,6 +180,10 @@ void ShapeVoice::voiceActivated(const VoiceState& vs, bool isLegato) {
             frequency = newFreq;
             glideActive = false;
         }
+#else
+        frequency = newFreq;
+        glideActive = false;
+#endif
     }
 }
 
@@ -543,8 +548,11 @@ void ShapeVoice::noteStopped() {
 
 void ShapeVoice::pitchWheelMoved(int newPitchWheelValue) {
     rawPitchWheelValue = newPitchWheelValue;
-    // Bend range in semitones from parameter; convert to frequency ratio
+#if OSCI_PREMIUM
     int bendSemitones = audioProcessor.pitchBendRange->getValueUnnormalised();
+#else
+    int bendSemitones = 2; // Free version: fixed 2-semitone bend range
+#endif
     double bendNorm = (newPitchWheelValue - 8192.0) / 8192.0; // -1..+1
     double bendInSemitones = bendNorm * bendSemitones;
     pitchWheelAdjustment = std::pow(2.0, bendInSemitones / 12.0);

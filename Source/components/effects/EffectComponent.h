@@ -87,7 +87,7 @@ public:
             addAndMakeVisible(min);
             addAndMakeVisible(max);
 
-            // LFO start/end sliders only in beginner mode (when per-param LFO sub-params exist)
+            // LFO start/end sliders only in free version (when per-param LFO sub-params exist)
             hasLfoParams = parameter->lfoStartPercent != nullptr && parameter->lfoEndPercent != nullptr;
             if (hasLfoParams) {
                 addAndMakeVisible(lfoStartLabel);

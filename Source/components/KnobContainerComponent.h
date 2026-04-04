@@ -202,15 +202,16 @@ public:
 
     void paint(juce::Graphics& g) override {
         auto bounds = getLocalBounds().toFloat();
+        float alpha = isEnabled() ? 1.0f : 0.3f;
 
         // Faint rounded rectangle behind the label only
         auto labelArea = bounds.removeFromBottom(Colours::kLabelHeight);
         auto labelBg = labelArea.reduced(2.0f, 0.0f);
-        g.setColour(Colours::darkerer());
+        g.setColour(Colours::darkerer().withAlpha(alpha));
         g.fillRoundedRectangle(labelBg, Colours::kPillRadius);
 
         // Label text
-        g.setColour(juce::Colours::white);
+        g.setColour(juce::Colours::white.withAlpha(alpha));
         g.setFont(juce::Font(10.0f));
         g.drawText(label, labelArea, juce::Justification::centred, false);
     }

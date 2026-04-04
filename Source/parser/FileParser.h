@@ -9,7 +9,9 @@
 #include "../lua/LuaParser.h"
 #include "img/ImageParser.h"
 #include "../audio/wav/WavParser.h"
+#if OSCI_PREMIUM
 #include "fractal/FractalParser.h"
+#endif
 
 class OscirenderAudioProcessor;
 class FileParser {
@@ -37,7 +39,9 @@ public:
 	std::shared_ptr<LuaParser> getLua();
 	std::shared_ptr<ImageParser> getImg();
 	std::shared_ptr<WavParser> getWav();
+#if OSCI_PREMIUM
 	std::shared_ptr<FractalParser> getFractal();
+#endif
 
 	bool isAnimatable = false;
 
@@ -58,7 +62,9 @@ private:
 	std::shared_ptr<LuaParser> lua;
 	std::shared_ptr<ImageParser> img;
 	std::shared_ptr<WavParser> wav;
+#if OSCI_PREMIUM
 	std::shared_ptr<FractalParser> fractal;
+#endif
 
 	juce::String fallbackLuaScript = "return { 0.0, 0.0 }";
 

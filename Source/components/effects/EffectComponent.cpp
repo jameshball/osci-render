@@ -13,8 +13,8 @@ EffectComponent::EffectComponent(osci::Effect& effect, int index) : effect(effec
     addAndMakeVisible(label);
     addAndMakeVisible(settingsButton);
 
-    // LFO ComboBox is only relevant when per-param LFO sub-params exist (beginner mode).
-    // In advanced mode, lfo/lfoRate are nullptr so we skip the combobox entirely.
+    // LFO ComboBox is only relevant when per-param LFO sub-params exist (free version).
+    // In premium, lfo/lfoRate are nullptr so we skip the combobox entirely.
     lfoEnabled = effect.parameters[index]->lfo != nullptr && effect.parameters[index]->lfoRate != nullptr;
     if (lfoEnabled) {
         addAndMakeVisible(lfo);
@@ -84,7 +84,7 @@ EffectComponent::EffectComponent(osci::Effect& effect, int index) : effect(effec
     settingsButton.onClick = [this] {
         auto settings = std::make_unique<EffectSettingsComponent>(this);
         settings->setLookAndFeel(&getLookAndFeel());
-        // Smaller popup in advanced mode (no LFO start/end sliders)
+        // Smaller popup in premium (no LFO start/end sliders)
         int height = (this->effect.parameters[this->index]->lfoStartPercent != nullptr) ? 290 : 170;
         settings->setSize(200, height);
         auto& myBox = juce::CallOutBox::launchAsynchronously(std::move(settings), settingsButton.getScreenBounds(), nullptr);
@@ -479,5 +479,7 @@ void EffectComponent::wireModulation(OscirenderAudioProcessor& processor) {
             || ModulationState::needsHighlightRepaint(false, effect.parameters[index]->paramID))
             repaint();
     });
+
+    repaint();
 }
 #endif

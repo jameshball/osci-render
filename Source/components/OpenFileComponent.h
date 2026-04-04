@@ -48,7 +48,9 @@ private:
     CategoryViews luaCat { juce::GroupComponent({}, "Lua"), GridComponent{} };
     CategoryViews modelsCat { juce::GroupComponent({}, "3D models"), GridComponent{} };
     CategoryViews svgsCat { juce::GroupComponent({}, "SVGs"), GridComponent{} };
+#if OSCI_PREMIUM
     CategoryViews fractalCat { juce::GroupComponent({}, "Fractals"), GridComponent{} };
+#endif
 
     // Helpers
     // Adds an example resource to a category. Optionally you may supply a custom icon SVG string & size.

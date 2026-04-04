@@ -24,15 +24,67 @@ QuickControlsBar::QuickControlsBar(OscirenderAudioProcessor& p, OscirenderAudioP
     frequencyKnob.wireModulation(audioProcessor);
     perspectiveKnob.wireModulation(audioProcessor);
     fovKnob.wireModulation(audioProcessor);
+
+#if !OSCI_PREMIUM
+    addAndMakeVisible(midiToggle);
+    addAndMakeVisible(midiLabel);
+    midiLabel.setFont(juce::Font(13.0f));
+    midiLabel.setJustificationType(juce::Justification::centredLeft);
+    midiLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+
+    addAndMakeVisible(voicesBar);
+    voicesBar.setVisible(audioProcessor.midiEnabled->getBoolValue());
+#endif
+
+    audioProcessor.midiEnabled->addListener(this);
+    frequencyKnob.setVisible(!audioProcessor.midiEnabled->getBoolValue());
 }
 
-QuickControlsBar::~QuickControlsBar() {}
+QuickControlsBar::~QuickControlsBar() {
+    audioProcessor.midiEnabled->removeListener(this);
+}
+
+void QuickControlsBar::parameterValueChanged(int, float) {
+    triggerAsyncUpdate();
+}
+
+void QuickControlsBar::parameterGestureChanged(int, bool) {}
+
+void QuickControlsBar::handleAsyncUpdate() {
+    bool midiOn = audioProcessor.midiEnabled->getBoolValue();
+    frequencyKnob.setVisible(!midiOn);
+#if !OSCI_PREMIUM
+    voicesBar.setVisible(midiOn);
+#endif
+    resized();
+    repaint();
+}
 
 void QuickControlsBar::resized() {
     auto area = getLocalBounds().reduced(5, 3);
 
     constexpr int gap = 3;
-    constexpr int numCols = 3;
+
+#if !OSCI_PREMIUM
+    // Layout: [toggle][label][voices] | [freq][persp][fov]
+    constexpr int toggleW = 30;
+    constexpr int labelW = 75;
+    constexpr int voicesW = 80;
+
+    auto midiArea = area.removeFromLeft(toggleW);
+    midiToggle.setBounds(midiArea.withSizeKeepingCentre(toggleW, 22));
+
+    midiLabel.setBounds(area.removeFromLeft(labelW));
+    area.removeFromLeft(gap);
+
+    bool midiOn = audioProcessor.midiEnabled->getBoolValue();
+    if (midiOn) {
+        voicesBar.setBounds(area.removeFromLeft(voicesW).reduced(0, 1));
+        area.removeFromLeft(gap);
+    }
+#endif
+
+    int numCols = frequencyKnob.isVisible() ? 3 : 2;
     int totalGaps = (numCols - 1) * gap;
     int available = area.getWidth() - totalGaps;
     float colWidth = (float)available / (float)numCols;
@@ -51,7 +103,8 @@ void QuickControlsBar::resized() {
         return juce::Rectangle<int>(left, y, right - left, h).reduced(0, vReduce);
     };
 
-    frequencyKnob.setBounds(nextCol(colWidth, 1));
+    if (frequencyKnob.isVisible())
+        frequencyKnob.setBounds(nextCol(colWidth, 1));
     perspectiveKnob.setBounds(nextCol(colWidth, 1));
     fovKnob.setBounds(nextCol(colWidth, 1));
 }

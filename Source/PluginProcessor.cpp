@@ -45,15 +45,7 @@
 #endif
 
 //==============================================================================
-OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(2), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-    beginnerMode(
-#if OSCI_PREMIUM
-        getGlobalBoolValue("beginnerMode", false)
-#else
-        true
-#endif
-    ),
-    envelopeParameters(beginnerMode) {
+OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(2), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
     // locking isn't necessary here because we are in the constructor
 
 
@@ -117,7 +109,9 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     osciPermanentEffects.push_back(frequencyEffect);
     osciPermanentEffects.push_back(imageThreshold);
     osciPermanentEffects.push_back(imageStride);
+#if OSCI_PREMIUM
     osciPermanentEffects.push_back(fractalIterationsEffect);
+#endif
 
     for (int i = 0; i < 26; i++) {
         addLuaSlider();
@@ -131,17 +125,17 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     effects.insert(effects.end(), osciPermanentEffects.begin(), osciPermanentEffects.end());
     effects.insert(effects.end(), luaEffects.begin(), luaEffects.end());
 
-    // --- Advanced mode: strip per-parameter LFO dropdowns and sidechain from all effects ---
-    // These are only used in beginner mode. In advanced mode, modulation is done via
+    // --- Premium mode: strip per-parameter LFO dropdowns and sidechain from all effects ---
+    // These are only used in the free version. In premium, modulation is done via
     // the global LFO/ENV module panels with drag-and-drop assignments.
-    if (!beginnerMode) {
-        for (auto& effect : effects) {
-            for (auto* param : effect->parameters) {
-                param->disableLfo();
-                param->disableSidechain();
-            }
+#if OSCI_PREMIUM
+    for (auto& effect : effects) {
+        for (auto* param : effect->parameters) {
+            param->disableLfo();
+            param->disableSidechain();
         }
     }
+#endif
 
     booleanParameters.push_back(midiEnabled);
     booleanParameters.push_back(inputEnabled);
@@ -157,40 +151,42 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     floatParameters.push_back(animationOffset);
     floatParameters.push_back(standaloneBpm);
 
-    // Adopt parameters from modulation state classes (advanced mode only)
-    if (!beginnerMode) {
-        for (auto* p : lfoParameters.getFloatParameters())
-            floatParameters.push_back(p);
-        for (auto* p : lfoParameters.getIntParameters())
-            intParameters.push_back(p);
-    }
+    // Adopt parameters from modulation state classes (premium only)
+#if OSCI_PREMIUM
+    for (auto* p : lfoParameters.getFloatParameters())
+        floatParameters.push_back(p);
+    for (auto* p : lfoParameters.getIntParameters())
+        intParameters.push_back(p);
 
-    // Adopt Random parameters from state class (advanced mode only)
-    if (!beginnerMode) {
-        for (auto* p : randomParameters.getFloatParameters())
-            floatParameters.push_back(p);
-        for (auto* p : randomParameters.getIntParameters())
-            intParameters.push_back(p);
-    }
+    // Adopt Random parameters from state class (premium only)
+    for (auto* p : randomParameters.getFloatParameters())
+        floatParameters.push_back(p);
+    for (auto* p : randomParameters.getIntParameters())
+        intParameters.push_back(p);
 
-    // Adopt Sidechain parameters from state class (advanced mode only)
-    if (!beginnerMode) {
-        for (auto* p : sidechainParameters.getFloatParameters())
-            floatParameters.push_back(p);
-    }
+    // Adopt Sidechain parameters from state class (premium only)
+    for (auto* p : sidechainParameters.getFloatParameters())
+        floatParameters.push_back(p);
+#endif
 
     intParameters.push_back(voices);
     intParameters.push_back(fileSelect);
+#if OSCI_PREMIUM
     intParameters.push_back(pitchBendRange);
+#endif
     floatParameters.push_back(velocityTracking);
+#if OSCI_PREMIUM
     floatParameters.push_back(glideTime);
     floatParameters.push_back(glideSlope);
     booleanParameters.push_back(alwaysGlide);
     booleanParameters.push_back(legato);
     booleanParameters.push_back(octaveScale);
+#endif
 
     voices->addListener(this);
+#if OSCI_PREMIUM
     legato->addListener(this);
+#endif
     envelopeParameters.params[0].addListenerToAll(this);
 
     // Start the background voice builder thread.
@@ -198,7 +194,9 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     int initialVoices = voices->getValueUnnormalised();
     synth.setClient(this);
     synth.setPolyphony(initialVoices);
+#if OSCI_PREMIUM
     synth.setLegato(legato->getBoolValue());
+#endif
     voiceBuilder->setTargetVoiceCount(initialVoices + 1); // +1 overlap voice for kill-fade
     voiceBuilder->startThread(juce::Thread::Priority::low);
 
@@ -364,7 +362,9 @@ OscirenderAudioProcessor::~OscirenderAudioProcessor() {
     permanentEffects.clear();
     effects.clear();
     envelopeParameters.params[0].removeListenerFromAll(this);
+#if OSCI_PREMIUM
     legato->removeListener(this);
+#endif
     voices->removeListener(this);
 }
 
@@ -909,7 +909,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         }
     }
 
-    // Step 2: Produce the smoothed volume buffer for beginner-mode per-parameter sidechain
+    // Step 2: Produce the smoothed volume buffer for free-version per-parameter sidechain
     // and for effects that receive volumeInput. Uses a default envelope follower with
     // fixed attack/release (same time constant as the old 100ms EMA).
     currentVolumeBuffer.setSize(1, numSamples, false, false, true);
@@ -942,14 +942,14 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             effect->animateValues(numSamples, &currentVolumeBuffer);
         }
 
-        if (!beginnerMode) {
-            // Fill modulation block buffers (type-specific generation)
-            lfoParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages,
-                                           currentBpm.load(std::memory_order_relaxed), uiVoiceActive);
-            envelopeParameters.fillBlockBuffers(numSamples, uiVoiceEnvActive, uiVoiceEnvValue);
-            randomParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages,
-                                              currentBpm.load(std::memory_order_relaxed), uiVoiceActive);
-        }
+#if OSCI_PREMIUM
+        // Fill modulation block buffers (type-specific generation)
+        lfoParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages,
+                                       currentBpm.load(std::memory_order_relaxed), uiVoiceActive);
+        envelopeParameters.fillBlockBuffers(numSamples, uiVoiceEnvActive, uiVoiceEnvValue);
+        randomParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages,
+                                          currentBpm.load(std::memory_order_relaxed), uiVoiceActive);
+#endif
 
         // Always run the sidechain envelope follower so the UI display
         // (graph marker + output pill) stays current in both modes.
@@ -1140,7 +1140,7 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
 
     std::unique_ptr<juce::XmlElement> xml = std::make_unique<juce::XmlElement>("project");
     xml->setAttribute("version", ProjectInfo::versionString);
-    xml->setAttribute("beginnerMode", beginnerMode);
+    xml->setAttribute("premiumProject", (bool) OSCI_PREMIUM);
 
     saveStandaloneProjectFilePathToXml(*xml);
     auto effectsXml = xml->createNewChildElement("effects");
@@ -1166,15 +1166,15 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
         parameter->save(parameterXml);
     }
 
-    // Save global LFO waveforms & assignments (advanced mode only)
-    if (!beginnerMode) {
-        lfoParameters.saveToXml(xml.get());
+    // Save global LFO waveforms & assignments (premium only)
+#if OSCI_PREMIUM
+    lfoParameters.saveToXml(xml.get());
 
-        envelopeParameters.saveToXml(xml.get());
+    envelopeParameters.saveToXml(xml.get());
 
-        randomParameters.saveToXml(xml.get());
-        sidechainParameters.saveToXml(xml.get());
-    }
+    randomParameters.saveToXml(xml.get());
+    sidechainParameters.saveToXml(xml.get());
+#endif
 
     auto customFunction = xml->createNewChildElement("customFunction");
     customFunction->addTextElement(juce::Base64::toBase64(luaEffectState->getCode()));
@@ -1325,27 +1325,32 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         }
         changeCurrentFile(xml->getIntAttribute("currentFile", -1));
 
-        // Load global LFO waveforms & assignments (only relevant in advanced mode)
-        if (!beginnerMode) {
-            lfoParameters.loadFromXml(xml.get());
-        } else {
-            lfoParameters.resetAudioState();
-        }
+        // Load global LFO waveforms & assignments (premium only)
+#if OSCI_PREMIUM
+        lfoParameters.loadFromXml(xml.get());
 
-        // Load envelope assignments (advanced mode only)
-        if (!beginnerMode) {
-            envelopeParameters.loadFromXml(xml.get());
+        // If this is a free project, convert per-parameter LFOs to global LFO assignments
+        if (!xml->getBoolAttribute("premiumProject", false)) {
+            convertFreeProjectLfos(xml->getChildByName("effects"));
         }
+#else
+        lfoParameters.resetAudioState();
+#endif
 
-        // Load random modulator state (advanced mode only)
-        if (!beginnerMode) {
-            randomParameters.loadFromXml(xml.get());
-        }
+        // Load envelope assignments (premium only)
+#if OSCI_PREMIUM
+        envelopeParameters.loadFromXml(xml.get());
+#endif
 
-        // Load sidechain modulator state (advanced mode only)
-        if (!beginnerMode) {
-            sidechainParameters.loadFromXml(xml.get());
-        }
+        // Load random modulator state (premium only)
+#if OSCI_PREMIUM
+        randomParameters.loadFromXml(xml.get());
+#endif
+
+        // Load sidechain modulator state (premium only)
+#if OSCI_PREMIUM
+        sidechainParameters.loadFromXml(xml.get());
+#endif
 
         recordingParameters.load(xml.get());
 
@@ -1355,6 +1360,22 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         broadcaster.sendChangeMessage();
         prevMidiEnabled = !midiEnabled->getBoolValue();
         undoManager.clearUndoHistory();
+
+#if !OSCI_PREMIUM
+        if (xml->getBoolAttribute("premiumProject", false)) {
+            juce::Logger::writeToLog("setStateInformation: premium project loaded in free build, some features unavailable");
+            juce::MessageManager::callAsync([]() {
+                juce::AlertWindow::showMessageBoxAsync(
+                    juce::AlertWindow::InfoIcon,
+                    "Premium Project",
+                    "This project was saved with the premium version of osci-render. "
+                    "Some features (global LFOs, envelopes, random/sidechain modulation, "
+                    "glide, legato, and premium effects) will not be available.",
+                    "OK");
+            });
+        }
+#endif
+
         juce::Logger::writeToLog("setStateInformation: state restore complete");
 }
 
@@ -1371,8 +1392,10 @@ void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float n
             }
             voiceBuilder->setTargetVoiceCount(numVoices + 1); // +1 overlap voice for kill-fade
         }
+#if OSCI_PREMIUM
     } else if (parameterIndex == legato->getParameterIndex()) {
         synth.setLegato(legato->getBoolValue());
+#endif
     }
 
     // Envelope UI listens to these parameters.
@@ -1391,6 +1414,144 @@ std::vector<ModulationSourceBinding> OscirenderAudioProcessor::getModulationSour
 void OscirenderAudioProcessor::autoAssignLfosForEffect(osci::Effect& effect) {
     lfoParameters.autoAssignForEffect(effect);
 }
+
+#if OSCI_PREMIUM
+void OscirenderAudioProcessor::convertFreeProjectLfos(const juce::XmlElement* effectsXml) {
+    if (effectsXml == nullptr) return;
+
+    // Parse per-parameter LFO settings from the free project's effects XML
+    // and convert them into global LFO assignments.
+    struct PerParamLfo {
+        juce::String paramId;
+        LfoPreset preset;
+        float rate;
+        float startPercent;
+        float endPercent;
+    };
+    std::vector<PerParamLfo> conversions;
+
+    for (auto* effectXml : effectsXml->getChildIterator()) {
+        for (auto* paramXml : effectXml->getChildIterator()) {
+            auto paramId = paramXml->getStringAttribute("id");
+            if (paramId.isEmpty()) continue;
+
+            auto* lfoXml = paramXml->getChildByName("lfo");
+            if (lfoXml == nullptr) continue;
+
+            auto lfoTypeStr = lfoXml->getStringAttribute("lfo", "Static");
+            auto lfoType = stringToLfoType(lfoTypeStr);
+            if (lfoType == osci::LfoType::Static) continue;
+
+            float lfoRate = (float)lfoXml->getDoubleAttribute("value", 1.0);
+
+            // Read LFO start/end percentages (defaults: 0%, 100%)
+            float startPct = 0.0f;
+            float endPct = 100.0f;
+            auto* lfoStartXml = paramXml->getChildByName("lfoStart");
+            if (lfoStartXml != nullptr)
+                startPct = (float)lfoStartXml->getDoubleAttribute("value", 0.0);
+            auto* lfoEndXml = paramXml->getChildByName("lfoEnd");
+            if (lfoEndXml != nullptr)
+                endPct = (float)lfoEndXml->getDoubleAttribute("value", 100.0);
+
+            conversions.push_back({ paramId, lfoTypeToLfoPreset(lfoType), lfoRate, startPct, endPct });
+        }
+    }
+
+    if (conversions.empty()) {
+        juce::Logger::writeToLog("convertFreeProjectLfos: no per-parameter LFOs to convert");
+        return;
+    }
+
+    juce::Logger::writeToLog("convertFreeProjectLfos: converting " + juce::String((int)conversions.size()) + " per-parameter LFOs to global LFO assignments");
+
+    // Track how many assignments each global LFO slot has
+    int assignmentCount[NUM_LFOS] = {};
+
+    auto ratesSimilar = [](float a, float b) -> bool {
+        if (a <= 0.0f || b <= 0.0f) return false;
+        float ratio = (a > b) ? a / b : b / a;
+        return ratio < 1.25f;
+    };
+
+    struct LfoMatch { int index = -1; int score = 0; };
+
+    auto findBestLfo = [&](LfoPreset desiredPreset, float desiredRate) -> LfoMatch {
+        LfoMatch best;
+        for (int i = 0; i < NUM_LFOS; ++i) {
+            int score = 0;
+            bool idle = assignmentCount[i] == 0;
+            LfoPreset currentPreset = lfoParameters.getPreset(i);
+            if (!idle && currentPreset == desiredPreset) {
+                float currentRate = (lfoParameters.rate[i] != nullptr) ? lfoParameters.rate[i]->getValueUnnormalised() : 1.0f;
+                if (ratesSimilar(currentRate, desiredRate))
+                    score = 4;
+            } else if (idle && currentPreset == desiredPreset && currentPreset != LfoPreset::Custom) {
+                score = 3;
+            } else if (idle && currentPreset != LfoPreset::Custom) {
+                score = 2;
+            } else if (idle) {
+                score = 1;
+            }
+            if (score > best.score) {
+                best = { i, score };
+                if (score == 4) break;
+            }
+        }
+        return best;
+    };
+
+    for (auto& conv : conversions) {
+        auto match = findBestLfo(conv.preset, conv.rate);
+        if (match.index < 0) {
+            juce::Logger::writeToLog("convertFreeProjectLfos: no free LFO slot for param " + conv.paramId);
+            continue;
+        }
+
+        // Configure the LFO slot if needed
+        if (match.score <= 2) {
+            juce::SpinLock::ScopedLockType lock(lfoParameters.waveformLock);
+            lfoParameters.setPreset(match.index, conv.preset);
+            lfoParameters.waveforms[match.index] = createLfoPreset(conv.preset);
+        }
+        if (match.score <= 3 && lfoParameters.rate[match.index] != nullptr) {
+            lfoParameters.rate[match.index]->setUnnormalisedValueNotifyingHost(conv.rate);
+        }
+
+        // Convert the per-param LFO range to a global unipolar assignment.
+        // Per-param LFO sweeps between [startPct, endPct] % of the parameter range.
+        // Global unipolar modulation: output = base + modData * depth * paramRange.
+        // So: base = paramMin + startPct/100 * range, depth = (endPct - startPct) / 100.
+        float startNorm = juce::jlimit(0.0f, 1.0f, conv.startPercent / 100.0f);
+        float endNorm = juce::jlimit(0.0f, 1.0f, conv.endPercent / 100.0f);
+        float depth = endNorm - startNorm;
+
+        // Set the parameter base value to the LFO sweep start
+        osci::EffectParameter* effectParam = nullptr;
+        for (auto& effect : effects) {
+            effectParam = effect->getParameter(conv.paramId);
+            if (effectParam != nullptr) break;
+        }
+        if (effectParam != nullptr) {
+            float paramMin = effectParam->min.load();
+            float paramRange = effectParam->max.load() - paramMin;
+            float baseValue = paramMin + startNorm * paramRange;
+            effectParam->setUnnormalisedValueNotifyingHost(baseValue);
+        }
+
+        LfoAssignment assignment;
+        assignment.sourceIndex = match.index;
+        assignment.paramId = conv.paramId;
+        assignment.depth = std::abs(depth);
+        assignment.bipolar = false;
+        lfoParameters.addAssignment(assignment);
+
+        assignmentCount[match.index]++;
+    }
+
+    juce::Logger::writeToLog("convertFreeProjectLfos: conversion complete");
+}
+#endif
 
 void OscirenderAudioProcessor::autoAssignLfosForPreview(const juce::String& effectId) {
     ScopedFlag suppress(undoSuppressed);

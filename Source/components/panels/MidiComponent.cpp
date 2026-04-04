@@ -8,6 +8,13 @@ MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 
     addAndMakeVisible(midiToggle);
     addAndMakeVisible(voicesBar);
+#if !OSCI_PREMIUM
+    midiLabel.setFont(juce::Font(12.0f));
+    midiLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+    midiLabel.setJustificationType(juce::Justification::centredLeft);
+    addAndMakeVisible(midiLabel);
+#endif
+#if OSCI_PREMIUM
     addAndMakeVisible(bendBar);
     addAndMakeVisible(velTrkKnob);
     addAndMakeVisible(glideKnob);
@@ -15,7 +22,9 @@ MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
     addAndMakeVisible(alwaysGlideToggle);
     addAndMakeVisible(legatoToggle);
     addAndMakeVisible(octaveScaleToggle);
+#endif
 
+#if OSCI_PREMIUM
     velTrkKnob.bindToParam(audioProcessor.velocityTracking);
     glideKnob.bindToParam(audioProcessor.glideTime, 1.0);
 
@@ -30,22 +39,27 @@ MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 
     // Glide: show as seconds
     glideKnob.getKnob().setTextValueSuffix(" s");
+#endif
 
     audioProcessor.midiEnabled->addListener(this);
+#if OSCI_PREMIUM
     audioProcessor.velocityTracking->addListener(this);
     audioProcessor.glideTime->addListener(this);
 
     if (juce::JUCEApplicationBase::isStandaloneApp()) {
         addAndMakeVisible(tempoBar);
     }
+#endif
 
     handleAsyncUpdate();
 }
 
 MidiComponent::~MidiComponent() {
     audioProcessor.midiEnabled->removeListener(this);
+#if OSCI_PREMIUM
     audioProcessor.velocityTracking->removeListener(this);
     audioProcessor.glideTime->removeListener(this);
+#endif
 }
 
 void MidiComponent::parameterValueChanged(int parameterIndex, float newValue) {
@@ -62,29 +76,53 @@ void MidiComponent::handleAsyncUpdate() {
 void MidiComponent::updateEnabledState() {
     const bool midiOn = audioProcessor.midiEnabled->getBoolValue();
     voicesBar.setEnabled(midiOn);
-    bendBar.setEnabled(midiOn);
+#if OSCI_PREMIUM
     velTrkKnob.setEnabled(midiOn);
+    bendBar.setEnabled(midiOn);
     glideKnob.setEnabled(midiOn);
     slopeGraph.setEnabled(midiOn);
     alwaysGlideToggle.setEnabled(midiOn);
     legatoToggle.setEnabled(midiOn);
     octaveScaleToggle.setEnabled(midiOn);
     tempoBar.setEnabled(midiOn);
+#endif
 
     float alpha = midiOn ? 1.0f : 0.4f;
     voicesBar.setAlpha(alpha);
-    bendBar.setAlpha(alpha);
+#if OSCI_PREMIUM
     velTrkKnob.setAlpha(alpha);
+    bendBar.setAlpha(alpha);
     glideKnob.setAlpha(alpha);
     slopeGraph.setAlpha(alpha);
     alwaysGlideToggle.setAlpha(alpha);
     legatoToggle.setAlpha(alpha);
     octaveScaleToggle.setAlpha(alpha);
     tempoBar.setAlpha(alpha);
+#endif
 }
 
 void MidiComponent::resized() {
     auto area = getLocalBounds();
+
+#if !OSCI_PREMIUM
+    // Free mode: toggle + "Enable MIDI" label + voices bar, no backgrounds
+    {
+        auto row = area.reduced(4, 0);
+        midiToggle.setBounds(row.removeFromLeft(30).withSizeKeepingCentre(30, 20));
+        row.removeFromLeft(4);
+        midiLabel.setBounds(row.removeFromLeft(80));
+
+        bool midiOn = audioProcessor.midiEnabled->getBoolValue();
+        voicesBar.setVisible(midiOn);
+        if (midiOn) {
+            row.removeFromLeft(4);
+            constexpr int kMaxVoicesWidth = 120;
+            auto voicesBounds = row.withWidth(juce::jmin(row.getWidth(), kMaxVoicesWidth));
+            voicesBar.setBounds(voicesBounds);
+        }
+    }
+    return;
+#endif
 
     // Toggle section on the left
     auto toggleSection = area.removeFromLeft(kToggleSectionWidth);
@@ -94,19 +132,24 @@ void MidiComponent::resized() {
     auto settingsArea = area.reduced(5, 3);
 
     constexpr int gap = 3;
+#if OSCI_PREMIUM
     static constexpr int kMinToggleColWidth = 80;
     bool hasTempo = tempoBar.isVisible();
-
     int numCols = hasTempo ? 7 : 6;
+#else
+    int numCols = 1;
+#endif
     int totalGaps = (numCols - 1) * gap;
     int available = settingsArea.getWidth() - totalGaps;
 
     float colWidth = (float)available / (float)numCols;
+#if OSCI_PREMIUM
     float toggleColWidth = colWidth;
     if (colWidth < (float)kMinToggleColWidth) {
         toggleColWidth = (float)kMinToggleColWidth;
         colWidth = ((float)available - toggleColWidth) / (float)(numCols - 1);
     }
+#endif
 
     // Cumulative float widths → integer boundaries (gaps are exact integers)
     int startX = settingsArea.getX();
@@ -124,6 +167,7 @@ void MidiComponent::resized() {
     };
 
     voicesBar.setBounds(nextCol(colWidth, 2));
+#if OSCI_PREMIUM
     bendBar.setBounds(nextCol(colWidth, 2));
     velTrkKnob.setBounds(nextCol(colWidth, 1));
     glideKnob.setBounds(nextCol(colWidth, 1));
@@ -153,9 +197,11 @@ void MidiComponent::resized() {
 
     if (hasTempo)
         tempoBar.setBounds(nextCol(colWidth, 2));
+#endif
 }
 
 void MidiComponent::paint(juce::Graphics& g) {
+#if OSCI_PREMIUM
     auto area = getLocalBounds();
 
     auto toggleSection = area.removeFromLeft(kToggleSectionWidth).toFloat();
@@ -178,9 +224,11 @@ void MidiComponent::paint(juce::Graphics& g) {
                                      false, true, false, true);
     g.setColour(Colours::darker());
     g.fillPath(settingsPath);
+#endif
 }
 
 void MidiComponent::paintOverChildren(juce::Graphics& g) {
+#if OSCI_PREMIUM
     if (!audioProcessor.midiEnabled->getBoolValue()) {
         auto area = getLocalBounds();
         area.removeFromLeft(kToggleSectionWidth);
@@ -200,4 +248,5 @@ void MidiComponent::paintOverChildren(juce::Graphics& g) {
         g.setFont(juce::Font(13.0f).boldened());
         g.drawText("MIDI DISABLED", settingsSection, juce::Justification::centred, false);
     }
+#endif
 }

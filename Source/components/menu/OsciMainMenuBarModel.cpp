@@ -177,15 +177,6 @@ void OsciMainMenuBarModel::resetMenuItems() {
         audioProcessor.setAcceptsKeys(! audioProcessor.getAcceptsKeys());
         resetMenuItems();
     }, [this] { return audioProcessor.getAcceptsKeys(); });
-
-#if OSCI_PREMIUM
-    addToggleMenuItem(interfaceMenu, "Beginner Mode (applies on restart)", [this] {
-        bool current = audioProcessor.getGlobalBoolValue("beginnerMode", false);
-        audioProcessor.setGlobalValue("beginnerMode", !current);
-        audioProcessor.saveGlobalSettings();
-        resetMenuItems();
-    }, [this] { return audioProcessor.getGlobalBoolValue("beginnerMode", false); });
-#endif
 }
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM

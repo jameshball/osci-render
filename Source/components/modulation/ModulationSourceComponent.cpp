@@ -544,7 +544,7 @@ void ModulationSourceComponent::paint(juce::Graphics& g) {
     auto panelBounds = getLocalBounds().toFloat().withTrimmedLeft(tabOffset);
     float r = OscirenderLookAndFeel::RECT_RADIUS;
     juce::Path panelPath;
-    // When there are no tabs (beginner), round all four corners; otherwise only the right ones
+    // When there are no tabs (free version), round all four corners; otherwise only the right ones
     panelPath.addRoundedRectangle(panelBounds.getX(), panelBounds.getY(),
                                    panelBounds.getWidth(), panelBounds.getHeight(),
                                    r, r, !hasTabs, true, !hasTabs, true);

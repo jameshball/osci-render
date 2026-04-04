@@ -87,10 +87,12 @@ void EffectTypeGridComponent::setupEffectItems()
                     juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
                     audioProcessor.setPreviewEffectId(effectId);
                 }
-                if (audioProcessor.isBeginnerMode() || audioProcessor.getGlobalBoolValue("autoLinkLfos", true)) {
+#if OSCI_PREMIUM
+                if (audioProcessor.getGlobalBoolValue("autoLinkLfos", true)) {
                     audioProcessor.autoAssignLfosForPreview(effectId);
                     audioProcessor.broadcaster.sendChangeMessage();
                 }
+#endif
             };
             item->onHoverEnd = [this]() {
                 if (audioProcessor.getGlobalBoolValue("previewEffectOnHover", true)) {

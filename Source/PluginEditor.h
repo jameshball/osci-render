@@ -51,6 +51,7 @@ private:
 public:
     const double CLOSED_PREF_SIZE = 30.0;
     const double RESIZER_BAR_SIZE = 7.0;
+    static constexpr int kMenuBarHeight = 25;
 
     std::atomic<bool> editingCustomFunction = false;
 

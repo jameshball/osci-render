@@ -100,11 +100,13 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
         }
         // Promote any preview LFO assignments so hover-end won't remove them
         audioProcessor.promotePreviewLfoAssignments();
-        // Auto-assign LFOs if the toggle is enabled (always on in beginner mode)
-        if (chosen != nullptr && (audioProcessor.isBeginnerMode() || audioProcessor.getGlobalBoolValue("autoLinkLfos", true))) {
+        // Auto-assign LFOs if the toggle is enabled
+#if OSCI_PREMIUM
+        if (chosen != nullptr && audioProcessor.getGlobalBoolValue("autoLinkLfos", true)) {
             audioProcessor.autoAssignLfosForEffect(*chosen);
             audioProcessor.broadcaster.sendChangeMessage();
         }
+#endif
         }
         // Refresh list content to include newly selected
         itemData.resetData();
@@ -164,11 +166,13 @@ void EffectsComponent::resized() {
 	randomiseButton.setBounds(titleBar.removeFromLeft(20));
 	titleBar.removeFromLeft(4);
 	autoLinkButton.setBounds(titleBar.removeFromLeft(20));
-    area = area.reduced(20);
+    area.reduce(20, 0);
+    area.removeFromBottom(10);
     if (showingGrid) {
         grid.setBounds(area);
         addEffectButton.setVisible(false);
     } else {
+        area.reduce(0, 20); // restore vertical padding for list view
         // Reserve space at bottom for the add button
         auto addBtnHeight = 44;
         auto listArea = area;

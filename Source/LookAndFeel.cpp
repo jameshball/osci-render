@@ -352,6 +352,7 @@ void OscirenderLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, in
     float diameter = juce::jmin(bounds.getWidth(), bounds.getHeight());
     auto centre = bounds.getCentre();
 
+    float disabledAlpha = slider.isEnabled() ? 1.0f : 0.3f;
     bool hovered = slider.isEnabled() && slider.isMouseOverOrDragging();
 
     float baseTrackWidth = diameter * 0.09f;
@@ -366,7 +367,7 @@ void OscirenderLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, in
     // Dark circle background
     {
         float bgRadius = radius + trackWidth * 0.5f + 3.0f;
-        g.setColour(Colours::veryDark());
+        g.setColour(Colours::veryDark().withAlpha(disabledAlpha));
         g.fillEllipse(centre.x - bgRadius, centre.y - bgRadius,
                       bgRadius * 2.0f, bgRadius * 2.0f);
     }
@@ -381,9 +382,6 @@ void OscirenderLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, in
             if (!(bool)props.getWithDefault(modType.propPrefix + "_active", false))
                 continue;
 
-            // Compute the modulated angle from the normalised modulated position.
-            // The mod_pos property stores a pixel position for linear sliders; for rotary
-            // knobs we store a normalised 0..1 value in "mod_pos_norm" instead.
             float modNorm = (float)(double)props.getWithDefault(modType.propPrefix + "_mod_pos_norm", (double)sliderPos);
             float modAngle = rotaryStartAngle + modNorm * angleRange;
 
@@ -398,19 +396,19 @@ void OscirenderLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, in
                 juce::Path modArc;
                 modArc.addCentredArc(centre.x, centre.y, radius, radius,
                                      0.0f, arcStart, arcEnd, true);
-                g.setColour(modColour.withAlpha(0.35f));
+                g.setColour(modColour.withAlpha(0.35f * disabledAlpha));
                 g.strokePath(modArc, juce::PathStrokeType(trackWidth + 4.0f, juce::PathStrokeType::curved,
                                                            juce::PathStrokeType::rounded));
             }
         }
     }
 
-    // Background track (matches the panel behind the knob)
+    // Background track
     {
         juce::Path bgTrack;
         bgTrack.addCentredArc(centre.x, centre.y, radius, radius,
                               0.0f, rotaryStartAngle, rotaryEndAngle, true);
-        g.setColour(Colours::darker());
+        g.setColour(Colours::darker().withAlpha(disabledAlpha));
         g.strokePath(bgTrack, juce::PathStrokeType(trackWidth, juce::PathStrokeType::curved,
                                                     juce::PathStrokeType::rounded));
     }
@@ -420,7 +418,7 @@ void OscirenderLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, in
         juce::Path filledArc;
         filledArc.addCentredArc(centre.x, centre.y, radius, radius,
                                 0.0f, rotaryStartAngle, valueAngle, true);
-        g.setColour(slider.findColour(juce::Slider::rotarySliderFillColourId));
+        g.setColour(slider.findColour(juce::Slider::rotarySliderFillColourId).withAlpha(disabledAlpha));
         g.strokePath(filledArc, juce::PathStrokeType(trackWidth, juce::PathStrokeType::curved,
                                                       juce::PathStrokeType::rounded));
     }
@@ -440,7 +438,7 @@ void OscirenderLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, in
                             .translated(centre.x, centre.y);
         marker.applyTransform(transform);
 
-        g.setColour(juce::Colours::white);
+        g.setColour(juce::Colours::white.withAlpha(disabledAlpha));
         g.fillPath(marker);
     }
 }
