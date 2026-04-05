@@ -101,6 +101,7 @@ if [ "$PLUGIN" = "osci-render" ]; then
 
   if [ "$OS" = "linux" ]; then
     cd "$ROOT/Builds/$PLUGIN/LinuxMakefile"
+    make clean CONFIG=Release
     make -j$(nproc) CONFIG=Release
     cp -r "./build/$INSTRUMENT_TARGET.vst3" "$ROOT/ci/bin/$INSTRUMENT_TARGET.vst3"
   fi
