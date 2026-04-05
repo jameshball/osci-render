@@ -1,4 +1,5 @@
 #include <JuceHeader.h>
+#include "TestCleanup.h"
 
 using namespace osci;
 
@@ -258,6 +259,7 @@ public:
                 "  DelayEffect clone: %.3f ms avg (%.1f ms total / %d iters)",
                 perCloneMs, totalMs, iterations));
             expectGreaterThan(totalMs, 0.0);
+            testutil::cleanupEffectParams(*delayEffect);
         }
 
         // ---------------------------------------------------------------
@@ -280,6 +282,7 @@ public:
             juce::Logger::outputDebugString(juce::String::formatted(
                 "  Stateless clone: %.1f us avg", perCloneUs));
             expectGreaterThan(totalMs, 0.0);
+            testutil::cleanupEffectParams(*effect);
         }
 
         // ---------------------------------------------------------------
@@ -379,6 +382,10 @@ public:
 
             expectGreaterThan(static_cast<double>(pointSize), 0.0);
         }
+
+        // Clean up parameters owned by globalEffects (not owned by any AudioProcessor in tests)
+        for (auto& effect : globalEffects)
+            testutil::cleanupEffectParams(*effect);
     }
 };
 

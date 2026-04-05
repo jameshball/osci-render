@@ -106,10 +106,13 @@ See `.github/docs/build-details.md`.
 ./bump_version --osci minor --sosci patch
 ```
 
-### Thread Safety
-- `juce::SpinLock` for audio-thread-safe data (`parsersLock`, `effectsLock`)
+### Thread Safety & Realtime Safety
+**All code on the audio thread MUST be realtime-safe.** This means:
+- **No mutex/CriticalSection locking** — use `juce::SpinLock` only
+- **No heap allocation or deallocation** (no `new`, `delete`, `std::vector::push_back` that grows, `std::string` construction)
+- **No blocking I/O** (no file access, no logging, no system calls)
 - `std::atomic` for simple cross-thread values
-- No allocations in `processBlock()`
+- Pre-allocate containers in constructors with `reserve()` to avoid audio-thread allocations
 
 ## Testing
 
@@ -133,17 +136,3 @@ ROOT=$(pwd) OS=mac ./ci/pluginval.sh osci-render
 bash run_sanitizers.sh --tsan --plugin osci-render --pluginval --strictness 5
 bash run_sanitizers.sh --asan --plugin osci-render --pluginval --strictness 5
 ```
-
-## Key Files
-
-| Purpose | File |
-|---------|------|
-| Main processor | `Source/PluginProcessor.cpp` |
-| Shared base processor | `Source/CommonPluginProcessor.cpp` |
-| Effect base | `modules/osci_render_core/effect/osci_Effect.h` |
-| Parameter types | `modules/osci_render_core/effect/osci_EffectParameter.h` |
-| Point type | `modules/osci_render_core/shape/osci_Point.h` |
-| Visualizer | `Source/visualiser/VisualiserRenderer.cpp` |
-| Lua integration | `Source/lua/LuaParser.cpp` |
-| Modulation | `Source/audio/modulation/LfoParameters.h`, `EnvelopeParameters.h` |
-| Build config | `osci-render.jucer`, `sosci.jucer` |

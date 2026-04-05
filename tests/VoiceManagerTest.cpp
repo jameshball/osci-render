@@ -137,16 +137,16 @@ private:
 // Helpers
 
 // Create VoiceManager with `polyphony` TestVoices + 1 overlap voice for kill-fade.
-static std::pair<std::unique_ptr<VoiceManager>, TestClient*>
+static std::pair<std::unique_ptr<VoiceManager>, std::unique_ptr<TestClient>>
 createVM(int polyphony) {
-    auto client = new TestClient();
+    auto client = std::make_unique<TestClient>();
     auto vm = std::make_unique<VoiceManager>();
     vm->setCurrentPlaybackSampleRate(44100.0);
     vm->setPolyphony(polyphony);
-    vm->setClient(client);
+    vm->setClient(client.get());
     for (int i = 0; i < polyphony + 1; ++i) // +1 overlap voice for kill-fade
         vm->addVoice(new TestVoice());
-    return { std::move(vm), client };
+    return { std::move(vm), std::move(client) };
 }
 
 static void sendNoteOn(VoiceManager& vm, int note, float vel = 0.8f, int ch = 1) {

@@ -216,5 +216,5 @@ private:
 
     juce::ReferenceCountedArray<juce::SynthesiserSound> sounds;
 
-    juce::CriticalSection lock;
+    juce::SpinLock lock;
 };

@@ -57,6 +57,7 @@
             resource="0" file="tests/LuaBeforeAfterBenchmarkTest.cpp"/>
       <FILE id="VmT1" name="VoiceManagerTest.cpp" compile="1" resource="0"
             file="tests/VoiceManagerTest.cpp"/>
+      <FILE id="TstClH" name="TestCleanup.h" compile="0" resource="0" file="tests/TestCleanup.h"/>
     </GROUP>
   </MAINGROUP>
   <MODULES>
