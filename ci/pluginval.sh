@@ -2,11 +2,14 @@
 
 # pluginval validation script
 # Usage (CI):   source ./ci/pluginval.sh "osci-render"
+# Usage (CI):   source ./ci/pluginval.sh "osci-render" "osci-render (instrument)"
 # Usage (local): ROOT=$(pwd) OS=win ./ci/pluginval.sh "osci-render"
 #
 # Requires: cmake, a C++ toolchain, and a previously-built plugin.
+# Optional second arg: target name (output binary name) if different from plugin name.
 
-PLUGIN="${1:?Usage: pluginval.sh <plugin-name>}"
+PLUGIN="${1:?Usage: pluginval.sh <plugin-name> [target-name]}"
+TARGET="${2:-$PLUGIN}"
 STRICTNESS="${PLUGINVAL_STRICTNESS:-5}"
 SKIP_GUI="${PLUGINVAL_SKIP_GUI:-}"
 
@@ -69,14 +72,14 @@ echo "pluginval binary: $PLUGINVAL"
 # ── Locate the built VST3 plugin ──────────────────────────────
 
 if [ "$OS" = "mac" ]; then
-    VST3_PATH="$ROOT/Builds/$PLUGIN/MacOSX/build/Release/$PLUGIN.vst3"
+    VST3_PATH="$ROOT/Builds/$PLUGIN/MacOSX/build/Release/$TARGET.vst3"
 elif [ "$OS" = "linux" ]; then
-    VST3_PATH="$ROOT/Builds/$PLUGIN/LinuxMakefile/build/$PLUGIN.vst3"
+    VST3_PATH="$ROOT/Builds/$PLUGIN/LinuxMakefile/build/$TARGET.vst3"
 else
     # Try Release first, then Debug
-    VST3_PATH="$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Release/VST3/$PLUGIN.vst3"
+    VST3_PATH="$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Release/VST3/$TARGET.vst3"
     if [ ! -d "$VST3_PATH" ]; then
-        VST3_PATH="$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Debug/VST3/$PLUGIN.vst3"
+        VST3_PATH="$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Debug/VST3/$TARGET.vst3"
     fi
 fi
 
