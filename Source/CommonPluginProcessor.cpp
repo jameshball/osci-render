@@ -647,11 +647,80 @@ juce::String CommonAudioProcessor::getFFmpegURL() {
     return ffmpegURL;
 }
 
+bool CommonAudioProcessor::validateFFmpegBinary() {
+    if (ffmpegValidated)
+        return true;
+
+    juce::File ffmpegFile = getFFmpegFile();
+    if (!ffmpegFile.existsAsFile()) {
+        juce::Logger::writeToLog("FFmpeg validation: binary not found at " + ffmpegFile.getFullPathName());
+        return false;
+    }
+
+    juce::Logger::writeToLog("FFmpeg validation: testing binary at " + ffmpegFile.getFullPathName());
+
+    juce::ChildProcess process;
+    juce::StringArray args;
+    args.add(ffmpegFile.getFullPathName());
+    args.add("-version");
+
+    if (!process.start(args)) {
+        juce::Logger::writeToLog("FFmpeg validation: failed to start process");
+        return false;
+    }
+
+    // Read output before waiting to prevent pipe-buffer deadlock
+    auto output = process.readAllProcessOutput();
+    process.waitForProcessToFinish(5000);
+    int exitCode = process.getExitCode();
+
+    if (exitCode != 0) {
+        juce::Logger::writeToLog("FFmpeg validation failed with exit code " + juce::String(exitCode));
+        if (output.isNotEmpty())
+            juce::Logger::writeToLog("FFmpeg output: " + output.substring(0, 500));
+    } else {
+        // Log just the first line (version string)
+        juce::Logger::writeToLog("FFmpeg validated: " + output.upToFirstOccurrenceOf("\n", false, false));
+        ffmpegValidated = true;
+    }
+
+    return exitCode == 0;
+}
+
 bool CommonAudioProcessor::ensureFFmpegExists(std::function<void()> onStart, std::function<void()> onSuccess) {
     juce::File ffmpegFile = getFFmpegFile();
     
-    if (ffmpegFile.exists()) {
-        // FFmpeg already exists
+    if (ffmpegFile.existsAsFile()) {
+        // Verify the binary actually works on this system
+        if (!validateFFmpegBinary()) {
+            // Binary exists but is incompatible — delete it and show an error
+            juce::Logger::writeToLog("FFmpeg binary incompatible — deleting " + ffmpegFile.getFullPathName());
+            ffmpegFile.deleteFile();
+
+            auto editor = dynamic_cast<CommonPluginEditor*>(getActiveEditor());
+            juce::String message =
+                "The FFmpeg binary is not compatible with your version of macOS.\n\n"
+#if JUCE_MAC && JUCE_ARM
+                "On Apple Silicon Macs, macOS 12 (Monterey) or later is required "
+                "for video recording and video/GIF file import.\n\n"
+                "Please update your macOS to use these features."
+#else
+                "The existing FFmpeg binary could not be launched. "
+                "It will be re-downloaded on the next attempt.\n\n"
+                "If this problem persists, please contact support."
+#endif
+                ;
+
+            juce::MessageBoxOptions options = juce::MessageBoxOptions()
+                .withTitle("FFmpeg Incompatible")
+                .withMessage(message)
+                .withButton("OK")
+                .withIconType(juce::AlertWindow::WarningIcon)
+                .withAssociatedComponent(editor);
+            juce::AlertWindow::showAsync(options, nullptr);
+            return false;
+        }
+
         if (onSuccess != nullptr) {
             onSuccess();
         }

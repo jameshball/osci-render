@@ -430,7 +430,18 @@ void VisualiserComponent::setRecording(bool recording) {
                 tempVideoFile->getFile());
 
             if (!ffmpegProcess.start(cmd)) {
+                juce::Logger::writeToLog("Recording: ffmpegProcess.start() failed for command: " + cmd);
                 record.setToggleState(false, juce::NotificationType::dontSendNotification);
+                juce::MessageManager::callAsync([this] {
+                    juce::MessageBoxOptions options = juce::MessageBoxOptions()
+                        .withTitle("Recording Error")
+                        .withMessage("Failed to start the FFmpeg video encoder.\n\n"
+                                     "Please check that FFmpeg is compatible with your system.")
+                        .withButton("OK")
+                        .withIconType(juce::AlertWindow::WarningIcon)
+                        .withAssociatedComponent(this);
+                    juce::AlertWindow::showAsync(options, nullptr);
+                });
                 return;
             }
             framePixels.resize(getRenderWidth() * getRenderHeight() * 4);

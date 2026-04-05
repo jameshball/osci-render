@@ -267,6 +267,13 @@ private:
 
     bool heartbeatActive = false;
 
+#if OSCI_PREMIUM
+    // Verify the downloaded ffmpeg binary actually runs on this system.
+    // Returns true if ffmpeg -version exits successfully. Result is cached.
+    bool validateFFmpegBinary();
+    bool ffmpegValidated = false;
+#endif
+
     // Maps paramID → AudioProcessorParameter* for O(1) lookup in valueTreePropertyChanged
     std::unordered_map<juce::String, juce::AudioProcessorParameter*> paramIdMap;
 };
