@@ -67,8 +67,8 @@ void VoiceManager::setPolyphony(int value) {
 }
 
 void VoiceManager::setCurrentPlaybackSampleRate(double rate) {
-    sampleRate = rate;
     juce::SpinLock::ScopedLockType sl(lock);
+    sampleRate = rate;
     for (auto& mv : allVoices) {
         if (mv->getJuceVoice() != nullptr)
             mv->getJuceVoice()->setCurrentPlaybackSampleRate(rate);
