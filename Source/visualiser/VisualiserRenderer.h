@@ -63,6 +63,8 @@ public:
     void setHasMirrorConsumer(bool has) { hasMirrorConsumer.store(has); }
     bool isMirrorMode() const { return mirrorSource.load() != nullptr; }
 
+    juce::OpenGLContext& getOpenGLContext() { return openGLContext; }
+
     void getFrame(std::vector<unsigned char>& frame);
     void drawFrame();    juce::Rectangle<int> getViewportArea() const { return viewportArea; }
     void setViewportArea(juce::Rectangle<int> area) {
@@ -198,6 +200,12 @@ private:
 
     float fadeAmount;
     ScreenOverlay screenOverlay = ScreenOverlay::INVALID;
+public:
+    // Reset GL surface transparency state so it gets re-configured next frame.
+    // Call after fullscreen transitions that may reset the GL context.
+    void resetGLSurfaceTransparency() { glSurfaceTransparent = false; }
+private:
+    bool glSurfaceTransparent = false;
 
     int resolution;
     double frameRate;

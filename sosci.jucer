@@ -244,6 +244,10 @@
               file="Source/visualiser/TexturedFragmentShader.glsl"/>
         <FILE id="EW75fo" name="TexturedVertexShader.glsl" compile="0" resource="0"
               file="Source/visualiser/TexturedVertexShader.glsl"/>
+        <FILE id="sW1nDo" name="TransparentWindow.h" compile="0" resource="0"
+              file="Source/visualiser/TransparentWindow.h"/>
+        <FILE id="sW2nDo" name="TransparentWindow.mm" compile="1" resource="0"
+              file="Source/visualiser/TransparentWindow.mm"/>
         <FILE id="pxVOD9" name="VisualiserComponent.cpp" compile="1" resource="0"
               file="Source/visualiser/VisualiserComponent.cpp"/>
         <FILE id="MH6n0v" name="VisualiserComponent.h" compile="0" resource="0"

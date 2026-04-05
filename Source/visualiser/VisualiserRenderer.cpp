@@ -13,6 +13,7 @@
 #include "SimpleFragmentShader.glsl"
 #include "SimpleVertexShader.glsl"
 #include "TexturedFragmentShader.glsl"
+#include "TransparentWindow.h"
 #include "TexturedVertexShader.glsl"
 #include "WideBlurFragmentShader.glsl"
 #include "WideBlurVertexShader.glsl"
@@ -310,6 +311,9 @@ void VisualiserRenderer::drawFrame() {
 
     // The crop rectangle will be applied in drawTexture if it's set
     setShader(texturedShader.get());
+#if OSCI_PREMIUM
+    texturedShader->setUniform("uPreserveAlpha", parameters.screenOverlay->isTransparent() ? 1.0f : 0.0f);
+#endif
     drawTexture({renderTexture});
 }
 
@@ -430,7 +434,24 @@ void VisualiserRenderer::renderOpenGL() {
     using namespace juce::gl;
 
     if (openGLContext.isActive()) {
-        juce::OpenGLHelpers::clear(juce::Colours::black);
+        // Configure GL surface for transparency once. The popout window is
+        // always created in transparent mode so this is needed regardless of
+        // the current screen overlay setting.
+        if (!glSurfaceTransparent) {
+            configureOpenGLSurfaceTransparency(openGLContext.getRawContext());
+            glSurfaceTransparent = true;
+        }
+
+#if OSCI_PREMIUM
+        bool isTransparent = parameters.screenOverlay->isTransparent();
+        if (isTransparent) {
+            juce::OpenGLHelpers::clear(juce::Colours::transparentBlack);
+        } else {
+            juce::OpenGLHelpers::clear(juce::Colours::black);
+        }
+#else
+            juce::OpenGLHelpers::clear(juce::Colours::black);
+#endif
 
         // Mirror mode: display the parent's captured frame
         auto* source = mirrorSource.load();
@@ -486,6 +507,9 @@ void VisualiserRenderer::renderOpenGL() {
             setShader(texturedShader.get());
             texturedShader->setUniform("uResizeForCanvas", 1.0f);
             texturedShader->setUniform("uCropEnabled", 0.0f);
+#if OSCI_PREMIUM
+            texturedShader->setUniform("uPreserveAlpha", parameters.screenOverlay->isTransparent() ? 1.0f : 0.0f);
+#endif
 
             Texture mirrorTex { mirrorTexture, w, h };
             targetTexture = std::nullopt;
@@ -519,6 +543,9 @@ void VisualiserRenderer::renderOpenGL() {
         // render texture to screen
         activateTargetTexture(std::nullopt);
         setShader(texturedShader.get());
+#if OSCI_PREMIUM
+        texturedShader->setUniform("uPreserveAlpha", parameters.screenOverlay->isTransparent() ? 1.0f : 0.0f);
+#endif
         drawTexture({renderTexture});
 
         // Capture frame for mirror consumer (child window)
@@ -656,7 +683,7 @@ Texture VisualiserRenderer::makeTexture(int width, int height, GLuint textureID)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    float borderColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
+    float borderColor[] = {0.0f, 0.0f, 0.0f, 0.0f};
     glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureID, 0);
@@ -941,6 +968,11 @@ void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::
 
     lineShader->setUniform("uFadeAmount", fadeAmount);
     lineShader->setUniform("uNEdges", (GLfloat)nEdges);
+#if OSCI_PREMIUM
+    lineShader->setUniform("uTransparent", parameters.screenOverlay->isTransparent() ? 1.0f : 0.0f);
+#else
+    lineShader->setUniform("uTransparent", 0.0f);
+#endif
     setOffsetAndScale(lineShader.get());
 
 #if OSCI_PREMIUM
@@ -970,11 +1002,24 @@ void VisualiserRenderer::fade() {
     setNormalBlending();
 
 #if OSCI_PREMIUM
+    // In transparent mode, use separate blend for alpha so it decays
+    // without accumulating (fade² each frame). Normal blending adds
+    // fade² to alpha; we want alpha to simply multiply by (1-fade).
+    bool transparent = parameters.screenOverlay->isTransparent();
+    if (transparent) {
+        glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA,
+                            GL_ZERO, GL_ONE_MINUS_SRC_ALPHA);
+    }
+
     setShader(afterglowShader.get());
     afterglowShader->setUniform("fadeAmount", fadeAmount);
     afterglowShader->setUniform("afterglowAmount", (float)parameters.getAfterglow());
     afterglowShader->setUniform("uResizeForCanvas", lineTexture.width / renderTexture.width);
     drawTexture({lineTexture});
+
+    if (transparent) {
+        setNormalBlending();
+    }
 #else
     simpleShader->use();
     glEnableVertexAttribArray(glGetAttribLocation(simpleShader->getProgramID(), "vertexPosition"));
@@ -993,6 +1038,12 @@ void VisualiserRenderer::drawCRT() {
     using namespace juce::gl;
 
     setNormalBlending();
+
+    // Reset uPreserveAlpha for internal passes — must not preserve alpha from
+    // the lineTexture during blur/copy passes, as normal blending with low alpha
+    // would zero out the RGB data.
+    texturedShader->use();
+    texturedShader->setUniform("uPreserveAlpha", 0.0f);
 
     activateTargetTexture(blur1Texture);
     setShader(texturedShader.get());
@@ -1045,6 +1096,15 @@ void VisualiserRenderer::drawCRT() {
 #endif
 
     activateTargetTexture(renderTexture);
+#if OSCI_PREMIUM
+    // In transparent mode, disable blending so the output shader overwrites
+    // the renderTexture completely. With normal blending, pixels where
+    // alpha=0 would preserve stale old content instead of clearing it.
+    bool transparentOutput = parameters.screenOverlay->isTransparent();
+    if (transparentOutput) {
+        glDisable(GL_BLEND);
+    }
+#endif
     setShader(outputShader.get());
     // Lower exposure slightly for RGB pipeline (previous mono calibration was higher)
     outputShader->setUniform("uExposure", 0.18f);
@@ -1070,9 +1130,11 @@ void VisualiserRenderer::drawCRT() {
 #if OSCI_PREMIUM
     outputShader->setUniform("uFishEye", screenOverlay == ScreenOverlay::VectorDisplay ? VECTOR_DISPLAY_FISH_EYE : 0.0f);
     outputShader->setUniform("uRealScreen", parameters.screenOverlay->isRealisticDisplay() ? 1.0f : 0.0f);
+    outputShader->setUniform("uTransparent", parameters.screenOverlay->isTransparent() ? 1.0f : 0.0f);
 #else
     outputShader->setUniform("uFishEye", 0.0f);
     outputShader->setUniform("uRealScreen", 0.0f);
+    outputShader->setUniform("uTransparent", 0.0f);
 #endif
     outputShader->setUniform("uResizeForCanvas", lineTexture.width / (float) renderTexture.width);
     // Colour uniform removed: line texture already encodes RGB
@@ -1086,6 +1148,11 @@ void VisualiserRenderer::drawCRT() {
         glowTexture,
 #endif
     });
+#if OSCI_PREMIUM
+    if (transparentOutput) {
+        glEnable(GL_BLEND);
+    }
+#endif
     checkGLErrors(__FILE__, __LINE__);
 }
 

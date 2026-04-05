@@ -13,7 +13,13 @@ juce::String FFmpegEncoderManager::buildVideoEncodingCommand(
     int height,
     double frameRate,
     const juce::String& compressionPreset,
-    const juce::File& outputFile) {
+    const juce::File& outputFile,
+    bool transparent) {
+    // When transparency is requested, always use ProRes 4444 with alpha
+    if (transparent) {
+        return buildProRes4444AlphaEncodingCommand(width, height, frameRate, outputFile);
+    }
+
     switch (codec) {
         case VideoCodec::H264:
             return buildH264EncodingCommand(crf, width, height, frameRate, compressionPreset, outputFile);
@@ -220,8 +226,10 @@ juce::String FFmpegEncoderManager::buildBaseEncodingCommand(
     int width,
     int height,
     double frameRate,
-    const juce::File& outputFile) {
+    const juce::File& outputFile,
+    bool transparent) {
     juce::String resolution = juce::String(width) + "x" + juce::String(height);
+    juce::String outputPixFmt = transparent ? "yuva444p10le" : "yuv420p";
     juce::String cmd = "\"" + ffmpegExecutable.getFullPathName() + "\"" +
                        " -r " + juce::String(frameRate) +
                        " -f rawvideo" +
@@ -230,7 +238,7 @@ juce::String FFmpegEncoderManager::buildBaseEncodingCommand(
                        " -i -" +
                        " -threads 4" +
                        " -y" +
-                       " -pix_fmt yuv420p" +
+                       " -pix_fmt " + outputPixFmt +
                        " -vf vflip";
 
     return cmd;
@@ -376,6 +384,24 @@ juce::String FFmpegEncoderManager::buildProResEncodingCommand(
     return cmd;
 }
 #endif
+
+juce::String FFmpegEncoderManager::buildProRes4444AlphaEncodingCommand(
+    int width,
+    int height,
+    double frameRate,
+    const juce::File& outputFile) {
+    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, outputFile, true);
+
+    // prores_ks is available cross-platform in FFmpeg
+    cmd += " -c:v prores_ks"
+           " -profile:v 4444"
+           " -vendor apl0"
+           " -bits_per_mb 8000";
+
+    cmd += " \"" + outputFile.getFullPathName() + "\"";
+
+    return cmd;
+}
 
 bool FFmpegEncoderManager::testEncoderWorks(const juce::String& encoderName) {
     juce::Logger::writeToLog("FFmpeg: testing encoder '" + encoderName + "'");

@@ -24,7 +24,8 @@ public:
         int height,
         double frameRate,
         const juce::String& compressionPreset,
-        const juce::File& outputFile);
+        const juce::File& outputFile,
+        bool transparent = false);
 
     // Get available encoders for a given codec
     juce::Array<EncoderDetails> getAvailableEncodersForCodec(VideoCodec codec);
@@ -56,7 +57,8 @@ private:
         int width,
         int height,
         double frameRate,
-        const juce::File& outputFile);
+        const juce::File& outputFile,
+        bool transparent = false);
 
     // H.264 encoder settings helper
     juce::String addH264EncoderSettings(
@@ -113,6 +115,13 @@ private:
         double frameRate,
         const juce::File& outputFile);
 #endif
+
+    // Build ProRes 4444 encoding command with alpha channel (cross-platform)
+    juce::String buildProRes4444AlphaEncodingCommand(
+        int width,
+        int height,
+        double frameRate,
+        const juce::File& outputFile);
 
     // Estimate bitrate for videotoolbox encoders based on resolution, frame rate, and CRF
     int estimateBitrateForVideotoolbox(int width, int height, double frameRate, int crfValue);

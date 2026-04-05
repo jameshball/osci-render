@@ -108,7 +108,11 @@ VisualiserComponent::VisualiserComponent(
     };
 
     popOutButton.onClick = [this]() {
-        popoutWindow();
+        if (child != nullptr) {
+            popout->closeButtonPressed();
+        } else {
+            popoutWindow();
+        }
     };
 
     if (visualiserOnly && juce::JUCEApplication::isStandaloneApp()) {
@@ -416,7 +420,8 @@ void VisualiserComponent::setRecording(bool recording) {
             }
 
             // Get the appropriate file extension based on codec
-            juce::String fileExtension = recordingSettings.getFileExtensionForCodec();
+            bool isTransparent = parameters.screenOverlay->isTransparent();
+            juce::String fileExtension = isTransparent ? "mov" : recordingSettings.getFileExtensionForCodec();
             tempVideoFile = std::make_unique<juce::TemporaryFile>("." + fileExtension);
 
             VideoCodec codec = recordingSettings.getVideoCodec();
@@ -427,7 +432,8 @@ void VisualiserComponent::setRecording(bool recording) {
                 getRenderHeight(),
                 recordingSettings.getFrameRate(),
                 recordingSettings.getCompressionPreset(),
-                tempVideoFile->getFile());
+                tempVideoFile->getFile(),
+                isTransparent);
 
             if (!ffmpegProcess.start(cmd)) {
                 record.setToggleState(false, juce::NotificationType::dontSendNotification);
@@ -455,7 +461,7 @@ void VisualiserComponent::setRecording(bool recording) {
         recordingAudio = false;
         recordingVideo = false;
 
-        juce::String extension = wasRecordingVideo ? recordingSettings.getFileExtensionForCodec() : "wav";
+        juce::String extension = wasRecordingVideo ? (parameters.screenOverlay->isTransparent() ? "mov" : recordingSettings.getFileExtensionForCodec()) : "wav";
         if (wasRecordingAudio) {
             audioRecorder.stop();
         }
@@ -528,6 +534,8 @@ void VisualiserComponent::resized() {
         record.setVisible(false);
         stopwatch.setVisible(false);
         timeline.setVisible(false);
+        if (popoutToolbar)
+            popoutToolbar->setBounds(getLocalBounds());
         setViewportArea(area);
         return;
     } else {
@@ -537,7 +545,7 @@ void VisualiserComponent::resized() {
     if (parent == nullptr || juce::JUCEApplicationBase::isStandaloneApp()) {
         fullScreenButton.setBounds(buttons.removeFromRight(30));
     }
-    if (child == nullptr && parent == nullptr) {
+    if (parent == nullptr) {
         popOutButton.setBounds(buttons.removeFromRight(30));
     }
     if (openSettings != nullptr) {
@@ -609,14 +617,26 @@ void VisualiserComponent::popoutWindow() {
     visualiser->setSize(350, 350);
     popout = std::make_unique<VisualiserWindow>("Software Oscilloscope", this);
     popout->setContentOwned(visualiser, true);
-    popout->setUsingNativeTitleBar(true);
+    popout->setUsingNativeTitleBar(false);
     popout->setResizable(true, false);
     // Register editor as KeyListener so undo/redo shortcuts work in the popout window
     popout->addKeyListener(&editor);
     popout->setVisible(true);
     popout->centreWithSize(350, 350);
+    // Configure the native window for transparency (always, so the overlay
+    // can switch to transparent mode without recreating the window).
+    configureNativeWindowTransparency(popout.get());
     // Hide all buttons on the popout and set up mirror mode
     visualiser->hideButtonRow = true;
+    // Create the floating toolbar overlay (componentPainting toggled dynamically on hover)
+    visualiser->popoutToolbar = std::make_unique<PopoutToolbar>();
+    visualiser->popoutToolbar->onClose = [this] { popout->closeButtonPressed(); };
+    visualiser->popoutToolbar->onFullScreen = [this] {
+        if (auto* window = dynamic_cast<VisualiserWindow*>(popout.get()))
+            window->toggleFullScreen();
+    };
+    visualiser->addAndMakeVisible(*visualiser->popoutToolbar);
+    visualiser->popoutToolbar->setVisible(false);
     visualiser->resized();
     // Set up mirror mode AFTER the window is visible so the GL context is active
     visualiser->setMirrorSource(this);
@@ -625,11 +645,10 @@ void VisualiserComponent::popoutWindow() {
 }
 
 void VisualiserComponent::childUpdated() {
-    popOutButton.setVisible(child == nullptr);
+    popOutButton.setToggleState(child != nullptr, juce::NotificationType::dontSendNotification);
 #if OSCI_PREMIUM
     editor.ffmpegDownloader.setVisible(child == nullptr);
 #endif
-    record.setVisible(child == nullptr);
     if (child != nullptr) {
         audioProcessor.haltRecording = [this] {
             setRecording(false);
