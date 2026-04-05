@@ -120,7 +120,7 @@ jobs:
           PLUGINVAL_TIMEOUT: "1200000"
           PLUGINVAL_STRICTNESS: "5"
         run: |
-          source ./ci/pluginval.sh "${{ matrix.project }}" "${{ matrix.project }} (instrument)"
+          source ./ci/pluginval.sh "${{ matrix.project }}" "${{ matrix.project }}-instrument"
 
       # macOS packaging & notarization
       - name: Download Packages installer build tool

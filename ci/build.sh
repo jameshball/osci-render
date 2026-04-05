@@ -53,7 +53,7 @@ fi
 # Build instrument version (osci-render only)
 if [ "$PLUGIN" = "osci-render" ]; then
   cd "$ROOT"
-  INSTRUMENT_NAME="$PLUGIN (instrument)"
+  INSTRUMENT_TARGET="$PLUGIN-instrument"
 
   echo "============================================="
   echo " Building instrument version..."
@@ -83,11 +83,13 @@ if [ "$PLUGIN" = "osci-render" ]; then
   # Change AU main type from music effect to music device (instrument)
   sed_jucer "s/pluginAUMainType=\"'aumf'\"/pluginAUMainType=\"'aumu'\"/"
 
-  # Add explicit pluginName and pluginCode for the instrument variant
+  # Add explicit pluginName (DAW display name) and pluginCode for the instrument variant
+  # pluginName keeps the user-facing "(instrument)" suffix; targetName uses hyphen for filesystem safety
   sed_jucer 's/name="osci-render" projectType/name="osci-render" pluginName="osci-render (instrument)" pluginCode="Hh2i" projectType/'
 
   # Change all targetName occurrences to produce differently-named binaries
-  sed_jucer 's/targetName="osci-render"/targetName="osci-render (instrument)"/g'
+  # Uses hyphen instead of parentheses to avoid Linux Makefile quoting issues
+  sed_jucer 's/targetName="osci-render"/targetName="osci-render-instrument"/g'
 
   # Resave jucer file with instrument settings
   eval "$RESAVE_COMMAND"
@@ -100,7 +102,7 @@ if [ "$PLUGIN" = "osci-render" ]; then
   if [ "$OS" = "linux" ]; then
     cd "$ROOT/Builds/$PLUGIN/LinuxMakefile"
     make -j$(nproc) CONFIG=Release
-    cp -r "./build/$INSTRUMENT_NAME.vst3" "$ROOT/ci/bin/$INSTRUMENT_NAME.vst3"
+    cp -r "./build/$INSTRUMENT_TARGET.vst3" "$ROOT/ci/bin/$INSTRUMENT_TARGET.vst3"
   fi
 
   if [ "$OS" = "win" ]; then
@@ -128,8 +130,8 @@ if [ "$OS" = "linux" ]; then
   cd "$ROOT/ci/bin"
 
   if [ "$PLUGIN" = "osci-render" ]; then
-    INSTRUMENT_NAME="$PLUGIN (instrument)"
-    zip -r "${OUTPUT_NAME}-linux-vst3.zip" "$PLUGIN.vst3" "$INSTRUMENT_NAME.vst3"
+    INSTRUMENT_TARGET="$PLUGIN-instrument"
+    zip -r "${OUTPUT_NAME}-linux-vst3.zip" "$PLUGIN.vst3" "$INSTRUMENT_TARGET.vst3"
   else
     zip -r "${OUTPUT_NAME}-linux-vst3.zip" "$PLUGIN.vst3"
   fi
