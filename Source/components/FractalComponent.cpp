@@ -15,11 +15,13 @@ void FractalComponent::RulesPanel::paint(juce::Graphics& g) {
 
 FractalComponent::FractalComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor)
     : audioProcessor(p), pluginEditor(editor) {
+    setWantsKeyboardFocus(false);
     addAndMakeVisible(group);
 
     addAndMakeVisible(axiomLabel);
     addAndMakeVisible(axiomEditor);
     axiomEditor.setMultiLine(false);
+    axiomEditor.setSelectAllWhenFocused(false);
     axiomEditor.onTextChange = [this]() {
         if (!updatingFromParser) updateFileFromUI();
     };
@@ -27,12 +29,15 @@ FractalComponent::FractalComponent(OscirenderAudioProcessor& p, OscirenderAudioP
     addAndMakeVisible(angleLabel);
     addAndMakeVisible(angleEditor);
     angleEditor.setMultiLine(false);
+    angleEditor.setSelectAllWhenFocused(false);
     angleEditor.setInputRestrictions(10, "0123456789.-");
     angleEditor.onTextChange = [this]() {
         if (!updatingFromParser) updateFileFromUI();
     };
 
-    addAndMakeVisible(depthSlider);
+    addAndMakeVisible(depthKnob);
+    depthKnob.bindToEffectParam(audioProcessor.fractalDepthEffect->parameters[0], 0.0, 0);
+    depthKnob.wireModulation(audioProcessor);
 
     addAndMakeVisible(rulesLabel);
     addAndMakeVisible(rulesViewport);
@@ -172,33 +177,36 @@ void FractalComponent::timerCallback() {}
 void FractalComponent::paint(juce::Graphics& g) {}
 
 void FractalComponent::resized() {
-    auto area = getLocalBounds().withTrimmedTop(20).reduced(20);
+    auto area = getLocalBounds().withTrimmedTop(30).reduced(10, 5);
     group.setBounds(getLocalBounds());
 
-    const int rowHeight = 20;
-    const int sliderHeight = 30;
-    const int labelWidth = 125; // 5px pad + 120px label inside EffectComponent
+    const int knobWidth = 80;
+    const int topRowHeight = 52;
 
-    // Axiom row — indented to align with slider track
-    auto axiomRow = area.removeFromTop(rowHeight);
-    axiomLabel.setBounds(axiomRow.removeFromLeft(labelWidth));
-    axiomEditor.setBounds(axiomRow);
-    area.removeFromTop(5);
+    // Top row: Axiom + Angle text + Depth knob
+    auto topRow = area.removeFromTop(topRowHeight);
 
-    // Base angle row — indented to align with slider track
-    auto angleRow = area.removeFromTop(rowHeight);
-    angleLabel.setBounds(angleRow.removeFromLeft(labelWidth));
-    angleEditor.setBounds(angleRow);
-    area.removeFromTop(5);
+    depthKnob.setBounds(topRow.removeFromRight(knobWidth));
+    topRow.removeFromRight(4);
 
-    // Effect sliders (same height as FrameSettingsComponent: 30px each, no extra spacing)
-    depthSlider.setBounds(area.removeFromTop(sliderHeight).withLeft(area.getX() - 5));
-    area.removeFromTop(5);
+    // Angle section
+    auto angleArea = topRow.removeFromRight(80);
+    angleLabel.setBounds(angleArea.removeFromTop(16));
+    angleEditor.setBounds(angleArea.removeFromTop(22));
 
-    // Rules label
-    auto rulesRow = area.removeFromTop(rowHeight);
-    rulesLabel.setBounds(rulesRow);
+    topRow.removeFromRight(4);
+
+    // Axiom fills remaining space
+    axiomLabel.setBounds(topRow.removeFromTop(16));
+    axiomEditor.setBounds(topRow.removeFromTop(22));
+
     area.removeFromTop(2);
+
+    // Rules label — overlap with controls row by 10px
+    area = area.withTop(area.getY() - 10);
+    auto rulesRow = area.removeFromTop(18);
+    rulesLabel.setBounds(rulesRow);
+    area.removeFromTop(1);
 
     // Rules viewport fills remaining space
     rulesViewport.setBounds(area);

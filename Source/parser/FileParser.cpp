@@ -136,7 +136,7 @@ std::vector<std::unique_ptr<osci::Shape>> FileParser::nextFrame() {
     }
 #if OSCI_PREMIUM
     else if (fractal != nullptr) {
-        fractal->setIterations(audioProcessor.fractalIterations.load(std::memory_order_relaxed));
+        fractal->setIterations(juce::roundToInt(audioProcessor.fractalDepthValue.load(std::memory_order_relaxed)));
         return fractal->draw();
     }
 #endif

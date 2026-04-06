@@ -110,7 +110,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     osciPermanentEffects.push_back(imageThreshold);
     osciPermanentEffects.push_back(imageStride);
 #if OSCI_PREMIUM
-    osciPermanentEffects.push_back(fractalIterationsEffect);
+    osciPermanentEffects.push_back(fractalDepthEffect);
 #endif
 
     for (int i = 0; i < 26; i++) {
@@ -244,9 +244,12 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     sidechainParameters.setUndoGroupingFlag(&undoGrouping);
 
     // Wire up renderer-side modulation for visualiser effects.
-    // The renderer calls this after animateValues() to apply LFO/ENV modulation.
+    // The renderer calls this after animateValues() to apply modulation from all sources.
+    // Uses modulationEngine.getSources() so that any newly registered source type is
+    // automatically included — no manual per-type code required.
     visualiserParameters.applyExternalModulation = [this](int numSamples) {
-        auto applyAssignments = [&](const auto& assignments, auto getValueFn, int maxIndex) {
+        auto applyAssignments = [&](const std::vector<ModAssignment>& assignments, ModulationSource* source) {
+            int maxIndex = source->getSourceCount();
             for (const auto& assignment : assignments) {
                 if (assignment.sourceIndex < 0 || assignment.sourceIndex >= maxIndex) continue;
 
@@ -258,7 +261,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
                             float* buf = effect->getAnimatedValuesWritePointer(p, numSamples);
                             if (buf == nullptr) continue;
 
-                            float val = getValueFn(assignment.sourceIndex);
+                            float val = source->getCurrentValue(assignment.sourceIndex);
                             float paramMin = effect->parameters[p]->min;
                             float paramMax = effect->parameters[p]->max;
                             float range = paramMax - paramMin;
@@ -282,26 +285,9 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
             }
         };
 
-        // Apply LFO modulation
-        {
-            juce::SpinLock::ScopedLockType assnLock(lfoParameters.assignments.lock);
-            applyAssignments(lfoParameters.assignments.items,
-                [this](int i) { return lfoParameters.currentValues[i].load(std::memory_order_relaxed); },
-                NUM_LFOS);
-        }
-        // Apply ENV modulation
-        {
-            juce::SpinLock::ScopedLockType assnLock(envelopeParameters.assignments.lock);
-            applyAssignments(envelopeParameters.assignments.items,
-                [this](int i) { return envelopeParameters.currentValues[i].load(std::memory_order_relaxed); },
-                NUM_ENVELOPES);
-        }
-        // Apply Sidechain modulation
-        {
-            juce::SpinLock::ScopedLockType assnLock(sidechainParameters.assignments.lock);
-            applyAssignments(sidechainParameters.assignments.items,
-                [this](int i) { return sidechainParameters.currentValues[i].load(std::memory_order_relaxed); },
-                NUM_SIDECHAINS);
+        for (auto* source : modulationEngine.getSources()) {
+            juce::SpinLock::ScopedLockType assnLock(source->assignments.lock);
+            applyAssignments(source->assignments.items, source);
         }
     };
 }

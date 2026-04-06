@@ -62,10 +62,12 @@ VisualiserComponent::VisualiserComponent(
         addAndMakeVisible(fullScreenButton);
         fullScreenButton.setTooltip("Toggles fullscreen mode.");
     }
+#if OSCI_PREMIUM
     if (child == nullptr && parent == nullptr) {
         addAndMakeVisible(popOutButton);
         popOutButton.setTooltip("Opens the oscilloscope in a new window.");
     }
+#endif
     addAndMakeVisible(settingsButton);
     settingsButton.setTooltip("Opens the visualiser settings window.");
 
@@ -107,9 +109,11 @@ VisualiserComponent::VisualiserComponent(
         }
     };
 
+#if OSCI_PREMIUM
     popOutButton.onClick = [this]() {
         popoutWindow();
     };
+#endif
 
     if (visualiserOnly && juce::JUCEApplication::isStandaloneApp()) {
         addAndMakeVisible(audioInputButton);
@@ -548,9 +552,11 @@ void VisualiserComponent::resized() {
     if (parent == nullptr || juce::JUCEApplicationBase::isStandaloneApp()) {
         fullScreenButton.setBounds(buttons.removeFromRight(30));
     }
+#if OSCI_PREMIUM
     if (child == nullptr && parent == nullptr) {
         popOutButton.setBounds(buttons.removeFromRight(30));
     }
+#endif
     if (openSettings != nullptr) {
         settingsButton.setVisible(true);
         settingsButton.setBounds(buttons.removeFromRight(30));
@@ -594,7 +600,6 @@ void VisualiserComponent::popoutWindow() {
     if (sharedTextureButton.getToggleState()) {
         sharedTextureButton.triggerClick();
     }
-#endif
     setRecording(false);
 
     // Release renderingSemaphore to prevent deadlock when creating a child visualizer
@@ -603,9 +608,7 @@ void VisualiserComponent::popoutWindow() {
     auto visualiser = new VisualiserComponent(
         audioProcessor,
         editor,
-#if OSCI_PREMIUM
         sharedTextureManager,
-#endif
         ffmpegFile,
         settings,
         recordingSettings,
@@ -633,10 +636,13 @@ void VisualiserComponent::popoutWindow() {
     visualiser->setMirrorSource(this);
     setHasMirrorConsumer(true);
     resized();
+#endif
 }
 
 void VisualiserComponent::childUpdated() {
+#if OSCI_PREMIUM
     popOutButton.setVisible(child == nullptr);
+#endif
 #if OSCI_PREMIUM
     editor.ffmpegDownloader.setVisible(child == nullptr);
 #endif

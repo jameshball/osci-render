@@ -5,7 +5,7 @@
 #include <JuceHeader.h>
 #include "../PluginProcessor.h"
 #include "../parser/fractal/FractalParser.h"
-#include "effects/EffectComponent.h"
+#include "KnobContainerComponent.h"
 #include "ScrollFadeViewport.h"
 
 class OscirenderAudioProcessorEditor;
@@ -36,11 +36,9 @@ private:
     juce::Label axiomLabel{{}, "Axiom"};
     juce::TextEditor axiomEditor;
 
-    juce::Label angleLabel{{}, juce::String (juce::CharPointer_UTF8 ("Angle (\xC2\xB0)"))};
+    juce::Label angleLabel{{}, juce::String(juce::CharPointer_UTF8("Angle (\xC2\xB0)"))};
     juce::TextEditor angleEditor;
-
-    // Effect sliders
-    EffectComponent depthSlider{*audioProcessor.fractalIterationsEffect};
+    KnobContainerComponent depthKnob{"DEPTH"};
 
     // Rules section — scrollable panel with dark background
     struct RulesPanel : public juce::Component {

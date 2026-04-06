@@ -209,7 +209,7 @@ void SettingsComponent::layoutChildren() {
             }
 #if OSCI_PREMIUM
             else if (fractalEditor.isVisible()) {
-                int preferredHeight = juce::jmin(300, effectsBounds.getHeight() / 2);
+                int preferredHeight = juce::jmin(210, effectsBounds.getHeight() / 2);
                 fractalEditor.setBounds(effectsBounds.removeFromBottom(preferredHeight));
                 effectsBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
             }
