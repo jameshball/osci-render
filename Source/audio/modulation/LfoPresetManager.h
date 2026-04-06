@@ -32,6 +32,12 @@ public:
     // Returns the destination file on success, or an invalid File on failure.
     juce::File importPreset(const juce::File& sourceFile);
 
+    // List .vitallfo files from the Vital synth user LFOs directory (if present).
+    std::vector<PresetEntry> getVitalUserPresets() const;
+
+    // Returns the Vital user LFOs directory for this platform.
+    static juce::File getVitalUserLfoDirectory();
+
     // Convert an internal LfoWaveform to Vital's JSON representation.
     static juce::var waveformToVitalJson(const LfoWaveform& waveform, const juce::String& name);
 

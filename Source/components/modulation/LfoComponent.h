@@ -59,7 +59,9 @@ private:
     struct LfoData {
         LfoWaveform waveform;
         LfoWaveform customWaveform;
+        LfoWaveform factoryWaveform;  // Cached waveform for current factory preset
         LfoPreset preset = LfoPreset::Triangle;
+        LfoPreset lastFactoryPreset = LfoPreset::Triangle; // For cycling when in Custom state
         juce::String userPresetName; // Non-empty when a user preset is loaded
     };
     std::array<LfoData, NUM_LFOS> lfoData;

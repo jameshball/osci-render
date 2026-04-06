@@ -84,6 +84,51 @@ juce::File LfoPresetManager::importPreset(const juce::File& sourceFile) {
     return {};
 }
 
+juce::File LfoPresetManager::getVitalUserLfoDirectory() {
+#if JUCE_MAC
+    return juce::File::getSpecialLocation(juce::File::userHomeDirectory)
+        .getChildFile("Music/Vital/User/LFOs");
+#elif JUCE_WINDOWS
+    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+        .getChildFile("Vital/User/LFOs");
+#else
+    return juce::File::getSpecialLocation(juce::File::userHomeDirectory)
+        .getChildFile(".local/share/vital/User/LFOs");
+#endif
+}
+
+std::vector<LfoPresetManager::PresetEntry> LfoPresetManager::getVitalUserPresets() const {
+    std::vector<PresetEntry> presets;
+
+    auto vitalDir = getVitalUserLfoDirectory();
+    if (!vitalDir.isDirectory()) return presets;
+
+    for (const auto& file : vitalDir.findChildFiles(juce::File::findFiles, false, "*.vitallfo")) {
+        PresetEntry entry;
+        entry.file = file;
+
+        auto text = file.loadFileAsString();
+        auto parsed = juce::JSON::parse(text);
+        if (parsed.isObject()) {
+            auto* obj = parsed.getDynamicObject();
+            if (obj && obj->hasProperty("name"))
+                entry.name = obj->getProperty("name").toString();
+        }
+
+        if (entry.name.isEmpty())
+            entry.name = file.getFileNameWithoutExtension();
+
+        presets.push_back(entry);
+    }
+
+    std::sort(presets.begin(), presets.end(),
+              [](const PresetEntry& a, const PresetEntry& b) {
+                  return a.name.compareIgnoreCase(b.name) < 0;
+              });
+
+    return presets;
+}
+
 juce::var LfoPresetManager::waveformToVitalJson(const LfoWaveform& waveform, const juce::String& name) {
     auto* root = new juce::DynamicObject();
     root->setProperty("name", name);

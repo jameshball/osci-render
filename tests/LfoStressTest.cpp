@@ -191,7 +191,7 @@ public:
                 Writer(LfoWaveformStore& s, std::atomic<bool>& r, std::atomic<int>& sc, int id)
                     : juce::Thread("WfWriter" + juce::String(id)), store(s), running(r), setCount(sc), writerId(id) {}
                 void run() override {
-                    static const LfoPreset presets[] = { LfoPreset::Sine, LfoPreset::Triangle, LfoPreset::Sawtooth, LfoPreset::Square };
+                    static const LfoPreset presets[] = { LfoPreset::Sine, LfoPreset::Triangle, LfoPreset::SawUp, LfoPreset::Square };
                     juce::Random rng(writerId * 54321);
                     while (running.load()) {
                         int lfo = rng.nextInt(NUM_LFOS);
@@ -307,7 +307,7 @@ public:
                 : juce::Thread("GuiSim"), wfStore(ws), running(r) {}
             void run() override {
                 static const LfoPreset presets[] = {
-                    LfoPreset::Sine, LfoPreset::Triangle, LfoPreset::Sawtooth, LfoPreset::Square
+                    LfoPreset::Sine, LfoPreset::Triangle, LfoPreset::SawUp, LfoPreset::Square
                 };
                 juce::Random rng(99);
                 while (running.load()) {
@@ -503,7 +503,7 @@ public:
                 : juce::Thread("GuiWaveform"), store(s), running(r) {}
             void run() override {
                 static const LfoPreset presets[] = {
-                    LfoPreset::Sine, LfoPreset::Triangle, LfoPreset::Sawtooth, LfoPreset::Square
+                    LfoPreset::Sine, LfoPreset::Triangle, LfoPreset::SawUp, LfoPreset::Square
                 };
                 juce::Random rng(77);
                 while (running.load()) {
@@ -578,9 +578,9 @@ public:
             expectWithinAbsoluteError(wf.evaluate(1.0f), 0.0f, 0.01f);
         }
 
-        beginTest("Sawtooth preset boundary values");
+        beginTest("Saw Up preset boundary values");
         {
-            auto wf = createLfoPreset(LfoPreset::Sawtooth);
+            auto wf = createLfoPreset(LfoPreset::SawUp);
             expectWithinAbsoluteError(wf.evaluate(0.0f), 0.0f, 0.01f);
             expectWithinAbsoluteError(wf.evaluate(0.5f), 0.5f, 0.01f);
             expectWithinAbsoluteError(wf.evaluate(0.99f), 0.99f, 0.02f);
@@ -616,7 +616,7 @@ public:
         beginTest("LfoAudioState phase wrapping");
         {
             LfoAudioState state;
-            auto wf = createLfoPreset(LfoPreset::Sawtooth);
+            auto wf = createLfoPreset(LfoPreset::SawUp);
             // Advance through many cycles, phase should always stay in [0, 1)
             float val;
             for (int i = 0; i < 100000; ++i) {

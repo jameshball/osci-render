@@ -56,23 +56,22 @@ struct LfoWaveform {
 
 // Preset LFO waveform shapes.
 enum class LfoPreset {
+    // Basic
     Sine,
     Triangle,
-    Sawtooth,
-    ReverseSawtooth,
+    SawUp,
+    SawDown,
     Square,
-    // Creative presets
-    Exponential,
-    Logarithmic,
-    Pulse,
-    Staircase,
-    SmoothRandom,
-    Bounce,
-    Elastic,
-    WarmSaw,
-    Shark,
-    PulseTrain,
-    Sidechain,
+    StaircaseDown,
+    // Pattern
+    GrowingOscillations,
+    NervousGroove,
+    PulseSeries,
+    RandomPulses,
+    ShuffleGate,
+    SideChain1,
+    SideChain2,
+    SplitGate,
     TranceGate,
     Custom
 };
@@ -86,24 +85,21 @@ struct LfoPresetEntry {
 
 inline const std::vector<LfoPresetEntry>& getLfoPresetRegistry() {
     static const std::vector<LfoPresetEntry> registry = {
-        { LfoPreset::Sine,            "Sine" },
-        { LfoPreset::Triangle,        "Triangle" },
-        { LfoPreset::Sawtooth,        "Sawtooth" },
-        { LfoPreset::ReverseSawtooth, "Reverse Sawtooth" },
-        { LfoPreset::Square,          "Square" },
-        { LfoPreset::Exponential,     "Exponential" },
-        { LfoPreset::Logarithmic,     "Logarithmic" },
-        { LfoPreset::Pulse,           "Pulse" },
-        { LfoPreset::Staircase,       "Staircase" },
-        { LfoPreset::SmoothRandom,    "Smooth Random" },
-        { LfoPreset::Bounce,          "Bounce" },
-        { LfoPreset::Elastic,         "Elastic" },
-        { LfoPreset::WarmSaw,         "Warm Saw" },
-        { LfoPreset::Shark,           "Shark" },
-        { LfoPreset::PulseTrain,      "Pulse Train" },
-        { LfoPreset::Sidechain,       "Sidechain" },
-        { LfoPreset::TranceGate,      "Trance Gate" },
-        { LfoPreset::Custom,          "Custom" },
+        { LfoPreset::Sine,                 "Sine" },
+        { LfoPreset::Triangle,             "Triangle" },
+        { LfoPreset::SawUp,               "Saw Up" },
+        { LfoPreset::SawDown,             "Saw Down" },
+        { LfoPreset::Square,              "Square" },
+        { LfoPreset::StaircaseDown,       "Staircase Down" },
+        { LfoPreset::GrowingOscillations, "Growing Oscillations" },
+        { LfoPreset::NervousGroove,       "Nervous Groove" },
+        { LfoPreset::PulseSeries,         "Pulse Series" },
+        { LfoPreset::RandomPulses,        "Random Pulses" },
+        { LfoPreset::ShuffleGate,         "Shuffle Gate" },
+        { LfoPreset::SideChain1,          "Side Chain 1" },
+        { LfoPreset::SideChain2,          "Side Chain 2" },
+        { LfoPreset::SplitGate,           "Split Gate" },
+        { LfoPreset::TranceGate,          "Trance Gate" },
     };
     return registry;
 }
@@ -117,8 +113,6 @@ inline juce::String lfoPresetToString(LfoPreset preset) {
 inline LfoPreset stringToLfoPreset(const juce::String& s) {
     for (auto& entry : getLfoPresetRegistry())
         if (s == entry.name) return entry.preset;
-    // Legacy aliases for renamed/removed presets
-    if (s == "Rounded Square") return LfoPreset::WarmSaw;
     return LfoPreset::Custom;
 }
 
@@ -146,8 +140,8 @@ inline LfoPreset lfoTypeToLfoPreset(osci::LfoType type) {
     switch (type) {
         case osci::LfoType::Sine:            return LfoPreset::Sine;
         case osci::LfoType::Triangle:        return LfoPreset::Triangle;
-        case osci::LfoType::Sawtooth:        return LfoPreset::Sawtooth;
-        case osci::LfoType::ReverseSawtooth: return LfoPreset::ReverseSawtooth;
+        case osci::LfoType::Sawtooth:        return LfoPreset::SawUp;
+        case osci::LfoType::ReverseSawtooth: return LfoPreset::SawDown;
         case osci::LfoType::Square:          return LfoPreset::Square;
         case osci::LfoType::Seesaw:          return LfoPreset::Triangle; // closest match
         default:                             return LfoPreset::Sine;

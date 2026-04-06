@@ -242,6 +242,7 @@ LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
     for (int i = 0; i < NUM_LFOS; ++i) {
         lfoData[i].preset = LfoPreset::Triangle;
         lfoData[i].waveform = createLfoPreset(LfoPreset::Triangle);
+        lfoData[i].factoryWaveform = lfoData[i].waveform;
     }
 
     // Setup graph
@@ -487,8 +488,8 @@ void LfoComponent::syncGraphToActiveLfo() {
     int idx = getActiveSourceIndex();
     auto& waveform = lfoData[idx].waveform;
     juce::ScopedValueSetter<bool> guard(isSyncingGraph, true);
-    graph.setNodes(waveform.nodes);
     graph.setSmoothMode(waveform.smooth);
+    graph.setNodes(waveform.nodes);
     smoothToggle.setSmooth(waveform.smooth);
 
     auto colour = getLfoColour(idx);
@@ -501,12 +502,18 @@ void LfoComponent::syncActiveLfoFromGraph() {
     int idx = getActiveSourceIndex();
     lfoData[idx].waveform.nodes = graph.getNodes();
     lfoData[idx].waveform.smooth = graph.isSmoothMode();
-    lfoData[idx].preset = LfoPreset::Custom;
-    lfoData[idx].userPresetName.clear();
+
+    // Only mark as Custom if the waveform actually differs from the current preset
+    if (lfoData[idx].preset != LfoPreset::Custom) {
+        if (lfoData[idx].waveform != lfoData[idx].factoryWaveform) {
+            lfoData[idx].preset = LfoPreset::Custom;
+            lfoData[idx].userPresetName.clear();
+        }
+    }
     updatePresetLabel();
 
     audioProcessor.lfoParameters.waveformChanged(idx, lfoData[idx].waveform);
-    audioProcessor.lfoParameters.setPreset(idx, LfoPreset::Custom);
+    audioProcessor.lfoParameters.setPreset(idx, lfoData[idx].preset);
 }
 
 void LfoComponent::setLfoWaveform(int lfoIndex, const LfoWaveform& waveform) {
@@ -526,11 +533,16 @@ void LfoComponent::setLfoPreset(int lfoIndex, LfoPreset preset) {
     lfoData[lfoIndex].preset = preset;
     auto waveformBefore = audioProcessor.lfoParameters.getWaveform(lfoIndex);
     lfoData[lfoIndex].waveform = createLfoPreset(preset);
+    if (preset != LfoPreset::Custom)
+        lfoData[lfoIndex].factoryWaveform = lfoData[lfoIndex].waveform;
     audioProcessor.lfoParameters.waveformChanged(lfoIndex, lfoData[lfoIndex].waveform);
     if (lfoIndex == getActiveSourceIndex()) {
         auto nodesBefore = graph.getNodes();
         syncGraphToActiveLfo();
-        recordLfoUndoableChange(nodesBefore, waveformBefore, lfoIndex);
+        {
+            juce::ScopedValueSetter<bool> guard(isSyncingGraph, true);
+            recordLfoUndoableChange(nodesBefore, waveformBefore, lfoIndex);
+        }
         updatePresetLabel();
     }
 }
@@ -542,14 +554,23 @@ LfoPreset LfoComponent::getLfoPreset(int lfoIndex) const {
 
 void LfoComponent::cyclePreset(int direction) {
     auto& registry = getLfoPresetRegistry();
+    if (registry.empty()) return;
 
     int idx = getActiveSourceIndex();
-    auto current = lfoData[idx].preset;
+    // When in Custom state, cycle relative to the last factory preset
+    auto referencePreset = (lfoData[idx].preset == LfoPreset::Custom)
+                             ? lfoData[idx].lastFactoryPreset
+                             : lfoData[idx].preset;
+
     int currentIdx = -1;
     for (int i = 0; i < (int)registry.size(); ++i) {
-        if (registry[i].preset == current) { currentIdx = i; break; }
+        if (registry[i].preset == referencePreset) {
+            currentIdx = i;
+            break;
+        }
     }
     if (currentIdx < 0) currentIdx = (direction > 0) ? -1 : 0;
+
     int newIdx = (currentIdx + direction + (int)registry.size()) % (int)registry.size();
     applyPreset(registry[newIdx].preset);
 }
@@ -560,12 +581,17 @@ void LfoComponent::applyPreset(LfoPreset preset) {
         lfoData[idx].customWaveform = lfoData[idx].waveform;
 
     lfoData[idx].preset = preset;
+    if (preset != LfoPreset::Custom)
+        lfoData[idx].lastFactoryPreset = preset;
     lfoData[idx].userPresetName.clear();
 
-    if (preset == LfoPreset::Custom && !lfoData[idx].customWaveform.nodes.empty())
+    if (preset == LfoPreset::Custom && !lfoData[idx].customWaveform.nodes.empty()) {
         lfoData[idx].waveform = lfoData[idx].customWaveform;
-    else
+    } else {
         lfoData[idx].waveform = createLfoPreset(preset);
+        if (preset != LfoPreset::Custom)
+            lfoData[idx].factoryWaveform = lfoData[idx].waveform;
+    }
 
     // Disable paint mode when switching to a preset
     if (paintToggle.getToggleState()) {
@@ -578,7 +604,13 @@ void LfoComponent::applyPreset(LfoPreset preset) {
     audioProcessor.lfoParameters.waveformChanged(idx, lfoData[idx].waveform);
     auto nodesBefore = graph.getNodes();
     syncGraphToActiveLfo();
-    recordLfoUndoableChange(nodesBefore, waveformBefore, idx);
+
+    // Guard against the undo perform() call triggering onNodesChanged
+    {
+        juce::ScopedValueSetter<bool> guard(isSyncingGraph, true);
+        recordLfoUndoableChange(nodesBefore, waveformBefore, idx);
+    }
+
     updatePresetLabel();
     audioProcessor.lfoParameters.setPreset(idx, preset);
 }
@@ -595,6 +627,10 @@ void LfoComponent::syncFromProcessorState() {
     for (int i = 0; i < NUM_LFOS; ++i) {
         lfoData[i].waveform = audioProcessor.lfoParameters.getWaveform(i);
         lfoData[i].preset = audioProcessor.lfoParameters.getPreset(i);
+        if (lfoData[i].preset != LfoPreset::Custom) {
+            lfoData[i].lastFactoryPreset = lfoData[i].preset;
+            lfoData[i].factoryWaveform = createLfoPreset(lfoData[i].preset);
+        }
     }
 
     ModulationSourceComponent::syncFromProcessorState();
@@ -725,7 +761,10 @@ void LfoComponent::pasteWaveformFromClipboard() {
 
     auto nodesBefore = graph.getNodes();
     syncGraphToActiveLfo();
-    recordLfoUndoableChange(nodesBefore, waveformBefore, idx);
+    {
+        juce::ScopedValueSetter<bool> guard(isSyncingGraph, true);
+        recordLfoUndoableChange(nodesBefore, waveformBefore, idx);
+    }
     updatePresetLabel();
 }
 
@@ -844,6 +883,9 @@ void LfoComponent::loadUserPreset(const juce::File& file) {
 
     auto nodesBefore = graph.getNodes();
     syncGraphToActiveLfo();
-    recordLfoUndoableChange(nodesBefore, waveformBefore, idx);
+    {
+        juce::ScopedValueSetter<bool> guard(isSyncingGraph, true);
+        recordLfoUndoableChange(nodesBefore, waveformBefore, idx);
+    }
     updatePresetLabel();
 }

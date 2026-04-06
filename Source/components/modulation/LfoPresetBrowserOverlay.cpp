@@ -282,6 +282,33 @@ void LfoPresetBrowserOverlay::rebuildContent() {
         }
     }
 
+    // Vital user LFOs section
+    auto vitalPresets = presetManager.getVitalUserPresets();
+    numVitalPresets = (int)vitalPresets.size();
+
+    if (!vitalPresets.empty()) {
+        y += 4;
+        auto* vitalHeader = new SectionHeader();
+        vitalHeader->title = "VITAL";
+        rows.add(vitalHeader);
+        content.addAndMakeVisible(vitalHeader);
+        y += kSectionHeaderHeight;
+
+        for (int i = 0; i < (int)vitalPresets.size(); ++i) {
+            auto* row = new PresetRow();
+            row->name = vitalPresets[i].name;
+            row->isActive = (activeUserName == vitalPresets[i].name);
+            row->isUserPreset = false;
+            auto file = vitalPresets[i].file;
+            row->onSelect = [this, file]() {
+                if (browserListener) browserListener->presetBrowserUserSelected(file);
+            };
+            rows.add(row);
+            content.addAndMakeVisible(row);
+            y += kRowHeight;
+        }
+    }
+
     contentHeight = y;
     browserPanel.contentHeight = y;
     layoutRows();
@@ -319,6 +346,19 @@ void LfoPresetBrowserOverlay::layoutRows() {
         rowIdx++;
 
         for (int i = 0; i < numUserPresets && rowIdx < rows.size(); ++i, ++rowIdx) {
+            rows[rowIdx]->setBounds(0, y, rowW, kRowHeight);
+            y += kRowHeight;
+        }
+    }
+
+    // Vital user presets
+    if (numVitalPresets > 0 && rowIdx < rows.size()) {
+        y += 4;
+        rows[rowIdx]->setBounds(0, y, rowW, kSectionHeaderHeight);
+        y += kSectionHeaderHeight;
+        rowIdx++;
+
+        for (int i = 0; i < numVitalPresets && rowIdx < rows.size(); ++i, ++rowIdx) {
             rows[rowIdx]->setBounds(0, y, rowW, kRowHeight);
             y += kRowHeight;
         }

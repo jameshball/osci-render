@@ -92,7 +92,8 @@ private:
     };
 
     juce::OwnedArray<juce::Component> rows;
-    int numUserPresets = 0;  // cached count from last rebuildContent()
+    int numUserPresets = 0;   // cached count from last rebuildContent()
+    int numVitalPresets = 0;  // cached count from last rebuildContent()
     juce::Component::SafePointer<juce::Component> anchorComponent;
 
     void repositionPanel();

@@ -211,6 +211,11 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
 
     fileSelectionNotifier = std::make_unique<FileSelectionAsyncNotifier>(*this);
 
+    // Default to MIDI enabled when running as a plugin (VST/AU)
+    if (!juce::JUCEApplicationBase::isStandaloneApp()) {
+        midiEnabled->setBoolValue(true);
+    }
+
     addAllParameters();
 
     buildParamLocationMap();
