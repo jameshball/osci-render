@@ -128,11 +128,14 @@ Tests live in `tests/`, configured by `osci-render-test.jucer`.
 
 **pluginval** — run locally only after major changes (effects, parameters, audio processing). Runs in CI automatically.
 ```bash
-ROOT=$(pwd) OS=mac ./ci/pluginval.sh osci-render
+./run_tests.sh --pluginval
+./run_tests.sh --pluginval --plugin sosci
 ```
 
-**Sanitizers (preferred)** — TSan/ASan via pluginval. Catches races and memory errors invisible in Debug builds.
+**Sanitizers (preferred)** — TSan/ASan via pluginval or unit tests. Catches races and memory errors invisible in Debug builds.
 ```bash
-bash run_sanitizers.sh --tsan --plugin osci-render --pluginval --strictness 5
-bash run_sanitizers.sh --asan --plugin osci-render --pluginval --strictness 5
+./run_tests.sh --tsan --pluginval                # TSan + pluginval
+./run_tests.sh --asan --pluginval                # ASan + pluginval
+./run_tests.sh --tsan                            # TSan + unit tests
+./run_tests.sh --tsan --pluginval --tests        # TSan + both
 ```

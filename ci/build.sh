@@ -14,6 +14,39 @@ sed_jucer() {
   fi
 }
 
+# Build for the current platform.
+# Pass --clean to run `make clean` first (Linux only, used for instrument build
+# to avoid stale objects from an earlier differently-named target).
+platform_build() {
+  local clean="${1:-}"
+
+  if [ "$OS" = "mac" ]; then
+    cd "$ROOT/Builds/$PLUGIN/MacOSX"
+    xcodebuild -configuration Release -parallelizeTargets -jobs $(sysctl -n hw.logicalcpu) || exit 1
+  fi
+
+  if [ "$OS" = "linux" ]; then
+    cd "$ROOT/Builds/$PLUGIN/LinuxMakefile"
+    if [ "$clean" = "--clean" ]; then make clean CONFIG=Release; fi
+    make -j$(nproc) CONFIG=Release
+  fi
+
+  if [ "$OS" = "win" ]; then
+    cd "$ROOT/Builds/$PLUGIN/VisualStudio2022"
+    msbuild.exe "//m" "$PLUGIN.sln" \
+      "//p:VisualStudioVersion=16.0" \
+      "//p:MultiProcessorCompilation=true" \
+      "//p:CL_MPCount=16" \
+      "//p:BuildInParallel=true" \
+      "//t:Build" \
+      "//p:Configuration=Release" \
+      "//p:Platform=x64" \
+      "//p:PreferredToolArchitecture=x64" \
+      "//restore" \
+      "//p:RestorePackagesConfig=true"
+  fi
+}
+
 # If we are on the free version, we need to disable the build flag OSCI_PREMIUM
 if [ "$VERSION" = "free" ]; then
   # Edit the jucer file to disable the OSCI_PREMIUM flag
@@ -24,29 +57,21 @@ fi
 RESAVE_COMMAND="$PROJUCER_PATH --resave '$ROOT/$PLUGIN.jucer'"
 eval "$RESAVE_COMMAND"
 
-# Build mac version
-if [ "$OS" = "mac" ]; then
-  cd "$ROOT/Builds/$PLUGIN/MacOSX"
-  xcodebuild -configuration Release -parallelizeTargets -jobs $(sysctl -n hw.logicalcpu) || exit 1
-fi
-
-# Build linux version
-if [ "$OS" = "linux" ]; then
-  cd "$ROOT/Builds/$PLUGIN/LinuxMakefile"
-  make -j$(nproc) CONFIG=Release
-
-  cp -r ./build/$PLUGIN.vst3 "$ROOT/ci/bin/$PLUGIN.vst3"
-  cp -r ./build/$PLUGIN "$ROOT/ci/bin/$PLUGIN"
-fi
-
-# Build Win version
+# Set up Windows build environment before any msbuild invocation
 if [ "$OS" = "win" ]; then
   VS_WHERE="C:/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
-  
   eval "$($(cygpath "$COMSPEC") /c$(cygpath -w "$ROOT/ci/vcvars_export.bat"))"
+fi
 
-  cd "$ROOT/Builds/$PLUGIN/VisualStudio2022"
-  msbuild.exe "//m" "$PLUGIN.sln" "//p:VisualStudioVersion=16.0" "//p:MultiProcessorCompilation=true" "//p:CL_MPCount=16" "//p:BuildInParallel=true" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64" "//restore" "//p:RestorePackagesConfig=true"
+# Build effect version
+platform_build
+
+if [ "$OS" = "linux" ]; then
+  cp -r "$ROOT/Builds/$PLUGIN/LinuxMakefile/build/$PLUGIN.vst3" "$ROOT/ci/bin/$PLUGIN.vst3"
+  cp -r "$ROOT/Builds/$PLUGIN/LinuxMakefile/build/$PLUGIN"      "$ROOT/ci/bin/$PLUGIN"
+fi
+
+if [ "$OS" = "win" ]; then
   cp "$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Release/Standalone Plugin/$PLUGIN.pdb" "$ROOT/bin/$OUTPUT_NAME.pdb"
 fi
 
@@ -66,15 +91,15 @@ if [ "$PLUGIN" = "osci-render" ]; then
 
   if [ "$OS" = "mac" ]; then
     MAC_BUILD="$ROOT/Builds/$PLUGIN/MacOSX/build/Release"
-    cp -R "$MAC_BUILD/$PLUGIN.vst3" "$EFFECT_SAVE_DIR/"
+    cp -R "$MAC_BUILD/$PLUGIN.vst3"      "$EFFECT_SAVE_DIR/"
     cp -R "$MAC_BUILD/$PLUGIN.component" "$EFFECT_SAVE_DIR/"
-    cp -R "$MAC_BUILD/$PLUGIN.app" "$EFFECT_SAVE_DIR/"
+    cp -R "$MAC_BUILD/$PLUGIN.app"       "$EFFECT_SAVE_DIR/"
   fi
 
   if [ "$OS" = "win" ]; then
     WIN_BUILD="$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Release"
-    cp -R "$WIN_BUILD/VST3/$PLUGIN.vst3" "$EFFECT_SAVE_DIR/"
-    cp -R "$WIN_BUILD/Standalone Plugin/$PLUGIN.exe" "$EFFECT_SAVE_DIR/"
+    cp -R "$WIN_BUILD/VST3/$PLUGIN.vst3"              "$EFFECT_SAVE_DIR/"
+    cp -R "$WIN_BUILD/Standalone Plugin/$PLUGIN.exe"  "$EFFECT_SAVE_DIR/"
   fi
 
   # Add pluginIsSynth to characteristics
@@ -91,38 +116,26 @@ if [ "$PLUGIN" = "osci-render" ]; then
   # Uses hyphen instead of parentheses to avoid Linux Makefile quoting issues
   sed_jucer 's/targetName="osci-render"/targetName="osci-render-instrument"/g'
 
-  # Resave jucer file with instrument settings
+  # Resave jucer file with instrument settings and build
   eval "$RESAVE_COMMAND"
-
-  if [ "$OS" = "mac" ]; then
-    cd "$ROOT/Builds/$PLUGIN/MacOSX"
-    xcodebuild -configuration Release -parallelizeTargets -jobs $(sysctl -n hw.logicalcpu) || exit 1
-  fi
+  platform_build --clean
 
   if [ "$OS" = "linux" ]; then
-    cd "$ROOT/Builds/$PLUGIN/LinuxMakefile"
-    make clean CONFIG=Release
-    make -j$(nproc) CONFIG=Release
-    cp -r "./build/$INSTRUMENT_TARGET.vst3" "$ROOT/ci/bin/$INSTRUMENT_TARGET.vst3"
-  fi
-
-  if [ "$OS" = "win" ]; then
-    cd "$ROOT/Builds/$PLUGIN/VisualStudio2022"
-    msbuild.exe "//m" "$PLUGIN.sln" "//p:VisualStudioVersion=16.0" "//p:MultiProcessorCompilation=true" "//p:CL_MPCount=16" "//p:BuildInParallel=true" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64" "//restore" "//p:RestorePackagesConfig=true"
+    cp -r "$ROOT/Builds/$PLUGIN/LinuxMakefile/build/$INSTRUMENT_TARGET.vst3" "$ROOT/ci/bin/$INSTRUMENT_TARGET.vst3"
   fi
 
   # Restore effect build artifacts alongside the instrument ones
   if [ "$OS" = "mac" ]; then
     MAC_BUILD="$ROOT/Builds/$PLUGIN/MacOSX/build/Release"
-    cp -R "$EFFECT_SAVE_DIR/$PLUGIN.vst3" "$MAC_BUILD/"
+    cp -R "$EFFECT_SAVE_DIR/$PLUGIN.vst3"      "$MAC_BUILD/"
     cp -R "$EFFECT_SAVE_DIR/$PLUGIN.component" "$MAC_BUILD/"
-    cp -R "$EFFECT_SAVE_DIR/$PLUGIN.app" "$MAC_BUILD/"
+    cp -R "$EFFECT_SAVE_DIR/$PLUGIN.app"       "$MAC_BUILD/"
   fi
 
   if [ "$OS" = "win" ]; then
     WIN_BUILD="$ROOT/Builds/$PLUGIN/VisualStudio2022/x64/Release"
-    cp -R "$EFFECT_SAVE_DIR/$PLUGIN.vst3" "$WIN_BUILD/VST3/"
-    cp -R "$EFFECT_SAVE_DIR/$PLUGIN.exe" "$WIN_BUILD/Standalone Plugin/"
+    cp -R "$EFFECT_SAVE_DIR/$PLUGIN.vst3"             "$WIN_BUILD/VST3/"
+    cp -R "$EFFECT_SAVE_DIR/$PLUGIN.exe"              "$WIN_BUILD/Standalone Plugin/"
   fi
 fi
 
