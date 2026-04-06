@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include <vector>
 #include <cmath>
+#include <optional>
 #include "../GraphNode.h"
 #include "ModAssignment.h"
 
@@ -73,7 +74,6 @@ enum class LfoPreset {
     SideChain2,
     SplitGate,
     TranceGate,
-    Custom
 };
 
 // Canonical preset registry: maps enum values to display strings.
@@ -110,10 +110,10 @@ inline juce::String lfoPresetToString(LfoPreset preset) {
     return "Custom";
 }
 
-inline LfoPreset stringToLfoPreset(const juce::String& s) {
+inline std::optional<LfoPreset> stringToLfoPreset(const juce::String& s) {
     for (auto& entry : getLfoPresetRegistry())
         if (s == entry.name) return entry.preset;
-    return LfoPreset::Custom;
+    return std::nullopt;
 }
 
 // Generate preset waveform node sets (defined in LfoState.cpp).

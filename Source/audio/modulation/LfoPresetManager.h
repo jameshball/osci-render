@@ -33,7 +33,11 @@ public:
     juce::File importPreset(const juce::File& sourceFile);
 
     // List .vitallfo files from the Vital synth user LFOs directory (if present).
-    std::vector<PresetEntry> getVitalUserPresets() const;
+    // Caches the result; call invalidateVitalCache() to force a re-scan.
+    const std::vector<PresetEntry>& getVitalUserPresets() const;
+
+    // Force re-scan of Vital user LFO directory on next access.
+    void invalidateVitalCache() { vitalCacheValid = false; }
 
     // Returns the Vital user LFOs directory for this platform.
     static juce::File getVitalUserLfoDirectory();
@@ -46,6 +50,8 @@ public:
 
 private:
     juce::File presetsDir;
+    mutable std::vector<PresetEntry> vitalPresetsCache;
+    mutable bool vitalCacheValid = false;
 
     static juce::String sanitizeFilename(const juce::String& name);
 };

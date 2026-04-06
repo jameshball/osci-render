@@ -1473,13 +1473,14 @@ void OscirenderAudioProcessor::convertFreeProjectLfos(const juce::XmlElement* ef
             int score = 0;
             bool idle = assignmentCount[i] == 0;
             LfoPreset currentPreset = lfoParameters.getPreset(i);
+            bool isCustom = lfoParameters.getIsCustom(i);
             if (!idle && currentPreset == desiredPreset) {
                 float currentRate = (lfoParameters.rate[i] != nullptr) ? lfoParameters.rate[i]->getValueUnnormalised() : 1.0f;
                 if (ratesSimilar(currentRate, desiredRate))
                     score = 4;
-            } else if (idle && currentPreset == desiredPreset && currentPreset != LfoPreset::Custom) {
+            } else if (idle && currentPreset == desiredPreset && !isCustom) {
                 score = 3;
-            } else if (idle && currentPreset != LfoPreset::Custom) {
+            } else if (idle && !isCustom) {
                 score = 2;
             } else if (idle) {
                 score = 1;

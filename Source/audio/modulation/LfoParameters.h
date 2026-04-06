@@ -43,6 +43,7 @@ public:
     std::atomic<float> currentPhases[NUM_LFOS] = {};
     std::atomic<bool> active[NUM_LFOS] = {};
     std::atomic<bool> retriggered[NUM_LFOS] = {};
+    std::atomic<bool> customState[NUM_LFOS] = {};  // true when LFO waveform is user-modified
 
     LfoParameters() {
         for (int i = 0; i < NUM_LFOS; ++i) {
@@ -99,7 +100,7 @@ public:
     // === Parameter getters (read from DAW parameters atomically) ===
 
     LfoPreset getPreset(int i) const {
-        if (i < 0 || i >= NUM_LFOS || !preset[i]) return LfoPreset::Custom;
+        if (i < 0 || i >= NUM_LFOS || !preset[i]) return LfoPreset::Triangle;
         return (LfoPreset)preset[i]->getValueUnnormalised();
     }
 
@@ -131,6 +132,16 @@ public:
     float getDelayAmount(int i) const {
         if (i < 0 || i >= NUM_LFOS || !delayAmount[i]) return 0.0f;
         return delayAmount[i]->getValueUnnormalised();
+    }
+
+    bool getIsCustom(int i) const {
+        if (i < 0 || i >= NUM_LFOS) return false;
+        return customState[i].load(std::memory_order_relaxed);
+    }
+
+    void setIsCustom(int i, bool custom) {
+        if (i < 0 || i >= NUM_LFOS) return;
+        customState[i].store(custom, std::memory_order_relaxed);
     }
 
     // === Parameter setters (notify DAW host) ===
@@ -411,13 +422,14 @@ public:
                 int score = 0;
                 bool idle = assignmentCount[i] == 0;
                 LfoPreset currentPreset = getPreset(i);
+                bool isCustom = getIsCustom(i);
                 if (!idle && currentPreset == desiredPreset) {
                     float currentRate = (rate[i] != nullptr) ? rate[i]->getValueUnnormalised() : 1.0f;
                     if (ratesSimilar(currentRate, desiredRate))
                         score = 4;
-                } else if (idle && currentPreset == desiredPreset && currentPreset != LfoPreset::Custom) {
+                } else if (idle && currentPreset == desiredPreset && !isCustom) {
                     score = 3;
-                } else if (idle && currentPreset != LfoPreset::Custom) {
+                } else if (idle && !isCustom) {
                     score = 2;
                 } else if (idle) {
                     score = 1;
@@ -457,9 +469,10 @@ public:
             {
                 bool idle = assignmentCount[chosenLfo] == 0;
                 LfoPreset currentPreset = getPreset(chosenLfo);
+                bool isCustom = getIsCustom(chosenLfo);
                 if (!idle) score = 4;
-                else if (currentPreset == desiredPreset && currentPreset != LfoPreset::Custom) score = 3;
-                else if (currentPreset != LfoPreset::Custom) score = 2;
+                else if (currentPreset == desiredPreset && !isCustom) score = 3;
+                else if (!isCustom) score = 2;
                 else score = 1;
             }
             configureLfo(chosenLfo, desiredPreset, desiredRate, score);

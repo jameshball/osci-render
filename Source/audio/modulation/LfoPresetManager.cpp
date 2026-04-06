@@ -97,11 +97,17 @@ juce::File LfoPresetManager::getVitalUserLfoDirectory() {
 #endif
 }
 
-std::vector<LfoPresetManager::PresetEntry> LfoPresetManager::getVitalUserPresets() const {
-    std::vector<PresetEntry> presets;
+const std::vector<LfoPresetManager::PresetEntry>& LfoPresetManager::getVitalUserPresets() const {
+    if (vitalCacheValid)
+        return vitalPresetsCache;
+
+    vitalPresetsCache.clear();
 
     auto vitalDir = getVitalUserLfoDirectory();
-    if (!vitalDir.isDirectory()) return presets;
+    if (!vitalDir.isDirectory()) {
+        vitalCacheValid = true;
+        return vitalPresetsCache;
+    }
 
     for (const auto& file : vitalDir.findChildFiles(juce::File::findFiles, false, "*.vitallfo")) {
         PresetEntry entry;
@@ -118,15 +124,16 @@ std::vector<LfoPresetManager::PresetEntry> LfoPresetManager::getVitalUserPresets
         if (entry.name.isEmpty())
             entry.name = file.getFileNameWithoutExtension();
 
-        presets.push_back(entry);
+        vitalPresetsCache.push_back(entry);
     }
 
-    std::sort(presets.begin(), presets.end(),
+    std::sort(vitalPresetsCache.begin(), vitalPresetsCache.end(),
               [](const PresetEntry& a, const PresetEntry& b) {
                   return a.name.compareIgnoreCase(b.name) < 0;
               });
 
-    return presets;
+    vitalCacheValid = true;
+    return vitalPresetsCache;
 }
 
 juce::var LfoPresetManager::waveformToVitalJson(const LfoWaveform& waveform, const juce::String& name) {

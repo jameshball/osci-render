@@ -61,7 +61,7 @@ private:
         LfoWaveform customWaveform;
         LfoWaveform factoryWaveform;  // Cached waveform for current factory preset
         LfoPreset preset = LfoPreset::Triangle;
-        LfoPreset lastFactoryPreset = LfoPreset::Triangle; // For cycling when in Custom state
+        bool isCustom = false;        // True when waveform differs from factory preset
         juce::String userPresetName; // Non-empty when a user preset is loaded
     };
     std::array<LfoData, NUM_LFOS> lfoData;
@@ -164,6 +164,8 @@ private:
     // that undo works even if the editor is destroyed and recreated.
     void recordLfoUndoableChange(const std::vector<GraphNode>& nodesBefore,
                                  const LfoWaveform& waveformBefore, int lfoIndex);
+    void recordLfoUndoableChangeGuarded(const std::vector<GraphNode>& nodesBefore,
+                                        const LfoWaveform& waveformBefore, int lfoIndex);
     void showPaintShapeMenu();
     void showPresetBrowser();
     void dismissPresetBrowser();

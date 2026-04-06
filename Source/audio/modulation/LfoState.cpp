@@ -347,14 +347,6 @@ LfoWaveform createLfoPreset(LfoPreset preset) {
                 { 1.0, 1.0, 0.0f },
             };
             break;
-        case LfoPreset::Custom:
-            waveform.smooth = false;
-            waveform.nodes = {
-                { 0.0, 0.0, 0.0f },
-                { 0.5, 1.0, 0.0f },
-                { 1.0, 0.0, 0.0f },
-            };
-            break;
     }
     return waveform;
 }
