@@ -110,12 +110,21 @@ echo "============================================="
 PLUGINVAL_CMD="\"$PLUGINVAL\" $PLUGINVAL_ARGS --validate \"$VST3_PATH\""
 
 if [ "$OS" = "linux" ]; then
+    # Print a stack trace on crash (SIGSEGV, SIGABRT, etc.)
+    SEGFAULT_LIB=$(find /lib /usr/lib -name 'libSegFault.so' 2>/dev/null | head -1 || true)
+    if [ -n "$SEGFAULT_LIB" ]; then
+        export LD_PRELOAD="$SEGFAULT_LIB"
+        export SEGFAULT_SIGNALS="all"
+    fi
+
     # Linux CI needs a virtual display for JUCE GUI
     if command -v xvfb-run &> /dev/null; then
         eval xvfb-run -a -s \"-screen 0 1280x720x24\" $PLUGINVAL_CMD
     else
         eval $PLUGINVAL_CMD
     fi
+
+    unset LD_PRELOAD SEGFAULT_SIGNALS
 else
     eval $PLUGINVAL_CMD
 fi

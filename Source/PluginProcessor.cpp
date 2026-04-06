@@ -1374,10 +1374,12 @@ void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float n
     if (parameterIndex == voices->getParameterIndex()) {
         int numVoices = voices->getValueUnnormalised();
         synth.setPolyphony(numVoices);
-        if (numVoices != synth.getNumVoices()) {
+        const int currentVoices = synth.getNumVoices();
+        if (numVoices != currentVoices) {
             // Reset UI telemetry for voices that are about to be added/removed.
-            for (int i = std::min(numVoices, synth.getNumVoices());
-                 i < std::max(numVoices, synth.getNumVoices()); i++) {
+            const int lo = std::min(numVoices, currentVoices);
+            const int hi = std::min(std::max(numVoices, currentVoices), kMaxUiVoices);
+            for (int i = lo; i < hi; i++) {
                 uiVoiceActive[i].store(false, std::memory_order_relaxed);
                 uiVoiceEnvelopeTimeSeconds[i].store(0.0, std::memory_order_relaxed);
             }
