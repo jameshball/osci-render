@@ -37,7 +37,7 @@ private:
     ModulationModeComponent styleControl;
 
     // Layout constants
-    static constexpr int kRateHeight  = 40;
+    static constexpr int kRateHeight  = 48;
     static constexpr int kRateGap     = 4;
     static constexpr int kMaxRateWidth  = 130;
     static constexpr int kMaxStyleWidth = 130;

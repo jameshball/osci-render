@@ -420,6 +420,7 @@ void OscirenderAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
     CommonAudioProcessor::prepareToPlay(sampleRate, samplesPerBlock);
 
     defaultEnvelopeState.smoothedLevel = 0.0f;
+    synth.handleMidiEvent(juce::MidiMessage::allSoundOff(1));
     synth.setCurrentPlaybackSampleRate(sampleRate);
     retriggerMidi = true;
 

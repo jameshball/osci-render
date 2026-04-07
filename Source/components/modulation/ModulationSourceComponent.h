@@ -66,8 +66,15 @@ public:
 
     int getActiveSourceIndex() const { return activeSourceIndex; }
 
+    // Collapsed mode: tabs shown as floating pills, content hidden.
+    void setCollapsed(bool collapsed);
+    bool isCollapsed() const { return collapsed; }
+
     // Callback invoked when a drag starts/ends from a tab.
     std::function<void(bool isDragging)> onDragActiveChanged;
+
+    // Callback invoked when a tab label is clicked while collapsed, requesting uncollapse.
+    std::function<void()> onUncollapseRequested;
 
     // Force-refresh all depth indicators from current assignments.
     void refreshAllDepthIndicators();
@@ -107,16 +114,17 @@ protected:
 
 private:
     ModulationSourceConfig config;
+    bool collapsed = false;
 
     // --- Layout constants ---
-    static constexpr int kTabWidth        = 55;
-    static constexpr int kTabGap          = 1;
-    static constexpr int kSeamShadowWidth = 10;
-    static constexpr int kMinTabHeight    = 40;
+    static constexpr int kTabHeight       = 50;
+    static constexpr int kTabGap          = 3;
+    static constexpr int kSeamShadowHeight = 10;
+    static constexpr int kMinTabWidth     = 55;
 
     juce::Rectangle<int> contentBounds;
     juce::Rectangle<int> outlineBounds;
-    melatonin::DropShadow panelEdgeShadow { juce::Colours::black.withAlpha(0.5f), 5, {-2, 0}, 0 };
+    melatonin::DropShadow panelEdgeShadow { juce::Colours::black.withAlpha(0.5f), 5, {0, -2}, 0 };
 
     // DepthIndicator – small arc knob for a single source→param connection.
     class DepthIndicator : public HoverAnimationMixin {
@@ -166,10 +174,12 @@ private:
         void refreshDepthIndicators(const std::vector<ModAssignment>& assignments);
 
         void setSourceValue(float value01) {
-            float delta = value01 - sourceValue;
-            sourceDelta = delta;
             sourceValue = value01;
             repaint();
+        }
+
+        void updateSmoothedValue(float current, float decay) {
+            smoothedValue += decay * (current - smoothedValue);
         }
 
         void setSourceActive(bool active) {
@@ -185,7 +195,7 @@ private:
         bool isDragging = false;
         bool isHovering = false;
         float sourceValue = 0.0f;
-        float sourceDelta = 0.0f;
+        float smoothedValue = 0.0f;
         bool sourceActive = false;
 
         juce::OwnedArray<DepthIndicator> depthIndicators;

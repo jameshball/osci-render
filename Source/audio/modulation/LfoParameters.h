@@ -139,6 +139,24 @@ public:
         return customState[i].load(std::memory_order_relaxed);
     }
 
+    // Switch unmodified Free-mode LFOs (with no assignments) to Trigger mode.
+    // Intended to be called when MIDI is enabled so that LFOs retrigger with notes.
+    void switchUnmodifiedFreeToTrigger() {
+        auto allAssignments = getAssignments();
+        int assignCount[NUM_LFOS] = {};
+        for (const auto& a : allAssignments)
+            if (a.sourceIndex >= 0 && a.sourceIndex < NUM_LFOS)
+                assignCount[a.sourceIndex]++;
+
+        for (int i = 0; i < NUM_LFOS; ++i) {
+            bool isFree = getMode(i) == LfoMode::Free;
+            bool unassigned = assignCount[i] == 0;
+            bool unmodified = !getIsCustom(i);
+            if (isFree && unassigned && unmodified)
+                setMode(i, LfoMode::Trigger);
+        }
+    }
+
     void setIsCustom(int i, bool custom) {
         if (i < 0 || i >= NUM_LFOS) return;
         customState[i].store(custom, std::memory_order_relaxed);

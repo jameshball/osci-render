@@ -177,6 +177,14 @@ void OsciMainMenuBarModel::resetMenuItems() {
         audioProcessor.setAcceptsKeys(! audioProcessor.getAcceptsKeys());
         resetMenuItems();
     }, [this] { return audioProcessor.getAcceptsKeys(); });
+
+    addToggleMenuItem(interfaceMenu, "Show MIDI Keyboard", [this] {
+        bool current = audioProcessor.getGlobalBoolValue("showMidiKeyboard", true);
+        audioProcessor.setGlobalValue("showMidiKeyboard", !current);
+        audioProcessor.saveGlobalSettings();
+        editor.settings.resized();
+        resetMenuItems();
+    }, [this] { return audioProcessor.getGlobalBoolValue("showMidiKeyboard", true); });
 }
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM

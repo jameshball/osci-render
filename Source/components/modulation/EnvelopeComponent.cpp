@@ -446,9 +446,9 @@ void EnvelopeComponent::syncKnobsToActiveEnv() {
 
 void EnvelopeComponent::resized() {
     ModulationSourceComponent::resized();
+    if (isCollapsed()) return;
 
     auto bounds = getContentBounds();
-    bounds.reduce(4, 4); // content inset
 
 #if OSCI_PREMIUM
     // Bottom row: DAHDSR knobs

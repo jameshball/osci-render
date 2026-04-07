@@ -49,6 +49,13 @@ MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
     if (juce::JUCEApplicationBase::isStandaloneApp()) {
         addAndMakeVisible(tempoBar);
     }
+
+    disabledOverlay.setText("MIDI DISABLED");
+    disabledOverlay.setSubText("(click to enable)");
+    disabledOverlay.onClick = [this] {
+        audioProcessor.midiEnabled->setBoolValueNotifyingHost(true);
+    };
+    addChildComponent(disabledOverlay);
 #endif
 
     handleAsyncUpdate();
@@ -76,28 +83,12 @@ void MidiComponent::handleAsyncUpdate() {
 void MidiComponent::updateEnabledState() {
     const bool midiOn = audioProcessor.midiEnabled->getBoolValue();
     voicesBar.setEnabled(midiOn);
-#if OSCI_PREMIUM
-    velTrkKnob.setEnabled(midiOn);
-    bendBar.setEnabled(midiOn);
-    glideKnob.setEnabled(midiOn);
-    slopeGraph.setEnabled(midiOn);
-    alwaysGlideToggle.setEnabled(midiOn);
-    legatoToggle.setEnabled(midiOn);
-    octaveScaleToggle.setEnabled(midiOn);
-    tempoBar.setEnabled(midiOn);
-#endif
-
     float alpha = midiOn ? 1.0f : 0.4f;
     voicesBar.setAlpha(alpha);
 #if OSCI_PREMIUM
-    velTrkKnob.setAlpha(alpha);
-    bendBar.setAlpha(alpha);
-    glideKnob.setAlpha(alpha);
-    slopeGraph.setAlpha(alpha);
-    alwaysGlideToggle.setAlpha(alpha);
-    legatoToggle.setAlpha(alpha);
-    octaveScaleToggle.setAlpha(alpha);
-    tempoBar.setAlpha(alpha);
+    disabledOverlay.setDisabledWithSiblings(!midiOn,
+        { velTrkKnob, bendBar, glideKnob, slopeGraph,
+          alwaysGlideToggle, legatoToggle, octaveScaleToggle, tempoBar });
 #endif
 }
 
@@ -197,6 +188,9 @@ void MidiComponent::resized() {
 
     if (hasTempo)
         tempoBar.setBounds(nextCol(colWidth, 2));
+
+    // Overlay covers the settings section (right of toggle)
+    disabledOverlay.setBounds(area);
 #endif
 }
 
@@ -224,29 +218,5 @@ void MidiComponent::paint(juce::Graphics& g) {
                                      false, true, false, true);
     g.setColour(Colours::darker());
     g.fillPath(settingsPath);
-#endif
-}
-
-void MidiComponent::paintOverChildren(juce::Graphics& g) {
-#if OSCI_PREMIUM
-    if (!audioProcessor.midiEnabled->getBoolValue()) {
-        auto area = getLocalBounds();
-        area.removeFromLeft(kToggleSectionWidth);
-        auto settingsSection = area.toFloat();
-
-        auto centre = settingsSection.getCentre();
-        float rx = settingsSection.getWidth() * 0.4f;
-        float ry = settingsSection.getHeight();
-
-        juce::ColourGradient gradient(
-            Colours::darker(), centre.x, centre.y,
-            Colours::darker().withAlpha(0.0f), centre.x + rx, centre.y, true);
-        g.setGradientFill(gradient);
-        g.fillEllipse(centre.x - rx, centre.y - ry, rx * 2.0f, ry * 2.0f);
-
-        g.setColour(juce::Colours::white.withAlpha(0.7f));
-        g.setFont(juce::Font(13.0f).boldened());
-        g.drawText("MIDI DISABLED", settingsSection, juce::Justification::centred, false);
-    }
 #endif
 }

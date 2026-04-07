@@ -209,82 +209,104 @@ void ModulationSourceComponent::DepthIndicator::hideValuePopup() {
 ModulationSourceComponent::ModTabHandle::ModTabHandle(
         const juce::String& l, int idx, ModulationSourceComponent& o)
     : label(l), sourceIndex(idx), owner(o) {
-    setMouseCursor(juce::MouseCursor::DraggingHandCursor);
+    setMouseCursor(juce::MouseCursor::PointingHandCursor);
 }
 
 void ModulationSourceComponent::ModTabHandle::paint(juce::Graphics& g) {
-    bool active = isActiveTab();
+    bool active = (sourceIndex == owner.activeSourceIndex);
+    bool ownerCollapsed = owner.collapsed;
     auto colour = owner.config.getSourceColour(sourceIndex);
     auto bounds = getLocalBounds().toFloat();
     constexpr float radius = 4.0f;
 
     juce::Path tabShape;
-    tabShape.addRoundedRectangle(bounds.getX(), bounds.getY(),
-                                  bounds.getWidth(), bounds.getHeight(),
-                                  radius, radius,
-                                  true, false, true, false);
-
-    if (active) {
+    if (ownerCollapsed) {
+        // Collapsed: all corners rounded (floating pill look)
+        tabShape.addRoundedRectangle(bounds.getX(), bounds.getY(),
+                                      bounds.getWidth(), bounds.getHeight(),
+                                      radius, radius,
+                                      true, true, true, true);
+        // All tabs look "active" when collapsed
         g.setColour(Colours::darker());
         g.fillPath(tabShape);
     } else {
-        g.setColour(Colours::darker().darker(0.5f));
-        g.fillPath(tabShape);
+        tabShape.addRoundedRectangle(bounds.getX(), bounds.getY(),
+                                      bounds.getWidth(), bounds.getHeight(),
+                                      radius, radius,
+                                      true, true, false, false);
+        if (active) {
+            g.setColour(Colours::darker());
+            g.fillPath(tabShape);
+        } else {
+            g.setColour(Colours::darker().darker(0.5f));
+            g.fillPath(tabShape);
 
-        juce::ColourGradient shadow(juce::Colours::black.withAlpha(0.2f), bounds.getRight(), bounds.getCentreY(),
-                                     juce::Colours::transparentBlack, bounds.getRight() - 12.0f, bounds.getCentreY(), false);
-        g.setGradientFill(shadow);
-        g.fillPath(tabShape);
+            juce::ColourGradient shadow(juce::Colours::black.withAlpha(0.2f), bounds.getCentreX(), bounds.getBottom(),
+                                         juce::Colours::transparentBlack, bounds.getCentreX(), bounds.getBottom() - 12.0f, false);
+            g.setGradientFill(shadow);
+            g.fillPath(tabShape);
+        }
     }
 
+    // Label - top aligned
     constexpr int trackWidth = 8;
     constexpr float trackPad = 2.0f;
+    constexpr float trackBottomExtra = 3.0f;
     float trackX = trackPad;
     float trackY = trackPad;
-    float trackH = (float)getHeight() - trackPad * 2.0f;
+    float trackH = (float)getHeight() - trackPad * 2.0f - trackBottomExtra;
     bool hasAttachment = !depthIndicators.isEmpty();
 
-    // Label
     {
         int labelLeft = (int)(trackX + trackWidth + 2.0f);
-        auto labelBounds = getLocalBounds().removeFromTop(20);
+        auto labelBounds = getLocalBounds();
         labelBounds.setLeft(labelLeft);
-        g.setColour(active ? juce::Colours::white : juce::Colours::white.withAlpha(0.35f));
+        labelBounds = labelBounds.withHeight(18).translated(0, 1);
+        g.setColour((active || ownerCollapsed) ? juce::Colours::white : juce::Colours::white.withAlpha(0.35f));
         g.setFont(juce::Font(13.0f));
         g.drawText(label, labelBounds, juce::Justification::centred);
     }
 
-    // Value track
+    // Value track — pill dimensions define the track geometry
+    constexpr float pillGap = 1.0f;       // uniform gap between pill and track
+    float pillW = (float)trackWidth - pillGap * 2.0f;
+    float pillR = pillW * 0.5f;
+    float trackR = pillR + pillGap;       // track corner radius hugs the pill
+
     auto trackRect = juce::Rectangle<float>(trackX, trackY, (float)trackWidth, trackH);
     g.setColour(juce::Colours::black.withAlpha(0.32f));
-    g.fillRoundedRectangle(trackRect, (float)trackWidth * 0.5f);
+    g.fillRoundedRectangle(trackRect, trackR);
     g.setColour(juce::Colours::white.withAlpha(0.05f));
-    g.drawRoundedRectangle(trackRect, (float)trackWidth * 0.5f, 0.5f);
+    g.drawRoundedRectangle(trackRect, trackR, 0.5f);
 
     if (hasAttachment && sourceActive) {
-        constexpr float pillBaseH = 5.0f;
-        constexpr float pillMaxStretch = 14.0f;
-        float stretch = juce::jlimit(0.0f, pillMaxStretch, std::abs(sourceDelta) * 80.0f);
-        float pillW = (float)trackWidth - 2.0f;
-        float pillH = pillBaseH + stretch;
+        // Vital-style animation: pill extends between current and smoothed values
+        float pillX = trackX + pillGap;
 
-        float pillArea = trackH - pillBaseH;
-        float pillCentreY = trackY + pillArea * (1.0f - sourceValue) + pillBaseH * 0.5f;
-        float pillX = trackX + 1.0f;
+        // Inset the usable range so the pill circle has pillGap clearance at extremes
+        float usableH = trackH - pillW - pillGap * 2.0f;
+        float usableTop = trackY + pillR + pillGap;
 
-        juce::Rectangle<float> pill(pillX, pillCentreY - pillH * 0.5f, pillW, pillH);
+        // Map values to y positions (0 = bottom, 1 = top)
+        float currentY = usableTop + usableH * (1.0f - sourceValue);
+        float smoothY  = usableTop + usableH * (1.0f - smoothedValue);
+
+        float top    = juce::jmin(currentY, smoothY) - pillR;
+        float bottom = juce::jmax(currentY, smoothY) + pillR;
+
+        juce::Rectangle<float> pill(pillX, top, pillW, bottom - top);
         g.setColour(colour.withAlpha(0.9f));
-        g.fillRoundedRectangle(pill, pillW * 0.5f);
+        g.fillRoundedRectangle(pill, pillR);
     } else if (hoverProgress > 0.001f) {
-        int labelH = 20;
         int trackW = (int)(trackX + trackWidth + 2.0f);
-        auto emptyArea = getLocalBounds().withTrimmedTop(labelH).withTrimmedLeft(trackW).reduced(2);
+        // Icon is centred below the label text (1px top pad + 12px font height)
+        constexpr int titleBottom = 13;
+        auto emptyArea = getLocalBounds().withTrimmedLeft(trackW).withTrimmedTop(titleBottom).reduced(2);
 
         if (auto svg = juce::Drawable::createFromImageData(BinaryData::drag_svg, BinaryData::drag_svgSize)) {
-            float iconSize = juce::jmin((float)emptyArea.getWidth(), (float)emptyArea.getHeight()) * 0.45f;
-            iconSize = juce::jmax(iconSize, 10.0f);
-            auto iconBounds = emptyArea.toFloat().withSizeKeepingCentre(iconSize, iconSize)
-                                  .translated(0.0f, -3.0f);
+            float iconSize = juce::jmin((float)emptyArea.getWidth(), (float)emptyArea.getHeight()) * 0.6f;
+            iconSize = juce::jmax(iconSize, 14.0f);
+            auto iconBounds = emptyArea.toFloat().withSizeKeepingCentre(iconSize, iconSize);
             float baseAlpha = active ? 0.2f : 0.15f;
             svg->drawWithin(g, iconBounds, juce::RectanglePlacement::centred, baseAlpha * hoverProgress);
         }
@@ -292,7 +314,6 @@ void ModulationSourceComponent::ModTabHandle::paint(juce::Graphics& g) {
 }
 
 void ModulationSourceComponent::ModTabHandle::mouseDown(const juce::MouseEvent&) {
-    requestActivation();
     isDragging = true;
     repaint();
 }
@@ -323,11 +344,19 @@ void ModulationSourceComponent::ModTabHandle::mouseDrag(const juce::MouseEvent& 
     }
 }
 
-void ModulationSourceComponent::ModTabHandle::mouseUp(const juce::MouseEvent&) {
+void ModulationSourceComponent::ModTabHandle::mouseUp(const juce::MouseEvent& e) {
     if (isDragging) {
         isDragging = false;
-        if (owner.onDragActiveChanged)
-            owner.onDragActiveChanged(false);
+
+        // If this was a click (not a drag), select tab and uncollapse
+        if (e.getDistanceFromDragStart() <= 4) {
+            requestActivation();
+            if (owner.collapsed && owner.onUncollapseRequested)
+                owner.onUncollapseRequested();
+        } else {
+            if (owner.onDragActiveChanged)
+                owner.onDragActiveChanged(false);
+        }
     }
 }
 
@@ -367,8 +396,11 @@ void ModulationSourceComponent::ModTabHandle::resized() {
     int n = depthIndicators.size();
     if (n == 0) return;
 
-    int labelH = 16;
     int trackW = 12;
+    int labelW = 0;
+    // If no depth indicators we don't need to reserve label space separately
+    // With indicators, reserve space for the label at top
+    int labelH = 16;
     int availW = getWidth() - trackW - 1;
     int availH = getHeight() - labelH - 1;
 
@@ -469,8 +501,9 @@ void ModulationSourceComponent::ModTabHandle::refreshDepthIndicators(
 
 ModulationSourceComponent::ModulationSourceComponent(const ModulationSourceConfig& cfg)
     : config(cfg) {
+    tabList.setOrientation(VerticalTabListComponent::Horizontal);
     tabList.setTabGap(kTabGap);
-    tabList.setMinTabHeight(kMinTabHeight);
+    tabList.setMinTabSize(kMinTabWidth);
     for (int i = 0; i < config.sourceCount; ++i) {
         auto tab = std::make_unique<ModTabHandle>(config.getLabel(i), i, *this);
         tabHandles.push_back(tab.get());
@@ -480,11 +513,11 @@ ModulationSourceComponent::ModulationSourceComponent(const ModulationSourceConfi
     tabList.onTabChanged = [this](int index) { switchToSource(index); };
 
     tabViewport.setViewedComponent(&tabList, false);
-    tabViewport.setScrollBarsShown(false, false, true, false);
+    tabViewport.setScrollBarsShown(false, false, false, true);
     tabViewport.setColour(scrollFadeOverlayBackgroundColourId,
                           findColour(juce::ResizableWindow::backgroundColourId));
-    tabViewport.setSidesEnabled(true, true);
-    tabViewport.setFadeHeight(20);
+    tabViewport.setSidesEnabled(false, false, true, true);
+    tabViewport.setFadeWidth(20);
     addAndMakeVisible(tabViewport);
 
     startTimerHz(60);
@@ -499,13 +532,27 @@ ModulationSourceComponent::~ModulationSourceComponent() {
         config.broadcaster->removeChangeListener(this);
 }
 
+void ModulationSourceComponent::setCollapsed(bool c) {
+    if (collapsed == c) return;
+    collapsed = c;
+    resized();
+    for (auto* th : tabHandles)
+        th->repaint();
+    repaint();
+}
+
 void ModulationSourceComponent::timerCallback() {
     if (config.getAssignments)
         refreshAllDepthIndicators();
 
     if (config.getCurrentValue) {
+        // Vital-style smooth decay: smoothing factor = 15 * dt (frame-rate independent)
+        float dt = (float)getTimerInterval() / 1000.0f;
+        float decay = juce::jlimit(0.0f, 1.0f, 15.0f * dt);
         for (int i = 0; i < (int)tabHandles.size(); ++i) {
-            tabHandles[i]->setSourceValue(config.getCurrentValue(i));
+            float current = config.getCurrentValue(i);
+            tabHandles[i]->setSourceValue(current);
+            tabHandles[i]->updateSmoothedValue(current, decay);
             if (config.isSourceActive)
                 tabHandles[i]->setSourceActive(config.isSourceActive(i));
         }
@@ -522,15 +569,21 @@ void ModulationSourceComponent::resized() {
 
     const bool showTabs = config.sourceCount > 1 || config.alwaysShowTabs;
     if (showTabs) {
-        auto tabArea = bounds.removeFromLeft(kTabWidth);
+        auto tabArea = bounds.removeFromTop(kTabHeight);
         tabViewport.setBounds(tabArea);
         tabViewport.setVisible(true);
 
-        int requiredH = tabList.getRequiredHeight();
-        int contentH = juce::jmax(tabArea.getHeight(), requiredH);
-        tabList.setBounds(0, 0, tabArea.getWidth(), contentH);
+        int requiredW = tabList.getRequiredSize();
+        int contentW = juce::jmax(tabArea.getWidth(), requiredW);
+        tabList.setBounds(0, 0, contentW, tabArea.getHeight());
     } else {
         tabViewport.setVisible(false);
+    }
+
+    if (collapsed) {
+        contentBounds = {};
+        outlineBounds = {};
+        return;
     }
 
     bounds.reduce(kContentInset, kContentInset);
@@ -539,28 +592,32 @@ void ModulationSourceComponent::resized() {
 }
 
 void ModulationSourceComponent::paint(juce::Graphics& g) {
+    if (collapsed) return; // No panel background in collapsed mode
+
     const bool hasTabs = config.sourceCount > 1 || config.alwaysShowTabs;
-    const float tabOffset = hasTabs ? (float)kTabWidth : 0.0f;
-    auto panelBounds = getLocalBounds().toFloat().withTrimmedLeft(tabOffset);
+    const float tabOffset = hasTabs ? (float)kTabHeight : 0.0f;
+    auto panelBounds = getLocalBounds().toFloat().withTrimmedTop(tabOffset);
     float r = OscirenderLookAndFeel::RECT_RADIUS;
     juce::Path panelPath;
-    // When there are no tabs (free version), round all four corners; otherwise only the right ones
+    // When there are no tabs, round all four corners; otherwise only the bottom ones
     panelPath.addRoundedRectangle(panelBounds.getX(), panelBounds.getY(),
                                    panelBounds.getWidth(), panelBounds.getHeight(),
-                                   r, r, !hasTabs, true, !hasTabs, true);
+                                   r, r, !hasTabs, !hasTabs, true, true);
     g.setColour(Colours::darker());
     g.fillPath(panelPath);
 }
 
 void ModulationSourceComponent::paintOverChildren(juce::Graphics& g) {
+    if (collapsed) return; // No overlays in collapsed mode
+
     const bool hasTabs = config.sourceCount > 1 || config.alwaysShowTabs;
-    const float tabOffset = hasTabs ? (float)kTabWidth : 0.0f;
-    auto panelBounds = getLocalBounds().toFloat().withTrimmedLeft(tabOffset);
+    const float tabOffset = hasTabs ? (float)kTabHeight : 0.0f;
+    auto panelBounds = getLocalBounds().toFloat().withTrimmedTop(tabOffset);
     juce::Path panelPath;
     panelPath.addRoundedRectangle(panelBounds.getX(), panelBounds.getY(),
                                    panelBounds.getWidth(), panelBounds.getHeight(),
                                    OscirenderLookAndFeel::RECT_RADIUS, OscirenderLookAndFeel::RECT_RADIUS,
-                                   !hasTabs, true, !hasTabs, true);
+                                   !hasTabs, !hasTabs, true, true);
 
     if (!hasTabs) {
         // No tabs — just draw the source outline
@@ -577,8 +634,10 @@ void ModulationSourceComponent::paintOverChildren(juce::Graphics& g) {
         return;
     auto* activeTab = tabList.getTab(activeSourceIndex);
     auto activeTabBounds = getLocalArea(&tabList, activeTab->getBounds());
+
+    // Shadow along the bottom edge of tabs, excluding the active tab
     juce::RectangleList<int> clipRegion;
-    clipRegion.add(kTabWidth - kSeamShadowWidth, 0, kSeamShadowWidth, getHeight());
+    clipRegion.add(0, kTabHeight - kSeamShadowHeight, getWidth(), kSeamShadowHeight);
     clipRegion.subtract(activeTabBounds);
 
     g.saveState();
@@ -597,13 +656,15 @@ void ModulationSourceComponent::paintOverChildren(juce::Graphics& g) {
 
 void ModulationSourceComponent::switchToSource(int index) {
     if (index < 0 || index >= config.sourceCount) return;
-    if (index == activeSourceIndex) return;
 
+    bool changed = (index != activeSourceIndex);
     activeSourceIndex = index;
+    tabList.setActiveTabIndexSilent(index);
     if (config.setActiveTab)
         config.setActiveTab(index);
 
-    onActiveSourceChanged(index);
+    if (changed)
+        onActiveSourceChanged(index);
 
     for (auto* th : tabHandles)
         th->repaint();

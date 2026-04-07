@@ -6,7 +6,7 @@
 
 LfoPresetBrowserOverlay::LfoPresetBrowserOverlay(LfoPresetManager& manager, Listener* listener)
     : presetManager(manager), browserListener(listener) {
-    lightweight = true;
+    setOpaque(false);
 
     addAndMakeVisible(browserPanel);
 
@@ -43,45 +43,17 @@ LfoPresetBrowserOverlay::LfoPresetBrowserOverlay(LfoPresetManager& manager, List
     browserPanel.addAndMakeVisible(importButton);
 }
 
-void LfoPresetBrowserOverlay::showAt(juce::Component& anchor, LfoPreset currentFactoryPreset, const juce::String& currentUserName) {
+void LfoPresetBrowserOverlay::show(LfoPreset currentFactoryPreset, const juce::String& currentUserName) {
     activeFactoryPreset = currentFactoryPreset;
     activeUserName = currentUserName;
-    anchorComponent = &anchor;
 
     rebuildContent();
-    repositionPanel();
+    resized();
     grabKeyboardFocus();
 }
 
 void LfoPresetBrowserOverlay::resized() {
-    // Don't call OverlayComponent::resized() — we position the panel ourselves.
-    repositionPanel();
-}
-
-void LfoPresetBrowserOverlay::repositionPanel() {
-    if (anchorComponent == nullptr || getWidth() <= 0) return;
-
-    auto anchorBounds = getLocalArea(anchorComponent, anchorComponent->getLocalBounds());
-
-    int tooltipW = kTooltipWidth;
-    int tooltipH = juce::jmin(kMaxTooltipHeight, contentHeight + kBottomBarHeight + kImportBarHeight + 16);
-
-    // Centre horizontally below the anchor
-    int x = anchorBounds.getCentreX() - tooltipW / 2;
-    int y = anchorBounds.getBottom() + 4;
-
-    // Clamp to overlay edges
-    if (x + tooltipW > getWidth() - 4)
-        x = getWidth() - tooltipW - 4;
-    if (x < 4) x = 4;
-    if (y + tooltipH > getHeight())
-        y = anchorBounds.getY() - tooltipH - 4;
-
-    // Expand component bounds to accommodate shadow rendering outside the visual panel
-    constexpr int shadowMargin = 14;
-    browserPanel.setBounds(x - shadowMargin, y - shadowMargin,
-                           tooltipW + shadowMargin * 2, tooltipH + shadowMargin * 2);
-    panelBounds = juce::Rectangle<int>(x, y, tooltipW, tooltipH);
+    browserPanel.setBounds(getLocalBounds());
 }
 
 void LfoPresetBrowserOverlay::refresh(LfoPreset currentFactoryPreset, const juce::String& currentUserName) {
@@ -90,17 +62,10 @@ void LfoPresetBrowserOverlay::refresh(LfoPreset currentFactoryPreset, const juce
     rebuildContent();
 }
 
-void LfoPresetBrowserOverlay::paint(juce::Graphics& g) {
-    // lightweight — no backdrop dimming; base class paint is skipped.
-}
-
-void LfoPresetBrowserOverlay::mouseDown(const juce::MouseEvent& e) {
-    OverlayComponent::mouseDown(e);
-}
-
 bool LfoPresetBrowserOverlay::keyPressed(const juce::KeyPress& key) {
     if (key == juce::KeyPress::escapeKey) {
-        dismiss();
+        if (onDismissRequested)
+            onDismissRequested();
         return true;
     }
     return false;
@@ -111,22 +76,15 @@ bool LfoPresetBrowserOverlay::keyPressed(const juce::KeyPress& key) {
 // ============================================================================
 
 void LfoPresetBrowserOverlay::BrowserPanel::paint(juce::Graphics& g) {
-    constexpr int shadowMargin = 14;
-    auto bounds = getLocalBounds().reduced(shadowMargin).toFloat();
+    auto bounds = getLocalBounds().toFloat();
     constexpr float radius = 6.0f;
 
-    juce::Path panelPath;
-    panelPath.addRoundedRectangle(bounds, radius);
-
-    shadow.render(g, panelPath);
-
     g.setColour(Colours::veryDark().brighter(0.08f));
-    g.fillPath(panelPath);
+    g.fillRoundedRectangle(bounds, radius);
 }
 
 void LfoPresetBrowserOverlay::BrowserPanel::resized() {
-    constexpr int shadowMargin = 14;
-    auto inner = getLocalBounds().reduced(shadowMargin).reduced(6);
+    auto inner = getLocalBounds().reduced(6);
 
     auto bottomBar = inner.removeFromBottom(26);
     saveButton.setBounds(bottomBar.removeFromRight(48));
@@ -317,7 +275,7 @@ void LfoPresetBrowserOverlay::rebuildContent() {
 
 void LfoPresetBrowserOverlay::layoutRows() {
     int w = viewport.getWidth();
-    if (w <= 0) w = kTooltipWidth - 12;
+    if (w <= 0) w = getWidth();
     int scrollBarW = (contentHeight > viewport.getHeight()) ? 8 : 0;
     int rowW = w - scrollBarW;
 

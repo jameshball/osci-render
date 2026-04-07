@@ -2,12 +2,14 @@
 
 #include <JuceHeader.h>
 
-// A generic vertical tab list component.
-// Manages N tabs laid out vertically with equal height and optional gaps.
+// A generic tab list component that lays out tabs vertically or horizontally.
+// Manages N tabs with equal size and optional gaps.
 // Tracks active tab index and notifies via callback.
-// Use inside a ScrollFadeViewport when tabs may exceed available height.
+// Use inside a ScrollFadeViewport when tabs may exceed available space.
 class VerticalTabListComponent : public juce::Component {
 public:
+    enum Orientation { Vertical, Horizontal };
+
     // Base class for individual tab items. Subclass this and override paint/resized.
     class Tab : public juce::Component {
     public:
@@ -77,14 +79,21 @@ public:
     }
 
     void setTabGap(int gap) { tabGap = gap; }
-    void setMinTabHeight(int h) { minTabHeight = h; }
+    void setMinTabSize(int s) { minTabSize = s; }
+    // Legacy alias for vertical mode
+    void setMinTabHeight(int h) { minTabSize = h; }
 
-    // Total height needed if every tab gets at least minTabHeight.
-    int getRequiredHeight() const {
+    void setOrientation(Orientation o) { orientation = o; }
+    Orientation getOrientation() const { return orientation; }
+
+    // Total size needed along the primary axis if every tab gets at least minTabSize.
+    int getRequiredSize() const {
         int n = tabs.size();
         if (n == 0) return 0;
-        return n * minTabHeight + (n - 1) * tabGap;
+        return n * minTabSize + (n - 1) * tabGap;
     }
+    // Legacy alias
+    int getRequiredHeight() const { return getRequiredSize(); }
 
     // Callback when active tab changes via user interaction.
     std::function<void(int newIndex)> onTabChanged;
@@ -92,16 +101,21 @@ public:
     void resized() override {
         int n = tabs.size();
         if (n == 0) return;
-        int totalGaps = tabGap * (n - 1);
-        int availH = getHeight() - totalGaps;
-        int tabH = juce::jmax(minTabHeight, availH / n);
-        int extra = availH - tabH * n;
 
-        int y = 0;
+        bool horiz = (orientation == Horizontal);
+        int totalGaps = tabGap * (n - 1);
+        int availSize = (horiz ? getWidth() : getHeight()) - totalGaps;
+        int tabSize = juce::jmax(minTabSize, availSize / n);
+        int extra = availSize - tabSize * n;
+
+        int pos = 0;
         for (int i = 0; i < n; ++i) {
-            int h = tabH + (i < extra ? 1 : 0);
-            tabs[i]->setBounds(0, y, getWidth(), h);
-            y += h + tabGap;
+            int s = tabSize + (i < extra ? 1 : 0);
+            if (horiz)
+                tabs[i]->setBounds(pos, 0, s, getHeight());
+            else
+                tabs[i]->setBounds(0, pos, getWidth(), s);
+            pos += s + tabGap;
         }
     }
 
@@ -109,5 +123,6 @@ private:
     juce::OwnedArray<Tab> tabs;
     int activeIndex = 0;
     int tabGap = 1;
-    int minTabHeight = 30;
+    int minTabSize = 30;
+    Orientation orientation = Vertical;
 };

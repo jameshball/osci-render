@@ -128,6 +128,7 @@ void RandomComponent::timerCallback() {
 
 void RandomComponent::resized() {
     ModulationSourceComponent::resized();
+    if (isCollapsed()) return;
 
     auto bounds = getContentBounds();
 

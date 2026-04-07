@@ -125,7 +125,8 @@ private:
     SvgButton pasteButton;
     LfoPresetManager presetManager;
     std::unique_ptr<juce::FileChooser> fileChooser;
-    juce::Component::SafePointer<LfoPresetBrowserOverlay> presetBrowserOverlay;
+    LfoPresetBrowserOverlay presetBrowser;
+    bool presetBrowserVisible = false;
     ModulationRateComponent rateControl;
     ModulationModeComponent modeControl;
     PhaseSliderComponent phaseSlider;

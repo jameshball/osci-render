@@ -167,19 +167,19 @@ void EffectsComponent::resized() {
 	titleBar.removeFromLeft(4);
 	autoLinkButton.setBounds(titleBar.removeFromLeft(20));
     area.reduce(20, 0);
-    area.removeFromBottom(10);
+    area.removeFromBottom(4);
     if (showingGrid) {
         grid.setBounds(area);
         addEffectButton.setVisible(false);
     } else {
-        area.reduce(0, 20); // restore vertical padding for list view
+        area.removeFromTop(10);
         // Reserve space at bottom for the add button
-        auto addBtnHeight = 44;
+        auto addBtnHeight = 36;
         auto listArea = area;
         auto buttonArea = listArea.removeFromBottom(addBtnHeight);
         listBox.setBounds(listArea);
         addEffectButton.setVisible(true);
-        addEffectButton.setBounds(buttonArea.reduced(0, 4));
+        addEffectButton.setBounds(buttonArea.reduced(0, 2));
     }
 }
 

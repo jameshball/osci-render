@@ -23,7 +23,7 @@
 #include "../modulation/SidechainComponent.h"
 
 class OscirenderAudioProcessorEditor;
-class SettingsComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, private juce::Timer {
+class SettingsComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, public juce::ChangeListener, private juce::Timer {
 public:
     SettingsComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
     ~SettingsComponent() override;
@@ -38,6 +38,7 @@ public:
     void mouseDown(const juce::MouseEvent& event) override;
     // Show or hide the example files grid panel on the right-hand side
     void showExamples(bool shouldShow);
+    void changeListenerCallback(juce::ChangeBroadcaster* source) override;
 
 private:
     OscirenderAudioProcessor& audioProcessor;
@@ -63,10 +64,37 @@ private:
 
     bool examplesVisible = false;
 
-    // Three-column horizontal layout: visColumn | resizer | effectsColumn | resizer2 | rightColumn
+    // Horizontal layout for top section: visColumn | resizer | effectsColumn
     juce::StretchableLayoutManager mainLayout;
     juce::StretchableLayoutResizerBar mainResizerBar{&mainLayout, 1, true};
-    juce::StretchableLayoutResizerBar midiResizerBar{&mainLayout, 3, true};
+
+#if OSCI_PREMIUM
+    // Manual vertical split with snap-to-collapse
+    static constexpr int kCollapsedModHeight = 50;
+    static constexpr int kCollapseThreshold = 150;
+    static constexpr int kMinExpandedModHeight = 200;
+    int modPanelHeight = kCollapsedModHeight;
+    bool modPanelCollapsed = true;
+
+    // Simple horizontal drag bar for vertical split
+    struct VerticalDragBar : public juce::Component {
+        VerticalDragBar();
+        std::function<void(int newHeight)> onDrag;
+        std::function<void()> onDragEnd;
+        void paint(juce::Graphics& g) override;
+        void mouseEnter(const juce::MouseEvent&) override;
+        void mouseExit(const juce::MouseEvent&) override;
+        void mouseDown(const juce::MouseEvent&) override;
+        void mouseDrag(const juce::MouseEvent& e) override;
+        void mouseUp(const juce::MouseEvent&) override;
+        void setCurrentPanelHeight(int h) { currentPanelHeight = h; }
+    private:
+        int currentPanelHeight = 0;
+        int dragStartPanelHeight = 0;
+        bool isDragging = false;
+    };
+    VerticalDragBar verticalResizerBar;
+#endif
 
     juce::Rectangle<int> volumeVisualiserBounds;
     juce::Rectangle<int> keyboardPanelBounds;
@@ -77,7 +105,10 @@ private:
     // Proxy components whose bounds are set by layOutComponents() in resized().
     // They persist into the deferred layoutChildren() call so the async path
     // reads the same column geometry that was computed synchronously.
-    juce::Component layoutVisColumnProxy, layoutEffectsColumnProxy, layoutRightColumnProxy;
+    juce::Component layoutVisColumnProxy, layoutEffectsColumnProxy;
+#if OSCI_PREMIUM
+    juce::Component layoutTopProxy, layoutBottomProxy;
+#endif
 
     // Deferred child-layout updater – coalesces rapid resizer-bar drag events
     // so that the expensive child setBounds cascade runs at most once per
@@ -101,6 +132,10 @@ private:
         void handleAsyncUpdate() override;
     };
     DahdsrListener dahdsrListener{*this};
+
+#if OSCI_PREMIUM
+    void updateSidechainDisabledState();
+#endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SettingsComponent)
 };

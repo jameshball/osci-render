@@ -236,6 +236,7 @@ LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
       pasteButton("paste", juce::String(BinaryData::paste_svg, BinaryData::paste_svgSize),
                   juce::Colours::white.withAlpha(0.5f), juce::Colours::white.withAlpha(0.5f)),
       presetManager(processor.applicationFolder.getChildFile("LFO Presets")),
+      presetBrowser(presetManager, this),
       rateControl(buildLfoRateConfig(processor), 0),
       modeControl(buildLfoModeConfig(processor), 0) {
     // Initialize all LFOs with default triangle preset
@@ -390,6 +391,7 @@ void LfoComponent::paint(juce::Graphics& g) {
 
 void LfoComponent::resized() {
     ModulationSourceComponent::resized();
+    if (isCollapsed()) return;
 
     auto bounds = getContentBounds();
 
@@ -461,6 +463,9 @@ void LfoComponent::resized() {
 
     graph.setBounds(bounds);
     setOutlineBounds(graph.getBounds());
+
+    if (presetBrowserVisible)
+        presetBrowser.setBounds(graph.getBounds());
 }
 
 void LfoComponent::onActiveSourceChanged(int index) {
@@ -761,29 +766,28 @@ void LfoComponent::pasteWaveformFromClipboard() {
 // ============================================================================
 
 void LfoComponent::showPresetBrowser() {
-    if (presetBrowserOverlay) {
+    if (presetBrowserVisible) {
         dismissPresetBrowser();
         return;
     }
 
-    auto* editor = findParentComponentOfClass<CommonPluginEditor>();
-    if (editor == nullptr) return;
-
-    auto overlay = std::make_unique<LfoPresetBrowserOverlay>(presetManager, this);
-    presetBrowserOverlay = overlay.get();
-    editor->showOverlay(std::move(overlay));
+    presetBrowser.onDismissRequested = [this]() { dismissPresetBrowser(); };
+    addAndMakeVisible(presetBrowser);
+    presetBrowserVisible = true;
 
     int idx = getActiveSourceIndex();
-    presetBrowserOverlay->showAt(presetSelector, lfoData[idx].preset, lfoData[idx].userPresetName);
+    presetBrowser.show(lfoData[idx].preset, lfoData[idx].userPresetName);
+
+    // Position inline browser over the graph
+    graph.setVisible(false);
+    presetBrowser.setBounds(graph.getBounds());
 }
 
 void LfoComponent::dismissPresetBrowser() {
-    if (presetBrowserOverlay) {
-        auto* editor = findParentComponentOfClass<CommonPluginEditor>();
-        if (editor != nullptr) {
-            editor->dismissOverlay(presetBrowserOverlay);
-        }
-        presetBrowserOverlay = nullptr;
+    if (presetBrowserVisible) {
+        graph.setVisible(true);
+        removeChildComponent(&presetBrowser);
+        presetBrowserVisible = false;
     }
 }
 
@@ -813,8 +817,8 @@ void LfoComponent::presetBrowserUserDeleted(const juce::File& file) {
     }
 
     // Refresh the overlay
-    if (presetBrowserOverlay)
-        presetBrowserOverlay->refresh(lfoData[idx].preset, lfoData[idx].userPresetName);
+    if (presetBrowserVisible)
+        presetBrowser.refresh(lfoData[idx].preset, lfoData[idx].userPresetName);
 }
 
 void LfoComponent::presetBrowserSaveRequested(const juce::String& name) {
@@ -825,8 +829,8 @@ void LfoComponent::presetBrowserSaveRequested(const juce::String& name) {
     updatePresetLabel();
 
     // Refresh the overlay to show the new preset
-    if (presetBrowserOverlay)
-        presetBrowserOverlay->refresh(lfoData[idx].preset, lfoData[idx].userPresetName);
+    if (presetBrowserVisible)
+        presetBrowser.refresh(lfoData[idx].preset, lfoData[idx].userPresetName);
 }
 
 void LfoComponent::presetBrowserImportRequested() {

@@ -1,15 +1,13 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include <melatonin_blur/melatonin_blur.h>
 #include "../../audio/modulation/LfoState.h"
 #include "../../audio/modulation/LfoPresetManager.h"
 #include "../../LookAndFeel.h"
-#include "../OverlayComponent.h"
 
-// Full-editor overlay that shows an LFO preset browser positioned near an anchor.
-// Extends OverlayComponent with a lighter backdrop and anchor-based panel positioning.
-class LfoPresetBrowserOverlay : public OverlayComponent {
+// Inline LFO preset browser panel.  Shown as a child of LfoComponent,
+// replacing the graph area while the browser is open.
+class LfoPresetBrowserOverlay : public juce::Component {
 public:
     struct Listener {
         virtual ~Listener() = default;
@@ -22,23 +20,17 @@ public:
 
     LfoPresetBrowserOverlay(LfoPresetManager& manager, Listener* listener);
 
-    void showAt(juce::Component& anchor, LfoPreset currentFactoryPreset, const juce::String& currentUserName);
+    void show(LfoPreset currentFactoryPreset, const juce::String& currentUserName);
     void refresh(LfoPreset currentFactoryPreset, const juce::String& currentUserName);
+    std::function<void()> onDismissRequested;
 
-    void paint(juce::Graphics& g) override;
     void resized() override;
-    void mouseDown(const juce::MouseEvent& e) override;
     bool keyPressed(const juce::KeyPress& key) override;
-
-protected:
-    void resizeContent(juce::Rectangle<int>) override {}
 
 private:
     static constexpr int kRowHeight = 24;
     static constexpr int kSectionHeaderHeight = 22;
     static constexpr int kDeleteButtonSize = 18;
-    static constexpr int kTooltipWidth = 260;
-    static constexpr int kMaxTooltipHeight = 400;
     static constexpr int kBottomBarHeight = 30;
     static constexpr int kImportBarHeight = 26;
 
@@ -58,8 +50,6 @@ private:
         juce::TextButton saveButton;
         juce::TextButton importButton;
         int contentHeight = 0;
-
-        melatonin::DropShadow shadow { juce::Colours::black.withAlpha(0.6f), 10, {0, 2}, 0 };
     };
 
     BrowserPanel browserPanel;
@@ -94,9 +84,7 @@ private:
     juce::OwnedArray<juce::Component> rows;
     int numUserPresets = 0;   // cached count from last rebuildContent()
     int numVitalPresets = 0;  // cached count from last rebuildContent()
-    juce::Component::SafePointer<juce::Component> anchorComponent;
 
-    void repositionPanel();
     void rebuildContent();
     void layoutRows();
     void doSave();

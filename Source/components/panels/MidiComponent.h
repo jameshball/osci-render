@@ -7,6 +7,7 @@
 #include "../KnobContainerComponent.h"
 #include "../ToggleLabelComponent.h"
 #include "../SlopeGraphComponent.h"
+#include "../DisabledOverlay.h"
 
 class OscirenderAudioProcessorEditor;
 class MidiComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater {
@@ -20,7 +21,6 @@ public:
 
 	void resized() override;
 	void paint(juce::Graphics& g) override;
-	void paintOverChildren(juce::Graphics& g) override;
 private:
 	OscirenderAudioProcessor& audioProcessor;
 	OscirenderAudioProcessorEditor& pluginEditor;
@@ -41,6 +41,7 @@ private:
 	ToggleLabelComponent legatoToggle{audioProcessor.legato};
 	ToggleLabelComponent octaveScaleToggle{audioProcessor.octaveScale};
 	ParameterBarComponent tempoBar{audioProcessor.standaloneBpm, "BPM"};
+	DisabledOverlay disabledOverlay;
 #endif
 
 	void updateEnabledState();

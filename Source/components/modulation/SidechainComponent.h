@@ -5,6 +5,7 @@
 #include "ModulationSourceComponent.h"
 #include "../KnobContainerComponent.h"
 #include "../ParameterSyncHelper.h"
+#include "../DisabledOverlay.h"
 #include "../../audio/modulation/SidechainState.h"
 
 class OscirenderAudioProcessor;
@@ -34,6 +35,12 @@ public:
 
     static juce::Colour getSidechainColour(int index = 0);
 
+    // Callback invoked when the disabled-overlay is clicked (e.g. to open audio settings).
+    std::function<void()> onDisabledClicked;
+
+    // Show/hide the "no sidechain input" overlay and dim child controls.
+    void setSidechainDisabled(bool disabled);
+
     void syncFromProcessorState() override;
 
 protected:
@@ -60,6 +67,8 @@ private:
     bool isSyncingGraph = false;
 
     ParameterSyncHelper paramSync { [this] { syncFromProcessorState(); } };
+
+    DisabledOverlay disabledOverlay;
 
     void syncGraphFromProcessor();
     void syncGraphColours();

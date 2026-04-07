@@ -34,6 +34,9 @@ public:
         } else {
             assignments.add(a);
         }
+        // Only notify for real user actions (not preview/suppressed operations)
+        bool suppressed = (undoSuppressedFlag != nullptr && *undoSuppressedFlag);
+        if (!suppressed && onAssignmentAdded) onAssignmentAdded();
     }
     void removeAssignment(int sourceIndex, const juce::String& paramId) {
         auto* um = (undoSuppressedFlag != nullptr && *undoSuppressedFlag) ? nullptr : undoManager;
@@ -91,6 +94,9 @@ public:
 
     // Assignment store — public so the engine and serialization helpers can access it directly.
     ModulationAssignmentStore<ModAssignment> assignments;
+
+    // UI callback: fired on the message thread after an assignment is added.
+    std::function<void()> onAssignmentAdded;
 
 protected:
     std::vector<osci::FloatParameter*> floatParameters;
