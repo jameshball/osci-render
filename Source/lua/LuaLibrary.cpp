@@ -2,6 +2,7 @@
 #include "LuaParser.h"
 
 #include <lua.hpp>
+#include <cinttypes>
 
 // ============================================================================
 // Helpers
@@ -506,18 +507,58 @@ static int luaNormalize(lua_State* L) {
 // Console
 // ============================================================================
 
+// Convert a Lua value at stack index to a printable string, matching
+// standard Lua tostring() behavior: honours __tostring metamethods,
+// prints booleans as "true"/"false", nil as "nil", and other types
+// as "typename: 0xpointer".
+static std::string luaValueToString(lua_State* L, int index) {
+    // Try __tostring metamethod first (works for tables, userdata, etc.)
+    if (luaL_callmeta(L, index, "__tostring")) {
+        size_t len = 0;
+        const char* str = lua_tolstring(L, -1, &len);
+        std::string result(str ? str : "", str ? len : 0);
+        lua_pop(L, 1);
+        return result;
+    }
+
+    int t = lua_type(L, index);
+    switch (t) {
+        case LUA_TSTRING: {
+            size_t len = 0;
+            const char* s = lua_tolstring(L, index, &len);
+            return std::string(s, len);
+        }
+        case LUA_TNUMBER: {
+            // lua_tolstring converts in-place; use a copy to avoid mutating the stack
+            lua_pushvalue(L, index);
+            size_t len = 0;
+            const char* s = lua_tolstring(L, -1, &len);
+            std::string result(s, len);
+            lua_pop(L, 1);
+            return result;
+        }
+        case LUA_TBOOLEAN:
+            return lua_toboolean(L, index) ? "true" : "false";
+        case LUA_TNIL:
+            return "nil";
+        default: {
+            // "typename: 0xpointer" — matches standard Lua output
+            const void* ptr = lua_topointer(L, index);
+            char buf[64];
+            snprintf(buf, sizeof(buf), "%s: 0x%" PRIxPTR,
+                     lua_typename(L, t), (uintptr_t)ptr);
+            return buf;
+        }
+    }
+}
+
+// NOTE: print() is not realtime-safe (std::string allocation + onPrint callback).
+// Intended for debugging only; users should avoid calling it per-sample.
 static int luaPrint(lua_State* L) {
     int nargs = lua_gettop(L);
 
     for (int i = 1; i <= nargs; ++i) {
-        size_t len = 0;
-        const char* str = lua_tolstring(L, i, &len);
-        if (str != nullptr) {
-            LuaParser::onPrint(std::string(str, len));
-        } else {
-            LuaParser::onPrint(lua_typename(L, lua_type(L, i)));
-        }
-        lua_pop(L, 1);
+        LuaParser::onPrint(luaValueToString(L, i));
     }
 
     return 0;

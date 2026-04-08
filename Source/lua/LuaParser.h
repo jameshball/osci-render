@@ -134,6 +134,7 @@ public:
 	juce::String getScript();
 	void resetErrors();
 	void close(lua_State*& L);
+	void forgetAllStates() { resetRequested.store(true, std::memory_order_release); }
 	std::function<void(int, juce::String, juce::String)> getErrorCallback() const { return errorCallback; }
 
 	static std::function<void(const std::string&)> onPrint;
@@ -165,4 +166,5 @@ private:
 	std::vector<lua_State*> seenStates;
 	lua_State* lastSeenState = nullptr;
 	uint64_t usedVarMask = ~uint64_t(0);
+	std::atomic<bool> resetRequested{false};
 };

@@ -125,6 +125,9 @@ public:
         auto bounds = getLocalBounds();
         auto headerArea = bounds.removeFromTop(30);
         
+        if (resetButton != nullptr && resetButton->isVisible()) {
+            resetButton->setBounds(headerArea.removeFromLeft(30).reduced(5));
+        }
         if (helpButton != nullptr && helpButton->isVisible()) {
             helpButton->setBounds(headerArea.removeFromRight(30).reduced(5));
         }
@@ -138,16 +141,28 @@ public:
     }
 
     void setHelpButton(SvgButton* button) {
-        if (helpButton == button) return;
-        helpButton = button;
-        if (helpButton != nullptr) {
-            addAndMakeVisible(helpButton);
-        }
+        setButton(helpButton, button);
+    }
+
+    void setResetButton(SvgButton* button) {
+        setButton(resetButton, button);
     }
 
 private:
 
+    void setButton(SvgButton*& member, SvgButton* button) {
+        if (member == button) return;
+        if (member != nullptr) {
+            removeChildComponent(member);
+        }
+        member = button;
+        if (member != nullptr) {
+            addAndMakeVisible(member);
+        }
+    }
+
     ErrorCodeEditorComponent editor;
     OscirenderAudioProcessor& audioProcessor;
     SvgButton* helpButton = nullptr;
+    SvgButton* resetButton = nullptr;
 };

@@ -58,6 +58,22 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
         showLuaDocumentation();
     };
 
+    luaResetButton.setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    luaResetButton.setTooltip("Reset Lua State");
+    luaResetButton.onClick = [this] {
+        juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
+        auto parser = audioProcessor.getCurrentFileParser();
+        if (parser != nullptr) {
+            auto luaParser = parser->getLua();
+            if (luaParser != nullptr) {
+                luaParser->forgetAllStates();
+            }
+        }
+        if (audioProcessor.luaEffectState != nullptr && audioProcessor.luaEffectState->parser != nullptr) {
+            audioProcessor.luaEffectState->parser->forgetAllStates();
+        }
+    };
+
     addAndMakeVisible(collapseButton);
     collapseButton.onClick = [this] {
         setCodeEditorVisible(std::nullopt);
@@ -311,6 +327,7 @@ void OscirenderAudioProcessorEditor::resized() {
                     console.setBounds(dummy3Bounds.removeFromBottom(console.getConsoleOpen() ? 200 : 30));
                     dummy3Bounds.removeFromBottom(RESIZER_BAR_SIZE);
                     codeEditors[index]->setHelpButton(&luaHelpButton);
+                    codeEditors[index]->setResetButton(&luaResetButton);
                     codeEditors[index]->setBounds(dummy3Bounds);
                     luaFileOpen = true;
                 } else {
@@ -519,24 +536,28 @@ void OscirenderAudioProcessorEditor::editCustomFunction(bool enable) {
     updateCodeEditor(binaryFile, shouldOpenEditor);
 }
 
-// parsersLock AND effectsLock must be locked before calling this function
+// Called on the message thread by CodeDocument when the user edits text.
+// When updatingDocumentsWithParserLock is true we are programmatically loading
+// content into the editor (lock already held), so we skip re-parsing.
 void OscirenderAudioProcessorEditor::codeDocumentTextInserted(const juce::String& newText, int insertIndex) {
     if (updatingDocumentsWithParserLock) {
-        updateCodeDocument();
-    } else {
-        juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
-        updateCodeDocument();
+        return;
     }
+    juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
+    juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
+    updateCodeDocument();
 }
 
-// parsersLock AND effectsLock must be locked before calling this function
+// Called on the message thread by CodeDocument when the user deletes text.
+// When updatingDocumentsWithParserLock is true we are programmatically loading
+// content into the editor (lock already held), so we skip re-parsing.
 void OscirenderAudioProcessorEditor::codeDocumentTextDeleted(int startIndex, int endIndex) {
     if (updatingDocumentsWithParserLock) {
-        updateCodeDocument();
-    } else {
-        juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
-        updateCodeDocument();
+        return;
     }
+    juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
+    juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
+    updateCodeDocument();
 }
 
 // parsersLock AND effectsLock must be locked before calling this function

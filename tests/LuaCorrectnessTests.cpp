@@ -68,6 +68,12 @@ public:
         testInfiniteLoopProtection();
         testMultipleStates();
         testScriptStatePreservation();
+        testPrintAllTypes();
+        testResetClearsState();
+        testResetMultipleStates();
+        testRapidResetBetweenRuns();
+        testResetPreservesScriptCorrectness();
+        testResetStressWithManyCycles();
     }
 
 private:
@@ -593,6 +599,241 @@ private:
         expectWithinAbsoluteError(r3.values[0], 3.0f, 0.001f);
 
         parser.close(L);
+    }
+
+    void testPrintAllTypes() {
+        beginTest("print outputs correct strings for all Lua types");
+
+        std::vector<std::string> printed;
+        auto oldPrint = LuaParser::onPrint;
+        LuaParser::onPrint = [&](const std::string& s) { printed.push_back(s); };
+
+        ErrorCollector errors;
+        LuaParser parser("test.lua",
+            "print(nil)\n"                                   // [0] "nil"
+            "print(true)\n"                                  // [1] "true"
+            "print(false)\n"                                 // [2] "false"
+            "print(42)\n"                                    // [3] "42"
+            "print('hello')\n"                               // [4] "hello"
+            "print(print)\n"                                 // [5] "function: 0x..."
+            "local t = {}; print(t)\n"                       // [6] "table: 0x..."
+            "local mt = setmetatable({}, {__tostring = function() return 'custom' end})\n"
+            "print(mt)\n"                                    // [7] "custom"
+            "return {0, 0}",
+            errors.callback());
+
+        lua_State* L = nullptr;
+        auto vars = makeDefaultVars();
+        parser.run(L, vars);
+        parser.close(L);
+
+        LuaParser::onPrint = oldPrint;
+
+        expect(!errors.hasErrors(), "Script should not produce errors");
+        expect(printed.size() >= 8, "Expected at least 8 print outputs, got " + juce::String((int)printed.size()));
+
+        if (printed.size() >= 8) {
+            expectEquals(juce::String(printed[0]), juce::String("nil"));
+            expectEquals(juce::String(printed[1]), juce::String("true"));
+            expectEquals(juce::String(printed[2]), juce::String("false"));
+            expectEquals(juce::String(printed[3]), juce::String("42"));
+            expectEquals(juce::String(printed[4]), juce::String("hello"));
+            expect(juce::String(printed[5]).startsWith("function: 0x"),
+                   "Expected function address, got: " + juce::String(printed[5]));
+            expect(juce::String(printed[6]).startsWith("table: 0x"),
+                   "Expected table address, got: " + juce::String(printed[6]));
+            expectEquals(juce::String(printed[7]), juce::String("custom"));
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Reset / forgetAllStates stress tests
+    // ------------------------------------------------------------------
+
+    static constexpr const char* COUNTER_SCRIPT =
+        "if counter == nil then counter = 0 end\n"
+        "counter = counter + 1\n"
+        "return {counter, 0}";
+
+    LuaVariables makeDefaultVars() {
+        LuaVariables vars;
+        vars.sampleRate = 44100;
+        vars.frequency = 440;
+        return vars;
+    }
+
+    void testResetClearsState() {
+        beginTest("forgetAllStates resets accumulated script state");
+        ErrorCollector errors;
+        LuaParser parser("test.lua", COUNTER_SCRIPT, errors.callback());
+
+        lua_State* L = nullptr;
+        auto vars = makeDefaultVars();
+
+        // Run 5 times to accumulate state
+        for (int i = 0; i < 5; i++)
+            parser.run(L, vars);
+
+        auto r5 = parser.run(L, vars);
+        expectWithinAbsoluteError(r5.values[0], 6.0f, 0.001f);
+
+        // Reset and verify counter starts over
+        parser.forgetAllStates();
+        auto r6 = parser.run(L, vars);
+        expectWithinAbsoluteError(r6.values[0], 1.0f, 0.001f);
+
+        parser.close(L);
+    }
+
+    void testResetMultipleStates() {
+        beginTest("forgetAllStates resets all independent states");
+        ErrorCollector errors;
+        LuaParser parser("test.lua", COUNTER_SCRIPT, errors.callback());
+
+        lua_State* L1 = nullptr;
+        lua_State* L2 = nullptr;
+        lua_State* L3 = nullptr;
+        auto vars = makeDefaultVars();
+
+        // Accumulate state in 3 independent lua_States
+        for (int i = 0; i < 10; i++) {
+            parser.run(L1, vars);
+            parser.run(L2, vars);
+            parser.run(L3, vars);
+        }
+
+        auto r1 = parser.run(L1, vars);
+        auto r2 = parser.run(L2, vars);
+        auto r3 = parser.run(L3, vars);
+        expectWithinAbsoluteError(r1.values[0], 11.0f, 0.001f);
+        expectWithinAbsoluteError(r2.values[0], 11.0f, 0.001f);
+        expectWithinAbsoluteError(r3.values[0], 11.0f, 0.001f);
+
+        // Reset all states at once
+        parser.forgetAllStates();
+
+        auto rr1 = parser.run(L1, vars);
+        auto rr2 = parser.run(L2, vars);
+        auto rr3 = parser.run(L3, vars);
+        expectWithinAbsoluteError(rr1.values[0], 1.0f, 0.001f);
+        expectWithinAbsoluteError(rr2.values[0], 1.0f, 0.001f);
+        expectWithinAbsoluteError(rr3.values[0], 1.0f, 0.001f);
+
+        parser.close(L1);
+        parser.close(L2);
+        parser.close(L3);
+    }
+
+    void testRapidResetBetweenRuns() {
+        beginTest("Rapid successive resets don't corrupt state");
+        ErrorCollector errors;
+        LuaParser parser("test.lua", COUNTER_SCRIPT, errors.callback());
+
+        lua_State* L = nullptr;
+        auto vars = makeDefaultVars();
+
+        // Repeatedly: accumulate a few runs, reset, verify clean start
+        for (int cycle = 0; cycle < 50; cycle++) {
+            // Run a few iterations
+            for (int i = 0; i < 5; i++)
+                parser.run(L, vars);
+
+            auto pre = parser.run(L, vars);
+            expectWithinAbsoluteError(pre.values[0], 6.0f, 0.001f);
+
+            // Multiple rapid resets (only the first matters, rest are no-ops)
+            parser.forgetAllStates();
+            parser.forgetAllStates();
+            parser.forgetAllStates();
+
+            auto post = parser.run(L, vars);
+            expectWithinAbsoluteError(post.values[0], 1.0f, 0.001f);
+
+            // Reset again so next cycle starts clean
+            parser.forgetAllStates();
+        }
+
+        parser.close(L);
+    }
+
+    void testResetPreservesScriptCorrectness() {
+        beginTest("Reset preserves script execution correctness");
+        ErrorCollector errors;
+        LuaParser parser("test.lua",
+            "if acc == nil then acc = 0 end\n"
+            "acc = acc + step\n"
+            "return {acc, math.sin(phase * math.pi * 2)}",
+            errors.callback());
+
+        lua_State* L = nullptr;
+        auto vars = makeDefaultVars();
+
+        // Run and accumulate
+        for (int i = 0; i < 100; i++) {
+            vars.step = i;
+            vars.phase = i * 0.01;
+            parser.run(L, vars);
+        }
+
+        // Reset
+        parser.forgetAllStates();
+
+        // Verify script still works correctly after reset
+        vars.step = 5;
+        vars.phase = 0.25;
+        auto r1 = parser.run(L, vars);
+        expectWithinAbsoluteError(r1.values[0], 5.0f, 0.001f);
+        expectWithinAbsoluteError(r1.values[1], 1.0f, 0.001f); // sin(0.25 * 2pi) = 1
+
+        vars.step = 3;
+        auto r2 = parser.run(L, vars);
+        expectWithinAbsoluteError(r2.values[0], 8.0f, 0.001f); // 5 + 3
+
+        parser.close(L);
+        expect(!errors.hasErrors(), "No errors expected after reset");
+    }
+
+    void testResetStressWithManyCycles() {
+        beginTest("Stress: many run/reset cycles with multiple states");
+        ErrorCollector errors;
+        LuaParser parser("test.lua", COUNTER_SCRIPT, errors.callback());
+
+        constexpr int NUM_STATES = 4;
+        lua_State* states[NUM_STATES] = {};
+        auto vars = makeDefaultVars();
+
+        for (int cycle = 0; cycle < 100; cycle++) {
+            // Run each state a varying number of times
+            int runsPerState = (cycle % 7) + 1;
+            LuaResult lastResults[NUM_STATES] = {};
+            for (int r = 0; r < runsPerState; r++) {
+                for (int s = 0; s < NUM_STATES; s++) {
+                    lastResults[s] = parser.run(states[s], vars);
+                }
+            }
+
+            // Verify accumulated count matches the number of runs
+            for (int s = 0; s < NUM_STATES; s++) {
+                expectWithinAbsoluteError(lastResults[s].values[0], (float)runsPerState, 0.001f);
+            }
+
+            // Reset all states
+            parser.forgetAllStates();
+
+            // Verify all states restart from 1
+            for (int s = 0; s < NUM_STATES; s++) {
+                auto result = parser.run(states[s], vars);
+                expectWithinAbsoluteError(result.values[0], 1.0f, 0.001f);
+            }
+
+            // Reset again to clean for next cycle
+            parser.forgetAllStates();
+        }
+
+        for (int s = 0; s < NUM_STATES; s++)
+            parser.close(states[s]);
+
+        expect(!errors.hasErrors(), "No errors expected during stress test");
     }
 };
 

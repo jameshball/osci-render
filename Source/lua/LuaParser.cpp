@@ -223,6 +223,13 @@ void LuaParser::readTable(lua_State*& L, LuaResult& result) {
 
 // only the audio thread runs this fuction
 LuaResult LuaParser::run(lua_State*& L, LuaVariables& vars) {
+    // Check if a reset was requested from the UI thread
+    if (resetRequested.load(std::memory_order_acquire)) {
+        resetRequested.store(false, std::memory_order_relaxed);
+        seenStates.clear();
+        lastSeenState = nullptr;
+    }
+
     // if we haven't seen this state before, reset it
     if (L == nullptr || L != lastSeenState) {
         if (std::find(seenStates.begin(), seenStates.end(), L) == seenStates.end()) {

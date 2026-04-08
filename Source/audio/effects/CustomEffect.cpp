@@ -8,6 +8,7 @@ CustomEffect::CustomEffect(LuaEffectState& luaState, std::atomic<double>* luaVal
 }
 
 CustomEffect::~CustomEffect() {
+	juce::SpinLock::ScopedLockType lock(luaState.codeLock);
 	if (luaState.parser) {
 		luaState.parser->close(L);
 	}
