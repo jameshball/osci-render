@@ -32,15 +32,6 @@ LfoPresetBrowserOverlay::LfoPresetBrowserOverlay(LfoPresetManager& manager, List
     saveButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
     saveButton.onClick = [this]() { doSave(); };
     browserPanel.addAndMakeVisible(saveButton);
-
-    importButton.setButtonText("Import .vitallfo");
-    importButton.setColour(juce::TextButton::buttonColourId, Colours::veryDark().brighter(0.15f));
-    importButton.setColour(juce::TextButton::textColourOnId, juce::Colours::white.withAlpha(0.8f));
-    importButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white.withAlpha(0.8f));
-    importButton.onClick = [this]() {
-        if (browserListener) browserListener->presetBrowserImportRequested();
-    };
-    browserPanel.addAndMakeVisible(importButton);
 }
 
 void LfoPresetBrowserOverlay::show(LfoPreset currentFactoryPreset, const juce::String& currentUserName) {
@@ -49,6 +40,9 @@ void LfoPresetBrowserOverlay::show(LfoPreset currentFactoryPreset, const juce::S
 
     rebuildContent();
     resized();
+    // Re-layout after resized() so viewport dimensions are valid on first open
+    layoutRows();
+    browserPanel.resized();
     grabKeyboardFocus();
 }
 
@@ -91,10 +85,6 @@ void LfoPresetBrowserOverlay::BrowserPanel::resized() {
     bottomBar.removeFromRight(4);
     saveEditor.setBounds(bottomBar);
 
-    inner.removeFromBottom(4);
-
-    auto importBar = inner.removeFromBottom(22);
-    importButton.setBounds(importBar);
     inner.removeFromBottom(4);
 
     viewport.setBounds(inner);
@@ -240,19 +230,26 @@ void LfoPresetBrowserOverlay::rebuildContent() {
         }
     }
 
-    // Vital user LFOs section
+    // Vital LFOs sections — grouped by category folder
     auto vitalPresets = presetManager.getVitalUserPresets();
     numVitalPresets = (int)vitalPresets.size();
+    numVitalHeaders = 0;
 
     if (!vitalPresets.empty()) {
-        y += 4;
-        auto* vitalHeader = new SectionHeader();
-        vitalHeader->title = "VITAL";
-        rows.add(vitalHeader);
-        content.addAndMakeVisible(vitalHeader);
-        y += kSectionHeaderHeight;
+        juce::String currentCategory;
 
         for (int i = 0; i < (int)vitalPresets.size(); ++i) {
+            if (vitalPresets[i].category != currentCategory) {
+                currentCategory = vitalPresets[i].category;
+                y += 4;
+                auto* catHeader = new SectionHeader();
+                catHeader->title = currentCategory.toUpperCase() + " (VITAL)";
+                rows.add(catHeader);
+                content.addAndMakeVisible(catHeader);
+                y += kSectionHeaderHeight;
+                numVitalHeaders++;
+            }
+
             auto* row = new PresetRow();
             row->name = vitalPresets[i].name;
             row->isActive = (activeUserName == vitalPresets[i].name);
@@ -309,17 +306,21 @@ void LfoPresetBrowserOverlay::layoutRows() {
         }
     }
 
-    // Vital user presets
-    if (numVitalPresets > 0 && rowIdx < rows.size()) {
-        y += 4;
-        rows[rowIdx]->setBounds(0, y, rowW, kSectionHeaderHeight);
-        y += kSectionHeaderHeight;
-        rowIdx++;
-
-        for (int i = 0; i < numVitalPresets && rowIdx < rows.size(); ++i, ++rowIdx) {
+    // Vital presets — multiple category headers interleaved with preset rows
+    int vitalItemsRemaining = numVitalPresets + numVitalHeaders;
+    while (vitalItemsRemaining > 0 && rowIdx < rows.size()) {
+        // Determine if this is a header or a preset row
+        auto* asHeader = dynamic_cast<SectionHeader*>(rows[rowIdx]);
+        if (asHeader != nullptr) {
+            y += 4;
+            rows[rowIdx]->setBounds(0, y, rowW, kSectionHeaderHeight);
+            y += kSectionHeaderHeight;
+        } else {
             rows[rowIdx]->setBounds(0, y, rowW, kRowHeight);
             y += kRowHeight;
         }
+        rowIdx++;
+        vitalItemsRemaining--;
     }
 
     content.setSize(rowW, juce::jmax(viewport.getHeight(), contentHeight));

@@ -333,10 +333,12 @@ void SettingsComponent::layoutChildren() {
         }
 
         if (examplesVisible) {
+#if !OSCI_PREMIUM
             quickControls.setVisible(false);
+            midi.setVisible(false);
+#endif
             effects.setVisible(false);
             frame.setVisible(false);
-            midi.setVisible(false);
             examples.setVisible(true);
             examples.setBounds(effectsBounds);
         } else {
@@ -474,7 +476,7 @@ void SettingsComponent::layoutChildren() {
         auto visBounds = layoutVisColumnProxy.getBounds();
 
         // Reserve space for MIDI + quick controls below vis/effects columns
-        if (!examplesVisible) {
+        {
             static constexpr int controlsRowHeight = 60;
             quickControls.setBounds(visBounds.removeFromBottom(controlsRowHeight));
             visBounds.removeFromBottom(kGap);

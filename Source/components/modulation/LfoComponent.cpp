@@ -424,6 +424,9 @@ void LfoComponent::resized() {
 
     presetSelector.setBounds(topBar);
 
+    // Save the full area below the top bar for the preset browser overlay
+    presetBrowserBounds = bounds;
+
     // Bottom row: mode + rate controls
     auto bottomRow = bounds.removeFromBottom(kRateHeight);
     bounds.removeFromBottom(kRateGap);
@@ -462,10 +465,10 @@ void LfoComponent::resized() {
     delayKnob.setBounds(nextLfoCol(knobW));
 
     graph.setBounds(bounds);
-    setOutlineBounds(graph.getBounds());
+    setOutlineBounds(presetBrowserVisible ? juce::Rectangle<int>{} : graph.getBounds());
 
     if (presetBrowserVisible)
-        presetBrowser.setBounds(graph.getBounds());
+        presetBrowser.setBounds(presetBrowserBounds);
 }
 
 void LfoComponent::onActiveSourceChanged(int index) {
@@ -775,19 +778,33 @@ void LfoComponent::showPresetBrowser() {
     addAndMakeVisible(presetBrowser);
     presetBrowserVisible = true;
 
+    // Position inline browser over the graph and controls area
+    graph.setVisible(false);
+    phaseSlider.setVisible(false);
+    modeControl.setVisible(false);
+    rateControl.setVisible(false);
+    smoothKnob.setVisible(false);
+    delayKnob.setVisible(false);
+    setOutlineBounds({});
+    repaint();
+    presetBrowser.setBounds(presetBrowserBounds);
+
     int idx = getActiveSourceIndex();
     presetBrowser.show(lfoData[idx].preset, lfoData[idx].userPresetName);
-
-    // Position inline browser over the graph
-    graph.setVisible(false);
-    presetBrowser.setBounds(graph.getBounds());
 }
 
 void LfoComponent::dismissPresetBrowser() {
     if (presetBrowserVisible) {
         graph.setVisible(true);
+        phaseSlider.setVisible(true);
+        modeControl.setVisible(true);
+        rateControl.setVisible(true);
+        smoothKnob.setVisible(true);
+        delayKnob.setVisible(true);
+        setOutlineBounds(graph.getBounds());
         removeChildComponent(&presetBrowser);
         presetBrowserVisible = false;
+        repaint();
     }
 }
 
@@ -831,30 +848,6 @@ void LfoComponent::presetBrowserSaveRequested(const juce::String& name) {
     // Refresh the overlay to show the new preset
     if (presetBrowserVisible)
         presetBrowser.refresh(lfoData[idx].preset, lfoData[idx].userPresetName);
-}
-
-void LfoComponent::presetBrowserImportRequested() {
-    dismissPresetBrowser();
-    importVitalLfo();
-}
-
-void LfoComponent::importVitalLfo() {
-    fileChooser = std::make_unique<juce::FileChooser>(
-        "Import .vitallfo file",
-        juce::File::getSpecialLocation(juce::File::userHomeDirectory),
-        "*.vitallfo");
-
-    fileChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-        [this](const juce::FileChooser& fc) {
-            auto results = fc.getResults();
-            if (results.isEmpty()) return;
-
-            auto sourceFile = results.getFirst();
-            auto destFile = presetManager.importPreset(sourceFile);
-
-            if (destFile.existsAsFile())
-                loadUserPreset(destFile);
-        });
 }
 
 void LfoComponent::loadUserPreset(const juce::File& file) {

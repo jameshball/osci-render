@@ -15,7 +15,6 @@ public:
         virtual void presetBrowserUserSelected(const juce::File& file) = 0;
         virtual void presetBrowserUserDeleted(const juce::File& file) = 0;
         virtual void presetBrowserSaveRequested(const juce::String& name) = 0;
-        virtual void presetBrowserImportRequested() = 0;
     };
 
     LfoPresetBrowserOverlay(LfoPresetManager& manager, Listener* listener);
@@ -32,7 +31,6 @@ private:
     static constexpr int kSectionHeaderHeight = 22;
     static constexpr int kDeleteButtonSize = 18;
     static constexpr int kBottomBarHeight = 30;
-    static constexpr int kImportBarHeight = 26;
 
     LfoPresetManager& presetManager;
     Listener* browserListener;
@@ -48,7 +46,6 @@ private:
         juce::Component contentComp;
         juce::TextEditor saveEditor;
         juce::TextButton saveButton;
-        juce::TextButton importButton;
         int contentHeight = 0;
     };
 
@@ -57,7 +54,6 @@ private:
     juce::Component& content = browserPanel.contentComp;
     juce::TextEditor& saveEditor = browserPanel.saveEditor;
     juce::TextButton& saveButton = browserPanel.saveButton;
-    juce::TextButton& importButton = browserPanel.importButton;
     int contentHeight = 0;
 
     struct PresetRow : public juce::Component {
@@ -84,6 +80,7 @@ private:
     juce::OwnedArray<juce::Component> rows;
     int numUserPresets = 0;   // cached count from last rebuildContent()
     int numVitalPresets = 0;  // cached count from last rebuildContent()
+    int numVitalHeaders = 0;  // number of Vital category section headers
 
     void rebuildContent();
     void layoutRows();

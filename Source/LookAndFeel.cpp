@@ -198,17 +198,21 @@ void OscirenderLookAndFeel::drawTextEditorOutline(juce::Graphics& g, int width, 
     {
         if (textEditor.hasKeyboardFocus (true) && ! textEditor.isReadOnly())
         {
-            const int border = 2;
+            const float border = 1.0f;
+            const float half = border * 0.5f;
 
             g.setColour (textEditor.findColour (juce::TextEditor::focusedOutlineColourId));
-            g.drawRoundedRectangle(0, 0, width, height, Colours::kPillRadius, border);
+            g.drawRoundedRectangle(half, half, width - border, height - border, Colours::kPillRadius, border);
         }
         else
         {
+            const float border = 1.0f;
+            const float half = border * 0.5f;
+
             auto outlineColour = textEditor.findColour(juce::TextEditor::outlineColourId);
             outlineColour = LookAndFeelHelpers::createBaseColour(outlineColour, false, textEditor.isMouseOver(true), false, textEditor.isEnabled());
             g.setColour(outlineColour);
-            g.drawRoundedRectangle(0, 0, width, height, Colours::kPillRadius, 1.0f);
+            g.drawRoundedRectangle(half, half, width - border, height - border, Colours::kPillRadius, border);
         }
     }
 }

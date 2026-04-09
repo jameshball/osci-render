@@ -55,45 +55,16 @@ bool LfoPresetManager::deletePreset(const juce::File& file) {
     return file.deleteFile();
 }
 
-juce::File LfoPresetManager::importPreset(const juce::File& sourceFile) {
-    if (!sourceFile.existsAsFile()) return {};
-
-    auto text = sourceFile.loadFileAsString();
-    auto parsed = juce::JSON::parse(text);
-    if (!parsed.isObject()) return {};
-
-    LfoWaveform waveform;
-    juce::String name;
-    if (!vitalJsonToWaveform(parsed, waveform, name)) return {};
-
-    if (name.isEmpty())
-        name = sourceFile.getFileNameWithoutExtension();
-
-    auto destFile = presetsDir.getChildFile(sanitizeFilename(name) + ".vitallfo");
-
-    int counter = 2;
-    while (destFile.existsAsFile()) {
-        destFile = presetsDir.getChildFile(sanitizeFilename(name) + " " + juce::String(counter) + ".vitallfo");
-        counter++;
-    }
-
-    auto json = waveformToVitalJson(waveform, name);
-    if (destFile.replaceWithText(juce::JSON::toString(json)))
-        return destFile;
-
-    return {};
-}
-
-juce::File LfoPresetManager::getVitalUserLfoDirectory() {
+juce::File LfoPresetManager::getVitalBaseDirectory() {
 #if JUCE_MAC
     return juce::File::getSpecialLocation(juce::File::userHomeDirectory)
-        .getChildFile("Music/Vital/User/LFOs");
+        .getChildFile("Music/Vital");
 #elif JUCE_WINDOWS
     return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
-        .getChildFile("Vital/User/LFOs");
+        .getChildFile("Vital");
 #else
     return juce::File::getSpecialLocation(juce::File::userHomeDirectory)
-        .getChildFile(".local/share/vital/User/LFOs");
+        .getChildFile(".local/share/vital");
 #endif
 }
 
@@ -103,32 +74,47 @@ const std::vector<LfoPresetManager::PresetEntry>& LfoPresetManager::getVitalUser
 
     vitalPresetsCache.clear();
 
-    auto vitalDir = getVitalUserLfoDirectory();
-    if (!vitalDir.isDirectory()) {
+    auto vitalBase = getVitalBaseDirectory();
+    if (!vitalBase.isDirectory()) {
         vitalCacheValid = true;
         return vitalPresetsCache;
     }
 
-    for (const auto& file : vitalDir.findChildFiles(juce::File::findFiles, false, "*.vitallfo")) {
-        PresetEntry entry;
-        entry.file = file;
+    // Scan all Vital/*/LFOs directories, excluding Factory
+    for (const auto& subDir : vitalBase.findChildFiles(juce::File::findDirectories, false)) {
+        if (subDir.getFileName().equalsIgnoreCase("Factory"))
+            continue;
 
-        auto text = file.loadFileAsString();
-        auto parsed = juce::JSON::parse(text);
-        if (parsed.isObject()) {
-            auto* obj = parsed.getDynamicObject();
-            if (obj && obj->hasProperty("name"))
-                entry.name = obj->getProperty("name").toString();
+        auto lfosDir = subDir.getChildFile("LFOs");
+        if (!lfosDir.isDirectory())
+            continue;
+
+        juce::String folderName = subDir.getFileName();
+
+        for (const auto& file : lfosDir.findChildFiles(juce::File::findFiles, false, "*.vitallfo")) {
+            PresetEntry entry;
+            entry.file = file;
+            entry.category = folderName;
+
+            auto text = file.loadFileAsString();
+            auto parsed = juce::JSON::parse(text);
+            if (parsed.isObject()) {
+                auto* obj = parsed.getDynamicObject();
+                if (obj && obj->hasProperty("name"))
+                    entry.name = obj->getProperty("name").toString();
+            }
+
+            if (entry.name.isEmpty())
+                entry.name = file.getFileNameWithoutExtension();
+
+            vitalPresetsCache.push_back(entry);
         }
-
-        if (entry.name.isEmpty())
-            entry.name = file.getFileNameWithoutExtension();
-
-        vitalPresetsCache.push_back(entry);
     }
 
     std::sort(vitalPresetsCache.begin(), vitalPresetsCache.end(),
               [](const PresetEntry& a, const PresetEntry& b) {
+                  int catCmp = a.category.compareIgnoreCase(b.category);
+                  if (catCmp != 0) return catCmp < 0;
                   return a.name.compareIgnoreCase(b.name) < 0;
               });
 

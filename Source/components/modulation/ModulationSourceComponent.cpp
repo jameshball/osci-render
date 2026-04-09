@@ -621,7 +621,7 @@ void ModulationSourceComponent::paintOverChildren(juce::Graphics& g) {
 
     if (!hasTabs) {
         // No tabs — just draw the source outline
-        if (config.getSourceColour) {
+        if (config.getSourceColour && !outlineBounds.isEmpty()) {
             auto colour = config.getSourceColour(activeSourceIndex);
             auto graphBounds = outlineBounds.toFloat();
             g.setColour(colour.withAlpha(0.25f));
@@ -646,7 +646,7 @@ void ModulationSourceComponent::paintOverChildren(juce::Graphics& g) {
     g.restoreState();
 
     // Source-coloured rounded border around the graph area
-    if (config.getSourceColour) {
+    if (config.getSourceColour && !outlineBounds.isEmpty()) {
         auto colour = config.getSourceColour(activeSourceIndex);
         auto graphBounds = outlineBounds.toFloat();
         g.setColour(colour.withAlpha(0.25f));

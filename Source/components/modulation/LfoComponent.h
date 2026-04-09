@@ -47,7 +47,6 @@ public:
     void presetBrowserUserSelected(const juce::File& file) override;
     void presetBrowserUserDeleted(const juce::File& file) override;
     void presetBrowserSaveRequested(const juce::String& name) override;
-    void presetBrowserImportRequested() override;
 
 protected:
     void onActiveSourceChanged(int newIndex) override;
@@ -124,9 +123,9 @@ private:
     SvgButton copyButton;
     SvgButton pasteButton;
     LfoPresetManager presetManager;
-    std::unique_ptr<juce::FileChooser> fileChooser;
     LfoPresetBrowserOverlay presetBrowser;
     bool presetBrowserVisible = false;
+    juce::Rectangle<int> presetBrowserBounds;
     ModulationRateComponent rateControl;
     ModulationModeComponent modeControl;
     PhaseSliderComponent phaseSlider;
@@ -170,7 +169,6 @@ private:
     void showPaintShapeMenu();
     void showPresetBrowser();
     void dismissPresetBrowser();
-    void importVitalLfo();
     void loadUserPreset(const juce::File& file);
     void copyWaveformToClipboard();
     void pasteWaveformFromClipboard();
