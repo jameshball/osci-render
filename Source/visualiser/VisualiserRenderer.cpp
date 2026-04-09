@@ -273,13 +273,16 @@ int VisualiserRenderer::prepareTask(double sampleRate, int bufferSize) {
     rResampler.prepare(sampleRate, RESAMPLE_RATIO);
     gResampler.prepare(sampleRate, RESAMPLE_RATIO);
     bResampler.prepare(sampleRate, RESAMPLE_RATIO);
-    
-    // Prepare audio effects with the correct sample rate
-    for (auto& effect : parameters.audioEffects) {
-        effect->prepareToPlay(sampleRate, bufferSize);
-    }
 
     int desiredBufferSize = sampleRate / frameRate;
+
+    // Use desiredBufferSize when bufferSize is invalid (e.g. -1 from setFrameRate)
+    int effectBufferSize = bufferSize > 0 ? bufferSize : desiredBufferSize;
+
+    // Prepare audio effects with the correct sample rate
+    for (auto& effect : parameters.audioEffects) {
+        effect->prepareToPlay(sampleRate, effectBufferSize);
+    }
 
     return desiredBufferSize;
 }
