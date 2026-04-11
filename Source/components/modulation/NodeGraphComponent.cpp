@@ -1042,6 +1042,14 @@ void NodeGraphComponent::setSnapDivisions(int divisions) {
     }
 }
 
+void NodeGraphComponent::setFirstNodeValue(double value) {
+    if (!nodes.empty()) {
+        nodes.front().value = juce::jlimit(valueMin, valueMax, value);
+        if (!handles.isEmpty())
+            handles.getFirst()->updateFromNode();
+    }
+}
+
 void NodeGraphComponent::setLastNodeValue(double value) {
     if (!nodes.empty()) {
         nodes.back().value = juce::jlimit(valueMin, valueMax, value);

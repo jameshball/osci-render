@@ -678,7 +678,7 @@ void LfoComponent::applyLfoConstraints(int nodeIndex, double& time, double& valu
     if (nodeIndex == numNodes - 1)
         time = 1.0;
     if (nodeIndex == numNodes - 1 && numNodes > 1)
-        value = graphNodes[0].value;
+        graph.setFirstNodeValue(value);
     if (nodeIndex == 0 && numNodes > 1)
         graph.setLastNodeValue(value);
 

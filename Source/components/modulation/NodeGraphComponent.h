@@ -152,7 +152,8 @@ public:
     int getActiveNodeIndex() const;
     int getActiveCurveNodeIndex() const;
 
-    // Set the value of the last node (used for seamless looping constraints).
+    // Set the value of the first/last node (used for seamless looping constraints).
+    void setFirstNodeValue(double value);
     void setLastNodeValue(double value);
 
     // Snap configuration
