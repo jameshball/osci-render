@@ -853,6 +853,11 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     // merge keyboard state and midi messages
     keyboardState.processNextMidiBuffer(midiMessages, 0, buffer.getNumSamples(), true);
 
+#if OSCI_PREMIUM
+    // Parse MTS SysEx from incoming MIDI for microtuning support
+    mtsClient.parseMidiBuffer(midiMessages);
+#endif
+
     bool usingInput = inputEnabled->getBoolValue();
 
     bool usingMidi = midiEnabled->getBoolValue();
@@ -1675,6 +1680,14 @@ void OscirenderAudioProcessor::restoreDrawingState(ManagedVoice& target, const M
     auto* sourceVoice = dynamic_cast<ShapeVoice*>(source.getJuceVoice());
     if (targetVoice != nullptr)
         targetVoice->restoreDrawingState(sourceVoice);
+}
+
+double OscirenderAudioProcessor::noteToFrequency(int note, int channel) {
+#if OSCI_PREMIUM
+    return mtsClient.noteToFrequency(note, channel);
+#else
+    return juce::MidiMessage::getMidiNoteInHertz(note);
+#endif
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {

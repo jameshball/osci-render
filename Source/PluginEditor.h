@@ -38,6 +38,7 @@ public:
     void openVisualiserSettings();
     void openRecordingSettings() override;
     void showPremiumSplashScreen() override;
+    void timerCallback() override;
     bool isInterestedInFileDrag(const juce::StringArray& files) override;
     void filesDropped(const juce::StringArray& files, int x, int y) override;
 
@@ -52,6 +53,7 @@ public:
     const double CLOSED_PREF_SIZE = 30.0;
     const double RESIZER_BAR_SIZE = 7.0;
     static constexpr int kMenuBarHeight = 25;
+    static constexpr int kMenuBarMaxWidth = 380;
 
     std::atomic<bool> editingCustomFunction = false;
 
@@ -61,6 +63,10 @@ public:
 
 #if !OSCI_PREMIUM
     juce::TextButton upgradeButton{"Upgrade to premium!"};
+#endif
+
+#if OSCI_PREMIUM
+    juce::Label mtsEspLabel;
 #endif
 
     juce::ComponentAnimator codeEditorAnimator;

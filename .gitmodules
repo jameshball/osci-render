@@ -37,3 +37,6 @@
 [submodule "modules/miniaudio"]
 	path = modules/miniaudio
 	url = https://github.com/mackron/miniaudio
+[submodule "modules/juce_mts_esp"]
+	path = modules/juce_mts_esp
+	url = https://github.com/jameshball/juce_mts_esp.git

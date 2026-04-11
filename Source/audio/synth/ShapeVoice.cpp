@@ -135,7 +135,7 @@ void ShapeVoice::voiceActivated(const VoiceState& vs, bool isLegato) {
     killFadeGain = 1.0f;
 
     if (audioProcessor.midiEnabled->getBoolValue()) {
-        double newFreq = juce::MidiMessage::getMidiNoteInHertz(vs.midiNote) + osci_audio::kMacFrequencyEpsilonHz;
+        double newFreq = audioProcessor.noteToFrequency(vs.midiNote, vs.channel) + osci_audio::kMacFrequencyEpsilonHz;
 #if OSCI_PREMIUM
         double glideTimeSec = audioProcessor.glideTime->getValueUnnormalised();
 
@@ -154,7 +154,7 @@ void ShapeVoice::voiceActivated(const VoiceState& vs, bool isLegato) {
             hasDifferentSource = (std::abs(glideSource - newFreq) > 0.01);
         } else {
             // Fresh noteOn: glide from the previously played note.
-            glideSource = juce::MidiMessage::getMidiNoteInHertz(static_cast<int>(vs.lastNote));
+            glideSource = audioProcessor.noteToFrequency(static_cast<int>(vs.lastNote), vs.channel);
             hasDifferentSource = (static_cast<int>(vs.lastNote) != vs.midiNote);
         }
 

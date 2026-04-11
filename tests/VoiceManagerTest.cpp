@@ -124,6 +124,9 @@ public:
         auto* sv = cast(source);
         if (tv && sv) tv->onRestoreState(sv->capturedPosition);
     }
+    double noteToFrequency(int note, int channel) override {
+        return juce::MidiMessage::getMidiNoteInHertz(note);
+    }
 
 private:
     static TestVoice* cast(ManagedVoice& mv) {

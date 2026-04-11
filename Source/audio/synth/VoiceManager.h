@@ -130,6 +130,7 @@ public:
     virtual double getVoiceFrequency(const ManagedVoice& mv) const = 0;
     virtual void captureDrawingState(ManagedVoice& mv) = 0;
     virtual void restoreDrawingState(ManagedVoice& target, const ManagedVoice& source) = 0;
+    virtual double noteToFrequency(int note, int channel) = 0;
 };
 
 class VoiceManager {

@@ -169,7 +169,8 @@ void VoiceManager::noteOn(int note, float velocity, int channel) {
     if (lastPlayedNote >= 0.0f)
         prevNote = lastPlayedNote;
     lastPlayedNote = static_cast<float>(note);
-    lastPlayedNoteFreq.store(juce::MidiMessage::getMidiNoteInHertz(note),
+    lastPlayedNoteFreq.store(client ? client->noteToFrequency(note, channel)
+                                    : juce::MidiMessage::getMidiNoteInHertz(note),
                              std::memory_order_relaxed);
 
     int noteValue = combineNoteChannel(note, channel);
@@ -268,7 +269,8 @@ void VoiceManager::noteOff(int note, float lift, int channel) {
 
                     lastPlayedNote = static_cast<float>(oldNote);
                     lastPlayedNoteFreq.store(
-                        juce::MidiMessage::getMidiNoteInHertz(oldNote),
+                        client ? client->noteToFrequency(oldNote, oldChannel)
+                               : juce::MidiMessage::getMidiNoteInHertz(oldNote),
                         std::memory_order_relaxed);
 
                     if (client != nullptr) {

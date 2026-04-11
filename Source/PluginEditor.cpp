@@ -39,6 +39,11 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     };
     upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor());
     upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark());
+#else
+    addChildComponent(mtsEspLabel);
+    mtsEspLabel.setFont(juce::Font(11.0f));
+    mtsEspLabel.setColour(juce::Label::textColourId, juce::Colours::limegreen);
+    mtsEspLabel.setJustificationType(juce::Justification::centredRight);
 #endif
 
     addAndMakeVisible(console);
@@ -241,12 +246,10 @@ void OscirenderAudioProcessorEditor::dragOperationEnded(const juce::DragAndDropT
 
 void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
     g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
-#if !OSCI_PREMIUM
     if (!usingNativeMenuBar) {
         g.setColour(getLookAndFeel().findColour(juce::TextButton::buttonColourId));
         g.fillRect(0, 0, getWidth(), kMenuBarHeight);
     }
-#endif
 }
 
 void OscirenderAudioProcessorEditor::resized() {
@@ -267,15 +270,18 @@ void OscirenderAudioProcessorEditor::resized() {
     if (!usingNativeMenuBar) {
         auto topBar = area.removeFromTop(kMenuBarHeight);
 #if !OSCI_PREMIUM
-        upgradeButton.setBounds(topBar.removeFromRight(150).reduced(2, 2));
+        upgradeButton.setBounds(topBar.removeFromRight(juce::jmin(150, topBar.getWidth())).reduced(2, 2));
 #endif
-        menuBar.setBounds(topBar);
-        redoButton.setBounds(topBar.removeFromRight(25).reduced(2, 2));
-        undoButton.setBounds(topBar.removeFromRight(25).reduced(2, 2));
+        // Menu bar gets priority — allocate from the left first
+        menuBar.setBounds(topBar.removeFromLeft(juce::jmin(kMenuBarMaxWidth, topBar.getWidth())));
+        // Right-side items share whatever remains, clamped to available width
+        redoButton.setBounds(topBar.removeFromRight(juce::jmin(25, topBar.getWidth())).reduced(2, 2));
+        undoButton.setBounds(topBar.removeFromRight(juce::jmin(25, topBar.getWidth())).reduced(2, 2));
         undoLabel.setBounds(topBar.removeFromRight(juce::jmin(150, topBar.getWidth())).reduced(2, 2));
-        undoLabel.toFront(false);
-        undoButton.toFront(false);
-        redoButton.toFront(false);
+#if OSCI_PREMIUM
+        if (mtsEspLabel.isVisible())
+            mtsEspLabel.setBounds(topBar.removeFromRight(juce::jmin(150, topBar.getWidth())).reduced(2, 2));
+#endif
     }
 
     bool editorVisible = false;
@@ -657,6 +663,31 @@ void OscirenderAudioProcessorEditor::showPremiumSplashScreen() {
         juce::URL("https://osci-render.com/#purchase").launchInDefaultBrowser();
     };
     showOverlay(std::move(splash));
+#endif
+}
+
+void OscirenderAudioProcessorEditor::timerCallback() {
+    CommonPluginEditor::timerCallback();
+
+#if OSCI_PREMIUM
+    auto mtsEspDisplayText = [this]() -> juce::String {
+        auto scaleName = audioProcessor.getMtsEspScaleName();
+        if (scaleName.isNotEmpty())
+            return "MTS-ESP: " + scaleName;
+        return "MTS-ESP Connected";
+    };
+
+    bool connected = audioProcessor.isMtsEspConnected();
+    if (connected != mtsEspLabel.isVisible()) {
+        mtsEspLabel.setVisible(connected);
+        if (connected)
+            mtsEspLabel.setText(mtsEspDisplayText(), juce::dontSendNotification);
+        resized();
+    } else if (connected) {
+        juce::String newText = mtsEspDisplayText();
+        if (mtsEspLabel.getText() != newText)
+            mtsEspLabel.setText(newText, juce::dontSendNotification);
+    }
 #endif
 }
 

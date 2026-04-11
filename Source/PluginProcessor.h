@@ -9,6 +9,9 @@
 #pragma once
 
 #include <JuceHeader.h>
+#if OSCI_PREMIUM
+#include <juce_mts_esp/juce_mts_esp.h>
+#endif
 
 #include <limits>
 #include <numbers>
@@ -97,6 +100,11 @@ public:
     double getVoiceFrequency(const ManagedVoice& mv) const override;
     void captureDrawingState(ManagedVoice& mv) override;
     void restoreDrawingState(ManagedVoice& target, const ManagedVoice& source) override;
+    double noteToFrequency(int note, int channel) override;
+#if OSCI_PREMIUM
+    bool isMtsEspConnected() const { return mtsClient.hasMaster(); }
+    juce::String getMtsEspScaleName() const { return juce::String(mtsClient.getScaleName()); }
+#endif
 
     // Central 60 Hz broadcaster for modulation display updates.
     // EffectComponents register/unregister via wireModulation / destructor.
@@ -389,6 +397,9 @@ private:
 
     ShapeSound::Ptr defaultSound;
     VoiceManager synth;
+#if OSCI_PREMIUM
+    mts_esp::Client mtsClient;
+#endif
     bool retriggerMidi = true;
 
     std::unique_ptr<VoiceBuilder> voiceBuilder;
