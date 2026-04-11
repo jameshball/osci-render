@@ -136,6 +136,9 @@ void SosciMainMenuBarModel::resetMenuItems() {
 
         juce::DialogWindow* dw = options.launchAsync();
     });
+    addMenuItem(aboutMenu, "Open Log File", [this] {
+        processor.applicationFolder.getChildFile(juce::String(JucePlugin_Name) + ".log").revealToUser();
+    });
 
     addMenuItem(videoMenu, "Settings...", [this] {
         editor.openRecordingSettings();

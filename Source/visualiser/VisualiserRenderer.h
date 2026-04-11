@@ -94,6 +94,7 @@ private:
     std::optional<juce::Rectangle<float>> cropRectangle;
 
     float renderScale = 1.0f;
+    bool dpiDiagnosticsLogged = false;
 
     GLuint quadIndexBuffer = 0;
     GLuint vertexIndexBuffer = 0;

@@ -109,6 +109,9 @@ void OsciMainMenuBarModel::resetMenuItems() {
 
         juce::DialogWindow* dw = options.launchAsync();
     });
+    addMenuItem(aboutMenu, "Open Log File", [this] {
+        audioProcessor.applicationFolder.getChildFile(juce::String(JucePlugin_Name) + ".log").revealToUser();
+    });
     addMenuItem(aboutMenu, "Randomize Blender Port", [this] {
         audioProcessor.setObjectServerPort(juce::Random::getSystemRandom().nextInt(juce::Range<int>(51600, 51700)));
     });

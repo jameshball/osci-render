@@ -1287,7 +1287,7 @@ void VisualiserRenderer::checkGLErrors(juce::String file, int line) {
                 errorMessage = "Unknown OpenGL error";
                 break;
         }
-        DBG("OpenGL error at " + file + ":" + juce::String(line) + " - " + errorMessage);
+        juce::Logger::writeToLog("OpenGL error at " + file + ":" + juce::String(line) + " - " + errorMessage);
     }
 }
 
@@ -1307,6 +1307,34 @@ void VisualiserRenderer::renderScope(const std::vector<float> &xPoints, const st
     }
 
     renderScale = (float)openGLContext.getRenderingScale();
+
+    // One-time DPI diagnostics: log on the first audio frame so we can diagnose
+    // scaling issues on Windows hosts without flooding logs or affecting performance.
+    if (!dpiDiagnosticsLogged) {
+        dpiDiagnosticsLogged = true;
+
+        using namespace juce::gl;
+        GLint vp[4] = {};
+        glGetIntegerv(GL_VIEWPORT, vp);
+
+        auto componentBounds = getLocalBounds();
+        auto screenBounds = getScreenBounds();
+        auto globalScale = juce::Desktop::getInstance().getGlobalScaleFactor();
+
+        juce::String diagMsg;
+        diagMsg << "[DPI Diagnostics] "
+                << "renderScale=" << renderScale
+                << " getRenderingScale()=" << openGLContext.getRenderingScale()
+                << " | component: " << componentBounds.getWidth() << "x" << componentBounds.getHeight()
+                << " | screenBounds: " << screenBounds.getWidth() << "x" << screenBounds.getHeight()
+                << " @ (" << screenBounds.getX() << "," << screenBounds.getY() << ")"
+                << " | glViewport: " << vp[2] << "x" << vp[3]
+                << " @ (" << vp[0] << "," << vp[1] << ")"
+                << " | globalScaleFactor=" << globalScale
+                << " | viewportArea: " << viewportArea.getWidth() << "x" << viewportArea.getHeight();
+
+        juce::Logger::writeToLog(diagMsg);
+    }
 
     // Provide dummy colour buffers for non-RGB modes to avoid allocations
     static std::vector<float> empty;
