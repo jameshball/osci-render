@@ -15,6 +15,7 @@
 #include "components/timeline/OscirenderAudioTimelineController.h"
 #include "components/menu/OsciMainMenuBarModel.h"
 #include "components/SplashScreenComponent.h"
+#include "components/ModulationModeOverlay.h"
 #include "visualiser/VisualiserSettings.h"
 
 class OscirenderAudioProcessorEditor : public CommonPluginEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer {
@@ -38,6 +39,7 @@ public:
     void openVisualiserSettings();
     void openRecordingSettings() override;
     void showPremiumSplashScreen() override;
+    void showModulationModeOverlay();
     void timerCallback() override;
     bool isInterestedInFileDrag(const juce::StringArray& files) override;
     void filesDropped(const juce::StringArray& files, int x, int y) override;
@@ -67,6 +69,7 @@ public:
 
 #if OSCI_PREMIUM
     juce::Label mtsEspLabel;
+    juce::TextButton simpleModeButton{"Simple Mode"};
 #endif
 
     juce::ComponentAnimator codeEditorAnimator;

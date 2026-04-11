@@ -35,6 +35,12 @@ public:
     void setLocked(bool shouldBeLocked);
     bool isLocked() const { return locked; }
 
+    void setSelected(bool shouldBeSelected);
+    bool isSelected() const { return selected; }
+
+    void setRecommended(bool shouldBeRecommended);
+    bool isRecommended() const { return recommended; }
+
     int getPreferredHeight(int width) const;
 
 private:
@@ -49,9 +55,11 @@ private:
     };
 
     [[nodiscard]] TextLayoutMetrics computeTextLayouts(int textWidth) const;
+    void updateIconColour(juce::Colour colour);
 
     juce::String itemName;
     juce::String itemId;
+    juce::String iconSvgSource;
 
     // Icon for the item
     std::unique_ptr<SvgButton> iconButton;
@@ -59,8 +67,16 @@ private:
 
     bool interactive { true };
     bool locked { false };
+    bool selected { false };
+    bool recommended { false };
     juce::String description;
     juce::Colour iconColour;
+
+    // Selection animation
+    float selectionProgress { 0.0f };
+    juce::VBlankAnimatorUpdater selectionAnimatorUpdater { this };
+    juce::Animator selectAnimator;
+    juce::Animator deselectAnimator;
 
     static constexpr int CORNER_RADIUS = 8;
     static constexpr int TEXT_HORIZONTAL_PADDING = 40;

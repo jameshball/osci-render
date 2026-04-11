@@ -38,11 +38,14 @@ public:
 
     void resized() override {
         auto bounds = getLocalBounds();
-        auto horizontalMargin = juce::jmax(40, bounds.getWidth() / 6);
-        auto verticalMargin = juce::jmax(40, bounds.getHeight() / 6);
+        auto horizontalMargin = juce::jmax(6, bounds.getWidth() / 10);
+        auto verticalMargin = juce::jmax(6, bounds.getHeight() / 10);
         panelBounds = bounds.reduced(horizontalMargin, verticalMargin);
 
-        resizeContent(panelBounds.reduced(28));
+        if (maxPanelHeight > 0 && panelBounds.getHeight() > maxPanelHeight)
+            panelBounds = panelBounds.withSizeKeepingCentre(panelBounds.getWidth(), maxPanelHeight);
+
+        resizeContent(panelBounds.reduced(20));
     }
 
     void mouseDown(const juce::MouseEvent& e) override {
@@ -62,6 +65,7 @@ protected:
     }
 
     juce::Rectangle<int> panelBounds;
+    int maxPanelHeight = 0; // 0 = no limit
 
     // Helper shared by subclasses for configuring labels.
     static void configureLabel(juce::Label& label, const juce::Font& font,

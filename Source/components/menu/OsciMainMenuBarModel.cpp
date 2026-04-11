@@ -188,6 +188,12 @@ void OsciMainMenuBarModel::resetMenuItems() {
         editor.settings.resized();
         resetMenuItems();
     }, [this] { return audioProcessor.getGlobalBoolValue("showMidiKeyboard", true); });
+
+#if OSCI_PREMIUM
+    addMenuItem(interfaceMenu, "Modulation Mode...", [this] {
+        editor.showModulationModeOverlay();
+    });
+#endif
 }
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM

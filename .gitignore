@@ -366,3 +366,5 @@ MigrationBackup/
 
 # Vital synth
 vital/
+
+RELEASE_NOTES.md

@@ -126,13 +126,15 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     effects.insert(effects.end(), luaEffects.begin(), luaEffects.end());
 
     // --- Premium mode: strip per-parameter LFO dropdowns and sidechain from all effects ---
-    // These are only used in the free version. In premium, modulation is done via
-    // the global LFO/ENV module panels with drag-and-drop assignments.
+    // These are only used in Simple mode (and the free version). In Standard mode,
+    // modulation is done via the global LFO/ENV module panels with drag-and-drop assignments.
 #if OSCI_PREMIUM
-    for (auto& effect : effects) {
-        for (auto* param : effect->parameters) {
-            param->disableLfo();
-            param->disableSidechain();
+    if (modulationMode == ModulationMode::Standard) {
+        for (auto& effect : effects) {
+            for (auto* param : effect->parameters) {
+                param->disableLfo();
+                param->disableSidechain();
+            }
         }
     }
 #endif
@@ -151,22 +153,24 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     floatParameters.push_back(animationOffset);
     floatParameters.push_back(standaloneBpm);
 
-    // Adopt parameters from modulation state classes (premium only)
+    // Adopt parameters from modulation state classes (premium Standard mode only)
 #if OSCI_PREMIUM
-    for (auto* p : lfoParameters.getFloatParameters())
-        floatParameters.push_back(p);
-    for (auto* p : lfoParameters.getIntParameters())
-        intParameters.push_back(p);
+    if (modulationMode == ModulationMode::Standard) {
+        for (auto* p : lfoParameters.getFloatParameters())
+            floatParameters.push_back(p);
+        for (auto* p : lfoParameters.getIntParameters())
+            intParameters.push_back(p);
 
-    // Adopt Random parameters from state class (premium only)
-    for (auto* p : randomParameters.getFloatParameters())
-        floatParameters.push_back(p);
-    for (auto* p : randomParameters.getIntParameters())
-        intParameters.push_back(p);
+        // Adopt Random parameters from state class
+        for (auto* p : randomParameters.getFloatParameters())
+            floatParameters.push_back(p);
+        for (auto* p : randomParameters.getIntParameters())
+            intParameters.push_back(p);
 
-    // Adopt Sidechain parameters from state class (premium only)
-    for (auto* p : sidechainParameters.getFloatParameters())
-        floatParameters.push_back(p);
+        // Adopt Sidechain parameters from state class
+        for (auto* p : sidechainParameters.getFloatParameters())
+            floatParameters.push_back(p);
+    }
 #endif
 
     intParameters.push_back(voices);
@@ -940,20 +944,23 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         }
 
 #if OSCI_PREMIUM
-        // Fill modulation block buffers (type-specific generation)
-        lfoParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages,
-                                       currentBpm.load(std::memory_order_relaxed), uiVoiceActive);
-        envelopeParameters.fillBlockBuffers(numSamples, uiVoiceEnvActive, uiVoiceEnvValue);
-        randomParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages,
-                                          currentBpm.load(std::memory_order_relaxed), uiVoiceActive);
+        // Fill modulation block buffers (Standard mode only — global mod engine)
+        if (modulationMode == ModulationMode::Standard) {
+            lfoParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages,
+                                           currentBpm.load(std::memory_order_relaxed), uiVoiceActive);
+            envelopeParameters.fillBlockBuffers(numSamples, uiVoiceEnvActive, uiVoiceEnvValue);
+            randomParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages,
+                                              currentBpm.load(std::memory_order_relaxed), uiVoiceActive);
+        }
 #endif
 
         // Always run the sidechain envelope follower so the UI display
         // (graph marker + output pill) stays current in both modes.
         sidechainParameters.fillBlockBuffers(numSamples, sampleRate, rectifiedInputBuffer.getReadPointer(0));
 
-        // Apply all modulation buffers to animated parameter values (generic)
-        modulationEngine.applyAllModulation(numSamples);
+        // Apply all modulation buffers to animated parameter values (Standard mode only)
+        if (modulationMode == ModulationMode::Standard)
+            modulationEngine.applyAllModulation(numSamples);
     }
 
     outputBuffer3d.setSize(6, buffer.getNumSamples(), false, false, true);
@@ -1138,6 +1145,7 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
     std::unique_ptr<juce::XmlElement> xml = std::make_unique<juce::XmlElement>("project");
     xml->setAttribute("version", ProjectInfo::versionString);
     xml->setAttribute("premiumProject", (bool) OSCI_PREMIUM);
+    xml->setAttribute("modulationMode", modulationModeToString(modulationMode));
 
     saveStandaloneProjectFilePathToXml(*xml);
     auto effectsXml = xml->createNewChildElement("effects");
@@ -1233,6 +1241,21 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         }
         auto version = xml->hasAttribute("version") ? xml->getStringAttribute("version") : "2.0.0";
         juce::Logger::writeToLog("setStateInformation: restoring state version " + version);
+
+        // Determine the project's modulation mode.
+        // Projects before 2.8.0.0 (pre-modulation) are always treated as Simple.
+        // Projects >= 2.8.0 without an explicit attribute use the instance's mode.
+        ModulationMode projectMode = modulationMode; // default to current instance mode
+        if (lessThanVersion(version, "2.8.0")) {
+            projectMode = ModulationMode::Simple;
+        } else if (xml->hasAttribute("modulationMode")) {
+            projectMode = modulationModeFromString(xml->getStringAttribute("modulationMode"));
+        } else {
+            // No modulationMode attribute but version >= 2.8.0 — this is a project
+            // saved by this version before the user made a choice, or after resetToDefault.
+            // Use the current instance mode (no mismatch).
+            projectMode = modulationMode;
+        }
 
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);

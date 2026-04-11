@@ -44,15 +44,35 @@ GridItemComponent::GridItemComponent(const juce::String& name, const juce::Strin
         juce::String::createStringFromData(BinaryData::lock_svg, BinaryData::lock_svgSize),
         juce::Colours::white.withAlpha(0.9f),
         juce::Colours::white.withAlpha(0.9f))
+    , selectAnimator(juce::ValueAnimatorBuilder{}
+          .withEasing(juce::Easings::createEaseOut())
+          .withDurationMs(150)
+          .withValueChangedCallback([this](auto value) {
+              selectionProgress = static_cast<float>(value);
+              repaint();
+              resized();
+          })
+          .build())
+    , deselectAnimator(juce::ValueAnimatorBuilder{}
+          .withEasing(juce::Easings::createEaseOut())
+          .withDurationMs(150)
+          .withValueChangedCallback([this](auto value) {
+              selectionProgress = 1.0f - static_cast<float>(value);
+              repaint();
+              resized();
+          })
+          .build())
 {
-    juce::String iconSvg = icon;
-    if (icon.isEmpty()) {
-        // Default icon if none is provided
-        iconSvg = juce::String::createStringFromData(BinaryData::rotate_svg, BinaryData::rotate_svgSize);
+    selectionAnimatorUpdater.addAnimator(selectAnimator);
+    selectionAnimatorUpdater.addAnimator(deselectAnimator);
+
+    iconSvgSource = icon;
+    if (iconSvgSource.isEmpty()) {
+        iconSvgSource = juce::String::createStringFromData(BinaryData::rotate_svg, BinaryData::rotate_svgSize);
     }
     iconButton = std::make_unique<SvgButton>(
         "gridItemIcon",
-        iconSvg,
+        iconSvgSource,
         iconColour
     );
 
@@ -71,7 +91,9 @@ GridItemComponent::~GridItemComponent() = default;
 
 void GridItemComponent::paint(juce::Graphics& g)
 {
-    auto bounds = getLocalBounds().toFloat().reduced(10);
+    // Interpolate card inset based on selection animation progress
+    float selReduction = 12.0f - selectionProgress * 4.0f;
+    auto bounds = getLocalBounds().toFloat().reduced(selReduction);
 
     // Get animation progress from inherited HoverAnimationMixin (disabled => no hover)
     auto animationProgress = (interactive && ! locked && isEnabled()) ? getAnimationProgress() : 0.0f;
@@ -81,10 +103,11 @@ void GridItemComponent::paint(juce::Graphics& g)
     bounds = bounds.translated(0, yOffset);
 
     // Draw drop shadow
-    if (animationProgress > 0.01f) {
+    if (animationProgress > 0.01f || selected) {
         juce::DropShadow shadow;
-        shadow.colour = juce::Colours::lime.withAlpha(animationProgress * 0.2f);
-        shadow.radius = 15 * animationProgress;
+        float shadowAlpha = selected ? juce::jmax(0.15f, animationProgress * 0.2f) : animationProgress * 0.2f;
+        shadow.colour = juce::Colours::lime.withAlpha(shadowAlpha);
+        shadow.radius = selected ? juce::jmax(10, (int)(15 * animationProgress)) : (int)(15 * animationProgress);
         shadow.offset = juce::Point<int>(0, 4);
 
         if (shadow.radius > 0) {
@@ -100,15 +123,48 @@ void GridItemComponent::paint(juce::Graphics& g)
     juce::Colour hoverBgColour = normalBgColour.brighter(0.05f);
     juce::Colour bgColour = normalBgColour.interpolatedWith(hoverBgColour, animationProgress);
 
+    // Slightly brighter background for selected items
+    if (selected)
+        bgColour = bgColour.brighter(0.06f);
+
     g.setColour(bgColour);
     g.fillRoundedRectangle(bounds.toFloat(), CORNER_RADIUS);
 
     // Draw colored outline
-    juce::Colour outlineColour = description.isNotEmpty()
-        ? Colours::accentColor()
-        : juce::Colour::fromRGB(160, 160, 160);
-    g.setColour(outlineColour.withAlpha(description.isNotEmpty() ? 0.8f : 0.9f));
-    g.drawRoundedRectangle(bounds.toFloat(), CORNER_RADIUS, 1.0f);
+    juce::Colour outlineColour;
+    float outlineThickness = 1.0f;
+
+    if (selected) {
+        outlineColour = Colours::accentColor();
+        outlineThickness = 2.0f;
+    } else if (description.isNotEmpty()) {
+        outlineColour = juce::Colour::fromRGB(160, 160, 160);
+    } else {
+        outlineColour = juce::Colour::fromRGB(160, 160, 160);
+    }
+
+    float outlineAlpha = selected ? 1.0f : 0.3f;
+    g.setColour(outlineColour.withAlpha(outlineAlpha));
+    g.drawRoundedRectangle(bounds.toFloat(), CORNER_RADIUS, outlineThickness);
+
+    // Draw "Recommended" badge
+    if (recommended) {
+        auto badgeFont = juce::Font(11.0f, juce::Font::bold);
+        juce::String badgeText = "Recommended";
+        auto badgeWidth = (float)(badgeFont.getStringWidth(badgeText) + 14);
+        auto badgeHeight = 18.0f;
+        auto badgeBounds = juce::Rectangle<float>(
+            bounds.getRight() - badgeWidth - 8.0f,
+            bounds.getY() + 6.0f,
+            badgeWidth, badgeHeight);
+
+        g.setColour(Colours::accentColor());
+        g.fillRoundedRectangle(badgeBounds, 4.0f);
+
+        g.setColour(Colours::veryDark());
+        g.setFont(badgeFont);
+        g.drawText(badgeText, badgeBounds, juce::Justification::centred, false);
+    }
 
     // Create text area - now accounting for icon space on the left
     auto textArea = bounds.reduced(10, 8);
@@ -151,7 +207,8 @@ void GridItemComponent::paint(juce::Graphics& g)
 
 void GridItemComponent::resized()
 {
-    auto bounds = getLocalBounds().reduced(10);
+    float resizeReduction = 12.0f - selectionProgress * 4.0f;
+    auto bounds = getLocalBounds().reduced((int)resizeReduction);
 
     // Reserve space for the icon on the left
     auto iconWidth = description.isNotEmpty() ? 56 : 60;
@@ -276,6 +333,41 @@ void GridItemComponent::setLocked(bool shouldBeLocked)
     if (locked || ! isEnabled())
         iconButton->setTransform(juce::AffineTransform());
 
+    repaint();
+}
+
+void GridItemComponent::setSelected(bool shouldBeSelected)
+{
+    if (selected == shouldBeSelected)
+        return;
+
+    selected = shouldBeSelected;
+    updateIconColour(selected ? Colours::accentColor() : juce::Colours::white.withAlpha(0.7f));
+    if (selected) {
+        deselectAnimator.complete();
+        selectAnimator.start();
+    } else {
+        selectAnimator.complete();
+        deselectAnimator.start();
+    }
+}
+
+void GridItemComponent::updateIconColour(juce::Colour colour)
+{
+    auto prevBounds = iconButton->getBounds();
+    iconButton.reset();
+    iconButton = std::make_unique<SvgButton>("gridItemIcon", iconSvgSource, colour);
+    iconButton->setInterceptsMouseClicks(false, false);
+    addAndMakeVisible(*iconButton);
+    iconButton->setBounds(prevBounds);
+}
+
+void GridItemComponent::setRecommended(bool shouldBeRecommended)
+{
+    if (recommended == shouldBeRecommended)
+        return;
+
+    recommended = shouldBeRecommended;
     repaint();
 }
 

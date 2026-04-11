@@ -44,6 +44,13 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     mtsEspLabel.setFont(juce::Font(11.0f));
     mtsEspLabel.setColour(juce::Label::textColourId, juce::Colours::limegreen);
     mtsEspLabel.setJustificationType(juce::Justification::centredRight);
+
+    // Simple Mode button — visible only when the project is in Simple mode
+    addChildComponent(simpleModeButton);
+    simpleModeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor());
+    simpleModeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark());
+    simpleModeButton.onClick = [this] { showModulationModeOverlay(); };
+    simpleModeButton.setVisible(audioProcessor.getModulationMode() == ModulationMode::Simple);
 #endif
 
     addAndMakeVisible(console);
@@ -147,6 +154,17 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     visualiserSettingsWindow.addKeyListener(this);
 
     initialiseMenuBar(model);
+
+#if OSCI_PREMIUM
+    // Show modulation mode overlay on first launch for this format
+    if (!audioProcessor.hasSeenModulationModeOverlay()) {
+        juce::Component::SafePointer<OscirenderAudioProcessorEditor> safeThis(this);
+        juce::MessageManager::callAsync([safeThis] {
+            if (safeThis != nullptr)
+                safeThis->showModulationModeOverlay();
+        });
+    }
+#endif
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
@@ -279,6 +297,8 @@ void OscirenderAudioProcessorEditor::resized() {
         undoButton.setBounds(topBar.removeFromRight(juce::jmin(25, topBar.getWidth())).reduced(2, 2));
         undoLabel.setBounds(topBar.removeFromRight(juce::jmin(150, topBar.getWidth())).reduced(2, 2));
 #if OSCI_PREMIUM
+        if (simpleModeButton.isVisible())
+            simpleModeButton.setBounds(topBar.removeFromRight(juce::jmin(120, topBar.getWidth())).reduced(2, 2));
         if (mtsEspLabel.isVisible())
             mtsEspLabel.setBounds(topBar.removeFromRight(juce::jmin(150, topBar.getWidth())).reduced(2, 2));
 #endif
@@ -663,6 +683,36 @@ void OscirenderAudioProcessorEditor::showPremiumSplashScreen() {
         juce::URL("https://osci-render.com/#purchase").launchInDefaultBrowser();
     };
     showOverlay(std::move(splash));
+#endif
+}
+
+void OscirenderAudioProcessorEditor::showModulationModeOverlay() {
+#if OSCI_PREMIUM
+    if (findActiveOverlay<ModulationModeOverlay>() != nullptr)
+        return;
+
+    auto overlay = std::make_unique<ModulationModeOverlay>(audioProcessor.getModulationMode());
+    overlay->onModeSelected = [this](ModulationMode chosen) {
+        audioProcessor.setHasSeenModulationModeOverlay(true);
+        auto current = audioProcessor.getModulationMode();
+        audioProcessor.setDefaultModulationMode(chosen);
+
+        if (chosen != current) {
+            // Mode differs from the one used at construction — must reconstruct.
+            if (juce::JUCEApplicationBase::isStandaloneApp()) {
+                // Defer destruction until all callbacks have returned.
+                juce::MessageManager::callAsync([this] { resetToDefault(); });
+            } else {
+                juce::AlertWindow::showMessageBoxAsync(
+                    juce::AlertWindow::InfoIcon,
+                    "Mode Changed",
+                    "Your new default modulation mode is " + modulationModeToString(chosen)
+                        + ". Please create a new plugin instance for this to take effect.",
+                    "OK");
+            }
+        }
+    };
+    showOverlay(std::move(overlay));
 #endif
 }
 

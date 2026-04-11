@@ -11,6 +11,7 @@
 
 #include <JuceHeader.h>
 #include <any>
+#include "ModulationMode.h"
 #include "audio/platform/SampleRateManager.h"
 #include "visualiser/VisualiserSettings.h"
 #include "visualiser/RecordingSettings.h"
@@ -88,6 +89,14 @@ public:
     void removeGlobalValue(const juce::String& keyName);
     void saveGlobalSettings();
     void reloadGlobalSettings();
+
+    // Modulation mode: determines which modulation paradigm this instance uses.
+    // Read from the global setting at construction time; per-project state is handled by subclasses.
+    ModulationMode getModulationMode() const { return modulationMode; }
+    ModulationMode getDefaultModulationMode() const;
+    void setDefaultModulationMode(ModulationMode mode);
+    bool hasSeenModulationModeOverlay() const;
+    void setHasSeenModulationModeOverlay(bool seen);
     
     bool hasSetSessionStartTime = false;
     bool programCrashedAndUserWantsToReset();
@@ -187,6 +196,9 @@ protected:
     
     bool brightnessEnabled = false;
     bool rgbEnabled = false;
+
+    // The modulation mode for this processor instance (set at construction time from global default).
+    ModulationMode modulationMode = ModulationMode::Standard;
 
     // Expose flags to GUI thread safely
 public:

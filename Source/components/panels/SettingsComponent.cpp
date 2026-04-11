@@ -420,7 +420,10 @@ void SettingsComponent::layoutChildren() {
         // ============================================================
         // PREMIUM: top (vis | resizer | effects) / vertical resizer / bottom modulation row
         // Keyboard at the very bottom spanning full width when MIDI enabled
+        // In Simple mode, the bottom modulation panel is hidden entirely.
         // ============================================================
+
+        const bool isSimple = audioProcessor.getModulationMode() == ModulationMode::Simple;
 
         const bool midiOn = audioProcessor.midiEnabled->getBoolValue()
                           && audioProcessor.getGlobalBoolValue("showMidiKeyboard", true);
@@ -458,15 +461,22 @@ void SettingsComponent::layoutChildren() {
 
         int effectiveModH = modPanelCollapsed ? kCollapsedModHeight : modPanelHeight;
 
-        auto bottomArea = area.removeFromBottom(effectiveModH);
-        auto resizerArea = area.removeFromBottom(resizerH);
+        juce::Rectangle<int> bottomArea;
+        if (!isSimple) {
+            bottomArea = area.removeFromBottom(effectiveModH);
+            auto resizerArea = area.removeFromBottom(resizerH);
+            verticalResizerBar.setBounds(resizerArea);
+            verticalResizerBar.setVisible(true);
+        } else {
+            verticalResizerBar.setVisible(false);
+        }
         auto topArea = area;
 
-        verticalResizerBar.setBounds(resizerArea);
-        verticalResizerBar.setVisible(true);
-        verticalResizerBar.setCurrentPanelHeight(effectiveModH);
+        if (!isSimple)
+            verticalResizerBar.setCurrentPanelHeight(effectiveModH);
         layoutTopProxy.setBounds(topArea);
-        layoutBottomProxy.setBounds(bottomArea);
+        if (!isSimple)
+            layoutBottomProxy.setBounds(bottomArea);
 
         // --- Top section: vis | resizer | effects ---
         juce::Component* columns[] = { &layoutVisColumnProxy, &mainResizerBar, &layoutEffectsColumnProxy };
@@ -484,18 +494,29 @@ void SettingsComponent::layoutChildren() {
             effectsBounds.removeFromBottom(kGap);
         }
 
+        // In Simple mode, show envelope above effects (like free version)
+        if (isSimple && midiOn) {
+            static constexpr int envelopeHeight = 90;
+            envelope.setBounds(effectsBounds.removeFromBottom(envelopeHeight));
+            envelope.setVisible(true);
+            effectsBounds.removeFromBottom(kGap);
+        } else if (isSimple) {
+            envelope.setVisible(false);
+        }
+
         layoutVisColumn(visBounds);
         layoutEffectsColumn(effectsBounds);
 
         lfo->setMidiEnabled(midiOn);
 
-        // Set collapsed state on all modulation components
-        lfo->setCollapsed(modPanelCollapsed);
-        envelope.setCollapsed(modPanelCollapsed);
-        random->setCollapsed(modPanelCollapsed);
-        sidechain->setCollapsed(modPanelCollapsed);
+        if (!isSimple) {
+            // Set collapsed state on all modulation components
+            lfo->setCollapsed(modPanelCollapsed);
+            envelope.setCollapsed(modPanelCollapsed);
+            random->setCollapsed(modPanelCollapsed);
+            sidechain->setCollapsed(modPanelCollapsed);
 
-        // --- Bottom modulation panel: LFO | Envelope | Random | Sidechain in a row ---
+            // --- Bottom modulation panel: LFO | Envelope | Random | Sidechain in a row ---
         static constexpr int kMaxRandW = 250;
         static constexpr int kMaxScW = 200;
         static constexpr int kMinScW = 130;
@@ -529,6 +550,13 @@ void SettingsComponent::layoutChildren() {
         random->setBounds(modRow.removeFromLeft(randW));
         modRow.removeFromLeft(kGap);
         sidechain->setBounds(modRow.removeFromLeft(scW));
+
+        } else {
+            // Simple mode: hide all global modulation components
+            lfo->setVisible(false);
+            random->setVisible(false);
+            sidechain->setVisible(false);
+        }
 
         if (isVisible() && getWidth() > 0 && getHeight() > 0) {
             audioProcessor.setProperty("mainLayoutVisSize", mainLayout.getItemCurrentRelativeSize(0));

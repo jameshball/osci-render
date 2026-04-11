@@ -42,6 +42,9 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
     
     globalSettings = std::make_unique<juce::PropertiesFile>(options);
 
+    // Set the modulation mode for this instance from the global default.
+    modulationMode = getDefaultModulationMode();
+
     // Restore recently-opened project files (shared across instances).
     recentProjectFiles.setMaxNumberOfItems(10);
     {
@@ -549,6 +552,40 @@ void CommonAudioProcessor::reloadGlobalSettings()
 {
     if (globalSettings != nullptr)
         globalSettings->reload();
+}
+
+ModulationMode CommonAudioProcessor::getDefaultModulationMode() const
+{
+    auto key = juce::JUCEApplicationBase::isStandaloneApp()
+                   ? "defaultModulationModeStandalone"
+                   : "defaultModulationModePlugin";
+    return modulationModeFromString(getGlobalStringValue(key, "standard"));
+}
+
+void CommonAudioProcessor::setDefaultModulationMode(ModulationMode mode)
+{
+    auto key = juce::JUCEApplicationBase::isStandaloneApp()
+                   ? "defaultModulationModeStandalone"
+                   : "defaultModulationModePlugin";
+    setGlobalValue(key, modulationModeToString(mode));
+    saveGlobalSettings();
+}
+
+bool CommonAudioProcessor::hasSeenModulationModeOverlay() const
+{
+    auto key = juce::JUCEApplicationBase::isStandaloneApp()
+                   ? "hasSeenModulationModeOverlayStandalone"
+                   : "hasSeenModulationModeOverlayPlugin";
+    return getGlobalBoolValue(key, false);
+}
+
+void CommonAudioProcessor::setHasSeenModulationModeOverlay(bool seen)
+{
+    auto key = juce::JUCEApplicationBase::isStandaloneApp()
+                   ? "hasSeenModulationModeOverlayStandalone"
+                   : "hasSeenModulationModeOverlayPlugin";
+    setGlobalValue(key, seen);
+    saveGlobalSettings();
 }
 
 juce::File CommonAudioProcessor::getLastOpenedDirectory()
