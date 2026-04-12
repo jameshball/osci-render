@@ -95,15 +95,10 @@ public:
     juce::SpinLock audioPlayerListenersLock;
     std::vector<AudioPlayerListener*> audioPlayerListeners;
 
-    std::atomic<double> volume = 1.0;
-    std::atomic<double> threshold = 1.0;
     osci::BooleanParameter* muteParameter = nullptr;
 
     std::shared_ptr<osci::Effect> volumeEffect = std::make_shared<osci::SimpleEffect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {
-            volume = values[0].load();
-            return input;
-        }, new osci::EffectParameter(
+        new osci::EffectParameter(
             "Volume",
             "Controls the volume of the output audio.",
             "volume",
@@ -112,10 +107,7 @@ public:
     );
 
     std::shared_ptr<osci::Effect> thresholdEffect = std::make_shared<osci::SimpleEffect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {
-            threshold = values[0].load();
-            return input;
-        }, new osci::EffectParameter(
+        new osci::EffectParameter(
             "Threshold",
             "Clips the audio to a maximum value. Applying a harsher threshold results in a more distorted sound.",
             "threshold",
@@ -125,6 +117,10 @@ public:
 
     juce::SpinLock wavParserLock;
     WavParser wavParser{ *this };
+
+    // Apply per-sample volume scaling and threshold clipping to a stereo buffer.
+    // Uses SIMD (FloatVectorOperations) when the animated buffer is not populated.
+    void applyVolumeAndThreshold(float* const* channels, int numSamples);
 
     std::atomic<double> currentSampleRate = 0.0;
     juce::SpinLock effectsLock;

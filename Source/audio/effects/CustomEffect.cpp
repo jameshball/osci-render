@@ -2,8 +2,8 @@
 #include <numbers>
 #include "../../util/MathUtil.h"
 
-CustomEffect::CustomEffect(LuaEffectState& luaState, std::atomic<double>* luaValues) 
-	: luaState(luaState), luaValues(luaValues) {
+CustomEffect::CustomEffect(LuaEffectState& luaState, const std::vector<std::shared_ptr<osci::Effect>>& luaSliderEffects) 
+	: luaState(luaState), luaSliderEffects(luaSliderEffects) {
 	vars.isEffect = true;
 }
 
@@ -15,7 +15,7 @@ CustomEffect::~CustomEffect() {
 }
 
 osci::Point CustomEffect::apply(int index, osci::Point input, osci::Point externalInput, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {
-	if (!luaState.parser || !luaValues) {
+	if (!luaState.parser) {
 		return input;
 	}
 	
@@ -41,7 +41,10 @@ osci::Point CustomEffect::apply(int index, osci::Point input, osci::Point extern
 			vars.ext_x = externalInput.x;
 			vars.ext_y = externalInput.y;
 
-			std::copy(luaValues, luaValues + 26, std::begin(vars.sliders));
+			// Read Lua slider values per-sample from animated buffers
+			for (int s = 0; s < 26 && s < (int)luaSliderEffects.size(); ++s) {
+				vars.sliders[s] = luaSliderEffects[s]->getAnimatedValue(0, static_cast<size_t>(index));
+			}
 
 			auto result = luaState.parser->run(L, vars);
 			if (result.count >= 6) {

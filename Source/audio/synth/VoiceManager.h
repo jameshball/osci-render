@@ -172,6 +172,7 @@ public:
     void handleMidiEvent(const juce::MidiMessage& m);
 
 private:
+    void handleMidiEventUnlocked(const juce::MidiMessage& m);
     void noteOn(int note, float velocity, int channel);
     void noteOff(int note, float lift, int channel);
     void sustainOn(int channel);

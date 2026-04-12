@@ -4,11 +4,11 @@
 
 class CustomEffect : public osci::EffectApplication {
 public:
-	CustomEffect(LuaEffectState& luaState, std::atomic<double>* luaValues);
+	CustomEffect(LuaEffectState& luaState, const std::vector<std::shared_ptr<osci::Effect>>& luaSliderEffects);
 	~CustomEffect();
 
 	std::shared_ptr<osci::EffectApplication> clone() const override {
-		return std::make_shared<CustomEffect>(luaState, luaValues);
+		return std::make_shared<CustomEffect>(luaState, luaSliderEffects);
 	}
 
 	bool modifiesColour() const override { return lastRunHadColour; }
@@ -23,7 +23,7 @@ public:
 
 private:
 	LuaEffectState& luaState;
-	std::atomic<double>* luaValues;
+	const std::vector<std::shared_ptr<osci::Effect>>& luaSliderEffects;
 	
 	// Per-voice Lua state
 	lua_State *L = nullptr;

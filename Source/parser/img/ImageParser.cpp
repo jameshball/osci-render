@@ -408,7 +408,7 @@ void ImageParser::findNearestNeighbour(int searchRadius, float thresholdPow, int
     findWhite(thresholdPow, invert);
 }
 
-osci::Point ImageParser::getSample() {
+osci::Point ImageParser::getSample(int blockSampleIndex) {
     juce::SpinLock::ScopedLockType lock(liveImageLock);
     
     if (ALGORITHM == "HILLIGOSS") {
@@ -420,26 +420,27 @@ osci::Point ImageParser::getSample() {
             std::fill(visited.begin(), visited.end(), false);
         }
         
-        float thresholdPow = audioProcessor.imageThreshold->getActualValue() * 10 + 1;
+        float thresholdPow = audioProcessor.imageThreshold->getAnimatedValue(0, static_cast<size_t>(blockSampleIndex)) * 10 + 1;
         
-        findNearestNeighbour(10, thresholdPow, audioProcessor.imageStride->getActualValue(), audioProcessor.invertImage->getValue());
+        findNearestNeighbour(10, thresholdPow, audioProcessor.imageStride->getAnimatedValue(0, static_cast<size_t>(blockSampleIndex)), audioProcessor.invertImage->getValue());
         float maxDim = juce::jmax(width, height);
         count++;
         float widthDiff = (maxDim - width) / 2;
         float heightDiff = (maxDim - height) / 2;
         return osci::Point(2 * (currentX + widthDiff) / maxDim - 1, 2 * (currentY + heightDiff) / maxDim - 1);
     } else {
-        double scanIncrement = audioProcessor.imageStride->getActualValue() / 100;
+        double scanIncrement = audioProcessor.imageStride->getAnimatedValue(0, static_cast<size_t>(blockSampleIndex)) / 100;
+        float thresholdVal = audioProcessor.imageThreshold->getAnimatedValue(0, static_cast<size_t>(blockSampleIndex));
         
         double pixel = 0;
         int maxIterations = 10000;
-        while (pixel <= audioProcessor.imageThreshold->getActualValue() && maxIterations > 0) {
+        while (pixel <= thresholdVal && maxIterations > 0) {
             int x = (int) ((scanX + 1) * width / 2);
             int y = (int) ((scanY + 1) * height / 2);
             pixel = getPixelValue(x, y, audioProcessor.invertImage->getValue());
             
             double increment = 0.01;
-            if (pixel > audioProcessor.imageThreshold->getActualValue()) {
+            if (pixel > thresholdVal) {
                 increment = (1 - std::tanh(4 * pixel)) * 0.3;
             }
             

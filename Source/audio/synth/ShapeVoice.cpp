@@ -258,13 +258,19 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     // Recompute pitch wheel adjustment using current bend range parameter
     pitchWheelMoved(rawPitchWheelValue);
 
+    // Per-sample frequency animated buffer pointer for non-MIDI mode
+    const float* freqAnimBuf = (!audioProcessor.midiEnabled->getBoolValue())
+        ? audioProcessor.frequencyEffect->getAnimatedValuesReadPointer(0, numSamples) : nullptr;
+
     if (audioProcessor.midiEnabled->getBoolValue()) {
         // Glide is advanced per-sample below; set initial frequency here
         if (!glideActive) {
             actualFrequency = frequency * pitchWheelAdjustment;
         }
     } else {
-        actualFrequency = audioProcessor.frequency.load();
+        // Non-MIDI: initial frequency from animated buffer (first sample).
+        // Per-sample updates happen inside the rendering loop below.
+        actualFrequency = freqAnimBuf ? (double)freqAnimBuf[0] + 0.000001 : audioProcessor.frequencyEffect->getValue() + 0.000001;
     }
 
     // Prepare working buffers for effect processing
@@ -327,6 +333,11 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             actualFrequency = frequency * pitchWheelAdjustment;
         }
 
+        // Per-sample frequency update from animated buffer in non-MIDI mode
+        if (freqAnimBuf) {
+            actualFrequency = (double)freqAnimBuf[i] + 0.000001;
+        }
+
         int sample = startSample + i;
         lengthIncrement = juce::jmax(frameLength / (audioProcessor.currentSampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
 
@@ -358,6 +369,9 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
                 // Envelope
                 vars.envelope = envState.getCurrentValue();
                 vars.envelopeStage = static_cast<int>(envState.getStage());
+
+                // Block-relative sample index for per-sample parameter reads
+                vars.blockSampleIndex = i;
                 
                 if (externalAudio.getNumSamples() >= 1) {
                     double sampleIndex = sample % externalAudio.getNumSamples();
@@ -369,7 +383,10 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
                         vars.ext_y = externalAudio.getSample(1, sampleIndex);
                     }
                 }
-                std::copy(std::begin(audioProcessor.luaValues), std::end(audioProcessor.luaValues), std::begin(vars.sliders));
+                // Read Lua slider values per-sample from animated buffers
+                for (int s = 0; s < 26 && s < (int)audioProcessor.luaEffects.size(); ++s) {
+                    vars.sliders[s] = audioProcessor.luaEffects[s]->getAnimatedValue(0, static_cast<size_t>(i));
+                }
 
                 channels = parser->nextSample(L, vars);
             } else if (currentShape < frame.size()) {

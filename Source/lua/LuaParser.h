@@ -78,6 +78,8 @@ struct LuaVariables {
 	double envelope = 1.0;
 	int envelopeStage = 0;  // 0=delay, 1=attack, 2=hold, 3=decay, 4=sustain, 5=release, 6=done
 
+	// Block-relative sample index for per-sample parameter reads
+	int blockSampleIndex = 0;
 };
 
 // Bit positions for the usedVarMask that controls which globals are set per sample.

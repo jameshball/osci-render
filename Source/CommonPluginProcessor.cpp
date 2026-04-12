@@ -765,3 +765,16 @@ bool CommonAudioProcessor::ensureFFmpegExists(std::function<void()> onStart, std
 }
 #endif
 
+void CommonAudioProcessor::applyVolumeAndThreshold(float* const* channels, int numSamples) {
+    const float* volBuf = volumeEffect->getAnimatedValuesReadPointer(0, numSamples);
+    const float* thrBuf = thresholdEffect->getAnimatedValuesReadPointer(0, numSamples);
+    const float volFallback = volumeEffect->getValue();
+    const float thrFallback = thresholdEffect->getValue();
+    for (int i = 0; i < numSamples; ++i) {
+        float vol = volBuf ? volBuf[i] : volFallback;
+        float thr = thrBuf ? thrBuf[i] : thrFallback;
+        channels[0][i] = juce::jlimit(-thr, thr, channels[0][i] * vol);
+        channels[1][i] = juce::jlimit(-thr, thr, channels[1][i] * vol);
+    }
+}
+

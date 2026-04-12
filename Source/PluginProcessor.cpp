@@ -453,10 +453,6 @@ void OscirenderAudioProcessor::addLuaSlider() {
     }
 
     luaEffects.push_back(std::make_shared<osci::SimpleEffect>(
-        [this, sliderIndex](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {
-            luaValues[sliderIndex].store(values[0]);
-            return input;
-        },
         new osci::EffectParameter(
             "Lua Slider " + sliderName,
             "Controls the value of the Lua variable called slider_" + sliderName.toLowerCase() + ".",
@@ -969,7 +965,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
     if (syphonInputActive) {
         for (int sample = 0; sample < outputBuffer3d.getNumSamples(); sample++) {
-            osci::Point point = syphonImageParser.getSample();
+            osci::Point point = syphonImageParser.getSample(sample);
             outputBuffer3d.setSample(0, sample, point.x);
             outputBuffer3d.setSample(1, sample, point.y);
         }
@@ -998,7 +994,14 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 			juce::SpinLock::ScopedLockType lock(effectsLock);
 
             inputFrequencyBuffer.setSize(1, numSamples, false, false, true);
-            juce::FloatVectorOperations::fill(inputFrequencyBuffer.getWritePointer(0), (float)frequency.load(), numSamples);
+            {
+                const float* freqBuf = frequencyEffect->getAnimatedValuesReadPointer(0, numSamples);
+                if (freqBuf) {
+                    juce::FloatVectorOperations::copy(inputFrequencyBuffer.getWritePointer(0), freqBuf, numSamples);
+                } else {
+                    juce::FloatVectorOperations::fill(inputFrequencyBuffer.getWritePointer(0), frequencyEffect->getValue(), numSamples);
+                }
+            }
 
                         applyToggleableEffectsToBuffer(outputBuffer3d, &inputBuffer, &currentVolumeBuffer, &inputFrequencyBuffer, nullptr, nullptr, previewEffect);
 		}
@@ -1076,14 +1079,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     // Process in batches using buffer-wide operations
     auto* outputArray = outputBuffer3d.getArrayOfWritePointers();
     
-    // Scale by volume
-    juce::FloatVectorOperations::multiply(outputArray[0], outputArray[0], (float)volume.load(), numSamples);
-    juce::FloatVectorOperations::multiply(outputArray[1], outputArray[1], (float)volume.load(), numSamples);
-    
-    // Hard clip to threshold
-    float thresholdVal = (float)threshold.load();
-    juce::FloatVectorOperations::clip(outputArray[0], outputArray[0], -thresholdVal, thresholdVal, numSamples);
-    juce::FloatVectorOperations::clip(outputArray[1], outputArray[1], -thresholdVal, thresholdVal, numSamples);
+    applyVolumeAndThreshold(outputArray, numSamples);
     
     // Write to thread manager (for visualizers, etc.)
     threadManager.write(outputBuffer3d);

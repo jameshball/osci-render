@@ -17,7 +17,7 @@ public:
     void updateLiveFrame(const juce::Image& newImage);
 
     void setFrame(int index);
-    osci::Point getSample();
+    osci::Point getSample(int blockSampleIndex = 0);
     int getNumFrames() { return frames.size(); }
     int getCurrentFrame() const { return frameIndex; }
 

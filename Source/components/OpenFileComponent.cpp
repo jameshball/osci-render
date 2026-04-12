@@ -101,7 +101,6 @@ static void initialiseShapeGeneratorLuaSliders(OscirenderAudioProcessor& process
         auto setParam = [&](int idx, float value) {
             if (processor.luaEffects[idx]->parameters.size() > 0)
                 processor.luaEffects[idx]->parameters[0]->setValueNotifyingHost(value);
-            processor.luaValues[idx].store(value);
         };
         setParam(0, 0.0f);
         setParam(1, 1.0f);

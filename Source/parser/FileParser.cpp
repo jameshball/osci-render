@@ -136,7 +136,7 @@ std::vector<std::unique_ptr<osci::Shape>> FileParser::nextFrame() {
     }
 #if OSCI_PREMIUM
     else if (fractal != nullptr) {
-        fractal->setIterations(juce::roundToInt(audioProcessor.fractalDepthValue.load(std::memory_order_relaxed)));
+        fractal->setIterations(juce::roundToInt(audioProcessor.fractalDepthEffect->getActualValue()));
         return fractal->draw();
     }
 #endif
@@ -162,7 +162,7 @@ osci::Point FileParser::nextSample(lua_State*& L, LuaVariables& vars) {
             return osci::Point(result.values[0], result.values[1]);
         }
     } else if (img != nullptr) {
-        return img->getSample();
+        return img->getSample(vars.blockSampleIndex);
     } else if (wav != nullptr) {
         wavPointBuffer.clear();
         wav->processBlock(wavPointBuffer);

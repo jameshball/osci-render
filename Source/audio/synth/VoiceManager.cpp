@@ -111,7 +111,7 @@ void VoiceManager::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             startSample = samplePos;
         }
 
-        handleMidiEvent(metadata.getMessage());
+        handleMidiEventUnlocked(metadata.getMessage());
         firstEvent = false;
     }
 
@@ -120,6 +120,11 @@ void VoiceManager::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
 }
 
 void VoiceManager::handleMidiEvent(const juce::MidiMessage& m) {
+    juce::SpinLock::ScopedLockType sl(lock);
+    handleMidiEventUnlocked(m);
+}
+
+void VoiceManager::handleMidiEventUnlocked(const juce::MidiMessage& m) {
     if (m.isNoteOn()) {
         noteOn(m.getNoteNumber(), m.getFloatVelocity(), m.getChannel() - 1);
     } else if (m.isNoteOff()) {

@@ -138,14 +138,8 @@ public:
     std::vector<std::shared_ptr<osci::Effect>> luaEffects;
     // Temporary preview effect applied while hovering effects in the grid (guarded by effectsLock)
     std::shared_ptr<osci::Effect> previewEffect;
-    std::atomic<double> luaValues[26] = {0.0};
 
     std::shared_ptr<osci::Effect> frequencyEffect = std::make_shared<osci::SimpleEffect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float freq) {
-            // Update the global frequency from the slider value
-            frequency = values[0].load() + 0.000001; // epsilon prevents a weird bug on mac
-            return input;
-        },
         new osci::EffectParameter(
             "Frequency",
             "Controls how many times per second the image is drawn, thereby controlling the pitch of the sound. Lower frequencies result in more-accurately drawn images, but more flickering, and vice versa.",
@@ -159,14 +153,13 @@ public:
     std::function<void(int, juce::String, juce::String)> errorCallback = [this](int lineNum, juce::String fileName, juce::String error) { notifyErrorListeners(lineNum, fileName, error); };
     std::unique_ptr<LuaEffectState> luaEffectState = std::make_unique<LuaEffectState>(LuaEffectState::UNIQUE_ID, "return { x, y, z }", errorCallback);
     std::shared_ptr<osci::Effect> custom = std::make_shared<osci::SimpleEffect>(
-        std::make_shared<CustomEffect>(*luaEffectState, luaValues),
+        std::make_shared<CustomEffect>(*luaEffectState, luaEffects),
         new osci::EffectParameter("Lua Effect", "Controls the strength of the custom Lua effect applied. You can write your own custom effect using Lua by pressing the edit button on the right.", "customEffectStrength", VERSION_HINT, 1.0, 0.0, 1.0));
 
     std::shared_ptr<osci::Effect> perspective = PerspectiveEffect().build();
 
     osci::BooleanParameter* midiEnabled = new osci::BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false, "Enable MIDI input for the synth. If disabled, the synth will play a constant tone, as controlled by the frequency slider.");
     osci::BooleanParameter* inputEnabled = new osci::BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false, "Enable to use input audio, instead of the generated audio.");
-    std::atomic<double> frequency = 220.0;
 
     // DAW transport state (updated in processBlock, read by voices for Lua)
     std::atomic<double> luaBpm = 120.0;
@@ -262,18 +255,12 @@ public:
 
     osci::BooleanParameter* invertImage = new osci::BooleanParameter("Invert Image", "invertImage", VERSION_HINT, false, "Inverts the image so that dark pixels become light, and vice versa.");
     std::shared_ptr<osci::Effect> imageThreshold = std::make_shared<osci::SimpleEffect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {
-            return input;
-        },
         new osci::EffectParameter(
             "Image Threshold",
             "Controls the probability of visiting a dark pixel versus a light pixel. Darker pixels are less likely to be visited, so turning the threshold to a lower value makes it more likely to visit dark pixels.",
             "imageThreshold",
             VERSION_HINT, 0.5, 0, 1));
     std::shared_ptr<osci::Effect> imageStride = std::make_shared<osci::SimpleEffect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {
-            return input;
-        },
         new osci::EffectParameter(
             "Image Stride",
             "Controls the spacing between pixels when drawing an image. Larger values mean more of the image can be drawn, but at a lower fidelity.",
@@ -282,13 +269,7 @@ public:
 
 #if OSCI_PREMIUM
     // Fractal L-system parameters
-    std::atomic<float> fractalDepthValue{3.0f};
-
     std::shared_ptr<osci::Effect> fractalDepthEffect = std::make_shared<osci::SimpleEffect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {
-            fractalDepthValue.store(values[0].load(), std::memory_order_relaxed);
-            return input;
-        },
         new osci::EffectParameter(
             "Fractal Depth",
             "Controls the recursion depth of the L-system fractal. Higher values produce more detail but require more processing.",
