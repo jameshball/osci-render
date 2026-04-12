@@ -163,7 +163,12 @@
         <FILE id="Ft2WnP" name="StopwatchComponent.h" compile="0" resource="0"
               file="Source/components/StopwatchComponent.h"/>
         <FILE id="f2kkHV" name="SvgButton.h" compile="0" resource="0" file="Source/components/SvgButton.h"/>
+        <FILE id="SlTbHs" name="SliderTextBox.h" compile="0" resource="0" file="Source/components/SliderTextBox.h"/>
+        <FILE id="LbTbHs" name="LabelledTextBox.h" compile="0" resource="0"
+              file="Source/components/LabelledTextBox.h"/>
         <FILE id="qzfstC" name="SwitchButton.h" compile="0" resource="0" file="Source/components/SwitchButton.h"/>
+        <FILE id="BlPCCH" name="BooleanParamCCHelper.h" compile="0" resource="0"
+              file="Source/components/BooleanParamCCHelper.h"/>
         <FILE id="HC8nNY" name="VolumeComponent.cpp" compile="1" resource="0"
               file="Source/components/VolumeComponent.cpp"/>
         <FILE id="qwpGcH" name="VolumeComponent.h" compile="0" resource="0"
@@ -200,6 +205,18 @@
         </GROUP>
         <FILE id="ModStH" name="ModulationState.h" compile="0" resource="0"
               file="Source/components/ModulationState.h"/>
+        <FILE id="PrCtxS" name="ParameterContextMenu.h" compile="0" resource="0"
+              file="Source/components/ParameterContextMenu.h"/>
+        <FILE id="PrStSc" name="ParameterSettingsComponent.h" compile="0" resource="0"
+              file="Source/components/ParameterSettingsComponent.h"/>
+        <FILE id="InVlEs" name="InlineValueEditor.h" compile="0" resource="0"
+              file="Source/components/InlineValueEditor.h"/>
+        <FILE id="RtKnbS" name="RotaryKnobComponent.h" compile="0" resource="0"
+              file="Source/components/RotaryKnobComponent.h"/>
+        <FILE id="KnCnHs" name="KnobContainerComponent.h" compile="0" resource="0"
+              file="Source/components/KnobContainerComponent.h"/>
+        <FILE id="KnCnCs" name="KnobContainerComponent.cpp" compile="1" resource="0"
+              file="Source/components/KnobContainerComponent.cpp"/>
         <FILE id="ModStC" name="ModulationState.cpp" compile="1" resource="0"
               file="Source/components/ModulationState.cpp"/>
         <FILE id="C5aY6T" name="CustomAudioDeviceSelectorComponent.h" compile="0"

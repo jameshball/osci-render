@@ -29,6 +29,9 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     const float EPSILON = 0.0001f;
     const int numSamples = input.getNumSamples();
 
+    // Process MIDI CC → parameter mappings before clearing the buffer
+    midiCCManager.processMidiBuffer(midiMessages);
+
     midiMessages.clear();
 
     // Get source buffer (either from WAV parser or input)
@@ -201,6 +204,8 @@ void SosciAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
     }
 
     recordingParameters.save(xml.get());
+
+    midiCCManager.save(xml.get());
     
     saveProperties(*xml);
 
@@ -273,6 +278,9 @@ void SosciAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
         recordingParameters.load(xml.get());
         
         loadProperties(*xml);
+
+        loadMidiCCState(xml.get());
+
         undoManager.clearUndoHistory();
         juce::Logger::writeToLog("setStateInformation: state restore complete");
 }

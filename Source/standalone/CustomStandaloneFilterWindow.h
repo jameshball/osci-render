@@ -430,6 +430,14 @@ public:
                                   true,
                                   preferredDefaultDeviceName,
                                   preferredSetupOptions);
+
+        // On first launch (no saved state), enable all detected MIDI inputs
+        // so the user doesn't have to manually tick them in the settings panel.
+        if (savedState == nullptr)
+        {
+            for (auto& device : MidiInput::getAvailableDevices())
+                deviceManager.setMidiInputDeviceEnabled (device.identifier, true);
+        }
     }
 
     //==============================================================================

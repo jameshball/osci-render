@@ -395,6 +395,12 @@
               file="Source/components/ParameterSyncHelper.h"/>
         <FILE id="KnbCnC" name="KnobContainerComponent.cpp" compile="1" resource="0"
               file="Source/components/KnobContainerComponent.cpp"/>
+        <FILE id="PrCtxM" name="ParameterContextMenu.h" compile="0" resource="0"
+              file="Source/components/ParameterContextMenu.h"/>
+        <FILE id="PrStCm" name="ParameterSettingsComponent.h" compile="0" resource="0"
+              file="Source/components/ParameterSettingsComponent.h"/>
+        <FILE id="InVlEd" name="InlineValueEditor.h" compile="0" resource="0"
+              file="Source/components/InlineValueEditor.h"/>
         <FILE id="ModStH" name="ModulationState.h" compile="0" resource="0"
               file="Source/components/ModulationState.h"/>
         <FILE id="ModStC" name="ModulationState.cpp" compile="1" resource="0"
@@ -407,6 +413,8 @@
               file="Source/components/ParameterBarComponent.h"/>
         <FILE id="TgLbCm" name="ToggleLabelComponent.h" compile="0" resource="0"
               file="Source/components/ToggleLabelComponent.h"/>
+        <FILE id="BlPCCH" name="BooleanParamCCHelper.h" compile="0" resource="0"
+              file="Source/components/BooleanParamCCHelper.h"/>
         <FILE id="SlGrCm" name="SlopeGraphComponent.h" compile="0" resource="0"
               file="Source/components/SlopeGraphComponent.h"/>
         <FILE id="Fr3001" name="FractalComponent.cpp" compile="1" resource="0"

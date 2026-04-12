@@ -1,6 +1,9 @@
 #include "EffectComponent.h"
 
 #include "../../LookAndFeel.h"
+#include "../InlineValueEditor.h"
+#include "../ParameterContextMenu.h"
+#include "../ParameterSettingsComponent.h"
 #ifndef SOSCI
 #include "../../PluginProcessor.h"
 #include "../modulation/ModulationHelper.h"
@@ -11,7 +14,6 @@ EffectComponent::EffectComponent(osci::Effect& effect, int index) : effect(effec
     addAndMakeVisible(slider);
     addChildComponent(lfoSlider);
     addAndMakeVisible(label);
-    addAndMakeVisible(settingsButton);
 
     // LFO ComboBox is only relevant when per-param LFO sub-params exist (free version).
     // In premium, lfo/lfoRate are nullptr so we skip the combobox entirely.
@@ -79,16 +81,7 @@ EffectComponent::EffectComponent(osci::Effect& effect, int index) : effect(effec
         lfo.addItem("Noise", static_cast<int>(osci::LfoType::Noise));
     }
 
-    settingsButton.setTooltip("Click to change the slider settings, including range.");
-
-    settingsButton.onClick = [this] {
-        auto settings = std::make_unique<EffectSettingsComponent>(this);
-        settings->setLookAndFeel(&getLookAndFeel());
-        // Smaller popup in premium (no LFO start/end sliders)
-        int height = (this->effect.parameters[this->index]->lfoStartPercent != nullptr) ? 290 : 170;
-        settings->setSize(200, height);
-        auto& myBox = juce::CallOutBox::launchAsynchronously(std::move(settings), settingsButton.getScreenBounds(), nullptr);
-    };
+    label.setMouseCursor(juce::MouseCursor::PointingHandCursor);
 
     effect.addListener(index, this);
     setupComponent();
@@ -108,6 +101,9 @@ void EffectComponent::setSliderValueIfChanged(osci::FloatParameter* parameter, j
 void EffectComponent::setupComponent() {
     osci::EffectParameter* parameter = effect.parameters[index];
 
+    if (parameter->midiCCManager != nullptr)
+        wireMidiCC(*parameter->midiCCManager);
+
     setEnabled(effect.enabled == nullptr || effect.enabled->getBoolValue());
 
     if (effect.linked != nullptr && index == 0) {
@@ -120,7 +116,9 @@ void EffectComponent::setupComponent() {
 
     setTooltip(parameter->description);
     label.setText(parameter->name, juce::dontSendNotification);
-    label.setInterceptsMouseClicks(false, false);
+    label.setInterceptsMouseClicks(true, false);
+    label.removeMouseListener(this);
+    label.addMouseListener(this, false);
 
     slider.setRange(parameter->min, parameter->max, parameter->step);
     setSliderValueIfChanged(parameter, slider);
@@ -201,6 +199,8 @@ void EffectComponent::setupComponent() {
 }
 
 EffectComponent::~EffectComponent() {
+    if (midiCCManager)
+        midiCCManager->removeChangeListener(this);
 #ifndef SOSCI
     if (modBroadcaster)
         modBroadcaster->removeListener(this);
@@ -222,10 +222,6 @@ void EffectComponent::resized() {
 
     if (sidechainEnabled) {
         sidechainButton->setBounds(bounds.removeFromRight(20));
-    }
-
-    if (settingsButton.isVisible()) {
-        settingsButton.setBounds(bounds.removeFromRight(20));
     }
 
     bool drawingSmall = bounds.getWidth() < 3.5 * TEXT_WIDTH;
@@ -300,6 +296,21 @@ void EffectComponent::parameterValueChanged(int parameterIndex, float newValue) 
 }
 
 void EffectComponent::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
+
+void EffectComponent::changeListenerCallback(juce::ChangeBroadcaster*) {
+    updateLabelAppearance();
+}
+
+void EffectComponent::updateLabelAppearance() {
+    bool learning = midiCCManager != nullptr && midiCCManager->isLearning(effect.parameters[index]);
+    if (learning) {
+        label.setColour(juce::Label::textColourId, Colours::midiLearnText());
+        label.setText(Colours::midiLearnLabel(), juce::dontSendNotification);
+    } else {
+        label.setColour(juce::Label::textColourId, labelHovered ? Colours::accentColor() : juce::Colours::white);
+        label.setText(effect.parameters[index]->name, juce::dontSendNotification);
+    }
+}
 
 // Slider::Listener callbacks for MIDI learn support
 void EffectComponent::sliderValueChanged(juce::Slider* sliderThatChanged) {
@@ -382,7 +393,7 @@ void EffectComponent::updateModulationDisplay() {}
 #endif
 
 void EffectComponent::setRangeEnabled(bool enabled) {
-    settingsButton.setVisible(enabled);
+    rangeEnabled = enabled;
 }
 
 void EffectComponent::setComponent(std::shared_ptr<juce::Component> component) {
@@ -483,3 +494,70 @@ void EffectComponent::wireModulation(OscirenderAudioProcessor& processor) {
     repaint();
 }
 #endif
+
+void EffectComponent::wireMidiCC(osci::MidiCCManager& manager) {
+    ParameterContextMenu::wireMidiCCListener(midiCCManager, manager, this);
+}
+
+void EffectComponent::mouseDown(const juce::MouseEvent& event) {
+    auto* source = event.originalComponent;
+    if (event.mods.isRightButtonDown() || source == &label) {
+        showContextMenu(event.getScreenPosition());
+        return;
+    }
+    juce::Component::mouseDown(event);
+}
+
+void EffectComponent::mouseEnter(const juce::MouseEvent& event) {
+    if (event.originalComponent == &label) {
+        labelHovered = true;
+        updateLabelAppearance();
+    }
+    juce::Component::mouseEnter(event);
+}
+
+void EffectComponent::mouseExit(const juce::MouseEvent& event) {
+    if (event.originalComponent == &label) {
+        labelHovered = false;
+        updateLabelAppearance();
+    }
+    juce::Component::mouseExit(event);
+}
+
+void EffectComponent::showContextMenu(juce::Point<int> screenPos) {
+    osci::EffectParameter* param = effect.parameters[index];
+
+    ParameterContextMenu::Context ctx;
+    ctx.param = param;
+    ctx.effectParam = rangeEnabled ? param : nullptr;
+    ctx.midiCCManager = midiCCManager;
+    ctx.ccEffectParam = param;
+
+    auto safeThis = juce::Component::SafePointer<EffectComponent>(this);
+    ParameterContextMenu::showAsync(ctx, screenPos, this,
+        [safeThis]() {
+            if (!safeThis) return;
+            auto* p = safeThis->effect.parameters[safeThis->index];
+            p->setUnnormalisedValueNotifyingHost(p->defaultValue.load());
+        },
+        [safeThis]() { if (safeThis) safeThis->showValueEditor(); },
+        [safeThis]() {
+            if (!safeThis) return;
+            auto* p = safeThis->effect.parameters[safeThis->index];
+            auto settings = std::make_unique<ParameterSettingsComponent>(p, [safeThis]() {
+                if (safeThis != nullptr)
+                    safeThis->slider.setRange(
+                        safeThis->effect.parameters[safeThis->index]->min,
+                        safeThis->effect.parameters[safeThis->index]->max,
+                        safeThis->effect.parameters[safeThis->index]->step);
+            });
+            settings->setLookAndFeel(&safeThis->getLookAndFeel());
+            settings->setSize(settings->getDesiredWidth(), settings->getDesiredHeight());
+            juce::CallOutBox::launchAsynchronously(
+                std::move(settings), safeThis->label.getScreenBounds(), nullptr);
+        });
+}
+
+void EffectComponent::showValueEditor() {
+    InlineValueEditor::show(*this, slider, valueEditor, slider.getBounds());
+}

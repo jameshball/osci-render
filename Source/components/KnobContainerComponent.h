@@ -23,7 +23,8 @@ class ModulationUpdateBroadcaster;
 // polish of EffectComponent.
 class KnobContainerComponent : public juce::Component, public juce::DragAndDropTarget,
                                 public juce::AudioProcessorParameter::Listener,
-                                public juce::AsyncUpdater {
+                                public juce::AsyncUpdater,
+                                public juce::ChangeListener {
 public:
     KnobContainerComponent(const juce::String& labelText) : label(labelText) {
         addAndMakeVisible(knob);
@@ -55,6 +56,9 @@ public:
         boundParam = param;
         if (boundParam)
             boundParam->addListener(this);
+
+        if (param->midiCCManager != nullptr)
+            wireMidiCC(*param->midiCCManager);
 
         double minVal = param->min.load();
         double maxVal = param->max.load();
@@ -105,6 +109,10 @@ public:
     // --- AudioProcessorParameter::Listener ---
     void parameterValueChanged(int, float) override { triggerAsyncUpdate(); }
     void parameterGestureChanged(int, bool) override {}
+
+    void changeListenerCallback(juce::ChangeBroadcaster*) override {
+        repaint();
+    }
 
     void handleAsyncUpdate() override {
         if (boundParam) {
@@ -195,25 +203,52 @@ public:
 #endif
 
     void mouseDown(const juce::MouseEvent& event) override {
-        if (event.mods.isRightButtonDown() && effectParam) {
-            showSettingsPopup();
+        bool onLabel = event.getPosition().getY() >= getHeight() - Colours::kLabelHeight;
+        if (event.mods.isRightButtonDown() || onLabel) {
+            knob.showContextMenu(event.getScreenPosition());
         }
+    }
+
+    void mouseMove(const juce::MouseEvent& event) override {
+        mouseMoveInternal(event);
+        juce::Component::mouseMove(event);
+    }
+
+    void mouseEnter(const juce::MouseEvent& event) override {
+        mouseMoveInternal(event);
+        juce::Component::mouseEnter(event);
+    }
+
+    void mouseExit(const juce::MouseEvent& event) override {
+        if (labelHovered) {
+            labelHovered = false;
+            repaint();
+        }
+        setMouseCursor(juce::MouseCursor::NormalCursor);
+        juce::Component::mouseExit(event);
     }
 
     void paint(juce::Graphics& g) override {
         auto bounds = getLocalBounds().toFloat();
         float alpha = isEnabled() ? 1.0f : 0.3f;
 
+        bool isLearningCC = midiCCManager != nullptr && boundParam != nullptr
+                            && midiCCManager->isLearning(boundParam);
+
         // Faint rounded rectangle behind the label only
         auto labelArea = bounds.removeFromBottom(Colours::kLabelHeight);
         auto labelBg = labelArea.reduced(2.0f, 0.0f);
-        g.setColour(Colours::darkerer().withAlpha(alpha));
+        auto bgColour = isLearningCC ? Colours::midiLearnBackground()
+                       : Colours::darkerer().withAlpha(alpha);
+        if (labelHovered && !isLearningCC)
+            bgColour = bgColour.darker(0.3f);
+        g.setColour(bgColour);
         g.fillRoundedRectangle(labelBg, Colours::kPillRadius);
 
         // Label text
-        g.setColour(juce::Colours::white.withAlpha(alpha));
+        g.setColour(labelHovered && !isLearningCC ? Colours::accentColor().withAlpha(alpha) : juce::Colours::white.withAlpha(alpha));
         g.setFont(juce::Font(10.0f));
-        g.drawText(label, labelArea, juce::Justification::centred, false);
+        g.drawText(isLearningCC ? Colours::midiLearnLabel() : label, labelArea, juce::Justification::centred, false);
     }
 
     void paintOverChildren(juce::Graphics& g) override {
@@ -235,92 +270,26 @@ private:
     osci::FloatParameter* boundParam = nullptr;
     osci::EffectParameter* effectParam = nullptr;
     bool modDropHighlight = false;
+    bool labelHovered = false;
+    osci::MidiCCManager* midiCCManager = nullptr;
 
 #ifndef SOSCI
     ModulationUpdateBroadcaster* modBroadcaster = nullptr;
 #endif
 
-    void showSettingsPopup() {
-        if (!effectParam) return;
+    void wireMidiCC(osci::MidiCCManager& manager);
+    void setupMidiCCContextMenu();
 
-        // Reuse the same settings popup pattern as EffectComponent
-        auto settings = std::make_unique<KnobSettingsComponent>(this);
-        settings->setLookAndFeel(&getLookAndFeel());
-        settings->setSize(200, 170);
-        auto& myBox = juce::CallOutBox::launchAsynchronously(
-            std::move(settings), getScreenBounds(), nullptr);
-        juce::ignoreUnused(myBox);
+    void showSettingsPopup();
+
+    void mouseMoveInternal(const juce::MouseEvent& event) {
+        bool onLabel = event.getPosition().getY() >= getHeight() - Colours::kLabelHeight;
+        setMouseCursor(onLabel ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+        if (onLabel != labelHovered) {
+            labelHovered = onLabel;
+            repaint();
+        }
     }
-
-    // Settings popup for parameter range editing (mirrors EffectComponent::EffectSettingsComponent)
-    class KnobSettingsComponent : public juce::Component {
-    public:
-        KnobSettingsComponent(KnobContainerComponent* parent)
-            : parameter(parent->effectParam), owner(parent) {
-            addAndMakeVisible(popupLabel);
-            addAndMakeVisible(min);
-            addAndMakeVisible(max);
-            addAndMakeVisible(smoothLabel);
-            addAndMakeVisible(smoothSlider);
-
-            min.textBox.setValue(parameter->min, juce::dontSendNotification);
-            max.textBox.setValue(parameter->max, juce::dontSendNotification);
-
-            min.textBox.onValueChange = [this]() {
-                double minVal = min.textBox.getValue();
-                double maxVal = max.textBox.getValue();
-                if (minVal >= maxVal) {
-                    minVal = maxVal - parameter->step;
-                    min.textBox.setValue(minVal, juce::dontSendNotification);
-                }
-                parameter->min = minVal;
-                owner->knob.setRange(parameter->min, parameter->max, parameter->step);
-            };
-
-            max.textBox.onValueChange = [this]() {
-                double minVal = min.textBox.getValue();
-                double maxVal = max.textBox.getValue();
-                if (maxVal <= minVal) {
-                    maxVal = minVal + parameter->step;
-                    max.textBox.setValue(maxVal, juce::dontSendNotification);
-                }
-                parameter->max = maxVal;
-                owner->knob.setRange(parameter->min, parameter->max, parameter->step);
-            };
-
-            smoothLabel.setText("Smooth Value Change Speed", juce::dontSendNotification);
-            smoothLabel.setJustificationType(juce::Justification::centred);
-            smoothLabel.setFont(juce::Font(14.0f, juce::Font::bold));
-
-            smoothSlider.setRange(0.01, 1.0, 0.0001);
-            smoothSlider.setValue(parameter->smoothValueChange, juce::dontSendNotification);
-            smoothSlider.onValueChange = [this]() {
-                parameter->smoothValueChange = smoothSlider.getValue();
-            };
-
-            popupLabel.setText(parameter->name + " Range", juce::dontSendNotification);
-            popupLabel.setJustificationType(juce::Justification::centred);
-            popupLabel.setFont(juce::Font(14.0f, juce::Font::bold));
-        }
-
-        void resized() override {
-            auto bounds = getLocalBounds();
-            popupLabel.setBounds(bounds.removeFromTop(30));
-            min.setBounds(bounds.removeFromTop(40));
-            max.setBounds(bounds.removeFromTop(40));
-            smoothLabel.setBounds(bounds.removeFromTop(20));
-            smoothSlider.setBounds(bounds.removeFromTop(40));
-        }
-
-    private:
-        osci::EffectParameter* parameter;
-        KnobContainerComponent* owner;
-        juce::Label popupLabel;
-        LabelledTextBox min{"Min"};
-        LabelledTextBox max{"Max"};
-        juce::Label smoothLabel;
-        juce::Slider smoothSlider;
-    };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KnobContainerComponent)
 };

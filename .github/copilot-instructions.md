@@ -114,6 +114,8 @@ See `.github/docs/build-details.md`.
 - `std::atomic` for simple cross-thread values
 - Pre-allocate containers in constructors with `reserve()` to avoid audio-thread allocations
 
+**Prefer `juce::SpinLock` over `juce::CriticalSection`/`std::mutex` everywhere**, not just on the audio thread. CriticalSection or std::mutex should only be used when there is a clear need (e.g. very long critical sections with high contention, or when using condition variables). For short critical sections protecting data structures, SpinLock is the default choice.
+
 ## Testing
 
 ```bash

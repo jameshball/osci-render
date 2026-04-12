@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include "../LookAndFeel.h"
+#include "BooleanParamCCHelper.h"
 #include <osci_render_core/effect/osci_EffectParameter.h>
 
 // A toggleable rounded-label pill that wraps a BooleanParameter.
@@ -17,6 +18,7 @@ public:
     {
         jassert(param != nullptr);
         parameter->addListener(this);
+        ccHelper.init(param, this);
         setRepaintsOnMouseActivity(true);
     }
 
@@ -30,8 +32,13 @@ public:
         bool hovering = isEnabled() && isMouseOver();
 
         // Background pill
-        auto bgColour = on ? Colours::accentColor().withAlpha(0.25f)
-                           : Colours::darkerer();
+        juce::Colour bgColour;
+        if (ccHelper.isLearning()) {
+            bgColour = Colours::midiLearnBackground();
+        } else {
+            bgColour = on ? Colours::accentColor().withAlpha(0.25f)
+                          : Colours::darkerer();
+        }
         if (hovering)
             bgColour = bgColour.brighter(0.3f);
         g.setColour(bgColour);
@@ -56,6 +63,10 @@ public:
 
     void mouseUp(const juce::MouseEvent& e) override {
         if (!isEnabled()) return;
+        if (e.mouseWasClicked() && e.mods.isPopupMenu()) {
+            ccHelper.showContextMenu(e.getScreenPosition());
+            return;
+        }
         if (e.mouseWasClicked() && getLocalBounds().toFloat().contains(e.position)) {
             parameter->beginChangeGesture();
             parameter->setBoolValueNotifyingHost(!parameter->getBoolValue());
@@ -69,6 +80,7 @@ public:
 
 private:
     osci::BooleanParameter* parameter;
+    BooleanParamCCHelper ccHelper;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ToggleLabelComponent)
 };

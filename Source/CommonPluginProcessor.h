@@ -97,6 +97,8 @@ public:
 
     osci::BooleanParameter* muteParameter = nullptr;
 
+    osci::MidiCCManager midiCCManager;
+
     std::shared_ptr<osci::Effect> volumeEffect = std::make_shared<osci::SimpleEffect>(
         new osci::EffectParameter(
             "Volume",
@@ -234,6 +236,8 @@ protected:
     osci::BooleanParameter* getBooleanParameter(juce::String id);
     osci::FloatParameter* getFloatParameter(juce::String id);
     osci::IntParameter* getIntParameter(juce::String id);
+
+    void loadMidiCCState(const juce::XmlElement* xml);
     
     void saveProperties(juce::XmlElement& xml);
     void loadProperties(juce::XmlElement& xml);

@@ -58,6 +58,8 @@
       <FILE id="VmT1" name="VoiceManagerTest.cpp" compile="1" resource="0"
             file="tests/VoiceManagerTest.cpp"/>
       <FILE id="MtsT1" name="MTSESPTest.cpp" compile="1" resource="0" file="tests/MTSESPTest.cpp"/>
+      <FILE id="MdCCT" name="MidiCCManagerTest.cpp" compile="1" resource="0"
+            file="tests/MidiCCManagerTest.cpp"/>
       <FILE id="TstClH" name="TestCleanup.h" compile="0" resource="0" file="tests/TestCleanup.h"/>
       <FILE id="SmpAcc" name="SampleAccuracyTest.cpp" compile="1" resource="0"
             file="tests/SampleAccuracyTest.cpp"/>

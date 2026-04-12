@@ -93,6 +93,10 @@ namespace Colours {
 
     static constexpr int kLabelHeight = Theme::kLabelHeight;
     static constexpr float kPillRadius = kLabelHeight * 0.5f;
+
+    inline juce::Colour midiLearnBackground() { return juce::Colours::red.withAlpha(0.6f); }
+    inline juce::Colour midiLearnText()       { return juce::Colours::red; }
+    inline const juce::String& midiLearnLabel() { static const juce::String s("MIDI Learn..."); return s; }
 }
 
 namespace Dracula {

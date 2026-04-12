@@ -1,4 +1,6 @@
 #include "KnobContainerComponent.h"
+#include "ParameterContextMenu.h"
+#include "ParameterSettingsComponent.h"
 
 #ifndef SOSCI
 #include "../PluginProcessor.h"
@@ -7,6 +9,8 @@
 #endif
 
 KnobContainerComponent::~KnobContainerComponent() {
+    if (midiCCManager)
+        midiCCManager->removeChangeListener(this);
 #ifndef SOSCI
     if (modBroadcaster)
         modBroadcaster->removeListener(this);
@@ -59,3 +63,40 @@ void KnobContainerComponent::wireModulation(OscirenderAudioProcessor& processor)
 }
 
 #endif
+
+void KnobContainerComponent::wireMidiCC(osci::MidiCCManager& manager) {
+    ParameterContextMenu::wireMidiCCListener(midiCCManager, manager, this);
+    setupMidiCCContextMenu();
+}
+
+void KnobContainerComponent::setupMidiCCContextMenu() {
+    knob.onShowContextMenu = [this](juce::Point<int> screenPos) {
+        ParameterContextMenu::Context ctx;
+        ctx.param = boundParam;
+        ctx.effectParam = effectParam;
+        ctx.midiCCManager = midiCCManager;
+        ctx.canResetToDefault = knob.isDoubleClickReturnEnabled();
+        ctx.ccEffectParam = effectParam;
+
+        auto safeThis = juce::Component::SafePointer<KnobContainerComponent>(this);
+        ParameterContextMenu::showAsync(ctx, screenPos, this,
+            [safeThis]() {
+                if (safeThis) safeThis->knob.setValue(safeThis->knob.getDoubleClickReturnValue(), juce::sendNotificationSync);
+            },
+            [safeThis]() { if (safeThis) safeThis->knob.showValueEditor(); },
+            [safeThis]() { if (safeThis) safeThis->showSettingsPopup(); });
+    };
+}
+
+void KnobContainerComponent::showSettingsPopup() {
+    if (!effectParam) return;
+
+    auto settings = std::make_unique<ParameterSettingsComponent>(effectParam, [this]() {
+        knob.setRange(effectParam->min, effectParam->max, effectParam->step);
+    });
+    settings->setLookAndFeel(&getLookAndFeel());
+    settings->setSize(settings->getDesiredWidth(), settings->getDesiredHeight());
+    auto& myBox = juce::CallOutBox::launchAsynchronously(
+        std::move(settings), getScreenBounds(), nullptr);
+    juce::ignoreUnused(myBox);
+}

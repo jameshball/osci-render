@@ -654,6 +654,9 @@ int OscirenderAudioProcessor::getCurrentFileIndex() {
 }
 
 std::shared_ptr<FileParser> OscirenderAudioProcessor::getCurrentFileParser() {
+    if (currentFile < 0 || currentFile >= parsers.size()) {
+        return nullptr;
+    }
     return parsers[currentFile];
 }
 
@@ -849,6 +852,9 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     // merge keyboard state and midi messages
     keyboardState.processNextMidiBuffer(midiMessages, 0, buffer.getNumSamples(), true);
 
+    // Process MIDI CC → parameter mappings (always active, even when synth MIDI is off)
+    midiCCManager.processMidiBuffer(midiMessages);
+
 #if OSCI_PREMIUM
     // Parse MTS SysEx from incoming MIDI for microtuning support
     mtsClient.parseMidiBuffer(midiMessages);
@@ -861,10 +867,11 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         midiMessages.clear();
     }
 
-    // if midi enabled has changed state
+    // if midi enabled has changed state, kill all voices immediately
+    // (allSoundOff, not allNotesOff, so voices don't linger in release)
     if (prevMidiEnabled != usingMidi) {
         for (int i = 1; i <= 16; i++) {
-            midiMessages.addEvent(juce::MidiMessage::allNotesOff(i), i);
+            midiMessages.addEvent(juce::MidiMessage::allSoundOff(i), i);
         }
     }
 
@@ -1189,6 +1196,8 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
 
     recordingParameters.save(xml.get());
 
+    midiCCManager.save(xml.get());
+
     saveProperties(*xml);
 
     copyXmlToBinary(*xml, destData);
@@ -1349,6 +1358,8 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
 
         loadProperties(*xml);
         objectServer.reload();
+
+        loadMidiCCState(xml.get());
 
         broadcaster.sendChangeMessage();
         prevMidiEnabled = !midiEnabled->getBoolValue();

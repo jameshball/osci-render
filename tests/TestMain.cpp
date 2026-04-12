@@ -89,6 +89,12 @@ int main(int argc, char* argv[]) {
 			return 1;
 		}
 	}
+
+	// Clean up MessageManager if any test created one (e.g. MidiCC tests use
+	// Timer/ChangeBroadcaster which require it).
+	juce::DeletedAtShutdown::deleteAll();
+	if (juce::MessageManager::getInstanceWithoutCreating() != nullptr)
+		juce::MessageManager::deleteInstance();
     
 	return 0;
 }
