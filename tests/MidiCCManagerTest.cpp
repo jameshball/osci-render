@@ -49,6 +49,19 @@ static void pumpMessageLoop(int ms = 100) {
     }
 }
 
+// Pump message loop until a condition is met, or a generous timeout is reached.
+// Returns true if the condition was met, false if timed out.
+static bool pumpUntil(std::function<bool()> condition, int timeoutMs = 2000) {
+    auto* mm = juce::MessageManager::getInstanceWithoutCreating();
+    if (mm == nullptr) return condition();
+    auto start = juce::Time::getMillisecondCounterHiRes();
+    while (juce::Time::getMillisecondCounterHiRes() - start < timeoutMs) {
+        if (condition()) return true;
+        mm->runDispatchLoopUntil(10);
+    }
+    return condition();
+}
+
 // RAII helper to ensure MessageManager is initialized and the current thread
 // is registered as the message thread. Required for Timer and ChangeBroadcaster.
 // Created once per process; intentionally leaks at exit since the test runner
@@ -406,7 +419,7 @@ private:
         for (int i = 0; i < NUM_PARAMS; ++i) {
             mgr.startLearning(params[i].get());
             mgr.processMidiBuffer(makeCCBuffer(i, 64));
-            pumpMessageLoop(100);
+            pumpUntil([&] { return !mgr.isLearning(); });
         }
         // Stop all learning before threading starts
         mgr.stopLearning();
@@ -486,7 +499,7 @@ private:
             int cc = i % 128;
             mgr.startLearning(param.get());
             mgr.processMidiBuffer(makeCCBuffer(cc, 64));
-            pumpMessageLoop(50);
+            pumpUntil([&] { return !mgr.isLearning(); });
             mgr.removeAssignment(param.get());
         }
 
@@ -505,7 +518,7 @@ private:
             params.push_back(makeFloat("param_" + juce::String(i)));
             mgr.startLearning(params.back().get());
             mgr.processMidiBuffer(makeCCBuffer(i, 64));
-            pumpMessageLoop(50);
+            pumpUntil([&] { return !mgr.isLearning(); });
         }
 
         // Verify all assignments
