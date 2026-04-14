@@ -109,6 +109,8 @@ echo "============================================="
 
 PLUGINVAL_CMD="\"$PLUGINVAL\" $PLUGINVAL_ARGS --validate \"$VST3_PATH\""
 
+PLUGINVAL_EXIT=0
+
 if [ "$OS" = "linux" ]; then
     # Print a stack trace on crash (SIGSEGV, SIGABRT, etc.)
     SEGFAULT_LIB=$(find /lib /usr/lib -name 'libSegFault.so' 2>/dev/null | head -1 || true)
@@ -119,19 +121,69 @@ if [ "$OS" = "linux" ]; then
 
     # Linux CI needs a virtual display for JUCE GUI
     if command -v xvfb-run &> /dev/null; then
-        eval xvfb-run -a -s \"-screen 0 1280x720x24\" $PLUGINVAL_CMD
+        eval xvfb-run -a -s \"-screen 0 1280x720x24\" $PLUGINVAL_CMD || PLUGINVAL_EXIT=$?
     else
-        eval $PLUGINVAL_CMD
+        eval $PLUGINVAL_CMD || PLUGINVAL_EXIT=$?
     fi
 
     unset LD_PRELOAD SEGFAULT_SIGNALS
+elif [ "$OS" = "mac" ]; then
+    # Run under lldb in batch mode to capture a stack trace on crash.
+    # pluginval intercepts signals itself, so macOS doesn't generate .ips crash reports.
+    # lldb catches the signal first and prints a full backtrace.
+    LLDB_CRASH_LOG="$PLUGINVAL_LOG_DIR/pluginval_crash_bt.log"
+    if command -v lldb &> /dev/null; then
+        # Write an lldb command script:
+        # - Configure signal handling to stop on crash signals
+        # - Run the process
+        # - After stop/exit: dump backtraces (harmless if process exited normally)
+        # - Exit with code 1 on crash, 0 on normal exit
+        LLDB_SCRIPT="$PLUGINVAL_LOG_DIR/lldb_commands.txt"
+        cat > "$LLDB_SCRIPT" << 'LLDB_EOF'
+process handle SIGSEGV --stop true --pass false --notify true
+process handle SIGABRT --stop true --pass false --notify true
+process handle SIGBUS  --stop true --pass false --notify true
+run
+script import lldb; proc = lldb.debugger.GetSelectedTarget().GetProcess(); crashed = proc.GetState() != lldb.eStateExited; lldb.debugger.HandleCommand("thread backtrace all" if crashed else "script pass"); lldb.debugger.HandleCommand("quit 1" if crashed else "quit " + str(proc.GetExitStatus()))
+LLDB_EOF
+
+        lldb --batch \
+            -s "$LLDB_SCRIPT" \
+            -- "$PLUGINVAL" --strictness-level $STRICTNESS --verbose \
+               --timeout-ms $PLUGINVAL_TIMEOUT \
+               --output-dir "$PLUGINVAL_LOG_DIR" \
+               ${SKIP_GUI:+--skip-gui-tests} \
+               --validate "$VST3_PATH" \
+            2>&1 | tee "$LLDB_CRASH_LOG"
+        PLUGINVAL_EXIT=${PIPESTATUS[0]}
+
+        # If pluginval exited non-zero, highlight the stack trace
+        if [ "$PLUGINVAL_EXIT" -ne 0 ]; then
+            echo ""
+            echo "============================================="
+            echo " pluginval crashed (exit code $PLUGINVAL_EXIT)"
+            echo " Stack trace summary:"
+            echo "============================================="
+            grep -E 'frame #|Thread |stop reason|signal' "$LLDB_CRASH_LOG" | head -100 || true
+        fi
+    else
+        eval $PLUGINVAL_CMD || PLUGINVAL_EXIT=$?
+    fi
 else
-    eval $PLUGINVAL_CMD
+    eval $PLUGINVAL_CMD || PLUGINVAL_EXIT=$?
 fi
 
 echo ""
 echo "Logs saved to: $PLUGINVAL_LOG_DIR"
 ls -la "$PLUGINVAL_LOG_DIR" 2>/dev/null || true
+
+if [ "$PLUGINVAL_EXIT" -ne 0 ]; then
+    echo ""
+    echo "============================================="
+    echo " pluginval: FAILED (exit code $PLUGINVAL_EXIT)"
+    echo "============================================="
+    exit "$PLUGINVAL_EXIT"
+fi
 
 echo "============================================="
 echo " pluginval: ALL TESTS PASSED"
