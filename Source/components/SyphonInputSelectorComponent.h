@@ -12,9 +12,6 @@ public:
         sourceLabel.setText("Syphon/Spout Source:", juce::dontSendNotification);
 
         addAndMakeVisible(sourceDropdown);
-        sourceDropdown.onChange = [this] {
-            selectedSource = sourceDropdown.getText();
-        };
 
         addAndMakeVisible(connectButton);
         connectButton.setButtonText("Connect");
@@ -32,9 +29,15 @@ public:
 
     void refreshSources() {
         sourceDropdown.clear();
-        auto sources = sharedTextureManager.getAvailableSenders();
-        for (const auto& s : sources)
-            sourceDropdown.addItem(s, sourceDropdown.getNumItems() + 1);
+        serverNames.clear();
+        appNames.clear();
+        sharedTextureManager.getAvailableSenderDetails(serverNames, appNames);
+        for (int i = 0; i < serverNames.size(); i++) {
+            juce::String display = serverNames[i];
+            if (appNames[i].isNotEmpty())
+                display += " - " + appNames[i];
+            sourceDropdown.addItem(display, i + 1); // ComboBox IDs are 1-based
+        }
     }
 
     void resized() override {
@@ -48,13 +51,9 @@ public:
     }
 
     void buttonClicked(juce::Button* b) override {
-        auto selected = sourceDropdown.getText();
-        if (selected.isNotEmpty()) {
-            // Syphon: "ServerName - AppName"
-            auto parts = juce::StringArray::fromTokens(selected, "-", "");
-            juce::String server = parts[0].trim();
-            juce::String app = parts.size() > 1 ? parts[1].trim() : juce::String();
-            onConnectCallback(server, app);
+        int selectedIndex = sourceDropdown.getSelectedItemIndex();
+        if (selectedIndex >= 0 && selectedIndex < serverNames.size()) {
+            onConnectCallback(serverNames[selectedIndex], appNames[selectedIndex]);
 
             if (auto* window = findParentComponentOfClass<juce::DialogWindow>())
                 window->exitModalState(0);
@@ -66,7 +65,9 @@ private:
     std::function<void(const juce::String&, const juce::String&)> onConnectCallback;
     std::function<void()> onDisconnectCallback;
     juce::String currentSourceName;
-    juce::String selectedSource;
+
+    juce::StringArray serverNames;
+    juce::StringArray appNames;
 
     juce::Label sourceLabel;
     juce::ComboBox sourceDropdown;
