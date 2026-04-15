@@ -550,10 +550,12 @@ void VisualiserComponent::resized() {
     }
     auto buttons = buttonRow;
     if (parent == nullptr || juce::JUCEApplicationBase::isStandaloneApp()) {
+        fullScreenButton.setVisible(true);
         fullScreenButton.setBounds(buttons.removeFromRight(30));
     }
 #if OSCI_PREMIUM
     if (child == nullptr && parent == nullptr) {
+        popOutButton.setVisible(true);
         popOutButton.setBounds(buttons.removeFromRight(30));
     }
 #endif
@@ -565,11 +567,14 @@ void VisualiserComponent::resized() {
     }
 
     if (visualiserOnly && juce::JUCEApplication::isStandaloneApp() && child == nullptr) {
+        audioInputButton.setVisible(true);
         audioInputButton.setBounds(buttons.removeFromRight(30));
     }
 
+    sharedTextureButton.setVisible(true);
     sharedTextureButton.setBounds(buttons.removeFromRight(30));
 
+    record.setVisible(true);
     record.setBounds(buttons.removeFromRight(25));
     if (record.getToggleState()) {
         stopwatch.setVisible(true);
@@ -587,8 +592,9 @@ void VisualiserComponent::resized() {
 
     buttons.removeFromRight(10); // padding
 
-    if (child == nullptr) {
+    if (child == nullptr && timeline.getController() != nullptr) {
         // Timeline replaces the old audioPlayer UI
+        timeline.setVisible(true);
         timeline.setBounds(buttons);
     }
 
