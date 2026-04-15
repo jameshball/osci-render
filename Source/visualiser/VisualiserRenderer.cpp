@@ -433,6 +433,52 @@ void VisualiserRenderer::renderOpenGL() {
     using namespace juce::gl;
 
     if (openGLContext.isActive()) {
+        // One-time DPI diagnostics: log before anything modifies the viewport.
+        // JUCE sets glViewport to the physical pixel area just before calling
+        // renderOpenGL(), so reading it here captures the true JUCE viewport.
+        if (!dpiDiagnosticsLogged) {
+            dpiDiagnosticsLogged = true;
+
+            GLint vp[4] = {};
+            glGetIntegerv(GL_VIEWPORT, vp);
+
+            auto componentBounds = getLocalBounds();
+            auto screenBounds = getScreenBounds();
+            auto globalScale = juce::Desktop::getInstance().getGlobalScaleFactor();
+            auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect(getScreenBounds());
+            double displayScale = (display != nullptr) ? display->scale : -1.0;
+
+            juce::String diagMsg;
+            diagMsg << "[DPI Diagnostics] "
+                    << "getRenderingScale()=" << openGLContext.getRenderingScale()
+                    << " | component: " << componentBounds.getWidth() << "x" << componentBounds.getHeight()
+                    << " | screenBounds: " << screenBounds.getWidth() << "x" << screenBounds.getHeight()
+                    << " @ (" << screenBounds.getX() << "," << screenBounds.getY() << ")"
+                    << " | juceViewport: " << vp[2] << "x" << vp[3]
+                    << " @ (" << vp[0] << "," << vp[1] << ")"
+                    << " | globalScaleFactor=" << globalScale
+                    << " | displayScale=" << displayScale
+                    << " | viewportArea: " << viewportArea.getWidth() << "x" << viewportArea.getHeight();
+
+#if JUCE_WINDOWS
+            // Query the actual GL surface dimensions from Win32 to compare with
+            // what JUCE computed. This helps diagnose DPI scaling mismatches.
+            HDC hdc = wglGetCurrentDC();
+            if (hdc != nullptr) {
+                HWND hwnd = WindowFromDC(hdc);
+                if (hwnd != nullptr) {
+                    RECT rect = {};
+                    GetClientRect(hwnd, &rect);
+                    int surfaceW = rect.right - rect.left;
+                    int surfaceH = rect.bottom - rect.top;
+                    diagMsg << " | win32Surface: " << surfaceW << "x" << surfaceH;
+                }
+            }
+#endif
+
+            juce::Logger::writeToLog(diagMsg);
+        }
+
         juce::OpenGLHelpers::clear(juce::Colours::black);
 
         // Mirror mode: display the parent's captured frame
@@ -1307,34 +1353,6 @@ void VisualiserRenderer::renderScope(const std::vector<float> &xPoints, const st
     }
 
     renderScale = (float)openGLContext.getRenderingScale();
-
-    // One-time DPI diagnostics: log on the first audio frame so we can diagnose
-    // scaling issues on Windows hosts without flooding logs or affecting performance.
-    if (!dpiDiagnosticsLogged) {
-        dpiDiagnosticsLogged = true;
-
-        using namespace juce::gl;
-        GLint vp[4] = {};
-        glGetIntegerv(GL_VIEWPORT, vp);
-
-        auto componentBounds = getLocalBounds();
-        auto screenBounds = getScreenBounds();
-        auto globalScale = juce::Desktop::getInstance().getGlobalScaleFactor();
-
-        juce::String diagMsg;
-        diagMsg << "[DPI Diagnostics] "
-                << "renderScale=" << renderScale
-                << " getRenderingScale()=" << openGLContext.getRenderingScale()
-                << " | component: " << componentBounds.getWidth() << "x" << componentBounds.getHeight()
-                << " | screenBounds: " << screenBounds.getWidth() << "x" << screenBounds.getHeight()
-                << " @ (" << screenBounds.getX() << "," << screenBounds.getY() << ")"
-                << " | glViewport: " << vp[2] << "x" << vp[3]
-                << " @ (" << vp[0] << "," << vp[1] << ")"
-                << " | globalScaleFactor=" << globalScale
-                << " | viewportArea: " << viewportArea.getWidth() << "x" << viewportArea.getHeight();
-
-        juce::Logger::writeToLog(diagMsg);
-    }
 
     // Provide dummy colour buffers for non-RGB modes to avoid allocations
     static std::vector<float> empty;
