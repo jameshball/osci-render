@@ -39,6 +39,7 @@
 #include "audio/effects/GodRayEffect.h"
 #include "parser/FileParser.h"
 #include "parser/FrameProducer.h"
+#include "audio/modulation/LfoPresetManager.h"
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
 #include "parser/img/ImageParser.h"
@@ -167,6 +168,34 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     // Adopt Sidechain parameters from state class (premium only)
     for (auto* p : sidechainParameters.getFloatParameters())
         floatParameters.push_back(p);
+
+    // Apply global default LFO preset if set
+    {
+        auto defaultFactory = getGlobalStringValue("defaultLfoPreset");
+        auto defaultFile = getGlobalStringValue("defaultLfoPresetFile");
+        if (defaultFile.isNotEmpty()) {
+            juce::File file(defaultFile);
+            if (file.existsAsFile()) {
+                LfoPresetManager tempManager(applicationFolder.getChildFile("LFO Presets"));
+                LfoWaveform waveform;
+                juce::String name;
+                if (tempManager.loadPreset(file, waveform, name)) {
+                    for (int i = 0; i < NUM_LFOS; ++i) {
+                        lfoParameters.waveformChanged(i, waveform);
+                        lfoParameters.setIsCustom(i, true);
+                    }
+                }
+            }
+        } else if (defaultFactory.isNotEmpty()) {
+            auto parsed = stringToLfoPreset(defaultFactory);
+            if (parsed.has_value()) {
+                for (int i = 0; i < NUM_LFOS; ++i) {
+                    lfoParameters.setPreset(i, *parsed);
+                    lfoParameters.waveformChanged(i, createLfoPreset(*parsed));
+                }
+            }
+        }
+    }
 #endif
 
     intParameters.push_back(voices);

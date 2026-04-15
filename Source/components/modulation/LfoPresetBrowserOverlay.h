@@ -15,12 +15,17 @@ public:
         virtual void presetBrowserUserSelected(const juce::File& file) = 0;
         virtual void presetBrowserUserDeleted(const juce::File& file) = 0;
         virtual void presetBrowserSaveRequested(const juce::String& name) = 0;
+        virtual void presetBrowserSetDefaultFactory(LfoPreset preset) = 0;
+        virtual void presetBrowserSetDefaultFile(const juce::File& file) = 0;
+        virtual void presetBrowserClearDefault() = 0;
     };
 
     LfoPresetBrowserOverlay(LfoPresetManager& manager, Listener* listener);
 
-    void show(LfoPreset currentFactoryPreset, const juce::String& currentUserName);
-    void refresh(LfoPreset currentFactoryPreset, const juce::String& currentUserName);
+    void show(LfoPreset currentFactoryPreset, const juce::String& currentUserName,
+              const juce::String& defaultFactoryName, const juce::String& defaultFileName);
+    void refresh(LfoPreset currentFactoryPreset, const juce::String& currentUserName,
+                 const juce::String& defaultFactoryName, const juce::String& defaultFileName);
     std::function<void()> onDismissRequested;
 
     void resized() override;
@@ -37,6 +42,8 @@ private:
 
     LfoPreset activeFactoryPreset = LfoPreset::Triangle;
     juce::String activeUserName;
+    juce::String defaultFactoryPresetName;
+    juce::String defaultPresetFilePath;
 
     struct BrowserPanel : public juce::Component {
         void paint(juce::Graphics& g) override;
@@ -59,13 +66,17 @@ private:
     struct PresetRow : public juce::Component {
         juce::String name;
         bool isActive = false;
+        bool isDefault = false;
         bool isUserPreset = false;
         juce::File file;
         std::function<void()> onSelect;
         std::function<void()> onDelete;
+        std::function<void()> onSetDefault;
+        std::function<void()> onClearDefault;
 
         void paint(juce::Graphics& g) override;
         void mouseDown(const juce::MouseEvent& e) override;
+        void mouseUp(const juce::MouseEvent& e) override;
         void mouseEnter(const juce::MouseEvent&) override { repaint(); }
         void mouseExit(const juce::MouseEvent&) override { repaint(); }
         void mouseMove(const juce::MouseEvent&) override;

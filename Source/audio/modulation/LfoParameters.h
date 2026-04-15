@@ -515,6 +515,15 @@ public:
     juce::String previewEffectId;
     std::vector<std::pair<juce::String, float>> previewSavedParamValues;
 
+    struct SavedLfoState {
+        int lfoIndex;
+        LfoPreset preset;
+        LfoWaveform waveform;
+        bool isCustom;
+        float rateValue;
+    };
+    std::vector<SavedLfoState> previewSavedLfoStates;
+
     // Start previewing: save current param values, auto-assign LFOs to the effect.
     void startPreview(const juce::String& effectId,
                       const std::vector<std::shared_ptr<osci::Effect>>& effects,
@@ -524,10 +533,24 @@ public:
         for (auto& eff : effects) {
             if (eff->getId() == effectId) {
                 previewSavedParamValues.clear();
+                previewSavedLfoStates.clear();
+
+                // Save param values
                 for (auto* param : eff->parameters) {
                     if (param->lfoTypeDefault != osci::LfoType::Static)
                         previewSavedParamValues.emplace_back(param->paramID, param->getValueUnnormalised());
                 }
+
+                // Save LFO waveform/preset state for all LFOs (before auto-assign modifies them)
+                previewSavedLfoStates.reserve(NUM_LFOS);
+                for (int i = 0; i < NUM_LFOS; ++i) {
+                    juce::SpinLock::ScopedLockType lock(waveformLock);
+                    previewSavedLfoStates.push_back({
+                        i, getPreset(i), waveforms[i], getIsCustom(i),
+                        rate[i] != nullptr ? rate[i]->getValueUnnormalised() : 1.0f
+                    });
+                }
+
                 autoAssignForEffect(*eff);
                 previewEffectId = effectId;
                 break;
@@ -554,7 +577,21 @@ public:
                 break;
             }
         }
+
+        // Restore LFO waveform/preset states
+        for (const auto& saved : previewSavedLfoStates) {
+            {
+                juce::SpinLock::ScopedLockType lock(waveformLock);
+                setPreset(saved.lfoIndex, saved.preset);
+                waveforms[saved.lfoIndex] = saved.waveform;
+                setIsCustom(saved.lfoIndex, saved.isCustom);
+            }
+            if (rate[saved.lfoIndex] != nullptr)
+                rate[saved.lfoIndex]->setUnnormalisedValueNotifyingHost(saved.rateValue);
+        }
+
         previewSavedParamValues.clear();
+        previewSavedLfoStates.clear();
         previewEffectId = juce::String();
     }
 
@@ -562,6 +599,7 @@ public:
     void promotePreview() {
         jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
         previewSavedParamValues.clear();
+        previewSavedLfoStates.clear();
         previewEffectId = juce::String();
     }
 };

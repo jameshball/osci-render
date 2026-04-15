@@ -34,9 +34,12 @@ LfoPresetBrowserOverlay::LfoPresetBrowserOverlay(LfoPresetManager& manager, List
     browserPanel.addAndMakeVisible(saveButton);
 }
 
-void LfoPresetBrowserOverlay::show(LfoPreset currentFactoryPreset, const juce::String& currentUserName) {
+void LfoPresetBrowserOverlay::show(LfoPreset currentFactoryPreset, const juce::String& currentUserName,
+                                    const juce::String& defaultFactoryName, const juce::String& defaultFileName) {
     activeFactoryPreset = currentFactoryPreset;
     activeUserName = currentUserName;
+    defaultFactoryPresetName = defaultFactoryName;
+    defaultPresetFilePath = defaultFileName;
 
     rebuildContent();
     resized();
@@ -50,9 +53,12 @@ void LfoPresetBrowserOverlay::resized() {
     browserPanel.setBounds(getLocalBounds());
 }
 
-void LfoPresetBrowserOverlay::refresh(LfoPreset currentFactoryPreset, const juce::String& currentUserName) {
+void LfoPresetBrowserOverlay::refresh(LfoPreset currentFactoryPreset, const juce::String& currentUserName,
+                                       const juce::String& defaultFactoryName, const juce::String& defaultFileName) {
     activeFactoryPreset = currentFactoryPreset;
     activeUserName = currentUserName;
+    defaultFactoryPresetName = defaultFactoryName;
+    defaultPresetFilePath = defaultFileName;
     rebuildContent();
 }
 
@@ -115,10 +121,29 @@ void LfoPresetBrowserOverlay::PresetRow::paint(juce::Graphics& g) {
 
     g.setColour(isActive ? juce::Colours::white : juce::Colours::white.withAlpha(0.75f));
     g.setFont(juce::Font(12.5f));
-    g.drawText(name, textBounds, juce::Justification::centredLeft);
+
+    juce::String displayName = name;
+    if (isDefault)
+        displayName += " (default)";
+    g.drawText(displayName, textBounds, juce::Justification::centredLeft);
 }
 
 void LfoPresetBrowserOverlay::PresetRow::mouseDown(const juce::MouseEvent& e) {
+    if (e.mods.isRightButtonDown()) {
+        juce::PopupMenu menu;
+        if (isDefault) {
+            menu.addItem("Clear Default", [this]() { if (onClearDefault) onClearDefault(); });
+        } else {
+            menu.addItem("Set as Default", [this]() { if (onSetDefault) onSetDefault(); });
+        }
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetScreenArea(
+            { e.getScreenX(), e.getScreenY(), 1, 1 }));
+    }
+}
+
+void LfoPresetBrowserOverlay::PresetRow::mouseUp(const juce::MouseEvent& e) {
+    if (e.mods.isRightButtonDown()) return;
+
     auto bounds = getLocalBounds();
     if (isUserPreset) {
         auto deleteArea = bounds.removeFromRight(kDeleteButtonSize + 8);
@@ -189,10 +214,17 @@ void LfoPresetBrowserOverlay::rebuildContent() {
         auto* row = new PresetRow();
         row->name = registry[i].name;
         row->isActive = (registry[i].preset == activeFactoryPreset) && activeUserName.isEmpty();
+        row->isDefault = (defaultPresetFilePath.isEmpty() && defaultFactoryPresetName == registry[i].name);
         row->isUserPreset = false;
         auto preset = registry[i].preset;
         row->onSelect = [this, preset]() {
             if (browserListener) browserListener->presetBrowserFactorySelected(preset);
+        };
+        row->onSetDefault = [this, preset]() {
+            if (browserListener) browserListener->presetBrowserSetDefaultFactory(preset);
+        };
+        row->onClearDefault = [this]() {
+            if (browserListener) browserListener->presetBrowserClearDefault();
         };
         rows.add(row);
         content.addAndMakeVisible(row);
@@ -215,6 +247,7 @@ void LfoPresetBrowserOverlay::rebuildContent() {
             auto* row = new PresetRow();
             row->name = userPresets[i].name;
             row->isActive = (activeUserName == userPresets[i].name);
+            row->isDefault = (userPresets[i].file.getFullPathName() == defaultPresetFilePath);
             row->isUserPreset = true;
             row->file = userPresets[i].file;
             auto file = userPresets[i].file;
@@ -223,6 +256,12 @@ void LfoPresetBrowserOverlay::rebuildContent() {
             };
             row->onDelete = [this, file]() {
                 if (browserListener) browserListener->presetBrowserUserDeleted(file);
+            };
+            row->onSetDefault = [this, file]() {
+                if (browserListener) browserListener->presetBrowserSetDefaultFile(file);
+            };
+            row->onClearDefault = [this]() {
+                if (browserListener) browserListener->presetBrowserClearDefault();
             };
             rows.add(row);
             content.addAndMakeVisible(row);
@@ -253,10 +292,17 @@ void LfoPresetBrowserOverlay::rebuildContent() {
             auto* row = new PresetRow();
             row->name = vitalPresets[i].name;
             row->isActive = (activeUserName == vitalPresets[i].name);
+            row->isDefault = (vitalPresets[i].file.getFullPathName() == defaultPresetFilePath);
             row->isUserPreset = false;
             auto file = vitalPresets[i].file;
             row->onSelect = [this, file]() {
                 if (browserListener) browserListener->presetBrowserUserSelected(file);
+            };
+            row->onSetDefault = [this, file]() {
+                if (browserListener) browserListener->presetBrowserSetDefaultFile(file);
+            };
+            row->onClearDefault = [this]() {
+                if (browserListener) browserListener->presetBrowserClearDefault();
             };
             rows.add(row);
             content.addAndMakeVisible(row);

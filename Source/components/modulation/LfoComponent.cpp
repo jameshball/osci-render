@@ -239,11 +239,43 @@ LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
       presetBrowser(presetManager, this),
       rateControl(buildLfoRateConfig(processor), 0),
       modeControl(buildLfoModeConfig(processor), 0) {
-    // Initialize all LFOs with default triangle preset
+    // Initialize all LFOs with the global default preset (or Triangle if none set)
+    LfoPreset defaultPreset = LfoPreset::Triangle;
+    LfoWaveform defaultWaveform;
+    bool defaultIsFile = false;
+    juce::String defaultUserName;
+
+    juce::String defaultFileStr = audioProcessor.getGlobalStringValue("defaultLfoPresetFile");
+    juce::String defaultFactoryStr = audioProcessor.getGlobalStringValue("defaultLfoPreset");
+
+    if (defaultFileStr.isNotEmpty()) {
+        juce::File file(defaultFileStr);
+        if (file.existsAsFile()) {
+            LfoWaveform waveform;
+            juce::String name;
+            if (presetManager.loadPreset(file, waveform, name)) {
+                defaultWaveform = waveform;
+                defaultUserName = name;
+                defaultIsFile = true;
+            }
+        }
+    }
+    if (!defaultIsFile && defaultFactoryStr.isNotEmpty()) {
+        auto parsed = stringToLfoPreset(defaultFactoryStr);
+        if (parsed.has_value())
+            defaultPreset = *parsed;
+    }
+
     for (int i = 0; i < NUM_LFOS; ++i) {
-        lfoData[i].preset = LfoPreset::Triangle;
-        lfoData[i].waveform = createLfoPreset(LfoPreset::Triangle);
-        lfoData[i].factoryWaveform = lfoData[i].waveform;
+        lfoData[i].preset = defaultPreset;
+        if (defaultIsFile) {
+            lfoData[i].waveform = defaultWaveform;
+            lfoData[i].isCustom = true;
+            lfoData[i].userPresetName = defaultUserName;
+        } else {
+            lfoData[i].waveform = createLfoPreset(defaultPreset);
+        }
+        lfoData[i].factoryWaveform = createLfoPreset(defaultPreset);
     }
 
     // Setup graph
@@ -790,7 +822,8 @@ void LfoComponent::showPresetBrowser() {
     presetBrowser.setBounds(presetBrowserBounds);
 
     int idx = getActiveSourceIndex();
-    presetBrowser.show(lfoData[idx].preset, lfoData[idx].userPresetName);
+    presetBrowser.show(lfoData[idx].preset, lfoData[idx].userPresetName,
+                        getDefaultFactoryName(), getDefaultFilePath());
 }
 
 void LfoComponent::dismissPresetBrowser() {
@@ -835,7 +868,8 @@ void LfoComponent::presetBrowserUserDeleted(const juce::File& file) {
 
     // Refresh the overlay
     if (presetBrowserVisible)
-        presetBrowser.refresh(lfoData[idx].preset, lfoData[idx].userPresetName);
+        presetBrowser.refresh(lfoData[idx].preset, lfoData[idx].userPresetName,
+                              getDefaultFactoryName(), getDefaultFilePath());
 }
 
 void LfoComponent::presetBrowserSaveRequested(const juce::String& name) {
@@ -846,8 +880,7 @@ void LfoComponent::presetBrowserSaveRequested(const juce::String& name) {
     updatePresetLabel();
 
     // Refresh the overlay to show the new preset
-    if (presetBrowserVisible)
-        presetBrowser.refresh(lfoData[idx].preset, lfoData[idx].userPresetName);
+    refreshPresetBrowserIfVisible();
 }
 
 void LfoComponent::loadUserPreset(const juce::File& file) {
@@ -870,4 +903,41 @@ void LfoComponent::loadUserPreset(const juce::File& file) {
     syncGraphToActiveLfo();
     recordLfoUndoableChangeGuarded(nodesBefore, waveformBefore, idx);
     updatePresetLabel();
+}
+
+void LfoComponent::presetBrowserSetDefaultFactory(LfoPreset preset) {
+    audioProcessor.setGlobalValue("defaultLfoPreset", lfoPresetToString(preset));
+    audioProcessor.removeGlobalValue("defaultLfoPresetFile");
+    audioProcessor.saveGlobalSettings();
+    refreshPresetBrowserIfVisible();
+}
+
+void LfoComponent::presetBrowserSetDefaultFile(const juce::File& file) {
+    audioProcessor.setGlobalValue("defaultLfoPresetFile", file.getFullPathName());
+    audioProcessor.removeGlobalValue("defaultLfoPreset");
+    audioProcessor.saveGlobalSettings();
+    refreshPresetBrowserIfVisible();
+}
+
+void LfoComponent::presetBrowserClearDefault() {
+    audioProcessor.removeGlobalValue("defaultLfoPreset");
+    audioProcessor.removeGlobalValue("defaultLfoPresetFile");
+    audioProcessor.saveGlobalSettings();
+    refreshPresetBrowserIfVisible();
+}
+
+juce::String LfoComponent::getDefaultFactoryName() const {
+    return audioProcessor.getGlobalStringValue("defaultLfoPreset");
+}
+
+juce::String LfoComponent::getDefaultFilePath() const {
+    return audioProcessor.getGlobalStringValue("defaultLfoPresetFile");
+}
+
+void LfoComponent::refreshPresetBrowserIfVisible() {
+    if (presetBrowserVisible) {
+        int idx = getActiveSourceIndex();
+        presetBrowser.refresh(lfoData[idx].preset, lfoData[idx].userPresetName,
+                              getDefaultFactoryName(), getDefaultFilePath());
+    }
 }

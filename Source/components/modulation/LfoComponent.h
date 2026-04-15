@@ -47,6 +47,9 @@ public:
     void presetBrowserUserSelected(const juce::File& file) override;
     void presetBrowserUserDeleted(const juce::File& file) override;
     void presetBrowserSaveRequested(const juce::String& name) override;
+    void presetBrowserSetDefaultFactory(LfoPreset preset) override;
+    void presetBrowserSetDefaultFile(const juce::File& file) override;
+    void presetBrowserClearDefault() override;
 
 protected:
     void onActiveSourceChanged(int newIndex) override;
@@ -172,6 +175,9 @@ private:
     void loadUserPreset(const juce::File& file);
     void copyWaveformToClipboard();
     void pasteWaveformFromClipboard();
+    juce::String getDefaultFactoryName() const;
+    juce::String getDefaultFilePath() const;
+    void refreshPresetBrowserIfVisible();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LfoComponent)
 };
