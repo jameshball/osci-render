@@ -44,20 +44,25 @@ namespace ParameterContextMenu {
 
         if (ctx.midiCCManager != nullptr && ctx.param != nullptr) {
             menu.addSeparator();
-            int assignedCC = ctx.midiCCManager->getAssignedCC(ctx.param);
+            auto assignment = ctx.midiCCManager->getAssignment(ctx.param);
             bool learning = ctx.midiCCManager->isLearning(ctx.param);
+
+            auto describeAssignment = [&]() -> juce::String {
+                return "CC " + juce::String(assignment.cc)
+                       + " Ch " + juce::String(assignment.channel);
+            };
 
             if (learning) {
                 menu.addItem(firstId + kLearnCC, "Cancel MIDI CC Learn", true, true);
             } else {
                 juce::String learnText = "Learn MIDI CC Assignment";
-                if (assignedCC >= 0)
-                    learnText += " (CC " + juce::String(assignedCC) + ")";
+                if (assignment.isValid())
+                    learnText += " (" + describeAssignment() + ")";
                 menu.addItem(firstId + kLearnCC, learnText);
             }
 
-            if (assignedCC >= 0)
-                menu.addItem(firstId + kRemoveCC, "Remove MIDI CC Assignment (CC " + juce::String(assignedCC) + ")");
+            if (assignment.isValid())
+                menu.addItem(firstId + kRemoveCC, "Remove MIDI CC Assignment (" + describeAssignment() + ")");
         }
 
         return firstId + kCount;

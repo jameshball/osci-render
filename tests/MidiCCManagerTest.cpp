@@ -96,6 +96,9 @@ public:
         testCCValueMapsToInt();
         testLearningCancellation();
         testNoAssignment();
+        testSameCCDifferentChannels();
+        testChannelIsRespected();
+        testLearnCapturesChannel();
     }
 
 private:
@@ -275,6 +278,83 @@ private:
         pumpMessageLoop(100);
         expectWithinAbsoluteError(param->getValueUnnormalised(), before, 0.001f);
     }
+
+    void testSameCCDifferentChannels() {
+        beginTest("Same CC on different channels maps to different parameters");
+
+        osci::MidiCCManager mgr;
+        auto paramA = makeFloat("paramA", 0.0f, 0.0f, 1.0f);
+        auto paramB = makeFloat("paramB", 0.0f, 0.0f, 1.0f);
+
+        // Assign CC 4 on channel 1 to paramA
+        mgr.startLearning(paramA.get());
+        mgr.processMidiBuffer(makeCCBuffer(4, 64, 1));
+        pumpMessageLoop(200);
+
+        // Assign CC 4 on channel 2 to paramB (must NOT steal paramA's mapping)
+        mgr.startLearning(paramB.get());
+        mgr.processMidiBuffer(makeCCBuffer(4, 64, 2));
+        pumpMessageLoop(200);
+
+        auto a = mgr.getAssignment(paramA.get());
+        auto b = mgr.getAssignment(paramB.get());
+        expectEquals(a.cc, 4);
+        expectEquals(a.channel, 1);
+        expectEquals(b.cc, 4);
+        expectEquals(b.channel, 2);
+
+        // CC 4 on ch 1 should move paramA only
+        mgr.processMidiBuffer(makeCCBuffer(4, 127, 1));
+        pumpMessageLoop(200);
+        expectWithinAbsoluteError(paramA->getValueUnnormalised(), 1.0f, 0.15f);
+        expectWithinAbsoluteError(paramB->getValueUnnormalised(), 0.0f, 0.15f);
+
+        // CC 4 on ch 2 should move paramB only
+        mgr.processMidiBuffer(makeCCBuffer(4, 127, 2));
+        pumpMessageLoop(200);
+        expectWithinAbsoluteError(paramB->getValueUnnormalised(), 1.0f, 0.15f);
+    }
+
+    void testChannelIsRespected() {
+        beginTest("CC on an unassigned channel does not affect parameter");
+
+        osci::MidiCCManager mgr;
+        auto param = makeFloat("p", 0.0f, 0.0f, 1.0f);
+
+        mgr.startLearning(param.get());
+        mgr.processMidiBuffer(makeCCBuffer(10, 64, 3));
+        pumpMessageLoop(200);
+        expectEquals(mgr.getAssignment(param.get()).channel, 3);
+
+        // Send CC 10 on channels 1, 2, 4..16 — parameter must stay at current value.
+        const float before = param->getValueUnnormalised();
+        for (int ch = 1; ch <= 16; ++ch) {
+            if (ch == 3) continue;
+            mgr.processMidiBuffer(makeCCBuffer(10, 127, ch));
+        }
+        pumpMessageLoop(200);
+        expectWithinAbsoluteError(param->getValueUnnormalised(), before, 0.001f);
+
+        // Sanity: the assigned channel still works.
+        mgr.processMidiBuffer(makeCCBuffer(10, 127, 3));
+        pumpMessageLoop(200);
+        expectWithinAbsoluteError(param->getValueUnnormalised(), 1.0f, 0.15f);
+    }
+
+    void testLearnCapturesChannel() {
+        beginTest("Learn records the MIDI channel from the incoming message");
+
+        osci::MidiCCManager mgr;
+        auto param = makeFloat("p");
+
+        mgr.startLearning(param.get());
+        mgr.processMidiBuffer(makeCCBuffer(7, 64, 9));
+        pumpMessageLoop(200);
+
+        auto a = mgr.getAssignment(param.get());
+        expectEquals(a.cc, 7);
+        expectEquals(a.channel, 9);
+    }
 };
 
 static MidiCCAssignmentTest midiCCAssignmentTest;
@@ -290,6 +370,8 @@ public:
         testLoadWithMissingParams();
         testLoadEmptyXml();
         testClearAllAssignments();
+        testSaveAndLoadPreservesChannel();
+        testLoadBackCompatDefaultsToChannel1();
     }
 
 private:
@@ -384,6 +466,71 @@ private:
 
         mgr.clearAllAssignments();
         expectEquals(mgr.getAssignedCC(param.get()), -1);
+    }
+
+    void testSaveAndLoadPreservesChannel() {
+        beginTest("Save and load preserves MIDI channel");
+
+        auto paramA = makeFloat("paramA", 0.0f, 0.0f, 1.0f);
+        auto paramB = makeFloat("paramB", 0.0f, 0.0f, 1.0f);
+
+        osci::MidiCCManager src;
+        // paramA: CC 4 ch 1
+        src.startLearning(paramA.get());
+        src.processMidiBuffer(makeCCBuffer(4, 64, 1));
+        pumpMessageLoop(200);
+        // paramB: CC 4 ch 2
+        src.startLearning(paramB.get());
+        src.processMidiBuffer(makeCCBuffer(4, 64, 2));
+        pumpMessageLoop(200);
+
+        juce::XmlElement xml("state");
+        src.save(&xml);
+
+        auto paramA2 = makeFloat("paramA", 0.0f, 0.0f, 1.0f);
+        auto paramB2 = makeFloat("paramB", 0.0f, 0.0f, 1.0f);
+        osci::MidiCCManager dst;
+        dst.load(&xml, [&](const juce::String& id) -> osci::MidiCCManager::ParamBinding {
+            if (id == "paramA") return osci::MidiCCManager::makeBinding(paramA2.get());
+            if (id == "paramB") return osci::MidiCCManager::makeBinding(paramB2.get());
+            return {};
+        });
+
+        auto a = dst.getAssignment(paramA2.get());
+        auto b = dst.getAssignment(paramB2.get());
+        expectEquals(a.cc, 4);
+        expectEquals(a.channel, 1);
+        expectEquals(b.cc, 4);
+        expectEquals(b.channel, 2);
+
+        // Verify only the matching channel triggers each parameter.
+        dst.processMidiBuffer(makeCCBuffer(4, 127, 1));
+        pumpMessageLoop(200);
+        expectWithinAbsoluteError(paramA2->getValueUnnormalised(), 1.0f, 0.15f);
+        expectWithinAbsoluteError(paramB2->getValueUnnormalised(), 0.0f, 0.15f);
+    }
+
+    void testLoadBackCompatDefaultsToChannel1() {
+        beginTest("Load without channel attribute defaults to channel 1");
+
+        // Hand-craft an XML blob simulating a pre-channel save.
+        juce::XmlElement xml("state");
+        auto* mcc = xml.createNewChildElement("midiCCAssignments");
+        auto* a = mcc->createNewChildElement("assignment");
+        a->setAttribute("paramId", "p");
+        a->setAttribute("cc", 4);
+        // no "channel" attribute
+
+        auto param = makeFloat("p");
+        osci::MidiCCManager mgr;
+        mgr.load(&xml, [&](const juce::String& id) -> osci::MidiCCManager::ParamBinding {
+            if (id == "p") return osci::MidiCCManager::makeBinding(param.get());
+            return {};
+        });
+
+        auto assignment = mgr.getAssignment(param.get());
+        expectEquals(assignment.cc, 4);
+        expectEquals(assignment.channel, 1);
     }
 };
 
