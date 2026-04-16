@@ -3,6 +3,7 @@
 #include "../../LookAndFeel.h"
 #include "../../audio/modulation/ModulationTypes.h"
 #include "InlineEditorHelper.h"
+#include <osci_render_core/midi/osci_MidiCCManager.h>
 
 // ============================================================================
 // DepthIndicator – small arc knob for a single source→param connection
@@ -132,9 +133,41 @@ void ModulationSourceComponent::DepthIndicator::showRightClickMenu() {
     menu.addSeparator();
     menu.addItem(3, "Enter Value");
 
+#if OSCI_PREMIUM
+    osci::MidiCCManager* ccMgr = owner.config.midiCCManager;
+    juce::String ccId;
+    if (ccMgr != nullptr
+        && owner.config.buildModDepthCustomId
+        && owner.config.buildModDepthSetter) {
+        ccId = owner.config.buildModDepthCustomId(sourceIndex, paramId);
+        auto assignment = ccMgr->getCustomAssignment(ccId);
+        bool learning = ccMgr->isLearningCustom(ccId);
+
+        menu.addSeparator();
+        if (learning) {
+            menu.addItem(4, "Cancel MIDI CC Learn", true, true);
+        } else {
+            juce::String learnText = "Learn MIDI CC Assignment";
+            if (assignment.isValid())
+                learnText += " (CC " + juce::String(assignment.cc)
+                             + " Ch " + juce::String(assignment.channel) + ")";
+            menu.addItem(4, learnText);
+        }
+        if (assignment.isValid()) {
+            menu.addItem(5, "Remove MIDI CC Assignment (CC "
+                           + juce::String(assignment.cc)
+                           + " Ch " + juce::String(assignment.channel) + ")");
+        }
+    }
+#endif
+
     juce::Component::SafePointer<DepthIndicator> safeThis(this);
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this),
-        [safeThis](int result) {
+        [safeThis
+#if OSCI_PREMIUM
+         , ccMgr, ccId
+#endif
+        ](int result) {
             if (safeThis == nullptr) return;
             if (result == 1) {
                 safeThis->removeAndRefresh();
@@ -146,6 +179,20 @@ void ModulationSourceComponent::DepthIndicator::showRightClickMenu() {
             } else if (result == 3) {
                 safeThis->startTextEdit();
             }
+#if OSCI_PREMIUM
+            else if (result == 4 && ccMgr != nullptr && ccId.isNotEmpty()) {
+                if (ccMgr->isLearningCustom(ccId)) {
+                    ccMgr->stopLearning();
+                } else {
+                    auto setter = safeThis->owner.config.buildModDepthSetter(
+                        safeThis->sourceIndex, safeThis->paramId);
+                    if (setter)
+                        ccMgr->startLearningCustom(ccId, std::move(setter));
+                }
+            } else if (result == 5 && ccMgr != nullptr && ccId.isNotEmpty()) {
+                ccMgr->removeCustomAssignment(ccId);
+            }
+#endif
         });
 }
 

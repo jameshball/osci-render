@@ -121,6 +121,27 @@ public:
     void setStateInformation(const void* data, int sizeInBytes) override;
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
+
+    // --- Modulation-depth MIDI CC helpers ---
+
+    // Builds the MidiCCManager custom-target id for a (typeId, sourceIndex, paramId)
+    // modulation assignment. Stable across sessions — used both at learn time and at load.
+    static juce::String modDepthCustomId(const juce::String& typeId,
+                                          int sourceIndex,
+                                          const juce::String& paramId);
+
+    // Returns a setter function that, given a normalised CC value in [0,1],
+    // updates the depth of the matching modulation assignment (preserving its
+    // bipolar flag). Safe to call from the message thread. Returns an empty
+    // function if no modulation source of |typeId| is registered.
+    std::function<void(float)> buildModDepthSetter(const juce::String& typeId,
+                                                    int sourceIndex,
+                                                    const juce::String& paramId);
+
+    // Call this after mod assignments have been (re)loaded to re-attach live
+    // setters to any custom-target CC mappings that were restored inert by
+    // MidiCCManager::load().
+    void rebindAllModDepthCCMappings();
     DahdsrParams getCurrentDahdsrParams() const;
     DahdsrParams getCurrentDahdsrParams(int envIndex) const;
 

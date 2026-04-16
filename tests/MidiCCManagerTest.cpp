@@ -372,9 +372,25 @@ public:
         testClearAllAssignments();
         testSaveAndLoadPreservesChannel();
         testLoadBackCompatDefaultsToChannel1();
+        testCustomTargetLearnAndDeliver();
+        testCustomTargetSaveAndLoadPreservesBinding();
+        testCustomTargetRemove();
+        testCustomTargetRebindAfterLoad();
     }
 
 private:
+    // ------- Custom-target helpers -------
+    struct CapturedValue {
+        std::atomic<float> value { -1.0f };
+        std::atomic<int>   calls { 0 };
+    };
+
+    static osci::MidiCCManager::CustomSetter makeCapturingSetter(CapturedValue& capture) {
+        return [&capture](float v) {
+            capture.value.store(v, std::memory_order_release);
+            capture.calls.fetch_add(1, std::memory_order_release);
+        };
+    }
     void testSaveAndLoad() {
         beginTest("Save and load preserves CC assignments");
 
@@ -531,6 +547,121 @@ private:
         auto assignment = mgr.getAssignment(param.get());
         expectEquals(assignment.cc, 4);
         expectEquals(assignment.channel, 1);
+    }
+
+    void testCustomTargetLearnAndDeliver() {
+        beginTest("Custom target: learn binds CC and delivers values to setter");
+
+        osci::MidiCCManager mgr;
+        CapturedValue captured;
+
+        mgr.startLearningCustom("mod:lfo:0:someParam", makeCapturingSetter(captured));
+        expect(mgr.isLearning(), "Manager should be in learning mode");
+        expect(mgr.isLearningCustom("mod:lfo:0:someParam"));
+
+        mgr.processMidiBuffer(makeCCBuffer(7, 127, 3));
+        pumpMessageLoop(200);
+
+        auto assignment = mgr.getCustomAssignment("mod:lfo:0:someParam");
+        expectEquals(assignment.cc, 7);
+        expectEquals(assignment.channel, 3);
+        expect(!mgr.isLearning(), "Learning should end after CC captured");
+
+        // Send a CC value of 0 — setter should receive 0.0
+        mgr.processMidiBuffer(makeCCBuffer(7, 0, 3));
+        pumpUntil([&]() { return captured.calls.load() >= 1; });
+        expectWithinAbsoluteError(captured.value.load(), 0.0f, 0.001f);
+
+        // Send 127 — setter should receive 1.0
+        mgr.processMidiBuffer(makeCCBuffer(7, 127, 3));
+        pumpUntil([&]() { return captured.calls.load() >= 2; });
+        expectWithinAbsoluteError(captured.value.load(), 1.0f, 0.01f);
+
+        // Wrong channel: should NOT trigger setter.
+        int beforeCalls = captured.calls.load();
+        mgr.processMidiBuffer(makeCCBuffer(7, 64, 5));
+        pumpMessageLoop(100);
+        expectEquals(captured.calls.load(), beforeCalls);
+    }
+
+    void testCustomTargetSaveAndLoadPreservesBinding() {
+        beginTest("Custom target: save/load restores binding (inert until rebind)");
+
+        osci::MidiCCManager src;
+        CapturedValue srcCapture;
+        src.startLearningCustom("mod:env:1:thing", makeCapturingSetter(srcCapture));
+        src.processMidiBuffer(makeCCBuffer(9, 64, 4));
+        pumpMessageLoop(200);
+
+        auto srcAssign = src.getCustomAssignment("mod:env:1:thing");
+        expectEquals(srcAssign.cc, 9);
+        expectEquals(srcAssign.channel, 4);
+
+        juce::XmlElement xml("state");
+        src.save(&xml);
+
+        // Load: XML contains the custom entry, which should be restored inert.
+        osci::MidiCCManager dst;
+        dst.load(&xml, [](const juce::String&) -> osci::MidiCCManager::ParamBinding { return {}; });
+
+        auto dstAssign = dst.getCustomAssignment("mod:env:1:thing");
+        expectEquals(dstAssign.cc, 9);
+        expectEquals(dstAssign.channel, 4);
+
+        // Before rebinding: CCs arrive but no setter runs (no crash).
+        dst.processMidiBuffer(makeCCBuffer(9, 127, 4));
+        pumpMessageLoop(100);
+
+        // Rebind: now setter fires on subsequent CCs.
+        CapturedValue dstCapture;
+        dst.rebindCustomSetter("mod:env:1:thing", makeCapturingSetter(dstCapture));
+        dst.processMidiBuffer(makeCCBuffer(9, 127, 4));
+        pumpUntil([&]() { return dstCapture.calls.load() >= 1; });
+        expectWithinAbsoluteError(dstCapture.value.load(), 1.0f, 0.01f);
+    }
+
+    void testCustomTargetRemove() {
+        beginTest("Custom target: removeCustomAssignment detaches and halts delivery");
+
+        osci::MidiCCManager mgr;
+        CapturedValue captured;
+        mgr.startLearningCustom("mod:rng:2:foo", makeCapturingSetter(captured));
+        mgr.processMidiBuffer(makeCCBuffer(12, 64, 1));
+        pumpMessageLoop(200);
+
+        mgr.processMidiBuffer(makeCCBuffer(12, 127, 1));
+        pumpUntil([&]() { return captured.calls.load() >= 1; });
+        int before = captured.calls.load();
+
+        mgr.removeCustomAssignment("mod:rng:2:foo");
+        expectEquals(mgr.getCustomAssignment("mod:rng:2:foo").cc, -1);
+
+        mgr.processMidiBuffer(makeCCBuffer(12, 0, 1));
+        pumpMessageLoop(100);
+        expectEquals(captured.calls.load(), before);
+    }
+
+    void testCustomTargetRebindAfterLoad() {
+        beginTest("Custom target: learn replaces a param mapping in the same slot");
+
+        // Start with a param CC mapping on CC 20 ch 1
+        osci::MidiCCManager mgr;
+        auto param = makeFloat("somePar");
+        mgr.startLearning(param.get());
+        mgr.processMidiBuffer(makeCCBuffer(20, 64, 1));
+        pumpMessageLoop(200);
+        expectEquals(mgr.getAssignedCC(param.get()), 20);
+
+        // Now learn a custom target on the same CC — should evict the param.
+        CapturedValue captured;
+        mgr.startLearningCustom("mod:lfo:3:x", makeCapturingSetter(captured));
+        mgr.processMidiBuffer(makeCCBuffer(20, 0, 1));
+        pumpMessageLoop(200);
+
+        expectEquals(mgr.getAssignedCC(param.get()), -1);
+        auto a = mgr.getCustomAssignment("mod:lfo:3:x");
+        expectEquals(a.cc, 20);
+        expectEquals(a.channel, 1);
     }
 };
 

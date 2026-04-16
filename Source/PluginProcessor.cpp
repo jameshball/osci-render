@@ -1389,6 +1389,9 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         objectServer.reload();
 
         loadMidiCCState(xml.get());
+#if OSCI_PREMIUM
+        rebindAllModDepthCCMappings();
+#endif
 
         broadcaster.sendChangeMessage();
         prevMidiEnabled = !midiEnabled->getBoolValue();
@@ -1440,6 +1443,53 @@ void OscirenderAudioProcessor::parameterGestureChanged(int parameterIndex, bool 
 
 void OscirenderAudioProcessor::removeAllAssignmentsForEffect(const osci::Effect& effect) {
     modulationEngine.removeAllAssignmentsForEffect(effect);
+}
+
+// --- Modulation-depth MIDI CC helpers ---
+
+juce::String OscirenderAudioProcessor::modDepthCustomId(const juce::String& typeId,
+                                                        int sourceIndex,
+                                                        const juce::String& paramId) {
+    return "mod:" + typeId + ":" + juce::String(sourceIndex) + ":" + paramId;
+}
+
+std::function<void(float)> OscirenderAudioProcessor::buildModDepthSetter(
+        const juce::String& typeId, int sourceIndex, const juce::String& paramId) {
+    // Find the modulation source matching typeId. Sources are stable after
+    // construction so capturing the pointer is safe for the processor's lifetime.
+    ModulationSource* matched = nullptr;
+    for (auto* src : modulationEngine.getSources()) {
+        if (src->getTypeId() == typeId) { matched = src; break; }
+    }
+    if (matched == nullptr) return {};
+
+    return [matched, sourceIndex, paramId](float normValue) {
+        jassert(juce::MessageManager::existsAndIsCurrentThread());
+        // Map CC [0,1] to depth [-1,1].
+        float depth = juce::jlimit(-1.0f, 1.0f, normValue * 2.0f - 1.0f);
+        // Preserve the existing bipolar flag if an assignment is already present.
+        bool bipolar = false;
+        auto all = matched->getAssignments();
+        for (const auto& a : all) {
+            if (a.sourceIndex == sourceIndex && a.paramId == paramId) {
+                bipolar = a.bipolar;
+                break;
+            }
+        }
+        matched->addAssignment({ sourceIndex, paramId, depth, bipolar });
+    };
+}
+
+void OscirenderAudioProcessor::rebindAllModDepthCCMappings() {
+    for (auto* src : modulationEngine.getSources()) {
+        const auto typeId = src->getTypeId();
+        for (const auto& a : src->getAssignments()) {
+            auto id = modDepthCustomId(typeId, a.sourceIndex, a.paramId);
+            auto setter = buildModDepthSetter(typeId, a.sourceIndex, a.paramId);
+            if (setter)
+                midiCCManager.rebindCustomSetter(id, std::move(setter));
+        }
+    }
 }
 
 std::vector<ModulationSourceBinding> OscirenderAudioProcessor::getModulationSourceBindings() {

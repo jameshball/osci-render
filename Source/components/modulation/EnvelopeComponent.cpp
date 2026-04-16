@@ -100,7 +100,6 @@ static ModulationSourceConfig buildEnvConfig(OscirenderAudioProcessor& proc) {
     cfg.isSourceActive = [&proc](int i) { return proc.envelopeParameters.isActive(i); };
     cfg.getLabel = [](int i) { return "ENV " + juce::String(i + 1); };
 
-#if OSCI_PREMIUM
     cfg.dragPrefix = "ENV";
     cfg.getAssignments = [&proc]() { return proc.envelopeParameters.getAssignments(); };
     cfg.addAssignment = [&proc](const ModAssignment& a) { proc.envelopeParameters.addAssignment(a); };
@@ -111,6 +110,15 @@ static ModulationSourceConfig buildEnvConfig(OscirenderAudioProcessor& proc) {
     cfg.broadcaster = &proc.broadcaster;
     cfg.getActiveTab = [&proc]() { return proc.envelopeParameters.activeTab; };
     cfg.setActiveTab = [&proc](int i) { proc.envelopeParameters.activeTab = i; };
+#if OSCI_PREMIUM
+    cfg.typeId = "env";
+    cfg.midiCCManager = &proc.midiCCManager;
+    cfg.buildModDepthCustomId = [](int idx, const juce::String& pid) {
+        return OscirenderAudioProcessor::modDepthCustomId("env", idx, pid);
+    };
+    cfg.buildModDepthSetter = [&proc](int idx, const juce::String& pid) {
+        return proc.buildModDepthSetter("env", idx, pid);
+    };
 #endif
     return cfg;
 }

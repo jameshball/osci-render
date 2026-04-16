@@ -7,6 +7,8 @@
 #include "../ScrollFadeViewport.h"
 #include "../HoverAnimationMixin.h"
 
+namespace osci { class MidiCCManager; }
+
 class EffectComponent;
 
 // Configuration struct for a modulation source panel.
@@ -15,6 +17,7 @@ class EffectComponent;
 struct ModulationSourceConfig {
     int sourceCount = 1;
     juce::String dragPrefix;  // "LFO", "ENV", "RNG" — used as "MOD:LFO:0" drag description
+    juce::String typeId;      // "lfo", "env", "rng", "sc" — matches ModulationSource::getTypeId()
 
     std::function<juce::String(int)> getLabel;        // "LFO 1", "ENV 1"
     std::function<juce::Colour(int)> getSourceColour;
@@ -38,6 +41,17 @@ struct ModulationSourceConfig {
 
     // When true, the tab column is shown even with sourceCount == 1.
     bool alwaysShowTabs = false;
+
+    // MIDI CC manager (optional) — enables Learn/Remove MIDI CC on depth indicators.
+    osci::MidiCCManager* midiCCManager = nullptr;
+
+    // Builds the custom-target id used by midiCCManager to map CC → depth for
+    // (sourceIndex, paramId). Usually OscirenderAudioProcessor::modDepthCustomId.
+    std::function<juce::String(int sourceIndex, const juce::String& paramId)> buildModDepthCustomId;
+
+    // Builds a setter that updates the depth of a (sourceIndex, paramId)
+    // assignment when called with a normalised CC value.
+    std::function<std::function<void(float)>(int sourceIndex, const juce::String& paramId)> buildModDepthSetter;
 };
 
 // Generic modulation source panel: vertical tab/drag-handles with per-connection

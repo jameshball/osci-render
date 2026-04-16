@@ -37,6 +37,16 @@ static ModulationSourceConfig buildRandomConfig(OscirenderAudioProcessor& proc) 
     cfg.broadcaster = &proc.broadcaster;
     cfg.getActiveTab = [&proc]() { return proc.randomParameters.activeTab; };
     cfg.setActiveTab = [&proc](int i) { proc.randomParameters.activeTab = i; };
+#if OSCI_PREMIUM
+    cfg.typeId = "rng";
+    cfg.midiCCManager = &proc.midiCCManager;
+    cfg.buildModDepthCustomId = [](int idx, const juce::String& pid) {
+        return OscirenderAudioProcessor::modDepthCustomId("rng", idx, pid);
+    };
+    cfg.buildModDepthSetter = [&proc](int idx, const juce::String& pid) {
+        return proc.buildModDepthSetter("rng", idx, pid);
+    };
+#endif
     return cfg;
 }
 
