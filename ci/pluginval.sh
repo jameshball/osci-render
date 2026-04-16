@@ -170,7 +170,54 @@ LLDB_EOF
         eval $PLUGINVAL_CMD || PLUGINVAL_EXIT=$?
     fi
 else
-    eval $PLUGINVAL_CMD || PLUGINVAL_EXIT=$?
+    # Windows: use procdump to capture a minidump on crash (SIGSEGV, unhandled exception).
+    # procdump must be on PATH (installed in the CI workflow).
+    PROCDUMP_DIR="$PLUGINVAL_LOG_DIR/crashdumps"
+    mkdir -p "$PROCDUMP_DIR"
+
+    if command -v procdump &> /dev/null; then
+        echo "Running pluginval under procdump (crash dump dir: $PROCDUMP_DIR)"
+        # -e 1 = write dump on first-chance unhandled exception
+        # -t   = write dump on process termination
+        # -ma  = full memory dump (needed for useful stack analysis)
+        # -accepteula = suppress EULA prompt in CI
+        procdump -e 1 -t -ma -accepteula \
+            -o "$PROCDUMP_DIR" \
+            "$PLUGINVAL" --strictness-level $STRICTNESS --verbose \
+                --timeout-ms $PLUGINVAL_TIMEOUT \
+                --output-dir "$PLUGINVAL_LOG_DIR" \
+                ${SKIP_GUI:+--skip-gui-tests} \
+                --validate "$VST3_PATH" \
+            || PLUGINVAL_EXIT=$?
+
+        # Report any generated dump files
+        DUMP_FILES=($(find "$PROCDUMP_DIR" -name '*.dmp' 2>/dev/null))
+        if [ ${#DUMP_FILES[@]} -gt 0 ]; then
+            echo ""
+            echo "============================================="
+            echo " procdump captured ${#DUMP_FILES[@]} crash dump(s):"
+            echo "============================================="
+            for d in "${DUMP_FILES[@]}"; do
+                echo "  $(basename "$d") ($(du -h "$d" | cut -f1))"
+            done
+
+            # Try to extract a basic stack trace using cdb if available
+            if command -v cdb &> /dev/null; then
+                CDB_LOG="$PLUGINVAL_LOG_DIR/pluginval_crash_bt.log"
+                for d in "${DUMP_FILES[@]}"; do
+                    echo ""
+                    echo "--- Stack trace from $(basename "$d") ---"
+                    cdb -z "$d" -c "!analyze -v; ~*k; q" 2>&1 | tee -a "$CDB_LOG" | tail -80
+                done
+            else
+                echo "(cdb not found — install Windows SDK Debugging Tools to get inline stack traces)"
+                echo "Dump files will be uploaded to MEGA for offline analysis with WinDbg."
+            fi
+        fi
+    else
+        echo "WARNING: procdump not found, running pluginval without crash dump capture"
+        eval $PLUGINVAL_CMD || PLUGINVAL_EXIT=$?
+    fi
 fi
 
 echo ""
