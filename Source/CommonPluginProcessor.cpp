@@ -358,34 +358,25 @@ std::shared_ptr<osci::Effect> CommonAudioProcessor::getEffect(juce::String id) {
     return nullptr;
 }
 
-// effectsLock should be held when calling this
+// Looks up parameters by paramID across all registered parameters, including
+// osci::EffectParameter instances owned by individual effects (they are all
+// added to paramIdMap in addAllParameters()).
 osci::BooleanParameter* CommonAudioProcessor::getBooleanParameter(juce::String id) {
-    for (auto& parameter : booleanParameters) {
-        if (parameter->paramID == id) {
-            return parameter;
-        }
-    }
-    return nullptr;
+    auto it = paramIdMap.find(id);
+    if (it == paramIdMap.end()) return nullptr;
+    return dynamic_cast<osci::BooleanParameter*>(it->second);
 }
 
-// effectsLock should be held when calling this
 osci::FloatParameter* CommonAudioProcessor::getFloatParameter(juce::String id) {
-    for (auto& parameter : floatParameters) {
-        if (parameter->paramID == id) {
-            return parameter;
-        }
-    }
-    return nullptr;
+    auto it = paramIdMap.find(id);
+    if (it == paramIdMap.end()) return nullptr;
+    return dynamic_cast<osci::FloatParameter*>(it->second);
 }
 
-// effectsLock should be held when calling this
 osci::IntParameter* CommonAudioProcessor::getIntParameter(juce::String id) {
-    for (auto& parameter : intParameters) {
-        if (parameter->paramID == id) {
-            return parameter;
-        }
-    }
-    return nullptr;
+    auto it = paramIdMap.find(id);
+    if (it == paramIdMap.end()) return nullptr;
+    return dynamic_cast<osci::IntParameter*>(it->second);
 }
 
 //==============================================================================
