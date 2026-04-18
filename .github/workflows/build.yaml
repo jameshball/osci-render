@@ -251,9 +251,9 @@ jobs:
         run: |
           set -euo pipefail
           mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}"
-          DEST="/${{ matrix.project }}/${{ steps.version.outputs.version }}"
+          DEST="/${{ matrix.project }}/${{ steps.version.outputs.version }}/${{ matrix.version }}"
           ls -1 bin || true
-          # Upload all produced artifacts (files only) into version directory
+          # Upload all produced artifacts (files only) into variant subdirectory
           shopt -s nullglob
           for f in bin/*; do
             if [[ -f "$f" ]]; then
@@ -270,10 +270,16 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}"
-          $dest = "/${{ matrix.project }}/${{ steps.version.outputs.version }}"
+          $root = "/${{ matrix.project }}/${{ steps.version.outputs.version }}"
+          $variant = "$root/${{ matrix.version }}"
           Get-ChildItem bin -File | ForEach-Object {
-            Write-Host "Uploading $($_.FullName) -> $dest"
-            mega-put -c $_.FullName $dest/
+            if ($_.Extension -eq '.pdb') {
+              Write-Host "Uploading $($_.FullName) -> $root (debug info)"
+              mega-put -c $_.FullName $root/
+            } else {
+              Write-Host "Uploading $($_.FullName) -> $variant"
+              mega-put -c $_.FullName $variant/
+            }
           }
           mega-logout
 
