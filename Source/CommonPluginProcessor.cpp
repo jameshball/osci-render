@@ -28,6 +28,33 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
     );
     juce::Logger::setCurrentLogger(fileLogger.get());
 
+    // Log startup details so support tickets always have build/runtime context.
+    {
+        const bool premium =
+        #if OSCI_PREMIUM
+            true;
+        #else
+            false;
+        #endif
+        juce::Logger::writeToLog("==== " + juce::String(JucePlugin_Name) + " starting ====");
+        juce::Logger::writeToLog("Version: " + juce::String(JucePlugin_VersionString)
+                                 + (premium ? " (Premium)" : " (Free)"));
+        juce::Logger::writeToLog("Wrapper: " + juce::String(getWrapperTypeDescription(wrapperType)));
+        juce::Logger::writeToLog("JUCE: " + juce::SystemStats::getJUCEVersion());
+        juce::Logger::writeToLog("OS: " + juce::SystemStats::getOperatingSystemName()
+                                 + (juce::SystemStats::isOperatingSystem64Bit() ? " (64-bit)" : " (32-bit)"));
+        juce::Logger::writeToLog("CPU: " + juce::SystemStats::getCpuModel()
+                                 + " (" + juce::String(juce::SystemStats::getNumCpus()) + " cores, "
+                                 + juce::String(juce::SystemStats::getCpuSpeedInMegahertz()) + " MHz)");
+        juce::Logger::writeToLog("RAM: " + juce::String(juce::SystemStats::getMemorySizeInMegabytes()) + " MB");
+        juce::Logger::writeToLog("Device: " + juce::SystemStats::getDeviceDescription()
+                                 + " / " + juce::SystemStats::getDeviceManufacturer());
+        juce::Logger::writeToLog("User: " + juce::SystemStats::getLogonName()
+                                 + " @ " + juce::SystemStats::getComputerName()
+                                 + " (" + juce::SystemStats::getUserLanguage() + "_"
+                                 + juce::SystemStats::getUserRegion() + ")");
+    }
+
     // Initialize the global settings with the plugin name
     juce::PropertiesFile::Options options;
     options.applicationName = JucePlugin_Name + juce::String("_globals");
