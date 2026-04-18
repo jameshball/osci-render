@@ -181,8 +181,9 @@ else
         # -t   = write dump on process termination
         # -ma  = full memory dump (needed for useful stack analysis)
         # -accepteula = suppress EULA prompt in CI
+        # -x   = launch process mode: -x <dump_folder> <application> [args]
         procdump -e 1 -t -ma -accepteula \
-            -o "$PROCDUMP_DIR" \
+            -x "$PROCDUMP_DIR" \
             "$PLUGINVAL" --strictness-level $STRICTNESS --verbose \
                 --timeout-ms $PLUGINVAL_TIMEOUT \
                 --output-dir "$PLUGINVAL_LOG_DIR" \

@@ -163,12 +163,9 @@ jobs:
           set -euo pipefail
           mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}" || true
           DEST="/${{ matrix.project }}/${{ steps.version.outputs.version }}/pluginval-logs/${{ env.OS_ARTIFACT }}"
-          shopt -s nullglob globstar
-          for f in bin/pluginval-logs/**; do
-            if [[ -f "$f" && -s "$f" ]]; then
-              echo "Uploading $f -> $DEST"
-              mega-put -c "$f" "$DEST/" || echo "WARNING: failed to upload $f"
-            fi
+          find bin/pluginval-logs -type f -size +0c -print0 2>/dev/null | while IFS= read -r -d '' f; do
+            echo "Uploading $f -> $DEST"
+            mega-put -c "$f" "$DEST/" || echo "WARNING: failed to upload $f"
           done
           mega-logout || true
 
