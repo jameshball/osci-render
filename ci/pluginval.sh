@@ -178,17 +178,27 @@ else
     if command -v procdump &> /dev/null; then
         echo "Running pluginval under procdump (crash dump dir: $PROCDUMP_DIR)"
         # -e 1 = write dump on first-chance unhandled exception
-        # -t   = write dump on process termination
         # -ma  = full memory dump (needed for useful stack analysis)
         # -accepteula = suppress EULA prompt in CI
-        procdump -e 1 -t -ma -accepteula \
-            -o "$PROCDUMP_DIR" \
+        # -x   = launch process mode: -x <dump_folder> <application> [args]
+        #
+        # procdump's exit code in -x mode is UNRELIABLE: it returns non-zero
+        # when "dump count not reached" (i.e. no crash occurred). We ignore
+        # procdump's exit code entirely and instead check the pluginval log
+        # file for the SUCCESS marker.
+        procdump -e 1 -ma -accepteula \
+            -x "$PROCDUMP_DIR" \
             "$PLUGINVAL" --strictness-level $STRICTNESS --verbose \
                 --timeout-ms $PLUGINVAL_TIMEOUT \
                 --output-dir "$PLUGINVAL_LOG_DIR" \
                 ${SKIP_GUI:+--skip-gui-tests} \
                 --validate "$VST3_PATH" \
-            || PLUGINVAL_EXIT=$?
+            || true
+
+        # Check the pluginval log for SUCCESS instead of trusting procdump's exit code
+        if ! grep -rq '^SUCCESS$' "$PLUGINVAL_LOG_DIR"/ 2>/dev/null; then
+            PLUGINVAL_EXIT=1
+        fi
 
         # Report any generated dump files
         DUMP_FILES=($(find "$PROCDUMP_DIR" -name '*.dmp' 2>/dev/null))

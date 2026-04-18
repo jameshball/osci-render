@@ -38,7 +38,7 @@ private:
     Info info;
     juce::Image logo;
     juce::ImageComponent logoComponent;
-    juce::TextButton websiteBtn, githubBtn, issuesBtn;
+    juce::TextButton websiteBtn, discordBtn, issuesBtn;
 
     void paintCard(juce::Graphics& g, juce::Rectangle<float> area) const;
 

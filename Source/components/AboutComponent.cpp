@@ -14,19 +14,21 @@ AboutComponent::AboutComponent(const Info& info) : info(info) {
     logoComponent.setImage(logo);
     addAndMakeVisible(logoComponent);
 
-    auto setupBtn = [this](juce::TextButton& btn, const juce::String& text, const juce::String& url) {
+    auto setupBtn = [this](juce::TextButton& btn, const juce::String& text, const juce::String& url, juce::Colour tint) {
         btn.setButtonText(text);
-        btn.setColour(juce::TextButton::buttonColourId, Colours::accentColor().withAlpha(0.15f));
-        btn.setColour(juce::TextButton::buttonOnColourId, Colours::accentColor().withAlpha(0.25f));
-        btn.setColour(juce::TextButton::textColourOnId, Colours::accentColor());
-        btn.setColour(juce::TextButton::textColourOffId, Colours::accentColor());
+        btn.setColour(juce::TextButton::buttonColourId, tint.withAlpha(0.15f));
+        btn.setColour(juce::TextButton::buttonOnColourId, tint.withAlpha(0.25f));
+        btn.setColour(juce::TextButton::textColourOnId, tint);
+        btn.setColour(juce::TextButton::textColourOffId, tint);
         btn.onClick = [url]() { juce::URL(url).launchInDefaultBrowser(); };
         addAndMakeVisible(btn);
     };
 
-    setupBtn(websiteBtn, "Website", info.websiteUrl);
-    setupBtn(githubBtn, "GitHub", info.githubUrl);
-    setupBtn(issuesBtn, "Report Issue", info.githubUrl + "/issues");
+    // Brighten Discord brand colour so its hover/contrast feels similar to the accent buttons.
+    const juce::Colour discordColour = juce::Colour::fromRGB(0x58, 0x65, 0xF2).brighter(0.4f);
+    setupBtn(websiteBtn, "Website", info.websiteUrl, Colours::accentColor());
+    setupBtn(discordBtn, "Join Discord", "https://discord.gg/ekjpQvT68C", discordColour);
+    setupBtn(issuesBtn, "Report Issue", info.githubUrl + "/issues", Colours::accentColor());
 
     auto sz = preferredSize(info);
     setSize(sz.x, sz.y);
@@ -52,14 +54,14 @@ void AboutComponent::paint(juce::Graphics& g) {
 
     // "by Company"
     g.setFont(juce::Font(13.0f));
-    g.setColour(juce::Colours::white.withAlpha(0.5f));
+    g.setColour(juce::Colours::white.withAlpha(0.75f));
     g.drawText("by " + info.companyName, area.removeFromTop(18.0f), juce::Justification::centred);
 
     // Version · Premium/Free
     juce::String status = "Version " + info.versionString + "  \xc2\xb7  ";
     status += info.isPremium ? "Premium" : "Free";
     g.setFont(juce::Font(12.0f));
-    g.setColour(juce::Colours::white.withAlpha(0.35f));
+    g.setColour(juce::Colours::white.withAlpha(0.65f));
     g.drawText(status, area.removeFromTop(16.0f), juce::Justification::centred);
 
     area.removeFromTop(kGap);
@@ -73,24 +75,24 @@ void AboutComponent::paint(juce::Graphics& g) {
 
         // Title
         g.setFont(juce::Font(11.0f).boldened());
-        g.setColour(juce::Colours::white.withAlpha(0.5f));
+        g.setColour(juce::Colours::white.withAlpha(0.75f));
         g.drawText("CONTRIBUTORS", inner.removeFromTop(20.0f), juce::Justification::centredLeft);
 
         // Entries
         for (auto& c : info.credits) {
             auto nameRow = inner.removeFromTop(18.0f);
             g.setFont(juce::Font(13.0f).boldened());
-            g.setColour(juce::Colours::white.withAlpha(0.85f));
+            g.setColour(juce::Colours::white);
             g.drawText(c.name, nameRow, juce::Justification::centredLeft);
 
             auto descRow = inner.removeFromTop(16.0f);
             g.setFont(juce::Font(12.0f));
-            g.setColour(juce::Colours::white.withAlpha(0.4f));
+            g.setColour(juce::Colours::white.withAlpha(0.7f));
             g.drawText(c.contribution, descRow, juce::Justification::centredLeft);
         }
 
         g.setFont(juce::Font(11.0f).withStyle(juce::Font::italic));
-        g.setColour(juce::Colours::white.withAlpha(0.3f));
+        g.setColour(juce::Colours::white.withAlpha(0.6f));
         g.drawText("...and all the community!", inner.removeFromTop(18.0f), juce::Justification::centredLeft);
     }
 
@@ -104,7 +106,7 @@ void AboutComponent::paint(juce::Graphics& g) {
         auto inner = card.reduced(kCardPad + 4.0f, kCardPad);
 
         g.setFont(juce::Font(12.0f));
-        g.setColour(juce::Colours::white.withAlpha(0.35f));
+        g.setColour(juce::Colours::white.withAlpha(0.65f));
 
         juce::String buildInfo = juce::String("Built ") + __DATE__ + "  \xc2\xb7  " + juce::SystemStats::getJUCEVersion();
         g.drawText(buildInfo, inner.removeFromTop(16.0f), juce::Justification::centred);
@@ -125,7 +127,7 @@ void AboutComponent::resized() {
     int btnW = (int)((totalW - kBtnGap * 2.0f) / 3.0f);
     websiteBtn.setBounds(btnRow.removeFromLeft(btnW));
     btnRow.removeFromLeft((int)kBtnGap);
-    githubBtn.setBounds(btnRow.removeFromLeft(btnW));
+    discordBtn.setBounds(btnRow.removeFromLeft(btnW));
     btnRow.removeFromLeft((int)kBtnGap);
     issuesBtn.setBounds(btnRow);
 }

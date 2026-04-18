@@ -123,7 +123,17 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           choco install megacmd -y --no-progress
-          echo "$env:LOCALAPPDATA\MEGAcmd" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          # Find where MEGAcmd was installed
+          $megaDir = if (Test-Path "$env:LOCALAPPDATA\MEGAcmd") { "$env:LOCALAPPDATA\MEGAcmd" }
+                     elseif (Test-Path "C:\Users\runneradmin\AppData\Local\MEGAcmd") { "C:\Users\runneradmin\AppData\Local\MEGAcmd" }
+                     else { (Get-Command mega-login -ErrorAction SilentlyContinue).Source | Split-Path }
+          if (-not $megaDir -or -not (Test-Path $megaDir)) {
+            Write-Error "MEGAcmd installation not found. Checked LOCALAPPDATA, hardcoded path, and PATH."
+            exit 1
+          }
+          Write-Host "MEGAcmd directory: $megaDir"
+          Write-Host "Contents: $(Get-ChildItem $megaDir -Name -ErrorAction SilentlyContinue)"
+          echo $megaDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Install procdump (Windows)
         if: matrix.os == 'windows-2022'
@@ -163,12 +173,9 @@ jobs:
           set -euo pipefail
           mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}" || true
           DEST="/${{ matrix.project }}/${{ steps.version.outputs.version }}/pluginval-logs/${{ env.OS_ARTIFACT }}"
-          shopt -s nullglob globstar
-          for f in bin/pluginval-logs/**; do
-            if [[ -f "$f" && -s "$f" ]]; then
-              echo "Uploading $f -> $DEST"
-              mega-put -c "$f" "$DEST/" || echo "WARNING: failed to upload $f"
-            fi
+          find bin/pluginval-logs -type f -size +0c -print0 2>/dev/null | while IFS= read -r -d '' f; do
+            echo "Uploading $f -> $DEST"
+            mega-put -c "$f" "$DEST/" || echo "WARNING: failed to upload $f"
           done
           mega-logout || true
 
@@ -177,6 +184,11 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference = 'Continue'
+          # Ensure MEGAcmd is on PATH
+          if (-not (Get-Command mega-login -ErrorAction SilentlyContinue)) {
+            $p = "$env:LOCALAPPDATA\MEGAcmd"
+            if (Test-Path $p) { $env:PATH = "$p;$env:PATH" }
+          }
           mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}"
           $dest = "/${{ matrix.project }}/${{ steps.version.outputs.version }}/pluginval-logs/${{ env.OS_ARTIFACT }}"
           $logDir = "bin/pluginval-logs"
@@ -231,10 +243,6 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: spctl -a -vvv -t install "bin/${{ matrix.project }}-${{ matrix.version }}.pkg"
 
-      - name: List files
-        run: Get-ChildItem -Recurse ${{ github.workspace }}
-        shell: pwsh
-
       # Windows packaging (Inno Setup)
       - name: Compile .ISS to .EXE Installer
         if: matrix.os == 'windows-2022'
@@ -254,9 +262,9 @@ jobs:
         run: |
           set -euo pipefail
           mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}"
-          DEST="/${{ matrix.project }}/${{ steps.version.outputs.version }}"
+          DEST="/${{ matrix.project }}/${{ steps.version.outputs.version }}/${{ matrix.version }}"
           ls -1 bin || true
-          # Upload all produced artifacts (files only) into version directory
+          # Upload all produced artifacts (files only) into variant subdirectory
           shopt -s nullglob
           for f in bin/*; do
             if [[ -f "$f" ]]; then
@@ -272,11 +280,22 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
+          # Ensure MEGAcmd is on PATH
+          if (-not (Get-Command mega-login -ErrorAction SilentlyContinue)) {
+            $p = "$env:LOCALAPPDATA\MEGAcmd"
+            if (Test-Path $p) { $env:PATH = "$p;$env:PATH" }
+          }
           mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}"
-          $dest = "/${{ matrix.project }}/${{ steps.version.outputs.version }}"
+          $root = "/${{ matrix.project }}/${{ steps.version.outputs.version }}"
+          $variant = "$root/${{ matrix.version }}"
           Get-ChildItem bin -File | ForEach-Object {
-            Write-Host "Uploading $($_.FullName) -> $dest"
-            mega-put -c $_.FullName $dest/
+            if ($_.Extension -eq '.pdb') {
+              Write-Host "Uploading $($_.FullName) -> $root (debug info)"
+              mega-put -c $_.FullName $root/
+            } else {
+              Write-Host "Uploading $($_.FullName) -> $variant"
+              mega-put -c $_.FullName $variant/
+            }
           }
           mega-logout
 
