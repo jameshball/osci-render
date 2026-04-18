@@ -178,11 +178,11 @@ else
     if command -v procdump &> /dev/null; then
         echo "Running pluginval under procdump (crash dump dir: $PROCDUMP_DIR)"
         # -e 1 = write dump on first-chance unhandled exception
-        # -t   = write dump on process termination
         # -ma  = full memory dump (needed for useful stack analysis)
         # -accepteula = suppress EULA prompt in CI
         # -x   = launch process mode: -x <dump_folder> <application> [args]
-        procdump -e 1 -t -ma -accepteula \
+        # NOTE: do NOT use -t (dump on termination) — it causes non-zero exit on clean exits
+        procdump -e 1 -ma -accepteula \
             -x "$PROCDUMP_DIR" \
             "$PLUGINVAL" --strictness-level $STRICTNESS --verbose \
                 --timeout-ms $PLUGINVAL_TIMEOUT \
