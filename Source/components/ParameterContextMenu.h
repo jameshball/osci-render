@@ -3,6 +3,11 @@
 #include <JuceHeader.h>
 #include <osci_render_core/effect/osci_EffectParameter.h>
 
+// Global hook so non-UI code (e.g. context menus) can trigger the premium
+// splash screen without holding an editor reference.  Set by the editor's
+// constructor; cleared by its destructor (non-premium builds only).
+extern std::function<void()> showPremiumSplashScreenGlobal;
+
 // Shared context-menu builder for any parameter (used by EffectComponent,
 // KnobContainerComponent/RotaryKnobComponent, etc.).
 //
@@ -69,9 +74,6 @@ namespace ParameterContextMenu {
     }
 
     // Handle a menu result.
-    // |resetToDefault| — called for "Reset to Default Value"
-    // |showValueEditor| — called for "Set Value…"
-    // |showRangeEditor| — called for "Edit Range…"
     // Returns true if the result was handled.
     inline bool handleResult(int result, int firstId, const Context& ctx,
                              std::function<void()> resetToDefault,
@@ -96,10 +98,7 @@ namespace ParameterContextMenu {
             else
                 ctx.midiCCManager->startLearning(ctx.param, ctx.ccEffectParam);
 #else
-            juce::AlertWindow::showMessageBoxAsync(
-                juce::AlertWindow::InfoIcon,
-                "Premium Feature",
-                "MIDI CC mapping is available in the premium version of osci-render.");
+            if (showPremiumSplashScreenGlobal) showPremiumSplashScreenGlobal();
 #endif
             return true;
         }
@@ -107,10 +106,7 @@ namespace ParameterContextMenu {
 #if OSCI_PREMIUM
             ctx.midiCCManager->removeAssignment(ctx.param);
 #else
-            juce::AlertWindow::showMessageBoxAsync(
-                juce::AlertWindow::InfoIcon,
-                "Premium Feature",
-                "MIDI CC mapping is available in the premium version of osci-render.");
+            if (showPremiumSplashScreenGlobal) showPremiumSplashScreenGlobal();
 #endif
             return true;
         }

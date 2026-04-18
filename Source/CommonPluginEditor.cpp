@@ -6,6 +6,8 @@
 #include "visualiser/OfflineAudioToVideoRenderer.h"
 #endif
 
+std::function<void()> showPremiumSplashScreenGlobal;
+
 CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String appName, juce::String projectFileType, int defaultWidth, int defaultHeight)
     : AudioProcessorEditor(&p), audioProcessor(p), appName(appName), projectFileType(projectFileType)
 {
@@ -35,6 +37,12 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
         updateUndoRedoState();
     };
     startTimer(100);
+
+#if !OSCI_PREMIUM
+    showPremiumSplashScreenGlobal = [safeThis = juce::Component::SafePointer<CommonPluginEditor>(this)]() {
+        if (safeThis) safeThis->showPremiumSplashScreen();
+    };
+#endif
 
     if (juce::JUCEApplicationBase::isStandaloneApp()) {
         if (juce::TopLevelWindow::getNumTopLevelWindows() > 0) {
@@ -213,6 +221,9 @@ void CommonPluginEditor::initialiseMenuBar(juce::MenuBarModel& menuBarModel) {
 }
 
 CommonPluginEditor::~CommonPluginEditor() {
+#if !OSCI_PREMIUM
+    showPremiumSplashScreenGlobal = nullptr;
+#endif
     stopTimer();
     recordingSettingsWindow.removeKeyListener(this);
     if (topLevelKeyTarget != nullptr)

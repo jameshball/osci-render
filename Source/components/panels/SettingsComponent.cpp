@@ -370,12 +370,13 @@ void SettingsComponent::layoutChildren() {
 
         auto effectsBounds = layoutEffectsColumnProxy.getBounds();
 
-        const bool midiOn = audioProcessor.midiEnabled->getBoolValue()
+        const bool midiOn = audioProcessor.midiEnabled->getBoolValue();
+        const bool showKeyboard = midiOn
                           && audioProcessor.getGlobalBoolValue("showMidiKeyboard", true);
 
         midi.setVisible(false);
 
-        if (midiOn) {
+        if (showKeyboard) {
             // Keyboard at the bottom
             keyboardPanelBounds = juce::Rectangle<int>(
                 effectsBounds.getX(),
@@ -405,7 +406,16 @@ void SettingsComponent::layoutChildren() {
         } else {
             keyboardPanelBounds = {};
             keyboardViewport.setVisible(false);
-            envelope.setVisible(false);
+
+            if (midiOn) {
+                // Envelope visible even when keyboard is hidden
+                static constexpr int envelopeHeight = 90;
+                envelope.setBounds(effectsBounds.removeFromBottom(envelopeHeight));
+                envelope.setVisible(true);
+                effectsBounds.removeFromBottom(kGap);
+            } else {
+                envelope.setVisible(false);
+            }
         }
 
         layoutVisColumn(layoutVisColumnProxy.getBounds());
@@ -422,11 +432,12 @@ void SettingsComponent::layoutChildren() {
         // Keyboard at the very bottom spanning full width when MIDI enabled
         // ============================================================
 
-        const bool midiOn = audioProcessor.midiEnabled->getBoolValue()
+        const bool midiOn = audioProcessor.midiEnabled->getBoolValue();
+        const bool showKeyboard = midiOn
                           && audioProcessor.getGlobalBoolValue("showMidiKeyboard", true);
 
         // Reserve space for keyboard at the very bottom if MIDI is on
-        if (midiOn) {
+        if (showKeyboard) {
             keyboardPanelBounds = juce::Rectangle<int>(
                 area.getX(),
                 area.getBottom() - keyboardHeight,
@@ -449,7 +460,7 @@ void SettingsComponent::layoutChildren() {
             keyboardPanelBounds = {};
         }
 
-        keyboardViewport.setVisible(midiOn);
+        keyboardViewport.setVisible(showKeyboard);
 
         // Clamp to available space
         int resizerH = pluginEditor.RESIZER_BAR_SIZE;

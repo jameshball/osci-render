@@ -105,14 +105,17 @@ void SplashScreenComponent::buildBenefitTiles()
         int iconSize;
     };
 
-    static const std::array<BenefitEntry, 8> benefits{{
-        { "Video Support", "Turn MP4 or MOV footage into oscilloscope audio.", BinaryData::desktop_svg, BinaryData::desktop_svgSize },
-        { "Live Video Input", "Perform live via Syphon or Spout feeds.", BinaryData::spout_svg, BinaryData::spout_svgSize },
-        { "Enhanced Simulation", "More realistic analogue oscilloscope simulation.", BinaryData::oscilloscope_svg, BinaryData::oscilloscope_svgSize },
-        { "Advanced Controls", "Set custom framerate, resolution, and quality.", BinaryData::cog_svg, BinaryData::cog_svgSize },
-        { "Recording", "Export your visuals directly to MP4.", BinaryData::record_svg, BinaryData::record_svgSize },
-        { "Enhanced Text", "Improved text rendering quality.", BinaryData::greek_svg, BinaryData::greek_svgSize },
+    static const std::array<BenefitEntry, 11> benefits{{
         { "New Effects", "Twist, Kaleidoscope, Vortex, Multiplex, and more.", BinaryData::distort_svg, BinaryData::distort_svgSize },
+        { "Video Support", "Turn MP4 or MOV footage into oscilloscope audio.", BinaryData::desktop_svg, BinaryData::desktop_svgSize },
+        { "Recording", "Export your visuals directly to MP4.", BinaryData::record_svg, BinaryData::record_svgSize },
+        { "System Audio Capture", "Capture system audio on macOS and Windows.", BinaryData::microphone_svg, BinaryData::microphone_svgSize },
+        { "Fractals", "Koch Snowflake, Sierpinski Triangle, and custom fractals.", BinaryData::snowflake_svg, BinaryData::snowflake_svgSize },
+        { "Live Video Input", "Perform live via Syphon or Spout feeds.", BinaryData::spout_svg, BinaryData::spout_svgSize },
+        { "Synth Engine", "Rewritten synth with polyphony, glide, legato, and microtonal tuning.", BinaryData::waves_svg, BinaryData::waves_svgSize },
+        { "Modulation", "8 LFOs, 4 envelopes, random sources, and sidechain modulation.", BinaryData::graph_svg, BinaryData::graph_svgSize },
+        { "MIDI CC Learning", "Map hardware MIDI controllers to any parameter.", BinaryData::link_svg, BinaryData::link_svgSize },
+        { "And Many More", "Enhanced simulation, advanced controls, popout visualiser, and more.", BinaryData::plus_svg, BinaryData::plus_svgSize },
         { "Support the Project", "Your upgrade funds ongoing releases and support.", BinaryData::cash_svg, BinaryData::cash_svgSize }
     }};
 

@@ -39,7 +39,7 @@ public:
     void resized() override {
         auto bounds = getLocalBounds();
         auto horizontalMargin = juce::jmax(40, bounds.getWidth() / 6);
-        auto verticalMargin = juce::jmax(40, bounds.getHeight() / 6);
+        auto verticalMargin = juce::jmax(24, bounds.getHeight() / 10);
         panelBounds = bounds.reduced(horizontalMargin, verticalMargin);
 
         resizeContent(panelBounds.reduced(28));
