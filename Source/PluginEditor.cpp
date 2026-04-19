@@ -695,26 +695,7 @@ void OscirenderAudioProcessorEditor::showLuaDocumentation() {
     if (findActiveOverlay<LuaDocumentationComponent>() != nullptr)
         return;
 
-    if (!cachedLuaDocs) {
-        cachedLuaDocs = std::make_unique<LuaDocumentationComponent>();
-    }
-
-    std::unique_ptr<OverlayComponent> overlay(cachedLuaDocs.release());
-    showOverlay(std::move(overlay));
-}
-
-void OscirenderAudioProcessorEditor::dismissOverlay(OverlayComponent* overlay) {
-    // Reclaim LuaDocumentationComponent for reuse before the base class destroys it
-    if (dynamic_cast<LuaDocumentationComponent*>(overlay)) {
-        for (auto& o : activeOverlays) {
-            if (o.get() == overlay) {
-                cachedLuaDocs.reset(static_cast<LuaDocumentationComponent*>(o.release()));
-                cachedLuaDocs->onDismissRequested = nullptr;
-                break;
-            }
-        }
-    }
-    CommonPluginEditor::dismissOverlay(overlay);
+    showOverlay(std::make_unique<LuaDocumentationComponent>());
 }
 
 void OscirenderAudioProcessorEditor::updateTimelineController() {
