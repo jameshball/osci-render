@@ -60,6 +60,7 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 	wav = nullptr;
 #if OSCI_PREMIUM
 	fractal = nullptr;
+	lottie = nullptr;
 #endif
 	
 	if (extension == ".obj") {
@@ -107,6 +108,43 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 #if OSCI_PREMIUM
 		fractal = std::make_shared<FractalParser>(stream->readEntireStreamAsString());
 #endif
+	} else if (extension == ".json" || extension == ".lottie" || extension == ".lot") {
+#if OSCI_PREMIUM
+		juce::MemoryBlock buffer{};
+		int bytesRead = stream->readIntoMemoryBlock(buffer);
+		showFileSizeWarning(fileName, bytesRead, 10, "Lottie", [this, buffer, extension]() {
+			juce::String jsonContent;
+			if (extension == ".lottie") {
+				juce::MemoryInputStream zipStream(buffer, false);
+				juce::ZipFile zip(zipStream);
+				for (int i = 0; i < zip.getNumEntries(); ++i) {
+					auto* entry = zip.getEntry(i);
+					if (entry == nullptr) continue;
+					auto name = entry->filename.toLowerCase();
+					if (name.startsWith("animations/") && name.endsWith(".json")) {
+						std::unique_ptr<juce::InputStream> entryStream(zip.createStreamForEntry(i));
+						if (entryStream != nullptr) {
+							jsonContent = entryStream->readEntireStreamAsString();
+							break;
+						}
+					}
+				}
+				if (jsonContent.isEmpty()) {
+					juce::MessageManager::callAsync([] {
+						juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::AlertIconType::WarningIcon,
+							"Error", "The .lottie archive did not contain a Lottie animation JSON.");
+					});
+					return;
+				}
+			} else {
+				jsonContent = juce::String::fromUTF8(static_cast<const char*>(buffer.getData()),
+					(int) buffer.getSize());
+			}
+			lottie = std::make_shared<OsciLottieParser>(jsonContent);
+			isAnimatable = true;
+			sampleSource = false;
+		});
+#endif
 	} else if (extension == ".wav" || extension == ".aiff" || extension == ".flac" || extension == ".ogg" || extension == ".mp3") {
 		wav = std::make_shared<WavParser>(audioProcessor);
 		if (!wav->parse(std::move(stream))) {
@@ -119,6 +157,9 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 	}
 
 	isAnimatable = gpla != nullptr || (img != nullptr && (extension == ".gif" || extension == ".mp4" || extension == ".mov"));
+#if OSCI_PREMIUM
+	isAnimatable = isAnimatable || lottie != nullptr;
+#endif
 	sampleSource = lua != nullptr || img != nullptr || wav != nullptr;
 }
 
@@ -135,6 +176,9 @@ std::vector<std::unique_ptr<osci::Shape>> FileParser::nextFrame() {
         return gpla->draw();
     }
 #if OSCI_PREMIUM
+    else if (lottie != nullptr) {
+        return lottie->draw();
+    }
     else if (fractal != nullptr) {
         fractal->setIterations(juce::roundToInt(audioProcessor.fractalDepthEffect->getActualValue()));
         return fractal->draw();
@@ -229,6 +273,10 @@ std::shared_ptr<WavParser> FileParser::getWav() {
 std::shared_ptr<FractalParser> FileParser::getFractal() {
     return fractal;
 }
+
+std::shared_ptr<OsciLottieParser> FileParser::getLottie() {
+    return lottie;
+}
 #endif
 
 int FileParser::getNumFrames() {
@@ -237,6 +285,11 @@ int FileParser::getNumFrames() {
     } else if (img != nullptr) {
         return img->getNumFrames();
     }
+#if OSCI_PREMIUM
+    if (lottie != nullptr) {
+        return lottie->getNumFrames();
+    }
+#endif
     return 1; // Default to 1 frame for non-animatable content
 }
 
@@ -246,13 +299,25 @@ int FileParser::getCurrentFrame() {
     } else if (img != nullptr) {
         return img->getCurrentFrame();
     }
+#if OSCI_PREMIUM
+    if (lottie != nullptr) {
+        return lottie->getCurrentFrame();
+    }
+#endif
     return 0; // Default to frame 0 for non-animatable content
 }
 
 void FileParser::setFrame(int frame) {
+    juce::SpinLock::ScopedLockType scope(lock);
+
     if (gpla != nullptr) {
         gpla->setFrame(frame);
     } else if (img != nullptr) {
         img->setFrame(frame);
     }
+#if OSCI_PREMIUM
+    else if (lottie != nullptr) {
+        lottie->setFrame(frame);
+    }
+#endif
 }

@@ -40,3 +40,7 @@
 [submodule "modules/juce_mts_esp"]
 	path = modules/juce_mts_esp
 	url = https://github.com/jameshball/juce_mts_esp.git
+[submodule "modules/thorvg"]
+	path = modules/thorvg
+        url = https://github.com/jameshball/thorvg.git
+        branch = osci-render-trim-getter

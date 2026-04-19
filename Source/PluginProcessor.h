@@ -381,6 +381,9 @@ public:
         "lsystem",
         "mp4",
         "mov",
+        "json",
+        "lottie",
+        "lot",
 #endif
     };
 

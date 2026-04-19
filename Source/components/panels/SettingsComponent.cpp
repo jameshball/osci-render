@@ -605,9 +605,17 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
             }
         }
 #endif
-    } else if (extension == ".gpla" || isImage) {
+    } else if (extension == ".gpla" || isImage
+#if OSCI_PREMIUM
+               || extension == ".json" || extension == ".lottie" || extension == ".lot"
+#endif
+               ) {
         frame.setVisible(true);
-        frame.setAnimated(extension == ".gpla" || extension == ".gif" || extension == ".mov" || extension == ".mp4");
+        frame.setAnimated(extension == ".gpla" || extension == ".gif" || extension == ".mov" || extension == ".mp4"
+#if OSCI_PREMIUM
+            || extension == ".json" || extension == ".lottie" || extension == ".lot"
+#endif
+            );
         frame.setImage(isImage);
         frame.resized();
     }

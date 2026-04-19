@@ -11,6 +11,7 @@
 #include "../audio/wav/WavParser.h"
 #if OSCI_PREMIUM
 #include "fractal/FractalParser.h"
+#include "lottie/LottieParser.h"
 #endif
 
 class OscirenderAudioProcessor;
@@ -41,6 +42,7 @@ public:
 	std::shared_ptr<WavParser> getWav();
 #if OSCI_PREMIUM
 	std::shared_ptr<FractalParser> getFractal();
+	std::shared_ptr<OsciLottieParser> getLottie();
 #endif
 
 	bool isAnimatable = false;
@@ -64,6 +66,7 @@ private:
 	std::shared_ptr<WavParser> wav;
 #if OSCI_PREMIUM
 	std::shared_ptr<FractalParser> fractal;
+	std::shared_ptr<OsciLottieParser> lottie;
 #endif
 
 	juce::String fallbackLuaScript = "return { 0.0, 0.0 }";

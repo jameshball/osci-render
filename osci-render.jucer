@@ -5,7 +5,7 @@
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
               version="2.8.9.10" companyName="James H Ball" companyWebsite="https://osci-render.com"
-              companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1"
+              companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;TVG_STATIC=1&#10;THORVG_LOTTIE_LOADER_SUPPORT=1"
               pluginAUMainType="'aumf'" postExportShellCommandPosix="echo &quot;Building LuaJIT for $OSTYPE...&quot; &amp;&amp; DIR=%%1%% %%1%%/luajit_linux_macos.sh ">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
@@ -179,6 +179,15 @@
         <FILE id="qC6QiP" name="volume.svg" compile="0" resource="1" file="Resources/svg/volume.svg"/>
         <FILE id="hH1OSK" name="vortex.svg" compile="0" resource="1" file="Resources/svg/vortex.svg"/>
         <FILE id="Unp5Kx" name="waves.svg" compile="0" resource="1" file="Resources/svg/waves.svg"/>
+        <FILE id="LoSvg01" name="lottie_menu_open.svg" compile="0" resource="1"
+              file="Resources/svg/lottie_menu_open.svg"/>
+        <FILE id="LoSvg02" name="lottie_android.svg" compile="0" resource="1"
+              file="Resources/svg/lottie_android.svg"/>
+        <FILE id="LoSvg06" name="lottie_switch.svg" compile="0" resource="1"
+              file="Resources/svg/lottie_switch.svg"/>
+        <FILE id="LoSvg07" name="lottie_heart.svg" compile="0" resource="1"
+              file="Resources/svg/lottie_heart.svg"/>
+        <FILE id="LoSvg08" name="lottie_pin.svg" compile="0" resource="1" file="Resources/svg/lottie_pin.svg"/>
         <FILE id="SkgUSk" name="wobble.svg" compile="0" resource="1" file="Resources/svg/wobble.svg"/>
         <FILE id="HCK5B8" name="yinyang.svg" compile="0" resource="1" file="Resources/svg/yinyang.svg"/>
       </GROUP>
@@ -193,6 +202,18 @@
               file="Resources/fractal/koch_snowflake.lsystem"/>
         <FILE id="Fr1006" name="sierpinski_triangle.lsystem" compile="0" resource="1"
               file="Resources/fractal/sierpinski_triangle.lsystem"/>
+      </GROUP>
+      <GROUP id="{8E2F4C1A-3D5B-4E6F-9A7C-B1D2E3F4A5B6}" name="lottie">
+        <FILE id="Lo1001" name="hamburger_arrow.json" compile="0" resource="1"
+              file="Resources/lottie/hamburger_arrow.json"/>
+        <FILE id="Lo1002" name="android_wave.json" compile="0" resource="1"
+              file="Resources/lottie/android_wave.json"/>
+        <FILE id="Lo1003" name="lottie_logo.json" compile="0" resource="1"
+              file="Resources/lottie/lottie_logo.json"/>
+        <FILE id="Lo1004" name="switch.json" compile="0" resource="1" file="Resources/lottie/switch.json"/>
+        <FILE id="Lo1005" name="twitter_heart.json" compile="0" resource="1"
+              file="Resources/lottie/twitter_heart.json"/>
+        <FILE id="Lo1006" name="pin_jump.json" compile="0" resource="1" file="Resources/lottie/pin_jump.json"/>
       </GROUP>
       <GROUP id="{F8A3D32C-4187-9A2F-5D78-040259957E9B}" name="text">
         <FILE id="N9Q6Zg" name="greek.txt" compile="0" resource="1" file="Resources/text/greek.txt"/>
@@ -592,6 +613,74 @@
         <FILE id="YdfYbM" name="tiny_obj_loader.h" compile="0" resource="0"
               file="modules/tinyobjloader/tiny_obj_loader.h"/>
       </GROUP>
+      <GROUP id="{D3E4F5A6-7B89-0123-4567-890123456789}" name="thorvg">
+        <FILE id="tvgHdrA" name="thorvg.h" compile="0" resource="0" file="modules/thorvg/inc/thorvg.h"/>
+        <FILE id="tvgCfg1" name="config.h" compile="0" resource="0" file="Source/thorvg-config/config.h"/>
+        <GROUP id="{D3E4F5A6-7B89-0123-4567-890123456790}" name="common">
+          <FILE id="tvgCm01" name="tvgColor.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/common/tvgColor.cpp"/>
+          <FILE id="tvgCm02" name="tvgCompressor.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/common/tvgCompressor.cpp"/>
+          <FILE id="tvgCm03" name="tvgMath.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/common/tvgMath.cpp"/>
+          <FILE id="tvgCm04" name="tvgStr.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/common/tvgStr.cpp"/>
+        </GROUP>
+        <GROUP id="{D3E4F5A6-7B89-0123-4567-890123456791}" name="renderer">
+          <FILE id="tvgRn01" name="tvgAccessor.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/renderer/tvgAccessor.cpp"/>
+          <FILE id="tvgRn02" name="tvgAnimation.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/renderer/tvgAnimation.cpp"/>
+          <FILE id="tvgRn03" name="tvgCanvas.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/renderer/tvgCanvas.cpp"/>
+          <FILE id="tvgRn04" name="tvgFill.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/renderer/tvgFill.cpp"/>
+          <FILE id="tvgRn05" name="tvgInitializer.cpp" compile="1" skipPCH="1"
+                resource="0" file="Source/thorvg-config/tvgInitializer.cpp"/>
+          <FILE id="tvgRn07" name="tvgLoaderMgr.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/renderer/tvgLoaderMgr.cpp"/>
+          <FILE id="tvgRn08" name="tvgPaint.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/renderer/tvgPaint.cpp"/>
+          <FILE id="tvgRn09" name="tvgPicture.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/renderer/tvgPicture.cpp"/>
+          <FILE id="tvgRn10" name="tvgRender.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/renderer/tvgRender.cpp"/>
+          <FILE id="tvgRn11" name="tvgSaver.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/renderer/tvgSaver.cpp"/>
+          <FILE id="tvgRn12" name="tvgScene.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/renderer/tvgScene.cpp"/>
+          <FILE id="tvgRn13" name="tvgShape.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/renderer/tvgShape.cpp"/>
+          <FILE id="tvgRn14" name="tvgTaskScheduler.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/renderer/tvgTaskScheduler.cpp"/>
+          <FILE id="tvgRn15" name="tvgText.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/renderer/tvgText.cpp"/>
+        </GROUP>
+        <GROUP id="{D3E4F5A6-7B89-0123-4567-890123456792}" name="lottie-loader">
+          <FILE id="tvgLt01" name="tvgLottieAnimation.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/loaders/lottie/tvgLottieAnimation.cpp"/>
+          <FILE id="tvgLt02" name="tvgLottieBuilder.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/loaders/lottie/tvgLottieBuilder.cpp"/>
+          <FILE id="tvgLt03" name="tvgLottieExpressions.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/loaders/lottie/tvgLottieExpressions.cpp"/>
+          <FILE id="tvgLt04" name="tvgLottieInterpolator.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/loaders/lottie/tvgLottieInterpolator.cpp"/>
+          <FILE id="tvgLt05" name="tvgLottieLoader.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/loaders/lottie/tvgLottieLoader.cpp"/>
+          <FILE id="tvgLt06" name="tvgLottieModel.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/loaders/lottie/tvgLottieModel.cpp"/>
+          <FILE id="tvgLt07" name="tvgLottieModifier.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/loaders/lottie/tvgLottieModifier.cpp"/>
+          <FILE id="tvgLt08" name="tvgLottieParser.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/loaders/lottie/tvgLottieParser.cpp"/>
+          <FILE id="tvgLt09" name="tvgLottieParserHandler.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/loaders/lottie/tvgLottieParserHandler.cpp"/>
+        </GROUP>
+        <GROUP id="{D3E4F5A6-7B89-0123-4567-890123456793}" name="raw-loader">
+          <FILE id="tvgRw01" name="tvgRawLoader.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/loaders/raw/tvgRawLoader.cpp"/>
+        </GROUP>
+      </GROUP>
       <GROUP id="{E6ED85A9-3843-825F-EF48-BCF81E38F8AD}" name="obj">
         <FILE id="ahOy0q" name="Camera.cpp" compile="1" resource="0" file="Source/obj/Camera.cpp"/>
         <FILE id="dUDESs" name="Camera.h" compile="0" resource="0" file="Source/obj/Camera.h"/>
@@ -628,6 +717,11 @@
         <GROUP id="{56A27063-1FE7-31C3-8263-98389240A8CB}" name="svg">
           <FILE id="cTec1H" name="SvgParser.cpp" compile="1" resource="0" file="Source/parser/svg/SvgParser.cpp"/>
           <FILE id="gvkrDH" name="SvgParser.h" compile="0" resource="0" file="Source/parser/svg/SvgParser.h"/>
+        </GROUP>
+        <GROUP id="{9A3C1F4E-4B12-4E6B-8A7D-2F6E11C5D901}" name="lottie">
+          <FILE id="LotPr01" name="LottieParser.cpp" compile="1" resource="0"
+                file="Source/parser/lottie/LottieParser.cpp"/>
+          <FILE id="LotPr02" name="LottieParser.h" compile="0" resource="0" file="Source/parser/lottie/LottieParser.h"/>
         </GROUP>
         <GROUP id="{E81B1D7B-B0F7-1967-B271-71B3F838720F}" name="txt">
           <FILE id="vIYWRG" name="TextParser.cpp" compile="1" resource="0" file="Source/parser/txt/TextParser.cpp"/>
@@ -734,9 +828,9 @@
     <LINUX_MAKE targetFolder="Builds/osci-render/LinuxMakefile" smallIcon="pSc1mq"
                 bigIcon="pSc1mq" externalLibraries="luajit" extraCompilerFlags="-mavx">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" headerPath="../../../modules/LuaJIT/src"
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" headerPath="../../../modules/LuaJIT/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw"
                        libraryPath="../../../modules/LuaJIT/src"/>
-        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render" headerPath="../../../modules/LuaJIT/src"
+        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render" headerPath="../../../modules/LuaJIT/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw"
                        libraryPath="../../../modules/LuaJIT/src"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
@@ -776,11 +870,11 @@
             extraLinkerFlags="/IGNORE:4006" externalLibraries="luajit51.lib">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" winWarningLevel="2"
-                       libraryPath="..\..\..\modules\LuaJIT\src" headerPath="..\..\..\modules\LuaJIT\src"
+                       libraryPath="..\..\..\modules\LuaJIT\src" headerPath="..\..\..\modules\LuaJIT\src&#10;..\..\..\Source\thorvg-config&#10;..\..\..\modules\thorvg\inc&#10;..\..\..\modules\thorvg\src&#10;..\..\..\modules\thorvg\src\common&#10;..\..\..\modules\thorvg\src\renderer&#10;..\..\..\modules\thorvg\src\loaders&#10;..\..\..\modules\thorvg\src\loaders\lottie&#10;..\..\..\modules\thorvg\src\loaders\lottie\rapidjson&#10;..\..\..\modules\thorvg\src\loaders\raw"
                        prebuildCommand="call ..\..\..\luajit_win.bat"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="osci-render" alwaysGenerateDebugSymbols="1"
                        debugInformationFormat="ProgramDatabase" winWarningLevel="2"
-                       libraryPath="..\..\..\modules\LuaJIT\src" headerPath="..\..\..\modules\LuaJIT\src"
+                       libraryPath="..\..\..\modules\LuaJIT\src" headerPath="..\..\..\modules\LuaJIT\src&#10;..\..\..\Source\thorvg-config&#10;..\..\..\modules\thorvg\inc&#10;..\..\..\modules\thorvg\src&#10;..\..\..\modules\thorvg\src\common&#10;..\..\..\modules\thorvg\src\renderer&#10;..\..\..\modules\thorvg\src\loaders&#10;..\..\..\modules\thorvg\src\loaders\lottie&#10;..\..\..\modules\thorvg\src\loaders\lottie\rapidjson&#10;..\..\..\modules\thorvg\src\loaders\raw"
                        prebuildCommand="call ..\..\..\luajit_win.bat" enablePluginBinaryCopyStep="0"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
@@ -824,18 +918,18 @@
                externalLibraries="luajit" userNotes="D86A3M3H2L" customPList="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&#10;&#10;&lt;!DOCTYPE plist PUBLIC &quot;-//Apple//DTD PLIST 1.0//EN&quot; &quot;http://www.apple.com/DTDs/PropertyList-1.0.dtd&quot;&gt;&#10;&lt;plist&gt;&#10;  &lt;dict&gt;&#10;    &lt;key&gt;NSAudioCaptureUsageDescription&lt;/key&gt;&#10;    &lt;string&gt;osci-render needs permission to capture audio from other applications for visualization.&lt;/string&gt;&#10;    &lt;key&gt;NSBluetoothAlwaysUsageDescription&lt;/key&gt;&#10;    &lt;string&gt;osci-render needs Bluetooth access to connect to Bluetooth MIDI devices.&lt;/string&gt;&#10;  &lt;/dict&gt;&#10;&lt;/plist&gt;&#10;">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx,CC=$(SRCROOT)/../../../ci/ccache-clang,CXX=$(SRCROOT)/../../../ci/ccache-clang++"
-                       headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
-                       usePrecompiledHeaderFile="1" precompiledHeaderFile="Source/pch.h"
-                       userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
+                       headerPath="../../../modules/LuaJIt/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw"
+                       libraryPath="../../../modules/LuaJIt/src" usePrecompiledHeaderFile="1"
+                       precompiledHeaderFile="Source/pch.h" userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
         <CONFIGURATION name="Release" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO,OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
-                       headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
-                       codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
+                       headerPath="../../../modules/LuaJIt/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw"
+                       libraryPath="../../../modules/LuaJIt/src" codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
         <CONFIGURATION name="Release (Development)" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
-                       headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
-                       userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
+                       headerPath="../../../modules/LuaJIt/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw"
+                       libraryPath="../../../modules/LuaJIt/src" userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
         <CONFIGURATION name="Profiling" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx,GCC_GENERATE_DEBUGGING_SYMBOLS=YES,GCC_DEBUGGING_SYMBOLS=full,DEBUG_INFORMATION_FORMAT=dwarf-with-dsym,STRIP_INSTALLED_PRODUCT = NO,COPY_PHASE_STRIP=NO,DWARF_DSYM_FILE_SHOULD_ACCOMPANY_PRODUCT=YES"
-                       headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
-                       userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
+                       headerPath="../../../modules/LuaJIt/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw"
+                       libraryPath="../../../modules/LuaJIt/src" userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>

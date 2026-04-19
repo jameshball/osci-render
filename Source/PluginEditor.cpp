@@ -222,6 +222,9 @@ bool OscirenderAudioProcessorEditor::isBinaryFile(juce::String name) {
         || name.endsWith(".obj")
 #if OSCI_PREMIUM
         || name.endsWith(".lsystem")
+        || name.endsWith(".json")
+        || name.endsWith(".lottie")
+        || name.endsWith(".lot")
 #endif
         ;
 }
