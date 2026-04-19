@@ -1612,13 +1612,25 @@ void OscirenderAudioProcessor::convertFreeProjectLfos(const juce::XmlElement* ef
         float endNorm = juce::jlimit(0.0f, 1.0f, conv.endPercent / 100.0f);
         float depth = endNorm - startNorm;
 
-        // Set the parameter base value to the LFO sweep start
+        // Only convert if the parameter belongs to an effect that is actually
+        // present (selected) in the project — skip effects that weren't added.
         osci::EffectParameter* effectParam = nullptr;
+        bool effectIsSelected = false;
         for (auto& effect : effects) {
             effectParam = effect->getParameter(conv.paramId);
-            if (effectParam != nullptr) break;
+            if (effectParam != nullptr) {
+                // For toggleable effects, require the effect to be selected (present in the project).
+                // Permanent effects and lua effects are always considered present.
+                bool isToggleable = std::find(toggleableEffects.begin(), toggleableEffects.end(), effect) != toggleableEffects.end();
+                effectIsSelected = !isToggleable || (effect->selected != nullptr && effect->selected->getBoolValue());
+                break;
+            }
         }
-        if (effectParam != nullptr) {
+        if (effectParam == nullptr || !effectIsSelected) {
+            juce::Logger::writeToLog("convertFreeProjectLfos: param " + conv.paramId + " not found or effect not selected, skipping");
+            continue;
+        }
+        {
             float paramMin = effectParam->min.load();
             float paramRange = effectParam->max.load() - paramMin;
             float baseValue = paramMin + startNorm * paramRange;
