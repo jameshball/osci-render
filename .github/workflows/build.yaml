@@ -94,13 +94,33 @@ jobs:
         if: matrix.os == 'windows-2022'
         run: nuget sources
 
-      - name: Run build & tests
+      - name: Check commit message for skip-validation marker
+        id: ci_flags
+        shell: bash
+        run: |
+          MSG=$(git log -1 --pretty=%B || true)
+          if [[ "$MSG" == *"[skip-validation]"* ]]; then
+            echo "skip_validation=true" >> "$GITHUB_OUTPUT"
+            echo "Commit requests skip-validation: tests + pluginval will be skipped."
+          else
+            echo "skip_validation=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run unit tests
+        if: steps.ci_flags.outputs.skip_validation != 'true'
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           source ./ci/setup-env.sh
           source ./ci/test.sh
+
+      - name: Run build
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          source ./ci/setup-env.sh
           source ./ci/build.sh "${{ matrix.project }}" "${{ matrix.version }}"
 
       # Install MEGAcmd early so both pluginval-log and binary uploads can use it
@@ -144,6 +164,7 @@ jobs:
 
       - name: Validate plugin with pluginval
         id: pluginval_effect
+        if: steps.ci_flags.outputs.skip_validation != 'true'
         continue-on-error: true
         shell: bash
         env:
@@ -155,7 +176,7 @@ jobs:
 
       - name: Validate instrument plugin with pluginval
         id: pluginval_instrument
-        if: matrix.project == 'osci-render'
+        if: matrix.project == 'osci-render' && steps.ci_flags.outputs.skip_validation != 'true'
         continue-on-error: true
         shell: bash
         env:

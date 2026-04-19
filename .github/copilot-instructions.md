@@ -104,6 +104,7 @@ See `.github/docs/build-details.md`.
 4-part version `A.B.C.D`. `--major` bumps B, `--minor` bumps C, `--patch` bumps D. Updates both `.jucer` files, `packaging/*.iss` and `packaging/*.pkgproj`. Requires clean working tree.
 ```bash
 ./bump_version --osci minor --sosci patch
+./bump_version --osci patch --sosci patch --skip-validation   # low-cost CI: build only, no tests/pluginval
 ```
 
 ### Thread Safety & Realtime Safety

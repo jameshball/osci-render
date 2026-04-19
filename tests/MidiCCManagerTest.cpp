@@ -768,7 +768,7 @@ private:
     }
 
     void testRapidLearningCycles() {
-        beginTest("Rapid learn→assign→remove cycles");
+        beginTest("Rapid learn->assign->remove cycles");
 
         osci::MidiCCManager mgr;
         auto param = makeFloat("rapidParam");
