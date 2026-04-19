@@ -2,7 +2,7 @@
 #include "CodeDependencies.iss"
 
 #define MyAppName "osci-render"
-#define MyAppVersion "2.8.9.10"
+#define MyAppVersion "2.8.9.11"
 #define MyAppPublisher "James H Ball"
 #define MyAppURL "https://osci-render.com/"
 #define MyAppExeName "osci-render.exe"
