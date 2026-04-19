@@ -136,14 +136,7 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     threadManager.write(workBuffer, "VisualiserRenderer");
 
     if (juce::JUCEApplication::isStandaloneApp()) {
-        // Scale output by volume
-        juce::FloatVectorOperations::multiply(workArray[0], workArray[0], volume.load(), numSamples);
-        juce::FloatVectorOperations::multiply(workArray[1], workArray[1], volume.load(), numSamples);
-
-        // Hard clip to threshold
-        float thresholdVal = threshold.load();
-        juce::FloatVectorOperations::clip(workArray[0], workArray[0], -thresholdVal, thresholdVal, numSamples);
-        juce::FloatVectorOperations::clip(workArray[1], workArray[1], -thresholdVal, thresholdVal, numSamples);
+        applyVolumeAndThreshold(workArray, numSamples);
 
         // apply mute if active
         if (muteParameter->getBoolValue()) {
