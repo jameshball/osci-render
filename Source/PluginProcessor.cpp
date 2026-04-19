@@ -370,7 +370,7 @@ OscirenderAudioProcessor::~OscirenderAudioProcessor() {
     // Stop the voice builder before tearing down any processor state it references.
     voiceBuilder.reset();
 
-    for (int i = luaEffects.size() - 1; i >= 0; i--) {
+    for (auto i = luaEffects.size(); i-- > 0;) {
         luaEffects[i]->parameters[0]->removeListener(this);
     }
     // Clear all effect vectors that may reference luaEffectState before it is
@@ -473,7 +473,7 @@ void OscirenderAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
 void OscirenderAudioProcessor::addLuaSlider() {
     juce::String sliderName = "";
 
-    int sliderIndex = luaEffects.size();
+    int sliderIndex = static_cast<int>(luaEffects.size());
     int sliderNum = sliderIndex + 1;
     while (sliderNum > 0) {
         int mod = (sliderNum - 1) % 26;
@@ -535,7 +535,7 @@ void OscirenderAudioProcessor::applyEffectOrder(const std::vector<juce::String>&
 
 // parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessor::updateFileBlock(int index, std::shared_ptr<juce::MemoryBlock> block) {
-    if (index < 0 || index >= fileBlocks.size()) {
+    if (index < 0 || index >= static_cast<int>(fileBlocks.size())) {
         return;
     }
     fileBlocks[index] = block;
@@ -551,7 +551,7 @@ void OscirenderAudioProcessor::addFile(juce::File file) {
     sounds.push_back(new ShapeSound(*this, parsers.back()));
     file.createInputStream()->readIntoMemoryBlock(*fileBlocks.back());
 
-    openFile(fileBlocks.size() - 1);
+    openFile(static_cast<int>(fileBlocks.size()) - 1);
 }
 
 
@@ -564,7 +564,7 @@ void OscirenderAudioProcessor::addFile(juce::String fileName, const char* data, 
     sounds.push_back(new ShapeSound(*this, parsers.back()));
     fileBlocks.back()->append(data, size);
 
-    openFile(fileBlocks.size() - 1);
+    openFile(static_cast<int>(fileBlocks.size()) - 1);
 }
 
 // parsersLock AND effectsLock must be locked before calling this function
@@ -575,7 +575,7 @@ void OscirenderAudioProcessor::addFile(juce::String fileName, std::shared_ptr<ju
     parsers.push_back(std::make_shared<FileParser>(*this, errorCallback));
     sounds.push_back(new ShapeSound(*this, parsers.back()));
 
-    openFile(fileBlocks.size() - 1);
+    openFile(static_cast<int>(fileBlocks.size()) - 1);
 }
 
 // Setter for the callback
@@ -585,7 +585,7 @@ void OscirenderAudioProcessor::setFileRemovedCallback(std::function<void(int)> c
 
 // parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessor::removeFile(int index) {
-    if (index < 0 || index >= fileBlocks.size()) {
+    if (index < 0 || index >= static_cast<int>(fileBlocks.size())) {
         return;
     }
     fileBlocks.erase(fileBlocks.begin() + index);
@@ -595,8 +595,8 @@ void OscirenderAudioProcessor::removeFile(int index) {
     sounds.erase(sounds.begin() + index);
 
     auto newFileIndex = index;
-    if (newFileIndex >= fileBlocks.size()) {
-        newFileIndex = fileBlocks.size() - 1;
+    if (newFileIndex >= static_cast<int>(fileBlocks.size())) {
+        newFileIndex = static_cast<int>(fileBlocks.size()) - 1;
     }
     changeCurrentFile(newFileIndex);
 
@@ -609,7 +609,7 @@ void OscirenderAudioProcessor::removeFile(int index) {
 // parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessor::removeParser(FileParser* parser) {
     int parserIndex = -1;
-    for (int i = 0; i < parsers.size(); i++) {
+    for (int i = 0; i < static_cast<int>(parsers.size()); i++) {
         if (parsers[i].get() == parser) {
             parserIndex = i;
             break;
@@ -622,14 +622,14 @@ void OscirenderAudioProcessor::removeParser(FileParser* parser) {
 }
 
 int OscirenderAudioProcessor::numFiles() {
-    return fileBlocks.size();
+    return static_cast<int>(fileBlocks.size());
 }
 
 // used for opening NEW files. Should be the default way of opening files as
 // it will reparse any existing files, so it is safer.
 // parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessor::openFile(int index) {
-    if (index < 0 || index >= fileBlocks.size()) {
+    if (index < 0 || index >= static_cast<int>(fileBlocks.size())) {
         return;
     }
     parsers[index]->parse(juce::String(fileIds[index]), fileNames[index], fileNames[index].fromLastOccurrenceOf(".", true, false).toLowerCase(), std::make_unique<juce::MemoryInputStream>(*fileBlocks[index], false), font);
@@ -911,8 +911,6 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     }
 
     prevMidiEnabled = usingMidi;
-
-    const double EPSILON = 0.00001;
 
     inputBuffer.setSize(totalNumInputChannels, buffer.getNumSamples(), false, false, true);
     for (auto channel = 0; channel < totalNumInputChannels; channel++) {
@@ -1320,7 +1318,7 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
             auto family = fontXml->getStringAttribute("family");
             auto bold = fontXml->getBoolAttribute("bold");
             auto italic = fontXml->getBoolAttribute("italic");
-            font = juce::Font(family, FONT_SIZE, (bold ? juce::Font::bold : 0) | (italic ? juce::Font::italic : 0));
+            font = juce::Font(juce::FontOptions(family, FONT_SIZE, (bold ? juce::Font::bold : 0) | (italic ? juce::Font::italic : 0)));
         }
 
         // close all files

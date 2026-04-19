@@ -5,14 +5,14 @@ LineArtParser::LineArtParser(juce::String json) {
     frames.clear();
     numFrames = 0;
     frames = parseJsonFrames(json);
-    numFrames = frames.size();
+    numFrames = static_cast<int>(frames.size());
 }
 
 LineArtParser::LineArtParser(char* data, int dataLength) {
     frames.clear();
     numFrames = 0;
     frames = parseBinaryFrames(data, dataLength);
-    numFrames = frames.size();
+    numFrames = static_cast<int>(frames.size());
     if (numFrames == 0) frames = epicFail();
 }
 
@@ -36,7 +36,7 @@ std::vector<std::vector<osci::Line>> LineArtParser::epicFail() {
 
 std::vector<std::vector<osci::Line>> LineArtParser::parseBinaryFrames(char* bytes, int bytesLength) {
     int64_t* data = (int64_t*)bytes;
-    int dataLength = bytesLength / 8;
+    int dataLength = static_cast<int>(bytesLength / 8);
     std::vector<std::vector<osci::Line>> tFrames;
 
     if (dataLength < 4) return epicFail();
@@ -83,9 +83,9 @@ std::vector<std::vector<osci::Line>> LineArtParser::parseBinaryFrames(char* byte
         index++;
 
         if (strcmp(tag, "fCount  ") == 0) {
-            reportedNumFrames = rawData;
+            reportedNumFrames = static_cast<int>(rawData);
         } else if (strcmp(tag, "fRate   ") == 0) {
-            frameRate = rawData;
+            frameRate = static_cast<int>(rawData);
         }
 
         if (index >= dataLength) return epicFail();
@@ -170,7 +170,7 @@ std::vector<std::vector<osci::Line>> LineArtParser::parseBinaryFrames(char* byte
                                             if (index >= dataLength) return epicFail();
                                             rawData = data[index];
                                             index++;
-                                            vertexCount = rawData;
+                                            vertexCount = static_cast<int>(rawData);
                                         }
                                         else if (strcmp(tag, "VERTICES") == 0) {
                                             double x = 0;

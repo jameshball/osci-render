@@ -12,7 +12,7 @@ public:
               juce::Colour fg = juce::Colours::white) {
         if (!popup) {
             popup = std::make_unique<juce::Label>();
-            popup->setFont(juce::Font(11.0f, juce::Font::bold));
+            popup->setFont(juce::Font(juce::FontOptions(11.0f, juce::Font::bold)));
             popup->setJustificationType(juce::Justification::centred);
             popup->setInterceptsMouseClicks(false, false);
             popup->addToDesktop(juce::ComponentPeer::windowIsTemporary
@@ -24,7 +24,7 @@ public:
         popup->setColour(juce::Label::textColourId, fg);
         popup->setText(text, juce::dontSendNotification);
 
-        int popupW = popup->getFont().getStringWidth(text) + 14;
+        int popupW = juce::GlyphArrangement::getStringWidthInt(popup->getFont(), text) + 14;
         int popupH = 20;
         auto screenPos = anchor.localPointToGlobal(
             juce::Point<int>(anchor.getWidth() / 2, 0));

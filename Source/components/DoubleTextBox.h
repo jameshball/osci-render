@@ -7,7 +7,7 @@ public:
 		setText(juce::String(minValue, 2), false);
 		setMultiLine(false);
 		setJustification(juce::Justification::centred);
-		setFont(juce::Font(15.0f, juce::Font::plain));
+		setFont(juce::Font(juce::FontOptions(15.0f, juce::Font::plain)));
 		setSelectAllWhenFocused(true);
 		onTextChange = [this]() {
 			setText(getText(), false);
@@ -20,7 +20,7 @@ public:
 	}
 
 	void setValue(double value, bool sendChangeMessage = true, int digits = 2) {
-		setText(juce::String(value, (size_t)(digits)), sendChangeMessage);
+		setText(juce::String(value, juce::jmax(0, digits)), sendChangeMessage);
 	}
 
 	void setText(const juce::String& newText, bool sendChangeMessage = true) {

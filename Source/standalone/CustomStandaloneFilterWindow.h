@@ -100,8 +100,8 @@ public:
                             )
 
         : settings (settingsToUse, takeOwnershipOfSettings),
-          commandLine (commandLine),
           channelConfiguration (channels),
+          commandLine (commandLine),
           autoOpenMidiDevices (shouldAutoOpenMidiDevices)
     {
         // Only one StandalonePluginHolder may be created at a time
@@ -380,14 +380,14 @@ public:
                     || e->getStringAttribute ("currentDeviceType").containsIgnoreCase (deviceTypeName))
                     return true;
 
-                forEachXmlChildElement (*e, child)
+                for (auto* child : e->getChildIterator())
                     toVisit.add (child);
             }
 
             return false;
         };
 
-        const auto hasAudioDeviceType = [&] (const String& typeName) -> bool
+        [[maybe_unused]] const auto hasAudioDeviceType = [&] (const String& typeName) -> bool
         {
             const auto& types = deviceManager.getAvailableDeviceTypes();
             for (auto* t : types)

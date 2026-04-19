@@ -15,7 +15,7 @@ private:
     
     juce::Font& font;
 	std::vector<std::unique_ptr<osci::Shape>> shapes;
-    juce::Font currentFont;
+    juce::Font currentFont { juce::FontOptions(14.0f) };
     juce::String text;
     juce::AttributedString attributedString;
 };

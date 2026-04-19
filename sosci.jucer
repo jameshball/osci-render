@@ -298,7 +298,7 @@
                JUCE_WEB_BROWSER="0" JUCE_USE_MP3AUDIOFORMAT="1" JUCE_ASIO="1"/>
   <EXPORTFORMATS>
     <LINUX_MAKE targetFolder="Builds/sosci/LinuxMakefile" smallIcon="KigaoN"
-                bigIcon="KigaoN" extraCompilerFlags="-mavx">
+                bigIcon="KigaoN" extraCompilerFlags="-mavx -Wno-deprecated-declarations -Wno-reorder-ctor -Wno-inconsistent-missing-override -Wno-unused-function -Wno-unused-variable">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="sosci"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="sosci"/>
@@ -373,6 +373,7 @@
     <XCODE_MAC targetFolder="Builds/sosci/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak"
                extraDefs="JUCE_SILENCE_XCODE_15_LINKER_WARNING=1" smallIcon="CeSRLV"
                bigIcon="CeSRLV" applicationCategory="public.app-category.music"
+               extraCompilerFlags="-Wno-deprecated-declarations -Wno-reorder-ctor -Wno-inconsistent-missing-override -Wno-unused-function -Wno-unused-variable"
                microphonePermissionNeeded="1" extraCustomFrameworks="/Library/Frameworks/Syphon.framework"
                frameworkSearchPaths="/Library/Frameworks" hardenedRuntime="1"
                hardenedRuntimeOptions="com.apple.security.cs.disable-library-validation,com.apple.security.device.audio-input"

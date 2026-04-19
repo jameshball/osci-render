@@ -23,8 +23,8 @@ VisualiserRenderer::VisualiserRenderer(
     int resolution,
     double frameRate,
     juce::String threadName
-) : parameters(parameters),
-    osci::AudioBackgroundThread("VisualiserRenderer" + threadName, threadManager),
+) : osci::AudioBackgroundThread("VisualiserRenderer" + threadName, threadManager),
+    parameters(parameters),
     resolution(resolution),
     frameRate(frameRate)
 {
@@ -1001,7 +1001,7 @@ void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::
 #endif
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vertexIndexBuffer);
-    int nEdgesThisTime = xPoints.size() - 1;
+    int nEdgesThisTime = static_cast<int>(xPoints.size()) - 1;
     glDrawElements(GL_TRIANGLES, nEdgesThisTime * 6, GL_UNSIGNED_INT, 0);
 
     glDisableVertexAttribArray(aStartLoc);
@@ -1258,7 +1258,7 @@ Texture VisualiserRenderer::createScreenTexture() {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         simpleShader->setUniform("colour", 0.01f, 0.05f, 0.01f, 1.0f);
         glLineWidth(4.0f);
-        glDrawArrays(GL_LINES, 0, data.size() / 2);
+        glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(data.size() / 2));
 
         // Also write a clean graticule mask into alpha so the compositor can
         // reveal grid lines under ambient without washing out the smudged texture.
@@ -1283,7 +1283,7 @@ Texture VisualiserRenderer::createScreenTexture() {
 
             // Draw grid lines into alpha only.
             simpleShader->setUniform("colour", 0.0f, 0.0f, 0.0f, 0.0f);
-            glDrawArrays(GL_LINES, 0, data.size() / 2);
+            glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(data.size() / 2));
 
             glClearColor(prevClearColour[0], prevClearColour[1], prevClearColour[2], prevClearColour[3]);
             glColorMask(prevColourMask[0], prevColourMask[1], prevColourMask[2], prevColourMask[3]);

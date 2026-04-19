@@ -25,16 +25,18 @@ public:
             // Create an OutputStream to write to our destination file...
             file.deleteFile();
 
-            if (auto fileStream = std::unique_ptr<juce::FileOutputStream>(file.createOutputStream())) {
+            if (auto fileStream = std::unique_ptr<juce::OutputStream>(file.createOutputStream().release())) {
                 // Now create a WAV writer object that writes to our output stream...
                 juce::WavAudioFormat wavFormat;
 
-                if (auto writer = wavFormat.createWriterFor(fileStream.get(), sampleRate, 2, 32, {}, 0)) {
-                    fileStream.release(); // (passes responsibility for deleting the stream to the writer object that is now using it)
-
+                if (auto writer = wavFormat.createWriterFor(fileStream,
+                                                            juce::AudioFormatWriterOptions{}
+                                                                .withSampleRate(sampleRate)
+                                                                .withNumChannels(2)
+                                                                .withBitsPerSample(32))) {
                     // Now we'll create one of these helper objects which will act as a FIFO buffer, and will
                     // write the data to disk on our background thread.
-                    threadedWriter.reset(new juce::AudioFormatWriter::ThreadedWriter(writer, backgroundThread, 32768));
+                    threadedWriter.reset(new juce::AudioFormatWriter::ThreadedWriter(writer.release(), backgroundThread, 32768));
 
                     nextSampleNum = 0;
 

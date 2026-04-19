@@ -53,7 +53,7 @@ WorldObject::WorldObject(const std::string& obj_string) {
     reader.ParseFromString(obj_string, "", reader_config);
 
     vs = reader.GetAttrib().vertices;
-	numVertices = vs.size() / 3;
+    numVertices = static_cast<int>(vs.size() / 3);
 
     //
     // normalising object vertices
@@ -87,7 +87,7 @@ WorldObject::WorldObject(const std::string& obj_string) {
     // scaling down so that it's slightly smaller
     max = 1.2 * max;
 
-    for (int i = 0; i < vs.size(); i++) {
+    for (int i = 0; i < static_cast<int>(vs.size()); i++) {
         vs[i] /= max;
     }
 
@@ -183,7 +183,7 @@ WorldObject::WorldObject(const std::string& obj_string) {
             }
         }
 
-        Graph subgraph(connected_component.size(), sub_edge_list);
+        Graph subgraph(static_cast<int>(connected_component.size()), sub_edge_list);
 
         std::vector<double> cost(subgraph.GetNumEdges());
 		for (auto& edge : sub_edge_list) {

@@ -3,7 +3,7 @@
 #include "../PluginProcessor.h"
 
 FileParser::FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce::String, juce::String)> errorCallback) 
-    : errorCallback(errorCallback), audioProcessor(p) {}
+    : audioProcessor(p), errorCallback(errorCallback) {}
 
 // Helper function to show file size warning
 void FileParser::showFileSizeWarning(juce::String fileName, int64_t totalBytes, int64_t mbLimit,
@@ -78,7 +78,7 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 		lua = std::make_shared<LuaParser>(fileId, stream->readEntireStreamAsString(), errorCallback, fallbackLuaScript);
 	} else if (extension == ".gpla") {
 		juce::MemoryBlock buffer{};
-		int bytesRead = stream->readIntoMemoryBlock(buffer);
+		auto bytesRead = stream->readIntoMemoryBlock(buffer);
 		if (bytesRead < 8) return;
 		char* gplaData = (char*)buffer.getData();
 		const char tag[] = "GPLA    ";
@@ -87,14 +87,14 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 			isBinary = isBinary && tag[i] == gplaData[i];
 		}
 		if (isBinary) {
-			gpla = std::make_shared<LineArtParser>(gplaData, bytesRead);
+			gpla = std::make_shared<LineArtParser>(gplaData, static_cast<int>(bytesRead));
 		} else {
 			stream->setPosition(0);
 			gpla = std::make_shared<LineArtParser>(stream->readEntireStreamAsString());
 		}
 	} else if (extension == ".gif" || extension == ".png" || extension == ".jpg" || extension == ".jpeg" || extension == ".mp4" || extension == ".mov") {
 		juce::MemoryBlock buffer{};
-		int bytesRead = stream->readIntoMemoryBlock(buffer);
+		auto bytesRead = stream->readIntoMemoryBlock(buffer);
 
 		showFileSizeWarning(fileName, bytesRead, 20, (extension == ".mp4" || extension == ".mov") ? "video" : "image",
 			[this, buffer, extension]() {

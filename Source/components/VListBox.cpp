@@ -71,7 +71,7 @@ public:
     bool isInDragToScrollViewport() const noexcept
     {
         if (auto* vp = owner.getViewport())
-            return vp->isScrollOnDragEnabled() && (vp->canScrollVertically() || vp->canScrollHorizontally());
+            return vp->getScrollOnDragMode() != juce::Viewport::ScrollOnDragMode::never && (vp->canScrollVertically() || vp->canScrollHorizontally());
 
         return false;
     }
@@ -1013,7 +1013,7 @@ void VListBox::startDragAndDrop (const juce::MouseEvent& e,
         auto dragImage = createSnapshotOfRows (rowsToDrag, x, y);
 
         auto p = juce::Point<int> (x, y) - e.getEventRelativeTo (this).position.toInt();
-        dragContainer->startDragging (dragDescription, this, dragImage, allowDraggingToOtherWindows, &p, &e.source);
+        dragContainer->startDragging (dragDescription, this, juce::ScaledImage (dragImage), allowDraggingToOtherWindows, &p, &e.source);
     }
     else
     {

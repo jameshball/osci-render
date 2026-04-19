@@ -25,7 +25,7 @@ inline std::unique_ptr<juce::TextEditor> create(
         float fontSize = 12.0f) {
     auto editor = std::make_unique<juce::TextEditor>();
     editor->setJustification(juce::Justification::centred);
-    editor->setFont(juce::Font(fontSize, juce::Font::bold));
+    editor->setFont(juce::Font(juce::FontOptions(fontSize, juce::Font::bold)));
     editor->setColour(juce::TextEditor::backgroundColourId, backgroundColour);
     editor->setColour(juce::TextEditor::textColourId, textColour);
     editor->setColour(juce::TextEditor::outlineColourId, outlineColour);

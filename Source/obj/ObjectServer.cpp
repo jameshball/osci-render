@@ -2,7 +2,7 @@
 #include "../PluginProcessor.h"
 
 
-ObjectServer::ObjectServer(OscirenderAudioProcessor& p) : audioProcessor(p), juce::Thread("Object Server") {
+ObjectServer::ObjectServer(OscirenderAudioProcessor& p) : juce::Thread("Object Server"), audioProcessor(p) {
     startThread();
 }
 
@@ -64,7 +64,7 @@ void ObjectServer::run() {
                                 juce::String messageString = message.get();
                                 if (juce::Base64::convertFromBase64(binStream, messageString)) {
                                     std::vector<std::vector<osci::Line>> receivedFrames;
-                                    int bytesRead = binStream.getDataSize();
+                                    int bytesRead = static_cast<int>(binStream.getDataSize());
                                     if (bytesRead < 8) return;
                                     char* gplaData = (char*)binStream.getData();
                                     receivedFrames = LineArtParser::parseBinaryFrames(gplaData, bytesRead);

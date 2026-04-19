@@ -15,17 +15,20 @@ VisualiserComponent::VisualiserComponent(
     RecordingSettings &recordingSettings,
     VisualiserComponent *parent,
     bool visualiserOnly) : VisualiserRenderer(settings.parameters, processor.threadManager),
-                           settings(settings),
+                           parent(parent),
                            audioProcessor(processor),
-                           ffmpegFile(ffmpegFile),
-#if OSCI_PREMIUM
-                           sharedTextureManager(sharedTextureManager),
-                           ffmpegEncoderManager(ffmpegFile),
-#endif
+                           editor(pluginEditor),
+                           settings(settings),
                            recordingSettings(recordingSettings),
                            visualiserOnly(visualiserOnly),
-                           parent(parent),
-                           editor(pluginEditor) {
+#if OSCI_PREMIUM
+                           sharedTextureManager(sharedTextureManager),
+#endif
+                           ffmpegFile(ffmpegFile)
+#if OSCI_PREMIUM
+                           , ffmpegEncoderManager(ffmpegFile)
+#endif
+                           {
     // Sync active state with the parameter for the primary visualiser
     if (isPrimaryVisualiser()) {
         active = !audioProcessor.visualiserParameters.visualiserPaused->getBoolValue();

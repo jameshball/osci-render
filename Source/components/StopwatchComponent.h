@@ -6,7 +6,7 @@ class StopwatchComponent : public juce::Component, public juce::Timer {
     StopwatchComponent() {
         addAndMakeVisible(label);
         // set mono-spaced font
-        juce::Font font;
+        juce::Font font(juce::FontOptions{});
         font.setTypefaceName(juce::Font::getDefaultMonospacedFontName());
         label.setFont(font);
         label.setColour(juce::Label::textColourId, juce::Colours::red);

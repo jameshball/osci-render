@@ -174,7 +174,7 @@ std::shared_ptr<juce::Component> EffectsListComponent::createComponent(osci::Eff
 
 int EffectsListBoxModel::getRowHeight(int row) {
     auto data = (AudioEffectListBoxItemData&)modelData;
-    return data.getEffect(row)->parameters.size() * EffectsListComponent::ROW_HEIGHT + EffectsListComponent::PADDING;
+    return static_cast<int>(data.getEffect(row)->parameters.size()) * EffectsListComponent::ROW_HEIGHT + EffectsListComponent::PADDING;
 }
 
 bool EffectsListBoxModel::hasVariableHeightRows() const {

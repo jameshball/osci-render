@@ -193,7 +193,6 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     };
 
     double mainLayoutVisSize = std::any_cast<double>(audioProcessor.getProperty("mainLayoutVisSize", -0.25));
-    double mainLayoutModSize = std::any_cast<double>(audioProcessor.getProperty("mainLayoutModSize", -0.35));
 
 #if !OSCI_PREMIUM
     {
@@ -278,7 +277,6 @@ void SettingsComponent::resized() {
 }
 
 void SettingsComponent::layoutChildren() {
-    auto padding = 7;
     static constexpr int kGap = 3; // small gap between stacked panels
 
     auto area = getLocalBounds();

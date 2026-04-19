@@ -247,7 +247,7 @@ public:
 
         // Label text
         g.setColour(labelHovered && !isLearningCC ? Colours::accentColor().withAlpha(alpha) : juce::Colours::white.withAlpha(alpha));
-        g.setFont(juce::Font(10.0f));
+        g.setFont(juce::Font(juce::FontOptions(10.0f)));
         g.drawText(isLearningCC ? Colours::midiLearnLabel() : label, labelArea, juce::Justification::centred, false);
     }
 

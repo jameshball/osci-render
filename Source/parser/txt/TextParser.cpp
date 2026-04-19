@@ -2,7 +2,7 @@
 #include "../svg/SvgParser.h"
 
 
-TextParser::TextParser(juce::String text, juce::Font& font) : text(text), font(font) {
+TextParser::TextParser(juce::String text, juce::Font& font) : font(font), text(text) {
     parse(text);
 }
 

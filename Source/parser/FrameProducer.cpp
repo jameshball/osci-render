@@ -1,7 +1,7 @@
 #include "FrameProducer.h"
 #include "FileParser.h"
 
-FrameProducer::FrameProducer(FrameConsumer& fc, std::shared_ptr<FileParser> fs) : frameConsumer(fc), frameSource(fs), juce::Thread("producer", 0) {}
+FrameProducer::FrameProducer(FrameConsumer& fc, std::shared_ptr<FileParser> fs) : juce::Thread("producer", 0), frameConsumer(fc), frameSource(fs) {}
 
 FrameProducer::~FrameProducer() {}
 

@@ -16,7 +16,7 @@ void LuaListComponent::resized() {
 void paintListBoxItem(int sliderNum, juce::Graphics& g, int width, int height, bool rowIsSelected) {}
 
 int LuaListBoxModel::getNumRows() {
-	return audioProcessor.luaEffects.size();
+	return static_cast<int>(audioProcessor.luaEffects.size());
 }
 
 void LuaListBoxModel::paintListBoxItem(int rowNumber, juce::Graphics& g, int width, int height, bool rowIsSelected) {}

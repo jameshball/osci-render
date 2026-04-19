@@ -32,7 +32,7 @@ public:
     void paintContent(juce::Graphics& g, juce::Rectangle<int> area) override {
         // Value text
         g.setColour(juce::Colours::white.withAlpha(0.9f));
-        g.setFont(juce::Font(14.0f, juce::Font::bold));
+        g.setFont(juce::Font(juce::FontOptions(14.0f, juce::Font::bold)));
         g.drawText(getDisplayText(), valueArea.toFloat(), juce::Justification::centred);
 
         // Optional icon area with separator

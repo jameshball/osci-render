@@ -41,7 +41,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark());
 #else
     addChildComponent(mtsEspLabel);
-    mtsEspLabel.setFont(juce::Font(11.0f));
+    mtsEspLabel.setFont(juce::Font(juce::FontOptions(11.0f)));
     mtsEspLabel.setColour(juce::Label::textColourId, juce::Colours::limegreen);
     mtsEspLabel.setJustificationType(juce::Justification::centredRight);
 #endif

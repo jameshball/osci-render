@@ -294,8 +294,6 @@ static int luaPulseWave(lua_State* L) {
 // ============================================================================
 
 static int luaMix(lua_State* L) {
-    int nargs = lua_gettop(L);
-
     osci::Point point1 = tableToPoint(L, 1);
     osci::Point point2 = tableToPoint(L, 2);
     double weight = lua_tonumber(L, 3);

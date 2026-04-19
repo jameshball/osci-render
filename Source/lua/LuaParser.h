@@ -5,6 +5,7 @@
 
 class ErrorListener {
 public:
+	virtual ~ErrorListener() = default;
 	virtual void onError(int lineNumber, juce::String error) = 0;
 	virtual juce::String getId() = 0;
 };

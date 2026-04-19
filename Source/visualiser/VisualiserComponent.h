@@ -26,7 +26,7 @@ enum class FullScreenMode {
 
 class CommonPluginEditor;
 class VisualiserWindow;
-class VisualiserComponent : public VisualiserRenderer, public juce::MouseListener, public AudioPlayerListener, public juce::AudioProcessorParameter::Listener {
+class VisualiserComponent : public VisualiserRenderer, public AudioPlayerListener, public juce::AudioProcessorParameter::Listener {
 public:
     VisualiserComponent(
         CommonAudioProcessor& processor,
@@ -149,7 +149,7 @@ private:
 
 class VisualiserWindow : public juce::DocumentWindow {
 public:
-    VisualiserWindow(juce::String name, VisualiserComponent* parent) : parent(parent), juce::DocumentWindow(name, juce::Colours::black, juce::DocumentWindow::TitleBarButtons::allButtons) {
+    VisualiserWindow(juce::String name, VisualiserComponent* parent) : juce::DocumentWindow(name, juce::Colours::black, juce::DocumentWindow::TitleBarButtons::allButtons), parent(parent) {
         setAlwaysOnTop(true);
     }
 

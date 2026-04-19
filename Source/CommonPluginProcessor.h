@@ -18,6 +18,7 @@
 
 class AudioPlayerListener {
 public:
+    virtual ~AudioPlayerListener() = default;
     virtual void parserChanged() = 0;
 };
 
@@ -42,8 +43,8 @@ public:
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
    #endif
 
-    virtual void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) = 0;
-    virtual juce::AudioProcessorEditor* createEditor() = 0;
+    void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override = 0;
+    juce::AudioProcessorEditor* createEditor() override = 0;
 
     bool hasEditor() const override;
 
