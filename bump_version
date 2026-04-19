@@ -173,7 +173,7 @@ def set_pkgproj_versions(path: Path, new_version: Version) -> bool:
 
 
 def ensure_clean_working_tree() -> None:
-    out = run_git(["status", "--porcelain"])
+    out = run_git(["status", "--porcelain", "--untracked-files=no"])
     if out.strip():
         raise FatalError(
             "Working tree is not clean. Commit or stash changes before running bump_version.\n"
