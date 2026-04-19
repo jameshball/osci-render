@@ -50,7 +50,7 @@ public:
             juce::String idx = juce::String(i + 1);
             juce::String pfx = "lfo" + idx;
 
-            rate[i] = new osci::FloatParameter("LFO " + idx + " Rate", pfx + "Rate", VERSION_HINT, 1.0f, 0.01f, 100.0f, 0.01f, "Hz");
+            rate[i] = new osci::FloatParameter("LFO " + idx + " Rate", pfx + "Rate", VERSION_HINT, 1.0f, 0.01f, 1000.0f, 0.01f, "Hz");
             phaseOffset[i] = new osci::FloatParameter("LFO " + idx + " Phase Offset", pfx + "PhaseOffset", VERSION_HINT, 0.0f, 0.0f, 1.0f, 0.0001f);
             smoothAmount[i] = new osci::FloatParameter("LFO " + idx + " Smooth", pfx + "SmoothAmount", VERSION_HINT, 0.0f, 0.0f, 16.0f, 0.0001f, "s");
             delayAmount[i] = new osci::FloatParameter("LFO " + idx + " Delay", pfx + "DelayAmount", VERSION_HINT, 0.0f, 0.0f, 4.0f, 0.0001f, "s");
