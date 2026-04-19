@@ -7,6 +7,7 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
     addAndMakeVisible(quality);
     addAndMakeVisible(resolution);
     addAndMakeVisible(frameRate);
+    addAndMakeVisible(losslessAudio);
     addAndMakeVisible(losslessVideo);
     addAndMakeVisible(recordAudio);
     addAndMakeVisible(recordVideo);
@@ -21,10 +22,12 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
     resolution.setRangeEnabled(false);
     frameRate.setRangeEnabled(false);
     
+    updateLosslessAudioEnabled();
     recordAudio.onClick = [this] {
         if (!recordAudio.getToggleState() && !recordVideo.getToggleState()) {
             recordVideo.setToggleState(true, juce::NotificationType::sendNotification);
         }
+        updateLosslessAudioEnabled();
     };
     recordVideo.onClick = [this] {
         if (!recordAudio.getToggleState() && !recordVideo.getToggleState()) {
@@ -52,6 +55,10 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
     videoCodecSelector.setSelectedId(static_cast<int>(parameters.videoCodec) + 1);
     videoCodecSelector.onChange = [this] {
         parameters.videoCodec = static_cast<VideoCodec>(videoCodecSelector.getSelectedId() - 1);
+        if (parameters.videoCodec == VideoCodec::VP9) {
+            losslessAudio.setToggleState(false, juce::NotificationType::sendNotification);
+        }
+        updateLosslessAudioEnabled();
     };
     videoCodecLabel.setTooltip("The video codec to use when recording. Different codecs offer different trade-offs between quality, file size, and compatibility.");
     
@@ -66,22 +73,28 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
     
     recordVideoWarning.setText("Recording video is only available in osci-render premium or sosci.");
     recordVideoWarning.setJustification(juce::Justification::centred);
-    recordVideoWarning.setColour(juce::TextEditor::textColourId, Colours::accentColor);
+    recordVideoWarning.setColour(juce::TextEditor::textColourId, Colours::accentColor());
     recordVideoWarning.setMultiLine(true);
     recordVideoWarning.setReadOnly(true);
     recordVideoWarning.setInterceptsMouseClicks(false, false);
     
-    sosciLink.setColour(juce::HyperlinkButton::textColourId, Colours::accentColor);
+    sosciLink.setColour(juce::HyperlinkButton::textColourId, Colours::accentColor());
 #endif
 }
 
 RecordingSettings::~RecordingSettings() {}
+
+void RecordingSettings::updateLosslessAudioEnabled() {
+    losslessAudio.setEnabled(recordAudio.getToggleState()
+                             && parameters.videoCodec != VideoCodec::VP9);
+}
 
 void RecordingSettings::resized() {
 	auto area = getLocalBounds().reduced(20);
     double rowHeight = 30;
     
 #if OSCI_PREMIUM
+    losslessAudio.setBounds(area.removeFromTop(rowHeight));
     losslessVideo.setBounds(area.removeFromTop(rowHeight));
     quality.setBounds(area.removeFromTop(rowHeight).expanded(6, 0));
     resolution.setBounds(area.removeFromTop(rowHeight).expanded(6, 0));

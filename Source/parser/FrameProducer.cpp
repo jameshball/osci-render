@@ -1,4 +1,5 @@
 #include "FrameProducer.h"
+#include "FileParser.h"
 
 FrameProducer::FrameProducer(FrameConsumer& fc, std::shared_ptr<FileParser> fs) : frameConsumer(fc), frameSource(fs), juce::Thread("producer", 0) {}
 
@@ -6,7 +7,18 @@ FrameProducer::~FrameProducer() {}
 
 void FrameProducer::run() {
 	while (!threadShouldExit()) {
+		// Note: there is a small TOCTOU gap between consumeDirty() and
+		// nextFrame().  If a parameter changes after consumeDirty() returns
+		// false but before nextFrame() runs, one frame at the new parameters
+		// may be queued normally rather than via replaceQueueWith().  The
+		// next iteration will catch the dirty flag and flush.  This is
+		// imperceptible in practice.
+		bool dirty = frameSource->consumeDirty();
 		auto frame = frameSource->nextFrame();
-		frameConsumer.addFrame(frame);
+		if (dirty) {
+			frameConsumer.replaceQueueWith(frame);
+		} else {
+			frameConsumer.addFrame(frame);
+		}
 	}
 }

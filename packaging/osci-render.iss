@@ -2,7 +2,7 @@
 #include "CodeDependencies.iss"
 
 #define MyAppName "osci-render"
-#define MyAppVersion "2.7.2.9"
+#define MyAppVersion "2.8.9.18"
 #define MyAppPublisher "James H Ball"
 #define MyAppURL "https://osci-render.com/"
 #define MyAppExeName "osci-render.exe"
@@ -19,4 +19,10 @@
 #define MyAppVstPageSubHeader "Select where the osci-render VST3 plug-in should be installed."
 #define MyAppVstPageDescription "Pick the folder that will receive osci-render.vst3."
 
+#define MyAppInstrumentVstName "osci-render-instrument.vst3"
+#define MyAppInstrumentVstSource ProjectRoot + "Builds\\osci-render\\VisualStudio2022\\x64\\Release\\VST3\\" + MyAppInstrumentVstName + "\\Contents\\x86_64-win\\" + MyAppInstrumentVstName
+
 #include "CommonProductInstaller.iss"
+
+[Files]
+Source: "{#MyAppInstrumentVstSource}"; DestDir: "{code:GetVstInstallDir}"; Flags: ignoreversion

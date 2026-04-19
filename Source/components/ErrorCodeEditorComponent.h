@@ -2,6 +2,7 @@
 #include <JuceHeader.h>
 #include "../lua/LuaParser.h"
 #include "../PluginProcessor.h"
+#include "SvgButton.h"
 
 class ErrorCodeEditorComponent : public juce::CodeEditorComponent, public ErrorListener, public juce::AsyncUpdater {
  public:
@@ -108,8 +109,9 @@ public:
     OscirenderCodeEditorComponent(juce::CodeDocument& document, juce::CodeTokeniser* codeTokeniser, OscirenderAudioProcessor& p, juce::String id, juce::String fileName) : editor(document, codeTokeniser, id), audioProcessor(p) {
         setText(fileName);
         setTextLabelPosition(juce::Justification::centred);
-        setColour(groupComponentBackgroundColourId, Colours::veryDark);
+        setColour(groupComponentBackgroundColourId, Colours::veryDark());
         
+        editor.setScrollbarThickness(8);
         addAndMakeVisible(editor);
         
         audioProcessor.addErrorListener(&editor);
@@ -121,7 +123,15 @@ public:
 
     void resized() override {
         auto bounds = getLocalBounds();
-        bounds.removeFromTop(30);
+        auto headerArea = bounds.removeFromTop(30);
+        
+        if (resetButton != nullptr && resetButton->isVisible()) {
+            resetButton->setBounds(headerArea.removeFromLeft(30).reduced(5));
+        }
+        if (helpButton != nullptr && helpButton->isVisible()) {
+            helpButton->setBounds(headerArea.removeFromRight(30).reduced(5));
+        }
+        
         bounds.removeFromBottom(5);
         editor.setBounds(bounds);
     }
@@ -130,8 +140,29 @@ public:
         return editor;
     }
 
+    void setHelpButton(SvgButton* button) {
+        setButton(helpButton, button);
+    }
+
+    void setResetButton(SvgButton* button) {
+        setButton(resetButton, button);
+    }
+
 private:
+
+    void setButton(SvgButton*& member, SvgButton* button) {
+        if (member == button) return;
+        if (member != nullptr) {
+            removeChildComponent(member);
+        }
+        member = button;
+        if (member != nullptr) {
+            addAndMakeVisible(member);
+        }
+    }
 
     ErrorCodeEditorComponent editor;
     OscirenderAudioProcessor& audioProcessor;
+    SvgButton* helpButton = nullptr;
+    SvgButton* resetButton = nullptr;
 };

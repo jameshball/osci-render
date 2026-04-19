@@ -1,0 +1,307 @@
+#!/usr/bin/env python3
+"""Bump project/package versions and commit.
+
+Versioning scheme here is 4-part: A.B.C.D
+
+- We never increment A (it is treated as a fixed epoch/compat digit).
+- --major increments B and resets C/D to 0.
+- --minor increments C and resets D to 0.
+- --patch increments D.
+
+By default, both products get a patch bump.
+
+Usage:
+    ./bump_version --osci {major,minor,patch,none} --sosci {major,minor,patch,none} [--message MSG] [--skip-validation]
+
+Examples:
+    ./bump_version
+    ./bump_version --osci minor --sosci patch
+    ./bump_version --sosci none
+    ./bump_version --osci patch --sosci none --skip-validation   # low-cost CI run (build only)
+
+Notes:
+- Requires a clean working tree.
+- --skip-validation injects a `[skip-validation]` marker into the commit
+  message, causing the CI `Build` workflow to skip unit tests and pluginval.
+- For Windows, run: python bump_version (or use bump_version.cmd).
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import re
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Iterable, Sequence
+
+REPO_ROOT = Path(__file__).resolve().parent
+CI_TRIGGER_MARKER = "[trigger-ci:bump-version]"
+CI_SKIP_VALIDATION_MARKER = "[skip-validation]"
+
+
+class FatalError(RuntimeError):
+    pass
+
+
+def run_git(args: Sequence[str], *, capture: bool = True) -> str:
+    proc = subprocess.run(
+        ["git", *args],
+        cwd=REPO_ROOT,
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE if capture else None,
+        stderr=subprocess.STDOUT if capture else None,
+        env={**os.environ, "LC_ALL": "C"},
+    )
+    if proc.returncode != 0:
+        raise FatalError(f"git {' '.join(args)} failed (exit {proc.returncode})\n{proc.stdout or ''}")
+    return proc.stdout.strip() if capture else ""
+
+
+@dataclass(frozen=True)
+class Version:
+    epoch: int
+    major: int
+    minor: int
+    patch: int
+
+    @staticmethod
+    def parse(text: str) -> "Version":
+        parts = text.strip().split(".")
+        if len(parts) != 4:
+            raise FatalError(f"Expected 4-part version like 1.2.3.4, got: {text!r}")
+        try:
+            a, b, c, d = (int(x) for x in parts)
+        except ValueError as e:
+            raise FatalError(f"Version contains non-integers: {text!r}") from e
+        if min(a, b, c, d) < 0:
+            raise FatalError(f"Version parts must be >= 0: {text!r}")
+        return Version(a, b, c, d)
+
+    def bump(self, kind: str) -> "Version":
+        if kind == "none":
+            return self
+        if kind == "major":
+            return Version(self.epoch, self.major + 1, 0, 0)
+        if kind == "minor":
+            return Version(self.epoch, self.major, self.minor + 1, 0)
+        if kind == "patch":
+            return Version(self.epoch, self.major, self.minor, self.patch + 1)
+        raise FatalError(f"Unknown bump kind: {kind}")
+
+    def __str__(self) -> str:
+        return f"{self.epoch}.{self.major}.{self.minor}.{self.patch}"
+
+
+def read_text_preserve_newlines(path: Path) -> str:
+    # Read as UTF-8 while preserving newlines exactly as-is.
+    with path.open("r", encoding="utf-8", newline="") as f:
+        return f.read()
+
+
+def write_text_preserve_newlines(path: Path, content: str) -> None:
+    with path.open("w", encoding="utf-8", newline="") as f:
+        f.write(content)
+
+
+_JUCER_VERSION_RE = re.compile(r'(\bversion=")([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)(")')
+
+
+def get_jucer_version(path: Path) -> Version:
+    text = read_text_preserve_newlines(path)
+    m = _JUCER_VERSION_RE.search(text)
+    if not m:
+        raise FatalError(f"Could not find 4-part version attribute in {path}")
+    return Version.parse(m.group(2))
+
+
+def set_jucer_version(path: Path, new_version: Version) -> bool:
+    text = read_text_preserve_newlines(path)
+
+    def _sub(match: re.Match[str]) -> str:
+        return f"{match.group(1)}{new_version}{match.group(3)}"
+
+    new_text, n = _JUCER_VERSION_RE.subn(_sub, text, count=1)
+    if n != 1:
+        raise FatalError(f"Expected to update exactly 1 version attribute in {path}, updated {n}")
+    if new_text != text:
+        write_text_preserve_newlines(path, new_text)
+        return True
+    return False
+
+
+_ISS_VERSION_RE = re.compile(r'(^\s*#define\s+MyAppVersion\s+")([^\"]+)("\s*$)', re.MULTILINE)
+
+
+def set_iss_version(path: Path, new_version: Version) -> bool:
+    text = read_text_preserve_newlines(path)
+
+    def _sub(match: re.Match[str]) -> str:
+        return f"{match.group(1)}{new_version}{match.group(3)}"
+
+    new_text, n = _ISS_VERSION_RE.subn(_sub, text, count=1)
+    if n != 1:
+        raise FatalError(f"Expected to update exactly 1 MyAppVersion in {path}, updated {n}")
+    if new_text != text:
+        write_text_preserve_newlines(path, new_text)
+        return True
+    return False
+
+
+# pkgproj is a plist-ish XML. We only update VERSION string values, not VERSION integers.
+_PKGPROJ_VERSION_STRING_RE = re.compile(
+    r'(<key>VERSION</key>\s*<string>)([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)(</string>)'
+)
+
+
+def set_pkgproj_versions(path: Path, new_version: Version) -> bool:
+    text = read_text_preserve_newlines(path)
+
+    def _sub(match: re.Match[str]) -> str:
+        return f"{match.group(1)}{new_version}{match.group(3)}"
+
+    new_text, n = _PKGPROJ_VERSION_STRING_RE.subn(_sub, text)
+    if n == 0:
+        raise FatalError(f"No <key>VERSION</key><string>... found to update in {path}")
+    if new_text != text:
+        write_text_preserve_newlines(path, new_text)
+        return True
+    return False
+
+
+def ensure_clean_working_tree() -> None:
+    out = run_git(["status", "--porcelain", "--untracked-files=no"])
+    if out.strip():
+        raise FatalError(
+            "Working tree is not clean. Commit or stash changes before running bump_version.\n"
+            "(This tool makes a version bump commit.)"
+        )
+
+
+def stage_files(paths: Iterable[Path]) -> None:
+    rels = [str(p.relative_to(REPO_ROOT)) for p in paths]
+    run_git(["add", "--", *rels], capture=True)
+
+
+def commit(message: str) -> None:
+    # If nothing staged, fail with a clear message.
+    diff = run_git(["diff", "--cached", "--name-only"])
+    if not diff.strip():
+        raise FatalError("Nothing staged to commit (no version changes?).")
+    run_git(["commit", "-m", message], capture=True)
+
+
+def add_ci_trigger_marker(message: str) -> str:
+    message = message.rstrip()
+    if CI_TRIGGER_MARKER in message:
+        return message
+    return f"{message}\n\n{CI_TRIGGER_MARKER}"
+
+
+def add_skip_validation_marker(message: str) -> str:
+    message = message.rstrip()
+    if CI_SKIP_VALIDATION_MARKER in message:
+        return message
+    return f"{message}\n{CI_SKIP_VALIDATION_MARKER}"
+
+
+def parse_args(argv: Sequence[str]) -> tuple[argparse.Namespace, list[str]]:
+    parser = argparse.ArgumentParser(prog="bump_version", add_help=True)
+    parser.add_argument(
+        "--osci",
+        choices=["major", "minor", "patch", "none"],
+        required=True,
+        help="Bump kind for osci-render",
+    )
+    parser.add_argument(
+        "--sosci",
+        choices=["major", "minor", "patch", "none"],
+        required=True,
+        help="Bump kind for sosci",
+    )
+
+    parser.add_argument(
+        "--message",
+        default=None,
+        help="Commit message override (default: chore: bump versions ...)",
+    )
+
+    parser.add_argument(
+        "--skip-validation",
+        action="store_true",
+        help=(
+            "Produce a lightweight CI run: skip unit tests (ci/test.sh) and "
+            "pluginval validation. Adds the " + CI_SKIP_VALIDATION_MARKER +
+            " marker to the commit message. CI still builds all artefacts."
+        ),
+    )
+
+    ns = parser.parse_args(list(argv))
+    return ns, []
+
+
+def main(argv: Sequence[str]) -> int:
+    ns, _ = parse_args(list(argv))
+    osci_kind = ns.osci
+    sosci_kind = ns.sosci
+
+    ensure_clean_working_tree()
+
+    osci_jucer = REPO_ROOT / "osci-render.jucer"
+    sosci_jucer = REPO_ROOT / "sosci.jucer"
+    osci_iss = REPO_ROOT / "packaging" / "osci-render.iss"
+    sosci_iss = REPO_ROOT / "packaging" / "sosci.iss"
+    osci_pkgproj = REPO_ROOT / "packaging" / "osci-render.pkgproj"
+    sosci_pkgproj = REPO_ROOT / "packaging" / "sosci.pkgproj"
+
+    osci_old = get_jucer_version(osci_jucer)
+    sosci_old = get_jucer_version(sosci_jucer)
+
+    osci_new = osci_old.bump(osci_kind)
+    sosci_new = sosci_old.bump(sosci_kind)
+
+    changed: list[Path] = []
+
+    if set_jucer_version(osci_jucer, osci_new):
+        changed.append(osci_jucer)
+    if set_jucer_version(sosci_jucer, sosci_new):
+        changed.append(sosci_jucer)
+
+    if set_iss_version(osci_iss, osci_new):
+        changed.append(osci_iss)
+    if set_iss_version(sosci_iss, sosci_new):
+        changed.append(sosci_iss)
+
+    if set_pkgproj_versions(osci_pkgproj, osci_new):
+        changed.append(osci_pkgproj)
+    if set_pkgproj_versions(sosci_pkgproj, sosci_new):
+        changed.append(sosci_pkgproj)
+
+    if osci_new == osci_old and sosci_new == sosci_old:
+        raise FatalError("No version bump requested (both products unchanged).")
+
+    stage_files(changed)
+
+    msg = ns.message
+    if not msg:
+        msg = f"chore: bump versions (osci-render {osci_old}->{osci_new}, sosci {sosci_old}->{sosci_new})"
+
+    msg = add_ci_trigger_marker(msg)
+    if ns.skip_validation:
+        msg = add_skip_validation_marker(msg)
+
+    commit(msg)
+
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main(sys.argv[1:]))
+    except FatalError as e:
+        print(f"bump_version: {e}", file=sys.stderr)
+        return_code = 2
+        raise SystemExit(return_code)

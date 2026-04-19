@@ -33,8 +33,15 @@ VisualiserRenderer::VisualiserRenderer(
 }
 
 VisualiserRenderer::~VisualiserRenderer() {
-    openGLContext.detach();
+    // Stop the background thread FIRST, before any member destruction or vptr change.
+    // The thread may still be calling virtual runTask()/stopTask(); stopping here
+    // ensures it exits while the VisualiserRenderer vtable is still intact.
+    // Note: derived classes (e.g. VisualiserComponent) may have already stopped the
+    // thread in their own destructor. setShouldBeRunning is idempotent, so this is a
+    // safe defense-in-depth for direct VisualiserRenderer use or future subclasses.
     setShouldBeRunning(false, [this] { renderingSemaphore.release(); });
+    mirrorTimer.reset();
+    openGLContext.detach();
 }
 
 void VisualiserRenderer::runTask(const juce::AudioBuffer<float>& buffer) {
@@ -66,11 +73,24 @@ void VisualiserRenderer::runTask(const juce::AudioBuffer<float>& buffer) {
         
         // Apply effects to the entire buffer (only first 3 channels for effects)
         juce::AudioBuffer<float> effectBuffer(tempBuffer.getArrayOfWritePointers(), 3, numSamples);
-        for (auto &effect : parameters.audioEffects) {
-            // Pre-animate effect values for this block before processing
+
+        // Animate all visualiser effects (audio + shader)
+        for (auto &effect : parameters.audioEffects)
             effect->animateValues(numSamples, nullptr);
+        for (auto &effect : parameters.effects)
+            effect->animateValues(numSamples, nullptr);
+
+        // Apply external modulation (LFO/ENV) to animated buffers
+        if (parameters.applyExternalModulation)
+            parameters.applyExternalModulation(numSamples);
+
+        // For shader effects, publish modulated values to actualValues
+        for (auto &effect : parameters.effects)
+            effect->publishAnimatedToActual(numSamples);
+
+        // Process audio effects (reads modulated animated buffer, transforms audio)
+        for (auto &effect : parameters.audioEffects)
             effect->processBlock(effectBuffer, midiMessages);
-        }
 
 #if OSCI_PREMIUM
         // Apply horizontal/vertical flip to the entire buffer
@@ -110,10 +130,10 @@ void VisualiserRenderer::runTask(const juce::AudioBuffer<float>& buffer) {
                 if (mode == RenderMode::XYZ) {
                     zSamples.push_back(1.0f); // legacy: third component treated as brightness
                 } else if (mode == RenderMode::XYRGB) {
-                    // colour provided (if not, upstream logic should have set defaults)
-                    rSamples.push_back(numChannels > 3 ? channelData[3][i] : 1.0f);
-                    gSamples.push_back(numChannels > 4 ? channelData[4][i] : 0.0f);
-                    bSamples.push_back(numChannels > 5 ? channelData[5][i] : 0.0f);
+                    // no colour specified — sentinel -1 flows through
+                    rSamples.push_back(numChannels > 3 ? channelData[3][i] : -1.0f);
+                    gSamples.push_back(numChannels > 4 ? channelData[4][i] : -1.0f);
+                    bSamples.push_back(numChannels > 5 ? channelData[5][i] : -1.0f);
                 }
 
                 sampleCount++;
@@ -173,9 +193,9 @@ void VisualiserRenderer::runTask(const juce::AudioBuffer<float>& buffer) {
             if (mode == RenderMode::XYZ) {
                 copyOrFillChannel(zSamples, 2, 1.0f);
             } else if (mode == RenderMode::XYRGB) {
-                copyOrFillChannel(rSamples, 3, 1.0f);
-                copyOrFillChannel(gSamples, 4, 0.0f);
-                copyOrFillChannel(bSamples, 5, 0.0f);
+                copyOrFillChannel(rSamples, 3, -1.0f);
+                copyOrFillChannel(gSamples, 4, -1.0f);
+                copyOrFillChannel(bSamples, 5, -1.0f);
             }
         }
 
@@ -227,8 +247,21 @@ void VisualiserRenderer::runTask(const juce::AudioBuffer<float>& buffer) {
     triggerAsyncUpdate();
     // wait for rendering on the OpenGLRenderer thread to complete
     if (!renderingSemaphore.acquire()) {
-        // If acquire times out, log a message or handle it as appropriate
-        juce::Logger::writeToLog("Rendering semaphore acquisition timed out");
+        juce::String info;
+        info << "=== Rendering semaphore acquisition timed out ===" << juce::newLine;
+        info << "Time: " << juce::Time::getCurrentTime().toString(true, true, true, true) << juce::newLine;
+        info << "Thread: " << getThreadName() << " (ID: " << juce::String::toHexString((juce::pointer_sized_int)juce::Thread::getCurrentThreadId()) << ")" << juce::newLine;
+        info << "Semaphore available: " << juce::String((int)renderingSemaphore.available()) << juce::newLine;
+        info << "OpenGL context active: " << (openGLContext.isActive() ? "yes" : "no") << juce::newLine;
+        info << "OpenGL context attached: " << (openGLContext.isAttached() ? "yes" : "no") << juce::newLine;
+        info << "sampleBufferCount: " << juce::String(sampleBufferCount.load()) << juce::newLine;
+        info << "prevSampleBufferCount: " << juce::String(prevSampleBufferCount) << juce::newLine;
+        info << "Component visible: " << (isVisible() ? "yes" : "no") << juce::newLine;
+        info << "Component size: " << juce::String(getWidth()) << "x" << juce::String(getHeight()) << juce::newLine;
+        info << "--- Stack trace (waiting thread) ---" << juce::newLine;
+        info << juce::SystemStats::getStackBacktrace() << juce::newLine;
+        info << "=== End semaphore timeout info ===" << juce::newLine;
+        juce::Logger::writeToLog(info);
     }
 }
 
@@ -240,13 +273,16 @@ int VisualiserRenderer::prepareTask(double sampleRate, int bufferSize) {
     rResampler.prepare(sampleRate, RESAMPLE_RATIO);
     gResampler.prepare(sampleRate, RESAMPLE_RATIO);
     bResampler.prepare(sampleRate, RESAMPLE_RATIO);
-    
-    // Prepare audio effects with the correct sample rate
-    for (auto& effect : parameters.audioEffects) {
-        effect->prepareToPlay(sampleRate, bufferSize);
-    }
 
     int desiredBufferSize = sampleRate / frameRate;
+
+    // Use desiredBufferSize when bufferSize is invalid (e.g. -1 from setFrameRate)
+    int effectBufferSize = bufferSize > 0 ? bufferSize : desiredBufferSize;
+
+    // Prepare audio effects with the correct sample rate
+    for (auto& effect : parameters.audioEffects) {
+        effect->prepareToPlay(sampleRate, effectBufferSize);
+    }
 
     return desiredBufferSize;
 }
@@ -353,6 +389,11 @@ void VisualiserRenderer::newOpenGLContextCreated() {
 void VisualiserRenderer::openGLContextClosing() {
     using namespace juce::gl;
 
+    if (mirrorTexture != 0) {
+        glDeleteTextures(1, &mirrorTexture);
+        mirrorTexture = 0;
+    }
+
     glDeleteBuffers(1, &quadIndexBuffer);
     glDeleteBuffers(1, &vertexIndexBuffer);
     glDeleteBuffers(1, &vertexBuffer);
@@ -392,7 +433,114 @@ void VisualiserRenderer::renderOpenGL() {
     using namespace juce::gl;
 
     if (openGLContext.isActive()) {
+        // One-time DPI diagnostics: log before anything modifies the viewport.
+        // JUCE sets glViewport to the physical pixel area just before calling
+        // renderOpenGL(), so reading it here captures the true JUCE viewport.
+        if (!dpiDiagnosticsLogged) {
+            dpiDiagnosticsLogged = true;
+
+            GLint vp[4] = {};
+            glGetIntegerv(GL_VIEWPORT, vp);
+
+            auto componentBounds = getLocalBounds();
+            auto screenBounds = getScreenBounds();
+            auto globalScale = juce::Desktop::getInstance().getGlobalScaleFactor();
+            auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect(getScreenBounds());
+            double displayScale = (display != nullptr) ? display->scale : -1.0;
+
+            juce::String diagMsg;
+            diagMsg << "[DPI Diagnostics] "
+                    << "getRenderingScale()=" << openGLContext.getRenderingScale()
+                    << " | component: " << componentBounds.getWidth() << "x" << componentBounds.getHeight()
+                    << " | screenBounds: " << screenBounds.getWidth() << "x" << screenBounds.getHeight()
+                    << " @ (" << screenBounds.getX() << "," << screenBounds.getY() << ")"
+                    << " | juceViewport: " << vp[2] << "x" << vp[3]
+                    << " @ (" << vp[0] << "," << vp[1] << ")"
+                    << " | globalScaleFactor=" << globalScale
+                    << " | displayScale=" << displayScale
+                    << " | viewportArea: " << viewportArea.getWidth() << "x" << viewportArea.getHeight();
+
+#if JUCE_WINDOWS
+            // Query the actual GL surface dimensions from Win32 to compare with
+            // what JUCE computed. This helps diagnose DPI scaling mismatches.
+            HDC hdc = wglGetCurrentDC();
+            if (hdc != nullptr) {
+                HWND hwnd = WindowFromDC(hdc);
+                if (hwnd != nullptr) {
+                    RECT rect = {};
+                    GetClientRect(hwnd, &rect);
+                    int surfaceW = rect.right - rect.left;
+                    int surfaceH = rect.bottom - rect.top;
+                    diagMsg << " | win32Surface: " << surfaceW << "x" << surfaceH;
+                }
+            }
+#endif
+
+            juce::Logger::writeToLog(diagMsg);
+        }
+
         juce::OpenGLHelpers::clear(juce::Colours::black);
+
+        // Mirror mode: display the parent's captured frame
+        auto* source = mirrorSource.load();
+        if (source != nullptr) {
+            renderScale = (float)openGLContext.getRenderingScale();
+
+            // Use full component bounds (ignore toolbar) for mirror mode
+            float totalW = getWidth() * renderScale;
+            float totalH = getHeight() * renderScale;
+
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glViewport(0, 0, juce::roundToInt(totalW), juce::roundToInt(totalH));
+
+            int w = 0, h = 0;
+            {
+                juce::SpinLock::ScopedLockType lock(source->capturedPixelsLock);
+                if (source->capturedPixels.empty())
+                    return;
+                w = source->capturedWidth;
+                h = source->capturedHeight;
+                mirrorPixelBuffer.assign(source->capturedPixels.begin(), source->capturedPixels.end());
+            }
+
+            // Create or re-use mirror texture in OUR GL context
+            if (mirrorTexture == 0) {
+                glGenTextures(1, &mirrorTexture);
+                glBindTexture(GL_TEXTURE_2D, mirrorTexture);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, mirrorPixelBuffer.data());
+                mirrorTextureWidth = w;
+                mirrorTextureHeight = h;
+            } else {
+                glBindTexture(GL_TEXTURE_2D, mirrorTexture);
+                if (w == mirrorTextureWidth && h == mirrorTextureHeight) {
+                    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, mirrorPixelBuffer.data());
+                } else {
+                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, mirrorPixelBuffer.data());
+                    mirrorTextureWidth = w;
+                    mirrorTextureHeight = h;
+                }
+            }
+
+            // Centered square viewport using full component size (not viewportArea)
+            float minDim = juce::jmin(totalW, totalH);
+            float x = (totalW - minDim) / 2.0f;
+            float y = (totalH - minDim) / 2.0f;
+            glViewport(juce::roundToInt(x), juce::roundToInt(y),
+                       juce::roundToInt(minDim), juce::roundToInt(minDim));
+
+            setShader(texturedShader.get());
+            texturedShader->setUniform("uResizeForCanvas", 1.0f);
+            texturedShader->setUniform("uCropEnabled", 0.0f);
+
+            Texture mirrorTex { mirrorTexture, w, h };
+            targetTexture = std::nullopt;
+            drawTexture({ mirrorTex });
+            return;
+        }
 
         // we have a new buffer to render
         if (sampleBufferCount != prevSampleBufferCount) {
@@ -421,6 +569,30 @@ void VisualiserRenderer::renderOpenGL() {
         activateTargetTexture(std::nullopt);
         setShader(texturedShader.get());
         drawTexture({renderTexture});
+
+        // Capture frame for mirror consumer (child window)
+        if (hasMirrorConsumer.load()) {
+            int w = renderTexture.width;
+            int h = renderTexture.height;
+            size_t numBytes = (size_t)w * h * 4;
+
+            // Read pixels into a local buffer (outside lock) to avoid stalling the child
+            if (captureReadbackBuffer.size() != numBytes)
+                captureReadbackBuffer.resize(numBytes);
+
+            glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, renderTexture.id, 0);
+            glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, captureReadbackBuffer.data());
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+            // Brief lock to swap data to the shared buffer
+            {
+                juce::SpinLock::ScopedLockType lock(capturedPixelsLock);
+                std::swap(capturedPixels, captureReadbackBuffer);
+                capturedWidth = w;
+                capturedHeight = h;
+            }
+        }
     }
 }
 
@@ -741,7 +913,12 @@ void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::
             float r = rPoints[i];
             float g = gPoints[i];
             float b = bPoints[i];
-            brightness = std::max(r, std::max(g, b));
+            if (r < 0.0f) {
+                // Sentinel: no colour specified, use full brightness and fall back to uLineColor
+                brightness = 1.0f;
+            } else {
+                brightness = std::max(r, std::max(g, b));
+            }
         }
         for (int k = 0; k < 4; ++k) {
             positionData[p + 3 * k] = x;
@@ -982,10 +1159,16 @@ Texture VisualiserRenderer::createReflectionTexture() {
     using namespace juce::gl;
 
     if (parameters.getScreenOverlay() == ScreenOverlay::VectorDisplay) {
+        if (vectorDisplayReflectionImage.isNull())
+            vectorDisplayReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::vector_display_reflection_png, BinaryData::vector_display_reflection_pngSize);
         reflectionOpenGLTexture.loadImage(vectorDisplayReflectionImage);
     } else if (parameters.getScreenOverlay() == ScreenOverlay::Real) {
+        if (oscilloscopeReflectionImage.isNull())
+            oscilloscopeReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::real_reflection_png, BinaryData::real_reflection_pngSize);
         reflectionOpenGLTexture.loadImage(oscilloscopeReflectionImage);
     } else {
+        if (emptyReflectionImage.isNull())
+            emptyReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::no_reflection_jpg, BinaryData::no_reflection_jpgSize);
         reflectionOpenGLTexture.loadImage(emptyReflectionImage);
     }
 
@@ -999,18 +1182,26 @@ Texture VisualiserRenderer::createScreenTexture() {
     using namespace juce::gl;
 
     if (screenOverlay == ScreenOverlay::Smudged || screenOverlay == ScreenOverlay::SmudgedGraticule) {
+        if (screenTextureImage.isNull())
+            screenTextureImage = juce::ImageFileFormat::loadFrom(BinaryData::noise_jpg, BinaryData::noise_jpgSize);
         screenOpenGLTexture.loadImage(screenTextureImage);
 #if OSCI_PREMIUM
     } else if (screenOverlay == ScreenOverlay::Real) {
+        if (oscilloscopeImage.isNull())
+            oscilloscopeImage = juce::ImageFileFormat::loadFrom(BinaryData::real_png, BinaryData::real_pngSize);
         screenOpenGLTexture.loadImage(oscilloscopeImage);
     } else if (screenOverlay == ScreenOverlay::VectorDisplay) {
+        if (vectorDisplayImage.isNull())
+            vectorDisplayImage = juce::ImageFileFormat::loadFrom(BinaryData::vector_display_png, BinaryData::vector_display_pngSize);
         screenOpenGLTexture.loadImage(vectorDisplayImage);
 #endif
     } else {
+        if (emptyScreenImage.isNull())
+            emptyScreenImage = juce::ImageFileFormat::loadFrom(BinaryData::empty_jpg, BinaryData::empty_jpgSize);
         screenOpenGLTexture.loadImage(emptyScreenImage);
     }
     checkGLErrors(__FILE__, __LINE__);
-    Texture texture = {screenOpenGLTexture.getTextureID(), screenTextureImage.getWidth(), screenTextureImage.getHeight()};
+    Texture texture = {screenOpenGLTexture.getTextureID(), screenOpenGLTexture.getWidth(), screenOpenGLTexture.getHeight()};
 
     if (screenOverlay == ScreenOverlay::Graticule || screenOverlay == ScreenOverlay::SmudgedGraticule) {
         activateTargetTexture(texture);
@@ -1142,7 +1333,7 @@ void VisualiserRenderer::checkGLErrors(juce::String file, int line) {
                 errorMessage = "Unknown OpenGL error";
                 break;
         }
-        DBG("OpenGL error at " + file + ":" + juce::String(line) + " - " + errorMessage);
+        juce::Logger::writeToLog("OpenGL error at " + file + ":" + juce::String(line) + " - " + errorMessage);
     }
 }
 

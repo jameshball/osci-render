@@ -47,6 +47,22 @@ public:
     int getRenderHeight() const { return renderTexture.height; }
     Texture getRenderTexture() const { return renderTexture; }
 
+    // Mirror mode: child displays parent's rendered frame instead of its own pipeline
+    void setMirrorSource(VisualiserRenderer* source) {
+        mirrorSource.store(source);
+        if (source != nullptr) {
+            setShouldBeRunning(false);
+            openGLContext.setContinuousRepainting(true);
+            mirrorTimer = std::make_unique<MirrorTimer>(*this);
+            mirrorTimer->startTimerHz(60);
+        } else {
+            mirrorTimer.reset();
+            openGLContext.setContinuousRepainting(false);
+        }
+    }
+    void setHasMirrorConsumer(bool has) { hasMirrorConsumer.store(has); }
+    bool isMirrorMode() const { return mirrorSource.load() != nullptr; }
+
     void getFrame(std::vector<unsigned char>& frame);
     void drawFrame();    juce::Rectangle<int> getViewportArea() const { return viewportArea; }
     void setViewportArea(juce::Rectangle<int> area) {
@@ -78,6 +94,7 @@ private:
     std::optional<juce::Rectangle<float>> cropRectangle;
 
     float renderScale = 1.0f;
+    bool dpiDiagnosticsLogged = false;
 
     GLuint quadIndexBuffer = 0;
     GLuint vertexIndexBuffer = 0;
@@ -126,16 +143,16 @@ private:
     juce::OpenGLTexture screenOpenGLTexture;
     std::optional<Texture> targetTexture = std::nullopt;
 
-    juce::Image screenTextureImage = juce::ImageFileFormat::loadFrom(BinaryData::noise_jpg, BinaryData::noise_jpgSize);
-    juce::Image emptyScreenImage = juce::ImageFileFormat::loadFrom(BinaryData::empty_jpg, BinaryData::empty_jpgSize);
+    juce::Image screenTextureImage;
+    juce::Image emptyScreenImage;
 
 #if OSCI_PREMIUM
-    juce::Image oscilloscopeImage = juce::ImageFileFormat::loadFrom(BinaryData::real_png, BinaryData::real_pngSize);
-    juce::Image vectorDisplayImage = juce::ImageFileFormat::loadFrom(BinaryData::vector_display_png, BinaryData::vector_display_pngSize);
+    juce::Image oscilloscopeImage;
+    juce::Image vectorDisplayImage;
 
-    juce::Image emptyReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::no_reflection_jpg, BinaryData::no_reflection_jpgSize);
-    juce::Image oscilloscopeReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::real_reflection_png, BinaryData::real_reflection_pngSize);
-    juce::Image vectorDisplayReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::vector_display_reflection_png, BinaryData::vector_display_reflection_pngSize);
+    juce::Image emptyReflectionImage;
+    juce::Image oscilloscopeReflectionImage;
+    juce::Image vectorDisplayReflectionImage;
 
     osci::Point REAL_SCREEN_OFFSET = {0.02, -0.15};
     osci::Point REAL_SCREEN_SCALE = {0.6};
@@ -150,6 +167,27 @@ private:
     std::unique_ptr<juce::OpenGLShaderProgram> glowShader;
     std::unique_ptr<juce::OpenGLShaderProgram> afterglowShader;
 #endif
+
+    // Mirror mode state
+    std::atomic<VisualiserRenderer*> mirrorSource{nullptr};
+    std::atomic<bool> hasMirrorConsumer{false};
+    std::vector<unsigned char> capturedPixels;
+    int capturedWidth = 0;
+    int capturedHeight = 0;
+    juce::SpinLock capturedPixelsLock;
+    GLuint mirrorTexture = 0;
+    int mirrorTextureWidth = 0;
+    int mirrorTextureHeight = 0;
+    std::vector<unsigned char> mirrorPixelBuffer; // child's local copy to avoid allocation under lock
+    std::vector<unsigned char> captureReadbackBuffer; // parent's local readback buffer (no lock needed)
+
+    // Timer to drive the child's GL rendering independently of the audio thread
+    struct MirrorTimer : public juce::Timer {
+        VisualiserRenderer& owner;
+        MirrorTimer(VisualiserRenderer& o) : owner(o) {}
+        void timerCallback() override { owner.openGLContext.triggerRepaint(); }
+    };
+    std::unique_ptr<MirrorTimer> mirrorTimer;
 
     std::unique_ptr<juce::OpenGLShaderProgram> simpleShader;
     std::unique_ptr<juce::OpenGLShaderProgram> texturedShader;

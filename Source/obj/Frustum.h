@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "../mathter/Matrix.hpp"
+#include "../../modules/Mathter/include/Mathter/Matrix.hpp"
 #include <cmath>
 
 using Vec3 = mathter::Vector<float, 3, false>;

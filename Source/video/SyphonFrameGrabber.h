@@ -1,18 +1,21 @@
 #pragma once
 #include <JuceHeader.h>
 
+#include "../parser/img/ImageParser.h"
 #include "InvisibleOpenGLContextComponent.h"
 
 class SyphonFrameGrabber : public juce::Component, public juce::OpenGLRenderer {
 public:
     SyphonFrameGrabber(SharedTextureManager& manager, juce::String server, juce::String app, ImageParser& parser)
         : manager(manager), parser(parser) {
-        // Create the invisible component that hosts our OpenGL context
-        openGLComponent = std::make_unique<InvisibleOpenGLContextComponent>(this);
-
-        // Store the server/app info for initializing the receiver
+        // Store server/app info BEFORE creating the GL context, because the GL
+        // thread can fire newOpenGLContextCreated() before the constructor body
+        // finishes (observed on Windows/Parallels).
         serverName = server;
         appName = app;
+
+        // Create the invisible component that hosts our OpenGL context
+        openGLComponent = std::make_unique<InvisibleOpenGLContextComponent>(this);
     }
 
     ~SyphonFrameGrabber() override {

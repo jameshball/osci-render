@@ -1,4 +1,5 @@
 #include "SosciPluginProcessor.h"
+#include "audio/AudioThreadGuard.h"
 #include "SosciPluginEditor.h"
 
 SosciAudioProcessor::SosciAudioProcessor() : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(5), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
@@ -15,11 +16,21 @@ SosciAudioProcessor::~SosciAudioProcessor() {}
 
 void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
     juce::ScopedNoDenormals noDenormals;
+    AudioThreadGuard::ScopedAudioThread audioThreadGuard;
+
+    if (isOfflineRenderActive()) {
+        midiMessages.clear();
+        buffer.clear();
+        return;
+    }
 
     juce::AudioBuffer<float> input = getBusBuffer(buffer, true, 0);
     juce::AudioBuffer<float> output = getBusBuffer(buffer, false, 0);
     const float EPSILON = 0.0001f;
     const int numSamples = input.getNumSamples();
+
+    // Process MIDI CC → parameter mappings before clearing the buffer
+    midiCCManager.processMidiBuffer(midiMessages);
 
     midiMessages.clear();
 
@@ -36,7 +47,7 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         bool readingFromWav = wavParser.isInitialised();
 
         if (readingFromWav) {
-            wavBuffer.setSize(6, numSamples, false, true, false);
+            wavBuffer.setSize(6, numSamples, false, true, true);
             wavBuffer.clear();
             wavParser.processBlock(wavBuffer);
             sourceBuffer = juce::AudioBuffer<float>(wavBuffer.getArrayOfWritePointers(), wavBuffer.getNumChannels(), numSamples);
@@ -46,10 +57,10 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     }
 
     // Resize working buffer with 6 channels: x, y, z/brightness, r, g, b
-    workBuffer.setSize(6, numSamples, false, true, false);
+    workBuffer.setSize(6, numSamples, false, true, true);
     auto sourceArray = sourceBuffer.getArrayOfReadPointers();
     auto workArray = workBuffer.getArrayOfWritePointers();
-
+    
     // Copy X and Y channels
     for (int ch = 0; ch < 2; ++ch) {
         if (sourceBuffer.getNumChannels() > ch) {
@@ -58,7 +69,7 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             juce::FloatVectorOperations::clear(workArray[ch], numSamples);
         }
     }
-
+    
     // Detect brightness mode: check if channel 2 has any signal > EPSILON
     if (!brightnessEnabled && sourceBuffer.getNumChannels() > 2 && !forceDisableBrightnessInput) {
         auto range = juce::FloatVectorOperations::findMinAndMax(sourceArray[2], numSamples);
@@ -66,14 +77,14 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             brightnessEnabled = true;
         }
     }
-
+    
     // Detect RGB mode: check if channels 3 or 4 have any signal > EPSILON
     bool haveG = sourceBuffer.getNumChannels() > 3;
     bool haveB = sourceBuffer.getNumChannels() > 4;
     if (!rgbEnabled && !forceDisableRgbInput && (haveG || haveB)) {
         bool hasGSignal = false;
         bool hasBSignal = false;
-
+        
         if (haveG) {
             auto gRange = juce::FloatVectorOperations::findMinAndMax(sourceArray[3], numSamples);
             hasGSignal = std::abs(gRange.getStart()) > EPSILON || std::abs(gRange.getEnd()) > EPSILON;
@@ -82,29 +93,29 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             auto bRange = juce::FloatVectorOperations::findMinAndMax(sourceArray[4], numSamples);
             hasBSignal = std::abs(bRange.getStart()) > EPSILON || std::abs(bRange.getEnd()) > EPSILON;
         }
-
+        
         if (hasGSignal || hasBSignal) {
             rgbEnabled = true;
         }
     }
-
+    
     // Populate remaining channels based on detected mode
     if (rgbEnabled && !forceDisableRgbInput) {
         // RGB mode: z = 1.0; r = ch2 (or 1.0 if unavailable); g = ch3 (or 0.0); b = ch4 (or 0.0)
         juce::FloatVectorOperations::fill(workArray[2], 1.0f, numSamples);
-
+        
         if (sourceBuffer.getNumChannels() > 2) {
             juce::FloatVectorOperations::copy(workArray[3], sourceArray[2], numSamples);
         } else {
             juce::FloatVectorOperations::fill(workArray[3], 1.0f, numSamples);
         }
-
+        
         if (haveG) {
             juce::FloatVectorOperations::copy(workArray[4], sourceArray[3], numSamples);
         } else {
             juce::FloatVectorOperations::clear(workArray[4], numSamples);
         }
-
+        
         if (haveB) {
             juce::FloatVectorOperations::copy(workArray[5], sourceArray[4], numSamples);
         } else {
@@ -117,12 +128,12 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         } else {
             juce::FloatVectorOperations::fill(workArray[2], 1.0f, numSamples);
         }
-
+        
         juce::FloatVectorOperations::fill(workArray[3], 1.0f, numSamples);
         juce::FloatVectorOperations::clear(workArray[4], numSamples);
         juce::FloatVectorOperations::clear(workArray[5], numSamples);
     }
-
+    
     // Clamp brightness channel
     juce::FloatVectorOperations::clip(workBuffer.getWritePointer(2), workBuffer.getReadPointer(2), 0.0f, 1.0f, numSamples);
 
@@ -136,14 +147,7 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     threadManager.write(workBuffer, "VisualiserRenderer");
 
     if (juce::JUCEApplication::isStandaloneApp()) {
-        // Scale output by volume
-        juce::FloatVectorOperations::multiply(workArray[0], workArray[0], volume.load(), numSamples);
-        juce::FloatVectorOperations::multiply(workArray[1], workArray[1], volume.load(), numSamples);
-
-        // Hard clip to threshold
-        float thresholdVal = threshold.load();
-        juce::FloatVectorOperations::clip(workArray[0], workArray[0], -thresholdVal, thresholdVal, numSamples);
-        juce::FloatVectorOperations::clip(workArray[1], workArray[1], -thresholdVal, thresholdVal, numSamples);
+        applyVolumeAndThreshold(workArray, numSamples);
 
         // apply mute if active
         if (muteParameter->getBoolValue()) {
@@ -167,6 +171,8 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 }
 
 void SosciAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
+    juce::Logger::writeToLog("getStateInformation: saving state (version " + juce::String(ProjectInfo::versionString) + ")");
+
     // we need to stop recording the visualiser when saving the state, otherwise
     // there are issues. This is the only place we can do this because there is
     // no callback when closing the standalone app except for this.
@@ -179,6 +185,8 @@ void SosciAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
 
     std::unique_ptr<juce::XmlElement> xml = std::make_unique<juce::XmlElement>("project");
     xml->setAttribute("version", ProjectInfo::versionString);
+
+    saveStandaloneProjectFilePathToXml(*xml);
     auto effectsXml = xml->createNewChildElement("effects");
     for (auto effect : effects) {
         effect->save(effectsXml->createNewChildElement("effect"));
@@ -203,14 +211,20 @@ void SosciAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
     }
 
     recordingParameters.save(xml.get());
+
+    midiCCManager.save(xml.get());
     
     saveProperties(*xml);
 
     copyXmlToBinary(*xml, destData);
+    juce::Logger::writeToLog("getStateInformation: saved " + juce::String(effects.size()) + " effects, " + juce::String((int)destData.getSize()) + " bytes");
 }
 
 void SosciAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
+    juce::Logger::writeToLog("setStateInformation: loading state (" + juce::String(sizeInBytes) + " bytes)");
+
     if (juce::JUCEApplicationBase::isStandaloneApp() && programCrashedAndUserWantsToReset()) {
+        juce::Logger::writeToLog("setStateInformation: user chose to reset after crash, skipping restore");
         return;
     }
 
@@ -225,18 +239,18 @@ void SosciAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
         xml = juce::XmlDocument::parse(juce::String((const char*)data, sizeInBytes));
     }
 
-    if (xml.get() != nullptr && xml->hasTagName("project")) {
+    if (xml.get() == nullptr || !xml->hasTagName("project")) {
+        juce::Logger::writeToLog("setStateInformation: failed to parse XML from state data");
+        return;
+    }
+
+    auto version = xml->hasAttribute("version") ? xml->getStringAttribute("version") : "unknown";
+    juce::Logger::writeToLog("setStateInformation: restoring state version " + version);
+    restoreStandaloneProjectFilePathFromXml(*xml);
+
         juce::SpinLock::ScopedLockType lock2(effectsLock);
 
-        auto effectsXml = xml->getChildByName("effects");
-        if (effectsXml != nullptr) {
-            for (auto effectXml : effectsXml->getChildIterator()) {
-                auto effect = getEffect(effectXml->getStringAttribute("id"));
-                if (effect != nullptr) {
-                    effect->load(effectXml);
-                }
-            }
-        }
+        loadEffectsFromXml(xml->getChildByName("effects"));
 
         auto booleanParametersXml = xml->getChildByName("booleanParameters");
         if (booleanParametersXml != nullptr) {
@@ -271,7 +285,11 @@ void SosciAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
         recordingParameters.load(xml.get());
         
         loadProperties(*xml);
-    }
+
+        loadMidiCCState(xml.get());
+
+        undoManager.clearUndoHistory();
+        juce::Logger::writeToLog("setStateInformation: state restore complete");
 }
 
 juce::AudioProcessorEditor* SosciAudioProcessor::createEditor() {

@@ -4,22 +4,25 @@
 
 #include "CommonPluginEditor.h"
 #include "LookAndFeel.h"
-#include "MidiComponent.h"
+#include "components/panels/MidiComponent.h"
 #include "PluginProcessor.h"
-#include "SettingsComponent.h"
-#include "TxtComponent.h"
-#include "components/AnimationTimelineController.h"
+#include "components/panels/SettingsComponent.h"
+#include "components/panels/TxtComponent.h"
+#include "components/timeline/AnimationTimelineController.h"
 #include "components/ErrorCodeEditorComponent.h"
-#include "components/LuaConsole.h"
-#include "components/OscirenderAudioTimelineController.h"
-#include "components/OsciMainMenuBarModel.h"
+#include "components/lua/LuaConsole.h"
+#include "components/lua/LuaDocumentationComponent.h"
+#include "components/timeline/OscirenderAudioTimelineController.h"
+#include "components/menu/OsciMainMenuBarModel.h"
 #include "components/SplashScreenComponent.h"
 #include "visualiser/VisualiserSettings.h"
 
-class OscirenderAudioProcessorEditor : public CommonPluginEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener, public juce::FileDragAndDropTarget {
+class OscirenderAudioProcessorEditor : public CommonPluginEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer {
 public:
     OscirenderAudioProcessorEditor(OscirenderAudioProcessor&);
     ~OscirenderAudioProcessorEditor() override;
+
+    void dragOperationEnded(const juce::DragAndDropTarget::SourceDetails&) override;
 
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -35,6 +38,7 @@ public:
     void openVisualiserSettings();
     void openRecordingSettings() override;
     void showPremiumSplashScreen() override;
+    void timerCallback() override;
     bool isInterestedInFileDrag(const juce::StringArray& files) override;
     void filesDropped(const juce::StringArray& files, int x, int y) override;
 
@@ -48,15 +52,21 @@ private:
 public:
     const double CLOSED_PREF_SIZE = 30.0;
     const double RESIZER_BAR_SIZE = 7.0;
+    static constexpr int kMenuBarHeight = 25;
+    static constexpr int kMenuBarMaxWidth = 380;
 
     std::atomic<bool> editingCustomFunction = false;
+
+    bool codeEditorWasVisibleBeforeEditingCustomFunction = false;
 
     SettingsComponent settings{audioProcessor, *this};
 
 #if !OSCI_PREMIUM
     juce::TextButton upgradeButton{"Upgrade to premium!"};
-    std::unique_ptr<SplashScreenComponent> premiumSplashScreen;
-    bool visualiserWasVisibleBeforeSplash = true;
+#endif
+
+#if OSCI_PREMIUM
+    juce::Label mtsEspLabel;
 #endif
 
     juce::ComponentAnimator codeEditorAnimator;
@@ -66,6 +76,9 @@ public:
     SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings", visualiserSettings, 550, 500, 1500, VISUALISER_SETTINGS_HEIGHT);
 
     LuaConsole console;
+
+    SvgButton luaHelpButton { "luaHelp", juce::String(BinaryData::help_svg), juce::Colours::white };
+    SvgButton luaResetButton { "luaReset", juce::String(BinaryData::refresh_svg), juce::Colours::white };
 
     std::vector<std::shared_ptr<juce::CodeDocument>> codeDocuments;
     std::vector<std::shared_ptr<OscirenderCodeEditorComponent>> codeEditors;
@@ -111,6 +124,9 @@ public:
     juce::SpinLock syphonLock;
     std::unique_ptr<SyphonFrameGrabber> syphonFrameGrabber;
 #endif
+
+private:
+    void showLuaDocumentation();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OscirenderAudioProcessorEditor)
 };

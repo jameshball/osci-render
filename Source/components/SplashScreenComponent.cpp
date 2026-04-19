@@ -2,17 +2,7 @@
 
 #include <array>
 
-namespace {
-constexpr int defaultSplashWidth = 640;
-constexpr int defaultSplashHeight = 420;
-}
-
-SplashScreenComponent::SplashScreenComponent()
-    : juce::SplashScreen("osci-render", defaultSplashWidth, defaultSplashHeight, false) {
-    setOpaque(false);
-    setAlwaysOnTop(true);
-    setInterceptsMouseClicks(true, true);
-
+SplashScreenComponent::SplashScreenComponent() {
     const auto headingFont = juce::Font(26.0f, juce::Font::bold);
     const auto subtitleFont = juce::Font(17.0f, juce::Font::plain);
     configureLabel(titleLabel, headingFont, juce::Justification::centred);
@@ -25,11 +15,11 @@ SplashScreenComponent::SplashScreenComponent()
     benefitsGrid.setUseCenteringPlaceholders(true);
     benefitsGrid.setItemsInteractive(false);
     benefitsGrid.setItemHeight(120);
-    benefitsGrid.setColour(ColourIds::scrollFadeOverlayBackgroundColourId, Colours::veryDark);
+    benefitsGrid.setColour(ColourIds::scrollFadeOverlayBackgroundColourId, Colours::veryDark());
     addAndMakeVisible(benefitsGrid);
 
     configureLabel(supportLabel, juce::Font(14.5f, juce::Font::italic), juce::Justification::centred);
-    supportLabel.setColour(juce::Label::textColourId, Colours::accentColor.brighter(0.2f));
+    supportLabel.setColour(juce::Label::textColourId, Colours::accentColor().brighter(0.2f));
     supportLabel.setText("Purchasing premium directly supports ongoing development. Thank you!", juce::NotificationType::dontSendNotification);
     addAndMakeVisible(supportLabel);
 
@@ -46,11 +36,11 @@ SplashScreenComponent::SplashScreenComponent()
         dismiss();
     };
 
-    upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor);
-    upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark);
-    upgradeButton.setColour(juce::TextButton::textColourOnId, Colours::veryDark);
+    upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor());
+    upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark());
+    upgradeButton.setColour(juce::TextButton::textColourOnId, Colours::veryDark());
 
-    continueButton.setColour(juce::TextButton::buttonColourId, Colours::darker.withAlpha(0.8f));
+    continueButton.setColour(juce::TextButton::buttonColourId, Colours::darker().withAlpha(0.8f));
     continueButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
     continueButton.setColour(juce::TextButton::textColourOnId, juce::Colours::white);
 
@@ -60,27 +50,7 @@ SplashScreenComponent::SplashScreenComponent()
     addAndMakeVisible(continueButton);
 }
 
-void SplashScreenComponent::configureLabel(juce::Label& label, const juce::Font& font, juce::Justification justification) {
-    label.setColour(juce::Label::textColourId, juce::Colours::white);
-    label.setFont(font);
-    label.setJustificationType(justification);
-    label.setEditable(false, false, false);
-    label.setInterceptsMouseClicks(false, false);
-}
-
-void SplashScreenComponent::dismiss() {
-    if (onDismissRequested) {
-        onDismissRequested();
-    }
-}
-
-void SplashScreenComponent::resized() {
-    auto bounds = getLocalBounds();
-    auto horizontalMargin = juce::jmax(40, bounds.getWidth() / 6);
-    auto verticalMargin = juce::jmax(40, bounds.getHeight() / 6);
-    panelBounds = bounds.reduced(horizontalMargin, verticalMargin);
-
-    auto contentArea = panelBounds.reduced(28);
+void SplashScreenComponent::resizeContent(juce::Rectangle<int> contentArea) {
 
     auto titleArea = contentArea.removeFromTop(40);
     titleLabel.setBounds(titleArea);
@@ -123,19 +93,6 @@ void SplashScreenComponent::resized() {
     buttonsFlex.performLayout(buttonsArea.toFloat());
 }
 
-void SplashScreenComponent::paint(juce::Graphics& g) {
-    g.fillAll(juce::Colours::black.withAlpha(0.6f));
-
-    auto cornerRadius = 12.0f;
-    auto panelFloat = panelBounds.toFloat();
-
-    g.setColour(Colours::veryDark);
-    g.fillRoundedRectangle(panelFloat, cornerRadius);
-
-    g.setColour(Colours::accentColor.withAlpha(0.6f));
-    g.drawRoundedRectangle(panelFloat.reduced(0.5f), cornerRadius, 1.5f);
-}
-
 void SplashScreenComponent::buildBenefitTiles()
 {
     benefitsGrid.clearItems();
@@ -148,21 +105,24 @@ void SplashScreenComponent::buildBenefitTiles()
         int iconSize;
     };
 
-    static const std::array<BenefitEntry, 8> benefits{{
-        { "Video Support", "Turn MP4 or MOV footage into oscilloscope audio.", BinaryData::desktop_svg, BinaryData::desktop_svgSize },
-        { "Live Video Input", "Perform live via Syphon or Spout feeds.", BinaryData::spout_svg, BinaryData::spout_svgSize },
-        { "Enhanced Simulation", "More realistic analogue oscilloscope simulation.", BinaryData::oscilloscope_svg, BinaryData::oscilloscope_svgSize },
-        { "Advanced Controls", "Set custom framerate, resolution, and quality.", BinaryData::cog_svg, BinaryData::cog_svgSize },
-        { "Recording", "Export your visuals directly to MP4.", BinaryData::record_svg, BinaryData::record_svgSize },
-        { "Enhanced Text", "Improved text rendering quality.", BinaryData::greek_svg, BinaryData::greek_svgSize },
+    static const std::array<BenefitEntry, 11> benefits{{
         { "New Effects", "Twist, Kaleidoscope, Vortex, Multiplex, and more.", BinaryData::distort_svg, BinaryData::distort_svgSize },
+        { "Video Support", "Turn MP4 or MOV footage into oscilloscope audio.", BinaryData::desktop_svg, BinaryData::desktop_svgSize },
+        { "Recording", "Export your visuals directly to MP4.", BinaryData::record_svg, BinaryData::record_svgSize },
+        { "System Audio Capture", "Capture system audio on macOS and Windows.", BinaryData::microphone_svg, BinaryData::microphone_svgSize },
+        { "Fractals", "Koch Snowflake, Sierpinski Triangle, and custom fractals.", BinaryData::snowflake_svg, BinaryData::snowflake_svgSize },
+        { "Live Video Input", "Perform live via Syphon or Spout feeds.", BinaryData::spout_svg, BinaryData::spout_svgSize },
+        { "Synth Engine", "Rewritten synth with polyphony, glide, legato, and microtonal tuning.", BinaryData::waves_svg, BinaryData::waves_svgSize },
+        { "Modulation", "8 LFOs, 4 envelopes, random sources, and sidechain modulation.", BinaryData::graph_svg, BinaryData::graph_svgSize },
+        { "MIDI CC Learning", "Map hardware MIDI controllers to any parameter.", BinaryData::link_svg, BinaryData::link_svgSize },
+        { "And Many More", "Enhanced simulation, advanced controls, popout visualiser, and more.", BinaryData::plus_svg, BinaryData::plus_svgSize },
         { "Support the Project", "Your upgrade funds ongoing releases and support.", BinaryData::cash_svg, BinaryData::cash_svgSize }
     }};
 
     for (const auto& benefit : benefits)
     {
         auto iconSvg = juce::String::createStringFromData(benefit.iconData, benefit.iconSize);
-        auto* tile = new GridItemComponent(benefit.title, iconSvg, benefit.title, Colours::accentColor);
+        auto* tile = new GridItemComponent(benefit.title, iconSvg, benefit.title, Colours::accentColor());
         tile->setDescription(benefit.description);
         tile->setInteractive(false);
         benefitsGrid.addItem(tile);

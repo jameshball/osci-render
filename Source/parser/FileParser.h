@@ -3,12 +3,15 @@
 #include <JuceHeader.h>
 #include "FrameSource.h"
 #include "../obj/WorldObject.h"
-#include "../svg/SvgParser.h"
-#include "../txt/TextParser.h"
-#include "../gpla/LineArtParser.h"
+#include "svg/SvgParser.h"
+#include "txt/TextParser.h"
+#include "gpla/LineArtParser.h"
 #include "../lua/LuaParser.h"
-#include "../img/ImageParser.h"
-#include "../wav/WavParser.h"
+#include "img/ImageParser.h"
+#include "../audio/wav/WavParser.h"
+#if OSCI_PREMIUM
+#include "fractal/FractalParser.h"
+#endif
 
 class OscirenderAudioProcessor;
 class FileParser {
@@ -23,6 +26,7 @@ public:
 	bool isActive();
 	void disable();
 	void enable();
+	bool consumeDirty();
     
     int getNumFrames();
     int getCurrentFrame();
@@ -35,6 +39,9 @@ public:
 	std::shared_ptr<LuaParser> getLua();
 	std::shared_ptr<ImageParser> getImg();
 	std::shared_ptr<WavParser> getWav();
+#if OSCI_PREMIUM
+	std::shared_ptr<FractalParser> getFractal();
+#endif
 
 	bool isAnimatable = false;
 
@@ -55,8 +62,13 @@ private:
 	std::shared_ptr<LuaParser> lua;
 	std::shared_ptr<ImageParser> img;
 	std::shared_ptr<WavParser> wav;
+#if OSCI_PREMIUM
+	std::shared_ptr<FractalParser> fractal;
+#endif
 
 	juce::String fallbackLuaScript = "return { 0.0, 0.0 }";
 
 	std::function<void(int, juce::String, juce::String)> errorCallback;
+
+	juce::AudioBuffer<float> wavPointBuffer{3, 1};
 };

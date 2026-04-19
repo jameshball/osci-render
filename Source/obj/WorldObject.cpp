@@ -1,7 +1,7 @@
 #include "WorldObject.h"
-#include "../chinese_postman/ChinesePostman.h"
-#include "tiny_obj_loader.h"
-#include "../MathUtil.h"
+#include "../../modules/chinese_postman/ChinesePostman.h"
+#include "../../modules/tinyobjloader/tiny_obj_loader.h"
+#include "../util/MathUtil.h"
 #include <unordered_set>
 
 struct pair_hash {
@@ -127,6 +127,25 @@ WorldObject::WorldObject(const std::string& obj_string) {
             int last = std::max(firstVertex, lastVertex);
             edge_set.insert(std::make_pair(first, last));
             face++;
+        }
+
+        // process line elements ('l' directives in OBJ)
+        int li = 0;
+        int line = 0;
+        while (li < shape.lines.indices.size()) {
+            int prevVertex = -1;
+            int num_line_vertices = shape.lines.num_line_vertices[line];
+            for (int j = 0; j < num_line_vertices; j++) {
+                int vertex = shape.lines.indices[li].vertex_index;
+                if (prevVertex != -1) {
+                    int first = std::min(prevVertex, vertex);
+                    int last = std::max(prevVertex, vertex);
+                    edge_set.insert(std::make_pair(first, last));
+                }
+                prevVertex = vertex;
+                li++;
+            }
+            line++;
         }
 	}
 

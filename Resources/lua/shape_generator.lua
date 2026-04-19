@@ -5,12 +5,6 @@
 -- slider_b - trace end
 -- slider_c - reduce
 
--- utility function to linerarly interpolate between startVal and endVal
--- t should go from 0 to 1
-function lerp(startVal, endVal, t)
-    return (endVal - startVal) * t + startVal
-end
-
 -- These are the lookup tables for the X, Y, and time coordinates of the
 -- shape's vertices
 lutL = lutL or {-1, 0, 1, -1}
@@ -38,8 +32,8 @@ end
 diff = math.max(1e-10, (lutT[ind+1] - lutT[ind]) / math.min(1,math.max(1e-10,1-slider_c)))
 
 -- Actually perform the lookup and interpolation
-x = lerp(lutL[ind], lutL[ind+1], ((timeNow % lutT[#lutT]) - lutT[ind])/diff)
-y = lerp(lutR[ind], lutR[ind+1], ((timeNow % lutT[#lutT]) - lutT[ind])/diff)
+x = osci_lerp(lutL[ind], lutL[ind+1], ((timeNow % lutT[#lutT]) - lutT[ind])/diff)
+y = osci_lerp(lutR[ind], lutR[ind+1], ((timeNow % lutT[#lutT]) - lutT[ind])/diff)
 
 -- increment the time variable by the appropriate amount to get the desired frequency
 timeNow = timeNow + ((endval-startval) * frequency / sample_rate)

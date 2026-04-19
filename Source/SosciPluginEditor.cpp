@@ -1,6 +1,6 @@
 #include "SosciPluginProcessor.h"
 #include "SosciPluginEditor.h"
-#include "CustomStandaloneFilterWindow.h"
+#include "standalone/CustomStandaloneFilterWindow.h"
 
 SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p) : CommonPluginEditor(p, "sosci", "sosci", 1180, 750), audioProcessor(p) {
     // Create timeline controller for audio playback
@@ -56,7 +56,7 @@ SosciPluginEditor::~SosciPluginEditor() {
 }
 
 void SosciPluginEditor::paint(juce::Graphics& g) {
-    g.fillAll(Colours::veryDark);
+    g.fillAll(Colours::veryDark());
 }
 
 void SosciPluginEditor::resized() {
@@ -66,7 +66,14 @@ void SosciPluginEditor::resized() {
     if (audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
         visualiser.setBounds(area);
     } else {
-        menuBar.setBounds(area.removeFromTop(25));
+        auto topBar = area.removeFromTop(25);
+        menuBar.setBounds(topBar);
+        redoButton.setBounds(topBar.removeFromRight(25).reduced(2, 2));
+        undoButton.setBounds(topBar.removeFromRight(25).reduced(2, 2));
+        undoLabel.setBounds(topBar.removeFromRight(juce::jmin(150, topBar.getWidth())).reduced(2, 2));
+        undoLabel.toFront(false);
+        undoButton.toFront(false);
+        redoButton.toFront(false);
 
         if (juce::JUCEApplication::isStandaloneApp()) {
             auto volumeArea = area.removeFromLeft(35);
@@ -92,16 +99,16 @@ bool SosciPluginEditor::isInterestedInFileDrag(const juce::StringArray& files) {
         return false;
     }
     juce::File file(files[0]);
-    return 
-        file.hasFileExtension("wav") ||
-        file.hasFileExtension("mp3") ||
-        file.hasFileExtension("aiff") ||
-        file.hasFileExtension("flac") ||
-        file.hasFileExtension("ogg") ||
-        file.hasFileExtension("sosci");
+    return file.hasFileExtension("wav") ||
+           file.hasFileExtension("mp3") ||
+           file.hasFileExtension("aiff") ||
+           file.hasFileExtension("flac") ||
+           file.hasFileExtension("ogg") ||
+           file.hasFileExtension("sosci");
 }
 
 void SosciPluginEditor::filesDropped(const juce::StringArray& files, int x, int y) {
+    juce::ignoreUnused(x, y);
     if (files.size() != 1) {
         return;
     }
@@ -124,13 +131,17 @@ void SosciPluginEditor::visualiserFullScreenChanged() {
     }
     visualiserSettingsWrapper.setVisible(!fullScreen);
     menuBar.setVisible(!fullScreen);
+    undoButton.setVisible(!fullScreen);
+    redoButton.setVisible(!fullScreen);
     resized();
     repaint();
 }
 
 void SosciPluginEditor::parameterValueChanged(int parameterIndex, float newValue) {
-    juce::MessageManager::callAsync([this] {
-        visualiserFullScreenChanged();
+    juce::Component::SafePointer<SosciPluginEditor> safeThis(this);
+    juce::MessageManager::callAsync([safeThis] {
+        if (safeThis != nullptr)
+            safeThis->visualiserFullScreenChanged();
     });
 }
 

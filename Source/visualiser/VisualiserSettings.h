@@ -1,16 +1,18 @@
 #pragma once
 
-#define VERSION_HINT 2
-
 #include <JuceHeader.h>
 
 #include "../LookAndFeel.h"
-#include "../audio/SmoothEffect.h"
-#include "../audio/StereoEffect.h"
-#include "../components/EffectComponent.h"
+#include "../audio/effects/SmoothEffect.h"
+#include "../audio/effects/StereoEffect.h"
+#include "../components/effects/EffectComponent.h"
 #include "../components/SvgButton.h"
 #include "../components/SwitchButton.h"
 #include "VisualiserParameters.h"
+
+#ifndef SOSCI
+class OscirenderAudioProcessor;
+#endif
 
 class GroupedSettings : public juce::GroupComponent {
 public:
@@ -19,8 +21,15 @@ public:
             addAndMakeVisible(effect.get());
         }
 
-        setColour(groupComponentBackgroundColourId, Colours::veryDark.withMultipliedBrightness(3.0));
+        setColour(groupComponentBackgroundColourId, Colours::veryDark().withMultipliedBrightness(3.0));
     }
+
+#ifndef SOSCI
+    void wireModulation(OscirenderAudioProcessor& processor) {
+        for (auto& effect : effects)
+            effect->wireModulation(processor);
+    }
+#endif
 
     void resized() override {
         auto area = getLocalBounds();
@@ -46,6 +55,10 @@ class VisualiserSettings : public juce::Component, public juce::AudioProcessorPa
 public:
     VisualiserSettings(VisualiserParameters&, int numChannels = 2);
     ~VisualiserSettings();
+
+#ifndef SOSCI
+    void wireModulation(OscirenderAudioProcessor& processor);
+#endif
 
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -150,7 +163,7 @@ public:
     }
 
     void paint(juce::Graphics& g) override {
-        g.fillAll(Colours::darker);
+        g.fillAll(Colours::darker());
     }
 
     void resized() override {
@@ -164,7 +177,7 @@ private:
 
 class SettingsWindow : public juce::DialogWindow {
 public:
-    SettingsWindow(juce::String name, juce::Component& component, int windowWidth, int windowHeight, int componentWidth, int componentHeight) : juce::DialogWindow(name, Colours::darker, true, true), component(component), componentHeight(componentHeight) {
+    SettingsWindow(juce::String name, juce::Component& component, int windowWidth, int windowHeight, int componentWidth, int componentHeight) : juce::DialogWindow(name, Colours::darker(), true, true), component(component), componentHeight(componentHeight) {
         setContentComponent(&viewport);
         centreWithSize(windowWidth, windowHeight);
         setResizeLimits(windowWidth, windowHeight, componentWidth, componentHeight);

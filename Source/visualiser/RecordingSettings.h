@@ -1,12 +1,10 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "../components/EffectComponent.h"
+#include "../components/effects/EffectComponent.h"
 #include "../components/SvgButton.h"
 #include "../LookAndFeel.h"
 #include "../components/SwitchButton.h"
-
-#define VERSION_HINT 2
 
 // Define codec options
 enum class VideoCodec {
@@ -45,6 +43,7 @@ public:
         "brightness",
         VERSION_HINT, 0.7, 0.0, 1.0
     );
+    osci::BooleanParameter losslessAudio = osci::BooleanParameter("Lossless Audio", "losslessAudio", VERSION_HINT, false, "Record audio in a lossless format.");
     osci::BooleanParameter losslessVideo = osci::BooleanParameter("Lossless Video", "losslessVideo", VERSION_HINT, false, "Record video in a lossless format. WARNING: This is not supported by all media players.");
     std::shared_ptr<osci::Effect> qualityEffect = std::make_shared<osci::SimpleEffect>(&qualityParameter);
 
@@ -72,6 +71,7 @@ public:
 
     void save(juce::XmlElement* xml) {
         auto settingsXml = xml->createNewChildElement("recordingSettings");
+        losslessAudio.save(settingsXml->createNewChildElement("losslessAudio"));
         losslessVideo.save(settingsXml->createNewChildElement("losslessVideo"));
         recordAudio.save(settingsXml->createNewChildElement("recordAudio"));
         recordVideo.save(settingsXml->createNewChildElement("recordVideo"));
@@ -92,6 +92,9 @@ public:
     // opt to not change any values if not found
     void load(juce::XmlElement* xml) {
         if (auto* settingsXml = xml->getChildByName("recordingSettings")) {
+            if (auto* losslessAudioXml = settingsXml->getChildByName("losslessAudio")) {
+                losslessAudio.load(losslessAudioXml);
+            }
             if (auto* losslessVideoXml = settingsXml->getChildByName("losslessVideo")) {
                 losslessVideo.load(losslessVideoXml);
             }
@@ -183,10 +186,18 @@ public:
 #endif
             case VideoCodec::H264:
             case VideoCodec::H265:
+                return parameters.losslessAudio.getBoolValue() ? "mov" : "mp4";
             case VideoCodec::VP9:
             default:
                 return "mp4";
         }
+    }
+
+    juce::StringArray getAudioCodecArgs() const {
+        if (parameters.losslessAudio.getBoolValue() && parameters.videoCodec != VideoCodec::VP9) {
+            return {"-c:a", "pcm_s16le"};
+        }
+        return {"-c:a", "aac", "-b:a", "384k"};
     }
 
     RecordingParameters& parameters;
@@ -196,6 +207,7 @@ private:
     EffectComponent resolution{*parameters.resolutionEffect};
     EffectComponent frameRate{*parameters.frameRateEffect};
 
+    jux::SwitchButton losslessAudio{&parameters.losslessAudio};
     jux::SwitchButton losslessVideo{&parameters.losslessVideo};
     jux::SwitchButton recordAudio{&parameters.recordAudio};
     jux::SwitchButton recordVideo{&parameters.recordVideo};
@@ -213,6 +225,8 @@ private:
     
     juce::Label customSharedTextureOutputLabel{"Custom Syphon/Spout Name", "Custom Syphon/Spout Name"};
     juce::TextEditor customSharedTextureOutputEditor{"customSharedTextureOutputEditor"};
+
+    void updateLosslessAudioEnabled();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RecordingSettings)
 };

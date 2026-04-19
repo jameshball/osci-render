@@ -15,7 +15,7 @@ void FileParser::showFileSizeWarning(juce::String fileName, int64_t totalBytes, 
 	}
 
 	const double fileSizeMB = totalBytes / (1024.0 * 1024.0);
-	juce::String message = "The " + fileType + " file '" + fileName + "' you're trying to open is " + juce::String(fileSizeMB, 2) + " MB in size, and may time a long time to open.\n\nWould you like to continue loading it?";
+	juce::String message = "The " + fileType + " file '" + fileName + "' you're trying to open is " + juce::String(fileSizeMB, 2) + " MB in size, and may take a long time to open.\n\nWould you like to continue loading it?";
 	
 	juce::MessageManager::callAsync([this, message, callback]() {
 		juce::AlertWindow::showOkCancelBox(
@@ -58,6 +58,9 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 	lua = nullptr;
 	img = nullptr;
 	wav = nullptr;
+#if OSCI_PREMIUM
+	fractal = nullptr;
+#endif
 	
 	if (extension == ".obj") {
 		const int64_t fileSize = stream->getTotalLength();
@@ -100,6 +103,10 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
                 sampleSource = true;
 			}
 		);
+	} else if (extension == ".lsystem") {
+#if OSCI_PREMIUM
+		fractal = std::make_shared<FractalParser>(stream->readEntireStreamAsString());
+#endif
 	} else if (extension == ".wav" || extension == ".aiff" || extension == ".flac" || extension == ".ogg" || extension == ".mp3") {
 		wav = std::make_shared<WavParser>(audioProcessor);
 		if (!wav->parse(std::move(stream))) {
@@ -127,6 +134,12 @@ std::vector<std::unique_ptr<osci::Shape>> FileParser::nextFrame() {
     } else if (gpla != nullptr) {
         return gpla->draw();
     }
+#if OSCI_PREMIUM
+    else if (fractal != nullptr) {
+        fractal->setIterations(juce::roundToInt(audioProcessor.fractalDepthEffect->getActualValue()));
+        return fractal->draw();
+    }
+#endif
     auto tempShapes = std::vector<std::unique_ptr<osci::Shape>>();
     // return a square
     tempShapes.push_back(std::make_unique<osci::Line>(osci::Point(-0.5, -0.5, 0), osci::Point(0.5, -0.5, 0)));
@@ -140,19 +153,20 @@ osci::Point FileParser::nextSample(lua_State*& L, LuaVariables& vars) {
     juce::SpinLock::ScopedLockType scope(lock);
 
     if (lua != nullptr) {
-        auto values = lua->run(L, vars);
-        if (values.size() == 2) {
-            return osci::Point(values[0], values[1], 0);
-        } else if (values.size() > 2) {
-            return osci::Point(values[0], values[1], values[2]);
+        auto result = lua->run(L, vars);
+        if (result.count >= 6) {
+            return osci::Point(result.values[0], result.values[1], result.values[2], result.values[3], result.values[4], result.values[5]);
+        } else if (result.count >= 3) {
+            return osci::Point(result.values[0], result.values[1], result.values[2]);
+        } else if (result.count == 2) {
+            return osci::Point(result.values[0], result.values[1]);
         }
     } else if (img != nullptr) {
-        return img->getSample();
+        return img->getSample(vars.blockSampleIndex);
     } else if (wav != nullptr) {
-        juce::AudioBuffer<float> pointBuffer(3, 1);
-        pointBuffer.clear();
-        wav->processBlock(pointBuffer);
-        auto* data = pointBuffer.getReadPointer(0);
+        wavPointBuffer.clear();
+        wav->processBlock(wavPointBuffer);
+        auto* data = wavPointBuffer.getReadPointer(0);
 		return osci::Point(data[0], data[1], data[2]);
     }
 
@@ -173,6 +187,14 @@ void FileParser::disable() {
 
 void FileParser::enable() {
     active = true;
+}
+
+bool FileParser::consumeDirty() {
+    juce::SpinLock::ScopedLockType scope(lock);
+#if OSCI_PREMIUM
+    if (fractal != nullptr) return fractal->consumeDirty();
+#endif
+    return false;
 }
 
 std::shared_ptr<WorldObject> FileParser::getObject() {
@@ -202,6 +224,12 @@ std::shared_ptr<ImageParser> FileParser::getImg() {
 std::shared_ptr<WavParser> FileParser::getWav() {
     return wav;
 }
+
+#if OSCI_PREMIUM
+std::shared_ptr<FractalParser> FileParser::getFractal() {
+    return fractal;
+}
+#endif
 
 int FileParser::getNumFrames() {
     if (gpla != nullptr) {

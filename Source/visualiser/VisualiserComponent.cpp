@@ -58,14 +58,16 @@ VisualiserComponent::VisualiserComponent(
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
     setWantsKeyboardFocus(true);
 
-    if (parent == nullptr) {
+    if (parent == nullptr || juce::JUCEApplicationBase::isStandaloneApp()) {
         addAndMakeVisible(fullScreenButton);
         fullScreenButton.setTooltip("Toggles fullscreen mode.");
     }
+#if OSCI_PREMIUM
     if (child == nullptr && parent == nullptr) {
         addAndMakeVisible(popOutButton);
         popOutButton.setTooltip("Opens the oscilloscope in a new window.");
     }
+#endif
     addAndMakeVisible(settingsButton);
     settingsButton.setTooltip("Opens the visualiser settings window.");
 
@@ -91,7 +93,14 @@ VisualiserComponent::VisualiserComponent(
 #endif
 
     fullScreenButton.onClick = [this]() {
-        enableFullScreen();
+        if (this->parent != nullptr) {
+#if OSCI_PREMIUM
+            if (auto* window = dynamic_cast<VisualiserWindow*>(getTopLevelComponent()))
+                window->toggleFullScreen();
+#endif
+        } else {
+            enableFullScreen();
+        }
     };
 
     settingsButton.onClick = [this]() {
@@ -100,9 +109,11 @@ VisualiserComponent::VisualiserComponent(
         }
     };
 
+#if OSCI_PREMIUM
     popOutButton.onClick = [this]() {
         popoutWindow();
     };
+#endif
 
     if (visualiserOnly && juce::JUCEApplication::isStandaloneApp()) {
         addAndMakeVisible(audioInputButton);
@@ -165,6 +176,10 @@ VisualiserComponent::VisualiserComponent(
 }
 
 VisualiserComponent::~VisualiserComponent() {
+    // Stop the background thread while VisualiserComponent's vtable is still live.
+    // If deferred to ~VisualiserRenderer, the vptr has already changed and the
+    // running thread's virtual run()/runTask() dispatch becomes a data race.
+    setShouldBeRunning(false, [this] { renderingSemaphore.release(); });
     setRecording(false);
     audioProcessor.removeAudioPlayerListener(this);
     if (isPrimaryVisualiser()) {
@@ -223,10 +238,7 @@ void VisualiserComponent::setPaused(bool paused, bool affectAudio) {
         audioProcessor.wavParser.setPaused(paused);
     }
     
-    // Update the parameter only for primary visualiser with no child window
-    // When a child window exists, the parent is temporarily paused but we don't 
-    // want to save this state to the parameter
-    if (isPrimaryVisualiser() && child == nullptr) {
+    if (isPrimaryVisualiser()) {
         bool currentParamValue = audioProcessor.visualiserParameters.visualiserPaused->getBoolValue();
         if (currentParamValue != paused) {
             audioProcessor.visualiserParameters.visualiserPaused->setBoolValueNotifyingHost(paused);
@@ -234,6 +246,9 @@ void VisualiserComponent::setPaused(bool paused, bool affectAudio) {
     }
     
     repaint();
+    if (child != nullptr) {
+        child->repaint();
+    }
 }
 
 bool VisualiserComponent::isPaused() const {
@@ -245,8 +260,7 @@ bool VisualiserComponent::isPrimaryVisualiser() const {
 }
 
 void VisualiserComponent::updatePausedState() {
-    // Called when the parameter changes - only relevant for primary visualiser with no child
-    if (isPrimaryVisualiser() && child == nullptr) {
+    if (isPrimaryVisualiser()) {
         bool shouldBePaused = audioProcessor.visualiserParameters.visualiserPaused->getBoolValue();
         if (active == shouldBePaused) { // active and paused are opposites
             setPaused(shouldBePaused, true);
@@ -255,9 +269,10 @@ void VisualiserComponent::updatePausedState() {
 }
 
 void VisualiserComponent::parameterValueChanged(int parameterIndex, float newValue) {
-    // Handle parameter changes on the message thread
-    juce::MessageManager::callAsync([this] {
-        updatePausedState();
+    auto safeThis = juce::Component::SafePointer<VisualiserComponent>(this);
+    juce::MessageManager::callAsync([safeThis] {
+        if (safeThis == nullptr) return;
+        safeThis->updatePausedState();
     });
 }
 
@@ -273,6 +288,8 @@ void VisualiserComponent::mouseMove(const juce::MouseEvent &event) {
     if (event.getScreenX() == lastMouseX && event.getScreenY() == lastMouseY) {
         return;
     }
+    if (isMirrorMode())
+        return;
     hideButtonRow = false;
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
 
@@ -306,8 +323,12 @@ void VisualiserComponent::mouseMove(const juce::MouseEvent &event) {
 
 void VisualiserComponent::mouseDown(const juce::MouseEvent &event) {
     if (event.originalComponent == this) {
-        if (event.mods.isLeftButtonDown() && child == nullptr && !record.getToggleState()) {
-            setPaused(active);
+        if (event.mods.isLeftButtonDown() && !record.getToggleState()) {
+            if (isMirrorMode() && parent != nullptr) {
+                parent->setPaused(parent->active);
+            } else {
+                setPaused(active);
+            }
         }
     }
 }
@@ -317,12 +338,36 @@ bool VisualiserComponent::keyPressed(const juce::KeyPress &key) {
     if (!audioProcessor.getAcceptsKeys()) return false;
 
     if (key.isKeyCode(juce::KeyPress::escapeKey)) {
-        if (fullScreenCallback) {
+        // In popout mode, exit popout fullscreen first
+        if (parent != nullptr) {
+#if OSCI_PREMIUM
+            if (auto* window = dynamic_cast<VisualiserWindow*>(getTopLevelComponent())) {
+                if (window->getIsFullScreen()) {
+                    window->toggleFullScreen();
+                    return true;
+                }
+            }
+#endif
+        } else if (fullScreenCallback) {
             fullScreenCallback(FullScreenMode::MAIN_COMPONENT);
         }
         return true;
+    } else if (key.isKeyCode(juce::KeyPress::F11Key) && juce::JUCEApplicationBase::isStandaloneApp()) {
+#if OSCI_PREMIUM
+        if (parent != nullptr) {
+            if (auto* window = dynamic_cast<VisualiserWindow*>(getTopLevelComponent()))
+                window->toggleFullScreen();
+        } else {
+            enableFullScreen();
+        }
+#endif
+        return true;
     } else if (key.isKeyCode(juce::KeyPress::spaceKey)) {
-        setPaused(active);
+        if (isMirrorMode() && parent != nullptr) {
+            parent->setPaused(parent->active);
+        } else {
+            setPaused(active);
+        }
         return true;
     }
 
@@ -389,7 +434,18 @@ void VisualiserComponent::setRecording(bool recording) {
                 tempVideoFile->getFile());
 
             if (!ffmpegProcess.start(cmd)) {
+                juce::Logger::writeToLog("Recording: ffmpegProcess.start() failed for command: " + cmd);
                 record.setToggleState(false, juce::NotificationType::dontSendNotification);
+                juce::MessageManager::callAsync([this] {
+                    juce::MessageBoxOptions options = juce::MessageBoxOptions()
+                        .withTitle("Recording Error")
+                        .withMessage("Failed to start the FFmpeg video encoder.\n\n"
+                                     "Please check that FFmpeg is compatible with your system.")
+                        .withButton("OK")
+                        .withIconType(juce::AlertWindow::WarningIcon)
+                        .withAssociatedComponent(this);
+                    juce::AlertWindow::showAsync(options, nullptr);
+                });
                 return;
             }
             framePixels.resize(getRenderWidth() * getRenderHeight() * 4);
@@ -442,7 +498,7 @@ void VisualiserComponent::setRecording(bool recording) {
                     if (file.existsAsFile()) {
                         file.deleteFile();
                     }
-                    ffmpegProcess.start("\"" + ffmpegFile.getFullPathName() + "\" -i \"" + tempVideoFile->getFile().getFullPathName() + "\" -i \"" + tempAudioFile->getFile().getFullPathName() + "\" -c:v copy -c:a aac -b:a 384k -y \"" + file.getFullPathName() + "\"");
+                    ffmpegProcess.start("\"" + ffmpegFile.getFullPathName() + "\" -i \"" + tempVideoFile->getFile().getFullPathName() + "\" -i \"" + tempAudioFile->getFile().getFullPathName() + "\" -c:v copy " + recordingSettings.getAudioCodecArgs().joinIntoString(" ") + " -y \"" + file.getFullPathName() + "\"");
                     ffmpegProcess.close();
                 } else if (wasRecordingAudio) {
                     tempAudioFile->getFile().copyFileTo(file);
@@ -479,16 +535,30 @@ void VisualiserComponent::resized() {
     // Apply hideButtonRow logic to both fullscreen and pop-out modes
     if ((fullScreen || parent != nullptr) && hideButtonRow) {
         buttonRow = area.removeFromBottom(0);
+        fullScreenButton.setVisible(false);
+        popOutButton.setVisible(false);
+        settingsButton.setVisible(false);
+        audioInputButton.setVisible(false);
+        sharedTextureButton.setVisible(false);
+        record.setVisible(false);
+        stopwatch.setVisible(false);
+        timeline.setVisible(false);
+        setViewportArea(area);
+        return;
     } else {
         buttonRow = area.removeFromBottom(25);
     }
     auto buttons = buttonRow;
-    if (parent == nullptr) {
+    if (parent == nullptr || juce::JUCEApplicationBase::isStandaloneApp()) {
+        fullScreenButton.setVisible(true);
         fullScreenButton.setBounds(buttons.removeFromRight(30));
     }
+#if OSCI_PREMIUM
     if (child == nullptr && parent == nullptr) {
+        popOutButton.setVisible(true);
         popOutButton.setBounds(buttons.removeFromRight(30));
     }
+#endif
     if (openSettings != nullptr) {
         settingsButton.setVisible(true);
         settingsButton.setBounds(buttons.removeFromRight(30));
@@ -497,11 +567,14 @@ void VisualiserComponent::resized() {
     }
 
     if (visualiserOnly && juce::JUCEApplication::isStandaloneApp() && child == nullptr) {
+        audioInputButton.setVisible(true);
         audioInputButton.setBounds(buttons.removeFromRight(30));
     }
 
+    sharedTextureButton.setVisible(true);
     sharedTextureButton.setBounds(buttons.removeFromRight(30));
 
+    record.setVisible(true);
     record.setBounds(buttons.removeFromRight(25));
     if (record.getToggleState()) {
         stopwatch.setVisible(true);
@@ -519,8 +592,9 @@ void VisualiserComponent::resized() {
 
     buttons.removeFromRight(10); // padding
 
-    if (child == nullptr) {
+    if (child == nullptr && timeline.getController() != nullptr) {
         // Timeline replaces the old audioPlayer UI
+        timeline.setVisible(true);
         timeline.setBounds(buttons);
     }
 
@@ -532,7 +606,6 @@ void VisualiserComponent::popoutWindow() {
     if (sharedTextureButton.getToggleState()) {
         sharedTextureButton.triggerClick();
     }
-#endif
     setRecording(false);
 
     // Release renderingSemaphore to prevent deadlock when creating a child visualizer
@@ -541,9 +614,7 @@ void VisualiserComponent::popoutWindow() {
     auto visualiser = new VisualiserComponent(
         audioProcessor,
         editor,
-#if OSCI_PREMIUM
         sharedTextureManager,
-#endif
         ffmpegFile,
         settings,
         recordingSettings,
@@ -560,14 +631,24 @@ void VisualiserComponent::popoutWindow() {
     popout->setContentOwned(visualiser, true);
     popout->setUsingNativeTitleBar(true);
     popout->setResizable(true, false);
+    // Register editor as KeyListener so undo/redo shortcuts work in the popout window
+    popout->addKeyListener(&editor);
     popout->setVisible(true);
     popout->centreWithSize(350, 350);
-    setPaused(true, false);
+    // Hide all buttons on the popout and set up mirror mode
+    visualiser->hideButtonRow = true;
+    visualiser->resized();
+    // Set up mirror mode AFTER the window is visible so the GL context is active
+    visualiser->setMirrorSource(this);
+    setHasMirrorConsumer(true);
     resized();
+#endif
 }
 
 void VisualiserComponent::childUpdated() {
+#if OSCI_PREMIUM
     popOutButton.setVisible(child == nullptr);
+#endif
 #if OSCI_PREMIUM
     editor.ffmpegDownloader.setVisible(child == nullptr);
 #endif
@@ -587,7 +668,8 @@ void VisualiserComponent::childUpdated() {
 void VisualiserComponent::updateRenderModeFromProcessor() {
     // Called on message thread
     if (!visualiserOnly) {
-        setRenderMode(RenderMode::XY);
+        // osci-render always provides 6 channels (x, y, z, r, g, b)
+        setRenderMode(RenderMode::XYRGB);
         return;
     }
     // Determine based on whether brightness and RGB are enabled and not force-disabled
@@ -657,8 +739,20 @@ void VisualiserComponent::setTimelineController(std::shared_ptr<TimelineControll
 }
 
 void VisualiserComponent::paint(juce::Graphics &g) {
+    // Mirror mode: draw paused overlay over GL content
+    if (isMirrorMode()) {
+        if (parent != nullptr && parent->isPaused()) {
+            g.setColour(juce::Colours::black.withAlpha(0.5f));
+            g.fillRect(getLocalBounds());
+            g.setColour(juce::Colours::white);
+            g.setFont(30.0f);
+            g.drawText("Paused", getLocalBounds(), juce::Justification::centred);
+        }
+        return;
+    }
+
     bool colourSpecified = isColourSpecified(buttonRowColourId);
-    auto buttonRowColour = Colours::veryDark;
+    auto buttonRowColour = Colours::veryDark();
     if (colourSpecified) {
         buttonRowColour = findColour(buttonRowColourId, true);
     }
@@ -671,7 +765,6 @@ void VisualiserComponent::paint(juce::Graphics &g) {
 
         g.setColour(juce::Colours::white);
         g.setFont(30.0f);
-        juce::String text = child == nullptr ? "Paused" : "Open in another window";
-        g.drawText(text, getViewportArea(), juce::Justification::centred);
+        g.drawText("Paused", getViewportArea(), juce::Justification::centred);
     }
 }

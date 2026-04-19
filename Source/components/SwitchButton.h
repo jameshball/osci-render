@@ -29,6 +29,8 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "BooleanParamCCHelper.h"
+#include "../LookAndFeel.h"
 
 namespace jux
 {
@@ -61,9 +63,7 @@ public:
         this->parameter = parameter;
         setToggleState(parameter->getBoolValue(), juce::NotificationType::dontSendNotification);
         parameter->addListener(this);
-        onStateChange = [this]() {
-            this->parameter->setBoolValueNotifyingHost(getToggleState());
-        };
+        ccHelper.init(parameter, this);
         addAndMakeVisible(label);
         label.setTooltip(parameter->getDescription());
         label.setText(parameter->name, juce::NotificationType::dontSendNotification);
@@ -86,6 +86,19 @@ public:
     
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override {}
 
+    void mouseDown(const juce::MouseEvent& e) override {
+        if (e.mods.isPopupMenu() && parameter != nullptr) {
+            ccHelper.showContextMenu(e.getScreenPosition());
+            return;
+        }
+        Button::mouseDown(e);
+    }
+
+    void clicked() override {
+        if (parameter != nullptr)
+            parameter->setBoolValueNotifyingHost(getToggleState());
+    }
+
     void setMillisecondsToSpendMoving (int newValue)
     {
         millisecondsToSpendMoving = newValue;
@@ -99,7 +112,10 @@ public:
         auto cornerSize = (isVertical ? b.getWidth() : b.getHeight()) * 0.5;
         g.setColour (juce::Colours::black.withAlpha (0.1f));
         g.drawRoundedRectangle (b, cornerSize, 2.0f);
-        g.setColour (findColour (getSwitchState() ? switchOnBackgroundColour : switchOffBackgroundColour));
+        if (ccHelper.isLearning())
+            g.setColour(Colours::midiLearnBackground());
+        else
+            g.setColour (findColour (getSwitchState() ? switchOnBackgroundColour : switchOffBackgroundColour));
         g.fillRoundedRectangle (b, cornerSize);
 
         juce::Path switchPath;
@@ -176,6 +192,7 @@ private:
     bool prevToggleState = false;
     
     osci::BooleanParameter* parameter = nullptr;
+    BooleanParamCCHelper ccHelper;
     
     JUCE_DECLARE_WEAK_REFERENCEABLE(SwitchButton)
 };

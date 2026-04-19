@@ -16,5 +16,27 @@
 	url = https://luajit.org/git/luajit.git
 	ignore = untracked
 [submodule "Source/chinese_postman"]
-	path = Source/chinese_postman
+	path = modules/chinese_postman
 	url = git@github.com:jameshball/chinese-postman.git
+[submodule "modules/melatonin_blur"]
+	path = modules/melatonin_blur
+	url = https://github.com/sudara/melatonin_blur.git
+[submodule "modules/pluginval"]
+	path = modules/pluginval
+	url = https://github.com/Tracktion/pluginval.git
+	branch = develop
+[submodule "modules/gifdec"]
+	path = modules/gifdec
+	url = https://github.com/lecram/gifdec
+[submodule "modules/tinyobjloader"]
+	path = modules/tinyobjloader
+	url = https://github.com/jameshball/tinyobjloader
+[submodule "modules/Mathter"]
+	path = modules/Mathter
+	url = https://github.com/petiaccja/Mathter
+[submodule "modules/miniaudio"]
+	path = modules/miniaudio
+	url = https://github.com/mackron/miniaudio
+[submodule "modules/juce_mts_esp"]
+	path = modules/juce_mts_esp
+	url = https://github.com/jameshball/juce_mts_esp.git

@@ -1,19 +1,55 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "../LookAndFeel.h"
 
 class AboutComponent : public juce::Component {
 public:
-    AboutComponent(const void *image, size_t imageSize, juce::String sectionText, int port = -1);
+    struct CreditEntry {
+        juce::String name;
+        juce::String contribution;
+    };
 
+    struct Info {
+        const void* imageData = nullptr;
+        size_t imageSize = 0;
+        juce::String productName;
+        juce::String companyName;
+        juce::String versionString;
+        bool isPremium = false;
+        juce::String websiteUrl;
+        juce::String githubUrl;
+        std::vector<CreditEntry> credits;
+        int blenderPort = -1;
+    };
+
+    explicit AboutComponent(const Info& info);
+
+    void paint(juce::Graphics& g) override;
     void resized() override;
 
+    // Recommended dialog background colour — matches the main application window.
+    static juce::Colour dialogBackground() { return Colours::veryDark().brighter(0.1f); }
+
+    // Preferred dialog size for the given content.
+    static juce::Point<int> preferredSize(const Info& info);
+
 private:
+    Info info;
     juce::Image logo;
     juce::ImageComponent logoComponent;
+    juce::TextButton websiteBtn, discordBtn, issuesBtn;
 
-    juce::TextEditor text;
-    juce::TextEditor portText;
-    
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AboutComponent)
+    void paintCard(juce::Graphics& g, juce::Rectangle<float> area) const;
+
+    static constexpr float kPad = 16.0f;
+    static constexpr float kCardPad = 12.0f;
+    static constexpr float kCardRadius = 6.0f;
+    static constexpr float kGap = 8.0f;
+    static constexpr float kLogoH = 100.0f;
+    static constexpr float kRowH = 34.0f;
+    static constexpr float kBtnH = 28.0f;
+    static constexpr float kBtnGap = 8.0f;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AboutComponent)
 };

@@ -1,10 +1,8 @@
 #pragma once
 
-#define VERSION_HINT 2
-
 #include <JuceHeader.h>
-#include "../audio/SmoothEffect.h"
-#include "../audio/StereoEffect.h"
+#include "../audio/effects/SmoothEffect.h"
+#include "../audio/effects/StereoEffect.h"
 
 enum class ScreenOverlay : int {
     INVALID = -1,
@@ -92,6 +90,11 @@ public:
         booleans.push_back(scaleEffect->linked);
 #endif
     }
+
+    // Callback for applying external modulation (LFO/ENV) to animated visualiser
+    // effect buffers. Set by the processor; called by the renderer after
+    // animateValues() but before processBlock().
+    std::function<void(int numSamples)> applyExternalModulation;
 
     double getIntensity() {
         return intensityEffect->getActualValue() / 100;

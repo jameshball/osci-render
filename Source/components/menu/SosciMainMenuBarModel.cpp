@@ -1,0 +1,177 @@
+#include "SosciMainMenuBarModel.h"
+
+#include "../../SosciPluginEditor.h"
+#include "../../SosciPluginProcessor.h"
+
+SosciMainMenuBarModel::SosciMainMenuBarModel(SosciPluginEditor& e, SosciAudioProcessor& p) : editor(e), processor(p) {
+    resetMenuItems();
+}
+
+void SosciMainMenuBarModel::resetMenuItems() {
+    MainMenuBarModel::resetMenuItems();
+
+    constexpr int RECENT_BASE_ID = 1000;
+
+    addTopLevelMenu("File");
+    addTopLevelMenu("Edit");
+    addTopLevelMenu("About");
+    addTopLevelMenu("Video");
+    addTopLevelMenu("Audio");
+    addTopLevelMenu("Interface");
+
+    const int fileMenu      = 0;
+    const int editMenu      = 1;
+    const int aboutMenu     = 2;
+    const int videoMenu     = 3;
+    const int audioMenu     = 4;
+    const int interfaceMenu = 5;
+
+    std::vector<std::tuple<juce::String, const void*, int>> examples = {
+        {"default.sosci", BinaryData::default_sosci, BinaryData::default_sosciSize},
+        {"clean.sosci", BinaryData::clean_sosci, BinaryData::clean_sosciSize},
+        {"vector_display.sosci", BinaryData::vector_display_sosci, BinaryData::vector_display_sosciSize},
+        {"real_oscilloscope.sosci", BinaryData::real_oscilloscope_sosci, BinaryData::real_oscilloscope_sosciSize},
+        {"rainbow.sosci", BinaryData::rainbow_sosci, BinaryData::rainbow_sosciSize},
+    };
+
+    // This is a hack - ideally I would improve the MainMenuBarModel class to allow for submenus
+    customMenuLogic = [this, examples](juce::PopupMenu& menu, int topLevelMenuIndex) {
+        if (topLevelMenuIndex != 0)
+            return;
+
+        juce::PopupMenu recentMenu;
+        const int added = processor.createRecentProjectsPopupMenuItems(recentMenu,
+                                                                       RECENT_BASE_ID,
+                                                                       true,
+                                                                       true);
+        if (added == 0)
+            recentMenu.addItem(RECENT_BASE_ID, "(No Recent Projects)", false);
+
+        menu.addSubMenu("Open Recent", recentMenu);
+
+        juce::PopupMenu submenu;
+        for (int i = 0; i < (int) examples.size(); i++) {
+            submenu.addItem(SUBMENU_ID + i, std::get<0>(examples[i]));
+        }
+
+        menu.addSubMenu("Examples", submenu);
+        menu.addSeparator();
+    };
+
+    customMenuSelectedLogic = [this, examples](int menuItemID, int topLevelMenuIndex) {
+        if (topLevelMenuIndex != 0)
+            return false;
+
+        if (menuItemID >= RECENT_BASE_ID) {
+            const int index = menuItemID - RECENT_BASE_ID;
+            const auto file = processor.getRecentProjectFile(index);
+            if (file != juce::File() && file.existsAsFile())
+                editor.openProject(file);
+            return true;
+        }
+
+        if (menuItemID >= SUBMENU_ID) {
+            int index = menuItemID - SUBMENU_ID;
+            processor.setStateInformation(std::get<1>(examples[index]), std::get<2>(examples[index]));
+            return true;
+        }
+
+        return false;
+    };
+
+    addMenuItem(fileMenu, "Open Audio File", [&]() {
+        fileChooser = std::make_unique<juce::FileChooser>("Open Audio File", processor.getLastOpenedDirectory(), "*.wav;*.aiff;*.flac;*.ogg;*.mp3");
+        auto flags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
+        fileChooser->launchAsync(flags, [&](const juce::FileChooser& chooser) {
+            auto file = chooser.getResult();
+            if (file != juce::File()) {
+                processor.loadAudioFile(file);
+                processor.setLastOpenedDirectory(file.getParentDirectory());
+            }
+        });
+    });
+    addMenuItem(fileMenu, "Open Project", [&]() { editor.openProject(); });
+    addMenuItem(fileMenu, "Save Project", [&]() { editor.saveProject(); });
+    addMenuItem(fileMenu, "Save Project As", [&]() { editor.saveProjectAs(); });
+    if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
+        addMenuItem(fileMenu, "Create New Project", [&]() { editor.resetToDefault(); });
+    }
+
+    addMenuItem(editMenu, "Undo", [this] { processor.getUndoManager().undo(); }, juce::String::fromUTF8("\xe2\x8c\x98Z"));
+    addMenuItem(editMenu, "Redo", [this] { processor.getUndoManager().redo(); }, juce::String::fromUTF8("\xe2\x87\xa7\xe2\x8c\x98Z"));
+
+    addMenuItem(aboutMenu, "About sosci", [&]() {
+        juce::DialogWindow::LaunchOptions options;
+        AboutComponent::Info aboutInfo;
+        aboutInfo.imageData = BinaryData::sosci_logo_png;
+        aboutInfo.imageSize = BinaryData::sosci_logo_pngSize;
+        aboutInfo.productName = ProjectInfo::projectName;
+        aboutInfo.companyName = ProjectInfo::companyName;
+        aboutInfo.versionString = ProjectInfo::versionString;
+#if OSCI_PREMIUM
+        aboutInfo.isPremium = true;
+#else
+        aboutInfo.isPremium = false;
+#endif
+        aboutInfo.websiteUrl = "https://osci-render.com";
+        aboutInfo.githubUrl = "https://github.com/jameshball/osci-render";
+        aboutInfo.credits = {
+            { "Neil Thapen",    "Allowing adaptation of the brilliant dood.al/oscilloscope" },
+            { "Kevin Kripper",  "Guiding much of the features and development of sosci" },
+            { "DJ_Level_3",     "Testing throughout and helping add features" },
+        };
+
+        AboutComponent* about = new AboutComponent(aboutInfo);
+        options.content.setOwned(about);
+        options.dialogTitle = "About";
+        options.dialogBackgroundColour = AboutComponent::dialogBackground();
+        options.escapeKeyTriggersCloseButton = true;
+#if JUCE_WINDOWS
+        // if not standalone, use native title bar for compatibility with DAWs
+        options.useNativeTitleBar = editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone;
+#elif JUCE_MAC
+        options.useNativeTitleBar = true;
+#endif
+        options.resizable = false;
+
+        juce::DialogWindow* dw = options.launchAsync();
+    });
+    addMenuItem(aboutMenu, "Open Log File", [this] {
+        processor.applicationFolder.getChildFile(juce::String(JucePlugin_Name) + ".log").revealToUser();
+    });
+
+    addMenuItem(videoMenu, "Settings...", [this] {
+        editor.openRecordingSettings();
+    });
+
+    addMenuItem(videoMenu, "Render Audio File to Video...", [this] {
+        editor.renderAudioFileToVideo();
+    });
+
+    addMenuItem(audioMenu, "Force Disable Brightness Input", [&]() {
+        processor.forceDisableBrightnessInput = !processor.forceDisableBrightnessInput;
+        if (processor.forceDisableBrightnessInput) {
+            // Disabling brightness should also disable RGB
+            processor.forceDisableRgbInput = true;
+        }
+        menuItemsChanged();
+    });
+    addMenuItem(audioMenu, "Force Disable RGB Input", [&]() {
+        processor.forceDisableRgbInput = !processor.forceDisableRgbInput;
+        if (!processor.forceDisableRgbInput) {
+            // Enabling RGB implies brightness is allowed too
+            processor.forceDisableBrightnessInput = false;
+        }
+        menuItemsChanged();
+    });
+
+    if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
+        addMenuItem(audioMenu, "Settings...", [&]() { editor.openAudioSettings(); });
+    }
+
+    // Interface menu
+    addToggleMenuItem(interfaceMenu, "Listen for Special Keys", [this] {
+        processor.setAcceptsKeys(! processor.getAcceptsKeys());
+        resetMenuItems();
+    }, [this] { return processor.getAcceptsKeys(); });
+}

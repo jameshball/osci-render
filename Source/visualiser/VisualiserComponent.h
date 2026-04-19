@@ -10,11 +10,10 @@
 #include "../components/DownloaderComponent.h"
 #include "../components/StopwatchComponent.h"
 #include "../components/SvgButton.h"
-#include "../components/TimelineComponent.h"
-#include "../components/TimelineController.h"
-#include "../img/qoixx.hpp"
+#include "../components/timeline/TimelineComponent.h"
+#include "../components/timeline/TimelineController.h"
 #include "../video/FFmpegEncoderManager.h"
-#include "../wav/WavParser.h"
+#include "../audio/wav/WavParser.h"
 #include "RecordingSettings.h"
 #include "VisualiserSettings.h"
 #include "VisualiserRenderer.h"
@@ -150,21 +149,48 @@ private:
 
 class VisualiserWindow : public juce::DocumentWindow {
 public:
-    VisualiserWindow(juce::String name, VisualiserComponent* parent) : parent(parent), wasPaused(parent->isPaused()), juce::DocumentWindow(name, juce::Colours::black, juce::DocumentWindow::TitleBarButtons::allButtons) {
+    VisualiserWindow(juce::String name, VisualiserComponent* parent) : parent(parent), juce::DocumentWindow(name, juce::Colours::black, juce::DocumentWindow::TitleBarButtons::allButtons) {
         setAlwaysOnTop(true);
     }
 
     void closeButtonPressed() override {
+        if (isFullScreen)
+            toggleFullScreen();
         // local copy of parent so that we can safely delete the child
         VisualiserComponent* parent = this->parent;
-        parent->setPaused(wasPaused);
+        parent->setHasMirrorConsumer(false);
         parent->child = nullptr;
         parent->popout.reset();
         parent->childUpdated();
         parent->resized();
     }
 
+    void toggleFullScreen() {
+        isFullScreen = !isFullScreen;
+        setAlwaysOnTop(!isFullScreen);
+#if JUCE_WINDOWS
+        if (isFullScreen) {
+            windowedBounds = getBounds();
+            auto& displays = juce::Desktop::getInstance().getDisplays();
+            auto* display = displays.getDisplayForRect(getBounds());
+            if (display != nullptr) {
+                setFullScreen(true);
+                setBounds(display->totalArea);
+            }
+        } else {
+            setFullScreen(false);
+            if (!windowedBounds.isEmpty())
+                setBounds(windowedBounds);
+        }
+#else
+        setFullScreen(isFullScreen);
+#endif
+    }
+
+    bool getIsFullScreen() const { return isFullScreen; }
+
 private:
     VisualiserComponent* parent;
-    bool wasPaused;
+    bool isFullScreen = false;
+    juce::Rectangle<int> windowedBounds;
 };
