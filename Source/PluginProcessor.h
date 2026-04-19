@@ -385,10 +385,6 @@ public:
     };
 
 private:
-    // processBlock helpers (audio thread)
-    void renderNextBlockWithSynth(juce::AudioBuffer<float>& outputBuffer3d, juce::MidiBuffer& midiMessages, int numSamples);
-    void applyDirectBufferGlobalEffects(juce::AudioBuffer<float>& outputBuffer3d, const juce::MidiBuffer& midiMessages, int totalNumInputChannels, int numSamples);
-
     juce::AudioBuffer<float> inputBuffer;
     juce::AudioBuffer<float> inputFrequencyBuffer;
     juce::AudioBuffer<float> outputBuffer3d;
