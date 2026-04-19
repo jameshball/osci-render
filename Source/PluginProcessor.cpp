@@ -998,6 +998,12 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     juce::FloatVectorOperations::fill(outputBuffer3d.getWritePointer(4), -1.0f, buffer.getNumSamples());
     juce::FloatVectorOperations::fill(outputBuffer3d.getWritePointer(5), -1.0f, buffer.getNumSamples());
 
+    // Track whether we need to apply toggleable effects after filling the buffer.
+    // The synth path applies them per-voice internally, but Syphon and audio input
+    // need them applied globally here.
+    bool applyToggleableEffectsGlobally = false;
+    juce::AudioBuffer<float>* toggleableExternalInput = nullptr;
+
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
     if (syphonInputActive) {
         for (int sample = 0; sample < outputBuffer3d.getNumSamples(); sample++) {
@@ -1005,6 +1011,16 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             outputBuffer3d.setSample(0, sample, point.x);
             outputBuffer3d.setSample(1, sample, point.y);
         }
+
+        // Forward MIDI to the synth so MIDI-driven modulation/effects work
+        // the same way they do in the audio-input path.
+        auto midiIterator = midiMessages.cbegin();
+        std::for_each(midiIterator,
+            midiMessages.cend(),
+            [&] (const juce::MidiMessageMetadata& meta) { synth.handleMidiEvent(meta.getMessage()); }
+        );
+
+        applyToggleableEffectsGlobally = true;
     } else
 #endif
     if (usingInput && totalNumInputChannels >= 1) {
@@ -1025,22 +1041,8 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             [&] (const juce::MidiMessageMetadata& meta) { synth.handleMidiEvent(meta.getMessage()); }
         );
 
-		// Apply toggleable effects directly in input mode (no synth voices involved)
-		{
-			juce::SpinLock::ScopedLockType lock(effectsLock);
-
-            inputFrequencyBuffer.setSize(1, numSamples, false, false, true);
-            {
-                const float* freqBuf = frequencyEffect->getAnimatedValuesReadPointer(0, numSamples);
-                if (freqBuf) {
-                    juce::FloatVectorOperations::copy(inputFrequencyBuffer.getWritePointer(0), freqBuf, numSamples);
-                } else {
-                    juce::FloatVectorOperations::fill(inputFrequencyBuffer.getWritePointer(0), frequencyEffect->getValue(), numSamples);
-                }
-            }
-
-                        applyToggleableEffectsToBuffer(outputBuffer3d, &inputBuffer, &currentVolumeBuffer, &inputFrequencyBuffer, nullptr, nullptr, previewEffect);
-		}
+        applyToggleableEffectsGlobally = true;
+        toggleableExternalInput = &inputBuffer;
     } else {
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
@@ -1049,6 +1051,23 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         applyFileSelectLocked();
 
         synth.renderNextBlock(outputBuffer3d, midiMessages, 0, buffer.getNumSamples());
+    }
+
+    // Apply toggleable effects for non-synth paths (Syphon/Spout and audio input)
+    if (applyToggleableEffectsGlobally) {
+        juce::SpinLock::ScopedLockType lock(effectsLock);
+
+        inputFrequencyBuffer.setSize(1, numSamples, false, false, true);
+        {
+            const float* freqBuf = frequencyEffect->getAnimatedValuesReadPointer(0, numSamples);
+            if (freqBuf) {
+                juce::FloatVectorOperations::copy(inputFrequencyBuffer.getWritePointer(0), freqBuf, numSamples);
+            } else {
+                juce::FloatVectorOperations::fill(inputFrequencyBuffer.getWritePointer(0), frequencyEffect->getValue(), numSamples);
+            }
+        }
+
+        applyToggleableEffectsToBuffer(outputBuffer3d, toggleableExternalInput, &currentVolumeBuffer, &inputFrequencyBuffer, nullptr, nullptr, previewEffect);
     }
 
     midiMessages.clear();
