@@ -51,6 +51,13 @@ jobs:
             echo "OS_ARTIFACT=windows" >> $GITHUB_ENV
           fi
 
+          # sosci has only one variant; omit the version suffix from its artifact names
+          if [[ "${{ matrix.project }}" == "sosci" ]]; then
+            echo "OUTPUT_NAME=${{ matrix.project }}" >> $GITHUB_ENV
+          else
+            echo "OUTPUT_NAME=${{ matrix.project }}-${{ matrix.version }}" >> $GITHUB_ENV
+          fi
+
       - name: Extract project version
         id: version
         shell: bash
@@ -241,14 +248,14 @@ jobs:
       - name: Sign installer (macOS pkg)
         if: matrix.os == 'macos-latest'
         run: |
-          productsign -s "${{ secrets.APPLE_DEVELOPER_ID_INSTALLER }}" "packaging/build/${{ matrix.project }}.pkg" "bin/${{ matrix.project }}-${{ matrix.version }}.pkg"
-          pkgutil --check-signature "bin/${{ matrix.project }}-${{ matrix.version }}.pkg"
+          productsign -s "${{ secrets.APPLE_DEVELOPER_ID_INSTALLER }}" "packaging/build/${{ matrix.project }}.pkg" "bin/${{ env.OUTPUT_NAME }}-mac.pkg"
+          pkgutil --check-signature "bin/${{ env.OUTPUT_NAME }}-mac.pkg"
 
       - name: Notarize installer (macOS)
         if: matrix.os == 'macos-latest'
         uses: lando/notarize-action@v2
         with:
-          product-path: "bin/${{ matrix.project }}-${{ matrix.version }}.pkg"
+          product-path: "bin/${{ env.OUTPUT_NAME }}-mac.pkg"
           appstore-connect-username: ${{ secrets.APPLE_ID }}
           appstore-connect-password: ${{ secrets.APPLE_NOTARIZATION_PASSWORD }}
           appstore-connect-team-id: ${{ secrets.APPLE_TEAM_ID }}
@@ -258,11 +265,11 @@ jobs:
 
       - name: Staple installer (macOS)
         if: matrix.os == 'macos-latest'
-        run: xcrun stapler staple "bin/${{ matrix.project }}-${{ matrix.version }}.pkg"
+        run: xcrun stapler staple "bin/${{ env.OUTPUT_NAME }}-mac.pkg"
 
       - name: Check installer (macOS)
         if: matrix.os == 'macos-latest'
-        run: spctl -a -vvv -t install "bin/${{ matrix.project }}-${{ matrix.version }}.pkg"
+        run: spctl -a -vvv -t install "bin/${{ env.OUTPUT_NAME }}-mac.pkg"
 
       # Windows packaging (Inno Setup)
       - name: Compile .ISS to .EXE Installer
@@ -271,10 +278,17 @@ jobs:
         with:
           path: "packaging/${{ matrix.project }}.iss"
 
-      - name: Move installer to bin (Windows)
+      - name: Package Windows installer as zip
         if: matrix.os == 'windows-2022'
         shell: bash
-        run: mv "packaging/build/${{ matrix.project }}.exe" "bin/${{ matrix.project }}-${{ matrix.version }}.exe"
+        run: |
+          # Move the installer .exe into bin/ under the canonical OUTPUT_NAME,
+          # then zip it as ${OUTPUT_NAME}-windows.zip so users get a single, clearly
+          # named download matching the other platforms.
+          mv "packaging/build/${{ matrix.project }}.exe" "bin/${OUTPUT_NAME}.exe"
+          cd bin
+          7z a "${OUTPUT_NAME}-windows.zip" "${OUTPUT_NAME}.exe"
+          rm -f "${OUTPUT_NAME}.exe"
 
       # Combined MEGA upload (Unix)
       - name: Upload binaries to MEGA (Linux/macOS)
@@ -283,7 +297,12 @@ jobs:
         run: |
           set -euo pipefail
           mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}"
-          DEST="/${{ matrix.project }}/${{ steps.version.outputs.version }}/${{ matrix.version }}"
+          # sosci has no free/premium variants, so upload flat under the version dir
+          if [[ "${{ matrix.project }}" == "sosci" ]]; then
+            DEST="/${{ matrix.project }}/${{ steps.version.outputs.version }}"
+          else
+            DEST="/${{ matrix.project }}/${{ steps.version.outputs.version }}/${{ matrix.version }}"
+          fi
           ls -1 bin || true
           # Upload all produced artifacts (files only) into variant subdirectory
           shopt -s nullglob
@@ -308,7 +327,12 @@ jobs:
           }
           mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}"
           $root = "/${{ matrix.project }}/${{ steps.version.outputs.version }}"
-          $variant = "$root/${{ matrix.version }}"
+          # sosci has no free/premium variants, so upload flat under the version dir
+          if ('${{ matrix.project }}' -eq 'sosci') {
+            $variant = $root
+          } else {
+            $variant = "$root/${{ matrix.version }}"
+          }
           Get-ChildItem bin -File | ForEach-Object {
             if ($_.Extension -eq '.pdb') {
               Write-Host "Uploading $($_.FullName) -> $root (debug info)"
