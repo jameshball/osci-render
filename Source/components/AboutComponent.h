@@ -34,6 +34,13 @@ public:
     // Preferred dialog size for the given content.
     static juce::Point<int> preferredSize(const Info& info);
 
+    // Convenience: launches the About content in a standard dialog window
+    // (matches the boilerplate used by every app's "About" menu item).
+    // `useNativeTitleBar` should typically be true when running as a standalone
+    // app and false when embedded in a DAW on Windows. The flag has no effect
+    // on Linux (JUCE always uses its own title bar there).
+    static void launchAsDialog(const Info& info, bool useNativeTitleBar);
+
 private:
     Info info;
     juce::Image logo;

@@ -53,6 +53,80 @@ namespace juce
 {
 
 //==============================================================================
+namespace SystemAudioCapture
+{
+    /** Returns the device-type name used for platform-native system-audio capture
+        (macOS process taps / Windows WASAPI loopback), or an empty string if the
+        platform has no such device type. */
+    inline String getTypeName()
+    {
+       #if OSCI_PREMIUM && JUCE_MAC
+        return "Process Audio";
+       #elif OSCI_PREMIUM && JUCE_WINDOWS
+        return "Windows Loopback";
+       #else
+        return {};
+       #endif
+    }
+
+    /** Returns true if the given device-type name is the system-audio capture type
+        for this platform. */
+    inline bool isCaptureType (const String& typeName)
+    {
+        const auto name = getTypeName();
+        return name.isNotEmpty() && typeName == name;
+    }
+
+    /** Builds the combined device name used by the system-audio capture type
+        (format: "System Audio -> <outputName>"). */
+    inline String makeDeviceName (const String& outputName = "Default Output")
+    {
+       #if OSCI_PREMIUM && JUCE_MAC
+        return ProcessAudioDeviceType::makeCombinedDeviceName ("System Audio", outputName);
+       #elif OSCI_PREMIUM && JUCE_WINDOWS
+        return WindowsLoopbackAudioDeviceType::makeCombinedDeviceName ("System Audio", outputName);
+       #else
+        ignoreUnused (outputName);
+        return {};
+       #endif
+    }
+
+    /** Returns true if the system-audio capture device type is available and
+        usable on this platform at runtime (permissions granted, type registered). */
+    inline bool isAvailable (AudioDeviceManager& deviceManager)
+    {
+       #if OSCI_PREMIUM && JUCE_MAC
+        if (! ProcessAudioPermissions::isProcessTapAvailable())
+            return false;
+       #endif
+
+        const auto name = getTypeName();
+        if (name.isEmpty())
+            return false;
+
+        for (auto* t : deviceManager.getAvailableDeviceTypes())
+            if (t != nullptr && t->getTypeName() == name)
+                return true;
+
+        return false;
+    }
+}
+
+/** Returns the parameter with the given ID from the processor, or nullptr. */
+inline AudioProcessorParameterWithID* findParameterByID (AudioProcessor* processor, StringRef id)
+{
+    if (processor == nullptr)
+        return nullptr;
+
+    for (auto* p : processor->getParameters())
+        if (auto* pwid = dynamic_cast<AudioProcessorParameterWithID*> (p))
+            if (pwid->getParameterID() == id)
+                return pwid;
+
+    return nullptr;
+}
+
+//==============================================================================
 /**
     An object that creates and plays a standalone instance of an AudioProcessor.
 
@@ -515,6 +589,11 @@ public:
     AudioBuffer<float> emptyBuffer;
     bool autoOpenMidiDevices;
 
+   #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+    // -1 = never seen a device start; 0 = last was not capture; 1 = last was capture.
+    std::atomic<int> lastDeviceWasCapturePath { -1 };
+   #endif
+
     std::unique_ptr<AudioDeviceManager::AudioDeviceSetup> options;
     Array<MidiDeviceInfo> lastMidiDevices;
 
@@ -655,46 +734,45 @@ private:
 
             addAndMakeVisible (deviceSelector);
 
-#if JUCE_MAC && OSCI_PREMIUM
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
             enableSystemAudioCaptureButton.setButtonText ("Enable System Audio Capture");
             enableSystemAudioCaptureButton.onClick = [this]
             {
-                owner.deviceManager.setCurrentAudioDeviceType ("Process Audio", true);
+                const auto typeName = SystemAudioCapture::getTypeName();
+                if (typeName.isEmpty())
+                    return;
 
-                auto setup = owner.deviceManager.getAudioDeviceSetup();
-                const auto combined = ProcessAudioDeviceType::makeCombinedDeviceName ("System Audio", "<< none >>");
-                setup.outputDeviceName = combined;
-                setup.inputDeviceName = combined;
-                setup.useDefaultInputChannels = true;
-                setup.useDefaultOutputChannels = true;
-                setup.sampleRate = 0; // let ProcessAudioDevice pick the tap's native rate
-                owner.deviceManager.setAudioDeviceSetup (setup, true);
+                owner.deviceManager.setCurrentAudioDeviceType (typeName, true);
 
-                // Match the UI mic-toggle behavior by forcing input mode on.
-                if (owner.processor != nullptr)
+                // Apply our desired combined device name. Deferred via callAsync so it runs
+                // after the CustomAudioDeviceSelectorComponent's internal recovery logic,
+                // which would otherwise reset the output to "<< none >>".
+                MessageManager::callAsync ([this]
                 {
-                    for (auto* parameter : owner.processor->getParameters())
-                    {
-                        if (auto* parameterWithID = dynamic_cast<AudioProcessorParameterWithID*> (parameter))
-                        {
-                            if (parameterWithID->getParameterID() == "inputEnabled")
-                            {
-                                parameterWithID->setValueNotifyingHost (1.0f);
-                                break;
-                            }
-                        }
-                    }
-                }
+                    auto setup = owner.deviceManager.getAudioDeviceSetup();
+                    const auto combined = SystemAudioCapture::makeDeviceName();
+                    setup.outputDeviceName = combined;
+                    setup.inputDeviceName = combined;
+                    setup.useDefaultInputChannels = true;
+                    setup.useDefaultOutputChannels = true;
+                    setup.sampleRate = 0; // let the capture device pick its native rate
+                    owner.deviceManager.setAudioDeviceSetup (setup, true);
+                });
 
-                updateProcessAudioButtonVisibility();
+                // Force input mode on to match the UI mic-toggle behavior (osci-render only;
+                // sosci has no such parameter and this is a no-op there). The plugin's output
+                // mute is handled automatically by audioDeviceAboutToStart.
+                if (auto* param = findParameterByID (owner.processor.get(), "inputEnabled"))
+                    param->setValueNotifyingHost (1.0f);
+
+                updateSystemAudioCaptureButtonVisibility();
             };
 
             addChildComponent (enableSystemAudioCaptureButton);
-            updateProcessAudioButtonVisibility();
+            updateSystemAudioCaptureButtonVisibility();
 #endif
 
 #if JUCE_MAC && OSCI_PREMIUM
-            // Process audio controls are handled inside the custom selector.
             // Audio Capture permission is requested at app start (see CustomStandalone.cpp).
 #endif
 
@@ -724,8 +802,8 @@ private:
             auto r = getLocalBounds();
             const int itemHeight = deviceSelector.getItemHeight();
 
-#if JUCE_MAC && OSCI_PREMIUM
-            layoutProcessAudioCaptureButtonRow (r, itemHeight);
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+            layoutSystemAudioCaptureButtonRow (r, itemHeight);
 #endif
 
             if (owner.getProcessorHasPotentialFeedbackLoop())
@@ -761,8 +839,8 @@ private:
                 return itemHeight + separatorHeight;
             }();
 
-#if JUCE_MAC && OSCI_PREMIUM
-            const auto processAudioButtonExtra = getProcessAudioButtonExtraHeight (deviceSelector.getItemHeight());
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+            const auto processAudioButtonExtra = getSystemAudioCaptureButtonExtraHeight (deviceSelector.getItemHeight());
 #else
             const auto processAudioButtonExtra = 0;
 #endif
@@ -771,15 +849,15 @@ private:
         }
 
     private:
-#if JUCE_MAC && OSCI_PREMIUM
-        int getProcessAudioButtonExtraHeight (int itemHeight) const
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+        int getSystemAudioCaptureButtonExtraHeight (int itemHeight) const
         {
-            return shouldShowProcessAudioButton ? (itemHeight + (itemHeight >> 2)) : 0;
+            return shouldShowSystemAudioCaptureButton ? (itemHeight + (itemHeight >> 2)) : 0;
         }
 
-        void layoutProcessAudioCaptureButtonRow (Rectangle<int>& bounds, int itemHeight)
+        void layoutSystemAudioCaptureButtonRow (Rectangle<int>& bounds, int itemHeight)
         {
-            if (! shouldShowProcessAudioButton)
+            if (! shouldShowSystemAudioCaptureButton)
                 return;
 
             auto row = bounds.removeFromTop (itemHeight);
@@ -789,35 +867,22 @@ private:
             bounds.removeFromTop (itemHeight >> 2);
         }
 
-        bool isProcessAudioTypeAvailable() const
+        bool shouldShowSystemAudioCaptureEnableButton() const
         {
-            if (! ProcessAudioPermissions::isProcessTapAvailable())
+            if (! SystemAudioCapture::isAvailable (owner.deviceManager))
                 return false;
 
-            const auto& types = owner.deviceManager.getAvailableDeviceTypes();
-            for (auto* t : types)
-                if (t != nullptr && t->getTypeName() == "Process Audio")
-                    return true;
-
-            return false;
+            return owner.deviceManager.getCurrentAudioDeviceType() != SystemAudioCapture::getTypeName();
         }
 
-        bool shouldShowProcessAudioEnableButton() const
+        void updateSystemAudioCaptureButtonVisibility()
         {
-            if (! isProcessAudioTypeAvailable())
-                return false;
+            const auto visible = shouldShowSystemAudioCaptureEnableButton();
 
-            return owner.deviceManager.getCurrentAudioDeviceType() != "Process Audio";
-        }
-
-        void updateProcessAudioButtonVisibility()
-        {
-            const auto visible = shouldShowProcessAudioEnableButton();
-
-            if (visible == shouldShowProcessAudioButton)
+            if (visible == shouldShowSystemAudioCaptureButton)
                 return;
 
-            shouldShowProcessAudioButton = visible;
+            shouldShowSystemAudioCaptureButton = visible;
             enableSystemAudioCaptureButton.setVisible (visible);
             setToRecommendedSize();
             resized();
@@ -826,8 +891,8 @@ private:
 
         void changeListenerCallback (ChangeBroadcaster*) override
         {
-#if JUCE_MAC && OSCI_PREMIUM
-            updateProcessAudioButtonVisibility();
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+            updateSystemAudioCaptureButtonVisibility();
 #endif
         }
 
@@ -838,9 +903,9 @@ private:
         ToggleButton shouldMuteButton;
         bool isResizing = false;
 
-#if JUCE_MAC && OSCI_PREMIUM
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
         TextButton enableSystemAudioCaptureButton;
-        bool shouldShowProcessAudioButton = false;
+        bool shouldShowSystemAudioCaptureButton = false;
 #endif
 
         //==============================================================================
@@ -873,15 +938,7 @@ private:
     {
        #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
         const auto typeName = device != nullptr ? device->getTypeName() : String();
-        const bool isCapturePathType =
-           #if JUCE_MAC
-            typeName == "Process Audio"
-           #elif JUCE_WINDOWS
-            typeName == "Windows Loopback"
-           #else
-            false
-           #endif
-            ;
+        const bool isCapturePathType = SystemAudioCapture::isCaptureType (typeName);
 
         if (isCapturePathType)
         {
@@ -891,6 +948,29 @@ private:
                 shouldMuteInput.setValue (false);
             else
                 MessageManager::callAsync ([v = Value (shouldMuteInput)]() mutable { v.setValue (false); });
+        }
+
+        // Auto-toggle the plugin's output mute (VolumeComponent mute) only on actual
+        // transitions in or out of a system-audio capture path — so we don't stomp
+        // over the user's mute state every time audio restarts (including first launch).
+        const int previousState = lastDeviceWasCapturePath.exchange (isCapturePathType ? 1 : 0);
+        const bool isTransition = (previousState != -1) && ((previousState == 1) != isCapturePathType);
+        if (isTransition)
+        {
+            if (auto* muteParam = findParameterByID (processor.get(), "mute"))
+            {
+                const float targetValue = isCapturePathType ? 1.0f : 0.0f;
+                auto applyMute = [muteParam, targetValue]
+                {
+                    if (muteParam->getValue() != targetValue)
+                        muteParam->setValueNotifyingHost (targetValue);
+                };
+
+                if (MessageManager::getInstance()->isThisTheMessageThread())
+                    applyMute();
+                else
+                    MessageManager::callAsync (std::move (applyMute));
+            }
         }
        #endif
 
@@ -1109,6 +1189,8 @@ public:
 
         pluginHolder->createPlugin();
         updateContent();
+        // startPlaying() will trigger audioDeviceAboutToStart on the new processor, which
+        // applies the correct mute state for the current device type automatically.
         pluginHolder->startPlaying();
     }
 

@@ -88,6 +88,11 @@ public:
     void removeGlobalValue(const juce::String& keyName);
     void saveGlobalSettings();
     void reloadGlobalSettings();
+    juce::File getGlobalSettingsFile() const { return globalSettings != nullptr ? globalSettings->getFile() : juce::File(); }
+    // Path to the standalone app's settings file (written by CustomStandaloneFilterApp).
+    // The file only exists when running as a standalone; when hosted in a DAW
+    // this returns the would-be path (which will not exist on disk).
+    static juce::File getAppSettingsFile();
     
     bool hasSetSessionStartTime = false;
     bool programCrashedAndUserWantsToReset();

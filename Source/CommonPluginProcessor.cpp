@@ -595,6 +595,22 @@ void CommonAudioProcessor::reloadGlobalSettings()
         globalSettings->reload();
 }
 
+juce::File CommonAudioProcessor::getAppSettingsFile()
+{
+    // Mirror the PropertiesFile::Options used by CustomStandaloneFilterApp so this
+    // always resolves to the same path the standalone app writes to.
+    juce::PropertiesFile::Options options;
+    options.applicationName     = juce::CharPointer_UTF8 (JucePlugin_Name);
+    options.filenameSuffix      = ".settings";
+    options.osxLibrarySubFolder = "Application Support";
+   #if JUCE_LINUX || JUCE_BSD
+    options.folderName          = "~/.config";
+   #else
+    options.folderName          = "";
+   #endif
+    return options.getDefaultFile();
+}
+
 juce::File CommonAudioProcessor::getLastOpenedDirectory()
 {
     juce::String savedDir = getGlobalStringValue("lastOpenedDirectory");

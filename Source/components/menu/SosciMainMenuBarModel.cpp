@@ -97,11 +97,9 @@ void SosciMainMenuBarModel::resetMenuItems() {
         addMenuItem(fileMenu, "Create New Project", [&]() { editor.resetToDefault(); });
     }
 
-    addMenuItem(editMenu, "Undo", [this] { processor.getUndoManager().undo(); }, juce::String::fromUTF8("\xe2\x8c\x98Z"));
-    addMenuItem(editMenu, "Redo", [this] { processor.getUndoManager().redo(); }, juce::String::fromUTF8("\xe2\x87\xa7\xe2\x8c\x98Z"));
+    addEditMenuItems(editMenu, processor);
 
     addMenuItem(aboutMenu, "About sosci", [&]() {
-        juce::DialogWindow::LaunchOptions options;
         AboutComponent::Info aboutInfo;
         aboutInfo.imageData = BinaryData::sosci_logo_png;
         aboutInfo.imageSize = BinaryData::sosci_logo_pngSize;
@@ -121,24 +119,14 @@ void SosciMainMenuBarModel::resetMenuItems() {
             { "DJ_Level_3",     "Testing throughout and helping add features" },
         };
 
-        AboutComponent* about = new AboutComponent(aboutInfo);
-        options.content.setOwned(about);
-        options.dialogTitle = "About";
-        options.dialogBackgroundColour = AboutComponent::dialogBackground();
-        options.escapeKeyTriggersCloseButton = true;
-#if JUCE_WINDOWS
-        // if not standalone, use native title bar for compatibility with DAWs
-        options.useNativeTitleBar = editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone;
-#elif JUCE_MAC
-        options.useNativeTitleBar = true;
-#endif
-        options.resizable = false;
-
-        juce::DialogWindow* dw = options.launchAsync();
+       #if JUCE_WINDOWS
+        const bool useNativeTitleBar = editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone;
+       #else
+        const bool useNativeTitleBar = true;
+       #endif
+        AboutComponent::launchAsDialog(aboutInfo, useNativeTitleBar);
     });
-    addMenuItem(aboutMenu, "Open Log File", [this] {
-        processor.applicationFolder.getChildFile(juce::String(JucePlugin_Name) + ".log").revealToUser();
-    });
+    addDiagnosticsMenuItems(aboutMenu, processor);
 
     addMenuItem(videoMenu, "Settings...", [this] {
         editor.openRecordingSettings();
@@ -170,8 +158,5 @@ void SosciMainMenuBarModel::resetMenuItems() {
     }
 
     // Interface menu
-    addToggleMenuItem(interfaceMenu, "Listen for Special Keys", [this] {
-        processor.setAcceptsKeys(! processor.getAcceptsKeys());
-        resetMenuItems();
-    }, [this] { return processor.getAcceptsKeys(); });
+    addListenForSpecialKeysMenuItem(interfaceMenu, processor);
 }

@@ -67,11 +67,9 @@ void OsciMainMenuBarModel::resetMenuItems() {
         addMenuItem(fileMenu, "Create New Project", [this] { editor.resetToDefault(); });
     }
 
-    addMenuItem(editMenu, "Undo", [this] { audioProcessor.getUndoManager().undo(); }, juce::String::fromUTF8("\xe2\x8c\x98Z"));
-    addMenuItem(editMenu, "Redo", [this] { audioProcessor.getUndoManager().redo(); }, juce::String::fromUTF8("\xe2\x87\xa7\xe2\x8c\x98Z"));
+    addEditMenuItems(editMenu, audioProcessor);
 
     addMenuItem(aboutMenu, "About osci-render", [this] {
-        juce::DialogWindow::LaunchOptions options;
         AboutComponent::Info aboutInfo;
         aboutInfo.imageData = BinaryData::logo_png;
         aboutInfo.imageSize = BinaryData::logo_pngSize;
@@ -94,24 +92,14 @@ void OsciMainMenuBarModel::resetMenuItems() {
         };
         aboutInfo.blenderPort = std::any_cast<int>(audioProcessor.getProperty("objectServerPort"));
 
-        AboutComponent* about = new AboutComponent(aboutInfo);
-        options.content.setOwned(about);
-        options.dialogTitle = "About";
-        options.dialogBackgroundColour = AboutComponent::dialogBackground();
-        options.escapeKeyTriggersCloseButton = true;
-#if JUCE_WINDOWS
-        // if not standalone, use native title bar for compatibility with DAWs
-        options.useNativeTitleBar = editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone;
-#elif JUCE_MAC
-        options.useNativeTitleBar = true;
-#endif
-        options.resizable = false;
-
-        juce::DialogWindow* dw = options.launchAsync();
+       #if JUCE_WINDOWS
+        const bool useNativeTitleBar = editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone;
+       #else
+        const bool useNativeTitleBar = true;
+       #endif
+        AboutComponent::launchAsDialog(aboutInfo, useNativeTitleBar);
     });
-    addMenuItem(aboutMenu, "Open Log File", [this] {
-        audioProcessor.applicationFolder.getChildFile(juce::String(JucePlugin_Name) + ".log").revealToUser();
-    });
+    addDiagnosticsMenuItems(aboutMenu, audioProcessor);
     addMenuItem(aboutMenu, "Randomize Blender Port", [this] {
         audioProcessor.setObjectServerPort(juce::Random::getSystemRandom().nextInt(juce::Range<int>(51600, 51700)));
     });
@@ -176,10 +164,7 @@ void OsciMainMenuBarModel::resetMenuItems() {
         }, [this] { return audioProcessor.getGlobalBoolValue("previewEffectOnHover", true);
     });
 
-    addToggleMenuItem(interfaceMenu, "Listen for Special Keys", [this] {
-        audioProcessor.setAcceptsKeys(! audioProcessor.getAcceptsKeys());
-        resetMenuItems();
-    }, [this] { return audioProcessor.getAcceptsKeys(); });
+    addListenForSpecialKeysMenuItem(interfaceMenu, audioProcessor);
 
     addToggleMenuItem(interfaceMenu, "Show MIDI Keyboard", [this] {
         bool current = audioProcessor.getGlobalBoolValue("showMidiKeyboard", true);
