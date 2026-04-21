@@ -183,12 +183,16 @@ void OpenFileComponent::populate()
     addExample(fractalCat, "binary_tree.lsystem", "Binary Tree", BinaryData::binary_tree_lsystem, BinaryData::binary_tree_lsystemSize, BinaryData::binary_tree_svg, BinaryData::binary_tree_svgSize);
     addExample(fractalCat, "hilbert_curve.lsystem", "Hilbert Curve", BinaryData::hilbert_curve_lsystem, BinaryData::hilbert_curve_lsystemSize, BinaryData::hilbert_curve_svg, BinaryData::hilbert_curve_svgSize);
 
-    addExample(lottieCat, "hamburger_arrow.json", "Hamburger Arrow", BinaryData::hamburger_arrow_json, BinaryData::hamburger_arrow_jsonSize, BinaryData::lottie_menu_open_svg, BinaryData::lottie_menu_open_svgSize);
-    addExample(lottieCat, "android_wave.json", "Android Wave", BinaryData::android_wave_json, BinaryData::android_wave_jsonSize, BinaryData::lottie_android_svg, BinaryData::lottie_android_svgSize);
-    addExample(lottieCat, "switch.json", "Switch", BinaryData::switch_json, BinaryData::switch_jsonSize, BinaryData::lottie_switch_svg, BinaryData::lottie_switch_svgSize);
-    addExample(lottieCat, "twitter_heart.json", "Twitter Heart", BinaryData::twitter_heart_json, BinaryData::twitter_heart_jsonSize, BinaryData::lottie_heart_svg, BinaryData::lottie_heart_svgSize);
-    addExample(lottieCat, "pin_jump.json", "Pin Jump", BinaryData::pin_jump_json, BinaryData::pin_jump_jsonSize, BinaryData::lottie_pin_svg, BinaryData::lottie_pin_svgSize);
-    addExample(lottieCat, "lottie_logo.json", "Lottie Logo", BinaryData::lottie_logo_json, BinaryData::lottie_logo_jsonSize, BinaryData::play_svg, BinaryData::play_svgSize);
+    addExample(lottieCat, "android_wave.lottie", "Android Wave", BinaryData::android_wave_lottie, BinaryData::android_wave_lottieSize, BinaryData::lottie_android_svg, BinaryData::lottie_android_svgSize);
+    addExample(lottieCat, "switch.lottie", "Switch", BinaryData::switch_lottie, BinaryData::switch_lottieSize, BinaryData::lottie_switch_svg, BinaryData::lottie_switch_svgSize);
+    addExample(lottieCat, "heart.lottie", "Heart", BinaryData::heart_lottie, BinaryData::heart_lottieSize, BinaryData::lottie_heart_svg, BinaryData::lottie_heart_svgSize);
+    addExample(lottieCat, "pin_jump.lottie", "Pin Jump", BinaryData::pin_jump_lottie, BinaryData::pin_jump_lottieSize, BinaryData::lottie_pin_svg, BinaryData::lottie_pin_svgSize);
+    addExample(lottieCat, "lottie_logo_1.lottie", "Lottie Logo 1", BinaryData::lottie_logo_1_lottie, BinaryData::lottie_logo_1_lottieSize, BinaryData::lottie_logo1_svg, BinaryData::lottie_logo1_svgSize);
+    addExample(lottieCat, "lottie_logo_2.lottie", "Lottie Logo 2", BinaryData::lottie_logo_2_lottie, BinaryData::lottie_logo_2_lottieSize, BinaryData::lottie_logo2_svg, BinaryData::lottie_logo2_svgSize);
+    addExample(lottieCat, "hello.lottie", "Hello", BinaryData::hello_lottie, BinaryData::hello_lottieSize, BinaryData::lottie_hello_svg, BinaryData::lottie_hello_svgSize);
+    addExample(lottieCat, "spinning_squares.lottie", "Spinning Squares", BinaryData::spinning_squares_lottie, BinaryData::spinning_squares_lottieSize, BinaryData::lottie_grid_svg, BinaryData::lottie_grid_svgSize);
+    addExample(lottieCat, "wave.lottie", "Wave", BinaryData::wave_lottie, BinaryData::wave_lottieSize, BinaryData::lottie_wave_svg, BinaryData::lottie_wave_svgSize);
+    addExample(lottieCat, "blinking_eye.lottie", "Blinking Eye", BinaryData::blinking_eye_lottie, BinaryData::blinking_eye_lottieSize, BinaryData::lottie_eye_svg, BinaryData::lottie_eye_svgSize);
 #endif
 }
 

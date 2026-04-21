@@ -110,6 +110,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     osciPermanentEffects.push_back(frequencyEffect);
     osciPermanentEffects.push_back(imageThreshold);
     osciPermanentEffects.push_back(imageStride);
+    osciPermanentEffects.push_back(animationSpeed);
 #if OSCI_PREMIUM
     osciPermanentEffects.push_back(fractalDepthEffect);
 #endif
@@ -148,7 +149,6 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     // Adopt envelope parameters
     for (auto* p : envelopeParameters.getFloatParameters())
         floatParameters.push_back(p);
-    floatParameters.push_back(animationRate);
     floatParameters.push_back(animationOffset);
     floatParameters.push_back(standaloneBpm);
 
@@ -1057,14 +1057,23 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
     // Handle animation frame updates
     if (animateFrames->getBoolValue()) {
+        // rate = native file framerate * user-controlled speed multiplier.
+        double nativeRate = 30.0;
+        {
+            juce::SpinLock::ScopedLockType lock1(parsersLock);
+            if (currentFile >= 0 && currentFile < sounds.size() && sounds[currentFile]->parser != nullptr) {
+                nativeRate = sounds[currentFile]->parser->getFrameRate();
+            }
+        }
+        const double rate = nativeRate * animationSpeed->parameters[0]->getValueUnnormalised();
         double frameIncrement;
         if (juce::JUCEApplicationBase::isStandaloneApp()) {
-            frameIncrement = sTimeSec * animationRate->getValueUnnormalised() * numSamples;
+            frameIncrement = sTimeSec * rate * numSamples;
         } else if (animationSyncBPM->getValue()) {
-            animationFrame = playTimeBeats * animationRate->getValueUnnormalised() + animationOffset->getValueUnnormalised();
+            animationFrame = playTimeBeats * rate + animationOffset->getValueUnnormalised();
             frameIncrement = 0.0; // Already calculated absolute position
         } else {
-            animationFrame = playTimeSeconds * animationRate->getValueUnnormalised() + animationOffset->getValueUnnormalised();
+            animationFrame = playTimeSeconds * rate + animationOffset->getValueUnnormalised();
             frameIncrement = 0.0; // Already calculated absolute position
         }
 
@@ -1077,7 +1086,10 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         if (currentFile >= 0 && sounds[currentFile]->parser->isAnimatable) {
             int totalFrames = sounds[currentFile]->parser->getNumFrames();
             if (loopAnimation->getBoolValue()) {
-                animationFrame = std::fmod(animationFrame, totalFrames);
+                // Euclidean-style modulo so negative speeds wrap instead of clamp to 0.
+                double wrapped = std::fmod(animationFrame.load(), (double)totalFrames);
+                if (wrapped < 0.0) wrapped += (double)totalFrames;
+                animationFrame = wrapped;
             } else {
                 animationFrame = juce::jlimit(0.0, (double)totalFrames - 1, animationFrame.load());
             }

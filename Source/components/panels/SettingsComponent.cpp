@@ -81,7 +81,7 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     };
 #endif
     addAndMakeVisible(midi);
-    addChildComponent(frame);
+    addChildComponent(quickControls);
 #if OSCI_PREMIUM
     addChildComponent(fractalEditor);
 #endif
@@ -318,13 +318,8 @@ void SettingsComponent::layoutChildren() {
     // --- Effects column (shared by both modes) ---
     auto layoutEffectsColumn = [&](juce::Rectangle<int> effectsBounds) {
         if (!examplesVisible) {
-            if (frame.isVisible()) {
-                int preferredHeight = frame.getPreferredHeight();
-                frame.setBounds(effectsBounds.removeFromBottom(preferredHeight));
-                effectsBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
-            }
 #if OSCI_PREMIUM
-            else if (fractalEditor.isVisible()) {
+            if (fractalEditor.isVisible()) {
                 int preferredHeight = juce::jmin(210, effectsBounds.getHeight() / 2);
                 fractalEditor.setBounds(effectsBounds.removeFromBottom(preferredHeight));
                 effectsBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
@@ -338,7 +333,6 @@ void SettingsComponent::layoutChildren() {
             midi.setVisible(false);
 #endif
             effects.setVisible(false);
-            frame.setVisible(false);
             examples.setVisible(true);
             examples.setBounds(effectsBounds);
         } else {
@@ -570,7 +564,6 @@ void SettingsComponent::paint(juce::Graphics& g) {
 // syphonLock must be held when calling this function
 void SettingsComponent::fileUpdated(juce::String fileName) {
     juce::String extension = fileName.fromLastOccurrenceOf(".", true, false).toLowerCase();
-    frame.setVisible(false);
 #if OSCI_PREMIUM
     fractalEditor.setVisible(false);
 #endif
@@ -589,6 +582,13 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
                     extension == ".mov" ||
                     extension == ".mp4");
 
+    bool isAnimated = extension == ".gpla" || extension == ".gif" || extension == ".mov" || extension == ".mp4"
+#if OSCI_PREMIUM
+            || isLottieExtension(extension)
+#endif
+            ;
+    quickControls.setAnimated(isAnimated);
+
     // Skip processing if object server is rendering or if no file is selected and no Syphon input
     bool skipProcessing = audioProcessor.objectServerRendering || (fileName.isEmpty() && !isSyphonActive);
 
@@ -605,26 +605,12 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
             }
         }
 #endif
-    } else if (extension == ".gpla" || isImage
-#if OSCI_PREMIUM
-               || extension == ".json" || extension == ".lottie" || extension == ".lot"
-#endif
-               ) {
-        frame.setVisible(true);
-        frame.setAnimated(extension == ".gpla" || extension == ".gif" || extension == ".mov" || extension == ".mp4"
-#if OSCI_PREMIUM
-            || extension == ".json" || extension == ".lottie" || extension == ".lot"
-#endif
-            );
-        frame.setImage(isImage);
-        frame.resized();
     }
     fileControls.updateFileLabel();
     resized();
 }
 
 void SettingsComponent::update() {
-    frame.update();
 }
 
 void SettingsComponent::mouseMove(const juce::MouseEvent& event) {

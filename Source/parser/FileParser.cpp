@@ -108,14 +108,14 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 #if OSCI_PREMIUM
 		fractal = std::make_shared<FractalParser>(stream->readEntireStreamAsString());
 #endif
-	} else if (extension == ".json" || extension == ".lottie" || extension == ".lot") {
+       } else if (isLottieExtension(extension)) {
 #if OSCI_PREMIUM
-		juce::MemoryBlock buffer{};
-		int bytesRead = stream->readIntoMemoryBlock(buffer);
+		auto buffer = std::make_shared<juce::MemoryBlock>();
+		int bytesRead = stream->readIntoMemoryBlock(*buffer);
 		showFileSizeWarning(fileName, bytesRead, 10, "Lottie", [this, buffer, extension]() {
 			juce::String jsonContent;
 			if (extension == ".lottie") {
-				juce::MemoryInputStream zipStream(buffer, false);
+				juce::MemoryInputStream zipStream(*buffer, false);
 				juce::ZipFile zip(zipStream);
 				for (int i = 0; i < zip.getNumEntries(); ++i) {
 					auto* entry = zip.getEntry(i);
@@ -137,8 +137,8 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 					return;
 				}
 			} else {
-				jsonContent = juce::String::fromUTF8(static_cast<const char*>(buffer.getData()),
-					(int) buffer.getSize());
+				jsonContent = juce::String::fromUTF8(static_cast<const char*>(buffer->getData()),
+					(int) buffer->getSize());
 			}
 			lottie = std::make_shared<OsciLottieParser>(jsonContent);
 			isAnimatable = true;
@@ -320,4 +320,21 @@ void FileParser::setFrame(int frame) {
         lottie->setFrame(frame);
     }
 #endif
+}
+
+double FileParser::getFrameRate() {
+    juce::SpinLock::ScopedLockType scope(lock);
+
+#if OSCI_PREMIUM
+    if (lottie != nullptr) {
+        return lottie->getFrameRate();
+    }
+#endif
+    if (gpla != nullptr) {
+        return gpla->getFrameRate();
+    }
+    if (img != nullptr) {
+        return img->getFrameRate();
+    }
+    return 30.0;
 }

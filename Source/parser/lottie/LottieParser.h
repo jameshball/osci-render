@@ -3,7 +3,7 @@
 
 // Forward-declare thorvg types so this header does not leak thorvg's globals.
 namespace tvg {
-    struct Animation;
+    class Animation;
 }
 
 // NOTE: do NOT name this `LottieParser` — thorvg itself declares a class named
@@ -23,9 +23,10 @@ public:
     int getNumFrames() const;
     int getCurrentFrame() const;
     void setFrame(int index);
+    double getFrameRate() const { return frameRate; }
 
 private:
-    void extractShapesAtCurrentFrame();
+    void extractShapesAtCurrentFrame(std::vector<std::unique_ptr<osci::Shape>>& out);
     void showError(juce::String message);
     void fallbackShapes();
 
@@ -36,10 +37,13 @@ private:
     struct AnimationDeleter { void operator()(tvg::Animation* a) const noexcept; };
     std::unique_ptr<tvg::Animation, AnimationDeleter> animation;
 
-    std::vector<std::unique_ptr<osci::Shape>> currentShapes;
+    // Pre-rendered shape vectors, one per frame. Populated in the constructor
+    // so setFrame/draw are O(1) and safe to call on the audio thread.
+    std::vector<std::vector<std::unique_ptr<osci::Shape>>> framesCache;
 
     int totalFrames = 1;
     int currentFrame = -1; // force rebuild on first setFrame
     float pictureWidth = 0.0f;
     float pictureHeight = 0.0f;
+    double frameRate = 30.0;
 };

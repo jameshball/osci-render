@@ -44,3 +44,6 @@
 	path = modules/thorvg
         url = https://github.com/jameshball/thorvg.git
         branch = osci-render-trim-getter
+[submodule "modules/Clipper2"]
+	path = modules/Clipper2
+	url = https://github.com/AngusJohnson/Clipper2.git

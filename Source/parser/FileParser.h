@@ -32,6 +32,7 @@ public:
     int getNumFrames();
     int getCurrentFrame();
     void setFrame(int frame);
+    double getFrameRate();
 	
 	std::shared_ptr<WorldObject> getObject();
 	std::shared_ptr<SvgParser> getSvg();

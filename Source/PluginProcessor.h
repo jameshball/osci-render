@@ -79,6 +79,15 @@ private:
     std::vector<Entry> entries;
 };
 
+#if OSCI_PREMIUM
+// Extensions recognised as Lottie animation files (with or without the leading dot).
+inline bool isLottieExtension(const juce::String& extension) {
+    auto e = extension.toLowerCase();
+    return e == "json" || e == "lottie" || e == "lot"
+        || e == ".json" || e == ".lottie" || e == ".lot";
+}
+#endif
+
 /**
  */
 class OscirenderAudioProcessor : public CommonAudioProcessor, juce::AudioProcessorParameter::Listener, public VoiceManagerClient
@@ -271,7 +280,12 @@ public:
     osci::BooleanParameter* animateFrames = new osci::BooleanParameter("Animate", "animateFrames", VERSION_HINT, true, "Enables animation for files that have multiple frames, such as GIFs or Line Art.");
     osci::BooleanParameter* loopAnimation = new osci::BooleanParameter("Loop Animation", "loopAnimation", VERSION_HINT, true, "Loops the animation. If disabled, the animation will stop at the last frame.");
     osci::BooleanParameter* animationSyncBPM = new osci::BooleanParameter("Sync To BPM", "animationSyncBPM", VERSION_HINT, false, "Synchronises the animation's framerate with the BPM of your DAW.");
-    osci::FloatParameter* animationRate = new osci::FloatParameter("Animation Rate", "animationRate", VERSION_HINT, 30, -1000, 1000);
+    std::shared_ptr<osci::Effect> animationSpeed = std::make_shared<osci::SimpleEffect>(
+        new osci::EffectParameter(
+            "Animation Speed",
+            "Scalar multiplier of the file's intrinsic frame rate. Negative values play the animation in reverse. Right-click to edit the range.",
+            "animationSpeed",
+            VERSION_HINT, 1.0f, -4.0f, 4.0f, 0.01f));
     osci::FloatParameter* animationOffset = new osci::FloatParameter("Animation Offset", "animationOffset", VERSION_HINT, 0, -10000, 10000);
 
     osci::BooleanParameter* invertImage = new osci::BooleanParameter("Invert Image", "invertImage", VERSION_HINT, false, "Inverts the image so that dark pixels become light, and vice versa.");

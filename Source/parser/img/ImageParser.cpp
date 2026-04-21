@@ -80,6 +80,10 @@ void ImageParser::processGifFile(juce::File& file) {
 
         int i = 0;
         while (gd_get_frame(gif) > 0) {
+            if (i == 0 && gif->gce.delay > 0) {
+                // GIF delay is in hundredths of a second.
+                frameRate = 100.0 / static_cast<double>(gif->gce.delay);
+            }
             gd_render_frame(gif, tempBuffer.data());
 
             frames.emplace_back(std::vector<uint8_t>(frameSize));
@@ -192,6 +196,14 @@ bool ImageParser::loadAllVideoFrames(const juce::File& file, const juce::File& f
         {
             width = std::stoi(match[1].str());
             height = std::stoi(match[2].str());
+        }
+
+        // Parse "30 fps" / "29.97 fps" from ffmpeg's metadata output.
+        std::regex fpsRegex(R"((\d+(?:\.\d+)?)\s*fps)");
+        std::smatch fpsMatch;
+        if (std::regex_search(stdOut, fpsMatch, fpsRegex) && fpsMatch.size() == 2) {
+            double parsed = std::stod(fpsMatch[1].str());
+            if (parsed > 0.0) frameRate = parsed;
         }
     }
     

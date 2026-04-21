@@ -20,6 +20,7 @@ public:
     osci::Point getSample(int blockSampleIndex = 0);
     int getNumFrames() { return frames.size(); }
     int getCurrentFrame() const { return frameIndex; }
+    double getFrameRate() const { return frameRate; }
 
 private:
     void findNearestNeighbour(int searchRadius, float thresholdPow, int stride, bool invert);
@@ -49,6 +50,7 @@ private:
     int width = -1;
     int height = -1;
     int count = 0;
+    double frameRate = 30.0;
 
     juce::TemporaryFile temp{".temp"};
 

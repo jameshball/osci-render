@@ -91,6 +91,7 @@ void OsciMainMenuBarModel::resetMenuItems() {
             { "BUS ERROR Collective", "Provided source code for the Hilligoss encoder" },
             { "Ener-G",             "Provided his L-system fractal script that formed the basis for the L-system implementation" },
             { "TheDumbDude",         "Contributed several example Lua files" },
+            { "LottieFiles",         "Free Lottie animations used as examples (lottiefiles.com)" },
         };
         aboutInfo.blenderPort = std::any_cast<int>(audioProcessor.getProperty("objectServerPort"));
 
