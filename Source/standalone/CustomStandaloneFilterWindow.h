@@ -1095,6 +1095,23 @@ public:
             if (displays.displays.isEmpty())
                 return { width, height };
 
+            const auto constrainToDisplay = [&displays] (Rectangle<int> bounds)
+            {
+                auto* display = displays.getDisplayForRect (bounds);
+
+                if (display == nullptr)
+                    display = displays.getPrimaryDisplay();
+
+                if (display == nullptr)
+                    return bounds;
+
+                const auto screenLimits = display->userArea;
+
+                return Rectangle<int> { jlimit (screenLimits.getX(), jmax (screenLimits.getX(), screenLimits.getRight()  - bounds.getWidth()),  bounds.getX()),
+                                        jlimit (screenLimits.getY(), jmax (screenLimits.getY(), screenLimits.getBottom() - bounds.getHeight()), bounds.getY()),
+                                        bounds.getWidth(), bounds.getHeight() };
+            };
+
             if (auto* props = pluginHolder->settings.get())
             {
                 constexpr int defaultValue = -100;
@@ -1103,20 +1120,14 @@ public:
                 const auto y = props->getIntValue ("windowY", defaultValue);
 
                 if (x != defaultValue && y != defaultValue)
-                {
-                    const auto screenLimits = displays.getDisplayForRect ({ x, y, width, height })->userArea;
-
-                    return { jlimit (screenLimits.getX(), jmax (screenLimits.getX(), screenLimits.getRight()  - width),  x),
-                             jlimit (screenLimits.getY(), jmax (screenLimits.getY(), screenLimits.getBottom() - height), y),
-                             width, height };
-                }
+                    return constrainToDisplay ({ x, y, width, height });
             }
 
             const auto displayArea = displays.getPrimaryDisplay()->userArea;
 
-            return { displayArea.getCentreX() - width / 2,
-                     displayArea.getCentreY() - height / 2,
-                     width, height };
+            return constrainToDisplay ({ displayArea.getCentreX() - width / 2,
+                                         displayArea.getCentreY() - height / 2,
+                                         width, height });
         }();
 
         setBoundsConstrained (windowScreenBounds);
