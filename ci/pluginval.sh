@@ -119,11 +119,18 @@ if [ "$OS" = "linux" ]; then
         export SEGFAULT_SIGNALS="all"
     fi
 
+    # Keep a wrapper-level stdout/stderr log as well as pluginval's own output
+    # files. If pluginval aborts before flushing its output file, this log still
+    # gives CI something useful and non-empty to upload.
+    LINUX_STDOUT_LOG="$PLUGINVAL_LOG_DIR/pluginval-linux-${TARGET}-stdout.log"
+
     # Linux CI needs a virtual display for JUCE GUI
     if command -v xvfb-run &> /dev/null; then
-        eval xvfb-run -a -s \"-screen 0 1280x720x24\" $PLUGINVAL_CMD || PLUGINVAL_EXIT=$?
+        eval xvfb-run -a -s "-screen 0 1280x720x24" $PLUGINVAL_CMD 2>&1 | tee "$LINUX_STDOUT_LOG"
+        PLUGINVAL_EXIT=${PIPESTATUS[0]}
     else
-        eval $PLUGINVAL_CMD || PLUGINVAL_EXIT=$?
+        eval $PLUGINVAL_CMD 2>&1 | tee "$LINUX_STDOUT_LOG"
+        PLUGINVAL_EXIT=${PIPESTATUS[0]}
     fi
 
     unset LD_PRELOAD SEGFAULT_SIGNALS
